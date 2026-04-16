@@ -30,11 +30,7 @@ export interface RemoteArkdConfig {
   [key: string]: unknown;
 }
 
-export type ComputeConfig =
-  | LocalComputeConfig
-  | EC2ComputeConfig
-  | DockerComputeConfig
-  | RemoteArkdConfig;
+export type ComputeConfig = LocalComputeConfig | EC2ComputeConfig | DockerComputeConfig | RemoteArkdConfig;
 
 export interface Compute {
   name: string;

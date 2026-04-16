@@ -129,9 +129,9 @@ interface SessionRow {
 
 export function findSessionByPR(app: AppContext, prUrl: string): Session | null {
   const db = app.db;
-  const row = db.prepare(
-    "SELECT * FROM sessions WHERE pr_url = ? ORDER BY rowid DESC LIMIT 1"
-  ).get(prUrl) as SessionRow | undefined;
+  const row = db.prepare("SELECT * FROM sessions WHERE pr_url = ? ORDER BY rowid DESC LIMIT 1").get(prUrl) as
+    | SessionRow
+    | undefined;
   if (!row) return null;
   return {
     ...row,
@@ -176,7 +176,7 @@ export function handleGitHubWebhook(app: AppContext, event: string, payload: Rec
   if (comments.length > 0) {
     const prompt = formatReviewPrompt(prTitle, prNumber, comments, payload.review?.state);
 
-    // Store as a message so TUI shows it
+    // Store as a message so the UI shows it
     app.messages.send(session.id, "system", prompt, "text");
 
     app.events.log(session.id, "webhook_review_steer", {
@@ -196,7 +196,7 @@ export function handleGitHubWebhook(app: AppContext, event: string, payload: Rec
       safeAsync(`[github-pr] deliverToChannel for ${session.id}`, async () => {
         const { deliverToChannel } = await import("../conductor/conductor.js");
         await deliverToChannel(session, channelPort, steerPayload);
-      }).then(delivered => {
+      }).then((delivered) => {
         if (!delivered) {
           safeAsync(`[github-pr] direct HTTP fallback for ${session.id}`, async () => {
             await fetch(`${DEFAULT_CHANNEL_BASE_URL}:${channelPort}`, {

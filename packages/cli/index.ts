@@ -6,7 +6,6 @@
  * ark session list
  * ark session dispatch s-abc123
  * ark session attach s-abc123
- * ark tui
  *
  * Remote mode:
  *   ark --server https://ark.company.com --token xxx session list
@@ -121,9 +120,12 @@ await program.parseAsync(process.argv);
 
 // Non-blocking update check (only in local mode)
 if (app) {
-  core.checkForUpdate(app.config.arkDir).then(latest => {
-    if (latest) console.error(chalk.yellow(`Update available: v${latest}`));
-  }).catch(() => {});
+  core
+    .checkForUpdate(app.config.arkDir)
+    .then((latest) => {
+      if (latest) console.error(chalk.yellow(`Update available: v${latest}`));
+    })
+    .catch(() => {});
 }
 
 closeArkClient();

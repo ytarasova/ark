@@ -52,16 +52,17 @@ export interface GhIssue {
  * Fetch open issues with a specific label via gh CLI.
  * Returns null if the CLI call fails.
  */
-export async function fetchLabeledIssues(
-  label: string,
-  ghExec: GhExecFn = _ghExec,
-): Promise<GhIssue[] | null> {
+export async function fetchLabeledIssues(label: string, ghExec: GhExecFn = _ghExec): Promise<GhIssue[] | null> {
   try {
     const { stdout } = await ghExec([
-      "issue", "list",
-      "--label", label,
-      "--state", "open",
-      "--json", "number,title,body,url,labels",
+      "issue",
+      "list",
+      "--label",
+      label,
+      "--state",
+      "open",
+      "--json",
+      "number,title,body,url,labels",
     ]);
     return JSON.parse(stdout) as GhIssue[];
   } catch {
@@ -75,7 +76,7 @@ export async function fetchLabeledIssues(
  */
 export function issueAlreadyTracked(app: AppContext, ticket: string): boolean {
   const sessions = app.sessions.list({ limit: 500 });
-  return sessions.some(s => s.ticket === ticket);
+  return sessions.some((s) => s.ticket === ticket);
 }
 
 /**
@@ -100,7 +101,7 @@ export async function createSessionFromIssue(
     config: {
       issue_url: issue.url,
       issue_body: issue.body,
-      issue_labels: issue.labels.map(l => l.name),
+      issue_labels: issue.labels.map((l) => l.name),
     },
   });
 
@@ -148,10 +149,7 @@ export function startIssuePoller(app: AppContext, opts?: IssuePollerOptions): { 
   // fire-and-forget: initial poll runs in background
   safeAsync("issue-poller: initial poll", () => pollIssues(app, opts));
 
-  const timer = setInterval(
-    () => safeAsync("issue-poller: poll tick", () => pollIssues(app, opts)),
-    intervalMs,
-  );
+  const timer = setInterval(() => safeAsync("issue-poller: poll tick", () => pollIssues(app, opts)), intervalMs);
 
   return {
     stop() {

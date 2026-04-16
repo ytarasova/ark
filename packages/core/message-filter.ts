@@ -4,11 +4,11 @@
  */
 
 export interface MessageFilter {
-  maxMessages?: number;        // max N most recent messages
-  fromAgents?: string[];       // only include messages from these agents
-  excludeAgents?: string[];    // exclude messages from these agents
+  maxMessages?: number; // max N most recent messages
+  fromAgents?: string[]; // only include messages from these agents
+  excludeAgents?: string[]; // exclude messages from these agents
   includeSystemPrompt?: boolean;
-  maxTokenEstimate?: number;   // rough token budget for history
+  maxTokenEstimate?: number; // rough token budget for history
 }
 
 export interface FilteredMessage {
@@ -25,11 +25,11 @@ export function filterMessages(messages: FilteredMessage[], filter: MessageFilte
   // Filter by source agent
   if (filter.fromAgents?.length) {
     const allowed = new Set(filter.fromAgents);
-    result = result.filter(m => !m.agent || allowed.has(m.agent));
+    result = result.filter((m) => !m.agent || allowed.has(m.agent));
   }
   if (filter.excludeAgents?.length) {
     const excluded = new Set(filter.excludeAgents);
-    result = result.filter(m => !m.agent || !excluded.has(m.agent));
+    result = result.filter((m) => !m.agent || !excluded.has(m.agent));
   }
 
   // Limit to most recent N messages
@@ -42,7 +42,7 @@ export function filterMessages(messages: FilteredMessage[], filter: MessageFilte
     let totalTokens = 0;
     const kept: FilteredMessage[] = [];
     for (let i = result.length - 1; i >= 0; i--) {
-      const tokens = Math.ceil(result[i].content.length / 4);  // rough estimate
+      const tokens = Math.ceil(result[i].content.length / 4); // rough estimate
       if (totalTokens + tokens > filter.maxTokenEstimate) break;
       totalTokens += tokens;
       kept.unshift(result[i]);

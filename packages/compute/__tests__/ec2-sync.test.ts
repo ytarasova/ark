@@ -1,12 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { userInfo } from "os";
 
-import {
-  rewritePaths,
-  SYNC_STEPS,
-  syncToHost,
-  syncProjectFiles,
-} from "../providers/ec2/sync.js";
+import { rewritePaths, SYNC_STEPS, syncToHost, syncProjectFiles } from "../providers/ec2/sync.js";
 
 describe("EC2 environment sync", () => {
   const username = userInfo().username;

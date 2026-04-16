@@ -3,11 +3,7 @@ import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import * as core from "../../core/index.js";
 import { RpcError } from "../../protocol/types.js";
-import type {
-  ProfileSetParams,
-  ProfileCreateParams,
-  ProfileDeleteParams,
-} from "../../types/index.js";
+import type { ProfileSetParams, ProfileCreateParams, ProfileDeleteParams } from "../../types/index.js";
 
 export function registerConfigHandlers(router: Router, _app: AppContext): void {
   router.handle("config/read", async () => ({ config: core.loadConfig() }));

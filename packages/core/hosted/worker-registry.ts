@@ -54,26 +54,26 @@ export class WorkerRegistry {
     // Upsert: if worker exists, update its fields and mark online
     const existing = this.db.prepare("SELECT id FROM workers WHERE id = ?").get(worker.id);
     if (existing) {
-      this.db.prepare(
-        `UPDATE workers SET url = ?, capacity = ?, compute_name = ?, tenant_id = ?,
-         metadata = ?, status = 'online', last_heartbeat = ? WHERE id = ?`
-      ).run(worker.url, worker.capacity, worker.compute_name ?? null,
-            worker.tenant_id ?? null, meta, now, worker.id);
+      this.db
+        .prepare(
+          `UPDATE workers SET url = ?, capacity = ?, compute_name = ?, tenant_id = ?,
+         metadata = ?, status = 'online', last_heartbeat = ? WHERE id = ?`,
+        )
+        .run(worker.url, worker.capacity, worker.compute_name ?? null, worker.tenant_id ?? null, meta, now, worker.id);
     } else {
-      this.db.prepare(
-        `INSERT INTO workers (id, url, status, capacity, active_sessions, last_heartbeat,
-         compute_name, tenant_id, metadata) VALUES (?, ?, 'online', ?, 0, ?, ?, ?, ?)`
-      ).run(worker.id, worker.url, worker.capacity, now,
-            worker.compute_name ?? null, worker.tenant_id ?? null, meta);
+      this.db
+        .prepare(
+          `INSERT INTO workers (id, url, status, capacity, active_sessions, last_heartbeat,
+         compute_name, tenant_id, metadata) VALUES (?, ?, 'online', ?, 0, ?, ?, ?, ?)`,
+        )
+        .run(worker.id, worker.url, worker.capacity, now, worker.compute_name ?? null, worker.tenant_id ?? null, meta);
     }
   }
 
   /** Update heartbeat timestamp for a worker. Marks it online if it was offline. */
   heartbeat(workerId: string): void {
     const now = new Date().toISOString();
-    this.db.prepare(
-      "UPDATE workers SET last_heartbeat = ?, status = 'online' WHERE id = ?"
-    ).run(now, workerId);
+    this.db.prepare("UPDATE workers SET last_heartbeat = ?, status = 'online' WHERE id = ?").run(now, workerId);
   }
 
   /** Remove a worker from the registry. */
@@ -97,7 +97,7 @@ export class WorkerRegistry {
 
     sql += " ORDER BY active_sessions ASC";
     const rows = this.db.prepare(sql).all(...params) as WorkerRow[];
-    return rows.map(r => this.hydrateRow(r));
+    return rows.map((r) => this.hydrateRow(r));
   }
 
   /** Get available (online, not at capacity) workers, optionally filtered. */
@@ -116,30 +116,28 @@ export class WorkerRegistry {
 
     sql += " ORDER BY active_sessions ASC";
     const rows = this.db.prepare(sql).all(...params) as WorkerRow[];
-    return rows.map(r => this.hydrateRow(r));
+    return rows.map((r) => this.hydrateRow(r));
   }
 
   /** Get the least loaded online worker, or null if none available. */
   getLeastLoaded(): WorkerNode | null {
-    const row = this.db.prepare(
-      `SELECT * FROM workers WHERE status = 'online' AND active_sessions < capacity
-       ORDER BY (CAST(active_sessions AS REAL) / capacity) ASC LIMIT 1`
-    ).get() as WorkerRow | undefined;
+    const row = this.db
+      .prepare(
+        `SELECT * FROM workers WHERE status = 'online' AND active_sessions < capacity
+       ORDER BY (CAST(active_sessions AS REAL) / capacity) ASC LIMIT 1`,
+      )
+      .get() as WorkerRow | undefined;
     return row ? this.hydrateRow(row) : null;
   }
 
   /** Increment the active session count for a worker. */
   incrementSessions(workerId: string): void {
-    this.db.prepare(
-      "UPDATE workers SET active_sessions = active_sessions + 1 WHERE id = ?"
-    ).run(workerId);
+    this.db.prepare("UPDATE workers SET active_sessions = active_sessions + 1 WHERE id = ?").run(workerId);
   }
 
   /** Decrement the active session count for a worker. */
   decrementSessions(workerId: string): void {
-    this.db.prepare(
-      "UPDATE workers SET active_sessions = MAX(0, active_sessions - 1) WHERE id = ?"
-    ).run(workerId);
+    this.db.prepare("UPDATE workers SET active_sessions = MAX(0, active_sessions - 1) WHERE id = ?").run(workerId);
   }
 
   /**
@@ -148,9 +146,9 @@ export class WorkerRegistry {
    */
   pruneStale(timeoutMs: number): number {
     const cutoff = new Date(Date.now() - timeoutMs).toISOString();
-    const result = this.db.prepare(
-      "UPDATE workers SET status = 'offline' WHERE status = 'online' AND last_heartbeat < ?"
-    ).run(cutoff);
+    const result = this.db
+      .prepare("UPDATE workers SET status = 'offline' WHERE status = 'online' AND last_heartbeat < ?")
+      .run(cutoff);
     return result.changes;
   }
 

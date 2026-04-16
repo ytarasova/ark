@@ -14,16 +14,16 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { AppContext, setApp, clearApp } from "../app.js";
-import {
-  mediateStageHandoff,
-  runVerification,
-} from "../services/session-orchestration.js";
+import { mediateStageHandoff, runVerification } from "../services/session-orchestration.js";
 import * as flow from "../state/flow.js";
 
 let app: AppContext;
 
 beforeEach(async () => {
-  if (app) { await app.shutdown(); clearApp(); }
+  if (app) {
+    await app.shutdown();
+    clearApp();
+  }
   app = AppContext.forTest();
   setApp(app);
   await app.boot();
@@ -38,10 +38,7 @@ afterEach(async () => {
 function createWorkdirWithVerify(scripts: string[]): string {
   const dir = join(app.arkDir, `workdir-qg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   mkdirSync(dir, { recursive: true });
-  const yaml = [
-    "verify:",
-    ...scripts.map(s => `  - "${s}"`),
-  ].join("\n");
+  const yaml = ["verify:", ...scripts.map((s) => `  - "${s}"`)].join("\n");
   writeFileSync(join(dir, ".ark.yaml"), yaml);
   return dir;
 }
@@ -51,7 +48,7 @@ function createWorkdirWithVerify(scripts: string[]): string {
 describe("autonomous-sdlc flow structure", () => {
   it("has a verify stage", () => {
     const stages = flow.getStages(app, "autonomous-sdlc");
-    const verifyStage = stages.find(s => s.name === "verify");
+    const verifyStage = stages.find((s) => s.name === "verify");
     expect(verifyStage).toBeTruthy();
   });
 
@@ -78,7 +75,7 @@ describe("autonomous-sdlc flow structure", () => {
 
   it("stages are ordered: plan -> implement -> verify -> review -> pr -> merge", () => {
     const stages = flow.getStages(app, "autonomous-sdlc");
-    const names = stages.map(s => s.name);
+    const names = stages.map((s) => s.name);
     expect(names).toEqual(["plan", "implement", "verify", "review", "pr", "merge"]);
   });
 
@@ -105,7 +102,7 @@ describe("autonomous-sdlc DAG validation", () => {
   it("implement is ready after plan completes", () => {
     const stages = flow.getStages(app, "autonomous-sdlc");
     const ready = flow.getReadyStages(stages, ["plan"]);
-    const readyNames = ready.map(s => s.name);
+    const readyNames = ready.map((s) => s.name);
     expect(readyNames).toContain("implement");
     expect(readyNames).not.toContain("verify");
   });
@@ -113,7 +110,7 @@ describe("autonomous-sdlc DAG validation", () => {
   it("verify is ready after implement completes", () => {
     const stages = flow.getStages(app, "autonomous-sdlc");
     const ready = flow.getReadyStages(stages, ["plan", "implement"]);
-    const readyNames = ready.map(s => s.name);
+    const readyNames = ready.map((s) => s.name);
     expect(readyNames).toContain("verify");
     expect(readyNames).not.toContain("review");
   });
@@ -121,14 +118,14 @@ describe("autonomous-sdlc DAG validation", () => {
   it("review is ready after verify completes", () => {
     const stages = flow.getStages(app, "autonomous-sdlc");
     const ready = flow.getReadyStages(stages, ["plan", "implement", "verify"]);
-    const readyNames = ready.map(s => s.name);
+    const readyNames = ready.map((s) => s.name);
     expect(readyNames).toContain("review");
   });
 
   it("review is NOT ready if only implement completes (verify missing)", () => {
     const stages = flow.getStages(app, "autonomous-sdlc");
     const ready = flow.getReadyStages(stages, ["plan", "implement"]);
-    const readyNames = ready.map(s => s.name);
+    const readyNames = ready.map((s) => s.name);
     expect(readyNames).not.toContain("review");
   });
 });
@@ -370,7 +367,7 @@ describe("quality gate observability", () => {
     await mediateStageHandoff(app, session.id, { source: "channel_report" });
 
     const events = app.events.list(session.id);
-    const blocked = events.find(e => e.type === "stage_handoff_blocked");
+    const blocked = events.find((e) => e.type === "stage_handoff_blocked");
     expect(blocked).toBeTruthy();
     expect(blocked!.data?.reason).toBe("verification_failed");
     expect(blocked!.data?.source).toBe("channel_report");
@@ -389,7 +386,7 @@ describe("quality gate observability", () => {
     });
 
     const events = app.events.list(session.id);
-    const handoff = events.find(e => e.type === "stage_handoff");
+    const handoff = events.find((e) => e.type === "stage_handoff");
     expect(handoff).toBeTruthy();
     expect(handoff!.data?.from_stage).toBe("verify");
     expect(handoff!.data?.to_stage).toBe("review");
@@ -403,7 +400,7 @@ describe("quality gate observability", () => {
     await mediateStageHandoff(app, session.id, { source: "test" });
 
     const msgs = app.messages.list(session.id);
-    const errorMsg = msgs.find(m => m.content.includes("Advance blocked"));
+    const errorMsg = msgs.find((m) => m.content.includes("Advance blocked"));
     expect(errorMsg).toBeTruthy();
     expect(errorMsg!.content).toContain("verify");
   });
@@ -414,7 +411,7 @@ describe("quality gate observability", () => {
 describe("autonomous flow (single stage, no verify)", () => {
   it("autonomous flow has no verify stage", () => {
     const stages = flow.getStages(app, "autonomous");
-    const verifyStage = stages.find(s => s.name === "verify");
+    const verifyStage = stages.find((s) => s.name === "verify");
     expect(verifyStage).toBeFalsy();
   });
 

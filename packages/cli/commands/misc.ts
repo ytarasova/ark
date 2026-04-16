@@ -8,7 +8,7 @@ import { AppContext } from "../../core/app.js";
 import { getArkClient } from "./_shared.js";
 import { splitEditorCommand } from "../helpers.js";
 
-export function registerMiscCommands(program: Command, app: AppContext | null) {
+export function registerMiscCommands(program: Command, _app: AppContext | null) {
   // ── PR commands ──────────────────────────────────────────────────────────────
 
   const pr = program.command("pr").description("Manage PR-bound sessions");
@@ -49,7 +49,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   // ── Watch (Issue Poller) ─────────────────────────────────────────────────────
 
-  program.command("watch")
+  program
+    .command("watch")
     .description("Watch GitHub issues with a label and auto-create sessions")
     .option("-l, --label <label>", "GitHub label to watch", "ark")
     .option("-d, --dispatch", "Auto-dispatch created sessions")
@@ -59,7 +60,11 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
       const label = opts.label;
       const intervalMs = parseInt(opts.interval, 10);
 
-      console.log(chalk.blue(`Watching issues labeled '${label}' (poll every ${intervalMs / 1000}s)${opts.dispatch ? " -- auto-dispatch on" : ""}`));
+      console.log(
+        chalk.blue(
+          `Watching issues labeled '${label}' (poll every ${intervalMs / 1000}s)${opts.dispatch ? " -- auto-dispatch on" : ""}`,
+        ),
+      );
       console.log(chalk.dim("Press Ctrl+C to stop.\n"));
 
       const { getApp } = await import("../../core/app.js");
@@ -84,7 +89,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   const claudeCmd = program.command("claude").description("Interact with Claude Code sessions");
 
-  claudeCmd.command("list")
+  claudeCmd
+    .command("list")
     .description("List Claude Code sessions found on disk")
     .option("-p, --project <filter>", "Filter by project path")
     .option("-l, --limit <n>", "Max results", "20")
@@ -110,7 +116,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   // ── Doctor command ──────────────────────────────────────────────────────────
 
-  program.command("doctor")
+  program
+    .command("doctor")
     .description("Check system prerequisites")
     .action(async () => {
       const { checkPrereqs, formatPrereqCheck, hasRequiredPrereqs } = await import("../../core/prereqs.js");
@@ -125,34 +132,10 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
       }
     });
 
-  // ── TUI command ─────────────────────────────────────────────────────────────
-
-  program.command("tui").description("Launch TUI dashboard").action(async () => {
-    const globalOpts = program.opts();
-    const serverUrl = globalOpts.server || process.env.ARK_SERVER;
-    const token = globalOpts.token || process.env.ARK_TOKEN;
-
-    // In remote mode, skip local prereq checks (tmux etc. not needed)
-    if (!serverUrl) {
-      const { checkPrereqs, hasRequiredPrereqs, formatPrereqCheck } = await import("../../core/prereqs.js");
-      const prereqs = checkPrereqs();
-      if (!hasRequiredPrereqs(prereqs)) {
-        console.log(chalk.red("Missing required tools:"));
-        console.log(formatPrereqCheck(prereqs));
-        process.exit(1);
-      }
-    }
-
-    // Pass remote config to TUI via env vars (picked up by tui/index.tsx)
-    if (serverUrl) process.env.ARK_TUI_SERVER = serverUrl;
-    if (token) process.env.ARK_TUI_TOKEN = token;
-
-    await import("../../tui/index.js");
-  });
-
   // ── ArkD (universal agent daemon) ────────────────────────────────────────────
 
-  program.command("arkd")
+  program
+    .command("arkd")
     .description("Start the arkd agent daemon")
     .option("-p, --port <port>", "Port", "19300")
     .option("--hostname <host>", "Bind address (default: 0.0.0.0)", "0.0.0.0")
@@ -168,7 +151,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   // ── Channel (MCP stdio server for remote compute) ──────────────────────────
 
-  program.command("channel")
+  program
+    .command("channel")
     .description("Run the MCP channel server (used by remote agents)")
     .action(async () => {
       await import("../../core/conductor/channel.js");
@@ -181,7 +165,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   // ── Config ─────────────────────────────────────────────────────────────────
 
-  program.command("config")
+  program
+    .command("config")
     .description("Open Ark config in your editor")
     .option("--path", "Just print the config path")
     .action((opts) => {
@@ -190,19 +175,22 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
       // Create default config if missing
       if (!existsSync(configPath)) {
         mkdirSync(dirname(configPath), { recursive: true });
-        writeFileSync(configPath, [
-          "# Ark configuration",
-          "# See: https://github.com/your-org/ark#configuration",
-          "",
-          "# hotkeys:",
-          "#   delete: x",
-          "#   fork: f",
-          "",
-          "# budgets:",
-          "#   dailyLimit: 50",
-          "#   weeklyLimit: 200",
-          "",
-        ].join("\n"));
+        writeFileSync(
+          configPath,
+          [
+            "# Ark configuration",
+            "# See: https://github.com/your-org/ark#configuration",
+            "",
+            "# hotkeys:",
+            "#   delete: x",
+            "#   fork: f",
+            "",
+            "# budgets:",
+            "#   dailyLimit: 50",
+            "#   weeklyLimit: 200",
+            "",
+          ].join("\n"),
+        );
       }
 
       if (opts.path) {
@@ -218,12 +206,14 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   // ── Web dashboard ──────────────────────────────────────────────────────────
 
-  program.command("web")
+  program
+    .command("web")
     .description("Start web dashboard")
     .option("--port <port>", "Listen port", "8420")
     .option("--read-only", "Read-only mode")
     .option("--token <token>", "Bearer token for auth")
     .option("--api-only", "API only, skip static file serving (for dev with Vite)")
+    .option("--with-daemon", "Also start conductor + arkd in-process (for desktop app / standalone use)")
     .action(async (opts) => {
       const globalOpts = program.opts();
       const remoteUrl = globalOpts.server || process.env.ARK_SERVER;
@@ -242,9 +232,61 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
         });
         console.log(chalk.green(`Ark web dashboard (proxying to ${remoteUrl}): ${proxy.url}`));
         console.log(chalk.dim("Press Ctrl+C to stop"));
-        process.on("SIGINT", () => { proxy.stop(); process.exit(0); });
+        process.on("SIGINT", () => {
+          proxy.stop();
+          process.exit(0);
+        });
         await new Promise(() => {});
       } else {
+        // Optionally start conductor + arkd before serving the web UI.
+        // Used by the desktop app so the user gets a fully working instance
+        // without manually running `ark daemon start` / `ark conductor start`.
+        // If the ports are already in use (user has external daemons), the
+        // start calls fail silently and the existing daemons are reused --
+        // the dashboard probes localhost:19100 / 19300 and finds them online.
+        const auxiliary: { stop: () => void }[] = [];
+        if (opts.withDaemon) {
+          const arkApp = core.getApp();
+          const { startConductor } = await import("../../core/conductor/conductor.js");
+          const { startArkd } = await import("../../arkd/index.js");
+          const { DEFAULT_CONDUCTOR_PORT, DEFAULT_ARKD_PORT } = await import("../../core/constants.js");
+
+          // Conductor: start unless something already listens on the port
+          try {
+            const probe = await fetch(`http://localhost:${DEFAULT_CONDUCTOR_PORT}/health`, {
+              signal: AbortSignal.timeout(500),
+            }).catch(() => null);
+            if (probe?.ok) {
+              console.log(chalk.dim(`Conductor already running on :${DEFAULT_CONDUCTOR_PORT} -- reusing`));
+            } else {
+              const conductor = startConductor(arkApp, DEFAULT_CONDUCTOR_PORT, { quiet: true });
+              auxiliary.push(conductor);
+              console.log(chalk.dim(`Started conductor on :${DEFAULT_CONDUCTOR_PORT}`));
+            }
+          } catch (e: any) {
+            console.log(chalk.yellow(`Could not start conductor: ${e?.message ?? e}`));
+          }
+
+          // ArkD: start unless something already listens on the port
+          try {
+            const probe = await fetch(`http://localhost:${DEFAULT_ARKD_PORT}/health`, {
+              signal: AbortSignal.timeout(500),
+            }).catch(() => null);
+            if (probe?.ok) {
+              console.log(chalk.dim(`ArkD already running on :${DEFAULT_ARKD_PORT} -- reusing`));
+            } else {
+              const arkd = startArkd(DEFAULT_ARKD_PORT, {
+                conductorUrl: `http://localhost:${DEFAULT_CONDUCTOR_PORT}`,
+                quiet: true,
+              });
+              auxiliary.push(arkd);
+              console.log(chalk.dim(`Started arkd on :${DEFAULT_ARKD_PORT}`));
+            }
+          } catch (e: any) {
+            console.log(chalk.yellow(`Could not start arkd: ${e?.message ?? e}`));
+          }
+        }
+
         const server = core.startWebServer(core.getApp(), {
           port: Number(opts.port),
           readOnly: opts.readOnly,
@@ -253,14 +295,27 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
         });
         console.log(chalk.green(`Ark web dashboard: ${server.url}`));
         console.log(chalk.dim("Press Ctrl+C to stop"));
-        process.on("SIGINT", () => { server.stop(); process.exit(0); });
+        const shutdown = () => {
+          server.stop();
+          for (const aux of auxiliary) {
+            try {
+              aux.stop();
+            } catch {
+              /* ignore */
+            }
+          }
+          process.exit(0);
+        };
+        process.on("SIGINT", shutdown);
+        process.on("SIGTERM", shutdown);
         await new Promise(() => {});
       }
     });
 
   // ── OpenAPI spec ──────────────────────────────────────────────────────────────
 
-  program.command("openapi")
+  program
+    .command("openapi")
     .description("Generate OpenAPI spec")
     .action(() => {
       console.log(JSON.stringify(core.generateOpenApiSpec(), null, 2));
@@ -268,7 +323,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   // ── MCP proxy (internal, used by pooled MCP configs) ────────────────────────
 
-  program.command("mcp-proxy")
+  program
+    .command("mcp-proxy")
     .description("Bridge stdin/stdout to a pooled MCP socket (internal)")
     .argument("<socket-path>")
     .action((socketPath) => {
@@ -277,7 +333,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   // ── ACP (headless JSON-RPC protocol) ──────────────────────────────────────
 
-  program.command("acp")
+  program
+    .command("acp")
     .description("Start headless ACP server on stdin/stdout (JSON-RPC)")
     .action(() => {
       core.runAcpServer(core.getApp());
@@ -285,7 +342,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   // ── Repo map ──────────────────────────────────────────────────────────────
 
-  program.command("repo-map")
+  program
+    .command("repo-map")
     .description("Generate repository structure map")
     .argument("[dir]", "Directory to scan", ".")
     .option("--max-files <n>", "Max files to include", "500")
@@ -311,7 +369,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
   // ── Init wizard ───────────────────────────────────────────────────────────
 
-  program.command("init")
+  program
+    .command("init")
     .description("Initialize Ark for this repository")
     .action(async () => {
       const { checkPrereqs, formatPrereqCheck, hasRequiredPrereqs } = await import("../../core/prereqs.js");
@@ -338,15 +397,18 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
       // 3. Create .ark.yaml in current dir if not exists
       const arkYamlPath = ".ark.yaml";
       if (!existsSync(arkYamlPath)) {
-        writeFileSync(arkYamlPath, [
-          "# Ark per-repository configuration",
-          "# flow: bare          # Default flow for sessions",
-          "# agent: implementer  # Default agent",
-          "# verify:             # Verification scripts",
-          "#   - npm test",
-          "# auto_pr: true       # Auto-create PR on completion",
-          "",
-        ].join("\n"));
+        writeFileSync(
+          arkYamlPath,
+          [
+            "# Ark per-repository configuration",
+            "# flow: bare          # Default flow for sessions",
+            "# agent: implementer  # Default agent",
+            "# verify:             # Verification scripts",
+            "#   - npm test",
+            "# auto_pr: true       # Auto-create PR on completion",
+            "",
+          ].join("\n"),
+        );
         console.log(chalk.green(`\nCreated ${arkYamlPath} (edit to customize)`));
       } else {
         console.log(chalk.dim(`\n${arkYamlPath} already exists`));
@@ -354,6 +416,5 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
 
       console.log(chalk.bold("\nReady! Try:"));
       console.log(`  ark session start --repo . --summary "My first task" --dispatch`);
-      console.log(`  ark tui`);
     });
 }

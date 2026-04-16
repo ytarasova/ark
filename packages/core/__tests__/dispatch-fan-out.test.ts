@@ -3,13 +3,17 @@ import { AppContext, setApp, clearApp } from "../app.js";
 import { dispatch } from "../services/session-orchestration.js";
 
 let app: AppContext;
-beforeAll(async () => { app = AppContext.forTest(); await app.boot(); setApp(app); });
+beforeAll(async () => {
+  app = AppContext.forTest();
+  await app.boot();
+  setApp(app);
+});
 afterAll(async () => {
   // Stop all sessions (kills tmux + claude processes via provider)
   if (app?.sessionService) await app.sessionService.stopAll();
   await app?.shutdown();
   clearApp();
-});
+}, 30_000);
 
 describe("dispatch fan_out stage", () => {
   test("fan_out stage creates children and sets parent to waiting", async () => {
@@ -27,5 +31,5 @@ describe("dispatch fan_out stage", () => {
 
     // Clean up dispatched agents before test exits
     await app.sessionService.stopAll();
-  });
+  }, 30_000);
 });

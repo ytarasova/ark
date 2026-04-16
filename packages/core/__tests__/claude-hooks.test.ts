@@ -137,11 +137,14 @@ describe("removeSettings", () => {
   it("preserves non-ark hooks", () => {
     const claudeDir = join(getCtx().arkDir, ".claude");
     mkdirSync(claudeDir, { recursive: true });
-    writeFileSync(join(claudeDir, "settings.local.json"), JSON.stringify({
-      hooks: {
-        Stop: [{ hooks: [{ type: "command", command: "my-custom-hook.sh", async: true }] }],
-      }
-    }));
+    writeFileSync(
+      join(claudeDir, "settings.local.json"),
+      JSON.stringify({
+        hooks: {
+          Stop: [{ hooks: [{ type: "command", command: "my-custom-hook.sh", async: true }] }],
+        },
+      }),
+    );
 
     // Add ark hooks on top
     writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
@@ -194,10 +197,12 @@ describe("buildPermissionsAllow", () => {
   });
 
   it("throws when tools references an undeclared MCP server", () => {
-    expect(() => buildPermissionsAllow({
-      tools: ["Bash", "mcp__github__createPullRequest"],
-      mcp_servers: ["atlassian"],
-    })).toThrow(/references MCP server 'github'/);
+    expect(() =>
+      buildPermissionsAllow({
+        tools: ["Bash", "mcp__github__createPullRequest"],
+        mcp_servers: ["atlassian"],
+      }),
+    ).toThrow(/references MCP server 'github'/);
   });
 
   it("accepts inline-object mcp_servers entries", () => {
@@ -285,9 +290,11 @@ describe("writeSettings with agent", () => {
   });
 
   it("throws when agent tools reference an undeclared MCP server", () => {
-    expect(() => writeSettings("s-test", "http://localhost:19100", getCtx().arkDir, {
-      agent: { tools: ["mcp__github__createIssue"], mcp_servers: [] },
-    })).toThrow(/references MCP server 'github'/);
+    expect(() =>
+      writeSettings("s-test", "http://localhost:19100", getCtx().arkDir, {
+        agent: { tools: ["mcp__github__createIssue"], mcp_servers: [] },
+      }),
+    ).toThrow(/references MCP server 'github'/);
   });
 
   it("idempotent: rewriting with the same agent produces the same allow list", () => {
@@ -329,7 +336,9 @@ describe("buildToolHints", () => {
       tools: ["Read", "mcp__atlassian__getJiraIssue", "mcp__atlassian__addCommentToJiraIssue"],
       mcp_servers: ["atlassian"],
     });
-    expect(hint).toContain("**Specific MCP tools granted:** mcp__atlassian__getJiraIssue, mcp__atlassian__addCommentToJiraIssue");
+    expect(hint).toContain(
+      "**Specific MCP tools granted:** mcp__atlassian__getJiraIssue, mcp__atlassian__addCommentToJiraIssue",
+    );
   });
 
   it("wildcards like mcp__atlassian__* do not appear in the Specific section", () => {
@@ -368,9 +377,12 @@ describe("removeSettings with agent permissions", () => {
   it("preserves pre-existing allow list when no agent was provided", () => {
     const claudeDir = join(getCtx().arkDir, ".claude");
     mkdirSync(claudeDir, { recursive: true });
-    writeFileSync(join(claudeDir, "settings.local.json"), JSON.stringify({
-      permissions: { allow: ["UserTool"] },
-    }));
+    writeFileSync(
+      join(claudeDir, "settings.local.json"),
+      JSON.stringify({
+        permissions: { allow: ["UserTool"] },
+      }),
+    );
     writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
     removeSettings(getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(claudeDir, "settings.local.json"), "utf-8"));

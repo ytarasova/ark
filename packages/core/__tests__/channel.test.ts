@@ -44,9 +44,7 @@ describe("channel-types", () => {
         agent: "deployer",
         task: "Deploy to prod",
         handoff: {
-          previousStages: [
-            { stage: "work", agent: "coder", summary: "Implemented feature" },
-          ],
+          previousStages: [{ stage: "work", agent: "coder", summary: "Implemented feature" }],
           planMd: "# Plan\n- Step 1\n- Step 2",
           recentCommits: "abc1234 fix: thing\ndef5678 feat: other",
         },

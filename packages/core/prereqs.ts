@@ -31,15 +31,20 @@ export function checkPrereqs(): PrereqResult[] {
   check("git", ["--version"], true, "brew install git");
   check("claude", ["--version"], false, "npm install -g @anthropic-ai/claude-code");
   check("gh", ["--version"], false, "brew install gh (optional - needed for PR creation)");
-  check("codegraph", ["--version"], false, "bundled with ark (optional - needed for knowledge graph codebase indexing)");
+  check(
+    "codegraph",
+    ["--version"],
+    false,
+    "bundled with ark (optional - needed for knowledge graph codebase indexing)",
+  );
 
   return results;
 }
 
 export function formatPrereqCheck(results: PrereqResult[]): string {
-  const lines = results.map(r => {
-    const status = r.ok ? "OK" : (r.required ? "MISSING" : "not found");
-    const icon = r.ok ? "+" : (r.required ? "x" : "-");
+  const lines = results.map((r) => {
+    const status = r.ok ? "OK" : r.required ? "MISSING" : "not found";
+    const icon = r.ok ? "+" : r.required ? "x" : "-";
     const ver = r.version ? `  ${r.version}` : "";
     const hint = !r.ok && r.installHint ? `  Install: ${r.installHint}` : "";
     return `  ${icon} ${r.name.padEnd(10)}${ver}${r.ok ? "" : `  ${status}${hint}`}`;
@@ -48,5 +53,5 @@ export function formatPrereqCheck(results: PrereqResult[]): string {
 }
 
 export function hasRequiredPrereqs(results: PrereqResult[]): boolean {
-  return results.filter(r => r.required).every(r => r.ok);
+  return results.filter((r) => r.required).every((r) => r.ok);
 }

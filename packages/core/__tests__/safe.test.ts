@@ -29,7 +29,9 @@ describe("safeAsync", () => {
     // Should not throw -- the point of safeAsync is error suppression
     let threw = false;
     try {
-      await safeAsync("test", async () => { throw new Error("should be caught"); });
+      await safeAsync("test", async () => {
+        throw new Error("should be caught");
+      });
     } catch {
       threw = true;
     }
@@ -38,7 +40,9 @@ describe("safeAsync", () => {
 
   it("executes the provided function", async () => {
     let called = false;
-    await safeAsync("test", async () => { called = true; });
+    await safeAsync("test", async () => {
+      called = true;
+    });
     expect(called).toBe(true);
   });
 
@@ -52,7 +56,9 @@ describe("safeAsync", () => {
     const consoleMock = mock(() => {});
     console.error = consoleMock;
     try {
-      await safeAsync("test", async () => { throw new Error("should use logError"); });
+      await safeAsync("test", async () => {
+        throw new Error("should use logError");
+      });
       expect(consoleMock).not.toHaveBeenCalled();
     } finally {
       console.error = origConsoleError;

@@ -21,7 +21,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  try { server.stop(); } catch { /* cleanup */ }
+  try {
+    server.stop();
+  } catch {
+    /* cleanup */
+  }
 });
 
 async function postHook(sessionId: string, payload: Record<string, unknown>): Promise<Response> {
@@ -39,7 +43,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const resp = await postHook(session.id, { hook_event_name: "UserPromptSubmit" });
     expect(resp.status).toBe(200);
-    const body = await resp.json() as Record<string, unknown>;
+    const body = (await resp.json()) as Record<string, unknown>;
     expect(body.mapped).toBe("running");
 
     const updated = getApp().sessions.get(session.id);
@@ -67,7 +71,7 @@ describe("Conductor /hooks/status endpoint", () => {
       error: "agent crashed",
     });
     expect(resp.status).toBe(200);
-    const body = await resp.json() as Record<string, unknown>;
+    const body = (await resp.json()) as Record<string, unknown>;
     expect(body.mapped).toBe("failed");
 
     const updated = getApp().sessions.get(session.id);
@@ -81,7 +85,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const resp = await postHook(session.id, { hook_event_name: "SessionEnd" });
     expect(resp.status).toBe(200);
-    const body = await resp.json() as Record<string, unknown>;
+    const body = (await resp.json()) as Record<string, unknown>;
     expect(body.mapped).toBe("completed");
 
     const updated = getApp().sessions.get(session.id);
@@ -97,7 +101,7 @@ describe("Conductor /hooks/status endpoint", () => {
       matcher: "permission_prompt",
     });
     expect(resp.status).toBe(200);
-    const body = await resp.json() as Record<string, unknown>;
+    const body = (await resp.json()) as Record<string, unknown>;
     expect(body.mapped).toBe("waiting");
 
     const updated = getApp().sessions.get(session.id);
@@ -109,7 +113,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const resp = await postHook(session.id, { hook_event_name: "SessionStart" });
     expect(resp.status).toBe(200);
-    const body = await resp.json() as Record<string, unknown>;
+    const body = (await resp.json()) as Record<string, unknown>;
     expect(body.mapped).toBe("running");
 
     const updated = getApp().sessions.get(session.id);
@@ -119,7 +123,7 @@ describe("Conductor /hooks/status endpoint", () => {
   it("returns 404 for unknown session", async () => {
     const resp = await postHook("s-nonexistent", { hook_event_name: "Stop" });
     expect(resp.status).toBe(404);
-    const body = await resp.json() as Record<string, unknown>;
+    const body = (await resp.json()) as Record<string, unknown>;
     expect(body.error).toBe("session not found");
   });
 
@@ -129,7 +133,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const resp = await postHook(session.id, { hook_event_name: "SomeUnknownEvent" });
     expect(resp.status).toBe(200);
-    const body = await resp.json() as Record<string, unknown>;
+    const body = (await resp.json()) as Record<string, unknown>;
     expect(body.mapped).toBe("no-op");
 
     const updated = getApp().sessions.get(session.id);
@@ -143,7 +147,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const events = getApp().events.list(session.id, { type: "hook_status" });
     expect(events.length).toBeGreaterThanOrEqual(1);
-    const hookEvent = events.find(e => e.type === "hook_status");
+    const hookEvent = events.find((e) => e.type === "hook_status");
     expect(hookEvent).toBeTruthy();
     expect(hookEvent!.actor).toBe("hook");
     expect(hookEvent!.data?.event).toBe("SessionStart");
@@ -196,10 +200,35 @@ describe("Conductor /hooks/status endpoint", () => {
     const { writeFileSync: wf } = await import("fs");
     const { join: j } = await import("path");
     const transcriptPath = j(getCtx().arkDir, "transcript-stop.jsonl");
-    wf(transcriptPath, [
-      JSON.stringify({ type: "assistant", message: { role: "assistant", usage: { input_tokens: 1000, output_tokens: 500, cache_read_input_tokens: 5000, cache_creation_input_tokens: 100 } } }),
-      JSON.stringify({ type: "assistant", message: { role: "assistant", usage: { input_tokens: 2000, output_tokens: 800, cache_read_input_tokens: 3000, cache_creation_input_tokens: 50 } } }),
-    ].join("\n"));
+    wf(
+      transcriptPath,
+      [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            role: "assistant",
+            usage: {
+              input_tokens: 1000,
+              output_tokens: 500,
+              cache_read_input_tokens: 5000,
+              cache_creation_input_tokens: 100,
+            },
+          },
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            role: "assistant",
+            usage: {
+              input_tokens: 2000,
+              output_tokens: 800,
+              cache_read_input_tokens: 3000,
+              cache_creation_input_tokens: 50,
+            },
+          },
+        }),
+      ].join("\n"),
+    );
 
     await postHook(session.id, {
       hook_event_name: "Stop",
@@ -219,7 +248,13 @@ describe("Conductor /hooks/status endpoint", () => {
     const { writeFileSync: wf } = await import("fs");
     const { join: j } = await import("path");
     const transcriptPath = j(getCtx().arkDir, "transcript-end.jsonl");
-    wf(transcriptPath, JSON.stringify({ type: "assistant", message: { role: "assistant", usage: { input_tokens: 500, output_tokens: 200 } } }));
+    wf(
+      transcriptPath,
+      JSON.stringify({
+        type: "assistant",
+        message: { role: "assistant", usage: { input_tokens: 500, output_tokens: 200 } },
+      }),
+    );
 
     await postHook(session.id, {
       hook_event_name: "SessionEnd",
@@ -248,7 +283,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const resp = await postHook(session.id, { hook_event_name: "UserPromptSubmit" });
     expect(resp.status).toBe(200);
-    const body = await resp.json() as Record<string, unknown>;
+    const body = (await resp.json()) as Record<string, unknown>;
     expect(body.mapped).toBe("no-op");
 
     const updated = getApp().sessions.get(session.id);
@@ -261,7 +296,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const resp = await postHook(session.id, { hook_event_name: "UserPromptSubmit" });
     expect(resp.status).toBe(200);
-    const body = await resp.json() as Record<string, unknown>;
+    const body = (await resp.json()) as Record<string, unknown>;
     expect(body.mapped).toBe("no-op");
 
     const updated = getApp().sessions.get(session.id);
@@ -276,7 +311,7 @@ describe("Conductor /hooks/status endpoint", () => {
 
     const resp = await postHook(session.id, { hook_event_name: "SessionEnd" });
     expect(resp.status).toBe(200);
-    const body = await resp.json() as Record<string, unknown>;
+    const body = (await resp.json()) as Record<string, unknown>;
     expect(body.mapped).toBe("ready");
 
     const updated = getApp().sessions.get(session.id);
@@ -293,7 +328,10 @@ describe("Conductor /hooks/status endpoint", () => {
     const { writeFileSync: wf } = await import("fs");
     const { join: j } = await import("path");
     const transcriptPath = j(getCtx().arkDir, "different-claude-session-xyz.jsonl");
-    wf(transcriptPath, JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "hello" }] } }));
+    wf(
+      transcriptPath,
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "hello" }] } }),
+    );
 
     const resp = await postHook(session.id, {
       hook_event_name: "Stop",
@@ -308,9 +346,13 @@ describe("Conductor /hooks/status endpoint", () => {
     const db = getApp().db;
     let count = 0;
     try {
-      const row = db.prepare("SELECT COUNT(*) as c FROM transcript_index WHERE session_id = ?").get(session.id) as { c: number } | undefined;
+      const row = db.prepare("SELECT COUNT(*) as c FROM transcript_index WHERE session_id = ?").get(session.id) as
+        | { c: number }
+        | undefined;
       count = row?.c ?? 0;
-    } catch { /* FTS5 table may not exist */ }
+    } catch {
+      /* FTS5 table may not exist */
+    }
     expect(count).toBe(0);
   });
 
@@ -391,7 +433,7 @@ describe("Conductor /hooks/status endpoint", () => {
       body: JSON.stringify({ hook_event_name: "Stop" }),
     });
     expect(resp.status).toBe(400);
-    const body = await resp.json() as Record<string, unknown>;
+    const body = (await resp.json()) as Record<string, unknown>;
     expect(body.error).toBe("missing session param");
   });
 });

@@ -44,16 +44,16 @@ describe("BunSqliteAdapter", () => {
   });
 
   test("run inserts rows and returns changes", () => {
-    const result = adapter.prepare(
-      "INSERT INTO test_items (name, value) VALUES (?, ?)"
-    ).run("alpha", 10);
+    const result = adapter.prepare("INSERT INTO test_items (name, value) VALUES (?, ?)").run("alpha", 10);
     expect(result.changes).toBe(1);
   });
 
   test("get retrieves a single row", () => {
-    const row = adapter.prepare(
-      "SELECT * FROM test_items WHERE name = ?"
-    ).get("alpha") as { id: number; name: string; value: number };
+    const row = adapter.prepare("SELECT * FROM test_items WHERE name = ?").get("alpha") as {
+      id: number;
+      name: string;
+      value: number;
+    };
     expect(row.name).toBe("alpha");
     expect(row.value).toBe(10);
   });
@@ -63,7 +63,9 @@ describe("BunSqliteAdapter", () => {
     adapter.prepare("INSERT INTO test_items (name, value) VALUES (?, ?)").run("gamma", 30);
 
     const rows = adapter.prepare("SELECT * FROM test_items ORDER BY id ASC").all() as {
-      id: number; name: string; value: number;
+      id: number;
+      name: string;
+      value: number;
     }[];
     expect(rows.length).toBe(3);
     expect(rows[0].name).toBe("alpha");
@@ -79,9 +81,10 @@ describe("BunSqliteAdapter", () => {
     });
     expect(result).toBe("done");
 
-    const rows = adapter.prepare(
-      "SELECT * FROM test_items WHERE name IN ('tx1', 'tx2') ORDER BY name"
-    ).all() as { name: string; value: number }[];
+    const rows = adapter.prepare("SELECT * FROM test_items WHERE name IN ('tx1', 'tx2') ORDER BY name").all() as {
+      name: string;
+      value: number;
+    }[];
     expect(rows.length).toBe(2);
     expect(rows[0].value).toBe(100);
     expect(rows[1].value).toBe(200);

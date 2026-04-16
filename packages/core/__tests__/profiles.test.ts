@@ -1,5 +1,12 @@
 import { describe, it, expect } from "bun:test";
-import { listProfiles, createProfile, deleteProfile, getActiveProfile, setActiveProfile, profileGroupPrefix } from "../state/profiles.js";
+import {
+  listProfiles,
+  createProfile,
+  deleteProfile,
+  getActiveProfile,
+  setActiveProfile,
+  profileGroupPrefix,
+} from "../state/profiles.js";
 import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 
@@ -9,13 +16,13 @@ describe("profiles", () => {
   it("listProfiles returns at least default", () => {
     const profiles = listProfiles();
     expect(profiles.length).toBeGreaterThanOrEqual(1);
-    expect(profiles.find(p => p.name === "default")).toBeDefined();
+    expect(profiles.find((p) => p.name === "default")).toBeDefined();
   });
 
   it("createProfile adds a new profile", () => {
     createProfile("work", "Work profile");
     const profiles = listProfiles();
-    expect(profiles.find(p => p.name === "work")).toBeDefined();
+    expect(profiles.find((p) => p.name === "work")).toBeDefined();
   });
 
   it("createProfile rejects duplicates", () => {
@@ -26,7 +33,7 @@ describe("profiles", () => {
   it("deleteProfile removes a profile", () => {
     createProfile("temp");
     expect(deleteProfile("temp")).toBe(true);
-    expect(listProfiles().find(p => p.name === "temp")).toBeUndefined();
+    expect(listProfiles().find((p) => p.name === "temp")).toBeUndefined();
   });
 
   it("deleteProfile rejects default", () => {
@@ -65,14 +72,14 @@ describe("profile-scoped session listing", () => {
     getApp().sessions.create({ summary: "personal-task", group_name: "personal/blog" });
 
     const workSessions = getApp().sessions.list({ groupPrefix: "work/" });
-    expect(workSessions.every(s => s.group_name?.startsWith("work/"))).toBe(true);
-    expect(workSessions.some(s => s.summary === "work-task")).toBe(true);
-    expect(workSessions.some(s => s.summary === "personal-task")).toBe(false);
+    expect(workSessions.every((s) => s.group_name?.startsWith("work/"))).toBe(true);
+    expect(workSessions.some((s) => s.summary === "work-task")).toBe(true);
+    expect(workSessions.some((s) => s.summary === "personal-task")).toBe(false);
 
     const personalSessions = getApp().sessions.list({ groupPrefix: "personal/" });
-    expect(personalSessions.every(s => s.group_name?.startsWith("personal/"))).toBe(true);
-    expect(personalSessions.some(s => s.summary === "personal-task")).toBe(true);
-    expect(personalSessions.some(s => s.summary === "work-task")).toBe(false);
+    expect(personalSessions.every((s) => s.group_name?.startsWith("personal/"))).toBe(true);
+    expect(personalSessions.some((s) => s.summary === "personal-task")).toBe(true);
+    expect(personalSessions.some((s) => s.summary === "work-task")).toBe(false);
   });
 
   it("listSessions without groupPrefix returns all", () => {
@@ -87,7 +94,7 @@ describe("profile-scoped session listing", () => {
     getApp().sessions.create({ summary: "grouped", group_name: "work/misc" });
 
     const workSessions = getApp().sessions.list({ groupPrefix: "work/" });
-    expect(workSessions.some(s => s.summary === "ungrouped")).toBe(false);
-    expect(workSessions.some(s => s.summary === "grouped")).toBe(true);
+    expect(workSessions.some((s) => s.summary === "ungrouped")).toBe(false);
+    expect(workSessions.some((s) => s.summary === "grouped")).toBe(true);
   });
 });

@@ -26,13 +26,11 @@ beforeAll(() => {
   createSpy = spyOn(tmux, "createSessionAsync").mockImplementation(
     async (name: string, cmd: string, _opts?: any): Promise<void> => {
       createdSessions.push({ name, cmd });
-    }
+    },
   );
-  sendTextSpy = spyOn(tmux, "sendTextAsync").mockImplementation(
-    async (name: string, text: string): Promise<void> => {
-      sentTexts.push({ name, text });
-    }
-  );
+  sendTextSpy = spyOn(tmux, "sendTextAsync").mockImplementation(async (name: string, text: string): Promise<void> => {
+    sentTexts.push({ name, text });
+  });
   killSpy = spyOn(tmux, "killSessionAsync").mockImplementation(async () => {});
 });
 

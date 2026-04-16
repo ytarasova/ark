@@ -16,9 +16,11 @@ function makeRequest(overrides: Partial<ChatCompletionRequest> = {}): ChatComple
 
 describe("classifier", () => {
   test("trivial message gets low score", () => {
-    const result = classify(makeRequest({
-      messages: [{ role: "user", content: "Hi" }],
-    }));
+    const result = classify(
+      makeRequest({
+        messages: [{ role: "user", content: "Hi" }],
+      }),
+    );
     expect(result.score).toBeLessThan(0.15);
     expect(result.difficulty).toBe("trivial");
     expect(result.task_type).toBe("chat");
@@ -26,16 +28,22 @@ describe("classifier", () => {
   });
 
   test("simple question gets low score", () => {
-    const result = classify(makeRequest({
-      messages: [{ role: "user", content: "What is the capital of France?" }],
-    }));
+    const result = classify(
+      makeRequest({
+        messages: [{ role: "user", content: "What is the capital of France?" }],
+      }),
+    );
     expect(result.score).toBeLessThan(0.3);
     expect(result.difficulty).toBe("trivial");
   });
 
   test("code request gets high score", () => {
-    const result = classify(makeRequest({
-      messages: [{ role: "user", content: `
+    const result = classify(
+      makeRequest({
+        messages: [
+          {
+            role: "user",
+            content: `
         Write a TypeScript function that implements a binary search tree.
         Include insert, delete, and search methods.
         Use generics and async/await for the persistence layer.
@@ -43,22 +51,27 @@ describe("classifier", () => {
         import { Database } from "./db.js";
         const db = new Database();
         \`\`\`
-      ` }],
-    }));
+      `,
+          },
+        ],
+      }),
+    );
     expect(result.score).toBeGreaterThanOrEqual(0.2);
     expect(result.task_type).toBe("code");
-    expect(result.signals.some(s => s.includes("code"))).toBe(true);
+    expect(result.signals.some((s) => s.includes("code"))).toBe(true);
   });
 
   test("tool requests are detected", () => {
-    const result = classify(makeRequest({
-      messages: [{ role: "user", content: "Search for files matching *.ts" }],
-      tools: [
-        { type: "function", function: { name: "search_files", parameters: {} } },
-        { type: "function", function: { name: "read_file", parameters: {} } },
-        { type: "function", function: { name: "write_file", parameters: {} } },
-      ],
-    }));
+    const result = classify(
+      makeRequest({
+        messages: [{ role: "user", content: "Search for files matching *.ts" }],
+        tools: [
+          { type: "function", function: { name: "search_files", parameters: {} } },
+          { type: "function", function: { name: "read_file", parameters: {} } },
+          { type: "function", function: { name: "write_file", parameters: {} } },
+        ],
+      }),
+    );
     expect(result.has_tools).toBe(true);
     expect(result.signals).toContain("has_tools");
   });
@@ -84,36 +97,50 @@ describe("classifier", () => {
   });
 
   test("reasoning keywords increase score", () => {
-    const result = classify(makeRequest({
-      messages: [{ role: "user", content: "Explain the trade-offs between microservices and monoliths. Analyze the implications for system design." }],
-    }));
+    const result = classify(
+      makeRequest({
+        messages: [
+          {
+            role: "user",
+            content:
+              "Explain the trade-offs between microservices and monoliths. Analyze the implications for system design.",
+          },
+        ],
+      }),
+    );
     expect(result.task_type).toBe("reasoning");
-    expect(result.signals.some(s => s.includes("reasoning"))).toBe(true);
+    expect(result.signals.some((s) => s.includes("reasoning"))).toBe(true);
   });
 
   test("long context detected", () => {
     const longContent = "x".repeat(50000);
-    const result = classify(makeRequest({
-      messages: [{ role: "user", content: longContent }],
-    }));
+    const result = classify(
+      makeRequest({
+        messages: [{ role: "user", content: longContent }],
+      }),
+    );
     expect(result.signals).toContain("long_context");
     expect(result.context_length).toBeGreaterThan(10000);
   });
 
   test("complex system prompt detected", () => {
-    const result = classify(makeRequest({
-      messages: [
-        { role: "system", content: "x".repeat(10000) },
-        { role: "user", content: "Do the thing" },
-      ],
-    }));
+    const result = classify(
+      makeRequest({
+        messages: [
+          { role: "system", content: "x".repeat(10000) },
+          { role: "user", content: "Do the thing" },
+        ],
+      }),
+    );
     expect(result.signals).toContain("complex_system_prompt");
   });
 
   test("extraction task detected", () => {
-    const result = classify(makeRequest({
-      messages: [{ role: "user", content: "Extract all email addresses and convert them to JSON format" }],
-    }));
+    const result = classify(
+      makeRequest({
+        messages: [{ role: "user", content: "Extract all email addresses and convert them to JSON format" }],
+      }),
+    );
     expect(result.task_type).toBe("extraction");
   });
 

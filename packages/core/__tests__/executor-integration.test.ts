@@ -25,7 +25,7 @@ describe("executor integration", () => {
   });
 
   it("listExecutors includes subprocess", () => {
-    const names = core.listExecutors().map(e => e.name);
+    const names = core.listExecutors().map((e) => e.name);
     expect(names).toContain("subprocess");
   });
 

@@ -43,11 +43,7 @@ export function Modal({ open, onClose, title, className, children }: ModalProps)
         )}
         onClick={stop}
       >
-        {title && (
-          <div className="border-b border-border px-5 py-3 text-sm font-semibold text-foreground">
-            {title}
-          </div>
-        )}
+        {title && <div className="border-b border-border px-5 py-3 text-sm font-semibold text-foreground">{title}</div>}
         <div className="flex min-h-0 flex-1 flex-col">{children}</div>
       </div>
     </div>

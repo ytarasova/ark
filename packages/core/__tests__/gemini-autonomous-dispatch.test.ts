@@ -213,7 +213,7 @@ describe("Gemini runtime + autonomous flow completion", () => {
 
       // Verify that a session_completed event was logged
       const events = app.events.list(session.id);
-      const completedEvent = events.find(e => e.type === "session_completed");
+      const completedEvent = events.find((e) => e.type === "session_completed");
       expect(completedEvent).not.toBeUndefined();
       // data is stored as JSON string -- parse and check the reason field
       const data = typeof completedEvent!.data === "string" ? JSON.parse(completedEvent!.data) : completedEvent!.data;

@@ -11,8 +11,9 @@
 #   make build         Build native macOS binary + Electron app
 #   make package       Package everything for distribution
 
-.PHONY: help install dev dev-daemon dev-arkd dev-tui dev-web tui-standalone claude-tfy web desktop \
-        test test-file test-e2e test-e2e-fast test-e2e-web test-e2e-tui test-install test-watch lint \
+.PHONY: help install dev dev-daemon dev-arkd dev-web claude-tfy web desktop \
+        test test-file test-e2e test-e2e-fast test-e2e-web test-install test-watch lint lint-fix \
+        format format-check \
         build build-cli build-web build-desktop \
         package package-cli package-desktop \
         vendor-tmux vendor-tensorzero vendor-codegraph \
@@ -32,10 +33,10 @@ CLAUDE_CONTINUE_FLAGS := $(if $(filter 0,$(CLAUDE_CONTINUE)),,--continue)
 help: ## Show available commands
 	@echo ""
 	@echo "  \033[1mDevelopment\033[0m"
-	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-tui|dev-web|tui-standalone|claude-tfy|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(install|dev|dev-daemon|dev-arkd|dev-web|claude-tfy|web|desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "  \033[1mTesting\033[0m"
-	@grep -E '^(test|test-file|test-e2e|test-install|test-watch):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^(test|test-file|test-e2e|test-install|test-watch|lint|format):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "  \033[1mBuilding & Packaging\033[0m"
 	@grep -E '^(build|build-cli|build-web|build-desktop|package|package-cli|package-desktop):' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "    \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -61,7 +62,6 @@ dev: ## Hot-reload: ark web (:8420) + Vite dev server (:5173) with HMR
 	@echo "  API:  http://localhost:8420  (bun --watch, auto-restarts on changes)"
 	@echo "  Web:  http://localhost:5173  (Vite HMR, proxies /api to :8420)"
 	@echo "  CLI:  ./ark <command>        (runs from source, no build)"
-	@echo "  TUI:  ./ark tui             (runs from source, no build)"
 	@echo ""
 	@trap 'kill 0' EXIT; \
 	  $(BUN) --watch packages/cli/index.ts web --port 8420 --api-only 2>&1 | sed 's/^/[api] /' & \
@@ -82,11 +82,6 @@ dev-arkd: ## Hot-reload: arkd agent daemon (:19300)
 	@echo ""
 	$(BUN) --watch packages/cli/index.ts arkd
 
-dev-tui: ## Hot-reload: TUI connecting to dev daemon (starts daemon if not running)
-	@curl -sf http://localhost:19400/health >/dev/null 2>&1 || \
-		(echo "Daemon not running. Start it with: make dev-daemon" && exit 1)
-	ARK_SERVER_PORT=19400 ./ark tui
-
 dev-web: ## Hot-reload: API server (:8420) + Vite frontend (:5173)
 	@echo "\033[1mArk Web (hot-reload)\033[0m"
 	@echo "  API:  http://localhost:8420"
@@ -96,9 +91,6 @@ dev-web: ## Hot-reload: API server (:8420) + Vite frontend (:5173)
 	  $(BUN) --watch packages/cli/index.ts web --port 8420 --api-only 2>&1 | sed 's/^/[api] /' & \
 	  sleep 1 && cd packages/web && npx vite --port 5173 2>&1 | sed 's/^/[web] /' & \
 	  wait
-
-tui-standalone: ## Launch TUI standalone (embedded mode, no daemon needed)
-	./ark tui
 
 # TrueFoundry: https://truefoundry.com/docs/ai-gateway/claude-code (ANTHROPIC_BASE_URL + Bearer in ANTHROPIC_CUSTOM_HEADERS).
 # Claude Code gateway requirements: https://code.claude.com/docs/en/llm-gateway (Messages /v1/messages, forward anthropic-* headers).
@@ -142,17 +134,12 @@ desktop: build-web ## Launch the Electron desktop app
 # ── Testing ──────────────────────────────────────────────────────────────────
 
 test: build-web ## Run all unit tests (sequential -- never parallel)
-	$(BUN) test packages/core packages/compute packages/server packages/protocol packages/tui packages/arkd packages/web --concurrency 1
+	$(BUN) test packages/core packages/compute packages/server packages/protocol packages/arkd packages/web --concurrency 1
 
 test-file: ## Run a single test: make test-file F=packages/core/__tests__/foo.test.ts
 	$(BUN) test $(F) --concurrency 1
 
-test-e2e: test-tui-e2e test-web-e2e ## Run all end-to-end tests (TUI browser harness + web Playwright)
-
-test-tui-e2e: ## Run TUI end-to-end tests via browser harness (xterm.js + real pty + real tmux)
-	@cd packages/tui-e2e && npm install --silent 2>/dev/null && \
-	  node node_modules/@playwright/test/cli.js install chromium 2>/dev/null; \
-	  node node_modules/@playwright/test/cli.js test
+test-e2e: test-web-e2e ## Run all end-to-end tests (web Playwright)
 
 test-web-e2e: build-web ## Run web end-to-end tests (Playwright against the web dashboard)
 	@# `bunx --bun playwright test` runs Playwright under Bun, which is
@@ -177,22 +164,24 @@ test-watch: ## Run unit tests in watch mode
 	$(BUN) test --watch
 
 lint: ## Lint the codebase (ESLint + TypeScript)
-	npx eslint packages/ --max-warnings 50
+	npx eslint packages/ --max-warnings 0
 	bash scripts/check-no-em-dashes.sh
 
 lint-fix: ## Auto-fix lint issues
 	npx eslint packages/ --fix
 
+format: ## Format code with Prettier
+	npx prettier --write "packages/**/*.{ts,tsx,js,jsx,json,css}"
+
+format-check: ## Check code formatting (CI gate)
+	npx prettier --check "packages/**/*.{ts,tsx,js,jsx,json,css}"
+
 # ── Building ─────────────────────────────────────────────────────────────────
 
 build: build-cli build-web ## Build CLI binary + web frontend
 
-build-cli: ## Build native macOS CLI+TUI binary (current arch)
+build-cli: ## Build native macOS CLI binary (current arch)
 	@echo "Building native binary..."
-	@mkdir -p node_modules/react-devtools-core 2>/dev/null; \
-	  test -f shims/react-devtools-core.js && \
-	  cp shims/react-devtools-core.js node_modules/react-devtools-core/index.js && \
-	  echo '{"main":"index.js"}' > node_modules/react-devtools-core/package.json || true
 	@$(BUN) run scripts/inject-version.ts
 	$(BUN) build --compile packages/cli/index.ts --outfile ark-native
 	@echo "Built: ark-native ($$(du -h ark-native | cut -f1))"
@@ -200,7 +189,12 @@ build-cli: ## Build native macOS CLI+TUI binary (current arch)
 build-web: ## Build web frontend (Vite production)
 	@cd packages/web && npx vite build --logLevel error 2>/dev/null || $(BUN) run packages/web/build.ts
 
-build-desktop: build-web ## Build Electron app for current platform
+build-desktop: build-web ## Build Electron app with bundled ark-native
+	@echo "Building ark-native for current platform..."
+	@$(MAKE) build-cli --no-print-directory
+	@mkdir -p packages/desktop/binaries/$$(uname -s | tr A-Z a-z)-$$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')
+	@cp ark-native packages/desktop/binaries/$$(uname -s | tr A-Z a-z)-$$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')/ark-native
+	@echo "Bundled ark-native into packages/desktop/binaries/"
 	cd packages/desktop && npm install --silent 2>/dev/null && npx electron-builder
 
 # ── Packaging (all platforms) ────────────────────────────────────────────────
@@ -209,10 +203,7 @@ package: package-cli package-desktop ## Package CLI + Electron for all platforms
 
 package-cli: build-web ## Build self-contained CLI bundles for macOS + Linux (4 targets)
 	@echo "Building Ark bundles for all platforms..."
-	@mkdir -p dist node_modules/react-devtools-core 2>/dev/null; \
-	  test -f shims/react-devtools-core.js && \
-	  cp shims/react-devtools-core.js node_modules/react-devtools-core/index.js && \
-	  echo '{"main":"index.js"}' > node_modules/react-devtools-core/package.json || true
+	@mkdir -p dist
 	$(BUN) build --compile --target bun-darwin-arm64 packages/cli/index.ts --outfile dist/bin/ark-darwin-arm64
 	$(BUN) build --compile --target bun-darwin-x64   packages/cli/index.ts --outfile dist/bin/ark-darwin-x64
 	$(BUN) build --compile --target bun-linux-arm64  packages/cli/index.ts --outfile dist/bin/ark-linux-arm64
@@ -297,7 +288,7 @@ package-desktop: build-web ## Package Electron app (.dmg + .AppImage)
 # ── Other ────────────────────────────────────────────────────────────────────
 
 clean: ## Remove all build artifacts
-	rm -rf dist packages/web/dist packages/desktop/out node_modules/.cache
+	rm -rf dist packages/web/dist packages/desktop/out packages/desktop/binaries node_modules/.cache
 	rm -f ark-native ark-darwin-arm64 ark-darwin-x64 ark-linux-arm64 ark-linux-x64
 	@echo "Cleaned."
 

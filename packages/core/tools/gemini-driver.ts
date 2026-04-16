@@ -42,7 +42,9 @@ export class GeminiDriver implements ToolDriver {
   }): { script: string; sessionId: string } {
     const sessionId = opts.sessionId ?? randomUUID();
     const envLines = opts.env
-      ? Object.entries(opts.env).map(([k, v]) => `export ${k}=${JSON.stringify(v)}`).join("\n")
+      ? Object.entries(opts.env)
+          .map(([k, v]) => `export ${k}=${JSON.stringify(v)}`)
+          .join("\n")
       : "";
 
     const cmd = shellQuoteArgs(opts.toolArgs);

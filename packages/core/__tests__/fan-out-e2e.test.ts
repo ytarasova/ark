@@ -4,8 +4,15 @@ import { fanOut, checkAutoJoin, spawnSubagent } from "../services/session-orches
 import { getReadyStages, getStages, validateDAG } from "../state/flow.js";
 
 let app: AppContext;
-beforeAll(async () => { app = AppContext.forTest(); await app.boot(); setApp(app); });
-afterAll(async () => { await app?.shutdown(); clearApp(); });
+beforeAll(async () => {
+  app = AppContext.forTest();
+  await app.boot();
+  setApp(app);
+});
+afterAll(async () => {
+  await app?.shutdown();
+  clearApp();
+});
 
 describe("fan-out E2E", () => {
   test("full lifecycle: create parent, fan-out, complete children, auto-join", async () => {

@@ -5,7 +5,8 @@ import { getArkClient } from "./_shared.js";
 export function registerEvalCommands(program: Command) {
   const evalCmd = program.command("eval").description("Agent performance evaluation");
 
-  evalCmd.command("stats")
+  evalCmd
+    .command("stats")
     .description("Show agent performance stats")
     .option("-a, --agent <role>", "Agent role to filter by")
     .action(async (opts) => {
@@ -28,7 +29,8 @@ export function registerEvalCommands(program: Command) {
       console.log(`  Avg cost:        $${stats.avgCost.toFixed(4)}`);
     });
 
-  evalCmd.command("drift")
+  evalCmd
+    .command("drift")
     .description("Check for performance drift")
     .option("-a, --agent <role>", "Agent role to check")
     .option("-d, --days <n>", "Recent window in days", "7")
@@ -58,7 +60,8 @@ export function registerEvalCommands(program: Command) {
       }
     });
 
-  evalCmd.command("list")
+  evalCmd
+    .command("list")
     .description("List recent eval results")
     .option("-a, --agent <role>", "Agent role to filter by")
     .option("-n, --limit <n>", "Max results", "20")
@@ -72,14 +75,16 @@ export function registerEvalCommands(program: Command) {
       }
 
       console.log(chalk.bold(`\nRecent Evals (${evals.length})\n`));
-      console.log(chalk.dim(
-        "Session".padEnd(14) +
-        "Agent".padEnd(16) +
-        "Status".padEnd(12) +
-        "Turns".padEnd(8) +
-        "Duration".padEnd(12) +
-        "Cost"
-      ));
+      console.log(
+        chalk.dim(
+          "Session".padEnd(14) +
+            "Agent".padEnd(16) +
+            "Status".padEnd(12) +
+            "Turns".padEnd(8) +
+            "Duration".padEnd(12) +
+            "Cost",
+        ),
+      );
       console.log(chalk.dim("-".repeat(72)));
 
       for (const e of evals) {

@@ -71,7 +71,7 @@ describe("evaluateSession", () => {
   it("records failed session metrics", () => {
     const session = makeSession({ id: "s-eval-fail", agent: "worker", status: "failed" });
     app.sessions.create({ summary: "fail test", repo: "/tmp/test", flow: "bare" });
-    const created = app.sessions.list().find(s => s.summary === "fail test")!;
+    const created = app.sessions.list().find((s) => s.summary === "fail test")!;
     app.sessions.update(created.id, { status: "failed", agent: "worker" } as Partial<Session>);
     const freshSession = app.sessions.get(created.id)!;
 
@@ -82,7 +82,7 @@ describe("evaluateSession", () => {
 
   it("detects PR creation", () => {
     app.sessions.create({ summary: "pr test", repo: "/tmp/test", flow: "bare" });
-    const created = app.sessions.list().find(s => s.summary === "pr test")!;
+    const created = app.sessions.list().find((s) => s.summary === "pr test")!;
     app.sessions.update(created.id, {
       status: "completed",
       agent: "implementer",
@@ -112,8 +112,8 @@ describe("getAgentStats", () => {
           agentRole: "planner",
           runtime: "claude",
           model: "opus",
-          completed: i < 2,  // 2 out of 3 completed
-          testsPassed: i === 0 ? true : (i === 1 ? false : null),
+          completed: i < 2, // 2 out of 3 completed
+          testsPassed: i === 0 ? true : i === 1 ? false : null,
           prCreated: i === 0,
           turnCount: 10 + i,
           durationMs: 60000 * (i + 1),

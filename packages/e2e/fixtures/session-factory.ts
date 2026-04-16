@@ -34,10 +34,16 @@ export function cleanupSessions(env: E2EEnv) {
     try {
       const s = app.sessions.get(id);
       if (s?.session_id) {
-        try { killSession(s.session_id); } catch { /* cleanup */ }
+        try {
+          killSession(s.session_id);
+        } catch {
+          /* cleanup */
+        }
       }
       app.sessions.delete(id);
-    } catch { /* cleanup */ }
+    } catch {
+      /* cleanup */
+    }
   }
   env.sessionIds.length = 0;
 }

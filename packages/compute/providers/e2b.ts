@@ -8,29 +8,43 @@
 
 import type { AppContext } from "../../core/app.js";
 import type {
-  ComputeProvider, Compute, Session, ProvisionOpts, LaunchOpts, SyncOpts,
-  IsolationMode, ComputeSnapshot, ComputeMetrics, PortDecl, PortStatus,
+  ComputeProvider,
+  Compute,
+  Session,
+  ProvisionOpts,
+  LaunchOpts,
+  SyncOpts,
+  IsolationMode,
+  ComputeSnapshot,
+  ComputeMetrics,
+  PortDecl,
+  PortStatus,
 } from "../types.js";
 import { DEFAULT_CONDUCTOR_URL } from "../../core/constants.js";
 
 export interface E2BConfig {
   provider: "e2b";
-  template?: string;      // E2B sandbox template (default: "base")
-  apiKey?: string;         // E2B API key (default: E2B_API_KEY env)
-  timeout?: number;        // Sandbox timeout in seconds (default: 3600)
+  template?: string; // E2B sandbox template (default: "base")
+  apiKey?: string; // E2B API key (default: E2B_API_KEY env)
+  timeout?: number; // Sandbox timeout in seconds (default: 3600)
   [key: string]: unknown;
 }
 
 const EMPTY_METRICS: ComputeMetrics = {
-  cpu: 0, memUsedGb: 0, memTotalGb: 0, memPct: 0, diskPct: 0,
-  netRxMb: 0, netTxMb: 0, uptime: "N/A", idleTicks: 0,
+  cpu: 0,
+  memUsedGb: 0,
+  memTotalGb: 0,
+  memPct: 0,
+  diskPct: 0,
+  netRxMb: 0,
+  netTxMb: 0,
+  uptime: "N/A",
+  idleTicks: 0,
 };
 
 export class E2BProvider implements ComputeProvider {
   readonly name = "e2b";
-  readonly isolationModes: IsolationMode[] = [
-    { value: "sandbox", label: "E2B managed Firecracker sandbox" },
-  ];
+  readonly isolationModes: IsolationMode[] = [{ value: "sandbox", label: "E2B managed Firecracker sandbox" }];
   readonly canDelete = true;
   readonly canReboot = false;
   readonly supportsWorktree = false;
@@ -41,7 +55,9 @@ export class E2BProvider implements ComputeProvider {
   // sessionId -> Sandbox instance (lazy import of e2b SDK)
   private sandboxes = new Map<string, any>();
 
-  setApp(app: AppContext): void { this.app = app; }
+  setApp(app: AppContext): void {
+    this.app = app;
+  }
 
   private async getSdk(): Promise<typeof import("e2b")> {
     return await import("e2b");
@@ -106,7 +122,11 @@ export class E2BProvider implements ComputeProvider {
     // Kill all sandboxes for this compute
     const entries = Array.from(this.sandboxes.entries());
     for (const [_sid, sandbox] of entries) {
-      try { await sandbox.kill(); } catch { /* may already be gone */ }
+      try {
+        await sandbox.kill();
+      } catch {
+        /* may already be gone */
+      }
     }
     this.sandboxes.clear();
     this.app!.computes.update(compute.name, { status: "stopped" });
@@ -142,7 +162,7 @@ export class E2BProvider implements ComputeProvider {
   }
 
   async probePorts(_compute: Compute, ports: PortDecl[]): Promise<PortStatus[]> {
-    return ports.map(p => ({ ...p, listening: false }));
+    return ports.map((p) => ({ ...p, listening: false }));
   }
 
   async syncEnvironment(_compute: Compute, _opts: SyncOpts): Promise<void> {
@@ -153,7 +173,12 @@ export class E2BProvider implements ComputeProvider {
     return ["echo", "E2B sandboxes do not support direct attach. Use ark session output."];
   }
 
-  buildChannelConfig(sessionId: string, stage: string, channelPort: number, opts?: { conductorUrl?: string }): Record<string, unknown> {
+  buildChannelConfig(
+    sessionId: string,
+    stage: string,
+    channelPort: number,
+    opts?: { conductorUrl?: string },
+  ): Record<string, unknown> {
     // E2B sandboxes run remotely; channel config points back to conductor
     return {
       env: {

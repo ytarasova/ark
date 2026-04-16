@@ -33,8 +33,8 @@ export interface SSHPoolOpts {
   computeName: string;
   key: string;
   ip: string;
-  maxConcurrent?: number;   // default 10
-  controlPersist?: number;  // default 300 seconds
+  maxConcurrent?: number; // default 10
+  controlPersist?: number; // default 300 seconds
 }
 
 export class SSHPool {
@@ -66,15 +66,18 @@ export class SSHPool {
     this.ip = newIp;
   }
 
-  getIp(): string { return this.ip; }
+  getIp(): string {
+    return this.ip;
+  }
 
   async isAlive(): Promise<boolean> {
     if (this.closed) return false;
     try {
-      await execFileAsync("ssh", [
-        "-i", this.key, "-o", `ControlPath=${this.socketPath}`,
-        "-O", "check", `ubuntu@${this.ip}`,
-      ], { timeout: SSH_CHECK_TIMEOUT_MS });
+      await execFileAsync(
+        "ssh",
+        ["-i", this.key, "-o", `ControlPath=${this.socketPath}`, "-O", "check", `ubuntu@${this.ip}`],
+        { timeout: SSH_CHECK_TIMEOUT_MS },
+      );
       return true;
     } catch {
       // Expected when master socket doesn't exist yet
@@ -87,31 +90,43 @@ export class SSHPool {
     if (this.closed) throw new Error("Pool is closed");
     if (await this.isAlive()) return;
     if (this.masterStarting) {
-      await new Promise<void>(r => this.waitQueue.push(r));
+      await new Promise<void>((r) => this.waitQueue.push(r));
       return;
     }
 
     this.masterStarting = true;
     try {
       if (existsSync(this.socketPath)) {
-        try { rmSync(this.socketPath); } catch {
+<<<<<<< HEAD
+        try {
+          rmSync(this.socketPath);
+        } catch {
           // Stale socket file may already be gone -- safe to ignore
         }
       }
 
-      await execFileAsync("ssh", [
-        "-i", this.key,
-        ...SSH_OPTS,
-        "-o", `ControlMaster=yes`,
-        "-o", `ControlPath=${this.socketPath}`,
-        "-o", `ControlPersist=${this.controlPersist}`,
-        "-N", "-f",
-        `ubuntu@${this.ip}`,
-      ], { timeout: SSH_MASTER_CONNECT_TIMEOUT_MS });
+      await execFileAsync(
+        "ssh",
+        [
+          "-i",
+          this.key,
+          ...SSH_OPTS,
+          "-o",
+          `ControlMaster=yes`,
+          "-o",
+          `ControlPath=${this.socketPath}`,
+          "-o",
+          `ControlPersist=${this.controlPersist}`,
+          "-N",
+          "-f",
+          `ubuntu@${this.ip}`,
+        ],
+        { timeout: SSH_MASTER_CONNECT_TIMEOUT_MS },
+      );
     } finally {
       this.masterStarting = false;
       const q = this.waitQueue.splice(0);
-      q.forEach(r => r());
+      q.forEach((r) => r());
     }
   }
 
@@ -120,15 +135,24 @@ export class SSHPool {
     await this.connect();
     await this.acquire();
     try {
-      const { stdout } = await execFileAsync("ssh", [
-        "-i", this.key,
-        "-o", `ControlPath=${this.socketPath}`,
-        "-o", "ControlMaster=no",
-        "-o", "StrictHostKeyChecking=no",
-        "-o", "LogLevel=ERROR",
-        `ubuntu@${this.ip}`,
-        cmd,
-      ], { encoding: "utf-8", timeout: opts?.timeout ?? SSH_EXEC_TIMEOUT_MS });
+      const { stdout } = await execFileAsync(
+        "ssh",
+        [
+          "-i",
+          this.key,
+          "-o",
+          `ControlPath=${this.socketPath}`,
+          "-o",
+          "ControlMaster=no",
+          "-o",
+          "StrictHostKeyChecking=no",
+          "-o",
+          "LogLevel=ERROR",
+          `ubuntu@${this.ip}`,
+          cmd,
+        ],
+        { encoding: "utf-8", timeout: opts?.timeout ?? SSH_EXEC_TIMEOUT_MS },
+      );
       return { stdout, stderr: "", exitCode: 0 };
     } catch (err: any) {
       return {
@@ -150,11 +174,11 @@ export class SSHPool {
     await this.acquire();
     try {
       await safeAsync(`[ec2] SSHPool.rsyncPush: (${local} -> ${this.ip}:${remote})`, async () => {
-        await execFileAsync("rsync", [
-          "-avz", "--update", "--timeout=30",
-          "-e", this.rsyncSshOpt(),
-          local, `ubuntu@${this.ip}:${remote}`,
-        ], { encoding: "utf-8", timeout: opts?.timeout ?? RSYNC_TIMEOUT_MS });
+        await execFileAsync(
+          "rsync",
+          ["-avz", "--update", "--timeout=30", "-e", this.rsyncSshOpt(), local, `ubuntu@${this.ip}:${remote}`],
+          { encoding: "utf-8", timeout: opts?.timeout ?? RSYNC_TIMEOUT_MS },
+        );
       });
     } finally {
       this.release();
@@ -166,11 +190,11 @@ export class SSHPool {
     await this.acquire();
     try {
       await safeAsync(`[ec2] SSHPool.rsyncPull: (${this.ip}:${remote} -> ${local})`, async () => {
-        await execFileAsync("rsync", [
-          "-avz", "--update", "--timeout=30",
-          "-e", this.rsyncSshOpt(),
-          `ubuntu@${this.ip}:${remote}`, local,
-        ], { encoding: "utf-8", timeout: opts?.timeout ?? RSYNC_TIMEOUT_MS });
+        await execFileAsync(
+          "rsync",
+          ["-avz", "--update", "--timeout=30", "-e", this.rsyncSshOpt(), `ubuntu@${this.ip}:${remote}`, local],
+          { encoding: "utf-8", timeout: opts?.timeout ?? RSYNC_TIMEOUT_MS },
+        );
       });
     } finally {
       this.release();
@@ -179,27 +203,43 @@ export class SSHPool {
 
   /** Spawn a persistent tunnel using the ControlMaster. */
   spawnTunnel(flags: string[]): void {
-    const child = spawn("ssh", [
-      "-i", this.key,
-      "-o", `ControlPath=${this.socketPath}`,
-      "-o", "ControlMaster=no",
-      "-o", "StrictHostKeyChecking=no",
-      "-N", "-f",
-      ...flags,
-      `ubuntu@${this.ip}`,
-    ], { detached: true, stdio: "ignore" });
+    const child = spawn(
+      "ssh",
+      [
+        "-i",
+        this.key,
+        "-o",
+        `ControlPath=${this.socketPath}`,
+        "-o",
+        "ControlMaster=no",
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-N",
+        "-f",
+        ...flags,
+        `ubuntu@${this.ip}`,
+      ],
+      { detached: true, stdio: "ignore" },
+    );
     child.unref();
   }
 
   /** Build args for interactive attach. */
   attachArgs(remoteCmd: string): string[] {
     return [
-      "ssh", "-i", this.key,
-      "-o", `ControlPath=${this.socketPath}`,
-      "-o", "ControlMaster=no",
-      "-o", "StrictHostKeyChecking=no",
-      "-o", "ConnectTimeout=10",
-      "-t", `ubuntu@${this.ip}`,
+      "ssh",
+      "-i",
+      this.key,
+      "-o",
+      `ControlPath=${this.socketPath}`,
+      "-o",
+      "ControlMaster=no",
+      "-o",
+      "StrictHostKeyChecking=no",
+      "-o",
+      "ConnectTimeout=10",
+      "-t",
+      `ubuntu@${this.ip}`,
       remoteCmd,
     ];
   }
@@ -211,10 +251,9 @@ export class SSHPool {
 
   private async destroyMaster(): Promise<void> {
     try {
-      await execFileAsync("ssh", [
-        "-o", `ControlPath=${this.socketPath}`,
-        "-O", "exit", `ubuntu@${this.ip}`,
-      ], { timeout: SSH_CHECK_TIMEOUT_MS });
+      await execFileAsync("ssh", ["-o", `ControlPath=${this.socketPath}`, "-O", "exit", `ubuntu@${this.ip}`], {
+        timeout: SSH_CHECK_TIMEOUT_MS,
+      });
     } catch {
       // Master may already be dead -- expected during cleanup
     }
@@ -231,7 +270,7 @@ export class SSHPool {
       this.active++;
       return;
     }
-    await new Promise<void>(resolve => this.waitQueue.push(resolve));
+    await new Promise<void>((resolve) => this.waitQueue.push(resolve));
     this.active++;
   }
 
@@ -271,5 +310,5 @@ export async function destroyPool(computeName: string): Promise<void> {
 export async function destroyAllPools(): Promise<void> {
   const all = [...pools.values()];
   pools.clear();
-  await Promise.all(all.map(p => p.close()));
+  await Promise.all(all.map((p) => p.close()));
 }

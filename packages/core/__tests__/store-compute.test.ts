@@ -5,7 +5,6 @@ import { withTestContext } from "./test-helpers.js";
 withTestContext();
 
 describe("compute CRUD", () => {
-
   it("rejects creating a second local compute (singleton)", () => {
     // "local" is auto-seeded -- creating another with provider=local must throw
     expect(() => getApp().computes.create({ name: "my-laptop" })).toThrow(/singleton/);
@@ -62,7 +61,7 @@ describe("compute CRUD", () => {
     const running = getApp().computes.list({ status: "running" });
     // "local" is auto-created as running + "b" was set to running
     expect(running.length).toBe(2);
-    expect(running.some(c => c.name === "b")).toBe(true);
+    expect(running.some((c) => c.name === "b")).toBe(true);
   });
 
   it("updates compute fields including config as JSON", () => {
@@ -115,7 +114,9 @@ describe("compute CRUD", () => {
 
     // Small delay to ensure timestamp differs
     const spinUntil = Date.now() + 5;
-    while (Date.now() < spinUntil) { /* busy-wait for timestamp to differ */ }
+    while (Date.now() < spinUntil) {
+      /* busy-wait for timestamp to differ */
+    }
 
     const updated = getApp().computes.update("dev", {});
     expect(updated).not.toBeNull();
@@ -142,7 +143,9 @@ describe("compute CRUD", () => {
     const originalUpdatedAt = compute.updated_at;
 
     const spinUntil = Date.now() + 5;
-    while (Date.now() < spinUntil) { /* busy-wait for timestamp to differ */ }
+    while (Date.now() < spinUntil) {
+      /* busy-wait for timestamp to differ */
+    }
 
     const updated = getApp().computes.update("ts-check", { status: "running" });
     expect(updated).not.toBeNull();

@@ -70,7 +70,7 @@ describe("SessionScheduler with tenant policies", () => {
     scheduler.setPolicyManager(pm);
 
     await expect(scheduler.schedule(session, "strict-tenant")).rejects.toThrow(
-      'Provider "ec2" not allowed for tenant "strict-tenant"'
+      'Provider "ec2" not allowed for tenant "strict-tenant"',
     );
   });
 

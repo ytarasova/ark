@@ -11,9 +11,19 @@ import type { AppContext } from "../core/app.js";
 
 // Re-export types
 export type {
-  ComputeProvider, IsolationMode, ProvisionOpts, LaunchOpts, SyncOpts,
-  ComputeSnapshot, ComputeMetrics, ComputeSession, ComputeProcess, DockerContainer,
-  PortDecl, PortStatus, ArcJson,
+  ComputeProvider,
+  IsolationMode,
+  ProvisionOpts,
+  LaunchOpts,
+  SyncOpts,
+  ComputeSnapshot,
+  ComputeMetrics,
+  ComputeSession,
+  ComputeProcess,
+  DockerContainer,
+  PortDecl,
+  PortStatus,
+  ArcJson,
 } from "./types.js";
 
 export function getIsolationModes(providerName: string): { value: string; label: string }[] {
@@ -54,7 +64,6 @@ export function clearProviders(): void {
 // Legacy provider classes (kept for backward compatibility during migration)
 import { LocalProvider } from "./providers/local/index.js";
 export { LocalProvider };
-
 
 import { DockerProvider } from "./providers/docker/index.js";
 export { DockerProvider };

@@ -18,12 +18,34 @@ export function generateOpenApiSpec(): object {
         get: {
           summary: "List sessions",
           tags: ["Sessions"],
-          responses: { "200": { description: "Session list", content: { "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/Session" } } } } } },
+          responses: {
+            "200": {
+              description: "Session list",
+              content: {
+                "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/Session" } } },
+              },
+            },
+          },
         },
         post: {
           summary: "Create session",
           tags: ["Sessions"],
-          requestBody: { content: { "application/json": { schema: { type: "object", properties: { summary: { type: "string" }, repo: { type: "string" }, flow: { type: "string" }, group_name: { type: "string" }, workdir: { type: "string" } } } } } },
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    summary: { type: "string" },
+                    repo: { type: "string" },
+                    flow: { type: "string" },
+                    group_name: { type: "string" },
+                    workdir: { type: "string" },
+                  },
+                },
+              },
+            },
+          },
           responses: { "200": { description: "Created" } },
         },
       },
@@ -36,19 +58,44 @@ export function generateOpenApiSpec(): object {
         },
       },
       "/api/sessions/{id}/dispatch": {
-        post: { summary: "Dispatch session", tags: ["Sessions"], parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Dispatched" } } },
+        post: {
+          summary: "Dispatch session",
+          tags: ["Sessions"],
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Dispatched" } },
+        },
       },
       "/api/sessions/{id}/stop": {
-        post: { summary: "Stop session", tags: ["Sessions"], parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Stopped" } } },
+        post: {
+          summary: "Stop session",
+          tags: ["Sessions"],
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Stopped" } },
+        },
       },
       "/api/sessions/{id}/restart": {
-        post: { summary: "Restart session", tags: ["Sessions"], parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Restarted" } } },
+        post: {
+          summary: "Restart session",
+          tags: ["Sessions"],
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Restarted" } },
+        },
       },
       "/api/sessions/{id}/delete": {
-        post: { summary: "Delete session", tags: ["Sessions"], parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Deleted" } } },
+        post: {
+          summary: "Delete session",
+          tags: ["Sessions"],
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Deleted" } },
+        },
       },
       "/api/sessions/{id}/output": {
-        get: { summary: "Get live output", tags: ["Sessions"], parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }], responses: { "200": { description: "Output text" } } },
+        get: {
+          summary: "Get live output",
+          tags: ["Sessions"],
+          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+          responses: { "200": { description: "Output text" } },
+        },
       },
       "/api/costs": {
         get: { summary: "Get cost summary", tags: ["Costs"], responses: { "200": { description: "Cost data" } } },
@@ -60,7 +107,11 @@ export function generateOpenApiSpec(): object {
         get: { summary: "List groups", tags: ["System"], responses: { "200": { description: "Group names" } } },
       },
       "/api/events/stream": {
-        get: { summary: "SSE event stream", tags: ["System"], responses: { "200": { description: "Server-Sent Events stream" } } },
+        get: {
+          summary: "SSE event stream",
+          tags: ["System"],
+          responses: { "200": { description: "Server-Sent Events stream" } },
+        },
       },
     },
     components: {
@@ -68,10 +119,17 @@ export function generateOpenApiSpec(): object {
         Session: {
           type: "object",
           properties: {
-            id: { type: "string" }, summary: { type: "string" }, status: { type: "string" },
-            repo: { type: "string" }, branch: { type: "string" }, agent: { type: "string" },
-            flow: { type: "string" }, stage: { type: "string" }, group_name: { type: "string" },
-            created_at: { type: "string" }, updated_at: { type: "string" },
+            id: { type: "string" },
+            summary: { type: "string" },
+            status: { type: "string" },
+            repo: { type: "string" },
+            branch: { type: "string" },
+            agent: { type: "string" },
+            flow: { type: "string" },
+            stage: { type: "string" },
+            group_name: { type: "string" },
+            created_at: { type: "string" },
+            updated_at: { type: "string" },
           },
         },
       },

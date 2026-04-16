@@ -116,12 +116,10 @@ describe("EC2 SSH primitives", () => {
       const publicKeyPath = `${privateKeyPath}.pub`;
 
       // Use execFileSync directly to generate the key in temp dir
-      execFileSync("ssh-keygen", [
-        "-t", "ed25519",
-        "-f", privateKeyPath,
-        "-N", "",
-        "-C", `ark-${hostName}`,
-      ], { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] });
+      execFileSync("ssh-keygen", ["-t", "ed25519", "-f", privateKeyPath, "-N", "", "-C", `ark-${hostName}`], {
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+      });
 
       expect(existsSync(privateKeyPath)).toBe(true);
       expect(existsSync(publicKeyPath)).toBe(true);

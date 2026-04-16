@@ -55,7 +55,9 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
         if (!cancelled) setLoadingRecent(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Load Claude Code sessions (for Transcripts tab)
@@ -130,10 +132,10 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
     // Build the list for the left panel
     const allResults = searched
       ? [
-          ...sessionResults.map(r => ({ ...r, _type: "session" as const })),
-          ...transcriptResults.map(r => ({ ...r, _type: "transcript" as const })),
+          ...sessionResults.map((r) => ({ ...r, _type: "session" as const })),
+          ...transcriptResults.map((r) => ({ ...r, _type: "transcript" as const })),
         ]
-      : recentSessions.map(s => ({ ...s, _type: "recent" as const }));
+      : recentSessions.map((s) => ({ ...s, _type: "recent" as const }));
 
     return (
       <>
@@ -156,10 +158,7 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
               <span className="text-muted-foreground text-[10px] font-mono">
                 {allResults.length} result{allResults.length !== 1 ? "s" : ""}
               </span>
-              <button
-                className="text-[10px] text-muted-foreground hover:text-foreground"
-                onClick={handleClear}
-              >
+              <button className="text-[10px] text-muted-foreground hover:text-foreground" onClick={handleClear}>
                 Clear
               </button>
             </div>
@@ -194,15 +193,19 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
                 className={cn(
                   "flex flex-col px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors",
                   "hover:bg-accent",
-                  selected?.id === s.id && selectedType === "session" && !searched && "bg-accent border-l-2 border-l-primary"
+                  selected?.id === s.id &&
+                    selectedType === "session" &&
+                    !searched &&
+                    "bg-accent border-l-2 border-l-primary",
                 )}
-                onClick={() => { setSelected(s); setSelectedType("session"); }}
+                onClick={() => {
+                  setSelected(s);
+                  setSelectedType("session");
+                }}
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <StatusDot status={s.status} />
-                  <span className="text-[12px] text-foreground truncate leading-snug">
-                    {s.summary || s.id}
-                  </span>
+                  <span className="text-[12px] text-foreground truncate leading-snug">{s.summary || s.id}</span>
                 </div>
                 <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground font-mono">
                   <span>{s.id}</span>
@@ -235,12 +238,17 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
                 className={cn(
                   "flex flex-col px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors",
                   "hover:bg-accent",
-                  selected === r && selectedType === "session" && "bg-accent border-l-2 border-l-primary"
+                  selected === r && selectedType === "session" && "bg-accent border-l-2 border-l-primary",
                 )}
-                onClick={() => { setSelected(r); setSelectedType("session"); }}
+                onClick={() => {
+                  setSelected(r);
+                  setSelectedType("session");
+                }}
               >
                 <div className="flex items-center gap-2 min-w-0">
-                  <Badge variant="outline" className="text-[9px] shrink-0">{r.source || "session"}</Badge>
+                  <Badge variant="outline" className="text-[9px] shrink-0">
+                    {r.source || "session"}
+                  </Badge>
                   <span className="text-[12px] text-foreground truncate leading-snug">
                     {r.match ? String(r.match).slice(0, 50) : r.sessionId || ""}
                   </span>
@@ -268,9 +276,12 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
                 className={cn(
                   "flex flex-col px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors",
                   "hover:bg-accent",
-                  selected === r && selectedType === "transcript" && "bg-accent border-l-2 border-l-primary"
+                  selected === r && selectedType === "transcript" && "bg-accent border-l-2 border-l-primary",
                 )}
-                onClick={() => { setSelected(r); setSelectedType("transcript"); }}
+                onClick={() => {
+                  setSelected(r);
+                  setSelectedType("transcript");
+                }}
               >
                 <span className="text-[12px] text-foreground truncate leading-snug">
                   {r.projectName || r.fileName || r.sessionId || `Transcript ${i + 1}`}
@@ -299,7 +310,7 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
           <button
             className={cn(
               "flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded",
-              refreshing && "opacity-50 pointer-events-none"
+              refreshing && "opacity-50 pointer-events-none",
             )}
             onClick={handleRefresh}
             disabled={refreshing}
@@ -322,46 +333,48 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
           <div className="flex flex-col items-center justify-center py-12 px-4">
             <FileText size={20} className="text-muted-foreground/30 mb-2" />
             <p className="text-[11px] text-muted-foreground text-center">No Claude Code transcripts found</p>
-            <button
-              className="text-[10px] text-primary hover:underline mt-2"
-              onClick={handleRefresh}
-            >
+            <button className="text-[10px] text-primary hover:underline mt-2" onClick={handleRefresh}>
               Scan for transcripts
             </button>
           </div>
         )}
 
         {/* Claude sessions list */}
-        {!loadingClaude && claudeSessions.length > 0 && claudeSessions.map((cs: any, i: number) => (
-          <div
-            key={cs.sessionId || i}
-            className={cn(
-              "flex flex-col px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors",
-              "hover:bg-accent",
-              selected?.sessionId === cs.sessionId && selectedType === "transcript" && "bg-accent border-l-2 border-l-primary"
-            )}
-            onClick={() => { setSelected(cs); setSelectedType("transcript"); }}
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <FileText size={10} className="text-muted-foreground shrink-0" />
-              <span className="text-[12px] text-foreground truncate leading-snug">
-                {cs.project || cs.sessionId}
-              </span>
-            </div>
-            {cs.summary && (
-              <span className="text-[11px] text-muted-foreground mt-0.5 truncate pl-[18px]">
-                {cs.summary}
-              </span>
-            )}
-            <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground font-mono pl-[18px]">
-              {cs.messageCount != null && (
-                <span>{cs.messageCount} msg{cs.messageCount !== 1 ? "s" : ""}</span>
+        {!loadingClaude &&
+          claudeSessions.length > 0 &&
+          claudeSessions.map((cs: any, i: number) => (
+            <div
+              key={cs.sessionId || i}
+              className={cn(
+                "flex flex-col px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors",
+                "hover:bg-accent",
+                selected?.sessionId === cs.sessionId &&
+                  selectedType === "transcript" &&
+                  "bg-accent border-l-2 border-l-primary",
               )}
-              <span className="flex-1" />
-              <span className="shrink-0">{relTime(cs.lastActivity || cs.timestamp)}</span>
+              onClick={() => {
+                setSelected(cs);
+                setSelectedType("transcript");
+              }}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText size={10} className="text-muted-foreground shrink-0" />
+                <span className="text-[12px] text-foreground truncate leading-snug">{cs.project || cs.sessionId}</span>
+              </div>
+              {cs.summary && (
+                <span className="text-[11px] text-muted-foreground mt-0.5 truncate pl-[18px]">{cs.summary}</span>
+              )}
+              <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground font-mono pl-[18px]">
+                {cs.messageCount != null && (
+                  <span>
+                    {cs.messageCount} msg{cs.messageCount !== 1 ? "s" : ""}
+                  </span>
+                )}
+                <span className="flex-1" />
+                <span className="shrink-0">{relTime(cs.lastActivity || cs.timestamp)}</span>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
       </>
     );
   }
@@ -371,14 +384,16 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
     return (
       <div className="p-5">
         <div className="flex items-center gap-2 mb-4">
-          <Badge variant="outline" className="text-[10px]">transcript</Badge>
-          {cs.project && (
-            <span className="text-[13px] font-semibold text-foreground">{cs.project}</span>
-          )}
+          <Badge variant="outline" className="text-[10px]">
+            transcript
+          </Badge>
+          {cs.project && <span className="text-[13px] font-semibold text-foreground">{cs.project}</span>}
         </div>
         {cs.summary && (
           <div className="mb-4">
-            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Summary</h3>
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+              Summary
+            </h3>
             <p className="text-[13px] text-foreground leading-relaxed">{cs.summary}</p>
           </div>
         )}
@@ -436,13 +451,11 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
     return (
       <div className="p-5">
         <div className="flex items-center gap-2 mb-4">
-          <Badge variant="outline" className="text-[10px]">transcript</Badge>
-          {r.projectName && (
-            <span className="text-[12px] text-muted-foreground font-mono">{r.projectName}</span>
-          )}
-          {r.fileName && (
-            <span className="text-[12px] text-muted-foreground/60 font-mono">{r.fileName}</span>
-          )}
+          <Badge variant="outline" className="text-[10px]">
+            transcript
+          </Badge>
+          {r.projectName && <span className="text-[12px] text-muted-foreground font-mono">{r.projectName}</span>}
+          {r.fileName && <span className="text-[12px] text-muted-foreground/60 font-mono">{r.fileName}</span>}
         </div>
         <div className="mb-4">
           <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Content</h3>
@@ -450,11 +463,7 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
             {r.matchLine || r.match || String(r.content || "")}
           </div>
         </div>
-        {r.lineNumber && (
-          <div className="text-[10px] text-muted-foreground/50 font-mono">
-            line {r.lineNumber}
-          </div>
-        )}
+        {r.lineNumber && <div className="text-[10px] text-muted-foreground/50 font-mono">line {r.lineNumber}</div>}
         {onSelectSession && r.sessionId && (
           <Button size="sm" variant="outline" className="mt-3" onClick={() => onSelectSession(r.sessionId)}>
             View in Sessions
@@ -482,7 +491,9 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
               <StatusBadge status={selected.status} />
             </div>
             <div className="mb-4">
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Details</h3>
+              <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+                Details
+              </h3>
               <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
                 <span className="text-muted-foreground">ID</span>
                 <span className="text-card-foreground font-mono">{selected.id}</span>
@@ -522,7 +533,9 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
           /* Search session result detail */
           <div className="p-5">
             <div className="flex items-center gap-2 mb-4">
-              <Badge variant="outline" className="text-[10px]">{selected.source || "session"}</Badge>
+              <Badge variant="outline" className="text-[10px]">
+                {selected.source || "session"}
+              </Badge>
               <span className="text-[12px] text-muted-foreground font-mono">{selected.sessionId || ""}</span>
               {selected.timestamp && (
                 <span className="text-[11px] text-muted-foreground/60 font-mono">{relTime(selected.timestamp)}</span>
@@ -530,7 +543,9 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
             </div>
             {selected.match && (
               <div className="mb-4">
-                <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Match</h3>
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+                  Match
+                </h3>
                 <div className="bg-black/40 border border-border rounded-lg p-3.5 text-[13px] leading-[1.7] max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words text-foreground">
                   {String(selected.match)}
                 </div>
@@ -576,7 +591,9 @@ function TranscriptMessages({ sessionId }: { sessionId: string }) {
     }
   }, [sessionId]);
 
-  useEffect(() => { if (sessionId) loadMessages(); }, [sessionId, loadMessages]);
+  useEffect(() => {
+    if (sessionId) loadMessages();
+  }, [sessionId, loadMessages]);
 
   const handleIndex = async () => {
     setIndexing(true);
@@ -610,7 +627,9 @@ function TranscriptMessages({ sessionId }: { sessionId: string }) {
 
   return (
     <div className="mb-4">
-      <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Recent Messages ({turns.length})</h3>
+      <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+        Recent Messages ({turns.length})
+      </h3>
       <div className="flex flex-col gap-1.5">
         {turns.map((t: any, i: number) => (
           <div
@@ -619,16 +638,24 @@ function TranscriptMessages({ sessionId }: { sessionId: string }) {
               "rounded-lg px-3 py-2 text-[12px] leading-relaxed max-w-[90%]",
               t.role === "user"
                 ? "bg-primary/10 border border-primary/20 self-end text-foreground"
-                : "bg-secondary border border-border self-start text-card-foreground"
+                : "bg-secondary border border-border self-start text-card-foreground",
             )}
           >
             <div className="flex items-center gap-2 mb-0.5">
-              <span className={cn("text-[10px] font-semibold uppercase", t.role === "user" ? "text-primary" : "text-muted-foreground")}>
+              <span
+                className={cn(
+                  "text-[10px] font-semibold uppercase",
+                  t.role === "user" ? "text-primary" : "text-muted-foreground",
+                )}
+              >
                 {t.role}
               </span>
               {t.timestamp && <span className="text-[10px] text-muted-foreground">{relTime(t.timestamp)}</span>}
             </div>
-            <div className="whitespace-pre-wrap break-words">{(t.content || "").slice(0, 500)}{(t.content || "").length > 500 ? "..." : ""}</div>
+            <div className="whitespace-pre-wrap break-words">
+              {(t.content || "").slice(0, 500)}
+              {(t.content || "").length > 500 ? "..." : ""}
+            </div>
           </div>
         ))}
       </div>

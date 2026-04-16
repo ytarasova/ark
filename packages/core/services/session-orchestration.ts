@@ -14,10 +14,10 @@ import { promisify } from "util";
 const execFileAsync = promisify(execFile);
 
 import type { AppContext } from "../app.js";
-import type { Session, Compute, MessageRole, MessageType } from "../../types/index.js";
+import type { Session, Compute } from "../../types/index.js";
 import * as tmux from "../infra/tmux.js";
 import * as flow from "../state/flow.js";
-import type { FlowDefinition } from "../state/flow.js";
+
 import * as agentRegistry from "../agent/agent.js";
 import * as claude from "../claude/claude.js";
 import { getProvider } from "../../compute/index.js";
@@ -27,20 +27,26 @@ import { resolvePortDecls, parseArcJson } from "../../compute/arc-json.js";
 import { buildSessionVars } from "../template.js";
 import { resolveFlow } from "../state/flow.js";
 import { loadRepoConfig } from "../repo-config.js";
-import type { OutboundMessage } from "../conductor/channel-types.js";
+
 import { safeAsync } from "../safe.js";
 import { saveCheckpoint } from "../session/checkpoint.js";
 import { profileGroupPrefix } from "../state/profiles.js";
 import { parseGraphFlow, getSuccessors, resolveNextStages, computeSkippedStages } from "../state/graph-flow.js";
-import { evaluateTermination, parseTermination, type TerminationContext } from "../termination.js";
-import { markStageCompleted, setCurrentStage, markStagesSkipped, getSkippedStages, loadFlowState } from "../state/flow-state.js";
+
+import { markStageCompleted, setCurrentStage, markStagesSkipped, loadFlowState } from "../state/flow-state.js";
 // memory.ts removed -- knowledge graph context injection handles memory/learning recall
-import { detectHandoff } from "../handoff.js";
+
 import { filterMessages, parseMessageFilter } from "../message-filter.js";
 import { logError, logWarn } from "../observability/structured-log.js";
 import { recordEvent } from "../observability.js";
 import { track } from "../observability/telemetry.js";
-import { emitSessionSpanStart, emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, flushSpans } from "../observability/otlp.js";
+import {
+  emitSessionSpanStart,
+  emitSessionSpanEnd,
+  emitStageSpanStart,
+  emitStageSpanEnd,
+  flushSpans,
+} from "../observability/otlp.js";
 import { detectInjection } from "../session/prompt-guard.js";
 import { generateRepoMap, formatRepoMap } from "../repo-map.js";
 import { getExecutor } from "../executor.js";
@@ -67,7 +73,13 @@ function ingestRemoteIndex(app: AppContext, data: any, log: (msg: string) => voi
       id: `symbol:${node.file}::${node.name}:${node.line}`,
       type: "symbol",
       label: node.name,
-      metadata: { kind: node.kind, file: node.file, line_start: node.line, line_end: node.end_line, exported: node.exported === 1 },
+      metadata: {
+        kind: node.kind,
+        file: node.file,
+        line_start: node.line,
+        line_end: node.end_line,
+        exported: node.exported === 1,
+      },
     });
   }
   for (const edge of data.edges ?? []) {
@@ -101,9 +113,7 @@ export function recordSessionUsage(
     const runtimeName = (session.config?.runtime as string | undefined) ?? session.agent ?? "claude";
     const runtime = app.runtimes.get(runtimeName);
     const billingMode = runtime?.billing?.mode ?? "api";
-    const model = (session.config?.model as string | undefined)
-      ?? runtime?.default_model
-      ?? "sonnet";
+    const model = (session.config?.model as string | undefined) ?? runtime?.default_model ?? "sonnet";
 
     app.usageRecorder.record({
       sessionId: session.id,
@@ -136,7 +146,8 @@ function resolveGitHubUrl(dir?: string | null): string | null {
   if (!dir) return null;
   try {
     const remote = execFileSync("git", ["-C", dir, "remote", "get-url", "origin"], {
-      encoding: "utf-8", timeout: 5_000,
+      encoding: "utf-8",
+      timeout: 5_000,
       stdio: ["ignore", "pipe", "pipe"],
     }).trim();
     // git@github.com:owner/repo.git -> https://github.com/owner/repo
@@ -156,17 +167,20 @@ function resolveGitHubUrl(dir?: string | null): string | null {
   }
 }
 
-export function startSession(app: AppContext, opts: {
-  ticket?: string;
-  summary?: string;
-  repo?: string;
-  flow?: string;
-  agent?: string | null;
-  compute_name?: string;
-  workdir?: string;
-  group_name?: string;
-  config?: Record<string, unknown>;
-}): Session {
+export function startSession(
+  app: AppContext,
+  opts: {
+    ticket?: string;
+    summary?: string;
+    repo?: string;
+    flow?: string;
+    agent?: string | null;
+    compute_name?: string;
+    workdir?: string;
+    group_name?: string;
+    config?: Record<string, unknown>;
+  },
+): Session {
   const repoDir = opts.workdir ?? opts.repo;
   const repoConfig = repoDir ? loadRepoConfig(repoDir) : {};
 
@@ -199,12 +213,13 @@ export function startSession(app: AppContext, opts: {
   }
 
   // Set first stage
-  const firstStage = flow.getFirstStage(app,mergedOpts.flow ?? "default");
+  const firstStage = flow.getFirstStage(app, mergedOpts.flow ?? "default");
   if (firstStage) {
-    const action = flow.getStageAction(app,mergedOpts.flow ?? "default", firstStage);
+    const action = flow.getStageAction(app, mergedOpts.flow ?? "default", firstStage);
     app.sessions.update(session.id, { stage: firstStage, status: "ready" });
     app.events.log(session.id, "stage_ready", {
-      stage: firstStage, actor: "system",
+      stage: firstStage,
+      actor: "system",
       data: { stage: firstStage, gate: "auto", stage_type: action.type, stage_agent: action.agent },
     });
 
@@ -214,7 +229,7 @@ export function startSession(app: AppContext, opts: {
       agent: opts.agent ?? undefined,
     });
     if (firstStage) {
-      const stageAction = flow.getStageAction(app,mergedOpts.flow ?? "default", firstStage);
+      const stageAction = flow.getStageAction(app, mergedOpts.flow ?? "default", firstStage);
       emitStageSpanStart(session.id, { stage: firstStage, agent: stageAction.agent, gate: "auto" });
     }
   }
@@ -240,7 +255,7 @@ export function resolveComputeForStage(
   // Resolve template: DB first, then config
   let tmpl = app.computeTemplates.get(templateName);
   if (!tmpl) {
-    const cfgTmpl = (app.config.computeTemplates ?? []).find(t => t.name === templateName);
+    const cfgTmpl = (app.config.computeTemplates ?? []).find((t) => t.name === templateName);
     if (cfgTmpl) {
       tmpl = {
         name: cfgTmpl.name,
@@ -278,7 +293,11 @@ export function resolveComputeForStage(
   return templateName;
 }
 
-export async function dispatch(app: AppContext, sessionId: string, opts?: { onLog?: (msg: string) => void }): Promise<{ ok: boolean; message: string }> {
+export async function dispatch(
+  app: AppContext,
+  sessionId: string,
+  opts?: { onLog?: (msg: string) => void },
+): Promise<{ ok: boolean; message: string }> {
   const log = opts?.onLog ?? (() => {});
   const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
@@ -346,7 +365,8 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
       }
       log(`Cloned remote repo to ${tmpDir}`);
       app.events.log(sessionId, "remote_repo_cloned", {
-        actor: "system", data: { url: remoteUrl, dir: tmpDir },
+        actor: "system",
+        data: { url: remoteUrl, dir: tmpDir },
       });
     } catch (e: any) {
       return { ok: false, message: `Failed to clone remote repo: ${e.message}` };
@@ -358,19 +378,23 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
     const injection = detectInjection(session.summary ?? "");
     if (injection.severity === "high") {
       app.events.log(sessionId, "prompt_injection_blocked", {
-        actor: "system", data: { patterns: injection.patterns, context: "dispatch" },
+        actor: "system",
+        data: { patterns: injection.patterns, context: "dispatch" },
       });
       return { ok: false, message: "Dispatch blocked: potential prompt injection in task summary" };
     }
     if (injection.detected) {
       app.events.log(sessionId, "prompt_injection_warning", {
-        actor: "system", data: { patterns: injection.patterns, severity: injection.severity, context: "dispatch" },
+        actor: "system",
+        data: { patterns: injection.patterns, severity: injection.severity, context: "dispatch" },
       });
     }
-  } catch { /* skip guard on error */ }
+  } catch {
+    /* skip guard on error */
+  }
 
   // Check if fork stage
-  const stageDef = flow.getStage(app,session.flow, stage);
+  const stageDef = flow.getStage(app, session.flow, stage);
 
   // Resolve per-stage compute template override
   const stageCompute = resolveComputeForStage(app, stageDef, sessionId, log);
@@ -387,7 +411,7 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
     return dispatchFanOut(app, sessionId, stageDef);
   }
 
-  const action = flow.getStageAction(app,session.flow, stage);
+  const action = flow.getStageAction(app, session.flow, stage);
   if (action.type !== "agent") {
     return { ok: false, message: `Stage '${stage}' is ${action.type}, not agent` };
   }
@@ -398,7 +422,10 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
 
   // Resolve runtime override from session config (set by --runtime CLI flag)
   const runtimeOverride = session.config?.runtime_override as string | undefined;
-  const agent = agentRegistry.resolveAgentWithRuntime(app, agentName, sessionAsVars(session), { runtimeOverride, projectRoot });
+  const agent = agentRegistry.resolveAgentWithRuntime(app, agentName, sessionAsVars(session), {
+    runtimeOverride,
+    projectRoot,
+  });
   if (!agent) return { ok: false, message: `Agent '${agentName}' not found` };
 
   // Resolve autonomy level from flow stage definition
@@ -432,7 +459,7 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
           body: JSON.stringify({ repoPath, incremental: true }),
         });
         if (resp.ok) {
-          const data = await resp.json() as { ok?: boolean; files?: number; symbols?: number; error?: string };
+          const data = (await resp.json()) as { ok?: boolean; files?: number; symbols?: number; error?: string };
           ingestRemoteIndex(app, data, log);
         }
       } catch (e: any) {
@@ -468,7 +495,9 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
       if (contextMd) {
         task = contextMd + task;
       }
-    } catch { /* knowledge not available -- continue without context */ }
+    } catch {
+      /* knowledge not available -- continue without context */
+    }
   }
 
   // Inject repo map into agent context for codebase awareness
@@ -479,7 +508,9 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
         const mapStr = formatRepoMap(repoMap.entries, 1500);
         task = task + `\n\n## Repository Structure\n\`\`\`\n${mapStr}\n\`\`\`\n`;
       }
-    } catch { /* skip repo map on error */ }
+    } catch {
+      /* skip repo map on error */
+    }
   }
 
   // Resolve executor -- use resolved runtime type (from RuntimeStore merge), fall back to agent.runtime, then claude-code.
@@ -489,7 +520,8 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
   if (!executor) return { ok: false, message: `Executor '${runtime}' not registered` };
 
   // Build claude args (only for claude-code executor)
-  const claudeArgs = runtime === "claude-code" ? agentRegistry.buildClaudeArgs(agent, { autonomy, projectRoot, app }) : [];
+  const claudeArgs =
+    runtime === "claude-code" ? agentRegistry.buildClaudeArgs(agent, { autonomy, projectRoot, app }) : [];
 
   // Launch via executor
   log(`Launching via ${runtime}...`);
@@ -508,7 +540,13 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
     // The full context-injected task is too large for ARG_MAX; it goes via
     // system prompt + channel delivery instead.
     initialPrompt: session.summary ?? task.slice(0, 2000),
-    compute: session.compute_name ? (app.computes.get(session.compute_name) as unknown as { name: string; provider: string; [k: string]: unknown } | null) ?? undefined : undefined,
+    compute: session.compute_name
+      ? ((app.computes.get(session.compute_name) as unknown as {
+          name: string;
+          provider: string;
+          [k: string]: unknown;
+        } | null) ?? undefined)
+      : undefined,
     app,
   });
 
@@ -529,9 +567,13 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
   if (session.workdir) {
     try {
       stageStartSha = execFileSync("git", ["rev-parse", "HEAD"], {
-        cwd: session.workdir, encoding: "utf-8", timeout: 5000,
+        cwd: session.workdir,
+        encoding: "utf-8",
+        timeout: 5000,
       }).trim();
-    } catch { /* no git -- skip */ }
+    } catch {
+      /* no git -- skip */
+    }
   }
 
   app.sessions.update(sessionId, { status: "running", agent: agentName, session_id: tmuxName });
@@ -539,17 +581,26 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
     app.sessions.mergeConfig(sessionId, { stage_start_sha: stageStartSha });
   }
   app.events.log(sessionId, "stage_started", {
-    stage, actor: "user",
+    stage,
+    actor: "user",
     data: {
-      agent: agentName, session_id: tmuxName, model: agent.model,
-      tools: agent.tools, skills: agent.skills, memories: agent.memories,
+      agent: agentName,
+      session_id: tmuxName,
+      model: agent.model,
+      tools: agent.tools,
+      skills: agent.skills,
+      memories: agent.memories,
       task_preview: task.slice(0, 200),
       stage_start_sha: stageStartSha,
     },
   });
 
   // Persist flow state: mark current stage
-  try { setCurrentStage(app, sessionId, session.stage!, session.flow); } catch { /* skip flow-state on error */ }
+  try {
+    setCurrentStage(app, sessionId, session.stage!, session.flow);
+  } catch {
+    /* skip flow-state on error */
+  }
 
   // Checkpoint after successful dispatch
   saveCheckpoint(app, sessionId);
@@ -560,7 +611,9 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
   try {
     const { startStatusPoller } = await import("../executors/status-poller.js");
     startStatusPoller(app, sessionId, tmuxName, runtime);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   // Observability + telemetry
   recordEvent({ type: "session_start", sessionId, data: { agent: session.agent ?? agentName, flow: session.flow } });
@@ -569,7 +622,12 @@ export async function dispatch(app: AppContext, sessionId: string, opts?: { onLo
   return { ok: true, message: tmuxName };
 }
 
-export async function advance(app: AppContext, sessionId: string, force = false, outcome?: string): Promise<{ ok: boolean; message: string }> {
+export async function advance(
+  app: AppContext,
+  sessionId: string,
+  force = false,
+  outcome?: string,
+): Promise<{ ok: boolean; message: string }> {
   const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
@@ -577,7 +635,7 @@ export async function advance(app: AppContext, sessionId: string, force = false,
   if (!stage) return { ok: false, message: "No current stage. The session may have completed its flow." };
 
   if (!force) {
-    const { canProceed, reason } = flow.evaluateGate(app,flowName, stage, session);
+    const { canProceed, reason } = flow.evaluateGate(app, flowName, stage, session);
     if (!canProceed) return { ok: false, message: reason };
   }
 
@@ -590,7 +648,7 @@ export async function advance(app: AppContext, sessionId: string, force = false,
   // Graph flow routing: if flow definition has edges, use DAG conditional routing
   try {
     const flowDef = app.flows.get(flowName);
-    const hasDependsOn = flowDef?.stages?.some(s => s.depends_on?.length > 0);
+    const hasDependsOn = flowDef?.stages?.some((s) => s.depends_on?.length > 0);
     if (flowDef && (flowDef.edges?.length > 0 || hasDependsOn)) {
       const graphFlow = parseGraphFlow(flowDef);
       const flowState = loadFlowState(app, sessionId);
@@ -598,28 +656,37 @@ export async function advance(app: AppContext, sessionId: string, force = false,
       const skippedStages = flowState?.skippedStages ?? [];
 
       // Resolve next stages with conditional routing and join barrier awareness
-      const readyStages = resolveNextStages(
-        graphFlow, stage, session.config ?? {},
-        completedStages, skippedStages,
-      );
+      const readyStages = resolveNextStages(graphFlow, stage, session.config ?? {}, completedStages, skippedStages);
 
       if (readyStages.length > 0) {
         // Mark current stage completed
-        try { markStageCompleted(app, sessionId, stage); } catch { /* skip */ }
+        try {
+          markStageCompleted(app, sessionId, stage);
+        } catch {
+          /* skip */
+        }
 
         // Compute which stages should be skipped due to conditional branching
         const allSuccessors = getSuccessors(graphFlow, stage);
         if (allSuccessors.length > 1) {
           const newSkipped = computeSkippedStages(graphFlow, stage, readyStages, skippedStages);
           if (newSkipped.length > skippedStages.length) {
-            try { markStagesSkipped(app, sessionId, newSkipped); } catch { /* skip */ }
+            try {
+              markStagesSkipped(app, sessionId, newSkipped);
+            } catch {
+              /* skip */
+            }
           }
         }
 
         // Advance to the first ready stage (additional ready stages will be
         // picked up on subsequent advance() calls if the flow has parallel branches)
         const graphNextStage = readyStages[0];
-        try { setCurrentStage(app, sessionId, graphNextStage, flowName); } catch { /* skip */ }
+        try {
+          setCurrentStage(app, sessionId, graphNextStage, flowName);
+        } catch {
+          /* skip */
+        }
 
         // Stage isolation: clear runtime handles so next stage gets a fresh runtime.
         // If the next stage has isolation="continue", preserve claude_session_id for --resume.
@@ -630,9 +697,20 @@ export async function advance(app: AppContext, sessionId: string, force = false,
           graphSessionUpdates.claude_session_id = null;
         }
         app.sessions.update(sessionId, graphSessionUpdates);
-        app.events.log(sessionId, "stage_advanced", {
-          actor: "system", stage: graphNextStage,
-          data: { via: "graph-flow-conditional", readyStages, skippedStages: flowState?.skippedStages ?? [], isolation: graphIsolation },
+        app.events.log(sessionId, "stage_ready", {
+          actor: "system",
+          stage: graphNextStage,
+          data: {
+            from_stage: stage,
+            to_stage: graphNextStage,
+            stage_type: flow.getStageAction(app, flowName, graphNextStage).type,
+            stage_agent: flow.getStageAction(app, flowName, graphNextStage).agent,
+            forced: force,
+            isolation: graphIsolation,
+            via: "graph-flow-conditional",
+            readyStages,
+            skippedStages: flowState?.skippedStages ?? [],
+          },
         });
         emitStageSpanEnd(sessionId, { status: "completed" });
         const graphAction = flow.getStageAction(app, flowName, graphNextStage);
@@ -647,20 +725,30 @@ export async function advance(app: AppContext, sessionId: string, force = false,
       const allSuccessors = getSuccessors(graphFlow, stage, session.config ?? {});
       if (allSuccessors.length > 0) {
         // Successors exist but aren't ready (join barriers) -- mark completed and wait
-        try { markStageCompleted(app, sessionId, stage); } catch { /* skip */ }
+        try {
+          markStageCompleted(app, sessionId, stage);
+        } catch {
+          /* skip */
+        }
         app.sessions.update(sessionId, { status: "waiting" });
         app.events.log(sessionId, "stage_waiting", {
-          actor: "system", stage,
+          actor: "system",
+          stage,
           data: { via: "graph-flow-conditional", waiting_for: allSuccessors, reason: "join-barrier" },
         });
         return { ok: true, message: `Stage ${stage} completed, waiting for join barrier` };
       }
 
       // Terminal node -- flow complete
-      try { markStageCompleted(app, sessionId, stage); } catch { /* skip */ }
+      try {
+        markStageCompleted(app, sessionId, stage);
+      } catch {
+        /* skip */
+      }
       app.sessions.update(sessionId, { status: "completed" });
       app.events.log(sessionId, "session_completed", {
-        stage, actor: "system",
+        stage,
+        actor: "system",
         data: { final_stage: stage, flow: flowName, via: "graph-flow-conditional" },
       });
       app.messages.markRead(sessionId);
@@ -669,21 +757,31 @@ export async function advance(app: AppContext, sessionId: string, force = false,
       const agg = app.usageRecorder.getSessionCost(sessionId);
       emitSessionSpanEnd(sessionId, {
         status: "completed",
-        tokens_in: agg.input_tokens, tokens_out: agg.output_tokens, tokens_cache: agg.cache_read_tokens,
-        cost_usd: agg.cost, turns: s?.config?.turns as number | undefined,
+        tokens_in: agg.input_tokens,
+        tokens_out: agg.output_tokens,
+        tokens_cache: agg.cache_read_tokens,
+        cost_usd: agg.cost,
+        turns: s?.config?.turns as number | undefined,
       });
       flushSpans();
       return { ok: true, message: "Flow completed (graph-flow)" };
     }
-  } catch { /* graph flow not applicable, fall through to linear */ }
+  } catch {
+    /* graph flow not applicable, fall through to linear */
+  }
 
   const nextStage = flow.resolveNextStage(app, flowName, stage, outcome);
   if (!nextStage) {
     // Flow complete -- persist final stage completion
-    try { markStageCompleted(app, sessionId, stage, outcome ? { outcome } : undefined); } catch { /* skip */ }
+    try {
+      markStageCompleted(app, sessionId, stage, outcome ? { outcome } : undefined);
+    } catch {
+      /* skip */
+    }
     app.sessions.update(sessionId, { status: "completed" });
     app.events.log(sessionId, "session_completed", {
-      stage, actor: "system",
+      stage,
+      actor: "system",
       data: { final_stage: stage, flow: flowName },
     });
     // Auto-clear unread badge so completed sessions don't show stale notifications
@@ -694,8 +792,11 @@ export async function advance(app: AppContext, sessionId: string, force = false,
     const agg = app.usageRecorder.getSessionCost(sessionId);
     emitSessionSpanEnd(sessionId, {
       status: "completed",
-      tokens_in: agg.input_tokens, tokens_out: agg.output_tokens, tokens_cache: agg.cache_read_tokens,
-      cost_usd: agg.cost, turns: s?.config?.turns as number | undefined,
+      tokens_in: agg.input_tokens,
+      tokens_out: agg.output_tokens,
+      tokens_cache: agg.cache_read_tokens,
+      cost_usd: agg.cost,
+      turns: s?.config?.turns as number | undefined,
     });
     flushSpans();
 
@@ -708,16 +809,26 @@ export async function advance(app: AppContext, sessionId: string, force = false,
         const turns = conv.map((c) => ({ role: c.role === "message" ? "user" : "assistant", content: c.content }));
         extractAndSaveSkills(sessionId, turns, app);
       }
-    } catch { /* skill extraction is best-effort */ }
+    } catch {
+      /* skill extraction is best-effort */
+    }
 
     return { ok: true, message: "Flow completed" };
   }
 
   // Persist flow state: mark completed + set next
-  try { markStageCompleted(app, sessionId, stage, outcome ? { outcome } : undefined); } catch { /* skip */ }
-  try { setCurrentStage(app, sessionId, nextStage, flowName); } catch { /* skip */ }
+  try {
+    markStageCompleted(app, sessionId, stage, outcome ? { outcome } : undefined);
+  } catch {
+    /* skip */
+  }
+  try {
+    setCurrentStage(app, sessionId, nextStage, flowName);
+  } catch {
+    /* skip */
+  }
 
-  const nextAction = flow.getStageAction(app,flowName, nextStage);
+  const nextAction = flow.getStageAction(app, flowName, nextStage);
 
   // Stage isolation: clear runtime handles so next stage gets a fresh runtime.
   // Default is "fresh" -- each stage starts with a clean slate.
@@ -731,10 +842,13 @@ export async function advance(app: AppContext, sessionId: string, force = false,
   app.sessions.update(sessionId, sessionUpdates);
 
   app.events.log(sessionId, "stage_ready", {
-    stage: nextStage, actor: "system",
+    stage: nextStage,
+    actor: "system",
     data: {
-      from_stage: stage, to_stage: nextStage,
-      stage_type: nextAction.type, stage_agent: nextAction.agent,
+      from_stage: stage,
+      to_stage: nextStage,
+      stage_type: nextAction.type,
+      stage_agent: nextAction.agent,
       forced: force,
       isolation,
       ...(outcome ? { outcome, via: "on_outcome" } : {}),
@@ -750,7 +864,11 @@ export async function advance(app: AppContext, sessionId: string, force = false,
   return { ok: true, message: `Advanced to ${nextStage}` };
 }
 
-export async function stop(app: AppContext, sessionId: string, opts?: { force?: boolean }): Promise<{ ok: boolean; message: string }> {
+export async function stop(
+  app: AppContext,
+  sessionId: string,
+  opts?: { force?: boolean },
+): Promise<{ ok: boolean; message: string }> {
   const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
@@ -769,7 +887,9 @@ export async function stop(app: AppContext, sessionId: string, opts?: { force?: 
     for (const entry of tree) {
       if (entry.pid) await killProcessTree(entry.pid);
     }
-  } catch { /* fall through to tmux kill */ }
+  } catch {
+    /* fall through to tmux kill */
+  }
 
   // Kill agent + clean up provider resources FIRST (before any DB writes)
   // This ensures processes are stopped even if subsequent DB ops fail
@@ -786,17 +906,23 @@ export async function stop(app: AppContext, sessionId: string, opts?: { force?: 
   try {
     const { stopStatusPoller } = await import("../executors/status-poller.js");
     stopStatusPoller(sessionId);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   // Checkpoint before state transition
   saveCheckpoint(app, sessionId);
 
   // Clean up hook config and channel MCP config from working directory
   if (session.workdir) {
-    try { claude.removeSettings(session.workdir); } catch (e: any) {
+    try {
+      claude.removeSettings(session.workdir);
+    } catch (e: any) {
       logError("session", `stop ${sessionId}: removeSettings: ${e?.message ?? e}`);
     }
-    try { claude.removeChannelConfig(session.workdir); } catch (e: any) {
+    try {
+      claude.removeChannelConfig(session.workdir);
+    } catch (e: any) {
       logError("session", `stop ${sessionId}: removeChannelConfig: ${e?.message ?? e}`);
     }
   }
@@ -808,7 +934,8 @@ export async function stop(app: AppContext, sessionId: string, opts?: { force?: 
   // Preserve claude_session_id so restart can --resume the conversation
   app.sessions.update(sessionId, { status: "stopped", error: null, session_id: null });
   app.events.log(sessionId, "session_stopped", {
-    stage: session.stage, actor: "user",
+    stage: session.stage,
+    actor: "user",
     data: { session_id: session.session_id, agent: session.agent },
   });
 
@@ -822,7 +949,11 @@ export async function stop(app: AppContext, sessionId: string, opts?: { force?: 
   return { ok: true, message: "Session stopped" };
 }
 
-export async function resume(app: AppContext, sessionId: string, opts?: { onLog?: (msg: string) => void }): Promise<{ ok: boolean; message: string }> {
+export async function resume(
+  app: AppContext,
+  sessionId: string,
+  opts?: { onLog?: (msg: string) => void },
+): Promise<{ ok: boolean; message: string }> {
   const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
   if (session.status === "running" && session.session_id) return { ok: false, message: "Already running" };
@@ -830,11 +961,15 @@ export async function resume(app: AppContext, sessionId: string, opts?: { onLog?
   if (session.session_id) await app.launcher.kill(session.session_id);
 
   app.sessions.update(sessionId, {
-    status: "ready", error: null, breakpoint_reason: null,
-    attached_by: null, session_id: null,
+    status: "ready",
+    error: null,
+    breakpoint_reason: null,
+    attached_by: null,
+    session_id: null,
   });
   app.events.log(sessionId, "session_resumed", {
-    stage: session.stage, actor: "user",
+    stage: session.stage,
+    actor: "user",
     data: { from_status: session.status },
   });
 
@@ -846,7 +981,10 @@ export async function resume(app: AppContext, sessionId: string, opts?: { onLog?
  * Run verification for a session: check todos are resolved and verify scripts pass.
  * Returns structured results for display and enforcement.
  */
-export async function runVerification(app: AppContext, sessionId: string): Promise<{
+export async function runVerification(
+  app: AppContext,
+  sessionId: string,
+): Promise<{
   ok: boolean;
   todosResolved: boolean;
   pendingTodos: string[];
@@ -854,17 +992,17 @@ export async function runVerification(app: AppContext, sessionId: string): Promi
   message: string;
 }> {
   const session = app.sessions.get(sessionId);
-  if (!session) return { ok: false, todosResolved: true, pendingTodos: [], scriptResults: [], message: "Session not found" };
+  if (!session)
+    return { ok: false, todosResolved: true, pendingTodos: [], scriptResults: [], message: "Session not found" };
 
   // Check todos
   const todos = app.todos.list(sessionId);
-  const pending = todos.filter(t => !t.done);
+  const pending = todos.filter((t) => !t.done);
   const todosResolved = pending.length === 0;
 
   // Determine verify scripts from flow stage + repo config
-  const stageVerify = session.stage && session.flow
-    ? flow.getStage(app,session.flow, session.stage)?.verify
-    : undefined;
+  const stageVerify =
+    session.stage && session.flow ? flow.getStage(app, session.flow, session.stage)?.verify : undefined;
   const repoConfig = session.workdir ? loadRepoConfig(session.workdir) : {};
   const scripts: string[] = stageVerify ?? repoConfig.verify ?? [];
 
@@ -885,12 +1023,12 @@ export async function runVerification(app: AppContext, sessionId: string): Promi
     }
   }
 
-  const allScriptsPassed = scriptResults.every(r => r.passed);
+  const allScriptsPassed = scriptResults.every((r) => r.passed);
   const ok = todosResolved && allScriptsPassed;
 
   // Build human-readable message
   const parts: string[] = [];
-  if (!todosResolved) parts.push(`${pending.length} unresolved todo(s): ${pending.map(t => t.content).join(", ")}`);
+  if (!todosResolved) parts.push(`${pending.length} unresolved todo(s): ${pending.map((t) => t.content).join(", ")}`);
   for (const r of scriptResults) {
     if (!r.passed) parts.push(`verify failed: ${r.script}\n${r.output}`);
   }
@@ -898,7 +1036,7 @@ export async function runVerification(app: AppContext, sessionId: string): Promi
   return {
     ok,
     todosResolved,
-    pendingTodos: pending.map(t => t.content),
+    pendingTodos: pending.map((t) => t.content),
     scriptResults,
     message: ok ? "Verification passed" : parts.join("\n"),
   };
@@ -908,7 +1046,11 @@ export async function runVerification(app: AppContext, sessionId: string): Promi
  * Execute an action stage (create_pr, merge, close, etc.).
  * Called by the conductor when auto-advancing into an action stage.
  */
-export async function executeAction(app: AppContext, sessionId: string, action: string): Promise<{ ok: boolean; message: string }> {
+export async function executeAction(
+  app: AppContext,
+  sessionId: string,
+  action: string,
+): Promise<{ ok: boolean; message: string }> {
   const s = app.sessions.get(sessionId);
   if (!s) return { ok: false, message: "Session not found" };
 
@@ -916,27 +1058,43 @@ export async function executeAction(app: AppContext, sessionId: string, action: 
     case "create_pr": {
       // Skip if we already know about a PR
       if (s.pr_url) {
-        app.events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action, pr_url: s.pr_url, skipped: "pr_already_exists" } });
-        return await advance(app, sessionId, true);
+        app.events.log(sessionId, "action_executed", {
+          stage: s.stage ?? undefined,
+          actor: "system",
+          data: { action, pr_url: s.pr_url, skipped: "pr_already_exists" },
+        });
+        return { ok: true, message: `Action '${action}' executed (PR already exists)` };
       }
       // Also check if a PR exists on the branch (agent may have created one without reporting pr_url)
       if (s.branch && s.workdir) {
         try {
           const { stdout: prUrl } = await execFileAsync("gh", ["pr", "view", s.branch, "--json", "url", "-q", ".url"], {
-            cwd: s.workdir, encoding: "utf-8", timeout: 10_000,
+            cwd: s.workdir,
+            encoding: "utf-8",
+            timeout: 10_000,
           });
           if (prUrl?.trim()) {
             const url = prUrl.trim();
             app.sessions.update(sessionId, { pr_url: url });
-            app.events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action, pr_url: url, skipped: "pr_found_on_branch" } });
-            return await advance(app, sessionId, true);
+            app.events.log(sessionId, "action_executed", {
+              stage: s.stage ?? undefined,
+              actor: "system",
+              data: { action, pr_url: url, skipped: "pr_found_on_branch" },
+            });
+            return { ok: true, message: `Action '${action}' executed (PR found on branch)` };
           }
-        } catch { /* no PR exists for this branch -- proceed to create */ }
+        } catch {
+          /* no PR exists for this branch -- proceed to create */
+        }
       }
       const result = await createWorktreePR(app, sessionId, { title: s.summary ?? undefined });
       if (result.ok) {
-        app.events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action, pr_url: result.pr_url } });
-        return await advance(app, sessionId, true);
+        app.events.log(sessionId, "action_executed", {
+          stage: s.stage ?? undefined,
+          actor: "system",
+          data: { action, pr_url: result.pr_url },
+        });
+        return { ok: true, message: `Action '${action}' executed` };
       }
       return result;
     }
@@ -944,14 +1102,22 @@ export async function executeAction(app: AppContext, sessionId: string, action: 
     case "merge": {
       const result = await finishWorktree(app, sessionId, { force: true });
       if (result.ok) {
-        app.events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action } });
+        app.events.log(sessionId, "action_executed", {
+          stage: s.stage ?? undefined,
+          actor: "system",
+          data: { action },
+        });
       }
       return result;
     }
     case "auto_merge": {
       const result = await mergeWorktreePR(app, sessionId);
       if (result.ok) {
-        app.events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action, pr_url: s.pr_url ?? undefined } });
+        app.events.log(sessionId, "action_executed", {
+          stage: s.stage ?? undefined,
+          actor: "system",
+          data: { action, pr_url: s.pr_url ?? undefined },
+        });
         // Don't advance yet -- gh pr merge --auto only queues the merge.
         // Transition to waiting; pr-merge-poller will advance once PR is actually merged.
         app.sessions.update(sessionId, {
@@ -974,16 +1140,24 @@ export async function executeAction(app: AppContext, sessionId: string, action: 
     case "close_ticket":
     case "close": {
       app.events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action } });
-      return await advance(app, sessionId, true);
+      return { ok: true, message: `Action '${action}' executed` };
     }
     default: {
-      app.events.log(sessionId, "action_skipped", { stage: s.stage ?? undefined, actor: "system", data: { action, reason: "unknown action type" } });
-      return await advance(app, sessionId, true);
+      app.events.log(sessionId, "action_skipped", {
+        stage: s.stage ?? undefined,
+        actor: "system",
+        data: { action, reason: "unknown action type" },
+      });
+      return { ok: true, message: `Action '${action}' skipped (unknown)` };
     }
   }
 }
 
-export async function complete(app: AppContext, sessionId: string, opts?: { force?: boolean }): Promise<{ ok: boolean; message: string }> {
+export async function complete(
+  app: AppContext,
+  sessionId: string,
+  opts?: { force?: boolean },
+): Promise<{ ok: boolean; message: string }> {
   const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
@@ -991,9 +1165,8 @@ export async function complete(app: AppContext, sessionId: string, opts?: { forc
   // Quick sync check: only call async runVerification if there are todos or verify scripts.
   if (!opts?.force) {
     const hasTodos = app.todos.list(sessionId).length > 0;
-    const stageVerify = session.stage && session.flow
-      ? flow.getStage(app,session.flow, session.stage)?.verify
-      : undefined;
+    const stageVerify =
+      session.stage && session.flow ? flow.getStage(app, session.flow, session.stage)?.verify : undefined;
     const repoVerify = session.workdir ? loadRepoConfig(session.workdir).verify : undefined;
     const hasScripts = (stageVerify ?? repoVerify ?? []).length > 0;
 
@@ -1006,7 +1179,8 @@ export async function complete(app: AppContext, sessionId: string, opts?: { forc
   }
 
   app.events.log(sessionId, "stage_completed", {
-    stage: session.stage, actor: "user",
+    stage: session.stage,
+    actor: "user",
     data: { note: "Manually completed" },
   });
   app.messages.markRead(sessionId);
@@ -1058,7 +1232,10 @@ function parseNonClaudeTranscript(app: AppContext, session: Session): void {
     const burnProject = session.repo ?? session.workdir ?? "unknown";
     recordBurnTurns(app, session.id, transcriptPath, parserKind, burnProject);
   } catch (e: any) {
-    logError("session", "non-Claude transcript parsing failed", { sessionId: session.id, error: String(e?.message ?? e) });
+    logError("session", "non-Claude transcript parsing failed", {
+      sessionId: session.id,
+      error: String(e?.message ?? e),
+    });
   }
 }
 
@@ -1068,7 +1245,8 @@ export function pause(app: AppContext, sessionId: string, reason?: string): { ok
 
   app.sessions.update(sessionId, { status: "blocked", breakpoint_reason: reason ?? "User paused" });
   app.events.log(sessionId, "session_paused", {
-    stage: session.stage, actor: "user",
+    stage: session.stage,
+    actor: "user",
     data: { reason, was_status: session.status },
   });
   return { ok: true, message: "Paused" };
@@ -1085,7 +1263,8 @@ export async function archive(app: AppContext, sessionId: string): Promise<{ ok:
 
   app.sessions.update(sessionId, { status: "archived", session_id: null });
   app.events.log(sessionId, "session_archived", {
-    stage: session.stage, actor: "user",
+    stage: session.stage,
+    actor: "user",
     data: { from_status: session.status },
   });
   return { ok: true, message: "Session archived" };
@@ -1098,7 +1277,8 @@ export function restore(app: AppContext, sessionId: string): { ok: boolean; mess
 
   app.sessions.update(sessionId, { status: "stopped" });
   app.events.log(sessionId, "session_restored", {
-    stage: session.stage, actor: "user",
+    stage: session.stage,
+    actor: "user",
     data: {},
   });
   return { ok: true, message: "Session restored" };
@@ -1117,7 +1297,8 @@ export async function interrupt(app: AppContext, sessionId: string): Promise<{ o
 
   app.sessions.update(sessionId, { status: "waiting" });
   app.events.log(sessionId, "session_interrupted", {
-    stage: session.stage, actor: "user",
+    stage: session.stage,
+    actor: "user",
     data: { session_id: session.session_id },
   });
 
@@ -1132,7 +1313,8 @@ export async function approveReviewGate(app: AppContext, sessionId: string): Pro
   if (!s) return { ok: false, message: "Session not found" };
 
   app.events.log(sessionId, "review_approved", {
-    stage: s.stage ?? undefined, actor: "github",
+    stage: s.stage ?? undefined,
+    actor: "github",
   });
 
   // Force-advance past the review gate
@@ -1165,7 +1347,8 @@ export function forkSession(app: AppContext, sessionId: string, newName?: string
   });
 
   app.events.log(fork.id, "session_forked", {
-    stage: original.stage, actor: "user",
+    stage: original.stage,
+    actor: "user",
     data: { forked_from: sessionId },
   });
 
@@ -1198,14 +1381,20 @@ export function cloneSession(app: AppContext, sessionId: string, newName?: strin
   });
 
   app.events.log(clone.id, "session_cloned", {
-    stage: original.stage, actor: "user",
+    stage: original.stage,
+    actor: "user",
     data: { cloned_from: sessionId, claude_session_id: original.claude_session_id },
   });
 
   return { ok: true, sessionId: clone.id };
 }
 
-export async function handoff(app: AppContext, sessionId: string, toAgent: string, instructions?: string): Promise<{ ok: boolean; message: string }> {
+export async function handoff(
+  app: AppContext,
+  sessionId: string,
+  toAgent: string,
+  instructions?: string,
+): Promise<{ ok: boolean; message: string }> {
   const result = cloneSession(app, sessionId, instructions);
   if (!result.ok) return { ok: false, message: (result as { ok: false; message: string }).message };
 
@@ -1219,10 +1408,15 @@ export async function handoff(app: AppContext, sessionId: string, toAgent: strin
 
 // ── Fork/Join ───────────────────────────────────────────────────────────────
 
-export async function fork(app: AppContext, parentId: string, task: string, opts?: {
-  agent?: string;
-  dispatch?: boolean;
-}): SessionOpResult {
+export async function fork(
+  app: AppContext,
+  parentId: string,
+  task: string,
+  opts?: {
+    agent?: string;
+    dispatch?: boolean;
+  },
+): SessionOpResult {
   const parent = app.sessions.get(parentId);
   if (!parent) return { ok: false, message: "Parent not found" };
 
@@ -1239,11 +1433,14 @@ export async function fork(app: AppContext, parentId: string, task: string, opts
   });
 
   app.sessions.update(child.id, {
-    parent_id: parentId, fork_group: forkGroup,
-    stage: parent.stage, status: "ready",
+    parent_id: parentId,
+    fork_group: forkGroup,
+    stage: parent.stage,
+    status: "ready",
   });
   app.events.log(child.id, "session_forked", {
-    stage: parent.stage, actor: "user",
+    stage: parent.stage,
+    actor: "user",
     data: { parent_id: parentId, fork_group: forkGroup, task },
   });
 
@@ -1253,7 +1450,11 @@ export async function fork(app: AppContext, parentId: string, task: string, opts
   return { ok: true, sessionId: child.id };
 }
 
-async function dispatchFork(app: AppContext, sessionId: string, stageDef: flow.StageDefinition): Promise<{ ok: boolean; message: string }> {
+async function dispatchFork(
+  app: AppContext,
+  sessionId: string,
+  stageDef: flow.StageDefinition,
+): Promise<{ ok: boolean; message: string }> {
   // Read PLAN.md or use default subtasks
   const session = app.sessions.get(sessionId)!;
   const subtasks = extractSubtasks(app, session);
@@ -1266,14 +1467,19 @@ async function dispatchFork(app: AppContext, sessionId: string, stageDef: flow.S
 
   app.sessions.update(sessionId, { status: "running" });
   app.events.log(sessionId, "fork_started", {
-    stage: session.stage, actor: "system",
+    stage: session.stage,
+    actor: "system",
     data: { children_count: children.length, children },
   });
 
   return { ok: true, message: `Forked into ${children.length} sessions` };
 }
 
-async function dispatchFanOut(app: AppContext, sessionId: string, stageDef: flow.StageDefinition): Promise<{ ok: boolean; message: string }> {
+async function dispatchFanOut(
+  app: AppContext,
+  sessionId: string,
+  stageDef: flow.StageDefinition,
+): Promise<{ ok: boolean; message: string }> {
   const session = app.sessions.get(sessionId)!;
   const subtasks = extractSubtasks(app, session);
 
@@ -1288,14 +1494,16 @@ async function dispatchFanOut(app: AppContext, sessionId: string, stageDef: flow
   if (!result.ok) return { ok: false, message: result.message ?? "Fan-out failed" };
 
   // Dispatch all children -- await so their session_ids are registered before returning
-  const dispatched = await Promise.allSettled(
-    (result.childIds ?? []).map((childId) => dispatch(app, childId)),
-  );
+  const dispatched = await Promise.allSettled((result.childIds ?? []).map((childId) => dispatch(app, childId)));
 
   return { ok: true, message: `Fan-out: ${dispatched.length} children dispatched` };
 }
 
-export async function joinFork(app: AppContext, parentId: string, force = false): Promise<{ ok: boolean; message: string }> {
+export async function joinFork(
+  app: AppContext,
+  parentId: string,
+  force = false,
+): Promise<{ ok: boolean; message: string }> {
   const children = app.sessions.getChildren(parentId);
   if (!children.length) return { ok: false, message: "No children" };
 
@@ -1348,7 +1556,10 @@ export async function checkAutoJoin(app: AppContext, childSessionId: string): Pr
  * Fully delete a session: kill agent, clean up provider resources, clean
  * hooks, delete DB rows. All provider-specific logic delegated to the provider.
  */
-export async function deleteSessionAsync(app: AppContext, sessionId: string): Promise<{ ok: boolean; message: string }> {
+export async function deleteSessionAsync(
+  app: AppContext,
+  sessionId: string,
+): Promise<{ ok: boolean; message: string }> {
   const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
@@ -1363,10 +1574,14 @@ export async function deleteSessionAsync(app: AppContext, sessionId: string): Pr
 
   // 2. Clean up hook config and channel MCP config (not provider-dependent)
   if (session.workdir) {
-    try { claude.removeSettings(session.workdir); } catch (e: any) {
+    try {
+      claude.removeSettings(session.workdir);
+    } catch (e: any) {
       logError("session", `delete ${sessionId}: removeSettings: ${e?.message ?? e}`);
     }
-    try { claude.removeChannelConfig(session.workdir); } catch (e: any) {
+    try {
+      claude.removeChannelConfig(session.workdir);
+    } catch (e: any) {
       logError("session", `delete ${sessionId}: removeChannelConfig: ${e?.message ?? e}`);
     }
   }
@@ -1383,7 +1598,10 @@ export async function deleteSessionAsync(app: AppContext, sessionId: string): Pr
   return { ok: true, message: "Session deleted (undo available for 90s)" };
 }
 
-export async function undeleteSessionAsync(app: AppContext, sessionId: string): Promise<{ ok: boolean; message: string }> {
+export async function undeleteSessionAsync(
+  app: AppContext,
+  sessionId: string,
+): Promise<{ ok: boolean; message: string }> {
   const restored = app.sessions.undelete(sessionId);
   if (!restored) return { ok: false, message: `Session ${sessionId} not found or not deleted` };
 
@@ -1439,9 +1657,7 @@ export async function setupSessionWorktree(
   const workdirRaw = session.workdir;
   const hasExplicitRepo = repoRaw && repoRaw !== "." && repoRaw.trim() !== "";
   const hasExplicitWorkdir = workdirRaw && workdirRaw !== "." && workdirRaw.trim() !== "";
-  const repoSource = hasExplicitRepo
-    ? resolve(repoRaw!)
-    : (hasExplicitWorkdir ? resolve(workdirRaw!) : resolve("."));
+  const repoSource = hasExplicitRepo ? resolve(repoRaw!) : hasExplicitWorkdir ? resolve(workdirRaw!) : resolve(".");
 
   let effectiveWorkdir = repoSource;
 
@@ -1459,7 +1675,7 @@ export async function setupSessionWorktree(
       // Surface the error so the operator knows isolation was not achieved.
       throw new Error(
         `Failed to create git worktree for session ${session.id} from ${repoSource}. ` +
-        `Refusing to dispatch against the live checkout. Check git worktree state (\`git worktree list\` in ${repoSource}) and retry.`,
+          `Refusing to dispatch against the live checkout. Check git worktree state (\`git worktree list\` in ${repoSource}) and retry.`,
       );
     }
   }
@@ -1514,8 +1730,7 @@ async function applyContainerSetup(
   if (arcJson?.compose === true && compute.config?.ip) {
     onLog("Starting Docker Compose services...");
     const { sshExec, sshKeyPath } = await import("../../compute/providers/ec2/ssh.js");
-    sshExec(sshKeyPath(compute.name), compute.config.ip as string,
-      `cd ${effectiveWorkdir} && docker compose up -d`);
+    sshExec(sshKeyPath(compute.name), compute.config.ip as string, `cd ${effectiveWorkdir} && docker compose up -d`);
   }
 
   // Devcontainer - only used when explicitly enabled in arc.json { "devcontainer": true }
@@ -1529,7 +1744,8 @@ async function applyContainerSetup(
 }
 
 /** Prepare remote compute: connectivity check, env sync, docker/devcontainer setup. */
-export async function prepareRemoteEnvironment(app: AppContext, 
+export async function prepareRemoteEnvironment(
+  app: AppContext,
   session: Session,
   compute: Compute,
   provider: ComputeProvider,
@@ -1575,7 +1791,9 @@ export async function prepareRemoteEnvironment(app: AppContext,
       projectDir: effectiveWorkdir,
       onLog: log,
     });
-  } catch (e: any) { log(`Credential sync failed (continuing): ${e?.message ?? e}`); }
+  } catch (e: any) {
+    log(`Credential sync failed (continuing): ${e?.message ?? e}`);
+  }
 
   // Apply container setup (Docker Compose + devcontainer)
   const finalLaunchContent = await applyContainerSetup(compute, effectiveWorkdir, opts?.launchContent ?? "", log);
@@ -1583,9 +1801,13 @@ export async function prepareRemoteEnvironment(app: AppContext,
   return { finalLaunchContent, ports };
 }
 
-async function _launchAgentTmux(app: AppContext,
-  session: Session, stage: string,
-  claudeArgs: string[], task: string, agent: agentRegistry.AgentDefinition,
+async function _launchAgentTmux(
+  app: AppContext,
+  session: Session,
+  stage: string,
+  claudeArgs: string[],
+  task: string,
+  agent: agentRegistry.AgentDefinition,
   opts?: { autonomy?: string; onLog?: (msg: string) => void },
 ): Promise<string> {
   const log = opts?.onLog ?? (() => {});
@@ -1602,15 +1824,18 @@ async function _launchAgentTmux(app: AppContext,
   const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
   const usesDevcontainer = arcJson?.devcontainer ?? false;
   const { DEFAULT_CONDUCTOR_URL, DOCKER_CONDUCTOR_URL } = await import("../constants.js");
-  const conductorUrl = usesDevcontainer
-    ? DOCKER_CONDUCTOR_URL
-    : DEFAULT_CONDUCTOR_URL;
+  const conductorUrl = usesDevcontainer ? DOCKER_CONDUCTOR_URL : DEFAULT_CONDUCTOR_URL;
 
   // Channel config + launcher
   const channelPort = app.sessions.channelPort(session.id);
   const channelConfig = provider?.buildChannelConfig(session.id, stage, channelPort, { conductorUrl });
   const originalRepoDir = session.repo ? resolve(session.repo) : undefined;
-  const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, { conductorUrl, channelConfig, tracksDir: app.config.tracksDir, originalRepoDir });
+  const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, {
+    conductorUrl,
+    channelConfig,
+    tracksDir: app.config.tracksDir,
+    originalRepoDir,
+  });
 
   // Status hooks + permissions allow-list -- write .claude/settings.local.json
   claude.writeSettings(session.id, conductorUrl, effectiveWorkdir, {
@@ -1640,8 +1865,12 @@ async function _launchAgentTmux(app: AppContext,
 
   // Remote compute (providers that don't support local worktrees)
   if (compute && provider && !provider.supportsWorktree) {
-    const { finalLaunchContent, ports } = await prepareRemoteEnvironment(app,
-      session, compute, provider, effectiveWorkdir,
+    const { finalLaunchContent, ports } = await prepareRemoteEnvironment(
+      app,
+      session,
+      compute,
+      provider,
+      effectiveWorkdir,
       { launchContent, onLog: log },
     );
 
@@ -1685,7 +1914,7 @@ function formatTaskHeader(app: AppContext, session: Session, stage: string, agen
   // Get resolved stage with substituted variables
   const vars = buildSessionVars(sessionAsVars(session));
   const resolved = resolveFlow(app, session.flow, vars);
-  const stageDef = resolved?.stages.find(s => s.name === stage);
+  const stageDef = resolved?.stages.find((s) => s.name === stage);
 
   // Every autonomously-dispatched session (including bare) gets an actionable
   // first-turn prompt. The system prompt gives Claude context, but Claude only
@@ -1705,8 +1934,12 @@ function formatTaskHeader(app: AppContext, session: Session, stage: string, agen
   }
 
   // Readiness + completion reporting
-  parts.push(`\nWhen you start up, immediately call the \`report\` tool with type='progress' to announce you are online and ready for work.`);
-  parts.push(`When you finish your work, call \`report\` with type='completed' and a concise summary of what you accomplished (files changed, tests added, key decisions). This summary is shown to the user in the dashboard.`);
+  parts.push(
+    `\nWhen you start up, immediately call the \`report\` tool with type='progress' to announce you are online and ready for work.`,
+  );
+  parts.push(
+    `When you finish your work, call \`report\` with type='completed' and a concise summary of what you accomplished (files changed, tests added, key decisions). This summary is shown to the user in the dashboard.`,
+  );
 
   return parts;
 }
@@ -1758,7 +1991,12 @@ async function appendPreviousStageContext(app: AppContext, session: Session): Pr
   return parts;
 }
 
-async function buildTaskWithHandoff(app: AppContext, session: Session, stage: string, agentName: string): Promise<string> {
+async function buildTaskWithHandoff(
+  app: AppContext,
+  session: Session,
+  stage: string,
+  agentName: string,
+): Promise<string> {
   const header = formatTaskHeader(app, session, stage, agentName);
   const context = await appendPreviousStageContext(app, session);
 
@@ -1769,8 +2007,10 @@ async function buildTaskWithHandoff(app: AppContext, session: Session, stage: st
     if (agent) {
       const mFilter = parseMessageFilter(agent);
       if (mFilter) {
-        const messages = app.messages.list(session.id).map(m => ({
-          role: m.role, content: m.content, timestamp: m.created_at,
+        const messages = app.messages.list(session.id).map((m) => ({
+          role: m.role,
+          content: m.content,
+          timestamp: m.created_at,
         }));
         const filtered = filterMessages(messages, mFilter);
         if (filtered.length > 0) {
@@ -1781,7 +2021,9 @@ async function buildTaskWithHandoff(app: AppContext, session: Session, stage: st
         }
       }
     }
-  } catch { /* skip message filtering on error */ }
+  } catch {
+    /* skip message filtering on error */
+  }
 
   return [...header, ...context].join("\n");
 }
@@ -1808,16 +2050,27 @@ function extractSubtasks(app: AppContext, session: Session): { name: string; tas
   ];
 }
 
-async function setupWorktree(app: AppContext, repoPath: string, sessionId: string, branch?: string): Promise<string | null> {
+async function setupWorktree(
+  app: AppContext,
+  repoPath: string,
+  sessionId: string,
+  branch?: string,
+): Promise<string | null> {
   const wtPath = join(app.config.worktreesDir, sessionId);
   if (existsSync(wtPath)) return wtPath;
 
   const branchName = branch ?? `ark-${sessionId}`;
   try {
-    await execFileAsync("git", ["-C", repoPath, "worktree", "prune"], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+    await execFileAsync("git", ["-C", repoPath, "worktree", "prune"], {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     // Try with new branch
     try {
-      await execFileAsync("git", ["-C", repoPath, "worktree", "add", "-b", branchName, wtPath], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+      await execFileAsync("git", ["-C", repoPath, "worktree", "add", "-b", branchName, wtPath], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
       return wtPath;
     } catch (e: any) {
       if (!String(e).includes("already exists")) {
@@ -1826,7 +2079,10 @@ async function setupWorktree(app: AppContext, repoPath: string, sessionId: strin
     }
     // Try existing branch
     try {
-      await execFileAsync("git", ["-C", repoPath, "worktree", "add", wtPath, branchName], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+      await execFileAsync("git", ["-C", repoPath, "worktree", "add", wtPath, branchName], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
       return wtPath;
     } catch (e: any) {
       if (!String(e).includes("already checked out") && !String(e).includes("already exists")) {
@@ -1835,7 +2091,10 @@ async function setupWorktree(app: AppContext, repoPath: string, sessionId: strin
     }
     // Unique branch
     try {
-      await execFileAsync("git", ["-C", repoPath, "worktree", "add", "-b", `ark-${sessionId}`, wtPath], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+      await execFileAsync("git", ["-C", repoPath, "worktree", "add", "-b", `ark-${sessionId}`, wtPath], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
       return wtPath;
     } catch (e: any) {
       logError("session", `setupWorktree: all strategies failed for ${sessionId}: ${e?.message ?? e}`);
@@ -1903,9 +2162,13 @@ export async function runWorktreeSetup(
  * Get a diff summary for a session's worktree branch vs its base branch.
  * Used for previewing changes before merge or PR creation.
  */
-export async function worktreeDiff(app: AppContext, sessionId: string, opts?: {
-  base?: string;
-}): Promise<{
+export async function worktreeDiff(
+  app: AppContext,
+  sessionId: string,
+  opts?: {
+    base?: string;
+  },
+): Promise<{
   ok: boolean;
   stat: string;
   diff: string;
@@ -1918,35 +2181,86 @@ export async function worktreeDiff(app: AppContext, sessionId: string, opts?: {
   message?: string;
 }> {
   const session = app.sessions.get(sessionId);
-  if (!session) return { ok: false, stat: "", diff: "", branch: "", baseBranch: "", filesChanged: 0, insertions: 0, deletions: 0, modifiedSinceReview: [], message: "Session not found" };
+  if (!session)
+    return {
+      ok: false,
+      stat: "",
+      diff: "",
+      branch: "",
+      baseBranch: "",
+      filesChanged: 0,
+      insertions: 0,
+      deletions: 0,
+      modifiedSinceReview: [],
+      message: "Session not found",
+    };
 
   const workdir = session.workdir;
   const repo = session.repo;
-  if (!workdir || !repo) return { ok: false, stat: "", diff: "", branch: "", baseBranch: "", filesChanged: 0, insertions: 0, deletions: 0, modifiedSinceReview: [], message: "No workdir or repo" };
+  if (!workdir || !repo)
+    return {
+      ok: false,
+      stat: "",
+      diff: "",
+      branch: "",
+      baseBranch: "",
+      filesChanged: 0,
+      insertions: 0,
+      deletions: 0,
+      modifiedSinceReview: [],
+      message: "No workdir or repo",
+    };
 
   // Determine the worktree path and branch
   const wtDir = join(app.config.worktreesDir, sessionId);
   let branch = session.branch;
   if (!branch && existsSync(wtDir)) {
     try {
-      const { stdout } = await execFileAsync("git", ["-C", wtDir, "rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+      const { stdout } = await execFileAsync("git", ["-C", wtDir, "rev-parse", "--abbrev-ref", "HEAD"], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
       branch = stdout.trim();
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
-  if (!branch) return { ok: false, stat: "", diff: "", branch: "", baseBranch: "", filesChanged: 0, insertions: 0, deletions: 0, modifiedSinceReview: [], message: "Cannot determine branch" };
+  if (!branch)
+    return {
+      ok: false,
+      stat: "",
+      diff: "",
+      branch: "",
+      baseBranch: "",
+      filesChanged: 0,
+      insertions: 0,
+      deletions: 0,
+      modifiedSinceReview: [],
+      message: "Cannot determine branch",
+    };
 
   const baseBranch = opts?.base ?? DEFAULT_BASE_BRANCH;
 
   try {
     // Get diff stat
-    const { stdout: stat } = await execFileAsync("git", ["-C", repo, "diff", "--stat", `${baseBranch}...${branch}`], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+    const { stdout: stat } = await execFileAsync("git", ["-C", repo, "diff", "--stat", `${baseBranch}...${branch}`], {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
 
     // Get full diff (truncated to 50KB)
-    const { stdout: fullDiff } = await execFileAsync("git", ["-C", repo, "diff", `${baseBranch}...${branch}`], { encoding: "utf-8", maxBuffer: 1024 * 1024 });
+    const { stdout: fullDiff } = await execFileAsync("git", ["-C", repo, "diff", `${baseBranch}...${branch}`], {
+      encoding: "utf-8",
+      maxBuffer: 1024 * 1024,
+    });
     const diff = fullDiff.length > 50_000 ? fullDiff.slice(0, 50_000) + "\n... (truncated)" : fullDiff;
 
     // Parse shortstat for counts
-    const { stdout: shortstat } = await execFileAsync("git", ["-C", repo, "diff", "--shortstat", `${baseBranch}...${branch}`], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+    const { stdout: shortstat } = await execFileAsync(
+      "git",
+      ["-C", repo, "diff", "--shortstat", `${baseBranch}...${branch}`],
+      { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] },
+    );
     // "3 files changed, 42 insertions(+), 7 deletions(-)"
     const filesMatch = shortstat.match(/(\d+) files? changed/);
     const insMatch = shortstat.match(/(\d+) insertions?/);
@@ -1955,14 +2269,23 @@ export async function worktreeDiff(app: AppContext, sessionId: string, opts?: {
     // Track file hashes for re-review detection
     const modifiedSinceReview: string[] = [];
     try {
-      const { stdout: diffNames } = await execFileAsync("git", ["-C", repo, "diff", "--name-only", `${baseBranch}...${branch}`], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+      const { stdout: diffNames } = await execFileAsync(
+        "git",
+        ["-C", repo, "diff", "--name-only", `${baseBranch}...${branch}`],
+        { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] },
+      );
       const files = diffNames.trim().split("\n").filter(Boolean);
       const fileHashes: Record<string, string> = {};
       for (const file of files) {
         try {
-          const { stdout: hash } = await execFileAsync("git", ["-C", repo, "rev-parse", `${branch}:${file}`], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+          const { stdout: hash } = await execFileAsync("git", ["-C", repo, "rev-parse", `${branch}:${file}`], {
+            encoding: "utf-8",
+            stdio: ["ignore", "pipe", "pipe"],
+          });
           fileHashes[file] = hash.trim();
-        } catch { /* file may have been deleted */ }
+        } catch {
+          /* file may have been deleted */
+        }
       }
 
       // Compare against previously reviewed hashes
@@ -1977,7 +2300,9 @@ export async function worktreeDiff(app: AppContext, sessionId: string, opts?: {
 
       // Save current hashes as reviewed
       app.sessions.mergeConfig(sessionId, { reviewed_files: fileHashes });
-    } catch { /* re-review tracking is best-effort */ }
+    } catch {
+      /* re-review tracking is best-effort */
+    }
 
     return {
       ok: true,
@@ -1991,7 +2316,18 @@ export async function worktreeDiff(app: AppContext, sessionId: string, opts?: {
       modifiedSinceReview,
     };
   } catch (e: any) {
-    return { ok: false, stat: "", diff: "", branch, baseBranch, filesChanged: 0, insertions: 0, deletions: 0, modifiedSinceReview: [], message: e?.message ?? "Diff failed" };
+    return {
+      ok: false,
+      stat: "",
+      diff: "",
+      branch,
+      baseBranch,
+      filesChanged: 0,
+      insertions: 0,
+      deletions: 0,
+      modifiedSinceReview: [],
+      message: e?.message ?? "Diff failed",
+    };
   }
 }
 
@@ -2002,9 +2338,13 @@ export async function worktreeDiff(app: AppContext, sessionId: string, opts?: {
  * Fetches origin, then rebases onto origin/<base>. On conflict, aborts
  * the rebase and returns an error -- the branch is left unchanged.
  */
-export async function rebaseOntoBase(app: AppContext, sessionId: string, opts?: {
-  base?: string;
-}): Promise<{ ok: boolean; message: string }> {
+export async function rebaseOntoBase(
+  app: AppContext,
+  sessionId: string,
+  opts?: {
+    base?: string;
+  },
+): Promise<{ ok: boolean; message: string }> {
   const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
@@ -2044,7 +2384,9 @@ export async function rebaseOntoBase(app: AppContext, sessionId: string, opts?: 
         encoding: "utf-8",
         stdio: ["ignore", "pipe", "pipe"],
       });
-    } catch { /* already clean */ }
+    } catch {
+      /* already clean */
+    }
 
     logWarn("session", `rebaseOntoBase: rebase failed for ${sessionId}: ${e?.message ?? e}`);
     return { ok: false, message: `Rebase failed: ${e?.message ?? e}` };
@@ -2058,12 +2400,16 @@ export async function rebaseOntoBase(app: AppContext, sessionId: string, opts?: 
  * Optionally rebases onto the base branch first (controlled by repo config auto_rebase, default true).
  * Pushes the branch and creates the PR via gh CLI.
  */
-export async function createWorktreePR(app: AppContext, sessionId: string, opts?: {
-  title?: string;
-  body?: string;
-  base?: string;
-  draft?: boolean;
-}): Promise<{ ok: boolean; message: string; pr_url?: string }> {
+export async function createWorktreePR(
+  app: AppContext,
+  sessionId: string,
+  opts?: {
+    title?: string;
+    body?: string;
+    base?: string;
+    draft?: boolean;
+  },
+): Promise<{ ok: boolean; message: string; pr_url?: string }> {
   const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
@@ -2075,9 +2421,14 @@ export async function createWorktreePR(app: AppContext, sessionId: string, opts?
   let branch = session.branch;
   if (!branch && existsSync(wtDir)) {
     try {
-      const { stdout } = await execFileAsync("git", ["-C", wtDir, "rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+      const { stdout } = await execFileAsync("git", ["-C", wtDir, "rev-parse", "--abbrev-ref", "HEAD"], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
       branch = stdout.trim();
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
   if (!branch) return { ok: false, message: "Cannot determine worktree branch" };
 
@@ -2092,7 +2443,10 @@ export async function createWorktreePR(app: AppContext, sessionId: string, opts?
     if (!rebaseResult.ok) {
       // Rebase failed (conflict) -- still proceed with PR creation without rebase.
       // The PR will show merge conflicts on GitHub, which is preferable to blocking.
-      logWarn("session", `createWorktreePR: auto-rebase failed for ${sessionId}, proceeding without rebase: ${rebaseResult.message}`);
+      logWarn(
+        "session",
+        `createWorktreePR: auto-rebase failed for ${sessionId}, proceeding without rebase: ${rebaseResult.message}`,
+      );
     }
   }
 
@@ -2127,10 +2481,14 @@ export async function createWorktreePR(app: AppContext, sessionId: string, opts?
  * Merge an existing PR via `gh pr merge`. Used by the auto_merge action stage.
  * Requires the session to have a pr_url (set by a preceding create_pr stage).
  */
-export async function mergeWorktreePR(app: AppContext, sessionId: string, opts?: {
-  method?: "merge" | "squash" | "rebase";
-  deleteAfter?: boolean;
-}): Promise<{ ok: boolean; message: string }> {
+export async function mergeWorktreePR(
+  app: AppContext,
+  sessionId: string,
+  opts?: {
+    method?: "merge" | "squash" | "rebase";
+    deleteAfter?: boolean;
+  },
+): Promise<{ ok: boolean; message: string }> {
   const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
@@ -2167,19 +2525,27 @@ export async function mergeWorktreePR(app: AppContext, sessionId: string, opts?:
  * Finish a worktree session: merge branch into target, remove worktree, delete session.
  * Aborts safely on merge conflict without losing work.
  */
-export async function finishWorktree(app: AppContext, sessionId: string, opts?: {
-  into?: string;  // target branch (default: "main")
-  noMerge?: boolean;  // skip merge, just cleanup
-  keepBranch?: boolean;  // don't delete the branch after merge
-  createPR?: boolean;  // create a PR instead of merging locally
-  force?: boolean;  // skip verification
-}): Promise<{ ok: boolean; message: string }> {
+export async function finishWorktree(
+  app: AppContext,
+  sessionId: string,
+  opts?: {
+    into?: string; // target branch (default: "main")
+    noMerge?: boolean; // skip merge, just cleanup
+    keepBranch?: boolean; // don't delete the branch after merge
+    createPR?: boolean; // create a PR instead of merging locally
+    force?: boolean; // skip verification
+  },
+): Promise<{ ok: boolean; message: string }> {
   const session = app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   const workdir = session.workdir;
   const repo = session.repo;
-  if (!workdir || !repo) return { ok: false, message: "Session has no workdir or repo. Create a new session with --repo to enable worktree features." };
+  if (!workdir || !repo)
+    return {
+      ok: false,
+      message: "Session has no workdir or repo. Create a new session with --repo to enable worktree features.",
+    };
 
   // Verify before finishing (unless force)
   if (!opts?.force) {
@@ -2197,9 +2563,14 @@ export async function finishWorktree(app: AppContext, sessionId: string, opts?: 
   let branch: string | null = session.branch;
   if (!branch && isWorktree) {
     try {
-      const { stdout } = await execFileAsync("git", ["-C", wtDir, "rev-parse", "--abbrev-ref", "HEAD"], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+      const { stdout } = await execFileAsync("git", ["-C", wtDir, "rev-parse", "--abbrev-ref", "HEAD"], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
       branch = stdout.trim();
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   if (!branch) return { ok: false, message: "Cannot determine worktree branch" };
@@ -2213,18 +2584,27 @@ export async function finishWorktree(app: AppContext, sessionId: string, opts?: 
 
   // 1b. Create PR instead of merging locally if requested
   if (opts?.createPR) {
-    const prResult = await createWorktreePR(app, sessionId, { base: targetBranch, title: session.summary ?? undefined });
+    const prResult = await createWorktreePR(app, sessionId, {
+      base: targetBranch,
+      title: session.summary ?? undefined,
+    });
     if (!prResult.ok) return prResult;
     // Still cleanup worktree after PR creation
     if (isWorktree) {
       try {
-        await execFileAsync("git", ["-C", repo, "worktree", "remove", wtDir, "--force"], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+        await execFileAsync("git", ["-C", repo, "worktree", "remove", wtDir, "--force"], {
+          encoding: "utf-8",
+          stdio: ["ignore", "pipe", "pipe"],
+        });
       } catch (e: any) {
         logError("session", `finishWorktree: remove worktree failed: ${e?.message ?? e}`);
       }
     }
     await deleteSessionAsync(app, sessionId);
-    app.events.log(sessionId, "worktree_finished", { actor: "user", data: { branch, targetBranch, merged: false, pr: true } });
+    app.events.log(sessionId, "worktree_finished", {
+      actor: "user",
+      data: { branch, targetBranch, merged: false, pr: true },
+    });
     return { ok: true, message: `PR created and worktree cleaned up. ${prResult.pr_url ?? ""}`.trim() };
   }
 
@@ -2232,20 +2612,39 @@ export async function finishWorktree(app: AppContext, sessionId: string, opts?: 
   if (!opts?.noMerge) {
     try {
       // Checkout target branch in the main repo
-      await execFileAsync("git", ["-C", repo, "checkout", targetBranch], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+      await execFileAsync("git", ["-C", repo, "checkout", targetBranch], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
       // Merge the worktree branch
-      await execFileAsync("git", ["-C", repo, "merge", branch, "--no-edit"], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+      await execFileAsync("git", ["-C", repo, "merge", branch, "--no-edit"], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
     } catch {
       // Abort merge on conflict to preserve state
-      try { await execFileAsync("git", ["-C", repo, "merge", "--abort"], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] }); } catch { /* ignore */ }
-      return { ok: false, message: `Merge conflict: ${branch} into ${targetBranch}. Resolve manually. Worktree preserved.` };
+      try {
+        await execFileAsync("git", ["-C", repo, "merge", "--abort"], {
+          encoding: "utf-8",
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+      } catch {
+        /* ignore */
+      }
+      return {
+        ok: false,
+        message: `Merge conflict: ${branch} into ${targetBranch}. Resolve manually. Worktree preserved.`,
+      };
     }
   }
 
   // 3. Remove worktree
   if (isWorktree) {
     try {
-      await execFileAsync("git", ["-C", repo, "worktree", "remove", wtDir, "--force"], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+      await execFileAsync("git", ["-C", repo, "worktree", "remove", wtDir, "--force"], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
     } catch (e: any) {
       logError("session", `finishWorktree: remove worktree failed: ${e?.message ?? e}`);
     }
@@ -2254,10 +2653,20 @@ export async function finishWorktree(app: AppContext, sessionId: string, opts?: 
   // 4. Delete branch (unless --keep-branch)
   if (!opts?.keepBranch && branch !== targetBranch) {
     try {
-      await execFileAsync("git", ["-C", repo, "branch", "-d", branch], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+      await execFileAsync("git", ["-C", repo, "branch", "-d", branch], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
     } catch {
       // Branch may not exist or not be fully merged -- try force delete
-      try { await execFileAsync("git", ["-C", repo, "branch", "-D", branch], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] }); } catch { /* ignore */ }
+      try {
+        await execFileAsync("git", ["-C", repo, "branch", "-D", branch], {
+          encoding: "utf-8",
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+      } catch {
+        /* ignore */
+      }
     }
   }
 
@@ -2265,7 +2674,10 @@ export async function finishWorktree(app: AppContext, sessionId: string, opts?: 
   await deleteSessionAsync(app, sessionId);
 
   const mergeMsg = opts?.noMerge ? "skipped merge" : `merged ${branch} → ${targetBranch}`;
-  app.events.log(sessionId, "worktree_finished", { actor: "user", data: { branch, targetBranch, merged: !opts?.noMerge } });
+  app.events.log(sessionId, "worktree_finished", {
+    actor: "user",
+    data: { branch, targetBranch, merged: !opts?.noMerge },
+  });
 
   return { ok: true, message: `Finished: ${mergeMsg}, worktree removed, session deleted` };
 }
@@ -2273,7 +2685,8 @@ export async function finishWorktree(app: AppContext, sessionId: string, opts?: 
 // ── Wait ────────────────────────────────────────────────────────────────
 
 /** Wait for a session to reach a terminal state. Returns the final session. */
-export async function waitForCompletion(app: AppContext, 
+export async function waitForCompletion(
+  app: AppContext,
   sessionId: string,
   opts?: { timeoutMs?: number; pollMs?: number; onStatus?: (status: string) => void },
 ): Promise<{ session: Session | null; timedOut: boolean }> {
@@ -2294,13 +2707,17 @@ export async function waitForCompletion(app: AppContext,
       return { session, timedOut: true };
     }
 
-    await new Promise(r => setTimeout(r, pollMs));
+    await new Promise((r) => setTimeout(r, pollMs));
   }
 }
 
 // ── Output ──────────────────────────────────────────────────────────────────
 
-export async function getOutput(app: AppContext, sessionId: string, opts?: { lines?: number; ansi?: boolean }): Promise<string> {
+export async function getOutput(
+  app: AppContext,
+  sessionId: string,
+  opts?: { lines?: number; ansi?: boolean },
+): Promise<string> {
   const session = app.sessions.get(sessionId);
   if (!session?.session_id) return "";
 
@@ -2311,7 +2728,11 @@ export async function getOutput(app: AppContext, sessionId: string, opts?: { lin
   return "";
 }
 
-export async function send(app: AppContext, sessionId: string, message: string): Promise<{ ok: boolean; message: string }> {
+export async function send(
+  app: AppContext,
+  sessionId: string,
+  message: string,
+): Promise<{ ok: boolean; message: string }> {
   const session = app.sessions.get(sessionId);
   if (!session?.session_id) return { ok: false, message: "No active session" };
 
@@ -2319,13 +2740,21 @@ export async function send(app: AppContext, sessionId: string, message: string):
   try {
     const injection = detectInjection(message);
     if (injection.severity === "high") {
-      app.events.log(sessionId, "prompt_injection_blocked", { actor: "system", data: { patterns: injection.patterns } });
+      app.events.log(sessionId, "prompt_injection_blocked", {
+        actor: "system",
+        data: { patterns: injection.patterns },
+      });
       return { ok: false, message: "Message blocked: potential prompt injection detected" };
     }
     if (injection.detected) {
-      app.events.log(sessionId, "prompt_injection_warning", { actor: "system", data: { patterns: injection.patterns, severity: injection.severity } });
+      app.events.log(sessionId, "prompt_injection_warning", {
+        actor: "system",
+        data: { patterns: injection.patterns, severity: injection.severity },
+      });
     }
-  } catch { /* skip prompt guard on error */ }
+  } catch {
+    /* skip prompt guard on error */
+  }
 
   // Persist user message to conversation history before sending to agent
   app.messages.send(sessionId, "user", message, "text");
@@ -2344,11 +2773,7 @@ export {
   retryWithContext,
   detectStatus,
 } from "./session-hooks.js";
-export type {
-  HookStatusResult,
-  ReportResult,
-  StageHandoffResult,
-} from "./session-hooks.js";
+export type { HookStatusResult, ReportResult, StageHandoffResult } from "./session-hooks.js";
 
 // ── Sub-Agent Fan-Out ──────────────────────────────────────────────────────
 
@@ -2358,9 +2783,10 @@ interface FanOutTask {
   flow?: string;
 }
 
-export function fanOut(app: AppContext, 
+export function fanOut(
+  app: AppContext,
   parentId: string,
-  opts: { tasks: FanOutTask[] }
+  opts: { tasks: FanOutTask[] },
 ): { ok: boolean; childIds?: string[]; message?: string } {
   const parent = app.sessions.get(parentId);
   if (!parent) return { ok: false, message: "Parent session not found" };
@@ -2380,7 +2806,7 @@ export function fanOut(app: AppContext,
     });
     // Set first stage so child is dispatchable
     const childFlow = task.flow ?? "bare";
-    const firstStage = flow.getFirstStage(app,childFlow);
+    const firstStage = flow.getFirstStage(app, childFlow);
     app.sessions.update(child.id, {
       parent_id: parentId,
       fork_group: forkGroup,
@@ -2408,20 +2834,24 @@ export function fanOut(app: AppContext,
  * Unlike fork (which copies the parent's config), subagents can use different
  * models and agents for cost optimization or specialization.
  */
-export function spawnSubagent(app: AppContext, parentId: string, opts: {
-  task: string;
-  agent?: string;       // override agent (default: parent's agent)
-  model?: string;       // override model (e.g., "haiku" for cheap tasks)
-  group_name?: string;
-  extensions?: string[]; // MCP extensions to enable
-}): { ok: boolean; sessionId?: string; message: string } {
+export function spawnSubagent(
+  app: AppContext,
+  parentId: string,
+  opts: {
+    task: string;
+    agent?: string; // override agent (default: parent's agent)
+    model?: string; // override model (e.g., "haiku" for cheap tasks)
+    group_name?: string;
+    extensions?: string[]; // MCP extensions to enable
+  },
+): { ok: boolean; sessionId?: string; message: string } {
   const parent = app.sessions.get(parentId);
   if (!parent) return { ok: false, message: "Parent session not found" };
 
   const session = app.sessions.create({
     summary: opts.task,
     repo: parent.repo || undefined,
-    flow: "quick",  // subagents use single-stage flow
+    flow: "quick", // subagents use single-stage flow
     compute_name: parent.compute_name || undefined,
     workdir: parent.workdir || undefined,
     group_name: opts.group_name ?? parent.group_name ?? undefined,
@@ -2437,7 +2867,7 @@ export function spawnSubagent(app: AppContext, parentId: string, opts: {
   app.sessions.update(session.id, { agent: agentName, parent_id: parentId });
 
   // Set first stage so the subagent is dispatchable
-  const firstStage = flow.getFirstStage(app,"quick");
+  const firstStage = flow.getFirstStage(app, "quick");
   if (firstStage) {
     app.sessions.update(session.id, { stage: firstStage, status: "ready" });
   }
@@ -2453,11 +2883,15 @@ export function spawnSubagent(app: AppContext, parentId: string, opts: {
 /**
  * Spawn multiple subagents in parallel and optionally wait for all to complete.
  */
-export async function spawnParallelSubagents(app: AppContext, parentId: string, tasks: Array<{
-  task: string;
-  agent?: string;
-  model?: string;
-}>): Promise<{ ok: boolean; sessionIds: string[]; message: string }> {
+export async function spawnParallelSubagents(
+  app: AppContext,
+  parentId: string,
+  tasks: Array<{
+    task: string;
+    agent?: string;
+    model?: string;
+  }>,
+): Promise<{ ok: boolean; sessionIds: string[]; message: string }> {
   const ids: string[] = [];
   for (const t of tasks) {
     const result = spawnSubagent(app, parentId, t);
@@ -2467,7 +2901,7 @@ export async function spawnParallelSubagents(app: AppContext, parentId: string, 
   }
 
   // Dispatch all in parallel
-  await Promise.allSettled(ids.map(id => dispatch(app, id).catch(() => {})));
+  await Promise.allSettled(ids.map((id) => dispatch(app, id).catch(() => {})));
 
   return { ok: true, sessionIds: ids, message: `${ids.length} subagents spawned and dispatched` };
 }
@@ -2492,7 +2926,9 @@ export async function removeSessionWorktree(app: AppContext, session: Session): 
         stdio: ["ignore", "pipe", "pipe"],
       });
       return;
-    } catch { /* fall through to rmSync */ }
+    } catch {
+      /* fall through to rmSync */
+    }
   }
 
   // Fallback: direct removal (no repo context or git worktree remove failed)
@@ -2506,7 +2942,7 @@ export function findOrphanedWorktrees(app: AppContext): string[] {
   const wtDir = app.config.worktreesDir;
   if (!existsSync(wtDir)) return [];
 
-  const sessionIds = new Set(app.sessions.list({ limit: 1000 }).map(s => s.id));
+  const sessionIds = new Set(app.sessions.list({ limit: 1000 }).map((s) => s.id));
   const orphans: string[] = [];
 
   try {
@@ -2515,7 +2951,9 @@ export function findOrphanedWorktrees(app: AppContext): string[] {
         orphans.push(entry);
       }
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   return orphans;
 }
@@ -2530,7 +2968,10 @@ export async function cleanupWorktrees(app: AppContext): Promise<{ removed: numb
     const wtPath = join(app.config.worktreesDir, id);
     try {
       // Try git worktree remove first
-      await execFileAsync("git", ["worktree", "remove", wtPath, "--force"], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] });
+      await execFileAsync("git", ["worktree", "remove", wtPath, "--force"], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "pipe"],
+      });
       removed++;
     } catch {
       // Fallback: just remove the directory

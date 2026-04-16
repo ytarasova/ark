@@ -66,7 +66,7 @@ async function call(path?: string) {
 
 describe("fs/list-dir handler", () => {
   it("lists only directories, sorted case-insensitively", async () => {
-    const res = await call(tmpRoot) as JsonRpcResponse;
+    const res = (await call(tmpRoot)) as JsonRpcResponse;
     const result = res.result as any;
     expect(result.cwd).toBe(tmpRoot);
     expect(result.entries).toHaveLength(3);
@@ -78,7 +78,7 @@ describe("fs/list-dir handler", () => {
   });
 
   it("flags entries that contain a .git directory", async () => {
-    const res = await call(tmpRoot) as JsonRpcResponse;
+    const res = (await call(tmpRoot)) as JsonRpcResponse;
     const result = res.result as any;
     const gamma = result.entries.find((e: any) => e.name === "gamma");
     const alpha = result.entries.find((e: any) => e.name === "alpha");
@@ -87,7 +87,7 @@ describe("fs/list-dir handler", () => {
   });
 
   it("returns each entry's absolute path", async () => {
-    const res = await call(tmpRoot) as JsonRpcResponse;
+    const res = (await call(tmpRoot)) as JsonRpcResponse;
     const result = res.result as any;
     for (const e of result.entries) {
       expect(e.path).toBe(join(tmpRoot, e.name));
@@ -96,39 +96,39 @@ describe("fs/list-dir handler", () => {
 
   it("reports the parent directory (non-null except at filesystem root)", async () => {
     const sub = join(tmpRoot, "alpha");
-    const res = await call(sub) as JsonRpcResponse;
+    const res = (await call(sub)) as JsonRpcResponse;
     const result = res.result as any;
     expect(result.cwd).toBe(sub);
     expect(result.parent).toBe(tmpRoot);
 
     // Filesystem root has parent === null
-    const rootRes = await call(parse(tmpRoot).root) as JsonRpcResponse;
+    const rootRes = (await call(parse(tmpRoot).root)) as JsonRpcResponse;
     const rootResult = rootRes.result as any;
     expect(rootResult.parent).toBeNull();
   });
 
   it("defaults to the user's home directory when no path is given", async () => {
-    const res = await call() as JsonRpcResponse;
+    const res = (await call()) as JsonRpcResponse;
     const result = res.result as any;
     expect(result.cwd).toBe(homedir());
     expect(result.home).toBe(homedir());
   });
 
   it("treats '.' as 'default to home' rather than process cwd", async () => {
-    const res = await call(".") as JsonRpcResponse;
+    const res = (await call(".")) as JsonRpcResponse;
     const result = res.result as any;
     expect(result.cwd).toBe(homedir());
   });
 
   it("expands a leading ~ to the home directory", async () => {
-    const res = await call("~") as JsonRpcResponse;
+    const res = (await call("~")) as JsonRpcResponse;
     const result = res.result as any;
     expect(result.cwd).toBe(homedir());
   });
 
   it("returns an RPC error for a non-existent path", async () => {
     const bogus = join(tmpRoot, "does-not-exist-xyz");
-    const res = await call(bogus) as JsonRpcError;
+    const res = (await call(bogus)) as JsonRpcError;
     expect(res.error).toBeDefined();
     expect(res.error.code).toBe(-32602);
     expect(res.error.message).toContain("does not exist");
@@ -136,14 +136,14 @@ describe("fs/list-dir handler", () => {
 
   it("rejects a path that points at a file", async () => {
     const filePath = join(tmpRoot, "zeta.txt");
-    const res = await call(filePath) as JsonRpcError;
+    const res = (await call(filePath)) as JsonRpcError;
     expect(res.error).toBeDefined();
     expect(res.error.code).toBe(-32602);
     expect(res.error.message).toContain("Not a directory");
   });
 
   it("rejects a relative path that slipped past the defaults", async () => {
-    const res = await call("some/relative/path") as JsonRpcError;
+    const res = (await call("some/relative/path")) as JsonRpcError;
     expect(res.error).toBeDefined();
     expect(res.error.code).toBe(-32602);
     expect(res.error.message).toContain("absolute");
@@ -151,7 +151,7 @@ describe("fs/list-dir handler", () => {
 
   it("refuses the call when running in hosted mode", async () => {
     (app.config as any).databaseUrl = "postgres://fake/ark";
-    const res = await call(tmpRoot) as JsonRpcError;
+    const res = (await call(tmpRoot)) as JsonRpcError;
     expect(res.error).toBeDefined();
     expect(res.error.code).toBe(-32601);
     expect(res.error.message.toLowerCase()).toContain("hosted");

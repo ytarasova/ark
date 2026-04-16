@@ -19,8 +19,16 @@ function baseDir() {
 const MIN_MSGS: object[] = [];
 for (let i = 0; i < 12; i++) {
   MIN_MSGS.push(
-    { type: "user", message: { role: "user", content: `Question ${i}: ${"x".repeat(500)}` }, timestamp: `2026-03-24T10:00:${String(i * 2 + 1).padStart(2, "0")}Z` },
-    { type: "assistant", message: { role: "assistant", content: `Answer ${i}: ${"y".repeat(500)}` }, timestamp: `2026-03-24T10:00:${String(i * 2 + 2).padStart(2, "0")}Z` },
+    {
+      type: "user",
+      message: { role: "user", content: `Question ${i}: ${"x".repeat(500)}` },
+      timestamp: `2026-03-24T10:00:${String(i * 2 + 1).padStart(2, "0")}Z`,
+    },
+    {
+      type: "assistant",
+      message: { role: "assistant", content: `Answer ${i}: ${"y".repeat(500)}` },
+      timestamp: `2026-03-24T10:00:${String(i * 2 + 2).padStart(2, "0")}Z`,
+    },
   );
 }
 
@@ -32,7 +40,7 @@ function writeTranscript(projectDirName: string, filename: string, lines: object
   mkdirSync(dir, { recursive: true });
   const msgCount = lines.filter((l: any) => l.type === "user" || l.type === "assistant").length;
   const allLines = msgCount >= 10 ? lines : [...lines, ...MIN_MSGS];
-  writeFileSync(join(dir, filename), allLines.map(l => JSON.stringify(l)).join("\n"));
+  writeFileSync(join(dir, filename), allLines.map((l) => JSON.stringify(l)).join("\n"));
 }
 
 /** Write transcripts and refresh the cache so listClaudeSessions can read them */
@@ -40,7 +48,6 @@ async function writeAndRefresh(projectDirName: string, filename: string, lines: 
   writeTranscript(projectDirName, filename, lines);
   await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
 }
-
 
 // ── listClaudeSessions ──────────────────────────────────────────────────────
 
@@ -61,12 +68,24 @@ describe("listClaudeSessions", () => {
   it("discovers sessions from JSONL files with correct metadata", async () => {
     const msgs: object[] = [
       { type: "system", sessionId: "abc-123", timestamp: "2026-03-24T10:00:00Z" },
-      { type: "user", message: { role: "user", content: [{ type: "text", text: "fix the bug" }] }, timestamp: "2026-03-24T10:01:00Z" },
+      {
+        type: "user",
+        message: { role: "user", content: [{ type: "text", text: "fix the bug" }] },
+        timestamp: "2026-03-24T10:01:00Z",
+      },
     ];
     // Add enough messages to pass the 10+ filter
     for (let i = 0; i < 10; i++) {
-      msgs.push({ type: "assistant", message: { role: "assistant", content: `step ${i}` }, timestamp: `2026-03-24T10:${String(i + 2).padStart(2, "0")}:00Z` });
-      msgs.push({ type: "user", message: { role: "user", content: `next ${i}` }, timestamp: `2026-03-24T10:${String(i + 2).padStart(2, "0")}:30Z` });
+      msgs.push({
+        type: "assistant",
+        message: { role: "assistant", content: `step ${i}` },
+        timestamp: `2026-03-24T10:${String(i + 2).padStart(2, "0")}:00Z`,
+      });
+      msgs.push({
+        type: "user",
+        message: { role: "user", content: `next ${i}` },
+        timestamp: `2026-03-24T10:${String(i + 2).padStart(2, "0")}:30Z`,
+      });
     }
     writeTranscript("-Users-yana-Projects-ark", "abc-123.jsonl", msgs);
 
@@ -93,13 +112,20 @@ describe("listClaudeSessions", () => {
   });
 
   it("counts only user and assistant messages, not system", async () => {
-    const msgs: object[] = [
-      { type: "system", sessionId: "s2", timestamp: "2026-01-01T00:00:00Z" },
-    ];
+    const msgs: object[] = [{ type: "system", sessionId: "s2", timestamp: "2026-01-01T00:00:00Z" }];
     // 6 user + 5 assistant = 11 messages, plus 3 system = 14 lines
     for (let i = 0; i < 6; i++) {
-      msgs.push({ type: "user", message: { role: "user", content: `q${i}` }, timestamp: `2026-01-01T00:${String(i + 1).padStart(2, "0")}:00Z` });
-      if (i < 5) msgs.push({ type: "assistant", message: { role: "assistant", content: `a${i}` }, timestamp: `2026-01-01T00:${String(i + 1).padStart(2, "0")}:30Z` });
+      msgs.push({
+        type: "user",
+        message: { role: "user", content: `q${i}` },
+        timestamp: `2026-01-01T00:${String(i + 1).padStart(2, "0")}:00Z`,
+      });
+      if (i < 5)
+        msgs.push({
+          type: "assistant",
+          message: { role: "assistant", content: `a${i}` },
+          timestamp: `2026-01-01T00:${String(i + 1).padStart(2, "0")}:30Z`,
+        });
     }
     msgs.push({ type: "system", content: "ignored1" });
     msgs.push({ type: "system", content: "ignored2" });
@@ -112,7 +138,11 @@ describe("listClaudeSessions", () => {
 
   it("extracts summary from string content", async () => {
     writeTranscript("-str-proj", "s3.jsonl", [
-      { type: "user", message: { role: "user", content: "refactor the auth module" }, timestamp: "2026-01-01T00:00:00Z" },
+      {
+        type: "user",
+        message: { role: "user", content: "refactor the auth module" },
+        timestamp: "2026-01-01T00:00:00Z",
+      },
     ]);
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
@@ -122,7 +152,11 @@ describe("listClaudeSessions", () => {
 
   it("extracts summary from array content", async () => {
     writeTranscript("-arr-proj", "s4.jsonl", [
-      { type: "user", message: { role: "user", content: [{ type: "text", text: "deploy to staging" }] }, timestamp: "2026-01-01T00:00:00Z" },
+      {
+        type: "user",
+        message: { role: "user", content: [{ type: "text", text: "deploy to staging" }] },
+        timestamp: "2026-01-01T00:00:00Z",
+      },
     ]);
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
@@ -134,13 +168,29 @@ describe("listClaudeSessions", () => {
     // Build 10+ message sessions with distinct timestamp ranges
     const oldMsgs: object[] = [{ type: "system", sessionId: "old", timestamp: "2020-01-01T00:00:00Z" }];
     for (let i = 0; i < 6; i++) {
-      oldMsgs.push({ type: "user", message: { role: "user", content: `old q${i}` }, timestamp: `2020-01-01T0${i + 1}:00:00Z` });
-      oldMsgs.push({ type: "assistant", message: { role: "assistant", content: `old a${i}` }, timestamp: `2020-01-01T0${i + 1}:30:00Z` });
+      oldMsgs.push({
+        type: "user",
+        message: { role: "user", content: `old q${i}` },
+        timestamp: `2020-01-01T0${i + 1}:00:00Z`,
+      });
+      oldMsgs.push({
+        type: "assistant",
+        message: { role: "assistant", content: `old a${i}` },
+        timestamp: `2020-01-01T0${i + 1}:30:00Z`,
+      });
     }
     const newMsgs: object[] = [{ type: "system", sessionId: "new", timestamp: "2029-01-01T00:00:00Z" }];
     for (let i = 0; i < 6; i++) {
-      newMsgs.push({ type: "user", message: { role: "user", content: `new q${i}` }, timestamp: `2029-01-01T0${i + 1}:00:00Z` });
-      newMsgs.push({ type: "assistant", message: { role: "assistant", content: `new a${i}` }, timestamp: `2029-01-01T0${i + 1}:30:00Z` });
+      newMsgs.push({
+        type: "user",
+        message: { role: "user", content: `new q${i}` },
+        timestamp: `2029-01-01T0${i + 1}:00:00Z`,
+      });
+      newMsgs.push({
+        type: "assistant",
+        message: { role: "assistant", content: `new a${i}` },
+        timestamp: `2029-01-01T0${i + 1}:30:00Z`,
+      });
     }
     writeTranscript("-proj-a", "old.jsonl", oldMsgs);
     writeTranscript("-proj-b", "new.jsonl", newMsgs);
@@ -162,9 +212,14 @@ describe("listClaudeSessions", () => {
     // Write a subagent transcript inside a subdirectory (not a .jsonl at project level)
     const subagentDir = join(baseDir(), "-proj", "main-session", "subagents");
     mkdirSync(subagentDir, { recursive: true });
-    writeFileSync(join(subagentDir, "sub-agent.jsonl"), JSON.stringify({
-      type: "user", message: { role: "user", content: "subagent task" }, timestamp: "2026-01-01T00:02:00Z",
-    }));
+    writeFileSync(
+      join(subagentDir, "sub-agent.jsonl"),
+      JSON.stringify({
+        type: "user",
+        message: { role: "user", content: "subagent task" },
+        timestamp: "2026-01-01T00:02:00Z",
+      }),
+    );
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
     const sessions = listClaudeSessions(getApp());
@@ -211,7 +266,11 @@ describe("listClaudeSessions", () => {
 
   it("strips HTML tags from summary", async () => {
     writeTranscript("-html-proj", "html-s.jsonl", [
-      { type: "user", message: { role: "user", content: "<context>some xml</context> fix this" }, timestamp: "2026-01-01T00:00:00Z" },
+      {
+        type: "user",
+        message: { role: "user", content: "<context>some xml</context> fix this" },
+        timestamp: "2026-01-01T00:00:00Z",
+      },
     ]);
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
@@ -308,22 +367,28 @@ describe("getClaudeSession", () => {
 describe("claude sessions filtering", () => {
   it("sessions with few messages are included (MIN_MESSAGE_COUNT=1)", async () => {
     // Write a session with only 4 user+assistant messages (8 total lines with system)
-    const fewMsgs: object[] = [
-      { type: "system", sessionId: "few-msgs", timestamp: "2026-03-24T10:00:00Z" },
-    ];
+    const fewMsgs: object[] = [{ type: "system", sessionId: "few-msgs", timestamp: "2026-03-24T10:00:00Z" }];
     for (let i = 0; i < 4; i++) {
       fewMsgs.push(
-        { type: "user", message: { role: "user", content: `q${i}: ${"x".repeat(500)}` }, timestamp: `2026-03-24T10:0${i + 1}:00Z` },
-        { type: "assistant", message: { role: "assistant", content: `a${i}: ${"y".repeat(500)}` }, timestamp: `2026-03-24T10:0${i + 1}:30Z` },
+        {
+          type: "user",
+          message: { role: "user", content: `q${i}: ${"x".repeat(500)}` },
+          timestamp: `2026-03-24T10:0${i + 1}:00Z`,
+        },
+        {
+          type: "assistant",
+          message: { role: "assistant", content: `a${i}: ${"y".repeat(500)}` },
+          timestamp: `2026-03-24T10:0${i + 1}:30Z`,
+        },
       );
     }
     const dir = join(baseDir(), "-filter-few");
     mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, "few-msgs.jsonl"), fewMsgs.map(l => JSON.stringify(l)).join("\n"));
+    writeFileSync(join(dir, "few-msgs.jsonl"), fewMsgs.map((l) => JSON.stringify(l)).join("\n"));
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
     const sessions = listClaudeSessions(getApp());
-    const found = sessions.find(s => s.sessionId === "few-msgs");
+    const found = sessions.find((s) => s.sessionId === "few-msgs");
     // With MIN_MESSAGE_COUNT=1, short conversations should be included
     expect(found).toBeDefined();
   });
@@ -335,7 +400,7 @@ describe("claude sessions filtering", () => {
     ]);
 
     const sessions = listClaudeSessions(getApp());
-    const found = sessions.find(s => s.sessionId === "many-msgs");
+    const found = sessions.find((s) => s.sessionId === "many-msgs");
     expect(found).toBeTruthy();
     expect(found!.messageCount).toBeGreaterThanOrEqual(10);
   });
@@ -344,21 +409,27 @@ describe("claude sessions filtering", () => {
     // Write a transcript under a dir name that decodes to /var/folders/...
     const varFolderDir = join(baseDir(), "-var-folders-ab-cd-T-test");
     mkdirSync(varFolderDir, { recursive: true });
-    const msgs: object[] = [
-      { type: "system", sessionId: "var-folder-session", timestamp: "2026-03-24T10:00:00Z" },
-    ];
+    const msgs: object[] = [{ type: "system", sessionId: "var-folder-session", timestamp: "2026-03-24T10:00:00Z" }];
     // Add enough messages to pass the 10+ filter
     for (let i = 0; i < 12; i++) {
       msgs.push(
-        { type: "user", message: { role: "user", content: `q${i}: ${"x".repeat(500)}` }, timestamp: `2026-03-24T10:${String(i + 1).padStart(2, "0")}:00Z` },
-        { type: "assistant", message: { role: "assistant", content: `a${i}: ${"y".repeat(500)}` }, timestamp: `2026-03-24T10:${String(i + 1).padStart(2, "0")}:30Z` },
+        {
+          type: "user",
+          message: { role: "user", content: `q${i}: ${"x".repeat(500)}` },
+          timestamp: `2026-03-24T10:${String(i + 1).padStart(2, "0")}:00Z`,
+        },
+        {
+          type: "assistant",
+          message: { role: "assistant", content: `a${i}: ${"y".repeat(500)}` },
+          timestamp: `2026-03-24T10:${String(i + 1).padStart(2, "0")}:30Z`,
+        },
       );
     }
-    writeFileSync(join(varFolderDir, "var-folder-session.jsonl"), msgs.map(l => JSON.stringify(l)).join("\n"));
+    writeFileSync(join(varFolderDir, "var-folder-session.jsonl"), msgs.map((l) => JSON.stringify(l)).join("\n"));
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
     const sessions = listClaudeSessions(getApp());
-    const found = sessions.find(s => s.sessionId === "var-folder-session");
+    const found = sessions.find((s) => s.sessionId === "var-folder-session");
     expect(found).toBeUndefined();
   });
 
@@ -366,20 +437,26 @@ describe("claude sessions filtering", () => {
     // Write a transcript under a dir name that decodes to .../worktrees/...
     const worktreeDir = join(baseDir(), "-Users-yana-.ark-worktrees-s-abc123");
     mkdirSync(worktreeDir, { recursive: true });
-    const msgs: object[] = [
-      { type: "system", sessionId: "worktree-session", timestamp: "2026-03-24T10:00:00Z" },
-    ];
+    const msgs: object[] = [{ type: "system", sessionId: "worktree-session", timestamp: "2026-03-24T10:00:00Z" }];
     for (let i = 0; i < 12; i++) {
       msgs.push(
-        { type: "user", message: { role: "user", content: `q${i}: ${"x".repeat(500)}` }, timestamp: `2026-03-24T10:${String(i + 1).padStart(2, "0")}:00Z` },
-        { type: "assistant", message: { role: "assistant", content: `a${i}: ${"y".repeat(500)}` }, timestamp: `2026-03-24T10:${String(i + 1).padStart(2, "0")}:30Z` },
+        {
+          type: "user",
+          message: { role: "user", content: `q${i}: ${"x".repeat(500)}` },
+          timestamp: `2026-03-24T10:${String(i + 1).padStart(2, "0")}:00Z`,
+        },
+        {
+          type: "assistant",
+          message: { role: "assistant", content: `a${i}: ${"y".repeat(500)}` },
+          timestamp: `2026-03-24T10:${String(i + 1).padStart(2, "0")}:30Z`,
+        },
       );
     }
-    writeFileSync(join(worktreeDir, "worktree-session.jsonl"), msgs.map(l => JSON.stringify(l)).join("\n"));
+    writeFileSync(join(worktreeDir, "worktree-session.jsonl"), msgs.map((l) => JSON.stringify(l)).join("\n"));
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
     const sessions = listClaudeSessions(getApp());
-    const found = sessions.find(s => s.sessionId === "worktree-session");
+    const found = sessions.find((s) => s.sessionId === "worktree-session");
     expect(found).toBeUndefined();
   });
 
@@ -396,7 +473,7 @@ describe("claude sessions filtering", () => {
 
     // Verify cache has the session
     let sessions = listClaudeSessions(getApp());
-    expect(sessions.find(s => s.sessionId === "first-session")).toBeTruthy();
+    expect(sessions.find((s) => s.sessionId === "first-session")).toBeTruthy();
 
     // Second refresh with no changes - incremental should return 0
     const secondCount = await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
@@ -418,7 +495,7 @@ describe("claude sessions filtering", () => {
 
     // Both sessions should now be in cache
     sessions = listClaudeSessions(getApp());
-    expect(sessions.find(s => s.sessionId === "first-session")).toBeTruthy();
-    expect(sessions.find(s => s.sessionId === "second-session")).toBeTruthy();
+    expect(sessions.find((s) => s.sessionId === "first-session")).toBeTruthy();
+    expect(sessions.find((s) => s.sessionId === "second-session")).toBeTruthy();
   });
 });

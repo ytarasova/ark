@@ -30,30 +30,39 @@ export class EventRepository {
 
   constructor(private db: IDatabase) {}
 
-  setTenant(tenantId: string): void { this.tenantId = tenantId; }
-  getTenant(): string { return this.tenantId; }
-
-  log(
-    trackId: string,
-    type: string,
-    opts?: { stage?: string; actor?: string; data?: Record<string, unknown> },
-  ): void {
-    this.db.prepare(`
-      INSERT INTO events (track_id, type, stage, actor, data, tenant_id, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      trackId, type, opts?.stage ?? null, opts?.actor ?? null,
-      opts?.data ? JSON.stringify(opts.data) : null, this.tenantId, now(),
-    );
+  setTenant(tenantId: string): void {
+    this.tenantId = tenantId;
+  }
+  getTenant(): string {
+    return this.tenantId;
   }
 
-  list(
-    trackId: string,
-    opts?: { type?: string; limit?: number },
-  ): Event[] {
+  log(trackId: string, type: string, opts?: { stage?: string; actor?: string; data?: Record<string, unknown> }): void {
+    this.db
+      .prepare(
+        `
+      INSERT INTO events (track_id, type, stage, actor, data, tenant_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `,
+      )
+      .run(
+        trackId,
+        type,
+        opts?.stage ?? null,
+        opts?.actor ?? null,
+        opts?.data ? JSON.stringify(opts.data) : null,
+        this.tenantId,
+        now(),
+      );
+  }
+
+  list(trackId: string, opts?: { type?: string; limit?: number }): Event[] {
     let sql = "SELECT * FROM events WHERE track_id = ? AND tenant_id = ?";
     const params: any[] = [trackId, this.tenantId];
-    if (opts?.type) { sql += " AND type = ?"; params.push(opts.type); }
+    if (opts?.type) {
+      sql += " AND type = ?";
+      params.push(opts.type);
+    }
     sql += " ORDER BY id ASC LIMIT ?";
     params.push(opts?.limit ?? 200);
 

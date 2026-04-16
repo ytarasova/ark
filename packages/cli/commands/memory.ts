@@ -5,7 +5,8 @@ import { getArkClient } from "./_shared.js";
 export function registerMemoryCommands(program: Command) {
   const memoryCmd = program.command("memory").description("Manage cross-session memory (backed by knowledge graph)");
 
-  memoryCmd.command("list")
+  memoryCmd
+    .command("list")
     .description("List stored memories")
     .option("-s, --scope <scope>", "Filter by scope")
     .action(async (opts) => {
@@ -23,7 +24,8 @@ export function registerMemoryCommands(program: Command) {
       console.log(chalk.dim(`\n${memories.length} memories total`));
     });
 
-  memoryCmd.command("recall")
+  memoryCmd
+    .command("recall")
     .description("Recall memories relevant to a query")
     .argument("<query>", "Search query")
     .option("-s, --scope <scope>", "Filter by scope")
@@ -41,7 +43,8 @@ export function registerMemoryCommands(program: Command) {
       }
     });
 
-  memoryCmd.command("forget")
+  memoryCmd
+    .command("forget")
     .description("Forget a specific memory")
     .argument("<id>", "Memory ID")
     .action(async (id: string) => {
@@ -50,7 +53,8 @@ export function registerMemoryCommands(program: Command) {
       console.log(ok ? chalk.green(`Forgot ${id}`) : chalk.red(`Memory ${id} not found`));
     });
 
-  memoryCmd.command("add")
+  memoryCmd
+    .command("add")
     .description("Store a new memory")
     .argument("<content>", "Memory content")
     .option("-t, --tags <tags>", "Comma-separated tags")
@@ -67,7 +71,8 @@ export function registerMemoryCommands(program: Command) {
       if (memory.tags.length) console.log(chalk.dim(`Tags: ${memory.tags.join(", ")}`));
     });
 
-  memoryCmd.command("clear")
+  memoryCmd
+    .command("clear")
     .description("Clear all memories in a scope")
     .option("-s, --scope <scope>", "Scope to clear (omit for ALL)")
     .option("--force", "Skip confirmation")
@@ -81,5 +86,4 @@ export function registerMemoryCommands(program: Command) {
       const count = await ark.memoryClear(opts.scope);
       console.log(chalk.green(`Cleared ${count} memories`));
     });
-
 }

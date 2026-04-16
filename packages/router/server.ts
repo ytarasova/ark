@@ -12,7 +12,14 @@
  *   GET  /health               -- health check
  */
 
-import type { ChatCompletionRequest, ChatCompletionResponse, ChatCompletionChunk, RouterConfig, RoutingDecision, ModelConfig } from "./types.js";
+import type {
+  ChatCompletionRequest,
+  ChatCompletionResponse,
+  ChatCompletionChunk,
+  RouterConfig,
+  RoutingDecision,
+  ModelConfig,
+} from "./types.js";
 import { classify } from "./classifier.js";
 import { RoutingEngine } from "./engine.js";
 import { Dispatcher, TensorZeroDispatcher } from "./dispatch.js";
@@ -57,11 +64,18 @@ export function startRouter(config: RouterConfig, opts?: RouterStartOpts): Route
   const tensorZeroUrl = opts?.tensorZeroUrl ?? process.env.ARK_TENSORZERO_URL;
   const tzDispatcher = tensorZeroUrl ? new TensorZeroDispatcher(tensorZeroUrl) : null;
 
-  console.error(`[router] Starting on port ${config.port}, policy=${config.policy}, providers=${config.providers.map(p => p.name).join(",")}`);
+  console.error(
+    `[router] Starting on port ${config.port}, policy=${config.policy}, providers=${config.providers.map((p) => p.name).join(",")}`,
+  );
   if (tzDispatcher) {
     console.error(`[router] TensorZero gateway: ${tensorZeroUrl}`);
   }
-  console.error(`[router] Models: ${registry.listModels().map(m => m.id).join(", ")}`);
+  console.error(
+    `[router] Models: ${registry
+      .listModels()
+      .map((m) => m.id)
+      .join(", ")}`,
+  );
 
   // ── HTTP server ────────────────────────────────────────────────────────
 
@@ -78,7 +92,7 @@ export function startRouter(config: RouterConfig, opts?: RouterStartOpts): Route
           return Response.json({
             ok: true,
             uptime_ms: Date.now() - feedback.getStats().started_at,
-            providers: config.providers.map(p => p.name),
+            providers: config.providers.map((p) => p.name),
             models: registry.listModels().length,
           });
         }
@@ -97,13 +111,22 @@ export function startRouter(config: RouterConfig, opts?: RouterStartOpts): Route
 
         // Chat completions
         if (url.pathname === "/v1/chat/completions" && req.method === "POST") {
-          const request = await req.json() as ChatCompletionRequest;
-          return await handleChatCompletion(request, registry, engine, dispatcher, feedback, config, tzDispatcher, opts?.onUsage);
+          const request = (await req.json()) as ChatCompletionRequest;
+          return await handleChatCompletion(
+            request,
+            registry,
+            engine,
+            dispatcher,
+            feedback,
+            config,
+            tzDispatcher,
+            opts?.onUsage,
+          );
         }
 
         // List models (OpenAI-compatible)
         if (url.pathname === "/v1/models" && req.method === "GET") {
-          const models = registry.listModels().map(m => ({
+          const models = registry.listModels().map((m) => ({
             id: m.id,
             object: "model",
             created: Math.floor(Date.now() / 1000),
@@ -115,10 +138,7 @@ export function startRouter(config: RouterConfig, opts?: RouterStartOpts): Route
         return new Response("Not Found", { status: 404 });
       } catch (err) {
         console.error(`[router] Error handling ${url.pathname}: ${(err as Error).message}`);
-        return Response.json(
-          { error: { message: (err as Error).message, type: "server_error" } },
-          { status: 500 },
-        );
+        return Response.json({ error: { message: (err as Error).message, type: "server_error" } }, { status: 500 });
       }
     },
   });
@@ -171,7 +191,9 @@ async function handleChatCompletion(
   decision.latency_ms.total_overhead = performance.now() - t0;
 
   if (config.log_decisions) {
-    console.error(`[router] Route: ${decision.selected_model} (${decision.reason}) [${decision.latency_ms.total_overhead.toFixed(1)}ms]`);
+    console.error(
+      `[router] Route: ${decision.selected_model} (${decision.reason}) [${decision.latency_ms.total_overhead.toFixed(1)}ms]`,
+    );
   }
 
   const model = registry.findModel(decision.selected_model);
@@ -215,9 +237,10 @@ async function handleChatCompletion(
   try {
     // Cascade mode
     if (config.cascade_enabled && classification.score < 0.5) {
-      const cascadeModels = registry.listModels()
-        .filter(m => m.supports_tools || !classification.has_tools)
-        .sort((a, b) => (a.cost_input + a.cost_output) - (b.cost_input + b.cost_output));
+      const cascadeModels = registry
+        .listModels()
+        .filter((m) => m.supports_tools || !classification.has_tools)
+        .sort((a, b) => a.cost_input + a.cost_output - (b.cost_input + b.cost_output));
 
       if (cascadeModels.length > 1) {
         const response = await dispatcher.cascade(request, cascadeModels, config.cascade_confidence_threshold);
@@ -274,7 +297,12 @@ async function handlePassthrough(
   const provider = registry.findProviderForModel(request.model);
   if (!provider) {
     return Response.json(
-      { error: { message: `Model '${request.model}' not found in any registered provider`, type: "invalid_request_error" } },
+      {
+        error: {
+          message: `Model '${request.model}' not found in any registered provider`,
+          type: "invalid_request_error",
+        },
+      },
       { status: 400 },
     );
   }
@@ -290,10 +318,7 @@ async function handlePassthrough(
     return Response.json(response);
   } catch (err) {
     feedback.logFailure(request.model, (err as Error).message);
-    return Response.json(
-      { error: { message: (err as Error).message, type: "provider_error" } },
-      { status: 502 },
-    );
+    return Response.json({ error: { message: (err as Error).message, type: "provider_error" } }, { status: 502 });
   }
 }
 
@@ -337,16 +362,12 @@ function handleStreamingRoute(
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
-      "Connection": "keep-alive",
+      Connection: "keep-alive",
     },
   });
 }
 
-function handleStreamingPassthrough(
-  request: ChatCompletionRequest,
-  provider: any,
-  modelId: string,
-): Response {
+function handleStreamingPassthrough(request: ChatCompletionRequest, provider: any, modelId: string): Response {
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
@@ -371,7 +392,7 @@ function handleStreamingPassthrough(
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
-      "Connection": "keep-alive",
+      Connection: "keep-alive",
     },
   });
 }
@@ -406,20 +427,14 @@ async function handleTensorZeroPassthrough(
     return Response.json(response);
   } catch (err) {
     feedback.logFailure(request.model, (err as Error).message);
-    return Response.json(
-      { error: { message: (err as Error).message, type: "tensorzero_error" } },
-      { status: 502 },
-    );
+    return Response.json({ error: { message: (err as Error).message, type: "tensorzero_error" } }, { status: 502 });
   }
 }
 
 /**
  * Handle a streaming passthrough request through TensorZero.
  */
-function handleStreamingTZPassthrough(
-  request: ChatCompletionRequest,
-  tzDispatcher: TensorZeroDispatcher,
-): Response {
+function handleStreamingTZPassthrough(request: ChatCompletionRequest, tzDispatcher: TensorZeroDispatcher): Response {
   const stream = new ReadableStream({
     async start(controller) {
       const encoder = new TextEncoder();
@@ -453,7 +468,7 @@ function handleStreamingTZPassthrough(
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
-      "Connection": "keep-alive",
+      Connection: "keep-alive",
     },
   });
 }
@@ -498,7 +513,7 @@ function handleStreamingTZ(
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
-      "Connection": "keep-alive",
+      Connection: "keep-alive",
     },
   });
 }

@@ -1,11 +1,26 @@
 export type SessionStatus =
-  | "pending" | "ready" | "running" | "waiting"
-  | "stopped" | "blocked" | "completed" | "failed" | "deleting" | "archived";
+  | "pending"
+  | "ready"
+  | "running"
+  | "waiting"
+  | "stopped"
+  | "blocked"
+  | "completed"
+  | "failed"
+  | "deleting"
+  | "archived";
 
 /** User-facing session statuses (excludes internal 'deleting'). */
 export const SESSION_STATUSES: readonly SessionStatus[] = [
-  "pending", "ready", "running", "waiting",
-  "stopped", "blocked", "completed", "failed", "archived",
+  "pending",
+  "ready",
+  "running",
+  "waiting",
+  "stopped",
+  "blocked",
+  "completed",
+  "failed",
+  "archived",
 ] as const;
 
 export interface SessionConfig {

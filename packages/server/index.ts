@@ -1,8 +1,5 @@
 import { Router, type Handler } from "./router.js";
-import {
-  createNotification, isRequest, isNotification, parseMessage,
-  type JsonRpcMessage,
-} from "../protocol/types.js";
+import { createNotification, isRequest, isNotification, parseMessage, type JsonRpcMessage } from "../protocol/types.js";
 import { createStdioTransport, type Transport } from "../protocol/transport.js";
 
 export interface ServerConnection {
@@ -90,10 +87,7 @@ export class ArkServer {
 
   /** Start server on stdio (JSONL over stdin/stdout). */
   startStdio(): string {
-    const transport = createStdioTransport(
-      Bun.stdin.stream(),
-      { write: (data) => process.stdout.write(data) },
-    );
+    const transport = createStdioTransport(Bun.stdin.stream(), { write: (data) => process.stdout.write(data) });
     return this.addConnection(transport);
   }
 
@@ -120,9 +114,15 @@ export class ArkServer {
           const conn: ServerConnection = {
             id: connId,
             transport: {
-              send(msg) { ws.send(JSON.stringify(msg)); },
-              onMessage(handler) { handlers.push(handler); },
-              close() { ws.close(); },
+              send(msg) {
+                ws.send(JSON.stringify(msg));
+              },
+              onMessage(handler) {
+                handlers.push(handler);
+              },
+              close() {
+                ws.close();
+              },
             },
             subscriptions: [],
           };
@@ -146,10 +146,14 @@ export class ArkServer {
         },
         message(ws, data) {
           try {
-            const msg = parseMessage(typeof data === "string" ? data : new TextDecoder().decode(data as unknown as ArrayBuffer));
+            const msg = parseMessage(
+              typeof data === "string" ? data : new TextDecoder().decode(data as unknown as ArrayBuffer),
+            );
             const meta = wsMetadata.get(ws);
             if (meta) for (const h of meta.handlers) h(msg);
-          } catch { /* ignore malformed messages */ }
+          } catch {
+            /* ignore malformed messages */
+          }
         },
         close(ws) {
           const meta = wsMetadata.get(ws);

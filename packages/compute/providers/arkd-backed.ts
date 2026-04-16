@@ -10,8 +10,16 @@
 import { ArkdClient } from "../../arkd/client.js";
 import type { AppContext } from "../../core/app.js";
 import type {
-  ComputeProvider, ProvisionOpts, LaunchOpts, SyncOpts,
-  ComputeSnapshot, PortDecl, PortStatus, Compute, Session, IsolationMode,
+  ComputeProvider,
+  ProvisionOpts,
+  LaunchOpts,
+  SyncOpts,
+  ComputeSnapshot,
+  PortDecl,
+  PortStatus,
+  Compute,
+  Session,
+  IsolationMode,
 } from "../types.js";
 
 export abstract class ArkdBackedProvider implements ComputeProvider {
@@ -41,7 +49,12 @@ export abstract class ArkdBackedProvider implements ComputeProvider {
   abstract syncEnvironment(compute: Compute, opts: SyncOpts): Promise<void>;
 
   abstract getAttachCommand(compute: Compute, session: Session): string[];
-  abstract buildChannelConfig(sessionId: string, stage: string, channelPort: number, opts?: { conductorUrl?: string }): Record<string, unknown>;
+  abstract buildChannelConfig(
+    sessionId: string,
+    stage: string,
+    channelPort: number,
+    opts?: { conductorUrl?: string },
+  ): Record<string, unknown>;
   abstract buildLaunchEnv(session: Session): Record<string, string>;
 
   /** Returns the base URL for the arkd instance on this compute target. */
@@ -94,9 +107,9 @@ export abstract class ArkdBackedProvider implements ComputeProvider {
 
   async probePorts(compute: Compute, ports: PortDecl[]): Promise<PortStatus[]> {
     const client = this.getClient(compute);
-    const res = await client.probePorts(ports.map(p => p.port));
-    return ports.map(decl => {
-      const found = res.results.find(r => r.port === decl.port);
+    const res = await client.probePorts(ports.map((p) => p.port));
+    return ports.map((decl) => {
+      const found = res.results.find((r) => r.port === decl.port);
       return { ...decl, listening: found?.listening ?? false };
     });
   }

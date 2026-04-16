@@ -10,7 +10,7 @@ describe("spawn command wiring", () => {
   test("spawn command calls sessionSpawn, not sessionFork", () => {
     // Extract the spawn command block (stop before spawn-subagent)
     const spawnBlockMatch = source.match(
-      /session\.command\("spawn"\)([\s\S]*?)session\.command\("spawn-subagent"\)/
+      /session\s*\.command\("spawn"\)([\s\S]*?)session\s*\.command\("spawn-subagent"\)/,
     );
     expect(spawnBlockMatch).toBeTruthy();
     const spawnBlock = spawnBlockMatch![1];
@@ -21,7 +21,7 @@ describe("spawn command wiring", () => {
 
   test("spawn command has --agent option", () => {
     const spawnBlockMatch = source.match(
-      /session\.command\("spawn"\)([\s\S]*?)session\.command\("spawn-subagent"\)/
+      /session\s*\.command\("spawn"\)([\s\S]*?)session\s*\.command\("spawn-subagent"\)/,
     );
     expect(spawnBlockMatch).toBeTruthy();
     const spawnBlock = spawnBlockMatch![1];
@@ -31,7 +31,7 @@ describe("spawn command wiring", () => {
 
   test("spawn command has --model option", () => {
     const spawnBlockMatch = source.match(
-      /session\.command\("spawn"\)([\s\S]*?)session\.command\("spawn-subagent"\)/
+      /session\s*\.command\("spawn"\)([\s\S]*?)session\s*\.command\("spawn-subagent"\)/,
     );
     expect(spawnBlockMatch).toBeTruthy();
     const spawnBlock = spawnBlockMatch![1];
@@ -41,7 +41,7 @@ describe("spawn command wiring", () => {
 
   test("spawn command has --dispatch option", () => {
     const spawnBlockMatch = source.match(
-      /session\.command\("spawn"\)([\s\S]*?)session\.command\("spawn-subagent"\)/
+      /session\s*\.command\("spawn"\)([\s\S]*?)session\s*\.command\("spawn-subagent"\)/,
     );
     expect(spawnBlockMatch).toBeTruthy();
     const spawnBlock = spawnBlockMatch![1];
@@ -51,7 +51,7 @@ describe("spawn command wiring", () => {
 
   test("spawn command passes task, agent, and model to sessionSpawn", () => {
     const spawnBlockMatch = source.match(
-      /session\.command\("spawn"\)([\s\S]*?)session\.command\("spawn-subagent"\)/
+      /session\s*\.command\("spawn"\)([\s\S]*?)session\s*\.command\("spawn-subagent"\)/,
     );
     expect(spawnBlockMatch).toBeTruthy();
     const spawnBlock = spawnBlockMatch![1];
@@ -63,7 +63,7 @@ describe("spawn command wiring", () => {
 
   test("spawn command handles dispatch after spawning", () => {
     const spawnBlockMatch = source.match(
-      /session\.command\("spawn"\)([\s\S]*?)session\.command\("spawn-subagent"\)/
+      /session\s*\.command\("spawn"\)([\s\S]*?)session\s*\.command\("spawn-subagent"\)/,
     );
     expect(spawnBlockMatch).toBeTruthy();
     const spawnBlock = spawnBlockMatch![1];

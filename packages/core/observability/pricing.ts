@@ -36,7 +36,7 @@ export class PricingRegistry {
       const url = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json";
       const resp = await fetch(url);
       if (!resp.ok) return 0;
-      const data = await resp.json() as Record<string, any>;
+      const data = (await resp.json()) as Record<string, any>;
       let count = 0;
       for (const [model, info] of Object.entries(data)) {
         if (info && typeof info === "object" && info.input_cost_per_token !== undefined) {
@@ -64,9 +64,9 @@ export class PricingRegistry {
 
     // Ark model aliases (short names used in agent YAML)
     const aliases: Record<string, string> = {
-      "opus": "claude-opus-4-6",
-      "sonnet": "claude-sonnet-4-6",
-      "haiku": "claude-haiku-4-5",
+      opus: "claude-opus-4-6",
+      sonnet: "claude-sonnet-4-6",
+      haiku: "claude-haiku-4-5",
       "gpt-4.1": "gpt-4.1",
       "gpt-4.1-mini": "gpt-4.1-mini",
       "gpt-4.1-nano": "gpt-4.1-nano",
@@ -114,48 +114,61 @@ export class PricingRegistry {
   private loadDefaults(): void {
     // Anthropic
     this.prices.set("claude-opus-4-6", {
-      input_cost_per_token: 15 / 1e6, output_cost_per_token: 75 / 1e6,
-      cache_read_per_token: 1.5 / 1e6, cache_write_per_token: 18.75 / 1e6,
-      fastMultiplier: 6, webSearchCostPerRequest: 0.01,
+      input_cost_per_token: 15 / 1e6,
+      output_cost_per_token: 75 / 1e6,
+      cache_read_per_token: 1.5 / 1e6,
+      cache_write_per_token: 18.75 / 1e6,
+      fastMultiplier: 6,
+      webSearchCostPerRequest: 0.01,
     });
     this.prices.set("claude-sonnet-4-6", {
-      input_cost_per_token: 3 / 1e6, output_cost_per_token: 15 / 1e6,
-      cache_read_per_token: 0.3 / 1e6, cache_write_per_token: 3.75 / 1e6,
+      input_cost_per_token: 3 / 1e6,
+      output_cost_per_token: 15 / 1e6,
+      cache_read_per_token: 0.3 / 1e6,
+      cache_write_per_token: 3.75 / 1e6,
       webSearchCostPerRequest: 0.01,
     });
     this.prices.set("claude-haiku-4-5", {
-      input_cost_per_token: 0.8 / 1e6, output_cost_per_token: 4 / 1e6,
-      cache_read_per_token: 0.08 / 1e6, cache_write_per_token: 1 / 1e6,
+      input_cost_per_token: 0.8 / 1e6,
+      output_cost_per_token: 4 / 1e6,
+      cache_read_per_token: 0.08 / 1e6,
+      cache_write_per_token: 1 / 1e6,
       webSearchCostPerRequest: 0.01,
     });
 
     // OpenAI
     this.prices.set("gpt-4.1", {
-      input_cost_per_token: 2 / 1e6, output_cost_per_token: 8 / 1e6,
+      input_cost_per_token: 2 / 1e6,
+      output_cost_per_token: 8 / 1e6,
       webSearchCostPerRequest: 0.01,
     });
     this.prices.set("gpt-4.1-mini", {
-      input_cost_per_token: 0.4 / 1e6, output_cost_per_token: 1.6 / 1e6,
+      input_cost_per_token: 0.4 / 1e6,
+      output_cost_per_token: 1.6 / 1e6,
       webSearchCostPerRequest: 0.01,
     });
     this.prices.set("gpt-4.1-nano", {
-      input_cost_per_token: 0.1 / 1e6, output_cost_per_token: 0.4 / 1e6,
+      input_cost_per_token: 0.1 / 1e6,
+      output_cost_per_token: 0.4 / 1e6,
       webSearchCostPerRequest: 0.01,
     });
 
     // Google
     this.prices.set("gemini-2.5-pro", {
-      input_cost_per_token: 1.25 / 1e6, output_cost_per_token: 10 / 1e6,
+      input_cost_per_token: 1.25 / 1e6,
+      output_cost_per_token: 10 / 1e6,
       webSearchCostPerRequest: 0.01,
     });
     this.prices.set("gemini-2.5-flash", {
-      input_cost_per_token: 0.15 / 1e6, output_cost_per_token: 0.6 / 1e6,
+      input_cost_per_token: 0.15 / 1e6,
+      output_cost_per_token: 0.6 / 1e6,
       webSearchCostPerRequest: 0.01,
     });
 
     // OpenAI reasoning
     this.prices.set("o4-mini", {
-      input_cost_per_token: 1.1 / 1e6, output_cost_per_token: 4.4 / 1e6,
+      input_cost_per_token: 1.1 / 1e6,
+      output_cost_per_token: 4.4 / 1e6,
       webSearchCostPerRequest: 0.01,
     });
   }

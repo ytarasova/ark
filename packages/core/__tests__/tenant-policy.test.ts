@@ -30,9 +30,7 @@ describe("TenantPolicyManager", () => {
         default_provider: "k8s",
         max_concurrent_sessions: 20,
         max_cost_per_day_usd: 50.0,
-        compute_pools: [
-          { pool_name: "pool-1", provider: "k8s", min: 1, max: 5, config: { namespace: "prod" } },
-        ],
+        compute_pools: [{ pool_name: "pool-1", provider: "k8s", min: 1, max: 5, config: { namespace: "prod" } }],
       });
 
       const policy = pm.getPolicy("tenant-a");
@@ -140,8 +138,8 @@ describe("TenantPolicyManager", () => {
 
       const policies = pm.listPolicies();
       expect(policies.length).toBe(2);
-      expect(policies.map(p => p.tenant_id)).toContain("list-a");
-      expect(policies.map(p => p.tenant_id)).toContain("list-b");
+      expect(policies.map((p) => p.tenant_id)).toContain("list-a");
+      expect(policies.map((p) => p.tenant_id)).toContain("list-b");
     });
   });
 

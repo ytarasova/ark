@@ -16,12 +16,12 @@ function nodeToMemoryEntry(node: KnowledgeNode): MemoryEntry {
   return {
     id: node.id,
     content: node.content ?? node.label,
-    tags: Array.isArray(node.metadata.tags) ? node.metadata.tags as string[] : [],
+    tags: Array.isArray(node.metadata.tags) ? (node.metadata.tags as string[]) : [],
     scope: (node.metadata.scope as string) ?? "global",
     importance: typeof node.metadata.importance === "number" ? node.metadata.importance : 0.5,
     createdAt: node.created_at,
     accessedAt: node.updated_at,
-    accessCount: typeof node.metadata.accessCount === "number" ? node.metadata.accessCount as number : 0,
+    accessCount: typeof node.metadata.accessCount === "number" ? (node.metadata.accessCount as number) : 0,
   };
 }
 
@@ -30,7 +30,7 @@ export function registerMemoryHandlers(router: Router, app: AppContext): void {
     const { scope } = extract<MemoryListParams>(p, []);
     const nodes = app.knowledge.listNodes({ type: "memory" });
     const filtered = scope
-      ? nodes.filter(n => (n.metadata.scope as string) === scope || (n.metadata.scope as string) === "global")
+      ? nodes.filter((n) => (n.metadata.scope as string) === scope || (n.metadata.scope as string) === "global")
       : nodes;
     return { memories: filtered.map(nodeToMemoryEntry) };
   });

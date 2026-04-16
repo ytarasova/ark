@@ -31,8 +31,11 @@ function ledgerPath(app: AppContext, conductorId: string): string {
 export function loadLedger(app: AppContext, conductorId: string): Ledger {
   const path = ledgerPath(app, conductorId);
   if (existsSync(path)) {
-    try { return JSON.parse(readFileSync(path, "utf-8")); }
-    catch { /* fall through */ }
+    try {
+      return JSON.parse(readFileSync(path, "utf-8"));
+    } catch {
+      /* fall through */
+    }
   }
   return { conductorId, entries: [], lastActivity: new Date().toISOString(), stallCount: 0 };
 }
@@ -44,7 +47,13 @@ export function saveLedger(app: AppContext, ledger: Ledger): void {
   writeFileSync(ledgerPath(app, ledger.conductorId), JSON.stringify(ledger, null, 2));
 }
 
-export function addEntry(app: AppContext, conductorId: string, type: LedgerEntry["type"], content: string, sessionId?: string): LedgerEntry {
+export function addEntry(
+  app: AppContext,
+  conductorId: string,
+  type: LedgerEntry["type"],
+  content: string,
+  sessionId?: string,
+): LedgerEntry {
   const ledger = loadLedger(app, conductorId);
   const entry: LedgerEntry = {
     id: `le-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -60,9 +69,14 @@ export function addEntry(app: AppContext, conductorId: string, type: LedgerEntry
   return entry;
 }
 
-export function updateEntry(app: AppContext, conductorId: string, entryId: string, updates: Partial<LedgerEntry>): void {
+export function updateEntry(
+  app: AppContext,
+  conductorId: string,
+  entryId: string,
+  updates: Partial<LedgerEntry>,
+): void {
   const ledger = loadLedger(app, conductorId);
-  const entry = ledger.entries.find(e => e.id === entryId);
+  const entry = ledger.entries.find((e) => e.id === entryId);
   if (entry) {
     Object.assign(entry, updates, { updatedAt: new Date().toISOString() });
     saveLedger(app, ledger);
@@ -72,7 +86,7 @@ export function updateEntry(app: AppContext, conductorId: string, entryId: strin
 /** Detect stalls -- no progress entries in the last N minutes. */
 export function detectStall(app: AppContext, conductorId: string, thresholdMinutes: number = 10): boolean {
   const ledger = loadLedger(app, conductorId);
-  const progressEntries = ledger.entries.filter(e => e.type === "progress");
+  const progressEntries = ledger.entries.filter((e) => e.type === "progress");
   if (progressEntries.length === 0) return false;
 
   const lastProgress = progressEntries[progressEntries.length - 1];
@@ -100,9 +114,9 @@ export function formatLedgerForPrompt(app: AppContext, conductorId: string): str
   const ledger = loadLedger(app, conductorId);
   if (ledger.entries.length === 0) return "";
 
-  const facts = ledger.entries.filter(e => e.type === "fact").map(e => `- ${e.content}`);
-  const plan = ledger.entries.filter(e => e.type === "plan_step").map(e => `- [${e.status}] ${e.content}`);
-  const recent = ledger.entries.slice(-5).map(e => `- [${e.type}] ${e.content}`);
+  const facts = ledger.entries.filter((e) => e.type === "fact").map((e) => `- ${e.content}`);
+  const plan = ledger.entries.filter((e) => e.type === "plan_step").map((e) => `- [${e.status}] ${e.content}`);
+  const recent = ledger.entries.slice(-5).map((e) => `- [${e.type}] ${e.content}`);
 
   let prompt = "\n## Task Ledger\n";
   if (facts.length) prompt += `### Facts\n${facts.join("\n")}\n`;

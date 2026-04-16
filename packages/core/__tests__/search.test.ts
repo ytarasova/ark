@@ -7,7 +7,16 @@ import { describe, it, expect } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { getApp } from "../app.js";
-import { searchSessions, searchTranscripts, indexTranscripts, indexSession, getIndexStats, getSessionConversation, searchSessionConversation, readTranscriptTail } from "../search/search.js";
+import {
+  searchSessions,
+  searchTranscripts,
+  indexTranscripts,
+  indexSession,
+  getIndexStats,
+  getSessionConversation,
+  searchSessionConversation,
+  readTranscriptTail,
+} from "../search/search.js";
 import type { MessageRole } from "../../types/index.js";
 import { withTestContext } from "./test-helpers.js";
 
@@ -20,7 +29,7 @@ describe("searchSessions", () => {
     getApp().sessions.create({ summary: "Fix login redirect bug" });
     const results = searchSessions(getApp(), "login redirect");
     expect(results.length).toBeGreaterThanOrEqual(1);
-    expect(results.some(r => r.source === "metadata")).toBe(true);
+    expect(results.some((r) => r.source === "metadata")).toBe(true);
     expect(results[0].match).toContain("Fix login redirect bug");
   });
 
@@ -28,7 +37,7 @@ describe("searchSessions", () => {
     getApp().sessions.create({ ticket: "PROJ-1234", summary: "some task" });
     const results = searchSessions(getApp(), "PROJ-1234");
     expect(results.length).toBeGreaterThanOrEqual(1);
-    const meta = results.find(r => r.source === "metadata");
+    const meta = results.find((r) => r.source === "metadata");
     expect(meta).toBeDefined();
   });
 
@@ -36,7 +45,7 @@ describe("searchSessions", () => {
     getApp().sessions.create({ repo: "acme/widget-service", summary: "work" });
     const results = searchSessions(getApp(), "widget-service");
     expect(results.length).toBeGreaterThanOrEqual(1);
-    const meta = results.find(r => r.source === "metadata");
+    const meta = results.find((r) => r.source === "metadata");
     expect(meta).toBeDefined();
   });
 
@@ -44,7 +53,7 @@ describe("searchSessions", () => {
     const session = getApp().sessions.create({ summary: "unrelated" });
     getApp().events.log(session.id, "deploy", { data: { message: "deployed to staging-east" } });
     const results = searchSessions(getApp(), "staging-east");
-    const ev = results.find(r => r.source === "event");
+    const ev = results.find((r) => r.source === "event");
     expect(ev).toBeDefined();
     expect(ev!.sessionId).toBe(session.id);
   });
@@ -53,7 +62,7 @@ describe("searchSessions", () => {
     const session = getApp().sessions.create({ summary: "unrelated" });
     getApp().messages.send(session.id, "agent" as MessageRole, "Refactored the payment module");
     const results = searchSessions(getApp(), "payment module");
-    const msg = results.find(r => r.source === "message");
+    const msg = results.find((r) => r.source === "message");
     expect(msg).toBeDefined();
     expect(msg!.sessionId).toBe(session.id);
   });
@@ -78,7 +87,7 @@ describe("searchSessions", () => {
     // A session whose summary AND ticket both match
     getApp().sessions.create({ ticket: "DUP-99", summary: "DUP-99 duplicate test" });
     const results = searchSessions(getApp(), "DUP-99");
-    const metaResults = results.filter(r => r.source === "metadata");
+    const metaResults = results.filter((r) => r.source === "metadata");
     // Should appear at most once for metadata even though both jira_key and jira_summary match
     expect(metaResults.length).toBe(1);
   });
@@ -104,7 +113,7 @@ describe("searchSessions", () => {
     getApp().events.log(session.id, "note", { data: { note: "alpha checkpoint" } });
 
     const results = searchSessions(getApp(), "alpha");
-    const sources = new Set(results.map(r => r.source));
+    const sources = new Set(results.map((r) => r.source));
     expect(sources.has("metadata")).toBe(true);
     expect(sources.has("message")).toBe(true);
     expect(sources.has("event")).toBe(true);
@@ -122,7 +131,11 @@ describe("searchTranscripts", () => {
 
     const jsonl = [
       JSON.stringify({ type: "user", message: { content: "Hello world" }, timestamp: "2025-01-01T00:00:00Z" }),
-      JSON.stringify({ type: "assistant", message: { content: "Implementing the frobnicator module" }, timestamp: "2025-01-01T00:01:00Z" }),
+      JSON.stringify({
+        type: "assistant",
+        message: { content: "Implementing the frobnicator module" },
+        timestamp: "2025-01-01T00:01:00Z",
+      }),
     ].join("\n");
 
     writeFileSync(join(projectDir, "session-abc.jsonl"), jsonl);
@@ -157,7 +170,11 @@ describe("searchTranscripts", () => {
     const projectDir = join(transcriptsDir, "empty-project");
     mkdirSync(projectDir, { recursive: true });
 
-    const jsonl = JSON.stringify({ type: "assistant", message: { content: "nothing relevant here" }, timestamp: "2025-01-01T00:00:00Z" });
+    const jsonl = JSON.stringify({
+      type: "assistant",
+      message: { content: "nothing relevant here" },
+      timestamp: "2025-01-01T00:00:00Z",
+    });
     writeFileSync(join(projectDir, "session-no.jsonl"), jsonl);
 
     const results = searchTranscripts(getApp(), "zzz_impossible_zzz", { transcriptsDir });
@@ -175,7 +192,11 @@ describe("searchTranscripts", () => {
     mkdirSync(projectDir, { recursive: true });
 
     for (let i = 0; i < 10; i++) {
-      const jsonl = JSON.stringify({ type: "assistant", message: { content: `match keyword-${i}` }, timestamp: "2025-01-01T00:00:00Z" });
+      const jsonl = JSON.stringify({
+        type: "assistant",
+        message: { content: `match keyword-${i}` },
+        timestamp: "2025-01-01T00:00:00Z",
+      });
       writeFileSync(join(projectDir, `session-${i}.jsonl`), jsonl);
     }
 
@@ -188,7 +209,11 @@ describe("searchTranscripts", () => {
     const projectDir = join(transcriptsDir, "case-project");
     mkdirSync(projectDir, { recursive: true });
 
-    const jsonl = JSON.stringify({ type: "assistant", message: { content: "CamelCase search Target" }, timestamp: "2025-01-01T00:00:00Z" });
+    const jsonl = JSON.stringify({
+      type: "assistant",
+      message: { content: "CamelCase search Target" },
+      timestamp: "2025-01-01T00:00:00Z",
+    });
     writeFileSync(join(projectDir, "session-case.jsonl"), jsonl);
 
     const results = searchTranscripts(getApp(), "camelcase search target", { transcriptsDir });
@@ -201,9 +226,21 @@ describe("searchTranscripts", () => {
     mkdirSync(projectDir, { recursive: true });
 
     const jsonl = [
-      JSON.stringify({ type: "assistant", message: { content: "first repeated term" }, timestamp: "2025-01-01T00:00:00Z" }),
-      JSON.stringify({ type: "assistant", message: { content: "second repeated term" }, timestamp: "2025-01-01T00:01:00Z" }),
-      JSON.stringify({ type: "assistant", message: { content: "third repeated term" }, timestamp: "2025-01-01T00:02:00Z" }),
+      JSON.stringify({
+        type: "assistant",
+        message: { content: "first repeated term" },
+        timestamp: "2025-01-01T00:00:00Z",
+      }),
+      JSON.stringify({
+        type: "assistant",
+        message: { content: "second repeated term" },
+        timestamp: "2025-01-01T00:01:00Z",
+      }),
+      JSON.stringify({
+        type: "assistant",
+        message: { content: "third repeated term" },
+        timestamp: "2025-01-01T00:02:00Z",
+      }),
     ].join("\n");
 
     writeFileSync(join(projectDir, "session-dedup.jsonl"), jsonl);
@@ -219,10 +256,19 @@ describe("indexTranscripts", () => {
   it("indexes JSONL files and returns count", async () => {
     const projectDir = join(getCtx().arkDir, "claude-projects", "-test-project");
     mkdirSync(projectDir, { recursive: true });
-    writeFileSync(join(projectDir, "sess-1.jsonl"), [
-      JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text: "fix the auth bug" }] } }),
-      JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "I'll fix the authentication issue" }] } }),
-    ].join("\n"));
+    writeFileSync(
+      join(projectDir, "sess-1.jsonl"),
+      [
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: [{ type: "text", text: "fix the auth bug" }] },
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: { role: "assistant", content: [{ type: "text", text: "I'll fix the authentication issue" }] },
+        }),
+      ].join("\n"),
+    );
 
     const count = await indexTranscripts(getApp(), { transcriptsDir: join(getCtx().arkDir, "claude-projects") });
     expect(count).toBe(2); // 1 user + 1 assistant message
@@ -231,9 +277,18 @@ describe("indexTranscripts", () => {
   it("FTS5 search returns matches after indexing", async () => {
     const projectDir = join(getCtx().arkDir, "claude-projects", "-test-project");
     mkdirSync(projectDir, { recursive: true });
-    writeFileSync(join(projectDir, "sess-fts.jsonl"), [
-      JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "fixed the SQL injection vulnerability in the login handler" }] } }),
-    ].join("\n"));
+    writeFileSync(
+      join(projectDir, "sess-fts.jsonl"),
+      [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            role: "assistant",
+            content: [{ type: "text", text: "fixed the SQL injection vulnerability in the login handler" }],
+          },
+        }),
+      ].join("\n"),
+    );
 
     await indexTranscripts(getApp(), { transcriptsDir: join(getCtx().arkDir, "claude-projects") });
     const results = searchTranscripts(getApp(), "SQL injection");
@@ -245,25 +300,36 @@ describe("indexTranscripts", () => {
     const projectDir = join(getCtx().arkDir, "claude-projects", "-test-project");
     mkdirSync(projectDir, { recursive: true });
     // "alpha" in one turn, "bravo" in another turn, same session
-    writeFileSync(join(projectDir, "sess-multi.jsonl"), [
-      JSON.stringify({ type: "user", message: { role: "user", content: "tell me about alpha" }, timestamp: "2025-01-01T00:00:00Z" }),
-      JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: "here is info about bravo" }] }, timestamp: "2025-01-01T00:00:01Z" }),
-    ].join("\n"));
+    writeFileSync(
+      join(projectDir, "sess-multi.jsonl"),
+      [
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: "tell me about alpha" },
+          timestamp: "2025-01-01T00:00:00Z",
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: { role: "assistant", content: [{ type: "text", text: "here is info about bravo" }] },
+          timestamp: "2025-01-01T00:00:01Z",
+        }),
+      ].join("\n"),
+    );
     await indexTranscripts(getApp(), { transcriptsDir: join(getCtx().arkDir, "claude-projects") });
 
     // Single terms find the session
     const alphaResults = searchTranscripts(getApp(), "alpha");
-    expect(alphaResults.some(r => r.sessionId === "sess-multi")).toBe(true);
+    expect(alphaResults.some((r) => r.sessionId === "sess-multi")).toBe(true);
     const bravoResults = searchTranscripts(getApp(), "bravo");
-    expect(bravoResults.some(r => r.sessionId === "sess-multi")).toBe(true);
+    expect(bravoResults.some((r) => r.sessionId === "sess-multi")).toBe(true);
 
     // Multi-term: both terms exist in the session (different turns) -- should find it
     const multiResults = searchTranscripts(getApp(), "alpha bravo");
-    expect(multiResults.some(r => r.sessionId === "sess-multi")).toBe(true);
+    expect(multiResults.some((r) => r.sessionId === "sess-multi")).toBe(true);
 
     // Multi-term with a non-existent term -- should NOT find it
     const noResults = searchTranscripts(getApp(), "alpha zzzznonexistent");
-    expect(noResults.some(r => r.sessionId === "sess-multi")).toBe(false);
+    expect(noResults.some((r) => r.sessionId === "sess-multi")).toBe(false);
   });
 
   it("is fast -- sub-100ms for indexed search", async () => {
@@ -271,7 +337,15 @@ describe("indexTranscripts", () => {
     mkdirSync(projectDir, { recursive: true });
     const lines = [];
     for (let i = 0; i < 100; i++) {
-      lines.push(JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "text", text: `Working on task ${i}: implementing feature ${i % 10}` }] } }));
+      lines.push(
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            role: "assistant",
+            content: [{ type: "text", text: `Working on task ${i}: implementing feature ${i % 10}` }],
+          },
+        }),
+      );
     }
     writeFileSync(join(projectDir, "sess-perf.jsonl"), lines.join("\n"));
     await indexTranscripts(getApp(), { transcriptsDir: join(getCtx().arkDir, "claude-projects") });
@@ -289,12 +363,18 @@ describe("indexTranscripts filtering", () => {
   it("does NOT index tool_result entries", async () => {
     const projectDir = join(getCtx().arkDir, "claude-projects", "-filter-project");
     mkdirSync(projectDir, { recursive: true });
-    writeFileSync(join(projectDir, "sess-filter.jsonl"), [
-      JSON.stringify({
-        type: "user",
-        message: { role: "user", content: [{ type: "tool_result", tool_use_id: "abc", content: "tool output here that is long enough" }] },
-      }),
-    ].join("\n"));
+    writeFileSync(
+      join(projectDir, "sess-filter.jsonl"),
+      [
+        JSON.stringify({
+          type: "user",
+          message: {
+            role: "user",
+            content: [{ type: "tool_result", tool_use_id: "abc", content: "tool output here that is long enough" }],
+          },
+        }),
+      ].join("\n"),
+    );
 
     const count = await indexTranscripts(getApp(), { transcriptsDir: join(getCtx().arkDir, "claude-projects") });
     expect(count).toBe(0);
@@ -303,12 +383,18 @@ describe("indexTranscripts filtering", () => {
   it("does NOT index tool_use-only entries", async () => {
     const projectDir = join(getCtx().arkDir, "claude-projects", "-tooluse-project");
     mkdirSync(projectDir, { recursive: true });
-    writeFileSync(join(projectDir, "sess-tooluse.jsonl"), [
-      JSON.stringify({
-        type: "assistant",
-        message: { role: "assistant", content: [{ type: "tool_use", id: "t1", name: "Read", input: { path: "/foo" } }] },
-      }),
-    ].join("\n"));
+    writeFileSync(
+      join(projectDir, "sess-tooluse.jsonl"),
+      [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            role: "assistant",
+            content: [{ type: "tool_use", id: "t1", name: "Read", input: { path: "/foo" } }],
+          },
+        }),
+      ].join("\n"),
+    );
 
     const count = await indexTranscripts(getApp(), { transcriptsDir: join(getCtx().arkDir, "claude-projects") });
     expect(count).toBe(0);
@@ -317,10 +403,13 @@ describe("indexTranscripts filtering", () => {
   it("does NOT index short messages under 10 chars", async () => {
     const projectDir = join(getCtx().arkDir, "claude-projects", "-short-project");
     mkdirSync(projectDir, { recursive: true });
-    writeFileSync(join(projectDir, "sess-short.jsonl"), [
-      JSON.stringify({ type: "user", message: { role: "user", content: "ok" } }),
-      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "done" } }),
-    ].join("\n"));
+    writeFileSync(
+      join(projectDir, "sess-short.jsonl"),
+      [
+        JSON.stringify({ type: "user", message: { role: "user", content: "ok" } }),
+        JSON.stringify({ type: "assistant", message: { role: "assistant", content: "done" } }),
+      ].join("\n"),
+    );
 
     const count = await indexTranscripts(getApp(), { transcriptsDir: join(getCtx().arkDir, "claude-projects") });
     expect(count).toBe(0);
@@ -329,10 +418,19 @@ describe("indexTranscripts filtering", () => {
   it("DOES index real user/assistant text", async () => {
     const projectDir = join(getCtx().arkDir, "claude-projects", "-real-project");
     mkdirSync(projectDir, { recursive: true });
-    writeFileSync(join(projectDir, "sess-real.jsonl"), [
-      JSON.stringify({ type: "user", message: { role: "user", content: "Please refactor the authentication module" } }),
-      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "I will refactor the authentication module now" } }),
-    ].join("\n"));
+    writeFileSync(
+      join(projectDir, "sess-real.jsonl"),
+      [
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: "Please refactor the authentication module" },
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: { role: "assistant", content: "I will refactor the authentication module now" },
+        }),
+      ].join("\n"),
+    );
 
     const count = await indexTranscripts(getApp(), { transcriptsDir: join(getCtx().arkDir, "claude-projects") });
     expect(count).toBe(2);
@@ -341,18 +439,21 @@ describe("indexTranscripts filtering", () => {
   it("indexes text blocks alongside tool_use blocks", async () => {
     const projectDir = join(getCtx().arkDir, "claude-projects", "-mixed-project");
     mkdirSync(projectDir, { recursive: true });
-    writeFileSync(join(projectDir, "sess-mixed.jsonl"), [
-      JSON.stringify({
-        type: "assistant",
-        message: {
-          role: "assistant",
-          content: [
-            { type: "text", text: "I will read the file and fix the issue in the handler" },
-            { type: "tool_use", id: "t1", name: "Read", input: { path: "/foo" } },
-          ],
-        },
-      }),
-    ].join("\n"));
+    writeFileSync(
+      join(projectDir, "sess-mixed.jsonl"),
+      [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            role: "assistant",
+            content: [
+              { type: "text", text: "I will read the file and fix the issue in the handler" },
+              { type: "tool_use", id: "t1", name: "Read", input: { path: "/foo" } },
+            ],
+          },
+        }),
+      ].join("\n"),
+    );
 
     const count = await indexTranscripts(getApp(), { transcriptsDir: join(getCtx().arkDir, "claude-projects") });
     expect(count).toBe(1); // text block present, so it's indexed
@@ -364,7 +465,10 @@ describe("indexTranscripts filtering", () => {
 describe("indexSession", () => {
   it("indexes a single transcript file", () => {
     const transcriptPath = join(getCtx().arkDir, "single.jsonl");
-    writeFileSync(transcriptPath, JSON.stringify({ type: "assistant", message: { role: "assistant", content: "hello world" } }));
+    writeFileSync(
+      transcriptPath,
+      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "hello world" } }),
+    );
 
     const count = indexSession(getApp(), transcriptPath, "s-single", "test-project");
     expect(count).toBe(1);
@@ -372,13 +476,31 @@ describe("indexSession", () => {
 
   it("incremental -- does not duplicate on second call", () => {
     const transcriptPath = join(getCtx().arkDir, "replace.jsonl");
-    writeFileSync(transcriptPath, JSON.stringify({ type: "assistant", message: { role: "assistant", content: "first version here" }, timestamp: "2026-01-01T00:01:00Z" }));
+    writeFileSync(
+      transcriptPath,
+      JSON.stringify({
+        type: "assistant",
+        message: { role: "assistant", content: "first version here" },
+        timestamp: "2026-01-01T00:01:00Z",
+      }),
+    );
     indexSession(getApp(), transcriptPath, "s-replace");
 
-    writeFileSync(transcriptPath, [
-      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "first version here" }, timestamp: "2026-01-01T00:01:00Z" }),
-      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "second version here" }, timestamp: "2026-01-01T00:02:00Z" }),
-    ].join("\n"));
+    writeFileSync(
+      transcriptPath,
+      [
+        JSON.stringify({
+          type: "assistant",
+          message: { role: "assistant", content: "first version here" },
+          timestamp: "2026-01-01T00:01:00Z",
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: { role: "assistant", content: "second version here" },
+          timestamp: "2026-01-01T00:02:00Z",
+        }),
+      ].join("\n"),
+    );
     indexSession(getApp(), transcriptPath, "s-replace");
 
     const turns = getSessionConversation(getApp(), "s-replace");
@@ -392,12 +514,31 @@ describe("getSessionConversation", () => {
   it("returns turns for a known session", async () => {
     const projectDir = join(getCtx().arkDir, "claude-projects", "-conv-proj");
     mkdirSync(projectDir, { recursive: true });
-    writeFileSync(join(projectDir, "conv-sess.jsonl"), [
-      JSON.stringify({ type: "user", message: { role: "user", content: "hello there friend" }, timestamp: "2026-01-01T00:01:00Z" }),
-      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "hi there how are you" }, timestamp: "2026-01-01T00:02:00Z" }),
-      JSON.stringify({ type: "user", message: { role: "user", content: "fix the auth bug please" }, timestamp: "2026-01-01T00:03:00Z" }),
-      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "I will fix the authentication issue now" }, timestamp: "2026-01-01T00:04:00Z" }),
-    ].join("\n"));
+    writeFileSync(
+      join(projectDir, "conv-sess.jsonl"),
+      [
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: "hello there friend" },
+          timestamp: "2026-01-01T00:01:00Z",
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: { role: "assistant", content: "hi there how are you" },
+          timestamp: "2026-01-01T00:02:00Z",
+        }),
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: "fix the auth bug please" },
+          timestamp: "2026-01-01T00:03:00Z",
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: { role: "assistant", content: "I will fix the authentication issue now" },
+          timestamp: "2026-01-01T00:04:00Z",
+        }),
+      ].join("\n"),
+    );
     await indexTranscripts(getApp(), { transcriptsDir: join(getCtx().arkDir, "claude-projects") });
 
     const turns = getSessionConversation(getApp(), "conv-sess");
@@ -414,12 +555,31 @@ describe("getSessionConversation", () => {
   it("respects limit", async () => {
     const projectDir = join(getCtx().arkDir, "claude-projects", "-conv-proj2");
     mkdirSync(projectDir, { recursive: true });
-    writeFileSync(join(projectDir, "conv-sess2.jsonl"), [
-      JSON.stringify({ type: "user", message: { role: "user", content: "hello there friend" }, timestamp: "2026-01-01T00:01:00Z" }),
-      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "hi there how are you" }, timestamp: "2026-01-01T00:02:00Z" }),
-      JSON.stringify({ type: "user", message: { role: "user", content: "fix the auth bug please" }, timestamp: "2026-01-01T00:03:00Z" }),
-      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "I will fix the authentication issue now" }, timestamp: "2026-01-01T00:04:00Z" }),
-    ].join("\n"));
+    writeFileSync(
+      join(projectDir, "conv-sess2.jsonl"),
+      [
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: "hello there friend" },
+          timestamp: "2026-01-01T00:01:00Z",
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: { role: "assistant", content: "hi there how are you" },
+          timestamp: "2026-01-01T00:02:00Z",
+        }),
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: "fix the auth bug please" },
+          timestamp: "2026-01-01T00:03:00Z",
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: { role: "assistant", content: "I will fix the authentication issue now" },
+          timestamp: "2026-01-01T00:04:00Z",
+        }),
+      ].join("\n"),
+    );
     await indexTranscripts(getApp(), { transcriptsDir: join(getCtx().arkDir, "claude-projects") });
 
     const turns = getSessionConversation(getApp(), "conv-sess2", { limit: 2 });
@@ -433,10 +593,21 @@ describe("searchSessionConversation", () => {
   it("finds matches within a session", async () => {
     const projectDir = join(getCtx().arkDir, "claude-projects", "-search-conv-proj");
     mkdirSync(projectDir, { recursive: true });
-    writeFileSync(join(projectDir, "search-conv-sess.jsonl"), [
-      JSON.stringify({ type: "user", message: { role: "user", content: "fix the auth bug please" }, timestamp: "2026-01-01T00:01:00Z" }),
-      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "I will fix the authentication issue now" }, timestamp: "2026-01-01T00:02:00Z" }),
-    ].join("\n"));
+    writeFileSync(
+      join(projectDir, "search-conv-sess.jsonl"),
+      [
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: "fix the auth bug please" },
+          timestamp: "2026-01-01T00:01:00Z",
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: { role: "assistant", content: "I will fix the authentication issue now" },
+          timestamp: "2026-01-01T00:02:00Z",
+        }),
+      ].join("\n"),
+    );
     await indexTranscripts(getApp(), { transcriptsDir: join(getCtx().arkDir, "claude-projects") });
 
     const results = searchSessionConversation(getApp(), "search-conv-sess", "authentication");
@@ -447,15 +618,29 @@ describe("searchSessionConversation", () => {
   it("does NOT return results from other sessions", async () => {
     const projectDir1 = join(getCtx().arkDir, "claude-projects", "-iso-proj1");
     mkdirSync(projectDir1, { recursive: true });
-    writeFileSync(join(projectDir1, "iso-sess1.jsonl"), [
-      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "authentication is handled here in the module" }, timestamp: "2026-01-01T00:01:00Z" }),
-    ].join("\n"));
+    writeFileSync(
+      join(projectDir1, "iso-sess1.jsonl"),
+      [
+        JSON.stringify({
+          type: "assistant",
+          message: { role: "assistant", content: "authentication is handled here in the module" },
+          timestamp: "2026-01-01T00:01:00Z",
+        }),
+      ].join("\n"),
+    );
 
     const projectDir2 = join(getCtx().arkDir, "claude-projects", "-iso-proj2");
     mkdirSync(projectDir2, { recursive: true });
-    writeFileSync(join(projectDir2, "iso-sess2.jsonl"), [
-      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "authentication is fixed in this version" }, timestamp: "2026-01-01T00:01:00Z" }),
-    ].join("\n"));
+    writeFileSync(
+      join(projectDir2, "iso-sess2.jsonl"),
+      [
+        JSON.stringify({
+          type: "assistant",
+          message: { role: "assistant", content: "authentication is fixed in this version" },
+          timestamp: "2026-01-01T00:01:00Z",
+        }),
+      ].join("\n"),
+    );
 
     await indexTranscripts(getApp(), { transcriptsDir: join(getCtx().arkDir, "claude-projects") });
 
@@ -475,34 +660,74 @@ describe("searchSessionConversation", () => {
 describe("indexSession improvements", () => {
   it("skips tool_result entries", () => {
     const path = join(getCtx().arkDir, "tool-test.jsonl");
-    writeFileSync(path, [
-      JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "tool_result", tool_use_id: "x", content: "big output here" }] }, timestamp: "2026-01-01T00:01:00Z" }),
-      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "I see the output clearly now" }, timestamp: "2026-01-01T00:02:00Z" }),
-    ].join("\n"));
+    writeFileSync(
+      path,
+      [
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: [{ type: "tool_result", tool_use_id: "x", content: "big output here" }] },
+          timestamp: "2026-01-01T00:01:00Z",
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: { role: "assistant", content: "I see the output clearly now" },
+          timestamp: "2026-01-01T00:02:00Z",
+        }),
+      ].join("\n"),
+    );
     const count = indexSession(getApp(), path, "tool-test");
     expect(count).toBe(1); // only the assistant message
   });
 
   it("skips tool_use-only entries", () => {
     const path = join(getCtx().arkDir, "tooluse-test.jsonl");
-    writeFileSync(path, [
-      JSON.stringify({ type: "assistant", message: { role: "assistant", content: [{ type: "tool_use", id: "x", name: "Read", input: {} }] }, timestamp: "2026-01-01T00:01:00Z" }),
-      JSON.stringify({ type: "user", message: { role: "user", content: "what did you find in there" }, timestamp: "2026-01-01T00:02:00Z" }),
-    ].join("\n"));
+    writeFileSync(
+      path,
+      [
+        JSON.stringify({
+          type: "assistant",
+          message: { role: "assistant", content: [{ type: "tool_use", id: "x", name: "Read", input: {} }] },
+          timestamp: "2026-01-01T00:01:00Z",
+        }),
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: "what did you find in there" },
+          timestamp: "2026-01-01T00:02:00Z",
+        }),
+      ].join("\n"),
+    );
     const count = indexSession(getApp(), path, "tooluse-test");
     expect(count).toBe(1); // only the user message
   });
 
   it("incremental -- second call adds only new entries", () => {
     const path = join(getCtx().arkDir, "incr-test.jsonl");
-    writeFileSync(path, JSON.stringify({ type: "user", message: { role: "user", content: "first message here" }, timestamp: "2026-01-01T00:01:00Z" }));
+    writeFileSync(
+      path,
+      JSON.stringify({
+        type: "user",
+        message: { role: "user", content: "first message here" },
+        timestamp: "2026-01-01T00:01:00Z",
+      }),
+    );
     indexSession(getApp(), path, "incr-test");
 
     // Add more content
-    writeFileSync(path, [
-      JSON.stringify({ type: "user", message: { role: "user", content: "first message here" }, timestamp: "2026-01-01T00:01:00Z" }),
-      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "second message here" }, timestamp: "2026-01-01T00:02:00Z" }),
-    ].join("\n"));
+    writeFileSync(
+      path,
+      [
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: "first message here" },
+          timestamp: "2026-01-01T00:01:00Z",
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: { role: "assistant", content: "second message here" },
+          timestamp: "2026-01-01T00:02:00Z",
+        }),
+      ].join("\n"),
+    );
     indexSession(getApp(), path, "incr-test");
 
     const turns = getSessionConversation(getApp(), "incr-test");

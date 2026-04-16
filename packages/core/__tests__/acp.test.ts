@@ -15,11 +15,14 @@ function req(method: string, params?: Record<string, unknown>, id: number = 1): 
 
 describe("handleAcpRequest", () => {
   it("session/create creates a new session", async () => {
-    const resp = await handleAcpRequest(getApp(), req("session/create", {
-      summary: "ACP test session",
-      repo: "/tmp/test-repo",
-      flow: "quick",
-    }));
+    const resp = await handleAcpRequest(
+      getApp(),
+      req("session/create", {
+        summary: "ACP test session",
+        repo: "/tmp/test-repo",
+        flow: "quick",
+      }),
+    );
 
     expect(resp.jsonrpc).toBe("2.0");
     expect(resp.id).toBe(1);

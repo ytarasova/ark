@@ -10,22 +10,32 @@ export function registerAuthCommands(program: Command) {
   const authCmd = program.command("auth").description("Manage authentication and API keys");
 
   // Claude CLI auth setup (moved from misc.ts)
-  authCmd.command("setup")
+  authCmd
+    .command("setup")
     .description("Set up Claude authentication (local or remote)")
     .option("--host <name>", "Run setup-token on a specific remote compute")
     .action(async (opts) => {
       if (opts.host) {
         const ark = await getArkClient();
         let compute: any;
-        try { compute = await ark.computeRead(opts.host); } catch { console.error(`Compute '${opts.host}' not found`); process.exit(1); }
+        try {
+          compute = await ark.computeRead(opts.host);
+        } catch {
+          console.error(`Compute '${opts.host}' not found`);
+          process.exit(1);
+        }
         const cfg = compute.config as { ip?: string };
-        if (!cfg.ip) { console.error(`No IP for '${opts.host}'`); process.exit(1); }
+        if (!cfg.ip) {
+          console.error(`No IP for '${opts.host}'`);
+          process.exit(1);
+        }
         const key = `${process.env.HOME}/.ssh/ark-${compute.name}`;
         console.log(`Running setup-token on ${compute.name} (${cfg.ip})...`);
-        execFileSync("ssh", [
-          "-i", key, "-o", "StrictHostKeyChecking=no", "-t",
-          `ubuntu@${cfg.ip}`, "~/.local/bin/claude setup-token",
-        ], { stdio: "inherit" });
+        execFileSync(
+          "ssh",
+          ["-i", key, "-o", "StrictHostKeyChecking=no", "-t", `ubuntu@${cfg.ip}`, "~/.local/bin/claude setup-token"],
+          { stdio: "inherit" },
+        );
       } else {
         const { spawn } = await import("child_process");
         console.log("Setting up Claude authentication...\n");
@@ -60,7 +70,8 @@ export function registerAuthCommands(program: Command) {
       }
     });
 
-  authCmd.command("create-key")
+  authCmd
+    .command("create-key")
     .description("Create a new API key")
     .option("--name <name>", "Human-readable label for the key", "default")
     .option("--role <role>", "Role: admin, member, or viewer", "member")
@@ -84,7 +95,8 @@ export function registerAuthCommands(program: Command) {
       console.log(chalk.yellow("Save the key now -- it cannot be retrieved later."));
     });
 
-  authCmd.command("list-keys")
+  authCmd
+    .command("list-keys")
     .description("List API keys")
     .option("--tenant <tenantId>", "Tenant ID", "default")
     .action((opts: any) => {
@@ -99,11 +111,14 @@ export function registerAuthCommands(program: Command) {
       for (const k of keys) {
         const expires = k.expiresAt ? ` expires ${k.expiresAt}` : "";
         const lastUsed = k.lastUsedAt ? ` last used ${k.lastUsedAt}` : " never used";
-        console.log(`  ${k.id.padEnd(14)} ${k.name.padEnd(20)} ${k.role.padEnd(8)} created ${k.createdAt.slice(0, 10)}${expires}${lastUsed}`);
+        console.log(
+          `  ${k.id.padEnd(14)} ${k.name.padEnd(20)} ${k.role.padEnd(8)} created ${k.createdAt.slice(0, 10)}${expires}${lastUsed}`,
+        );
       }
     });
 
-  authCmd.command("revoke-key")
+  authCmd
+    .command("revoke-key")
     .description("Revoke an API key")
     .argument("<id>", "API key ID (e.g. ak-abcd1234)")
     .action((id: string) => {
@@ -117,7 +132,8 @@ export function registerAuthCommands(program: Command) {
       }
     });
 
-  authCmd.command("rotate-key")
+  authCmd
+    .command("rotate-key")
     .description("Rotate an API key (revoke old, create new with same metadata)")
     .argument("<id>", "API key ID to rotate")
     .action((id: string) => {

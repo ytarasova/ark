@@ -291,7 +291,7 @@ describe("Goose runtime + autonomous flow completion", () => {
 
       // Verify that a session_completed event was logged
       const events = app.events.list(session.id);
-      const completedEvent = events.find(e => e.type === "session_completed");
+      const completedEvent = events.find((e) => e.type === "session_completed");
       expect(completedEvent).not.toBeUndefined();
       const data = typeof completedEvent!.data === "string" ? JSON.parse(completedEvent!.data) : completedEvent!.data;
       expect(data.reason).toBe("agent process exited");
@@ -374,7 +374,7 @@ describe("Goose runtime billing and transcript config", () => {
     const runtime = app.runtimes.get("goose");
     expect(runtime).not.toBeNull();
     expect(runtime!.models!.length).toBeGreaterThanOrEqual(3);
-    const modelIds = runtime!.models!.map(m => m.id);
+    const modelIds = runtime!.models!.map((m) => m.id);
     expect(modelIds).toContain("claude-sonnet-4-6");
     expect(modelIds).toContain("claude-opus-4-6");
   });
@@ -385,7 +385,7 @@ describe("Goose runtime billing and transcript config", () => {
 describe("Goose runtime executor dispatch path", () => {
   it("goose executor is in builtinExecutors", async () => {
     const { builtinExecutors } = await import("../executors/index.js");
-    const names = builtinExecutors.map(e => e.name);
+    const names = builtinExecutors.map((e) => e.name);
     expect(names).toContain("goose");
   });
 

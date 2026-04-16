@@ -6,8 +6,8 @@
  * Fork stages split into parallel children.
  *
  * All exported functions accept an AppContext so no caller needs to reach
- * for getApp(). The TUI's remote-capable render paths should fetch flow
- * definitions via the Ark JSON-RPC client instead of calling these directly.
+ * for getApp(). Remote-capable render paths should fetch flow definitions
+ * via the Ark JSON-RPC client instead of calling these directly.
  */
 
 import { substituteVars } from "../template.js";
@@ -20,7 +20,7 @@ export interface StageDefinition {
   type?: "agent" | "action" | "fork" | "fan_out";
   agent?: string;
   action?: string;
-  task?: string;  // Template for agent task prompt - supports {variable} substitution
+  task?: string; // Template for agent task prompt - supports {variable} substitution
   gate: "auto" | "manual" | "condition" | "review";
   autonomy?: "full" | "execute" | "edit" | "read-only";
   on_failure?: string;
@@ -39,10 +39,10 @@ export interface StageDefinition {
    */
   on_outcome?: Record<string, string>;
   optional?: boolean;
-  model?: string;  // override model for this stage (e.g., "opus" for planning, "haiku" for docs)
-  compute_template?: string;  // named compute template to use for this stage
-  verify?: string[];  // Scripts that must pass before stage completion
-  depends_on?: string[];  // DAG: stage names that must complete before this stage runs
+  model?: string; // override model for this stage (e.g., "opus" for planning, "haiku" for docs)
+  compute_template?: string; // named compute template to use for this stage
+  verify?: string[]; // Scripts that must pass before stage completion
+  depends_on?: string[]; // DAG: stage names that must complete before this stage runs
   /**
    * Runtime isolation mode for this stage.
    * - "fresh" (default): each stage gets a fresh runtime -- no --resume from prior stage.
@@ -60,7 +60,7 @@ export interface StageDefinition {
 export interface FlowEdgeDefinition {
   from: string;
   to: string;
-  condition?: string;  // JS expression evaluated against session data
+  condition?: string; // JS expression evaluated against session data
   label?: string;
 }
 
@@ -75,7 +75,11 @@ export interface FlowDefinition {
 
 /** Load a flow by name via the AppContext store. */
 function loadFlow(app: AppContext, name: string): FlowDefinition | null {
-  try { return app.flows.get(name); } catch { return null; }
+  try {
+    return app.flows.get(name);
+  } catch {
+    return null;
+  }
 }
 
 export function getStages(app: AppContext, flowName: string): StageDefinition[] {
@@ -111,7 +115,10 @@ export function getNextStage(app: AppContext, flowName: string, currentStage: st
  * doesn't match any key.
  */
 export function resolveNextStage(
-  app: AppContext, flowName: string, currentStage: string, outcome?: string,
+  app: AppContext,
+  flowName: string,
+  currentStage: string,
+  outcome?: string,
 ): string | null {
   const stage = getStage(app, flowName, currentStage);
   if (stage?.on_outcome && outcome) {
@@ -128,7 +135,10 @@ export function resolveNextStage(
 // ── Gate evaluation ─────────────────────────────────────────────────────────
 
 export function evaluateGate(
-  app: AppContext, flowName: string, stageName: string, session: { error?: string | null },
+  app: AppContext,
+  flowName: string,
+  stageName: string,
+  session: { error?: string | null },
 ): { canProceed: boolean; reason: string } {
   const stage = getStage(app, flowName, stageName);
   if (!stage) return { canProceed: false, reason: `Stage '${stageName}' not found` };
@@ -167,9 +177,12 @@ export function getStageAction(app: AppContext, flowName: string, stageName: str
 
   if (stage.type === "fork" || stage.type === "fan_out") {
     return {
-      type: stage.type, agent: stage.agent ?? "implementer",
-      strategy: stage.strategy ?? "plan", max_parallel: stage.max_parallel ?? 4,
-      on_failure: stage.on_failure, optional: stage.optional,
+      type: stage.type,
+      agent: stage.agent ?? "implementer",
+      strategy: stage.strategy ?? "plan",
+      max_parallel: stage.max_parallel ?? 4,
+      on_failure: stage.on_failure,
+      optional: stage.optional,
     };
   }
   if (stage.action) {
@@ -185,7 +198,7 @@ export function getStageAction(app: AppContext, flowName: string, stageName: str
 
 /** Validate that stages with depends_on form a valid DAG (no cycles, all refs exist). Throws on invalid. */
 export function validateDAG(stages: StageDefinition[]): void {
-  const names = new Set(stages.map(s => s.name));
+  const names = new Set(stages.map((s) => s.name));
   for (const stage of stages) {
     if (stage.depends_on) {
       for (const dep of stage.depends_on) {
@@ -241,10 +254,7 @@ export function validateDAG(stages: StageDefinition[]): void {
  * return the stages that are ready to execute (all dependencies met).
  * Stages without depends_on default to depending on the previous stage (linear).
  */
-export function getReadyStages(
-  stages: StageDefinition[],
-  completedStages: string[],
-): StageDefinition[] {
+export function getReadyStages(stages: StageDefinition[], completedStages: string[]): StageDefinition[] {
   const completed = new Set(completedStages);
   const ready: StageDefinition[] = [];
 
@@ -278,7 +288,7 @@ export function resolveFlow(app: AppContext, flowName: string, vars: Record<stri
   return {
     ...flow,
     description: flow.description ? substituteVars(flow.description, vars) : undefined,
-    stages: flow.stages.map(stage => ({
+    stages: flow.stages.map((stage) => ({
       ...stage,
       task: stage.task ? substituteVars(stage.task, vars) : undefined,
       on_failure: stage.on_failure ? substituteVars(stage.on_failure, vars) : undefined,

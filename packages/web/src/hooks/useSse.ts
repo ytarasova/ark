@@ -9,9 +9,15 @@ export function useSse<T>(path: string): T | null {
     const url = `${window.location.origin}${path}${TOKEN ? `${sep}token=${TOKEN}` : ""}`;
     const source = new EventSource(url);
     source.addEventListener("sessions", (e) => {
-      try { setData(JSON.parse(e.data)); } catch { /* ignore parse errors */ }
+      try {
+        setData(JSON.parse(e.data));
+      } catch {
+        /* ignore parse errors */
+      }
     });
-    source.onerror = () => { /* reconnects automatically */ };
+    source.onerror = () => {
+      /* reconnects automatically */
+    };
     return () => source.close();
   }, [path]);
 

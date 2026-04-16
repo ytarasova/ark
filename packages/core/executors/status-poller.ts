@@ -21,7 +21,10 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
     tick++;
     try {
       const executor = app.pluginRegistry.executor(executorName) ?? getExecutor(executorName);
-      if (!executor) { stopStatusPoller(sessionId); return; }
+      if (!executor) {
+        stopStatusPoller(sessionId);
+        return;
+      }
 
       const status = await executor.status(handle);
 
@@ -33,7 +36,9 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
           if (tree) {
             app.sessions.mergeConfig(sessionId, { process_tree: tree });
           }
-        } catch { /* best-effort */ }
+        } catch {
+          /* best-effort */
+        }
       }
 
       if (status.state === "completed" || status.state === "failed" || status.state === "not_found") {
@@ -53,7 +58,8 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
         });
 
         app.events.log(sessionId, `session_${newStatus}`, {
-          stage: session.stage, actor: "system",
+          stage: session.stage,
+          actor: "system",
           data: { reason: "agent process exited", exitCode: (status as { exitCode?: number }).exitCode },
         });
 
@@ -64,7 +70,9 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
           try {
             const { advance } = await import("../services/session-orchestration.js");
             await advance(app, sessionId);
-          } catch { /* advance may fail if flow is done */ }
+          } catch {
+            /* advance may fail if flow is done */
+          }
         }
 
         // Send OS notification
@@ -72,9 +80,13 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
           const { sendOSNotification } = await import("../notify.js");
           const title = newStatus === "completed" ? "Agent completed" : "Agent failed";
           await sendOSNotification(`Ark: ${title}`, session.summary ?? sessionId);
-        } catch { /* best-effort */ }
+        } catch {
+          /* best-effort */
+        }
       }
-    } catch { /* ignore polling errors */ }
+    } catch {
+      /* ignore polling errors */
+    }
   }, 3000); // Check every 3 seconds
 
   activePollers.set(sessionId, interval);

@@ -24,23 +24,22 @@ export async function mergeChildBranches(
     if (!existsSync(childWorktree)) continue;
 
     try {
-      const branch = execFileSync(
-        "git", ["-C", childWorktree, "rev-parse", "--abbrev-ref", "HEAD"],
-        { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] },
-      ).trim();
+      const branch = execFileSync("git", ["-C", childWorktree, "rev-parse", "--abbrev-ref", "HEAD"], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "pipe"],
+      }).trim();
       if (!branch || branch === "HEAD") continue;
 
-      execFileSync(
-        "git", ["-C", parentWorktree, "merge", "--no-edit", branch],
-        { encoding: "utf-8", stdio: "pipe" },
-      );
+      execFileSync("git", ["-C", parentWorktree, "merge", "--no-edit", branch], { encoding: "utf-8", stdio: "pipe" });
       merged.push(child.id);
     } catch (e: any) {
       const msg = (e.message ?? "") + (e.stderr ?? "");
       if (msg.includes("CONFLICT")) {
         try {
           execFileSync("git", ["-C", parentWorktree, "merge", "--abort"], { stdio: "pipe" });
-        } catch { /* merge abort may fail if no merge in progress */ }
+        } catch {
+          /* merge abort may fail if no merge in progress */
+        }
         conflicts.push(child.id);
       }
     }

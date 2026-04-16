@@ -1,5 +1,61 @@
 # Changelog
 
+## v0.17.0 (2026-04-15)
+
+### Desktop App
+- **Fully self-contained bundle** -- no prerequisites needed. The desktop app now embeds the `ark-native` binary inside the installer via electron-builder's `extraResources`. Users download, install, and launch -- no separate CLI install required.
+- **ark-native binary bundled inside the installer** -- approximately 78 MB, bringing total DMG size to ~172 MB. Trade-off: bigger download but zero-friction install.
+- **First-launch CLI installation dialog (macOS)** -- on first launch, the app offers to create a `/usr/local/bin/ark` symlink so `ark` is available in the terminal. Uses `osascript` for admin privilege escalation. Linux uses `pkexec`. Flag file `~/.ark/cli-installed` prevents repeat prompts.
+- **"Install CLI Tools..." menu item** -- under the Ark menu (macOS) or Tools menu (Linux/Windows). Users who skipped the first-launch dialog can install later.
+- **CI pipeline** -- the `desktop` job in `release.yml` now depends on `build-ark`, downloading the platform-specific ark-native artifact before running electron-builder.
+
+### Removed
+- **Tauri experimental package removed** -- `packages/desktop-tauri/` deleted. Tauri v2 was scaffolded (PR #105) and evaluated. Decision: stay with Electron for simpler toolchain and native Playwright testing support. The ~10x binary size advantage is moot once ark-native (~78 MB) is bundled regardless of shell. Evaluation notes preserved in `docs/ROADMAP.md`.
+- Removed CI job: `tauri-build` (macOS/Linux/Windows matrix)
+- Removed Makefile targets: `tauri-dev`, `tauri-build`, `tauri-package`, `build-tauri`
+- Cleaned up `.prettierignore`, `eslint.config.js` (Tauri ignore patterns)
+
+### Known Limitations (v0.17.0)
+- Unsigned macOS DMG -- see `packages/desktop/INSTALL.md` for Gatekeeper workaround.
+- Unsigned Windows installer -- SmartScreen warns about unverified publisher.
+- No auto-updater, no system tray.
+- Windows CLI install deferred (documented as limitation).
+
+## v0.16.0 (2026-04-15)
+
+### Breaking changes
+- **Removed: TUI** (`ark tui` command, `packages/tui/`, `packages/tui-e2e/`).
+  - The terminal dashboard was retired per team decision on 2026-04-14. Supported user-facing surfaces are now **Web UI** (`ark web`), **CLI** (`ark session ...`), and the **Electron desktop app** (see [`packages/desktop/INSTALL.md`](packages/desktop/INSTALL.md)).
+  - Dropped deps: all `ink*` packages and the `react-devtools-core` shim (`shims/react-devtools-core.js`).
+  - Removed Makefile targets: `make tui`, `make dev-tui`, `make tui-standalone`.
+  - Removed CI smoke test step: "Test TUI starts without crash".
+  - Removed docs: `docs/tui.html`, `docs/tui-reference.md`, `docs/SURFACE_PARITY.md`. Other docs (README, CLAUDE.md, guide, architecture, configuration, cli-reference, etc.) scrubbed of TUI references.
+  - **Migration**: use `ark web` for the browser dashboard or install the Ark Desktop app from the [GitHub releases page](https://github.com/ytarasova/ark/releases) instead. All session operations are available in the web UI and through the CLI.
+
+## v0.15.5 (2026-04-15)
+
+### Desktop App
+- **Health probe endpoint**: added `GET /api/health` to the web server (`packages/core/hosted/web.ts`) returning `{ ok, version, uptime }`. Unauthenticated, no DB hits, safe to call before token auth is configured. The desktop main process (`packages/desktop/main.js`) now probes this endpoint instead of the nonexistent `/api/status`, eliminating the spurious "Startup Error: The Ark server failed to start within 15 seconds" dialog that appeared on every launch even though the server was up.
+- **Daemon auto-start**: new `--with-daemon` flag on `ark web` (`packages/cli/commands/misc.ts`) starts the conductor (:19100) and arkd (:19300) in-process before serving the dashboard. The desktop app now passes this flag, so launching Ark Desktop gives the user a fully working instance with no manual `ark daemon start` required. Dashboard "System Health" widget shows Conductor and ArkD as online out of the box. If the user already has external daemons running on those ports, `--with-daemon` detects them via a `/health` probe and reuses them instead of failing. Both daemons shut down cleanly when the desktop app quits (SIGTERM handler).
+- **Traffic-light overlap fix**: macOS native window controls (red/yellow/green) no longer cover the "ark" sidebar brand. `BrowserWindow` now uses `titleBarStyle: "hiddenInset"` on macOS (preserving native traffic-light position), and the preload script tags `<body>` with `is-electron` and `is-macos` classes so platform-specific CSS in `packages/web/src/styles.css` adds 22px of top padding to the sidebar header (clears the 28px traffic-light strip).
+
+### Known Limitations (v0.15.5)
+- Same as v0.15.4: unsigned macOS DMG, unsigned Windows installer, no auto-updater, no system tray, requires `ark` CLI on `PATH`.
+
+## v0.15.4 (2026-04-15)
+
+### Desktop App
+- **Release pipeline**: fix `gh release create` glob in `.github/workflows/release.yml` so electron-builder artifacts actually reach the release. Previous `dist/ark-*` pattern matched only the lowercase Debian package; macOS `.dmg`/`.zip`, Windows `.exe`/`.zip`, and Linux `.AppImage` (all produced with capital A by electron-builder as `Ark-<ver>-*`) were silently dropped. Glob now covers `ark-*`, `Ark-*`, and `Ark Setup*`. Same fix applied to the rolling `latest` release upload.
+- **Single-instance lock**: desktop app now calls `app.requestSingleInstanceLock()` in `packages/desktop/main.js`. A second launch no longer spawns a second `ark web` subprocess on a new port -- it focuses the existing window.
+- **Install documentation**: new `packages/desktop/INSTALL.md` with platform downloads, the macOS Gatekeeper workaround (`xattr -dr com.apple.quarantine /Applications/Ark.app`) for the current unsigned build, and a full list of known limitations. Linked from root `README.md`.
+- **Remove stale playwright config**: `packages/desktop/playwright.config.ts` referenced `./tests`, which was deleted in the e2e migration (commit `1c6cb94`). `npm test` no longer errors out in the desktop package; the `test` script and `@playwright/test` dev dependency were removed. A real desktop smoke test will come when e2e coverage is restored.
+
+### Known Limitations (v0.15.4)
+- No bundled `ark` CLI runtime -- desktop app still requires the Ark CLI on `PATH` (install via `curl -fsSL https://ytarasova.github.io/ark/install.sh | bash`). Tracked as a follow-up.
+- Unsigned macOS DMG -- see `packages/desktop/INSTALL.md` for the Gatekeeper workaround. No Apple Developer certificate is configured in CI yet.
+- Unsigned Windows installer -- SmartScreen warns about unverified publisher.
+- No auto-updater, no system tray.
+
 ## v0.14.0 (2026-04-13)
 
 ### TUI

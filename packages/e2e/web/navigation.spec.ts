@@ -42,10 +42,7 @@ test("sidebar shows ark brand text", async () => {
 });
 
 test("sidebar nav items have correct labels", async () => {
-  const expected = [
-    "Sessions", "Agents", "Flows", "Compute", "History",
-    "Memory", "Tools", "Schedules", "Costs",
-  ];
+  const expected = ["Sessions", "Agents", "Flows", "Compute", "History", "Memory", "Tools", "Schedules", "Costs"];
   for (const label of expected) {
     await expect(page.locator(`nav button:has-text("${label}")`)).toBeVisible();
   }
@@ -110,9 +107,18 @@ test("SSE event stream connects successfully", async () => {
   const connected = await page.evaluate((baseUrl) => {
     return new Promise<boolean>((resolve) => {
       const es = new EventSource(`${baseUrl}/api/events/stream`);
-      es.onopen = () => { es.close(); resolve(true); };
-      es.onerror = () => { es.close(); resolve(false); };
-      setTimeout(() => { es.close(); resolve(false); }, 5000);
+      es.onopen = () => {
+        es.close();
+        resolve(true);
+      };
+      es.onerror = () => {
+        es.close();
+        resolve(false);
+      };
+      setTimeout(() => {
+        es.close();
+        resolve(false);
+      }, 5000);
     });
   }, ws.baseUrl);
   expect(connected).toBe(true);

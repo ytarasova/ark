@@ -9,7 +9,7 @@ withTestContext();
 
 describe("log manager", () => {
   it("truncateLog keeps last N lines", () => {
-    const dir = logDir(getApp(), );
+    const dir = logDir(getApp());
     mkdirSync(dir, { recursive: true });
     const path = join(dir, "test.log");
     const lines = Array.from({ length: 100 }, (_, i) => `line ${i}`);
@@ -23,7 +23,7 @@ describe("log manager", () => {
   });
 
   it("truncateLog skips files under limit", () => {
-    const dir = logDir(getApp(), );
+    const dir = logDir(getApp());
     mkdirSync(dir, { recursive: true });
     const path = join(dir, "small.log");
     writeFileSync(path, "line1\nline2\nline3");
@@ -41,12 +41,12 @@ describe("log manager", () => {
 
 describe("cleanupLogs", () => {
   it("returns zeros when log directory does not exist", () => {
-    const result = cleanupLogs(getApp(), );
+    const result = cleanupLogs(getApp());
     expect(result).toEqual({ truncated: 0, removed: 0 });
   });
 
   it("removes orphaned log files for sessions that no longer exist", () => {
-    const dir = logDir(getApp(), );
+    const dir = logDir(getApp());
     mkdirSync(dir, { recursive: true });
 
     // Create a session so we know its ID format
@@ -63,7 +63,7 @@ describe("cleanupLogs", () => {
   });
 
   it("truncates oversized log files", () => {
-    const dir = logDir(getApp(), );
+    const dir = logDir(getApp());
     mkdirSync(dir, { recursive: true });
 
     const session = getApp().sessions.create({ summary: "large log" });

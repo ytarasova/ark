@@ -92,7 +92,9 @@ describe("groups table", () => {
 
     // The session's group_name should now be null
     const db = getApp().db;
-    const row = db.prepare("SELECT group_name FROM sessions WHERE id = ?").get(session.id) as { group_name: string | null } | undefined;
+    const row = db.prepare("SELECT group_name FROM sessions WHERE id = ?").get(session.id) as
+      | { group_name: string | null }
+      | undefined;
     expect(row.group_name).toBeNull();
   });
 
@@ -135,8 +137,12 @@ describe("groups table", () => {
     getApp().sessions.deleteGroup("multi");
 
     const db = getApp().db;
-    const r1 = db.prepare("SELECT group_name FROM sessions WHERE id = ?").get(s1.id) as { group_name: string | null } | undefined;
-    const r2 = db.prepare("SELECT group_name FROM sessions WHERE id = ?").get(s2.id) as { group_name: string | null } | undefined;
+    const r1 = db.prepare("SELECT group_name FROM sessions WHERE id = ?").get(s1.id) as
+      | { group_name: string | null }
+      | undefined;
+    const r2 = db.prepare("SELECT group_name FROM sessions WHERE id = ?").get(s2.id) as
+      | { group_name: string | null }
+      | undefined;
     expect(r1.group_name).toBeNull();
     expect(r2.group_name).toBeNull();
   });

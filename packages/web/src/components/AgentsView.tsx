@@ -12,7 +12,17 @@ import { selectClassName } from "./ui/styles.js";
 
 const TOOL_OPTIONS = ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebSearch"];
 
-function AgentForm({ onClose, onSubmit, agent, isEdit }: { onClose: () => void; onSubmit: (form: any) => void; agent?: any; isEdit?: boolean }) {
+function AgentForm({
+  onClose,
+  onSubmit,
+  agent,
+  isEdit,
+}: {
+  onClose: () => void;
+  onSubmit: (form: any) => void;
+  agent?: any;
+  isEdit?: boolean;
+}) {
   const [form, setForm] = useState({
     name: agent?.name ?? "",
     description: agent?.description ?? "",
@@ -44,20 +54,37 @@ function AgentForm({ onClose, onSubmit, agent, isEdit }: { onClose: () => void; 
 
   return (
     <div className="flex flex-col h-full p-5 overflow-y-auto">
-      <h2 className="text-base font-semibold text-foreground mb-5">{isEdit ? `Edit Agent: ${agent?.name}` : "New Agent"}</h2>
+      <h2 className="text-base font-semibold text-foreground mb-5">
+        {isEdit ? `Edit Agent: ${agent?.name}` : "New Agent"}
+      </h2>
       <form onSubmit={handleSubmit} className="flex flex-col">
         {!isEdit && (
           <div className="mb-3.5">
-            <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Name *</label>
-            <Input autoFocus value={form.name} onChange={(e) => update("name", e.target.value)} placeholder="my-agent" />
+            <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+              Name *
+            </label>
+            <Input
+              autoFocus
+              value={form.name}
+              onChange={(e) => update("name", e.target.value)}
+              placeholder="my-agent"
+            />
           </div>
         )}
         <div className="mb-3.5">
-          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Description</label>
-          <Input value={form.description} onChange={(e) => update("description", e.target.value)} placeholder="What does this agent do?" />
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+            Description
+          </label>
+          <Input
+            value={form.description}
+            onChange={(e) => update("description", e.target.value)}
+            placeholder="What does this agent do?"
+          />
         </div>
         <div className="mb-3.5">
-          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Model</label>
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+            Model
+          </label>
           <select className={selectClassName} value={form.model} onChange={(e) => update("model", e.target.value)}>
             <option value="opus">opus</option>
             <option value="sonnet">sonnet</option>
@@ -65,18 +92,24 @@ function AgentForm({ onClose, onSubmit, agent, isEdit }: { onClose: () => void; 
           </select>
         </div>
         <div className="mb-3.5">
-          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Runtime</label>
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+            Runtime
+          </label>
           <select className={selectClassName} value={form.runtime} onChange={(e) => update("runtime", e.target.value)}>
             <option value="claude-code">claude-code</option>
             <option value="cli-agent">cli-agent</option>
           </select>
         </div>
         <div className="mb-3.5">
-          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Max Turns</label>
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+            Max Turns
+          </label>
           <Input value={form.max_turns} onChange={(e) => update("max_turns", e.target.value)} placeholder="200" />
         </div>
         <div className="mb-3.5">
-          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Tools</label>
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+            Tools
+          </label>
           <div className="flex flex-wrap gap-2">
             {TOOL_OPTIONS.map((tool) => (
               <label key={tool} className="flex items-center gap-1.5 text-[13px] text-foreground cursor-pointer">
@@ -92,15 +125,23 @@ function AgentForm({ onClose, onSubmit, agent, isEdit }: { onClose: () => void; 
           </div>
         </div>
         <div className="mb-3.5">
-          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Permission Mode</label>
-          <select className={selectClassName} value={form.permission_mode} onChange={(e) => update("permission_mode", e.target.value)}>
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+            Permission Mode
+          </label>
+          <select
+            className={selectClassName}
+            value={form.permission_mode}
+            onChange={(e) => update("permission_mode", e.target.value)}
+          >
             <option value="bypassPermissions">bypassPermissions</option>
             <option value="default">default</option>
           </select>
         </div>
         {!isEdit && (
           <div className="mb-3.5">
-            <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Scope</label>
+            <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+              Scope
+            </label>
             <select className={selectClassName} value={form.scope} onChange={(e) => update("scope", e.target.value)}>
               <option value="project">project</option>
               <option value="global">global</option>
@@ -108,7 +149,9 @@ function AgentForm({ onClose, onSubmit, agent, isEdit }: { onClose: () => void; 
           </div>
         )}
         <div className="mb-3.5">
-          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">System Prompt</label>
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+            System Prompt
+          </label>
           <textarea
             className="min-h-[200px] w-full resize-y bg-transparent border border-input rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
             value={form.system_prompt}
@@ -117,8 +160,12 @@ function AgentForm({ onClose, onSubmit, agent, isEdit }: { onClose: () => void; 
           />
         </div>
         <div className="flex gap-2 pt-4 border-t border-border mt-auto">
-          <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-          <Button type="submit" size="sm">{isEdit ? "Save Agent" : "Create Agent"}</Button>
+          <Button type="button" variant="outline" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" size="sm">
+            {isEdit ? "Save Agent" : "Create Agent"}
+          </Button>
         </div>
       </form>
     </div>
@@ -145,7 +192,7 @@ function SubTabBar({ active, onChange }: { active: SubTab; onChange: (tab: SubTa
             "px-3 py-2 text-[13px] font-medium transition-colors border-b-2 -mb-px",
             active === t.id
               ? "text-foreground border-primary"
-              : "text-muted-foreground border-transparent hover:text-foreground hover:border-border"
+              : "text-muted-foreground border-transparent hover:text-foreground hover:border-border",
           )}
         >
           {t.label}
@@ -164,13 +211,19 @@ interface AgentsViewProps {
   onSelectedChange?: (name: string | null) => void;
 }
 
-export function AgentsView({ showCreate = false, onCloseCreate, initialSelectedName, onSelectedChange }: AgentsViewProps) {
+export function AgentsView({
+  showCreate = false,
+  onCloseCreate,
+  initialSelectedName,
+  onSelectedChange,
+}: AgentsViewProps) {
   const queryClient = useQueryClient();
   const { data: agents = [] } = useAgentsQuery();
   const { data: runtimes = [] } = useRuntimesQuery();
   const [subTab, setSubTab] = useState<SubTab>("roles");
   const [selectedInternal, setSelectedInternal] = useState<any>(null);
-  const selected = selectedInternal ?? (initialSelectedName ? agents.find((a: any) => a.name === initialSelectedName) : null);
+  const selected =
+    selectedInternal ?? (initialSelectedName ? agents.find((a: any) => a.name === initialSelectedName) : null);
   const setSelected = (item: any) => {
     setSelectedInternal(item);
     onSelectedChange?.(item?.name ?? null);
@@ -232,9 +285,7 @@ export function AgentsView({ showCreate = false, onCloseCreate, initialSelectedN
           <div className="text-center">
             <Settings size={28} className="text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-sm text-muted-foreground">
-              {subTab === "roles"
-                ? "No custom agents. Builtin agents are shown by default."
-                : "No runtimes found."}
+              {subTab === "roles" ? "No custom agents. Builtin agents are shown by default." : "No runtimes found."}
             </p>
           </div>
         </div>
@@ -248,43 +299,53 @@ export function AgentsView({ showCreate = false, onCloseCreate, initialSelectedN
       <div className="grid grid-cols-[260px_1fr] overflow-hidden flex-1">
         {/* Left: list panel */}
         <div className="border-r border-border overflow-y-auto">
-          {subTab === "roles" ? (
-            agents.map((a: any) => (
-              <div
-                key={a.name}
-                className={cn(
-                  "flex items-center justify-between px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors text-[13px]",
-                  "hover:bg-accent",
-                  selected?.name === a.name && selected?._kind === "role" && "bg-accent border-l-2 border-l-primary font-semibold"
-                )}
-                onClick={() => setSelected({ ...a, _kind: "role" })}
-              >
-                <div className="flex flex-col min-w-0 mr-2">
-                  <span className="text-foreground truncate">{a.name}</span>
-                  <span className="text-[11px] text-muted-foreground truncate">{a.runtime || "claude"} / {a.model}</span>
+          {subTab === "roles"
+            ? agents.map((a: any) => (
+                <div
+                  key={a.name}
+                  className={cn(
+                    "flex items-center justify-between px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors text-[13px]",
+                    "hover:bg-accent",
+                    selected?.name === a.name &&
+                      selected?._kind === "role" &&
+                      "bg-accent border-l-2 border-l-primary font-semibold",
+                  )}
+                  onClick={() => setSelected({ ...a, _kind: "role" })}
+                >
+                  <div className="flex flex-col min-w-0 mr-2">
+                    <span className="text-foreground truncate">{a.name}</span>
+                    <span className="text-[11px] text-muted-foreground truncate">
+                      {a.runtime || "claude"} / {a.model}
+                    </span>
+                  </div>
+                  <Badge variant="secondary" className="text-[10px] shrink-0">
+                    {a.source || "builtin"}
+                  </Badge>
                 </div>
-                <Badge variant="secondary" className="text-[10px] shrink-0">{a.source || "builtin"}</Badge>
-              </div>
-            ))
-          ) : (
-            runtimes.map((r: any) => (
-              <div
-                key={r.name}
-                className={cn(
-                  "flex items-center justify-between px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors text-[13px]",
-                  "hover:bg-accent",
-                  selected?.name === r.name && selected?._kind === "runtime" && "bg-accent border-l-2 border-l-primary font-semibold"
-                )}
-                onClick={() => setSelected({ ...r, _kind: "runtime" })}
-              >
-                <div className="flex flex-col min-w-0 mr-2">
-                  <span className="text-foreground truncate">{r.name}</span>
-                  <span className="text-[11px] text-muted-foreground truncate">{r.type} / {r.default_model || "-"}</span>
+              ))
+            : runtimes.map((r: any) => (
+                <div
+                  key={r.name}
+                  className={cn(
+                    "flex items-center justify-between px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors text-[13px]",
+                    "hover:bg-accent",
+                    selected?.name === r.name &&
+                      selected?._kind === "runtime" &&
+                      "bg-accent border-l-2 border-l-primary font-semibold",
+                  )}
+                  onClick={() => setSelected({ ...r, _kind: "runtime" })}
+                >
+                  <div className="flex flex-col min-w-0 mr-2">
+                    <span className="text-foreground truncate">{r.name}</span>
+                    <span className="text-[11px] text-muted-foreground truncate">
+                      {r.type} / {r.default_model || "-"}
+                    </span>
+                  </div>
+                  <Badge variant="secondary" className="text-[10px] shrink-0">
+                    {r._source || "builtin"}
+                  </Badge>
                 </div>
-                <Badge variant="secondary" className="text-[10px] shrink-0">{r._source || "builtin"}</Badge>
-              </div>
-            ))
-          )}
+              ))}
         </div>
 
         {/* Right: detail panel or create form */}
@@ -315,7 +376,12 @@ export function AgentsView({ showCreate = false, onCloseCreate, initialSelectedN
 
 // ── Role Detail ────────────────────────────────────────────────────────────
 
-function RoleDetail({ agent, onEdit, onDelete, actionMsg }: {
+function RoleDetail({
+  agent,
+  onEdit,
+  onDelete,
+  actionMsg,
+}: {
   agent: any;
   onEdit: () => void;
   onDelete: () => void;
@@ -324,11 +390,11 @@ function RoleDetail({ agent, onEdit, onDelete, actionMsg }: {
   return (
     <div className="p-5">
       <h2 className="text-lg font-semibold text-foreground mb-1">{agent.name}</h2>
-      {agent.description && (
-        <p className="text-sm text-muted-foreground mb-5">{agent.description}</p>
-      )}
+      {agent.description && <p className="text-sm text-muted-foreground mb-5">{agent.description}</p>}
       <div className="mb-4">
-        <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Configuration</h3>
+        <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+          Configuration
+        </h3>
         <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
           <span className="text-muted-foreground">Model</span>
           <span className="text-card-foreground font-mono">{agent.model || "-"}</span>
@@ -345,7 +411,9 @@ function RoleDetail({ agent, onEdit, onDelete, actionMsg }: {
           <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Skills</h3>
           <div className="flex flex-wrap gap-1.5">
             {agent.skills.map((s: string) => (
-              <Badge key={s} variant="default" className="text-[11px]">{s}</Badge>
+              <Badge key={s} variant="default" className="text-[11px]">
+                {s}
+              </Badge>
             ))}
           </div>
         </div>
@@ -355,25 +423,35 @@ function RoleDetail({ agent, onEdit, onDelete, actionMsg }: {
           <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Tools</h3>
           <div className="flex flex-wrap gap-1.5">
             {agent.tools.map((t: string) => (
-              <Badge key={t} variant="secondary" className="text-[11px]">{t}</Badge>
+              <Badge key={t} variant="secondary" className="text-[11px]">
+                {t}
+              </Badge>
             ))}
           </div>
         </div>
       )}
       {agent.mcp_servers && agent.mcp_servers.length > 0 && (
         <div className="mb-4">
-          <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">MCP Servers</h3>
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+            MCP Servers
+          </h3>
           <div className="flex flex-wrap gap-1.5">
             {agent.mcp_servers.map((m: string) => (
-              <Badge key={m} variant="secondary" className="text-[11px]">{m}</Badge>
+              <Badge key={m} variant="secondary" className="text-[11px]">
+                {m}
+              </Badge>
             ))}
           </div>
         </div>
       )}
       {agent.system_prompt && (
         <div className="mb-4">
-          <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">System Prompt</h3>
-          <div className="bg-black/40 border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-muted-foreground">{agent.system_prompt}</div>
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+            System Prompt
+          </h3>
+          <div className="bg-black/40 border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-muted-foreground">
+            {agent.system_prompt}
+          </div>
         </div>
       )}
       {agent._source !== "builtin" && (
@@ -401,11 +479,11 @@ function RuntimeDetail({ runtime }: { runtime: any }) {
   return (
     <div className="p-5">
       <h2 className="text-lg font-semibold text-foreground mb-1">{runtime.name}</h2>
-      {runtime.description && (
-        <p className="text-sm text-muted-foreground mb-5">{runtime.description}</p>
-      )}
+      {runtime.description && <p className="text-sm text-muted-foreground mb-5">{runtime.description}</p>}
       <div className="mb-4">
-        <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Configuration</h3>
+        <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+          Configuration
+        </h3>
         <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
           <span className="text-muted-foreground">Type</span>
           <span className="text-card-foreground font-mono">{runtime.type || "-"}</span>
@@ -439,7 +517,9 @@ function RuntimeDetail({ runtime }: { runtime: any }) {
 
       {runtime.models && runtime.models.length > 0 && (
         <div className="mb-4">
-          <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Models ({runtime.models.length})</h3>
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+            Models ({runtime.models.length})
+          </h3>
           <div className="grid grid-cols-[100px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
             {runtime.models.map((m: any) => (
               <React.Fragment key={m.id}>
@@ -453,10 +533,14 @@ function RuntimeDetail({ runtime }: { runtime: any }) {
 
       {runtime.env && Object.keys(runtime.env).length > 0 && (
         <div className="mb-4">
-          <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Environment</h3>
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+            Environment
+          </h3>
           <div className="bg-black/40 border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] text-muted-foreground">
             {Object.entries(runtime.env).map(([k, v]) => (
-              <div key={k}>{k}={String(v)}</div>
+              <div key={k}>
+                {k}={String(v)}
+              </div>
             ))}
           </div>
         </div>

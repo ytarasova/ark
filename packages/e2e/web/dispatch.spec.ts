@@ -41,11 +41,7 @@ async function createSession(summary: string): Promise<string> {
 }
 
 /** Poll session status via RPC until it matches or times out */
-async function waitForStatus(
-  sessionId: string,
-  statuses: string[],
-  timeoutMs = 30_000,
-): Promise<string> {
+async function waitForStatus(sessionId: string, statuses: string[], timeoutMs = 30_000): Promise<string> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     try {
@@ -53,7 +49,9 @@ async function waitForStatus(
       if (data.session && statuses.includes(data.session.status)) {
         return data.session.status;
       }
-    } catch { /* not ready yet */ }
+    } catch {
+      /* not ready yet */
+    }
     await new Promise((r) => setTimeout(r, 1_000));
   }
   throw new Error(`Session ${sessionId} did not reach status [${statuses.join(",")}] within ${timeoutMs}ms`);
@@ -127,10 +125,9 @@ test("session/resume transitions a stopped session back to ready", async () => {
   // server's _detectStaleState() only scans `running` rows, so a
   // `stopped` row survives across boot.
   const { execFileSync } = await import("node:child_process");
-  execFileSync("sqlite3", [
-    `${ws.env.app.arkDir}/ark.db`,
-    `UPDATE sessions SET status='stopped' WHERE id='${id}'`,
-  ], { stdio: ["ignore", "pipe", "pipe"] });
+  execFileSync("sqlite3", [`${ws.env.app.arkDir}/ark.db`, `UPDATE sessions SET status='stopped' WHERE id='${id}'`], {
+    stdio: ["ignore", "pipe", "pipe"],
+  });
 
   // Confirm the seed landed.
   const before = await ws.rpc<{ session: { status: string } }>("session/read", { sessionId: id });

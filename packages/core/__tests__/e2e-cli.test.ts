@@ -23,11 +23,19 @@ const testComputes: string[] = [];
 afterEach(() => {
   const app = getApp();
   for (const id of testSessionIds) {
-    try { app.sessions.delete(id); } catch { /* gone */ }
+    try {
+      app.sessions.delete(id);
+    } catch {
+      /* gone */
+    }
   }
   testSessionIds.length = 0;
   for (const name of testComputes) {
-    try { app.computes.delete(name); } catch { /* gone */ }
+    try {
+      app.computes.delete(name);
+    } catch {
+      /* gone */
+    }
   }
   testComputes.length = 0;
 });
@@ -63,7 +71,7 @@ describe("CLI: compute lifecycle", () => {
     testComputes.push(name);
     app.computes.create({ name, provider: "ec2" });
     const computes = app.computes.list();
-    expect(computes.some(c => c.name === name)).toBe(true);
+    expect(computes.some((c) => c.name === name)).toBe(true);
   });
 
   it("shows compute status as JSON", () => {
@@ -131,7 +139,7 @@ describe("CLI: session lifecycle", () => {
     const session = startSession(app, { repo: ".", summary: "list-test", flow: "bare" });
     testSessionIds.push(session.id);
     const sessions = app.sessions.list();
-    expect(sessions.some(s => s.summary === "list-test")).toBe(true);
+    expect(sessions.some((s) => s.summary === "list-test")).toBe(true);
   });
 
   it("shows session details", () => {

@@ -56,6 +56,6 @@ describe("fmtCost", () => {
 
   it("formats exact cents", () => {
     expect(fmtCost(0.01)).toBe("$0.01");
-    expect(fmtCost(0.10)).toBe("$0.10");
+    expect(fmtCost(0.1)).toBe("$0.10");
   });
 });

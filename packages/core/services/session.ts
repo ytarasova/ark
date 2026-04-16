@@ -9,12 +9,7 @@
  * existing session-orchestration.ts functions for now.
  */
 
-import type {
-  Session,
-  SessionStatus,
-  CreateSessionOpts,
-  SessionOpResult,
-} from "../../types/index.js";
+import type { Session, SessionStatus, CreateSessionOpts, SessionOpResult } from "../../types/index.js";
 import type { SessionRepository } from "../repositories/session.js";
 import type { EventRepository } from "../repositories/event.js";
 import type { MessageRepository } from "../repositories/message.js";
@@ -32,7 +27,9 @@ export class SessionService {
   ) {}
 
   /** Inject AppContext after construction (called by app.ts boot). */
-  setApp(app: AppContext): void { this._app = app; }
+  setApp(app: AppContext): void {
+    this._app = app;
+  }
 
   /** Get the injected AppContext. Throws if not set. */
   private get app(): AppContext {
@@ -315,13 +312,16 @@ export class SessionService {
   /**
    * Spawn a subagent session under a parent.
    */
-  async spawn(parentId: string, opts: {
-    task: string;
-    agent?: string;
-    model?: string;
-    group_name?: string;
-    extensions?: string[];
-  }): Promise<SessionOpResult> {
+  async spawn(
+    parentId: string,
+    opts: {
+      task: string;
+      agent?: string;
+      model?: string;
+      group_name?: string;
+      extensions?: string[];
+    },
+  ): Promise<SessionOpResult> {
     const { spawnSubagent } = await import("./session-orchestration.js");
     return spawnSubagent(this.app, parentId, opts);
   }
@@ -353,12 +353,15 @@ export class SessionService {
   /**
    * Finish a worktree: merge back and clean up.
    */
-  async finishWorktree(id: string, opts?: {
-    into?: string;
-    noMerge?: boolean;
-    keepBranch?: boolean;
-    createPR?: boolean;
-  }): Promise<SessionOpResult> {
+  async finishWorktree(
+    id: string,
+    opts?: {
+      into?: string;
+      noMerge?: boolean;
+      keepBranch?: boolean;
+      createPR?: boolean;
+    },
+  ): Promise<SessionOpResult> {
     const { finishWorktree: legacyFinish } = await import("./session-orchestration.js");
     return legacyFinish(this.app, id, opts);
   }
@@ -374,7 +377,10 @@ export class SessionService {
   /**
    * Create a GitHub PR from a session's worktree branch.
    */
-  async createWorktreePR(id: string, opts?: { title?: string; body?: string; base?: string; draft?: boolean }): Promise<SessionOpResult & { pr_url?: string }> {
+  async createWorktreePR(
+    id: string,
+    opts?: { title?: string; body?: string; base?: string; draft?: boolean },
+  ): Promise<SessionOpResult & { pr_url?: string }> {
     const { createWorktreePR: legacyCreatePR } = await import("./session-orchestration.js");
     return legacyCreatePR(this.app, id, opts);
   }

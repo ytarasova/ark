@@ -14,16 +14,16 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext, setApp, clearApp } from "../app.js";
-import {
-  mediateStageHandoff,
-  executeAction,
-} from "../services/session-orchestration.js";
+import { mediateStageHandoff, executeAction } from "../services/session-orchestration.js";
 import { waitFor } from "./test-helpers.js";
 
 let app: AppContext;
 
 beforeEach(async () => {
-  if (app) { await app.shutdown(); clearApp(); }
+  if (app) {
+    await app.shutdown();
+    clearApp();
+  }
   app = AppContext.forTest();
   setApp(app);
   await app.boot();
@@ -58,16 +58,19 @@ describe("action stage chaining", () => {
     expect(result.dispatched).toBe(true);
 
     // Wait for async action chain to complete the flow
-    await waitFor(() => {
-      const s = app.sessions.get(session.id);
-      return s?.status === "completed";
-    }, { timeout: 5000, message: "Expected session to reach completed status" });
+    await waitFor(
+      () => {
+        const s = app.sessions.get(session.id);
+        return s?.status === "completed";
+      },
+      { timeout: 5000, message: "Expected session to reach completed status" },
+    );
 
     // Verify action_executed event was logged
     const events = app.events.list(session.id);
-    const actionEvents = events.filter(e => e.type === "action_executed");
+    const actionEvents = events.filter((e) => e.type === "action_executed");
     expect(actionEvents.length).toBeGreaterThanOrEqual(1);
-    expect(actionEvents.some(e => e.data?.action === "close")).toBe(true);
+    expect(actionEvents.some((e) => e.data?.action === "close")).toBe(true);
   });
 
   it("consecutive action stages chain-execute", async () => {
@@ -95,14 +98,17 @@ describe("action stage chaining", () => {
     expect(result.dispatched).toBe(true);
 
     // Wait for both actions to chain-execute and complete the flow
-    await waitFor(() => {
-      const s = app.sessions.get(session.id);
-      return s?.status === "completed";
-    }, { timeout: 5000, message: "Expected session to reach completed after chained actions" });
+    await waitFor(
+      () => {
+        const s = app.sessions.get(session.id);
+        return s?.status === "completed";
+      },
+      { timeout: 5000, message: "Expected session to reach completed after chained actions" },
+    );
 
     // Verify both action_executed events were logged
     const events = app.events.list(session.id);
-    const actionEvents = events.filter(e => e.type === "action_executed");
+    const actionEvents = events.filter((e) => e.type === "action_executed");
     expect(actionEvents.length).toBeGreaterThanOrEqual(2);
   });
 
@@ -132,10 +138,13 @@ describe("action stage chaining", () => {
     expect(result.dispatched).toBe(true);
 
     // Wait for the failure to propagate
-    await waitFor(() => {
-      const s = app.sessions.get(session.id);
-      return s?.status === "failed";
-    }, { timeout: 5000, message: "Expected session to reach failed status" });
+    await waitFor(
+      () => {
+        const s = app.sessions.get(session.id);
+        return s?.status === "failed";
+      },
+      { timeout: 5000, message: "Expected session to reach failed status" },
+    );
 
     const updated = app.sessions.get(session.id);
     expect(updated?.status).toBe("failed");
@@ -143,7 +152,7 @@ describe("action stage chaining", () => {
 
     // Verify auto_merge was NOT executed
     const events = app.events.list(session.id);
-    const mergeEvents = events.filter(e => e.type === "action_executed" && e.data?.action === "auto_merge");
+    const mergeEvents = events.filter((e) => e.type === "action_executed" && e.data?.action === "auto_merge");
     expect(mergeEvents.length).toBe(0);
   });
 
@@ -172,10 +181,13 @@ describe("action stage chaining", () => {
     expect(result.dispatched).toBe(true);
 
     // Wait for the action to execute and advance to work2
-    await waitFor(() => {
-      const s = app.sessions.get(session.id);
-      return s?.stage === "work2";
-    }, { timeout: 5000, message: "Expected session to advance to work2 stage" });
+    await waitFor(
+      () => {
+        const s = app.sessions.get(session.id);
+        return s?.stage === "work2";
+      },
+      { timeout: 5000, message: "Expected session to advance to work2 stage" },
+    );
 
     // Verify session is at work2 with ready status (dispatch will fail in test but stage should advance)
     const updated = app.sessions.get(session.id);
@@ -183,7 +195,7 @@ describe("action stage chaining", () => {
 
     // Verify the close action was executed
     const events = app.events.list(session.id);
-    const actionEvents = events.filter(e => e.type === "action_executed" && e.data?.action === "close");
+    const actionEvents = events.filter((e) => e.type === "action_executed" && e.data?.action === "close");
     expect(actionEvents.length).toBe(1);
   });
 

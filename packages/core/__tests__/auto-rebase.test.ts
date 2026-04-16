@@ -40,13 +40,15 @@ function setupRepo(testDir: string, name: string): { origin: string; work: strin
   // Create bare origin from the staging repo
   const origin = join(testDir, `${name}-origin.git`);
   execFileSync("git", ["clone", "--bare", staging, origin], {
-    encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
+    encoding: "utf-8",
+    stdio: ["pipe", "pipe", "pipe"],
   });
 
   // Clone the origin into a work dir
   const work = join(testDir, `${name}-work`);
   execFileSync("git", ["clone", origin, work], {
-    encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
+    encoding: "utf-8",
+    stdio: ["pipe", "pipe", "pipe"],
   });
   git(work, "config", "user.email", "test@test.com");
   git(work, "config", "user.name", "Test");
@@ -115,7 +117,7 @@ describe("rebaseOntoBase", () => {
 
     // Verify event was logged
     const events = app.events.list(session.id);
-    expect(events.some(e => e.type === "rebase_completed")).toBe(true);
+    expect(events.some((e) => e.type === "rebase_completed")).toBe(true);
   });
 
   it("aborts cleanly on conflict", async () => {
@@ -167,7 +169,8 @@ describe("rebaseOntoBase", () => {
     // Create a worktree directory at the expected path
     const wtDir = join(app.config.worktreesDir, session.id);
     execFileSync("git", ["-C", work, "worktree", "add", wtDir, "-b", "ark-s-wt01"], {
-      encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
     });
 
     // Configure git in worktree
@@ -193,9 +196,12 @@ describe("rebaseOntoBase", () => {
     // Cleanup worktree
     try {
       execFileSync("git", ["-C", work, "worktree", "remove", wtDir, "--force"], {
-        encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
       });
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   });
 });
 
@@ -232,7 +238,7 @@ describe("createWorktreePR auto-rebase integration", () => {
 
     // There should be no rebase_completed event
     const events = app.events.list(session.id);
-    expect(events.some(e => e.type === "rebase_completed")).toBe(false);
+    expect(events.some((e) => e.type === "rebase_completed")).toBe(false);
   });
 
   it("performs rebase when auto_rebase is not set (default true)", async () => {
@@ -262,6 +268,6 @@ describe("createWorktreePR auto-rebase integration", () => {
 
     // Rebase event should be logged
     const events = app.events.list(session.id);
-    expect(events.some(e => e.type === "rebase_completed")).toBe(true);
+    expect(events.some((e) => e.type === "rebase_completed")).toBe(true);
   });
 });

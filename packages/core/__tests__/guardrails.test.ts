@@ -20,7 +20,7 @@ describe("guardrails", () => {
 
   it("warns on sensitive file access", () => {
     const rules: GuardrailRule[] = [
-      { tool: "Read", pattern: "\\.env\"", action: "warn" },
+      { tool: "Read", pattern: '\\.env"', action: "warn" },
       { tool: "Read", pattern: "credentials", action: "warn" },
     ];
 

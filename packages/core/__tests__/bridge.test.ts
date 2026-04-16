@@ -14,7 +14,9 @@ describe("Bridge", () => {
   it("registers message handlers", () => {
     const bridge = new Bridge({});
     const messages: BridgeMessage[] = [];
-    bridge.onMessage((msg) => { messages.push(msg); });
+    bridge.onMessage((msg) => {
+      messages.push(msg);
+    });
     expect(messages).toHaveLength(0);
   });
 
@@ -29,7 +31,9 @@ describe("Bridge", () => {
     let sentText = "";
     const bridge = new Bridge({});
     // Override notify to capture text
-    bridge.notify = async (text: string) => { sentText = text; };
+    bridge.notify = async (text: string) => {
+      sentText = text;
+    };
 
     await bridge.notifySessionStatus(
       mockSession({ id: "s-1", status: "running", summary: "My task" }),
@@ -43,13 +47,11 @@ describe("Bridge", () => {
   it("notifySessionStatus uses id when no summary", async () => {
     let sentText = "";
     const bridge = new Bridge({});
-    bridge.notify = async (text: string) => { sentText = text; };
+    bridge.notify = async (text: string) => {
+      sentText = text;
+    };
 
-    await bridge.notifySessionStatus(
-      mockSession({ id: "s-42", status: "failed" }),
-      "running",
-      "failed",
-    );
+    await bridge.notifySessionStatus(mockSession({ id: "s-42", status: "failed" }), "running", "failed");
     expect(sentText).toContain("s-42");
     expect(sentText).toContain("running \u2192 failed");
   });
@@ -82,7 +84,9 @@ describe("Bridge status notifications", () => {
   it("notifySessionStatus uses correct emoji for each status", async () => {
     const bridge = new Bridge({});
     const texts: string[] = [];
-    bridge.notify = async (text: string) => { texts.push(text); };
+    bridge.notify = async (text: string) => {
+      texts.push(text);
+    };
 
     const statuses = [
       { to: "running", emoji: "\u{1F7E2}" },
@@ -107,7 +111,9 @@ describe("Bridge status notifications", () => {
   it("notifyStatusSummary includes session count", async () => {
     let sentText = "";
     const bridge = new Bridge({});
-    bridge.notify = async (text: string) => { sentText = text; };
+    bridge.notify = async (text: string) => {
+      sentText = text;
+    };
 
     await bridge.notifyStatusSummary();
     expect(sentText).toContain("Status summary");
@@ -141,8 +147,12 @@ describe("Bridge handler invocation", () => {
     const bridge = new Bridge({});
     const results: string[] = [];
 
-    bridge.onMessage((msg) => { results.push(`h1:${msg.text}`); });
-    bridge.onMessage((msg) => { results.push(`h2:${msg.text}`); });
+    bridge.onMessage((msg) => {
+      results.push(`h1:${msg.text}`);
+    });
+    bridge.onMessage((msg) => {
+      results.push(`h2:${msg.text}`);
+    });
 
     // Directly simulate -- we can't trigger pollTelegram in tests
     // but we can verify the handler registration pattern

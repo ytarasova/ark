@@ -13,11 +13,16 @@ import { join } from "path";
 const execFileAsync = promisify(execFile);
 
 export const SSH_OPTS: string[] = [
-  "-o", "StrictHostKeyChecking=no",
-  "-o", "ConnectTimeout=10",
-  "-o", "ServerAliveInterval=10",
-  "-o", "ServerAliveCountMax=3",
-  "-o", "LogLevel=ERROR",
+  "-o",
+  "StrictHostKeyChecking=no",
+  "-o",
+  "ConnectTimeout=10",
+  "-o",
+  "ServerAliveInterval=10",
+  "-o",
+  "ServerAliveCountMax=3",
+  "-o",
+  "LogLevel=ERROR",
 ];
 
 /** Return the path to the SSH private key for a given host name. */
@@ -77,20 +82,12 @@ function rsyncSshOpt(key: string): string {
 
 /** Build rsync arguments for pushing local -> remote. */
 export function rsyncPushArgs(key: string, ip: string, local: string, remote: string): string[] {
-  return [
-    "rsync", "-avz", "--update", "--timeout=30",
-    "-e", rsyncSshOpt(key),
-    local, `ubuntu@${ip}:${remote}`,
-  ];
+  return ["rsync", "-avz", "--update", "--timeout=30", "-e", rsyncSshOpt(key), local, `ubuntu@${ip}:${remote}`];
 }
 
 /** Build rsync arguments for pulling remote -> local. */
 export function rsyncPullArgs(key: string, ip: string, remote: string, local: string): string[] {
-  return [
-    "rsync", "-avz", "--update", "--timeout=30",
-    "-e", rsyncSshOpt(key),
-    `ubuntu@${ip}:${remote}`, local,
-  ];
+  return ["rsync", "-avz", "--update", "--timeout=30", "-e", rsyncSshOpt(key), `ubuntu@${ip}:${remote}`, local];
 }
 
 /** Push local path to remote via rsync (async). */
@@ -151,12 +148,9 @@ export async function generateSshKey(hostName: string): Promise<{ publicKeyPath:
   }
 
   try {
-    await execFileAsync("ssh-keygen", [
-      "-t", "ed25519",
-      "-f", privateKeyPath,
-      "-N", "",
-      "-C", `ark-${hostName}`,
-    ], { encoding: "utf-8" });
+    await execFileAsync("ssh-keygen", ["-t", "ed25519", "-f", privateKeyPath, "-N", "", "-C", `ark-${hostName}`], {
+      encoding: "utf-8",
+    });
   } catch (err: any) {
     throw new Error(`Failed to generate SSH key: ${err.stderr ?? err.message}`);
   }

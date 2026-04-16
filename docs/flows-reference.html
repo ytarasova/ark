@@ -16,7 +16,6 @@
       <a href="quickstart.html">Quick Start</a>
       <a href="concepts.html">Core Concepts</a>
       <div class="section-title">Guides</div>
-      <a href="tui.html">TUI Dashboard</a>
       <a href="web.html">Web Dashboard</a>
       <a href="cli.html">CLI Reference</a>
       <a href="configuration.html">Configuration</a>
@@ -257,7 +256,7 @@
           <tr><th>Gate</th><th>Behavior</th></tr>
         </thead>
         <tbody>
-          <tr><td><code>manual</code></td><td>Human must approve before advancing (TUI: <kbd>A</kbd> or <kbd>Enter</kbd>)</td></tr>
+          <tr><td><code>manual</code></td><td>Human must approve before advancing (CLI: <code>ark session advance &lt;id&gt;</code>; Web UI: advance button)</td></tr>
           <tr><td><code>auto</code></td><td>Advances automatically when the agent completes</td></tr>
           <tr><td><code>review</code></td><td>Advances when an external review (e.g., PR approval) is received</td></tr>
           <tr><td><code>condition</code></td><td>Advances when a condition expression evaluates to true</td></tr>
@@ -282,7 +281,7 @@
       <pre><code><span class="prompt">$</span> ark flow list              <span class="yaml-comment"># List all available flows</span>
 <span class="prompt">$</span> ark flow show default      <span class="yaml-comment"># Show flow definition with stages</span>
 <span class="prompt">$</span> ark flow show quick        <span class="yaml-comment"># Show the quick flow</span></code></pre>
-      <p>In the TUI, press <kbd>3</kbd> to switch to the Flows tab. Navigate with <kbd>j</kbd>/<kbd>k</kbd> and toggle to the detail pane with <kbd>Tab</kbd>.</p>
+      <p>In the web dashboard, open the <strong>Flows</strong> view to browse flow definitions with their stages and gates.</p>
 
       <div class="doc-footer">
         <a href="agents-reference.html">&larr; Agents Reference</a>

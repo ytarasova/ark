@@ -38,18 +38,20 @@ function err(res: unknown): { code: number; message: string } {
 
 describe("agent CRUD handlers", () => {
   it("agent/create persists a new agent and agent/delete removes it", async () => {
-    const create = await router.dispatch(createRequest(1, "agent/create", {
-      name: "parity-agent",
-      description: "test",
-      model: "sonnet",
-      tools: ["Bash", "Read"],
-    }));
+    const create = await router.dispatch(
+      createRequest(1, "agent/create", {
+        name: "parity-agent",
+        description: "test",
+        model: "sonnet",
+        tools: ["Bash", "Read"],
+      }),
+    );
     expect(ok(create).ok).toBe(true);
     expect(ok(create).name).toBe("parity-agent");
 
     const list = await router.dispatch(createRequest(2, "agent/list", {}));
     const agents = ok(list).agents as Array<{ name: string }>;
-    expect(agents.find(a => a.name === "parity-agent")).toBeDefined();
+    expect(agents.find((a) => a.name === "parity-agent")).toBeDefined();
 
     const del = await router.dispatch(createRequest(3, "agent/delete", { name: "parity-agent" }));
     expect(ok(del).ok).toBe(true);
@@ -57,7 +59,9 @@ describe("agent CRUD handlers", () => {
 
   it("agent/update merges fields", async () => {
     await router.dispatch(createRequest(1, "agent/create", { name: "parity-update", description: "first" }));
-    const update = await router.dispatch(createRequest(2, "agent/update", { name: "parity-update", description: "second" }));
+    const update = await router.dispatch(
+      createRequest(2, "agent/update", { name: "parity-update", description: "second" }),
+    );
     expect(ok(update).ok).toBe(true);
 
     const read = await router.dispatch(createRequest(3, "agent/read", { name: "parity-update" }));
@@ -80,17 +84,19 @@ describe("flow CRUD handlers", () => {
       { name: "plan", agent: "spec-planner", gate: "manual" },
       { name: "implement", agent: "implementer", gate: "auto" },
     ];
-    const create = await router.dispatch(createRequest(1, "flow/create", {
-      name: "parity-flow",
-      description: "test",
-      stages,
-    }));
+    const create = await router.dispatch(
+      createRequest(1, "flow/create", {
+        name: "parity-flow",
+        description: "test",
+        stages,
+      }),
+    );
     expect(ok(create).ok).toBe(true);
     expect(ok(create).name).toBe("parity-flow");
 
     const list = await router.dispatch(createRequest(2, "flow/list", {}));
     const flows = ok(list).flows as Array<{ name: string }>;
-    expect(flows.find(f => f.name === "parity-flow")).toBeDefined();
+    expect(flows.find((f) => f.name === "parity-flow")).toBeDefined();
 
     const del = await router.dispatch(createRequest(3, "flow/delete", { name: "parity-flow" }));
     expect(ok(del).ok).toBe(true);
@@ -111,17 +117,19 @@ describe("flow CRUD handlers", () => {
 
 describe("skill CRUD handlers", () => {
   it("skill/save creates and skill/delete removes", async () => {
-    const save = await router.dispatch(createRequest(1, "skill/save", {
-      name: "parity-skill",
-      description: "test skill",
-      prompt: "Do the thing.",
-      tags: ["test"],
-    }));
+    const save = await router.dispatch(
+      createRequest(1, "skill/save", {
+        name: "parity-skill",
+        description: "test skill",
+        prompt: "Do the thing.",
+        tags: ["test"],
+      }),
+    );
     expect(ok(save).ok).toBe(true);
 
     const list = await router.dispatch(createRequest(2, "skill/list", {}));
     const skills = ok(list).skills as Array<{ name: string }>;
-    expect(skills.find(s => s.name === "parity-skill")).toBeDefined();
+    expect(skills.find((s) => s.name === "parity-skill")).toBeDefined();
 
     const del = await router.dispatch(createRequest(3, "skill/delete", { name: "parity-skill" }));
     expect(ok(del).ok).toBe(true);

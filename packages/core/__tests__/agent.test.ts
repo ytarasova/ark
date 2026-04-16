@@ -6,10 +6,7 @@ import { describe, it, expect, beforeEach } from "bun:test";
 import { writeFileSync, mkdirSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
-import {
-  resolveAgent, buildClaudeArgs, findProjectRoot,
-  type AgentDefinition,
-} from "../agent/agent.js";
+import { resolveAgent, buildClaudeArgs, findProjectRoot, type AgentDefinition } from "../agent/agent.js";
 import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 
@@ -120,7 +117,7 @@ describe("listAgents", () => {
     const agents = getApp().agents.list();
     // Should include at least the builtin agents from agents/ dir
     expect(agents.length).toBeGreaterThan(0);
-    const names = agents.map(a => a.name);
+    const names = agents.map((a) => a.name);
     expect(names).toContain("worker");
     expect(names).toContain("planner");
   });
@@ -130,7 +127,7 @@ describe("listAgents", () => {
     writeAgentYaml("custom-two", { name: "custom-two", description: "Second" });
 
     const agents = getApp().agents.list();
-    const names = agents.map(a => a.name);
+    const names = agents.map((a) => a.name);
     expect(names).toContain("custom-one");
     expect(names).toContain("custom-two");
   });
@@ -142,7 +139,7 @@ describe("listAgents", () => {
     });
 
     const agents = getApp().agents.list();
-    const worker = agents.find(a => a.name === "worker");
+    const worker = agents.find((a) => a.name === "worker");
     expect(worker).toBeDefined();
     expect(worker!._source).toBe("global");
     expect(worker!.description).toBe("Override");
@@ -152,7 +149,7 @@ describe("listAgents", () => {
     writeAgentYaml("sparse", { name: "sparse" });
 
     const agents = getApp().agents.list();
-    const sparse = agents.find(a => a.name === "sparse");
+    const sparse = agents.find((a) => a.name === "sparse");
     expect(sparse).toBeDefined();
     expect(sparse!.model).toBe("sonnet");
     expect(sparse!.max_turns).toBe(200);
@@ -197,20 +194,24 @@ describe("agents.save", () => {
   it("creates agent directory if it does not exist", () => {
     rmSync(agentDir(), { recursive: true, force: true });
 
-    getApp().agents.save("new-agent", {
-      name: "new-agent",
-      description: "",
-      model: "sonnet",
-      max_turns: 200,
-      system_prompt: "",
-      tools: [],
-      mcp_servers: [],
-      skills: [],
-      memories: [],
-      context: [],
-      permission_mode: "bypassPermissions",
-      env: {},
-    } as AgentDefinition, "global");
+    getApp().agents.save(
+      "new-agent",
+      {
+        name: "new-agent",
+        description: "",
+        model: "sonnet",
+        max_turns: 200,
+        system_prompt: "",
+        tools: [],
+        mcp_servers: [],
+        skills: [],
+        memories: [],
+        context: [],
+        permission_mode: "bypassPermissions",
+        env: {},
+      } as AgentDefinition,
+      "global",
+    );
 
     expect(existsSync(join(agentDir(), "new-agent.yaml"))).toBe(true);
   });
@@ -291,9 +292,7 @@ describe("resolveAgent", () => {
     });
 
     expect(agent).not.toBeNull();
-    expect(agent!.system_prompt).toBe(
-      "Working on PROJ-123: Fix the bug in /code/myrepo on branch feat/fix-bug.",
-    );
+    expect(agent!.system_prompt).toBe("Working on PROJ-123: Fix the bug in /code/myrepo on branch feat/fix-bug.");
   });
 
   it("substitutes workdir, track_id, and stage vars", () => {
@@ -308,9 +307,7 @@ describe("resolveAgent", () => {
       stage: "implement",
     });
 
-    expect(agent!.system_prompt).toBe(
-      "Dir: /tmp/work, Track: s-abc123, Stage: implement",
-    );
+    expect(agent!.system_prompt).toBe("Dir: /tmp/work, Track: s-abc123, Stage: implement");
   });
 
   it("substitutes backward-compat jira_key and jira_summary", () => {
@@ -324,9 +321,7 @@ describe("resolveAgent", () => {
       summary: "Do the thing",
     });
 
-    expect(agent!.system_prompt).toBe(
-      "Ticket: JIRA-456, Summary: Do the thing",
-    );
+    expect(agent!.system_prompt).toBe("Ticket: JIRA-456, Summary: Do the thing");
   });
 
   it("preserves unknown template vars", () => {
@@ -453,7 +448,7 @@ describe("listAgents with projectRoot", () => {
     writeProjectAgentYaml("project-only", { name: "project-only", description: "project" });
 
     const agents = getApp().agents.list(projectDir());
-    const names = agents.map(a => a.name);
+    const names = agents.map((a) => a.name);
     expect(names).toContain("worker"); // builtin
     expect(names).toContain("global-only"); // global
     expect(names).toContain("project-only"); // project
@@ -464,7 +459,7 @@ describe("listAgents with projectRoot", () => {
     writeProjectAgentYaml("worker", { name: "worker", description: "project worker" });
 
     const agents = getApp().agents.list(projectDir());
-    const worker = agents.find(a => a.name === "worker");
+    const worker = agents.find((a) => a.name === "worker");
     expect(worker).toBeDefined();
     expect(worker!._source).toBe("project");
     expect(worker!.description).toBe("project worker");
@@ -474,7 +469,7 @@ describe("listAgents with projectRoot", () => {
     writeProjectAgentYaml("project-only", { name: "project-only" });
 
     const agents = getApp().agents.list();
-    const names = agents.map(a => a.name);
+    const names = agents.map((a) => a.name);
     expect(names).not.toContain("project-only");
   });
 });
@@ -526,7 +521,6 @@ describe("agents.save with scope", () => {
 // ── agents.delete with scope ──────────────────────────────────────────────────
 
 describe("agents.delete with scope", () => {
-
   it("deletes from global by default", () => {
     writeAgentYaml("to-delete", { name: "to-delete" });
     expect(getApp().agents.delete("to-delete")).toBe(true);
@@ -554,7 +548,6 @@ describe("agents.delete with scope", () => {
 // ── resolveAgent with projectRoot ───────────────────────────────────────────
 
 describe("resolveAgent with projectRoot", () => {
-
   it("resolves project agent with template substitution", () => {
     writeProjectAgentYaml("proj-tmpl", {
       name: "proj-tmpl",
@@ -665,7 +658,7 @@ describe("full agent lifecycle", () => {
     getApp().agents.save(agent.name, agent, "project", root);
 
     const agents = getApp().agents.list(root);
-    const found = agents.find(a => a.name === "lifecycle-test");
+    const found = agents.find((a) => a.name === "lifecycle-test");
     expect(found).not.toBeNull();
     expect(found!._source).toBe("project");
 

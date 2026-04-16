@@ -8,7 +8,7 @@ import type { AppContext } from "../app.js";
 import { dispatch } from "../services/session-orchestration.js";
 
 export interface IssueWebhookPayload {
-  action: string;  // "labeled", "opened", "edited"
+  action: string; // "labeled", "opened", "edited"
   issue: {
     number: number;
     title: string;
@@ -24,7 +24,7 @@ export interface IssueWebhookPayload {
 }
 
 export interface IssueWebhookConfig {
-  triggerLabel: string;     // e.g., "ark" or "fix-me"
+  triggerLabel: string; // e.g., "ark" or "fix-me"
   autoDispatch: boolean;
   flow?: string;
   agent?: string;
@@ -65,7 +65,10 @@ export async function handleIssueWebhook(
   };
   const session = app.sessions.create(createOpts);
 
-  const evOpts = { actor: "github", data: { issue_number: issue.number, label: config.triggerLabel, repo: repo.full_name } };
+  const evOpts = {
+    actor: "github",
+    data: { issue_number: issue.number, label: config.triggerLabel, repo: repo.full_name },
+  };
   app.events.log(session.id, "issue_webhook_triggered", evOpts);
 
   // Auto-dispatch if configured

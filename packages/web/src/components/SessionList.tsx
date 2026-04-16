@@ -12,10 +12,7 @@ interface SessionListProps {
   groupFilter: string;
 }
 
-export function SessionList({
-  sessions, selectedId, onSelect,
-  filter, search, groupFilter,
-}: SessionListProps) {
+export function SessionList({ sessions, selectedId, onSelect, filter, search, groupFilter }: SessionListProps) {
   const filtered = useMemo(() => {
     let list = sessions || [];
     // "archived" is filtered server-side; skip redundant client-side status filter
@@ -23,11 +20,12 @@ export function SessionList({
     if (groupFilter) list = list.filter((s) => s.group_name === groupFilter);
     if (search) {
       const q = search.toLowerCase();
-      list = list.filter((s) =>
-        (s.summary || "").toLowerCase().includes(q) ||
-        (s.id || "").toLowerCase().includes(q) ||
-        (s.repo || "").toLowerCase().includes(q) ||
-        (s.agent || "").toLowerCase().includes(q)
+      list = list.filter(
+        (s) =>
+          (s.summary || "").toLowerCase().includes(q) ||
+          (s.id || "").toLowerCase().includes(q) ||
+          (s.repo || "").toLowerCase().includes(q) ||
+          (s.agent || "").toLowerCase().includes(q),
       );
     }
     return list;
@@ -35,9 +33,7 @@ export function SessionList({
 
   if (filtered.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-        No sessions found
-      </div>
+      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">No sessions found</div>
     );
   }
 
@@ -50,7 +46,7 @@ export function SessionList({
           className={cn(
             "px-3 py-2.5 cursor-pointer border-b border-border transition-colors",
             "hover:bg-accent",
-            selectedId === s.id && "bg-accent border-l-2 border-l-primary"
+            selectedId === s.id && "bg-accent border-l-2 border-l-primary",
           )}
         >
           <div className="flex items-center justify-between">

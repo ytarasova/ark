@@ -56,7 +56,11 @@ const computeNames: string[] = [];
 
 function cleanupComputes() {
   for (const name of computeNames) {
-    try { getApp().computes.delete(name); } catch { /* already gone */ }
+    try {
+      getApp().computes.delete(name);
+    } catch {
+      /* already gone */
+    }
   }
   computeNames.length = 0;
 }
@@ -125,35 +129,26 @@ describe("E2E Compute: resolvePortDecls with all three sources", () => {
   });
 
   afterEach(() => {
-    try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* ok */ }
+    try {
+      rmSync(tempDir, { recursive: true, force: true });
+    } catch {
+      /* ok */
+    }
   });
 
   it("resolves ports from arc.json, devcontainer.json, and docker-compose.yml", () => {
     // Create arc.json with a port
-    writeFileSync(
-      join(tempDir, "arc.json"),
-      JSON.stringify({ ports: [{ port: 3000, name: "api" }] }),
-    );
+    writeFileSync(join(tempDir, "arc.json"), JSON.stringify({ ports: [{ port: 3000, name: "api" }] }));
 
     // Create .devcontainer/devcontainer.json with forwardPorts
     const devcontainerDir = join(tempDir, ".devcontainer");
     mkdirSync(devcontainerDir, { recursive: true });
-    writeFileSync(
-      join(devcontainerDir, "devcontainer.json"),
-      JSON.stringify({ forwardPorts: [5432] }),
-    );
+    writeFileSync(join(devcontainerDir, "devcontainer.json"), JSON.stringify({ forwardPorts: [5432] }));
 
     // Create docker-compose.yml with port mapping
     writeFileSync(
       join(tempDir, "docker-compose.yml"),
-      [
-        "version: '3'",
-        "services:",
-        "  redis:",
-        "    image: redis",
-        "    ports:",
-        '      - "6379:6379"',
-      ].join("\n"),
+      ["version: '3'", "services:", "  redis:", "    image: redis", "    ports:", '      - "6379:6379"'].join("\n"),
     );
 
     const portDecls = resolvePortDecls(tempDir);
@@ -181,16 +176,10 @@ describe("E2E Compute: resolvePortDecls with all three sources", () => {
 
   it("deduplicates ports with arc.json taking priority", () => {
     // Both arc.json and devcontainer declare port 3000
-    writeFileSync(
-      join(tempDir, "arc.json"),
-      JSON.stringify({ ports: [{ port: 3000, name: "web-app" }] }),
-    );
+    writeFileSync(join(tempDir, "arc.json"), JSON.stringify({ ports: [{ port: 3000, name: "web-app" }] }));
     const devcontainerDir = join(tempDir, ".devcontainer");
     mkdirSync(devcontainerDir, { recursive: true });
-    writeFileSync(
-      join(devcontainerDir, "devcontainer.json"),
-      JSON.stringify({ forwardPorts: [3000, 8080] }),
-    );
+    writeFileSync(join(devcontainerDir, "devcontainer.json"), JSON.stringify({ forwardPorts: [3000, 8080] }));
 
     const portDecls = resolvePortDecls(tempDir);
     expect(portDecls).toHaveLength(2);
@@ -274,9 +263,7 @@ describe("E2E Compute: Local provider probePorts", () => {
 
     try {
       // Probe the listening port
-      const probeUp = await provider.probePorts(compute, [
-        { port, source: "test" },
-      ]);
+      const probeUp = await provider.probePorts(compute, [{ port, source: "test" }]);
       expect(probeUp).toHaveLength(1);
       expect(probeUp[0].port).toBe(port);
       expect(probeUp[0].listening).toBe(true);
@@ -288,14 +275,16 @@ describe("E2E Compute: Local provider probePorts", () => {
       await new Promise((r) => setTimeout(r, 500));
 
       // Probe again - should not be listening
-      const probeDown = await provider.probePorts(compute, [
-        { port, source: "test" },
-      ]);
+      const probeDown = await provider.probePorts(compute, [{ port, source: "test" }]);
       expect(probeDown).toHaveLength(1);
       expect(probeDown[0].port).toBe(port);
       expect(probeDown[0].listening).toBe(false);
     } finally {
-      try { server.stop(true); } catch { /* already stopped */ }
+      try {
+        server.stop(true);
+      } catch {
+        /* already stopped */
+      }
     }
   });
 });
@@ -316,15 +305,15 @@ describe("E2E Compute: mergeComputeConfig", () => {
 
     const updated = getApp().computes.mergeConfig(name, { newKey: "hello", count: 99 });
     expect(updated).not.toBeNull();
-    expect((updated!.config).existing).toBe("value"); // preserved
-    expect((updated!.config).newKey).toBe("hello");   // added
-    expect((updated!.config).count).toBe(99);         // overwritten
+    expect(updated!.config.existing).toBe("value"); // preserved
+    expect(updated!.config.newKey).toBe("hello"); // added
+    expect(updated!.config.count).toBe(99); // overwritten
 
     // Verify via re-read
     const compute = getApp().computes.get(name);
-    expect((compute!.config).existing).toBe("value");
-    expect((compute!.config).newKey).toBe("hello");
-    expect((compute!.config).count).toBe(99);
+    expect(compute!.config.existing).toBe("value");
+    expect(compute!.config.newKey).toBe("hello");
+    expect(compute!.config.count).toBe(99);
   });
 
   it("returns null for non-existent compute", () => {

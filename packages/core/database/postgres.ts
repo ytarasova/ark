@@ -57,10 +57,7 @@ function sqliteToPostgres(sql: string): string {
   }
 
   // INTEGER PRIMARY KEY AUTOINCREMENT -> SERIAL PRIMARY KEY
-  result = result.replace(
-    /(\w+)\s+INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT/gi,
-    "$1 SERIAL PRIMARY KEY"
-  );
+  result = result.replace(/(\w+)\s+INTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT/gi, "$1 SERIAL PRIMARY KEY");
 
   // COLLATE NOCASE -> removed (Postgres uses ILIKE instead for case-insensitive)
   result = result.replace(/\s+COLLATE\s+NOCASE/gi, "");
@@ -132,8 +129,14 @@ class PostgresStatement implements IStatement {
     let done = false;
 
     this.conn.unsafe(this.pgSql, params).then(
-      (r: any) => { result = r; done = true; },
-      (e: any) => { error = e; done = true; },
+      (r: any) => {
+        result = r;
+        done = true;
+      },
+      (e: any) => {
+        error = e;
+        done = true;
+      },
     );
 
     while (!done) {
@@ -157,9 +160,9 @@ export class PostgresAdapter implements IDatabase {
 
   constructor(connectionString: string) {
     this.sql = createPostgres(connectionString, {
-      max: 20,                 // connection pool size
-      idle_timeout: 30,        // seconds before idle connections close
-      connect_timeout: 10,     // seconds to wait for a connection
+      max: 20, // connection pool size
+      idle_timeout: 30, // seconds before idle connections close
+      connect_timeout: 10, // seconds to wait for a connection
     });
   }
 
@@ -183,8 +186,13 @@ export class PostgresAdapter implements IDatabase {
       let error: any;
 
       this.sql.unsafe(stmt).then(
-        () => { done = true; },
-        (e: any) => { error = e; done = true; },
+        () => {
+          done = true;
+        },
+        (e: any) => {
+          error = e;
+          done = true;
+        },
       );
 
       while (!done) {
@@ -230,8 +238,12 @@ export class PostgresAdapter implements IDatabase {
   close(): void {
     let done = false;
     this.sql.end().then(
-      () => { done = true; },
-      () => { done = true; },
+      () => {
+        done = true;
+      },
+      () => {
+        done = true;
+      },
     );
     while (!done) {
       Bun.sleepSync(1);

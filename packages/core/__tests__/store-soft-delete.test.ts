@@ -34,8 +34,8 @@ describe("soft delete", () => {
     const s2 = getApp().sessions.create({ summary: "hidden" });
     getApp().sessions.softDelete(s2.id);
     const list = getApp().sessions.list();
-    expect(list.find(x => x.id === s.id)).toBeDefined();
-    expect(list.find(x => x.id === s2.id)).toBeUndefined();
+    expect(list.find((x) => x.id === s.id)).toBeDefined();
+    expect(list.find((x) => x.id === s2.id)).toBeUndefined();
   });
 
   it("undeleteSession restores previous status and clears delete state", () => {
@@ -54,8 +54,8 @@ describe("soft delete", () => {
     const s2 = getApp().sessions.create({ summary: "dead" });
     getApp().sessions.softDelete(s2.id);
     const deleted = getApp().sessions.listDeleted();
-    expect(deleted.find(x => x.id === s1.id)).toBeUndefined();
-    expect(deleted.find(x => x.id === s2.id)).toBeDefined();
+    expect(deleted.find((x) => x.id === s1.id)).toBeUndefined();
+    expect(deleted.find((x) => x.id === s2.id)).toBeDefined();
   });
 
   it("purgeExpiredDeletes removes sessions older than ttl", () => {
@@ -146,8 +146,8 @@ describe("soft delete edge cases", () => {
     getApp().sessions.update(s2.id, { status: "running" });
     getApp().sessions.softDelete(s2.id);
     const running = getApp().sessions.list({ status: "running" });
-    expect(running.find(x => x.id === s1.id)).toBeDefined();
-    expect(running.find(x => x.id === s2.id)).toBeUndefined();
+    expect(running.find((x) => x.id === s1.id)).toBeDefined();
+    expect(running.find((x) => x.id === s2.id)).toBeUndefined();
   });
 
   it("purgeExpiredDeletes returns empty array when nothing to purge", () => {
@@ -189,6 +189,6 @@ describe("soft delete edge cases", () => {
     getApp().sessions.update(s.id, { status: "pending" });
     await deleteSessionAsync(getApp(), s.id);
     const events = getApp().events.list(s.id);
-    expect(events.some(e => e.type === "session_deleted")).toBe(true);
+    expect(events.some((e) => e.type === "session_deleted")).toBe(true);
   });
 });

@@ -35,17 +35,23 @@ export class MessageRepository {
 
   constructor(private db: IDatabase) {}
 
-  setTenant(tenantId: string): void { this.tenantId = tenantId; }
-  getTenant(): string { return this.tenantId; }
+  setTenant(tenantId: string): void {
+    this.tenantId = tenantId;
+  }
+  getTenant(): string {
+    return this.tenantId;
+  }
 
   send(sessionId: string, role: MessageRole, content: string, type?: MessageType): Message {
     const ts = now();
-    this.db.prepare(
-      "INSERT INTO messages (session_id, role, content, type, read, tenant_id, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)"
-    ).run(sessionId, role, content, type ?? "text", this.tenantId, ts);
-    const row = this.db.prepare(
-      "SELECT * FROM messages WHERE session_id = ? AND tenant_id = ? ORDER BY id DESC LIMIT 1"
-    ).get(sessionId, this.tenantId) as MessageRow;
+    this.db
+      .prepare(
+        "INSERT INTO messages (session_id, role, content, type, read, tenant_id, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)",
+      )
+      .run(sessionId, role, content, type ?? "text", this.tenantId, ts);
+    const row = this.db
+      .prepare("SELECT * FROM messages WHERE session_id = ? AND tenant_id = ? ORDER BY id DESC LIMIT 1")
+      .get(sessionId, this.tenantId) as MessageRow;
     return rowToMessage(row);
   }
 
@@ -65,13 +71,17 @@ export class MessageRepository {
   }
 
   markRead(sessionId: string): void {
-    this.db.prepare("UPDATE messages SET read = 1 WHERE session_id = ? AND tenant_id = ? AND read = 0").run(sessionId, this.tenantId);
+    this.db
+      .prepare("UPDATE messages SET read = 1 WHERE session_id = ? AND tenant_id = ? AND read = 0")
+      .run(sessionId, this.tenantId);
   }
 
   unreadCount(sessionId: string): number {
-    const row = this.db.prepare(
-      "SELECT COUNT(*) as count FROM messages WHERE session_id = ? AND tenant_id = ? AND role = 'agent' AND read = 0"
-    ).get(sessionId, this.tenantId) as { count: number } | undefined;
+    const row = this.db
+      .prepare(
+        "SELECT COUNT(*) as count FROM messages WHERE session_id = ? AND tenant_id = ? AND role = 'agent' AND read = 0",
+      )
+      .get(sessionId, this.tenantId) as { count: number } | undefined;
     return row?.count ?? 0;
   }
 }

@@ -21,15 +21,31 @@ function describeCron(cron: string): string {
 
   // Common patterns
   if (minute === "*" && hour === "*" && dom === "*" && month === "*" && dow === "*") return "Every minute";
-  if (minute.startsWith("*/") && hour === "*" && dom === "*" && month === "*" && dow === "*") return `Every ${minute.slice(2)} minutes`;
-  if (hour.startsWith("*/") && dom === "*" && month === "*" && dow === "*") return `Every ${hour.slice(2)} hours at minute ${minute}`;
-  if (minute !== "*" && hour !== "*" && dom === "*" && month === "*" && dow === "*") return `Daily at ${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+  if (minute.startsWith("*/") && hour === "*" && dom === "*" && month === "*" && dow === "*")
+    return `Every ${minute.slice(2)} minutes`;
+  if (hour.startsWith("*/") && dom === "*" && month === "*" && dow === "*")
+    return `Every ${hour.slice(2)} hours at minute ${minute}`;
+  if (minute !== "*" && hour !== "*" && dom === "*" && month === "*" && dow === "*")
+    return `Daily at ${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
   if (minute !== "*" && hour !== "*" && dom === "*" && month === "*" && dow !== "*") {
-    const days: Record<string, string> = { "0": "Sun", "1": "Mon", "2": "Tue", "3": "Wed", "4": "Thu", "5": "Fri", "6": "Sat", "7": "Sun" };
-    const dayList = dow.split(",").map(d => days[d] || d).join(", ");
+    const days: Record<string, string> = {
+      "0": "Sun",
+      "1": "Mon",
+      "2": "Tue",
+      "3": "Wed",
+      "4": "Thu",
+      "5": "Fri",
+      "6": "Sat",
+      "7": "Sun",
+    };
+    const dayList = dow
+      .split(",")
+      .map((d) => days[d] || d)
+      .join(", ");
     return `${dayList} at ${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
   }
-  if (minute !== "*" && hour !== "*" && dom !== "*" && month === "*" && dow === "*") return `Monthly on day ${dom} at ${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+  if (minute !== "*" && hour !== "*" && dom !== "*" && month === "*" && dow === "*")
+    return `Monthly on day ${dom} at ${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
   return cron;
 }
 
@@ -96,15 +112,22 @@ export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleView
               className={cn(
                 "flex items-center justify-between px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors text-[13px]",
                 "hover:bg-accent",
-                selected?.id === s.id && "bg-accent border-l-2 border-l-primary font-semibold"
+                selected?.id === s.id && "bg-accent border-l-2 border-l-primary font-semibold",
               )}
               onClick={() => setSelected(s)}
             >
               <div className="flex items-center gap-2 min-w-0">
-                <span className={cn("inline-block w-2 h-2 rounded-full shrink-0", s.enabled ? "bg-emerald-400" : "bg-muted-foreground/30")} />
+                <span
+                  className={cn(
+                    "inline-block w-2 h-2 rounded-full shrink-0",
+                    s.enabled ? "bg-emerald-400" : "bg-muted-foreground/30",
+                  )}
+                />
                 <span className="text-foreground truncate">{s.summary || s.id}</span>
               </div>
-              <span className="text-[10px] font-mono uppercase text-muted-foreground tracking-wider shrink-0 ml-2">{s.cron}</span>
+              <span className="text-[10px] font-mono uppercase text-muted-foreground tracking-wider shrink-0 ml-2">
+                {s.cron}
+              </span>
             </div>
           ))}
         </div>
@@ -116,7 +139,9 @@ export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleView
             <div className="p-5">
               <h2 className="text-lg font-semibold text-foreground mb-1">{selected.summary || selected.id}</h2>
               <div className="mb-4">
-                <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Schedule</h3>
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+                  Schedule
+                </h3>
                 <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
                   <span className="text-muted-foreground">ID</span>
                   <span className="text-card-foreground font-mono">{selected.id}</span>
@@ -130,7 +155,12 @@ export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleView
                   )}
                   <span className="text-muted-foreground">Status</span>
                   <span className="text-card-foreground flex items-center gap-2">
-                    <span className={cn("inline-block w-2 h-2 rounded-full", selected.enabled ? "bg-emerald-400" : "bg-muted-foreground/30")} />
+                    <span
+                      className={cn(
+                        "inline-block w-2 h-2 rounded-full",
+                        selected.enabled ? "bg-emerald-400" : "bg-muted-foreground/30",
+                      )}
+                    />
                     {selected.enabled ? "Enabled" : "Disabled"}
                   </span>
                   <span className="text-muted-foreground">Flow</span>
@@ -168,7 +198,9 @@ export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleView
                 </div>
               </div>
               <div className="mb-4">
-                <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Actions</h3>
+                <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+                  Actions
+                </h3>
                 <div className="flex gap-1.5 flex-wrap">
                   <Button variant="outline" size="xs" onClick={() => handleToggle(selected)}>
                     {selected.enabled ? "Disable" : "Enable"}
@@ -178,7 +210,9 @@ export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleView
                   </Button>
                 </div>
                 {actionMsg && (
-                  <div className={cn("mt-1.5 text-xs", actionMsg.type === "error" ? "text-red-400" : "text-emerald-400")}>
+                  <div
+                    className={cn("mt-1.5 text-xs", actionMsg.type === "error" ? "text-red-400" : "text-emerald-400")}
+                  >
                     {actionMsg.text}
                   </div>
                 )}
@@ -210,9 +244,18 @@ function NewScheduleForm({ onClose, onSubmit }: { onClose: () => void; onSubmit:
   const [groups, setGroups] = useState<string[]>([]);
 
   useEffect(() => {
-    api.getFlows().then(setFlows).catch(() => {});
-    api.getCompute().then(setComputes).catch(() => {});
-    api.getGroups().then(setGroups).catch(() => {});
+    api
+      .getFlows()
+      .then(setFlows)
+      .catch(() => {});
+    api
+      .getCompute()
+      .then(setComputes)
+      .catch(() => {});
+    api
+      .getGroups()
+      .then(setGroups)
+      .catch(() => {});
   }, []);
 
   function update(key: string, val: string) {
@@ -230,35 +273,64 @@ function NewScheduleForm({ onClose, onSubmit }: { onClose: () => void; onSubmit:
       <h2 className="text-base font-semibold text-foreground mb-5">New Schedule</h2>
       <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
         <div className="mb-3.5">
-          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Cron Expression *</label>
-          <Input autoFocus value={form.cron} onChange={(e) => update("cron", e.target.value)} placeholder="*/30 * * * *" />
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+            Cron Expression *
+          </label>
+          <Input
+            autoFocus
+            value={form.cron}
+            onChange={(e) => update("cron", e.target.value)}
+            placeholder="*/30 * * * *"
+          />
         </div>
         <div className="mb-3.5">
-          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Summary</label>
-          <Input value={form.summary} onChange={(e) => update("summary", e.target.value)} placeholder="What should the scheduled agent do?" />
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+            Summary
+          </label>
+          <Input
+            value={form.summary}
+            onChange={(e) => update("summary", e.target.value)}
+            placeholder="What should the scheduled agent do?"
+          />
         </div>
         <div className="mb-3.5">
-          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Flow</label>
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+            Flow
+          </label>
           <select className={selectClassName} value={form.flow} onChange={(e) => update("flow", e.target.value)}>
             {flows.map((f) => (
-              <option key={f.name} value={f.name}>{f.name}</option>
+              <option key={f.name} value={f.name}>
+                {f.name}
+              </option>
             ))}
           </select>
         </div>
         <div className="mb-3.5">
-          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Repository</label>
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+            Repository
+          </label>
           <Input value={form.repo} onChange={(e) => update("repo", e.target.value)} placeholder="/path/to/repo or ." />
         </div>
         <div className="mb-3.5">
-          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Compute</label>
-          <select className={selectClassName} value={form.compute_name} onChange={(e) => update("compute_name", e.target.value)}>
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+            Compute
+          </label>
+          <select
+            className={selectClassName}
+            value={form.compute_name}
+            onChange={(e) => update("compute_name", e.target.value)}
+          >
             {computes.map((c) => (
-              <option key={c.name} value={c.name}>{c.name}</option>
+              <option key={c.name} value={c.name}>
+                {c.name}
+              </option>
             ))}
           </select>
         </div>
         <div className="mb-3.5">
-          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">Group</label>
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+            Group
+          </label>
           {groups.length > 0 && (
             <select
               className={selectClassName}
@@ -267,7 +339,9 @@ function NewScheduleForm({ onClose, onSubmit }: { onClose: () => void; onSubmit:
             >
               <option value="">none</option>
               {groups.map((g) => (
-                <option key={g} value={g}>{g}</option>
+                <option key={g} value={g}>
+                  {g}
+                </option>
               ))}
             </select>
           )}
@@ -279,8 +353,12 @@ function NewScheduleForm({ onClose, onSubmit }: { onClose: () => void; onSubmit:
           />
         </div>
         <div className="flex gap-2 pt-4 border-t border-border mt-auto">
-          <Button type="button" variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-          <Button type="submit" size="sm">Create Schedule</Button>
+          <Button type="button" variant="outline" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" size="sm">
+            Create Schedule
+          </Button>
         </div>
       </form>
     </div>

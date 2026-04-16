@@ -71,7 +71,11 @@ export function FolderPickerModal({ initialPath, onSelect, onClose }: FolderPick
 
   function submitSelection() {
     if (!cwd) return;
-    try { localStorage.setItem(LAST_REPO_KEY, cwd); } catch { /* ignore */ }
+    try {
+      localStorage.setItem(LAST_REPO_KEY, cwd);
+    } catch {
+      /* ignore */
+    }
     onSelect(cwd);
   }
 
@@ -110,12 +114,8 @@ export function FolderPickerModal({ initialPath, onSelect, onClose }: FolderPick
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto rounded-md border border-border">
-          {loading && (
-            <div className="px-3 py-2 text-sm text-muted-foreground">Loading…</div>
-          )}
-          {error && (
-            <div className="px-3 py-2 text-sm text-destructive">{error}</div>
-          )}
+          {loading && <div className="px-3 py-2 text-sm text-muted-foreground">Loading…</div>}
+          {error && <div className="px-3 py-2 text-sm text-destructive">{error}</div>}
           {!loading && !error && (
             <ul className="divide-y divide-border">
               {parent && (
@@ -127,16 +127,12 @@ export function FolderPickerModal({ initialPath, onSelect, onClose }: FolderPick
                   >
                     <span aria-hidden>↑</span>
                     <span>..</span>
-                    <span className="ml-auto truncate text-xs text-muted-foreground">
-                      {parent}
-                    </span>
+                    <span className="ml-auto truncate text-xs text-muted-foreground">{parent}</span>
                   </button>
                 </li>
               )}
               {entries.length === 0 && (
-                <li className="px-3 py-2 text-sm text-muted-foreground">
-                  (no sub-directories)
-                </li>
+                <li className="px-3 py-2 text-sm text-muted-foreground">(no sub-directories)</li>
               )}
               {entries.map((ent) => (
                 <li key={ent.path}>
@@ -161,19 +157,12 @@ export function FolderPickerModal({ initialPath, onSelect, onClose }: FolderPick
         </div>
 
         <div className="flex items-center justify-between gap-2 pt-1">
-          <div className="truncate text-xs text-muted-foreground">
-            {cwd ? `Current: ${cwd}` : ""}
-          </div>
+          <div className="truncate text-xs text-muted-foreground">{cwd ? `Current: ${cwd}` : ""}</div>
           <div className="flex gap-2">
             <Button type="button" variant="outline" size="sm" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={submitSelection}
-              disabled={!cwd || loading}
-            >
+            <Button type="button" size="sm" onClick={submitSelection} disabled={!cwd || loading}>
               Select this folder
             </Button>
           </div>

@@ -73,9 +73,7 @@ export async function teardownTunnels(ports: PortDecl[]): Promise<void> {
  * Remote localhost:port → local localhost:port.
  */
 export function setupReverseTunnel(key: string, ip: string, port: number): void {
-  const args = ["ssh", "-i", key, ...SSH_OPTS, "-N", "-f",
-    "-R", `${port}:localhost:${port}`,
-    `ubuntu@${ip}`];
+  const args = ["ssh", "-i", key, ...SSH_OPTS, "-N", "-f", "-R", `${port}:localhost:${port}`, `ubuntu@${ip}`];
   const [bin, ...rest] = args;
   const child = spawn(bin, rest, { detached: true, stdio: "ignore" });
   child.unref();

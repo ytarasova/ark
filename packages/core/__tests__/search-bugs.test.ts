@@ -21,10 +21,21 @@ describe("indexTranscripts transaction safety", () => {
     mkdirSync(projectDir, { recursive: true });
 
     // First: index some valid data
-    writeFileSync(join(projectDir, "tx-sess1.jsonl"), [
-      JSON.stringify({ type: "user", message: { role: "user", content: "first session content here" }, timestamp: "2026-01-01T00:01:00Z" }),
-      JSON.stringify({ type: "assistant", message: { role: "assistant", content: "response to first session" }, timestamp: "2026-01-01T00:02:00Z" }),
-    ].join("\n"));
+    writeFileSync(
+      join(projectDir, "tx-sess1.jsonl"),
+      [
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: "first session content here" },
+          timestamp: "2026-01-01T00:01:00Z",
+        }),
+        JSON.stringify({
+          type: "assistant",
+          message: { role: "assistant", content: "response to first session" },
+          timestamp: "2026-01-01T00:02:00Z",
+        }),
+      ].join("\n"),
+    );
 
     const count1 = await indexTranscripts(getApp(), { transcriptsDir });
     expect(count1).toBe(2);
@@ -38,9 +49,16 @@ describe("indexTranscripts transaction safety", () => {
     const projectDir = join(transcriptsDir, "-tx-commit-project");
     mkdirSync(projectDir, { recursive: true });
 
-    writeFileSync(join(projectDir, "tx-commit-sess.jsonl"), [
-      JSON.stringify({ type: "user", message: { role: "user", content: "transaction test content here" }, timestamp: "2026-01-01T00:01:00Z" }),
-    ].join("\n"));
+    writeFileSync(
+      join(projectDir, "tx-commit-sess.jsonl"),
+      [
+        JSON.stringify({
+          type: "user",
+          message: { role: "user", content: "transaction test content here" },
+          timestamp: "2026-01-01T00:01:00Z",
+        }),
+      ].join("\n"),
+    );
 
     await indexTranscripts(getApp(), { transcriptsDir });
 
@@ -77,8 +95,18 @@ describe("MIN_MESSAGE_COUNT filters trivial conversations", () => {
 
     // Write a transcript with only 2 messages (below threshold of 5)
     const lines = [
-      JSON.stringify({ type: "user", sessionId: "short-sess", message: { role: "user", content: "quick question" }, timestamp: "2026-01-01T00:01:00Z" }),
-      JSON.stringify({ type: "assistant", sessionId: "short-sess", message: { role: "assistant", content: "quick answer" }, timestamp: "2026-01-01T00:02:00Z" }),
+      JSON.stringify({
+        type: "user",
+        sessionId: "short-sess",
+        message: { role: "user", content: "quick question" },
+        timestamp: "2026-01-01T00:01:00Z",
+      }),
+      JSON.stringify({
+        type: "assistant",
+        sessionId: "short-sess",
+        message: { role: "assistant", content: "quick answer" },
+        timestamp: "2026-01-01T00:02:00Z",
+      }),
     ];
     writeFileSync(join(projectDir, "short-sess.jsonl"), lines.join("\n"));
 
@@ -86,7 +114,7 @@ describe("MIN_MESSAGE_COUNT filters trivial conversations", () => {
     const sessions = listClaudeSessions(getApp());
 
     // With MIN_MESSAGE_COUNT=5, this 2-message session should be excluded
-    const found = sessions.find(s => s.sessionId === "short-sess");
+    const found = sessions.find((s) => s.sessionId === "short-sess");
     expect(found).toBeUndefined();
   });
 
@@ -99,18 +127,21 @@ describe("MIN_MESSAGE_COUNT filters trivial conversations", () => {
     const lines = [];
     for (let i = 0; i < 6; i++) {
       const role = i % 2 === 0 ? "user" : "assistant";
-      lines.push(JSON.stringify({
-        type: role, sessionId: "real-sess",
-        message: { role, content: `message ${i} with enough content to be real` },
-        timestamp: `2026-01-01T00:0${i}:00Z`,
-      }));
+      lines.push(
+        JSON.stringify({
+          type: role,
+          sessionId: "real-sess",
+          message: { role, content: `message ${i} with enough content to be real` },
+          timestamp: `2026-01-01T00:0${i}:00Z`,
+        }),
+      );
     }
     writeFileSync(join(projectDir, "real-sess.jsonl"), lines.join("\n"));
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: bd });
     const sessions = listClaudeSessions(getApp());
 
-    const found = sessions.find(s => s.sessionId === "real-sess");
+    const found = sessions.find((s) => s.sessionId === "real-sess");
     expect(found).toBeDefined();
   });
 });

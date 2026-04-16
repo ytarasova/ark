@@ -16,7 +16,8 @@ import { execSession } from "../exec.js";
  *                itself after the user attaches once.
  */
 export function registerExecTryCommands(program: Command, app: AppContext | null) {
-  program.command("exec")
+  program
+    .command("exec")
     .description("Run a session non-interactively (for CI/CD)")
     .option("-r, --repo <path>", "Repository path", ".")
     .option("-s, --summary <text>", "Task summary")
@@ -50,7 +51,8 @@ export function registerExecTryCommands(program: Command, app: AppContext | null
       process.exit(code);
     });
 
-  program.command("try")
+  program
+    .command("try")
     .description("Run a one-shot sandboxed session (auto-cleans up)")
     .argument("<task>")
     .option("--image <image>", "Docker image", "ubuntu:22.04")
@@ -82,7 +84,9 @@ export function registerExecTryCommands(program: Command, app: AppContext | null
         try {
           const cmd = core.attachCommand(updated.session_id);
           execSync(cmd, { stdio: "inherit" });
-        } catch { /* session detached or user hit Ctrl-B-d */ }
+        } catch {
+          /* session detached or user hit Ctrl-B-d */
+        }
       }
 
       await ark.sessionDelete(session.id);

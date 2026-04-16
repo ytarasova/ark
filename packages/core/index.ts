@@ -9,7 +9,14 @@ export { BunSqliteAdapter } from "./database/index.js";
 // Re-exports
 export { getApp, setApp, clearApp, AppContext } from "./app.js";
 export { safeParseConfig } from "./util.js";
-export { loadConfig, type ArkConfig, type OtlpSettings, type RollbackSettings, type TelemetrySettings, type TensorZeroSettings } from "./config.js";
+export {
+  loadConfig,
+  type ArkConfig,
+  type OtlpSettings,
+  type RollbackSettings,
+  type TelemetrySettings,
+  type TensorZeroSettings,
+} from "./config.js";
 
 // Domain types (previously from store.ts, now from types/)
 export type { Session, Event, Compute, Message } from "../types/index.js";
@@ -24,13 +31,30 @@ export * from "./state/flow.js";
 export { substituteVars, buildSessionVars } from "./template.js";
 
 // Agent
-export { resolveAgent, resolveAgentWithRuntime, buildClaudeArgs, findProjectRoot, type AgentDefinition } from "./agent/agent.js";
+export {
+  resolveAgent,
+  resolveAgentWithRuntime,
+  buildClaudeArgs,
+  findProjectRoot,
+  type AgentDefinition,
+} from "./agent/agent.js";
 
 // Skill
 export { type SkillDefinition } from "./agent/skill.js";
 
 // Recipe
-export { instantiateRecipe, validateRecipeParams, resolveSubRecipe, listSubRecipes, sessionToRecipe, type RecipeDefinition, type RecipeVariable, type RecipeParameter, type RecipeInstance, type SubRecipeRef } from "./agent/recipe.js";
+export {
+  instantiateRecipe,
+  validateRecipeParams,
+  resolveSubRecipe,
+  listSubRecipes,
+  sessionToRecipe,
+  type RecipeDefinition,
+  type RecipeVariable,
+  type RecipeParameter,
+  type RecipeInstance,
+  type SubRecipeRef,
+} from "./agent/recipe.js";
 
 // Executor
 export type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "./executor.js";
@@ -65,7 +89,18 @@ export * from "./infra/tmux.js";
 export * from "./hooks.js";
 
 // Search
-export { searchSessions, searchTranscripts, indexTranscripts, indexSession, getIndexStats, getSessionConversation, searchSessionConversation, ftsTableExists, type SearchResult, type SearchOpts } from "./search/search.js";
+export {
+  searchSessions,
+  searchTranscripts,
+  indexTranscripts,
+  indexSession,
+  getIndexStats,
+  getSessionConversation,
+  searchSessionConversation,
+  ftsTableExists,
+  type SearchResult,
+  type SearchOpts,
+} from "./search/search.js";
 
 // GitHub PR utilities (lookup, formatting)
 export { findSessionByPR, formatReviewPrompt, extractComments } from "./integrations/github-pr.js";
@@ -74,22 +109,48 @@ export { findSessionByPR, formatReviewPrompt, extractComments } from "./integrat
 export { pollPRReviews } from "./integrations/pr-poller.js";
 
 // Issue polling
-export { pollIssues, startIssuePoller, fetchLabeledIssues, createSessionFromIssue, type IssuePollerOptions, type GhIssue } from "./integrations/issue-poller.js";
+export {
+  pollIssues,
+  startIssuePoller,
+  fetchLabeledIssues,
+  createSessionFromIssue,
+  type IssuePollerOptions,
+  type GhIssue,
+} from "./integrations/issue-poller.js";
 
 // Conductor
 export { startConductor } from "./conductor/conductor.js";
 
 // Claude sessions
-export { listClaudeSessions, getClaudeSession, refreshClaudeSessionsCache, type ClaudeSession } from "./claude/sessions.js";
+export {
+  listClaudeSessions,
+  getClaudeSession,
+  refreshClaudeSessionsCache,
+  type ClaudeSession,
+} from "./claude/sessions.js";
 
 // Repo-scoped config
 export { loadRepoConfig, type RepoConfig } from "./repo-config.js";
 
 // Schedules
-export { createSchedule, listSchedules, getSchedule, deleteSchedule, enableSchedule, updateScheduleLastRun, cronMatches, type Schedule } from "./schedule.js";
+export {
+  createSchedule,
+  listSchedules,
+  getSchedule,
+  deleteSchedule,
+  enableSchedule,
+  updateScheduleLastRun,
+  cronMatches,
+  type Schedule,
+} from "./schedule.js";
 
 // Skill extraction
-export { extractSkillCandidates, extractAndSaveSkills, type SkillCandidate, type ConversationTurn } from "./agent/skill-extractor.js";
+export {
+  extractSkillCandidates,
+  extractAndSaveSkills,
+  type SkillCandidate,
+  type ConversationTurn,
+} from "./agent/skill-extractor.js";
 
 // Structured review output
 export { parseReviewOutput, type ReviewResult, type ReviewIssue } from "./review.js";
@@ -98,7 +159,14 @@ export { parseReviewOutput, type ReviewResult, type ReviewIssue } from "./review
 export { evaluateGuardrail, evaluateToolCall, DEFAULT_RULES, type GuardrailRule } from "./session/guardrails.js";
 
 // Checkpoint and crash recovery
-export { saveCheckpoint, getCheckpoint, listCheckpoints, findOrphanedSessions, recoverSession, type Checkpoint } from "./session/checkpoint.js";
+export {
+  saveCheckpoint,
+  getCheckpoint,
+  listCheckpoints,
+  findOrphanedSessions,
+  recoverSession,
+  type Checkpoint,
+} from "./session/checkpoint.js";
 
 // Safe async helper
 export { safeAsync } from "./safe.js";
@@ -110,7 +178,15 @@ export { checkPrereqs, formatPrereqCheck, hasRequiredPrereqs, type PrereqResult 
 export { sendOSNotification } from "./notify.js";
 
 // Unified tool discovery
-export { discoverTools, removeMcpServer, removeCommand, getCommand, addMcpServer, addCommand, type ToolEntry } from "./tools.js";
+export {
+  discoverTools,
+  removeMcpServer,
+  removeCommand,
+  getCommand,
+  addMcpServer,
+  addCommand,
+  type ToolEntry,
+} from "./tools.js";
 
 // Replay
 export { buildReplay, type ReplayStep } from "./session/replay.js";
@@ -120,14 +196,37 @@ export type { ToolDriver } from "./tool-driver.js";
 export { getToolDriver, listToolDrivers, registerToolDriver } from "./tools/registry.js";
 
 // Cost helpers -- read from usage_records (written by UsageRecorder)
-export { calculateCost, formatCost, getSessionCost, getAllSessionCosts, checkBudget, syncCosts, exportCostsCsv, type SessionCostSummary, type BudgetConfig, type BudgetStatus } from "./observability/costs.js";
+export {
+  calculateCost,
+  formatCost,
+  getSessionCost,
+  getAllSessionCosts,
+  checkBudget,
+  syncCosts,
+  exportCostsCsv,
+  type SessionCostSummary,
+  type BudgetConfig,
+  type BudgetStatus,
+} from "./observability/costs.js";
 
 // Universal cost tracking (multi-runtime, multi-dimensional)
 export { PricingRegistry, type ModelPricing, type TokenUsage } from "./observability/pricing.js";
-export { UsageRecorder, type UsageRecord, type RecordOpts, type UsageSummaryRow, type DailyTrendRow, type CostMode } from "./observability/usage.js";
+export {
+  UsageRecorder,
+  type UsageRecord,
+  type RecordOpts,
+  type UsageSummaryRow,
+  type DailyTrendRow,
+  type CostMode,
+} from "./observability/usage.js";
 
 // Runtime transcript parsers (polymorphic)
-export { TranscriptParserRegistry, type TranscriptParser, type ParseResult, type FindOpts } from "./runtimes/transcript-parser.js";
+export {
+  TranscriptParserRegistry,
+  type TranscriptParser,
+  type ParseResult,
+  type FindOpts,
+} from "./runtimes/transcript-parser.js";
 export { ClaudeTranscriptParser } from "./runtimes/claude/parser.js";
 export { CodexTranscriptParser } from "./runtimes/codex/parser.js";
 export { GeminiTranscriptParser } from "./runtimes/gemini/parser.js";
@@ -139,7 +238,13 @@ export { GeminiTranscriptParser } from "./runtimes/gemini/parser.js";
 export { sendReliable, hasPasteMarker, isReadyForInput, type SendOptions } from "./send-reliable.js";
 
 // Messaging bridge
-export { Bridge, loadBridgeConfig, createBridge, type BridgeConfig, type BridgeMessage } from "./integrations/bridge.js";
+export {
+  Bridge,
+  loadBridgeConfig,
+  createBridge,
+  type BridgeConfig,
+  type BridgeMessage,
+} from "./integrations/bridge.js";
 
 // Docker sandbox
 export { buildSandboxCommand, isDockerAvailable, listSandboxContainers, type SandboxConfig } from "./sandbox.js";
@@ -160,7 +265,16 @@ export { checkForUpdate, getCurrentVersion } from "./infra/update-check.js";
 export { updateTmuxStatusBar, clearTmuxStatusBar } from "./infra/tmux-notify.js";
 
 // Profiles
-export { listProfiles, createProfile, deleteProfile, getActiveProfile, setActiveProfile, profileGroupPrefix, setProfilesArkDir, type Profile } from "./state/profiles.js";
+export {
+  listProfiles,
+  createProfile,
+  deleteProfile,
+  getActiveProfile,
+  setActiveProfile,
+  profileGroupPrefix,
+  setProfilesArkDir,
+  type Profile,
+} from "./state/profiles.js";
 
 // Notification daemon
 export { NotifyDaemon, startNotifyDaemon, type NotifyDaemonOptions } from "./infra/notify-daemon.js";
@@ -169,7 +283,13 @@ export { NotifyDaemon, startNotifyDaemon, type NotifyDaemonOptions } from "./inf
 export { searchAllConversations, type GlobalSearchResult } from "./search/global-search.js";
 
 // Tmux content-based status detection
-export { detectStatusFromContent, detectSessionStatus, stripAnsi, parseAgentProgress, type DetectedStatus } from "./observability/status-detect.js";
+export {
+  detectStatusFromContent,
+  detectSessionStatus,
+  stripAnsi,
+  parseAgentProgress,
+  type DetectedStatus,
+} from "./observability/status-detect.js";
 
 // Multi-instance coordination
 export { registerInstance, activeInstanceCount } from "./infra/instance-lock.js";
@@ -181,13 +301,33 @@ export { getTheme, setThemeMode, getThemeMode, type Theme, type ThemeMode } from
 export { loadUiState, saveUiState, type UiState } from "./state/ui-state.js";
 
 // MCP Socket Pool
-export { McpPool, getMcpPool, destroyMcpPool, discoverPoolSockets, runMcpProxy, type McpServerDef, type PoolConfig } from "./mcp-pool.js";
+export {
+  McpPool,
+  getMcpPool,
+  destroyMcpPool,
+  discoverPoolSockets,
+  runMcpProxy,
+  type McpServerDef,
+  type PoolConfig,
+} from "./mcp-pool.js";
 
 // Prompt injection detection
 export { detectInjection, hasInjection, type InjectionResult } from "./session/prompt-guard.js";
 
 // Telemetry
-export { track, getBuffer, clearBuffer, flush, enableTelemetry, disableTelemetry, isTelemetryEnabled, configureTelemetry, resetTelemetry, type TelemetryEvent, type TelemetryConfig } from "./observability/telemetry.js";
+export {
+  track,
+  getBuffer,
+  clearBuffer,
+  flush,
+  enableTelemetry,
+  disableTelemetry,
+  isTelemetryEnabled,
+  configureTelemetry,
+  resetTelemetry,
+  type TelemetryEvent,
+  type TelemetryConfig,
+} from "./observability/telemetry.js";
 
 // OpenAPI spec
 export { generateOpenApiSpec } from "./openapi.js";
@@ -216,28 +356,107 @@ export { evaluateSession, getAgentStats, detectDrift, listEvals } from "./knowle
 export type { AgentEvalResult } from "./knowledge/evals.js";
 
 // Observability hooks
-export { configureObservability, getObservabilityConfig, recordEvent, flush as flushObservability, getEventBuffer, resetObservability, type ObservabilityConfig, type ObservabilityEvent } from "./observability.js";
+export {
+  configureObservability,
+  getObservabilityConfig,
+  recordEvent,
+  flush as flushObservability,
+  getEventBuffer,
+  resetObservability,
+  type ObservabilityConfig,
+  type ObservabilityEvent,
+} from "./observability.js";
 
 // OTLP observability
-export { configureOtlp, resetOtlp, flushSpans, startSpan, endSpan, getSpanBuffer, emitSessionSpanStart, emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, getSessionTraceId, type OtlpConfig, type OtlpSpan } from "./observability/otlp.js";
+export {
+  configureOtlp,
+  resetOtlp,
+  flushSpans,
+  startSpan,
+  endSpan,
+  getSpanBuffer,
+  emitSessionSpanStart,
+  emitSessionSpanEnd,
+  emitStageSpanStart,
+  emitStageSpanEnd,
+  getSessionTraceId,
+  type OtlpConfig,
+  type OtlpSpan,
+} from "./observability/otlp.js";
 
 // Auto-rollback
-export { watchMergedPR, shouldRollback, allCompleted, createRevertPayload, pollCheckSuites, type RollbackConfig, type CheckSuiteResult, type RevertPayload } from "./integrations/rollback.js";
+export {
+  watchMergedPR,
+  shouldRollback,
+  allCompleted,
+  createRevertPayload,
+  pollCheckSuites,
+  type RollbackConfig,
+  type CheckSuiteResult,
+  type RevertPayload,
+} from "./integrations/rollback.js";
 
 // Structured JSONL logging
-export { log, logDebug, logInfo, logWarn, logError, setLogLevel, setLogComponents, setLogArkDir, type LogComponent, type LogLevel } from "./observability/structured-log.js";
+export {
+  log,
+  logDebug,
+  logInfo,
+  logWarn,
+  logError,
+  setLogLevel,
+  setLogComponents,
+  setLogArkDir,
+  type LogComponent,
+  type LogLevel,
+} from "./observability/structured-log.js";
 
 // Extension catalog
-export { EXTENSION_CATALOG, searchCatalog, getCatalogByCategory, getCatalogEntry, type ExtensionEntry } from "./extension-catalog.js";
+export {
+  EXTENSION_CATALOG,
+  searchCatalog,
+  getCatalogByCategory,
+  getCatalogEntry,
+  type ExtensionEntry,
+} from "./extension-catalog.js";
 
 // Graph-based flow definitions
-export { parseGraphFlow, getSuccessors, getPredecessors, isJoinNode, isFanOutNode, topologicalSort, validateGraphFlow, type GraphFlow, type FlowNode, type FlowEdge } from "./state/graph-flow.js";
+export {
+  parseGraphFlow,
+  getSuccessors,
+  getPredecessors,
+  isJoinNode,
+  isFanOutNode,
+  topologicalSort,
+  validateGraphFlow,
+  type GraphFlow,
+  type FlowNode,
+  type FlowEdge,
+} from "./state/graph-flow.js";
 
 // Composable termination conditions
-export { evaluateTermination, parseTermination, maxTurns, maxTokens, timeout, textMention, and, or, type TerminationCondition, type TerminationContext } from "./termination.js";
+export {
+  evaluateTermination,
+  parseTermination,
+  maxTurns,
+  maxTokens,
+  timeout,
+  textMention,
+  and,
+  or,
+  type TerminationCondition,
+  type TerminationContext,
+} from "./termination.js";
 
 // Flow state persistence
-export { saveFlowState, loadFlowState, markStageCompleted, setCurrentStage, isStageCompleted, deleteFlowState, type FlowState } from "./state/flow-state.js";
+export {
+  saveFlowState,
+  loadFlowState,
+  markStageCompleted,
+  setCurrentStage,
+  isStageCompleted,
+  deleteFlowState,
+  type FlowState,
+} from "./state/flow-state.js";
 
 // Cross-session memory (migrated to KnowledgeStore -- old file-based memory removed)
 // remember, recall, forget, listMemories, clearMemories, formatMemoriesForPrompt removed -- use app.knowledge directly
@@ -251,7 +470,11 @@ export { generateTensorZeroConfig, TensorZeroManager } from "./router/index.js";
 export type { TensorZeroConfigOpts, TensorZeroManagerOpts } from "./router/index.js";
 
 // GitHub issue webhook
-export { handleIssueWebhook, type IssueWebhookPayload, type IssueWebhookConfig } from "./integrations/github-webhook.js";
+export {
+  handleIssueWebhook,
+  type IssueWebhookPayload,
+  type IssueWebhookConfig,
+} from "./integrations/github-webhook.js";
 
 // Agent-initiated handoff
 export { detectHandoff, hasHandoff, type HandoffSignal } from "./handoff.js";
@@ -260,8 +483,16 @@ export { detectHandoff, hasHandoff, type HandoffSignal } from "./handoff.js";
 export { filterMessages, parseMessageFilter, type MessageFilter, type FilteredMessage } from "./message-filter.js";
 
 // Task/progress ledger
-export { loadLedger, saveLedger, addEntry, updateEntry, detectStall, formatLedgerForPrompt, type Ledger, type LedgerEntry } from "./ledger.js";
-
+export {
+  loadLedger,
+  saveLedger,
+  addEntry,
+  updateEntry,
+  detectStall,
+  formatLedgerForPrompt,
+  type Ledger,
+  type LedgerEntry,
+} from "./ledger.js";
 
 // Agent Client Protocol (headless JSON-RPC)
 export { handleAcpRequest, runAcpServer, type AcpRequest, type AcpResponse } from "./acp.js";
@@ -273,8 +504,20 @@ export { generateRepoMap, extractExports, formatRepoMap, type RepoMap, type Repo
 // hybridSearch, mergeAndDeduplicate removed -- use app.knowledge.search() directly
 
 // Types from packages/types -- stricter domain types (aliased to avoid collision with store types)
-export type { Session as SessionDomain, SessionStatus, SessionConfig, CreateSessionOpts, SessionListFilters } from "../types/index.js";
-export type { Compute as ComputeDomain, ComputeStatus, ComputeProviderName, ComputeConfig, CreateComputeOpts } from "../types/index.js";
+export type {
+  Session as SessionDomain,
+  SessionStatus,
+  SessionConfig,
+  CreateSessionOpts,
+  SessionListFilters,
+} from "../types/index.js";
+export type {
+  Compute as ComputeDomain,
+  ComputeStatus,
+  ComputeProviderName,
+  ComputeConfig,
+  CreateComputeOpts,
+} from "../types/index.js";
 export type { Event as EventDomain } from "../types/index.js";
 export type { Message as MessageDomain, MessageRole, MessageType } from "../types/index.js";
 export type { ComputeSnapshot, PortDecl } from "../types/index.js";
@@ -283,12 +526,25 @@ export type { AgentDefinition as AgentDefinitionDomain } from "../types/index.js
 export type { GateType } from "../types/index.js";
 
 // Auth and multi-tenancy
-export { extractTenantContext, canWrite, isAdmin, DEFAULT_AUTH_CONFIG, DEFAULT_TENANT_CONTEXT, type AuthConfig } from "./auth/index.js";
+export {
+  extractTenantContext,
+  canWrite,
+  isAdmin,
+  DEFAULT_AUTH_CONFIG,
+  DEFAULT_TENANT_CONTEXT,
+  type AuthConfig,
+} from "./auth/index.js";
 export { ApiKeyManager } from "./auth/index.js";
 export type { TenantContext, ApiKey } from "../types/index.js";
 
 // Repositories
-export { SessionRepository, ComputeRepository, EventRepository, MessageRepository, TodoRepository } from "./repositories/index.js";
+export {
+  SessionRepository,
+  ComputeRepository,
+  EventRepository,
+  MessageRepository,
+  TodoRepository,
+} from "./repositories/index.js";
 
 // Services
 export { SessionService, ComputeService, HistoryService } from "./services/index.js";

@@ -23,19 +23,39 @@ let app: AppContext;
 let server: { stop(): void } | null = null;
 
 beforeEach(async () => {
-  if (app) { await app.shutdown(); clearApp(); }
+  if (app) {
+    await app.shutdown();
+    clearApp();
+  }
   app = AppContext.forTest();
   setApp(app);
   await app.boot();
 });
 
 afterEach(() => {
-  if (server) { try { server.stop(); } catch { /* cleanup */ } server = null; }
+  if (server) {
+    try {
+      server.stop();
+    } catch {
+      /* cleanup */
+    }
+    server = null;
+  }
 });
 
 afterAll(async () => {
-  if (server) { try { server.stop(); } catch { /* cleanup */ } server = null; }
-  if (app) { await app.shutdown(); clearApp(); }
+  if (server) {
+    try {
+      server.stop();
+    } catch {
+      /* cleanup */
+    }
+    server = null;
+  }
+  if (app) {
+    await app.shutdown();
+    clearApp();
+  }
 });
 
 // ── Manual completion path (bare flow, gate: manual) ────────────────────────
@@ -62,7 +82,7 @@ describe("Manual completion path (bare flow)", () => {
     expect(result.updates.status).toBeUndefined();
     // Completion data should still be saved
     expect(result.updates.config?.completion_summary).toBe("All tasks done");
-    // Message should be generated for TUI
+    // Message should be generated for the UI
     expect(result.message).toBeTruthy();
     expect(result.message!.content).toContain("All tasks done");
     expect(result.message!.type).toBe("completed");
@@ -214,8 +234,12 @@ describe("Auto completion path (quick flow)", () => {
 
     // Simulate implement stage completion
     const r1 = applyReport(app, session.id, {
-      type: "completed", sessionId: session.id, stage: "implement",
-      summary: "Implemented", filesChanged: [], commits: [],
+      type: "completed",
+      sessionId: session.id,
+      stage: "implement",
+      summary: "Implemented",
+      filesChanged: [],
+      commits: [],
     });
     app.sessions.update(session.id, r1.updates);
     await advance(app, session.id);
@@ -223,8 +247,12 @@ describe("Auto completion path (quick flow)", () => {
     // Now at verify stage -- simulate verify completion
     app.sessions.update(session.id, { status: "running" });
     const r2 = applyReport(app, session.id, {
-      type: "completed", sessionId: session.id, stage: "verify",
-      summary: "Verified", filesChanged: [], commits: [],
+      type: "completed",
+      sessionId: session.id,
+      stage: "verify",
+      summary: "Verified",
+      filesChanged: [],
+      commits: [],
     });
     app.sessions.update(session.id, r2.updates);
     await advance(app, session.id);
@@ -232,8 +260,12 @@ describe("Auto completion path (quick flow)", () => {
     // Now at pr stage -- simulate pr completion
     app.sessions.update(session.id, { status: "running" });
     const r3 = applyReport(app, session.id, {
-      type: "completed", sessionId: session.id, stage: "pr",
-      summary: "PR created", filesChanged: [], commits: [],
+      type: "completed",
+      sessionId: session.id,
+      stage: "pr",
+      summary: "PR created",
+      filesChanged: [],
+      commits: [],
     });
     app.sessions.update(session.id, r3.updates);
     await advance(app, session.id);
@@ -241,8 +273,12 @@ describe("Auto completion path (quick flow)", () => {
     // Now at merge stage -- simulate merge completion
     app.sessions.update(session.id, { status: "running" });
     const r4 = applyReport(app, session.id, {
-      type: "completed", sessionId: session.id, stage: "merge",
-      summary: "Merged", filesChanged: [], commits: [],
+      type: "completed",
+      sessionId: session.id,
+      stage: "merge",
+      summary: "Merged",
+      filesChanged: [],
+      commits: [],
     });
     app.sessions.update(session.id, r4.updates);
     const finalAdv = await advance(app, session.id);
@@ -340,7 +376,7 @@ describe("Hook fallback path (SessionEnd)", () => {
 
     expect(result.events).toBeTruthy();
     expect(result.events!.length).toBeGreaterThanOrEqual(1);
-    const hookEvt = result.events!.find(e => e.type === "hook_status");
+    const hookEvt = result.events!.find((e) => e.type === "hook_status");
     expect(hookEvt).toBeTruthy();
     expect(hookEvt!.opts.actor).toBe("hook");
     expect(hookEvt!.opts.data?.event).toBe("SessionEnd");
@@ -406,7 +442,7 @@ describe("Conductor channel report delivery", () => {
 
     // Auto gate: conductor should have advanced to next stage and auto-dispatched
     // Give a moment for the async advance to complete
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 100));
     const updated = app.sessions.get(session.id);
     expect(updated?.stage).toBe("verify");
     // Status is "running" because auto-dispatch is now properly awaited
@@ -419,21 +455,18 @@ describe("Conductor channel report delivery", () => {
     const session = app.sessions.create({ summary: "hook http test", flow: "quick" });
     app.sessions.update(session.id, { status: "running", stage: "implement" });
 
-    const resp = await fetch(
-      `http://localhost:${TEST_PORT}/hooks/status?session=${session.id}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hook_event_name: "SessionEnd" }),
-      },
-    );
+    const resp = await fetch(`http://localhost:${TEST_PORT}/hooks/status?session=${session.id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hook_event_name: "SessionEnd" }),
+    });
 
     expect(resp.status).toBe(200);
-    const body = await resp.json() as Record<string, unknown>;
+    const body = (await resp.json()) as Record<string, unknown>;
     expect(body.mapped).toBe("ready");
 
     // Give a moment for the async advance to complete
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 100));
     const updated = app.sessions.get(session.id);
     // Auto-gate SessionEnd triggers advance to next stage and auto-dispatch
     expect(updated?.stage).toBe("verify");
@@ -447,14 +480,11 @@ describe("Conductor channel report delivery", () => {
     const session = app.sessions.create({ summary: "hook http manual", flow: "bare" });
     app.sessions.update(session.id, { status: "running", stage: "work" });
 
-    const resp = await fetch(
-      `http://localhost:${TEST_PORT}/hooks/status?session=${session.id}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hook_event_name: "SessionEnd" }),
-      },
-    );
+    const resp = await fetch(`http://localhost:${TEST_PORT}/hooks/status?session=${session.id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hook_event_name: "SessionEnd" }),
+    });
 
     expect(resp.status).toBe(200);
 
@@ -516,9 +546,7 @@ describe("Regression: complete() must advance flow (not leave status=ready)", ()
     const router = new Router();
     registerSessionHandlers(router, app);
 
-    const res = await router.dispatch(
-      createRequest(1, "session/complete", { sessionId: session.id }),
-    );
+    const res = await router.dispatch(createRequest(1, "session/complete", { sessionId: session.id }));
 
     // RPC should succeed
     expect((res as any).error).toBeUndefined();
@@ -540,9 +568,7 @@ describe("Regression: complete() must advance flow (not leave status=ready)", ()
     const router = new Router();
     registerSessionHandlers(router, app);
 
-    const res = await router.dispatch(
-      createRequest(1, "session/complete", { sessionId: session.id }),
-    );
+    const res = await router.dispatch(createRequest(1, "session/complete", { sessionId: session.id }));
 
     expect((res as any).error).toBeUndefined();
 

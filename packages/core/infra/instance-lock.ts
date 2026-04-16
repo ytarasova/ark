@@ -29,15 +29,19 @@ export function registerInstance(app: AppContext, instanceId: string): { stop: (
   cleanStaleInstances(app);
 
   const now = new Date().toISOString();
-  db.prepare(`
+  db.prepare(
+    `
     INSERT OR REPLACE INTO instance_heartbeat (id, pid, started_at, last_heartbeat)
     VALUES (?, ?, ?, ?)
-  `).run(instanceId, process.pid, now, now);
+  `,
+  ).run(instanceId, process.pid, now, now);
 
   const interval = setInterval(() => {
     try {
-      db.prepare("UPDATE instance_heartbeat SET last_heartbeat = ? WHERE id = ?")
-        .run(new Date().toISOString(), instanceId);
+      db.prepare("UPDATE instance_heartbeat SET last_heartbeat = ? WHERE id = ?").run(
+        new Date().toISOString(),
+        instanceId,
+      );
       cleanStaleInstances(app);
     } catch (e: any) {
       // The DB is normally closed during shutdown between the interval firing and stop() running.
@@ -63,9 +67,9 @@ export function registerInstance(app: AppContext, instanceId: string): { stop: (
     },
     isPrimary: () => {
       try {
-        const first = db.prepare(
-          "SELECT id FROM instance_heartbeat ORDER BY started_at ASC LIMIT 1"
-        ).get() as { id: string } | undefined;
+        const first = db.prepare("SELECT id FROM instance_heartbeat ORDER BY started_at ASC LIMIT 1").get() as
+          | { id: string }
+          | undefined;
         return first?.id === instanceId;
       } catch (e: any) {
         logWarn("session", `instance-lock: isPrimary check failed, assuming primary: ${String(e?.message ?? e)}`);

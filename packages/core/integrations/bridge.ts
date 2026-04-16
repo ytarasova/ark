@@ -6,7 +6,6 @@
 import type { Session } from "../../types/index.js";
 import type { AppContext } from "../app.js";
 
-
 /** Telegram getUpdates API response shape. */
 interface TelegramResponse {
   ok: boolean;
@@ -15,7 +14,6 @@ interface TelegramResponse {
     message?: { text?: string };
   }>;
 }
-
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -60,20 +58,19 @@ async function sendTelegram(token: string, chatId: string, text: string): Promis
   }
 }
 
-async function pollTelegram(
-  token: string,
-  onMessage: (text: string) => void,
-  signal: AbortSignal,
-): Promise<void> {
+async function pollTelegram(token: string, onMessage: (text: string) => void, signal: AbortSignal): Promise<void> {
   let offset = 0;
   const url = `https://api.telegram.org/bot${token}/getUpdates`;
 
   while (!signal.aborted) {
     try {
       const resp = await fetch(`${url}?offset=${offset}&timeout=30`, { signal });
-      if (!resp.ok) { await Bun.sleep(5000); continue; }
+      if (!resp.ok) {
+        await Bun.sleep(5000);
+        continue;
+      }
 
-      const data = await resp.json() as TelegramResponse;
+      const data = (await resp.json()) as TelegramResponse;
       for (const update of data.result ?? []) {
         offset = update.update_id + 1;
         const text = update.message?.text;
@@ -155,12 +152,18 @@ export class Bridge {
   /** Send a session status notification. */
   async notifySessionStatus(session: Session, fromStatus: string, toStatus: string): Promise<void> {
     const name = session.summary ?? session.id;
-    const emoji = toStatus === "running" ? "\u{1F7E2}"
-      : toStatus === "waiting" ? "\u{1F7E1}"
-      : toStatus === "completed" ? "\u2705"
-      : toStatus === "failed" ? "\u{1F534}"
-      : toStatus === "stopped" ? "\u23F9"
-      : "\u26AA";
+    const emoji =
+      toStatus === "running"
+        ? "\u{1F7E2}"
+        : toStatus === "waiting"
+          ? "\u{1F7E1}"
+          : toStatus === "completed"
+            ? "\u2705"
+            : toStatus === "failed"
+              ? "\u{1F534}"
+              : toStatus === "stopped"
+                ? "\u23F9"
+                : "\u26AA";
 
     await this.notify(`${emoji} *${name}*: ${fromStatus} \u2192 ${toStatus}`);
   }
@@ -169,7 +172,11 @@ export class Bridge {
   async notifyStatusSummary(app?: AppContext): Promise<void> {
     let sessions: Array<{ status: string }> = [];
     if (app) {
-      try { sessions = app.sessions.list({ limit: 100 }); } catch { /* app not booted */ }
+      try {
+        sessions = app.sessions.list({ limit: 100 });
+      } catch {
+        /* app not booted */
+      }
     }
     const counts: Record<string, number> = {};
     for (const s of sessions) {
@@ -191,7 +198,9 @@ export class Bridge {
         (text) => {
           const msg: BridgeMessage = { text, source: "telegram" };
           for (const handler of this.handlers) {
-            try { handler(msg); } catch (e: any) {
+            try {
+              handler(msg);
+            } catch (e: any) {
               console.error("bridge: handler error:", e?.message ?? e);
             }
           }

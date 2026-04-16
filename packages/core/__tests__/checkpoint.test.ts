@@ -4,7 +4,13 @@
 
 import { describe, it, expect, mock } from "bun:test";
 import { getApp } from "../app.js";
-import { saveCheckpoint, getCheckpoint, listCheckpoints, findOrphanedSessions, recoverSession } from "../session/checkpoint.js";
+import {
+  saveCheckpoint,
+  getCheckpoint,
+  listCheckpoints,
+  findOrphanedSessions,
+  recoverSession,
+} from "../session/checkpoint.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();
@@ -137,7 +143,7 @@ describe("recoverSession", () => {
     saveCheckpoint(getApp(), session.id);
 
     // Simulate crash: session still says "running" but tmux is dead
-    const result = recoverSession(getApp(),session.id);
+    const result = recoverSession(getApp(), session.id);
     expect(result.ok).toBe(true);
     expect(result.message).toContain("Recovered from checkpoint");
 
@@ -163,7 +169,7 @@ describe("recoverSession", () => {
     });
 
     // No checkpoint saved -- recover from current state
-    const result = recoverSession(getApp(),session.id);
+    const result = recoverSession(getApp(), session.id);
     expect(result.ok).toBe(true);
     expect(result.message).toContain("no checkpoint");
 
@@ -173,7 +179,7 @@ describe("recoverSession", () => {
   });
 
   it("returns error for nonexistent session", () => {
-    const result = recoverSession(getApp(),"s-nonexistent");
+    const result = recoverSession(getApp(), "s-nonexistent");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
   });
@@ -187,7 +193,7 @@ describe("recoverSession", () => {
       session_id: "ark-dead",
     });
 
-    const result = recoverSession(getApp(),session.id);
+    const result = recoverSession(getApp(), session.id);
     expect(result.ok).toBe(true);
 
     const recovered = getApp().sessions.get(session.id)!;

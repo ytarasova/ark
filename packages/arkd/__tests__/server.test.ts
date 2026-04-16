@@ -21,7 +21,11 @@ beforeAll(() => {
 
 afterAll(() => {
   server.stop();
-  try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* cleanup */ }
+  try {
+    rmSync(tempDir, { recursive: true, force: true });
+  } catch {
+    /* cleanup */
+  }
 });
 
 async function post<T>(path: string, body: unknown): Promise<{ status: number; data: T }> {
@@ -30,25 +34,25 @@ async function post<T>(path: string, body: unknown): Promise<{ status: number; d
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  return { status: resp.status, data: await resp.json() as T };
+  return { status: resp.status, data: (await resp.json()) as T };
 }
 
 async function get<T>(path: string): Promise<{ status: number; data: T }> {
   const resp = await fetch(`${BASE}${path}`);
-  return { status: resp.status, data: await resp.json() as T };
+  return { status: resp.status, data: (await resp.json()) as T };
 }
 
 /** Poll a condition until true or timeout. Replaces arbitrary setTimeout waits. */
 async function pollUntil(
   condition: () => boolean | Promise<boolean>,
-  opts?: { timeout?: number; interval?: number; message?: string }
+  opts?: { timeout?: number; interval?: number; message?: string },
 ): Promise<void> {
   const timeout = opts?.timeout ?? 5000;
   const interval = opts?.interval ?? 100;
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     if (await condition()) return;
-    await new Promise(r => setTimeout(r, interval));
+    await new Promise((r) => setTimeout(r, interval));
   }
   throw new Error(opts?.message ?? `pollUntil timed out after ${timeout}ms`);
 }
@@ -289,10 +293,13 @@ describe("Agent lifecycle (tmux)", () => {
     expect(launch.data.ok).toBe(true);
 
     // Poll until tmux reports the session as running
-    await pollUntil(async () => {
-      const s = await post<any>("/agent/status", { sessionName: SESSION_NAME });
-      return s.data.running === true;
-    }, { timeout: 5000, message: "tmux session never started" });
+    await pollUntil(
+      async () => {
+        const s = await post<any>("/agent/status", { sessionName: SESSION_NAME });
+        return s.data.running === true;
+      },
+      { timeout: 5000, message: "tmux session never started" },
+    );
 
     // Status: should be running
     const status = await post<any>("/agent/status", { sessionName: SESSION_NAME });
@@ -300,10 +307,13 @@ describe("Agent lifecycle (tmux)", () => {
 
     // Poll until capture output contains expected text
     let capture: { status: number; data: any } = { status: 0, data: {} };
-    await pollUntil(async () => {
-      capture = await post<any>("/agent/capture", { sessionName: SESSION_NAME });
-      return capture.data.output?.includes("arkd agent running") ?? false;
-    }, { timeout: 5000, message: "capture never contained expected output" });
+    await pollUntil(
+      async () => {
+        capture = await post<any>("/agent/capture", { sessionName: SESSION_NAME });
+        return capture.data.output?.includes("arkd agent running") ?? false;
+      },
+      { timeout: 5000, message: "capture never contained expected output" },
+    );
     expect(capture.data.output).toContain("arkd agent running");
 
     // Kill
@@ -384,10 +394,13 @@ describe("GET /snapshot", () => {
       workdir: tempDir,
     });
     // Poll until tmux session is visible
-    await pollUntil(async () => {
-      const s = await post<any>("/agent/status", { sessionName: name });
-      return s.data.running === true;
-    }, { timeout: 5000, message: "snapshot tmux session never started" });
+    await pollUntil(
+      async () => {
+        const s = await post<any>("/agent/status", { sessionName: name });
+        return s.data.running === true;
+      },
+      { timeout: 5000, message: "snapshot tmux session never started" },
+    );
 
     try {
       const { data } = await get<any>("/snapshot");
@@ -425,7 +438,7 @@ describe("Error handling", () => {
       body: "not json",
     });
     expect(resp.status).toBe(400);
-    const data = await resp.json() as Record<string, unknown>;
+    const data = (await resp.json()) as Record<string, unknown>;
     expect(data.error).toContain("invalid JSON");
   });
 
@@ -497,7 +510,11 @@ describe("Server lifecycle", () => {
       }
     } finally {
       // Ensure cleanup even if assertions fail
-      try { ephemeral.stop(); } catch { /* cleanup */ }
+      try {
+        ephemeral.stop();
+      } catch {
+        /* cleanup */
+      }
     }
   });
 });
@@ -522,7 +539,7 @@ describe("Channel report forwarding", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "completed", summary: "test" }),
       });
-      const data = await resp.json() as any;
+      const data = (await resp.json()) as any;
       expect(data.ok).toBe(false);
       expect(data.forwarded).toBe(false);
       expect(data.error).toBeDefined();
@@ -557,7 +574,7 @@ describe("Channel report forwarding", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "completed", summary: "test report" }),
       });
-      const data = await resp.json() as any;
+      const data = (await resp.json()) as any;
       expect(data.ok).toBe(true);
       expect(data.forwarded).toBe(true);
 

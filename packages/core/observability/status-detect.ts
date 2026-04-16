@@ -12,9 +12,9 @@ export type DetectedStatus = "running" | "waiting" | "idle" | "unknown";
 const BUSY_PATTERNS = [
   /ctrl\+c to interrupt/i,
   /esc to interrupt/i,
-  /⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏/,  // braille spinner chars
-  /\*\s*.+\.\.\./,  // asterisk spinner + loading text
-  /\(\d+s\s*[·•]\s*\d+\s*tokens?\)/i,  // Claude timing indicator
+  /⠋|⠙|⠹|⠸|⠼|⠴|⠦|⠧|⠇|⠏/, // braille spinner chars
+  /\*\s*.+\.\.\./, // asterisk spinner + loading text
+  /\(\d+s\s*[·•]\s*\d+\s*tokens?\)/i, // Claude timing indicator
   /thinking\.\.\./i,
   /processing\.\.\./i,
   /working\.\.\./i,
@@ -22,9 +22,9 @@ const BUSY_PATTERNS = [
 
 // Patterns indicating the agent is waiting for user input
 const PROMPT_PATTERNS = [
-  /^>\s*$/m,           // bare prompt
-  /^❯\s*$/m,          // arrow prompt
-  /Yes,?\s*allow/i,    // permission prompt
+  /^>\s*$/m, // bare prompt
+  /^❯\s*$/m, // arrow prompt
+  /Yes,?\s*allow/i, // permission prompt
   /Enter to confirm/i,
   /\[y\/n\]/i,
   /Press Enter/i,
@@ -32,14 +32,13 @@ const PROMPT_PATTERNS = [
 
 // Patterns indicating the agent has completed/exited
 const IDLE_PATTERNS = [
-  /\$\s*$/m,           // shell prompt at end
+  /\$\s*$/m, // shell prompt at end
   /session ended/i,
   /goodbye/i,
 ];
 
 /** Strip ANSI escape codes from terminal content. */
 export function stripAnsi(content: string): string {
-   
   return content.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "").replace(/\x1b\][^\x07]*\x07/g, "");
 }
 

@@ -64,10 +64,14 @@ export class ApiKeyManager {
     const keyHash = hashKey(key);
     const ts = now();
 
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO api_keys (id, tenant_id, key_hash, name, role, created_at, last_used_at, expires_at)
       VALUES (?, ?, ?, ?, ?, ?, NULL, ?)
-    `).run(id, tenantId, keyHash, name, role, ts, expiresAt ?? null);
+    `,
+      )
+      .run(id, tenantId, keyHash, name, role, ts, expiresAt ?? null);
 
     return { key, id };
   }
@@ -84,9 +88,9 @@ export class ApiKeyManager {
     const tenantId = parts[1];
 
     const keyHash = hashKey(key);
-    const row = this.db.prepare(
-      "SELECT * FROM api_keys WHERE key_hash = ? AND tenant_id = ?"
-    ).get(keyHash, tenantId) as ApiKeyRow | undefined;
+    const row = this.db
+      .prepare("SELECT * FROM api_keys WHERE key_hash = ? AND tenant_id = ?")
+      .get(keyHash, tenantId) as ApiKeyRow | undefined;
 
     if (!row) return null;
 
@@ -109,9 +113,9 @@ export class ApiKeyManager {
    * List all API keys for a tenant (key hashes are included but not the plaintext keys).
    */
   list(tenantId: string): ApiKey[] {
-    const rows = this.db.prepare(
-      "SELECT * FROM api_keys WHERE tenant_id = ? ORDER BY created_at DESC"
-    ).all(tenantId) as ApiKeyRow[];
+    const rows = this.db
+      .prepare("SELECT * FROM api_keys WHERE tenant_id = ? ORDER BY created_at DESC")
+      .all(tenantId) as ApiKeyRow[];
     return rows.map(rowToApiKey);
   }
 

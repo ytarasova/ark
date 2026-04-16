@@ -1,7 +1,9 @@
 import type { IDatabase } from "../database/index.js";
 import type { SessionArtifact, ArtifactType, ArtifactQuery } from "../../types/index.js";
 
-function now(): string { return new Date().toISOString(); }
+function now(): string {
+  return new Date().toISOString();
+}
 
 interface ArtifactRow {
   id: number;
@@ -15,7 +17,11 @@ interface ArtifactRow {
 
 function rowToArtifact(row: ArtifactRow): SessionArtifact {
   let metadata: Record<string, unknown> = {};
-  try { metadata = JSON.parse(row.metadata || "{}"); } catch { /* ignore */ }
+  try {
+    metadata = JSON.parse(row.metadata || "{}");
+  } catch {
+    /* ignore */
+  }
   return {
     ...row,
     type: row.type as ArtifactType,
@@ -28,8 +34,12 @@ export class ArtifactRepository {
 
   constructor(private db: IDatabase) {}
 
-  setTenant(tenantId: string): void { this.tenantId = tenantId; }
-  getTenant(): string { return this.tenantId; }
+  setTenant(tenantId: string): void {
+    this.tenantId = tenantId;
+  }
+  getTenant(): string {
+    return this.tenantId;
+  }
 
   /**
    * Record one or more artifacts for a session.
@@ -41,17 +51,21 @@ export class ArtifactRepository {
     const ts = now();
     for (const value of values) {
       // Skip duplicates
-      const existing = this.db.prepare(
-        "SELECT id FROM session_artifacts WHERE session_id = ? AND type = ? AND value = ? AND tenant_id = ?"
-      ).get(sessionId, type, value, this.tenantId);
+      const existing = this.db
+        .prepare("SELECT id FROM session_artifacts WHERE session_id = ? AND type = ? AND value = ? AND tenant_id = ?")
+        .get(sessionId, type, value, this.tenantId);
       if (existing) continue;
 
-      this.db.prepare(
-        "INSERT INTO session_artifacts (session_id, type, value, metadata, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?)"
-      ).run(sessionId, type, value, meta, this.tenantId, ts);
-      const row = this.db.prepare(
-        "SELECT * FROM session_artifacts WHERE session_id = ? AND type = ? AND value = ? AND tenant_id = ? ORDER BY id DESC LIMIT 1"
-      ).get(sessionId, type, value, this.tenantId) as ArtifactRow;
+      this.db
+        .prepare(
+          "INSERT INTO session_artifacts (session_id, type, value, metadata, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .run(sessionId, type, value, meta, this.tenantId, ts);
+      const row = this.db
+        .prepare(
+          "SELECT * FROM session_artifacts WHERE session_id = ? AND type = ? AND value = ? AND tenant_id = ? ORDER BY id DESC LIMIT 1",
+        )
+        .get(sessionId, type, value, this.tenantId) as ArtifactRow;
       results.push(rowToArtifact(row));
     }
     return results;
@@ -98,7 +112,9 @@ export class ArtifactRepository {
 
   /** Delete all artifacts for a session. Called during session cleanup. */
   deleteForSession(sessionId: string): void {
-    this.db.prepare("DELETE FROM session_artifacts WHERE session_id = ? AND tenant_id = ?").run(sessionId, this.tenantId);
+    this.db
+      .prepare("DELETE FROM session_artifacts WHERE session_id = ? AND tenant_id = ?")
+      .run(sessionId, this.tenantId);
   }
 
   /** Count artifacts for a session, optionally by type. */
@@ -115,9 +131,11 @@ export class ArtifactRepository {
 
   /** Get distinct session IDs that produced a given artifact value. */
   sessionsForArtifact(type: ArtifactType, value: string): string[] {
-    const rows = this.db.prepare(
-      "SELECT DISTINCT session_id FROM session_artifacts WHERE type = ? AND value = ? AND tenant_id = ? ORDER BY created_at DESC"
-    ).all(type, value, this.tenantId) as { session_id: string }[];
-    return rows.map(r => r.session_id);
+    const rows = this.db
+      .prepare(
+        "SELECT DISTINCT session_id FROM session_artifacts WHERE type = ? AND value = ? AND tenant_id = ? ORDER BY created_at DESC",
+      )
+      .all(type, value, this.tenantId) as { session_id: string }[];
+    return rows.map((r) => r.session_id);
   }
 }

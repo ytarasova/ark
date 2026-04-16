@@ -12,9 +12,7 @@
 import { ArkdBackedProvider } from "./arkd-backed.js";
 import { safeAsync } from "../../core/safe.js";
 import { sshKeyPath } from "./ec2/ssh.js";
-import type {
-  Compute, Session, ProvisionOpts, SyncOpts, IsolationMode, LaunchOpts,
-} from "../types.js";
+import type { Compute, Session, ProvisionOpts, SyncOpts, IsolationMode, LaunchOpts } from "../types.js";
 import { DEFAULT_CONDUCTOR_URL, DEFAULT_ARKD_PORT } from "../../core/constants.js";
 
 const ARKD_REMOTE_PORT = DEFAULT_ARKD_PORT;
@@ -110,15 +108,12 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
       log(`Instance ${result.instance_id} launched (IP: ${result.ip ?? "pending"})`);
       this.app.computes.update(compute.name, { status: "running" });
       this.app.computes.mergeConfig(compute.name, {
-        ...result as unknown as Record<string, unknown>,
+        ...(result as unknown as Record<string, unknown>),
         arkd_url: `http://${result.ip}:${ARKD_REMOTE_PORT}`,
       });
 
       // Store hourly rate
-      const instanceType = resolveInstanceType(
-        opts?.size ?? cfg.size ?? "m",
-        opts?.arch ?? cfg.arch ?? "x64",
-      );
+      const instanceType = resolveInstanceType(opts?.size ?? cfg.size ?? "m", opts?.arch ?? cfg.arch ?? "x64");
       const rate = hourlyRate(instanceType);
       if (rate > 0) this.app.computes.mergeConfig(compute.name, { hourlyRate: rate });
 
@@ -137,7 +132,12 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
         log("Waiting for cloud-init to finish...");
         await poll(
           async () => {
-            const res = await sshExecAsync(privateKeyPath, result.ip!, `test -f ${REMOTE_HOME}/.ark-ready && echo ready`, { timeout: 10_000 });
+            const res = await sshExecAsync(
+              privateKeyPath,
+              result.ip!,
+              `test -f ${REMOTE_HOME}/.ark-ready && echo ready`,
+              { timeout: 10_000 },
+            );
             return res.stdout.includes("ready");
           },
           { maxAttempts: 60, delayMs: 10_000 },
@@ -151,7 +151,9 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
             try {
               const resp = await fetch(`${arkdUrl}/health`, { signal: AbortSignal.timeout(5000) });
               return resp.ok;
-            } catch { return false; }
+            } catch {
+              return false;
+            }
           },
           { maxAttempts: 30, delayMs: 3000 },
         );
@@ -221,7 +223,9 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
         try {
           const res = await fetch(`${arkdUrl}/health`, { signal: AbortSignal.timeout(5000) });
           return res.ok;
-        } catch { return false; }
+        } catch {
+          return false;
+        }
       },
       { maxAttempts: 30, delayMs: 2000 },
     );
@@ -265,14 +269,22 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
     const cfg = compute.config as RemoteConfig;
     if (!session.session_id || !cfg.ip) return [];
     return [
-      "ssh", "-i", sshKeyPath(compute.name),
-      "-o", "StrictHostKeyChecking=no",
+      "ssh",
+      "-i",
+      sshKeyPath(compute.name),
+      "-o",
+      "StrictHostKeyChecking=no",
       `${REMOTE_USER}@${cfg.ip}`,
       `tmux attach -t ${session.session_id}`,
     ];
   }
 
-  buildChannelConfig(sessionId: string, stage: string, channelPort: number, opts?: { conductorUrl?: string }): Record<string, unknown> {
+  buildChannelConfig(
+    sessionId: string,
+    stage: string,
+    channelPort: number,
+    opts?: { conductorUrl?: string },
+  ): Record<string, unknown> {
     return {
       command: `${REMOTE_HOME}/.ark/bin/ark`,
       args: ["channel"],
@@ -281,7 +293,7 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
         ARK_STAGE: stage,
         ARK_CHANNEL_PORT: String(channelPort),
         ARK_CONDUCTOR_URL: opts?.conductorUrl ?? DEFAULT_CONDUCTOR_URL,
-        ARK_ARKD_URL: `http://localhost:${ARKD_REMOTE_PORT}`,  // always localhost on the remote host
+        ARK_ARKD_URL: `http://localhost:${ARKD_REMOTE_PORT}`, // always localhost on the remote host
       },
     };
   }
@@ -309,9 +321,7 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
 export class RemoteWorktreeProvider extends RemoteArkdBase {
   readonly name = "ec2";
   readonly isolationType = "worktree";
-  readonly isolationModes: IsolationMode[] = [
-    { value: "inplace", label: "Remote checkout (in-place)" },
-  ];
+  readonly isolationModes: IsolationMode[] = [{ value: "inplace", label: "Remote checkout (in-place)" }];
 
   async launch(compute: Compute, session: Session, opts: LaunchOpts): Promise<string> {
     const client = this.getClient(compute);
@@ -338,9 +348,7 @@ export class RemoteWorktreeProvider extends RemoteArkdBase {
 export class RemoteDockerProvider extends RemoteArkdBase {
   readonly name = "ec2-docker";
   readonly isolationType = "docker";
-  readonly isolationModes: IsolationMode[] = [
-    { value: "container", label: "Docker container on EC2" },
-  ];
+  readonly isolationModes: IsolationMode[] = [{ value: "container", label: "Docker container on EC2" }];
 
   private containerName(compute: Compute): string {
     return `ark-${compute.name}`;
@@ -359,10 +367,16 @@ export class RemoteDockerProvider extends RemoteArkdBase {
     await client.run({
       command: "docker",
       args: [
-        "create", "--name", container, "-it",
-        "-v", `${REMOTE_HOME}/.ssh:/root/.ssh:ro`,
-        "-v", `${REMOTE_HOME}/.claude:/root/.claude:ro`,
-        image, "bash",
+        "create",
+        "--name",
+        container,
+        "-it",
+        "-v",
+        `${REMOTE_HOME}/.ssh:/root/.ssh:ro`,
+        "-v",
+        `${REMOTE_HOME}/.claude:/root/.claude:ro`,
+        image,
+        "bash",
       ],
     });
     await client.run({ command: "docker", args: ["start", container] });
@@ -392,9 +406,7 @@ export class RemoteDockerProvider extends RemoteArkdBase {
 export class RemoteDevcontainerProvider extends RemoteArkdBase {
   readonly name = "ec2-devcontainer";
   readonly isolationType = "devcontainer";
-  readonly isolationModes: IsolationMode[] = [
-    { value: "devcontainer", label: "Devcontainer on EC2" },
-  ];
+  readonly isolationModes: IsolationMode[] = [{ value: "devcontainer", label: "Devcontainer on EC2" }];
 
   async postProvision(compute: Compute, log: (msg: string) => void): Promise<void> {
     const client = this.getClient(compute);
@@ -436,9 +448,7 @@ export class RemoteDevcontainerProvider extends RemoteArkdBase {
 export class RemoteFirecrackerProvider extends RemoteArkdBase {
   readonly name = "ec2-firecracker";
   readonly isolationType = "firecracker";
-  readonly isolationModes: IsolationMode[] = [
-    { value: "microvm", label: "Firecracker microVM on EC2" },
-  ];
+  readonly isolationModes: IsolationMode[] = [{ value: "microvm", label: "Firecracker microVM on EC2" }];
 
   async postProvision(compute: Compute, log: (msg: string) => void): Promise<void> {
     const client = this.getClient(compute);
@@ -447,14 +457,17 @@ export class RemoteFirecrackerProvider extends RemoteArkdBase {
     // Download firecracker binary
     await client.run({
       command: "bash",
-      args: ["-c", `
+      args: [
+        "-c",
+        `
         ARCH=$(uname -m)
         RELEASE_URL="https://github.com/firecracker-microvm/firecracker/releases"
         LATEST=$(curl -fsSLI -o /dev/null -w %{url_effective} \${RELEASE_URL}/latest | grep -oE "[^/]+$")
         curl -L \${RELEASE_URL}/download/\${LATEST}/firecracker-\${LATEST}-\${ARCH}.tgz | tar -xz -C /tmp
         sudo mv /tmp/release-*/firecracker-\${LATEST}-\${ARCH} /usr/local/bin/firecracker
         sudo chmod +x /usr/local/bin/firecracker
-      `],
+      `,
+      ],
       timeout: 120_000,
     });
 
@@ -462,12 +475,15 @@ export class RemoteFirecrackerProvider extends RemoteArkdBase {
     log("Downloading kernel and rootfs...");
     await client.run({
       command: "bash",
-      args: ["-c", `
+      args: [
+        "-c",
+        `
         sudo mkdir -p /opt/firecracker
         # Download pre-built kernel
         curl -fsSL -o /opt/firecracker/vmlinux \
           https://s3.amazonaws.com/spec.ccfc.min/img/quickstart_guide/x86_64/kernels/vmlinux.bin 2>/dev/null || true
-      `],
+      `,
+      ],
       timeout: 120_000,
     });
 
@@ -501,7 +517,11 @@ export class RemoteFirecrackerProvider extends RemoteArkdBase {
 
 // ── Cloud-init with arkd ────────────────────────────────────────────────────
 
-async function buildUserDataWithArkd(opts: { idleMinutes?: number; isolation?: string; conductorUrl?: string }): Promise<string> {
+async function buildUserDataWithArkd(opts: {
+  idleMinutes?: number;
+  isolation?: string;
+  conductorUrl?: string;
+}): Promise<string> {
   const { buildUserData } = await import("./ec2/cloud-init.js");
   let base = buildUserData(opts) as string;
 
@@ -534,10 +554,7 @@ iptables -A INPUT -p tcp --dport ${ARKD_REMOTE_PORT} -j ACCEPT || true
 `;
 
   // Insert before the ready marker
-  base = base.replace(
-    '# ── Ready marker',
-    `${arkdSetup}\n# ── Ready marker`,
-  );
+  base = base.replace("# ── Ready marker", `${arkdSetup}\n# ── Ready marker`);
 
   return base;
 }

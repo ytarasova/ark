@@ -44,7 +44,7 @@ describe("ComputeTemplateRepository", () => {
 
     const templates = app.computeTemplates.list();
     expect(templates.length).toBe(2);
-    expect(templates.map(t => t.name).sort()).toEqual(["quick", "sandbox"]);
+    expect(templates.map((t) => t.name).sort()).toEqual(["quick", "sandbox"]);
   });
 
   it("updates a template", () => {

@@ -46,10 +46,7 @@ describe("ArkClient.close()", () => {
   it("no unhandled promise rejections after close", async () => {
     const client = new ArkClient(createBlackHoleTransport());
     // Attach .catch() handlers before close to prevent unhandled rejection
-    const promises = [
-      client.initialize().catch((err) => err),
-      client.sessionList().catch((err) => err),
-    ];
+    const promises = [client.initialize().catch((err) => err), client.sessionList().catch((err) => err)];
     client.close();
     const results = await Promise.all(promises);
     for (const r of results) {

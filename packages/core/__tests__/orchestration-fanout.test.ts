@@ -5,8 +5,10 @@
  * tests beyond the basic fork/clone create-shape coverage.
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, setDefaultTimeout } from "bun:test";
 import { getApp } from "../app.js";
+
+setDefaultTimeout(15_000);
 import {
   fanOut,
   joinFork,
@@ -69,7 +71,7 @@ describe("fanOut", () => {
     fanOut(getApp(), parent.id, { tasks: [{ summary: "a" }, { summary: "b" }] });
 
     const events = getApp().events.list(parent.id);
-    const fanOutEvent = events.find(e => e.type === "fan_out");
+    const fanOutEvent = events.find((e) => e.type === "fan_out");
     expect(fanOutEvent).toBeDefined();
     const data = fanOutEvent!.data as { childCount: number; forkGroup: string };
     expect(data.childCount).toBe(2);
@@ -106,7 +108,7 @@ describe("joinFork", () => {
     // log the event and clear fork_group regardless.
     expect(getApp().sessions.get(parent.id)!.fork_group).toBeNull();
     const events = getApp().events.list(parent.id);
-    expect(events.some(e => e.type === "fork_joined")).toBe(true);
+    expect(events.some((e) => e.type === "fork_joined")).toBe(true);
     expect(typeof result.ok).toBe("boolean");
   });
 });
@@ -215,22 +217,20 @@ describe("spawnSubagent", () => {
     const result = spawnSubagent(getApp(), parent.id, { task: "x" });
     expect(result.ok).toBe(true);
     const events = getApp().events.list(result.sessionId!);
-    expect(events.some(e => e.type === "subagent_spawned")).toBe(true);
+    expect(events.some((e) => e.type === "subagent_spawned")).toBe(true);
   });
 });
 
 describe("spawnParallelSubagents", () => {
   it("returns the list of spawned ids and logs events on each", async () => {
     const parent = getApp().sessions.create({ summary: "parent" });
-    const result = await spawnParallelSubagents(getApp(), parent.id, [
-      { task: "a" }, { task: "b" }, { task: "c" },
-    ]);
+    const result = await spawnParallelSubagents(getApp(), parent.id, [{ task: "a" }, { task: "b" }, { task: "c" }]);
 
     expect(result.ok).toBe(true);
     expect(result.sessionIds).toHaveLength(3);
     for (const id of result.sessionIds) {
       const events = getApp().events.list(id);
-      expect(events.some(e => e.type === "subagent_spawned")).toBe(true);
+      expect(events.some((e) => e.type === "subagent_spawned")).toBe(true);
     }
   });
 });

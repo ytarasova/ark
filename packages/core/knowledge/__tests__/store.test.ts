@@ -144,7 +144,7 @@ describe("KnowledgeStore", () => {
       store.addNode({ type: "file", label: "f2" });
       const files = store.listNodes({ type: "file" });
       expect(files.length).toBe(2);
-      expect(files.every(n => n.type === "file")).toBe(true);
+      expect(files.every((n) => n.type === "file")).toBe(true);
     });
 
     it("respects limit", () => {
@@ -265,7 +265,7 @@ describe("KnowledgeStore", () => {
       store.addEdge(a, c, "imports");
       const neighbors = store.neighbors(a, { maxDepth: 1 });
       expect(neighbors.length).toBe(2);
-      const labels = neighbors.map(n => n.label).sort();
+      const labels = neighbors.map((n) => n.label).sort();
       expect(labels).toEqual(["b.ts", "c.ts"]);
     });
 
@@ -278,7 +278,7 @@ describe("KnowledgeStore", () => {
       store.addEdge(b, c, "imports");
       const neighbors = store.neighbors(a, { maxDepth: 2 });
       expect(neighbors.length).toBe(2);
-      const labels = neighbors.map(n => n.label).sort();
+      const labels = neighbors.map((n) => n.label).sort();
       expect(labels).toEqual(["b.ts", "c.ts"]);
     });
 
@@ -329,7 +329,7 @@ describe("KnowledgeStore", () => {
       // Default maxDepth is 2, so d (3 hops) should not be included
       const neighbors = store.neighbors(a);
       expect(neighbors.length).toBe(2);
-      const labels = neighbors.map(n => n.label).sort();
+      const labels = neighbors.map((n) => n.label).sort();
       expect(labels).toEqual(["b.ts", "c.ts"]);
     });
   });

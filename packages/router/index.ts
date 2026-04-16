@@ -30,7 +30,14 @@ export type {
 } from "./types.js";
 
 // Config
-export { loadRouterConfig, allModels, findModel, findProviderForModel, DEFAULT_MODELS, DEFAULT_ROUTER_PORT } from "./config.js";
+export {
+  loadRouterConfig,
+  allModels,
+  findModel,
+  findProviderForModel,
+  DEFAULT_MODELS,
+  DEFAULT_ROUTER_PORT,
+} from "./config.js";
 
 // Providers
 export { ProviderRegistry, Provider } from "./providers.js";

@@ -15,8 +15,7 @@ export interface IndexResult {
 /** Injectable exec function type for testability. */
 export type ExecFn = (cmd: string, args: string[], opts?: any) => string;
 
-const defaultExec: ExecFn = (cmd, args, opts) =>
-  execFileSync(cmd, args, opts) as unknown as string;
+const defaultExec: ExecFn = (cmd, args, opts) => execFileSync(cmd, args, opts) as unknown as string;
 
 /**
  * Find the codegraph binary. Search order:
@@ -48,7 +47,9 @@ export function isCodegraphInstalled(): boolean {
     const bin = findCodegraphBinary();
     execFileSync(bin, ["--version"], { stdio: "pipe" });
     return true;
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -67,15 +68,17 @@ export async function indexCodebase(
 ): Promise<IndexResult> {
   const exec = opts?.exec ?? defaultExec;
   const start = Date.now();
-  let files = 0, symbols = 0, edges = 0;
+  let files = 0,
+    symbols = 0,
+    edges = 0;
 
   // If incremental, only re-index changed files
   if (opts?.incremental && opts.changedFiles?.length) {
     for (const f of opts.changedFiles) {
       store.removeNode(`file:${f}`);
-      const symbolNodes = store.listNodes({ type: "symbol" }).filter(
-        n => (n.metadata?.file as string | undefined) === f
-      );
+      const symbolNodes = store
+        .listNodes({ type: "symbol" })
+        .filter((n) => (n.metadata?.file as string | undefined) === f);
       for (const sn of symbolNodes) store.removeNode(sn.id);
     }
   } else if (!opts?.incremental) {
@@ -115,9 +118,9 @@ export async function indexCodebase(
   const cgDb = new Database(dbPath);
   try {
     // Map codegraph nodes to Ark knowledge nodes
-    const nodeRows = cgDb.query(
-      "SELECT id, kind, name, file, line, end_line, visibility, exported, qualified_name FROM nodes"
-    ).all() as CodegraphNode[];
+    const nodeRows = cgDb
+      .query("SELECT id, kind, name, file, line, end_line, visibility, exported, qualified_name FROM nodes")
+      .all() as CodegraphNode[];
 
     // Build ID lookup for edge mapping
     const nodeIdMap = new Map<number, { kind: string; name: string; file: string; line: number }>();
@@ -162,9 +165,7 @@ export async function indexCodebase(
     }
 
     // Map codegraph edges to Ark knowledge edges
-    const edgeRows = cgDb.query(
-      "SELECT source_id, target_id, kind FROM edges"
-    ).all() as CodegraphEdge[];
+    const edgeRows = cgDb.query("SELECT source_id, target_id, kind FROM edges").all() as CodegraphEdge[];
 
     for (const edge of edgeRows) {
       const src = nodeIdMap.get(edge.source_id);
@@ -209,13 +210,36 @@ function mapEdgeRelation(kind: string): EdgeRelation {
 function detectLanguage(filePath: string): string {
   const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
   const langMap: Record<string, string> = {
-    ts: "typescript", tsx: "typescript", js: "javascript", jsx: "javascript",
-    py: "python", go: "go", rs: "rust", java: "java", kt: "kotlin",
-    c: "c", cpp: "cpp", h: "c", hpp: "cpp", cs: "csharp",
-    rb: "ruby", php: "php", swift: "swift", dart: "dart",
-    scala: "scala", ex: "elixir", erl: "erlang", hs: "haskell",
-    ml: "ocaml", lua: "lua", zig: "zig", r: "r",
-    sol: "solidity", v: "verilog", sh: "bash", bash: "bash",
+    ts: "typescript",
+    tsx: "typescript",
+    js: "javascript",
+    jsx: "javascript",
+    py: "python",
+    go: "go",
+    rs: "rust",
+    java: "java",
+    kt: "kotlin",
+    c: "c",
+    cpp: "cpp",
+    h: "c",
+    hpp: "cpp",
+    cs: "csharp",
+    rb: "ruby",
+    php: "php",
+    swift: "swift",
+    dart: "dart",
+    scala: "scala",
+    ex: "elixir",
+    erl: "erlang",
+    hs: "haskell",
+    ml: "ocaml",
+    lua: "lua",
+    zig: "zig",
+    r: "r",
+    sol: "solidity",
+    v: "verilog",
+    sh: "bash",
+    bash: "bash",
   };
   return langMap[ext] ?? "unknown";
 }
@@ -242,7 +266,11 @@ interface CodegraphEdge {
  * Analyze git log for files that frequently change together.
  * Creates co_changes edges with weight = frequency / total_commits.
  */
-export function indexCoChanges(repoPath: string, store: KnowledgeStore, opts?: { limit?: number; exec?: ExecFn }): number {
+export function indexCoChanges(
+  repoPath: string,
+  store: KnowledgeStore,
+  opts?: { limit?: number; exec?: ExecFn },
+): number {
   const exec = opts?.exec ?? defaultExec;
   const limit = opts?.limit ?? 500;
   let edgeCount = 0;
@@ -286,7 +314,9 @@ export function indexCoChanges(repoPath: string, store: KnowledgeStore, opts?: {
         edgeCount++;
       }
     }
-  } catch { /* git log may fail in non-git repos */ }
+  } catch {
+    /* git log may fail in non-git repos */
+  }
 
   return edgeCount;
 }

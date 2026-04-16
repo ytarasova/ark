@@ -36,7 +36,9 @@ export function configureOtlp(config: OtlpConfig): void {
   _config = config;
   if (_flushTimer) clearInterval(_flushTimer);
   if (config.enabled && config.endpoint) {
-    _flushTimer = setInterval(() => { flushSpans(); }, 30_000);
+    _flushTimer = setInterval(() => {
+      flushSpans();
+    }, 30_000);
   }
 }
 
@@ -45,13 +47,20 @@ export function resetOtlp(): void {
   _active.clear();
   _buffer = [];
   _sessionTraces.clear();
-  if (_flushTimer) { clearInterval(_flushTimer); _flushTimer = null; }
+  if (_flushTimer) {
+    clearInterval(_flushTimer);
+    _flushTimer = null;
+  }
 }
 
 // ── Span lifecycle ─────────────────────────────────────────────────────────
 
-function genId(): string { return randomBytes(8).toString("hex"); }
-function nowNano(): string { return (BigInt(Date.now()) * 1_000_000n).toString(); }
+function genId(): string {
+  return randomBytes(8).toString("hex");
+}
+function nowNano(): string {
+  return (BigInt(Date.now()) * 1_000_000n).toString();
+}
 
 export function startSpan(opts: {
   name: string;
@@ -86,38 +95,45 @@ export function endSpan(spanId: string, extraAttributes?: Record<string, string 
 
 // ── Buffer access (testing) ────────────────────────────────────────────────
 
-export function getSpanBuffer(): OtlpSpan[] { return [..._buffer]; }
+export function getSpanBuffer(): OtlpSpan[] {
+  return [..._buffer];
+}
 
 // ── Flush ──────────────────────────────────────────────────────────────────
 
 function formatOtlpJson(spans: OtlpSpan[]): object {
   return {
-    resourceSpans: [{
-      resource: {
-        attributes: [
-          { key: "service.name", value: { stringValue: "ark" } },
+    resourceSpans: [
+      {
+        resource: {
+          attributes: [{ key: "service.name", value: { stringValue: "ark" } }],
+        },
+        scopeSpans: [
+          {
+            scope: { name: "ark.session" },
+            spans: spans.map((s) => ({
+              traceId: s.traceId,
+              spanId: s.spanId,
+              parentSpanId: s.parentSpanId ?? "",
+              name: s.name,
+              kind: 1,
+              startTimeUnixNano: s.startTimeUnixNano,
+              endTimeUnixNano: s.endTimeUnixNano ?? nowNano(),
+              attributes: Object.entries(s.attributes).map(([key, value]) => ({
+                key,
+                value:
+                  typeof value === "string"
+                    ? { stringValue: value }
+                    : typeof value === "number"
+                      ? { doubleValue: value }
+                      : { boolValue: value },
+              })),
+              status: { code: 0 },
+            })),
+          },
         ],
       },
-      scopeSpans: [{
-        scope: { name: "ark.session" },
-        spans: spans.map(s => ({
-          traceId: s.traceId,
-          spanId: s.spanId,
-          parentSpanId: s.parentSpanId ?? "",
-          name: s.name,
-          kind: 1,
-          startTimeUnixNano: s.startTimeUnixNano,
-          endTimeUnixNano: s.endTimeUnixNano ?? nowNano(),
-          attributes: Object.entries(s.attributes).map(([key, value]) => ({
-            key,
-            value: typeof value === "string" ? { stringValue: value }
-              : typeof value === "number" ? { doubleValue: value }
-              : { boolValue: value },
-          })),
-          status: { code: 0 },
-        })),
-      }],
-    }],
+    ],
   };
 }
 
@@ -149,9 +165,14 @@ export function getSessionTraceId(sessionId: string): string | undefined {
   return _sessionTraces.get(sessionId)?.traceId;
 }
 
-export function emitSessionSpanStart(sessionId: string, attrs: {
-  flow: string; repo?: string; agent?: string;
-}): void {
+export function emitSessionSpanStart(
+  sessionId: string,
+  attrs: {
+    flow: string;
+    repo?: string;
+    agent?: string;
+  },
+): void {
   const traceId = genId() + genId();
   const spanId = startSpan({
     name: "session",
@@ -166,9 +187,17 @@ export function emitSessionSpanStart(sessionId: string, attrs: {
   _sessionTraces.set(sessionId, { traceId, sessionSpanId: spanId });
 }
 
-export function emitSessionSpanEnd(sessionId: string, attrs: {
-  status: string; tokens_in?: number; tokens_out?: number; tokens_cache?: number; cost_usd?: number; turns?: number;
-}): void {
+export function emitSessionSpanEnd(
+  sessionId: string,
+  attrs: {
+    status: string;
+    tokens_in?: number;
+    tokens_out?: number;
+    tokens_cache?: number;
+    cost_usd?: number;
+    turns?: number;
+  },
+): void {
   const trace = _sessionTraces.get(sessionId);
   if (!trace) return;
   endSpan(trace.sessionSpanId, {
@@ -182,9 +211,14 @@ export function emitSessionSpanEnd(sessionId: string, attrs: {
   _sessionTraces.delete(sessionId);
 }
 
-export function emitStageSpanStart(sessionId: string, attrs: {
-  stage: string; agent?: string; gate?: string;
-}): void {
+export function emitStageSpanStart(
+  sessionId: string,
+  attrs: {
+    stage: string;
+    agent?: string;
+    gate?: string;
+  },
+): void {
   const trace = _sessionTraces.get(sessionId);
   if (!trace) return;
   if (trace.stageSpanId) endSpan(trace.stageSpanId);
@@ -201,9 +235,13 @@ export function emitStageSpanStart(sessionId: string, attrs: {
   trace.stageSpanId = spanId;
 }
 
-export function emitStageSpanEnd(sessionId: string, attrs?: {
-  status?: string; retries?: number;
-}): void {
+export function emitStageSpanEnd(
+  sessionId: string,
+  attrs?: {
+    status?: string;
+    retries?: number;
+  },
+): void {
   const trace = _sessionTraces.get(sessionId);
   if (!trace?.stageSpanId) return;
   endSpan(trace.stageSpanId, {

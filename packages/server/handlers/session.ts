@@ -219,7 +219,10 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   });
 
   router.handle("session/fan-out", async (params, notify) => {
-    const { sessionId, tasks } = extract<{ sessionId: string; tasks: Array<{ summary: string; agent?: string; flow?: string }> }>(params, ["sessionId", "tasks"]);
+    const { sessionId, tasks } = extract<{
+      sessionId: string;
+      tasks: Array<{ summary: string; agent?: string; flow?: string }>;
+    }>(params, ["sessionId", "tasks"]);
     const result = await app.sessionService.fanOut(sessionId, { tasks });
     if (!result.ok) throw new RpcError(result.message ?? "Fan-out failed", SESSION_NOT_FOUND);
     for (const childId of result.childIds ?? []) {
@@ -273,7 +276,13 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   });
 
   router.handle("worktree/create-pr", async (params, notify) => {
-    const { sessionId, title, body, base, draft } = extract<{ sessionId: string; title?: string; body?: string; base?: string; draft?: boolean }>(params, ["sessionId"]);
+    const { sessionId, title, body, base, draft } = extract<{
+      sessionId: string;
+      title?: string;
+      body?: string;
+      base?: string;
+      draft?: boolean;
+    }>(params, ["sessionId"]);
     const result = await app.sessionService.createWorktreePR(sessionId, { title, body, base, draft });
     const session = app.sessions.get(sessionId);
     if (session) notify("session/updated", { session });
@@ -282,7 +291,10 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
 
   router.handle("worktree/finish", async (params, _notify) => {
     const { sessionId, noMerge, createPR } = extract<WorktreeFinishParams>(params, ["sessionId"]);
-    const result = await app.sessionService.finishWorktree(sessionId, { noMerge: noMerge ?? false, createPR: createPR ?? false });
+    const result = await app.sessionService.finishWorktree(sessionId, {
+      noMerge: noMerge ?? false,
+      createPR: createPR ?? false,
+    });
     return result;
   });
 

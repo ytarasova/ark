@@ -14,7 +14,7 @@ import { tmuxBin } from "./tmux.js";
 export function updateTmuxStatusBar(app: AppContext): void {
   try {
     const sessions = app.sessions.list({ limit: 100 });
-    const waiting = sessions.filter(s => ["waiting", "blocked"].includes(s.status));
+    const waiting = sessions.filter((s) => ["waiting", "blocked"].includes(s.status));
 
     if (waiting.length === 0) {
       // Clear the status
@@ -38,5 +38,7 @@ export function updateTmuxStatusBar(app: AppContext): void {
 export function clearTmuxStatusBar(): void {
   try {
     execFileSync(tmuxBin(), ["set-option", "-g", "status-left", ""], { stdio: "ignore" });
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }

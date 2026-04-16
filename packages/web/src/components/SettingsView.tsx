@@ -49,12 +49,21 @@ export function SettingsView() {
     applyTheme(getStoredTheme());
   }, []);
 
-  const options: { id: Theme; label: string; icon: typeof Monitor; preview: { bg: string; bar: string; card: string } }[] = [
+  const options: {
+    id: Theme;
+    label: string;
+    icon: typeof Monitor;
+    preview: { bg: string; bar: string; card: string };
+  }[] = [
     {
       id: "system",
       label: "System",
       icon: Monitor,
-      preview: { bg: "bg-gradient-to-r from-zinc-800 to-zinc-200", bar: "bg-gradient-to-r from-zinc-700 to-zinc-300", card: "bg-gradient-to-r from-zinc-600 to-zinc-400" },
+      preview: {
+        bg: "bg-gradient-to-r from-zinc-800 to-zinc-200",
+        bar: "bg-gradient-to-r from-zinc-700 to-zinc-300",
+        card: "bg-gradient-to-r from-zinc-600 to-zinc-400",
+      },
     },
     {
       id: "dark",
@@ -76,9 +85,7 @@ export function SettingsView() {
 
       {/* Appearance */}
       <section className="mb-8">
-        <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-3">
-          Appearance
-        </h2>
+        <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-3">Appearance</h2>
         <div className="grid grid-cols-3 gap-3">
           {options.map((opt) => {
             const selected = theme === opt.id;
@@ -88,9 +95,7 @@ export function SettingsView() {
                 onClick={() => handleThemeChange(opt.id)}
                 className={cn(
                   "cursor-pointer p-3 transition-all",
-                  selected
-                    ? "ring-2 ring-primary border-primary"
-                    : "hover:border-ring hover:bg-accent"
+                  selected ? "ring-2 ring-primary border-primary" : "hover:border-ring hover:bg-accent",
                 )}
               >
                 {/* Mini preview */}
@@ -99,14 +104,10 @@ export function SettingsView() {
                   <div className={cn("flex-1 rounded", opt.preview.card)} />
                 </div>
                 <div className="flex items-center gap-2">
-                  <opt.icon size={14} className={cn(
-                    "shrink-0",
-                    selected ? "text-primary" : "text-muted-foreground"
-                  )} />
-                  <span className={cn(
-                    "text-[13px] font-medium",
-                    selected ? "text-foreground" : "text-muted-foreground"
-                  )}>
+                  <opt.icon size={14} className={cn("shrink-0", selected ? "text-primary" : "text-muted-foreground")} />
+                  <span
+                    className={cn("text-[13px] font-medium", selected ? "text-foreground" : "text-muted-foreground")}
+                  >
                     {opt.label}
                   </span>
                 </div>
@@ -118,9 +119,7 @@ export function SettingsView() {
 
       {/* About */}
       <section className="mb-8">
-        <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-3">
-          About
-        </h2>
+        <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-3">About</h2>
         <Card className="p-4">
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">

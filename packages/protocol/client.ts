@@ -8,36 +8,85 @@
 import type { Transport } from "./transport.js";
 import type { ConnectionStatus } from "./transport.js";
 import {
-  createRequest, createNotification,
-  isResponse, isError, isNotification,
-  ARK_VERSION, RpcError,
-  type RequestId, type JsonRpcMessage,
+  createRequest,
+  createNotification,
+  isResponse,
+  isError,
+  isNotification,
+  ARK_VERSION,
+  RpcError,
+  type RequestId,
+  type JsonRpcMessage,
 } from "./types.js";
 import type {
-  Session, Compute, Event, Message, AgentDefinition, FlowDefinition,
-  SessionOpResult, ComputeSnapshot,
-  Profile, ClaudeSession, ToolEntry, MemoryEntry, Schedule,
-  ConversationTurn, SearchResult,
-  SessionStartResult, SessionListParams, SessionListResult,
-  SessionReadResult, SessionUpdateResult,
-  SessionEventsResult, SessionMessagesResult, SessionSearchResult,
-  SessionConversationResult, SessionSearchConversationResult,
-  SessionOutputResult, SessionForkResult, SessionCloneResult,
-  ComputeCreateResult, ComputeListResult, ComputeReadResult,
-  ComputePingResult, ComputeCleanZombiesResult,
-  AgentListResult, AgentReadResult, FlowListResult, FlowReadResult,
-  SkillListResult, SkillReadResult,
-  RecipeListResult, RecipeReadResult, RecipeUseResult,
-  RuntimeListResult, RuntimeReadResult,
-  SkillDefinition, RecipeDefinition, RuntimeDefinition,
-  HistoryListResult, HistoryRefreshResult, HistoryIndexResult, HistorySearchResult,
-  HistoryRebuildFtsResult, HistoryImportResult,
-  MetricsSnapshotResult, CostsReadResult,
-  MemoryListResult, MemoryRecallResult, MemoryForgetResult, MemoryAddResult, MemoryClearResult,
-  ScheduleListResult, ScheduleCreateResult, ScheduleDeleteResult,
-  ProfileListResult, ProfileCreateResult,
+  Session,
+  Compute,
+  Event,
+  Message,
+  AgentDefinition,
+  FlowDefinition,
+  SessionOpResult,
+  ComputeSnapshot,
+  Profile,
+  ClaudeSession,
+  ToolEntry,
+  MemoryEntry,
+  Schedule,
+  ConversationTurn,
+  SearchResult,
+  SessionStartResult,
+  SessionListParams,
+  SessionListResult,
+  SessionReadResult,
+  SessionUpdateResult,
+  SessionEventsResult,
+  SessionMessagesResult,
+  SessionSearchResult,
+  SessionConversationResult,
+  SessionSearchConversationResult,
+  SessionOutputResult,
+  SessionForkResult,
+  SessionCloneResult,
+  ComputeCreateResult,
+  ComputeListResult,
+  ComputeReadResult,
+  ComputePingResult,
+  ComputeCleanZombiesResult,
+  AgentListResult,
+  AgentReadResult,
+  FlowListResult,
+  FlowReadResult,
+  SkillListResult,
+  SkillReadResult,
+  RecipeListResult,
+  RecipeReadResult,
+  RecipeUseResult,
+  RuntimeListResult,
+  RuntimeReadResult,
+  SkillDefinition,
+  RecipeDefinition,
+  RuntimeDefinition,
+  HistoryListResult,
+  HistoryRefreshResult,
+  HistoryIndexResult,
+  HistorySearchResult,
+  HistoryRebuildFtsResult,
+  HistoryImportResult,
+  MetricsSnapshotResult,
+  CostsReadResult,
+  MemoryListResult,
+  MemoryRecallResult,
+  MemoryForgetResult,
+  MemoryAddResult,
+  MemoryClearResult,
+  ScheduleListResult,
+  ScheduleCreateResult,
+  ScheduleDeleteResult,
+  ProfileListResult,
+  ProfileCreateResult,
   ToolsListResult,
-  GroupListResult, GroupCreateResult,
+  GroupListResult,
+  GroupCreateResult,
   ConfigReadResult,
   IndexStatsResult,
 } from "../types/index.js";
@@ -77,7 +126,9 @@ export class ArkClient {
   /** Subscribe to connection status changes. Returns an unsubscribe function. */
   onConnectionStatus(handler: (status: ConnectionStatus) => void): () => void {
     this._statusHandlers.add(handler);
-    return () => { this._statusHandlers.delete(handler); };
+    return () => {
+      this._statusHandlers.delete(handler);
+    };
   }
 
   /** Called by the transport layer (or externally) to update connection status. */
@@ -130,8 +181,14 @@ export class ArkClient {
       }, timeoutMs);
 
       this.pending.set(id, {
-        resolve: (v) => { clearTimeout(timer); resolve(v); },
-        reject: (e) => { clearTimeout(timer); reject(e); },
+        resolve: (v) => {
+          clearTimeout(timer);
+          resolve(v);
+        },
+        reject: (e) => {
+          clearTimeout(timer);
+          reject(e);
+        },
       });
       this.transport.send(createRequest(id, method, params));
     });
@@ -247,7 +304,10 @@ export class ArkClient {
   }
 
   async sessionSearchConversation(sessionId: string, query: string): Promise<SearchResult[]> {
-    const { results } = await this.rpc<SessionSearchConversationResult>("session/search-conversation", { sessionId, query });
+    const { results } = await this.rpc<SessionSearchConversationResult>("session/search-conversation", {
+      sessionId,
+      query,
+    });
     return results;
   }
 
@@ -255,14 +315,27 @@ export class ArkClient {
     return this.rpc<SessionOpResult>("worktree/finish", { sessionId, ...opts });
   }
 
-  async worktreeCreatePR(sessionId: string, opts?: { title?: string; body?: string; base?: string; draft?: boolean }): Promise<SessionOpResult & { pr_url?: string }> {
+  async worktreeCreatePR(
+    sessionId: string,
+    opts?: { title?: string; body?: string; base?: string; draft?: boolean },
+  ): Promise<SessionOpResult & { pr_url?: string }> {
     return this.rpc("worktree/create-pr", { sessionId, ...opts });
   }
 
-  async worktreeDiff(sessionId: string, opts?: { base?: string }): Promise<{
-    ok: boolean; stat: string; diff: string; branch: string; baseBranch: string;
-    filesChanged: number; insertions: number; deletions: number;
-    modifiedSinceReview: string[]; message?: string;
+  async worktreeDiff(
+    sessionId: string,
+    opts?: { base?: string },
+  ): Promise<{
+    ok: boolean;
+    stat: string;
+    diff: string;
+    branch: string;
+    baseBranch: string;
+    filesChanged: number;
+    insertions: number;
+    deletions: number;
+    modifiedSinceReview: string[];
+    message?: string;
   }> {
     return this.rpc("worktree/diff", { sessionId, ...opts });
   }
@@ -293,7 +366,10 @@ export class ArkClient {
     return agent;
   }
 
-  async agentSave(agent: Partial<AgentDefinition> & { name: string }, opts?: { scope?: "global" | "project"; update?: boolean }): Promise<{ ok: boolean; name: string; scope: string }> {
+  async agentSave(
+    agent: Partial<AgentDefinition> & { name: string },
+    opts?: { scope?: "global" | "project"; update?: boolean },
+  ): Promise<{ ok: boolean; name: string; scope: string }> {
     const method = opts?.update ? "agent/update" : "agent/create";
     return this.rpc(method, { ...agent, scope: opts?.scope });
   }
@@ -312,7 +388,12 @@ export class ArkClient {
     return flow;
   }
 
-  async flowCreate(opts: { name: string; description?: string; stages: FlowDefinition["stages"]; scope?: "global" | "project" }): Promise<{ ok: boolean; name: string }> {
+  async flowCreate(opts: {
+    name: string;
+    description?: string;
+    stages: FlowDefinition["stages"];
+    scope?: "global" | "project";
+  }): Promise<{ ok: boolean; name: string }> {
     return this.rpc("flow/create", opts as unknown as Record<string, unknown>);
   }
 
@@ -330,7 +411,10 @@ export class ArkClient {
     return skill;
   }
 
-  async skillSave(skill: Partial<SkillDefinition> & { name: string }, opts?: { scope?: "global" | "project" }): Promise<{ ok: boolean; name: string; scope: string }> {
+  async skillSave(
+    skill: Partial<SkillDefinition> & { name: string },
+    opts?: { scope?: "global" | "project" },
+  ): Promise<{ ok: boolean; name: string; scope: string }> {
     return this.rpc("skill/save", { ...skill, scope: opts?.scope });
   }
 
@@ -422,11 +506,15 @@ export class ArkClient {
     return this.rpc<ComputeCleanZombiesResult>("compute/clean-zombies");
   }
 
-  async computeTemplateList(): Promise<{ templates: Array<{ name: string; description?: string; provider: string; config: Record<string, unknown> }> }> {
+  async computeTemplateList(): Promise<{
+    templates: Array<{ name: string; description?: string; provider: string; config: Record<string, unknown> }>;
+  }> {
     return this.rpc("compute/template/list");
   }
 
-  async computeTemplateGet(name: string): Promise<{ name: string; description?: string; provider: string; config: Record<string, unknown> } | null> {
+  async computeTemplateGet(
+    name: string,
+  ): Promise<{ name: string; description?: string; provider: string; config: Record<string, unknown> } | null> {
     return this.rpc("compute/template/get", { name });
   }
 
@@ -508,7 +596,13 @@ export class ArkClient {
     await this.rpc("tools/delete", { id });
   }
 
-  async toolsDeleteItem(opts: { name: string; kind: string; source?: string; scope?: string; projectRoot?: string }): Promise<void> {
+  async toolsDeleteItem(opts: {
+    name: string;
+    kind: string;
+    source?: string;
+    scope?: string;
+    projectRoot?: string;
+  }): Promise<void> {
     await this.rpc("tools/delete", opts);
   }
 
@@ -556,20 +650,37 @@ export class ArkClient {
     cache_write_tokens: number;
     total_tokens: number;
     records: Array<{
-      id: number; session_id: string; tenant_id: string; model: string; provider: string;
-      runtime: string | null; agent_role: string | null;
-      input_tokens: number; output_tokens: number; cache_read_tokens: number; cache_write_tokens: number;
-      cost_usd: number; source: string; created_at: string;
+      id: number;
+      session_id: string;
+      tenant_id: string;
+      model: string;
+      provider: string;
+      runtime: string | null;
+      agent_role: string | null;
+      input_tokens: number;
+      output_tokens: number;
+      cache_read_tokens: number;
+      cache_write_tokens: number;
+      cost_usd: number;
+      source: string;
+      created_at: string;
     }>;
   }> {
     return this.rpc("costs/session", { sessionId });
   }
 
   async costsRecord(opts: {
-    sessionId: string; model: string; provider: string;
-    input_tokens?: number; output_tokens?: number;
-    cache_read_tokens?: number; cache_write_tokens?: number;
-    tenantId?: string; runtime?: string; agentRole?: string; source?: string;
+    sessionId: string;
+    model: string;
+    provider: string;
+    input_tokens?: number;
+    output_tokens?: number;
+    cache_read_tokens?: number;
+    cache_write_tokens?: number;
+    tenantId?: string;
+    runtime?: string;
+    agentRole?: string;
+    source?: string;
   }): Promise<{ ok: boolean }> {
     return this.rpc("costs/record", opts as Record<string, unknown>);
   }
@@ -589,11 +700,17 @@ export class ArkClient {
     return this.rpc<SessionOpResult>("session/join", { sessionId, force });
   }
 
-  async sessionSpawn(sessionId: string, opts: { task: string; agent?: string; model?: string; group_name?: string }): Promise<SessionOpResult & { sessionId?: string }> {
+  async sessionSpawn(
+    sessionId: string,
+    opts: { task: string; agent?: string; model?: string; group_name?: string },
+  ): Promise<SessionOpResult & { sessionId?: string }> {
     return this.rpc<SessionOpResult & { sessionId?: string }>("session/spawn", { sessionId, ...opts });
   }
 
-  async sessionFanOut(sessionId: string, tasks: Array<{ summary: string; agent?: string; flow?: string }>): Promise<{ ok: boolean; childIds?: string[]; message?: string }> {
+  async sessionFanOut(
+    sessionId: string,
+    tasks: Array<{ summary: string; agent?: string; flow?: string }>,
+  ): Promise<{ ok: boolean; childIds?: string[]; message?: string }> {
     return this.rpc<{ ok: boolean; childIds?: string[]; message?: string }>("session/fan-out", { sessionId, tasks });
   }
 
@@ -643,7 +760,10 @@ export class ArkClient {
     return ok;
   }
 
-  async memoryAdd(content: string, opts?: { tags?: string[]; scope?: string; importance?: number }): Promise<MemoryEntry> {
+  async memoryAdd(
+    content: string,
+    opts?: { tags?: string[]; scope?: string; importance?: number },
+  ): Promise<MemoryEntry> {
     const { memory } = await this.rpc<MemoryAddResult>("memory/add", { content, ...opts });
     return memory;
   }
@@ -655,16 +775,35 @@ export class ArkClient {
 
   // ── Knowledge ──────────────────────────────────────────────────────────────
 
-  async knowledgeSearch(query: string, opts?: { types?: string[]; limit?: number }): Promise<Array<{ id: string; type: string; label: string; content: string | null; score: number; metadata: Record<string, unknown> }>> {
+  async knowledgeSearch(
+    query: string,
+    opts?: { types?: string[]; limit?: number },
+  ): Promise<
+    Array<{
+      id: string;
+      type: string;
+      label: string;
+      content: string | null;
+      score: number;
+      metadata: Record<string, unknown>;
+    }>
+  > {
     const { results } = await this.rpc<{ results: any[] }>("knowledge/search", { query, ...opts });
     return results;
   }
 
-  async knowledgeStats(): Promise<{ nodes: number; edges: number; by_node_type: Record<string, number>; by_edge_type: Record<string, number> }> {
+  async knowledgeStats(): Promise<{
+    nodes: number;
+    edges: number;
+    by_node_type: Record<string, number>;
+    by_edge_type: Record<string, number>;
+  }> {
     return this.rpc("knowledge/stats");
   }
 
-  async knowledgeIndex(repo?: string): Promise<{ ok: boolean; files?: number; symbols?: number; edges?: number; duration_ms?: number; error?: string }> {
+  async knowledgeIndex(
+    repo?: string,
+  ): Promise<{ ok: boolean; files?: number; symbols?: number; edges?: number; duration_ms?: number; error?: string }> {
     return this.rpc("knowledge/index", { repo });
   }
 
@@ -678,15 +817,49 @@ export class ArkClient {
 
   // ── Evals ─────────────────────────────────────────────────────────────────
 
-  async evalStats(agentRole?: string): Promise<{ stats: { totalSessions: number; completionRate: number; avgDurationMs: number; avgCost: number; avgTurns: number; testPassRate: number; prRate: number } }> {
+  async evalStats(agentRole?: string): Promise<{
+    stats: {
+      totalSessions: number;
+      completionRate: number;
+      avgDurationMs: number;
+      avgCost: number;
+      avgTurns: number;
+      testPassRate: number;
+      prRate: number;
+    };
+  }> {
     return this.rpc("eval/stats", { agentRole });
   }
 
-  async evalDrift(agentRole?: string, recentDays?: number): Promise<{ drift: { completionRateDelta: number; avgCostDelta: number; avgTurnsDelta: number; alert: boolean } }> {
+  async evalDrift(
+    agentRole?: string,
+    recentDays?: number,
+  ): Promise<{ drift: { completionRateDelta: number; avgCostDelta: number; avgTurnsDelta: number; alert: boolean } }> {
     return this.rpc("eval/drift", { agentRole, recentDays });
   }
 
-  async evalList(agentRole?: string, limit?: number): Promise<{ evals: Array<{ agentRole: string; runtime: string; model: string; sessionId: string; metrics: { completed: boolean; testsPassed: boolean | null; prCreated: boolean; turnCount: number; durationMs: number; tokenCost: number; filesChanged: number; retryCount: number }; timestamp: string }> }> {
+  async evalList(
+    agentRole?: string,
+    limit?: number,
+  ): Promise<{
+    evals: Array<{
+      agentRole: string;
+      runtime: string;
+      model: string;
+      sessionId: string;
+      metrics: {
+        completed: boolean;
+        testsPassed: boolean | null;
+        prCreated: boolean;
+        turnCount: number;
+        durationMs: number;
+        tokenCost: number;
+        filesChanged: number;
+        retryCount: number;
+      };
+      timestamp: string;
+    }>;
+  }> {
     return this.rpc("eval/list", { agentRole, limit });
   }
 
@@ -759,7 +932,13 @@ export class ArkClient {
   async dashboardSummary(): Promise<{
     counts: Record<string, number>;
     costs: { total: number; today: number; week: number; month: number; byModel: Record<string, number>; budget: any };
-    recentEvents: Array<{ sessionId: string; sessionSummary: string | null; type: string; data: any; created_at: string }>;
+    recentEvents: Array<{
+      sessionId: string;
+      sessionSummary: string | null;
+      type: string;
+      data: any;
+      created_at: string;
+    }>;
     topCostSessions: Array<{ sessionId: string; summary: string | null; model: string | null; cost: number }>;
     system: { conductor: boolean; router: boolean };
     activeCompute: number;

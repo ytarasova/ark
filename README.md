@@ -26,6 +26,10 @@ make install    # requires Bun + tmux pre-installed
 
 Run `ark doctor` to verify your environment.
 
+Prefer a native window? Install the [Ark Desktop app](packages/desktop/INSTALL.md)
+(macOS, Windows, Linux). macOS users: there's an unsigned-build workaround
+documented in the desktop install guide.
+
 ## Quick Start
 
 ```bash
@@ -34,9 +38,6 @@ ark session start --repo . --summary "Add user auth" --dispatch
 
 # Or use a recipe template
 ark session start --recipe quick-fix --repo . --dispatch
-
-# Launch the terminal dashboard
-ark tui
 
 # Launch the web dashboard (or desktop app)
 ark web
@@ -63,16 +64,15 @@ ark search "authentication"
 | **Auto-Index on Dispatch** | Local mode honors `knowledge.auto_index` config. Remote compute (arkd) ALWAYS indexes via `/codegraph/index` endpoint | [Guide](docs/guide.md#knowledge-graph) |
 | **Runtime Billing Modes** | `api` (per-token pricing), `subscription` (e.g. Claude Max $200/mo, tokens recorded for rate limits), `free`. Polymorphic transcript parsers per runtime | [CLAUDE.md](CLAUDE.md#runtimes) |
 | **Dashboard** | Fleet status overview with cost charts (Recharts), budget tracking, and recent activity | [CLI](docs/cli-reference.md#ark-dashboard) |
-| **TUI Dashboard** | 10-tab terminal UI with keyboard-driven navigation, search, status filters | [TUI Reference](docs/tui-reference.md) |
 | **Web Dashboard** | Browser-based session management with SSE live updates, token auth, read-only mode | [Guide](docs/guide.md#web-dashboard) |
-| **Desktop App** | Electron wrapper around the web dashboard -- native menus, system tray, local-first | -- |
+| **Desktop App** | Electron wrapper around the web dashboard -- native menus, local-first | [Install](packages/desktop/INSTALL.md) |
 | **Compute Providers** | Local, Docker, DevContainer, Firecracker, EC2 + arkd (base/docker/devcontainer/firecracker), E2B (managed sandbox), K8s, K8s+Kata | [Guide](docs/guide.md#compute) |
 | **Git Worktrees** | Automatic branch isolation per session, diff preview, merge + auto-PR in one command | [Guide](docs/guide.md#git-worktrees) |
 | **Skills & Recipes** | Reusable prompt fragments and session templates with three-tier resolution | [Guide](docs/guide.md#skills--recipes) |
 | **Cost Tracking** | Automatic token usage collection, per-model pricing, budget limits, cost export | [Guide](docs/guide.md#cost-tracking) |
 | **Search** | Full-text search across sessions, events, messages, and transcripts (FTS5) | [Guide](docs/guide.md#search) |
 | **Auth & Multi-Tenancy** | API key auth, tenant scoping, role-based access (admin/member/viewer) | [CLI](docs/cli-reference.md#ark-auth) |
-| **Remote Client Mode** | CLI/TUI/Web connect to a hosted Ark server via `--server`/`--token` | [Guide](docs/guide.md#remote-client-mode) |
+| **Remote Client Mode** | CLI/Web connect to a hosted Ark server via `--server`/`--token` | [Guide](docs/guide.md#remote-client-mode) |
 | **Control Plane** | Worker registry, session scheduler, tenant policies, Redis SSE bus | [Guide](docs/guide.md#control-plane) |
 | **MCP Socket Pooling** | 85-90% memory reduction by sharing MCP server processes across agents | [Guide](docs/guide.md#mcp-socket-pooling) |
 | **MCP Config Stubs** | Pre-configured integrations for Atlassian, GitHub, Linear, Figma | -- |
@@ -99,7 +99,6 @@ packages/
               e2b, k8s, k8s-kata
   arkd/       Universal agent daemon -- HTTP server on every compute target
   router/     LLM Router -- OpenAI-compatible proxy with routing policies
-  tui/        React + Ink terminal dashboard (10 tabs)
   web/        Vite-based web dashboard (SSE live updates, Dashboard page)
   desktop/    Electron shell wrapping the web dashboard
   server/     JSON-RPC handlers (delegate to services via AppContext)
@@ -127,8 +126,7 @@ docs/         User documentation + GitHub Pages site
 
 - **[User Guide](docs/guide.md)** -- comprehensive feature walkthrough
 - **[CLI Reference](docs/cli-reference.md)** -- every command, option, and example
-- **[TUI Reference](docs/tui-reference.md)** -- all keyboard shortcuts by tab
-- **[Configuration](docs/configuration.md)** -- config files, hotkeys, themes, budgets
+- **[Configuration](docs/configuration.md)** -- config files, themes, budgets
 - **[CLAUDE.md](CLAUDE.md)** -- developer documentation (architecture, testing, gotchas)
 - **[Contributing](CONTRIBUTING.md)** -- development setup, testing, and PR guidelines
 
@@ -138,7 +136,6 @@ docs/         User documentation + GitHub Pages site
 make dev              # TypeScript watch mode
 make test             # Run all tests sequentially (never parallel -- ports collide)
 make test-file F=path # Run a single test file
-make tui              # Launch TUI from source
 make web              # Launch web dashboard
 make desktop          # Launch Electron desktop app
 make desktop-build    # Package Electron app for distribution

@@ -5,7 +5,8 @@ import { getArkClient } from "./_shared.js";
 export function registerScheduleCommands(program: Command) {
   const schedule = program.command("schedule").description("Manage scheduled recurring sessions");
 
-  schedule.command("add")
+  schedule
+    .command("add")
     .description("Create a recurring scheduled session")
     .requiredOption("--cron <expression>", 'Cron expression (e.g., "0 2 * * *")')
     .option("-f, --flow <name>", "Flow name", "bare")
@@ -30,7 +31,8 @@ export function registerScheduleCommands(program: Command) {
       if (sched.summary) console.log(`  Summary: ${sched.summary}`);
     });
 
-  schedule.command("list")
+  schedule
+    .command("list")
     .description("List all schedules")
     .action(async () => {
       const ark = await getArkClient();
@@ -42,11 +44,14 @@ export function registerScheduleCommands(program: Command) {
       for (const s of schedules) {
         const status = s.enabled ? chalk.green("●") : chalk.dim("○");
         const lastRun = s.last_run ? s.last_run.slice(0, 19) : "never";
-        console.log(`  ${status} ${chalk.dim(s.id)}  ${s.cron.padEnd(15)}  ${s.flow.padEnd(10)}  last:${lastRun}  ${s.summary || ""}`);
+        console.log(
+          `  ${status} ${chalk.dim(s.id)}  ${s.cron.padEnd(15)}  ${s.flow.padEnd(10)}  last:${lastRun}  ${s.summary || ""}`,
+        );
       }
     });
 
-  schedule.command("delete")
+  schedule
+    .command("delete")
     .description("Delete a schedule")
     .argument("<id>", "Schedule ID")
     .action(async (id) => {
@@ -55,7 +60,8 @@ export function registerScheduleCommands(program: Command) {
       console.log(ok ? chalk.green(`Deleted ${id}`) : chalk.red(`Schedule ${id} not found`));
     });
 
-  schedule.command("enable")
+  schedule
+    .command("enable")
     .description("Enable a schedule")
     .argument("<id>", "Schedule ID")
     .action(async (id) => {
@@ -64,7 +70,8 @@ export function registerScheduleCommands(program: Command) {
       console.log(chalk.green(`Enabled ${id}`));
     });
 
-  schedule.command("disable")
+  schedule
+    .command("disable")
     .description("Disable a schedule")
     .argument("<id>", "Schedule ID")
     .action(async (id) => {

@@ -66,7 +66,11 @@ beforeAll(() => {
 
 afterAll(() => {
   if (ownServer) server?.stop();
-  try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* cleanup */ }
+  try {
+    rmSync(tempDir, { recursive: true, force: true });
+  } catch {
+    /* cleanup */
+  }
 });
 
 // ── LocalWorktreeProvider ───────────────────────────────────────────────────
@@ -146,8 +150,8 @@ describe("LocalWorktreeProvider", () => {
 
   it("isolationModes includes worktree and inplace", () => {
     expect(provider.isolationModes.length).toBe(2);
-    expect(provider.isolationModes.map(m => m.value)).toContain("worktree");
-    expect(provider.isolationModes.map(m => m.value)).toContain("inplace");
+    expect(provider.isolationModes.map((m) => m.value)).toContain("worktree");
+    expect(provider.isolationModes.map((m) => m.value)).toContain("inplace");
   });
 
   // ── Agent lifecycle through arkd ────────────────────────────────────────
@@ -156,7 +160,11 @@ describe("LocalWorktreeProvider", () => {
     const TMUX_NAME = `local-wt-test-${Date.now()}`;
 
     afterAll(async () => {
-      try { await client.killAgent({ sessionName: TMUX_NAME }); } catch { /* cleanup */ }
+      try {
+        await client.killAgent({ sessionName: TMUX_NAME });
+      } catch {
+        /* cleanup */
+      }
     });
 
     it("launch creates tmux session", async () => {
@@ -167,9 +175,12 @@ describe("LocalWorktreeProvider", () => {
         ports: [],
       });
       expect(result).toBe(TMUX_NAME);
-      await waitFor(async () => {
-        return await provider.checkSession(compute, TMUX_NAME);
-      }, { timeout: 5000 });
+      await waitFor(
+        async () => {
+          return await provider.checkSession(compute, TMUX_NAME);
+        },
+        { timeout: 5000 },
+      );
     });
 
     it("checkSession returns true for running session", async () => {
@@ -178,10 +189,13 @@ describe("LocalWorktreeProvider", () => {
     });
 
     it("captureOutput returns content from tmux", async () => {
-      await waitFor(async () => {
-        const o = await provider.captureOutput(compute, makeSession(TMUX_NAME));
-        return o.includes("local-wt-running");
-      }, { timeout: 5000 });
+      await waitFor(
+        async () => {
+          const o = await provider.captureOutput(compute, makeSession(TMUX_NAME));
+          return o.includes("local-wt-running");
+        },
+        { timeout: 5000 },
+      );
       const output = await provider.captureOutput(compute, makeSession(TMUX_NAME));
       expect(output).toContain("local-wt-running");
     });
@@ -227,12 +241,12 @@ describe("LocalWorktreeProvider", () => {
       ]);
       expect(results.length).toBe(2);
 
-      const arkd = results.find(r => r.port === ARKD_PORT);
+      const arkd = results.find((r) => r.port === ARKD_PORT);
       expect(arkd?.listening).toBe(true);
       expect(arkd?.name).toBe("arkd");
       expect(arkd?.source).toBe("test");
 
-      const dead = results.find(r => r.port === 19999);
+      const dead = results.find((r) => r.port === 19999);
       expect(dead?.listening).toBe(false);
     });
   });
@@ -271,10 +285,13 @@ describe("LocalDockerProvider", () => {
         ports: [],
       });
 
-      await waitFor(() => {
-        const scriptPath = `/tmp/arkd-launcher-${TMUX_NAME}.sh`;
-        return existsSync(scriptPath);
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          const scriptPath = `/tmp/arkd-launcher-${TMUX_NAME}.sh`;
+          return existsSync(scriptPath);
+        },
+        { timeout: 5000 },
+      );
 
       // The script on disk is the wrapper (agentLaunch overwrites the writeFile content)
       const scriptPath = `/tmp/arkd-launcher-${TMUX_NAME}.sh`;
@@ -288,7 +305,11 @@ describe("LocalDockerProvider", () => {
       const status = await client.agentStatus({ sessionName: TMUX_NAME });
       expect(typeof status.running).toBe("boolean");
     } finally {
-      try { await client.killAgent({ sessionName: TMUX_NAME }); } catch { /* cleanup */ }
+      try {
+        await client.killAgent({ sessionName: TMUX_NAME });
+      } catch {
+        /* cleanup */
+      }
     }
   });
 });
@@ -325,10 +346,13 @@ describe("LocalDevcontainerProvider", () => {
         ports: [],
       });
 
-      await waitFor(() => {
-        const scriptPath = `/tmp/arkd-launcher-${TMUX_NAME}.sh`;
-        return existsSync(scriptPath);
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          const scriptPath = `/tmp/arkd-launcher-${TMUX_NAME}.sh`;
+          return existsSync(scriptPath);
+        },
+        { timeout: 5000 },
+      );
 
       // The script on disk is the wrapper (agentLaunch overwrites the writeFile content)
       const scriptPath = `/tmp/arkd-launcher-${TMUX_NAME}.sh`;
@@ -340,7 +364,11 @@ describe("LocalDevcontainerProvider", () => {
       const status = await client.agentStatus({ sessionName: TMUX_NAME });
       expect(typeof status.running).toBe("boolean");
     } finally {
-      try { await client.killAgent({ sessionName: TMUX_NAME }); } catch { /* cleanup */ }
+      try {
+        await client.killAgent({ sessionName: TMUX_NAME });
+      } catch {
+        /* cleanup */
+      }
     }
   });
 });
@@ -389,10 +417,13 @@ describe("LocalFirecrackerProvider", () => {
         ports: [],
       });
 
-      await waitFor(() => {
-        const scriptPath = `/tmp/arkd-launcher-${TMUX_NAME}.sh`;
-        return existsSync(scriptPath);
-      }, { timeout: 5000 });
+      await waitFor(
+        () => {
+          const scriptPath = `/tmp/arkd-launcher-${TMUX_NAME}.sh`;
+          return existsSync(scriptPath);
+        },
+        { timeout: 5000 },
+      );
 
       // The script on disk is the SSH wrapper (agentLaunch overwrites the writeFile content)
       const scriptPath = `/tmp/arkd-launcher-${TMUX_NAME}.sh`;
@@ -405,7 +436,11 @@ describe("LocalFirecrackerProvider", () => {
       const status = await client.agentStatus({ sessionName: TMUX_NAME });
       expect(typeof status.running).toBe("boolean");
     } finally {
-      try { await client.killAgent({ sessionName: TMUX_NAME }); } catch { /* cleanup */ }
+      try {
+        await client.killAgent({ sessionName: TMUX_NAME });
+      } catch {
+        /* cleanup */
+      }
     }
   });
 });

@@ -13,10 +13,10 @@ import type { Compute, ComputeProviderName } from "../../types/index.js";
 
 export interface ComputePool {
   name: string;
-  provider: string;          // "ec2", "k8s", "e2b", "docker", etc.
-  min: number;               // minimum warm instances
-  max: number;               // maximum instances
-  config: Record<string, unknown>;  // provider-specific config
+  provider: string; // "ec2", "k8s", "e2b", "docker", etc.
+  min: number; // minimum warm instances
+  max: number; // maximum instances
+  config: Record<string, unknown>; // provider-specific config
 }
 
 export interface ComputePoolRow {
@@ -31,8 +31,8 @@ export interface ComputePoolRow {
 }
 
 export interface ComputePoolStatus extends ComputePool {
-  active: number;     // instances currently assigned to sessions
-  available: number;  // instances idle and ready
+  active: number; // instances currently assigned to sessions
+  available: number; // instances idle and ready
 }
 
 // ── Schema ─────────────────────────────────────────────────────────────────
@@ -60,8 +60,12 @@ export class ComputePoolManager {
 
   constructor(private app: AppContext) {}
 
-  setTenant(id: string): void { this.tenantId = id; }
-  getTenant(): string { return this.tenantId; }
+  setTenant(id: string): void {
+    this.tenantId = id;
+  }
+  getTenant(): string {
+    return this.tenantId;
+  }
 
   /** Ensure the compute_pools table exists. */
   ensureSchema(): void {
@@ -72,17 +76,23 @@ export class ComputePoolManager {
   createPool(pool: ComputePool): ComputePool {
     this.ensureSchema();
     const ts = new Date().toISOString();
-    this.app.db.prepare(`
+    this.app.db
+      .prepare(
+        `
       INSERT INTO compute_pools (name, provider, min_instances, max_instances, config, tenant_id, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(pool.name, pool.provider, pool.min, pool.max, JSON.stringify(pool.config), this.tenantId, ts, ts);
+    `,
+      )
+      .run(pool.name, pool.provider, pool.min, pool.max, JSON.stringify(pool.config), this.tenantId, ts, ts);
     return pool;
   }
 
   /** Get a pool by name. Returns null if not found. */
   getPool(name: string): ComputePool | null {
     this.ensureSchema();
-    const row = this.app.db.prepare("SELECT * FROM compute_pools WHERE name = ? AND tenant_id = ?").get(name, this.tenantId) as ComputePoolRow | undefined;
+    const row = this.app.db
+      .prepare("SELECT * FROM compute_pools WHERE name = ? AND tenant_id = ?")
+      .get(name, this.tenantId) as ComputePoolRow | undefined;
     if (!row) return null;
     return this._rowToPool(row);
   }
@@ -90,7 +100,9 @@ export class ComputePoolManager {
   /** Delete a pool definition. Returns true if deleted. */
   deletePool(name: string): boolean {
     this.ensureSchema();
-    const result = this.app.db.prepare("DELETE FROM compute_pools WHERE name = ? AND tenant_id = ?").run(name, this.tenantId);
+    const result = this.app.db
+      .prepare("DELETE FROM compute_pools WHERE name = ? AND tenant_id = ?")
+      .run(name, this.tenantId);
     return (result?.changes ?? 0) > 0;
   }
 
@@ -105,14 +117,10 @@ export class ComputePoolManager {
     // Find computes belonging to this pool that are not assigned to any running session
     const poolComputes = this._getPoolComputes(poolName);
     const runningSessions = this.app.sessions.list({ status: "running" });
-    const busyComputeNames = new Set(
-      runningSessions
-        .map(s => s.compute_name)
-        .filter(Boolean) as string[]
-    );
+    const busyComputeNames = new Set(runningSessions.map((s) => s.compute_name).filter(Boolean) as string[]);
 
     // Find an idle compute in the pool
-    const idle = poolComputes.find(c => !busyComputeNames.has(c.name) && c.status === "running");
+    const idle = poolComputes.find((c) => !busyComputeNames.has(c.name) && c.status === "running");
     if (idle) return idle;
 
     // Check if we can provision a new one
@@ -148,8 +156,8 @@ export class ComputePoolManager {
     // If we're over min instances, we could optionally stop it.
     const poolComputes = this._getPoolComputes(poolName);
     const runningSessions = this.app.sessions.list({ status: "running" });
-    const busyCount = runningSessions.filter(s =>
-      s.compute_name && this._isPoolCompute(s.compute_name, poolName)
+    const busyCount = runningSessions.filter(
+      (s) => s.compute_name && this._isPoolCompute(s.compute_name, poolName),
     ).length;
 
     // If after release we have more running than min, and this compute
@@ -162,21 +170,19 @@ export class ComputePoolManager {
   /** List all pools with their current utilization. */
   listPools(): ComputePoolStatus[] {
     this.ensureSchema();
-    const rows = this.app.db.prepare("SELECT * FROM compute_pools WHERE tenant_id = ? ORDER BY name").all(this.tenantId) as ComputePoolRow[];
+    const rows = this.app.db
+      .prepare("SELECT * FROM compute_pools WHERE tenant_id = ? ORDER BY name")
+      .all(this.tenantId) as ComputePoolRow[];
     const runningSessions = this.app.sessions.list({ status: "running" });
 
-    return rows.map(row => {
+    return rows.map((row) => {
       const pool = this._rowToPool(row);
       const poolComputes = this._getPoolComputes(pool.name);
       const busyComputeNames = new Set(
-        runningSessions
-          .map(s => s.compute_name)
-          .filter(n => n && this._isPoolCompute(n, pool.name)) as string[]
+        runningSessions.map((s) => s.compute_name).filter((n) => n && this._isPoolCompute(n, pool.name)) as string[],
       );
       const active = busyComputeNames.size;
-      const available = poolComputes.filter(c =>
-        !busyComputeNames.has(c.name) && c.status === "running"
-      ).length;
+      const available = poolComputes.filter((c) => !busyComputeNames.has(c.name) && c.status === "running").length;
 
       return { ...pool, active, available };
     });
@@ -186,7 +192,11 @@ export class ComputePoolManager {
 
   private _rowToPool(row: ComputePoolRow): ComputePool {
     let config: Record<string, unknown> = {};
-    try { config = JSON.parse(row.config); } catch { /* default */ }
+    try {
+      config = JSON.parse(row.config);
+    } catch {
+      /* default */
+    }
     return {
       name: row.name,
       provider: row.provider,
@@ -197,7 +207,7 @@ export class ComputePoolManager {
   }
 
   private _getPoolComputes(poolName: string): Compute[] {
-    return this.app.computes.list().filter(c => this._isPoolCompute(c.name, poolName));
+    return this.app.computes.list().filter((c) => this._isPoolCompute(c.name, poolName));
   }
 
   private _isPoolCompute(computeName: string, poolName: string): boolean {

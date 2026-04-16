@@ -25,13 +25,21 @@ function createPair(): { client: ArkClient; server: ArkServer } {
   let serverHandler: (msg: JsonRpcMessage) => void = () => {};
 
   const clientTransport: Transport = {
-    send(msg) { setTimeout(() => serverHandler(msg), 0); },
-    onMessage(h) { clientHandler = h; },
+    send(msg) {
+      setTimeout(() => serverHandler(msg), 0);
+    },
+    onMessage(h) {
+      clientHandler = h;
+    },
     close() {},
   };
   const serverTransport: Transport = {
-    send(msg) { setTimeout(() => clientHandler(msg), 0); },
-    onMessage(h) { serverHandler = h; },
+    send(msg) {
+      setTimeout(() => clientHandler(msg), 0);
+    },
+    onMessage(h) {
+      serverHandler = h;
+    },
     close() {},
   };
 
@@ -150,7 +158,9 @@ describe("ArkClient", () => {
     // Create a transport that never responds
     const blackHoleTransport: Transport = {
       send() {},
-      onMessage(h) { clientHandler = h; },
+      onMessage(h) {
+        clientHandler = h;
+      },
       close() {},
     };
     const client = new ArkClient(blackHoleTransport);
@@ -203,7 +213,9 @@ describe("ArkClient", () => {
       send(msg) {
         if ("id" in msg && "method" in msg) sentIds.push(msg.id as number);
       },
-      onMessage(h) { clientHandler = h; },
+      onMessage(h) {
+        clientHandler = h;
+      },
       close() {},
     };
     const client = new ArkClient(spyTransport);

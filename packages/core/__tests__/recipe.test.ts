@@ -13,7 +13,7 @@ describe("recipe CRUD", () => {
   it("recipes.list returns builtin recipes", () => {
     const recipes = getApp().recipes.list();
     expect(recipes.length).toBeGreaterThan(0);
-    expect(recipes.some(r => r.name === "quick-fix")).toBe(true);
+    expect(recipes.some((r) => r.name === "quick-fix")).toBe(true);
   });
 
   it("recipes.get returns a recipe by name", () => {
@@ -51,13 +51,17 @@ describe("recipe CRUD", () => {
   });
 
   it("recipes.save and recipes.delete round-trip", () => {
-    getApp().recipes.save("test-recipe", {
-      name: "test-recipe",
-      description: "test",
-      flow: "bare",
-      repo: "/tmp/my-repo",
-      variables: [],
-    }, "global");
+    getApp().recipes.save(
+      "test-recipe",
+      {
+        name: "test-recipe",
+        description: "test",
+        flow: "bare",
+        repo: "/tmp/my-repo",
+        variables: [],
+      },
+      "global",
+    );
     const loaded = getApp().recipes.get("test-recipe");
     expect(loaded).not.toBeNull();
     expect(loaded!.repo).toBe("/tmp/my-repo");

@@ -12,7 +12,16 @@ export function registerKnowledgeHandlers(router: Router, app: AppContext): void
 
   router.handle("knowledge/stats", async () => {
     const nodeTypes = ["file", "symbol", "session", "memory", "learning", "skill", "recipe", "agent"] as const;
-    const edgeTypes = ["depends_on", "imports", "modified_by", "learned_from", "relates_to", "uses", "extracted_from", "co_changes"] as const;
+    const edgeTypes = [
+      "depends_on",
+      "imports",
+      "modified_by",
+      "learned_from",
+      "relates_to",
+      "uses",
+      "extracted_from",
+      "co_changes",
+    ] as const;
 
     const byNodeType: Record<string, number> = {};
     let totalNodes = 0;

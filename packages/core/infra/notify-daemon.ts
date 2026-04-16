@@ -71,7 +71,7 @@ export class NotifyDaemon {
         if (prev && prev !== s.status) {
           const shouldNotify =
             (prev === "running" && ["waiting", "blocked", "failed", "completed", "stopped"].includes(s.status)) ||
-            (s.status === "failed");
+            s.status === "failed";
 
           if (shouldNotify) {
             await this.bridge.notifySessionStatus(s, prev, s.status);
@@ -80,15 +80,17 @@ export class NotifyDaemon {
       }
 
       // Clean up stale entries
-      const currentIds = new Set(sessions.map(s => s.id));
+      const currentIds = new Set(sessions.map((s) => s.id));
       for (const id of this.lastStatuses.keys()) {
         if (!currentIds.has(id)) this.lastStatuses.delete(id);
       }
 
       // Adaptive polling interval
-      const interval = hasRunning ? this.opts.activeIntervalMs
-        : hasWaiting ? this.opts.waitingIntervalMs
-        : this.opts.idleIntervalMs;
+      const interval = hasRunning
+        ? this.opts.activeIntervalMs
+        : hasWaiting
+          ? this.opts.waitingIntervalMs
+          : this.opts.idleIntervalMs;
 
       this.opts.onPoll?.();
       this.timer = setTimeout(() => this.poll(), interval);

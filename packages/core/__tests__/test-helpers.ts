@@ -50,15 +50,30 @@ export function killNewArkTmuxSessions(preExisting: Set<string>): void {
         // Kill child processes inside the tmux session first
         try {
           const panes = execFileSync("tmux", ["list-panes", "-t", name, "-F", "#{pane_pid}"], {
-            encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"],
+            encoding: "utf-8",
+            stdio: ["pipe", "pipe", "pipe"],
           });
           for (const pid of panes.split("\n").filter(Boolean)) {
-            try { execFileSync("pkill", ["-9", "-P", pid], { stdio: "pipe" }); } catch { /* process may already be dead */ }
-            try { process.kill(parseInt(pid), 9); } catch { /* process may already be dead */ }
+            try {
+              execFileSync("pkill", ["-9", "-P", pid], { stdio: "pipe" });
+            } catch {
+              /* process may already be dead */
+            }
+            try {
+              process.kill(parseInt(pid), 9);
+            } catch {
+              /* process may already be dead */
+            }
           }
-        } catch { /* pane listing may fail */ }
+        } catch {
+          /* pane listing may fail */
+        }
         // Then kill the tmux session
-        try { execFileSync("tmux", ["kill-session", "-t", name], { stdio: "pipe" }); } catch { /* session may already be dead */ }
+        try {
+          execFileSync("tmux", ["kill-session", "-t", name], { stdio: "pipe" });
+        } catch {
+          /* session may already be dead */
+        }
       }
     }
   } catch {
@@ -166,14 +181,14 @@ export function mockCompute(overrides: Partial<Compute> & { name?: string } = {}
 /** Poll a condition until it's true or timeout. Better than arbitrary setTimeout. */
 export async function waitFor(
   condition: () => boolean | Promise<boolean>,
-  opts?: { timeout?: number; interval?: number; message?: string }
+  opts?: { timeout?: number; interval?: number; message?: string },
 ): Promise<void> {
   const timeout = opts?.timeout ?? 5000;
   const interval = opts?.interval ?? 50;
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     if (await condition()) return;
-    await new Promise(r => setTimeout(r, interval));
+    await new Promise((r) => setTimeout(r, interval));
   }
   throw new Error(opts?.message ?? `waitFor timed out after ${timeout}ms`);
 }

@@ -2,10 +2,7 @@ import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import * as core from "../../core/index.js";
-import type {
-  ScheduleDeleteParams,
-  ScheduleIdParams,
-} from "../../types/index.js";
+import type { ScheduleDeleteParams, ScheduleIdParams } from "../../types/index.js";
 
 export function registerScheduleHandlers(router: Router, app: AppContext): void {
   router.handle("schedule/list", async () => ({
@@ -13,7 +10,15 @@ export function registerScheduleHandlers(router: Router, app: AppContext): void 
   }));
 
   router.handle("schedule/create", async (p) => {
-    const opts = extract<{ cron: string; flow?: string; repo?: string; workdir?: string; summary?: string; compute_name?: string; group_name?: string }>(p, ["cron"]);
+    const opts = extract<{
+      cron: string;
+      flow?: string;
+      repo?: string;
+      workdir?: string;
+      summary?: string;
+      compute_name?: string;
+      group_name?: string;
+    }>(p, ["cron"]);
     return { schedule: core.createSchedule(app, opts) };
   });
 

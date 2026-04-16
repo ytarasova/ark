@@ -7,7 +7,14 @@ import { describe, it, expect } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { withTestContext } from "./test-helpers.js";
-import { interrupt, worktreeDiff, createWorktreePR, mergeWorktreePR, executeAction, runVerification } from "../services/session-orchestration.js";
+import {
+  interrupt,
+  worktreeDiff,
+  createWorktreePR,
+  mergeWorktreePR,
+  executeAction,
+  runVerification,
+} from "../services/session-orchestration.js";
 import { getStageDefinition } from "../state/flow.js";
 import { loadRepoConfig } from "../repo-config.js";
 import { getApp } from "../app.js";
@@ -396,10 +403,7 @@ describe("RepoConfig verify field", () => {
   it("loadRepoConfig reads other fields alongside verify", () => {
     const tmpDir = join(getApp().arkDir, "test-repo-full");
     mkdirSync(tmpDir, { recursive: true });
-    writeFileSync(
-      join(tmpDir, ".ark.yaml"),
-      "flow: quick\ncompute: local\nverify:\n  - make test\n"
-    );
+    writeFileSync(join(tmpDir, ".ark.yaml"), "flow: quick\ncompute: local\nverify:\n  - make test\n");
 
     const config = loadRepoConfig(tmpDir);
     expect(config.flow).toBe("quick");
@@ -491,8 +495,20 @@ describe("cli-agent executor", () => {
 
   it("launch fails without command", async () => {
     const result = await cliAgentExecutor.launch({
-      sessionId: "s-test", workdir: "/tmp", task: "test",
-      agent: { name: "test", model: "test", max_turns: 1, system_prompt: "", tools: [], skills: [], mcp_servers: [], permission_mode: "bypassPermissions", env: {} },
+      sessionId: "s-test",
+      workdir: "/tmp",
+      task: "test",
+      agent: {
+        name: "test",
+        model: "test",
+        max_turns: 1,
+        system_prompt: "",
+        tools: [],
+        skills: [],
+        mcp_servers: [],
+        permission_mode: "bypassPermissions",
+        env: {},
+      },
     });
     expect(result.ok).toBe(false);
     expect(result.message).toContain("no command");

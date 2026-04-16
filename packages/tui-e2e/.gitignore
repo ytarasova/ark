@@ -1,6 +1,0 @@
-node_modules/
-test-results/
-playwright-report/
-bun.lock
-.claude/
-.mcp.json

@@ -85,18 +85,22 @@ const shellQuote = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
 
 /** Quote CLI args for bash, preserving --flags unquoted. */
 export function shellQuoteArgs(claudeArgs: string[]): string {
-  return claudeArgs.map((arg, i) => {
-    if (arg.startsWith("--")) return arg;
-    const prev = claudeArgs[i - 1];
-    if (prev && prev.startsWith("--")) return shellQuote(arg);
-    return arg;
-  }).join(" ");
+  return claudeArgs
+    .map((arg, i) => {
+      if (arg.startsWith("--")) return arg;
+      const prev = claudeArgs[i - 1];
+      if (prev && prev.startsWith("--")) return shellQuote(arg);
+      return arg;
+    })
+    .join(" ");
 }
 
 // ── Channel MCP config ──────────────────────────────────────────────────────
 
 export function channelMcpConfig(
-  sessionId: string, stage: string, channelPort: number,
+  sessionId: string,
+  stage: string,
+  channelPort: number,
   opts?: { conductorUrl?: string; tenantId?: string },
 ): Record<string, unknown> {
   const env: Record<string, string> = {
@@ -126,18 +130,29 @@ export function channelMcpConfig(
  * in the loaded MCP config, so the server must be in .mcp.json.
  */
 export function writeChannelConfig(
-  sessionId: string, stage: string, channelPort: number,
+  sessionId: string,
+  stage: string,
+  channelPort: number,
   workdir: string,
-  opts?: { conductorUrl?: string; channelConfig?: Record<string, unknown>; tracksDir?: string; originalRepoDir?: string },
+  opts?: {
+    conductorUrl?: string;
+    channelConfig?: Record<string, unknown>;
+    tracksDir?: string;
+    originalRepoDir?: string;
+  },
 ): string {
-  const config = opts?.channelConfig ?? channelMcpConfig(sessionId, stage, channelPort, { conductorUrl: opts?.conductorUrl });
+  const config =
+    opts?.channelConfig ?? channelMcpConfig(sessionId, stage, channelPort, { conductorUrl: opts?.conductorUrl });
 
   // Write to worktree .mcp.json so Claude finds it
   const mcpConfigPath = join(workdir, ".mcp.json");
   let existing: Record<string, any> = {};
   if (existsSync(mcpConfigPath)) {
-    try { existing = JSON.parse(readFileSync(mcpConfigPath, "utf-8")); }
-    catch (e: any) { console.error(`writeChannelConfig: failed to parse ${mcpConfigPath}:`, e?.message ?? e); }
+    try {
+      existing = JSON.parse(readFileSync(mcpConfigPath, "utf-8"));
+    } catch (e: any) {
+      console.error(`writeChannelConfig: failed to parse ${mcpConfigPath}:`, e?.message ?? e);
+    }
   }
 
   // Merge MCP servers from the original repo's .mcp.json into the worktree.
@@ -158,7 +173,10 @@ export function writeChannelConfig(
           }
         }
       } catch (e: any) {
-        console.error(`writeChannelConfig: failed to merge original repo MCP config from ${origMcpPath}:`, e?.message ?? e);
+        console.error(
+          `writeChannelConfig: failed to merge original repo MCP config from ${origMcpPath}:`,
+          e?.message ?? e,
+        );
       }
     }
   }
@@ -229,7 +247,7 @@ export function buildPermissionsAllow(agent: AgentToolSpec): string[] {
     if (!declared.has(name)) {
       throw new Error(
         `Agent tool entry 'mcp__${name}__*' references MCP server '${name}' ` +
-        `which is not declared in mcp_servers. Add '${name}' to mcp_servers or remove the tool entry.`,
+          `which is not declared in mcp_servers. Add '${name}' to mcp_servers or remove the tool entry.`,
       );
     }
   }
@@ -349,7 +367,9 @@ export interface ClaudeSettingsOpts {
  *   3. _ark metadata -- tracks which settings are ark-managed for clean teardown
  */
 export function writeSettings(
-  sessionId: string, conductorUrl: string, workdir: string,
+  sessionId: string,
+  conductorUrl: string,
+  workdir: string,
   opts?: ClaudeSettingsOpts,
 ): string {
   const claudeDir = join(workdir, ".claude");
@@ -358,8 +378,11 @@ export function writeSettings(
 
   let existing: Record<string, unknown> = {};
   if (existsSync(settingsPath)) {
-    try { existing = JSON.parse(readFileSync(settingsPath, "utf-8")); }
-    catch (e: any) { console.error(`writeSettings: failed to parse ${settingsPath}:`, e?.message ?? e); }
+    try {
+      existing = JSON.parse(readFileSync(settingsPath, "utf-8"));
+    } catch (e: any) {
+      console.error(`writeSettings: failed to parse ${settingsPath}:`, e?.message ?? e);
+    }
   }
 
   // Remove previous ark hooks (idempotent)
@@ -431,8 +454,12 @@ export function removeChannelConfig(workdir: string): void {
   if (!existsSync(mcpConfigPath)) return;
 
   let config: Record<string, any>;
-  try { config = JSON.parse(readFileSync(mcpConfigPath, "utf-8")); }
-  catch (e: any) { console.error(`removeChannelConfig: failed to parse ${mcpConfigPath}:`, e?.message ?? e); return; }
+  try {
+    config = JSON.parse(readFileSync(mcpConfigPath, "utf-8"));
+  } catch (e: any) {
+    console.error(`removeChannelConfig: failed to parse ${mcpConfigPath}:`, e?.message ?? e);
+    return;
+  }
 
   if (config.mcpServers && typeof config.mcpServers === "object") {
     delete config.mcpServers["ark-channel"];
@@ -441,7 +468,11 @@ export function removeChannelConfig(workdir: string): void {
 
   // If only empty object remains, remove the file entirely
   if (Object.keys(config).length === 0) {
-    try { unlinkSync(mcpConfigPath); } catch { /* already gone */ }
+    try {
+      unlinkSync(mcpConfigPath);
+    } catch {
+      /* already gone */
+    }
   } else {
     writeFileSync(mcpConfigPath, JSON.stringify(config, null, 2));
   }
@@ -453,8 +484,12 @@ export function removeSettings(workdir: string): void {
   if (!existsSync(settingsPath)) return;
 
   let settings: Record<string, unknown>;
-  try { settings = JSON.parse(readFileSync(settingsPath, "utf-8")); }
-  catch (e: any) { console.error(`removeSettings: failed to parse ${settingsPath}:`, e?.message ?? e); return; }
+  try {
+    settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
+  } catch (e: any) {
+    console.error(`removeSettings: failed to parse ${settingsPath}:`, e?.message ?? e);
+    return;
+  }
 
   const arkMeta = (settings._ark ?? {}) as Record<string, unknown>;
 
@@ -554,8 +589,11 @@ export function trustWorktree(originalRepo: string, worktreeDir: string): void {
   const wtProject = join(projectsDir, encode(worktreeDir));
 
   if (existsSync(origProject) && !existsSync(wtProject)) {
-    try { symlinkSync(origProject, wtProject); }
-    catch (e: any) { console.error(`trustWorktree: failed to symlink ${origProject} -> ${wtProject}:`, e?.message ?? e); }
+    try {
+      symlinkSync(origProject, wtProject);
+    } catch (e: any) {
+      console.error(`trustWorktree: failed to symlink ${origProject} -> ${wtProject}:`, e?.message ?? e);
+    }
   }
 
   trustDirectory(worktreeDir);
@@ -565,9 +603,7 @@ export function trustWorktree(originalRepo: string, worktreeDir: string): void {
 export function trustDirectory(dir: string): void {
   const claudeJsonPath = join(homedir(), ".claude.json");
   try {
-    const claudeJson = existsSync(claudeJsonPath)
-      ? JSON.parse(readFileSync(claudeJsonPath, "utf-8"))
-      : {};
+    const claudeJson = existsSync(claudeJsonPath) ? JSON.parse(readFileSync(claudeJsonPath, "utf-8")) : {};
     if (!claudeJson.projects) claudeJson.projects = {};
     const resolvedPath = resolve(dir);
     if (!claudeJson.projects[resolvedPath]?.hasTrustDialogAccepted) {
@@ -577,20 +613,16 @@ export function trustDirectory(dir: string): void {
       };
       writeFileSync(claudeJsonPath, JSON.stringify(claudeJson, null, 2));
     }
-  } catch (e: any) { console.error(`trustDirectory: failed to update ${claudeJsonPath}:`, e?.message ?? e); }
+  } catch (e: any) {
+    console.error(`trustDirectory: failed to update ${claudeJsonPath}:`, e?.message ?? e);
+  }
 }
 
 // ── Channel prompt auto-accept ───────────────────────────────────────────────
 
-const CHANNEL_PROMPT_MARKERS = [
-  "I am using this for local",
-  "local channel development",
-];
+const CHANNEL_PROMPT_MARKERS = ["I am using this for local", "local channel development"];
 /** Indicators that Claude is past all prompts and actively working. */
-const CLAUDE_WORKING_MARKERS = [
-  "ctrl+o to expand",
-  "esc to interrupt",
-];
+const CLAUDE_WORKING_MARKERS = ["ctrl+o to expand", "esc to interrupt"];
 
 /**
  * Poll tmux pane for the channel development prompt and auto-accept it.
@@ -620,7 +652,7 @@ export async function autoAcceptChannelPrompt(
       const output = await tmux.capturePaneAsync(tmuxName, { lines: 40 });
 
       // Found the channel development prompt -- accept it
-      if (CHANNEL_PROMPT_MARKERS.some(m => output.includes(m))) {
+      if (CHANNEL_PROMPT_MARKERS.some((m) => output.includes(m))) {
         // Option 1 is pre-selected (> prefix). Send "1" to select it,
         // brief pause, then Enter to confirm. Also try just Enter in case
         // the selection is already active.
@@ -635,16 +667,18 @@ export async function autoAcceptChannelPrompt(
       }
 
       // Claude is actively working -- safe to stop polling
-      if (CLAUDE_WORKING_MARKERS.some(m => output.includes(m))) {
+      if (CLAUDE_WORKING_MARKERS.some((m) => output.includes(m))) {
         return;
       }
 
       // If we already accepted at least once and the prompt markers are gone,
       // Claude is past the prompt even if working markers haven't appeared yet
-      if (accepted > 0 && !CHANNEL_PROMPT_MARKERS.some(m => output.includes(m))) {
+      if (accepted > 0 && !CHANNEL_PROMPT_MARKERS.some((m) => output.includes(m))) {
         return;
       }
-    } catch { /* tmux pane may not exist yet during startup */ }
+    } catch {
+      /* tmux pane may not exist yet during startup */
+    }
   }
 }
 
@@ -657,8 +691,10 @@ const deliveryInFlight = new Map<string, boolean>();
  * Tries arkd delivery first, then falls back to direct HTTP with retry.
  */
 export async function deliverTask(
-  sessionId: string, channelPort: number,
-  task: string, stage: string,
+  sessionId: string,
+  channelPort: number,
+  task: string,
+  stage: string,
   opts?: { arkdUrl?: string },
 ): Promise<void> {
   if (deliveryInFlight.get(sessionId)) return;
@@ -675,7 +711,10 @@ export async function deliverTask(
         const result = await client.channelDeliver({ channelPort, payload });
         if (result.delivered) return;
       } catch (e: any) {
-        console.error(`deliverTask: arkd delivery failed for session ${sessionId}, falling back to direct:`, e?.message ?? e);
+        console.error(
+          `deliverTask: arkd delivery failed for session ${sessionId}, falling back to direct:`,
+          e?.message ?? e,
+        );
       }
     }
 
@@ -692,7 +731,9 @@ export async function deliverTask(
           });
           return;
         }
-      } catch { /* channel port not ready yet -- retry */ }
+      } catch {
+        /* channel port not ready yet -- retry */
+      }
       await Bun.sleep(1000);
     }
   } finally {

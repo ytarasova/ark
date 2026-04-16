@@ -103,21 +103,23 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
 }
 
 @layer base {
   * {
     @apply border-border antialiased;
   }
-  button, [role="button"] {
+  button,
+  [role="button"] {
     cursor: pointer;
   }
   body {
     @apply bg-background text-foreground;
   }
-  html, body {
+  html,
+  body {
     width: 100vw;
     height: 100vh;
     margin: 0;
@@ -127,24 +129,62 @@
 }
 
 /* ---- Scrollbar ---- */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--ring); }
-::selection { background: var(--primary); color: white; }
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ring);
+}
+::selection {
+  background: var(--primary);
+  color: white;
+}
 
 /* ---- Animations ---- */
 @keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(52,211,153,0.5); }
-  50% { box-shadow: 0 0 12px rgba(52,211,153,0.3); }
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(52, 211, 153, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(52, 211, 153, 0.3);
+  }
 }
 @keyframes slide-up {
-  from { transform: translateY(8px); opacity: 0; }
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
 }
 @keyframes fade-in {
-  from { opacity: 0; }
+  from {
+    opacity: 0;
+  }
 }
 
 /* ---- Electron ---- */
-.drag-region { -webkit-app-region: drag; }
-.no-drag { -webkit-app-region: no-drag; }
+.drag-region {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* macOS Electron: push the sidebar header down so the "ark" brand and the
+   collapse chevron don't overlap the native traffic-light buttons
+   (red/yellow/green) at the top-left of the window. The body class is
+   added by packages/desktop/preload.js when running under Electron on
+   darwin. The 22px top padding clears the standard 28px traffic-light
+   strip; height auto + min-height keeps the row visually balanced. */
+body.is-macos .drag-region {
+  padding-top: 22px;
+  height: auto;
+  min-height: 66px;
+}

@@ -54,14 +54,17 @@ export async function checkForUpdate(arkDir?: string): Promise<string | null> {
     });
 
     if (!resp.ok) return null;
-    const data = await resp.json() as { tag_name: string };
+    const data = (await resp.json()) as { tag_name: string };
     const latest = data.tag_name?.replace(/^v/, "") ?? null;
 
-    writeFileSync(path, JSON.stringify({
-      lastCheck: new Date().toISOString(),
-      latestVersion: latest,
-      currentVersion: current,
-    }));
+    writeFileSync(
+      path,
+      JSON.stringify({
+        lastCheck: new Date().toISOString(),
+        latestVersion: latest,
+        currentVersion: current,
+      }),
+    );
 
     return latest && latest !== current ? latest : null;
   } catch {

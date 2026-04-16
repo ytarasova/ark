@@ -23,7 +23,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
       const res = await fetch("/api/rpc", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${key}`,
+          Authorization: `Bearer ${key}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "session/list", params: {} }),
@@ -66,14 +66,8 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               disabled={loading}
             />
           </div>
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={loading || !key.trim()}
-          >
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <Button type="submit" className="w-full" disabled={loading || !key.trim()}>
             {loading ? "Authenticating..." : "Sign In"}
           </Button>
         </form>

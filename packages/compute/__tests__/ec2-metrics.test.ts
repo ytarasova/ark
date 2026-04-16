@@ -1,11 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import {
-  SSH_FAST_CMD,
-  SSH_DOCKER_CMD,
-  parseSnapshot,
-  fetchMetrics,
-  fetchDocker,
-} from "../providers/ec2/metrics.js";
+import { SSH_FAST_CMD, SSH_DOCKER_CMD, parseSnapshot, fetchMetrics, fetchDocker } from "../providers/ec2/metrics.js";
 
 const SAMPLE_OUTPUT = `=== CPU ===
 23.5

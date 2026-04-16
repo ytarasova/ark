@@ -31,7 +31,12 @@ export async function execSession(opts: ExecOpts): Promise<number> {
 
   // Sanitize summary
   const rawSummary = opts.summary ?? opts.ticket ?? `exec-${Date.now()}`;
-  const summary = rawSummary.replace(/[^a-zA-Z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || rawSummary;
+  const summary =
+    rawSummary
+      .replace(/[^a-zA-Z0-9_-]/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 60) || rawSummary;
 
   // Create session
   log(`Creating session: ${summary}`);
@@ -69,14 +74,16 @@ export async function execSession(opts: ExecOpts): Promise<number> {
   // Result
   if (output === "json") {
     const usage = final.config?.usage;
-    console.log(JSON.stringify({
-      status: timedOut ? "timeout" : final.status,
-      sessionId: final.id,
-      flow: final.flow,
-      stage: final.stage,
-      error: final.error ?? null,
-      usage: usage ?? null,
-    }));
+    console.log(
+      JSON.stringify({
+        status: timedOut ? "timeout" : final.status,
+        sessionId: final.id,
+        flow: final.flow,
+        stage: final.stage,
+        error: final.error ?? null,
+        usage: usage ?? null,
+      }),
+    );
   } else {
     if (timedOut) {
       console.error(chalk.yellow(`Timeout after ${opts.timeout}s`));

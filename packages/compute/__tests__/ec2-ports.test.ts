@@ -1,10 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-  buildTunnelArgs,
-  setupTunnels,
-  teardownTunnels,
-  probeRemotePorts,
-} from "../providers/ec2/ports.js";
+import { buildTunnelArgs, setupTunnels, teardownTunnels, probeRemotePorts } from "../providers/ec2/ports.js";
 import type { PortDecl } from "../types.js";
 
 const KEY = "/tmp/test-key";

@@ -144,16 +144,31 @@ test("3 usage records aggregate to the correct total via RPC and DOM", async () 
   resetCosts(arkDir);
   // Seeded costs: 1.50 + 2.75 + 0.25 = 4.50 total
   seedUsageRecord(arkDir, {
-    sessionId: "s-aa0001", summary: "first task", model: "sonnet",
-    provider: "anthropic", inputTokens: 1000, outputTokens: 500, costUsd: 1.5,
+    sessionId: "s-aa0001",
+    summary: "first task",
+    model: "sonnet",
+    provider: "anthropic",
+    inputTokens: 1000,
+    outputTokens: 500,
+    costUsd: 1.5,
   });
   seedUsageRecord(arkDir, {
-    sessionId: "s-aa0002", summary: "second task", model: "sonnet",
-    provider: "anthropic", inputTokens: 2000, outputTokens: 900, costUsd: 2.75,
+    sessionId: "s-aa0002",
+    summary: "second task",
+    model: "sonnet",
+    provider: "anthropic",
+    inputTokens: 2000,
+    outputTokens: 900,
+    costUsd: 2.75,
   });
   seedUsageRecord(arkDir, {
-    sessionId: "s-aa0003", summary: "third task", model: "sonnet",
-    provider: "anthropic", inputTokens: 500, outputTokens: 200, costUsd: 0.25,
+    sessionId: "s-aa0003",
+    summary: "third task",
+    model: "sonnet",
+    provider: "anthropic",
+    inputTokens: 500,
+    outputTokens: 200,
+    costUsd: 0.25,
   });
 
   // RPC assertion -- the canonical truth: sum of cost_usd across records.
@@ -181,16 +196,31 @@ test("per-model breakdown aggregates records grouped by model", async () => {
   resetCosts(arkDir);
   // Seeded: claude-sonnet-4-6 totals $3.00 (1.25 + 1.75), gpt-5 totals $2.00
   seedUsageRecord(arkDir, {
-    sessionId: "s-bb0001", summary: "sonnet task A", model: "claude-sonnet-4-6",
-    provider: "anthropic", inputTokens: 1000, outputTokens: 500, costUsd: 1.25,
+    sessionId: "s-bb0001",
+    summary: "sonnet task A",
+    model: "claude-sonnet-4-6",
+    provider: "anthropic",
+    inputTokens: 1000,
+    outputTokens: 500,
+    costUsd: 1.25,
   });
   seedUsageRecord(arkDir, {
-    sessionId: "s-bb0002", summary: "sonnet task B", model: "claude-sonnet-4-6",
-    provider: "anthropic", inputTokens: 1200, outputTokens: 600, costUsd: 1.75,
+    sessionId: "s-bb0002",
+    summary: "sonnet task B",
+    model: "claude-sonnet-4-6",
+    provider: "anthropic",
+    inputTokens: 1200,
+    outputTokens: 600,
+    costUsd: 1.75,
   });
   seedUsageRecord(arkDir, {
-    sessionId: "s-bb0003", summary: "gpt task", model: "gpt-5",
-    provider: "openai", inputTokens: 800, outputTokens: 400, costUsd: 2.0,
+    sessionId: "s-bb0003",
+    summary: "gpt task",
+    model: "gpt-5",
+    provider: "openai",
+    inputTokens: 800,
+    outputTokens: 400,
+    costUsd: 2.0,
   });
 
   // RPC: verify grouping by model using the costs/summary endpoint.
@@ -226,18 +256,33 @@ test("cost_mode=subscription/free contribute zero dollars even with tokens", asy
   // One billed record ($1.00) + one subscription record (cost_usd=0, tokens>0)
   // + one free record (cost_usd=0, tokens>0). Total must equal $1.00.
   seedUsageRecord(arkDir, {
-    sessionId: "s-cc0001", summary: "api-billed task", model: "sonnet",
-    provider: "anthropic", inputTokens: 500, outputTokens: 250, costUsd: 1.0,
+    sessionId: "s-cc0001",
+    summary: "api-billed task",
+    model: "sonnet",
+    provider: "anthropic",
+    inputTokens: 500,
+    outputTokens: 250,
+    costUsd: 1.0,
     costMode: "api",
   });
   seedUsageRecord(arkDir, {
-    sessionId: "s-cc0002", summary: "claude-max subscription", model: "sonnet",
-    provider: "anthropic", inputTokens: 10_000, outputTokens: 5_000, costUsd: 0,
+    sessionId: "s-cc0002",
+    summary: "claude-max subscription",
+    model: "sonnet",
+    provider: "anthropic",
+    inputTokens: 10_000,
+    outputTokens: 5_000,
+    costUsd: 0,
     costMode: "subscription",
   });
   seedUsageRecord(arkDir, {
-    sessionId: "s-cc0003", summary: "free-tier task", model: "sonnet",
-    provider: "anthropic", inputTokens: 2_000, outputTokens: 1_000, costUsd: 0,
+    sessionId: "s-cc0003",
+    summary: "free-tier task",
+    model: "sonnet",
+    provider: "anthropic",
+    inputTokens: 2_000,
+    outputTokens: 1_000,
+    costUsd: 0,
     costMode: "free",
   });
 
@@ -271,17 +316,32 @@ test("per-session attribution: 2 sessions aggregate their own records", async ()
   resetCosts(arkDir);
   // Session alpha: two records totaling $2.50
   seedUsageRecord(arkDir, {
-    sessionId: "s-dd0001", summary: "alpha session", model: "sonnet",
-    provider: "anthropic", inputTokens: 1000, outputTokens: 500, costUsd: 1.0,
+    sessionId: "s-dd0001",
+    summary: "alpha session",
+    model: "sonnet",
+    provider: "anthropic",
+    inputTokens: 1000,
+    outputTokens: 500,
+    costUsd: 1.0,
   });
   appendUsageRecord(arkDir, {
-    sessionId: "s-dd0001", summary: "alpha session", model: "sonnet",
-    provider: "anthropic", inputTokens: 1500, outputTokens: 700, costUsd: 1.5,
+    sessionId: "s-dd0001",
+    summary: "alpha session",
+    model: "sonnet",
+    provider: "anthropic",
+    inputTokens: 1500,
+    outputTokens: 700,
+    costUsd: 1.5,
   });
   // Session beta: one record totaling $3.75
   seedUsageRecord(arkDir, {
-    sessionId: "s-dd0002", summary: "beta session", model: "opus",
-    provider: "anthropic", inputTokens: 2000, outputTokens: 1000, costUsd: 3.75,
+    sessionId: "s-dd0002",
+    summary: "beta session",
+    model: "opus",
+    provider: "anthropic",
+    inputTokens: 2000,
+    outputTokens: 1000,
+    costUsd: 3.75,
   });
 
   // RPC: sessions list has two entries; beta sorts first (higher cost).

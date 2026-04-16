@@ -19,18 +19,30 @@ let app: AppContext;
 let server: { stop(app): void };
 
 beforeEach(async () => {
-  if (app) { await app.shutdown(); clearApp(); }
-  app = AppContext.forTest(); setApp(app); await app.boot();
+  if (app) {
+    await app.shutdown();
+    clearApp();
+  }
+  app = AppContext.forTest();
+  setApp(app);
+  await app.boot();
 
   server = startConductor(app, TEST_PORT, { quiet: true });
 });
 
 afterEach(() => {
-  try { server.stop(); } catch { /* cleanup */ }
+  try {
+    server.stop();
+  } catch {
+    /* cleanup */
+  }
 });
 
 afterAll(async () => {
-  if (app) { await app.shutdown(); clearApp(); }
+  if (app) {
+    await app.shutdown();
+    clearApp();
+  }
 });
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -53,12 +65,12 @@ function writeTranscript(dir: string, filename: string, lines: object[]): string
   const subdir = join(dir, CLAUDE_SESSION_ID);
   mkdirSync(subdir, { recursive: true });
   const path = join(subdir, filename);
-  writeFileSync(path, lines.map(l => JSON.stringify(l)).join("\n"));
+  writeFileSync(path, lines.map((l) => JSON.stringify(l)).join("\n"));
   return path;
 }
 
 function appendTranscript(path: string, lines: object[]): void {
-  appendFileSync(path, "\n" + lines.map(l => JSON.stringify(l)).join("\n"));
+  appendFileSync(path, "\n" + lines.map((l) => JSON.stringify(l)).join("\n"));
 }
 
 function userTurn(content: string, ts: string) {
@@ -84,7 +96,10 @@ function toolUseTurn(ts: string) {
 function toolResultTurn(ts: string) {
   return {
     type: "user",
-    message: { role: "user", content: [{ type: "tool_result", tool_use_id: "tu1", content: "file contents here are quite long enough" }] },
+    message: {
+      role: "user",
+      content: [{ type: "tool_result", tool_use_id: "tu1", content: "file contents here are quite long enough" }],
+    },
     timestamp: ts,
   };
 }
@@ -221,7 +236,7 @@ describe("E2E: Cross-session search", () => {
     // Cross-session search for "deployment"
     const results = searchTranscripts(getApp(), "deployment");
     expect(results.length).toBe(2);
-    const sessionIds = results.map(r => r.sessionId);
+    const sessionIds = results.map((r) => r.sessionId);
     expect(sessionIds).toContain(sessionC.id);
     expect(sessionIds).toContain(sessionD.id);
 
@@ -240,13 +255,17 @@ describe("E2E: Token usage stored on hook", () => {
     const transcriptPath = writeTranscript(app.config.arkDir, "conv-usage.jsonl", [
       userTurn("analyze the performance bottleneck in the query", "2026-01-01T00:01:00Z"),
       assistantTurn("I will analyze the performance issue", "2026-01-01T00:02:00Z", {
-        input_tokens: 1000, output_tokens: 500,
-        cache_read_input_tokens: 5000, cache_creation_input_tokens: 100,
+        input_tokens: 1000,
+        output_tokens: 500,
+        cache_read_input_tokens: 5000,
+        cache_creation_input_tokens: 100,
       }),
       userTurn("what did you find in the profiler output", "2026-01-01T00:03:00Z"),
       assistantTurn("The bottleneck is in the N+1 query in the users endpoint", "2026-01-01T00:04:00Z", {
-        input_tokens: 2000, output_tokens: 800,
-        cache_read_input_tokens: 3000, cache_creation_input_tokens: 50,
+        input_tokens: 2000,
+        output_tokens: 800,
+        cache_read_input_tokens: 3000,
+        cache_creation_input_tokens: 50,
       }),
     ]);
 
@@ -258,9 +277,9 @@ describe("E2E: Token usage stored on hook", () => {
     const updated = app.sessions.get(session.id);
     expect(updated).toBeTruthy();
     const agg = app.usageRecorder.getSessionCost(session.id);
-    expect(agg.input_tokens).toBe(3000);   // 1000 + 2000
-    expect(agg.output_tokens).toBe(1300);   // 500 + 800
-    expect(agg.cache_read_tokens).toBe(8000);  // 5000 + 3000
+    expect(agg.input_tokens).toBe(3000); // 1000 + 2000
+    expect(agg.output_tokens).toBe(1300); // 500 + 800
+    expect(agg.cache_read_tokens).toBe(8000); // 5000 + 3000
     expect(agg.cache_write_tokens).toBe(150); // 100 + 50
     expect(agg.total_tokens).toBe(4300); // input + output
   });

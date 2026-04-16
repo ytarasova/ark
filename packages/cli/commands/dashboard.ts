@@ -4,7 +4,8 @@ import type { AppContext } from "../../core/app.js";
 import { getArkClient } from "./_shared.js";
 
 export function registerDashboardCommands(program: Command, _app: AppContext | null) {
-  program.command("dashboard")
+  program
+    .command("dashboard")
     .description("Show fleet status, costs, and recent activity")
     .option("--json", "Output as JSON")
     .action(async (opts) => {
@@ -21,8 +22,12 @@ export function registerDashboardCommands(program: Command, _app: AppContext | n
       // Fleet Status
       console.log(chalk.bold("\nFleet Status"));
       const statusLine = [
-        counts.running > 0 ? chalk.green(`\u25CF ${counts.running} running`) : chalk.dim(`\u25CF ${counts.running} running`),
-        counts.waiting > 0 ? chalk.yellow(`\u25D1 ${counts.waiting} waiting`) : chalk.dim(`\u25D1 ${counts.waiting} waiting`),
+        counts.running > 0
+          ? chalk.green(`\u25CF ${counts.running} running`)
+          : chalk.dim(`\u25CF ${counts.running} running`),
+        counts.waiting > 0
+          ? chalk.yellow(`\u25D1 ${counts.waiting} waiting`)
+          : chalk.dim(`\u25D1 ${counts.waiting} waiting`),
         chalk.dim(`\u25CB ${counts.stopped} stopped`),
         counts.failed > 0 ? chalk.red(`\u2715 ${counts.failed} failed`) : chalk.dim(`\u2715 ${counts.failed} failed`),
         chalk.blue(`\u2714 ${counts.completed} completed`),
@@ -32,12 +37,13 @@ export function registerDashboardCommands(program: Command, _app: AppContext | n
 
       // Costs
       console.log(chalk.bold("Costs"));
-      const fmtCost = (n: number) => n < 0.01 && n > 0 ? "<$0.01" : `$${n.toFixed(2)}`;
-      console.log(`  Today: ${chalk.green(fmtCost(costs.today))}  |  Week: ${fmtCost(costs.week)}  |  Month: ${fmtCost(costs.month)}`);
+      const fmtCost = (n: number) => (n < 0.01 && n > 0 ? "<$0.01" : `$${n.toFixed(2)}`);
+      console.log(
+        `  Today: ${chalk.green(fmtCost(costs.today))}  |  Week: ${fmtCost(costs.week)}  |  Month: ${fmtCost(costs.month)}`,
+      );
 
       // Model breakdown
-      const models = Object.entries(costs.byModel as Record<string, number>)
-        .sort(([, a], [, b]) => b - a);
+      const models = Object.entries(costs.byModel as Record<string, number>).sort(([, a], [, b]) => b - a);
       if (models.length > 0) {
         const modelParts = models.map(([m, c]) => `${chalk.yellow(m)}: ${fmtCost(c)}`).join("  ");
         console.log(`  ${modelParts}`);
@@ -46,16 +52,16 @@ export function registerDashboardCommands(program: Command, _app: AppContext | n
       // Budget
       const budget = costs.budget;
       if (budget?.daily?.limit || budget?.weekly?.limit || budget?.monthly?.limit) {
-        const b = budget.daily?.limit ? budget.daily
-          : budget.weekly?.limit ? budget.weekly
-          : budget.monthly;
+        const b = budget.daily?.limit ? budget.daily : budget.weekly?.limit ? budget.weekly : budget.monthly;
         if (b?.limit) {
           const pct = Math.min(100, b.pct);
-          const filled = Math.round(pct / 100 * 16);
+          const filled = Math.round((pct / 100) * 16);
           const barFull = "\u2588".repeat(filled);
           const barEmpty = "\u2591".repeat(16 - filled);
           const barColor = b.exceeded ? chalk.red : b.warning ? chalk.yellow : chalk.green;
-          console.log(`  Budget: ${fmtCost(b.spent)}/${fmtCost(b.limit)} [${barColor(barFull)}${chalk.dim(barEmpty)}] ${pct.toFixed(1)}%`);
+          console.log(
+            `  Budget: ${fmtCost(b.spent)}/${fmtCost(b.limit)} [${barColor(barFull)}${chalk.dim(barEmpty)}] ${pct.toFixed(1)}%`,
+          );
         }
       }
       console.log();

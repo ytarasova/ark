@@ -4,7 +4,9 @@ import { createRequest, ErrorCodes, RpcError, type JsonRpcResponse, type JsonRpc
 
 describe("Router", () => {
   let router: Router;
-  beforeEach(() => { router = new Router(); });
+  beforeEach(() => {
+    router = new Router();
+  });
 
   it("dispatches request to registered handler", async () => {
     router.handle("test/method", async (params) => ({ value: params.x }));
@@ -20,7 +22,9 @@ describe("Router", () => {
   });
 
   it("catches handler errors and returns INTERNAL_ERROR", async () => {
-    router.handle("test/throws", async () => { throw new Error("boom"); });
+    router.handle("test/throws", async () => {
+      throw new Error("boom");
+    });
     const req = createRequest(1, "test/throws", {});
     const res = await router.dispatch(req);
     expect((res as JsonRpcError).error.code).toBe(ErrorCodes.INTERNAL_ERROR);
@@ -50,7 +54,10 @@ describe("Router", () => {
     router.handle("initialize", async () => ({ server: { name: "ark", version: "0.8.0" } }));
     const initReq = createRequest(0, "initialize", {});
     const initRes = await router.dispatch(initReq);
-    expect(((initRes as JsonRpcResponse).result as Record<string, unknown>).server).toEqual({ name: "ark", version: "0.8.0" });
+    expect(((initRes as JsonRpcResponse).result as Record<string, unknown>).server).toEqual({
+      name: "ark",
+      version: "0.8.0",
+    });
 
     // After marking initialized
     router.markInitialized();

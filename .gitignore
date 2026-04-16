@@ -19,3 +19,4 @@ dist/
 # Electron desktop app build output
 packages/desktop/out/
 packages/desktop/node_modules/
+packages/desktop/binaries/

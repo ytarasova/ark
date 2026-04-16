@@ -14,7 +14,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { resolveStoreBaseDir } from "./install-paths.js";
 
-import { asClass, asValue } from "awilix";
+import { asValue } from "awilix";
 import { createAppContainer, type AppContainer } from "./container.js";
 import { loadConfig, type ArkConfig } from "./config.js";
 import { configureOtlp } from "./observability/otlp.js";
@@ -32,7 +32,15 @@ import { logError, logWarn, setLogArkDir } from "./observability/structured-log.
 import { setProfilesArkDir } from "./state/profiles.js";
 import { registerExecutor } from "./executor.js";
 import { builtinExecutors, loadPluginExecutors } from "./executors/index.js";
-import { SessionRepository, ComputeRepository, ComputeTemplateRepository, EventRepository, MessageRepository, TodoRepository, ArtifactRepository } from "./repositories/index.js";
+import {
+  SessionRepository,
+  ComputeRepository,
+  ComputeTemplateRepository,
+  EventRepository,
+  MessageRepository,
+  TodoRepository,
+  ArtifactRepository,
+} from "./repositories/index.js";
 import { SessionService, ComputeService, HistoryService } from "./services/index.js";
 import { FileFlowStore, FileSkillStore, FileAgentStore, FileRecipeStore, FileRuntimeStore } from "./stores/index.js";
 import { TranscriptParserRegistry } from "./runtimes/transcript-parser.js";
@@ -121,22 +129,40 @@ export class AppContext {
   // ── Accessors (resolved from the DI container) ────────────────────────
 
   /** Convenience shortcut for config.arkDir (used heavily in tests). */
-  get arkDir(): string { return this.config.arkDir; }
+  get arkDir(): string {
+    return this.config.arkDir;
+  }
 
-  get db(): IDatabase { return this._resolve("db"); }
+  get db(): IDatabase {
+    return this._resolve("db");
+  }
 
   get eventBus(): typeof eventBus {
     if (!this._eventBus) throw new Error("AppContext not booted -- eventBus not available");
     return this._eventBus;
   }
 
-  get sessions(): SessionRepository { return this._resolve("sessions"); }
-  get computes(): ComputeRepository { return this._resolve("computes"); }
-  get computeTemplates(): ComputeTemplateRepository { return this._resolve("computeTemplates"); }
-  get events(): EventRepository { return this._resolve("events"); }
-  get messages(): MessageRepository { return this._resolve("messages"); }
-  get todos(): TodoRepository { return this._resolve("todos"); }
-  get artifacts(): ArtifactRepository { return this._resolve("artifacts"); }
+  get sessions(): SessionRepository {
+    return this._resolve("sessions");
+  }
+  get computes(): ComputeRepository {
+    return this._resolve("computes");
+  }
+  get computeTemplates(): ComputeTemplateRepository {
+    return this._resolve("computeTemplates");
+  }
+  get events(): EventRepository {
+    return this._resolve("events");
+  }
+  get messages(): MessageRepository {
+    return this._resolve("messages");
+  }
+  get todos(): TodoRepository {
+    return this._resolve("todos");
+  }
+  get artifacts(): ArtifactRepository {
+    return this._resolve("artifacts");
+  }
 
   private _apiKeys: ApiKeyManager | null = null;
 
@@ -146,41 +172,73 @@ export class AppContext {
     return this._apiKeys;
   }
 
-  get sessionService(): SessionService { return this._resolve("sessionService"); }
-  get computeService(): ComputeService { return this._resolve("computeService"); }
-  get historyService(): HistoryService { return this._resolve("historyService"); }
+  get sessionService(): SessionService {
+    return this._resolve("sessionService");
+  }
+  get computeService(): ComputeService {
+    return this._resolve("computeService");
+  }
+  get historyService(): HistoryService {
+    return this._resolve("historyService");
+  }
 
   // ── Resource stores ────────────────────────────────────────────────────
 
-  get flows(): FlowStore { return this._resolve("flows"); }
-  get skills(): SkillStore { return this._resolve("skills"); }
-  get agents(): AgentStore { return this._resolve("agents"); }
-  get recipes(): RecipeStore { return this._resolve("recipes"); }
-  get runtimes(): RuntimeStore { return this._resolve("runtimes"); }
-  get knowledge(): KnowledgeStore { return this._resolve("knowledge"); }
+  get flows(): FlowStore {
+    return this._resolve("flows");
+  }
+  get skills(): SkillStore {
+    return this._resolve("skills");
+  }
+  get agents(): AgentStore {
+    return this._resolve("agents");
+  }
+  get recipes(): RecipeStore {
+    return this._resolve("recipes");
+  }
+  get runtimes(): RuntimeStore {
+    return this._resolve("runtimes");
+  }
+  get knowledge(): KnowledgeStore {
+    return this._resolve("knowledge");
+  }
 
   // ── Cost tracking ─────────────────────────────────────────────────────
 
-  get pricing(): PricingRegistry { return this._resolve("pricing"); }
-  get usageRecorder(): UsageRecorder { return this._resolve("usageRecorder"); }
-  get burn(): BurnRepository { return this._resolve("burn"); }
+  get pricing(): PricingRegistry {
+    return this._resolve("pricing");
+  }
+  get usageRecorder(): UsageRecorder {
+    return this._resolve("usageRecorder");
+  }
+  get burn(): BurnRepository {
+    return this._resolve("burn");
+  }
 
   // ── Burn transcript parsers (per-turn classification) ─────────────────
 
-  get burnParsers(): BurnParserRegistry { return this._resolve("burnParsers"); }
+  get burnParsers(): BurnParserRegistry {
+    return this._resolve("burnParsers");
+  }
 
   // ── Runtime transcript parsers ────────────────────────────────────────
 
-  get transcriptParsers(): TranscriptParserRegistry { return this._resolve("transcriptParsers"); }
+  get transcriptParsers(): TranscriptParserRegistry {
+    return this._resolve("transcriptParsers");
+  }
 
   // ── Plugin registry (executors, compute providers, transcript parsers) ──
 
-  get pluginRegistry(): PluginRegistry { return this._resolve("pluginRegistry"); }
+  get pluginRegistry(): PluginRegistry {
+    return this._resolve("pluginRegistry");
+  }
 
   // ── TensorZero gateway ────────────────────────────────────────────────
 
   /** TensorZero manager, or null if not enabled. */
-  get tensorZero(): TensorZeroManager | null { return this._tensorZero; }
+  get tensorZero(): TensorZeroManager | null {
+    return this._tensorZero;
+  }
 
   /** URL for the TensorZero gateway, or null if not enabled. */
   get tensorZeroUrl(): string | null {
@@ -191,7 +249,9 @@ export class AppContext {
   // ── Session launcher ──────────────────────────────────────────────────
 
   /** The session launcher (defaults to TmuxLauncher for local compute). */
-  get launcher(): SessionLauncher { return this._launcher; }
+  get launcher(): SessionLauncher {
+    return this._launcher;
+  }
 
   /** Replace the session launcher (e.g. for remote compute or testing). */
   setLauncher(launcher: SessionLauncher): void {
@@ -292,7 +352,19 @@ export class AppContext {
 
     // Scope DB-backed resource stores (hosted mode only)
     if (this.config.databaseUrl) {
-      const scopedAgents = new DbResourceStore(db, "agent", { description: "", model: "sonnet", max_turns: 200, system_prompt: "", tools: [], mcp_servers: [], skills: [], memories: [], context: [], permission_mode: "bypassPermissions", env: {} });
+      const scopedAgents = new DbResourceStore(db, "agent", {
+        description: "",
+        model: "sonnet",
+        max_turns: 200,
+        system_prompt: "",
+        tools: [],
+        mcp_servers: [],
+        skills: [],
+        memories: [],
+        context: [],
+        permission_mode: "bypassPermissions",
+        env: {},
+      });
       scopedAgents.setTenant(tenantId);
       const scopedFlows = new DbResourceStore(db, "flow", { stages: [] });
       scopedFlows.setTenant(tenantId);
@@ -316,7 +388,9 @@ export class AppContext {
   // ── Container access ───────────────────────────────────────────────────
 
   /** Expose the DI container for advanced use (e.g. registering test doubles). */
-  get container(): AppContainer { return this._container; }
+  get container(): AppContainer {
+    return this._container;
+  }
 
   // ── Provider registry ──────────────────────────────────────────────────
 
@@ -337,7 +411,8 @@ export class AppContext {
     const computeName = session.compute_name || "local";
     // Query compute directly via the app DB to avoid circular imports
     const row = this.db?.prepare("SELECT * FROM compute WHERE name = ?").get(computeName) as
-      { name: string; provider: string; status: string; config: string; created_at: string; updated_at: string } | undefined;
+      | { name: string; provider: string; status: string; config: string; created_at: string; updated_at: string }
+      | undefined;
     if (!row) return { provider: null, compute: null };
     const compute = { ...row, config: safeParseConfig(row.config) } as unknown as Compute;
     const provider = this.getProvider(compute.provider);
@@ -375,12 +450,7 @@ export class AppContext {
 
   /** Step 1: ensure ark directories exist and configure module-level paths. */
   private _initFilesystem(): void {
-    for (const dir of [
-      this.config.arkDir,
-      this.config.tracksDir,
-      this.config.worktreesDir,
-      this.config.logDir,
-    ]) {
+    for (const dir of [this.config.arkDir, this.config.tracksDir, this.config.worktreesDir, this.config.logDir]) {
       mkdirSync(dir, { recursive: true });
     }
     setLogArkDir(this.config.arkDir);
@@ -521,7 +591,9 @@ export class AppContext {
         const e2b = new E2BProvider();
         e2b.setApp(this);
         this.registerProvider(e2b);
-      } catch { /* e2b SDK not installed */ }
+      } catch {
+        /* e2b SDK not installed */
+      }
 
       try {
         const { K8sProvider, KataProvider } = await import("../compute/providers/k8s.js");
@@ -531,7 +603,9 @@ export class AppContext {
         const kata = new KataProvider();
         kata.setApp(this);
         this.registerProvider(kata);
-      } catch { /* @kubernetes/client-node not installed */ }
+      } catch {
+        /* @kubernetes/client-node not installed */
+      }
     });
   }
 
@@ -645,7 +719,9 @@ export class AppContext {
             this.sessions.delete(s.id);
           }
         }
-      } catch { /* container may be disposed during shutdown */ }
+      } catch {
+        /* container may be disposed during shutdown */
+      }
     }, 30_000);
 
     // tmux status bar every 5s
@@ -691,7 +767,9 @@ export class AppContext {
           const { removeSettings } = await import("./claude/claude.js");
           removeSettings(cwd);
         }
-      } catch { /* settings.local.json may be malformed; safe to skip */ }
+      } catch {
+        /* settings.local.json may be malformed; safe to skip */
+      }
     });
 
     await safeAsync("boot: cleanup stale mcp config", async () => {
@@ -708,7 +786,9 @@ export class AppContext {
           const { removeChannelConfig } = await import("./claude/claude.js");
           removeChannelConfig(cwd);
         }
-      } catch { /* .mcp.json may be malformed; safe to skip */ }
+      } catch {
+        /* .mcp.json may be malformed; safe to skip */
+      }
     });
 
     await safeAsync("boot: detect stale sessions", async () => {
@@ -756,18 +836,50 @@ export class AppContext {
     // Step 1: tear down infrastructure (reverse of boot steps 7-10)
     this._removeSignalHandlers();
 
-    try { const { stopAllPollers } = await import("./executors/status-poller.js"); stopAllPollers(); } catch { /* poller module may not be loaded */ }
+    try {
+      const { stopAllPollers } = await import("./executors/status-poller.js");
+      stopAllPollers();
+    } catch {
+      /* poller module may not be loaded */
+    }
 
-    if (this._notifyDaemon) { this._notifyDaemon.stop(); this._notifyDaemon = null; }
-    if (this._tmuxStatusInterval) { clearInterval(this._tmuxStatusInterval); this._tmuxStatusInterval = null; }
+    if (this._notifyDaemon) {
+      this._notifyDaemon.stop();
+      this._notifyDaemon = null;
+    }
+    if (this._tmuxStatusInterval) {
+      clearInterval(this._tmuxStatusInterval);
+      this._tmuxStatusInterval = null;
+    }
     clearTmuxStatusBar();
-    if (this._purgeInterval) { clearInterval(this._purgeInterval); this._purgeInterval = null; }
-    if (this.metricsPoller) { this.metricsPoller.stop(); this.metricsPoller = null; }
-    if (this._router) { this._router.stop(); this._router = null; }
-    if (this._tensorZero) { await this._tensorZero.stop().catch(() => {}); this._tensorZero = null; }
-    if (this.arkd) { this.arkd.stop(); this.arkd = null; }
-    if (this.conductor) { this.conductor.stop(); this.conductor = null; }
-    if (this._eventBus) { this._eventBus.clear(); this._eventBus = null; }
+    if (this._purgeInterval) {
+      clearInterval(this._purgeInterval);
+      this._purgeInterval = null;
+    }
+    if (this.metricsPoller) {
+      this.metricsPoller.stop();
+      this.metricsPoller = null;
+    }
+    if (this._router) {
+      this._router.stop();
+      this._router = null;
+    }
+    if (this._tensorZero) {
+      await this._tensorZero.stop().catch(() => {});
+      this._tensorZero = null;
+    }
+    if (this.arkd) {
+      this.arkd.stop();
+      this.arkd = null;
+    }
+    if (this.conductor) {
+      this.conductor.stop();
+      this.conductor = null;
+    }
+    if (this._eventBus) {
+      this._eventBus.clear();
+      this._eventBus = null;
+    }
 
     // Step 2: flush observability
     try {
@@ -776,11 +888,17 @@ export class AppContext {
       await flushTelemetry();
       await flushSpans();
       resetOtlp();
-    } catch { /* telemetry flush is best-effort */ }
+    } catch {
+      /* telemetry flush is best-effort */
+    }
 
     // Step 3: tear down compute + DI container (reverse of boot steps 3-5)
     clearProviderResolver();
-    try { this._container.resolve("db").close(); } catch { /* db may already be closed */ }
+    try {
+      this._container.resolve("db").close();
+    } catch {
+      /* db may already be closed */
+    }
     await this._container.dispose();
 
     // Step 4: clean up temp directory (test mode)
@@ -806,13 +924,17 @@ export class AppContext {
     // Claude parser uses session.claude_session_id (set at launch via --session-id)
     // to construct the exact transcript path. The sessionIdLookup bridges workdir
     // back to that stored ID by querying the session repo.
-    registry.register(new ClaudeTranscriptParser(undefined, (workdir) => {
-      try {
-        const sessions = this.sessions.list({ limit: 50 });
-        const match = sessions.find(s => s.workdir === workdir && s.claude_session_id);
-        return match?.claude_session_id ?? null;
-      } catch { return null; }
-    }));
+    registry.register(
+      new ClaudeTranscriptParser(undefined, (workdir) => {
+        try {
+          const sessions = this.sessions.list({ limit: 50 });
+          const match = sessions.find((s) => s.workdir === workdir && s.claude_session_id);
+          return match?.claude_session_id ?? null;
+        } catch {
+          return null;
+        }
+      }),
+    );
     registry.register(new CodexTranscriptParser());
     registry.register(new GeminiTranscriptParser());
     return registry;
@@ -843,7 +965,21 @@ export class AppContext {
       return {
         flows: asValue(new DbResourceStore(db, "flow", { stages: [] })),
         skills: asValue(new DbResourceStore(db, "skill", { description: "", content: "" })),
-        agents: asValue(new DbResourceStore(db, "agent", { description: "", model: "sonnet", max_turns: 200, system_prompt: "", tools: [], mcp_servers: [], skills: [], memories: [], context: [], permission_mode: "bypassPermissions", env: {} })),
+        agents: asValue(
+          new DbResourceStore(db, "agent", {
+            description: "",
+            model: "sonnet",
+            max_turns: 200,
+            system_prompt: "",
+            tools: [],
+            mcp_servers: [],
+            skills: [],
+            memories: [],
+            context: [],
+            permission_mode: "bypassPermissions",
+            env: {},
+          }),
+        ),
         recipes: asValue(new DbResourceStore(db, "recipe", { description: "", flow: "default" })),
         runtimes: asValue(new DbResourceStore(db, "runtime", { description: "", type: "cli-agent", command: [] })),
       };
@@ -851,26 +987,36 @@ export class AppContext {
 
     // Local mode: file-backed stores with three-tier resolution
     return {
-      flows: asValue(new FileFlowStore({
-        builtinDir: join(storeBaseDir, "flows", "definitions"),
-        userDir: join(this.config.arkDir, "flows"),
-      })),
-      skills: asValue(new FileSkillStore({
-        builtinDir: join(storeBaseDir, "skills"),
-        userDir: join(this.config.arkDir, "skills"),
-      })),
-      agents: asValue(new FileAgentStore({
-        builtinDir: join(storeBaseDir, "agents"),
-        userDir: join(this.config.arkDir, "agents"),
-      })),
-      recipes: asValue(new FileRecipeStore({
-        builtinDir: join(storeBaseDir, "recipes"),
-        userDir: join(this.config.arkDir, "recipes"),
-      })),
-      runtimes: asValue(new FileRuntimeStore({
-        builtinDir: join(storeBaseDir, "runtimes"),
-        userDir: join(this.config.arkDir, "runtimes"),
-      })),
+      flows: asValue(
+        new FileFlowStore({
+          builtinDir: join(storeBaseDir, "flows", "definitions"),
+          userDir: join(this.config.arkDir, "flows"),
+        }),
+      ),
+      skills: asValue(
+        new FileSkillStore({
+          builtinDir: join(storeBaseDir, "skills"),
+          userDir: join(this.config.arkDir, "skills"),
+        }),
+      ),
+      agents: asValue(
+        new FileAgentStore({
+          builtinDir: join(storeBaseDir, "agents"),
+          userDir: join(this.config.arkDir, "agents"),
+        }),
+      ),
+      recipes: asValue(
+        new FileRecipeStore({
+          builtinDir: join(storeBaseDir, "recipes"),
+          userDir: join(this.config.arkDir, "recipes"),
+        }),
+      ),
+      runtimes: asValue(
+        new FileRuntimeStore({
+          builtinDir: join(storeBaseDir, "runtimes"),
+          userDir: join(this.config.arkDir, "runtimes"),
+        }),
+      ),
     };
   }
 
@@ -882,7 +1028,7 @@ export class AppContext {
         const computes = this.computes?.list({ status: "running" }) ?? [];
         for (const c of computes) {
           await safeAsync(`metrics: poll compute "${c.name}"`, async () => {
-            const compute = await import("../compute/index.js") as Record<string, unknown>;
+            const compute = (await import("../compute/index.js")) as Record<string, unknown>;
             if (typeof compute.pollMetrics === "function") {
               await (compute.pollMetrics as (name: string) => Promise<void>)(c.name);
             }

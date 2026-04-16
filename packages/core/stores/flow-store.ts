@@ -52,9 +52,7 @@ export class FileFlowStore implements FlowStore {
 
   get(name: string): FlowDefinition | null {
     // Resolution order: project > user > builtin
-    const dirs = this.projectDir
-      ? [this.projectDir, this.userDir, this.builtinDir]
-      : [this.userDir, this.builtinDir];
+    const dirs = this.projectDir ? [this.projectDir, this.userDir, this.builtinDir] : [this.userDir, this.builtinDir];
 
     for (const dir of dirs) {
       const path = join(dir, `${name}.yaml`);
@@ -81,7 +79,7 @@ export class FileFlowStore implements FlowStore {
         result.set(name, {
           name,
           description: (p.description as string) ?? "",
-          stages: stages.map(s => s.name),
+          stages: stages.map((s) => s.name),
           source,
         });
       }
@@ -99,7 +97,10 @@ export class FileFlowStore implements FlowStore {
   delete(name: string, scope: "global" | "project" = "global"): boolean {
     const dir = scope === "project" && this.projectDir ? this.projectDir : this.userDir;
     const path = join(dir, `${name}.yaml`);
-    if (existsSync(path)) { unlinkSync(path); return true; }
+    if (existsSync(path)) {
+      unlinkSync(path);
+      return true;
+    }
     return false;
   }
 }

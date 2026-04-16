@@ -132,9 +132,11 @@ export function recoverSession(app: AppContext, sessionId: string): { ok: boolea
     },
   });
 
-  return { ok: true, message: checkpoint
-    ? `Recovered from checkpoint (stage: ${checkpoint.stage})`
-    : `Recovered to ready (no checkpoint, stage: ${session.stage})`
+  return {
+    ok: true,
+    message: checkpoint
+      ? `Recovered from checkpoint (stage: ${checkpoint.stage})`
+      : `Recovered to ready (no checkpoint, stage: ${session.stage})`,
   };
 }
 

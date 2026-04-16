@@ -3,11 +3,7 @@ import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import * as core from "../../core/index.js";
 import { startSession } from "../../core/services/session-orchestration.js";
-import type {
-  HistoryListParams,
-  HistoryImportParams,
-  HistorySearchParams,
-} from "../../types/index.js";
+import type { HistoryListParams, HistoryImportParams, HistorySearchParams } from "../../types/index.js";
 
 export function registerHistoryHandlers(router: Router, app: AppContext): void {
   router.handle("history/list", async (p) => {
@@ -30,7 +26,7 @@ export function registerHistoryHandlers(router: Router, app: AppContext): void {
   });
 
   router.handle("history/refresh", async (_p) => {
-    const count = await core.refreshClaudeSessionsCache(app,{
+    const count = await core.refreshClaudeSessionsCache(app, {
       onProgress: () => {},
     });
     const items = core.listClaudeSessions(app);
@@ -38,7 +34,7 @@ export function registerHistoryHandlers(router: Router, app: AppContext): void {
   });
 
   router.handle("history/index", async () => {
-    const count = await core.indexTranscripts(app,{ onProgress: () => {} });
+    const count = await core.indexTranscripts(app, { onProgress: () => {} });
     return { ok: true, count };
   });
 
@@ -46,15 +42,15 @@ export function registerHistoryHandlers(router: Router, app: AppContext): void {
     const db = app.db;
     db.run("DELETE FROM claude_sessions_cache");
     db.run("DELETE FROM transcript_index");
-    const sessionCount = await core.refreshClaudeSessionsCache(app,{});
-    const indexCount = await core.indexTranscripts(app,{});
+    const sessionCount = await core.refreshClaudeSessionsCache(app, {});
+    const indexCount = await core.indexTranscripts(app, {});
     const items = core.listClaudeSessions(app);
     return { ok: true, sessionCount, indexCount, items };
   });
 
   router.handle("history/refresh-and-index", async () => {
-    const sessionCount = await core.refreshClaudeSessionsCache(app,{});
-    const indexCount = await core.indexTranscripts(app,{});
+    const sessionCount = await core.refreshClaudeSessionsCache(app, {});
+    const indexCount = await core.indexTranscripts(app, {});
     const items = core.listClaudeSessions(app);
     return { ok: true, sessionCount, indexCount, items };
   });

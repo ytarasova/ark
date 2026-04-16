@@ -37,10 +37,16 @@ afterEach(async () => {
     try {
       const s = app.sessions.get(id);
       if (s?.session_id) {
-        try { killSession(s.session_id); } catch { /* already gone */ }
+        try {
+          killSession(s.session_id);
+        } catch {
+          /* already gone */
+        }
       }
       app.sessions.delete(id);
-    } catch { /* already gone */ }
+    } catch {
+      /* already gone */
+    }
   }
   sessionIds.length = 0;
 });

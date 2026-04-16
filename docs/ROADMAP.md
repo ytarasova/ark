@@ -3,13 +3,14 @@
 > Last updated: 2026-04-14 (full background agent gap analysis) (71 PRs total -- v0.14.0 released)
 > Planning framework: **11 sub-projects (SP1-SP11)** covering all 11 layers of the background agent stack
 > Reference: [background-agents.com/landscape](https://background-agents.com/landscape) | [Ona Software Factory](https://ona.com/stories/building-a-software-factory-in-public) | [Open Agents](https://github.com/vercel-labs/open-agents)
-> Releases: v0.13.0 (2026-04-13), v0.14.0 (2026-04-14)
+> Releases: v0.13.0 (2026-04-13), v0.14.0 (2026-04-14), v0.17.0 (2026-04-15)
 > Prompt caching: 99.9% hit rate, $3,430 saved (86% reduction) across 47 agent sessions
 >
 > **2026-04-14 "ark init" meeting (Yana, Zineng, Abhimanyu, Atul) -- key decisions:**
-> - **TUI retired** -- consensus to drop TUI from the product surface. Focus on **Web UI + CLI + Electron desktop app**. TUI code stays in repo but receives no further investment.
+> - **TUI retired and removed** -- consensus was to drop TUI from the product surface (2026-04-14). Code deletion shipped in v0.16.0 (2026-04-15): `packages/tui/`, `packages/tui-e2e/`, `ark tui` command, ink deps, Makefile targets, and docs. Product surfaces are **Web UI + CLI + Electron desktop app**.
 > - **Web UI is the primary interface** -- everything doable from web without touching CLI. Missing: conversation interface, repo dropdown, session creation wizard.
 > - **Electron desktop app** -- wrap web UI, build DMGs for macOS + Linux (Intel + ARM). No Windows. Near-term deliverable.
+> - **Tauri evaluated, staying with Electron (simpler toolchain, native Playwright testing)** -- Tauri v2 was scaffolded in `packages/desktop-tauri/` (2026-04-15) and evaluated. Decision (v0.17.0): stay with Electron. Rationale: Electron has mature Playwright testing support (critical for CI smoke tests), simpler build toolchain (no Rust needed), and the ~10x binary size advantage is offset by bundling ark-native (~78 MB) regardless of shell. Tauri scaffold removed in v0.17.0; evaluation notes preserved in roadmap history.
 > - **ACP (Agent Communication Protocol) POC** -- explore as parallel agent interface. Claude Code/Codex don't officially support it; Gemini does. Not a replacement for channels.
 > - **MiniMax as cheap model** -- ~1/10th Claude cost for mechanical tasks. Strategy: plan with Opus/Sonnet, implement with MiniMax. Needs OpenAI-compatible custom provider in LLM Router.
 > - **Benchmarking framework** -- Abhimanyu building task-based model benchmarks (100 real tasks on actual repos). Results could feed LLM Router routing decisions.
@@ -158,7 +159,7 @@ The orchestration platform for AI-powered software development. Manages the full
 | **Recipes** | 10 templates (islc, islc-quick, ideate, quick-fix, feature-build, code-review, fix-bug, new-feature, self-dogfood, self-quick). | Yes |
 | **CLI** | 25 command modules. `ark dashboard/knowledge/eval/router/runtime/tenant/auth/daemon` all working. | Yes |
 | **Web UI** | Dashboard (widget grid + Recharts cost charts + daemon health), Sessions (status filter tabs), Agents+Runtimes, Flows, Compute, History, Memory/Knowledge, Tools, Schedules, Costs, Settings, Login. 28 doc pages. | Yes |
-| **TUI** | 10-tab dashboard. Theme-driven (0 hardcoded colors). Dashboard summary in empty state. ASCII cost charts. Agents+Runtimes sub-groups. | Yes |
+| ~~**TUI**~~ | ~~10-tab dashboard. Theme-driven (0 hardcoded colors). Dashboard summary in empty state. ASCII cost charts. Agents+Runtimes sub-groups.~~ | Retired (v0.16.0, 2026-04-15) |
 | **ESLint** | 0 errors, 0 warnings. CI lint step. | Yes |
 | **Process leak prevention** | stopAll via provider, awaited dispatches, proper shutdown order. | Yes |
 | **Auth** | API keys (create/validate/revoke/rotate), tenant_id on all entities, per-tenant AppContext, auth middleware. | Yes |
@@ -199,14 +200,14 @@ The orchestration platform for AI-powered software development. Manages the full
 | **Compute: Docker** | `DockerProvider` + `LocalDockerProvider`. | Works locally when Docker is running. Not tested in CI. | Low |
 | **Compute: EC2+ArkD** | `RemoteArkdBase` with 4 isolation modes. | Requires AWS credentials. Provisioning flow untested end-to-end. | Medium |
 | **Control plane** | Worker registry, scheduler, tenant policies, hosted entry point. 20 unit tests. | Never deployed as a running service. Docker-compose untested. Helm chart untested. Worker registration flow untested. | High |
-| **Remote client** | `--server`/`--token` for CLI, TUI, Web. WebSocket transport. Web proxy mode. | Never tested with a real remote server. | High |
+| **Remote client** | `--server`/`--token` for CLI and Web. WebSocket transport. Web proxy mode. | Never tested with a real remote server. | High |
 | **Auth middleware** | Token extraction, tenant scoping in web server. | Never tested with real multi-user sessions. No session management. | Medium |
 | **SDLC flow E2E** | Full pipeline defined with agents, skills, recipes. Flow progression mechanics exercised by `flows.pw.ts` + `flows.spec.ts` -- walks `default` flow through all 9 stages via `session/advance`, asserts each transition. | Never processed a real Jira ticket end-to-end with a real Claude agent. MCP integrations (Atlassian, Bitbucket, Figma) still untested against live services. | Medium |
 | **OTLP observability** | `otlp.ts` sends spans to OTLP/HTTP endpoint. | Never tested against real Jaeger/Tempo/Honeycomb. | Medium |
 | **Knowledge: ops-codegraph indexer** | Calls ops-codegraph (33 languages via tree-sitter), parses output, stores in knowledge graph. | Never tested with real codegraph installed in CI. Mock-tested only. | Medium |
 | **Cost: router feed-back** | Router has in-memory cost tracking. UsageRecorder exists. | Router doesn't call `app.usageRecorder.record()` yet. Not wired. | Medium |
 | **Cost: non-Claude runtimes** | UsageRecorder supports any model/provider. | Codex/Gemini/Aider executors don't report usage yet. Only Claude transcript parsing works. | High |
-| **Dashboard** | Web widget grid, TUI summary, CLI command. | Data sources are partially mocked. No real fleet to visualize. | Low |
+| **Dashboard** | Web widget grid, CLI command. | Data sources are partially mocked. No real fleet to visualize. | Low |
 | **Deployment** | Dockerfile, docker-compose, Helm chart. | Never built the Docker image. Never `helm install`-ed. Never pushed to registry. | High |
 
 ### NOT BUILT -- Identified gaps, no code exists
@@ -241,7 +242,7 @@ The orchestration platform for AI-powered software development. Manages the full
 | **Worktree untracked file setup** | Git worktrees don't include untracked files (.env, .envrc, config/local.yaml). Agents in worktrees lose access to env vars and local config. Add `.ark.yaml` `worktree.copy` list and optional `worktree.setup` script hook. | Abhimanyu 2026-04-13 |
 | **ACP (Agent Communication Protocol) integration** | Standard agent interface for cross-tool communication. Goose uses it via Claude SDP adapter. Claude Code/Codex don't officially support it; Gemini does natively. Explore as parallel interface alongside channels. Would make the platform more agent-runtime-agnostic. | 2026-04-14 meeting |
 | **Task-based benchmarking framework** | Model comparison on real-world tasks (not just prompting). 100 tasks across categories: JWT updates, code graph, PR review, MCP tool calling. Results feed LLM Router routing weights (model X good at tool calling, model Y good at review). Abhimanyu building. | 2026-04-14 meeting |
-| **Web UI conversation interface** | Send messages to running agents from web UI. Currently only TUI has this via `t` shortcut. Channels work for Claude Code; need tmux send-keys fallback for other runtimes. Borrow structured question pattern from Open Agents (`ask_user_question` tool with options UI) instead of plain free-text. | 2026-04-14 meeting (Zineng) |
+| **Web UI conversation interface** | Send messages to running agents from web UI. Channels work for Claude Code; need tmux send-keys fallback for other runtimes. Borrow structured question pattern from Open Agents (`ask_user_question` tool with options UI) instead of plain free-text. | 2026-04-14 meeting (Zineng) |
 | **Web UI repo dropdown** | Pick repos from session history / Claude projects dir instead of typing full paths. | 2026-04-14 meeting (Zineng) |
 | **Web UI tool call renderers** | Per-tool-type rendering (bash: cmd+output, read: file+line numbers, edit: diff, glob: file tree, grep: results). Borrow from Open Agents `/apps/web/components/tool-call/renderers/` (14 renderers, framework-agnostic React). | Open Agents competitive analysis |
 | **Agent-driven todo panel** | Agent creates/manages its own task list visible in a pinned UI panel. Users see real-time progress. Borrow from Open Agents `/packages/agent/tools/todo.ts` + `pinned-todo-panel.tsx`. | Open Agents competitive analysis |
@@ -260,7 +261,7 @@ The orchestration platform for AI-powered software development. Manages the full
 ## Roadmap Camps (Legacy Detail)
 
 > **Note:** These camps contain detailed task breakdowns, ship-blockers, and what's already landed. The **Background Agent Landscape Gap Analysis** (below the camps) and the **Priority Sequence** (SP1-SP11) are the current planning framework. Camps map to SPs as follows:
-> - Camp 0 (Early Adopter Ship) + Camp 8 (UX Polish) -> **SP1** (TUI removal + Tauri + Web UI)
+> - Camp 0 (Early Adopter Ship) + Camp 8 (UX Polish) -> **SP1** (TUI removal + Desktop + Web UI)
 > - Camp 5 (Security) -> **SP2** (Security & Secrets)
 > - Camp 6 (Integrations) -> **SP3** (Interface Integrations)
 > - Camp 14 (Decoupled Compute) + Camp 12 (Federated) -> **SP4** (Sandbox & Compute Lifecycle)
@@ -359,7 +360,7 @@ The orchestration platform for AI-powered software development. Manages the full
 **Ship-blockers to resolve this week:**
 | Blocker | Owner | Notes |
 |---------|-------|-------|
-| Web UI conversation interface | Zineng | Send messages to agents from web UI. Currently only TUI has this (`t` shortcut). Zineng flagged as blocker. |
+| Web UI conversation interface | Zineng | Send messages to agents from web UI. Currently only works via CLI. Zineng flagged as blocker. |
 | Web UI repo dropdown | Zineng | List known repos from session history / Claude projects. Users shouldn't have to type full paths. |
 | Electron DMG packaging | Yana (deferred to Thu+) | DMG build was started but dropped. macOS Intel + ARM, Linux Intel + ARM. No Windows. |
 | MiniMax custom provider in LLM Router | Abhimanyu | Accept arbitrary OpenAI-compatible base URL + key. cost_mode=free. |
@@ -460,7 +461,7 @@ fixture uses Bun APIs that the Node Playwright runner can't parse.
 | Deploy Helm chart on K8s, verify | 1 day | Production |
 | Build + publish Docker image to registry | 0.5 day | Deployment |
 | End-to-end: real Jira ticket through full SDLC flow | 2-3 days | "Send to dev" workflow |
-| Test remote client mode (TUI/CLI → remote server) | 1 day | Multi-user |
+| Test remote client mode (CLI -> remote server) | 1 day | Multi-user |
 | Test ops-codegraph indexer with real codebase | 0.5 day | Knowledge graph |
 
 ### Camp 2: Workflow Persistence & Recovery
@@ -517,7 +518,7 @@ fixture uses Bun APIs that the Node Playwright runner can't parse.
 | Injection attempt tracking | 0.5 day |
 | Exec approval queue (interactive approve/deny) | 1-2 days |
 | Trust scoring per agent | 1 day |
-| Security dashboard panel (Web+TUI) | 1 day |
+| Security dashboard panel (Web) | 1 day |
 
 ### Camp 6: Integrations & Webhooks
 
@@ -530,7 +531,7 @@ fixture uses Bun APIs that the Node Playwright runner can't parse.
 | GitHub Issues bidirectional sync | 2-3 days |
 | Slack commands + thread-based interaction | 2-3 days |
 | Linear integration | 1-2 days |
-| Webhook/alert management panels (Web+TUI) | 1 day |
+| Webhook/alert management panels (Web) | 1 day |
 
 ### Camp 7: Task Management
 
@@ -540,7 +541,7 @@ fixture uses Bun APIs that the Node Playwright runner can't parse.
 |------|--------|
 | Task table (new schema -- separate from sessions) | 1 day |
 | Kanban board UI (Web) | 2-3 days |
-| Task list view (TUI) | 1 day |
+| Task list view (Web) | 1 day |
 | `ark task create/list/assign/dispatch` CLI | 1 day |
 | Quality gate / Aegis review system (agent-to-agent review) | 2-3 days |
 | Task → session mapping | 1 day |
@@ -552,8 +553,8 @@ fixture uses Bun APIs that the Node Playwright runner can't parse.
 
 | Task | Effort | Status |
 |------|--------|--------|
-| **Desktop app packaging (Electron or Tauri v2)** | 1-2 days | Electron started but incomplete. Tauri v2 (https://v2.tauri.app/) flagged as alternative -- ~10x smaller binaries, Rust backend, system webview. macOS Intel + ARM, Linux Intel + ARM. No Windows. No signing. Spike both before committing. |
-| **Web UI conversation interface** | 1-2 days | Not started. Send messages to agents from web UI. Currently only works via CLI/TUI. |
+| **Desktop app packaging (Electron)** | 1-2 days | **DONE (v0.17.0)** -- Electron app with bundled ark-native, first-launch CLI install, fully self-contained. Tauri v2 evaluated and rejected (simpler toolchain wins). |
+| **Web UI conversation interface** | 1-2 days | Not started. Send messages to agents from web UI. Currently only works via CLI. |
 | **Web UI repo dropdown** | 0.5-1 day | Not started. List repos from session history + Claude projects dir. |
 | **Web UI session creation wizard** | 1 day | Not started. Guided flow selection, agent selection, compute selection. |
 | **Web UI facelift** | 2-3 days | Not started. Borrow from v0 Electron mockups (Nov 2025 aspirational design). |
@@ -605,7 +606,7 @@ fixture uses Bun APIs that the Node Playwright runner can't parse.
 | Knowledge graph: `repo_id` on every node, cross-repo edges | 2-3 days | Migration adds the column. Indexer writes it on insert. Context builder pulls from all session repos. New edge types for cross-repo dependency. |
 | Atomic multi-PR auto-merge coordinator | 3-5 days | Create N PRs on dispatch; watch CI on all of them; merge only when all green AND approved. Needs a background worker. Partial-merge rollback if any fails post-merge. |
 | Dispatch CLI + recipe schema | 1 day | `ark session start --product <name>` or `--repo X --repo Y`. Recipe `repos:` list. |
-| Web + TUI: multi-repo session list, multi-repo diff preview | 2 days | Surface parity rule applies -- every surface shows all session repos. |
+| Web: multi-repo session list, multi-repo diff preview | 2 days | Every surface shows all session repos. |
 | arkd workdir handling | 1-2 days | N workdirs per session pushed / pulled to remote compute. |
 | Verify scripts across repos | 1 day | `verify:` field scopes per-repo or all-repos. |
 | Flow engine: stage `target_repo` field | 1 day | Optional per-stage scoping when a stage naturally touches one repo only. |
@@ -764,8 +765,9 @@ Ark's endgame is a **complete background agent platform** covering all 11 layers
 
 | Gap | Tool / Approach | Effort | Priority |
 |-----|----------------|--------|----------|
-| TUI removal (complete deletion) | Delete packages/tui/ (15.8K lines), packages/tui-e2e/, 7 ink deps | 0.5 day | **SP1** |
-| Desktop app distribution (.dmg, .app, AppImage, .deb) | Replace Electron with **Tauri v2** (10x smaller, Rust backend, web UI wraps cleanly) | 2-3 days | **SP1** |
+| ~~TUI removal (complete deletion)~~ | **DONE (v0.16.0, 2026-04-15)** -- `packages/tui/`, `packages/tui-e2e/`, ink deps, Makefile targets, docs all removed | 0 | done |
+| ~~Tauri desktop scaffold~~ | **Evaluated and removed (v0.17.0)** -- Tauri v2 scaffolded 2026-04-15, evaluated, removed in favor of Electron (simpler toolchain, native Playwright testing). Evaluation notes in roadmap history. | 0 | done |
+| Desktop app self-contained bundle (ark-native embedded) | **DONE (v0.17.0)** -- ark-native binary bundled via extraResources, first-launch CLI install dialog on macOS, CI pipeline downloads ark-native per platform. Desktop app works with zero prerequisites. | 1 day | done |
 | Web UI production-grade overhaul | Borrow from **Open Agents** (tool renderers, git panel, todo panel, structured questions, model selector, stream recovery). 6K lines -> 30K+ | 5-7 days | **SP1** |
 | GitHub App integration (webhooks, not just `gh` CLI) | Build GitHub App: inbound webhooks (PR events, issue events trigger sessions), outbound (create issues, comment on PRs, deployment status) | 2-3 days | **SP3** |
 | Bitbucket integration | Bitbucket Cloud REST API + webhooks. PR creation, review triggers, pipeline status | 2-3 days | **SP3** |
@@ -876,13 +878,78 @@ Ark's endgame is a **complete background agent platform** covering all 11 layers
 | Gap | Tool / Approach | Effort | Priority |
 |-----|----------------|--------|----------|
 | **A2A** (Agent-to-Agent protocol, Google) | Agents discover and communicate with other agents. Ark already has fan-out/fork -- A2A standardizes the wire format | 2-3 days | **SP6** |
-| **ACP** (Agent Communication Protocol) | Standard agent interface. Goose uses it via Claude SDP adapter. Ark channel system maps to ACP semantics | 2-3 days | **SP6** |
+| **ACP** (Agent Client Protocol) | JSON-RPC 2.0 over stdio. Editor/orchestrator = "Client", LLM runtime = "Agent". Native in Gemini CLI, Codex CLI, Copilot CLI, Cursor CLI, Goose. Claude Code wrapped via `@zed-industries/claude-agent-acp` shim (v0.28.0). See dedicated subsection below for Ark adoption plan | ~1,500 LOC touched / ~500 LOC net deletion | **SP6** |
 | **AGENTS.md** | Standard file that describes what agents can do in a repo. Ark should both read (discover repo agent config) and write (declare Ark's capabilities) | 0.5 day | **SP6** |
 | **OpenTelemetry / Agent Trace** | Wire OTLP spans (code exists in `otlp.ts` but never tested). Per-session traces with tool call spans, LLM call spans, stage transitions | 1-2 days | **SP6** |
 | **Agent Skills** protocol | Standard skill discovery and invocation. Ark's skill system maps but isn't protocol-compliant | 1 day | **SP6** |
 | **Agent Auth** protocol | Standardized token exchange for agent-to-service authentication | 1-2 days | **SP6** |
 | **Devcontainer** spec compliance | Ensure Ark's devcontainer compute provider fully implements the spec (features, lifecycle hooks, port forwarding) | 1 day | **SP4** |
 | **OCI** (Open Container Initiative) | Ensure Docker/K8s providers are OCI-compliant for image management | 0.5 day | **SP4** |
+
+### Layer 10a: ACP (Agent Client Protocol) -- adoption plan
+
+> Added 2026-04-15 after multi-agent research pass. Spec: [agentclientprotocol.com](https://agentclientprotocol.com) (v0.11.7, still shipping breaking changes). Repo: [agentclientprotocol/agent-client-protocol](https://github.com/agentclientprotocol/agent-client-protocol).
+
+**Why it matters for Ark.** Ark currently carries per-runtime glue for each of Claude Code, Codex, Gemini CLI, and Goose: transcript parsers, hook configs, launchers, channel MCP wiring, permission policies. ACP collapses that to a generic JSON-RPC client + a ~80-line adapter per runtime. Goose's entire Claude Code adapter is **82 lines** (`crates/goose/src/providers/claude_acp.rs`) vs. Ark's ~700-line `packages/core/claude/claude.ts`.
+
+**Protocol surface.**
+- Transport: stdio (mandatory), streamable HTTP in draft. Newline-delimited JSON-RPC.
+- Agent methods: `initialize`, `authenticate`, `session/new`, `session/load`, `session/prompt`, `session/set_mode`, `session/cancel`.
+- Client callbacks: `session/request_permission`, `fs/read_text_file`, `fs/write_text_file`, `terminal/create|output|wait_for_exit|kill|release`.
+- Agent notifications: `session/update` streams `agent_message_chunk`, `tool_call`, `tool_call_update`, `current_mode_update`, `plan` entries, `stopReason`.
+
+**Runtime support matrix (as of 2026-04-15).**
+| Runtime | ACP support | Adapter |
+|---|---|---|
+| Gemini CLI | Native (`--acp`) | none |
+| GitHub Copilot CLI | Native (public preview 2026-01-28) | none |
+| Cursor CLI | Native | none |
+| Codex CLI | Native OR via `codex-acp` shim | optional |
+| Goose | Native (both client + server sides) | none |
+| Claude Code | Shim-wrapped via `@zed-industries/claude-agent-acp` v0.28.0 | required (3,611 LOC TS over Claude Agent SDK) |
+| Amp, Pi | Shim-wrapped | required |
+
+**Recommended adoption path -- Option B (executor boundary only).**
+
+1. **Keep arkd HTTP surface intact.** ACP covers only agent-side calls. Metrics, directory ops (`list`/`stat`/`mkdir`), exec, port probing, codegraph indexing, control-plane registration -- all remain on arkd's HTTP API (:19300). Forcing ACP at the arkd boundary would require custom protocol extensions for half the surface.
+2. **Add an `acp` executor** alongside `claude-code`, `goose`, `subprocess` in `packages/core/executor.ts`. Spawns the agent (via shim where needed), speaks ACP over stdio, streams `session/update` into the conductor.
+3. **Migrate Goose first.** Native ACP, immediate win: deletes `--with-extension` plumbing and `buildGooseCommand` extension wiring in `packages/core/executors/goose.ts:64-67`.
+4. **Hold on Claude Code.** Until either Anthropic ships native ACP OR the Zed adapter stabilizes remote-compute support. Ark's hook-based status detection in `claude.ts` is already working in production.
+5. **Keep `packages/core/conductor/channel.ts`** until every enabled executor speaks ACP. It remains the only cross-runtime messaging path during migration.
+6. **Rename existing `packages/core/acp.ts`** (114 LOC, custom non-Zed protocol) to avoid name collision with the real ACP client.
+
+**Migration cost breakdown.**
+| Component | Change |
+|---|---|
+| New ACP client library | +300-500 LOC (JSON-RPC transport, handshake, `session/*`, `session/update` parser) |
+| `packages/core/executor.ts` | Extend interface with `prompt()`, `cancel()`, `onUpdate()` streaming |
+| `packages/core/executors/claude-code.ts` (153 LOC) | Swap tmux-direct for spawn-of-`claude-agent-acp` |
+| `packages/core/executors/goose.ts` (201 LOC) | Replace `--with-extension` MCP wiring with ACP spawn |
+| `packages/core/conductor/channel.ts` (222 LOC) + `channel-types.ts` (86 LOC) | Deletable once ACP `session/update` replaces `report` |
+| `packages/core/claude/claude.ts` (701 LOC) | ~200 LOC hooks/settings/channel-config become dead code |
+| `packages/core/conductor/` `/hooks/status` endpoint | Deletable |
+| Tests | `channel.test.ts`, `conductor-hooks.test.ts`, `autonomy.test.ts`, `e2e-autonomy.test.ts`, ~10 others |
+| **Total** | **~1,500 LOC touched, ~500 LOC net deletion** |
+
+**Caveats to resolve.**
+- **Protocol instability.** v0.11.x still shipping breaking changes. `sacp` Rust crate pinned to a git rev, not crates.io, because the unstable channel isn't published. Plan for 6-12 months of protocol upgrades.
+- **Tmux UX regression.** ACP agents are stdio children of the client. Ark's `tmux attach -t ark-s-<id>` workflow does not map. Need either a PTY wrapper, a detachable-client design, or acceptance that "attach" becomes "connect via web UI."
+- **Vendor leakage.** `CLAUDE_CODE_EMIT_SESSION_STATE_EVENTS` is set inside the Claude shim's "generic" ACP layer. Expect similar quirks for Codex-ACP, Amp-ACP. Ark's "generic" ACP executor will still carry per-runtime env var nuances.
+- **Known gaps in Goose's ACP client (as of 2026-04-15).** No session fork or resume. ACP session ID differs from Goose session ID -- telemetry correlation is weak.
+- **Extra IPC hop for Claude.** Goose -> stdio -> `claude-agent-acp` (TS/Node) -> in-process -> Claude Agent SDK -> Claude CLI. Three hops vs. Ark's current two. Measurable latency impact TBD.
+
+**Deliverables (SP6).**
+1. Design doc + name-collision rename: `packages/core/acp.ts` -> `packages/core/rpc-facade.ts` (or similar). **0.5 day**.
+2. ACP client library + protocol types (JSON-RPC transport, handshake, `session/*`). **2-3 days**.
+3. `acp` executor + Goose adapter. **2 days**.
+4. Channel retirement for ACP-native executors (feature-flag gated). **1-2 days**.
+5. Claude Code ACP adapter (spawn `claude-agent-acp`, map permission modes, wire MCP servers via `NewSessionRequest.mcpServers`). **2-3 days**. Gated by Anthropic native ACP timing or Zed adapter remote-compute support.
+6. Tests + migration guide + CLAUDE.md updates. **1-2 days**.
+
+**Reference implementations to study.**
+- [`github.com/block/goose` `crates/goose/src/providers/claude_acp.rs`](https://github.com/block/goose/blob/main/crates/goose/src/providers/claude_acp.rs) -- 82-line Claude adapter (upper bound for Ark's per-runtime adapter size).
+- [`github.com/block/goose` `crates/goose/src/acp/provider.rs`](https://github.com/block/goose/blob/main/crates/goose/src/acp/provider.rs) -- generic ACP consumer (~1,700 LOC Rust; Ark's TS equivalent will be smaller).
+- [`github.com/zed-industries/claude-agent-acp`](https://github.com/zed-industries/claude-agent-acp) -- the Claude shim itself. If Ark ships its own Claude ACP adapter instead of depending on this npm package, most of the translation logic comes from here.
 
 ### Layer 10b: Verification Artifacts & Session Recording
 **Current:** Events table logs stage transitions. Transcript parsers extract Claude/Codex/Gemini/Goose conversations. Artifacts table tracks files/commits/PRs. No video, no terminal recording, no structured test output capture.
@@ -921,8 +988,9 @@ Ark's endgame is a **complete background agent platform** covering all 11 layers
 ═══════════════════════════════════════════════════════════════════════════
 TIER 1 -- SHIP (now)
 ═══════════════════════════════════════════════════════════════════════════
-SP1:  TUI Removal + Tauri Desktop  ████         Delete TUI (15.8K lines), replace Electron with Tauri v2,
-      + Web UI Overhaul                          ship .dmg/.app + AppImage/.deb. Web UI production overhaul
+SP1:  TUI Removal + Desktop Bundle  ████        Delete TUI (15.8K lines), Electron desktop with bundled
+      + Web UI Overhaul                          ark-native (Tauri evaluated, staying with Electron).
+                                                 Ship .dmg/.app + AppImage/.deb. Web UI production overhaul
                                                  (Open Agents patterns). This is the user-facing foundation.
 
 ═══════════════════════════════════════════════════════════════════════════
@@ -1095,7 +1163,7 @@ SP11: ROI & Measurement            ██████       DX metrics, contribu
 - **Risk team (PAI-32794)**: Per-user MCP credentials, chat history on server → auth + control plane + knowledge graph + Camp 10 credential vault.
 - **Rollout discipline**: Start with individuals, not teams. Limited feature set, not everything at once. Daily feedback from recruits, weekly triage by builders. Success = an agent autonomously closing a real bug end-to-end (the Srinivasan-tweet test).
 - **2026-04-14 "ark init" meeting**: First team sync with Yana, Zineng, Abhimanyu, Atul. Architecture walkthrough confirmed two modes (user/local vs control plane), conductor as central gateway, arkd as per-compute agent manager. TUI retired by consensus. Web UI + CLI + Electron desktop as product surfaces. Zineng orienting on codebase (first tasks: web UI improvements). Abhimanyu building model benchmarks and exploring ACP. Team regroups Apr 15 for roadmap after orientation period. Yana on break until Thu Apr 17 (worked over weekend, out of Claude tokens).
-- **Tauri consideration (2026-04-14)**: Zineng flagged Tauri v2 as potential Electron alternative. Smaller binary size, Rust backend, better security model. Worth evaluating before investing heavily in Electron packaging -- both wrap a web UI, but Tauri produces ~10x smaller binaries.
+- **Tauri consideration (2026-04-14)**: Zineng flagged Tauri v2 as potential Electron alternative. Smaller binary size, Rust backend, better security model. Scaffolded 2026-04-15 under `packages/desktop-tauri/`. **Decision (v0.17.0)**: staying with Electron -- simpler toolchain (no Rust needed), native Playwright testing, and the binary size advantage is moot once ark-native (~78 MB) is bundled regardless. Tauri scaffold removed.
 - **MiniMax economics (2026-04-14)**: Input $0.30/Mtok, output $1.00/Mtok vs Claude Opus input $15/Mtok, output $75/Mtok. ~25-75x cheaper. ~90% performance for mechanical tasks per Abhimanyu's benchmarks. GLM also competitive on some benchmarks. Strategy: use cheap models for mechanical work (implement, verify) and expensive models for judgment work (plan, review).
 - **Native skill gap (2026-04-14)**: Abhimanyu asked about integrating native skills (like superpowers) into dispatched sessions. Yana: "I added native skill support at some point. Maybe dropped at some point." Needs investigation -- may have regressed during refactors.
 

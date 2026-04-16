@@ -17,10 +17,7 @@ const execFileAsync = promisify(execFile);
  * Checks .devcontainer/devcontainer.json first, then .devcontainer.json.
  */
 export function detectDevcontainer(repoDir: string): string | null {
-  const candidates = [
-    join(repoDir, ".devcontainer", "devcontainer.json"),
-    join(repoDir, ".devcontainer.json"),
-  ];
+  const candidates = [join(repoDir, ".devcontainer", "devcontainer.json"), join(repoDir, ".devcontainer.json")];
 
   for (const filePath of candidates) {
     if (existsSync(filePath)) return filePath;
@@ -54,20 +51,19 @@ export async function execInDevcontainer(
   command: string,
 ): Promise<{ stdout: string; exitCode: number }> {
   try {
-    const { stdout } = await execFileAsync(
-      "devcontainer",
-      ["exec", "--workspace-folder", workdir, "--", "bash", "-c", command],
-    );
+    const { stdout } = await execFileAsync("devcontainer", [
+      "exec",
+      "--workspace-folder",
+      workdir,
+      "--",
+      "bash",
+      "-c",
+      command,
+    ]);
     return { stdout, exitCode: 0 };
   } catch (err: unknown) {
-    const exitCode =
-      err && typeof err === "object" && "status" in err
-        ? (err as { status: number }).status
-        : 1;
-    const stdout =
-      err && typeof err === "object" && "stdout" in err
-        ? String((err as { stdout: Buffer }).stdout)
-        : "";
+    const exitCode = err && typeof err === "object" && "status" in err ? (err as { status: number }).status : 1;
+    const stdout = err && typeof err === "object" && "stdout" in err ? String((err as { stdout: Buffer }).stdout) : "";
     return { stdout, exitCode };
   }
 }
@@ -99,9 +95,7 @@ export function resolveDevcontainerPorts(repoDir: string): number[] {
   const json = JSON.parse(raw);
 
   if (Array.isArray(json.forwardPorts)) {
-    return json.forwardPorts.filter(
-      (p: unknown): p is number => typeof p === "number",
-    );
+    return json.forwardPorts.filter((p: unknown): p is number => typeof p === "number");
   }
 
   return [];
@@ -122,31 +116,19 @@ export function devcontainerMounts(opts: {
   const mounts: string[] = [];
 
   if (opts.awsDir) {
-    mounts.push(
-      "--mount",
-      `type=bind,source=${opts.awsDir},target=/home/node/.aws`,
-    );
+    mounts.push("--mount", `type=bind,source=${opts.awsDir},target=/home/node/.aws`);
   }
 
   if (opts.claudeDir) {
-    mounts.push(
-      "--mount",
-      `type=bind,source=${opts.claudeDir},target=/home/node/.claude`,
-    );
+    mounts.push("--mount", `type=bind,source=${opts.claudeDir},target=/home/node/.claude`);
   }
 
   if (opts.sshDir) {
-    mounts.push(
-      "--mount",
-      `type=bind,source=${opts.sshDir},target=/home/node/.ssh`,
-    );
+    mounts.push("--mount", `type=bind,source=${opts.sshDir},target=/home/node/.ssh`);
   }
 
   if (opts.gitconfig) {
-    mounts.push(
-      "--mount",
-      `type=bind,source=${opts.gitconfig},target=/home/node/.gitconfig`,
-    );
+    mounts.push("--mount", `type=bind,source=${opts.gitconfig},target=/home/node/.gitconfig`);
   }
 
   return mounts;

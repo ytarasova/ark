@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach } from "bun:test";
-import { configureObservability, recordEvent, getEventBuffer, resetObservability, getObservabilityConfig } from "../observability.js";
+import {
+  configureObservability,
+  recordEvent,
+  getEventBuffer,
+  resetObservability,
+  getObservabilityConfig,
+} from "../observability.js";
 
 describe("observability", () => {
   beforeEach(() => resetObservability());

@@ -13,32 +13,53 @@ export interface TerminationContext {
   lastOutput: string;
 }
 
-export type TerminationCondition = {
-  type: "maxTurns"; value: number;
-} | {
-  type: "maxTokens"; value: number;
-} | {
-  type: "timeout"; valueMs: number;
-} | {
-  type: "textMention"; text: string;
-} | {
-  type: "status"; status: string;
-} | {
-  type: "and"; conditions: TerminationCondition[];
-} | {
-  type: "or"; conditions: TerminationCondition[];
-};
+export type TerminationCondition =
+  | {
+      type: "maxTurns";
+      value: number;
+    }
+  | {
+      type: "maxTokens";
+      value: number;
+    }
+  | {
+      type: "timeout";
+      valueMs: number;
+    }
+  | {
+      type: "textMention";
+      text: string;
+    }
+  | {
+      type: "status";
+      status: string;
+    }
+  | {
+      type: "and";
+      conditions: TerminationCondition[];
+    }
+  | {
+      type: "or";
+      conditions: TerminationCondition[];
+    };
 
 /** Evaluate a termination condition against context. */
 export function evaluateTermination(condition: TerminationCondition, ctx: TerminationContext): boolean {
   switch (condition.type) {
-    case "maxTurns": return ctx.turnCount >= condition.value;
-    case "maxTokens": return ctx.tokenCount >= condition.value;
-    case "timeout": return ctx.elapsedMs >= condition.valueMs;
-    case "textMention": return ctx.lastOutput.includes(condition.text);
-    case "status": return ctx.session.status === condition.status;
-    case "and": return condition.conditions.every(c => evaluateTermination(c, ctx));
-    case "or": return condition.conditions.some(c => evaluateTermination(c, ctx));
+    case "maxTurns":
+      return ctx.turnCount >= condition.value;
+    case "maxTokens":
+      return ctx.tokenCount >= condition.value;
+    case "timeout":
+      return ctx.elapsedMs >= condition.valueMs;
+    case "textMention":
+      return ctx.lastOutput.includes(condition.text);
+    case "status":
+      return ctx.session.status === condition.status;
+    case "and":
+      return condition.conditions.every((c) => evaluateTermination(c, ctx));
+    case "or":
+      return condition.conditions.some((c) => evaluateTermination(c, ctx));
   }
 }
 

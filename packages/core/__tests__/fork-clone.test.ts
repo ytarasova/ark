@@ -12,7 +12,12 @@ withTestContext();
 describe("forkSession (shallow)", () => {
   it("creates a new session with same config", () => {
     const original = getApp().sessions.create({ summary: "original", repo: "my-repo" });
-    getApp().sessions.update(original.id, { flow: "bare", stage: "work", compute_name: "my-compute", group_name: "my-group" });
+    getApp().sessions.update(original.id, {
+      flow: "bare",
+      stage: "work",
+      compute_name: "my-compute",
+      group_name: "my-group",
+    });
 
     const result = forkSession(getApp(), original.id);
     expect(result.ok).toBe(true);
@@ -63,7 +68,12 @@ describe("forkSession (shallow)", () => {
 describe("cloneSession (deep)", () => {
   it("creates a new session with same config", () => {
     const original = getApp().sessions.create({ summary: "original", repo: "my-repo" });
-    getApp().sessions.update(original.id, { flow: "bare", stage: "work", compute_name: "my-compute", group_name: "my-group" });
+    getApp().sessions.update(original.id, {
+      flow: "bare",
+      stage: "work",
+      compute_name: "my-compute",
+      group_name: "my-group",
+    });
 
     const result = cloneSession(getApp(), original.id);
     expect(result.ok).toBe(true);

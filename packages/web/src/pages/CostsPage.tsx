@@ -11,7 +11,14 @@ interface CostsPageProps {
 
 export function CostsPage({ view, onNavigate, readOnly, daemonStatus }: CostsPageProps) {
   return (
-    <Layout view={view} onNavigate={onNavigate} readOnly={readOnly} title="Costs" padded={false} daemonStatus={daemonStatus}>
+    <Layout
+      view={view}
+      onNavigate={onNavigate}
+      readOnly={readOnly}
+      title="Costs"
+      padded={false}
+      daemonStatus={daemonStatus}
+    >
       <CostsView />
     </Layout>
   );

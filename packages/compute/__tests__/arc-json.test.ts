@@ -19,7 +19,10 @@ describe("parseArcJson", () => {
     writeFileSync(
       join(tmpDir, "arc.json"),
       JSON.stringify({
-        ports: [{ port: 3000, name: "web" }, { port: 5432, name: "postgres" }],
+        ports: [
+          { port: 3000, name: "web" },
+          { port: 5432, name: "postgres" },
+        ],
         sync: ["config.yaml", ".env"],
         compose: true,
         devcontainer: false,
@@ -28,7 +31,10 @@ describe("parseArcJson", () => {
 
     const result = parseArcJson(tmpDir);
     expect(result).toEqual({
-      ports: [{ port: 3000, name: "web" }, { port: 5432, name: "postgres" }],
+      ports: [
+        { port: 3000, name: "web" },
+        { port: 5432, name: "postgres" },
+      ],
       sync: ["config.yaml", ".env"],
       compose: true,
       devcontainer: false,
@@ -72,10 +78,7 @@ describe("resolvePortDecls", () => {
 
   it("reads forwardPorts from devcontainer.json", () => {
     mkdirSync(join(tmpDir, ".devcontainer"));
-    writeFileSync(
-      join(tmpDir, ".devcontainer", "devcontainer.json"),
-      JSON.stringify({ forwardPorts: [3000, 8080] }),
-    );
+    writeFileSync(join(tmpDir, ".devcontainer", "devcontainer.json"), JSON.stringify({ forwardPorts: [3000, 8080] }));
 
     const result = resolvePortDecls(tmpDir);
     expect(result).toEqual([
@@ -92,10 +95,7 @@ describe("resolvePortDecls", () => {
       }),
     );
     mkdirSync(join(tmpDir, ".devcontainer"));
-    writeFileSync(
-      join(tmpDir, ".devcontainer", "devcontainer.json"),
-      JSON.stringify({ forwardPorts: [3000, 8080] }),
-    );
+    writeFileSync(join(tmpDir, ".devcontainer", "devcontainer.json"), JSON.stringify({ forwardPorts: [3000, 8080] }));
 
     const result = resolvePortDecls(tmpDir);
     expect(result).toEqual([
@@ -179,17 +179,11 @@ describe("resolvePortDecls with docker-compose", () => {
 
   it("deduplicates across all three sources", () => {
     // arc.json with port 3000
-    writeFileSync(
-      join(tmpDir, "arc.json"),
-      JSON.stringify({ ports: [{ port: 3000, name: "web" }] }),
-    );
+    writeFileSync(join(tmpDir, "arc.json"), JSON.stringify({ ports: [{ port: 3000, name: "web" }] }));
 
     // devcontainer with ports 3000 and 5000
     mkdirSync(join(tmpDir, ".devcontainer"));
-    writeFileSync(
-      join(tmpDir, ".devcontainer", "devcontainer.json"),
-      JSON.stringify({ forwardPorts: [3000, 5000] }),
-    );
+    writeFileSync(join(tmpDir, ".devcontainer", "devcontainer.json"), JSON.stringify({ forwardPorts: [3000, 5000] }));
 
     // docker-compose with ports 3000, 5000, and 8080
     const compose = [
@@ -215,17 +209,11 @@ describe("resolvePortDecls with docker-compose", () => {
 describe("port precedence", () => {
   it("arc.json > devcontainer > compose when same port appears in multiple", () => {
     // arc.json declares port 3000 with name
-    writeFileSync(
-      join(tmpDir, "arc.json"),
-      JSON.stringify({ ports: [{ port: 3000, name: "from-arc" }] }),
-    );
+    writeFileSync(join(tmpDir, "arc.json"), JSON.stringify({ ports: [{ port: 3000, name: "from-arc" }] }));
 
     // devcontainer also declares 3000 and 4000
     mkdirSync(join(tmpDir, ".devcontainer"));
-    writeFileSync(
-      join(tmpDir, ".devcontainer", "devcontainer.json"),
-      JSON.stringify({ forwardPorts: [3000, 4000] }),
-    );
+    writeFileSync(join(tmpDir, ".devcontainer", "devcontainer.json"), JSON.stringify({ forwardPorts: [3000, 4000] }));
 
     // compose also declares 3000, 4000, and 5000
     const compose = [

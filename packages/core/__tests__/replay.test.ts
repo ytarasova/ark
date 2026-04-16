@@ -16,7 +16,11 @@ describe("buildReplay", () => {
   it("returns steps in chronological order", () => {
     const session = startSession(getApp(), { summary: "test replay", flow: "default" });
     getApp().events.log(session.id, "stage_ready", { stage: "plan", data: { stage: "plan" } });
-    getApp().events.log(session.id, "stage_started", { stage: "plan", actor: "planner", data: { stage: "plan", agent: "planner" } });
+    getApp().events.log(session.id, "stage_started", {
+      stage: "plan",
+      actor: "planner",
+      data: { stage: "plan", agent: "planner" },
+    });
 
     const steps = buildReplay(getApp(), session.id);
     expect(steps.length).toBeGreaterThanOrEqual(3);

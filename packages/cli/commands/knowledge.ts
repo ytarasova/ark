@@ -7,7 +7,8 @@ import * as core from "../../core/index.js";
 export function registerKnowledgeCommands(program: Command) {
   const cmd = program.command("knowledge").description("Knowledge graph - search, index, remember, export");
 
-  cmd.command("search")
+  cmd
+    .command("search")
     .description("Search across all knowledge (files, memories, sessions, learnings)")
     .argument("<query>", "Search query")
     .option("-t, --types <types>", "Comma-separated node types to filter (file,symbol,session,memory,learning,skill)")
@@ -29,7 +30,8 @@ export function registerKnowledgeCommands(program: Command) {
       console.log(chalk.dim(`\n${results.length} results`));
     });
 
-  cmd.command("index")
+  cmd
+    .command("index")
     .description("Index/re-index codebase into the knowledge graph")
     .option("-r, --repo <path>", "Repository path (default: cwd)")
     .option("--incremental", "Only re-index changed files")
@@ -46,13 +48,18 @@ export function registerKnowledgeCommands(program: Command) {
         const result = await indexCodebase(repoPath, app.knowledge, {
           incremental: opts.incremental,
         });
-        console.log(chalk.green(`Indexed: ${result.files} files, ${result.symbols} symbols, ${result.edges} edges (${result.duration_ms}ms)`));
+        console.log(
+          chalk.green(
+            `Indexed: ${result.files} files, ${result.symbols} symbols, ${result.edges} edges (${result.duration_ms}ms)`,
+          ),
+        );
       } catch (e: any) {
         console.log(chalk.red(`Index failed: ${e.message}`));
       }
     });
 
-  cmd.command("stats")
+  cmd
+    .command("stats")
     .description("Show node/edge counts by type")
     .action(() => {
       const app = core.getApp();
@@ -69,7 +76,16 @@ export function registerKnowledgeCommands(program: Command) {
       }
       console.log(`  ${"total".padEnd(12)} ${totalNodes}`);
 
-      const edgeTypes = ["depends_on", "imports", "modified_by", "learned_from", "relates_to", "uses", "extracted_from", "co_changes"] as const;
+      const edgeTypes = [
+        "depends_on",
+        "imports",
+        "modified_by",
+        "learned_from",
+        "relates_to",
+        "uses",
+        "extracted_from",
+        "co_changes",
+      ] as const;
       console.log(chalk.bold("\nEdges:"));
       let totalEdges = 0;
       for (const r of edgeTypes) {
@@ -82,7 +98,8 @@ export function registerKnowledgeCommands(program: Command) {
       console.log(`  ${"total".padEnd(16)} ${totalEdges}`);
     });
 
-  cmd.command("remember")
+  cmd
+    .command("remember")
     .description("Store a new memory in the knowledge graph")
     .argument("<content>", "Memory content")
     .option("-t, --tags <tags>", "Comma-separated tags")
@@ -100,7 +117,8 @@ export function registerKnowledgeCommands(program: Command) {
       console.log(chalk.green(`Remembered: ${id}`));
     });
 
-  cmd.command("recall")
+  cmd
+    .command("recall")
     .description("Search memories and learnings")
     .argument("<query>", "Search query")
     .option("-n, --limit <n>", "Max results", "10")
@@ -115,14 +133,16 @@ export function registerKnowledgeCommands(program: Command) {
         return;
       }
       for (const r of results) {
-        const tags = Array.isArray(r.metadata.tags) && r.metadata.tags.length
-          ? chalk.dim(` [${(r.metadata.tags as string[]).join(", ")}]`)
-          : "";
+        const tags =
+          Array.isArray(r.metadata.tags) && r.metadata.tags.length
+            ? chalk.dim(` [${(r.metadata.tags as string[]).join(", ")}]`)
+            : "";
         console.log(`  ${chalk.cyan(`[${r.type}]`)} ${r.content ?? r.label}${tags}`);
       }
     });
 
-  cmd.command("export")
+  cmd
+    .command("export")
     .description("Export knowledge as markdown files")
     .option("-d, --dir <path>", "Output directory", "./knowledge-export")
     .option("-t, --types <types>", "Comma-separated types to export (default: memory,learning)")
@@ -135,7 +155,8 @@ export function registerKnowledgeCommands(program: Command) {
       console.log(chalk.green(`Exported ${result.exported} nodes to ${outputDir}`));
     });
 
-  cmd.command("import")
+  cmd
+    .command("import")
     .description("Import knowledge from markdown files")
     .option("-d, --dir <path>", "Input directory", "./knowledge-export")
     .action(async (opts) => {
@@ -151,7 +172,8 @@ export function registerKnowledgeCommands(program: Command) {
     });
 
   // Ingest subcommand -- uses knowledge indexer
-  cmd.command("ingest")
+  cmd
+    .command("ingest")
     .description("Ingest a directory into the knowledge graph (indexes files and symbols)")
     .argument("<path>", "Directory to ingest")
     .option("--incremental", "Only re-index changed files")
@@ -168,7 +190,11 @@ export function registerKnowledgeCommands(program: Command) {
         const result = await indexCodebase(resolved, app.knowledge, {
           incremental: opts.incremental,
         });
-        console.log(chalk.green(`Indexed: ${result.files} files, ${result.symbols} symbols, ${result.edges} edges (${result.duration_ms}ms)`));
+        console.log(
+          chalk.green(
+            `Indexed: ${result.files} files, ${result.symbols} symbols, ${result.edges} edges (${result.duration_ms}ms)`,
+          ),
+        );
       } catch (e: any) {
         console.log(chalk.red(`Ingest failed: ${e.message}`));
       }

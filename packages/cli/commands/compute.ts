@@ -13,21 +13,42 @@ import type { ComputeProviderName } from "../../types/index.js";
 export function registerComputeCommands(program: Command) {
   const computeCmd = program.command("compute").description("Manage compute resources");
 
-  computeCmd.command("create")
+  computeCmd
+    .command("create")
     .description("Create a new compute resource")
     .argument("<name>", "Compute name")
     .option("--provider <type>", "Provider type (local, docker, ec2, e2b, k8s, k8s-kata)", "local")
     // EC2-specific options
-    .option("--size <size>", "Instance size: xs (2vCPU/8GB), s (4/16), m (8/32), l (16/64), xl (32/128), xxl (48/192), xxxl (64/256)", "m")
+    .option(
+      "--size <size>",
+      "Instance size: xs (2vCPU/8GB), s (4/16), m (8/32), l (16/64), xl (32/128), xxl (48/192), xxxl (64/256)",
+      "m",
+    )
     .option("--arch <arch>", "Architecture: x64, arm", "x64")
     .option("--region <region>", "Region", "us-east-1")
     .option("--profile <profile>", "AWS profile")
     .option("--subnet-id <id>", "Subnet ID")
-    .option("--tag <key=value>", "Tag (repeatable)", (val: string, acc: string[]) => { acc.push(val); return acc; }, [] as string[])
+    .option(
+      "--tag <key=value>",
+      "Tag (repeatable)",
+      (val: string, acc: string[]) => {
+        acc.push(val);
+        return acc;
+      },
+      [] as string[],
+    )
     // Docker-specific options
     .option("--image <image>", "Docker image (default: ubuntu:22.04)")
     .option("--devcontainer", "Use devcontainer.json from project")
-    .option("--volume <mount>", "Extra volume mount (repeatable)", (val: string, acc: string[]) => { acc.push(val); return acc; }, [] as string[])
+    .option(
+      "--volume <mount>",
+      "Extra volume mount (repeatable)",
+      (val: string, acc: string[]) => {
+        acc.push(val);
+        return acc;
+      },
+      [] as string[],
+    )
     // E2B-specific options
     .option("--template <template>", "E2B sandbox template (e2b provider)")
     // K8s-specific options
@@ -123,7 +144,9 @@ export function registerComputeCommands(program: Command) {
             const { INSTANCE_SIZES } = await import("../../compute/providers/ec2/provision.js");
             const tier = INSTANCE_SIZES[opts.size];
             if (tier) sizeLabel = tier.label;
-          } catch { /* not ec2 provider */ }
+          } catch {
+            /* not ec2 provider */
+          }
           console.log(`  Size:     ${sizeLabel}`);
           console.log(`  Arch:     ${opts.arch}`);
           console.log(`  Region:   ${opts.region}`);
@@ -140,7 +163,8 @@ export function registerComputeCommands(program: Command) {
       }
     });
 
-  computeCmd.command("provision")
+  computeCmd
+    .command("provision")
     .description("Provision a compute resource (create infrastructure)")
     .argument("<name>", "Compute name")
     .action(async (name) => {
@@ -151,12 +175,17 @@ export function registerComputeCommands(program: Command) {
         await ark.computeProvision(name);
         console.log(chalk.green(`Compute '${name}' provisioned and running`));
       } catch (e: any) {
-        try { await ark.computeUpdate(name, { status: "stopped" }); } catch { /* ignore */ }
+        try {
+          await ark.computeUpdate(name, { status: "stopped" });
+        } catch {
+          /* ignore */
+        }
         console.log(chalk.red(`Provision failed: ${e.message}`));
       }
     });
 
-  computeCmd.command("start")
+  computeCmd
+    .command("start")
     .description("Start a compute resource")
     .argument("<name>", "Compute name")
     .action(async (name) => {
@@ -169,7 +198,8 @@ export function registerComputeCommands(program: Command) {
       }
     });
 
-  computeCmd.command("stop")
+  computeCmd
+    .command("stop")
     .description("Stop a compute resource")
     .argument("<name>", "Compute name")
     .action(async (name) => {
@@ -182,7 +212,8 @@ export function registerComputeCommands(program: Command) {
       }
     });
 
-  computeCmd.command("destroy")
+  computeCmd
+    .command("destroy")
     .description("Destroy a compute resource (remove infrastructure)")
     .argument("<name>", "Compute name")
     .action(async (name) => {
@@ -195,7 +226,8 @@ export function registerComputeCommands(program: Command) {
       }
     });
 
-  computeCmd.command("delete")
+  computeCmd
+    .command("delete")
     .description("Delete a compute record from the database")
     .argument("<name>", "Compute name")
     .action(async (name) => {
@@ -213,7 +245,8 @@ export function registerComputeCommands(program: Command) {
       }
     });
 
-  computeCmd.command("update")
+  computeCmd
+    .command("update")
     .description("Update compute configuration")
     .argument("<name>", "Compute name")
     .option("--size <size>", "Instance size")
@@ -223,7 +256,15 @@ export function registerComputeCommands(program: Command) {
     .option("--subnet-id <id>", "Subnet ID")
     .option("--ingress <cidrs>", "SSH ingress CIDRs (comma-separated, or 'open' for 0.0.0.0/0)")
     .option("--idle-minutes <min>", "Idle shutdown timeout in minutes")
-    .option("--set <key=value>", "Set arbitrary config key", (val: string, acc: string[]) => { acc.push(val); return acc; }, [] as string[])
+    .option(
+      "--set <key=value>",
+      "Set arbitrary config key",
+      (val: string, acc: string[]) => {
+        acc.push(val);
+        return acc;
+      },
+      [] as string[],
+    )
     .action(async (name, opts) => {
       const ark = await getArkClient();
       try {
@@ -236,9 +277,8 @@ export function registerComputeCommands(program: Command) {
         if (opts.profile) config.aws_profile = opts.profile;
         if (opts.subnetId) config.subnet_id = opts.subnetId;
         if (opts.ingress) {
-          config.ingress_cidrs = opts.ingress === "open"
-            ? ["0.0.0.0/0"]
-            : opts.ingress.split(",").map((s: string) => s.trim());
+          config.ingress_cidrs =
+            opts.ingress === "open" ? ["0.0.0.0/0"] : opts.ingress.split(",").map((s: string) => s.trim());
         }
         if (opts.idleMinutes) config.idle_minutes = parseInt(opts.idleMinutes);
         for (const kv of opts.set) {
@@ -254,7 +294,8 @@ export function registerComputeCommands(program: Command) {
       }
     });
 
-  computeCmd.command("list")
+  computeCmd
+    .command("list")
     .description("List all compute")
     .action(async () => {
       const ark = await getArkClient();
@@ -270,7 +311,8 @@ export function registerComputeCommands(program: Command) {
       }
     });
 
-  computeCmd.command("status")
+  computeCmd
+    .command("status")
     .description("Show compute details")
     .argument("<name>", "Compute name")
     .action(async (name) => {
@@ -283,7 +325,9 @@ export function registerComputeCommands(program: Command) {
             const snap = await ark.metricsSnapshot(name);
             console.log(chalk.bold("\nMetrics:"));
             console.log(`  CPU:  ${snap.metrics.cpu.toFixed(1)}%`);
-            console.log(`  MEM:  ${snap.metrics.memUsedGb.toFixed(1)}/${snap.metrics.memTotalGb.toFixed(1)} GB (${snap.metrics.memPct.toFixed(1)}%)`);
+            console.log(
+              `  MEM:  ${snap.metrics.memUsedGb.toFixed(1)}/${snap.metrics.memTotalGb.toFixed(1)} GB (${snap.metrics.memPct.toFixed(1)}%)`,
+            );
             console.log(`  DISK: ${snap.metrics.diskPct.toFixed(1)}%`);
           } catch (e: any) {
             console.log(chalk.dim(`(metrics unavailable: ${e.message})`));
@@ -294,16 +338,25 @@ export function registerComputeCommands(program: Command) {
       }
     });
 
-  computeCmd.command("sync")
+  computeCmd
+    .command("sync")
     .description("Sync environment to/from compute")
     .argument("<name>", "Compute name")
     .option("--direction <dir>", "Sync direction (push|pull)", "push")
     .action(async (name, opts) => {
       const ark = await getArkClient();
       let compute: any;
-      try { compute = await ark.computeRead(name); } catch { console.log(chalk.red(`Compute '${name}' not found`)); return; }
+      try {
+        compute = await ark.computeRead(name);
+      } catch {
+        console.log(chalk.red(`Compute '${name}' not found`));
+        return;
+      }
       const provider = getProvider(compute.provider);
-      if (!provider) { console.log(chalk.red(`Provider '${compute.provider}' not found`)); return; }
+      if (!provider) {
+        console.log(chalk.red(`Provider '${compute.provider}' not found`));
+        return;
+      }
       try {
         console.log(chalk.dim(`Syncing (${opts.direction}) to '${name}'...`));
         await provider.syncEnvironment(compute, { direction: opts.direction });
@@ -313,17 +366,23 @@ export function registerComputeCommands(program: Command) {
       }
     });
 
-  computeCmd.command("metrics")
+  computeCmd
+    .command("metrics")
     .description("Show compute metrics")
     .argument("<name>", "Compute name")
     .action(async (name) => {
       const ark = await getArkClient();
       try {
         const snap = await ark.metricsSnapshot(name);
-        if (!snap) { console.log(chalk.red(`No metrics for '${name}'`)); return; }
+        if (!snap) {
+          console.log(chalk.red(`No metrics for '${name}'`));
+          return;
+        }
         console.log(chalk.bold(`\nCompute: ${name}`));
         console.log(`  CPU:       ${snap.metrics.cpu.toFixed(1)}%`);
-        console.log(`  MEM:       ${snap.metrics.memUsedGb.toFixed(1)}/${snap.metrics.memTotalGb.toFixed(1)} GB (${snap.metrics.memPct.toFixed(1)}%)`);
+        console.log(
+          `  MEM:       ${snap.metrics.memUsedGb.toFixed(1)}/${snap.metrics.memTotalGb.toFixed(1)} GB (${snap.metrics.memPct.toFixed(1)}%)`,
+        );
         console.log(`  DISK:      ${snap.metrics.diskPct.toFixed(1)}%`);
         console.log(`  NET:       rx=${snap.metrics.netRxMb.toFixed(1)} MB  tx=${snap.metrics.netTxMb.toFixed(1)} MB`);
         console.log(`  Uptime:    ${snap.metrics.uptime}`);
@@ -334,17 +393,27 @@ export function registerComputeCommands(program: Command) {
       }
     });
 
-  computeCmd.command("default")
+  computeCmd
+    .command("default")
     .description("Set default compute")
     .argument("<name>", "Compute name")
     .action(async (name) => {
       const ark = await getArkClient();
-      try { await ark.computeRead(name); } catch { console.log(chalk.red(`Compute '${name}' not found`)); return; }
+      try {
+        await ark.computeRead(name);
+      } catch {
+        console.log(chalk.red(`Compute '${name}' not found`));
+        return;
+      }
       const envPath = join(homedir(), ".ark", ".env");
       mkdirSync(dirname(envPath), { recursive: true });
       // Read existing, update or append
       let content = "";
-      try { content = readFileSync(envPath, "utf-8"); } catch { /* new file */ }
+      try {
+        content = readFileSync(envPath, "utf-8");
+      } catch {
+        /* new file */
+      }
       if (content.includes("ARK_DEFAULT_COMPUTE=")) {
         content = content.replace(/ARK_DEFAULT_COMPUTE=.*/g, `ARK_DEFAULT_COMPUTE=${name}`);
       } else {
@@ -355,18 +424,27 @@ export function registerComputeCommands(program: Command) {
       console.log(chalk.green(`Default compute set to '${name}'`));
     });
 
-  computeCmd.command("ssh")
+  computeCmd
+    .command("ssh")
     .description("SSH into a compute")
     .argument("<name>", "Compute name")
     .action(async (name) => {
       const ark = await getArkClient();
       let compute: any;
-      try { compute = await ark.computeRead(name); } catch { console.log(chalk.red(`Compute '${name}' not found`)); return; }
+      try {
+        compute = await ark.computeRead(name);
+      } catch {
+        console.log(chalk.red(`Compute '${name}' not found`));
+        return;
+      }
       const sshCfg = compute.config as { ip?: string; key_path?: string; ssh_user?: string };
       const ip = sshCfg.ip;
       const keyPath = sshCfg.key_path;
       const user = sshCfg.ssh_user ?? "ubuntu";
-      if (!ip) { console.log(chalk.red(`Compute '${name}' has no IP address`)); return; }
+      if (!ip) {
+        console.log(chalk.red(`Compute '${name}' has no IP address`));
+        return;
+      }
       const sshArgs = [`${user}@${ip}`];
       if (keyPath) sshArgs.unshift("-i", keyPath);
       console.log(chalk.dim(`$ ssh ${sshArgs.join(" ")}`));
@@ -381,7 +459,8 @@ export function registerComputeCommands(program: Command) {
 
   const pool = computeCmd.command("pool").description("Manage compute pools");
 
-  pool.command("create")
+  pool
+    .command("create")
     .description("Create a compute pool")
     .argument("<name>", "Pool name")
     .option("--provider <type>", "Provider type (ec2, docker, k8s, e2b)", "ec2")
@@ -414,7 +493,8 @@ export function registerComputeCommands(program: Command) {
       }
     });
 
-  pool.command("list")
+  pool
+    .command("list")
     .description("List compute pools")
     .action(async () => {
       try {
@@ -425,16 +505,21 @@ export function registerComputeCommands(program: Command) {
           console.log(chalk.dim("No pools. Create one: ark compute pool create <name> --provider ec2"));
           return;
         }
-        console.log(`  ${"NAME".padEnd(20)} ${"PROVIDER".padEnd(10)} ${"MIN".padEnd(5)} ${"MAX".padEnd(5)} ${"ACTIVE".padEnd(8)} AVAIL`);
+        console.log(
+          `  ${"NAME".padEnd(20)} ${"PROVIDER".padEnd(10)} ${"MIN".padEnd(5)} ${"MAX".padEnd(5)} ${"ACTIVE".padEnd(8)} AVAIL`,
+        );
         for (const p of pools) {
-          console.log(`  ${p.name.padEnd(20)} ${p.provider.padEnd(10)} ${String(p.min).padEnd(5)} ${String(p.max).padEnd(5)} ${String(p.active).padEnd(8)} ${p.available}`);
+          console.log(
+            `  ${p.name.padEnd(20)} ${p.provider.padEnd(10)} ${String(p.min).padEnd(5)} ${String(p.max).padEnd(5)} ${String(p.active).padEnd(8)} ${p.available}`,
+          );
         }
       } catch (e: any) {
         console.log(chalk.red(`Failed: ${e.message}`));
       }
     });
 
-  pool.command("delete")
+  pool
+    .command("delete")
     .description("Delete a compute pool")
     .argument("<name>", "Pool name")
     .action(async (name) => {
@@ -456,7 +541,8 @@ export function registerComputeCommands(program: Command) {
 
   const template = computeCmd.command("template").description("Manage compute templates");
 
-  template.command("list")
+  template
+    .command("list")
     .description("List compute templates")
     .action(async () => {
       try {
@@ -465,15 +551,17 @@ export function registerComputeCommands(program: Command) {
 
         // Also show config-defined templates
         const configTemplates = app.config.computeTemplates ?? [];
-        const dbNames = new Set(templates.map(t => t.name));
+        const dbNames = new Set(templates.map((t) => t.name));
         const allTemplates = [
           ...templates,
-          ...configTemplates.filter(t => !dbNames.has(t.name)).map(t => ({
-            name: t.name,
-            description: t.description,
-            provider: t.provider as ComputeProviderName,
-            config: t.config,
-          })),
+          ...configTemplates
+            .filter((t) => !dbNames.has(t.name))
+            .map((t) => ({
+              name: t.name,
+              description: t.description,
+              provider: t.provider as ComputeProviderName,
+              config: t.config,
+            })),
         ];
 
         if (!allTemplates.length) {
@@ -495,7 +583,8 @@ export function registerComputeCommands(program: Command) {
       }
     });
 
-  template.command("show")
+  template
+    .command("show")
     .description("Show a compute template")
     .argument("<name>", "Template name")
     .action(async (name) => {
@@ -505,9 +594,14 @@ export function registerComputeCommands(program: Command) {
 
         // Fall back to config
         if (!tmpl) {
-          const cfgTmpl = (app.config.computeTemplates ?? []).find(t => t.name === name);
+          const cfgTmpl = (app.config.computeTemplates ?? []).find((t) => t.name === name);
           if (cfgTmpl) {
-            tmpl = { name: cfgTmpl.name, description: cfgTmpl.description, provider: cfgTmpl.provider as ComputeProviderName, config: cfgTmpl.config };
+            tmpl = {
+              name: cfgTmpl.name,
+              description: cfgTmpl.description,
+              provider: cfgTmpl.provider as ComputeProviderName,
+              config: cfgTmpl.config,
+            };
           }
         }
 
@@ -528,7 +622,8 @@ export function registerComputeCommands(program: Command) {
       }
     });
 
-  template.command("create")
+  template
+    .command("create")
     .description("Create a compute template")
     .argument("<name>", "Template name")
     .option("--provider <type>", "Provider type", "ec2")
@@ -567,7 +662,8 @@ export function registerComputeCommands(program: Command) {
       }
     });
 
-  template.command("delete")
+  template
+    .command("delete")
     .description("Delete a compute template")
     .argument("<name>", "Template name")
     .action(async (name) => {

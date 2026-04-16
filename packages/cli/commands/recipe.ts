@@ -9,7 +9,8 @@ import { getArkClient } from "./_shared.js";
 export function registerRecipeCommands(program: Command) {
   const recipeCmd = program.command("recipe").description("Manage recipes");
 
-  recipeCmd.command("list")
+  recipeCmd
+    .command("list")
     .description("List available recipes")
     .action(async () => {
       const ark = await getArkClient();
@@ -23,14 +24,18 @@ export function registerRecipeCommands(program: Command) {
       }
     });
 
-  recipeCmd.command("show")
+  recipeCmd
+    .command("show")
     .description("Show recipe details")
     .argument("<name>", "Recipe name")
     .action(async (name: string) => {
       const ark = await getArkClient();
       try {
         const recipe = await ark.recipeRead(name);
-        if (!recipe) { console.log(chalk.red(`Recipe not found: ${name}`)); return; }
+        if (!recipe) {
+          console.log(chalk.red(`Recipe not found: ${name}`));
+          return;
+        }
         console.log(chalk.bold(`\n${recipe.name}`) + chalk.dim(` (${recipe._source})`));
         console.log(`  Description: ${recipe.description}`);
         console.log(`  Flow:        ${recipe.flow}`);
@@ -38,7 +43,9 @@ export function registerRecipeCommands(program: Command) {
         if (recipe.variables?.length) {
           console.log(chalk.bold(`\n  Variables:`));
           for (const v of recipe.variables) {
-            console.log(`    ${v.name}${v.required ? " *" : ""}  ${v.description}${v.default ? ` (default: ${v.default})` : ""}`);
+            console.log(
+              `    ${v.name}${v.required ? " *" : ""}  ${v.description}${v.default ? ` (default: ${v.default})` : ""}`,
+            );
           }
         }
       } catch {
@@ -46,7 +53,8 @@ export function registerRecipeCommands(program: Command) {
       }
     });
 
-  recipeCmd.command("create")
+  recipeCmd
+    .command("create")
     .description("Create a new recipe")
     .option("--from <file>", "Create from YAML file")
     .option("--from-session <id>", "Create from existing session")
@@ -57,10 +65,16 @@ export function registerRecipeCommands(program: Command) {
       const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
 
       if (opts.fromSession) {
-        if (!opts.name) { console.error(chalk.red("--name required with --from-session")); process.exit(1); }
+        if (!opts.name) {
+          console.error(chalk.red("--name required with --from-session"));
+          process.exit(1);
+        }
         const ark = await getArkClient();
         const { session } = await ark.sessionRead(opts.fromSession);
-        if (!session) { console.error(chalk.red(`Session not found: ${opts.fromSession}`)); process.exit(1); }
+        if (!session) {
+          console.error(chalk.red(`Session not found: ${opts.fromSession}`));
+          process.exit(1);
+        }
         const recipe = core.sessionToRecipe(session, opts.name);
         getApp().recipes.save(recipe.name, recipe, scope, projectRoot);
         console.log(chalk.green(`Created recipe: ${opts.name} from session ${opts.fromSession} (${scope})`));
@@ -69,10 +83,17 @@ export function registerRecipeCommands(program: Command) {
 
       if (opts.from) {
         let content: string;
-        try { content = readFileSync(opts.from, "utf-8"); }
-        catch { console.error(chalk.red(`Cannot read file: ${opts.from}`)); process.exit(1); }
+        try {
+          content = readFileSync(opts.from, "utf-8");
+        } catch {
+          console.error(chalk.red(`Cannot read file: ${opts.from}`));
+          process.exit(1);
+        }
         const recipe = YAML.parse(content);
-        if (!recipe.name) { console.error(chalk.red("YAML must have a 'name' field")); process.exit(1); }
+        if (!recipe.name) {
+          console.error(chalk.red("YAML must have a 'name' field"));
+          process.exit(1);
+        }
         getApp().recipes.save(recipe.name, recipe, scope, projectRoot);
         console.log(chalk.green(`Created recipe: ${recipe.name} (${scope})`));
         return;
@@ -82,7 +103,8 @@ export function registerRecipeCommands(program: Command) {
       process.exit(1);
     });
 
-  recipeCmd.command("delete")
+  recipeCmd
+    .command("delete")
     .description("Delete a recipe (global or project only)")
     .argument("<name>", "Recipe name")
     .option("-s, --scope <scope>", "Scope: global or project", "global")

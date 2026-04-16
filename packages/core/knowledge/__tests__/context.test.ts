@@ -50,19 +50,29 @@ describe("buildContext", () => {
 
     const ctx = buildContext(store, "fix authentication token issue");
     expect(ctx.memories.length).toBeGreaterThanOrEqual(1);
-    const authMemory = ctx.memories.find(m => m.content.includes("authentication token"));
+    const authMemory = ctx.memories.find((m) => m.content.includes("authentication token"));
     expect(authMemory).not.toBeUndefined();
     expect(authMemory!.importance).toBe(0.9);
   });
 
   it("includes file neighbors", () => {
-    const fileA = store.addNode({ id: "file:src/auth.ts", type: "file", label: "src/auth.ts", metadata: { language: "typescript" } });
-    const fileB = store.addNode({ id: "file:src/session.ts", type: "file", label: "src/session.ts", metadata: { language: "typescript" } });
+    const fileA = store.addNode({
+      id: "file:src/auth.ts",
+      type: "file",
+      label: "src/auth.ts",
+      metadata: { language: "typescript" },
+    });
+    const fileB = store.addNode({
+      id: "file:src/session.ts",
+      type: "file",
+      label: "src/session.ts",
+      metadata: { language: "typescript" },
+    });
     store.addEdge(fileA, fileB, "imports");
 
     const ctx = buildContext(store, "update auth", { files: ["src/auth.ts"] });
     // Should include src/session.ts as a neighbor of src/auth.ts
-    const sessionFile = ctx.files.find(f => f.path === "src/session.ts");
+    const sessionFile = ctx.files.find((f) => f.path === "src/session.ts");
     expect(sessionFile).not.toBeUndefined();
   });
 
@@ -83,23 +93,34 @@ describe("buildContext", () => {
     });
 
     const ctx = buildContext(store, "fix login bug", { sessionId: "s-current" });
-    const sessionIds = ctx.sessions.map(s => s.id);
+    const sessionIds = ctx.sessions.map((s) => s.id);
     expect(sessionIds).not.toContain("s-current");
     // Past session may or may not be found depending on search match, but current should never appear
   });
 
   it("populates file context with dependents count and recent sessions", () => {
-    store.addNode({ id: "file:src/utils.ts", type: "file", label: "src/utils.ts", content: "utility functions", metadata: { language: "typescript" } });
+    store.addNode({
+      id: "file:src/utils.ts",
+      type: "file",
+      label: "src/utils.ts",
+      content: "utility functions",
+      metadata: { language: "typescript" },
+    });
     store.addNode({ id: "file:src/a.ts", type: "file", label: "src/a.ts", metadata: { language: "typescript" } });
     store.addNode({ id: "file:src/b.ts", type: "file", label: "src/b.ts", metadata: { language: "typescript" } });
-    store.addNode({ id: "session:s-old", type: "session", label: "Refactored utils", metadata: { outcome: "success" } });
+    store.addNode({
+      id: "session:s-old",
+      type: "session",
+      label: "Refactored utils",
+      metadata: { outcome: "success" },
+    });
 
     store.addEdge("file:src/a.ts", "file:src/utils.ts", "imports");
     store.addEdge("file:src/b.ts", "file:src/utils.ts", "imports");
     store.addEdge("file:src/utils.ts", "session:s-old", "modified_by");
 
     const ctx = buildContext(store, "update utility functions");
-    const utilsFile = ctx.files.find(f => f.path === "src/utils.ts");
+    const utilsFile = ctx.files.find((f) => f.path === "src/utils.ts");
     expect(utilsFile).not.toBeUndefined();
     expect(utilsFile!.language).toBe("typescript");
     expect(utilsFile!.dependents).toBe(2); // two files import it
@@ -163,7 +184,7 @@ describe("buildContext", () => {
     });
 
     const ctx = buildContext(store, "run tests sequentially");
-    const found = ctx.learnings.find(l => l.title === "Sequential Testing Required");
+    const found = ctx.learnings.find((l) => l.title === "Sequential Testing Required");
     expect(found).not.toBeUndefined();
     expect(found!.description).toContain("port collisions");
   });
@@ -185,7 +206,9 @@ describe("formatContextAsMarkdown", () => {
     const md = formatContextAsMarkdown({
       files: [{ path: "src/app.ts", language: "typescript", dependents: 3, recent_sessions: [] }],
       memories: [{ content: "Always test first", importance: 0.9, scope: "global" }],
-      sessions: [{ id: "s-1", summary: "Fixed auth", outcome: "success", files_changed: ["src/auth.ts"], date: "2026-04-01" }],
+      sessions: [
+        { id: "s-1", summary: "Fixed auth", outcome: "success", files_changed: ["src/auth.ts"], date: "2026-04-01" },
+      ],
       learnings: [{ title: "Use worktrees", description: "Isolate parallel work" }],
       skills: [{ name: "code-review", description: "Structured review process" }],
     });
@@ -225,7 +248,15 @@ describe("formatContextAsMarkdown", () => {
     const md = formatContextAsMarkdown({
       files: [],
       memories: [],
-      sessions: [{ id: "s-2", summary: "Multi-file fix", outcome: "success", files_changed: ["a.ts", "b.ts"], date: "2026-04-01" }],
+      sessions: [
+        {
+          id: "s-2",
+          summary: "Multi-file fix",
+          outcome: "success",
+          files_changed: ["a.ts", "b.ts"],
+          date: "2026-04-01",
+        },
+      ],
       learnings: [],
       skills: [],
     });

@@ -7,12 +7,18 @@ import { execFile, spawn } from "child_process";
 import { promisify } from "util";
 import { existsSync, rmSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
 
 const execFileAsync = promisify(execFile);
 import type {
-  ComputeProvider, ProvisionOpts, LaunchOpts, SyncOpts,
-  ComputeSnapshot, PortDecl, PortStatus, Compute, Session,
+  ComputeProvider,
+  ProvisionOpts,
+  LaunchOpts,
+  SyncOpts,
+  ComputeSnapshot,
+  PortDecl,
+  PortStatus,
+  Compute,
+  Session,
 } from "../../types.js";
 import type { AppContext } from "../../../core/app.js";
 import * as tmux from "../../../core/infra/tmux.js";
@@ -25,7 +31,8 @@ import { channelLaunchSpec } from "../../../core/install-paths.js";
 async function checkLocalPort(port: number): Promise<boolean> {
   try {
     const { stdout } = await execFileAsync("lsof", ["-i", `:${port}`, "-sTCP:LISTEN"], {
-      encoding: "utf-8", timeout: 5000,
+      encoding: "utf-8",
+      timeout: 5000,
     });
     return stdout.trim().length > 0;
   } catch {
@@ -113,10 +120,12 @@ export class LocalProvider implements ComputeProvider {
   }
 
   async probePorts(_compute: Compute, ports: PortDecl[]): Promise<PortStatus[]> {
-    return Promise.all(ports.map(async (decl) => {
-      const listening = await checkLocalPort(decl.port);
-      return { ...decl, listening };
-    }));
+    return Promise.all(
+      ports.map(async (decl) => {
+        const listening = await checkLocalPort(decl.port);
+        return { ...decl, listening };
+      }),
+    );
   }
 
   async syncEnvironment(_compute: Compute, _opts: SyncOpts): Promise<void> {
@@ -132,7 +141,12 @@ export class LocalProvider implements ComputeProvider {
     return [tmux.tmuxBin(), "attach", "-t", session.session_id];
   }
 
-  buildChannelConfig(sessionId: string, stage: string, channelPort: number, opts?: { conductorUrl?: string }): Record<string, unknown> {
+  buildChannelConfig(
+    sessionId: string,
+    stage: string,
+    channelPort: number,
+    opts?: { conductorUrl?: string },
+  ): Record<string, unknown> {
     // channelLaunchSpec() returns the compiled-binary self-spawn in prod and
     // the bun-runtime + source-path spawn in dev. Replaces the old approach
     // that hardcoded bun + CHANNEL_SCRIPT_PATH, which broke in compiled

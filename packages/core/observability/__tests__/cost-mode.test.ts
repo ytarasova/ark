@@ -96,9 +96,11 @@ describe("UsageRecorder cost_mode", () => {
     });
 
     // Raw SQL query to verify cost_mode column works
-    const rows = app.db.prepare(
-      "SELECT cost_mode, COUNT(*) as cnt FROM usage_records WHERE session_id IN ('s-mix-1', 's-mix-2') GROUP BY cost_mode"
-    ).all() as Array<{ cost_mode: string; cnt: number }>;
+    const rows = app.db
+      .prepare(
+        "SELECT cost_mode, COUNT(*) as cnt FROM usage_records WHERE session_id IN ('s-mix-1', 's-mix-2') GROUP BY cost_mode",
+      )
+      .all() as Array<{ cost_mode: string; cnt: number }>;
 
     expect(rows.length).toBe(2);
     const byMode: Record<string, number> = {};

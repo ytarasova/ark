@@ -13,13 +13,38 @@ interface AgentsPageProps {
   onSelectedChange?: (id: string | null) => void;
 }
 
-export function AgentsPage({ view, onNavigate, readOnly, daemonStatus, initialSelectedId, onSelectedChange }: AgentsPageProps) {
+export function AgentsPage({
+  view,
+  onNavigate,
+  readOnly,
+  daemonStatus,
+  initialSelectedId,
+  onSelectedChange,
+}: AgentsPageProps) {
   const [showNew, setShowNew] = useState(false);
 
   return (
-    <Layout view={view} onNavigate={onNavigate} readOnly={readOnly} title="Agents" padded={false} daemonStatus={daemonStatus}
-      headerRight={!readOnly ? <Button size="sm" onClick={() => setShowNew(true)}>+ New Agent</Button> : undefined}>
-      <AgentsView showCreate={showNew} onCloseCreate={() => setShowNew(false)} initialSelectedName={initialSelectedId} onSelectedChange={onSelectedChange} />
+    <Layout
+      view={view}
+      onNavigate={onNavigate}
+      readOnly={readOnly}
+      title="Agents"
+      padded={false}
+      daemonStatus={daemonStatus}
+      headerRight={
+        !readOnly ? (
+          <Button size="sm" onClick={() => setShowNew(true)}>
+            + New Agent
+          </Button>
+        ) : undefined
+      }
+    >
+      <AgentsView
+        showCreate={showNew}
+        onCloseCreate={() => setShowNew(false)}
+        initialSelectedName={initialSelectedId}
+        onSelectedChange={onSelectedChange}
+      />
     </Layout>
   );
 }

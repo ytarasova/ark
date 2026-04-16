@@ -35,7 +35,9 @@ export class HistoryService {
     const pattern = `%${query}%`;
     const results: HistorySearchResult[] = [];
 
-    const rows = this.db.prepare(`
+    const rows = this.db
+      .prepare(
+        `
       SELECT id, ticket, summary, repo, created_at FROM sessions
       WHERE (summary LIKE ? COLLATE NOCASE
          OR ticket LIKE ? COLLATE NOCASE
@@ -43,7 +45,9 @@ export class HistoryService {
          OR id LIKE ? COLLATE NOCASE)
         AND status != 'deleting'
       ORDER BY created_at DESC LIMIT ?
-    `).all(pattern, pattern, pattern, pattern, limit) as HistoryRow[];
+    `,
+      )
+      .all(pattern, pattern, pattern, pattern, limit) as HistoryRow[];
 
     for (const row of rows) {
       results.push({

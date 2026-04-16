@@ -4,10 +4,7 @@ import { fmtCost } from "../util.js";
 import { cn } from "../lib/utils.js";
 import { Card } from "./ui/card.js";
 import { DollarSign } from "lucide-react";
-import {
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, Legend,
-} from "recharts";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 // Chart theme colors
 const CHART_COLORS = ["#82aaff", "#c3e88d", "#ffcb6b", "#ff5370", "#b4befe", "#89ddff", "#f78c6c"];
@@ -34,22 +31,24 @@ export function CostsView() {
   }
 
   // Chart data: cost by model (pie)
-  const pieData = useMemo(() =>
-    Object.entries(byModel).map(([model, data]) => ({
-      name: model,
-      value: Math.round(data.cost * 100) / 100,
-      fill: MODEL_COLORS[model] ?? CHART_COLORS[Object.keys(byModel).indexOf(model) % CHART_COLORS.length],
-    })),
+  const pieData = useMemo(
+    () =>
+      Object.entries(byModel).map(([model, data]) => ({
+        name: model,
+        value: Math.round(data.cost * 100) / 100,
+        fill: MODEL_COLORS[model] ?? CHART_COLORS[Object.keys(byModel).indexOf(model) % CHART_COLORS.length],
+      })),
     [sessions],
   );
 
   // Chart data: top 10 sessions by cost (bar)
-  const barData = useMemo(() =>
-    sessions.slice(0, 10).map((s: any) => ({
-      name: (s.summary || s.sessionId || "").slice(0, 20),
-      cost: Math.round(s.cost * 100) / 100,
-      model: s.model || "unknown",
-    })),
+  const barData = useMemo(
+    () =>
+      sessions.slice(0, 10).map((s: any) => ({
+        name: (s.summary || s.sessionId || "").slice(0, 20),
+        cost: Math.round(s.cost * 100) / 100,
+        model: s.model || "unknown",
+      })),
     [sessions],
   );
 
@@ -80,7 +79,7 @@ export function CostsView() {
             className={cn(
               "flex items-center justify-between px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors",
               "hover:bg-accent",
-              selected === s && "bg-accent border-l-2 border-l-primary"
+              selected === s && "bg-accent border-l-2 border-l-primary",
             )}
             onClick={() => setSelected(s)}
           >
@@ -101,7 +100,9 @@ export function CostsView() {
           <div className="p-5">
             <h2 className="text-lg font-semibold text-foreground mb-1">{selected.summary || selected.sessionId}</h2>
             <div className="mb-4">
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Cost Details</h3>
+              <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
+                Cost Details
+              </h3>
               <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
                 <span className="text-muted-foreground">Session</span>
                 <span className="text-card-foreground font-mono">{selected.sessionId}</span>
@@ -150,12 +151,15 @@ export function CostsView() {
                             </Pie>
                             <Tooltip
                               formatter={(val: number) => `$${val.toFixed(2)}`}
-                              contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }}
+                              contentStyle={{
+                                background: "hsl(var(--card))",
+                                border: "1px solid hsl(var(--border))",
+                                borderRadius: "8px",
+                                fontSize: "12px",
+                              }}
                               itemStyle={{ color: "hsl(var(--foreground))" }}
                             />
-                            <Legend
-                              wrapperStyle={{ fontSize: "11px" }}
-                            />
+                            <Legend wrapperStyle={{ fontSize: "11px" }} />
                           </PieChart>
                         </ResponsiveContainer>
                       </Card>
@@ -188,12 +192,20 @@ export function CostsView() {
                             />
                             <Tooltip
                               formatter={(val: number) => `$${val.toFixed(2)}`}
-                              contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: "8px", fontSize: "12px" }}
+                              contentStyle={{
+                                background: "hsl(var(--card))",
+                                border: "1px solid hsl(var(--border))",
+                                borderRadius: "8px",
+                                fontSize: "12px",
+                              }}
                               itemStyle={{ color: "hsl(var(--foreground))" }}
                             />
                             <Bar dataKey="cost" radius={[4, 4, 0, 0]}>
                               {barData.map((entry, idx) => (
-                                <Cell key={`bar-${idx}`} fill={MODEL_COLORS[entry.model] ?? CHART_COLORS[idx % CHART_COLORS.length]} />
+                                <Cell
+                                  key={`bar-${idx}`}
+                                  fill={MODEL_COLORS[entry.model] ?? CHART_COLORS[idx % CHART_COLORS.length]}
+                                />
                               ))}
                             </Bar>
                           </BarChart>
@@ -208,8 +220,12 @@ export function CostsView() {
                   <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-2.5 mb-5">
                     {Object.entries(byModel).map(([model, data]) => (
                       <Card key={model} className="p-4 transition-colors hover:bg-accent hover:border-ring">
-                        <div className="font-medium text-amber-400 text-[10px] uppercase tracking-[0.04em] font-mono">{model}</div>
-                        <div className="text-2xl font-bold text-foreground mt-1.5 tracking-[-0.02em] font-mono">{fmtCost(data.cost)}</div>
+                        <div className="font-medium text-amber-400 text-[10px] uppercase tracking-[0.04em] font-mono">
+                          {model}
+                        </div>
+                        <div className="text-2xl font-bold text-foreground mt-1.5 tracking-[-0.02em] font-mono">
+                          {fmtCost(data.cost)}
+                        </div>
                         <div className="text-xs text-muted-foreground mt-1">{data.count} sessions</div>
                       </Card>
                     ))}
@@ -226,9 +242,15 @@ export function CostsView() {
                       <table className="w-full border-collapse">
                         <thead>
                           <tr>
-                            <th className="text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground p-2 px-3 border-b border-border bg-card">Session</th>
-                            <th className="text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground p-2 px-3 border-b border-border bg-card">Model</th>
-                            <th className="text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground p-2 px-3 border-b border-border bg-card">Cost</th>
+                            <th className="text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground p-2 px-3 border-b border-border bg-card">
+                              Session
+                            </th>
+                            <th className="text-left text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground p-2 px-3 border-b border-border bg-card">
+                              Model
+                            </th>
+                            <th className="text-right text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground p-2 px-3 border-b border-border bg-card">
+                              Cost
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
@@ -238,9 +260,15 @@ export function CostsView() {
                               className="hover:bg-accent transition-colors cursor-pointer"
                               onClick={() => setSelected(s)}
                             >
-                              <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-card-foreground">{s.summary || s.sessionId}</td>
-                              <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-card-foreground">{s.model || "-"}</td>
-                              <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-right text-emerald-400 font-semibold font-mono">{fmtCost(s.cost)}</td>
+                              <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-card-foreground">
+                                {s.summary || s.sessionId}
+                              </td>
+                              <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-card-foreground">
+                                {s.model || "-"}
+                              </td>
+                              <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-right text-emerald-400 font-semibold font-mono">
+                                {fmtCost(s.cost)}
+                              </td>
                             </tr>
                           ))}
                         </tbody>

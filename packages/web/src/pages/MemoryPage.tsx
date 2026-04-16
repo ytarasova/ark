@@ -16,8 +16,21 @@ export function MemoryPage({ view, onNavigate, readOnly, daemonStatus, onToast }
   const [addCounter, setAddCounter] = useState(0);
 
   return (
-    <Layout view={view} onNavigate={onNavigate} readOnly={readOnly} title="Memory" padded={false} daemonStatus={daemonStatus}
-      headerRight={!readOnly ? <Button size="sm" onClick={() => setAddCounter(c => c + 1)}>+ Add Memory</Button> : undefined}>
+    <Layout
+      view={view}
+      onNavigate={onNavigate}
+      readOnly={readOnly}
+      title="Memory"
+      padded={false}
+      daemonStatus={daemonStatus}
+      headerRight={
+        !readOnly ? (
+          <Button size="sm" onClick={() => setAddCounter((c) => c + 1)}>
+            + Add Memory
+          </Button>
+        ) : undefined
+      }
+    >
       <MemoryView addRequested={addCounter} onToast={onToast} />
     </Layout>
   );

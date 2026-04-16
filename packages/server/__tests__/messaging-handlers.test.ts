@@ -124,7 +124,9 @@ describe("messaging handlers", () => {
   });
 
   it("message/send to nonexistent session returns ok:false", async () => {
-    const res = await router.dispatch(createRequest(1, "message/send", { sessionId: "s-nonexistent", content: "hello" }));
+    const res = await router.dispatch(
+      createRequest(1, "message/send", { sessionId: "s-nonexistent", content: "hello" }),
+    );
     const result = (res as JsonRpcResponse).result as Record<string, any>;
     expect(result.ok).toBe(false);
     expect(result.message).toBeDefined();

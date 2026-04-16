@@ -172,7 +172,10 @@ describe("orchestration uses app.launcher", () => {
     let killedHandle: string | null = null;
     const mockLauncher: SessionLauncher = {
       launch: async () => ({ handle: "mock" }),
-      kill: async (handle) => { killCalled = true; killedHandle = handle; },
+      kill: async (handle) => {
+        killCalled = true;
+        killedHandle = handle;
+      },
       status: async () => "running",
       send: async () => {},
       sendKeys: async () => {},
@@ -201,7 +204,10 @@ describe("orchestration uses app.launcher", () => {
     let killedHandle: string | null = null;
     const mockLauncher: SessionLauncher = {
       launch: async () => ({ handle: "mock" }),
-      kill: async (handle) => { killCalled = true; killedHandle = handle; },
+      kill: async (handle) => {
+        killCalled = true;
+        killedHandle = handle;
+      },
       status: async () => "running",
       send: async () => {},
       sendKeys: async () => {},
@@ -231,7 +237,10 @@ describe("orchestration uses app.launcher", () => {
     let killedHandle: string | null = null;
     const mockLauncher: SessionLauncher = {
       launch: async () => ({ handle: "mock" }),
-      kill: async (handle) => { killCalled = true; killedHandle = handle; },
+      kill: async (handle) => {
+        killCalled = true;
+        killedHandle = handle;
+      },
       status: async () => "running",
       send: async () => {},
       sendKeys: async () => {},
@@ -260,7 +269,9 @@ describe("orchestration uses app.launcher", () => {
     let killCalled = false;
     const mockLauncher: SessionLauncher = {
       launch: async () => ({ handle: "mock" }),
-      kill: async () => { killCalled = true; },
+      kill: async () => {
+        killCalled = true;
+      },
       status: async () => "running",
       send: async () => {},
       sendKeys: async () => {},

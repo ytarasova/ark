@@ -22,7 +22,11 @@ import { join, resolve } from "path";
  * subject function obtained its answer.
  */
 function canonical(p: string): string {
-  try { return realpathSync(p); } catch { return resolve(p); }
+  try {
+    return realpathSync(p);
+  } catch {
+    return resolve(p);
+  }
 }
 import { AppContext, setApp, clearApp } from "../app.js";
 import { setupSessionWorktree } from "../services/session-orchestration.js";

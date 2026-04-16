@@ -1,8 +1,18 @@
 import { describe, it, expect, beforeEach } from "bun:test";
-import { track, getBuffer, clearBuffer, enableTelemetry, disableTelemetry, isTelemetryEnabled } from "../observability/telemetry.js";
+import {
+  track,
+  getBuffer,
+  clearBuffer,
+  enableTelemetry,
+  disableTelemetry,
+  isTelemetryEnabled,
+} from "../observability/telemetry.js";
 
 describe("telemetry", () => {
-  beforeEach(() => { clearBuffer(); disableTelemetry(); });
+  beforeEach(() => {
+    clearBuffer();
+    disableTelemetry();
+  });
 
   it("disabled by default (no ARK_TELEMETRY env)", () => {
     track("test_event");
@@ -24,7 +34,8 @@ describe("telemetry", () => {
 
   it("clearBuffer empties the buffer", () => {
     enableTelemetry();
-    track("a"); track("b");
+    track("a");
+    track("b");
     clearBuffer();
     expect(getBuffer()).toHaveLength(0);
   });

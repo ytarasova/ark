@@ -1,6 +1,6 @@
 {
   "name": "ark-desktop",
-  "version": "0.10.0",
+  "version": "0.17.0",
   "description": "Ark Desktop - AI Agent Orchestration",
   "homepage": "https://github.com/ytarasova/ark",
   "author": {
@@ -10,12 +10,12 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --mac --win --linux",
+    "build": "electron-builder --mac --linux",
     "build:mac": "electron-builder --mac",
-    "build:win": "electron-builder --win",
     "build:linux": "electron-builder --linux",
-    "test": "npx playwright test",
-    "test:headed": "npx playwright test --headed"
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui"
   },
   "build": {
     "appId": "com.ark.desktop",
@@ -33,6 +33,10 @@
       {
         "from": "../../packages/web/dist",
         "to": "web-dist"
+      },
+      {
+        "from": "binaries/${os}-${arch}/ark-native",
+        "to": "ark-native"
       }
     ],
     "mac": {
@@ -42,13 +46,6 @@
         "zip"
       ],
       "icon": "icon.icns"
-    },
-    "win": {
-      "target": [
-        "nsis",
-        "zip"
-      ],
-      "icon": "icon.png"
     },
     "linux": {
       "target": [
@@ -62,6 +59,7 @@
   "devDependencies": {
     "@playwright/test": "^1.59.1",
     "electron": "^33.0.0",
-    "electron-builder": "^25.0.0"
+    "electron-builder": "^25.0.0",
+    "playwright": "^1.59.1"
   }
 }

@@ -16,7 +16,10 @@ let app: AppContext;
 let server: { stop(app): void };
 
 beforeEach(async () => {
-  if (app) { await app.shutdown(); clearApp(); }
+  if (app) {
+    await app.shutdown();
+    clearApp();
+  }
   app = AppContext.forTest();
   setApp(app);
   await app.boot();
@@ -24,11 +27,18 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
-  try { server.stop(); } catch { /* cleanup */ }
+  try {
+    server.stop();
+  } catch {
+    /* cleanup */
+  }
 });
 
 afterAll(async () => {
-  if (app) { await app.shutdown(); clearApp(); }
+  if (app) {
+    await app.shutdown();
+    clearApp();
+  }
 });
 
 async function postReport(sessionId: string, report: Record<string, unknown>): Promise<Response> {
@@ -97,7 +107,7 @@ describe("Conductor E2E -- report pipeline", () => {
 
     // Session should be in waiting status
     const sessions = getApp().sessions.list();
-    const updated = sessions.find(s => s.id === session.id);
+    const updated = sessions.find((s) => s.id === session.id);
     expect(updated?.status).toBe("waiting");
   });
 
@@ -119,7 +129,7 @@ describe("Conductor E2E -- report pipeline", () => {
     expect(msgs[0].content).toBe("Something went wrong");
 
     const sessions = getApp().sessions.list();
-    const updated = sessions.find(s => s.id === session.id);
+    const updated = sessions.find((s) => s.id === session.id);
     expect(updated?.status).toBe("failed");
   });
 
@@ -127,15 +137,21 @@ describe("Conductor E2E -- report pipeline", () => {
     const session = getApp().sessions.create({ summary: "multi-report" });
 
     await postReport(session.id, {
-      type: "progress", sessionId: session.id, stage: "work",
+      type: "progress",
+      sessionId: session.id,
+      stage: "work",
       message: "Starting...",
     });
     await postReport(session.id, {
-      type: "progress", sessionId: session.id, stage: "work",
+      type: "progress",
+      sessionId: session.id,
+      stage: "work",
       message: "Halfway done...",
     });
     await postReport(session.id, {
-      type: "progress", sessionId: session.id, stage: "work",
+      type: "progress",
+      sessionId: session.id,
+      stage: "work",
       message: "Almost there...",
     });
 
@@ -150,11 +166,15 @@ describe("Conductor E2E -- report pipeline", () => {
     const session = getApp().sessions.create({ summary: "unread test" });
 
     await postReport(session.id, {
-      type: "progress", sessionId: session.id, stage: "work",
+      type: "progress",
+      sessionId: session.id,
+      stage: "work",
       message: "Update 1",
     });
     await postReport(session.id, {
-      type: "progress", sessionId: session.id, stage: "work",
+      type: "progress",
+      sessionId: session.id,
+      stage: "work",
       message: "Update 2",
     });
 
@@ -166,11 +186,15 @@ describe("Conductor E2E -- report pipeline", () => {
     const s2 = getApp().sessions.create({ summary: "session 2" });
 
     await postReport(s1.id, {
-      type: "progress", sessionId: s1.id, stage: "work",
+      type: "progress",
+      sessionId: s1.id,
+      stage: "work",
       message: "For session 1",
     });
     await postReport(s2.id, {
-      type: "progress", sessionId: s2.id, stage: "work",
+      type: "progress",
+      sessionId: s2.id,
+      stage: "work",
       message: "For session 2",
     });
 
@@ -188,7 +212,9 @@ describe("Conductor E2E -- report pipeline", () => {
     getApp().sessions.update(session.id, { status: "waiting", breakpoint_reason: "Should I proceed?" });
 
     await postReport(session.id, {
-      type: "progress", sessionId: session.id, stage: "work",
+      type: "progress",
+      sessionId: session.id,
+      stage: "work",
       message: "I am online and ready for work",
     });
 
@@ -208,7 +234,9 @@ describe("Conductor E2E -- report pipeline", () => {
     getApp().sessions.update(s1.id, { status: "stopped" });
 
     await postReport(s1.id, {
-      type: "progress", sessionId: s1.id, stage: "work",
+      type: "progress",
+      sessionId: s1.id,
+      stage: "work",
       message: "still alive",
     });
     expect(getApp().sessions.get(s1.id)?.status).toBe("stopped");
@@ -218,7 +246,9 @@ describe("Conductor E2E -- report pipeline", () => {
     getApp().sessions.update(s2.id, { status: "running" });
 
     await postReport(s2.id, {
-      type: "progress", sessionId: s2.id, stage: "work",
+      type: "progress",
+      sessionId: s2.id,
+      stage: "work",
       message: "update",
     });
     expect(getApp().sessions.get(s2.id)?.status).toBe("running");
@@ -228,7 +258,9 @@ describe("Conductor E2E -- report pipeline", () => {
     getApp().sessions.update(s3.id, { status: "completed" });
 
     await postReport(s3.id, {
-      type: "progress", sessionId: s3.id, stage: "work",
+      type: "progress",
+      sessionId: s3.id,
+      stage: "work",
       message: "ghost report",
     });
     expect(getApp().sessions.get(s3.id)?.status).toBe("completed");
@@ -238,7 +270,9 @@ describe("Conductor E2E -- report pipeline", () => {
     const session = getApp().sessions.create({ summary: "no message" });
 
     await postReport(session.id, {
-      type: "progress", sessionId: session.id, stage: "work",
+      type: "progress",
+      sessionId: session.id,
+      stage: "work",
       filesChanged: [],
     });
 
@@ -249,7 +283,7 @@ describe("Conductor E2E -- report pipeline", () => {
 
   it("health endpoint returns ok", async () => {
     const resp = await fetch(`http://localhost:${TEST_PORT}/health`);
-    const body = await resp.json() as Record<string, unknown>;
+    const body = (await resp.json()) as Record<string, unknown>;
     expect(body.status).toBe("ok");
   });
 });

@@ -99,8 +99,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
       throw new Error(`Agent '${params.name}' is builtin -- copy it to global/project before editing.`);
     }
     const merged: AgentDefinition = { ...existing, ...rest, name: params.name };
-    const resolvedScope: "global" | "project" =
-      scope ?? (existing._source === "project" ? "project" : "global");
+    const resolvedScope: "global" | "project" = scope ?? (existing._source === "project" ? "project" : "global");
     app.agents.save(merged.name, merged, resolvedScope, resolvedScope === "project" ? projectRoot : undefined);
     return { ok: true, name: merged.name, scope: resolvedScope };
   });
@@ -113,8 +112,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     if (existing._source === "builtin") {
       throw new Error(`Cannot delete builtin agent '${name}'.`);
     }
-    const resolvedScope: "global" | "project" =
-      scope ?? (existing._source === "project" ? "project" : "global");
+    const resolvedScope: "global" | "project" = scope ?? (existing._source === "project" ? "project" : "global");
     const ok = app.agents.delete(name, resolvedScope, resolvedScope === "project" ? projectRoot : undefined);
     return { ok };
   });
@@ -146,7 +144,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     if (!Array.isArray(params.stages) || params.stages.length === 0) {
       throw new Error("flow/create requires at least one stage");
     }
-    const summary = app.flows.list().find(f => f.name === params.name);
+    const summary = app.flows.list().find((f) => f.name === params.name);
     if (summary && summary.source !== "builtin") {
       throw new Error(`Flow '${params.name}' already exists.`);
     }
@@ -164,7 +162,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
 
   router.handle("flow/delete", async (p) => {
     const { name, scope } = extract<{ name: string; scope?: "global" | "project" }>(p, ["name"]);
-    const summary = app.flows.list().find(f => f.name === name);
+    const summary = app.flows.list().find((f) => f.name === name);
     if (!summary) throw new Error(`Flow '${name}' not found`);
     if (summary.source === "builtin") {
       throw new Error(`Cannot delete builtin flow '${name}'.`);
@@ -206,8 +204,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     if (existing._source === "builtin") {
       throw new Error(`Cannot delete builtin skill '${name}'.`);
     }
-    const resolvedScope: "global" | "project" =
-      scope ?? (existing._source === "project" ? "project" : "global");
+    const resolvedScope: "global" | "project" = scope ?? (existing._source === "project" ? "project" : "global");
     const ok = app.skills.delete(name, resolvedScope, resolvedScope === "project" ? projectRoot : undefined);
     return { ok };
   });
@@ -243,14 +240,17 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     if (existing._source === "builtin") {
       throw new Error(`Cannot delete builtin recipe '${name}'.`);
     }
-    const resolvedScope: "global" | "project" =
-      scope ?? (existing._source === "project" ? "project" : "global");
+    const resolvedScope: "global" | "project" = scope ?? (existing._source === "project" ? "project" : "global");
     const ok = app.recipes.delete(name, resolvedScope, resolvedScope === "project" ? projectRoot : undefined);
     return { ok };
   });
   router.handle("compute/list", async () => ({ targets: app.computes.list() }));
   router.handle("compute/create", async (p) => {
-    const { name, provider, config } = extract<{ name: string; provider?: import("../../types/index.js").ComputeProviderName; config?: Partial<import("../../types/index.js").ComputeConfig> }>(p, ["name"]);
+    const { name, provider, config } = extract<{
+      name: string;
+      provider?: import("../../types/index.js").ComputeProviderName;
+      config?: Partial<import("../../types/index.js").ComputeConfig>;
+    }>(p, ["name"]);
     const compute = app.computes.create({ name, provider, config });
     return { compute };
   });
@@ -353,7 +353,9 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     if (!ip) return { reachable: false, message: "No IP configured" };
     try {
       const { sshExecAsync, sshKeyPath } = await import("../../compute/providers/ec2/ssh.js");
-      const { exitCode, stdout } = await sshExecAsync(sshKeyPath(compute.name), ip, "echo ok && uptime", { timeout: 10_000 });
+      const { exitCode, stdout } = await sshExecAsync(sshKeyPath(compute.name), ip, "echo ok && uptime", {
+        timeout: 10_000,
+      });
       if (exitCode === 0) {
         return { reachable: true, message: stdout.trim() };
       }
@@ -380,15 +382,17 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   router.handle("compute/template/list", async () => {
     const dbTemplates = app.computeTemplates.list();
     const configTemplates = app.config.computeTemplates ?? [];
-    const dbNames = new Set(dbTemplates.map(t => t.name));
+    const dbNames = new Set(dbTemplates.map((t) => t.name));
     const merged = [
       ...dbTemplates,
-      ...configTemplates.filter(t => !dbNames.has(t.name)).map(t => ({
-        name: t.name,
-        description: t.description,
-        provider: t.provider,
-        config: t.config,
-      })),
+      ...configTemplates
+        .filter((t) => !dbNames.has(t.name))
+        .map((t) => ({
+          name: t.name,
+          description: t.description,
+          provider: t.provider,
+          config: t.config,
+        })),
     ];
     return { templates: merged };
   });
@@ -396,15 +400,25 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const { name } = extract<{ name: string }>(p, ["name"]);
     let tmpl = app.computeTemplates.get(name);
     if (!tmpl) {
-      const cfgTmpl = (app.config.computeTemplates ?? []).find(t => t.name === name);
+      const cfgTmpl = (app.config.computeTemplates ?? []).find((t) => t.name === name);
       if (cfgTmpl) {
-        tmpl = { name: cfgTmpl.name, description: cfgTmpl.description, provider: cfgTmpl.provider as ComputeProviderName, config: cfgTmpl.config };
+        tmpl = {
+          name: cfgTmpl.name,
+          description: cfgTmpl.description,
+          provider: cfgTmpl.provider as ComputeProviderName,
+          config: cfgTmpl.config,
+        };
       }
     }
     return tmpl ?? null;
   });
   router.handle("compute/template/create", async (p) => {
-    const { name, provider, config, description } = extract<{ name: string; provider: string; config?: Record<string, unknown>; description?: string }>(p, ["name", "provider"]);
+    const { name, provider, config, description } = extract<{
+      name: string;
+      provider: string;
+      config?: Record<string, unknown>;
+      description?: string;
+    }>(p, ["name", "provider"]);
     app.computeTemplates.create({ name, description, provider: provider as ComputeProviderName, config: config ?? {} });
     return { ok: true };
   });

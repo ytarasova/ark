@@ -32,9 +32,9 @@ describe("AppContext", () => {
   it("initializes database with schema on boot", async () => {
     app = AppContext.forTest();
     await app.boot();
-    const row = app.db.prepare(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'"
-    ).get() as { name: string } | undefined;
+    const row = app.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'").get() as
+      | { name: string }
+      | undefined;
     expect(row?.name).toBe("sessions");
   });
 

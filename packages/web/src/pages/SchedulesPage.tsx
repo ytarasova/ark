@@ -15,8 +15,21 @@ export function SchedulesPage({ view, onNavigate, readOnly, daemonStatus }: Sche
   const [showNew, setShowNew] = useState(false);
 
   return (
-    <Layout view={view} onNavigate={onNavigate} readOnly={readOnly} title="Schedules" padded={false} daemonStatus={daemonStatus}
-      headerRight={!readOnly ? <Button size="sm" onClick={() => setShowNew(true)}>+ New Schedule</Button> : undefined}>
+    <Layout
+      view={view}
+      onNavigate={onNavigate}
+      readOnly={readOnly}
+      title="Schedules"
+      padded={false}
+      daemonStatus={daemonStatus}
+      headerRight={
+        !readOnly ? (
+          <Button size="sm" onClick={() => setShowNew(true)}>
+            + New Schedule
+          </Button>
+        ) : undefined
+      }
+    >
       <ScheduleView showCreate={showNew} onCloseCreate={() => setShowNew(false)} />
     </Layout>
   );

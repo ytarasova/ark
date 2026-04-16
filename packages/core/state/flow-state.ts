@@ -40,11 +40,18 @@ export function loadFlowState(app: AppContext, sessionId: string): FlowState | n
   if (!existsSync(path)) return null;
   try {
     return JSON.parse(readFileSync(path, "utf-8")) as FlowState;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 /** Mark a stage as completed in the flow state. */
-export function markStageCompleted(app: AppContext, sessionId: string, stageName: string, data?: Record<string, unknown>): void {
+export function markStageCompleted(
+  app: AppContext,
+  sessionId: string,
+  stageName: string,
+  data?: Record<string, unknown>,
+): void {
   let state = loadFlowState(app, sessionId);
   if (!state) {
     state = {
@@ -134,6 +141,10 @@ export function isStageCompleted(app: AppContext, sessionId: string, stageName: 
 export function deleteFlowState(app: AppContext, sessionId: string): void {
   const path = statePath(app, sessionId);
   if (existsSync(path)) {
-    try { unlinkSync(path); } catch { /* ignore */ }
+    try {
+      unlinkSync(path);
+    } catch {
+      /* ignore */
+    }
   }
 }

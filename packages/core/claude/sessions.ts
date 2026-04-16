@@ -47,34 +47,52 @@ function decodeProjectDir(dirName: string): string {
 /** Junk prefixes in user messages that aren't real prompts */
 const JUNK_PREFIXES = [
   // System/channel noise
-  "Caveat:", "<local-command", "<command-", "<system-reminder", "<channel",
-  "Listening for channel", '"""', "Base directory for this skill",
+  "Caveat:",
+  "<local-command",
+  "<command-",
+  "<system-reminder",
+  "<channel",
+  "Listening for channel",
+  '"""',
+  "Base directory for this skill",
   // Ark agent task assignments
-  "Session s-", "Work on s-",
-  "You are the worker agent", "You are the implementer agent",
-  "You are the planner agent", "You are the reviewer agent",
+  "Session s-",
+  "Work on s-",
+  "You are the worker agent",
+  "You are the implementer agent",
+  "You are the planner agent",
+  "You are the reviewer agent",
   "You are a healing agent",
   // Slash commands
-  "/effort", "/remote-control", "/resume", "/clear", "/plugin",
-  "/compact", "/help", "/init",
+  "/effort",
+  "/remote-control",
+  "/resume",
+  "/clear",
+  "/plugin",
+  "/compact",
+  "/help",
+  "/init",
   // Interrupted/error states
   "[Request interrupted",
   // Repetitive automated prompts
-  "Describe this image", "Read the image at",
+  "Describe this image",
+  "Read the image at",
   "say hello",
 ];
 
 function isRealUserMessage(text: string): boolean {
   const trimmed = text.trim();
   if (!trimmed || trimmed.length < 3) return false;
-  return !JUNK_PREFIXES.some(p => trimmed.startsWith(p));
+  return !JUNK_PREFIXES.some((p) => trimmed.startsWith(p));
 }
 
 /**
  * Fast metadata extraction -- reads only first 8KB + last 2KB of the file,
  * NOT the entire 100MB transcript. Uses grep -c for message counting.
  */
-async function parseTranscriptMeta(filePath: string): Promise<Omit<ClaudeSession, "project" | "projectDir" | "transcriptPath"> | null> {
+async function parseTranscriptMeta(
+  filePath: string,
+): Promise<Omit<ClaudeSession, "project" | "projectDir" | "transcriptPath"> | null> {
   let sessionId = basename(filePath, ".jsonl");
   let timestamp = "";
   let lastActivity = "";
@@ -97,7 +115,10 @@ async function parseTranscriptMeta(filePath: string): Promise<Omit<ClaudeSession
     closeSync(fd);
 
     // Parse head lines for sessionId, timestamp, summary
-    const headLines = headBuf.toString("utf-8").split("\n").filter(l => l.trim());
+    const headLines = headBuf
+      .toString("utf-8")
+      .split("\n")
+      .filter((l) => l.trim());
     for (const line of headLines) {
       try {
         const entry = JSON.parse(line);
@@ -113,9 +134,15 @@ async function parseTranscriptMeta(filePath: string): Promise<Omit<ClaudeSession
             const c = msg.content;
             if (typeof c === "string") text = c;
             else if (Array.isArray(c)) {
-              text = c.filter((x: { type: string; text?: string }) => x.type === "text").map((x: { type: string; text?: string }) => x.text ?? "").join(" ");
+              text = c
+                .filter((x: { type: string; text?: string }) => x.type === "text")
+                .map((x: { type: string; text?: string }) => x.text ?? "")
+                .join(" ");
             }
-            text = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+            text = text
+              .replace(/<[^>]+>/g, " ")
+              .replace(/\s+/g, " ")
+              .trim();
             if (entry.type === "user" && isRealUserMessage(text)) {
               summary = text.slice(0, 200);
             } else if (entry.type === "assistant" && text.length > 10) {
@@ -125,19 +152,26 @@ async function parseTranscriptMeta(filePath: string): Promise<Omit<ClaudeSession
           }
         }
       } catch {
-          // Truncated or malformed JSON lines are expected in partial transcript reads
-        }
+        // Truncated or malformed JSON lines are expected in partial transcript reads
+      }
     }
 
     // Parse tail lines for lastActivity
-    const tailLines = tailBuf.toString("utf-8").split("\n").filter(l => l.trim());
+    const tailLines = tailBuf
+      .toString("utf-8")
+      .split("\n")
+      .filter((l) => l.trim());
     for (let i = tailLines.length - 1; i >= 0; i--) {
       try {
         const entry = JSON.parse(tailLines[i]);
-        if (entry.timestamp) { lastActivity = entry.timestamp; break; }
-      } catch {
-          // Truncated JSON in tail buffer is expected -- last line is often incomplete
+<<<<<<< HEAD
+        if (entry.timestamp) {
+          lastActivity = entry.timestamp;
+          break;
         }
+      } catch {
+        // Truncated JSON in tail buffer is expected -- last line is often incomplete
+      }
     }
 
     // Fast message count via grep -c (counts lines matching "user" or "assistant")
@@ -201,7 +235,7 @@ export function listClaudeSessions(app: AppContext, opts?: ListOpts): ClaudeSess
 
   try {
     const rows = db.prepare(sql).all(...params) as ClaudeSessionCacheRow[];
-    return rows.map(r => ({
+    return rows.map((r) => ({
       sessionId: r.session_id,
       project: r.project,
       projectDir: r.project_dir,
@@ -226,14 +260,19 @@ export function listClaudeSessions(app: AppContext, opts?: ListOpts): ClaudeSess
 export function getClaudeSession(app: AppContext, sessionId: string, _opts?: ListOpts): ClaudeSession | null {
   const db = app.db;
   try {
-    const row = db.prepare(
-      "SELECT * FROM claude_sessions_cache WHERE session_id = ? OR session_id LIKE ?"
-    ).get(sessionId, `${sessionId}%`) as ClaudeSessionCacheRow | undefined;
+    const row = db
+      .prepare("SELECT * FROM claude_sessions_cache WHERE session_id = ? OR session_id LIKE ?")
+      .get(sessionId, `${sessionId}%`) as ClaudeSessionCacheRow | undefined;
     if (!row) return null;
     return {
-      sessionId: row.session_id, project: row.project, projectDir: row.project_dir,
-      transcriptPath: row.transcript_path, summary: row.summary,
-      messageCount: row.message_count, timestamp: row.timestamp, lastActivity: row.last_activity,
+      sessionId: row.session_id,
+      project: row.project,
+      projectDir: row.project_dir,
+      transcriptPath: row.transcript_path,
+      summary: row.summary,
+      messageCount: row.message_count,
+      timestamp: row.timestamp,
+      lastActivity: row.last_activity,
     };
   } catch (e: any) {
     if (!String(e?.message).includes("no such table")) {
@@ -245,9 +284,12 @@ export function getClaudeSession(app: AppContext, sessionId: string, _opts?: Lis
 
 /**
  * Refresh the cache by scanning ~/.claude/projects/.
- * Async with periodic yields so the TUI stays responsive.
+ * Async with periodic yields so the UI stays responsive.
  */
-export async function refreshClaudeSessionsCache(app: AppContext, opts?: { baseDir?: string; onProgress?: (processed: number, total: number) => void }): Promise<number> {
+export async function refreshClaudeSessionsCache(
+  app: AppContext,
+  opts?: { baseDir?: string; onProgress?: (processed: number, total: number) => void },
+): Promise<number> {
   const baseDir = opts?.baseDir ?? join(homedir(), ".claude", "projects");
   if (!existsSync(baseDir)) return 0;
 
@@ -256,7 +298,7 @@ export async function refreshClaudeSessionsCache(app: AppContext, opts?: { baseD
   const insert = db.prepare(
     `INSERT OR REPLACE INTO claude_sessions_cache
      (session_id, project, project_dir, transcript_path, summary, message_count, timestamp, last_activity, cached_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
 
   // Get the most recent cached_at timestamp for incremental refresh
@@ -281,31 +323,65 @@ export async function refreshClaudeSessionsCache(app: AppContext, opts?: { baseD
   let totalFiles = 0;
   for (const pd of readdirSync(baseDir)) {
     const pp = join(baseDir, pd);
-    try { if (!statSync(pp).isDirectory()) continue; } catch (e: any) { if (e?.code !== 'ENOENT') console.error('refreshClaudeSessionsCache (stat project dir):', e?.message ?? e); continue; }
+    try {
+      if (!statSync(pp).isDirectory()) continue;
+    } catch (e: any) {
+      if (e?.code !== "ENOENT") console.error("refreshClaudeSessionsCache (stat project dir):", e?.message ?? e);
+      continue;
+    }
     const decoded = decodeProjectDir(pd);
-    if (decoded.includes("/var/folders/") || decoded.includes("/tmp/") || decoded.includes("/worktrees/") || decoded.includes("/subagents/")) continue;
-    try { totalFiles += readdirSync(pp).filter(f => f.endsWith(".jsonl")).length; } catch (e: any) { if (e?.code !== 'ENOENT') console.error('refreshClaudeSessionsCache (readdir for count):', e?.message ?? e); }
+    if (
+      decoded.includes("/var/folders/") ||
+      decoded.includes("/tmp/") ||
+      decoded.includes("/worktrees/") ||
+      decoded.includes("/subagents/")
+    )
+      continue;
+    try {
+      totalFiles += readdirSync(pp).filter((f) => f.endsWith(".jsonl")).length;
+    } catch (e: any) {
+      if (e?.code !== "ENOENT") console.error("refreshClaudeSessionsCache (readdir for count):", e?.message ?? e);
+    }
   }
 
   for (const projectDir of readdirSync(baseDir)) {
     const projectPath = join(baseDir, projectDir);
-    try { if (!statSync(projectPath).isDirectory()) continue; } catch (e: any) { if (e?.code !== 'ENOENT') console.error('refreshClaudeSessionsCache (stat project):', e?.message ?? e); continue; }
+    try {
+      if (!statSync(projectPath).isDirectory()) continue;
+    } catch (e: any) {
+      if (e?.code !== "ENOENT") console.error("refreshClaudeSessionsCache (stat project):", e?.message ?? e);
+      continue;
+    }
 
     const decodedProject = decodeProjectDir(projectDir);
 
     // Skip temp dirs, worktrees, test artifacts
-    if (decodedProject.includes("/var/folders/") ||
-        decodedProject.includes("/tmp/") ||
-        decodedProject.includes("/worktrees/") ||
-        decodedProject.includes("/subagents/")) continue;
+    if (
+      decodedProject.includes("/var/folders/") ||
+      decodedProject.includes("/tmp/") ||
+      decodedProject.includes("/worktrees/") ||
+      decodedProject.includes("/subagents/")
+    )
+      continue;
 
     let files: string[];
-    try { files = readdirSync(projectPath).filter(f => f.endsWith(".jsonl")); } catch (e: any) { if (e?.code !== 'ENOENT') console.error('refreshClaudeSessionsCache (readdir):', e?.message ?? e); continue; }
+    try {
+      files = readdirSync(projectPath).filter((f) => f.endsWith(".jsonl"));
+    } catch (e: any) {
+      if (e?.code !== "ENOENT") console.error("refreshClaudeSessionsCache (readdir):", e?.message ?? e);
+      continue;
+    }
 
     for (const file of files) {
       const filePath = join(projectPath, file);
       let fileStat;
-      try { fileStat = statSync(filePath); if (!fileStat.isFile()) continue; } catch (e: any) { if (e?.code !== 'ENOENT') console.error('refreshClaudeSessionsCache (stat file):', e?.message ?? e); continue; }
+      try {
+        fileStat = statSync(filePath);
+        if (!fileStat.isFile()) continue;
+      } catch (e: any) {
+        if (e?.code !== "ENOENT") console.error("refreshClaudeSessionsCache (stat file):", e?.message ?? e);
+        continue;
+      }
 
       fileCount++;
 
@@ -322,14 +398,21 @@ export async function refreshClaudeSessionsCache(app: AppContext, opts?: { baseD
       if (meta.messageCount < MIN_MESSAGE_COUNT) continue;
 
       insert.run(
-        meta.sessionId, decodedProject, projectDir, filePath,
-        meta.summary, meta.messageCount, meta.timestamp, meta.lastActivity, now,
+        meta.sessionId,
+        decodedProject,
+        projectDir,
+        filePath,
+        meta.summary,
+        meta.messageCount,
+        meta.timestamp,
+        meta.lastActivity,
+        now,
       );
       count++;
 
       opts?.onProgress?.(fileCount, totalFiles);
-      // Yield after every file so TUI stays responsive
-      await new Promise(r => setTimeout(r, 0));
+      // Yield after every file so UI stays responsive
+      await new Promise((r) => setTimeout(r, 0));
     }
   }
 

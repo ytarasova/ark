@@ -41,7 +41,7 @@ function discoverMcpServers(projectDir: string): ToolEntry[] {
     return Object.entries(servers).map(([name, config]) => ({
       kind: "mcp-server" as const,
       name,
-      description: (config as Record<string, unknown>).description as string ?? `MCP server: ${name}`,
+      description: ((config as Record<string, unknown>).description as string) ?? `MCP server: ${name}`,
       source: mcpPath,
       config: config as Record<string, unknown>,
     }));
@@ -66,7 +66,9 @@ function discoverCommands(projectDir: string): ToolEntry[] {
         description: firstLine.replace(/^#\s*/, "") || `Command: ${basename(file, ".md")}`,
         source: join(cmdDir, file),
       });
-    } catch { /* skip unreadable files */ }
+    } catch {
+      /* skip unreadable files */
+    }
   }
   return entries;
 }
@@ -86,7 +88,9 @@ function discoverClaudeSkills(projectDir: string): ToolEntry[] {
         description: firstLine.replace(/^#\s*/, "") || `Skill: ${basename(file, ".md")}`,
         source: join(skillDir, file),
       });
-    } catch { /* skip unreadable files */ }
+    } catch {
+      /* skip unreadable files */
+    }
   }
   return entries;
 }
@@ -94,16 +98,18 @@ function discoverClaudeSkills(projectDir: string): ToolEntry[] {
 function discoverContext(projectDir: string): ToolEntry[] {
   const claudeMd = join(projectDir, "CLAUDE.md");
   if (!existsSync(claudeMd)) return [];
-  return [{
-    kind: "context",
-    name: "CLAUDE.md",
-    description: "Project context file",
-    source: claudeMd,
-  }];
+  return [
+    {
+      kind: "context",
+      name: "CLAUDE.md",
+      description: "Project context file",
+      source: claudeMd,
+    },
+  ];
 }
 
 function discoverArkSkills(app: AppContext, projectDir?: string): ToolEntry[] {
-  return app.skills.list(projectDir).map(s => ({
+  return app.skills.list(projectDir).map((s) => ({
     kind: "ark-skill" as const,
     name: s.name,
     description: s.description ?? "",
@@ -112,7 +118,7 @@ function discoverArkSkills(app: AppContext, projectDir?: string): ToolEntry[] {
 }
 
 function discoverArkRecipes(app: AppContext, projectDir?: string): ToolEntry[] {
-  return app.recipes.list(projectDir).map(r => ({
+  return app.recipes.list(projectDir).map((r) => ({
     kind: "ark-recipe" as const,
     name: r.name,
     description: r.description ?? "",
@@ -144,9 +150,9 @@ export function discoverTools(projectDir?: string, app?: AppContext): ToolEntry[
   // Sort by kind then name
   const kindOrder: Record<string, number> = {
     "mcp-server": 0,
-    "command": 1,
+    command: 1,
     "claude-skill": 2,
-    "context": 3,
+    context: 3,
     "ark-skill": 4,
     "ark-recipe": 5,
   };
@@ -166,8 +172,11 @@ export function addMcpServer(projectDir: string, name: string, config: Record<st
   const mcpPath = join(projectDir, ".mcp.json");
   let existing: Record<string, any> = {};
   if (existsSync(mcpPath)) {
-    try { existing = readJsonc(mcpPath) as Record<string, any>; }
-    catch { /* start fresh if parse fails */ }
+    try {
+      existing = readJsonc(mcpPath) as Record<string, any>;
+    } catch {
+      /* start fresh if parse fails */
+    }
   }
   if (!existing.mcpServers) existing.mcpServers = {};
   existing.mcpServers[name] = config;
@@ -179,8 +188,11 @@ export function removeMcpServer(projectDir: string, name: string): void {
   const mcpPath = join(projectDir, ".mcp.json");
   if (!existsSync(mcpPath)) return;
   let existing: Record<string, any>;
-  try { existing = readJsonc(mcpPath) as Record<string, any>; }
-  catch { return; }
+  try {
+    existing = readJsonc(mcpPath) as Record<string, any>;
+  } catch {
+    return;
+  }
   if (!existing.mcpServers) return;
   delete existing.mcpServers[name];
   writeFileSync(mcpPath, JSON.stringify(existing, null, 2));

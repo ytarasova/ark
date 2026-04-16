@@ -222,7 +222,9 @@ export function initSchema(db: IDatabase): void {
 }
 
 export function initKnowledgeSchema(db: IDatabase): void {
-  safeExec(db, `
+  safeExec(
+    db,
+    `
     CREATE TABLE IF NOT EXISTS knowledge (
       id TEXT PRIMARY KEY,
       type TEXT NOT NULL,
@@ -233,11 +235,14 @@ export function initKnowledgeSchema(db: IDatabase): void {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
-  `);
+  `,
+  );
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_knowledge_type ON knowledge(tenant_id, type)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_knowledge_label ON knowledge(tenant_id, label)");
 
-  safeExec(db, `
+  safeExec(
+    db,
+    `
     CREATE TABLE IF NOT EXISTS knowledge_edges (
       source_id TEXT NOT NULL,
       target_id TEXT NOT NULL,
@@ -248,14 +253,17 @@ export function initKnowledgeSchema(db: IDatabase): void {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       PRIMARY KEY (source_id, target_id, relation)
     )
-  `);
+  `,
+  );
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_edges_source ON knowledge_edges(tenant_id, source_id)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_edges_target ON knowledge_edges(tenant_id, target_id)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_edges_relation ON knowledge_edges(relation)");
 }
 
 export function initUsageSchema(db: IDatabase): void {
-  safeExec(db, `
+  safeExec(
+    db,
+    `
     CREATE TABLE IF NOT EXISTS usage_records (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       session_id TEXT NOT NULL,
@@ -274,7 +282,8 @@ export function initUsageSchema(db: IDatabase): void {
       source TEXT NOT NULL DEFAULT 'transcript',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
-  `);
+  `,
+  );
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_session ON usage_records(session_id)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_cost_mode ON usage_records(cost_mode)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_tenant ON usage_records(tenant_id)");
@@ -284,7 +293,9 @@ export function initUsageSchema(db: IDatabase): void {
 }
 
 export function initArtifactSchema(db: IDatabase): void {
-  safeExec(db, `
+  safeExec(
+    db,
+    `
     CREATE TABLE IF NOT EXISTS session_artifacts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       session_id TEXT NOT NULL,
@@ -294,7 +305,8 @@ export function initArtifactSchema(db: IDatabase): void {
       tenant_id TEXT NOT NULL DEFAULT 'default',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
-  `);
+  `,
+  );
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_artifacts_session ON session_artifacts(session_id)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_artifacts_type_value ON session_artifacts(type, value)");
   safeExec(db, "CREATE INDEX IF NOT EXISTS idx_artifacts_tenant ON session_artifacts(tenant_id)");
@@ -311,8 +323,10 @@ function safeExec(db: IDatabase, sql: string): void {
 
 export function seedLocalCompute(db: IDatabase): void {
   const ts = new Date().toISOString();
-  db.prepare(`
+  db.prepare(
+    `
     INSERT OR IGNORE INTO compute (name, provider, status, config, created_at, updated_at)
     VALUES ('local', 'local', 'running', '{}', ?, ?)
-  `).run(ts, ts);
+  `,
+  ).run(ts, ts);
 }

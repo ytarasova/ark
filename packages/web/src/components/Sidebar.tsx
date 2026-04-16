@@ -1,9 +1,20 @@
 import { cn } from "../lib/utils.js";
 import { Button } from "./ui/button.js";
 import {
-  Play, Settings, Wrench, GitBranch, Clock, Server,
-  Calendar, BookOpen, DollarSign, Flame, Cog,
-  ChevronLeft, ChevronRight, LayoutDashboard,
+  Play,
+  Settings,
+  Wrench,
+  GitBranch,
+  Clock,
+  Server,
+  Calendar,
+  BookOpen,
+  DollarSign,
+  Flame,
+  Cog,
+  ChevronLeft,
+  ChevronRight,
+  LayoutDashboard,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
@@ -61,11 +72,24 @@ export function Sidebar({ activeView, onNavigate, readOnly, collapsed, onToggle,
   return (
     <div className="bg-sidebar border-r border-sidebar-border flex flex-col h-full overflow-y-auto relative z-2">
       {/* Header - compact, draggable */}
-      <div className={cn("h-[44px] px-3.5 flex items-center gap-2 drag-region shrink-0", collapsed && "justify-center px-0")}>
+      <div
+        className={cn(
+          "h-[44px] px-3.5 flex items-center gap-2 drag-region shrink-0",
+          collapsed && "justify-center px-0",
+        )}
+      >
         {!collapsed && (
           <>
-            <span className="text-[15px] font-bold text-sidebar-foreground tracking-[-0.03em]">ark</span>
-            <span className={cn("w-[7px] h-[7px] rounded-full shrink-0 no-drag", dot.color, dot.glow)} title={dot.title} />
+            <span
+              data-testid="sidebar-brand"
+              className="text-[15px] font-bold text-sidebar-foreground tracking-[-0.03em]"
+            >
+              ark
+            </span>
+            <span
+              className={cn("w-[7px] h-[7px] rounded-full shrink-0 no-drag", dot.color, dot.glow)}
+              title={dot.title}
+            />
             <span className="flex-1" />
           </>
         )}
@@ -91,7 +115,7 @@ export function Sidebar({ activeView, onNavigate, readOnly, collapsed, onToggle,
               "w-full text-[13px] font-medium",
               collapsed ? "justify-center px-0" : "justify-start gap-2.5",
               "text-muted-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent",
-              activeView === it.id && "text-sidebar-foreground bg-sidebar-accent border-l-2 border-l-sidebar-primary"
+              activeView === it.id && "text-sidebar-foreground bg-sidebar-accent border-l-2 border-l-sidebar-primary",
             )}
           >
             <it.icon size={15} className="opacity-50 shrink-0" />
@@ -111,7 +135,8 @@ export function Sidebar({ activeView, onNavigate, readOnly, collapsed, onToggle,
             "w-full text-[13px] font-medium",
             collapsed ? "justify-center px-0" : "justify-start gap-2.5",
             "text-muted-foreground hover:text-sidebar-accent-foreground hover:bg-sidebar-accent",
-            activeView === "settings" && "text-sidebar-foreground bg-sidebar-accent border-l-2 border-l-sidebar-primary"
+            activeView === "settings" &&
+              "text-sidebar-foreground bg-sidebar-accent border-l-2 border-l-sidebar-primary",
           )}
         >
           <Cog size={15} className="opacity-50 shrink-0" />

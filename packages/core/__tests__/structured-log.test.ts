@@ -10,7 +10,11 @@ withTestContext();
 function readLogEntries(arkDir: string): any[] {
   const logFile = join(arkDir, "ark.jsonl");
   if (!existsSync(logFile)) return [];
-  return readFileSync(logFile, "utf-8").trim().split("\n").filter(Boolean).map(l => JSON.parse(l));
+  return readFileSync(logFile, "utf-8")
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((l) => JSON.parse(l));
 }
 
 /** Clear the log file so each test starts fresh */
@@ -50,7 +54,7 @@ describe("structured logging", () => {
     const entries = readLogEntries(getApp().config.arkDir);
     // Only error-level entries should be written
     expect(entries.length).toBeGreaterThan(0);
-    expect(entries.every(e => e.level === "error")).toBe(true);
+    expect(entries.every((e) => e.level === "error")).toBe(true);
   });
 
   it("respects component filtering", () => {
@@ -62,7 +66,7 @@ describe("structured logging", () => {
     const entries = readLogEntries(getApp().config.arkDir);
     // Only mcp component entries should be written
     expect(entries.length).toBeGreaterThan(0);
-    expect(entries.every(e => e.component === "mcp")).toBe(true);
+    expect(entries.every((e) => e.component === "mcp")).toBe(true);
   });
 
   it("entries have timestamps", () => {

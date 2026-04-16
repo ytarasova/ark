@@ -40,8 +40,12 @@ describe("InMemorySSEBus", () => {
     let count1 = 0;
     let count2 = 0;
 
-    bus.subscribe("multi", () => { count1++; });
-    bus.subscribe("multi", () => { count2++; });
+    bus.subscribe("multi", () => {
+      count1++;
+    });
+    bus.subscribe("multi", () => {
+      count2++;
+    });
 
     bus.publish("multi", "ping", null);
 
@@ -53,8 +57,12 @@ describe("InMemorySSEBus", () => {
     const bus = new InMemorySSEBus();
     const received: string[] = [];
 
-    bus.subscribe("channelA", (event) => { received.push(`A:${event}`); });
-    bus.subscribe("channelB", (event) => { received.push(`B:${event}`); });
+    bus.subscribe("channelA", (event) => {
+      received.push(`A:${event}`);
+    });
+    bus.subscribe("channelB", (event) => {
+      received.push(`B:${event}`);
+    });
 
     bus.publish("channelA", "only-a", null);
 
@@ -92,8 +100,12 @@ describe("InMemorySSEBus", () => {
     const bus = new InMemorySSEBus();
     const received: string[] = [];
 
-    bus.subscribe("robust", () => { throw new Error("boom"); });
-    bus.subscribe("robust", (event) => { received.push(event); });
+    bus.subscribe("robust", () => {
+      throw new Error("boom");
+    });
+    bus.subscribe("robust", (event) => {
+      received.push(event);
+    });
 
     bus.publish("robust", "test", null);
 

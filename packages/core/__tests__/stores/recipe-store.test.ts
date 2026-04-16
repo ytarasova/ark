@@ -83,7 +83,7 @@ describe("FileRecipeStore.list", () => {
     writeRecipe(builtinDir, "b-recipe", { name: "b-recipe", flow: "default", variables: [] });
     writeRecipe(userDir, "u-recipe", { name: "u-recipe", flow: "quick", variables: [] });
     const recipes = store.list();
-    const names = recipes.map(r => r.name);
+    const names = recipes.map((r) => r.name);
     expect(names).toContain("b-recipe");
     expect(names).toContain("u-recipe");
   });
@@ -100,7 +100,7 @@ describe("FileRecipeStore.list", () => {
     writeRecipe(builtinDir, "overlap", { name: "overlap", description: "builtin", flow: "default", variables: [] });
     writeRecipe(userDir, "overlap", { name: "overlap", description: "global", flow: "quick", variables: [] });
     const recipes = store.list();
-    const overlap = recipes.filter(r => r.name === "overlap");
+    const overlap = recipes.filter((r) => r.name === "overlap");
     expect(overlap).toHaveLength(1);
     expect(overlap[0]._source).toBe("global");
   });
@@ -108,7 +108,7 @@ describe("FileRecipeStore.list", () => {
   it("ensures variables defaults to empty array", () => {
     writeRecipe(builtinDir, "no-vars", { name: "no-vars", flow: "default" });
     const recipes = store.list();
-    const noVars = recipes.find(r => r.name === "no-vars");
+    const noVars = recipes.find((r) => r.name === "no-vars");
     expect(noVars!.variables).toEqual([]);
   });
 });
@@ -150,7 +150,10 @@ describe("FileRecipeStore.delete", () => {
   });
 
   it("deletes .yml files too", () => {
-    writeFileSync(join(userDir, "yml-recipe.yml"), stringifyYaml({ name: "yml-recipe", flow: "default", variables: [] }));
+    writeFileSync(
+      join(userDir, "yml-recipe.yml"),
+      stringifyYaml({ name: "yml-recipe", flow: "default", variables: [] }),
+    );
     expect(store.delete("yml-recipe")).toBe(true);
     expect(existsSync(join(userDir, "yml-recipe.yml"))).toBe(false);
   });

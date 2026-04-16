@@ -56,15 +56,9 @@ interface GhPRData {
  * Fetch PR data (reviews, title, number, state) via gh CLI.
  * Returns null if the CLI call fails.
  */
-export async function fetchPRReviews(
-  prUrl: string,
-  ghExec: GhExecFn = _ghExec,
-): Promise<GhPRData | null> {
+export async function fetchPRReviews(prUrl: string, ghExec: GhExecFn = _ghExec): Promise<GhPRData | null> {
   try {
-    const { stdout } = await ghExec([
-      "pr", "view", prUrl,
-      "--json", "reviews,title,number,state",
-    ]);
+    const { stdout } = await ghExec(["pr", "view", prUrl, "--json", "reviews,title,number,state"]);
     return JSON.parse(stdout) as GhPRData;
   } catch {
     return null;
@@ -87,7 +81,7 @@ export async function processReviewFeedback(
 
   if (reviews.length <= previousCount) return; // No new reviews
 
-  const newReviews = reviews.filter(r => r.submittedAt > lastReviewTime);
+  const newReviews = reviews.filter((r) => r.submittedAt > lastReviewTime);
   if (newReviews.length === 0) return;
 
   // Update state
@@ -102,13 +96,13 @@ export async function processReviewFeedback(
   });
 
   // Check for approvals
-  const approvals = newReviews.filter(r => r.state === "APPROVED");
+  const approvals = newReviews.filter((r) => r.state === "APPROVED");
   if (approvals.length > 0) {
     app.events.log(session.id, "pr_approved", {
       actor: "github",
       data: {
         pr_url: session.pr_url,
-        reviewers: approvals.map(r => r.author.login),
+        reviewers: approvals.map((r) => r.author.login),
       },
     });
 
@@ -116,19 +110,21 @@ export async function processReviewFeedback(
     try {
       const { approveReviewGate } = await import("../services/session-orchestration.js");
       await approveReviewGate(app, session.id);
-    } catch { /* gate may already be advanced */ }
+    } catch {
+      /* gate may already be advanced */
+    }
     return;
   }
 
   // Changes requested or comments - steer the agent
-  const comments: ReviewComment[] = newReviews.map(r => ({
+  const comments: ReviewComment[] = newReviews.map((r) => ({
     author: r.author.login,
     body: r.body || "(no comment body)",
   }));
 
   const prompt = formatReviewPrompt(data.title, data.number, comments, newReviews[0]?.state);
 
-  // Store as message for TUI
+  // Store as message for the UI
   app.messages.send(session.id, "system", prompt, "text");
 
   app.events.log(session.id, "pr_review_feedback", {

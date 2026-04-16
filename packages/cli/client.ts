@@ -2,7 +2,7 @@
  * CLI singleton ArkClient -- in-process server with in-memory transport,
  * or remote WebSocket client when --server / ARK_SERVER is set.
  *
- * Same pattern as ArkClientProvider.tsx in the TUI, adapted for non-React use.
+ * Singleton pattern adapted for non-React CLI use.
  */
 
 import { ArkClient } from "../protocol/client.js";
@@ -37,14 +37,22 @@ function createInMemoryPair(): { clientTransport: Transport; serverTransport: Tr
   let serverHandler: (msg: JsonRpcMessage) => void = () => {};
 
   const clientTransport: Transport = {
-    send(msg) { queueMicrotask(() => serverHandler(msg)); },
-    onMessage(h) { clientHandler = h; },
+    send(msg) {
+      queueMicrotask(() => serverHandler(msg));
+    },
+    onMessage(h) {
+      clientHandler = h;
+    },
     close() {},
   };
 
   const serverTransport: Transport = {
-    send(msg) { queueMicrotask(() => clientHandler(msg)); },
-    onMessage(h) { serverHandler = h; },
+    send(msg) {
+      queueMicrotask(() => clientHandler(msg));
+    },
+    onMessage(h) {
+      serverHandler = h;
+    },
     close() {},
   };
 

@@ -9,9 +9,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { startArkd } from "../../arkd/server.js";
 import { ArkdBackedProvider } from "../providers/arkd-backed.js";
-import type {
-  Compute, Session, ProvisionOpts, SyncOpts, IsolationMode,
-} from "../types.js";
+import type { Compute, Session, ProvisionOpts, SyncOpts, IsolationMode } from "../types.js";
 import { waitFor } from "../../core/__tests__/test-helpers.js";
 
 const TEST_PORT = 19360;
@@ -39,9 +37,15 @@ class TestArkdProvider extends ArkdBackedProvider {
   async attach() {}
   async cleanupSession() {}
   async syncEnvironment(_c: Compute, _o: SyncOpts) {}
-  getAttachCommand() { return []; }
-  buildChannelConfig() { return {}; }
-  buildLaunchEnv() { return {}; }
+  getAttachCommand() {
+    return [];
+  }
+  buildChannelConfig() {
+    return {};
+  }
+  buildLaunchEnv() {
+    return {};
+  }
 }
 
 const provider = new TestArkdProvider();
@@ -74,7 +78,11 @@ beforeAll(() => {
 
 afterAll(() => {
   server.stop();
-  try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* cleanup */ }
+  try {
+    rmSync(tempDir, { recursive: true, force: true });
+  } catch {
+    /* cleanup */
+  }
 });
 
 // ── Launch + Kill + Status ──────────────────────────────────────────────────
@@ -83,7 +91,11 @@ describe("ArkdBackedProvider agent lifecycle", () => {
   const TMUX_NAME = `arkd-backed-test-${Date.now()}`;
 
   afterAll(async () => {
-    try { await provider.killAgent(compute, makeSession(TMUX_NAME)); } catch { /* cleanup */ }
+    try {
+      await provider.killAgent(compute, makeSession(TMUX_NAME));
+    } catch {
+      /* cleanup */
+    }
   });
 
   it("launch creates tmux session via arkd", async () => {
@@ -96,9 +108,12 @@ describe("ArkdBackedProvider agent lifecycle", () => {
     expect(result).toBe(TMUX_NAME);
 
     // Wait for tmux session to start
-    await waitFor(async () => {
-      return await provider.checkSession(compute, TMUX_NAME);
-    }, { timeout: 5000 });
+    await waitFor(
+      async () => {
+        return await provider.checkSession(compute, TMUX_NAME);
+      },
+      { timeout: 5000 },
+    );
   });
 
   it("checkSession returns true for running session", async () => {
@@ -112,10 +127,13 @@ describe("ArkdBackedProvider agent lifecycle", () => {
   });
 
   it("captureOutput returns tmux pane content", async () => {
-    await waitFor(async () => {
-      const o = await provider.captureOutput(compute, makeSession(TMUX_NAME));
-      return o.includes("arkd-backed-running");
-    }, { timeout: 5000 });
+    await waitFor(
+      async () => {
+        const o = await provider.captureOutput(compute, makeSession(TMUX_NAME));
+        return o.includes("arkd-backed-running");
+      },
+      { timeout: 5000 },
+    );
     const output = await provider.captureOutput(compute, makeSession(TMUX_NAME));
     expect(output).toContain("arkd-backed-running");
   });
@@ -168,12 +186,12 @@ describe("ArkdBackedProvider probePorts", () => {
 
     expect(results.length).toBe(2);
 
-    const arkd = results.find(r => r.port === TEST_PORT);
+    const arkd = results.find((r) => r.port === TEST_PORT);
     expect(arkd?.listening).toBe(true);
     expect(arkd?.name).toBe("arkd");
     expect(arkd?.source).toBe("test");
 
-    const dead = results.find(r => r.port === 19999);
+    const dead = results.find((r) => r.port === 19999);
     expect(dead?.listening).toBe(false);
   });
 });

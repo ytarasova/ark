@@ -1,6 +1,11 @@
 import {
-  createResponse, createErrorResponse, ErrorCodes, RpcError,
-  type JsonRpcRequest, type JsonRpcResponse, type JsonRpcError,
+  createResponse,
+  createErrorResponse,
+  ErrorCodes,
+  RpcError,
+  type JsonRpcRequest,
+  type JsonRpcResponse,
+  type JsonRpcError,
 } from "../protocol/types.js";
 
 export type NotifyFn = (method: string, params?: Record<string, unknown>) => void;

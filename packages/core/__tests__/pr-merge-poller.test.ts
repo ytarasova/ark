@@ -7,12 +7,7 @@
 
 import { describe, it, expect, beforeEach } from "bun:test";
 import { getApp } from "../app.js";
-import {
-  fetchPRState,
-  pollPRMerges,
-  checkSessionMerge,
-  setGhExec,
-} from "../integrations/pr-merge-poller.js";
+import { fetchPRState, pollPRMerges, checkSessionMerge, setGhExec } from "../integrations/pr-merge-poller.js";
 import { withTestContext } from "./test-helpers.js";
 
 withTestContext();
@@ -20,12 +15,14 @@ withTestContext();
 let ghOutput: string = "{}";
 let ghShouldThrow = false;
 
-function createMergeSession(opts: {
-  pr_url?: string;
-  status?: string;
-  stage?: string;
-  config?: Record<string, any>;
-} = {}) {
+function createMergeSession(
+  opts: {
+    pr_url?: string;
+    status?: string;
+    stage?: string;
+    config?: Record<string, any>;
+  } = {},
+) {
   const session = getApp().sessions.create({
     summary: "test merge poller",
     flow: "autonomous-sdlc",
@@ -81,7 +78,9 @@ describe("fetchPRState", () => {
   });
 
   it("returns null on gh CLI failure", async () => {
-    const mockExec = async () => { throw new Error("not found"); };
+    const mockExec = async () => {
+      throw new Error("not found");
+    };
     const result = await fetchPRState("https://github.com/org/repo/pull/404", mockExec);
     expect(result).toBeNull();
   });
@@ -108,7 +107,7 @@ describe("pollPRMerges", () => {
     await pollPRMerges(getApp());
 
     const events = getApp().events.list(session.id);
-    const mergeEvents = events.filter(e => e.type.startsWith("pr_merge"));
+    const mergeEvents = events.filter((e) => e.type.startsWith("pr_merge"));
     expect(mergeEvents).toHaveLength(0);
   });
 
@@ -121,7 +120,7 @@ describe("pollPRMerges", () => {
 
     // Should not have processed -- session not in waiting status
     const events = getApp().events.list(session.id);
-    const mergeEvents = events.filter(e => e.type === "pr_merged_confirmed");
+    const mergeEvents = events.filter((e) => e.type === "pr_merged_confirmed");
     expect(mergeEvents).toHaveLength(0);
   });
 
@@ -133,7 +132,7 @@ describe("pollPRMerges", () => {
     await pollPRMerges(getApp());
 
     const events = getApp().events.list(session.id);
-    const mergeEvents = events.filter(e => e.type === "pr_merged_confirmed");
+    const mergeEvents = events.filter((e) => e.type === "pr_merged_confirmed");
     expect(mergeEvents).toHaveLength(0);
   });
 
@@ -151,7 +150,7 @@ describe("pollPRMerges", () => {
 
     // Should have been skipped due to cooldown
     const events = getApp().events.list(session.id);
-    const mergeEvents = events.filter(e => e.type === "pr_merged_confirmed");
+    const mergeEvents = events.filter((e) => e.type === "pr_merged_confirmed");
     expect(mergeEvents).toHaveLength(0);
   });
 
@@ -181,7 +180,7 @@ describe("checkSessionMerge", () => {
 
     // Should have logged pr_merged_confirmed event
     const events = getApp().events.list(session.id);
-    const confirmed = events.filter(e => e.type === "pr_merged_confirmed");
+    const confirmed = events.filter((e) => e.type === "pr_merged_confirmed");
     expect(confirmed).toHaveLength(1);
 
     const eventData = confirmed[0].data as Record<string, any>;
@@ -197,7 +196,7 @@ describe("checkSessionMerge", () => {
 
     // Should have logged pr_merge_failed event
     const events = getApp().events.list(session.id);
-    const failed = events.filter(e => e.type === "pr_merge_failed");
+    const failed = events.filter((e) => e.type === "pr_merge_failed");
     expect(failed).toHaveLength(1);
 
     // Session should be failed

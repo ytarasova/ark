@@ -11,7 +11,14 @@ interface DashboardPageProps {
 
 export function DashboardPage({ view, onNavigate, readOnly, daemonStatus }: DashboardPageProps) {
   return (
-    <Layout view={view} onNavigate={onNavigate} readOnly={readOnly} title="Dashboard" padded={false} daemonStatus={daemonStatus}>
+    <Layout
+      view={view}
+      onNavigate={onNavigate}
+      readOnly={readOnly}
+      title="Dashboard"
+      padded={false}
+      daemonStatus={daemonStatus}
+    >
       <DashboardView onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
     </Layout>
   );

@@ -29,7 +29,9 @@ export function detectHandoff(output: string): HandoffSignal | null {
           context: parsed.context,
         };
       }
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
     // Fallback: extract handoff value with simple regex
     const fallback = jsonBlockMatch[1].match(/"handoff"\s*:\s*"(\w+)"/);
     if (fallback) {

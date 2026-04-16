@@ -7,8 +7,8 @@ import { join } from "path";
 import type { AppContext } from "../app.js";
 
 export interface LogManagerOptions {
-  maxSizeMb?: number;    // Max log file size (default: 10)
-  maxLines?: number;     // Lines to keep when truncating (default: 10000)
+  maxSizeMb?: number; // Max log file size (default: 10)
+  maxLines?: number; // Lines to keep when truncating (default: 10000)
   removeOrphans?: boolean; // Delete logs for missing sessions (default: true)
 }
 
@@ -42,8 +42,8 @@ export function cleanupLogs(app: AppContext, opts?: LogManagerOptions): { trunca
   let truncated = 0;
   let removed = 0;
 
-  const sessionIds = new Set(app.sessions.list({ limit: 1000 }).map(s => s.id));
-  const files = readdirSync(dir).filter(f => f.endsWith(".log"));
+  const sessionIds = new Set(app.sessions.list({ limit: 1000 }).map((s) => s.id));
+  const files = readdirSync(dir).filter((f) => f.endsWith(".log"));
 
   for (const file of files) {
     const filePath = join(dir, file);
@@ -66,7 +66,9 @@ export function cleanupLogs(app: AppContext, opts?: LogManagerOptions): { trunca
           removed++;
         }
       }
-    } catch { /* skip errors */ }
+    } catch {
+      /* skip errors */
+    }
   }
 
   return { truncated, removed };

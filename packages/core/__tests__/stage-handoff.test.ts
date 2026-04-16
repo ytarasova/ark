@@ -16,19 +16,17 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext, getApp, setApp, clearApp } from "../app.js";
-import {
-  mediateStageHandoff,
-  applyReport,
-  applyHookStatus,
-  advance,
-} from "../services/session-orchestration.js";
+import { mediateStageHandoff, applyReport, applyHookStatus, advance } from "../services/session-orchestration.js";
 import { startConductor } from "../conductor/conductor.js";
 import type { OutboundMessage } from "../conductor/channel-types.js";
 
 let app: AppContext;
 
 beforeEach(async () => {
-  if (app) { await app.shutdown(); clearApp(); }
+  if (app) {
+    await app.shutdown();
+    clearApp();
+  }
   app = AppContext.forTest();
   setApp(app);
   await app.boot();
@@ -180,7 +178,7 @@ describe("mediateStageHandoff", () => {
 
       // Error message should be stored
       const msgs = app.messages.list(session.id);
-      expect(msgs.some(m => m.content.includes("Advance blocked"))).toBe(true);
+      expect(msgs.some((m) => m.content.includes("Advance blocked"))).toBe(true);
     });
 
     it("logs stage_handoff_blocked event on verification failure", async () => {
@@ -191,7 +189,7 @@ describe("mediateStageHandoff", () => {
       await mediateStageHandoff(app, session.id, { source: "channel_report" });
 
       const events = app.events.list(session.id);
-      const blocked = events.find(e => e.type === "stage_handoff_blocked");
+      const blocked = events.find((e) => e.type === "stage_handoff_blocked");
       expect(blocked).toBeTruthy();
       expect(blocked!.data?.source).toBe("channel_report");
       expect(blocked!.data?.reason).toBe("verification_failed");
@@ -209,7 +207,7 @@ describe("mediateStageHandoff", () => {
       });
 
       const events = app.events.list(session.id);
-      const handoff = events.find(e => e.type === "stage_handoff");
+      const handoff = events.find((e) => e.type === "stage_handoff");
       expect(handoff).toBeTruthy();
       expect(handoff!.data?.from_stage).toBe("implement");
       expect(handoff!.data?.to_stage).toBe("verify");
@@ -223,7 +221,7 @@ describe("mediateStageHandoff", () => {
       await mediateStageHandoff(app, session.id, { source: "hook_status" });
 
       const events = app.events.list(session.id);
-      const handoff = events.find(e => e.type === "stage_handoff");
+      const handoff = events.find((e) => e.type === "stage_handoff");
       expect(handoff).toBeTruthy();
       expect(handoff!.data?.flow_completed).toBe(true);
       expect(handoff!.data?.source).toBe("hook_status");
@@ -339,7 +337,14 @@ describe("mediateStageHandoff via conductor HTTP", () => {
   let server: { stop(): void } | null = null;
 
   afterEach(() => {
-    if (server) { try { server.stop(); } catch { /* cleanup */ } server = null; }
+    if (server) {
+      try {
+        server.stop();
+      } catch {
+        /* cleanup */
+      }
+      server = null;
+    }
   });
 
   it("channel report on auto-gate stage triggers handoff to next stage", async () => {
@@ -362,7 +367,7 @@ describe("mediateStageHandoff via conductor HTTP", () => {
     });
 
     expect(resp.status).toBe(200);
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 100));
 
     const updated = app.sessions.get(session.id);
     expect(updated?.stage).toBe("verify");
@@ -371,7 +376,7 @@ describe("mediateStageHandoff via conductor HTTP", () => {
 
     // Verify stage_handoff event was logged
     const events = app.events.list(session.id);
-    const handoff = events.find(e => e.type === "stage_handoff");
+    const handoff = events.find((e) => e.type === "stage_handoff");
     expect(handoff).toBeTruthy();
     expect(handoff!.data?.from_stage).toBe("implement");
     expect(handoff!.data?.to_stage).toBe("verify");
@@ -384,14 +389,11 @@ describe("mediateStageHandoff via conductor HTTP", () => {
     const session = app.sessions.create({ summary: "hook handoff test", flow: "autonomous" });
     app.sessions.update(session.id, { status: "running", stage: "work" });
 
-    const resp = await fetch(
-      `http://localhost:${TEST_PORT}/hooks/status?session=${session.id}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hook_event_name: "SessionEnd" }),
-      },
-    );
+    const resp = await fetch(`http://localhost:${TEST_PORT}/hooks/status?session=${session.id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hook_event_name: "SessionEnd" }),
+    });
 
     expect(resp.status).toBe(200);
 
@@ -400,7 +402,7 @@ describe("mediateStageHandoff via conductor HTTP", () => {
 
     // Verify stage_handoff event was logged
     const events = app.events.list(session.id);
-    const handoff = events.find(e => e.type === "stage_handoff");
+    const handoff = events.find((e) => e.type === "stage_handoff");
     expect(handoff).toBeTruthy();
     expect(handoff!.data?.flow_completed).toBe(true);
     expect(handoff!.data?.source).toBe("hook_status");
@@ -433,7 +435,7 @@ describe("mediateStageHandoff via conductor HTTP", () => {
 
     // No stage_handoff event should exist
     const events = app.events.list(session.id);
-    const handoff = events.find(e => e.type === "stage_handoff");
+    const handoff = events.find((e) => e.type === "stage_handoff");
     expect(handoff).toBeFalsy();
   });
 });

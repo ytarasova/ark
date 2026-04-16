@@ -16,12 +16,16 @@ export interface LaunchResult {
 
 export interface SessionLauncher {
   /** Launch an agent session. Returns a handle for tracking. */
-  launch(session: Session, script: string, opts: {
-    env?: Record<string, string>;
-    workdir?: string;
-    compute?: Compute;
-    arkDir?: string;
-  }): Promise<LaunchResult>;
+  launch(
+    session: Session,
+    script: string,
+    opts: {
+      env?: Record<string, string>;
+      workdir?: string;
+      compute?: Compute;
+      arkDir?: string;
+    },
+  ): Promise<LaunchResult>;
 
   /** Kill a running session by its handle. */
   kill(handle: string): Promise<void>;

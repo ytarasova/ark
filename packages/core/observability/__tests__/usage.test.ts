@@ -46,7 +46,7 @@ describe("UsageRecorder", () => {
       expect(records[0].source).toBe("transcript");
       expect(cost).toBeGreaterThan(0);
       // sonnet: input 3.00 + output 1.50 + cacheRead 0.15 + cacheWrite 0.75 = 5.40
-      expect(cost).toBeCloseTo(5.40, 2);
+      expect(cost).toBeCloseTo(5.4, 2);
     });
 
     it("uses default tenant and source", () => {
@@ -83,7 +83,7 @@ describe("UsageRecorder", () => {
       const { cost, records } = app.usageRecorder.getSessionCost(session.id);
       expect(records).toHaveLength(2);
       // haiku input: 1M * 0.8/1M = 0.80 each, total = 1.60
-      expect(cost).toBeCloseTo(1.60, 2);
+      expect(cost).toBeCloseTo(1.6, 2);
     });
 
     it("returns zero for session with no records", () => {
@@ -116,8 +116,8 @@ describe("UsageRecorder", () => {
       });
 
       const summary = app.usageRecorder.getSummary({ groupBy: "model" });
-      const modelA = summary.find(r => r.key === "test-model-a");
-      const modelB = summary.find(r => r.key === "test-model-b");
+      const modelA = summary.find((r) => r.key === "test-model-a");
+      const modelB = summary.find((r) => r.key === "test-model-b");
 
       expect(modelA).toBeDefined();
       expect(modelA!.count).toBe(2);
@@ -133,7 +133,7 @@ describe("UsageRecorder", () => {
       const summary = app.usageRecorder.getSummary({ groupBy: "provider" });
       expect(summary.length).toBeGreaterThan(0);
       // Should have at least "anthropic" from the earlier tests
-      const anthropic = summary.find(r => r.key === "anthropic");
+      const anthropic = summary.find((r) => r.key === "anthropic");
       expect(anthropic).toBeDefined();
     });
 
@@ -229,9 +229,9 @@ describe("UsageRecorder", () => {
 
       // Check runtime grouping
       const runtimeSummary = app.usageRecorder.getSummary({ groupBy: "runtime" });
-      const claude = runtimeSummary.find(r => r.key === "claude");
-      const codex = runtimeSummary.find(r => r.key === "codex");
-      const gemini = runtimeSummary.find(r => r.key === "gemini");
+      const claude = runtimeSummary.find((r) => r.key === "claude");
+      const codex = runtimeSummary.find((r) => r.key === "codex");
+      const gemini = runtimeSummary.find((r) => r.key === "gemini");
       expect(claude).toBeDefined();
       expect(codex).toBeDefined();
       expect(gemini).toBeDefined();

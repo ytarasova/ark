@@ -12,12 +12,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { getApp } from "../app.js";
-import {
-  applyReport,
-  applyHookStatus,
-  parseOnFailure,
-  retryWithContext,
-} from "../services/session-orchestration.js";
+import { applyReport, applyHookStatus, parseOnFailure, retryWithContext } from "../services/session-orchestration.js";
 import { startConductor } from "../conductor/conductor.js";
 import { withTestContext } from "./test-helpers.js";
 
@@ -181,7 +176,11 @@ describe("conductor on_failure retry loop", () => {
   });
 
   afterEach(() => {
-    try { server.stop(); } catch { /* cleanup */ }
+    try {
+      server.stop();
+    } catch {
+      /* cleanup */
+    }
   });
 
   async function postReport(sessionId: string, report: Record<string, unknown>): Promise<Response> {
@@ -219,7 +218,7 @@ describe("conductor on_failure retry loop", () => {
 
     // Should have logged a retry event
     const events = app.events.list(session.id);
-    const retryEvent = events.find(e => e.type === "retry_with_context");
+    const retryEvent = events.find((e) => e.type === "retry_with_context");
     expect(retryEvent).toBeDefined();
     expect(retryEvent!.data!.attempt).toBe(1);
     expect(retryEvent!.data!.error).toBe("Build failed");
@@ -269,7 +268,7 @@ describe("conductor on_failure retry loop", () => {
 
     // No retry event should be logged
     const events = app.events.list(session.id);
-    const retryEvent = events.find(e => e.type === "retry_with_context");
+    const retryEvent = events.find((e) => e.type === "retry_with_context");
     expect(retryEvent).toBeUndefined();
   });
 
@@ -290,7 +289,7 @@ describe("conductor on_failure retry loop", () => {
 
     // Should have logged a retry event
     const events = app.events.list(session.id);
-    const retryEvent = events.find(e => e.type === "retry_with_context");
+    const retryEvent = events.find((e) => e.type === "retry_with_context");
     expect(retryEvent).toBeDefined();
   });
 });

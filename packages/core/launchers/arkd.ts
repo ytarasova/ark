@@ -16,17 +16,19 @@ export class ArkdLauncher implements SessionLauncher {
   constructor(arkdUrl: string);
   constructor(client: ArkdClient);
   constructor(urlOrClient: string | ArkdClient) {
-    this.client = typeof urlOrClient === "string"
-      ? new ArkdClient(urlOrClient)
-      : urlOrClient;
+    this.client = typeof urlOrClient === "string" ? new ArkdClient(urlOrClient) : urlOrClient;
   }
 
-  async launch(session: Session, script: string, opts: {
-    env?: Record<string, string>;
-    workdir?: string;
-    compute?: Compute;
-    arkDir?: string;
-  }): Promise<LaunchResult> {
+  async launch(
+    session: Session,
+    script: string,
+    opts: {
+      env?: Record<string, string>;
+      workdir?: string;
+      compute?: Compute;
+      arkDir?: string;
+    },
+  ): Promise<LaunchResult> {
     const sessionName = `ark-${session.id}`;
     const result = await this.client.launchAgent({
       sessionName,

@@ -77,7 +77,7 @@ describe("FileSkillStore.list", () => {
     writeSkill(builtinDir, "b-skill", { name: "b-skill", description: "b", prompt: "b" });
     writeSkill(userDir, "u-skill", { name: "u-skill", description: "u", prompt: "u" });
     const skills = store.list();
-    const names = skills.map(s => s.name);
+    const names = skills.map((s) => s.name);
     expect(names).toContain("b-skill");
     expect(names).toContain("u-skill");
   });
@@ -94,7 +94,7 @@ describe("FileSkillStore.list", () => {
     writeSkill(builtinDir, "overlap", { name: "overlap", description: "builtin", prompt: "b" });
     writeSkill(userDir, "overlap", { name: "overlap", description: "global", prompt: "g" });
     const skills = store.list();
-    const overlap = skills.filter(s => s.name === "overlap");
+    const overlap = skills.filter((s) => s.name === "overlap");
     expect(overlap).toHaveLength(1);
     expect(overlap[0]._source).toBe("global");
   });

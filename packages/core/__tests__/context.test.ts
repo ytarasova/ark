@@ -8,14 +8,20 @@ import { AppContext, getApp, setApp, clearApp } from "../app.js";
 let app: AppContext;
 
 beforeEach(async () => {
-  if (app) { await app.shutdown(); clearApp(); }
+  if (app) {
+    await app.shutdown();
+    clearApp();
+  }
   app = AppContext.forTest();
   setApp(app);
   await app.boot();
 });
 
 afterAll(async () => {
-  if (app) { await app.shutdown(); clearApp(); }
+  if (app) {
+    await app.shutdown();
+    clearApp();
+  }
 });
 
 describe("Store context isolation", () => {
@@ -46,7 +52,7 @@ describe("Store context isolation", () => {
   it("computes are isolated between contexts", () => {
     // Default local compute is auto-created
     const computes = getApp().computes.list();
-    const localCompute = computes.find(h => h.name === "local");
+    const localCompute = computes.find((h) => h.name === "local");
     expect(localCompute).toBeDefined();
     expect(localCompute!.provider).toBe("local");
   });

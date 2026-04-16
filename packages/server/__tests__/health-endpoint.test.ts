@@ -37,7 +37,7 @@ describe("ArkServer health endpoint", () => {
     expect(resp.status).toBe(200);
     expect(resp.headers.get("content-type")).toContain("application/json");
 
-    const data = await resp.json() as { status: string; pid: number; uptime: number };
+    const data = (await resp.json()) as { status: string; pid: number; uptime: number };
     expect(data.status).toBe("ok");
     expect(data.pid).toBe(process.pid);
     expect(typeof data.uptime).toBe("number");

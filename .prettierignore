@@ -1,0 +1,12 @@
+node_modules/
+dist/
+packages/web/dist/
+packages/desktop/out/
+packages/desktop/test-results/
+packages/desktop/playwright-report/
+*.db
+*.db-journal
+*.db-wal
+.codegraph/
+.claude/
+.ark/

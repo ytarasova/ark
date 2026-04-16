@@ -33,4 +33,12 @@ export interface ContextPackage {
 }
 
 export type NodeType = "file" | "symbol" | "session" | "memory" | "learning" | "skill" | "recipe" | "agent";
-export type EdgeRelation = "depends_on" | "imports" | "modified_by" | "learned_from" | "relates_to" | "uses" | "extracted_from" | "co_changes";
+export type EdgeRelation =
+  | "depends_on"
+  | "imports"
+  | "modified_by"
+  | "learned_from"
+  | "relates_to"
+  | "uses"
+  | "extracted_from"
+  | "co_changes";

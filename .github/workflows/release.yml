@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    tags: ['v*']
+    tags: ["v*"]
     branches: [main]
 
 jobs:
@@ -34,12 +34,6 @@ jobs:
 
       - name: Install dependencies
         run: bun install
-
-      - name: Shim optional deps
-        run: |
-          mkdir -p node_modules/react-devtools-core
-          cp shims/react-devtools-core.js node_modules/react-devtools-core/index.js
-          echo '{"main":"index.js"}' > node_modules/react-devtools-core/package.json
 
       - name: Inject version from package.json
         run: bun run scripts/inject-version.ts
@@ -520,8 +514,10 @@ jobs:
           fi
           echo "PASS: ark web serves dashboard from installed tarball layout"
 
-  # Electron desktop app
+  # Electron desktop app -- downloads ark-native from the build-ark job,
+  # places it in the extraResources path so electron-builder embeds it.
   desktop:
+    needs: [build-ark, build-web]
     strategy:
       fail-fast: false
       matrix:
@@ -529,12 +525,13 @@ jobs:
           - os: macos-latest
             build-flag: "--mac"
             name: mac
+            ark-platform: darwin-arm64
           - os: ubuntu-latest
             build-flag: "--linux"
             name: linux
-          - os: windows-latest
-            build-flag: "--win"
-            name: win
+            ark-platform: linux-x64
+          # Windows desktop skipped: Bun cannot compile ark-native for Windows.
+          # Windows users need WSL to run Ark.
 
     runs-on: ${{ matrix.os }}
     name: desktop (${{ matrix.name }})
@@ -554,8 +551,37 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Build web frontend
-        run: bun run packages/web/build.ts
+      - name: Download web dist
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: packages/web/dist
+
+      - name: Download ark-native binary
+        uses: actions/download-artifact@v4
+        with:
+          name: ark-bin-${{ matrix.ark-platform }}
+          path: /tmp/ark-bin
+
+      - name: Place ark-native for electron-builder extraResources
+        shell: bash
+        env:
+          ARK_PLATFORM: ${{ matrix.ark-platform }}
+        run: |
+          # electron-builder uses ${os}-${arch} variables from the build config.
+          # We map our CI platform names to electron-builder's naming convention.
+          case "$ARK_PLATFORM" in
+            darwin-arm64) eb_os="mac"; eb_arch="arm64" ;;
+            darwin-x64)   eb_os="mac"; eb_arch="x64" ;;
+            linux-x64)    eb_os="linux"; eb_arch="x64" ;;
+            linux-arm64)  eb_os="linux"; eb_arch="arm64" ;;
+            *)            eb_os="linux"; eb_arch="x64" ;;
+          esac
+          mkdir -p "packages/desktop/binaries/${eb_os}-${eb_arch}"
+          cp "/tmp/ark-bin/ark-${ARK_PLATFORM}" "packages/desktop/binaries/${eb_os}-${eb_arch}/ark-native"
+          chmod +x "packages/desktop/binaries/${eb_os}-${eb_arch}/ark-native"
+          echo "Placed ark-native at packages/desktop/binaries/${eb_os}-${eb_arch}/ark-native"
+          ls -lh "packages/desktop/binaries/${eb_os}-${eb_arch}/"
 
       - name: Install Electron dependencies
         run: cd packages/desktop && npm install
@@ -582,7 +608,6 @@ jobs:
           path: |
             packages/desktop/out/*.dmg
             packages/desktop/out/*.zip
-            packages/desktop/out/*.exe
             packages/desktop/out/*.AppImage
             packages/desktop/out/*.deb
 
@@ -631,10 +656,18 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ steps.release-type.outputs.tag }}
         run: |
+          # Glob includes both lowercase (ark-*) and capitalized (Ark-*, "Ark Setup*")
+          # names -- electron-builder produces "Ark-<ver>-*.dmg",
+          # "Ark-<ver>.AppImage" etc. with a capital A. Without this, mac +
+          # AppImage artifacts are silently dropped from the release.
+          shopt -s nullglob
+          files=(dist/ark-* dist/Ark-*)
+          echo "Uploading ${#files[@]} release assets:"
+          printf '  %s\n' "${files[@]}"
           gh release create "$RELEASE_TAG" \
             --title "$RELEASE_TAG" \
             --generate-notes \
-            dist/ark-*
+            "${files[@]}"
 
       - name: Update latest release
         if: steps.release-type.outputs.is_tag == 'false'
@@ -659,4 +692,9 @@ jobs:
           Each platform tarball (\`ark-<platform>.tar.gz\`) is self-contained: ark + tmux + codegraph + tensorzero-gateway. No system dependencies required.
 
           Commit: $COMMIT_SHA"
-          gh release upload latest dist/ark-* --clobber
+          # See tagged-release step above for why we glob both cases.
+          shopt -s nullglob
+          files=(dist/ark-* dist/Ark-* dist/Ark\ Setup*)
+          echo "Uploading ${#files[@]} rolling release assets:"
+          printf '  %s\n' "${files[@]}"
+          gh release upload latest "${files[@]}" --clobber

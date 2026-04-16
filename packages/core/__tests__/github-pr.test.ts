@@ -102,9 +102,7 @@ describe("extractComments", () => {
 
 describe("formatReviewPrompt", () => {
   it("includes PR number and title", () => {
-    const result = formatReviewPrompt("Fix login bug", 123, [
-      { author: "alice", body: "Please add tests" },
-    ]);
+    const result = formatReviewPrompt("Fix login bug", 123, [{ author: "alice", body: "Please add tests" }]);
     expect(result).toContain("#123");
     expect(result).toContain("Fix login bug");
   });
@@ -119,16 +117,12 @@ describe("formatReviewPrompt", () => {
   });
 
   it("includes review state when provided", () => {
-    const result = formatReviewPrompt("Feature", 789, [
-      { author: "carol", body: "Needs work" },
-    ], "changes_requested");
+    const result = formatReviewPrompt("Feature", 789, [{ author: "carol", body: "Needs work" }], "changes_requested");
     expect(result).toContain("changes_requested");
   });
 
   it("formats path-only comments without line number", () => {
-    const result = formatReviewPrompt("PR", 1, [
-      { author: "dave", body: "Check this file", path: "README.md" },
-    ]);
+    const result = formatReviewPrompt("PR", 1, [{ author: "dave", body: "Check this file", path: "README.md" }]);
     expect(result).toContain("`README.md`");
     expect(result).not.toContain("undefined");
   });
@@ -188,13 +182,17 @@ describe("handleGitHubWebhook", () => {
     const session = getApp().sessions.create({ summary: "webhook test" });
     getApp().sessions.update(session.id, { pr_url: prUrl, status: "running" });
 
-    const result = handleGitHubWebhook(getApp(), "pull_request_review", makePRPayload(prUrl, {
-      review: {
-        state: "approved",
-        body: "LGTM",
-        user: { login: "approver" },
-      },
-    }));
+    const result = handleGitHubWebhook(
+      getApp(),
+      "pull_request_review",
+      makePRPayload(prUrl, {
+        review: {
+          state: "approved",
+          body: "LGTM",
+          user: { login: "approver" },
+        },
+      }),
+    );
 
     expect(result.action).toBe("approve");
     expect(result.sessionId).toBe(session.id);
@@ -205,13 +203,17 @@ describe("handleGitHubWebhook", () => {
     const session = getApp().sessions.create({ summary: "steer test" });
     getApp().sessions.update(session.id, { pr_url: prUrl, status: "stopped" });
 
-    const result = handleGitHubWebhook(getApp(), "pull_request_review", makePRPayload(prUrl, {
-      review: {
-        state: "changes_requested",
-        body: "Fix the error handling",
-        user: { login: "reviewer" },
-      },
-    }));
+    const result = handleGitHubWebhook(
+      getApp(),
+      "pull_request_review",
+      makePRPayload(prUrl, {
+        review: {
+          state: "changes_requested",
+          body: "Fix the error handling",
+          user: { login: "reviewer" },
+        },
+      }),
+    );
 
     expect(result.action).toBe("steer");
     expect(result.sessionId).toBe(session.id);
@@ -223,14 +225,18 @@ describe("handleGitHubWebhook", () => {
     const session = getApp().sessions.create({ summary: "comment test" });
     getApp().sessions.update(session.id, { pr_url: prUrl, status: "running" });
 
-    const result = handleGitHubWebhook(getApp(), "pull_request_review_comment", makePRPayload(prUrl, {
-      comment: {
-        body: "Use a map here instead",
-        user: { login: "commenter" },
-        path: "src/utils.ts",
-        line: 55,
-      },
-    }));
+    const result = handleGitHubWebhook(
+      getApp(),
+      "pull_request_review_comment",
+      makePRPayload(prUrl, {
+        comment: {
+          body: "Use a map here instead",
+          user: { login: "commenter" },
+          path: "src/utils.ts",
+          line: 55,
+        },
+      }),
+    );
 
     expect(result.action).toBe("steer");
     expect(result.sessionId).toBe(session.id);
@@ -252,10 +258,13 @@ describe("handleGitHubWebhook", () => {
   });
 
   it("ignores events with no matching session", () => {
-    const result = handleGitHubWebhook(getApp(), "pull_request_review", makePRPayload(
-      "https://github.com/org/repo/pull/9999",
-      { review: { state: "approved", body: "ok", user: { login: "x" } } },
-    ));
+    const result = handleGitHubWebhook(
+      getApp(),
+      "pull_request_review",
+      makePRPayload("https://github.com/org/repo/pull/9999", {
+        review: { state: "approved", body: "ok", user: { login: "x" } },
+      }),
+    );
     expect(result.action).toBe("ignore");
     expect(result.message).toContain("No session");
   });

@@ -16,7 +16,6 @@
       <a href="quickstart.html">Quick Start</a>
       <a href="concepts.html">Core Concepts</a>
       <div class="section-title">Guides</div>
-      <a href="tui.html">TUI Dashboard</a>
       <a href="web.html">Web Dashboard</a>
       <a href="cli.html">CLI Reference</a>
       <a href="configuration.html">Configuration</a>
@@ -73,10 +72,11 @@
         <li>Three-tier resolution for resources: <code>builtin</code> &gt; <code>global</code> (<code>~/.ark/</code>) &gt; <code>project</code> (<code>.ark/</code> in repo).</li>
         <li>No authentication.</li>
         <li>Cost tracking is local only (session-level rows in <code>usage_records</code>).</li>
-        <li>Conductor runs under the TUI; the CLI skips the conductor and writes directly to the DB.</li>
+        <li>Conductor runs under the server daemon; the CLI skips the conductor and writes directly to the DB.</li>
       </ul>
       <p>Start locally:</p>
-      <pre><code>$ ark tui
+      <pre><code>$ ark server daemon start --detach
+$ ark web
 $ ark session start --repo . --summary <span class="yaml-value">"Fix bug"</span> --agent implementer --dispatch</code></pre>
 
       <h2>Hosted / control plane mode</h2>
@@ -199,7 +199,7 @@ $ ark cost summary --group-by user_id</code></pre>
           <tr><td><code>DATABASE_URL</code></td><td>PostgreSQL connection string. Setting this triggers hosted mode.</td></tr>
           <tr><td><code>REDIS_URL</code></td><td>Redis URL for the SSE bus in multi-instance deployments.</td></tr>
           <tr><td><code>ARK_AUTH_ENABLED</code></td><td>Set to <code>true</code> to require API keys on every request.</td></tr>
-          <tr><td><code>ARK_SERVER</code></td><td>Remote Ark server URL for CLI / TUI / Web clients.</td></tr>
+          <tr><td><code>ARK_SERVER</code></td><td>Remote Ark server URL for CLI and Web clients.</td></tr>
           <tr><td><code>ARK_TOKEN</code></td><td>API key for remote server authentication.</td></tr>
         </tbody>
       </table>

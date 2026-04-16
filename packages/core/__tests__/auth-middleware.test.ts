@@ -58,11 +58,7 @@ describe("extractTenantContext - auth enabled", () => {
   });
 
   it("returns null when the Bearer token is invalid", () => {
-    const ctx = extractTenantContext(
-      mkReq({ authorization: "Bearer ark_default_nope" }),
-      config,
-      keyManager,
-    );
+    const ctx = extractTenantContext(mkReq({ authorization: "Bearer ark_default_nope" }), config, keyManager);
     expect(ctx).toBeNull();
   });
 
@@ -70,11 +66,7 @@ describe("extractTenantContext - auth enabled", () => {
     const { key, id } = keyManager.create("acme", "test-key", "member");
     expect(id).toMatch(/^ak-/);
 
-    const ctx = extractTenantContext(
-      mkReq({ authorization: `Bearer ${key}` }),
-      config,
-      keyManager,
-    );
+    const ctx = extractTenantContext(mkReq({ authorization: `Bearer ${key}` }), config, keyManager);
     expect(ctx).not.toBeNull();
     expect(ctx?.tenantId).toBe("acme");
     expect(ctx?.role).toBe("member");
@@ -82,11 +74,7 @@ describe("extractTenantContext - auth enabled", () => {
 
   it("accepts the token via ?token= query param as a fallback", () => {
     const { key } = keyManager.create("qparam", "q-key", "admin");
-    const ctx = extractTenantContext(
-      mkReq({}, `http://localhost/api?token=${key}`),
-      config,
-      keyManager,
-    );
+    const ctx = extractTenantContext(mkReq({}, `http://localhost/api?token=${key}`), config, keyManager);
     expect(ctx?.tenantId).toBe("qparam");
     expect(ctx?.role).toBe("admin");
   });
@@ -103,11 +91,7 @@ describe("extractTenantContext - auth enabled", () => {
   });
 
   it("returns null when an API key manager is not provided even if the token looks valid", () => {
-    const ctx = extractTenantContext(
-      mkReq({ authorization: "Bearer ark_default_anything" }),
-      config,
-      null,
-    );
+    const ctx = extractTenantContext(mkReq({ authorization: "Bearer ark_default_anything" }), config, null);
     expect(ctx).toBeNull();
   });
 });

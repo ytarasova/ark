@@ -24,7 +24,11 @@ beforeAll(() => {
 
 afterAll(() => {
   server.stop();
-  try { rmSync(tempDir, { recursive: true, force: true }); } catch { /* cleanup */ }
+  try {
+    rmSync(tempDir, { recursive: true, force: true });
+  } catch {
+    /* cleanup */
+  }
 });
 
 // ── Health ──────────────────────────────────────────────────────────────────
@@ -89,8 +93,8 @@ describe("client file ops", () => {
 
     const res = await client.listDir({ path: dir });
     expect(res.entries.length).toBe(2);
-    expect(res.entries.find(e => e.name === "x.txt")?.type).toBe("file");
-    expect(res.entries.find(e => e.name === "sub")?.type).toBe("dir");
+    expect(res.entries.find((e) => e.name === "x.txt")?.type).toBe("file");
+    expect(res.entries.find((e) => e.name === "sub")?.type).toBe("dir");
   });
 
   it("listDir recursive includes nested files", async () => {
@@ -100,7 +104,7 @@ describe("client file ops", () => {
     writeFileSync(join(dir, "inner", "deep.txt"), "deep");
 
     const res = await client.listDir({ path: dir, recursive: true });
-    const names = res.entries.map(e => e.name);
+    const names = res.entries.map((e) => e.name);
     expect(names).toContain("top.txt");
     expect(names).toContain("inner");
     expect(names).toContain("deep.txt");
@@ -144,7 +148,11 @@ describe("client agent lifecycle", () => {
   const SESSION_NAME = `arkd-client-test-${Date.now()}`;
 
   afterAll(async () => {
-    try { await client.killAgent({ sessionName: SESSION_NAME }); } catch { /* cleanup */ }
+    try {
+      await client.killAgent({ sessionName: SESSION_NAME });
+    } catch {
+      /* cleanup */
+    }
   });
 
   it("launch → status → capture → kill", async () => {
@@ -155,18 +163,24 @@ describe("client agent lifecycle", () => {
     });
     expect(launch.ok).toBe(true);
 
-    await waitFor(async () => {
-      const s = await client.agentStatus({ sessionName: SESSION_NAME });
-      return s.running === true;
-    }, { timeout: 5000 });
+    await waitFor(
+      async () => {
+        const s = await client.agentStatus({ sessionName: SESSION_NAME });
+        return s.running === true;
+      },
+      { timeout: 5000 },
+    );
 
     const status = await client.agentStatus({ sessionName: SESSION_NAME });
     expect(status.running).toBe(true);
 
-    await waitFor(async () => {
-      const c = await client.captureOutput({ sessionName: SESSION_NAME });
-      return c.output.includes("client agent up");
-    }, { timeout: 5000 });
+    await waitFor(
+      async () => {
+        const c = await client.captureOutput({ sessionName: SESSION_NAME });
+        return c.output.includes("client agent up");
+      },
+      { timeout: 5000 },
+    );
     const capture = await client.captureOutput({ sessionName: SESSION_NAME });
     expect(capture.output).toContain("client agent up");
 
@@ -200,9 +214,9 @@ describe("client system", () => {
 
   it("probePorts detects server port", async () => {
     const res = await client.probePorts([TEST_PORT, 19999]);
-    const arkd = res.results.find(r => r.port === TEST_PORT);
+    const arkd = res.results.find((r) => r.port === TEST_PORT);
     expect(arkd?.listening).toBe(true);
-    const dead = res.results.find(r => r.port === 19999);
+    const dead = res.results.find((r) => r.port === 19999);
     expect(dead?.listening).toBe(false);
   });
 });

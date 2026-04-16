@@ -50,8 +50,11 @@ class EventBus {
   emit(type: string, sessionId: string, data?: { stage?: string; data?: Record<string, unknown> }): boolean {
     // Check before handlers
     const beforeEvent: ArkEvent = {
-      id: 0, type, sessionId,
-      stage: data?.stage, data: data?.data,
+      id: 0,
+      type,
+      sessionId,
+      stage: data?.stage,
+      data: data?.data,
       timestamp: new Date().toISOString(),
     };
 
@@ -75,10 +78,18 @@ class EventBus {
 
     // Notify handlers
     for (const handler of this.handlers.get(type) ?? []) {
-      try { handler(event); } catch (e) { console.error(`Handler error for ${type}:`, e); }
+      try {
+        handler(event);
+      } catch (e) {
+        console.error(`Handler error for ${type}:`, e);
+      }
     }
     for (const handler of this.handlers.get("*") ?? []) {
-      try { handler(event); } catch (e) { console.error(`Wildcard handler error:`, e); }
+      try {
+        handler(event);
+      } catch (e) {
+        console.error(`Wildcard handler error:`, e);
+      }
     }
 
     return true;

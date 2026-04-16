@@ -29,11 +29,13 @@ function makeResponse(model = "test-model"): ChatCompletionResponse {
     object: "chat.completion",
     created: Math.floor(Date.now() / 1000),
     model,
-    choices: [{
-      index: 0,
-      message: { role: "assistant", content: "Hello!" },
-      finish_reason: "stop",
-    }],
+    choices: [
+      {
+        index: 0,
+        message: { role: "assistant", content: "Hello!" },
+        finish_reason: "stop",
+      },
+    ],
     usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
   };
 }
@@ -48,10 +50,7 @@ describe("Dispatcher", () => {
     // No providers registered -- should throw
     const decision = makeDecision();
     try {
-      await dispatcher.dispatch(
-        { model: "auto", messages: [{ role: "user", content: "test" }] },
-        decision,
-      );
+      await dispatcher.dispatch({ model: "auto", messages: [{ role: "user", content: "test" }] }, decision);
       // Should not reach here
       expect(false).toBe(true);
     } catch (err: any) {
@@ -64,18 +63,41 @@ describe("Dispatcher", () => {
     const dispatcher = new Dispatcher(registry);
 
     const models: ModelConfig[] = [
-      { id: "expensive", provider: "p1", tier: "frontier", cost_input: 15, cost_output: 75, max_context: 200000, supports_tools: true, quality: 0.98 },
-      { id: "cheap", provider: "p2", tier: "economy", cost_input: 0.1, cost_output: 0.4, max_context: 200000, supports_tools: true, quality: 0.75 },
-      { id: "mid", provider: "p3", tier: "standard", cost_input: 3, cost_output: 15, max_context: 200000, supports_tools: true, quality: 0.92 },
+      {
+        id: "expensive",
+        provider: "p1",
+        tier: "frontier",
+        cost_input: 15,
+        cost_output: 75,
+        max_context: 200000,
+        supports_tools: true,
+        quality: 0.98,
+      },
+      {
+        id: "cheap",
+        provider: "p2",
+        tier: "economy",
+        cost_input: 0.1,
+        cost_output: 0.4,
+        max_context: 200000,
+        supports_tools: true,
+        quality: 0.75,
+      },
+      {
+        id: "mid",
+        provider: "p3",
+        tier: "standard",
+        cost_input: 3,
+        cost_output: 15,
+        max_context: 200000,
+        supports_tools: true,
+        quality: 0.92,
+      },
     ];
 
     // No providers registered, so cascade will fail -- but we test that it tries
     try {
-      await dispatcher.cascade(
-        { model: "auto", messages: [{ role: "user", content: "test" }] },
-        models,
-        0.7,
-      );
+      await dispatcher.cascade({ model: "auto", messages: [{ role: "user", content: "test" }] }, models, 0.7);
     } catch (err: any) {
       expect(err.message).toContain("all models failed");
     }

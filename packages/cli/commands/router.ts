@@ -70,10 +70,14 @@ export function registerRouterCommands(program: Command) {
       if (tensorZeroUrl) {
         console.log(chalk.dim(`TensorZero: ${tensorZeroUrl}`));
       }
-      console.log(chalk.dim(`Providers: ${config.providers.map(p => p.name).join(", ")}`));
-      console.log(chalk.dim(`Models: ${config.providers.flatMap(p => p.models).length}`));
+      console.log(chalk.dim(`Providers: ${config.providers.map((p) => p.name).join(", ")}`));
+      console.log(chalk.dim(`Models: ${config.providers.flatMap((p) => p.models).length}`));
       console.log(chalk.dim("\nUsage:"));
-      console.log(chalk.dim(`  curl ${server.url}/v1/chat/completions -d '{"model":"auto","messages":[{"role":"user","content":"hello"}]}'`));
+      console.log(
+        chalk.dim(
+          `  curl ${server.url}/v1/chat/completions -d '{"model":"auto","messages":[{"role":"user","content":"hello"}]}'`,
+        ),
+      );
       console.log(chalk.dim("\nPress Ctrl+C to stop"));
 
       process.on("SIGINT", async () => {
@@ -107,12 +111,12 @@ export function registerRouterCommands(program: Command) {
           process.exit(1);
         }
 
-        const health = await healthResp.json() as {
+        const health = (await healthResp.json()) as {
           uptime_ms: number;
           providers?: string[];
           models: number;
         };
-        const stats = await statsResp.json() as {
+        const stats = (await statsResp.json()) as {
           total_requests: number;
           routed_requests: number;
           passthrough_requests: number;
@@ -135,9 +139,13 @@ export function registerRouterCommands(program: Command) {
         try {
           const tzResp = await fetch(`${opts.tensorzeroUrl}/status`);
           tzHealthy = tzResp.ok;
-        } catch { /* not running */ }
+        } catch {
+          /* not running */
+        }
 
-        console.log(`  TensorZero: ${tzHealthy ? chalk.green("running") : chalk.dim("not running")} (${opts.tensorzeroUrl})`);
+        console.log(
+          `  TensorZero: ${tzHealthy ? chalk.green("running") : chalk.dim("not running")} (${opts.tensorzeroUrl})`,
+        );
 
         console.log();
         console.log(chalk.bold("Stats"));
@@ -177,7 +185,7 @@ export function registerRouterCommands(program: Command) {
           process.exit(1);
         }
 
-        const costs = await resp.json() as Array<{
+        const costs = (await resp.json()) as Array<{
           key: string;
           request_count: number;
           total_input_tokens: number;
@@ -191,13 +199,11 @@ export function registerRouterCommands(program: Command) {
         }
 
         console.log(chalk.bold(`\nCost Breakdown (by ${opts.groupBy})\n`));
-        console.log(chalk.dim(
-          "Name".padEnd(30) +
-          "Requests".padEnd(12) +
-          "Input Tokens".padEnd(16) +
-          "Output Tokens".padEnd(16) +
-          "Cost"
-        ));
+        console.log(
+          chalk.dim(
+            "Name".padEnd(30) + "Requests".padEnd(12) + "Input Tokens".padEnd(16) + "Output Tokens".padEnd(16) + "Cost",
+          ),
+        );
         console.log(chalk.dim("-".repeat(80)));
 
         let totalCost = 0;
@@ -205,10 +211,10 @@ export function registerRouterCommands(program: Command) {
           totalCost += c.total_cost_usd;
           console.log(
             c.key.padEnd(30) +
-            String(c.request_count).padEnd(12) +
-            formatTokens(c.total_input_tokens).padEnd(16) +
-            formatTokens(c.total_output_tokens).padEnd(16) +
-            `$${c.total_cost_usd.toFixed(4)}`
+              String(c.request_count).padEnd(12) +
+              formatTokens(c.total_input_tokens).padEnd(16) +
+              formatTokens(c.total_output_tokens).padEnd(16) +
+              `$${c.total_cost_usd.toFixed(4)}`,
           );
         }
 

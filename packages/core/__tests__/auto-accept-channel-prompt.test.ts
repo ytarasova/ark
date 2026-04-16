@@ -17,19 +17,15 @@ let captureResponses: string[] = [];
 let captureIndex = 0;
 const sentKeys: string[][] = [];
 
-const captureSpy = spyOn(tmux, "capturePaneAsync").mockImplementation(
-  async (_name: string, _opts?: any) => {
-    const response = captureResponses[captureIndex] ?? "";
-    captureIndex = Math.min(captureIndex + 1, captureResponses.length - 1);
-    return response;
-  }
-);
+const captureSpy = spyOn(tmux, "capturePaneAsync").mockImplementation(async (_name: string, _opts?: any) => {
+  const response = captureResponses[captureIndex] ?? "";
+  captureIndex = Math.min(captureIndex + 1, captureResponses.length - 1);
+  return response;
+});
 
-const sendKeysSpy = spyOn(tmux, "sendKeysAsync").mockImplementation(
-  async (_name: string, ...keys: string[]) => {
-    sentKeys.push(keys);
-  }
-);
+const sendKeysSpy = spyOn(tmux, "sendKeysAsync").mockImplementation(async (_name: string, ...keys: string[]) => {
+  sentKeys.push(keys);
+});
 
 // ── Restore after all tests ────────────────────────────────────────────────
 
@@ -97,10 +93,10 @@ describe("autoAcceptChannelPrompt", () => {
 
   it("keeps polling during startup before prompt appears", async () => {
     captureResponses = [
-      STARTUP_OUTPUT,  // startup - no prompt yet
-      STARTUP_OUTPUT,  // still starting
-      PROMPT_OUTPUT,   // prompt appears
-      WORKING_OUTPUT,  // Claude starts working
+      STARTUP_OUTPUT, // startup - no prompt yet
+      STARTUP_OUTPUT, // still starting
+      PROMPT_OUTPUT, // prompt appears
+      WORKING_OUTPUT, // Claude starts working
     ];
 
     await autoAcceptChannelPrompt("ark-test", { maxAttempts: 10, delayMs: 1 });
@@ -112,18 +108,18 @@ describe("autoAcceptChannelPrompt", () => {
   it("handles double prompt from resume fallback", async () => {
     // Scenario: --resume fails, first prompt accepted, then second prompt appears
     captureResponses = [
-      PROMPT_OUTPUT,   // 1st prompt (from --resume attempt)
-      PROMPT_OUTPUT,   // prompt still showing (keys in flight)
-      STARTUP_OUTPUT,  // resume fails, transitioning to --session-id
-      PROMPT_OUTPUT,   // 2nd prompt (from --session-id attempt)
-      WORKING_OUTPUT,  // finally working
+      PROMPT_OUTPUT, // 1st prompt (from --resume attempt)
+      PROMPT_OUTPUT, // prompt still showing (keys in flight)
+      STARTUP_OUTPUT, // resume fails, transitioning to --session-id
+      PROMPT_OUTPUT, // 2nd prompt (from --session-id attempt)
+      WORKING_OUTPUT, // finally working
     ];
 
     await autoAcceptChannelPrompt("ark-test", { maxAttempts: 10, delayMs: 1 });
 
     // Should have accepted the prompt TWICE (4 keys total: "1", Enter, "1", Enter)
-    const enterCount = sentKeys.filter(k => k[0] === "Enter").length;
-    const oneCount = sentKeys.filter(k => k[0] === "1").length;
+    const enterCount = sentKeys.filter((k) => k[0] === "Enter").length;
+    const oneCount = sentKeys.filter((k) => k[0] === "1").length;
     expect(enterCount).toBeGreaterThanOrEqual(2);
     expect(oneCount).toBeGreaterThanOrEqual(2);
   });

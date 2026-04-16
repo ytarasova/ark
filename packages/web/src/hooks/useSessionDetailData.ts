@@ -1,8 +1,7 @@
 /**
  * Web session detail data fetcher.
  *
- * Mirrors packages/tui/hooks/useSessionDetailData.ts -- consolidates the
- * fetching effects for session detail, todos, messages, flow stages,
+ * Consolidates the fetching effects for session detail, todos, messages, flow stages,
  * cost, and the running-output poller. Returns the live state plus
  * setters needed by the parent component for optimistic updates.
  */
@@ -48,27 +47,41 @@ export function useSessionDetailData(sessionId: string): SessionDetailData {
   // Todos
   useEffect(() => {
     if (!sessionId) return;
-    api.getTodos(sessionId).then((data) => setTodos(Array.isArray(data) ? data : [])).catch(() => {});
+    api
+      .getTodos(sessionId)
+      .then((data) => setTodos(Array.isArray(data) ? data : []))
+      .catch(() => {});
   }, [sessionId]);
 
   // Messages (conversation history)
   useEffect(() => {
     if (!sessionId) return;
-    api.getMessages(sessionId)
+    api
+      .getMessages(sessionId)
       .then((data) => setMessages(Array.isArray(data?.messages) ? data.messages : Array.isArray(data) ? data : []))
       .catch(() => {});
   }, [sessionId]);
 
   // Cost from usage_records
   useEffect(() => {
-    if (!sessionId) { setCost(null); return; }
-    api.getSessionCost(sessionId).then(setCost).catch(() => setCost(null));
+    if (!sessionId) {
+      setCost(null);
+      return;
+    }
+    api
+      .getSessionCost(sessionId)
+      .then(setCost)
+      .catch(() => setCost(null));
   }, [sessionId, detail?.session?.updated_at]);
 
   // Flow stages (pipeline visualization)
   useEffect(() => {
-    if (!detail?.session?.flow) { setFlowStages([]); return; }
-    api.getFlowDetail(detail.session.flow)
+    if (!detail?.session?.flow) {
+      setFlowStages([]);
+      return;
+    }
+    api
+      .getFlowDetail(detail.session.flow)
       .then((d: any) => setFlowStages(d.stages || []))
       .catch(() => setFlowStages([]));
   }, [detail?.session?.flow]);
@@ -83,13 +96,28 @@ export function useSessionDetailData(sessionId: string): SessionDetailData {
     let active = true;
     const poll = () => {
       if (!active) return;
-      api.getSession(sessionId).then(d => { if (active) setDetail(d); });
-      api.getTodos(sessionId).then(d => { if (active) setTodos(Array.isArray(d) ? d : []); }).catch(() => {});
-      api.getSessionCost(sessionId).then(d => { if (active) setCost(d); }).catch(() => setCost(null));
+      api.getSession(sessionId).then((d) => {
+        if (active) setDetail(d);
+      });
+      api
+        .getTodos(sessionId)
+        .then((d) => {
+          if (active) setTodos(Array.isArray(d) ? d : []);
+        })
+        .catch(() => {});
+      api
+        .getSessionCost(sessionId)
+        .then((d) => {
+          if (active) setCost(d);
+        })
+        .catch(() => setCost(null));
     };
 
     const iv = setInterval(poll, 5000);
-    return () => { active = false; clearInterval(iv); };
+    return () => {
+      active = false;
+      clearInterval(iv);
+    };
   }, [sessionId, detail?.session?.status]);
 
   // Poll output for running sessions
@@ -99,13 +127,19 @@ export function useSessionDetailData(sessionId: string): SessionDetailData {
     let active = true;
     function poll() {
       if (!active) return;
-      api.getOutput(sessionId)
-        .then((d) => { if (active && d.output) setOutput(d.output); })
+      api
+        .getOutput(sessionId)
+        .then((d) => {
+          if (active && d.output) setOutput(d.output);
+        })
         .catch(() => {});
     }
     poll();
     const iv = setInterval(poll, 2000);
-    return () => { active = false; clearInterval(iv); };
+    return () => {
+      active = false;
+      clearInterval(iv);
+    };
   }, [detail?.session?.status, sessionId]);
 
   // Auto-scroll output

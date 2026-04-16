@@ -53,8 +53,10 @@ export function getRepoName(repoUrlOrPath: string): string {
  * Returns the remote working directory path.
  */
 export async function cloneRepoOnRemote(
-  key: string, ip: string,
-  repoUrl: string, repoName: string,
+  key: string,
+  ip: string,
+  repoUrl: string,
+  repoName: string,
   opts?: { branch?: string; sessionId?: string; onLog?: (msg: string) => void },
 ): Promise<string> {
   const log = opts?.onLog ?? (() => {});
@@ -69,12 +71,15 @@ export async function cloneRepoOnRemote(
   // Clone
   const branchFlag = opts?.branch ? `-b ${opts.branch}` : "";
   log(`Cloning ${repoUrl} into ${dirName}...`);
-  const { exitCode, stderr } = await sshExecAsync(key, ip,
+  const { exitCode, stderr } = await sshExecAsync(
+    key,
+    ip,
     `cd ~/Projects && git clone ${branchFlag} ${repoUrl} ${dirName}`,
-    { timeout: 120_000 });
+    { timeout: 120_000 },
+  );
 
   if (exitCode !== 0) {
-    throw new Error(`Git clone failed: ${stderr.slice(0, 200)}${stderr.length > 200 ? '...' : ''}`);
+    throw new Error(`Git clone failed: ${stderr.slice(0, 200)}${stderr.length > 200 ? "..." : ""}`);
   }
 
   log(`Cloned to ${remotePath}`);
@@ -84,9 +89,7 @@ export async function cloneRepoOnRemote(
 /**
  * Pre-trust a directory in Claude's config on the remote host.
  */
-export async function trustRemoteDirectory(
-  key: string, ip: string, remotePath: string,
-): Promise<void> {
+export async function trustRemoteDirectory(key: string, ip: string, remotePath: string): Promise<void> {
   // Use python3 since it's always available on Ubuntu
   const script = `python3 -c "
 import json, os
@@ -100,27 +103,25 @@ json.dump(j, open(f, 'w'), indent=2)
 }
 
 /** Markers that indicate the channel development prompt is visible. */
-const CHANNEL_PROMPT_MARKERS = [
-  "I am using this for local",
-  "local channel development",
-];
+const CHANNEL_PROMPT_MARKERS = ["I am using this for local", "local channel development"];
 
 /** Markers that indicate Claude is past all prompts and actively working. */
-const CLAUDE_WORKING_MARKERS = [
-  "ctrl+o to expand",
-  "esc to interrupt",
-];
+const CLAUDE_WORKING_MARKERS = ["ctrl+o to expand", "esc to interrupt"];
 
 /** Single iteration of the channel prompt poll loop. */
 async function pollChannelPrompt(
-  key: string, ip: string, tmuxName: string, attempt: number, max: number,
+  key: string,
+  ip: string,
+  tmuxName: string,
+  attempt: number,
+  max: number,
 ): Promise<"done" | "retry"> {
   try {
-    const { stdout } = await sshExecAsync(key, ip,
-      `tmux capture-pane -t '${tmuxName}' -p 2>/dev/null | tail -30`,
-      { timeout: 10_000 });
+    const { stdout } = await sshExecAsync(key, ip, `tmux capture-pane -t '${tmuxName}' -p 2>/dev/null | tail -30`, {
+      timeout: 10_000,
+    });
 
-    if (CHANNEL_PROMPT_MARKERS.some(m => stdout.includes(m))) {
+    if (CHANNEL_PROMPT_MARKERS.some((m) => stdout.includes(m))) {
       await sshExecAsync(key, ip, `tmux send-keys -t '${tmuxName}' 1`, { timeout: 5_000 });
       const { sleep } = await import("../../util.js");
       await sleep(300);
@@ -128,10 +129,13 @@ async function pollChannelPrompt(
       return "retry";
     }
 
-    if (CLAUDE_WORKING_MARKERS.some(m => stdout.includes(m))) return "done";
+    if (CLAUDE_WORKING_MARKERS.some((m) => stdout.includes(m))) return "done";
     return "retry";
   } catch (e: any) {
-    console.error(`[ec2] autoAcceptChannelPrompt: ssh to ${tmuxName} failed (attempt ${attempt + 1}/${max}):`, e?.message ?? e);
+    console.error(
+      `[ec2] autoAcceptChannelPrompt: ssh to ${tmuxName} failed (attempt ${attempt + 1}/${max}):`,
+      e?.message ?? e,
+    );
     return "retry";
   }
 }
@@ -144,7 +148,9 @@ async function pollChannelPrompt(
  * We keep polling after acceptance until Claude is actually working.
  */
 export async function autoAcceptChannelPrompt(
-  key: string, ip: string, tmuxName: string,
+  key: string,
+  ip: string,
+  tmuxName: string,
   opts?: { maxAttempts?: number; delayMs?: number },
 ): Promise<void> {
   const max = opts?.maxAttempts ?? 60;

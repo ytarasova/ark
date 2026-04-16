@@ -40,7 +40,7 @@ export type GateType = "auto" | "manual" | "condition" | "review";
 export interface FlowEdgeDefinition {
   from: string;
   to: string;
-  condition?: string;  // JS expression evaluated against session data
+  condition?: string; // JS expression evaluated against session data
   label?: string;
 }
 

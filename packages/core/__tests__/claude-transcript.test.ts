@@ -13,7 +13,7 @@ const parser = new ClaudeTranscriptParser();
 
 function writeTranscript(name: string, lines: Record<string, unknown>[]): string {
   const path = join(getCtx().arkDir, `${name}.jsonl`);
-  writeFileSync(path, lines.map(l => JSON.stringify(l)).join("\n") + "\n");
+  writeFileSync(path, lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
   return path;
 }
 
@@ -21,9 +21,26 @@ describe("ClaudeTranscriptParser.parse", () => {
   it("sums input and output tokens across assistant messages", () => {
     const path = writeTranscript("basic", [
       { type: "user", message: { role: "user", content: "hello" } },
-      { type: "assistant", message: { role: "assistant", usage: { input_tokens: 100, output_tokens: 50, cache_read_input_tokens: 200, cache_creation_input_tokens: 10 } } },
+      {
+        type: "assistant",
+        message: {
+          role: "assistant",
+          usage: {
+            input_tokens: 100,
+            output_tokens: 50,
+            cache_read_input_tokens: 200,
+            cache_creation_input_tokens: 10,
+          },
+        },
+      },
       { type: "user", message: { role: "user", content: "more" } },
-      { type: "assistant", message: { role: "assistant", usage: { input_tokens: 150, output_tokens: 75, cache_read_input_tokens: 300, cache_creation_input_tokens: 5 } } },
+      {
+        type: "assistant",
+        message: {
+          role: "assistant",
+          usage: { input_tokens: 150, output_tokens: 75, cache_read_input_tokens: 300, cache_creation_input_tokens: 5 },
+        },
+      },
     ]);
     const result = parser.parse(path);
     expect(result.usage.input_tokens).toBe(250);
@@ -74,8 +91,9 @@ describe("ClaudeTranscriptParser.findForSession", () => {
     const projectsDir = join(getCtx().arkDir, "fake-projects");
     const projDir = join(projectsDir, slug);
     mkdirSync(projDir, { recursive: true });
-    writeFileSync(join(projDir, "test-session-id.jsonl"),
-      JSON.stringify({ type: "assistant", message: { usage: { input_tokens: 42, output_tokens: 7 } } }) + "\n"
+    writeFileSync(
+      join(projDir, "test-session-id.jsonl"),
+      JSON.stringify({ type: "assistant", message: { usage: { input_tokens: 42, output_tokens: 7 } } }) + "\n",
     );
 
     const p = new ClaudeTranscriptParser(projectsDir, () => "test-session-id");

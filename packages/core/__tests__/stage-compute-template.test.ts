@@ -71,9 +71,7 @@ describe("StageDefinition compute_template field", () => {
   it("compute_template is undefined when not specified", () => {
     writeUserFlow("no-tmpl-flow", {
       name: "no-tmpl-flow",
-      stages: [
-        { name: "work", agent: "worker", gate: "auto" },
-      ],
+      stages: [{ name: "work", agent: "worker", gate: "auto" }],
     });
 
     const stage = getStage(app, "no-tmpl-flow", "work");
@@ -117,7 +115,7 @@ describe("resolveComputeForStage", () => {
     const stageDef = { name: "work", gate: "auto" as const, compute_template: "nonexistent" };
     const result = resolveComputeForStage(app, stageDef, "s-test", (m) => logs.push(m));
     expect(result).toBeNull();
-    expect(logs.some(l => l.includes("not found"))).toBe(true);
+    expect(logs.some((l) => l.includes("not found"))).toBe(true);
   });
 
   it("provisions compute from DB template when no existing compute", () => {
@@ -142,7 +140,7 @@ describe("resolveComputeForStage", () => {
 
     // Verify event was logged
     const events = app.events.list(session.id);
-    const provisionEvent = events.find(e => e.type === "compute_provisioned_from_template");
+    const provisionEvent = events.find((e) => e.type === "compute_provisioned_from_template");
     expect(provisionEvent).toBeDefined();
     expect(provisionEvent!.data?.template).toBe("fast-docker");
 
@@ -165,11 +163,11 @@ describe("resolveComputeForStage", () => {
 
     const result = resolveComputeForStage(app, stageDef, session.id, (m) => logs.push(m));
     expect(result).toBe("existing-compute");
-    expect(logs.some(l => l.includes("existing compute"))).toBe(true);
+    expect(logs.some((l) => l.includes("existing compute"))).toBe(true);
 
     // Verify no new provision event (reused existing)
     const events = app.events.list(session.id);
-    const provisionEvent = events.find(e => e.type === "compute_provisioned_from_template");
+    const provisionEvent = events.find((e) => e.type === "compute_provisioned_from_template");
     expect(provisionEvent).toBeUndefined();
 
     app.computes.delete("existing-compute");
@@ -178,9 +176,7 @@ describe("resolveComputeForStage", () => {
   it("resolves template from config when not in DB", () => {
     // Temporarily add to config
     const originalTemplates = app.config.computeTemplates;
-    app.config.computeTemplates = [
-      { name: "config-tmpl", provider: "docker", config: { image: "alpine" } },
-    ];
+    app.config.computeTemplates = [{ name: "config-tmpl", provider: "docker", config: { image: "alpine" } }];
 
     const session = app.sessions.create({ summary: "config-test" });
     const stageDef = { name: "build", gate: "auto" as const, compute_template: "config-tmpl" };

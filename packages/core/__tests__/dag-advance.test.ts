@@ -19,7 +19,9 @@ beforeAll(async () => {
   const flowsDir = join(getApp().config.arkDir, "flows");
   mkdirSync(flowsDir, { recursive: true });
   dagFlowPath = join(flowsDir, "test-dag.yaml");
-  writeFileSync(dagFlowPath, `
+  writeFileSync(
+    dagFlowPath,
+    `
 name: test-dag
 description: Test DAG flow with depends_on
 stages:
@@ -34,11 +36,14 @@ stages:
     agent: reviewer
     gate: auto
     depends_on: [implement]
-`);
+`,
+  );
 
   // Write a parallel DAG flow for fan-out / join testing
   parallelFlowPath = join(flowsDir, "test-dag-parallel.yaml");
-  writeFileSync(parallelFlowPath, `
+  writeFileSync(
+    parallelFlowPath,
+    `
 name: test-dag-parallel
 description: Test parallel DAG with fan-out and join
 stages:
@@ -57,7 +62,8 @@ stages:
     agent: implementer
     gate: auto
     depends_on: [implement, test]
-`);
+`,
+  );
 });
 
 afterAll(async () => {

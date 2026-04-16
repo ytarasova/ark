@@ -29,11 +29,15 @@ function makeAgent(overrides: Partial<AgentDefinition> & { name: string }): Agen
 
 describe("skill injection via buildClaudeArgs", () => {
   it("injects skill prompts into agent system prompt", () => {
-    getApp().skills.save("test-skill", {
-      name: "test-skill",
-      description: "test",
-      prompt: "Always write tests first.",
-    }, "global");
+    getApp().skills.save(
+      "test-skill",
+      {
+        name: "test-skill",
+        description: "test",
+        prompt: "Always write tests first.",
+      },
+      "global",
+    );
 
     const agent = makeAgent({ name: "test-agent", skills: ["test-skill"] });
     getApp().agents.save(agent.name, agent, "global");
@@ -70,17 +74,25 @@ describe("skill injection via buildClaudeArgs", () => {
   });
 
   it("injects multiple skills in order", () => {
-    getApp().skills.save("skill-a", {
-      name: "skill-a",
-      description: "first",
-      prompt: "Follow TDD methodology.",
-    }, "global");
+    getApp().skills.save(
+      "skill-a",
+      {
+        name: "skill-a",
+        description: "first",
+        prompt: "Follow TDD methodology.",
+      },
+      "global",
+    );
 
-    getApp().skills.save("skill-b", {
-      name: "skill-b",
-      description: "second",
-      prompt: "Use conventional commits.",
-    }, "global");
+    getApp().skills.save(
+      "skill-b",
+      {
+        name: "skill-b",
+        description: "second",
+        prompt: "Use conventional commits.",
+      },
+      "global",
+    );
 
     const agent = makeAgent({ name: "multi-skill-agent", skills: ["skill-a", "skill-b"] });
     getApp().agents.save(agent.name, agent, "global");

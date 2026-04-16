@@ -39,7 +39,11 @@ function createTempGitRepo(): string {
   const dir = mkdtempSync(join(tmpdir(), "ark-commit-test-"));
   execFileSync("git", ["init"], { cwd: dir });
   execFileSync("git", ["checkout", "-b", "test-branch"], { cwd: dir });
-  execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "--allow-empty", "-m", "initial"], { cwd: dir });
+  execFileSync(
+    "git",
+    ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "--allow-empty", "-m", "initial"],
+    { cwd: dir },
+  );
   return dir;
 }
 
@@ -86,7 +90,9 @@ describe("Commit verification: uncommitted changes", () => {
     // Create and commit a file first
     writeFileSync(join(gitDir, "existing.ts"), "export const v = 1;");
     execFileSync("git", ["add", "existing.ts"], { cwd: gitDir });
-    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "-m", "add existing"], { cwd: gitDir });
+    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "-m", "add existing"], {
+      cwd: gitDir,
+    });
 
     const session = app.sessions.create({ summary: "modified tracked test", flow: "quick" });
     app.sessions.update(session.id, {
@@ -113,7 +119,9 @@ describe("Commit verification: uncommitted changes", () => {
     // Add and commit a real change so the commit check passes
     writeFileSync(join(gitDir, "feature.ts"), "export const x = 1;");
     execFileSync("git", ["add", "feature.ts"], { cwd: gitDir });
-    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "-m", "add feature"], { cwd: gitDir });
+    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "-m", "add feature"], {
+      cwd: gitDir,
+    });
 
     const session = app.sessions.create({ summary: "untracked only test", flow: "quick" });
     app.sessions.update(session.id, {
@@ -140,7 +148,9 @@ describe("Commit verification: uncommitted changes", () => {
     // Create and commit a change
     writeFileSync(join(gitDir, "feature.ts"), "export const x = 1;");
     execFileSync("git", ["add", "feature.ts"], { cwd: gitDir });
-    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "-m", "add feature"], { cwd: gitDir });
+    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "-m", "add feature"], {
+      cwd: gitDir,
+    });
 
     const session = app.sessions.create({ summary: "clean test", flow: "quick" });
     app.sessions.update(session.id, {
@@ -210,7 +220,7 @@ describe("Commit verification: rejection events", () => {
     const result = applyReport(app, session.id, makeReport(session.id, "implement"));
 
     // Should have completion_rejected event with file info
-    const rejectionEvent = result.logEvents!.find(e => e.type === "completion_rejected");
+    const rejectionEvent = result.logEvents!.find((e) => e.type === "completion_rejected");
     expect(rejectionEvent).toBeTruthy();
     expect(rejectionEvent!.opts.data?.reason).toBe("uncommitted changes in worktree");
     expect(rejectionEvent!.opts.data?.files).toBeTruthy();
@@ -250,9 +260,13 @@ describe("Commit verification: rejection events", () => {
     writeFileSync(join(gitDir, "dirty.ts"), "const x = 1;");
     execFileSync("git", ["add", "dirty.ts"], { cwd: gitDir });
 
-    const result = applyReport(app, session.id, makeReport(session.id, "implement", {
-      summary: "My work summary",
-    } as any));
+    const result = applyReport(
+      app,
+      session.id,
+      makeReport(session.id, "implement", {
+        summary: "My work summary",
+      } as any),
+    );
 
     // Completion data should still be saved to config even though completion is rejected
     expect(result.updates.config).toBeTruthy();
@@ -285,7 +299,8 @@ describe("Per-stage commit verification via stage_start_sha", () => {
 
     // Record initial HEAD as stage_start_sha (simulating what dispatch does)
     const headSha = execFileSync("git", ["rev-parse", "HEAD"], {
-      cwd: gitDir, encoding: "utf-8",
+      cwd: gitDir,
+      encoding: "utf-8",
     }).trim();
 
     const session = app.sessions.create({ summary: "no stage commits", flow: "quick" });
@@ -310,13 +325,16 @@ describe("Per-stage commit verification via stage_start_sha", () => {
 
     // Record initial HEAD as stage_start_sha
     const startSha = execFileSync("git", ["rev-parse", "HEAD"], {
-      cwd: gitDir, encoding: "utf-8",
+      cwd: gitDir,
+      encoding: "utf-8",
     }).trim();
 
     // Make a commit (simulating agent work during the stage)
     writeFileSync(join(gitDir, "feature.ts"), "export const x = 1;");
     execFileSync("git", ["add", "feature.ts"], { cwd: gitDir });
-    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "-m", "stage work"], { cwd: gitDir });
+    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "-m", "stage work"], {
+      cwd: gitDir,
+    });
 
     const session = app.sessions.create({ summary: "has stage commits", flow: "quick" });
     app.sessions.update(session.id, {
@@ -341,11 +359,16 @@ describe("Per-stage commit verification via stage_start_sha", () => {
     // Simulate a prior stage making commits
     writeFileSync(join(gitDir, "prior-stage.ts"), "export const prior = true;");
     execFileSync("git", ["add", "prior-stage.ts"], { cwd: gitDir });
-    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "-m", "prior stage commit"], { cwd: gitDir });
+    execFileSync(
+      "git",
+      ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "-m", "prior stage commit"],
+      { cwd: gitDir },
+    );
 
     // Record HEAD now as stage_start_sha (this stage starts here)
     const startSha = execFileSync("git", ["rev-parse", "HEAD"], {
-      cwd: gitDir, encoding: "utf-8",
+      cwd: gitDir,
+      encoding: "utf-8",
     }).trim();
 
     // No new commits after stage started
@@ -370,7 +393,8 @@ describe("Per-stage commit verification via stage_start_sha", () => {
   it("includes stage_start_sha in completion_rejected event data", () => {
     const gitDir = createTempGitRepo();
     const headSha = execFileSync("git", ["rev-parse", "HEAD"], {
-      cwd: gitDir, encoding: "utf-8",
+      cwd: gitDir,
+      encoding: "utf-8",
     }).trim();
 
     const session = app.sessions.create({ summary: "rejection sha test", flow: "quick" });
@@ -384,7 +408,7 @@ describe("Per-stage commit verification via stage_start_sha", () => {
 
     const result = applyReport(app, session.id, makeReport(session.id, "implement"));
 
-    const rejectionEvent = result.logEvents!.find(e => e.type === "completion_rejected");
+    const rejectionEvent = result.logEvents!.find((e) => e.type === "completion_rejected");
     expect(rejectionEvent).toBeTruthy();
     expect(rejectionEvent!.opts.data?.stage_start_sha).toBe(headSha);
   });
@@ -395,7 +419,9 @@ describe("Per-stage commit verification via stage_start_sha", () => {
     // Make a commit so origin/main..HEAD fallback finds something
     writeFileSync(join(gitDir, "feature.ts"), "export const x = 1;");
     execFileSync("git", ["add", "feature.ts"], { cwd: gitDir });
-    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "-m", "work"], { cwd: gitDir });
+    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "-m", "work"], {
+      cwd: gitDir,
+    });
 
     const session = app.sessions.create({ summary: "no sha fallback", flow: "quick" });
     app.sessions.update(session.id, {
@@ -420,7 +446,8 @@ describe("Per-stage commit verification in applyHookStatus (SessionEnd)", () => 
   it("rejects auto-advance when HEAD matches stage_start_sha on SessionEnd", () => {
     const gitDir = createTempGitRepo();
     const headSha = execFileSync("git", ["rev-parse", "HEAD"], {
-      cwd: gitDir, encoding: "utf-8",
+      cwd: gitDir,
+      encoding: "utf-8",
     }).trim();
 
     const session = app.sessions.create({ summary: "hook no commits", flow: "quick" });
@@ -445,13 +472,16 @@ describe("Per-stage commit verification in applyHookStatus (SessionEnd)", () => 
   it("allows auto-advance when HEAD differs from stage_start_sha on SessionEnd", () => {
     const gitDir = createTempGitRepo();
     const startSha = execFileSync("git", ["rev-parse", "HEAD"], {
-      cwd: gitDir, encoding: "utf-8",
+      cwd: gitDir,
+      encoding: "utf-8",
     }).trim();
 
     // Make a commit during the stage
     writeFileSync(join(gitDir, "feature.ts"), "export const x = 1;");
     execFileSync("git", ["add", "feature.ts"], { cwd: gitDir });
-    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "-m", "stage work"], { cwd: gitDir });
+    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "-m", "stage work"], {
+      cwd: gitDir,
+    });
 
     const session = app.sessions.create({ summary: "hook has commits", flow: "quick" });
     app.sessions.update(session.id, {
@@ -477,7 +507,9 @@ describe("Per-stage commit verification in applyHookStatus (SessionEnd)", () => 
     // Make a commit so there's content on branch
     writeFileSync(join(gitDir, "feature.ts"), "export const x = 1;");
     execFileSync("git", ["add", "feature.ts"], { cwd: gitDir });
-    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "-m", "work"], { cwd: gitDir });
+    execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@test.com", "commit", "-m", "work"], {
+      cwd: gitDir,
+    });
 
     const session = app.sessions.create({ summary: "hook no sha", flow: "quick" });
     app.sessions.update(session.id, {

@@ -38,9 +38,15 @@ class BunSqliteShim {
   prepare(sql: string) {
     const stmt = this._db.prepare(sql);
     return {
-      run(...params: any[]) { return stmt.run(...params); },
-      get(...params: any[]) { return stmt.get(...params); },
-      all(...params: any[]) { return stmt.all(...params); },
+      run(...params: any[]) {
+        return stmt.run(...params);
+      },
+      get(...params: any[]) {
+        return stmt.get(...params);
+      },
+      all(...params: any[]) {
+        return stmt.all(...params);
+      },
       pluck(_flag = true) {
         return {
           get(...p: any[]) {
@@ -52,14 +58,18 @@ class BunSqliteShim {
           },
         };
       },
-      bind(..._params: any[]) { return stmt; },
+      bind(..._params: any[]) {
+        return stmt;
+      },
       [Symbol.iterator](...params: any[]) {
         return stmt.all(...params)[Symbol.iterator]();
       },
     };
   }
 
-  run(sql: string): void { this._db.run(sql); }
+  run(sql: string): void {
+    this._db.run(sql);
+  }
 
   transaction(fn: (...args: any[]) => any) {
     return (...args: any[]) => {
@@ -75,9 +85,13 @@ class BunSqliteShim {
     };
   }
 
-  close(): void { this._db.close(); }
+  close(): void {
+    this._db.close();
+  }
 
-  get open(): boolean { return true; }
+  get open(): boolean {
+    return true;
+  }
 }
 
 /**

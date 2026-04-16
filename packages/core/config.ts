@@ -103,8 +103,7 @@ function loadYamlConfig(arkDir: string): Record<string, unknown> {
 
 export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
   const arkDir = overrides?.arkDir ?? process.env.ARK_TEST_DIR ?? join(homedir(), ".ark");
-  const conductorPort = overrides?.conductorPort
-    ?? parseInt(process.env.ARK_CONDUCTOR_PORT ?? "19100", 10);
+  const conductorPort = overrides?.conductorPort ?? parseInt(process.env.ARK_CONDUCTOR_PORT ?? "19100", 10);
 
   // Load user config from ~/.ark/config.yaml
   const yaml = overrides?.env === "test" ? {} : loadYamlConfig(arkDir);
@@ -116,7 +115,9 @@ export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
     worktreesDir: join(arkDir, "worktrees"),
     logDir: join(arkDir, "logs"),
     conductorPort,
-    conductorUrl: process.env.ARK_CONDUCTOR_URL ?? (conductorPort !== 19100 ? `http://localhost:${conductorPort}` : DEFAULT_CONDUCTOR_URL),
+    conductorUrl:
+      process.env.ARK_CONDUCTOR_URL ??
+      (conductorPort !== 19100 ? `http://localhost:${conductorPort}` : DEFAULT_CONDUCTOR_URL),
     arkdPort: overrides?.arkdPort ?? parseInt(process.env.ARK_ARKD_PORT ?? "19300", 10),
     env: process.env.ARK_TEST_DIR !== undefined ? "test" : "production",
     otlp: {
@@ -142,8 +143,7 @@ export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
       autoStart: (yaml.router as Record<string, unknown>)?.auto_start === true,
     },
     knowledge: {
-      autoIndex: (yaml.knowledge as Record<string, unknown>)?.auto_index === true
-        || process.env.ARK_AUTO_INDEX === "1",
+      autoIndex: (yaml.knowledge as Record<string, unknown>)?.auto_index === true || process.env.ARK_AUTO_INDEX === "1",
       incrementalIndex: (yaml.knowledge as Record<string, unknown>)?.incremental_index !== false,
     },
     default_compute: process.env.ARK_DEFAULT_COMPUTE ?? (yaml.default_compute as string) ?? null,
@@ -153,19 +153,23 @@ export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
     notifications: yaml.notifications as boolean | undefined,
     auth: {
       enabled: (yaml.auth as Record<string, unknown>)?.enabled === true,
-      apiKeyEnabled: (yaml.auth as Record<string, unknown>)?.apiKeyEnabled === true
-        || (yaml.auth as Record<string, unknown>)?.api_key_enabled === true,
+      apiKeyEnabled:
+        (yaml.auth as Record<string, unknown>)?.apiKeyEnabled === true ||
+        (yaml.auth as Record<string, unknown>)?.api_key_enabled === true,
     },
     tensorZero: {
-      enabled: process.env.ARK_TENSORZERO_ENABLED === "1"
-        || (yaml.tensorzero as Record<string, unknown>)?.enabled === true
-        || (yaml.tensor_zero as Record<string, unknown>)?.enabled === true,
+      enabled:
+        process.env.ARK_TENSORZERO_ENABLED === "1" ||
+        (yaml.tensorzero as Record<string, unknown>)?.enabled === true ||
+        (yaml.tensor_zero as Record<string, unknown>)?.enabled === true,
       port: parseInt(process.env.ARK_TENSORZERO_PORT ?? "3000", 10),
-      configDir: (yaml.tensorzero as Record<string, unknown>)?.config_dir as string
-        ?? (yaml.tensor_zero as Record<string, unknown>)?.config_dir as string
-        ?? undefined,
-      autoStart: (yaml.tensorzero as Record<string, unknown>)?.auto_start === true
-        || (yaml.tensor_zero as Record<string, unknown>)?.auto_start === true,
+      configDir:
+        ((yaml.tensorzero as Record<string, unknown>)?.config_dir as string) ??
+        ((yaml.tensor_zero as Record<string, unknown>)?.config_dir as string) ??
+        undefined,
+      autoStart:
+        (yaml.tensorzero as Record<string, unknown>)?.auto_start === true ||
+        (yaml.tensor_zero as Record<string, unknown>)?.auto_start === true,
     },
     computeTemplates: parseComputeTemplates(yaml.compute_templates),
     databaseUrl: process.env.DATABASE_URL ?? (yaml.database_url as string) ?? undefined,

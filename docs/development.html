@@ -16,7 +16,6 @@
       <a href="quickstart.html">Quick Start</a>
       <a href="concepts.html">Core Concepts</a>
       <div class="section-title">Guides</div>
-      <a href="tui.html">TUI Dashboard</a>
       <a href="web.html">Web Dashboard</a>
       <a href="cli.html">CLI Reference</a>
       <a href="configuration.html">Configuration</a>
@@ -73,11 +72,11 @@
 <span class="prompt">$</span> make install   <span class="comment"># bun install + symlink ark to /usr/local/bin</span></code></pre>
 
       <h2>Development Workflow</h2>
-      <pre><code><span class="comment"># Hot-reload: TypeScript watch + web dev server</span>
+      <pre><code><span class="comment"># Hot-reload: API (:8420) + Vite HMR (:5173)</span>
 <span class="prompt">$</span> make dev
 
-<span class="comment"># Run the TUI from source</span>
-<span class="prompt">$</span> make tui
+<span class="comment"># Hot-reload: server daemon (conductor + arkd + WS)</span>
+<span class="prompt">$</span> make dev-daemon
 
 <span class="comment"># Launch just the web dev server (needs separate ark web on :8420)</span>
 <span class="prompt">$</span> make dev-web
@@ -102,7 +101,6 @@
   router/    <span class="comment">LLM Router (OpenAI-compatible proxy)</span>
   server/    <span class="comment">JSON-RPC handlers</span>
   protocol/  <span class="comment">ArkClient (typed JSON-RPC client)</span>
-  tui/       <span class="comment">React + Ink terminal dashboard</span>
   web/       <span class="comment">Vite-based web dashboard</span>
   desktop/   <span class="comment">Electron shell wrapping the web dashboard</span>
   types/     <span class="comment">Domain interfaces (Session, Compute, Event, etc.)</span>
@@ -143,7 +141,7 @@ recipes/     <span class="comment">8 recipe templates (YAML)</span></code></pre>
 <span class="comment"># Run a single test file</span>
 <span class="prompt">$</span> make test-file F=packages/core/__tests__/session.test.ts
 
-<span class="comment"># Run E2E tests (TUI + Web)</span>
+<span class="comment"># Run E2E tests (Web + Desktop)</span>
 <span class="prompt">$</span> make test-e2e
 
 <span class="comment"># Watch mode</span>
@@ -189,7 +187,7 @@ it(<span class="string">"creates a session"</span>, () => {
       <pre><code><span class="comment"># Build first, then run E2E</span>
 <span class="prompt">$</span> make dev  <span class="comment"># or just tsc</span>
 <span class="prompt">$</span> make test-e2e</code></pre>
-      <p>TUI E2E tests use a browser harness (xterm.js + real pty + real tmux). Web E2E tests use Playwright.</p>
+      <p>Web E2E tests use Playwright against the web dashboard.</p>
 
       <h2>Building</h2>
       <pre><code><span class="comment"># Build CLI binary + web frontend</span>
@@ -219,7 +217,7 @@ it(<span class="string">"creates a session"</span>, () => {
       <ul>
         <li>TypeScript with <code>strict: false</code> (implicit <code>any</code> allowed, no strict null checks)</li>
         <li>ES modules (<code>"type": "module"</code>) -- always use <code>.js</code> import extensions even in TypeScript</li>
-        <li>React + Ink for TUI components, React + Vite + Tailwind for Web</li>
+        <li>React + Vite + Tailwind for Web and Desktop</li>
         <li>YAML for agent/flow/runtime/recipe definitions</li>
         <li>SQLite for local, PostgreSQL for hosted mode (via <code>IDatabase</code> abstraction, no ORM)</li>
         <li>Never use em dashes (U+2014) -- use hyphens (-) or double dashes (--) instead</li>

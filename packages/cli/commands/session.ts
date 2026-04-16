@@ -24,7 +24,8 @@ async function forkCloneHandler(id: string, opts: { task?: string; group?: strin
 export function registerSessionCommands(program: Command) {
   const session = program.command("session").description("Manage SDLC flow sessions");
 
-  session.command("start")
+  session
+    .command("start")
     .description("Start a new session")
     .argument("[ticket]", "External ticket reference (Jira key, GitHub issue, etc.)")
     .option("-r, --repo <path>", "Repository path or name")
@@ -63,13 +64,21 @@ export function registerSessionCommands(program: Command) {
       if (opts.claudeSession) {
         const cs = await core.getClaudeSession(core.getApp(), opts.claudeSession);
         if (!cs) {
-          console.log(chalk.red(`Claude session '${opts.claudeSession}' not found. Run 'ark claude list' to see available sessions.`));
+          console.log(
+            chalk.red(
+              `Claude session '${opts.claudeSession}' not found. Run 'ark claude list' to see available sessions.`,
+            ),
+          );
           return;
         }
         claudeSessionId = cs.sessionId;
         if (!opts.summary) opts.summary = cs.summary?.slice(0, 100) || `Imported from ${cs.sessionId.slice(0, 8)}`;
-        if (!repo) { repo = cs.project; }
-        if (!workdir) { workdir = cs.project; }
+        if (!repo) {
+          repo = cs.project;
+        }
+        if (!workdir) {
+          workdir = cs.project;
+        }
         console.log(chalk.dim(`Importing Claude session ${cs.sessionId.slice(0, 8)} from ${cs.project}`));
       }
 
@@ -87,11 +96,14 @@ export function registerSessionCommands(program: Command) {
           if (!opts.flow || opts.flow === "default") opts.flow = instance.flow;
           if (!opts.compute && instance.compute) opts.compute = instance.compute;
           if (!opts.group && instance.group) opts.group = instance.group;
-          if (!repo && instance.repo) { repo = instance.repo; }
+          if (!repo && instance.repo) {
+            repo = instance.repo;
+          }
           recipeAgent = instance.agent;
           console.log(chalk.dim(`Using recipe '${recipe.name}' (${recipe._source})`));
         } catch {
-          console.error(chalk.red(`Recipe not found: ${opts.recipe}`)); process.exit(1);
+          console.error(chalk.red(`Recipe not found: ${opts.recipe}`));
+          process.exit(1);
         }
       }
 
@@ -118,16 +130,22 @@ export function registerSessionCommands(program: Command) {
       if (summary !== rawName) console.log(`Note: session name sanitized to "${summary}"`);
 
       const s = await ark.sessionStart({
-        ticket, summary,
-        repo, flow: opts.flow, compute_name: opts.compute,
+        ticket,
+        summary,
+        repo,
+        flow: opts.flow,
+        compute_name: opts.compute,
         agent: recipeAgent,
-        workdir, group_name: opts.group,
+        workdir,
+        group_name: opts.group,
         ...(sessionConfig ? { config: sessionConfig } : {}),
       });
 
       if (claudeSessionId) {
         await ark.sessionUpdate(s.id, { claude_session_id: claudeSessionId });
-        console.log(chalk.dim(`  Bound to Claude session: ${claudeSessionId.slice(0, 8)} (will use --resume on dispatch)`));
+        console.log(
+          chalk.dim(`  Bound to Claude session: ${claudeSessionId.slice(0, 8)} (will use --resume on dispatch)`),
+        );
       }
 
       console.log(chalk.green(`Session ${s.id} created`));
@@ -152,7 +170,8 @@ export function registerSessionCommands(program: Command) {
       }
     });
 
-  session.command("list")
+  session
+    .command("list")
     .description("List all sessions")
     .addOption(new Option("-s, --status <status>", "Filter by status").choices(SESSION_STATUSES as unknown as string[]))
     .option("-r, --repo <repo>", "Filter by repo")
@@ -163,18 +182,30 @@ export function registerSessionCommands(program: Command) {
       const filters: Record<string, unknown> = { ...opts, groupPrefix: core.profileGroupPrefix() || undefined };
       if (opts.archived) filters.status = "archived";
       delete filters.archived;
-      const sessions = await ark.sessionList(filters as import("../../types/index.js").SessionListParams & Record<string, unknown>);
+      const sessions = await ark.sessionList(
+        filters as import("../../types/index.js").SessionListParams & Record<string, unknown>,
+      );
       if (!sessions.length) {
         console.log(chalk.dim("No sessions. Start one: ark session start --repo . --summary 'task'"));
         return;
       }
       const icons: Record<string, string> = {
-        running: "●", waiting: "⏸", pending: "○", ready: "◎",
-        completed: "✓", failed: "✕", blocked: "■", archived: "▪",
+        running: "●",
+        waiting: "⏸",
+        pending: "○",
+        ready: "◎",
+        completed: "✓",
+        failed: "✕",
+        blocked: "■",
+        archived: "▪",
       };
       const colors: Record<string, (s: string) => string> = {
-        running: chalk.blue, waiting: chalk.yellow, completed: chalk.green,
-        failed: chalk.red, blocked: chalk.yellow, archived: chalk.dim,
+        running: chalk.blue,
+        waiting: chalk.yellow,
+        completed: chalk.green,
+        failed: chalk.red,
+        blocked: chalk.yellow,
+        archived: chalk.dim,
       };
       for (const s of sessions) {
         const icon = icons[s.status] ?? "?";
@@ -185,13 +216,17 @@ export function registerSessionCommands(program: Command) {
       }
     });
 
-  session.command("show")
+  session
+    .command("show")
     .description("Show session details")
     .argument("<id>", "Session ID")
     .action(async (id) => {
       const ark = await getArkClient();
       const { session: s } = await ark.sessionRead(id);
-      if (!s) { console.log(chalk.red(`Session ${id} not found`)); return; }
+      if (!s) {
+        console.log(chalk.red(`Session ${id} not found`));
+        return;
+      }
       console.log(chalk.bold(`\n${s.ticket ?? s.id}: ${s.summary ?? ""}`));
       console.log(`  ID:       ${s.id}`);
       console.log(`  Status:   ${s.status}`);
@@ -203,7 +238,8 @@ export function registerSessionCommands(program: Command) {
       if (s.breakpoint_reason) console.log(chalk.yellow(`  Waiting:  ${s.breakpoint_reason}`));
     });
 
-  session.command("dispatch")
+  session
+    .command("dispatch")
     .description("Dispatch the agent for the current stage")
     .argument("<id>", "Session ID")
     .action(async (id) => {
@@ -212,7 +248,8 @@ export function registerSessionCommands(program: Command) {
       console.log(r.ok ? chalk.green(r.message) : chalk.red(r.message));
     });
 
-  session.command("stop")
+  session
+    .command("stop")
     .description("Stop a session")
     .argument("<id>")
     .action(async (id) => {
@@ -225,7 +262,8 @@ export function registerSessionCommands(program: Command) {
       }
     });
 
-  session.command("resume")
+  session
+    .command("resume")
     .description("Resume a stopped/paused session")
     .argument("<id>")
     .action(async (id) => {
@@ -234,7 +272,8 @@ export function registerSessionCommands(program: Command) {
       console.log(r.ok ? chalk.green(r.message) : chalk.red(r.message));
     });
 
-  session.command("advance")
+  session
+    .command("advance")
     .description("Advance to the next flow stage")
     .argument("<id>")
     .option("-f, --force", "Force past gate")
@@ -244,7 +283,8 @@ export function registerSessionCommands(program: Command) {
       console.log(r.ok ? chalk.green(r.message) : chalk.red(r.message));
     });
 
-  session.command("complete")
+  session
+    .command("complete")
     .description("Mark current stage done and advance")
     .argument("<id>")
     .option("--force", "Skip verification checks")
@@ -269,7 +309,8 @@ export function registerSessionCommands(program: Command) {
       }
     });
 
-  session.command("pause")
+  session
+    .command("pause")
     .description("Pause a session")
     .argument("<id>")
     .option("-r, --reason <text>")
@@ -279,7 +320,8 @@ export function registerSessionCommands(program: Command) {
       console.log(r.ok ? chalk.yellow("Paused") : chalk.red(r.message));
     });
 
-  session.command("interrupt")
+  session
+    .command("interrupt")
     .description("Interrupt a running agent (Ctrl+C) without killing the session")
     .argument("<id>", "Session ID")
     .action(async (id) => {
@@ -288,7 +330,8 @@ export function registerSessionCommands(program: Command) {
       console.log(result.ok ? chalk.green(result.message) : chalk.red(result.message));
     });
 
-  session.command("archive")
+  session
+    .command("archive")
     .description("Archive a session for later reference")
     .argument("<id>", "Session ID")
     .action(async (id) => {
@@ -297,7 +340,8 @@ export function registerSessionCommands(program: Command) {
       console.log(result.ok ? chalk.green(result.message) : chalk.red(result.message));
     });
 
-  session.command("restore")
+  session
+    .command("restore")
     .description("Restore an archived session")
     .argument("<id>", "Session ID")
     .action(async (id) => {
@@ -306,24 +350,32 @@ export function registerSessionCommands(program: Command) {
       console.log(result.ok ? chalk.green(result.message) : chalk.red(result.message));
     });
 
-  session.command("attach")
+  session
+    .command("attach")
     .description("Attach to a running agent session")
     .argument("<id>")
     .action(async (id) => {
       const ark = await getArkClient();
       let { session: s } = await ark.sessionRead(id);
-      if (!s) { console.log(chalk.red("Not found")); return; }
+      if (!s) {
+        console.log(chalk.red("Not found"));
+        return;
+      }
       if (!s.session_id) {
         console.log(chalk.yellow("No active session. Dispatching..."));
         const r = await ark.sessionDispatch(id);
-        if (!r.ok) { console.log(chalk.red(r.message)); return; }
+        if (!r.ok) {
+          console.log(chalk.red(r.message));
+          return;
+        }
         s = (await ark.sessionRead(id)).session;
       }
       const cmd = core.attachCommand(s.session_id!);
       execSync(cmd, { stdio: "inherit" });
     });
 
-  session.command("output")
+  session
+    .command("output")
     .description("Show live output from a running session")
     .argument("<id>")
     .option("-n, --lines <n>", "Number of lines", "30")
@@ -333,7 +385,8 @@ export function registerSessionCommands(program: Command) {
       console.log(output || chalk.dim("No output"));
     });
 
-  session.command("send")
+  session
+    .command("send")
     .description("Send a message to a running Claude session")
     .argument("<id>")
     .argument("<message>")
@@ -347,7 +400,8 @@ export function registerSessionCommands(program: Command) {
       }
     });
 
-  session.command("undelete")
+  session
+    .command("undelete")
     .description("Restore a recently deleted session (within 90s)")
     .argument("<id>")
     .action(async (id) => {
@@ -360,7 +414,8 @@ export function registerSessionCommands(program: Command) {
       }
     });
 
-  session.command("fork")
+  session
+    .command("fork")
     .description("Fork a session (branches the conversation)")
     .argument("<id>")
     .option("-t, --task <text>", "Task description for forked session")
@@ -368,7 +423,8 @@ export function registerSessionCommands(program: Command) {
     .option("-d, --dispatch", "Auto-dispatch")
     .action(forkCloneHandler);
 
-  session.command("clone")
+  session
+    .command("clone")
     .description("Alias for fork (branches the conversation)")
     .argument("<id>")
     .option("-t, --task <text>", "Task description for forked session")
@@ -376,7 +432,8 @@ export function registerSessionCommands(program: Command) {
     .option("-d, --dispatch", "Auto-dispatch")
     .action(forkCloneHandler);
 
-  session.command("todo")
+  session
+    .command("todo")
     .description("Manage session verification todos")
     .argument("<action>", "add|list|done|delete")
     .argument("<session-id>", "Session ID")
@@ -396,13 +453,19 @@ export function registerSessionCommands(program: Command) {
           break;
         }
         case "add": {
-          if (!text) { console.log(chalk.red("Usage: ark session todo add <session-id> <content>")); return; }
+          if (!text) {
+            console.log(chalk.red("Usage: ark session todo add <session-id> <content>"));
+            return;
+          }
           const todo = core.getApp().todos.add(id, text);
           console.log(chalk.green(`Added todo #${todo.id}: ${todo.content}`));
           break;
         }
         case "done": {
-          if (!text) { console.log(chalk.red("Usage: ark session todo done <session-id> <todo-id>")); return; }
+          if (!text) {
+            console.log(chalk.red("Usage: ark session todo done <session-id> <todo-id>"));
+            return;
+          }
           const todo = core.getApp().todos.toggle(parseInt(text, 10));
           if (todo) {
             console.log(chalk.green(`Todo #${todo.id} ${todo.done ? "done" : "undone"}`));
@@ -412,7 +475,10 @@ export function registerSessionCommands(program: Command) {
           break;
         }
         case "delete": {
-          if (!text) { console.log(chalk.red("Usage: ark session todo delete <session-id> <todo-id>")); return; }
+          if (!text) {
+            console.log(chalk.red("Usage: ark session todo delete <session-id> <todo-id>"));
+            return;
+          }
           const ok = core.getApp().todos.delete(parseInt(text, 10));
           console.log(ok ? chalk.green("Deleted") : chalk.red("Not found"));
           break;
@@ -422,7 +488,8 @@ export function registerSessionCommands(program: Command) {
       }
     });
 
-  session.command("verify")
+  session
+    .command("verify")
     .description("Run verification scripts for a session")
     .argument("<id>", "Session ID")
     .action(async (id) => {
@@ -447,7 +514,8 @@ export function registerSessionCommands(program: Command) {
       }
     });
 
-  session.command("handoff")
+  session
+    .command("handoff")
     .description("Hand off to a different agent")
     .argument("<id>")
     .argument("<agent>")
@@ -458,7 +526,8 @@ export function registerSessionCommands(program: Command) {
       console.log(r.ok ? chalk.green(r.message) : chalk.red(r.message));
     });
 
-  session.command("spawn")
+  session
+    .command("spawn")
     .description("Spawn a child session for parallel work")
     .argument("<parent-id>")
     .argument("<task>")
@@ -483,7 +552,8 @@ export function registerSessionCommands(program: Command) {
       }
     });
 
-  session.command("spawn-subagent")
+  session
+    .command("spawn-subagent")
     .description("Spawn a subagent with optional model/agent override")
     .argument("<parent-id>")
     .argument("<task>")
@@ -510,7 +580,8 @@ export function registerSessionCommands(program: Command) {
       }
     });
 
-  session.command("join")
+  session
+    .command("join")
     .description("Join all forked children")
     .argument("<parent-id>")
     .option("-f, --force")
@@ -520,12 +591,13 @@ export function registerSessionCommands(program: Command) {
       console.log(r.ok ? chalk.green(r.message) : chalk.yellow(r.message));
     });
 
-  session.command("events")
+  session
+    .command("events")
     .description("Show event history")
     .argument("<id>")
     .action(async (id) => {
       const ark = await getArkClient();
-      const { formatEvent } = await import("../../tui/helpers/formatEvent.js");
+      const { formatEvent } = await import("../helpers.js");
       const events = await ark.sessionEvents(id);
       for (const e of events) {
         const ts = e.created_at.slice(11, 16);
@@ -534,7 +606,8 @@ export function registerSessionCommands(program: Command) {
       }
     });
 
-  session.command("delete")
+  session
+    .command("delete")
     .description("Delete sessions")
     .argument("<ids...>")
     .action(async (ids: string[]) => {
@@ -550,7 +623,8 @@ export function registerSessionCommands(program: Command) {
       }
     });
 
-  session.command("group")
+  session
+    .command("group")
     .description("Assign a session to a group")
     .argument("<id>")
     .argument("<group>")
@@ -560,7 +634,8 @@ export function registerSessionCommands(program: Command) {
       console.log(chalk.green(`${id} → group '${group}'`));
     });
 
-  session.command("export")
+  session
+    .command("export")
     .description("Export session to file")
     .argument("<id>")
     .argument("[file]")
@@ -573,7 +648,8 @@ export function registerSessionCommands(program: Command) {
       }
     });
 
-  session.command("import")
+  session
+    .command("import")
     .description("Import session from file")
     .argument("<file>")
     .action((file) => {

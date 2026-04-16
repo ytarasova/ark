@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 import {
-  configureOtlp, resetOtlp, startSpan, endSpan, getSpanBuffer, flushSpans,
+  configureOtlp,
+  resetOtlp,
+  startSpan,
+  endSpan,
+  getSpanBuffer,
+  flushSpans,
   type OtlpConfig,
 } from "../observability/otlp.js";
 
@@ -31,12 +36,17 @@ describe("OTLP span builder", () => {
   it("child span has correct parentSpanId", () => {
     configureOtlp({ enabled: true, endpoint: "http://localhost:4318/v1/traces" });
     const parentId = startSpan({ name: "session", traceId: "trace-1", attributes: {} });
-    const childId = startSpan({ name: "stage:plan", traceId: "trace-1", parentSpanId: parentId, attributes: { "stage.name": "plan" } });
+    const childId = startSpan({
+      name: "stage:plan",
+      traceId: "trace-1",
+      parentSpanId: parentId,
+      attributes: { "stage.name": "plan" },
+    });
     endSpan(childId);
     endSpan(parentId);
     const buffer = getSpanBuffer();
     expect(buffer.length).toBe(2);
-    const child = buffer.find(s => s.name === "stage:plan");
+    const child = buffer.find((s) => s.name === "stage:plan");
     expect(child!.parentSpanId).toBe(parentId);
   });
 

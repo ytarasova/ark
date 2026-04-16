@@ -34,7 +34,7 @@ describe("buildContext token budget", () => {
         type: "memory",
         label: `Memory about topic ${i} with keywords for search`,
         content: `Detailed content about topic ${i} for testing budget limits`.repeat(5),
-        metadata: { importance: 0.5 + (i * 0.02), scope: "global" },
+        metadata: { importance: 0.5 + i * 0.02, scope: "global" },
       });
     }
 
@@ -45,10 +45,33 @@ describe("buildContext token budget", () => {
 
   it("default limits are 5 files, 3 memories, 3 sessions, 2 learnings, 2 skills", () => {
     for (let i = 0; i < 10; i++) {
-      store.addNode({ id: `file:src/f${i}.ts`, type: "file", label: `src/f${i}.ts`, content: "test file content", metadata: { language: "typescript" } });
-      store.addNode({ id: `memory:m${i}`, type: "memory", label: `Memory ${i} test`, content: `test content ${i}`, metadata: { importance: 0.5, scope: "global" } });
-      store.addNode({ id: `session:s${i}`, type: "session", label: `Session ${i} test`, content: `session content ${i}`, metadata: { outcome: "success", files_changed: [] } });
-      store.addNode({ id: `learning:l${i}`, type: "learning", label: `Learning ${i} test`, content: `learning content ${i}` });
+      store.addNode({
+        id: `file:src/f${i}.ts`,
+        type: "file",
+        label: `src/f${i}.ts`,
+        content: "test file content",
+        metadata: { language: "typescript" },
+      });
+      store.addNode({
+        id: `memory:m${i}`,
+        type: "memory",
+        label: `Memory ${i} test`,
+        content: `test content ${i}`,
+        metadata: { importance: 0.5, scope: "global" },
+      });
+      store.addNode({
+        id: `session:s${i}`,
+        type: "session",
+        label: `Session ${i} test`,
+        content: `session content ${i}`,
+        metadata: { outcome: "success", files_changed: [] },
+      });
+      store.addNode({
+        id: `learning:l${i}`,
+        type: "learning",
+        label: `Learning ${i} test`,
+        content: `learning content ${i}`,
+      });
       store.addNode({ id: `skill:sk${i}`, type: "skill", label: `Skill ${i} test`, content: `skill content ${i}` });
     }
 
@@ -191,12 +214,28 @@ describe("ingestRemoteIndex", () => {
     const remoteData = {
       ok: true,
       nodes: [
-        { id: 1, kind: "function", name: "boot", file: "src/app.ts", line: 10, end_line: 30, exported: 1, qualified_name: "src/app.ts::boot" },
-        { id: 2, kind: "class", name: "Database", file: "src/db.ts", line: 5, end_line: 45, exported: 1, qualified_name: "src/db.ts::Database" },
+        {
+          id: 1,
+          kind: "function",
+          name: "boot",
+          file: "src/app.ts",
+          line: 10,
+          end_line: 30,
+          exported: 1,
+          qualified_name: "src/app.ts::boot",
+        },
+        {
+          id: 2,
+          kind: "class",
+          name: "Database",
+          file: "src/db.ts",
+          line: 5,
+          end_line: 45,
+          exported: 1,
+          qualified_name: "src/db.ts::Database",
+        },
       ],
-      edges: [
-        { source_id: 1, target_id: 2, kind: "calls" },
-      ],
+      edges: [{ source_id: 1, target_id: 2, kind: "calls" }],
       files: 2,
       symbols: 2,
     };
@@ -217,7 +256,13 @@ describe("ingestRemoteIndex", () => {
         id: `symbol:${node.file}::${node.name}:${node.line}`,
         type: "symbol",
         label: node.name,
-        metadata: { kind: node.kind, file: node.file, line_start: node.line, line_end: node.end_line, exported: node.exported === 1 },
+        metadata: {
+          kind: node.kind,
+          file: node.file,
+          line_start: node.line,
+          line_end: node.end_line,
+          exported: node.exported === 1,
+        },
       });
     }
 

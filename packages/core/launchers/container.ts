@@ -16,12 +16,16 @@ export class ContainerLauncher implements SessionLauncher {
     this.client = new ArkdClient(arkdUrl);
   }
 
-  async launch(session: Session, script: string, opts: {
-    env?: Record<string, string>;
-    workdir?: string;
-    compute?: Compute;
-    arkDir?: string;
-  }): Promise<LaunchResult> {
+  async launch(
+    session: Session,
+    script: string,
+    opts: {
+      env?: Record<string, string>;
+      workdir?: string;
+      compute?: Compute;
+      arkDir?: string;
+    },
+  ): Promise<LaunchResult> {
     const sessionName = `ark-${session.id}`;
     const result = await this.client.launchAgent({
       sessionName,

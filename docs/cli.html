@@ -16,7 +16,6 @@
       <a href="quickstart.html">Quick Start</a>
       <a href="concepts.html">Core Concepts</a>
       <div class="section-title">Guides</div>
-      <a href="tui.html">TUI Dashboard</a>
       <a href="web.html">Web Dashboard</a>
       <a href="cli.html">CLI Reference</a>
       <a href="configuration.html">Configuration</a>
@@ -56,11 +55,10 @@
       <h1>CLI Reference</h1>
       <p class="subtitle">Complete command reference for the <code>ark</code> CLI.</p>
 
-      <!-- ── ark tui ─────────────────────────────────────────────────────── -->
-      <h2>ark tui</h2>
-      <p>Launch the interactive TUI dashboard.</p>
-      <pre><code><span class="prompt">$</span> ark tui</code></pre>
-      <p>Opens the terminal dashboard with 10 tabs: Sessions, Agents, Events, Flows, Compute, History, Memory, Tools, Schedules, Costs. See the <a href="tui.html">TUI Guide</a> for keyboard shortcuts.</p>
+      <!-- ── ark web ─────────────────────────────────────────────────────── -->
+      <h2>ark web</h2>
+      <p>Launch the web dashboard (or use the <a href="../packages/desktop/INSTALL.md">Electron desktop app</a> for a native window).</p>
+      <pre><code><span class="prompt">$</span> ark web</code></pre>
 
       <!-- ── ark exec ────────────────────────────────────────────────────── -->
       <h2>ark exec</h2>
@@ -678,7 +676,7 @@
 
       <!-- ── ark conductor ───────────────────────────────────────────────── -->
       <h2>ark conductor</h2>
-      <p>Start the conductor HTTP server. The TUI runs the conductor automatically; use this command when running the conductor as a standalone process.</p>
+      <p>Start the conductor HTTP server. The server daemon (<code>ark server daemon start</code>) runs the conductor automatically; use this command when running the conductor as a standalone process.</p>
       <pre><code><span class="prompt">$</span> ark conductor
 <span class="prompt">$</span> ark conductor --port 19200</code></pre>
 

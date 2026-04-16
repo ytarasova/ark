@@ -8,7 +8,10 @@ withTestContext();
 
 describe("NotifyDaemon", () => {
   let daemon: NotifyDaemon | null = null;
-  afterEach(() => { daemon?.stop(); daemon = null; });
+  afterEach(() => {
+    daemon?.stop();
+    daemon = null;
+  });
 
   it("constructs without error", () => {
     const bridge = new Bridge({});
@@ -57,7 +60,9 @@ describe("NotifyDaemon", () => {
       activeIntervalMs: 20,
       waitingIntervalMs: 20,
       idleIntervalMs: 20,
-      onPoll: () => { polls++; },
+      onPoll: () => {
+        polls++;
+      },
     });
 
     const s1 = getApp().sessions.create({ summary: "running-test" });
@@ -73,14 +78,18 @@ describe("NotifyDaemon", () => {
   it("detects status transitions on subsequent polls", async () => {
     const notifications: string[] = [];
     const bridge = new Bridge({});
-    bridge.notify = async (text: string) => { notifications.push(text); };
+    bridge.notify = async (text: string) => {
+      notifications.push(text);
+    };
 
     let polls = 0;
     daemon = new NotifyDaemon(getApp(), bridge, {
       activeIntervalMs: 20,
       waitingIntervalMs: 20,
       idleIntervalMs: 20,
-      onPoll: () => { polls++; },
+      onPoll: () => {
+        polls++;
+      },
     });
 
     const s = getApp().sessions.create({ summary: "transition-test" });
@@ -92,10 +101,10 @@ describe("NotifyDaemon", () => {
 
     // Transition -> wait until at least one more poll observes it
     getApp().sessions.update(s.id, { status: "waiting" });
-    await waitFor(
-      () => notifications.some(n => n.includes("transition-test")),
-      { timeout: 2000, message: "expected a transition notification" },
-    );
+    await waitFor(() => notifications.some((n) => n.includes("transition-test")), {
+      timeout: 2000,
+      message: "expected a transition notification",
+    });
 
     daemon.stop();
     expect(notifications.length).toBeGreaterThanOrEqual(1);
@@ -104,14 +113,18 @@ describe("NotifyDaemon", () => {
   it("does not notify on initial poll (no previous status)", async () => {
     const notifications: string[] = [];
     const bridge = new Bridge({});
-    bridge.notify = async (text: string) => { notifications.push(text); };
+    bridge.notify = async (text: string) => {
+      notifications.push(text);
+    };
 
     let polls = 0;
     daemon = new NotifyDaemon(getApp(), bridge, {
       activeIntervalMs: 20,
       waitingIntervalMs: 20,
       idleIntervalMs: 20,
-      onPoll: () => { polls++; },
+      onPoll: () => {
+        polls++;
+      },
     });
 
     getApp().sessions.create({ summary: "no-initial-notify" });
