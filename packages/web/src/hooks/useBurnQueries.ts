@@ -4,9 +4,10 @@ import { api } from "./useApi.js";
 export type BurnPeriod = "today" | "week" | "30days" | "month";
 
 export function useBurnSummary(period: BurnPeriod) {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   return useQuery({
-    queryKey: ["burn", "summary", period],
-    queryFn: () => api.getBurnSummary(period),
+    queryKey: ["burn", "summary", period, tz],
+    queryFn: () => api.getBurnSummary(period, tz),
   });
 }
 

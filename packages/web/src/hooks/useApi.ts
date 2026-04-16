@@ -212,7 +212,8 @@ export const api = {
   getRepoMap: (dir?: string) => rpc<any>("repo-map/get", { dir }),
 
   // Burn
-  getBurnSummary: (period: string) => rpc<any>("burn/summary", { period }),
+  getBurnSummary: (period: string, tz?: string) =>
+    rpc<any>("burn/summary", { period, tz }),
   syncBurn: (force?: boolean) => rpc<any>("burn/sync", { force }),
 
   // Filesystem (local mode only -- for the folder picker in New Session)

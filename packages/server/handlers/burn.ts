@@ -112,13 +112,14 @@ export function getDateRange(
 
 export function registerBurnHandlers(router: Router, app: AppContext): void {
   router.handle("burn/summary", async (p) => {
-    const { period } = extract<{ period?: BurnPeriod }>(p, []);
+    const { period, tz } = extract<{ period?: BurnPeriod; tz?: string }>(p, []);
     const per = period ?? "week";
-    const dateRange = getDateRange(per, undefined);
+    const dateRange = getDateRange(per, tz);
     const opts = {
       tenantId: "default",
       since: dateRange.start,
       until: dateRange.end,
+      tz: dateRange.tz,
     };
 
     const overview = app.burn.getOverview(opts);
