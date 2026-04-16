@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ark -- Midnight Observatory Design Preview</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: {
+        heading: ['"Instrument Sans"', 'system-ui', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'monospace'],
+        body: ['Inter', 'system-ui', 'sans-serif'],
+      },
+    },
+  },
+};
+</script>
+<style>
+  /* ============================================================
+     CSS Custom Properties -- theme-aware
+     ============================================================ */
+  :root {
+    --page-bg: #08080a;
+    --surface-1: #0e0e12;
+    --surface-2: #141418;
+    --surface-3: #1a1a20;
+    --surface-sunken: #060608;
+    --sidebar-bg: #060608;
+    --text-primary: #e4e4e7;
+    --text-secondary: #8b8b94;
+    --text-muted: #44444a;
+    --border: rgba(255,255,255,0.04);
+    --border-hover: rgba(255,255,255,0.08);
+    --border-subtle: rgba(255,255,255,0.02);
+    --border-light: rgba(255,255,255,0.06);
+    --border-tool: rgba(255,255,255,0.03);
+    --accent-warm: rgba(255,190,100,0.6);
+    --accent-warm-bg: rgba(255,190,100,0.08);
+    --accent-warm-border: rgba(255,190,100,0.15);
+    --accent-warm-glow: rgba(255,190,100,0.4);
+    --accent-warm-ambient: rgba(255,190,100,0.04);
+    --accent-cool: rgba(100,180,255,0.4);
+    --status-green: rgba(80,220,140,0.6);
+    --status-red: rgba(240,80,80,0.5);
+    --diff-add-bg: rgba(80,220,140,0.06);
+    --diff-remove-bg: rgba(240,80,80,0.06);
+    --card-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    --modal-shadow: 0 8px 48px rgba(0,0,0,0.6);
+    --input-shadow: 0 -4px 24px rgba(0,0,0,0.3);
+    --modal-overlay: rgba(0,0,0,0.6);
+    --icon-active: #e4e4e7;
+    --icon-inactive: #8b8b94;
+    --icon-muted: #44444a;
+    --stage-done: rgba(255,255,255,0.2);
+    --stage-pending: rgba(255,255,255,0.06);
+    --stage-active-bg: rgba(255,190,100,0.7);
+    --stage-active-label: rgba(255,190,100,0.8);
+    --noise-opacity: 0.025;
+    --scrollbar-thumb: rgba(255,255,255,0.08);
+    --cancel-border: rgba(255,255,255,0.06);
+  }
+
+  .light {
+    --page-bg: #f4f4f6;
+    --surface-1: #ffffff;
+    --surface-2: #f5f5f7;
+    --surface-3: #ededf1;
+    --surface-sunken: #e8e8ec;
+    --sidebar-bg: #eaeaee;
+    --text-primary: #1a1a1e;
+    --text-secondary: #6b6b74;
+    --text-muted: #a0a0a8;
+    --border: rgba(0,0,0,0.06);
+    --border-hover: rgba(0,0,0,0.1);
+    --border-subtle: rgba(0,0,0,0.04);
+    --border-light: rgba(0,0,0,0.08);
+    --border-tool: rgba(0,0,0,0.05);
+    --accent-warm: rgba(160,100,20,0.7);
+    --accent-warm-bg: rgba(180,120,30,0.06);
+    --accent-warm-border: rgba(180,120,30,0.2);
+    --accent-warm-glow: rgba(180,120,30,0.5);
+    --accent-warm-ambient: rgba(180,120,30,0.03);
+    --accent-cool: rgba(60,120,200,0.5);
+    --status-green: rgba(40,160,90,0.7);
+    --status-red: rgba(200,50,50,0.6);
+    --diff-add-bg: rgba(40,160,90,0.08);
+    --diff-remove-bg: rgba(200,50,50,0.08);
+    --card-shadow: 0 4px 24px rgba(0,0,0,0.06);
+    --modal-shadow: 0 8px 48px rgba(0,0,0,0.12);
+    --input-shadow: 0 -4px 24px rgba(0,0,0,0.04);
+    --modal-overlay: rgba(0,0,0,0.2);
+    --icon-active: #1a1a1e;
+    --icon-inactive: #6b6b74;
+    --icon-muted: #a0a0a8;
+    --stage-done: rgba(0,0,0,0.15);
+    --stage-pending: rgba(0,0,0,0.06);
+    --stage-active-bg: rgba(180,120,30,0.7);
+    --stage-active-label: rgba(160,100,20,0.8);
+    --noise-opacity: 0.015;
+    --scrollbar-thumb: rgba(0,0,0,0.1);
+    --cancel-border: rgba(0,0,0,0.1);
+  }
+
+  /* ============================================================
+     Base
+     ============================================================ */
+  body { margin: 0; }
+
+  .noise-overlay::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: var(--noise-opacity);
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 200px 200px;
+  }
+
+  .page-bg { background: var(--page-bg); }
+  .sidebar-bg { background: var(--sidebar-bg); }
+  .surface-1 { background: var(--surface-1); }
+  .surface-2 { background: var(--surface-2); }
+  .surface-3 { background: var(--surface-3); }
+  .surface-sunken { background: var(--surface-sunken); }
+
+  .text-primary { color: var(--text-primary); }
+  .text-secondary { color: var(--text-secondary); }
+  .text-muted { color: var(--text-muted); }
+
+  /* ============================================================
+     Cards
+     ============================================================ */
+  .card-elevated {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    box-shadow: var(--card-shadow);
+    border-radius: 16px;
+  }
+  .card-elevated:hover {
+    border-color: var(--border-hover);
+  }
+
+  /* ============================================================
+     Glows
+     ============================================================ */
+  .glow-warm {
+    box-shadow: 0 0 30px var(--accent-warm-ambient), 0 0 60px var(--accent-warm-ambient);
+  }
+
+  .ambient-warm {
+    position: relative;
+  }
+  .ambient-warm::after {
+    content: '';
+    position: absolute;
+    inset: -20px;
+    background: radial-gradient(circle at 50% 50%, var(--accent-warm-ambient), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+    border-radius: 24px;
+  }
+
+  /* ============================================================
+     Status dots
+     ============================================================ */
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .status-online {
+    background: var(--accent-warm-glow);
+    box-shadow: 0 0 8px var(--accent-warm-glow), 0 0 16px var(--accent-warm-ambient);
+  }
+  .status-done {
+    background: var(--status-green);
+    box-shadow: 0 0 8px var(--status-green);
+  }
+  .status-error {
+    background: var(--status-red);
+    box-shadow: 0 0 8px var(--status-red);
+  }
+  .status-offline {
+    background: var(--text-muted);
+    opacity: 0.5;
+  }
+
+  /* ============================================================
+     Selected row
+     ============================================================ */
+  .row-selected { position: relative; }
+  .row-selected::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--accent-warm-glow);
+    box-shadow: 0 0 16px var(--accent-warm-ambient), 4px 0 24px var(--accent-warm-ambient);
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* ============================================================
+     Modal
+     ============================================================ */
+  .modal-backdrop {
+    background: var(--modal-overlay);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* ============================================================
+     Input
+     ============================================================ */
+  .input-field {
+    background: var(--surface-1);
+    border: 1px solid var(--border-light);
+    color: var(--text-primary);
+  }
+  .input-field:focus {
+    border-color: var(--accent-warm-border);
+    outline: none;
+    box-shadow: 0 0 0 2px var(--accent-warm-ambient);
+  }
+
+  /* ============================================================
+     Diff
+     ============================================================ */
+  .diff-add { background: var(--diff-add-bg); }
+  .diff-remove { background: var(--diff-remove-bg); }
+
+  /* ============================================================
+     Stage
+     ============================================================ */
+  .stage-label {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+  }
+  .stage-node:hover .stage-label { opacity: 1; }
+  .stage-active {
+    box-shadow: 0 0 12px var(--accent-warm-glow), 0 0 24px var(--accent-warm-ambient);
+  }
+
+  /* ============================================================
+     Animation
+     ============================================================ */
+  @keyframes heartbeat {
+    0%, 100% { opacity: 0.3; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.3); }
+  }
+  .heartbeat { animation: heartbeat 3s ease-in-out infinite; }
+
+  /* ============================================================
+     Scrollbar
+     ============================================================ */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+
+  /* ============================================================
+     Smooth transitions
+     ============================================================ */
+  * {
+    transition-property: background-color, border-color, color, box-shadow, opacity;
+    transition-duration: 0.15s;
+    transition-timing-function: ease;
+  }
+
+  /* ============================================================
+     Theme toggle
+     ============================================================ */
+  .theme-toggle {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 10000;
+    background: var(--surface-2);
+    border: 1px solid var(--border-light);
+    color: var(--text-secondary);
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-family: 'Instrument Sans', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+</style>
+</head>
+<body class="dark">
+<div class="noise-overlay page-bg min-h-screen font-body">
+
+<!-- Theme Toggle -->
+<button class="theme-toggle" onclick="document.body.classList.toggle('dark'); document.body.classList.toggle('light');">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+  Toggle theme
+</button>
+
+<!-- ================================================================== -->
+<!-- SECTION TITLE -->
+<!-- ================================================================== -->
+<div class="max-w-7xl mx-auto px-8 pt-16 pb-6">
+  <h1 class="font-heading text-4xl tracking-tight text-primary" style="font-weight: 700;">Midnight Observatory</h1>
+  <p class="text-secondary font-body text-sm mt-2">Ark Design System Preview -- v2</p>
+</div>
+
+<!-- ================================================================== -->
+<!-- 1. DASHBOARD STATS -->
+<!-- ================================================================== -->
+<section class="max-w-7xl mx-auto px-8 py-6">
+  <h2 class="font-heading text-secondary mb-6 uppercase tracking-widest" style="font-size: 11px; letter-spacing: 0.15em; font-weight: 600;">Dashboard</h2>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+    <!-- Running stat -- with warm ambient glow -->
+    <div class="card-elevated p-8 ambient-warm relative overflow-hidden">
+      <div class="relative z-10">
+        <p class="text-muted font-mono text-xs uppercase tracking-wider mb-3">Running</p>
+        <p class="font-heading text-5xl text-primary tracking-tight" style="font-weight: 700;">3</p>
+        <p class="text-secondary text-sm mt-2 font-body">agents active</p>
+      </div>
+    </div>
+
+    <!-- Completed stat -->
+    <div class="card-elevated p-8">
+      <p class="text-muted font-mono text-xs uppercase tracking-wider mb-3">Completed Today</p>
+      <p class="font-heading text-5xl text-primary tracking-tight" style="font-weight: 700;">47</p>
+      <p class="text-secondary text-sm mt-2 font-body">sessions finished</p>
+    </div>
+
+    <!-- Cost stat -->
+    <div class="card-elevated p-8">
+      <p class="text-muted font-mono text-xs uppercase tracking-wider mb-3">Spent Today</p>
+      <p class="font-heading text-5xl text-primary tracking-tight" style="font-weight: 700;">$12.40</p>
+      <p class="text-secondary text-sm mt-2 font-body">across 3 providers</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- 4. STAGE PROGRESS -->
+<!-- ================================================================== -->
+<section class="max-w-7xl mx-auto px-8 py-6">
+  <h2 class="font-heading text-secondary mb-6 uppercase tracking-widest" style="font-size: 11px; letter-spacing: 0.15em; font-weight: 600;">Stage Progress</h2>
+  <div class="card-elevated p-8">
+    <div class="flex items-center justify-between relative" style="max-width: 600px; margin: 0 auto;">
+      <!-- Line -->
+      <div class="absolute top-1/2 left-0 right-0 h-px" style="background: var(--border-light);"></div>
+
+      <!-- Stage 1: Done -->
+      <div class="stage-node relative flex flex-col items-center z-10" style="cursor: default;">
+        <div class="w-3 h-3 rounded-full" style="background: var(--stage-done);"></div>
+        <span class="stage-label absolute -bottom-7 text-xs text-secondary font-mono whitespace-nowrap">Plan</span>
+      </div>
+
+      <!-- Stage 2: Done -->
+      <div class="stage-node relative flex flex-col items-center z-10" style="cursor: default;">
+        <div class="w-3 h-3 rounded-full" style="background: var(--stage-done);"></div>
+        <span class="stage-label absolute -bottom-7 text-xs text-secondary font-mono whitespace-nowrap">Implement</span>
+      </div>
+
+      <!-- Stage 3: Active -->
+      <div class="stage-node relative flex flex-col items-center z-10" style="cursor: default;">
+        <div class="w-4 h-4 rounded-full stage-active" style="background: var(--stage-active-bg);"></div>
+        <span class="stage-label absolute -bottom-7 text-xs font-mono whitespace-nowrap" style="color: var(--stage-active-label);">Test</span>
+      </div>
+
+      <!-- Stage 4: Pending -->
+      <div class="stage-node relative flex flex-col items-center z-10" style="cursor: default;">
+        <div class="w-3 h-3 rounded-full" style="background: var(--stage-pending);"></div>
+        <span class="stage-label absolute -bottom-7 text-xs text-muted font-mono whitespace-nowrap">Review</span>
+      </div>
+
+      <!-- Stage 5: Pending -->
+      <div class="stage-node relative flex flex-col items-center z-10" style="cursor: default;">
+        <div class="w-3 h-3 rounded-full" style="background: var(--stage-pending);"></div>
+        <span class="stage-label absolute -bottom-7 text-xs text-muted font-mono whitespace-nowrap">Deploy</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- MAIN LAYOUT: SIDEBAR + SESSION LIST + CHAT -->
+<!-- ================================================================== -->
+<section class="max-w-7xl mx-auto px-8 py-6">
+  <h2 class="font-heading text-secondary mb-6 uppercase tracking-widest" style="font-size: 11px; letter-spacing: 0.15em; font-weight: 600;">Application Layout</h2>
+  <div class="card-elevated overflow-hidden" style="height: 680px;">
+    <div class="flex h-full">
+
+      <!-- 5. SIDEBAR -->
+      <div class="sidebar-bg flex flex-col py-4 px-3" style="width: 56px; border-right: 1px solid var(--border);">
+        <!-- Logo -->
+        <div class="flex items-center justify-center mb-6">
+          <div class="w-7 h-7 rounded-lg flex items-center justify-center" style="background: var(--accent-warm-bg);">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-warm);"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          </div>
+        </div>
+
+        <!-- Nav items -->
+        <div class="flex flex-col items-center gap-1 flex-1">
+          <!-- Active: Dashboard -->
+          <div class="relative w-10 h-10 rounded-xl flex items-center justify-center" style="cursor: pointer;">
+            <div class="absolute left-0 top-2 bottom-2 w-0.5 rounded-r" style="background: var(--accent-warm-glow); box-shadow: 0 0 8px var(--accent-warm-ambient);"></div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--icon-active);"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </div>
+          <!-- Sessions -->
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="cursor: pointer;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--icon-inactive);"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </div>
+          <!-- Agents -->
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="cursor: pointer;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--icon-inactive);"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <!-- Flows -->
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="cursor: pointer;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--icon-inactive);"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+          <!-- Settings -->
+          <div class="w-10 h-10 rounded-xl flex items-center justify-center mt-auto" style="cursor: pointer;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--icon-muted);"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. SESSION LIST -->
+      <div class="surface-1 flex flex-col" style="width: 280px; border-right: 1px solid var(--border);">
+        <div class="px-4 py-4" style="border-bottom: 1px solid var(--border);">
+          <p class="font-heading text-sm text-primary" style="font-weight: 600;">Sessions</p>
+        </div>
+        <div class="flex-1 overflow-y-auto">
+
+          <!-- Selected session -->
+          <div class="row-selected px-4 py-3 surface-2" style="cursor: pointer;">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="status-dot status-online"></span>
+              <span class="font-heading text-sm text-primary truncate" style="font-weight: 500;">Refactor auth middleware</span>
+            </div>
+            <div class="flex items-center gap-3 pl-4">
+              <span class="font-mono text-xs text-muted" style="font-size: 10px;">s-a3f2</span>
+              <span class="font-mono text-xs text-muted" style="font-size: 10px;">2m ago</span>
+              <span class="font-mono text-xs text-muted" style="font-size: 10px;">claude</span>
+            </div>
+          </div>
+
+          <!-- Other sessions -->
+          <div class="px-4 py-3" style="cursor: pointer; border-bottom: 1px solid var(--border-subtle);">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="status-dot status-online"></span>
+              <span class="font-heading text-sm text-primary truncate" style="font-weight: 500;">Add WebSocket reconnection</span>
+            </div>
+            <div class="flex items-center gap-3 pl-4">
+              <span class="font-mono text-xs text-muted" style="font-size: 10px;">s-b7c1</span>
+              <span class="font-mono text-xs text-muted" style="font-size: 10px;">5m ago</span>
+              <span class="font-mono text-xs text-muted" style="font-size: 10px;">codex</span>
+            </div>
+          </div>
+
+          <div class="px-4 py-3" style="cursor: pointer; border-bottom: 1px solid var(--border-subtle);">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="status-dot status-online"></span>
+              <span class="font-heading text-sm text-primary truncate" style="font-weight: 500;">Fix cost aggregation query</span>
+            </div>
+            <div class="flex items-center gap-3 pl-4">
+              <span class="font-mono text-xs text-muted" style="font-size: 10px;">s-e4d8</span>
+              <span class="font-mono text-xs text-muted" style="font-size: 10px;">8m ago</span>
+              <span class="font-mono text-xs text-muted" style="font-size: 10px;">gemini</span>
+            </div>
+          </div>
+
+          <div class="px-4 py-3" style="cursor: pointer; border-bottom: 1px solid var(--border-subtle);">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="status-dot status-done"></span>
+              <span class="font-heading text-sm text-secondary truncate" style="font-weight: 500;">Update Helm chart values</span>
+            </div>
+            <div class="flex items-center gap-3 pl-4">
+              <span class="font-mono text-xs text-muted" style="font-size: 10px;">s-1f09</span>
+              <span class="font-mono text-xs text-muted" style="font-size: 10px;">34m ago</span>
+              <span class="font-mono text-xs text-muted" style="font-size: 10px;">claude</span>
+            </div>
+          </div>
+
+          <div class="px-4 py-3" style="cursor: pointer; border-bottom: 1px solid var(--border-subtle);">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="status-dot status-done"></span>
+              <span class="font-heading text-sm text-secondary truncate" style="font-weight: 500;">Migrate session store to PG</span>
+            </div>
+            <div class="flex items-center gap-3 pl-4">
+              <span class="font-mono text-xs text-muted" style="font-size: 10px;">s-c2a6</span>
+              <span class="font-mono text-xs text-muted" style="font-size: 10px;">1h ago</span>
+              <span class="font-mono text-xs text-muted" style="font-size: 10px;">claude</span>
+            </div>
+          </div>
+
+          <div class="px-4 py-3" style="cursor: pointer; border-bottom: 1px solid var(--border-subtle);">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="status-dot status-error"></span>
+              <span class="font-heading text-sm text-secondary truncate" style="font-weight: 500;">E2B sandbox timeout fix</span>
+            </div>
+            <div class="flex items-center gap-3 pl-4">
+              <span class="font-mono text-xs text-muted" style="font-size: 10px;">s-9e3b</span>
+              <span class="font-mono text-xs text-muted" style="font-size: 10px;">2h ago</span>
+              <span class="font-mono text-xs text-muted" style="font-size: 10px;">goose</span>
+            </div>
+          </div>
+
+          <div class="px-4 py-3" style="cursor: pointer;">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="status-dot status-offline"></span>
+              <span class="font-heading text-sm text-muted truncate" style="font-weight: 500;">Setup CI pipeline</span>
+            </div>
+            <div class="flex items-center gap-3 pl-4">
+              <span class="font-mono text-xs text-muted" style="font-size: 10px;">s-7d45</span>
+              <span class="font-mono text-xs text-muted" style="font-size: 10px;">yesterday</span>
+              <span class="font-mono text-xs text-muted" style="font-size: 10px;">codex</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- 3. CHAT CONVERSATION -->
+      <div class="flex-1 flex flex-col page-bg relative">
+        <!-- Chat header -->
+        <div class="px-6 py-3 flex items-center justify-between surface-1" style="border-bottom: 1px solid var(--border);">
+          <div class="flex items-center gap-3">
+            <span class="status-dot status-online"></span>
+            <span class="font-heading text-sm text-primary" style="font-weight: 600;">Refactor auth middleware</span>
+            <span class="font-mono text-xs text-muted" style="font-size: 10px;">s-a3f2</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="font-mono text-xs text-muted" style="font-size: 10px;">claude-opus-4 / local</span>
+          </div>
+        </div>
+
+        <!-- Messages area -->
+        <div class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+
+          <!-- System event -->
+          <div class="flex justify-center">
+            <span class="text-muted font-mono" style="font-size: 10px;">Session started -- autonomous-sdlc flow -- 14:23:07</span>
+          </div>
+
+          <!-- User message -->
+          <div class="flex justify-end">
+            <div class="surface-2 rounded-2xl px-5 py-3 max-w-md" style="border: 1px solid var(--border);">
+              <p class="text-primary text-sm font-body leading-relaxed">Refactor the auth middleware to support both JWT and API key authentication. Keep backward compatibility with existing endpoints.</p>
+            </div>
+          </div>
+
+          <!-- Agent message -->
+          <div class="flex justify-start">
+            <div class="max-w-lg">
+              <p class="text-primary text-sm font-body leading-relaxed mb-3">I'll refactor the auth middleware to support dual authentication. Here's my plan:</p>
+              <ol class="text-primary text-sm font-body leading-relaxed space-y-1 mb-3" style="list-style: decimal; padding-left: 1.2em;">
+                <li class="text-secondary">Extract token validation into a strategy pattern</li>
+                <li class="text-secondary">Add <code class="font-mono text-xs px-1.5 py-0.5 rounded surface-sunken" style="font-size: 11px;">ApiKeyStrategy</code> alongside existing <code class="font-mono text-xs px-1.5 py-0.5 rounded surface-sunken" style="font-size: 11px;">JwtStrategy</code></li>
+                <li class="text-secondary">Route selection based on the <code class="font-mono text-xs px-1.5 py-0.5 rounded surface-sunken" style="font-size: 11px;">Authorization</code> header format</li>
+                <li class="text-secondary">Preserve all existing middleware signatures</li>
+              </ol>
+              <p class="text-secondary text-sm font-body">Let me start by reading the current implementation.</p>
+
+              <!-- Tool call: collapsed -->
+              <div class="mt-3 rounded-xl surface-sunken" style="border: 1px solid var(--border-tool);">
+                <div class="flex items-center gap-2 px-3 py-2" style="cursor: pointer;">
+                  <span class="status-dot status-done"></span>
+                  <span class="font-mono text-xs text-secondary" style="font-size: 11px;">Read packages/server/middleware/auth.ts</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted ml-auto"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+              </div>
+
+              <!-- Tool call: expanded -->
+              <div class="mt-2 rounded-xl surface-sunken overflow-hidden" style="border: 1px solid var(--border-tool);">
+                <div class="flex items-center gap-2 px-3 py-2" style="cursor: pointer; border-bottom: 1px solid var(--border-tool);">
+                  <span class="status-dot status-done"></span>
+                  <span class="font-mono text-xs text-secondary" style="font-size: 11px;">Edit packages/server/middleware/auth.ts</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-muted ml-auto" style="transform: rotate(180deg);"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+                <div class="px-3 py-2 font-mono" style="font-size: 11px; line-height: 1.6;">
+                  <div class="flex">
+                    <span class="text-muted select-none" style="width: 3em; text-align: right; padding-right: 1em;">14</span>
+                    <span class="diff-add flex-1 px-1"><span style="color: var(--status-green);">+</span> <span class="text-secondary">export type AuthStrategy = "jwt" | "apikey";</span></span>
+                  </div>
+                  <div class="flex">
+                    <span class="text-muted select-none" style="width: 3em; text-align: right; padding-right: 1em;">15</span>
+                    <span class="diff-add flex-1 px-1"><span style="color: var(--status-green);">+</span> <span class="text-secondary">export interface AuthContext {</span></span>
+                  </div>
+                  <div class="flex">
+                    <span class="text-muted select-none" style="width: 3em; text-align: right; padding-right: 1em;">16</span>
+                    <span class="diff-add flex-1 px-1"><span style="color: var(--status-green);">+</span> <span class="text-secondary">  strategy: AuthStrategy;</span></span>
+                  </div>
+                  <div class="flex">
+                    <span class="text-muted select-none" style="width: 3em; text-align: right; padding-right: 1em;">17</span>
+                    <span class="diff-add flex-1 px-1"><span style="color: var(--status-green);">+</span> <span class="text-secondary">  userId: string;</span></span>
+                  </div>
+                  <div class="flex">
+                    <span class="text-muted select-none" style="width: 3em; text-align: right; padding-right: 1em;">18</span>
+                    <span class="diff-add flex-1 px-1"><span style="color: var(--status-green);">+</span> <span class="text-secondary">}</span></span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Running tool call -->
+              <div class="mt-2 rounded-xl surface-sunken" style="border: 1px solid var(--border-tool);">
+                <div class="flex items-center gap-2 px-3 py-2" style="cursor: pointer;">
+                  <span class="status-dot status-online"></span>
+                  <span class="font-mono text-xs text-secondary" style="font-size: 11px;">Running bun test auth.test.ts</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- System event -->
+          <div class="flex justify-center">
+            <span class="text-muted font-mono" style="font-size: 10px;">Stage: test -- 3 files modified, 1 test running</span>
+          </div>
+
+        </div>
+
+        <!-- Input bar -->
+        <div class="px-6 py-4">
+          <div class="surface-2 rounded-2xl px-4 py-3 flex items-center gap-3" style="border: 1px solid var(--border-light); box-shadow: var(--input-shadow);">
+            <input type="text" placeholder="Send a message..." class="input-field flex-1 bg-transparent text-sm font-body" style="outline: none; border: none; box-shadow: none;" />
+            <button class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: var(--accent-warm-bg);">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent-warm);"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- 6. CARDS -->
+<!-- ================================================================== -->
+<section class="max-w-7xl mx-auto px-8 py-6">
+  <h2 class="font-heading text-secondary mb-6 uppercase tracking-widest" style="font-size: 11px; letter-spacing: 0.15em; font-weight: 600;">Cards</h2>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+    <div class="card-elevated p-6">
+      <div class="flex items-center justify-between mb-4">
+        <span class="font-heading text-sm text-primary" style="font-weight: 600;">claude-coder</span>
+        <span class="status-dot status-online"></span>
+      </div>
+      <p class="text-secondary text-sm font-body mb-4">General-purpose coding agent with full filesystem access and git integration.</p>
+      <div class="flex items-center gap-4">
+        <span class="font-mono text-xs text-muted" style="font-size: 10px;">claude-opus-4</span>
+        <span class="font-mono text-xs text-muted" style="font-size: 10px;">local</span>
+        <span class="font-mono text-xs text-muted ml-auto" style="font-size: 10px;">12 sessions</span>
+      </div>
+    </div>
+
+    <div class="card-elevated p-6">
+      <div class="flex items-center justify-between mb-4">
+        <span class="font-heading text-sm text-primary" style="font-weight: 600;">codex-reviewer</span>
+        <span class="status-dot status-done"></span>
+      </div>
+      <p class="text-secondary text-sm font-body mb-4">Code review specialist. Reads diffs, checks for bugs, suggests improvements.</p>
+      <div class="flex items-center gap-4">
+        <span class="font-mono text-xs text-muted" style="font-size: 10px;">codex</span>
+        <span class="font-mono text-xs text-muted" style="font-size: 10px;">docker</span>
+        <span class="font-mono text-xs text-muted ml-auto" style="font-size: 10px;">8 sessions</span>
+      </div>
+    </div>
+
+    <div class="card-elevated p-6">
+      <div class="flex items-center justify-between mb-4">
+        <span class="font-heading text-sm text-primary" style="font-weight: 600;">gemini-researcher</span>
+        <span class="status-dot status-offline"></span>
+      </div>
+      <p class="text-secondary text-sm font-body mb-4">Research agent optimized for large context analysis and documentation.</p>
+      <div class="flex items-center gap-4">
+        <span class="font-mono text-xs text-muted" style="font-size: 10px;">gemini-2.5</span>
+        <span class="font-mono text-xs text-muted" style="font-size: 10px;">e2b</span>
+        <span class="font-mono text-xs text-muted ml-auto" style="font-size: 10px;">3 sessions</span>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- 7. STATUS INDICATORS -->
+<!-- ================================================================== -->
+<section class="max-w-7xl mx-auto px-8 py-6">
+  <h2 class="font-heading text-secondary mb-6 uppercase tracking-widest" style="font-size: 11px; letter-spacing: 0.15em; font-weight: 600;">Status Indicators</h2>
+  <div class="card-elevated p-8">
+    <div class="flex items-center gap-12">
+      <div class="flex items-center gap-3">
+        <span class="status-dot status-online"></span>
+        <span class="text-secondary text-sm font-body">Running</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="status-dot status-done"></span>
+        <span class="text-secondary text-sm font-body">Completed</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="status-dot status-error"></span>
+        <span class="text-secondary text-sm font-body">Error</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="status-dot status-offline"></span>
+        <span class="text-secondary text-sm font-body">Offline</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- 9. DIFF VIEWER -->
+<!-- ================================================================== -->
+<section class="max-w-7xl mx-auto px-8 py-6">
+  <h2 class="font-heading text-secondary mb-6 uppercase tracking-widest" style="font-size: 11px; letter-spacing: 0.15em; font-weight: 600;">Diff Viewer</h2>
+  <div class="card-elevated overflow-hidden">
+    <div class="px-4 py-3 flex items-center gap-3" style="border-bottom: 1px solid var(--border);">
+      <span class="font-mono text-xs text-primary" style="font-size: 11px;">packages/server/middleware/auth.ts</span>
+      <span class="font-mono text-xs text-muted ml-auto" style="font-size: 10px;">+24 -8</span>
+    </div>
+    <div class="surface-sunken px-4 py-3 font-mono" style="font-size: 11px; line-height: 1.7;">
+      <div class="flex"><span class="text-muted select-none" style="width: 3em; text-align: right; padding-right: 1em;">10</span><span class="text-secondary flex-1 px-1"> import { verify } from "jsonwebtoken";</span></div>
+      <div class="flex"><span class="text-muted select-none" style="width: 3em; text-align: right; padding-right: 1em;">11</span><span class="text-secondary flex-1 px-1"> import { db } from "../db.js";</span></div>
+      <div class="flex"><span class="text-muted select-none" style="width: 3em; text-align: right; padding-right: 1em;">12</span><span class="text-secondary flex-1 px-1"> </span></div>
+      <div class="flex"><span class="text-muted select-none" style="width: 3em; text-align: right; padding-right: 1em;">13</span><span class="diff-remove flex-1 px-1"><span style="color: var(--status-red);">-</span> <span class="text-secondary">export function authMiddleware(req, res, next) {</span></span></div>
+      <div class="flex"><span class="text-muted select-none" style="width: 3em; text-align: right; padding-right: 1em;">14</span><span class="diff-add flex-1 px-1"><span style="color: var(--status-green);">+</span> <span class="text-secondary">export type AuthStrategy = "jwt" | "apikey";</span></span></div>
+      <div class="flex"><span class="text-muted select-none" style="width: 3em; text-align: right; padding-right: 1em;">15</span><span class="diff-add flex-1 px-1"><span style="color: var(--status-green);">+</span> <span class="text-secondary"> </span></span></div>
+      <div class="flex"><span class="text-muted select-none" style="width: 3em; text-align: right; padding-right: 1em;">16</span><span class="diff-add flex-1 px-1"><span style="color: var(--status-green);">+</span> <span class="text-secondary">function detectStrategy(header: string): AuthStrategy {</span></span></div>
+      <div class="flex"><span class="text-muted select-none" style="width: 3em; text-align: right; padding-right: 1em;">17</span><span class="diff-add flex-1 px-1"><span style="color: var(--status-green);">+</span> <span class="text-secondary">  return header.startsWith("Bearer ") ? "jwt" : "apikey";</span></span></div>
+      <div class="flex"><span class="text-muted select-none" style="width: 3em; text-align: right; padding-right: 1em;">18</span><span class="diff-add flex-1 px-1"><span style="color: var(--status-green);">+</span> <span class="text-secondary">}</span></span></div>
+      <div class="flex"><span class="text-muted select-none" style="width: 3em; text-align: right; padding-right: 1em;">19</span><span class="diff-add flex-1 px-1"><span style="color: var(--status-green);">+</span> <span class="text-secondary"> </span></span></div>
+      <div class="flex"><span class="text-muted select-none" style="width: 3em; text-align: right; padding-right: 1em;">20</span><span class="diff-add flex-1 px-1"><span style="color: var(--status-green);">+</span> <span class="text-secondary">export function authMiddleware(req, res, next) {</span></span></div>
+      <div class="flex"><span class="text-muted select-none" style="width: 3em; text-align: right; padding-right: 1em;">21</span><span class="text-secondary flex-1 px-1">   const header = req.headers.authorization;</span></div>
+      <div class="flex"><span class="text-muted select-none" style="width: 3em; text-align: right; padding-right: 1em;">22</span><span class="diff-remove flex-1 px-1"><span style="color: var(--status-red);">-</span> <span class="text-secondary">  if (!header) return res.status(401).end();</span></span></div>
+      <div class="flex"><span class="text-muted select-none" style="width: 3em; text-align: right; padding-right: 1em;">23</span><span class="diff-add flex-1 px-1"><span style="color: var(--status-green);">+</span> <span class="text-secondary">  if (!header) return res.status(401).json({ error: "missing auth" });</span></span></div>
+      <div class="flex"><span class="text-muted select-none" style="width: 3em; text-align: right; padding-right: 1em;">24</span><span class="diff-add flex-1 px-1"><span style="color: var(--status-green);">+</span> <span class="text-secondary">  const strategy = detectStrategy(header);</span></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- 8. MODAL -->
+<!-- ================================================================== -->
+<section class="max-w-7xl mx-auto px-8 py-6">
+  <h2 class="font-heading text-secondary mb-6 uppercase tracking-widest" style="font-size: 11px; letter-spacing: 0.15em; font-weight: 600;">Modal</h2>
+  <div class="relative rounded-2xl overflow-hidden" style="height: 420px;">
+    <!-- Fake app content behind -->
+    <div class="absolute inset-0 surface-1 p-8">
+      <div class="h-4 w-48 rounded surface-2 mb-3"></div>
+      <div class="h-3 w-72 rounded surface-2 mb-2"></div>
+      <div class="h-3 w-60 rounded surface-2 mb-2"></div>
+      <div class="h-3 w-80 rounded surface-2"></div>
+    </div>
+    <!-- Backdrop -->
+    <div class="absolute inset-0 modal-backdrop flex items-center justify-center">
+      <!-- Modal -->
+      <div class="surface-3 rounded-2xl p-8 w-full max-w-md" style="border: 1px solid var(--border-light); box-shadow: var(--modal-shadow);">
+        <h3 class="font-heading text-lg text-primary mb-1" style="font-weight: 600;">New Session</h3>
+        <p class="text-secondary text-sm font-body mb-6">Configure and launch a new agent session.</p>
+
+        <div class="space-y-4">
+          <div>
+            <label class="text-secondary text-xs font-mono uppercase tracking-wider mb-1.5 block" style="font-size: 10px;">Agent</label>
+            <div class="input-field rounded-xl px-3 py-2.5 text-sm font-body" style="cursor: pointer;">
+              <span class="text-primary">claude-coder</span>
+            </div>
+          </div>
+          <div>
+            <label class="text-secondary text-xs font-mono uppercase tracking-wider mb-1.5 block" style="font-size: 10px;">Flow</label>
+            <div class="input-field rounded-xl px-3 py-2.5 text-sm font-body" style="cursor: pointer;">
+              <span class="text-primary">autonomous-sdlc</span>
+            </div>
+          </div>
+          <div>
+            <label class="text-secondary text-xs font-mono uppercase tracking-wider mb-1.5 block" style="font-size: 10px;">Prompt</label>
+            <textarea class="input-field rounded-xl px-3 py-2.5 text-sm font-body w-full resize-none" rows="3" placeholder="Describe the task..."></textarea>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 mt-6">
+          <button class="px-4 py-2 rounded-xl text-sm font-body text-secondary" style="border: 1px solid var(--cancel-border);">Cancel</button>
+          <button class="px-4 py-2 rounded-xl text-sm font-body text-primary" style="background: var(--accent-warm-bg); border: 1px solid var(--accent-warm-border);">Launch</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- 10. EMPTY STATE -->
+<!-- ================================================================== -->
+<section class="max-w-7xl mx-auto px-8 py-6 pb-16">
+  <h2 class="font-heading text-secondary mb-6 uppercase tracking-widest" style="font-size: 11px; letter-spacing: 0.15em; font-weight: 600;">Empty State</h2>
+  <div class="card-elevated p-16 flex flex-col items-center justify-center" style="min-height: 240px;">
+    <p class="font-heading text-2xl text-primary mb-4" style="font-weight: 600;">No sessions.</p>
+    <div class="w-2 h-2 rounded-full heartbeat" style="background: var(--accent-warm-glow);"></div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<!-- DESIGN TOKENS REFERENCE -->
+<!-- ================================================================== -->
+<section class="max-w-7xl mx-auto px-8 py-6 pb-24">
+  <h2 class="font-heading text-secondary mb-6 uppercase tracking-widest" style="font-size: 11px; letter-spacing: 0.15em; font-weight: 600;">Design Tokens</h2>
+  <div class="card-elevated p-8">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+      <div>
+        <div class="w-full h-16 rounded-xl mb-2 page-bg" style="border: 1px solid var(--border-light);"></div>
+        <p class="font-mono text-xs text-secondary" style="font-size: 10px;">Page bg</p>
+      </div>
+      <div>
+        <div class="w-full h-16 rounded-xl mb-2 surface-1" style="border: 1px solid var(--border-light);"></div>
+        <p class="font-mono text-xs text-secondary" style="font-size: 10px;">Surface 1</p>
+      </div>
+      <div>
+        <div class="w-full h-16 rounded-xl mb-2 surface-2" style="border: 1px solid var(--border-light);"></div>
+        <p class="font-mono text-xs text-secondary" style="font-size: 10px;">Surface 2</p>
+      </div>
+      <div>
+        <div class="w-full h-16 rounded-xl mb-2 surface-3" style="border: 1px solid var(--border-light);"></div>
+        <p class="font-mono text-xs text-secondary" style="font-size: 10px;">Surface 3</p>
+      </div>
+      <div>
+        <div class="w-full h-16 rounded-xl mb-2 flex items-center justify-center surface-1" style="border: 1px solid var(--border-light);">
+          <span class="text-sm text-primary">Primary</span>
+        </div>
+        <p class="font-mono text-xs text-secondary" style="font-size: 10px;">Text primary</p>
+      </div>
+      <div>
+        <div class="w-full h-16 rounded-xl mb-2 flex items-center justify-center surface-1" style="border: 1px solid var(--border-light);">
+          <span class="text-sm text-secondary">Secondary</span>
+        </div>
+        <p class="font-mono text-xs text-secondary" style="font-size: 10px;">Text secondary</p>
+      </div>
+      <div>
+        <div class="w-full h-16 rounded-xl mb-2 flex items-center justify-center surface-1" style="border: 1px solid var(--border-light);">
+          <span class="text-sm text-muted">Muted</span>
+        </div>
+        <p class="font-mono text-xs text-secondary" style="font-size: 10px;">Text muted</p>
+      </div>
+      <div>
+        <div class="w-full h-16 rounded-xl mb-2 flex items-center justify-center glow-warm surface-1" style="border: 1px solid var(--border-light);">
+          <span class="text-sm" style="color: var(--accent-warm);">Accent</span>
+        </div>
+        <p class="font-mono text-xs text-secondary" style="font-size: 10px;">Warm glow</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<script>
+  // Default to dark mode
+  document.body.classList.add('dark');
+</script>
+</body>
+</html>
