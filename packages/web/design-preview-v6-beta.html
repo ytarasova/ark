@@ -1,0 +1,1880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ark - Design Preview v6-beta</title>
+<style>
+/* ========================================
+   Ark Design Preview v6-beta
+   Guidelines-strict, workspace-focused
+   ======================================== */
+
+/* --- CSS Variables (Appendix) --- */
+:root {
+  --page: #0a0a0b;
+  --panel: #111113;
+  --recessed: #18181b;
+  --hover: #1c1c1f;
+  --active: #222226;
+
+  --text: #fafafa;
+  --text-2: #a1a1aa;
+  --text-3: #52525b;
+  --text-4: #3f3f46;
+
+  --accent: #8b5cf6;
+  --accent-faint: rgba(139, 92, 246, 0.07);
+
+  --border: #1e1e22;
+
+  --green: #4ade80;
+  --red: #f87171;
+  --amber: #fbbf24;
+
+  --sans: 'Geist Sans', system-ui, -apple-system, sans-serif;
+  --mono: 'Geist Mono', 'SF Mono', 'Cascadia Code', monospace;
+}
+
+/* --- Reset --- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+::selection {
+  background: rgba(139, 92, 246, 0.25);
+}
+
+html, body {
+  height: 100%;
+  background: var(--page);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* --- Scrollbar (4px, near-invisible) --- */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--text-4); border-radius: 2px; }
+
+/* --- Layout: 3-panel --- */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.header {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 16px;
+}
+
+.main-area {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* --- Header --- */
+.wordmark {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+.pipeline {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+.pipeline-stage {
+  padding: 3px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.pipeline-stage.done { color: var(--green); }
+.pipeline-stage.active { color: var(--accent); font-weight: 500; }
+.pipeline-stage.pending { color: var(--text-4); }
+
+.pipeline-arrow {
+  color: var(--text-4);
+  font-size: 10px;
+  margin: 0 2px;
+}
+
+.header-spacer { flex: 1; }
+
+.search-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  height: 28px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-3);
+  font-size: 12px;
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.search-trigger:hover { background: var(--hover); }
+
+.search-trigger kbd {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-4);
+  background: var(--recessed);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.header-meta {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-3);
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* --- Sidebar (216px) --- */
+.sidebar {
+  width: 216px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+.sidebar-sessions {
+  flex: 1;
+  padding: 8px 6px;
+  overflow-y: auto;
+}
+
+.session-group-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-4);
+  padding: 12px 10px 4px;
+}
+
+.session-item {
+  padding: 7px 10px;
+  border-radius: 6px;
+  border-left: 2px solid transparent;
+  cursor: pointer;
+  transition: background 150ms ease;
+  margin-bottom: 1px;
+}
+
+.session-item:hover { background: var(--hover); }
+
+.session-item.selected {
+  background: var(--accent-faint);
+  border-left-color: var(--accent);
+}
+
+.session-item-name {
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-item.selected .session-item-name { color: var(--text); }
+
+.session-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.session-status {
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+.session-status.running {
+  color: var(--green);
+  animation: pulse 2s ease-in-out infinite;
+}
+.session-status.completed { color: var(--text-3); }
+.session-status.failed { color: var(--red); }
+.session-status.waiting { color: var(--amber); }
+.session-status.stopped { color: var(--text-4); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.session-time {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-4);
+}
+
+.sidebar-nav {
+  border-top: 1px solid var(--border);
+  padding: 8px 6px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.nav-item:hover { background: var(--hover); }
+
+.nav-item kbd {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-4);
+  background: var(--recessed);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.sidebar-version {
+  padding: 4px 16px 8px;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-4);
+}
+
+/* --- Center Panel --- */
+.center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--page);
+}
+
+.conversation {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 0;
+}
+
+.conversation-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* --- System Events --- */
+.system-event {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 8px 0;
+  padding-left: 46px;
+}
+
+.event-time {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-4);
+  width: 36px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.event-text {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-3);
+  line-height: 1.5;
+}
+
+.event-text .stage-name {
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+/* --- Agent Messages --- */
+.agent-message {
+  margin: 16px 0;
+  padding-left: 46px;
+}
+
+.agent-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 6px;
+}
+
+.agent-body p {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.7;
+  margin-bottom: 12px;
+}
+
+.agent-body p:last-child { margin-bottom: 0; }
+
+.agent-body code {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--recessed);
+  color: var(--text-2);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.agent-body ul, .agent-body ol {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.7;
+  padding-left: 20px;
+  margin-bottom: 12px;
+}
+
+.agent-body li { margin-bottom: 4px; }
+
+/* --- User Messages --- */
+.user-message {
+  margin: 16px 0;
+  margin-left: 46px;
+  border-left: 2px solid var(--accent);
+  background: var(--accent-faint);
+  border-radius: 0 8px 8px 0;
+  padding: 12px 16px;
+}
+
+.user-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.user-body {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.7;
+}
+
+/* --- Tool Call Rows --- */
+.tool-group {
+  margin: 8px 0;
+  padding-left: 46px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.tool-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--recessed);
+  cursor: pointer;
+  transition: background 150ms ease;
+  margin-bottom: 1px;
+}
+
+.tool-row:hover { background: var(--active); }
+
+.tool-icon {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+}
+
+.tool-icon.success { color: var(--green); }
+.tool-icon.error { color: var(--red); }
+
+.tool-expand {
+  width: 10px;
+  height: 10px;
+  color: var(--text-4);
+  flex-shrink: 0;
+  transition: transform 150ms ease;
+}
+
+.tool-expand.open { transform: rotate(90deg); }
+
+.tool-summary {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-3);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tool-timing {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-4);
+  flex-shrink: 0;
+}
+
+.tool-detail {
+  background: var(--active);
+  padding: 8px 10px 8px 28px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-3);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* --- Review Findings --- */
+.finding-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 8px 0;
+  padding-left: 46px;
+}
+
+.finding-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.finding-badge.good { color: var(--green); background: rgba(74, 222, 128, 0.08); }
+.finding-badge.note { color: var(--amber); background: rgba(251, 191, 36, 0.08); }
+.finding-badge.issue { color: var(--red); background: rgba(248, 113, 113, 0.08); }
+
+.finding-text {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.7;
+}
+
+.finding-text strong { font-weight: 500; }
+
+/* --- Summary Block --- */
+.summary-block {
+  margin: 12px 0;
+  margin-left: 46px;
+  background: var(--recessed);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.summary-row {
+  display: flex;
+  gap: 8px;
+}
+
+.summary-key { color: var(--text-3); flex-shrink: 0; }
+.summary-val { color: var(--text-2); }
+
+.summary-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 8px 0;
+}
+
+/* --- Input Bar --- */
+.input-bar {
+  border-top: 1px solid var(--border);
+  padding: 12px 0;
+  background: var(--panel);
+}
+
+.input-bar-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input-field {
+  flex: 1;
+  background: var(--recessed);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 200ms ease;
+}
+
+.input-field::placeholder { color: var(--text-4); }
+.input-field:focus { border-color: var(--accent); }
+
+.model-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-4);
+  flex-shrink: 0;
+}
+
+.send-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: var(--accent);
+  border: none;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: opacity 150ms ease;
+}
+
+.send-btn:hover { opacity: 0.85; }
+
+/* --- Right Workspace (320px) --- */
+.workspace {
+  width: 320px;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* --- Workspace Tabs --- */
+.ws-tabs {
+  display: flex;
+  height: 40px;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.ws-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-3);
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: var(--sans);
+  position: relative;
+  transition: color 150ms ease;
+}
+
+.ws-tab.active { color: var(--text); }
+
+.ws-tab-indicator {
+  position: absolute;
+  bottom: 0;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+  transition: left 250ms cubic-bezier(0.4, 0, 0.2, 1), width 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ws-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+/* hide inactive tab panels */
+.ws-panel { display: none; }
+.ws-panel.active { display: block; }
+
+/* --- Overview Tab --- */
+.ws-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 10px;
+  margin-top: 16px;
+}
+
+.ws-section-label:first-child { margin-top: 0; }
+
+/* Stage timeline */
+.stage-timeline {
+  position: relative;
+  padding-left: 14px;
+}
+
+.stage-timeline::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 6px;
+  bottom: 6px;
+  width: 1px;
+  background: var(--border);
+}
+
+.stage-entry {
+  position: relative;
+  padding: 4px 0 10px 12px;
+}
+
+.stage-dot {
+  position: absolute;
+  left: -14px;
+  top: 8px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  background: var(--panel);
+}
+
+.stage-entry.done .stage-dot { border-color: var(--green); background: var(--green); }
+.stage-entry.active .stage-dot { border-color: var(--accent); background: var(--accent); }
+.stage-entry.pending .stage-dot { border-color: var(--text-4); background: var(--panel); }
+
+.stage-name-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+
+.stage-entry.done .stage-name-label { color: var(--text-2); }
+.stage-entry.active .stage-name-label { color: var(--text); }
+.stage-entry.pending .stage-name-label { color: var(--text-4); }
+
+.stage-detail {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-4);
+  margin-top: 1px;
+  display: flex;
+  gap: 8px;
+}
+
+.stage-detail .agent-tag {
+  color: var(--text-3);
+}
+
+/* Metadata grid */
+.meta-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+}
+
+.meta-key {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-3);
+  line-height: 1.5;
+}
+
+.meta-val {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Agents section */
+.agent-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.agent-entry:last-child { border-bottom: none; }
+
+.agent-entry-name {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
+}
+
+.agent-entry-model {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* --- Files Tab --- */
+.files-summary {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-3);
+  padding: 6px 8px;
+  background: var(--recessed);
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+.files-summary .added { color: var(--green); }
+.files-summary .removed { color: var(--red); }
+
+.file-group {
+  margin-bottom: 8px;
+}
+
+.file-group-name {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-4);
+  padding: 4px 0;
+}
+
+.file-entry {
+  display: flex;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 150ms ease;
+  gap: 8px;
+}
+
+.file-entry:hover { background: var(--hover); }
+.file-entry.selected { background: var(--accent-faint); }
+
+.file-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--text-4);
+}
+
+.file-name {
+  font-size: 12px;
+  color: var(--text-2);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-stats {
+  font-family: var(--mono);
+  font-size: 10px;
+  flex-shrink: 0;
+  display: flex;
+  gap: 4px;
+}
+
+.file-stats .added { color: var(--green); }
+.file-stats .removed { color: var(--red); }
+
+/* --- Diff Tab --- */
+.diff-file-select {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.diff-file-btn {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-3);
+  background: var(--recessed);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 150ms ease;
+}
+
+.diff-file-btn:hover { background: var(--hover); }
+.diff-file-btn.active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: var(--accent-faint);
+}
+
+.diff-viewer {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.diff-header {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-3);
+  background: var(--recessed);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  border-radius: 6px 6px 0 0;
+}
+
+.diff-body {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.7;
+  background: var(--page);
+  border-radius: 0 0 6px 6px;
+  overflow-x: auto;
+}
+
+.diff-line {
+  display: flex;
+  padding: 0 10px;
+  white-space: pre;
+}
+
+.diff-ln {
+  width: 32px;
+  text-align: right;
+  color: var(--text-4);
+  flex-shrink: 0;
+  padding-right: 8px;
+  user-select: none;
+}
+
+.diff-ln2 {
+  width: 32px;
+  text-align: right;
+  color: var(--text-4);
+  flex-shrink: 0;
+  padding-right: 12px;
+  user-select: none;
+}
+
+.diff-content {
+  flex: 1;
+  white-space: pre;
+}
+
+.diff-line.added {
+  color: var(--green);
+  background: rgba(74, 222, 128, 0.04);
+}
+
+.diff-line.removed {
+  color: var(--red);
+  background: rgba(248, 113, 113, 0.04);
+}
+
+.diff-line.context { color: var(--text-3); }
+
+.diff-line.hunk {
+  color: var(--text-4);
+  background: var(--recessed);
+}
+
+/* --- Metrics Tab --- */
+.metric-card {
+  background: var(--recessed);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+
+.metric-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-4);
+  margin-bottom: 6px;
+}
+
+.metric-value {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.metric-sub {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+
+.metric-breakdown {
+  margin-top: 8px;
+}
+
+.metric-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-3);
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.metric-breakdown-row:last-child { border-bottom: none; }
+
+.metric-breakdown-row .label { color: var(--text-3); }
+.metric-breakdown-row .value { color: var(--text-2); }
+
+.test-results {
+  display: flex;
+  gap: 16px;
+  margin-top: 6px;
+}
+
+.test-stat {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.test-stat.passed { color: var(--green); }
+.test-stat.failed { color: var(--text-3); }
+
+.lint-status {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--green);
+  margin-top: 4px;
+}
+
+/* --- Code block in conversation --- */
+.code-block {
+  background: var(--recessed);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.6;
+  margin: 8px 0 12px;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.code-block .kw { color: var(--accent); }
+.code-block .str { color: var(--green); }
+.code-block .cm { color: var(--text-4); }
+.code-block .fn { color: #93c5fd; }
+.code-block .num { color: var(--amber); }
+</style>
+</head>
+<body>
+
+<div class="app-shell">
+  <!-- ============ HEADER (44px) ============ -->
+  <header class="header">
+    <div class="wordmark">Ark</div>
+
+    <div class="pipeline">
+      <span class="pipeline-stage done">plan</span>
+      <span class="pipeline-arrow">--></span>
+      <span class="pipeline-stage done">implement</span>
+      <span class="pipeline-arrow">--></span>
+      <span class="pipeline-stage done">verify</span>
+      <span class="pipeline-arrow">--></span>
+      <span class="pipeline-stage active">review</span>
+      <span class="pipeline-arrow">--></span>
+      <span class="pipeline-stage pending">merge</span>
+    </div>
+
+    <div class="header-spacer"></div>
+
+    <button class="search-trigger">Search... <kbd>&#8984;K</kbd></button>
+
+    <div class="header-meta">
+      <span>$0.82</span>
+      <span>24m</span>
+    </div>
+  </header>
+
+  <div class="main-area">
+    <!-- ============ SIDEBAR (216px) ============ -->
+    <aside class="sidebar">
+      <div class="sidebar-sessions">
+        <div class="session-group-label">Autonomous SDLC</div>
+
+        <div class="session-item selected">
+          <div class="session-item-name">Add OAuth2 PKCE provider</div>
+          <div class="session-item-meta">
+            <span class="session-status running">running</span>
+            <span class="session-time">24m</span>
+          </div>
+        </div>
+
+        <div class="session-item">
+          <div class="session-item-name">Refactor session store to PG</div>
+          <div class="session-item-meta">
+            <span class="session-status completed">completed</span>
+            <span class="session-time">18m</span>
+          </div>
+        </div>
+
+        <div class="session-item">
+          <div class="session-item-name">Fix circuit breaker retry loop</div>
+          <div class="session-item-meta">
+            <span class="session-status completed">completed</span>
+            <span class="session-time">9m</span>
+          </div>
+        </div>
+
+        <div class="session-item">
+          <div class="session-item-name">Helm chart resource limits</div>
+          <div class="session-item-meta">
+            <span class="session-status failed">failed</span>
+            <span class="session-time">7m</span>
+          </div>
+        </div>
+
+        <div class="session-group-label">Quick</div>
+
+        <div class="session-item">
+          <div class="session-item-name">Update README badges</div>
+          <div class="session-item-meta">
+            <span class="session-status completed">completed</span>
+            <span class="session-time">2m</span>
+          </div>
+        </div>
+
+        <div class="session-item">
+          <div class="session-item-name">Add cost per session metric</div>
+          <div class="session-item-meta">
+            <span class="session-status completed">completed</span>
+            <span class="session-time">5m</span>
+          </div>
+        </div>
+
+        <div class="session-group-label">Fan-out</div>
+
+        <div class="session-item">
+          <div class="session-item-name">Migrate 7 repos to ESM</div>
+          <div class="session-item-meta">
+            <span class="session-status waiting">waiting</span>
+            <span class="session-time">--</span>
+          </div>
+        </div>
+
+        <div class="session-item">
+          <div class="session-item-name">Bump deps across monorepo</div>
+          <div class="session-item-meta">
+            <span class="session-status stopped">stopped</span>
+            <span class="session-time">12m</span>
+          </div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-item">Agents <kbd>A</kbd></div>
+        <div class="nav-item">Flows <kbd>F</kbd></div>
+        <div class="nav-item">Compute <kbd>C</kbd></div>
+        <div class="nav-item">Costs <kbd>$</kbd></div>
+        <div class="nav-item">Settings <kbd>,</kbd></div>
+      </nav>
+      <div class="sidebar-version">v0.9.4</div>
+    </aside>
+
+    <!-- ============ CENTER (Conversation) ============ -->
+    <main class="center">
+      <div class="conversation">
+        <div class="conversation-inner">
+
+          <!-- Session start -->
+          <div class="system-event">
+            <span class="event-time">14:02</span>
+            <span class="event-text">Session started -- flow: <span class="stage-name">autonomous-sdlc</span> -- compute: local</span>
+          </div>
+
+          <!-- User message -->
+          <div class="user-message">
+            <div class="user-label">You</div>
+            <div class="user-body">Add an OAuth2 PKCE auth provider to the core package. It should support authorization code flow with S256 challenge, token refresh, and a pluggable storage backend for tokens. Write tests for the full flow including edge cases around token expiry and PKCE validation failures.</div>
+          </div>
+
+          <!-- Stage: plan dispatched -->
+          <div class="system-event">
+            <span class="event-time">14:02</span>
+            <span class="event-text">Stage <span class="stage-name">plan</span> dispatched</span>
+          </div>
+
+          <!-- Planner message 1 -->
+          <div class="agent-message">
+            <div class="agent-label">Planner</div>
+            <div class="agent-body">
+              <p>I will implement an OAuth2 PKCE authentication provider for the core package. Let me start by reading the existing auth infrastructure to understand the patterns in use.</p>
+            </div>
+          </div>
+
+          <!-- Tool calls -->
+          <div class="tool-group">
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><polyline points="2,5 4.5,7.5 8,3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg class="tool-expand" viewBox="0 0 10 10"><polyline points="3,1 7,5 3,9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="tool-summary">Read auth.ts, session.ts, types.ts</span>
+              <span class="tool-timing">0.8s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><polyline points="2,5 4.5,7.5 8,3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg class="tool-expand" viewBox="0 0 10 10"><polyline points="3,1 7,5 3,9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="tool-summary">Searched 'AuthProvider' across packages/core/</span>
+              <span class="tool-timing">1.2s</span>
+            </div>
+          </div>
+
+          <!-- Planner message 2 -->
+          <div class="agent-message">
+            <div class="agent-label">Planner</div>
+            <div class="agent-body">
+              <p>The existing auth module uses a provider interface pattern with <code>AuthProvider</code> as the base. I will create a new <code>PKCEProvider</code> that implements this interface. Here is the implementation plan:</p>
+              <ol>
+                <li>Create <code>packages/core/auth/pkce-provider.ts</code> with S256 challenge generation, authorization URL builder, token exchange, and token refresh</li>
+                <li>Add <code>TokenStorage</code> interface with in-memory and SQLite implementations</li>
+                <li>Create <code>packages/core/auth/pkce-verifier.ts</code> for PKCE code verifier/challenge utilities</li>
+                <li>Register the provider in <code>auth/index.ts</code></li>
+                <li>Write comprehensive tests covering the full authorization code flow, token refresh, expiry edge cases, and PKCE validation failures</li>
+              </ol>
+              <p>The S256 challenge will use <code>crypto.subtle.digest</code> for SHA-256 hashing, base64url-encoded. Token storage will default to in-memory but accept any <code>TokenStorage</code> implementation via constructor injection.</p>
+            </div>
+          </div>
+
+          <!-- Stage transition -->
+          <div class="system-event">
+            <span class="event-time">14:04</span>
+            <span class="event-text">Stage <span class="stage-name">plan</span> completed -- advancing to <span class="stage-name">implement</span></span>
+          </div>
+
+          <!-- Stage: implement dispatched -->
+          <div class="system-event">
+            <span class="event-time">14:04</span>
+            <span class="event-text">Stage <span class="stage-name">implement</span> dispatched</span>
+          </div>
+
+          <!-- Implementer message 1 -->
+          <div class="agent-message">
+            <div class="agent-label">Implementer</div>
+            <div class="agent-body">
+              <p>Starting implementation. I will create the PKCE utilities first, then the provider, then the token storage interface.</p>
+            </div>
+          </div>
+
+          <!-- Tool calls - creating files -->
+          <div class="tool-group">
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><polyline points="2,5 4.5,7.5 8,3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg class="tool-expand" viewBox="0 0 10 10"><polyline points="3,1 7,5 3,9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="tool-summary">Created packages/core/auth/pkce-verifier.ts (47 lines)</span>
+              <span class="tool-timing">0.3s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><polyline points="2,5 4.5,7.5 8,3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg class="tool-expand" viewBox="0 0 10 10"><polyline points="3,1 7,5 3,9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="tool-summary">Created packages/core/auth/token-storage.ts (62 lines)</span>
+              <span class="tool-timing">0.3s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><polyline points="2,5 4.5,7.5 8,3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg class="tool-expand open" viewBox="0 0 10 10"><polyline points="3,1 7,5 3,9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="tool-summary">Created packages/core/auth/pkce-provider.ts (128 lines)</span>
+              <span class="tool-timing">0.4s</span>
+            </div>
+            <div class="tool-detail">export class PKCEProvider implements AuthProvider {
+  private storage: TokenStorage;
+  private clientId: string;
+  private redirectUri: string;
+
+  constructor(opts: PKCEProviderOptions) {
+    this.storage = opts.storage ?? new InMemoryTokenStorage();
+    this.clientId = opts.clientId;
+    this.redirectUri = opts.redirectUri;
+  }
+
+  async startAuthFlow(): Promise&lt;AuthFlowResult&gt; {
+    const verifier = generateCodeVerifier();
+    const challenge = await generateS256Challenge(verifier);
+    // ...
+  }
+}</div>
+          </div>
+
+          <!-- More tool calls -->
+          <div class="tool-group">
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><polyline points="2,5 4.5,7.5 8,3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg class="tool-expand" viewBox="0 0 10 10"><polyline points="3,1 7,5 3,9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="tool-summary">Edited packages/core/auth/index.ts (+8 -1)</span>
+              <span class="tool-timing">0.2s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><polyline points="2,5 4.5,7.5 8,3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg class="tool-expand" viewBox="0 0 10 10"><polyline points="3,1 7,5 3,9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="tool-summary">Created packages/core/__tests__/pkce.test.ts (193 lines)</span>
+              <span class="tool-timing">0.5s</span>
+            </div>
+          </div>
+
+          <!-- Implementer message 2 -->
+          <div class="agent-message">
+            <div class="agent-label">Implementer</div>
+            <div class="agent-body">
+              <p>Implementation complete. Created 4 files and edited 1. The <code>PKCEProvider</code> supports:</p>
+              <ul>
+                <li>Authorization code flow with S256 PKCE challenge</li>
+                <li>Token exchange with automatic verifier cleanup</li>
+                <li>Token refresh with expiry-aware logic (refreshes 60s before expiry)</li>
+                <li>Pluggable <code>TokenStorage</code> interface with <code>InMemoryTokenStorage</code> default</li>
+              </ul>
+              <p>Tests cover 12 scenarios including happy path, expired tokens, invalid verifiers, network failures during refresh, and concurrent token access.</p>
+            </div>
+          </div>
+
+          <!-- Stage transition -->
+          <div class="system-event">
+            <span class="event-time">14:12</span>
+            <span class="event-text">Stage <span class="stage-name">implement</span> completed -- advancing to <span class="stage-name">verify</span></span>
+          </div>
+
+          <!-- Stage: verify -->
+          <div class="system-event">
+            <span class="event-time">14:12</span>
+            <span class="event-text">Stage <span class="stage-name">verify</span> dispatched</span>
+          </div>
+
+          <!-- Verifier message -->
+          <div class="agent-message">
+            <div class="agent-label">Verifier</div>
+            <div class="agent-body">
+              <p>Running the test suite and linter against the new auth module.</p>
+            </div>
+          </div>
+
+          <!-- Tool calls - tests -->
+          <div class="tool-group">
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><polyline points="2,5 4.5,7.5 8,3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg class="tool-expand" viewBox="0 0 10 10"><polyline points="3,1 7,5 3,9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="tool-summary">bun test packages/core/__tests__/pkce.test.ts -- 12 passed</span>
+              <span class="tool-timing">3.4s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><polyline points="2,5 4.5,7.5 8,3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg class="tool-expand" viewBox="0 0 10 10"><polyline points="3,1 7,5 3,9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="tool-summary">bun test -- 2,857 passed, 0 failed</span>
+              <span class="tool-timing">48.2s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><polyline points="2,5 4.5,7.5 8,3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg class="tool-expand" viewBox="0 0 10 10"><polyline points="3,1 7,5 3,9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="tool-summary">eslint packages/core/auth/ -- 0 warnings, 0 errors</span>
+              <span class="tool-timing">2.1s</span>
+            </div>
+          </div>
+
+          <div class="agent-message">
+            <div class="agent-label">Verifier</div>
+            <div class="agent-body">
+              <p>All 2,857 tests pass (including 12 new PKCE tests). Lint is clean with zero warnings. No type errors detected.</p>
+            </div>
+          </div>
+
+          <!-- Stage transition -->
+          <div class="system-event">
+            <span class="event-time">14:14</span>
+            <span class="event-text">Stage <span class="stage-name">verify</span> completed -- advancing to <span class="stage-name">review</span></span>
+          </div>
+
+          <!-- Stage: review -->
+          <div class="system-event">
+            <span class="event-time">14:14</span>
+            <span class="event-text">Stage <span class="stage-name">review</span> dispatched</span>
+          </div>
+
+          <!-- Reviewer message -->
+          <div class="agent-message">
+            <div class="agent-label">Reviewer</div>
+            <div class="agent-body">
+              <p>Reviewing the OAuth2 PKCE implementation for correctness, security, and code quality.</p>
+            </div>
+          </div>
+
+          <!-- Tool calls - review reads -->
+          <div class="tool-group">
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><polyline points="2,5 4.5,7.5 8,3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg class="tool-expand" viewBox="0 0 10 10"><polyline points="3,1 7,5 3,9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="tool-summary">Read pkce-provider.ts, pkce-verifier.ts, token-storage.ts</span>
+              <span class="tool-timing">0.6s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><polyline points="2,5 4.5,7.5 8,3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg class="tool-expand" viewBox="0 0 10 10"><polyline points="3,1 7,5 3,9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="tool-summary">Read pkce.test.ts</span>
+              <span class="tool-timing">0.4s</span>
+            </div>
+          </div>
+
+          <!-- Review findings -->
+          <div class="agent-message">
+            <div class="agent-label">Reviewer</div>
+            <div class="agent-body">
+              <p>Review findings:</p>
+            </div>
+          </div>
+
+          <div class="finding-row">
+            <span class="finding-badge good">Good</span>
+            <span class="finding-text"><strong>PKCE flow</strong> implemented correctly with S256 challenge method per RFC 7636</span>
+          </div>
+          <div class="finding-row">
+            <span class="finding-badge good">Good</span>
+            <span class="finding-text"><strong>Token refresh</strong> handles expiry window correctly with 60s buffer</span>
+          </div>
+          <div class="finding-row">
+            <span class="finding-badge good">Good</span>
+            <span class="finding-text"><strong>Storage interface</strong> is cleanly abstracted with proper async boundaries</span>
+          </div>
+          <div class="finding-row">
+            <span class="finding-badge note">Note</span>
+            <span class="finding-text"><strong>Verifier entropy</strong> uses 32 bytes -- consider documenting why this exceeds the RFC minimum of 32 characters</span>
+          </div>
+          <div class="finding-row">
+            <span class="finding-badge note">Note</span>
+            <span class="finding-text"><strong>Error messages</strong> could include the OAuth2 error code from the server response for debugging</span>
+          </div>
+          <div class="finding-row">
+            <span class="finding-badge issue">Issue</span>
+            <span class="finding-text"><strong>Missing test</strong> for concurrent token refresh race condition when two callers hit refresh simultaneously</span>
+          </div>
+
+          <div class="agent-message">
+            <div class="agent-label">Reviewer</div>
+            <div class="agent-body">
+              <p>Overall: <strong>approve</strong> with minor suggestions. The PKCE implementation is correct and well-tested. The concurrent refresh edge case should be addressed in a follow-up.</p>
+            </div>
+          </div>
+
+          <!-- Summary block -->
+          <div class="summary-block">
+            <div class="summary-row">
+              <span class="summary-key">PR</span>
+              <span class="summary-val">#847 -- Add OAuth2 PKCE auth provider</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-key">Branch</span>
+              <span class="summary-val">feat/oauth2-pkce-provider</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-key">Files</span>
+              <span class="summary-val">6 changed (+319 -13)</span>
+            </div>
+            <hr class="summary-divider">
+            <div class="summary-row">
+              <span class="summary-key">Tests</span>
+              <span class="summary-val">2,857 passed, 0 failed</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-key">Lint</span>
+              <span class="summary-val">clean</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-key">Cost</span>
+              <span class="summary-val">$0.82 (187k tokens)</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-key">Duration</span>
+              <span class="summary-val">24m 18s</span>
+            </div>
+          </div>
+
+          <!-- User follow-up -->
+          <div class="user-message">
+            <div class="user-label">You</div>
+            <div class="user-body">Looks good. Can you add the concurrent refresh test the reviewer flagged?</div>
+          </div>
+
+          <!-- Implementer response -->
+          <div class="system-event">
+            <span class="event-time">14:26</span>
+            <span class="event-text">Resuming stage <span class="stage-name">implement</span> for follow-up</span>
+          </div>
+
+          <div class="agent-message">
+            <div class="agent-label">Implementer</div>
+            <div class="agent-body">
+              <p>Adding a test for the concurrent token refresh race condition. This test will verify that when two callers trigger a refresh simultaneously, only one refresh request is made and both callers receive the same new token.</p>
+            </div>
+          </div>
+
+          <div class="tool-group">
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><polyline points="2,5 4.5,7.5 8,3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg class="tool-expand" viewBox="0 0 10 10"><polyline points="3,1 7,5 3,9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="tool-summary">Edited packages/core/__tests__/pkce.test.ts (+34 -0)</span>
+              <span class="tool-timing">0.3s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><polyline points="2,5 4.5,7.5 8,3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg class="tool-expand" viewBox="0 0 10 10"><polyline points="3,1 7,5 3,9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="tool-summary">Edited packages/core/auth/pkce-provider.ts (+12 -3)</span>
+              <span class="tool-timing">0.2s</span>
+            </div>
+            <div class="tool-row">
+              <svg class="tool-icon success" viewBox="0 0 10 10"><polyline points="2,5 4.5,7.5 8,3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg class="tool-expand" viewBox="0 0 10 10"><polyline points="3,1 7,5 3,9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="tool-summary">bun test packages/core/__tests__/pkce.test.ts -- 13 passed</span>
+              <span class="tool-timing">3.1s</span>
+            </div>
+          </div>
+
+          <div class="agent-message">
+            <div class="agent-label">Implementer</div>
+            <div class="agent-body">
+              <p>Done. Added a mutex guard around the refresh logic so concurrent callers share a single in-flight refresh. The new test spawns 5 concurrent <code>getAccessToken()</code> calls with an expired token and asserts that exactly one refresh HTTP request is made. All 13 PKCE tests pass.</p>
+            </div>
+          </div>
+
+          <!-- Bottom spacer -->
+          <div style="height: 20px"></div>
+
+        </div>
+      </div>
+
+      <!-- Input bar -->
+      <div class="input-bar">
+        <div class="input-bar-inner">
+          <input class="input-field" type="text" placeholder="Message Ark...">
+          <span class="model-badge">claude-4-opus</span>
+          <button class="send-btn">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 13L13 8L3 3V7L9 8L3 9V13Z" fill="currentColor"/></svg>
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- ============ RIGHT WORKSPACE (320px) ============ -->
+    <aside class="workspace">
+      <div class="ws-tabs" id="wsTabs">
+        <button class="ws-tab active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
+        <button class="ws-tab" data-tab="files" onclick="switchTab('files')">Files</button>
+        <button class="ws-tab" data-tab="diff" onclick="switchTab('diff')">Diff</button>
+        <button class="ws-tab" data-tab="metrics" onclick="switchTab('metrics')">Metrics</button>
+        <div class="ws-tab-indicator" id="tabIndicator" style="left: 0; width: 80px;"></div>
+      </div>
+
+      <div class="ws-content">
+
+        <!-- ========== OVERVIEW TAB ========== -->
+        <div class="ws-panel active" id="panel-overview">
+
+          <div class="ws-section-label">Stage Progress</div>
+          <div class="stage-timeline">
+            <div class="stage-entry done">
+              <div class="stage-dot"></div>
+              <div class="stage-name-label">Plan</div>
+              <div class="stage-detail">
+                <span>1m 42s</span>
+                <span class="agent-tag">planner</span>
+              </div>
+            </div>
+            <div class="stage-entry done">
+              <div class="stage-dot"></div>
+              <div class="stage-name-label">Implement</div>
+              <div class="stage-detail">
+                <span>8m 14s</span>
+                <span class="agent-tag">implementer</span>
+              </div>
+            </div>
+            <div class="stage-entry done">
+              <div class="stage-dot"></div>
+              <div class="stage-name-label">Verify</div>
+              <div class="stage-detail">
+                <span>2m 06s</span>
+                <span class="agent-tag">verifier</span>
+              </div>
+            </div>
+            <div class="stage-entry active">
+              <div class="stage-dot"></div>
+              <div class="stage-name-label">Review</div>
+              <div class="stage-detail">
+                <span>12m 16s</span>
+                <span class="agent-tag">reviewer</span>
+              </div>
+            </div>
+            <div class="stage-entry pending">
+              <div class="stage-dot"></div>
+              <div class="stage-name-label">Merge</div>
+              <div class="stage-detail">
+                <span>--</span>
+                <span class="agent-tag">merger</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="ws-section-label">Session</div>
+          <div class="meta-grid">
+            <span class="meta-key">id</span>
+            <span class="meta-val">s-a7f3</span>
+            <span class="meta-key">flow</span>
+            <span class="meta-val">autonomous-sdlc</span>
+            <span class="meta-key">runtime</span>
+            <span class="meta-val">claude</span>
+            <span class="meta-key">compute</span>
+            <span class="meta-val">local</span>
+            <span class="meta-key">branch</span>
+            <span class="meta-val">feat/oauth2-pkce-provider</span>
+            <span class="meta-key">pr</span>
+            <span class="meta-val">#847</span>
+          </div>
+
+          <div class="ws-section-label">Agents</div>
+          <div class="agent-entry">
+            <span class="agent-entry-name">Planner</span>
+            <span class="agent-entry-model">claude-4-opus</span>
+          </div>
+          <div class="agent-entry">
+            <span class="agent-entry-name">Implementer</span>
+            <span class="agent-entry-model">claude-4-opus</span>
+          </div>
+          <div class="agent-entry">
+            <span class="agent-entry-name">Verifier</span>
+            <span class="agent-entry-model">claude-4-sonnet</span>
+          </div>
+          <div class="agent-entry">
+            <span class="agent-entry-name">Reviewer</span>
+            <span class="agent-entry-model">claude-4-opus</span>
+          </div>
+          <div class="agent-entry">
+            <span class="agent-entry-name">Merger</span>
+            <span class="agent-entry-model">claude-4-sonnet</span>
+          </div>
+
+        </div>
+
+        <!-- ========== FILES TAB ========== -->
+        <div class="ws-panel" id="panel-files">
+
+          <div class="files-summary">
+            6 files changed, <span class="added">+319</span> <span class="removed">-13</span>
+          </div>
+
+          <div class="file-group">
+            <div class="file-group-name">packages/core/auth/</div>
+
+            <div class="file-entry selected" onclick="selectFile(this, 'pkce-provider.ts')">
+              <svg class="file-icon" viewBox="0 0 14 14" fill="none"><rect x="2" y="1" width="10" height="12" rx="1.5" stroke="currentColor" stroke-width="1.2"/><line x1="5" y1="5" x2="9" y2="5" stroke="currentColor" stroke-width="1"/><line x1="5" y1="7.5" x2="9" y2="7.5" stroke="currentColor" stroke-width="1"/><line x1="5" y1="10" x2="7.5" y2="10" stroke="currentColor" stroke-width="1"/></svg>
+              <span class="file-name">pkce-provider.ts</span>
+              <span class="file-stats"><span class="added">+140</span> <span class="removed">-3</span></span>
+            </div>
+
+            <div class="file-entry" onclick="selectFile(this, 'pkce-verifier.ts')">
+              <svg class="file-icon" viewBox="0 0 14 14" fill="none"><rect x="2" y="1" width="10" height="12" rx="1.5" stroke="currentColor" stroke-width="1.2"/><line x1="5" y1="5" x2="9" y2="5" stroke="currentColor" stroke-width="1"/><line x1="5" y1="7.5" x2="9" y2="7.5" stroke="currentColor" stroke-width="1"/><line x1="5" y1="10" x2="7.5" y2="10" stroke="currentColor" stroke-width="1"/></svg>
+              <span class="file-name">pkce-verifier.ts</span>
+              <span class="file-stats"><span class="added">+47</span></span>
+            </div>
+
+            <div class="file-entry" onclick="selectFile(this, 'token-storage.ts')">
+              <svg class="file-icon" viewBox="0 0 14 14" fill="none"><rect x="2" y="1" width="10" height="12" rx="1.5" stroke="currentColor" stroke-width="1.2"/><line x1="5" y1="5" x2="9" y2="5" stroke="currentColor" stroke-width="1"/><line x1="5" y1="7.5" x2="9" y2="7.5" stroke="currentColor" stroke-width="1"/><line x1="5" y1="10" x2="7.5" y2="10" stroke="currentColor" stroke-width="1"/></svg>
+              <span class="file-name">token-storage.ts</span>
+              <span class="file-stats"><span class="added">+62</span></span>
+            </div>
+
+            <div class="file-entry" onclick="selectFile(this, 'index.ts')">
+              <svg class="file-icon" viewBox="0 0 14 14" fill="none"><rect x="2" y="1" width="10" height="12" rx="1.5" stroke="currentColor" stroke-width="1.2"/><line x1="5" y1="5" x2="9" y2="5" stroke="currentColor" stroke-width="1"/><line x1="5" y1="7.5" x2="9" y2="7.5" stroke="currentColor" stroke-width="1"/><line x1="5" y1="10" x2="7.5" y2="10" stroke="currentColor" stroke-width="1"/></svg>
+              <span class="file-name">index.ts</span>
+              <span class="file-stats"><span class="added">+8</span> <span class="removed">-1</span></span>
+            </div>
+          </div>
+
+          <div class="file-group">
+            <div class="file-group-name">packages/core/__tests__/</div>
+
+            <div class="file-entry" onclick="selectFile(this, 'pkce.test.ts')">
+              <svg class="file-icon" viewBox="0 0 14 14" fill="none"><rect x="2" y="1" width="10" height="12" rx="1.5" stroke="currentColor" stroke-width="1.2"/><line x1="5" y1="5" x2="9" y2="5" stroke="currentColor" stroke-width="1"/><line x1="5" y1="7.5" x2="9" y2="7.5" stroke="currentColor" stroke-width="1"/><line x1="5" y1="10" x2="7.5" y2="10" stroke="currentColor" stroke-width="1"/></svg>
+              <span class="file-name">pkce.test.ts</span>
+              <span class="file-stats"><span class="added">+227</span></span>
+            </div>
+          </div>
+
+          <div class="file-group">
+            <div class="file-group-name">packages/types/</div>
+
+            <div class="file-entry" onclick="selectFile(this, 'auth.ts')">
+              <svg class="file-icon" viewBox="0 0 14 14" fill="none"><rect x="2" y="1" width="10" height="12" rx="1.5" stroke="currentColor" stroke-width="1.2"/><line x1="5" y1="5" x2="9" y2="5" stroke="currentColor" stroke-width="1"/><line x1="5" y1="7.5" x2="9" y2="7.5" stroke="currentColor" stroke-width="1"/><line x1="5" y1="10" x2="7.5" y2="10" stroke="currentColor" stroke-width="1"/></svg>
+              <span class="file-name">auth.ts</span>
+              <span class="file-stats"><span class="added">+18</span> <span class="removed">-9</span></span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ========== DIFF TAB ========== -->
+        <div class="ws-panel" id="panel-diff">
+
+          <div class="diff-file-select">
+            <button class="diff-file-btn active" onclick="selectDiffFile(this)">pkce-provider.ts</button>
+            <button class="diff-file-btn" onclick="selectDiffFile(this)">pkce-verifier.ts</button>
+            <button class="diff-file-btn" onclick="selectDiffFile(this)">token-storage.ts</button>
+            <button class="diff-file-btn" onclick="selectDiffFile(this)">index.ts</button>
+            <button class="diff-file-btn" onclick="selectDiffFile(this)">pkce.test.ts</button>
+            <button class="diff-file-btn" onclick="selectDiffFile(this)">auth.ts</button>
+          </div>
+
+          <div class="diff-viewer">
+            <div class="diff-header">packages/core/auth/pkce-provider.ts</div>
+            <div class="diff-body">
+              <div class="diff-line hunk"><span class="diff-ln"></span><span class="diff-ln2"></span><span class="diff-content">@@ -1,8 +1,145 @@</span></div>
+              <div class="diff-line context"><span class="diff-ln">1</span><span class="diff-ln2">1</span><span class="diff-content"> import { AuthProvider } from "./types.js";</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">2</span><span class="diff-content">+import { generateCodeVerifier, generateS256Challenge } from "./pkce-verifier.js";</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">3</span><span class="diff-content">+import { TokenStorage, InMemoryTokenStorage } from "./token-storage.js";</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">4</span><span class="diff-content">+import type { PKCEProviderOptions, AuthFlowResult, TokenSet } from "./types.js";</span></div>
+              <div class="diff-line context"><span class="diff-ln">2</span><span class="diff-ln2">5</span><span class="diff-content"> </span></div>
+              <div class="diff-line removed"><span class="diff-ln">3</span><span class="diff-ln2"></span><span class="diff-content">-export class PKCEProvider {</span></div>
+              <div class="diff-line removed"><span class="diff-ln">4</span><span class="diff-ln2"></span><span class="diff-content">-  // TODO: implement</span></div>
+              <div class="diff-line removed"><span class="diff-ln">5</span><span class="diff-ln2"></span><span class="diff-content">-}</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">6</span><span class="diff-content">+export class PKCEProvider implements AuthProvider {</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">7</span><span class="diff-content">+  private storage: TokenStorage;</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">8</span><span class="diff-content">+  private clientId: string;</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">9</span><span class="diff-content">+  private redirectUri: string;</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">10</span><span class="diff-content">+  private authEndpoint: string;</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">11</span><span class="diff-content">+  private tokenEndpoint: string;</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">12</span><span class="diff-content">+  private refreshMutex: Promise&lt;TokenSet&gt; | null = null;</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">13</span><span class="diff-content">+</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">14</span><span class="diff-content">+  constructor(opts: PKCEProviderOptions) {</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">15</span><span class="diff-content">+    this.storage = opts.storage ?? new InMemoryTokenStorage();</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">16</span><span class="diff-content">+    this.clientId = opts.clientId;</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">17</span><span class="diff-content">+    this.redirectUri = opts.redirectUri;</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">18</span><span class="diff-content">+    this.authEndpoint = opts.authEndpoint;</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">19</span><span class="diff-content">+    this.tokenEndpoint = opts.tokenEndpoint;</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">20</span><span class="diff-content">+  }</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">21</span><span class="diff-content">+</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">22</span><span class="diff-content">+  async startAuthFlow(): Promise&lt;AuthFlowResult&gt; {</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">23</span><span class="diff-content">+    const verifier = generateCodeVerifier();</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">24</span><span class="diff-content">+    const challenge = await generateS256Challenge(verifier);</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">25</span><span class="diff-content">+    await this.storage.setVerifier(verifier);</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">26</span><span class="diff-content">+</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">27</span><span class="diff-content">+    const params = new URLSearchParams({</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">28</span><span class="diff-content">+      response_type: "code",</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">29</span><span class="diff-content">+      client_id: this.clientId,</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">30</span><span class="diff-content">+      redirect_uri: this.redirectUri,</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">31</span><span class="diff-content">+      code_challenge: challenge,</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">32</span><span class="diff-content">+      code_challenge_method: "S256",</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">33</span><span class="diff-content">+    });</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">34</span><span class="diff-content">+</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">35</span><span class="diff-content">+    return {</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">36</span><span class="diff-content">+      authUrl: `${this.authEndpoint}?${params}`,</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">37</span><span class="diff-content">+      verifier,</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">38</span><span class="diff-content">+    };</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">39</span><span class="diff-content">+  }</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">40</span><span class="diff-content">+</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">41</span><span class="diff-content">+  async exchangeCode(code: string): Promise&lt;TokenSet&gt; {</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">42</span><span class="diff-content">+    const verifier = await this.storage.getVerifier();</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">43</span><span class="diff-content">+    if (!verifier) throw new Error("No PKCE verifier found");</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">44</span><span class="diff-content">+</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">45</span><span class="diff-content">+    const res = await fetch(this.tokenEndpoint, {</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">46</span><span class="diff-content">+      method: "POST",</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">47</span><span class="diff-content">+      headers: { "Content-Type": "application/x-www-form-urlencoded" },</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">48</span><span class="diff-content">+      body: new URLSearchParams({</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">49</span><span class="diff-content">+        grant_type: "authorization_code",</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">50</span><span class="diff-content">+        code,</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">51</span><span class="diff-content">+        code_verifier: verifier,</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">52</span><span class="diff-content">+        client_id: this.clientId,</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">53</span><span class="diff-content">+        redirect_uri: this.redirectUri,</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">54</span><span class="diff-content">+      }),</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">55</span><span class="diff-content">+    });</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">56</span><span class="diff-content">+</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">57</span><span class="diff-content">+    if (!res.ok) throw new Error(`Token exchange failed: ${res.status}`);</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">58</span><span class="diff-content">+    const tokens: TokenSet = await res.json();</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">59</span><span class="diff-content">+    await this.storage.setTokens(tokens);</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">60</span><span class="diff-content">+    await this.storage.clearVerifier();</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">61</span><span class="diff-content">+    return tokens;</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">62</span><span class="diff-content">+  }</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">63</span><span class="diff-content">+</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">64</span><span class="diff-content">+  async getAccessToken(): Promise&lt;string&gt; {</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">65</span><span class="diff-content">+    const tokens = await this.storage.getTokens();</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">66</span><span class="diff-content">+    if (!tokens) throw new Error("Not authenticated");</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">67</span><span class="diff-content">+</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">68</span><span class="diff-content">+    const expiresAt = tokens.issued_at + tokens.expires_in * 1000;</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">69</span><span class="diff-content">+    if (Date.now() &lt; expiresAt - 60_000) return tokens.access_token;</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">70</span><span class="diff-content">+</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">71</span><span class="diff-content">+    // Mutex: deduplicate concurrent refresh calls</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">72</span><span class="diff-content">+    if (this.refreshMutex) return (await this.refreshMutex).access_token;</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">73</span><span class="diff-content">+    this.refreshMutex = this.doRefresh(tokens.refresh_token);</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">74</span><span class="diff-content">+    try {</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">75</span><span class="diff-content">+      const refreshed = await this.refreshMutex;</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">76</span><span class="diff-content">+      return refreshed.access_token;</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">77</span><span class="diff-content">+    } finally {</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">78</span><span class="diff-content">+      this.refreshMutex = null;</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">79</span><span class="diff-content">+    }</span></div>
+              <div class="diff-line added"><span class="diff-ln"></span><span class="diff-ln2">80</span><span class="diff-content">+  }</span></div>
+              <div class="diff-line context"><span class="diff-ln">6</span><span class="diff-ln2">81</span><span class="diff-content"> </span></div>
+              <div class="diff-line context"><span class="diff-ln">7</span><span class="diff-ln2">82</span><span class="diff-content"> export default PKCEProvider;</span></div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ========== METRICS TAB ========== -->
+        <div class="ws-panel" id="panel-metrics">
+
+          <div class="metric-card">
+            <div class="metric-title">Token Usage</div>
+            <div class="metric-value">187,420</div>
+            <div class="metric-sub">total tokens</div>
+            <div class="metric-breakdown">
+              <div class="metric-breakdown-row"><span class="label">Plan</span><span class="value">24,180</span></div>
+              <div class="metric-breakdown-row"><span class="label">Implement</span><span class="value">98,340</span></div>
+              <div class="metric-breakdown-row"><span class="label">Verify</span><span class="value">31,200</span></div>
+              <div class="metric-breakdown-row"><span class="label">Review</span><span class="value">33,700</span></div>
+            </div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-title">Cost</div>
+            <div class="metric-value">$0.82</div>
+            <div class="metric-sub">across 4 stages</div>
+            <div class="metric-breakdown">
+              <div class="metric-breakdown-row"><span class="label">Input</span><span class="value">$0.31</span></div>
+              <div class="metric-breakdown-row"><span class="label">Output</span><span class="value">$0.47</span></div>
+              <div class="metric-breakdown-row"><span class="label">Cache read</span><span class="value">$0.04</span></div>
+            </div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-title">Duration</div>
+            <div class="metric-value">24m 18s</div>
+            <div class="metric-sub">wall clock time</div>
+            <div class="metric-breakdown">
+              <div class="metric-breakdown-row"><span class="label">Plan</span><span class="value">1m 42s</span></div>
+              <div class="metric-breakdown-row"><span class="label">Implement</span><span class="value">8m 14s</span></div>
+              <div class="metric-breakdown-row"><span class="label">Verify</span><span class="value">2m 06s</span></div>
+              <div class="metric-breakdown-row"><span class="label">Review</span><span class="value">12m 16s</span></div>
+            </div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-title">Test Results</div>
+            <div class="test-results">
+              <span class="test-stat passed">2,857 passed</span>
+              <span class="test-stat failed">0 failed</span>
+            </div>
+            <div class="metric-sub">13 new tests in pkce.test.ts</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-title">Lint</div>
+            <div class="lint-status">clean -- 0 warnings, 0 errors</div>
+          </div>
+
+        </div>
+
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+// Tab switching with animated indicator
+function switchTab(tabName) {
+  // Update tab active states
+  document.querySelectorAll('.ws-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.ws-tab[data-tab="${tabName}"]`).classList.add('active');
+
+  // Update panel visibility
+  document.querySelectorAll('.ws-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`panel-${tabName}`).classList.add('active');
+
+  // Animate indicator
+  const activeTab = document.querySelector(`.ws-tab[data-tab="${tabName}"]`);
+  const indicator = document.getElementById('tabIndicator');
+  const tabsRect = document.getElementById('wsTabs').getBoundingClientRect();
+  const tabRect = activeTab.getBoundingClientRect();
+  const inset = 12;
+  indicator.style.left = (tabRect.left - tabsRect.left + inset) + 'px';
+  indicator.style.width = (tabRect.width - inset * 2) + 'px';
+}
+
+// File selection in Files tab
+function selectFile(el, filename) {
+  document.querySelectorAll('.file-entry').forEach(f => f.classList.remove('selected'));
+  el.classList.add('selected');
+  // Switch to diff tab with this file selected
+  switchTab('diff');
+  document.querySelectorAll('.diff-file-btn').forEach(b => {
+    b.classList.remove('active');
+    if (b.textContent === filename) b.classList.add('active');
+  });
+}
+
+// Diff file selector
+function selectDiffFile(el) {
+  document.querySelectorAll('.diff-file-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// Initialize indicator position
+window.addEventListener('load', () => {
+  switchTab('overview');
+});
+</script>
+
+</body>
+</html>
