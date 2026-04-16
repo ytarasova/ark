@@ -31,6 +31,7 @@ Ark currently uses a custom **MCP-based channel protocol** for all agent communi
 - **22 files** directly reference channel ports/communication and would need awareness of the new transport
 - **3 packages** are in the critical blast radius: `core`, `compute`, `arkd`
 - The `Executor` interface is the natural abstraction boundary -- ACP can be introduced as a transport strategy without changing the executor contract
+- **All communication flows through the conductor** -- ACP is a transport between conductor and agent, NOT for direct agent-to-agent bypass. The conductor decides per-runtime whether to use channel or ACP transport.
 - Claude Code does NOT natively support ACP -- it would need an adapter (MCP server wrapping ACP client)
 - Goose already supports ACP via extensions; Gemini has native support
 - The existing `acp.ts` (headless session management) is **unrelated** to the industry ACP standard and should be renamed to avoid confusion
@@ -108,7 +109,7 @@ ACP (Agent Communication Protocol) is an open standard (Linux Foundation / AAIF)
 | Transport | stdio + HTTP notifications | HTTP + SSE + webhooks |
 | Discovery | Hardcoded in `.mcp.json` | Agent Cards (/.well-known/agent.json) |
 | Message format | Custom TypeScript types | Standardized JSON schema |
-| Agent-to-agent | Relay via conductor | Direct (agent card resolution) |
+| Agent-to-agent | Relay via conductor | Relay via conductor (ACP transport on each leg) |
 | Async model | MCP notifications | SSE streams + push notifications |
 | Auth | Tenant header injection | OAuth2 / API keys (spec-defined) |
 | Runtime support | Claude Code (native), others via adapter | Gemini (native), Goose (via adapter) |
@@ -119,6 +120,7 @@ ACP (Agent Communication Protocol) is an open standard (Linux Foundation / AAIF)
 - **Not a replacement for MCP.** MCP connects agents to tools/resources; ACP connects agents to agents.
 - **Not natively supported by Claude Code.** Claude Code uses MCP channels, not ACP.
 - **Not incompatible with channels.** Both can coexist -- channels for Claude, ACP for Goose/Gemini.
+- **Not a way to bypass the conductor.** In Ark, ACP is a transport layer between conductor and agent. The conductor remains the single source of truth for session state, report validation, and stage orchestration. Direct agent-to-agent communication still routes through the conductor.
 
 ---
 
@@ -281,58 +283,89 @@ The **most dangerous change** is modifying the conductor's report handling (`con
 
 ## 7. Dual-Mode Strategy: Channels + ACP
 
-### 7.1 Architecture
+### 7.1 Architecture (Conductor-Centric)
+
+**Design principle:** The conductor is the single hub for ALL communication. ACP is a transport choice on the conductor-to-agent leg, not a way for agents to bypass the conductor.
 
 ```
-                         ┌────────────────────────────┐
-                         │       Conductor :19100     │
-                         │                            │
-                         │  POST /api/channel/:id     │  <-- channel reports (existing)
-                         │  POST /api/acp/tasks/:id   │  <-- ACP task updates (new)
-                         │  POST /api/relay            │  <-- agent relay (existing)
-                         │                            │
-                         │  ┌────────────────────────┐│
-                         │  │   Report Normalizer    ││  <-- maps both formats to OutboundMessage
-                         │  └──────────┬─────────────┘│
-                         │             │              │
-                         │  ┌──────────v─────────────┐│
-                         │  │    applyReport()       ││  <-- unchanged business logic
-                         │  │    mediateHandoff()    ││
-                         │  └────────────────────────┘│
-                         └────────────────────────────┘
-                                    │           │
-                    ┌───────────────┘           └───────────────┐
-                    │ channel transport                         │ ACP transport
-                    v                                          v
-            ┌───────────────┐                          ┌───────────────┐
-            │  ark-channel  │                          │  ACP Server   │
-            │  (MCP stdio)  │                          │  (HTTP REST)  │
-            └───────┬───────┘                          └───────┬───────┘
-                    │                                          │
-            ┌───────v───────┐                          ┌───────v───────┐
-            │  Claude Code  │                          │ Goose/Gemini  │
-            │  Codex        │                          │ (ACP-native)  │
-            └───────────────┘                          └───────────────┘
+                         ┌─────────────────────────────────────────┐
+                         │          Conductor :19100               │
+                         │         (single source of truth)        │
+                         │                                         │
+                         │  INBOUND (reports from agents):         │
+                         │    POST /api/channel/:id   (channel)    │
+                         │    POST /api/acp/tasks/:id (ACP)        │
+                         │                                         │
+                         │  RELAY (agent-to-agent, always via us): │
+                         │    POST /api/relay                      │
+                         │                                         │
+                         │  ┌───────────────────────────────────┐  │
+                         │  │   Transport-Aware Report Ingress  │  │
+                         │  │   (normalizes both to             │  │
+                         │  │    OutboundMessage before handoff) │  │
+                         │  └──────────────┬────────────────────┘  │
+                         │                 │                       │
+                         │  ┌──────────────v────────────────────┐  │
+                         │  │  applyReport() -- unchanged       │  │
+                         │  │  mediateHandoff() -- unchanged    │  │
+                         │  └───────────────────────────────────┘  │
+                         │                                         │
+                         │  OUTBOUND (tasks/steering to agents):   │
+                         │    Selects transport per runtime:       │
+                         │    - channel: HTTP POST to channel port │
+                         │    - acp: ACP POST /tasks/:id/messages  │
+                         └──────────────┬──────────┬───────────────┘
+                                        │          │
+                    ┌───────────────────┘          └────────────────────┐
+                    │ channel transport                                 │ ACP transport
+                    │ (selected for claude-code, codex)                │ (selected for goose, gemini)
+                    v                                                  v
+            ┌───────────────┐                                  ┌───────────────┐
+            │  ark-channel  │                                  │  ACP endpoint │
+            │  (MCP stdio)  │                                  │  (HTTP REST)  │
+            └───────┬───────┘                                  └───────┬───────┘
+                    │                                                  │
+            ┌───────v───────┐                                  ┌───────v───────┐
+            │  Claude Code  │                                  │ Goose/Gemini  │
+            │  Codex        │                                  │ (ACP-native)  │
+            └───────────────┘                                  └───────────────┘
+
+Agent-to-Agent relay (ALWAYS through conductor):
+  Agent A --[channel or ACP]--> Conductor --[channel or ACP]--> Agent B
+  (conductor selects outbound transport based on target agent's runtime)
 ```
 
-### 7.2 Transport Selection Logic
+### 7.2 Transport Selection Logic (Conductor Decides)
+
+The conductor resolves the transport at dispatch time based on runtime type. The agent itself does not choose -- it simply speaks whichever protocol the conductor configures for it.
 
 ```typescript
-// In executor.ts or session-orchestration.ts
+// In session-orchestration.ts dispatch(), called by conductor
 function resolveTransport(runtime: string, agent: AgentConfig): "channel" | "acp" {
-  // Explicit override in agent YAML
+  // Explicit override in agent YAML (operator decision)
   if (agent.transport) return agent.transport;
 
-  // Runtime defaults
+  // Conductor picks based on runtime's native protocol
   switch (runtime) {
     case "claude-code":
     case "codex":
-      return "channel";       // MCP channel is native
+      return "channel";       // MCP channel is native; Claude has no ACP support
     case "goose":
     case "gemini-cli":
-      return "acp";           // ACP is native/preferred
+      return "acp";           // ACP is native/preferred for these runtimes
     default:
-      return "channel";       // safe default
+      return "channel";       // safe default -- channel is battle-tested
+  }
+}
+
+// For agent-to-agent relay, conductor resolves OUTBOUND transport per target:
+function deliverToAgent(conductor, targetSessionId, message) {
+  const targetSession = conductor.sessions.get(targetSessionId);
+  const transport = targetSession.transport; // resolved at dispatch time
+  if (transport === "acp") {
+    return conductor.acpClient.sendMessage(targetSessionId, message);
+  } else {
+    return conductor.deliverToChannel(targetSessionId, message);
   }
 }
 ```
@@ -364,7 +397,7 @@ ALTER TABLE sessions ADD COLUMN transport TEXT DEFAULT 'channel';
 | Task delivery | HTTP POST to channel port | ACP `POST /tasks` with message |
 | Report reception | `POST /api/channel/:id` | ACP `POST /tasks/:id` (status update) |
 | Steering | `notifications/claude/channel` | ACP `POST /tasks/:id/messages` |
-| Agent-to-agent | `send_to_agent` via relay | ACP direct task creation |
+| Agent-to-agent | `send_to_agent` via conductor relay | `send_to_agent` via conductor relay (conductor uses ACP on outbound leg) |
 | Hooks/settings | Claude settings.local.json | N/A (ACP agents self-configure) |
 | Transcript parsing | Runtime-specific parsers | Same -- independent of transport |
 
@@ -395,21 +428,25 @@ With ACP:
 
 ### 8.3 Better Agent-to-Agent Communication
 
-Current relay model:
+Agent-to-agent always routes through the conductor (single source of truth for session state and audit trail). ACP improves the transport on each leg:
+
+Current relay model (both legs use channel):
 ```
-Agent A --> channel --> arkd --> conductor --> arkd --> channel --> Agent B
+Agent A --[channel]--> arkd --> Conductor --> arkd --[channel]--> Agent B
 ```
 
-ACP model:
+ACP-aware relay (conductor picks transport per agent's runtime):
 ```
-Agent A --> ACP client --> Agent B's ACP endpoint
+Agent A --[ACP]--> Conductor --[channel]--> Agent B (Claude)
+Agent A --[ACP]--> Conductor --[ACP]------> Agent B (Goose)
+Agent A --[channel]--> Conductor --[ACP]--> Agent B (Gemini)
 ```
 
 Benefits:
-- **Lower latency:** No conductor hop for agent-to-agent messages
-- **Richer messages:** ACP supports structured data, images, embeddings -- not just text
-- **Discovery:** Agent cards enable dynamic discovery instead of hardcoded session IDs
-- **Decoupled:** Agents can communicate without conductor being online
+- **Mixed-runtime relay:** Conductor translates between channel and ACP transparently. A Claude agent can send to a Goose agent without knowing Goose speaks ACP.
+- **Richer messages:** ACP supports structured data, images, embeddings -- not just text. The conductor can forward rich payloads to ACP-native agents.
+- **Centralized audit:** All relay traffic passes through conductor, so event logging, tenant scoping, and rate limiting remain intact.
+- **No new trust boundaries:** Agents never talk directly to each other. The conductor validates every relay request.
 
 ### 8.4 Async-First Design
 
@@ -427,19 +464,22 @@ ACP's structured task model gives free observability:
 - Messages are timestamped and attributed to sender/receiver
 - Agent cards declare capabilities -- useful for the web UI
 
-### 8.6 Reduced Infrastructure Complexity
+### 8.6 Reduced Infrastructure Complexity (for ACP-native runtimes)
 
-Channel system requires:
+Channel system requires (for every runtime):
 - Per-session MCP process (ark-channel)
 - Per-session HTTP listener on ephemeral port
 - Arkd relay for port forwarding in remote compute
 - `.mcp.json` generation and management
 - `settings.local.json` hook wiring
 
-ACP requires:
-- One ACP server per compute target (or per session)
-- Standard HTTP -- no special port scheme needed
-- Agent card at well-known URL
+ACP-native runtimes (Goose, Gemini) require:
+- Conductor exposes ACP endpoints (already running on :19100)
+- Agent receives ACP server URL as env var at launch -- no `.mcp.json` needed
+- No per-session MCP process -- the runtime speaks ACP natively
+- Standard HTTP -- arkd can forward ACP requests the same way it forwards channel requests
+
+**Note:** Claude Code still uses the full channel stack. ACP reduces per-session process count only for runtimes that natively support it. The conductor is always in the loop.
 
 ### 8.7 Cost Comparison (Maintenance Burden)
 
