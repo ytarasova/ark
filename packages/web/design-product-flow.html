@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ark -- Product Refinement Flow (Midnight Circuit)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --font-sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+    --font-mono-ui: "Geist Mono", "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+
+    --rail-w: 48px;
+    --stage-w: 280px;
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+
+    --ease-linear: cubic-bezier(0.32, 0.72, 0, 1);
+
+    --running: #34D399;
+    --waiting: #FBBF24;
+    --completed: #60A5FA;
+    --failed: #F87171;
+    --stopped: rgba(107, 114, 128, 0.4);
+    --blocker: #F87171;
+    --info: #60A5FA;
+
+    --gradient-brand: linear-gradient(135deg, var(--primary) 0%, #06B6D4 100%);
+  }
+
+  .dark {
+    --bg: #0C0C14;
+    --bg-card: #14141E;
+    --bg-popover: #18182A;
+    --bg-sidebar: #0A0A12;
+    --bg-hover: #1E1E30;
+    --bg-input: #14141E;
+    --bg-overlay: rgba(0, 0, 0, 0.6);
+    --bg-section: #111120;
+
+    --fg: #E4E4ED;
+    --fg-muted: #7878A0;
+    --fg-faint: #4A4A6A;
+
+    --primary: #7C6AEF;
+    --primary-hover: #6B59DE;
+    --primary-subtle: rgba(124, 106, 239, 0.1);
+    --primary-fg: #FFFFFF;
+
+    --border: #252540;
+    --border-light: #1E1E30;
+
+    --running-glow: 0 0 8px rgba(52, 211, 153, 0.4);
+
+    color-scheme: dark;
+  }
+
+  .light {
+    --bg: #F8F8FC;
+    --bg-card: #FFFFFF;
+    --bg-popover: #FFFFFF;
+    --bg-sidebar: #F0F0F8;
+    --bg-hover: #EDEDF5;
+    --bg-input: #FFFFFF;
+    --bg-overlay: rgba(0, 0, 0, 0.3);
+    --bg-section: #F4F4FA;
+
+    --fg: #1A1A2E;
+    --fg-muted: #6B6B88;
+    --fg-faint: #A0A0B8;
+
+    --primary: #6C5CE7;
+    --primary-hover: #5B4BD6;
+    --primary-subtle: rgba(108, 92, 231, 0.08);
+    --primary-fg: #FFFFFF;
+
+    --border: #DCDCE8;
+    --border-light: #EDEDF5;
+
+    --running: #059669;
+    --waiting: #D97706;
+    --completed: #2563EB;
+    --failed: #DC2626;
+    --blocker: #DC2626;
+    --info: #2563EB;
+
+    --running-glow: 0 0 8px rgba(5, 150, 105, 0.3);
+
+    color-scheme: light;
+  }
+
+  html, body, .shell, .icon-rail, .stage-panel, .detail-panel,
+  .session-header, .stage-card, .section-card, .blocker-card,
+  .checklist-item, .metric-card {
+    transition: background-color 0.2s var(--ease-linear),
+                border-color 0.2s var(--ease-linear),
+                color 0.2s var(--ease-linear),
+                box-shadow 0.2s var(--ease-linear);
+  }
+
+  html, body {
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--fg);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  ::selection { background: rgba(124, 106, 239, 0.2); }
+
+  .shell { display: flex; height: 100vh; }
+
+  /* -- Icon Rail -- */
+  .icon-rail {
+    width: var(--rail-w); min-width: var(--rail-w);
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; align-items: center;
+    padding: 12px 0; gap: 2px;
+  }
+  .icon-rail-logo {
+    width: 28px; height: 28px; border-radius: var(--radius-sm);
+    background: var(--gradient-brand);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 16px; font-weight: 700; font-size: 12px; color: #fff; cursor: pointer;
+  }
+  .icon-rail-btn {
+    width: 36px; height: 36px; border-radius: var(--radius-md);
+    border: none; background: transparent; color: var(--fg-muted);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; position: relative;
+  }
+  .icon-rail-btn:hover { color: var(--fg); background: var(--bg-hover); }
+  .icon-rail-btn.active { color: var(--primary); background: var(--primary-subtle); }
+  .icon-rail-btn.active::before {
+    content: ""; position: absolute; left: -6px; top: 8px; bottom: 8px;
+    width: 3px; border-radius: 0 2px 2px 0; background: var(--primary);
+  }
+  .icon-rail-spacer { flex: 1; }
+  .icon-rail-btn svg { width: 18px; height: 18px; stroke-width: 1.5; }
+
+  /* -- Stage Sidebar -- */
+  .stage-panel {
+    width: var(--stage-w); min-width: var(--stage-w);
+    background: var(--bg); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .stage-header { padding: 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .stage-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .stage-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-muted); }
+  .stage-flow-label { font-size: 10px; font-family: var(--font-mono-ui); padding: 2px 6px; background: var(--primary-subtle); border-radius: 4px; color: var(--primary); }
+  .stage-session-name { font-size: 13px; font-weight: 600; color: var(--fg); margin-top: 8px; line-height: 1.4; }
+  .stage-meta { display: flex; align-items: center; gap: 12px; margin-top: 8px; font-size: 11px; color: var(--fg-muted); font-family: var(--font-mono-ui); }
+  .stage-meta-item { display: flex; align-items: center; gap: 4px; }
+  .stage-meta-item svg { width: 12px; height: 12px; }
+  .stage-progress-bar { height: 3px; background: var(--border); border-radius: 2px; margin-top: 12px; overflow: hidden; }
+  .stage-progress-fill { height: 100%; border-radius: 2px; background: var(--primary); transition: width 0.4s var(--ease-linear); }
+
+  .stage-list { flex: 1; overflow-y: auto; padding: 8px; }
+
+  .stage-card {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px; border-radius: var(--radius-sm); cursor: pointer; position: relative;
+  }
+  .stage-card:hover { background: var(--bg-hover); }
+  .stage-card.active { background: var(--primary-subtle); }
+  .stage-connector { position: absolute; left: 24px; top: 34px; bottom: -10px; width: 1px; background: var(--border); }
+  .stage-card:last-child .stage-connector { display: none; }
+
+  .stage-icon {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 12px; position: relative; z-index: 1;
+  }
+  .stage-icon.completed { background: rgba(52, 211, 153, 0.15); color: var(--running); }
+  .stage-icon.running { background: rgba(124, 106, 239, 0.15); color: var(--primary); box-shadow: var(--running-glow); }
+  .stage-icon.pending { background: var(--bg-card); border: 1px solid var(--border); color: var(--fg-faint); }
+  .stage-icon svg { width: 14px; height: 14px; }
+
+  .stage-info { flex: 1; min-width: 0; }
+  .stage-name { font-size: 13px; font-weight: 500; color: var(--fg); line-height: 1.3; }
+  .stage-card.active .stage-name { color: var(--primary); }
+  .stage-desc { font-size: 11px; color: var(--fg-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .stage-badges { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+  .stage-badge { font-size: 10px; font-family: var(--font-mono-ui); padding: 1px 6px; border-radius: 4px; }
+  .stage-badge.time { background: var(--bg-card); border: 1px solid var(--border); color: var(--fg-muted); }
+  .stage-badge.running-badge { background: rgba(52, 211, 153, 0.1); color: var(--running); border: 1px solid rgba(52, 211, 153, 0.2); }
+  .stage-badge.tokens { background: var(--primary-subtle); color: var(--primary); border: 1px solid rgba(124, 106, 239, 0.15); }
+
+  .stage-gate { padding: 12px 16px; border-top: 1px solid var(--border); flex-shrink: 0; }
+  .gate-btn {
+    width: 100%; height: 36px; border-radius: var(--radius-sm); border: none;
+    font-family: var(--font-sans); font-size: 13px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .gate-btn svg { width: 14px; height: 14px; }
+  .gate-btn.approve { background: var(--primary); color: var(--primary-fg); }
+  .gate-btn.approve:hover { background: var(--primary-hover); }
+  .gate-regen {
+    width: 100%; height: 30px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: transparent;
+    font-family: var(--font-sans); font-size: 12px; font-weight: 500;
+    color: var(--fg-muted); cursor: pointer; margin-top: 6px;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+  }
+  .gate-regen:hover { background: var(--bg-hover); color: var(--fg); }
+  .gate-regen svg { width: 12px; height: 12px; }
+
+  /* -- Detail Panel -- */
+  .detail-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+  .detail-header { padding: 16px 24px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .detail-header-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .detail-header-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+
+  .detail-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .detail-status-dot.running { background: var(--running); box-shadow: var(--running-glow); }
+  .detail-status-dot.completed { background: var(--completed); }
+
+  .detail-stage-name { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; color: var(--fg); }
+  .detail-stage-label { font-size: 11px; font-family: var(--font-mono-ui); color: var(--fg-muted); padding: 2px 8px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; }
+  .detail-header-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .detail-action-btn {
+    width: 32px; height: 32px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--bg-card); color: var(--fg-muted);
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .detail-action-btn:hover { background: var(--bg-hover); color: var(--fg); }
+  .detail-action-btn svg { width: 15px; height: 15px; }
+
+  .integration-badges { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+  .integration-badge {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; font-family: var(--font-mono-ui);
+    padding: 3px 8px; border-radius: 4px;
+    background: var(--bg-card); border: 1px solid var(--border); color: var(--fg-muted);
+  }
+  .integration-badge svg { width: 12px; height: 12px; }
+  .integration-badge .badge-count { font-weight: 600; color: var(--fg); }
+
+  /* Tabs */
+  .detail-tabs { display: flex; gap: 0; padding: 0 24px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .detail-tab {
+    padding: 8px 14px; font-size: 12px; font-weight: 500; color: var(--fg-muted);
+    background: transparent; border: none; cursor: pointer; position: relative; font-family: var(--font-sans);
+  }
+  .detail-tab:hover { color: var(--fg); }
+  .detail-tab.active { color: var(--fg); }
+  .detail-tab.active::after {
+    content: ""; position: absolute; bottom: -1px; left: 14px; right: 14px;
+    height: 2px; background: var(--primary); border-radius: 1px;
+  }
+  .detail-tab .tab-count { font-family: var(--font-mono-ui); font-size: 10px; color: var(--fg-faint); margin-left: 4px; }
+
+  .detail-content { flex: 1; overflow-y: auto; padding: 24px; }
+
+  /* Section Cards */
+  .section-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; margin-bottom: 16px; }
+  .section-title { font-size: 13px; font-weight: 600; color: var(--fg); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .section-title svg { width: 15px; height: 15px; color: var(--fg-muted); }
+  .section-title .count-badge { font-size: 10px; font-family: var(--font-mono-ui); padding: 1px 6px; border-radius: 4px; background: var(--primary-subtle); color: var(--primary); }
+
+  /* Constraints */
+  .constraint-list { display: flex; flex-direction: column; gap: 8px; }
+  .constraint-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--bg-section); border: 1px solid var(--border-light); }
+  .constraint-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
+  .constraint-dot.critical { background: var(--failed); }
+  .constraint-dot.high { background: var(--waiting); }
+  .constraint-dot.medium { background: var(--completed); }
+  .constraint-dot.info { background: var(--fg-faint); }
+  .constraint-content { flex: 1; min-width: 0; }
+  .constraint-label { font-size: 12px; font-weight: 600; color: var(--fg); margin-bottom: 2px; }
+  .constraint-desc { font-size: 12px; color: var(--fg-muted); line-height: 1.5; }
+  .constraint-tag { font-size: 10px; font-family: var(--font-mono-ui); padding: 1px 6px; border-radius: 4px; margin-left: 6px; }
+  .constraint-tag.issue { background: rgba(59, 130, 246, 0.1); color: var(--info); }
+
+  /* Blocker */
+  .blocker-card { background: rgba(248, 113, 113, 0.06); border: 1px solid rgba(248, 113, 113, 0.2); border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 16px; display: flex; align-items: flex-start; gap: 10px; }
+  .blocker-icon { width: 22px; height: 22px; border-radius: 50%; background: rgba(248, 113, 113, 0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--blocker); }
+  .blocker-icon svg { width: 12px; height: 12px; }
+  .blocker-content { flex: 1; }
+  .blocker-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--blocker); margin-bottom: 4px; }
+  .blocker-text { font-size: 12px; color: var(--fg); line-height: 1.5; }
+
+  /* Gap Analysis */
+  .gap-list { display: flex; flex-direction: column; gap: 6px; }
+  .gap-item { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; }
+  .gap-bullet { width: 4px; height: 4px; border-radius: 50%; background: var(--fg-faint); margin-top: 7px; flex-shrink: 0; }
+  .gap-text { font-size: 12px; color: var(--fg-muted); line-height: 1.5; }
+  .gap-text strong { color: var(--fg); font-weight: 500; }
+  .gap-text code { font-family: var(--font-mono); font-size: 11px; padding: 1px 5px; background: var(--bg-section); border: 1px solid var(--border-light); border-radius: 3px; color: var(--primary); }
+
+  /* Checklist */
+  .checklist { display: flex; flex-direction: column; gap: 4px; }
+  .checklist-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer; }
+  .checklist-item:hover { background: var(--bg-hover); }
+  .checklist-box {
+    width: 16px; height: 16px; border-radius: 3px; border: 1.5px solid var(--border);
+    background: var(--bg-card); display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-top: 1px; cursor: pointer; transition: all 0.15s ease-out;
+  }
+  .checklist-box:hover { border-color: var(--primary); }
+  .checklist-box.checked { background: var(--primary); border-color: var(--primary); }
+  .checklist-box.checked svg { color: #fff; }
+  .checklist-box svg { width: 10px; height: 10px; color: transparent; }
+  .checklist-text { font-size: 12px; color: var(--fg); line-height: 1.5; }
+  .checklist-item.checked-item .checklist-text { color: var(--fg-muted); text-decoration: line-through; }
+  .checklist-text code { font-family: var(--font-mono); font-size: 11px; padding: 1px 5px; background: var(--bg-section); border: 1px solid var(--border-light); border-radius: 3px; color: var(--primary); }
+
+  /* Metrics */
+  .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .metric-card { background: var(--bg-section); border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 12px; }
+  .metric-label { font-size: 11px; color: var(--fg-muted); margin-bottom: 4px; }
+  .metric-value { font-size: 16px; font-weight: 600; font-family: var(--font-mono-ui); color: var(--fg); }
+  .metric-value.high { color: var(--waiting); }
+  .metric-value.medium { color: var(--completed); }
+  .metric-desc { font-size: 11px; color: var(--fg-faint); margin-top: 2px; }
+  .risk-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; padding: 2px 6px; border-radius: 3px; }
+  .risk-tag.high { background: rgba(248, 113, 113, 0.1); color: var(--failed); }
+
+  /* Next Step */
+  .next-step-card { background: var(--primary-subtle); border: 1px solid rgba(124, 106, 239, 0.15); border-radius: var(--radius-md); padding: 12px 14px; display: flex; align-items: flex-start; gap: 10px; }
+  .next-step-icon { width: 22px; height: 22px; border-radius: 50%; background: rgba(124, 106, 239, 0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--primary); }
+  .next-step-icon svg { width: 12px; height: 12px; }
+  .next-step-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--primary); margin-bottom: 4px; }
+  .next-step-text { font-size: 12px; color: var(--fg); line-height: 1.5; }
+
+  /* Theme Toggle */
+  .theme-toggle {
+    width: 36px; height: 36px; border-radius: var(--radius-md); border: none;
+    background: transparent; color: var(--fg-muted);
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .theme-toggle:hover { color: var(--fg); background: var(--bg-hover); }
+  .theme-toggle svg { width: 18px; height: 18px; stroke-width: 1.5; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--fg-faint); }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Icon Rail -->
+  <nav class="icon-rail">
+    <div class="icon-rail-logo" title="Ark">A</div>
+    <button class="icon-rail-btn active" title="Sessions"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/></svg></button>
+    <button class="icon-rail-btn" title="Agents"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg></button>
+    <button class="icon-rail-btn" title="Compute"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 01-3-3m3 3a3 3 0 100 6h13.5a3 3 0 100-6m-16.5-3a3 3 0 013-3h13.5a3 3 0 013 3m-19.5 0a4.5 4.5 0 01.9-2.7L5.737 5.1a3.375 3.375 0 012.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 01.9 2.7m0 0a3 3 0 01-3 3m0 3h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008zm-3 6h.008v.008h-.008v-.008zm0-6h.008v.008h-.008v-.008z"/></svg></button>
+    <button class="icon-rail-btn" title="Knowledge"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"/></svg></button>
+    <button class="icon-rail-btn" title="Costs"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></button>
+    <div class="icon-rail-spacer"></div>
+    <button class="theme-toggle" id="themeBtn" title="Toggle theme"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"/></svg></button>
+    <button class="icon-rail-btn" title="Settings"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg></button>
+  </nav>
+
+  <!-- Stage Sidebar -->
+  <aside class="stage-panel">
+    <div class="stage-header">
+      <div class="stage-header-row">
+        <span class="stage-title">Flow Stages</span>
+        <span class="stage-flow-label">product-refinement</span>
+      </div>
+      <div class="stage-session-name">Field Sales Executives on the GG App make phone calls</div>
+      <div class="stage-meta">
+        <span class="stage-meta-item"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>12m 34s</span>
+        <span class="stage-meta-item"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>$1.42</span>
+        <span class="stage-meta-item">5/6</span>
+      </div>
+      <div class="stage-progress-bar"><div class="stage-progress-fill" style="width:83%"></div></div>
+    </div>
+
+    <div class="stage-list">
+      <div class="stage-card" onclick="selectStage(0)">
+        <div class="stage-icon completed"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg></div>
+        <div class="stage-connector"></div>
+        <div class="stage-info">
+          <div class="stage-name">Intelligence</div>
+          <div class="stage-desc">Market research and competitive analysis</div>
+          <div class="stage-badges"><span class="stage-badge time">1m 48s</span><span class="stage-badge tokens">2.1k tok</span></div>
+        </div>
+      </div>
+      <div class="stage-card" onclick="selectStage(1)">
+        <div class="stage-icon completed"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg></div>
+        <div class="stage-connector"></div>
+        <div class="stage-info">
+          <div class="stage-name">Wiki & Issue Context</div>
+          <div class="stage-desc">Confluence + GitHub Issues synthesis</div>
+          <div class="stage-badges"><span class="stage-badge time">2m 12s</span><span class="stage-badge tokens">3.4k tok</span></div>
+        </div>
+      </div>
+      <div class="stage-card" onclick="selectStage(2)">
+        <div class="stage-icon completed"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg></div>
+        <div class="stage-connector"></div>
+        <div class="stage-info">
+          <div class="stage-name">VOC Synthesis</div>
+          <div class="stage-desc">Voice of customer from Slack + support</div>
+          <div class="stage-badges"><span class="stage-badge time">2m 05s</span><span class="stage-badge tokens">4.8k tok</span></div>
+        </div>
+      </div>
+      <div class="stage-card" onclick="selectStage(3)">
+        <div class="stage-icon completed"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg></div>
+        <div class="stage-connector"></div>
+        <div class="stage-info">
+          <div class="stage-name">Problem Refinement</div>
+          <div class="stage-desc">Constraints, dependencies, scope</div>
+          <div class="stage-badges"><span class="stage-badge time">3m 21s</span><span class="stage-badge tokens">5.2k tok</span></div>
+        </div>
+      </div>
+      <div class="stage-card active" onclick="selectStage(4)">
+        <div class="stage-icon running"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"/></svg></div>
+        <div class="stage-connector"></div>
+        <div class="stage-info">
+          <div class="stage-name">Pre-Grooming</div>
+          <div class="stage-desc">Readiness assessment, spikes, estimates</div>
+          <div class="stage-badges"><span class="stage-badge running-badge">Running</span><span class="stage-badge tokens">3.1k tok</span></div>
+        </div>
+      </div>
+      <div class="stage-card" onclick="selectStage(5)">
+        <div class="stage-icon pending"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+        <div class="stage-info">
+          <div class="stage-name">Sprint Planning</div>
+          <div class="stage-desc">Story breakdown and assignment</div>
+          <div class="stage-badges"><span class="stage-badge time">Pending</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stage-gate">
+      <button class="gate-btn approve"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>Approve & Continue</button>
+      <button class="gate-regen"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182"/></svg>Regenerate</button>
+    </div>
+  </aside>
+
+  <!-- Detail Panel -->
+  <main class="detail-panel">
+    <div class="detail-header">
+      <div class="detail-header-top">
+        <div class="detail-header-left">
+          <div class="detail-status-dot running"></div>
+          <span class="detail-stage-name">Pre-Grooming</span>
+          <span class="detail-stage-label">Stage 5 of 6</span>
+        </div>
+        <div class="detail-header-actions">
+          <button class="detail-action-btn" title="Copy output"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184"/></svg></button>
+          <button class="detail-action-btn" title="Export as Markdown"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg></button>
+          <button class="detail-action-btn" title="Full screen"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"/></svg></button>
+        </div>
+      </div>
+      <div class="integration-badges">
+        <div class="integration-badge"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 01-2.25 2.25M16.5 7.5V18a2.25 2.25 0 002.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875V18a2.25 2.25 0 002.25 2.25h13.5"/></svg>GitHub Issues <span class="badge-count">3</span></div>
+        <div class="integration-badge"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 8.511c.884.284 1.5 1.128 1.5 2.097v4.286c0 1.136-.847 2.1-1.98 2.193-.34.027-.68.052-1.02.072v3.091l-3-3c-1.354 0-2.694-.055-4.02-.163a2.115 2.115 0 01-.825-.242m9.345-8.334a2.126 2.126 0 00-.476-.095 48.64 48.64 0 00-8.048 0c-1.131.094-1.976 1.057-1.976 2.192v4.286c0 .837.46 1.58 1.155 1.951m9.345-8.334V6.637c0-1.621-1.152-3.026-2.76-3.235A48.455 48.455 0 0011.25 3c-2.115 0-4.198.137-6.24.402-1.608.209-2.76 1.614-2.76 3.235v6.226c0 1.621 1.152 3.026 2.76 3.235.577.075 1.157.14 1.74.194V21l4.155-4.155"/></svg>Slack <span class="badge-count">12</span></div>
+        <div class="integration-badge"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg>Confluence <span class="badge-count">5</span></div>
+      </div>
+    </div>
+
+    <div class="detail-tabs">
+      <button class="detail-tab active" onclick="switchTab(this)">Output</button>
+      <button class="detail-tab" onclick="switchTab(this)">Sources <span class="tab-count">(8)</span></button>
+      <button class="detail-tab" onclick="switchTab(this)">Conversation</button>
+      <button class="detail-tab" onclick="switchTab(this)">Events <span class="tab-count">(14)</span></button>
+    </div>
+
+    <div class="detail-content">
+      <!-- Dependencies & Constraints -->
+      <div class="section-card">
+        <div class="section-title">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+          Dependencies & Constraints <span class="count-badge">4</span>
+        </div>
+        <div class="constraint-list">
+          <div class="constraint-item">
+            <div class="constraint-dot critical"></div>
+            <div class="constraint-content">
+              <div class="constraint-label">Vendor lock <span class="constraint-tag issue">GH-482</span></div>
+              <div class="constraint-desc">Need approved telephony provider (OpenQ1) before SDK selection. Current evaluation covers Twilio, Exotel, and Plivo.</div>
+            </div>
+          </div>
+          <div class="constraint-item">
+            <div class="constraint-dot high"></div>
+            <div class="constraint-content">
+              <div class="constraint-label">Latency SLA <span class="constraint-tag issue">GH-491</span></div>
+              <div class="constraint-desc">Call-outcome event must reach OL in &lt;5s for real-time task creation (OpenQ2). Requires WebSocket or SSE push -- polling won't meet SLA.</div>
+            </div>
+          </div>
+          <div class="constraint-item">
+            <div class="constraint-dot high"></div>
+            <div class="constraint-content">
+              <div class="constraint-label">Privacy</div>
+              <div class="constraint-desc">Call metadata storage must comply with Indian data protection rules (OpenQ3). No call recordings stored outside IN region.</div>
+            </div>
+          </div>
+          <div class="constraint-item">
+            <div class="constraint-dot medium"></div>
+            <div class="constraint-content">
+              <div class="constraint-label">Offline fallback</div>
+              <div class="constraint-desc">Must queue locally and sync when back online (OpenQ4). Field reps operate in low-connectivity areas -- offline-first is non-negotiable.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Blocker -->
+      <div class="blocker-card">
+        <div class="blocker-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg></div>
+        <div class="blocker-content">
+          <div class="blocker-label">Blocker</div>
+          <div class="blocker-text">Contractual confirmation of the telephony vendor (Twilio vs Exotel). Procurement timeline: 2-3 weeks. SDK integration work cannot begin until vendor is locked. <strong>PM action required.</strong></div>
+        </div>
+      </div>
+
+      <!-- Data & Analytics Readiness -->
+      <div class="section-card">
+        <div class="section-title">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>
+          Data & Analytics Readiness
+        </div>
+        <div class="gap-list">
+          <div class="gap-item"><div class="gap-bullet"></div><div class="gap-text">No existing <strong>"call-outcome"</strong> event in OpenSearch -- need new event type & dashboard widget.</div></div>
+          <div class="gap-item"><div class="gap-bullet"></div><div class="gap-text">Success metrics (<strong>"calls logged per active FSE"</strong>, "next-step execution rate") require instrumentation in <code>agent-aggregation-service</code> and a new KPI dashboard.</div></div>
+          <div class="gap-item"><div class="gap-bullet"></div><div class="gap-text">Add lightweight logging (<code>call-id</code>, <code>timestamp</code>, <code>outcome</code>) in the mobile SDK and forward to the new API.</div></div>
+        </div>
+      </div>
+
+      <!-- Recommended Spike / Investigation Items -->
+      <div class="section-card">
+        <div class="section-title">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0118 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3l1.5 1.5 3-3.75"/></svg>
+          Recommended Spike / Investigation Items <span class="count-badge">5</span>
+        </div>
+        <div class="checklist">
+          <div class="checklist-item checked-item" onclick="toggleCheck(this)">
+            <div class="checklist-box checked"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg></div>
+            <div class="checklist-text">Verify current IVR launch code (<code>TaskAndLeadsViewModelKt</code>) for available SDK callbacks on Android.</div>
+          </div>
+          <div class="checklist-item" onclick="toggleCheck(this)">
+            <div class="checklist-box"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg></div>
+            <div class="checklist-text">Prototype a minimal Twilio/Exotel SDK integration and capture call-end events on a test device.</div>
+          </div>
+          <div class="checklist-item" onclick="toggleCheck(this)">
+            <div class="checklist-box"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg></div>
+            <div class="checklist-text">Draft the <code>call-outcome</code> API contract and simulate end-to-end flow using Postman.</div>
+          </div>
+          <div class="checklist-item" onclick="toggleCheck(this)">
+            <div class="checklist-box"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg></div>
+            <div class="checklist-text">Evaluate offline queue design (Room DB vs. simple file) and sync latency impact.</div>
+          </div>
+          <div class="checklist-item" onclick="toggleCheck(this)">
+            <div class="checklist-box"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg></div>
+            <div class="checklist-text">Benchmark WebSocket vs SSE latency for call-outcome push delivery under Indian mobile networks.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rough Complexity Signal -->
+      <div class="section-card">
+        <div class="section-title">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6"/></svg>
+          Rough Complexity Signal
+        </div>
+        <div class="metrics-grid">
+          <div class="metric-card"><div class="metric-label">Overall complexity</div><div class="metric-value high">High</div><div class="metric-desc">Mobile SDK + new backend API + task rule + UI overlay</div></div>
+          <div class="metric-card"><div class="metric-label">Sprint allocation</div><div class="metric-value">4 sprints</div><div class="metric-desc">2 mobile, 1 backend, 1 validation/analytics</div></div>
+          <div class="metric-card"><div class="metric-label">Biggest risk</div><div class="metric-value"><span class="risk-tag high">High</span></div><div class="metric-desc">Quarterly mobile release freeze could push delivery beyond the Charter Cycle start</div></div>
+          <div class="metric-card"><div class="metric-label">Team dependencies</div><div class="metric-value medium">3 teams</div><div class="metric-desc">Mobile, Backend, Data Analytics</div></div>
+        </div>
+      </div>
+
+      <!-- PM Next Step -->
+      <div class="next-step-card">
+        <div class="next-step-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg></div>
+        <div>
+          <div class="next-step-label">PM Next Step</div>
+          <div class="next-step-text">Secure the approved telephony vendor contract and obtain latency/privacy requirements from Procurement and Legal. Once vendor is locked, unblock the SDK spike and proceed to Sprint Planning.</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<script>
+  function toggleTheme() {
+    var html = document.documentElement;
+    var isDark = html.classList.contains('dark');
+    html.classList.remove(isDark ? 'dark' : 'light');
+    html.classList.add(isDark ? 'light' : 'dark');
+    localStorage.setItem('ark-product-flow-mode', isDark ? 'light' : 'dark');
+    var btn = document.getElementById('themeBtn');
+    if (isDark) {
+      btn.textContent = '';
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('fill', 'none'); svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.style.width = '18px'; svg.style.height = '18px'; svg.style.strokeWidth = '1.5';
+      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('stroke-linecap', 'round'); path.setAttribute('stroke-linejoin', 'round');
+      path.setAttribute('d', 'M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z');
+      svg.appendChild(path); btn.appendChild(svg);
+    } else {
+      btn.textContent = '';
+      var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('fill', 'none'); svg.setAttribute('viewBox', '0 0 24 24');
+      svg.setAttribute('stroke', 'currentColor');
+      svg.style.width = '18px'; svg.style.height = '18px'; svg.style.strokeWidth = '1.5';
+      var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('stroke-linecap', 'round'); path.setAttribute('stroke-linejoin', 'round');
+      path.setAttribute('d', 'M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z');
+      svg.appendChild(path); btn.appendChild(svg);
+    }
+  }
+
+  var saved = localStorage.getItem('ark-product-flow-mode');
+  if (saved === 'light') toggleTheme();
+
+  function selectStage(idx) {
+    var cards = document.querySelectorAll('.stage-card');
+    for (var i = 0; i < cards.length; i++) {
+      if (i === idx) cards[i].classList.add('active');
+      else cards[i].classList.remove('active');
+    }
+  }
+
+  function switchTab(el) {
+    var tabs = document.querySelectorAll('.detail-tab');
+    for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+    el.classList.add('active');
+  }
+
+  function toggleCheck(el) {
+    var box = el.querySelector('.checklist-box');
+    box.classList.toggle('checked');
+    el.classList.toggle('checked-item');
+  }
+
+  document.addEventListener('keydown', function(e) {
+    var stages = document.querySelectorAll('.stage-card');
+    var activeIdx = -1;
+    for (var i = 0; i < stages.length; i++) {
+      if (stages[i].classList.contains('active')) { activeIdx = i; break; }
+    }
+    if (e.key === 'j' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); selectStage(Math.min(activeIdx + 1, stages.length - 1)); }
+    if (e.key === 'k' && !e.metaKey && !e.ctrlKey) { e.preventDefault(); selectStage(Math.max(activeIdx - 1, 0)); }
+    if ('1234'.indexOf(e.key) !== -1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      var tabs = document.querySelectorAll('.detail-tab');
+      var idx = parseInt(e.key) - 1;
+      if (tabs[idx]) { e.preventDefault(); for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active'); tabs[idx].classList.add('active'); }
+    }
+    if (e.key === 't' && !e.metaKey && !e.ctrlKey) toggleTheme();
+  });
+</script>
+</body>
+</html>
