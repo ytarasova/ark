@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ark - Design Preview v5 (Open Agents Clone)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ── Reset ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-page: #0a0a0a;
+    --bg-sidebar: #111111;
+    --bg-sidebar-hover: #1a1a1a;
+    --bg-sidebar-selected: #1a1a1a;
+    --bg-panel: #0a0a0a;
+    --bg-input: #1a1a1a;
+    --bg-user-msg: #2a2a2a;
+    --bg-tool-call: #141414;
+    --bg-tab-active: transparent;
+    --bg-badge: #2a2a2a;
+    --bg-button: transparent;
+    --bg-button-hover: #1a1a1a;
+    --bg-modal-overlay: rgba(0,0,0,0.6);
+    --bg-modal: #141414;
+
+    --border-default: rgba(255,255,255,0.06);
+    --border-subtle: rgba(255,255,255,0.04);
+    --border-user-msg: #333333;
+    --border-input: rgba(255,255,255,0.08);
+    --border-button: rgba(255,255,255,0.15);
+
+    --text-primary: #e5e5e5;
+    --text-secondary: #888888;
+    --text-muted: #555555;
+    --text-white: #ffffff;
+    --text-link: #60a5fa;
+    --text-green: #4ade80;
+    --text-red: #f87171;
+    --text-yellow: #facc15;
+
+    --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-mono: 'Geist Mono', 'SF Mono', 'Fira Code', monospace;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--text-primary);
+    background: var(--bg-page);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow: hidden;
+    height: 100vh;
+  }
+
+  /* ── App Shell ── */
+  .app {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* ── Left Sidebar: Session List ── */
+  .sidebar {
+    width: 280px;
+    min-width: 280px;
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border-default);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-header {
+    padding: 16px 16px 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .sidebar-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .sidebar-add-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--border-default);
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+  .sidebar-add-btn:hover {
+    background: var(--bg-sidebar-hover);
+    color: var(--text-primary);
+  }
+
+  .sidebar-tabs {
+    display: flex;
+    margin: 12px 16px 0 16px;
+    gap: 0;
+    border-bottom: 1px solid var(--border-default);
+  }
+
+  .sidebar-tab {
+    flex: 1;
+    padding: 8px 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: center;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .sidebar-tab.active {
+    color: var(--text-primary);
+    border-bottom-color: var(--text-primary);
+  }
+  .sidebar-tab:hover:not(.active) {
+    color: var(--text-secondary);
+  }
+
+  .session-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 8px;
+  }
+
+  .session-group-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 12px 8px 4px 8px;
+  }
+
+  .session-item {
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-bottom: 2px;
+  }
+  .session-item:hover {
+    background: var(--bg-sidebar-hover);
+  }
+  .session-item.active {
+    background: var(--bg-sidebar-selected);
+  }
+
+  .session-item-name {
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .session-item-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .session-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .session-status-dot.running { background: var(--text-green); }
+  .session-status-dot.completed { background: var(--text-secondary); }
+  .session-status-dot.failed { background: var(--text-red); }
+  .session-status-dot.paused { background: var(--text-yellow); }
+
+  .sidebar-footer {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border-default);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+  }
+
+  .user-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .user-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .user-email {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .settings-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .settings-btn:hover {
+    color: var(--text-secondary);
+    background: var(--bg-sidebar-hover);
+  }
+
+  /* ── Center: Main Content ── */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: var(--bg-page);
+  }
+
+  /* Top bar */
+  .top-bar {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--border-default);
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .top-bar-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .top-bar-icon {
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+  }
+  .top-bar-icon:hover {
+    color: var(--text-secondary);
+    background: var(--bg-sidebar-hover);
+  }
+
+  .top-bar-spacer { flex: 1; }
+
+  .top-bar-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .top-bar-btn {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-button);
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .top-bar-btn:hover {
+    background: var(--bg-button-hover);
+  }
+
+  /* Tab bar */
+  .tab-bar {
+    height: 40px;
+    display: flex;
+    align-items: stretch;
+    border-bottom: 1px solid var(--border-default);
+    padding: 0 16px;
+    gap: 0;
+    flex-shrink: 0;
+    overflow-x: auto;
+  }
+
+  .tab-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .tab-item.active {
+    color: var(--text-primary);
+    border-bottom-color: var(--text-primary);
+  }
+  .tab-item:hover:not(.active) {
+    color: var(--text-secondary);
+  }
+  .tab-item .tab-icon {
+    font-size: 14px;
+    color: var(--text-muted);
+  }
+  .tab-item.active .tab-icon {
+    color: var(--text-secondary);
+  }
+  .tab-close {
+    font-size: 12px;
+    margin-left: 4px;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 3px;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .tab-close:hover {
+    background: rgba(255,255,255,0.1);
+    color: var(--text-primary);
+  }
+  .tab-add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 10px;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 16px;
+  }
+  .tab-add:hover { color: var(--text-secondary); }
+
+  /* Chat area */
+  .chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* Messages */
+  .msg { max-width: 720px; width: 100%; }
+
+  .msg.user {
+    align-self: flex-end;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .msg.agent {
+    align-self: flex-start;
+  }
+
+  .msg-user-bubble {
+    background: var(--bg-user-msg);
+    border: 1px solid var(--border-user-msg);
+    border-radius: 18px;
+    padding: 10px 16px;
+    font-size: 14px;
+    color: var(--text-primary);
+    max-width: 560px;
+    line-height: 1.5;
+  }
+
+  .msg-agent-text {
+    font-size: 14px;
+    color: var(--text-primary);
+    line-height: 1.6;
+  }
+  .msg-agent-text p { margin-bottom: 8px; }
+  .msg-agent-text p:last-child { margin-bottom: 0; }
+  .msg-agent-text code {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    background: #1a1a1a;
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+  .msg-agent-text strong {
+    font-weight: 600;
+    color: var(--text-white);
+  }
+
+  .msg-agent-text ol, .msg-agent-text ul {
+    margin: 6px 0 8px 20px;
+  }
+  .msg-agent-text li {
+    margin-bottom: 4px;
+  }
+
+  /* Tool call summary line */
+  .tool-summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 0;
+    cursor: pointer;
+    user-select: none;
+  }
+  .tool-summary-icon {
+    color: var(--text-muted);
+    font-size: 12px;
+    transition: transform 0.15s;
+  }
+  .tool-summary-icon.expanded { transform: rotate(90deg); }
+  .tool-summary-text {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .tool-summary-detail {
+    display: none;
+    padding: 6px 0 6px 20px;
+    font-size: 13px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    line-height: 1.8;
+  }
+  .tool-summary-detail.show { display: block; }
+
+  /* Verification line */
+  .verification {
+    font-size: 13px;
+    color: var(--text-green);
+    padding: 4px 0;
+  }
+  .verification.fail { color: var(--text-red); }
+
+  /* Stage pill */
+  .stage-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: #1a1a1a;
+    border-radius: 4px;
+    padding: 3px 8px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  /* Input bar */
+  .input-area {
+    padding: 12px 32px 20px 32px;
+    flex-shrink: 0;
+  }
+
+  .input-wrapper {
+    display: flex;
+    align-items: center;
+    background: var(--bg-input);
+    border: 1px solid var(--border-input);
+    border-radius: 24px;
+    padding: 4px 6px 4px 16px;
+    gap: 4px;
+  }
+
+  .input-field {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    color: var(--text-primary);
+    padding: 8px 0;
+  }
+  .input-field::placeholder {
+    color: var(--text-muted);
+  }
+
+  .input-icon-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .input-icon-btn:hover {
+    color: var(--text-secondary);
+    background: rgba(255,255,255,0.05);
+  }
+  .input-icon-btn.send {
+    background: var(--text-primary);
+    color: #0a0a0a;
+  }
+  .input-icon-btn.send:hover {
+    background: #fff;
+  }
+
+  .input-meta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 6px 0 0 0;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  /* ── Right Panel ── */
+  .right-panel {
+    width: 300px;
+    min-width: 300px;
+    border-left: 1px solid var(--border-default);
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-page);
+  }
+
+  .right-tabs {
+    display: flex;
+    align-items: stretch;
+    height: 40px;
+    border-bottom: 1px solid var(--border-default);
+    padding: 0 12px;
+    gap: 0;
+    flex-shrink: 0;
+  }
+
+  .right-tab {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+  }
+  .right-tab.active {
+    color: var(--text-primary);
+    border-bottom-color: var(--text-primary);
+  }
+  .right-tab:hover:not(.active) {
+    color: var(--text-secondary);
+  }
+  .right-tab-badge {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-left: 2px;
+  }
+
+  .right-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+  }
+
+  /* Files list */
+  .file-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-primary);
+  }
+  .file-item:hover {
+    background: var(--bg-sidebar-hover);
+  }
+  .file-icon {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .file-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Changes view */
+  .changes-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px 12px 8px;
+  }
+  .changes-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--bg-input);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .changes-toggle-btn {
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: var(--font-sans);
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+  .changes-toggle-btn.active {
+    color: var(--text-primary);
+    background: rgba(255,255,255,0.08);
+  }
+  .changes-stat-total {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .changes-stat-total .additions { color: var(--text-green); }
+
+  .change-file {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .change-file:hover {
+    background: var(--bg-sidebar-hover);
+  }
+  .change-file-name {
+    flex: 1;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .change-file-stat {
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--text-green);
+    flex-shrink: 0;
+  }
+
+  /* PR tab */
+  .pr-content {
+    padding: 8px;
+  }
+  .pr-placeholder {
+    font-size: 13px;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 40px 16px;
+  }
+
+  /* ── Share Modal ── */
+  .modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--bg-modal-overlay);
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.show { display: flex; }
+
+  .modal {
+    background: var(--bg-modal);
+    border: 1px solid var(--border-default);
+    border-radius: 12px;
+    padding: 24px;
+    width: 400px;
+    max-width: 90vw;
+  }
+  .modal-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-white);
+    margin-bottom: 8px;
+  }
+  .modal-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+    line-height: 1.5;
+  }
+  .modal-btn {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    background: var(--text-primary);
+    color: #0a0a0a;
+    font-size: 14px;
+    font-weight: 500;
+    font-family: var(--font-sans);
+    cursor: pointer;
+  }
+  .modal-btn:hover { background: #fff; }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.12); }
+
+  /* SVG icon inline helper */
+  .icon-svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .icon-svg.sm { width: 14px; height: 14px; }
+  .icon-svg.lg { width: 18px; height: 18px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ═══════════ LEFT SIDEBAR ═══════════ -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-title">Sessions</span>
+      <button class="sidebar-add-btn">
+        <svg class="icon-svg" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+    </div>
+
+    <div class="sidebar-tabs">
+      <button class="sidebar-tab active">Active</button>
+      <button class="sidebar-tab">Archive</button>
+    </div>
+
+    <div class="session-list">
+      <div class="session-group-label">autonomous-sdlc</div>
+
+      <div class="session-item active">
+        <div class="session-item-name">Refactor session orchestration</div>
+        <div class="session-item-meta">
+          <span class="session-status-dot running"></span>
+          running -- 12m ago
+        </div>
+      </div>
+
+      <div class="session-item">
+        <div class="session-item-name">Add WebSocket reconnect logic</div>
+        <div class="session-item-meta">
+          <span class="session-status-dot completed"></span>
+          completed -- 2h ago
+        </div>
+      </div>
+
+      <div class="session-item">
+        <div class="session-item-name">Fix conductor race condition</div>
+        <div class="session-item-meta">
+          <span class="session-status-dot completed"></span>
+          completed -- 5h ago
+        </div>
+      </div>
+
+      <div class="session-group-label">quick</div>
+
+      <div class="session-item">
+        <div class="session-item-name">Update SSH pool metrics</div>
+        <div class="session-item-meta">
+          <span class="session-status-dot paused"></span>
+          paused -- 1d ago
+        </div>
+      </div>
+
+      <div class="session-item">
+        <div class="session-item-name">Debug E2B timeout on boot</div>
+        <div class="session-item-meta">
+          <span class="session-status-dot failed"></span>
+          failed -- 1d ago
+        </div>
+      </div>
+
+      <div class="session-group-label">fan-out</div>
+
+      <div class="session-item">
+        <div class="session-item-name">Migrate router to circuit breakers</div>
+        <div class="session-item-meta">
+          <span class="session-status-dot completed"></span>
+          completed -- 3d ago
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="user-avatar">YT</div>
+      <div class="user-info">
+        <div class="user-name">Yana Tarasova</div>
+        <div class="user-email">yana.tarasova@tellusmarkets.com</div>
+      </div>
+      <button class="settings-btn">
+        <svg class="icon-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════════ CENTER PANEL ═══════════ -->
+  <div class="main">
+    <!-- Top bar -->
+    <div class="top-bar">
+      <span class="top-bar-title">Refactor session orchestration</span>
+
+      <div class="top-bar-icon" title="Share" onclick="document.getElementById('shareModal').classList.add('show')">
+        <svg class="icon-svg" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+      </div>
+
+      <div class="top-bar-spacer"></div>
+
+      <div class="top-bar-actions">
+        <div class="top-bar-icon" title="Code">
+          <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        </div>
+        <div class="top-bar-icon" title="Play">
+          <svg class="icon-svg" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </div>
+        <div class="top-bar-icon" title="Terminal">
+          <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        </div>
+        <button class="top-bar-btn">Create PR</button>
+      </div>
+    </div>
+
+    <!-- Tab bar -->
+    <div class="tab-bar">
+      <div class="tab-item active">
+        <svg class="icon-svg sm" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Refactor session orchestration
+      </div>
+      <div class="tab-item">
+        <span class="tab-icon" style="font-family:var(--font-mono);font-size:12px">TS</span>
+        session-orchestration.ts
+        <span class="tab-close">&times;</span>
+      </div>
+      <div class="tab-item">
+        <span class="tab-icon" style="font-family:var(--font-mono);font-size:12px">TS</span>
+        session.test.ts
+        <span class="tab-close">&times;</span>
+      </div>
+      <div class="tab-add">+</div>
+    </div>
+
+    <!-- Chat area -->
+    <div class="chat-area">
+      <!-- User message 1 -->
+      <div class="msg user">
+        <div class="msg-user-bubble">Refactor session-orchestration.ts to extract all flow-related logic into a separate flow-executor.ts module. Keep the orchestration file focused on session lifecycle only.</div>
+      </div>
+
+      <!-- Agent response 1: plan -->
+      <div class="msg agent">
+        <div class="stage-pill">plan</div>
+        <div class="msg-agent-text">
+          <p>I'll refactor <code>session-orchestration.ts</code> by extracting flow execution into a new <code>flow-executor.ts</code> module. Here's my plan:</p>
+          <ol>
+            <li>Analyze the current <code>session-orchestration.ts</code> to identify flow-related functions</li>
+            <li>Create <code>packages/core/flow-executor.ts</code> with extracted functions</li>
+            <li>Update imports in <code>session-orchestration.ts</code> to delegate to the new module</li>
+            <li>Update all consumers that import flow functions directly</li>
+            <li>Run tests to verify nothing broke</li>
+          </ol>
+        </div>
+      </div>
+
+      <!-- Agent tool calls -->
+      <div class="msg agent">
+        <div class="tool-summary" onclick="this.nextElementSibling.classList.toggle('show'); this.querySelector('.tool-summary-icon').classList.toggle('expanded')">
+          <span class="tool-summary-icon">&#9654;</span>
+          <span class="tool-summary-text">Crafted 4 tool calls -- Read session-orchestration.ts, session.ts, flow.ts, types</span>
+        </div>
+        <div class="tool-summary-detail">
+          Read packages/core/session-orchestration.ts<br>
+          Read packages/core/services/session.ts<br>
+          Read packages/core/flow.ts<br>
+          Read packages/types/session.ts
+        </div>
+      </div>
+
+      <!-- Agent analysis -->
+      <div class="msg agent">
+        <div class="msg-agent-text">
+          <p>I've analyzed the file. It's 847 lines with 6 flow-related functions interleaved with session lifecycle code. The flow functions are: <code>executeFlow</code>, <code>advanceStage</code>, <code>evaluateStageGate</code>, <code>runFlowStep</code>, <code>handleStageTransition</code>, and <code>resolveFlowDAG</code>.</p>
+          <p>These all take <code>app: AppContext</code> as their first argument and operate on the flow DAG, so they can be cleanly extracted without touching session state management.</p>
+        </div>
+      </div>
+
+      <!-- Agent implements -->
+      <div class="msg agent">
+        <div class="stage-pill">implement</div>
+        <div class="tool-summary" onclick="this.nextElementSibling.classList.toggle('show'); this.querySelector('.tool-summary-icon').classList.toggle('expanded')">
+          <span class="tool-summary-icon">&#9654;</span>
+          <span class="tool-summary-text">Crafted 8 tool calls -- Write flow-executor.ts, Edit session-orchestration.ts, Edit 4 consumers</span>
+        </div>
+        <div class="tool-summary-detail">
+          Write packages/core/flow-executor.ts (342 lines)<br>
+          Edit packages/core/session-orchestration.ts -- remove 6 functions, add import<br>
+          Edit packages/core/services/session.ts -- update import path<br>
+          Edit packages/core/conductor.ts -- update import path<br>
+          Edit packages/server/handlers/session.ts -- update import path<br>
+          Edit packages/core/__tests__/session.test.ts -- update import path<br>
+          Edit packages/core/__tests__/flow.test.ts -- update import path<br>
+          Write packages/core/__tests__/flow-executor.test.ts (89 lines)
+        </div>
+      </div>
+
+      <!-- Agent explains -->
+      <div class="msg agent">
+        <div class="msg-agent-text">
+          <p>Created <code>flow-executor.ts</code> with all 6 extracted functions. The orchestration file is now 505 lines (down from 847) and focused purely on session lifecycle -- <code>launchSession</code>, <code>resumeSession</code>, <code>pauseSession</code>, <code>terminateSession</code>, and the heartbeat loop.</p>
+          <p>All re-exports are preserved via the barrel in <code>session-orchestration.ts</code> so existing consumers won't break.</p>
+        </div>
+      </div>
+
+      <!-- Verification -->
+      <div class="msg agent">
+        <div class="verification">Verification: ran <code>make test</code> -- 2,857 passed</div>
+      </div>
+
+      <!-- User correction -->
+      <div class="msg user">
+        <div class="msg-user-bubble">The re-exports in session-orchestration.ts are a crutch. Remove them and update every consumer to import from flow-executor.ts directly.</div>
+      </div>
+
+      <!-- Agent acknowledges -->
+      <div class="msg agent">
+        <div class="msg-agent-text">
+          <p>Good call. Re-exports hide the dependency graph and make it unclear where code actually lives. I'll remove them and fix all imports.</p>
+        </div>
+      </div>
+
+      <div class="msg agent">
+        <div class="tool-summary" onclick="this.nextElementSibling.classList.toggle('show'); this.querySelector('.tool-summary-icon').classList.toggle('expanded')">
+          <span class="tool-summary-icon">&#9654;</span>
+          <span class="tool-summary-text">Crafted 6 tool calls -- Edit session-orchestration.ts, 5 import updates</span>
+        </div>
+        <div class="tool-summary-detail">
+          Edit packages/core/session-orchestration.ts -- remove re-exports<br>
+          Edit packages/core/services/session.ts -- import from flow-executor.js<br>
+          Edit packages/core/conductor.ts -- import from flow-executor.js<br>
+          Edit packages/server/handlers/session.ts -- import from flow-executor.js<br>
+          Edit packages/core/__tests__/session.test.ts -- import from flow-executor.js<br>
+          Edit packages/core/__tests__/flow.test.ts -- import from flow-executor.js
+        </div>
+      </div>
+
+      <div class="msg agent">
+        <div class="msg-agent-text">
+          <p>Done. Removed the 6 re-exports from <code>session-orchestration.ts</code> and updated all 5 consumers to import directly from <code>flow-executor.js</code>. The import graph is now clean -- no circular dependencies and every module imports from the actual source.</p>
+        </div>
+      </div>
+
+      <div class="msg agent">
+        <div class="verification">Verification: ran <code>make test</code> -- 2,857 passed</div>
+      </div>
+
+      <!-- User asks for more -->
+      <div class="msg user">
+        <div class="msg-user-bubble">Also add JSDoc to the 6 exported functions in flow-executor.ts.</div>
+      </div>
+
+      <div class="msg agent">
+        <div class="tool-summary" onclick="this.nextElementSibling.classList.toggle('show'); this.querySelector('.tool-summary-icon').classList.toggle('expanded')">
+          <span class="tool-summary-icon">&#9654;</span>
+          <span class="tool-summary-text">Crafted 1 tool call -- Edit flow-executor.ts</span>
+        </div>
+        <div class="tool-summary-detail">
+          Edit packages/core/flow-executor.ts -- add JSDoc to 6 functions
+        </div>
+      </div>
+
+      <div class="msg agent">
+        <div class="msg-agent-text">
+          <p>Added JSDoc comments to all 6 exported functions: <code>executeFlow</code>, <code>advanceStage</code>, <code>evaluateStageGate</code>, <code>runFlowStep</code>, <code>handleStageTransition</code>, and <code>resolveFlowDAG</code>. Each documents parameters, return type, and side effects.</p>
+        </div>
+      </div>
+
+      <div class="msg agent">
+        <div class="verification">Verification: ran <code>make lint</code> -- 0 warnings</div>
+      </div>
+
+      <div class="msg agent">
+        <div class="verification">Verification: ran <code>make format</code> -- no changes</div>
+      </div>
+
+      <!-- User final -->
+      <div class="msg user">
+        <div class="msg-user-bubble">Looks good. Create the PR.</div>
+      </div>
+
+      <div class="msg agent">
+        <div class="tool-summary" onclick="this.nextElementSibling.classList.toggle('show'); this.querySelector('.tool-summary-icon').classList.toggle('expanded')">
+          <span class="tool-summary-icon">&#9654;</span>
+          <span class="tool-summary-text">Crafted 3 tool calls -- git add, git commit, gh pr create</span>
+        </div>
+        <div class="tool-summary-detail">
+          git add packages/core/flow-executor.ts packages/core/session-orchestration.ts ...<br>
+          git commit -m "refactor: extract flow execution into flow-executor.ts"<br>
+          gh pr create --title "refactor: extract flow execution logic" --body "..."
+        </div>
+      </div>
+
+      <div class="msg agent">
+        <div class="msg-agent-text">
+          <p>PR created: <a href="#" style="color:var(--text-link)">#247 -- refactor: extract flow execution logic</a></p>
+          <p>Summary: Extracted 6 flow-related functions from <code>session-orchestration.ts</code> (847 lines) into <code>flow-executor.ts</code> (342 lines). Orchestration file is now 505 lines focused on session lifecycle. All 2,857 tests pass, lint clean, format clean.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input bar -->
+    <div class="input-area">
+      <div class="input-wrapper">
+        <svg class="icon-svg" viewBox="0 0 24 24" style="color:var(--text-muted);flex-shrink:0;cursor:pointer"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        <input type="text" class="input-field" placeholder="Request changes or ask a question...">
+        <button class="input-icon-btn">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </button>
+        <button class="input-icon-btn send">
+          <svg class="icon-svg" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+      <div class="input-meta">
+        <span>Claude Opus 4.6</span>
+        <span>$0.82</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ RIGHT PANEL ═══════════ -->
+  <div class="right-panel">
+    <div class="right-tabs">
+      <div class="right-tab" onclick="switchRightTab('files', this)" id="rt-files">Files</div>
+      <div class="right-tab active" onclick="switchRightTab('changes', this)" id="rt-changes">Changes <span class="right-tab-badge">6</span></div>
+      <div class="right-tab" onclick="switchRightTab('pr', this)" id="rt-pr">PR</div>
+    </div>
+
+    <!-- Files content -->
+    <div class="right-content" id="rc-files" style="display:none">
+      <div class="file-item">
+        <span class="file-icon">TS</span>
+        <span class="file-name">flow-executor.ts</span>
+      </div>
+      <div class="file-item">
+        <span class="file-icon">TS</span>
+        <span class="file-name">session-orchestration.ts</span>
+      </div>
+      <div class="file-item">
+        <span class="file-icon">TS</span>
+        <span class="file-name">session.ts</span>
+      </div>
+      <div class="file-item">
+        <span class="file-icon">TS</span>
+        <span class="file-name">conductor.ts</span>
+      </div>
+      <div class="file-item">
+        <span class="file-icon">TS</span>
+        <span class="file-name">session.test.ts</span>
+      </div>
+      <div class="file-item">
+        <span class="file-icon">TS</span>
+        <span class="file-name">flow-executor.test.ts</span>
+      </div>
+    </div>
+
+    <!-- Changes content -->
+    <div class="right-content" id="rc-changes">
+      <div class="changes-header">
+        <div class="changes-toggle">
+          <button class="changes-toggle-btn active">All Changes</button>
+          <button class="changes-toggle-btn">Uncommitted</button>
+        </div>
+      </div>
+      <div style="padding:0 8px 12px 8px">
+        <span class="changes-stat-total">6 files changed <span class="additions">+431</span> -342</span>
+      </div>
+
+      <div class="change-file">
+        <span class="file-icon">TS</span>
+        <span class="change-file-name">flow-executor.ts</span>
+        <span class="change-file-stat">+342</span>
+      </div>
+      <div class="change-file">
+        <span class="file-icon">TS</span>
+        <span class="change-file-name">session-orchestration.ts</span>
+        <span class="change-file-stat" style="color:var(--text-red)">-342</span>
+      </div>
+      <div class="change-file">
+        <span class="file-icon">TS</span>
+        <span class="change-file-name">session.ts</span>
+        <span class="change-file-stat">+3</span>
+      </div>
+      <div class="change-file">
+        <span class="file-icon">TS</span>
+        <span class="change-file-name">conductor.ts</span>
+        <span class="change-file-stat">+3</span>
+      </div>
+      <div class="change-file">
+        <span class="file-icon">TS</span>
+        <span class="change-file-name">session.test.ts</span>
+        <span class="change-file-stat">+3</span>
+      </div>
+      <div class="change-file">
+        <span class="file-icon">TS</span>
+        <span class="change-file-name">flow-executor.test.ts</span>
+        <span class="change-file-stat">+89</span>
+      </div>
+    </div>
+
+    <!-- PR content -->
+    <div class="right-content" id="rc-pr" style="display:none">
+      <div class="pr-content">
+        <div style="padding:8px;border:1px solid var(--border-default);border-radius:8px;margin-bottom:12px">
+          <div style="font-size:13px;font-weight:500;color:var(--text-primary);margin-bottom:4px">#247 refactor: extract flow execution logic</div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">Open -- created 2m ago</div>
+          <div style="font-size:12px;color:var(--text-muted);line-height:1.5">
+            Extracted 6 flow-related functions from session-orchestration.ts into flow-executor.ts. Orchestration file now focused on session lifecycle only. All tests pass.
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <span style="font-size:11px;padding:3px 8px;background:#1a1a1a;border-radius:4px;color:var(--text-green)">+431</span>
+          <span style="font-size:11px;padding:3px 8px;background:#1a1a1a;border-radius:4px;color:var(--text-red)">-342</span>
+          <span style="font-size:11px;padding:3px 8px;background:#1a1a1a;border-radius:4px;color:var(--text-secondary)">6 files</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Share Modal -->
+<div class="modal-overlay" id="shareModal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="modal">
+    <div class="modal-title">Share session</div>
+    <div class="modal-desc">Anyone with the link can view this session in read-only mode.</div>
+    <button class="modal-btn" onclick="document.getElementById('shareModal').classList.remove('show')">Create share link</button>
+  </div>
+</div>
+
+<script>
+  function switchRightTab(tab, el) {
+    document.querySelectorAll('.right-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('rc-files').style.display = tab === 'files' ? '' : 'none';
+    document.getElementById('rc-changes').style.display = tab === 'changes' ? '' : 'none';
+    document.getElementById('rc-pr').style.display = tab === 'pr' ? '' : 'none';
+  }
+
+  // Sidebar tab switching
+  document.querySelectorAll('.sidebar-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+    });
+  });
+
+  // Session item selection
+  document.querySelectorAll('.session-item').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.session-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+    });
+  });
+
+  // Center tab switching
+  document.querySelectorAll('.tab-item').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+    });
+  });
+
+  // Changes toggle
+  document.querySelectorAll('.changes-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.changes-toggle-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>
