@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.17.1 (2026-04-15)
+
+### Desktop App
+- **Self-contained bundle**: the `ark` binary is now embedded inside the app
+  via Tauri's `externalBin` mechanism. Users no longer need to install the Ark
+  CLI separately -- the desktop app works out of the box. DMG size is
+  approximately 81 MB (3.2 MB Tauri shell + ~78 MB ark-native), still smaller
+  than the old Electron build (94.3 MB).
+- **CLI install on first launch**: on macOS, the app detects if
+  `/usr/local/bin/ark` exists. If not, it shows a native dialog offering to
+  create a symlink from the embedded sidecar binary. Uses `osascript` for
+  privilege elevation (standard macOS admin dialog -- no raw sudo). The same
+  operation is available on demand via the `install_cli_command` IPC handler.
+- **Sidecar resolution**: `find_ark_binary()` now checks the bundled sidecar
+  first (`<resource_dir>/binaries/ark-<triple>`), falling back to PATH in dev
+  mode.
+- **CI pipeline**: the `desktop` and `tauri-build` CI jobs now depend on the
+  `build-ark` / `build` jobs. The pre-built ark binary is downloaded and placed
+  at `src-tauri/binaries/ark-<target-triple>` before `tauri build` runs. A
+  "Verify sidecar in bundle" step confirms the produced bundles are ~80 MB.
+- **Makefile**: `make build-desktop` now builds `ark-native` first, copies it
+  to `src-tauri/binaries/ark-<triple>`, then runs the Tauri build.
+- **build.rs**: injects `TARGET_TRIPLE` env var at compile time so the sidecar
+  resolver can locate the platform-specific binary at runtime.
+
 ## v0.17.0 (2026-04-15)
 
 ### Breaking changes

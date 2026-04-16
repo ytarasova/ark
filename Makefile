@@ -188,7 +188,23 @@ build-cli: ## Build native macOS CLI binary (current arch)
 build-web: ## Build web frontend (Vite production)
 	@cd packages/web && npx vite build --logLevel error 2>/dev/null || $(BUN) run packages/web/build.ts
 
-build-desktop: build-web ## Build Tauri desktop app for current platform (release)
+build-desktop: build-web build-cli ## Build Tauri desktop app for current platform (release)
+	@echo "Preparing sidecar binary for Tauri bundle..."
+	@mkdir -p packages/desktop/src-tauri/binaries
+	@TRIPLE=$$(rustc -vV 2>/dev/null | grep host | awk '{print $$2}'); \
+	  if [ -z "$$TRIPLE" ]; then \
+	    ARCH=$$(uname -m); OS=$$(uname -s | tr A-Z a-z); \
+	    case "$$ARCH" in \
+	      arm64|aarch64) TRIPLE="aarch64-apple-darwin" ;; \
+	      x86_64) \
+	        if [ "$$OS" = "darwin" ]; then TRIPLE="x86_64-apple-darwin"; \
+	        else TRIPLE="x86_64-unknown-linux-gnu"; fi ;; \
+	      *) TRIPLE="unknown" ;; \
+	    esac; \
+	  fi; \
+	  cp ark-native "packages/desktop/src-tauri/binaries/ark-$$TRIPLE"; \
+	  chmod +x "packages/desktop/src-tauri/binaries/ark-$$TRIPLE"; \
+	  echo "  Sidecar: packages/desktop/src-tauri/binaries/ark-$$TRIPLE ($$(du -h ark-native | cut -f1))"
 	@cd packages/desktop && bun install --silent 2>/dev/null && bun run build
 
 # ── Packaging (all platforms) ────────────────────────────────────────────────

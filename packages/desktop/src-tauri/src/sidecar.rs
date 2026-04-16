@@ -1,16 +1,18 @@
 //! Sidecar lifecycle for the embedded `ark web` server.
 //!
-//! Why we don't use tauri-plugin-shell's sidecar API here:
-//! - We need the child to run in its *own process group* (setsid on Unix,
-//!   CREATE_NEW_PROCESS_GROUP + Job Object on Windows) so we can reap the
-//!   whole tree on quit. The Electron build is known to leak `bun` grandchildren
-//!   (tracked in PR #102); fixing that leak on this side is part of scope.
-//! - The shell-plugin sidecar ergonomics are tailored to bundled binaries.
-//!   For this preview we resolve `ark` from the user's PATH (matching Electron
-//!   behavior). Bundling can come in a follow-up PR via `externalBin`.
+//! As of v0.17.1 the `ark` binary is bundled inside the app via Tauri's
+//! `externalBin` mechanism. At build time the binary is placed at
+//! `src-tauri/binaries/ark-<target-triple>` and Tauri copies it into
+//! the app bundle. At runtime `find_ark_binary()` resolves it through
+//! the resource directory, falling back to the user's PATH in dev mode
+//! or if the sidecar is absent.
 //!
-//! The spawn logic is intentionally small and synchronous; `wait_healthy` is
-//! async so it can cooperate with tokio.
+//! The spawn logic uses its own `std::process::Command` (not the shell
+//! plugin's `Command`) because we need the child to run in its own
+//! process group (setsid on Unix, CREATE_NEW_PROCESS_GROUP on Windows)
+//! so we can reap the whole tree on quit. The Electron build is known
+//! to leak `bun` grandchildren (tracked in PR #102); fixing that leak
+//! on this side is part of scope.
 
 use anyhow::{anyhow, Context, Result};
 use std::net::TcpListener;
@@ -198,16 +200,28 @@ impl Sidecar {
 
 /// Find the `ark` CLI binary on disk.
 ///
-/// Search order (matches Electron main.js):
-///   1. `<cwd>/../../ark`    (dev tree: running from packages/desktop/src-tauri)
-///   2. `<resource_dir>/ark` (future: bundled externalBin)
-///   3. `/usr/local/bin/ark`
-///   4. `~/.bun/bin/ark`, `~/.ark/bin/ark`
-///   5. Whatever the user has on $PATH.
+/// Resolution order:
+///   1. **Bundled sidecar** -- the externalBin binary inside the app bundle.
+///      Tauri places it at `<resource_dir>/binaries/ark-<target-triple>`.
+///      This is the production path for the self-contained app.
+///   2. **Repo-relative** (dev mode) -- `<cwd>/../../../ark` when running
+///      from `packages/desktop/src-tauri` via `tauri dev`.
+///   3. **Common install paths** -- `/usr/local/bin/ark`,
+///      `~/.bun/bin/ark`, `~/.ark/bin/ark`.
+///   4. **$PATH lookup** -- whatever the user has on PATH.
 pub fn find_ark_binary(handle: &tauri::AppHandle) -> Result<PathBuf> {
+    // 1. Bundled sidecar via externalBin.
+    if let Some(path) = resolve_sidecar_path(handle) {
+        if is_executable(&path) {
+            info!(path = %path.display(), "using bundled sidecar");
+            return Ok(path);
+        }
+        debug!(path = %path.display(), "sidecar path resolved but not executable");
+    }
+
     let mut candidates: Vec<PathBuf> = Vec::new();
 
-    // 1. Repo-relative (dev mode). CWD is the crate dir when running `tauri dev`.
+    // 2. Repo-relative (dev mode). CWD is the crate dir when running `tauri dev`.
     if let Ok(cwd) = std::env::current_dir() {
         // src-tauri -> desktop -> packages -> repo root
         let repo_root = cwd
@@ -219,19 +233,14 @@ pub fn find_ark_binary(handle: &tauri::AppHandle) -> Result<PathBuf> {
         }
     }
 
-    // 2. Bundled externalBin (when we add it later).
-    if let Ok(res) = handle.path().resource_dir() {
-        candidates.push(res.join("ark"));
-    }
-
-    // 3/4. Common install paths.
+    // 3. Common install paths.
     candidates.push(PathBuf::from("/usr/local/bin/ark"));
     if let Some(home) = dirs_home() {
         candidates.push(home.join(".bun/bin/ark"));
         candidates.push(home.join(".ark/bin/ark"));
     }
 
-    // 5. PATH lookup.
+    // 4. PATH lookup.
     if let Ok(path_var) = std::env::var("PATH") {
         for p in std::env::split_paths(&path_var) {
             candidates.push(p.join("ark"));
@@ -240,10 +249,60 @@ pub fn find_ark_binary(handle: &tauri::AppHandle) -> Result<PathBuf> {
 
     for c in candidates {
         if is_executable(&c) {
+            info!(path = %c.display(), "found ark on PATH (sidecar not bundled)");
             return Ok(c);
         }
     }
-    Err(anyhow!("ark CLI not found in expected locations"))
+    Err(anyhow!(
+        "ark CLI not found -- the bundled sidecar is missing and ark is not on PATH"
+    ))
+}
+
+/// Resolve the absolute path to the sidecar binary that Tauri's externalBin
+/// would place inside the app bundle.
+///
+/// Tauri v2 puts externalBin entries in `<resource_dir>/<path>-<triple>` where
+/// `<path>` is from `tauri.conf.json > bundle > externalBin` (here:
+/// `binaries/ark`). At runtime the file is at
+/// `<resource_dir>/binaries/ark-<triple>`.
+fn resolve_sidecar_path(handle: &tauri::AppHandle) -> Option<PathBuf> {
+    let res_dir = handle.path().resource_dir().ok()?;
+
+    let triple = current_target_triple();
+    let suffixed = res_dir.join("binaries").join(format!("ark-{triple}"));
+    if suffixed.exists() {
+        return Some(suffixed);
+    }
+
+    // On Windows, Tauri appends .exe.
+    #[cfg(windows)]
+    {
+        let suffixed_exe = res_dir
+            .join("binaries")
+            .join(format!("ark-{triple}.exe"));
+        if suffixed_exe.exists() {
+            return Some(suffixed_exe);
+        }
+    }
+
+    // Fallback: unsuffixed name (useful during manual testing).
+    let base = res_dir.join("binaries").join("ark");
+    if base.exists() {
+        return Some(base);
+    }
+
+    None
+}
+
+/// Return the Rust target triple for the current build. Injected by build.rs.
+fn current_target_triple() -> &'static str {
+    env!("TARGET_TRIPLE")
+}
+
+/// Return the path to the embedded sidecar binary if it exists.
+/// Used by the CLI install feature to know where to symlink from.
+pub fn sidecar_binary_path(handle: &tauri::AppHandle) -> Option<PathBuf> {
+    resolve_sidecar_path(handle).filter(|p| is_executable(p))
 }
 
 /// Find a free port starting at `start`. Walks up to `start + 1000` then asks

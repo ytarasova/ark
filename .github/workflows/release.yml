@@ -514,8 +514,11 @@ jobs:
           fi
           echo "PASS: ark web serves dashboard from installed tarball layout"
 
-  # Tauri desktop app (replaces Electron as of v0.17.0)
+  # Tauri desktop app -- self-contained with embedded ark sidecar.
+  # Depends on build-ark to produce the ark binary that gets bundled
+  # inside the app via Tauri's externalBin mechanism.
   desktop:
+    needs: [build-ark]
     strategy:
       fail-fast: false
       matrix:
@@ -523,12 +526,22 @@ jobs:
           - name: mac
             os: macos-latest
             target: aarch64-apple-darwin
+            ark-artifact: ark-bin-darwin-arm64
+            ark-binary: ark-darwin-arm64
           - name: linux
             os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+            ark-artifact: ark-bin-linux-x64
+            ark-binary: ark-linux-x64
+          # Windows: no ark-native binary is cross-compiled yet (bun
+          # --compile only targets darwin + linux). The sidecar download
+          # uses continue-on-error so the desktop app still builds -- it
+          # just falls back to PATH resolution at runtime.
           - name: win
             os: windows-latest
             target: x86_64-pc-windows-msvc
+            ark-artifact: ""
+            ark-binary: ""
 
     runs-on: ${{ matrix.os }}
     name: desktop (${{ matrix.name }})
@@ -580,6 +593,36 @@ jobs:
       - name: Build web frontend
         run: bun run build:web
 
+      # Download the pre-built ark binary and place it where Tauri's
+      # externalBin expects it: src-tauri/binaries/ark-<target-triple>.
+      # Skipped on Windows (no bun --compile target for Windows yet).
+      - name: Download ark binary for sidecar
+        if: matrix.ark-artifact != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.ark-artifact }}
+          path: packages/desktop/src-tauri/binaries
+
+      - name: Prepare sidecar binary
+        if: matrix.ark-artifact != ''
+        shell: bash
+        run: |
+          cd packages/desktop/src-tauri/binaries
+          mv "${{ matrix.ark-binary }}" "ark-${{ matrix.target }}"
+          chmod +x "ark-${{ matrix.target }}" 2>/dev/null || true
+          ls -lh
+          echo "Sidecar ready: ark-${{ matrix.target }} ($(du -h "ark-${{ matrix.target }}" | cut -f1))"
+
+      # Windows: create a placeholder so Tauri's externalBin check
+      # does not fail the build. The app will fall back to PATH at runtime.
+      - name: Create sidecar placeholder (Windows)
+        if: matrix.ark-artifact == ''
+        shell: bash
+        run: |
+          mkdir -p packages/desktop/src-tauri/binaries
+          echo "placeholder" > "packages/desktop/src-tauri/binaries/ark-${{ matrix.target }}.exe"
+          echo "WARNING: No native ark binary for ${{ matrix.target }} -- app will use PATH fallback"
+
       - name: Install Tauri package dependencies
         working-directory: packages/desktop
         run: bun install
@@ -589,6 +632,16 @@ jobs:
         env:
           CARGO_TERM_COLOR: always
         run: bun run build
+
+      - name: Verify sidecar in bundle
+        shell: bash
+        run: |
+          echo "-- Checking bundle size (should be ~80 MB with sidecar, not ~3 MB) --"
+          find packages/desktop/src-tauri/target/release/bundle \
+            -maxdepth 3 -type f \
+            \( -name '*.dmg' -o -name '*.deb' -o -name '*.AppImage' \
+               -o -name '*.exe' -o -name '*.app.tar.gz' \) \
+            -exec ls -lh {} \; || true
 
       - name: Upload desktop artifact
         uses: actions/upload-artifact@v4

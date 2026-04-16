@@ -1,9 +1,8 @@
 //! Ark Desktop -- Tauri v2 shell.
 //!
-//! This mirrors the Electron app under `packages/desktop/` but with a Rust
-//! backend. The window is a thin wrapper around the `ark web` server:
+//! This is a thin Rust wrapper around the Ark web UI:
 //!
-//!   1. Find the `ark` CLI binary on disk.
+//!   1. Find the `ark` CLI binary (bundled sidecar or PATH fallback).
 //!   2. Find a free port starting at 8420.
 //!   3. Spawn `ark web --port <port> --with-daemon` as a child process in a
 //!      fresh process group so we can cleanly kill the whole tree on quit.
@@ -11,13 +10,15 @@
 //!   5. Navigate the main window to that URL and show it.
 //!   6. On app quit: SIGTERM the entire process group, SIGKILL after 2s.
 //!
-//! The "process-group" dance is what stops `bun` (grandchild of `ark` bash
-//! wrapper -> `bun cli/index.ts`) from leaking as an orphan. The Electron
-//! build still has that bug (tracked in PR #102 smoke tests); we fix it here.
+//! As of v0.17.1 the `ark` binary is embedded inside the app bundle via
+//! Tauri's `externalBin` mechanism, so users do not need to install
+//! anything separately. On first launch the app offers to symlink the
+//! embedded binary to `/usr/local/bin/ark` for terminal access.
 //!
 //! Logging is via `tracing`; set `RUST_LOG=ark_desktop_lib=debug` for
 //! verbose output during development.
 
+mod cli_install;
 mod sidecar;
 mod window;
 
@@ -49,7 +50,8 @@ pub fn run() {
 
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_opener::init());
+        .plugin(tauri_plugin_opener::init())
+        .invoke_handler(tauri::generate_handler![install_cli_command]);
 
     // Single-instance is desktop only -- no-op on mobile targets.
     #[cfg(desktop)]
@@ -89,6 +91,12 @@ pub fn run() {
                         if let Err(e) = window::show_main_window(&handle, &url) {
                             error!(error = %e, "failed to show main window");
                         }
+
+                        // After the UI is up, check if the CLI is installed.
+                        // On macOS, offer to symlink the embedded binary to
+                        // /usr/local/bin/ark on first launch.
+                        #[cfg(target_os = "macos")]
+                        cli_install::check_and_offer_cli_install(&handle);
                     }
                     Err(e) => {
                         error!(error = %e, "sidecar boot failed");
@@ -122,10 +130,18 @@ pub fn run() {
         });
 }
 
+/// Tauri IPC command: install the CLI by symlinking the embedded sidecar.
+/// Wired as a menu item "Install CLI Tools..." in the app.
+#[tauri::command]
+async fn install_cli_command(handle: tauri::AppHandle) -> std::result::Result<String, String> {
+    cli_install::install_cli(&handle).map_err(|e| e.to_string())
+}
+
 /// Find ark, pick a port, launch the server, wait for health.
 async fn boot_sidecar(handle: &tauri::AppHandle) -> Result<Sidecar> {
-    let ark_bin = sidecar::find_ark_binary(handle)
-        .context("Could not find the `ark` CLI. Install it with `make install` in the ark repo.")?;
+    let ark_bin = sidecar::find_ark_binary(handle).context(
+        "Could not find the `ark` CLI. The bundled sidecar is missing and ark is not on PATH.",
+    )?;
     info!(path = %ark_bin.display(), "found ark binary");
 
     let port = sidecar::pick_port(8420).context("No free port available")?;

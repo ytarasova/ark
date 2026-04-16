@@ -171,6 +171,7 @@ jobs:
   # Tauri desktop shell build -- proves the desktop app compiles and produces
   # installers on all three target platforms. See packages/desktop/README.md.
   tauri-build:
+    needs: build
     name: tauri-build (${{ matrix.name }})
     strategy:
       fail-fast: false
@@ -179,12 +180,18 @@ jobs:
           - name: macos-arm64
             os: macos-latest
             target: aarch64-apple-darwin
+            ark-artifact: ark-darwin-arm64
+            ark-binary: ark-darwin-arm64
           - name: linux-x64
             os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
+            ark-artifact: ark-linux-x64
+            ark-binary: ark-linux-x64
           - name: windows-x64
             os: windows-latest
             target: x86_64-pc-windows-msvc
+            ark-artifact: ""
+            ark-binary: ""
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
@@ -234,6 +241,30 @@ jobs:
       - name: Build web frontend
         # Tauri bundles ../../web/dist so the Vite build must succeed first.
         run: bun run build:web
+
+      # Download ark binary from the build job and place it as sidecar.
+      - name: Download ark binary for sidecar
+        if: matrix.ark-artifact != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.ark-artifact }}
+          path: packages/desktop/src-tauri/binaries
+
+      - name: Prepare sidecar binary
+        if: matrix.ark-artifact != ''
+        shell: bash
+        run: |
+          cd packages/desktop/src-tauri/binaries
+          mv "${{ matrix.ark-binary }}" "ark-${{ matrix.target }}"
+          chmod +x "ark-${{ matrix.target }}" 2>/dev/null || true
+          ls -lh
+
+      - name: Create sidecar placeholder (Windows)
+        if: matrix.ark-artifact == ''
+        shell: bash
+        run: |
+          mkdir -p packages/desktop/src-tauri/binaries
+          echo "placeholder" > "packages/desktop/src-tauri/binaries/ark-${{ matrix.target }}.exe"
 
       - name: Install Tauri package dependencies
         working-directory: packages/desktop
