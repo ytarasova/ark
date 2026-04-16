@@ -828,6 +828,9 @@ export class AppContext {
     registry.register(new ClaudeBurnParser());
     registry.register(new CodexBurnParser());
     registry.register(new GeminiBurnParser());
+    // Note: Goose sessions do not get burn data -- no GooseBurnParser is
+    // registered. recordBurnTurns and syncBurn both skip sessions whose
+    // runtime kind is unregistered.
     return registry;
   }
 
