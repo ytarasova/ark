@@ -11,7 +11,7 @@ interface BurnPageProps {
 
 export function BurnPage({ view, onNavigate, readOnly, daemonStatus }: BurnPageProps) {
   return (
-    <Layout view={view} onNavigate={onNavigate} readOnly={readOnly} title="Burn" padded={false} daemonStatus={daemonStatus}>
+    <Layout view={view} onNavigate={onNavigate} readOnly={readOnly} title="CodeBurn (local)" padded={false} daemonStatus={daemonStatus}>
       <BurnView />
     </Layout>
   );

@@ -12,6 +12,14 @@ import { CoreToolsPanel } from "./CoreToolsPanel.js";
 import { ShellCommandsPanel } from "./ShellCommandsPanel.js";
 import { McpServersPanel } from "./McpServersPanel.js";
 
+function BurnNote() {
+  return (
+    <div className="text-[11px] text-muted-foreground bg-accent/40 border border-border rounded px-3 py-2">
+      Local sessions only. Burn tracking currently supports Claude Code, Codex, and Gemini CLI. Goose sessions are not recorded.
+    </div>
+  );
+}
+
 function SkeletonCard({ className }: { className?: string }) {
   return (
     <Card className={className}>
@@ -32,6 +40,7 @@ export function BurnView() {
   if (isLoading) {
     return (
       <div className="p-4 space-y-4">
+        <BurnNote />
         <div className="flex items-center justify-between">
           <BurnPeriodTabs active={period} onChange={setPeriod} />
           <BurnSyncButton />
@@ -54,6 +63,7 @@ export function BurnView() {
   if (isError) {
     return (
       <div className="p-4 space-y-4">
+        <BurnNote />
         <div className="flex items-center justify-between">
           <BurnPeriodTabs active={period} onChange={setPeriod} />
           <BurnSyncButton />
@@ -76,6 +86,7 @@ export function BurnView() {
   if (!data || !data.overview) {
     return (
       <div className="p-4 space-y-4">
+        <BurnNote />
         <div className="flex items-center justify-between">
           <BurnPeriodTabs active={period} onChange={setPeriod} />
           <BurnSyncButton />
@@ -90,6 +101,8 @@ export function BurnView() {
 
   return (
     <div className="p-4 space-y-4">
+      <BurnNote />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <BurnPeriodTabs active={period} onChange={setPeriod} />
