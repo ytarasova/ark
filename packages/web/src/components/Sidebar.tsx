@@ -78,7 +78,12 @@ export function Sidebar({ activeView, onNavigate, readOnly, collapsed, onToggle,
       >
         {!collapsed && (
           <>
-            <span className="text-[15px] font-bold text-sidebar-foreground tracking-[-0.03em]">ark</span>
+            <span
+              data-testid="sidebar-brand"
+              className="text-[15px] font-bold text-sidebar-foreground tracking-[-0.03em]"
+            >
+              ark
+            </span>
             <span
               className={cn("w-[7px] h-[7px] rounded-full shrink-0 no-drag", dot.color, dot.glow)}
               title={dot.title}
