@@ -1,0 +1,1837 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ark -- Editorial Design Preview v5</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,500;0,8..60,600;0,8..60,700;1,8..60,300;1,8..60,400;1,8..60,500;1,8..60,600;1,8..60,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: {
+        serif: ['"Source Serif 4"', 'Georgia', 'serif'],
+        mono: ['"DM Mono"', 'monospace'],
+      },
+    },
+  },
+};
+</script>
+<style>
+  /* ==========================================
+     EDITORIAL v5 -- DESIGN TOKENS
+     Light mode is the SHOWCASE. Default.
+     ========================================== */
+
+  /* -- LIGHT MODE (default) -- */
+  :root {
+    --bg-deep: #faf7f2;
+    --bg-panel: #f4f0ea;
+    --bg-surface: #eee9e2;
+    --bg-surface-hover: #e8e3db;
+    --bg-code: #f0ece6;
+    --bg-input: #f6f3ed;
+    --bg-user: rgba(139, 105, 20, 0.04);
+
+    --border: #e0dbd4;
+    --border-strong: #d2ccc3;
+
+    --text-primary: #2a2520;
+    --text-secondary: #4a4238;
+    --text-muted: #7a7068;
+    --text-ghost: #b0a898;
+
+    --accent: #8b6914;
+    --accent-dim: rgba(139, 105, 20, 0.10);
+    --accent-hover: #a07a1a;
+
+    --green: #5a8c2a;
+    --green-dim: rgba(90, 140, 42, 0.10);
+    --red: #a52020;
+    --red-dim: rgba(165, 32, 32, 0.10);
+    --amber: #8b6914;
+    --blue: #4a6e8f;
+
+    --badge-note-bg: rgba(139, 105, 20, 0.10);
+    --badge-note-fg: #8b6914;
+    --badge-good-bg: rgba(90, 140, 42, 0.10);
+    --badge-good-fg: #4a7820;
+
+    --tool-border: #d8d2ca;
+    --drop-cap-color: #8b6914;
+    --noise-opacity: 0.015;
+  }
+
+  /* -- DARK MODE (toggle) -- */
+  html.dark {
+    --bg-deep: #121110;
+    --bg-panel: #16150f;
+    --bg-surface: #1c1a15;
+    --bg-surface-hover: #222018;
+    --bg-code: #0f0e0c;
+    --bg-input: #111010;
+    --bg-user: rgba(201, 165, 90, 0.04);
+
+    --border: #2a2824;
+    --border-strong: #3a3630;
+
+    --text-primary: #e8e4de;
+    --text-secondary: #a09888;
+    --text-muted: #6b6560;
+    --text-ghost: #453f36;
+
+    --accent: #c9a55a;
+    --accent-dim: rgba(201, 165, 90, 0.12);
+    --accent-hover: #d4b36a;
+
+    --green: #7cb342;
+    --green-dim: rgba(124, 179, 66, 0.12);
+    --red: #c62828;
+    --red-dim: rgba(198, 40, 40, 0.12);
+    --amber: #c9a55a;
+    --blue: #7b9ec7;
+
+    --badge-note-bg: rgba(201, 165, 90, 0.12);
+    --badge-note-fg: #c9a55a;
+    --badge-good-bg: rgba(124, 179, 66, 0.12);
+    --badge-good-fg: #8cc152;
+
+    --tool-border: #2e2b26;
+    --drop-cap-color: #c9a55a;
+    --noise-opacity: 0.010;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 15px;
+    line-height: 1.75;
+    height: 100%;
+    overflow: hidden;
+    letter-spacing: -0.01em;
+  }
+
+  /* Paper-like noise texture -- on body only, NOT on conversation */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: var(--noise-opacity);
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* Clean surface for conversation reading area */
+  .center-panel::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10000;
+    background: var(--bg-deep);
+    opacity: 0;
+  }
+
+  ::selection {
+    background: rgba(139, 105, 20, 0.25);
+  }
+  html.dark ::selection {
+    background: rgba(201, 165, 90, 0.3);
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--text-ghost); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+  .font-mono { font-family: 'DM Mono', monospace; }
+
+  /* ==========================================
+     LAYOUT -- more generous spacing
+     ========================================== */
+  .app-layout {
+    display: grid;
+    grid-template-columns: 230px 1fr 320px;
+    grid-template-rows: 48px 1fr 56px;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* ==========================================
+     HEADER -- 48px, editorial wordmark
+     ========================================== */
+  .header-bar {
+    grid-column: 1 / -1;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 14px;
+    font-size: 12px;
+    -webkit-app-region: drag;
+  }
+
+  /* Editorial italic wordmark */
+  .wordmark {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-style: italic;
+    font-weight: 600;
+    font-size: 20px;
+    color: var(--text-primary);
+    letter-spacing: -0.03em;
+    line-height: 1;
+  }
+
+  /* ==========================================
+     PANELS
+     ========================================== */
+  .left-panel {
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 12px 0 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .center-panel {
+    background: var(--bg-deep);
+    overflow-y: auto;
+    padding: 0;
+    position: relative;
+  }
+
+  .right-panel {
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 0;
+  }
+
+  .input-bar {
+    grid-column: 1 / -1;
+    background: var(--bg-panel);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 14px;
+    height: 56px;
+  }
+
+  /* ==========================================
+     SESSION ITEMS
+     ========================================== */
+  .session-item {
+    display: flex;
+    align-items: center;
+    padding: 7px 16px;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.15s;
+    border-left: 2px solid transparent;
+  }
+  .session-item:hover { background: var(--bg-surface); }
+  .session-item.selected {
+    background: var(--bg-surface);
+    border-left-color: var(--accent);
+  }
+
+  .group-header {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent);
+    padding: 16px 16px 5px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* ==========================================
+     MESSAGES -- Typography is the STAR
+     ========================================== */
+
+  /* System events: mono, warm muted, infrastructure */
+  .msg-system {
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 6px 32px;
+    font-family: 'DM Mono', monospace;
+    line-height: 1.5;
+  }
+
+  /* Stage banners */
+  .msg-stage {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    padding: 10px 32px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    font-family: 'DM Mono', monospace;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-surface);
+    margin-top: 8px;
+  }
+  .msg-stage .stage-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green);
+    flex-shrink: 0;
+  }
+  .msg-stage .stage-dot.active {
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+  }
+
+  /* Agent prose: Source Serif 4, 15px, 1.75 line-height, max 680px */
+  .msg-agent {
+    padding: 12px 32px 14px;
+    line-height: 1.75;
+    color: var(--text-primary);
+    font-size: 15px;
+    font-family: 'Source Serif 4', Georgia, serif;
+    letter-spacing: -0.01em;
+    max-width: 740px; /* 680px prose + 60px padding */
+  }
+  .msg-agent p,
+  .msg-agent .prose-para {
+    margin-bottom: 16px;
+  }
+  .msg-agent p:last-child,
+  .msg-agent .prose-para:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Agent bylines: serif, 700, uppercase, tracking, amber */
+  .msg-agent-name {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* Drop cap on first agent message per stage */
+  .drop-cap::first-letter {
+    float: left;
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 2.5em;
+    line-height: 0.85;
+    margin-right: 8px;
+    margin-top: 4px;
+    color: var(--drop-cap-color);
+    font-weight: 600;
+  }
+
+  /* User messages: serif + amber left border + small-caps label */
+  .msg-user {
+    padding: 12px 32px;
+    background: var(--bg-user);
+    border-left: 2px solid var(--accent);
+    color: var(--text-primary);
+    font-size: 15px;
+    line-height: 1.75;
+    font-family: 'Source Serif 4', Georgia, serif;
+    letter-spacing: -0.01em;
+    max-width: 740px;
+  }
+
+  .msg-user-label {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 4px;
+    font-variant: small-caps;
+    letter-spacing: 0.06em;
+  }
+
+  /* Tool calls: mono, warm muted, thin left border "aside" */
+  .tool-block {
+    padding: 4px 32px 8px;
+  }
+  .tool-call {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text-muted);
+    padding: 3px 0 3px 12px;
+    line-height: 1.5;
+    cursor: pointer;
+    transition: color 0.15s;
+    border-left: 1px solid var(--tool-border);
+  }
+  .tool-call:hover { color: var(--text-secondary); }
+  .tool-call .chevron { color: var(--text-ghost); margin-right: 4px; transition: transform 0.15s; display: inline-block; }
+  .tool-call .duration { color: var(--text-ghost); }
+  .tool-call.expanded .chevron { transform: rotate(90deg); }
+
+  .tool-detail {
+    display: none;
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin: 4px 0 4px 12px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+  .tool-call.expanded + .tool-detail { display: block; }
+
+  /* Code within prose */
+  .msg-agent code,
+  .inline-code {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    background: var(--bg-code);
+    border-radius: 3px;
+    padding: 1px 6px;
+  }
+
+  /* Code blocks */
+  .code-block {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 8px 0;
+    font-family: 'DM Mono', monospace;
+    font-size: 11.5px;
+    line-height: 1.6;
+    overflow-x: auto;
+    color: var(--text-secondary);
+  }
+
+  .msg-agent ol {
+    padding-left: 24px;
+    margin: 8px 0;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+  .msg-agent ol li { padding: 2px 0; }
+
+  /* Diff */
+  .diff-add { color: var(--green); }
+  .diff-del { color: var(--red); }
+  .diff-hunk { color: var(--blue); }
+  .diff-context { color: var(--text-muted); }
+
+  /* Conversation gap between messages */
+  .msg-gap {
+    height: 24px;
+  }
+
+  /* ==========================================
+     REVIEW FINDINGS -- generous spacing
+     ========================================== */
+  .review-finding {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 0;
+  }
+  .review-badge {
+    display: inline-flex;
+    align-items: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-weight: 500;
+    flex-shrink: 0;
+    margin-top: 3px;
+  }
+  .review-badge.good {
+    background: var(--badge-good-bg);
+    color: var(--badge-good-fg);
+  }
+  .review-badge.note {
+    background: var(--badge-note-bg);
+    color: var(--badge-note-fg);
+  }
+
+  /* ==========================================
+     RIGHT PANEL -- Editorial sidebar
+     ========================================== */
+  .panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-weight: 500;
+  }
+  .panel-tab {
+    padding: 10px 16px;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.15s;
+    letter-spacing: 0.01em;
+  }
+  .panel-tab:hover { color: var(--text-secondary); }
+  .panel-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  /* Vertical timeline for stages */
+  .stage-timeline {
+    padding: 16px 28px;
+  }
+  .stage-timeline-item {
+    display: flex;
+    gap: 14px;
+    position: relative;
+    padding-bottom: 16px;
+  }
+  .stage-timeline-item:last-child { padding-bottom: 0; }
+  .stage-timeline-item::before {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 14px;
+    bottom: 0;
+    width: 1px;
+    background: var(--border);
+  }
+  .stage-timeline-item:last-child::before { display: none; }
+  .stage-timeline-dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 3px;
+    position: relative;
+    z-index: 1;
+  }
+  .stage-timeline-dot.done { background: var(--green); }
+  .stage-timeline-dot.active { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .stage-timeline-dot.pending { border: 1.5px solid var(--text-ghost); background: transparent; }
+  .stage-timeline-content {
+    flex: 1;
+    min-width: 0;
+  }
+  .stage-timeline-name {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.3;
+  }
+  .stage-timeline-name.pending-text { color: var(--text-ghost); }
+  .stage-timeline-desc {
+    font-family: 'DM Mono', monospace;
+    font-size: 10.5px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    line-height: 1.4;
+  }
+
+  /* File list: mono names, serif descriptions */
+  .file-entry {
+    padding: 6px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .file-entry-name {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text-secondary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .file-entry-desc {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+    line-height: 1.4;
+  }
+  .file-dir-label {
+    padding: 10px 28px 3px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text-ghost);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* Metrics: large serif numbers, small mono labels */
+  .metric-card {
+    padding: 14px 28px;
+    border-bottom: 1px solid var(--border);
+  }
+  .metric-value {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+  .metric-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* Right panel section headers */
+  .rpanel-header {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding: 14px 28px 6px;
+    letter-spacing: 0.01em;
+  }
+
+  /* Status dot */
+  .status-dot {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    margin-right: 2px;
+    flex-shrink: 0;
+  }
+  .status-dot.running { background: var(--accent); box-shadow: 0 0 5px var(--accent); }
+  .status-dot.completed { background: var(--green); }
+  .status-dot.failed { background: var(--red); }
+  .status-dot.stopped { background: var(--text-ghost); }
+
+  /* Pipeline */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .pipeline-stage {
+    padding: 3px 8px;
+    color: var(--text-muted);
+    transition: color 0.15s;
+  }
+  .pipeline-stage.done { color: var(--green); }
+  .pipeline-stage.active { color: var(--accent); font-weight: 600; }
+  .pipeline-stage.pending { color: var(--text-ghost); }
+  .pipeline-arrow { color: var(--text-ghost); font-size: 10px; margin: 0 2px; }
+
+  /* Pulse */
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .pulse { animation: pulse-glow 2.5s ease-in-out infinite; }
+
+  /* Nav items */
+  .nav-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 7px 16px;
+    font-size: 13px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: 'Source Serif 4', serif;
+  }
+  .nav-item:hover { color: var(--text-secondary); background: var(--bg-surface); }
+  .nav-item.active { color: var(--accent); }
+
+  /* Keyboard shortcut badge */
+  .kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    line-height: 1;
+  }
+
+  /* Session summary stats */
+  .session-summary {
+    border-top: 1px solid var(--border);
+    padding: 10px 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+  }
+  .session-summary .row {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+  }
+
+  /* Theme toggle */
+  .theme-toggle {
+    cursor: pointer;
+    width: 30px; height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 14px;
+    transition: all 0.2s;
+    -webkit-app-region: no-drag;
+  }
+  .theme-toggle:hover { background: var(--bg-surface); color: var(--text-primary); }
+
+  /* Input */
+  .msg-input {
+    flex: 1;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-primary);
+    padding: 12px 18px;
+    font-size: 14px;
+    font-family: 'Source Serif 4', serif;
+    outline: none;
+    transition: border-color 0.2s;
+    letter-spacing: -0.01em;
+  }
+  .msg-input:focus { border-color: var(--accent); }
+  .msg-input::placeholder { color: var(--text-ghost); }
+
+  .send-btn {
+    background: var(--accent);
+    color: #faf7f2;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 22px;
+    font-family: 'Source Serif 4', serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+    letter-spacing: 0.01em;
+  }
+  html.dark .send-btn { color: #121110; }
+  .send-btn:hover { background: var(--accent-hover); }
+
+  /* Version tag */
+  .version-tag {
+    font-family: 'Source Serif 4', serif;
+    font-size: 11px;
+    font-style: italic;
+    color: var(--text-ghost);
+    padding: 10px 16px;
+  }
+
+  /* Search button */
+  .search-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 12px 5px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    font-family: 'Source Serif 4', serif;
+    font-size: 12px;
+    transition: all 0.15s;
+    -webkit-app-region: no-drag;
+  }
+  .search-btn:hover { border-color: var(--border-strong); color: var(--text-secondary); }
+
+  /* Command palette */
+  .cmd-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.2);
+    backdrop-filter: blur(6px);
+    z-index: 100;
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 18vh;
+  }
+  .cmd-overlay.open { display: flex; }
+  html.dark .cmd-overlay { background: rgba(0,0,0,0.55); backdrop-filter: blur(4px); }
+
+  .cmd-box {
+    width: 540px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.12);
+  }
+  html.dark .cmd-box { box-shadow: 0 24px 80px rgba(0,0,0,0.5); }
+  .cmd-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .cmd-input-wrap svg { color: var(--text-muted); flex-shrink: 0; }
+  .cmd-search-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-family: 'Source Serif 4', serif;
+    font-size: 15px;
+  }
+  .cmd-search-input::placeholder { color: var(--text-ghost); }
+  .cmd-results {
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 6px;
+  }
+  .cmd-group-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-ghost);
+    padding: 8px 10px 4px;
+  }
+  .cmd-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'Source Serif 4', serif;
+    font-size: 14px;
+    color: var(--text-secondary);
+    transition: background 0.1s;
+  }
+  .cmd-item:hover { background: var(--bg-surface); color: var(--text-primary); }
+  .cmd-item .cmd-meta {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text-ghost);
+  }
+</style>
+</head>
+<body>
+
+<div class="app-layout" id="app">
+
+  <!-- ================================ -->
+  <!-- HEADER BAR -- 48px              -->
+  <!-- ================================ -->
+  <div class="header-bar">
+    <span class="wordmark">ark</span>
+    <span style="color:var(--text-ghost); font-size:14px;">|</span>
+    <span class="font-mono" style="color:var(--text-muted); font-size:11px;">s-abc123</span>
+    <span style="color:var(--text-ghost);">&rsaquo;</span>
+    <span style="font-family:'Source Serif 4',serif; font-size:12px; color:var(--text-secondary); font-weight:500;">review</span>
+
+    <div style="flex:1;"></div>
+
+    <!-- Stage pipeline -- serif labels -->
+    <div class="pipeline">
+      <span class="pipeline-stage done">plan</span>
+      <span class="pipeline-arrow">&rarr;</span>
+      <span class="pipeline-stage done">implement</span>
+      <span class="pipeline-arrow">&rarr;</span>
+      <span class="pipeline-stage done">verify</span>
+      <span class="pipeline-arrow">&rarr;</span>
+      <span class="pipeline-stage active pulse">review</span>
+      <span class="pipeline-arrow">&rarr;</span>
+      <span class="pipeline-stage pending">merge</span>
+    </div>
+
+    <div style="flex:1;"></div>
+
+    <button class="search-btn" onclick="toggleCmdPalette()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      Search...
+      <span class="kbd" style="margin-left:2px;">&#8984;K</span>
+    </button>
+
+    <span class="font-mono" style="font-size:11px; color:var(--text-muted);">local</span>
+    <span style="color:var(--text-ghost);">|</span>
+    <span class="font-mono" style="font-size:11px; color:var(--text-muted);">opus-4</span>
+    <span style="color:var(--text-ghost);">|</span>
+    <span class="font-mono" style="font-size:11px; color:var(--green);">$0.82</span>
+    <span style="color:var(--text-ghost);">|</span>
+    <span class="font-mono" style="font-size:11px; color:var(--text-muted);">4m 32s</span>
+
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" id="theme-btn">
+      <span id="theme-icon-moon">&#9790;</span>
+      <span id="theme-icon-sun" style="display:none;">&#9788;</span>
+    </button>
+  </div>
+
+  <!-- ================================ -->
+  <!-- LEFT PANEL                       -->
+  <!-- ================================ -->
+  <div class="left-panel">
+    <div style="padding: 6px 16px 12px; font-family: 'Source Serif 4', serif; font-size: 16px; font-weight: 600; color: var(--text-primary);">Sessions</div>
+
+    <div class="group-header">autonomous-sdlc</div>
+
+    <div class="session-item selected" onclick="selectSession(this)">
+      <span class="status-dot running pulse"></span>
+      <div style="flex:1; min-width:0;">
+        <div style="font-family:'Source Serif 4',serif; font-size:13px; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Add SSH connection pooling</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:2px;">
+          <span class="font-mono" style="font-size:10px; color:var(--text-muted);">s-abc123</span>
+          <span class="font-mono" style="font-size:10px; color:var(--accent);">review</span>
+        </div>
+      </div>
+      <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">2m</span>
+    </div>
+
+    <div class="session-item" onclick="selectSession(this)">
+      <span class="status-dot completed"></span>
+      <div style="flex:1; min-width:0;">
+        <div style="font-family:'Source Serif 4',serif; font-size:13px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Fix circuit breaker timeout</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:2px;">
+          <span class="font-mono" style="font-size:10px; color:var(--text-muted);">s-def456</span>
+          <span class="font-mono" style="font-size:10px; color:var(--green);">merged</span>
+        </div>
+      </div>
+      <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">18m</span>
+    </div>
+
+    <div class="session-item" onclick="selectSession(this)">
+      <span class="status-dot completed"></span>
+      <div style="flex:1; min-width:0;">
+        <div style="font-family:'Source Serif 4',serif; font-size:13px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Refactor LLM router policies</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:2px;">
+          <span class="font-mono" style="font-size:10px; color:var(--text-muted);">s-789abc</span>
+          <span class="font-mono" style="font-size:10px; color:var(--green);">merged</span>
+        </div>
+      </div>
+      <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">45m</span>
+    </div>
+
+    <div class="group-header">quick</div>
+
+    <div class="session-item" onclick="selectSession(this)">
+      <span class="status-dot running pulse"></span>
+      <div style="flex:1; min-width:0;">
+        <div style="font-family:'Source Serif 4',serif; font-size:13px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Update README badges</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:2px;">
+          <span class="font-mono" style="font-size:10px; color:var(--text-muted);">s-cde012</span>
+          <span class="font-mono" style="font-size:10px; color:var(--accent);">running</span>
+        </div>
+      </div>
+      <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">3m</span>
+    </div>
+
+    <div class="session-item" onclick="selectSession(this)">
+      <span class="status-dot failed"></span>
+      <div style="flex:1; min-width:0;">
+        <div style="font-family:'Source Serif 4',serif; font-size:13px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Add Kubernetes RBAC</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:2px;">
+          <span class="font-mono" style="font-size:10px; color:var(--text-muted);">s-ef3456</span>
+          <span class="font-mono" style="font-size:10px; color:var(--red);">failed</span>
+        </div>
+      </div>
+      <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">12m</span>
+    </div>
+
+    <div class="session-item" onclick="selectSession(this)">
+      <span class="status-dot stopped"></span>
+      <div style="flex:1; min-width:0;">
+        <div style="font-family:'Source Serif 4',serif; font-size:13px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Migrate to PostgreSQL</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:2px;">
+          <span class="font-mono" style="font-size:10px; color:var(--text-muted);">s-gh7890</span>
+          <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">stopped</span>
+        </div>
+      </div>
+      <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">1h</span>
+    </div>
+
+    <div class="group-header">fan-out</div>
+
+    <div class="session-item" onclick="selectSession(this)">
+      <span class="status-dot completed"></span>
+      <div style="flex:1; min-width:0;">
+        <div style="font-family:'Source Serif 4',serif; font-size:13px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Lint all compute providers</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:2px;">
+          <span class="font-mono" style="font-size:10px; color:var(--text-muted);">s-ij1234</span>
+          <span class="font-mono" style="font-size:10px; color:var(--green);">done</span>
+        </div>
+      </div>
+      <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">8m</span>
+    </div>
+
+    <div class="session-item" onclick="selectSession(this)">
+      <span class="status-dot completed"></span>
+      <div style="flex:1; min-width:0;">
+        <div style="font-family:'Source Serif 4',serif; font-size:13px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Add E2B sandbox metrics</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:2px;">
+          <span class="font-mono" style="font-size:10px; color:var(--text-muted);">s-kl5678</span>
+          <span class="font-mono" style="font-size:10px; color:var(--green);">done</span>
+        </div>
+      </div>
+      <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">14m</span>
+    </div>
+
+    <!-- Nav divider -->
+    <div style="border-top: 1px solid var(--border); margin: 12px 0 8px;"></div>
+
+    <div class="nav-item active">
+      <span style="display:flex; align-items:center; gap:10px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>
+        Sessions
+      </span>
+      <span class="kbd">S</span>
+    </div>
+    <div class="nav-item">
+      <span style="display:flex; align-items:center; gap:10px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        Flows
+      </span>
+      <span class="kbd">F</span>
+    </div>
+    <div class="nav-item">
+      <span style="display:flex; align-items:center; gap:10px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        Agents
+      </span>
+      <span class="kbd">A</span>
+    </div>
+    <div class="nav-item">
+      <span style="display:flex; align-items:center; gap:10px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Router
+      </span>
+      <span class="kbd">R</span>
+    </div>
+
+    <div style="flex:1;"></div>
+
+    <div class="session-summary">
+      <div class="row">
+        <span style="color:var(--text-muted);">8 sessions</span>
+        <span style="color:var(--accent);">2 running</span>
+      </div>
+      <div class="row">
+        <span style="color:var(--text-muted);">total cost</span>
+        <span style="color:var(--text-secondary);">$4.37</span>
+      </div>
+    </div>
+
+    <div class="version-tag">ark v0.17.0</div>
+  </div>
+
+  <!-- ================================ -->
+  <!-- CENTER PANEL -- CONVERSATION     -->
+  <!-- ================================ -->
+  <div class="center-panel" id="conversation">
+
+    <!-- System start -->
+    <div class="msg-system" style="padding-top: 18px;">
+      session s-abc123 started -- flow: autonomous-sdlc -- runtime: claude -- compute: local
+    </div>
+    <div class="msg-system">
+      agent: planner (claude-opus-4) -- task: "Add SSH connection pooling with ControlMaster and per-type queues"
+    </div>
+
+    <!-- PLAN STAGE -->
+    <div class="msg-stage">
+      <span class="stage-dot" style="background: var(--green);"></span>
+      stage: plan -- planner agent
+    </div>
+
+    <div class="msg-gap"></div>
+
+    <div class="msg-user">
+      <div class="msg-user-label">you</div>
+      Add SSH connection pooling to the compute layer. Each compute provider type should maintain its own pool with ControlMaster multiplexing. Stale connections should be dropped automatically based on metrics.
+    </div>
+
+    <div class="msg-gap"></div>
+
+    <!-- First agent message in plan stage -- DROP CAP -->
+    <div class="msg-agent">
+      <div class="msg-agent-name">planner</div>
+      <div class="drop-cap">I will analyze the codebase to understand the current SSH handling and design a connection pooling architecture that fits cleanly into the existing compute layer.</div>
+    </div>
+
+    <div class="tool-block">
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Read packages/compute/ssh.ts <span class="duration">-- 0.3s</span>
+      </div>
+      <div class="tool-detail">Read 142 lines from packages/compute/ssh.ts. Found: createSSHConnection(), executeRemoteCommand(), current implementation creates a new connection per invocation with no reuse.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Read packages/compute/providers/ec2-micro.ts <span class="duration">-- 0.2s</span>
+      </div>
+      <div class="tool-detail">Read 89 lines. Provider calls ssh.connect() in startSession(), executeCommand(), and cleanup() -- three separate connections per session lifecycle.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Grep "ssh.connect\|createSSH" packages/compute/ <span class="duration">-- 0.4s</span>
+      </div>
+      <div class="tool-detail">Found 23 call sites across 8 provider files. Average 2.8 connections per session operation. No connection reuse anywhere in the compute layer.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Read packages/core/metrics.ts <span class="duration">-- 0.2s</span>
+      </div>
+      <div class="tool-detail">Metrics module tracks connection_count, latency_ms, error_rate. Has staleCheck() method that returns boolean for connections older than configurable TTL.</div>
+    </div>
+
+    <div class="msg-gap"></div>
+
+    <div class="msg-agent">
+      <div class="msg-agent-name">planner</div>
+      <div class="prose-para">After reviewing the codebase, here is my analysis and plan.</div>
+
+      <div class="prose-para"><strong style="color:var(--text-primary);">Current state:</strong> Each compute provider creates SSH connections on demand with no pooling. A single session lifecycle (start, execute, cleanup) opens two to three separate connections. Across eight providers, there are 23 call sites -- all creating fresh connections.</div>
+
+      <div class="prose-para"><strong style="color:var(--text-primary);">Design for SSH connection pool:</strong></div>
+      <ol>
+        <li><strong>SSHPool class</strong> in <code>packages/compute/ssh-pool.ts</code> -- singleton pool manager with per-provider-type queues</li>
+        <li><strong>ControlMaster integration</strong> -- each pool entry uses OpenSSH ControlMaster for multiplexing. One TCP connection, multiple logical channels</li>
+        <li><strong>Queue architecture</strong> -- Map&lt;ProviderType, ConnectionQueue&gt; where each queue has configurable max size, TTL, and health checks</li>
+        <li><strong>Stale connection eviction</strong> -- background sweep every 30s using <code>metrics.staleCheck()</code>. Connections with no activity beyond TTL get gracefully closed</li>
+        <li><strong>Provider migration</strong> -- update all 8 providers to use <code>pool.acquire()</code> / <code>pool.release()</code> instead of direct <code>ssh.connect()</code></li>
+        <li><strong>Tests</strong> -- pool lifecycle, concurrent acquisition, eviction timing, ControlMaster failover</li>
+      </ol>
+    </div>
+
+    <div class="tool-block">
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Write packages/compute/ssh-pool.ts (plan skeleton) <span class="duration">-- 0.1s</span>
+      </div>
+      <div class="tool-detail">Created plan skeleton with SSHPool class interface, ConnectionQueue type, and PoolConfig defaults (maxPerType: 5, ttlMs: 300000, sweepIntervalMs: 30000).</div>
+    </div>
+
+    <div class="msg-system">plan approved -- handing off to implementer</div>
+
+    <!-- IMPLEMENT STAGE -->
+    <div class="msg-stage">
+      <span class="stage-dot" style="background: var(--green);"></span>
+      stage: implement -- coder agent
+    </div>
+
+    <div class="msg-gap"></div>
+
+    <!-- First agent message in implement stage -- DROP CAP -->
+    <div class="msg-agent">
+      <div class="msg-agent-name">coder</div>
+      <div class="drop-cap">Starting implementation of the SSH connection pool. I will follow the plan's architecture exactly, beginning with the core pool class and then migrating each provider.</div>
+    </div>
+
+    <div class="tool-block">
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Write packages/compute/ssh-pool.ts <span class="duration">-- 0.8s</span>
+      </div>
+      <div class="tool-detail">Created 186-line SSHPool implementation with ControlMaster support, per-type queues, TTL eviction, health checks, and graceful shutdown.</div>
+    </div>
+
+    <div class="msg-gap"></div>
+
+    <div class="msg-agent">
+      <div class="msg-agent-name">coder</div>
+      <div class="prose-para">Core pool implementation done. The SSHPool maintains a Map&lt;ProviderType, ConnectionEntry[]&gt; where each entry tracks:</div>
+
+      <div class="code-block"><span class="diff-add">interface ConnectionEntry {</span>
+<span class="diff-add">  id: string;</span>
+<span class="diff-add">  socket: SSHConnection;</span>
+<span class="diff-add">  providerType: ProviderType;</span>
+<span class="diff-add">  controlPath: string;       // ControlMaster socket</span>
+<span class="diff-add">  createdAt: number;</span>
+<span class="diff-add">  lastUsedAt: number;</span>
+<span class="diff-add">  useCount: number;</span>
+<span class="diff-add">  healthy: boolean;</span>
+<span class="diff-add">}</span></div>
+
+      <div class="prose-para">Now migrating providers to use the pool.</div>
+    </div>
+
+    <div class="tool-block">
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Edit packages/compute/providers/ec2-micro.ts <span class="duration">-- 0.3s</span>
+      </div>
+      <div class="tool-detail">Replaced 3 direct ssh.connect() calls with pool.acquire('ec2-micro') and pool.release(). Added cleanup in provider.shutdown().</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Edit packages/compute/providers/ec2-medium.ts <span class="duration">-- 0.3s</span>
+      </div>
+      <div class="tool-detail">Same migration pattern. Replaced 3 ssh.connect() calls with pool.acquire('ec2-medium').</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Edit packages/compute/providers/docker.ts <span class="duration">-- 0.2s</span>
+      </div>
+      <div class="tool-detail">Docker provider uses local socket, not SSH. Skipped -- no changes needed.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Edit packages/compute/providers/e2b.ts <span class="duration">-- 0.4s</span>
+      </div>
+      <div class="tool-detail">E2B provider uses SSH tunnel. Migrated 2 call sites to pool.acquire('e2b'). Added pool.release() in session cleanup handler.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Edit packages/compute/providers/firecracker.ts <span class="duration">-- 0.3s</span>
+      </div>
+      <div class="tool-detail">Migrated 4 call sites. Firecracker had the most SSH calls due to snapshot restore needing reconnection.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Edit packages/compute/providers/k8s.ts <span class="duration">-- 0.2s</span>
+      </div>
+      <div class="tool-detail">Migrated 2 call sites to pool.acquire('k8s').</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Edit packages/compute/providers/k8s-kata.ts <span class="duration">-- 0.2s</span>
+      </div>
+      <div class="tool-detail">Same as k8s. 2 call sites migrated.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Edit packages/compute/providers/devcontainer.ts <span class="duration">-- 0.3s</span>
+      </div>
+      <div class="tool-detail">Migrated 3 call sites. Devcontainer needed special handling for workspace-mount reconnection.</div>
+    </div>
+
+    <div class="msg-gap"></div>
+
+    <div class="msg-agent">
+      <div class="msg-agent-name">coder</div>
+      <div class="prose-para">All eight providers migrated. Twenty-three direct <code>ssh.connect()</code> calls replaced with <code>pool.acquire()</code>/<code>pool.release()</code> pairs. Docker provider skipped -- it uses local sockets, not SSH. Now implementing the stale connection eviction with the metrics integration.</div>
+    </div>
+
+    <div class="tool-block">
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Edit packages/compute/ssh-pool.ts (add eviction sweep) <span class="duration">-- 0.4s</span>
+      </div>
+      <div class="tool-detail">Added sweepStale() method: iterates all pools, calls metrics.staleCheck() for each entry, closes and removes stale connections. Runs on setInterval(30000).</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Edit packages/core/metrics.ts (add pool metrics) <span class="duration">-- 0.2s</span>
+      </div>
+      <div class="tool-detail">Added pool_size, pool_hit_rate, pool_eviction_count metrics. Exposed via existing metrics endpoint.</div>
+    </div>
+
+    <div class="msg-gap"></div>
+
+    <div class="msg-agent">
+      <div class="msg-agent-name">coder</div>
+      <div class="prose-para">Eviction sweep implemented. Every 30 seconds, the pool checks each connection against the metrics TTL. Stale connections are gracefully closed and their ControlMaster sockets cleaned up. Writing tests now.</div>
+    </div>
+
+    <div class="tool-block">
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Write packages/compute/__tests__/ssh-pool.test.ts <span class="duration">-- 0.6s</span>
+      </div>
+      <div class="tool-detail">Created 4 test suites: pool lifecycle (create/shutdown), concurrent acquisition (5 simultaneous acquires), eviction timing (mock clock advance), ControlMaster failover (socket cleanup on error).</div>
+    </div>
+
+    <div class="msg-system">implement complete -- 12 files changed -- handing off to verifier</div>
+
+    <!-- VERIFY STAGE -->
+    <div class="msg-stage">
+      <span class="stage-dot" style="background: var(--green);"></span>
+      stage: verify -- verifier agent
+    </div>
+
+    <div class="msg-gap"></div>
+
+    <!-- First agent message in verify stage -- DROP CAP -->
+    <div class="msg-agent">
+      <div class="msg-agent-name">verifier</div>
+      <div class="drop-cap">Running the full test suite and linting the changes to ensure correctness before this moves to review.</div>
+    </div>
+
+    <div class="tool-block">
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Bash: make test <span class="duration">-- 14.2s</span>
+      </div>
+      <div class="tool-detail">42 tests passed, 0 failed, 0 skipped. All new ssh-pool tests green. No regressions in existing compute provider tests.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Bash: make lint <span class="duration">-- 2.1s</span>
+      </div>
+      <div class="tool-detail">0 errors, 0 warnings. Clean.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Bash: make format <span class="duration">-- 1.8s</span>
+      </div>
+      <div class="tool-detail">2 files reformatted (ssh-pool.ts, firecracker.ts). No functional changes.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Bash: tsc --noEmit <span class="duration">-- 3.4s</span>
+      </div>
+      <div class="tool-detail">0 errors. Type checking passed across all packages.</div>
+    </div>
+
+    <div class="msg-gap"></div>
+
+    <div class="msg-agent">
+      <div class="msg-agent-name">verifier</div>
+      <div class="prose-para">All checks pass. 42 tests green, lint clean, formatting applied, type-safe. Two files needed Prettier reformatting -- no logic changes.</div>
+    </div>
+
+    <div class="msg-system">verify passed -- all tests green, lint clean</div>
+
+    <!-- User interjection -->
+    <div class="msg-gap"></div>
+
+    <div class="msg-user">
+      <div class="msg-user-label">you</div>
+      Make sure the pool handles the case where ControlMaster socket files are orphaned on crash. We had issues with stale socket files in /tmp before.
+    </div>
+
+    <div class="msg-gap"></div>
+
+    <div class="msg-agent">
+      <div class="msg-agent-name">verifier</div>
+      <div class="prose-para">Good catch. Let me check the current cleanup logic for orphaned ControlMaster sockets.</div>
+    </div>
+
+    <div class="tool-block">
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Read packages/compute/ssh-pool.ts lines 120-160 <span class="duration">-- 0.1s</span>
+      </div>
+      <div class="tool-detail">The shutdown() method calls controlSocket.unlink() for each entry. But if the process crashes, these sockets persist. No startup cleanup exists.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Edit packages/compute/ssh-pool.ts (add startup cleanup) <span class="duration">-- 0.3s</span>
+      </div>
+      <div class="tool-detail">Added cleanOrphanedSockets() to pool constructor. On init, scans /tmp/ark-ssh-* for stale socket files older than the process start time and removes them. Also added a SIGTERM handler for graceful cleanup.</div>
+    </div>
+
+    <div class="msg-gap"></div>
+
+    <div class="msg-agent">
+      <div class="msg-agent-name">verifier</div>
+      <div class="prose-para">Added orphan socket cleanup. On pool initialization, it now scans for stale <code>/tmp/ark-ssh-*</code> socket files from previous crashed processes and removes them. Also registered a SIGTERM handler for graceful shutdown. Re-running tests to confirm.</div>
+    </div>
+
+    <div class="tool-block">
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Bash: make test <span class="duration">-- 14.8s</span>
+      </div>
+      <div class="tool-detail">43 tests passed (1 new test for orphan cleanup), 0 failed. All green.</div>
+    </div>
+
+    <div class="msg-system">verify re-confirmed -- 43 tests green</div>
+
+    <!-- REVIEW STAGE -->
+    <div class="msg-stage">
+      <span class="stage-dot active" style="background: var(--accent); box-shadow: 0 0 6px var(--accent);"></span>
+      stage: review -- reviewer agent
+    </div>
+
+    <div class="msg-gap"></div>
+
+    <!-- First agent message in review stage -- DROP CAP -->
+    <div class="msg-agent">
+      <div class="msg-agent-name">reviewer</div>
+      <div class="drop-cap">Reviewing the SSH pool implementation and provider migrations for correctness, edge cases, and adherence to the plan. I will examine the core pool logic, test coverage, and confirm balanced acquire/release pairs across all providers.</div>
+    </div>
+
+    <div class="tool-block">
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Read packages/compute/ssh-pool.ts <span class="duration">-- 0.2s</span>
+      </div>
+      <div class="tool-detail">Reviewing full implementation: SSHPool class, ConnectionEntry interface, acquire(), release(), sweepStale(), cleanOrphanedSockets(), shutdown() methods.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Read packages/compute/__tests__/ssh-pool.test.ts <span class="duration">-- 0.2s</span>
+      </div>
+      <div class="tool-detail">5 test suites, 17 test cases. Good coverage of happy path and error scenarios. Missing: test for max pool size exceeded (should queue).</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Grep "pool.acquire" packages/compute/providers/ <span class="duration">-- 0.1s</span>
+      </div>
+      <div class="tool-detail">Found 19 pool.acquire() calls and 19 matching pool.release() calls across 7 provider files. All balanced.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Diff against main branch <span class="duration">-- 0.3s</span>
+      </div>
+      <div class="tool-detail">13 files changed, +398 -98. Clean diff, no unintended changes. All imports use .js extensions as required.</div>
+    </div>
+
+    <div class="msg-gap"></div>
+
+    <div class="msg-agent">
+      <div class="msg-agent-name">reviewer</div>
+      <div class="prose-para">Good implementation overall. Review findings:</div>
+
+      <div style="margin: 8px 0 12px;">
+        <div class="review-finding">
+          <span class="review-badge good">Good</span>
+          <span>ControlMaster integration is clean. Socket paths are correctly scoped per provider type, preventing cross-contamination between ec2-micro and ec2-medium pools.</span>
+        </div>
+
+        <div class="review-finding">
+          <span class="review-badge good">Good</span>
+          <span>Acquire/release pairs are balanced across all providers (19/19). No leak paths found.</span>
+        </div>
+
+        <div class="review-finding">
+          <span class="review-badge good">Good</span>
+          <span>Orphaned socket cleanup on startup addresses the crash recovery scenario correctly.</span>
+        </div>
+
+        <div class="review-finding">
+          <span class="review-badge note">Note</span>
+          <span><strong>Missing test:</strong> No test for max pool size exceeded. When all connections are in use and a new <code>acquire()</code> is called, the pool should queue the request. Add a test for this backpressure scenario.</span>
+        </div>
+
+        <div class="review-finding">
+          <span class="review-badge note">Note</span>
+          <span><strong>Minor:</strong> The <code>sweepStale()</code> interval should be cleared in <code>shutdown()</code> to prevent timer leaks. Currently it is only cleared if the pool is explicitly destroyed -- but <code>shutdown()</code> just closes connections without clearing the interval.</span>
+        </div>
+      </div>
+
+      <div class="prose-para">Neither finding is blocking. The metrics integration is clean and the SIGTERM handler covers the most common crash path.</div>
+
+      <div class="prose-para"><span style="color: var(--accent); font-weight: 600;">Recommendation: approve with minor fixes.</span></div>
+    </div>
+
+    <div class="msg-system" style="padding-bottom: 6px;">review in progress -- waiting for approval <span class="pulse" style="color:var(--accent);">...</span></div>
+
+    <!-- Spacer for scroll -->
+    <div style="height: 20px;"></div>
+  </div>
+
+  <!-- ================================ -->
+  <!-- RIGHT PANEL -- Editorial sidebar -->
+  <!-- ================================ -->
+  <div class="right-panel">
+
+    <div class="panel-tabs">
+      <div class="panel-tab active" onclick="switchTab(this, 'tab-progress')">Progress</div>
+      <div class="panel-tab" onclick="switchTab(this, 'tab-files')">Files</div>
+      <div class="panel-tab" onclick="switchTab(this, 'tab-metrics')">Metrics</div>
+    </div>
+
+    <!-- Tab: Progress (default) -- vertical timeline -->
+    <div id="tab-progress">
+      <div class="stage-timeline">
+        <div class="stage-timeline-item">
+          <div class="stage-timeline-dot done"></div>
+          <div class="stage-timeline-content">
+            <div class="stage-timeline-name">Plan</div>
+            <div class="stage-timeline-desc">analyzed codebase, designed pool architecture with per-type queues and ControlMaster -- 1m 12s</div>
+          </div>
+        </div>
+        <div class="stage-timeline-item">
+          <div class="stage-timeline-dot done"></div>
+          <div class="stage-timeline-content">
+            <div class="stage-timeline-name">Implement</div>
+            <div class="stage-timeline-desc">built SSHPool class, migrated 8 providers (23 call sites), added eviction sweep and tests -- 2m 04s</div>
+          </div>
+        </div>
+        <div class="stage-timeline-item">
+          <div class="stage-timeline-dot done"></div>
+          <div class="stage-timeline-content">
+            <div class="stage-timeline-name">Verify</div>
+            <div class="stage-timeline-desc">43 tests green, lint clean, types pass. Added orphan socket cleanup per user request -- 0m 48s</div>
+          </div>
+        </div>
+        <div class="stage-timeline-item">
+          <div class="stage-timeline-dot active"></div>
+          <div class="stage-timeline-content">
+            <div class="stage-timeline-name">Review</div>
+            <div class="stage-timeline-desc">3 good findings, 2 notes (non-blocking). Recommends approve with minor fixes</div>
+          </div>
+        </div>
+        <div class="stage-timeline-item">
+          <div class="stage-timeline-dot pending"></div>
+          <div class="stage-timeline-content">
+            <div class="stage-timeline-name pending-text">Merge</div>
+            <div class="stage-timeline-desc">pending review approval</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid var(--border);"></div>
+
+      <!-- Session metadata -->
+      <div style="padding: 14px 28px;">
+        <div style="font-family:'DM Mono',monospace; font-size:10px; color:var(--text-ghost); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:8px;">Session</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px 14px; font-size:12px;">
+          <span class="font-mono" style="color:var(--text-muted);">id</span><span class="font-mono" style="color:var(--text-secondary);">s-abc123</span>
+          <span class="font-mono" style="color:var(--text-muted);">flow</span><span class="font-mono" style="color:var(--text-secondary);">autonomous-sdlc</span>
+          <span class="font-mono" style="color:var(--text-muted);">compute</span><span class="font-mono" style="color:var(--text-secondary);">local</span>
+          <span class="font-mono" style="color:var(--text-muted);">model</span><span class="font-mono" style="color:var(--text-secondary);">claude-opus-4</span>
+          <span class="font-mono" style="color:var(--text-muted);">branch</span><span class="font-mono" style="color:var(--text-secondary);">feat/ssh-pool</span>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid var(--border);"></div>
+
+      <!-- Agents -->
+      <div style="padding: 14px 28px;">
+        <div style="font-family:'DM Mono',monospace; font-size:10px; color:var(--text-ghost); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:8px;">Agents</div>
+        <div style="font-size:12px;">
+          <div style="display:flex; align-items:center; gap:8px; padding:3px 0;">
+            <span style="font-family:'Source Serif 4',serif; color:var(--text-secondary);">planner</span>
+            <span style="flex:1;"></span>
+            <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">opus-4</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; padding:3px 0;">
+            <span style="font-family:'Source Serif 4',serif; color:var(--text-secondary);">coder</span>
+            <span style="flex:1;"></span>
+            <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">opus-4</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; padding:3px 0;">
+            <span style="font-family:'Source Serif 4',serif; color:var(--text-secondary);">verifier</span>
+            <span style="flex:1;"></span>
+            <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">sonnet-4</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; padding:3px 0;">
+            <span style="font-family:'Source Serif 4',serif; color:var(--accent); font-weight:500;">reviewer</span>
+            <span class="pulse" style="display:inline-block; width:4px; height:4px; border-radius:50%; background:var(--accent);"></span>
+            <span style="flex:1;"></span>
+            <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">opus-4</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Files (hidden) -->
+    <div id="tab-files" style="display:none;">
+      <div style="padding:10px 28px; font-family:'DM Mono',monospace; font-size:11px; color:var(--text-muted); border-bottom:1px solid var(--border); display:flex; justify-content:space-between;">
+        <span>13 files changed</span>
+        <span><span style="color:var(--green);">+398</span>&nbsp;&nbsp;<span style="color:var(--red);">-98</span></span>
+      </div>
+
+      <div class="file-dir-label">packages/compute/</div>
+      <div class="file-entry">
+        <div class="file-entry-name">
+          <span style="color:var(--green);">ssh-pool.ts</span>
+          <span style="color:var(--green); font-size:10px;">+198</span>
+        </div>
+        <div class="file-entry-desc">New pool manager with ControlMaster support</div>
+      </div>
+      <div class="file-entry">
+        <div class="file-entry-name">
+          <span>ssh.ts</span>
+          <span><span style="color:var(--green); font-size:10px;">+4</span> <span style="color:var(--red); font-size:10px;">-12</span></span>
+        </div>
+        <div class="file-entry-desc">Removed direct connection factory</div>
+      </div>
+
+      <div class="file-dir-label">packages/compute/providers/</div>
+      <div class="file-entry">
+        <div class="file-entry-name">
+          <span>ec2-micro.ts</span>
+          <span><span style="color:var(--green); font-size:10px;">+8</span> <span style="color:var(--red); font-size:10px;">-14</span></span>
+        </div>
+        <div class="file-entry-desc">Migrated to pool.acquire/release</div>
+      </div>
+      <div class="file-entry">
+        <div class="file-entry-name">
+          <span>ec2-medium.ts</span>
+          <span><span style="color:var(--green); font-size:10px;">+8</span> <span style="color:var(--red); font-size:10px;">-14</span></span>
+        </div>
+        <div class="file-entry-desc">Migrated to pool.acquire/release</div>
+      </div>
+      <div class="file-entry">
+        <div class="file-entry-name">
+          <span>e2b.ts</span>
+          <span><span style="color:var(--green); font-size:10px;">+6</span> <span style="color:var(--red); font-size:10px;">-10</span></span>
+        </div>
+        <div class="file-entry-desc">SSH tunnel migrated to pool</div>
+      </div>
+      <div class="file-entry">
+        <div class="file-entry-name">
+          <span>firecracker.ts</span>
+          <span><span style="color:var(--green); font-size:10px;">+10</span> <span style="color:var(--red); font-size:10px;">-18</span></span>
+        </div>
+        <div class="file-entry-desc">Most call sites -- snapshot reconnect handling</div>
+      </div>
+      <div class="file-entry">
+        <div class="file-entry-name">
+          <span>k8s.ts</span>
+          <span><span style="color:var(--green); font-size:10px;">+6</span> <span style="color:var(--red); font-size:10px;">-8</span></span>
+        </div>
+        <div class="file-entry-desc">Migrated to pool.acquire/release</div>
+      </div>
+      <div class="file-entry">
+        <div class="file-entry-name">
+          <span>k8s-kata.ts</span>
+          <span><span style="color:var(--green); font-size:10px;">+6</span> <span style="color:var(--red); font-size:10px;">-8</span></span>
+        </div>
+        <div class="file-entry-desc">Migrated to pool.acquire/release</div>
+      </div>
+      <div class="file-entry">
+        <div class="file-entry-name">
+          <span>devcontainer.ts</span>
+          <span><span style="color:var(--green); font-size:10px;">+8</span> <span style="color:var(--red); font-size:10px;">-12</span></span>
+        </div>
+        <div class="file-entry-desc">Workspace-mount reconnect handling</div>
+      </div>
+
+      <div class="file-dir-label">packages/core/</div>
+      <div class="file-entry">
+        <div class="file-entry-name">
+          <span>metrics.ts</span>
+          <span><span style="color:var(--green); font-size:10px;">+14</span> <span style="color:var(--red); font-size:10px;">-2</span></span>
+        </div>
+        <div class="file-entry-desc">Added pool_size, hit_rate, eviction metrics</div>
+      </div>
+
+      <div class="file-dir-label">packages/compute/__tests__/</div>
+      <div class="file-entry">
+        <div class="file-entry-name">
+          <span style="color:var(--green);">ssh-pool.test.ts</span>
+          <span style="color:var(--green); font-size:10px;">+130</span>
+        </div>
+        <div class="file-entry-desc">5 suites, 17 cases covering lifecycle and edge cases</div>
+      </div>
+
+      <!-- Inline diff preview -->
+      <div style="border-top:1px solid var(--border); padding:12px 28px;">
+        <div class="font-mono" style="font-size:11px; color:var(--text-muted); margin-bottom:6px;">
+          packages/compute/ssh-pool.ts
+        </div>
+        <div class="code-block" style="font-size:11px; line-height:1.6; margin:0;">
+          <span class="diff-hunk">@@ -1,0 +1,12 @@</span><br>
+          <span class="diff-add">+import { SSHConnection } from "./ssh.js";</span><br>
+          <span class="diff-add">+import { metrics } from "../core/metrics.js";</span><br>
+          <span class="diff-context"> </span><br>
+          <span class="diff-add">+interface ConnectionEntry {</span><br>
+          <span class="diff-add">+  id: string;</span><br>
+          <span class="diff-add">+  socket: SSHConnection;</span><br>
+          <span class="diff-add">+  providerType: ProviderType;</span><br>
+          <span class="diff-add">+  controlPath: string;</span><br>
+          <span class="diff-add">+  createdAt: number;</span><br>
+          <span class="diff-add">+  lastUsedAt: number;</span><br>
+          <span class="diff-add">+  healthy: boolean;</span><br>
+          <span class="diff-add">+}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Metrics (hidden) -->
+    <div id="tab-metrics" style="display:none;">
+      <div style="display:grid; grid-template-columns:1fr 1fr;">
+        <div class="metric-card">
+          <div class="metric-value" style="color:var(--green);">$0.82</div>
+          <div class="metric-label">Total cost</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">4:32</div>
+          <div class="metric-label">Elapsed</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">43</div>
+          <div class="metric-label">Tests passed</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value" style="color:var(--red);">0</div>
+          <div class="metric-label">Tests failed</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">38.4k</div>
+          <div class="metric-label">Tokens in</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">12.1k</div>
+          <div class="metric-label">Tokens out</div>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid var(--border);"></div>
+
+      <div class="rpanel-header">Cost by Agent</div>
+      <div style="padding:6px 28px 12px;">
+        <div style="display:flex; justify-content:space-between; padding:4px 0;">
+          <span style="font-family:'Source Serif 4',serif; font-size:13px; color:var(--text-secondary);">planner</span>
+          <span class="font-mono" style="font-size:12px; color:var(--text-secondary);">$0.24</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:4px 0;">
+          <span style="font-family:'Source Serif 4',serif; font-size:13px; color:var(--text-secondary);">coder</span>
+          <span class="font-mono" style="font-size:12px; color:var(--text-secondary);">$0.38</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:4px 0;">
+          <span style="font-family:'Source Serif 4',serif; font-size:13px; color:var(--text-secondary);">verifier</span>
+          <span class="font-mono" style="font-size:12px; color:var(--text-secondary);">$0.08</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:4px 0;">
+          <span style="font-family:'Source Serif 4',serif; font-size:13px; color:var(--accent); font-weight:500;">reviewer</span>
+          <span class="font-mono" style="font-size:12px; color:var(--accent);">$0.12</span>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid var(--border);"></div>
+
+      <div class="rpanel-header">Router</div>
+      <div style="padding:6px 28px;">
+        <div style="display:flex; justify-content:space-between; padding:4px 0;">
+          <span class="font-mono" style="font-size:11px; color:var(--text-muted);">policy</span>
+          <span class="font-mono" style="font-size:11px; color:var(--text-secondary);">cost-aware</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:4px 0;">
+          <span class="font-mono" style="font-size:11px; color:var(--text-muted);">cache hit</span>
+          <span class="font-mono" style="font-size:11px; color:var(--green);">72%</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:4px 0;">
+          <span class="font-mono" style="font-size:11px; color:var(--text-muted);">breakers</span>
+          <span class="font-mono" style="font-size:11px; color:var(--green);">0 open</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================ -->
+  <!-- INPUT BAR -- 56px               -->
+  <!-- ================================ -->
+  <div class="input-bar">
+    <input class="msg-input" type="text" placeholder="Send a message to the session..." />
+    <span class="font-mono" style="font-size:10px; color:var(--text-ghost); flex-shrink:0;">Claude Opus 4</span>
+    <button class="send-btn">Send</button>
+  </div>
+
+</div>
+
+<!-- ================================ -->
+<!-- COMMAND PALETTE (Cmd+K)          -->
+<!-- ================================ -->
+<div class="cmd-overlay" id="cmd-overlay" onclick="if(event.target===this)closeCmdPalette()">
+  <div class="cmd-box">
+    <div class="cmd-input-wrap">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" class="cmd-search-input" placeholder="Search sessions, agents, flows..." id="cmd-input" />
+      <span class="kbd">Esc</span>
+    </div>
+    <div class="cmd-results">
+      <div class="cmd-group-label">Recent sessions</div>
+      <div class="cmd-item">
+        <span>Add SSH connection pooling</span>
+        <span class="cmd-meta">s-abc123 -- running</span>
+      </div>
+      <div class="cmd-item">
+        <span>Fix circuit breaker timeout</span>
+        <span class="cmd-meta">s-def456 -- merged</span>
+      </div>
+      <div class="cmd-item">
+        <span>Refactor LLM router policies</span>
+        <span class="cmd-meta">s-789abc -- merged</span>
+      </div>
+      <div class="cmd-item">
+        <span>Update README badges</span>
+        <span class="cmd-meta">s-cde012 -- running</span>
+      </div>
+      <div class="cmd-group-label">Commands</div>
+      <div class="cmd-item">
+        <span>New session</span>
+        <span class="kbd">N</span>
+      </div>
+      <div class="cmd-item">
+        <span>Switch theme</span>
+        <span class="kbd">T</span>
+      </div>
+      <div class="cmd-item">
+        <span>View all agents</span>
+        <span class="kbd">A</span>
+      </div>
+      <div class="cmd-item">
+        <span>Open flows</span>
+        <span class="kbd">F</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Theme toggle -- light is default
+  function toggleTheme() {
+    var html = document.documentElement;
+    var moonIcon = document.getElementById('theme-icon-moon');
+    var sunIcon = document.getElementById('theme-icon-sun');
+    if (html.classList.contains('light')) {
+      html.classList.remove('light');
+      html.classList.add('dark');
+      moonIcon.style.display = 'none';
+      sunIcon.style.display = 'inline';
+    } else {
+      html.classList.remove('dark');
+      html.classList.add('light');
+      moonIcon.style.display = 'inline';
+      sunIcon.style.display = 'none';
+    }
+  }
+
+  // Session selection
+  function selectSession(el) {
+    document.querySelectorAll('.session-item').forEach(function(s) { s.classList.remove('selected'); });
+    el.classList.add('selected');
+  }
+
+  // Tool call expand/collapse
+  function toggleTool(el) {
+    el.classList.toggle('expanded');
+  }
+
+  // Right panel tab switching
+  function switchTab(tabEl, tabId) {
+    document.querySelectorAll('.panel-tab').forEach(function(t) { t.classList.remove('active'); });
+    tabEl.classList.add('active');
+    document.querySelectorAll('#tab-progress, #tab-files, #tab-metrics').forEach(function(p) { p.style.display = 'none'; });
+    document.getElementById(tabId).style.display = 'block';
+  }
+
+  // Command palette
+  function toggleCmdPalette() {
+    var overlay = document.getElementById('cmd-overlay');
+    overlay.classList.toggle('open');
+    if (overlay.classList.contains('open')) {
+      document.getElementById('cmd-input').focus();
+    }
+  }
+  function closeCmdPalette() {
+    document.getElementById('cmd-overlay').classList.remove('open');
+  }
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', function(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      toggleCmdPalette();
+    }
+    if (e.key === 'Escape') {
+      closeCmdPalette();
+    }
+  });
+
+  // Scroll conversation to top on load (show from beginning -- plan stage)
+  document.addEventListener('DOMContentLoaded', function() {
+    var conv = document.getElementById('conversation');
+    conv.scrollTop = 0;
+  });
+</script>
+
+</body>
+</html>
