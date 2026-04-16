@@ -3,6 +3,11 @@
 Ark Desktop is an Electron wrapper around the Ark web dashboard. It renders the
 same UI as `ark web`, inside a native window, with native menus.
 
+> **Tauri preview (2026-04-15):** a parallel Tauri v2 shell lives under
+> [`packages/desktop-tauri/`](../desktop-tauri/README.md). It is not yet the
+> default release target; the Electron build below remains the shipping one.
+> See the roadmap (SP1) for the swap criteria.
+
 ## Prerequisites
 
 Ark Desktop is a thin shell and does **not** bundle the `ark` CLI runtime yet

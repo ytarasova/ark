@@ -10,6 +10,7 @@
 > - **TUI retired and removed** -- consensus was to drop TUI from the product surface (2026-04-14). Code deletion shipped in v0.16.0 (2026-04-15): `packages/tui/`, `packages/tui-e2e/`, `ark tui` command, ink deps, Makefile targets, and docs. Product surfaces are **Web UI + CLI + Electron desktop app**.
 > - **Web UI is the primary interface** -- everything doable from web without touching CLI. Missing: conversation interface, repo dropdown, session creation wizard.
 > - **Electron desktop app** -- wrap web UI, build DMGs for macOS + Linux (Intel + ARM). No Windows. Near-term deliverable.
+> - **Tauri v2 scaffold (2026-04-15)** -- parallel desktop package under `packages/desktop-tauri/` (Rust + tauri v2 + plugin-shell + plugin-opener + single-instance). Makefile targets `tauri-dev` / `tauri-build` / `tauri-package`. CI job `tauri-build` across macOS arm64, Linux x64, Windows x64. Electron release pipeline untouched -- default swap comes in a follow-up PR after review.
 > - **ACP (Agent Communication Protocol) POC** -- explore as parallel agent interface. Claude Code/Codex don't officially support it; Gemini does. Not a replacement for channels.
 > - **MiniMax as cheap model** -- ~1/10th Claude cost for mechanical tasks. Strategy: plan with Opus/Sonnet, implement with MiniMax. Needs OpenAI-compatible custom provider in LLM Router.
 > - **Benchmarking framework** -- Abhimanyu building task-based model benchmarks (100 real tasks on actual repos). Results could feed LLM Router routing decisions.
@@ -765,7 +766,8 @@ Ark's endgame is a **complete background agent platform** covering all 11 layers
 | Gap | Tool / Approach | Effort | Priority |
 |-----|----------------|--------|----------|
 | ~~TUI removal (complete deletion)~~ | **DONE (v0.16.0, 2026-04-15)** -- `packages/tui/`, `packages/tui-e2e/`, ink deps, Makefile targets, docs all removed | 0 | done |
-| Desktop app distribution (.dmg, .app, AppImage, .deb) | Replace Electron with **Tauri v2** (10x smaller, Rust backend, web UI wraps cleanly) | 2-3 days | **SP1** |
+| Tauri desktop scaffold (parallel to Electron) | **SCAFFOLDED (2026-04-15)** -- `packages/desktop-tauri/` (Rust crate, tauri.conf.json, sidecar process-group cleanup, single-instance, opener plugin). `make tauri-dev` / `make tauri-build` / `make tauri-package` targets. `tauri-build` CI job across macOS arm64 / Linux x64 / Windows x64. Electron build and release pipeline untouched. | 0.5 day | done |
+| Desktop app distribution (.dmg, .app, AppImage, .deb) -- make Tauri the default | Swap `release.yml` to build Tauri bundles, delete `packages/desktop/` Electron shell, move `packages/desktop-tauri/` to `packages/desktop/`, version bump. Electron remains shipping today via existing release pipeline | 1-2 days | **SP1** |
 | Web UI production-grade overhaul | Borrow from **Open Agents** (tool renderers, git panel, todo panel, structured questions, model selector, stream recovery). 6K lines -> 30K+ | 5-7 days | **SP1** |
 | GitHub App integration (webhooks, not just `gh` CLI) | Build GitHub App: inbound webhooks (PR events, issue events trigger sessions), outbound (create issues, comment on PRs, deployment status) | 2-3 days | **SP3** |
 | Bitbucket integration | Bitbucket Cloud REST API + webhooks. PR creation, review triggers, pipeline status | 2-3 days | **SP3** |
