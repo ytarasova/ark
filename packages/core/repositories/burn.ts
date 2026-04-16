@@ -142,9 +142,9 @@ export class BurnRepository {
       WHERE ${where}
     `;
     const row = this.db.prepare(sql).get(...params) as any;
-    const totalInput = row.totalInputTokens + row.totalCacheWriteTokens;
-    const cacheHitPct = totalInput > 0
-      ? (row.totalCacheReadTokens / totalInput) * 100
+    const totalPresented = row.totalInputTokens + row.totalCacheReadTokens;
+    const cacheHitPct = totalPresented > 0
+      ? (row.totalCacheReadTokens / totalPresented) * 100
       : 0;
     return {
       totalCostUsd: row.totalCostUsd,
