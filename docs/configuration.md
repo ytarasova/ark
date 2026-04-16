@@ -9,7 +9,6 @@ Ark uses several configuration files:
 | `~/.ark/config.yaml` | Global user preferences | User |
 | `~/.ark/bridge.json` | Messaging bridge credentials | User |
 | `~/.ark/profiles.json` | Profile definitions | `ark profile` commands |
-| `~/.ark/ui-state.json` | TUI state persistence | Auto-managed by TUI |
 | `.ark.yaml` (repo root) | Per-repository defaults | User |
 | `~/.ark/router.yaml` | LLM router configuration (optional) | User |
 
@@ -19,7 +18,7 @@ Ark runs in one of two deployment modes and the scope of each config key depends
 
 | Aspect | Local (default) | Hosted control plane |
 |--------|-----------------|----------------------|
-| Entry point | `ark tui`, `ark cli`, `ark web` | `ark server start --hosted` |
+| Entry point | `ark cli`, `ark web` | `ark server start --hosted` |
 | Database | SQLite at `~/.ark/ark.db` | PostgreSQL via `DATABASE_URL` |
 | Stores (flows/agents/skills/recipes/runtimes) | File-backed, three-tier (builtin > `~/.ark/...` > `.ark/...`) | DB-backed `DbResourceStore`, tenant-scoped rows in `resource_definitions` |
 | SSE bus | In-memory | Redis via `REDIS_URL` |
@@ -38,42 +37,6 @@ Unless noted otherwise, config keys in `~/.ark/config.yaml` apply to **both** mo
 The main configuration file. Open it with `ark config` (creates a default if missing).
 
 ```yaml
-# ── Hotkeys ─────────────────────────────────────────────────────────
-# Remap any TUI keyboard shortcut. Keys map action names to key bindings.
-# Set a value to null to disable the shortcut.
-hotkeys:
-  dispatch: Enter
-  stop: s
-  restart: r
-  fork: f
-  delete: x
-  attach: a
-  talk: t
-  mcp: M
-  move: m
-  search: /
-  newSession: n
-  complete: d
-  clone: C
-  group: o
-  inbox: T
-  events: e
-  filterRunning: "!"
-  filterWaiting: "@"
-  filterStopped: "#"
-  filterFailed: "$"
-  filterClear: "0"
-  undo: ctrl+z
-  markUnread: u
-  skills: K
-  memory: Y
-  settings: P
-  advance: A
-  worktreeFinish: W
-  interrupt: I
-  verify: V
-  archive: Z
-
 # ── Budgets ─────────────────────────────────────────────────────────
 # Spending limits in USD. Ark warns when approaching/exceeding limits.
 budgets:
@@ -82,8 +45,8 @@ budgets:
   monthlyLimit: 500     # USD per month
 
 # ── Theme ───────────────────────────────────────────────────────────
-# Theme mode for the TUI. Options: dark, light, system
-# "system" auto-detects macOS dark mode setting.
+# Theme mode for the web dashboard. Options: dark, light, system
+# "system" auto-detects OS dark mode setting.
 theme: dark
 
 # ── Default Compute ────────────────────────────────────────────────
@@ -117,54 +80,6 @@ notifications: true
 telemetry:
   enabled: false
   endpoint: null      # HTTP endpoint for telemetry events
-```
-
-### Hotkey Remapping
-
-All TUI keyboard shortcuts can be remapped. The format is `action: key`.
-
-Available actions and their defaults:
-
-| Action | Default | Description |
-|--------|---------|-------------|
-| `dispatch` | `Enter` | Dispatch or restart a session |
-| `stop` | `s` | Stop a running session |
-| `restart` | `r` | Restart a session / open replay |
-| `fork` | `f` | Fork (branch) a session |
-| `delete` | `x` | Delete a session |
-| `attach` | `a` | Attach to a running session |
-| `talk` | `t` | Send a message to agent |
-| `mcp` | `M` | Open MCP manager |
-| `move` | `m` | Move session to a group |
-| `search` | `/` | Open fuzzy search |
-| `newSession` | `n` | Create a new session |
-| `complete` | `d` | Mark session as done |
-| `clone` | `C` | Clone a session |
-| `group` | `o` | Open group manager |
-| `inbox` | `T` | Open inbox / threads |
-| `events` | `e` | Expand event log |
-| `filterRunning` | `!` | Filter to running sessions |
-| `filterWaiting` | `@` | Filter to waiting sessions |
-| `filterStopped` | `#` | Filter to stopped sessions |
-| `filterFailed` | `$` | Filter to failed sessions |
-| `filterClear` | `0` | Clear status filter |
-| `undo` | `ctrl+z` | Undo last delete |
-| `markUnread` | `u` | Mark session as unread |
-| `skills` | `K` | Open skills manager |
-| `settings` | `P` | Open settings |
-| `advance` | `A` | Advance session to next flow stage |
-| `worktreeFinish` | `W` | Finish worktree (merge branch and clean up) |
-| `interrupt` | `I` | Interrupt running agent |
-| `verify` | `V` | Run verification |
-| `archive` | `Z` | Archive/restore session |
-
-To disable a shortcut, set it to `null`:
-
-```yaml
-hotkeys:
-  clone: null       # Disable the clone shortcut
-  fork: F           # Remap fork to uppercase F
-  undo: ctrl+z      # Ctrl+ prefix for modifier keys
 ```
 
 ### Budget Configuration
@@ -293,7 +208,7 @@ Theme colors:
 
 ### Router Configuration
 
-Configure the LLM router (used by `ark router start`, the TUI, and hosted mode).
+Configure the LLM router (used by `ark router start`, the web UI, and hosted mode).
 
 ```yaml
 router:
@@ -310,7 +225,7 @@ router:
 | `url` | string | `http://localhost:8430` | Base URL that executors should target |
 | `port` | number | `8430` | Router listen port (used when auto-starting) |
 | `policy` | string | `balanced` | Default routing policy: `quality`, `balanced`, or `cost` |
-| `auto_start` | boolean | `false` | Start the router automatically on Ark boot (TUI, CLI, or control plane) |
+| `auto_start` | boolean | `false` | Start the router automatically on Ark boot (CLI, web, or control plane) |
 
 Providers are auto-detected from environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`). Advanced provider configuration can be placed in `~/.ark/router.yaml`.
 
@@ -587,32 +502,6 @@ Managed by `ark profile` commands. Do not edit directly.
 
 ---
 
-## ~/.ark/ui-state.json
-
-Auto-managed by the TUI. Persists cursor position, active tab, and scroll state across restarts.
-
-```json
-{
-  "activeTab": 0,
-  "selectedSessionId": "s-a1b2c3",
-  "scrollOffset": 5,
-  "statusFilter": null,
-  "previewMode": null
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `activeTab` | number | Active tab index (0-6) |
-| `selectedSessionId` | string? | Currently selected session |
-| `scrollOffset` | number | Scroll position in session list |
-| `statusFilter` | string? | Active status filter |
-| `previewMode` | string? | Active preview mode |
-
-Do not edit this file manually -- it is overwritten on every TUI state change.
-
----
-
 ## .ark.yaml (Per-Repository)
 
 Place in your repository root. Ark reads it when starting sessions in that repo. Recognized file names (in priority order):
@@ -835,7 +724,6 @@ When `runtime` is omitted the agent runs in the local environment (same machine,
 | `~/.ark/config.yaml` | User configuration |
 | `~/.ark/bridge.json` | Messaging bridge credentials |
 | `~/.ark/profiles.json` | Profile definitions |
-| `~/.ark/ui-state.json` | TUI state persistence |
 | `~/.ark/claude-oauth-token` | Saved OAuth token from `ark auth` |
 | `~/.ark/tracks/<sessionId>/` | Launcher scripts, channel configs per session |
 | `~/.ark/worktrees/<sessionId>/` | Git worktrees for isolated sessions |

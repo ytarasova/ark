@@ -16,7 +16,6 @@
       <a href="quickstart.html">Quick Start</a>
       <a href="concepts.html">Core Concepts</a>
       <div class="section-title">Guides</div>
-      <a href="tui.html">TUI Dashboard</a>
       <a href="web.html">Web Dashboard</a>
       <a href="cli.html">CLI Reference</a>
       <a href="configuration.html">Configuration</a>
@@ -81,7 +80,7 @@
       <p>Each stage has a <strong>gate</strong> that controls advancement:</p>
       <ul>
         <li><strong>auto</strong>: advances when the agent completes without errors</li>
-        <li><strong>manual</strong>: waits for human approval (press Enter in TUI or <code>ark session advance</code>)</li>
+        <li><strong>manual</strong>: waits for human approval (web UI advance button or <code>ark session advance</code>)</li>
         <li><strong>review</strong>: waits for GitHub PR approval (via webhook)</li>
         <li><strong>condition</strong>: evaluates an expression</li>
       </ul>
@@ -95,7 +94,7 @@
         <li><strong>permission_mode</strong>: bypassPermissions, default</li>
         <li><strong>max_turns</strong>: conversation turn limit</li>
       </ul>
-      <p>Agents are resolved with a 3-tier lookup: <strong>builtin</strong> (shipped with Ark), <strong>project</strong> (in your repo's <code>agents/</code> directory), and <strong>global</strong> (in <code>~/.ark/agents/</code>). Project agents override builtins of the same name, and global agents override both. You can create, edit, copy, and delete custom agents from the TUI Agents tab.</p>
+      <p>Agents are resolved with a 3-tier lookup: <strong>builtin</strong> (shipped with Ark), <strong>project</strong> (in your repo's <code>agents/</code> directory), and <strong>global</strong> (in <code>~/.ark/agents/</code>). Project agents override builtins of the same name, and global agents override both. You can create, edit, copy, and delete custom agents from the web dashboard's Agents view or via the <code>ark agent</code> CLI.</p>
       <p>Built-in agents: <code>planner</code>, <code>implementer</code>, <code>reviewer</code>, <code>documenter</code>, <code>worker</code>.</p>
 
       <h2>Executors</h2>
@@ -117,7 +116,7 @@
       </ul>
 
       <h2>Channels</h2>
-      <p>Channels are the communication layer between you and running agents. The conductor runs an HTTP server; each session gets a dedicated MCP channel on a deterministic port. You can send messages via the TUI (press <code>t</code>) or CLI (<code>ark session send</code>).</p>
+      <p>Channels are the communication layer between you and running agents. The conductor runs an HTTP server; each session gets a dedicated MCP channel on a deterministic port. You can send messages via the web dashboard's chat panel or the CLI (<code>ark session send</code>).</p>
 
       <h2>Hooks</h2>
       <p>Ark uses Claude Code hooks for agent status detection. At dispatch time, hooks config is written to the session's working directory. Hooks POST status events (<code>busy</code>/<code>idle</code>/<code>error</code>/<code>done</code>) to the conductor.</p>
@@ -133,7 +132,7 @@
         <li>Serves the GitHub webhook endpoint for PR monitoring</li>
         <li>Polls scheduled sessions</li>
       </ul>
-      <p>It runs automatically when you use <code>ark tui</code> or <code>ark exec</code>.</p>
+      <p>It runs automatically when you start the server daemon (<code>ark server daemon start</code>), launch the web UI, or use <code>ark exec</code>.</p>
 
       <h2>PR Monitoring</h2>
       <p>Ark can monitor GitHub PRs via webhooks. When a reviewer leaves comments:</p>
@@ -171,7 +170,7 @@
       <p>Guardrails are pattern-based tool authorization rules that restrict what agents can do. They block dangerous commands (e.g. <code>rm -rf /</code>, <code>git push --force</code>) before the agent executes them. Guardrails are evaluated at the tool-call level and apply regardless of the agent's permission mode.</p>
 
       <h2>Web Dashboard</h2>
-      <p>Ark includes a browser-based dashboard (<code>ark web</code>) with the same capabilities as the TUI. It uses Server-Sent Events (SSE) for real-time updates without polling. The dashboard supports token auth (<code>--token</code>) and read-only mode (<code>--read-only</code>). An Electron desktop app (<code>make desktop</code>) wraps the web UI in a native window. See <a href="web.html">Web Dashboard</a> for details.</p>
+      <p>Ark includes a browser-based dashboard (<code>ark web</code>) with Sessions, Agents, Flows, Compute, History, Memory, Tools, Schedules, Costs, and Settings pages. It uses Server-Sent Events (SSE) for real-time updates without polling. The dashboard supports token auth (<code>--token</code>) and read-only mode (<code>--read-only</code>). An Electron desktop app (<code>make desktop</code>) wraps the web UI in a native window. See <a href="web.html">Web Dashboard</a> for details.</p>
 
       <h2>Remote Sync</h2>
       <p>When dispatching to remote compute targets, Ark syncs project-local configuration to the remote environment. The following paths are pushed at dispatch time:</p>
@@ -183,7 +182,7 @@
 
       <div class="doc-footer">
         <a href="quickstart.html">&larr; Quick Start</a>
-        <a href="tui.html">TUI Guide &rarr;</a>
+        <a href="web.html">Web Dashboard &rarr;</a>
       </div>
     </main>
   </div>

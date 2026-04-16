@@ -16,7 +16,6 @@
       <a href="quickstart.html">Quick Start</a>
       <a href="concepts.html">Core Concepts</a>
       <div class="section-title">Guides</div>
-      <a href="tui.html">TUI Dashboard</a>
       <a href="web.html">Web Dashboard</a>
       <a href="cli.html">CLI Reference</a>
       <a href="configuration.html">Configuration</a>
@@ -83,12 +82,13 @@
 
       <h2>Your First Session</h2>
 
-      <h3>1. Launch the TUI</h3>
-      <pre><code><span class="prompt">$</span> ark tui</code></pre>
-      <p>This opens the terminal dashboard with 10 tabs: Sessions, Agents, Events, Flows, Compute, History, Memory, Tools, Schedules, Costs.</p>
+      <h3>1. Start the server daemon and launch the Web UI</h3>
+      <pre><code><span class="prompt">$</span> ark server daemon start --detach
+<span class="prompt">$</span> ark web</code></pre>
+      <p>Or install the <a href="../packages/desktop/INSTALL.md">Electron desktop app</a> and open Ark from your Applications/Start menu.</p>
 
       <h3>2. Create a Session</h3>
-      <p>Press <code>n</code> in the Sessions tab. Fill in:</p>
+      <p>Click <strong>New Session</strong>. Fill in:</p>
       <ul>
         <li><strong>Name</strong>: A short description (e.g., "add-auth")</li>
         <li><strong>Repo</strong>: Path to your repository</li>
@@ -97,13 +97,13 @@
       </ul>
 
       <h3>3. Dispatch</h3>
-      <p>Press <code>Enter</code> on the session to dispatch the agent. The agent launches in a tmux session and starts working.</p>
+      <p>Click <strong>Dispatch</strong> to launch the agent. The agent runs in a tmux session and starts working.</p>
 
       <h3>4. Monitor</h3>
       <ul>
-        <li>Watch live output in the detail pane (right side)</li>
-        <li>Press <code>a</code> to attach directly to the agent's terminal</li>
-        <li>Press <code>t</code> to send messages to the running agent</li>
+        <li>Watch live output in the Session Detail pane</li>
+        <li>Use the embedded terminal to attach to the agent</li>
+        <li>Use the Chat panel to send messages to the running agent</li>
       </ul>
 
       <h3>5. Headless Mode (CI/CD)</h3>
@@ -117,13 +117,12 @@
       <h2>What's Next?</h2>
       <ul>
         <li>Read <a href="concepts.html">Core Concepts</a> to understand flows, agents, and stages</li>
-        <li>See the <a href="tui.html">TUI Guide</a> for all keyboard shortcuts</li>
         <li>Check <a href="cli.html">CLI Reference</a> for full command documentation</li>
         <li>Set up <a href="compute.html">Compute Providers</a> for Docker, EC2, E2B, or Kubernetes</li>
       </ul>
 
       <div class="callout tip">
-        <strong>Tip:</strong> Run <code>ark tui</code> alongside your editor. The detail pane streams agent output in real time so you can watch the agent work without leaving your terminal.
+        <strong>Tip:</strong> Keep the web dashboard open alongside your editor. The Session Detail pane streams agent output in real time over SSE.
       </div>
 
       <div class="doc-footer">

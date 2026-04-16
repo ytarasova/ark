@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.16.0 (2026-04-15)
+
+### Breaking changes
+- **Removed: TUI** (`ark tui` command, `packages/tui/`, `packages/tui-e2e/`).
+  - The terminal dashboard was retired per team decision on 2026-04-14. Supported user-facing surfaces are now **Web UI** (`ark web`), **CLI** (`ark session ...`), and the **Electron desktop app** (see [`packages/desktop/INSTALL.md`](packages/desktop/INSTALL.md)).
+  - Dropped deps: all `ink*` packages and the `react-devtools-core` shim (`shims/react-devtools-core.js`).
+  - Removed Makefile targets: `make tui`, `make dev-tui`, `make tui-standalone`.
+  - Removed CI smoke test step: "Test TUI starts without crash".
+  - Removed docs: `docs/tui.html`, `docs/tui-reference.md`, `docs/SURFACE_PARITY.md`. Other docs (README, CLAUDE.md, guide, architecture, configuration, cli-reference, etc.) scrubbed of TUI references.
+  - **Migration**: use `ark web` for the browser dashboard or install the Ark Desktop app from the [GitHub releases page](https://github.com/ytarasova/ark/releases) instead. All session operations are available in the web UI and through the CLI.
+
 ## v0.15.5 (2026-04-15)
 
 ### Desktop App

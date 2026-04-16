@@ -1420,25 +1420,6 @@ ark schedule delete <id>
 
 ---
 
-## ark tui
-
-Launch the terminal UI dashboard.
-
-```
-ark tui [options]
-```
-
-Supports `--server` and `--token` global options for remote mode:
-
-```bash
-ark tui
-ark tui --server https://ark.company.com --token ark_default_xxx
-```
-
-See [TUI Reference](tui-reference.md) for keyboard shortcuts.
-
----
-
 ## ark doctor
 
 Check system prerequisites (Bun, tmux, git, Claude CLI). Reports which tools are available and flags any missing required dependencies.
@@ -1661,7 +1642,7 @@ ark openapi > openapi.json
 
 ## ark acp
 
-Start a headless ACP (Agent Communication Protocol) server on stdin/stdout using JSON-RPC. Used for programmatic access to Ark without the TUI or web interface.
+Start a headless ACP (Agent Communication Protocol) server on stdin/stdout using JSON-RPC. Used for programmatic access to Ark without the web interface.
 
 ```
 ark acp
@@ -1743,7 +1724,7 @@ ark server start --port 9000       # Custom port
 ark server start --hosted          # Multi-tenant control plane with workers + scheduler
 ```
 
-The TUI and CLI embed the server in-process. Start it explicitly only for external clients.
+The CLI talks to the database directly via AppContext. Start the server daemon explicitly only for external clients (web UI, desktop app, remote clients).
 
 With `--hosted`, the server boots a full control plane: worker registry, session scheduler, tenant policies, and optional Redis SSE bus (via `REDIS_URL`). Database defaults to PostgreSQL (via `DATABASE_URL`).
 

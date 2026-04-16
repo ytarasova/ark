@@ -47,12 +47,13 @@
 ## What works now
 
 - **Ark-on-Ark dogfooding**: dispatch sessions that plan, implement, verify, review, create PR, and merge autonomously
-- **Daemon-client**: `make dev-daemon` (hot-reload) + `make dev-tui` / `make dev-web`
+- **Daemon-client**: `make dev-daemon` (hot-reload) + `make dev-web`
 - **Action stages**: create_pr and auto_merge execute reliably (await safeAsync + branch check)
 - **Knowledge graph**: codegraph indexes codebase, nodes ingested into knowledge store, context injected at dispatch
 - **Prompt caching**: 99.9% cache hit rate, $3,430 saved (86% reduction) across 47 sessions
-- **TUI**: group headers visible, Events tab, Costs tab (0), stable scroll (ink-scroll-list)
 - **Web UI**: contextual session controls, auto-refresh polling, toast notifications, deep links, flow docs
+
+> Note: TUI (`ark tui`, `packages/tui/`, `packages/tui-e2e/`) was removed in v0.16.0 (2026-04-15). Historical entries below describe shipments that happened before removal -- they are retained as history.
 
 ## Known issues
 
@@ -159,13 +160,9 @@
 ## Dev workflow
 
 ```bash
-# Development (3 terminals)
+# Development (2 terminals)
 make dev-daemon    # terminal 1: hot-reload daemon (conductor + arkd + WS)
-make dev-tui       # terminal 2: TUI connects to daemon
-make dev-web       # terminal 3: API + Vite frontend
-
-# Standalone (1 terminal, no hot-reload)
-make tui-standalone
+make dev-web       # terminal 2: API + Vite frontend (Web UI)
 
 # Dispatch work via Ark
 ark session start --flow autonomous-sdlc --repo . --summary "description" --dispatch

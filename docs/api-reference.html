@@ -16,7 +16,6 @@
       <a href="quickstart.html">Quick Start</a>
       <a href="concepts.html">Core Concepts</a>
       <div class="section-title">Guides</div>
-      <a href="tui.html">TUI Dashboard</a>
       <a href="web.html">Web Dashboard</a>
       <a href="cli.html">CLI Reference</a>
       <a href="configuration.html">Configuration</a>
@@ -57,14 +56,14 @@
       <p class="subtitle">JSON-RPC 2.0 protocol, ArkClient, and remote mode.</p>
 
       <h2>Overview</h2>
-      <p>Ark exposes a JSON-RPC 2.0 API for all operations. The same API powers the CLI, TUI, Web dashboard, and remote clients. The protocol version is <strong>0.8.0</strong>.</p>
+      <p>Ark exposes a JSON-RPC 2.0 API for all operations. The same API powers the CLI, Web dashboard, Desktop app, and remote clients. The protocol version is <strong>0.8.0</strong>.</p>
       <p>Source: <code>packages/server/</code> (handlers), <code>packages/protocol/</code> (client).</p>
 
       <h2>Transport Layers</h2>
       <table>
         <thead><tr><th>Transport</th><th>Use Case</th><th>Encoding</th></tr></thead>
         <tbody>
-          <tr><td><strong>Stdio</strong></td><td>Local CLI and TUI</td><td>JSONL (JSON + newline)</td></tr>
+          <tr><td><strong>Stdio</strong></td><td>Local CLI</td><td>JSONL (JSON + newline)</td></tr>
           <tr><td><strong>WebSocket</strong></td><td>Remote clients, Web dashboard</td><td>JSON-RPC over WS (optional Bearer token auth)</td></tr>
         </tbody>
       </table>
@@ -79,8 +78,8 @@
 <span class="prompt">$</span> export ARK_TOKEN=ark_default_xxx
 <span class="prompt">$</span> ark session list
 
-<span class="comment"># TUI in remote mode</span>
-<span class="prompt">$</span> ark tui --server https://ark.company.com --token ark_default_xxx</code></pre>
+<span class="comment"># Web UI in remote mode (proxy)</span>
+<span class="prompt">$</span> ark web --server https://ark.company.com --token ark_default_xxx</code></pre>
       <p>When remote mode is active, the CLI creates a WebSocket <code>ArkClient</code> to the remote server instead of booting a local <code>AppContext</code>.</p>
 
       <h2>ArkClient</h2>

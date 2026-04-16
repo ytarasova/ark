@@ -16,7 +16,6 @@
       <a href="quickstart.html">Quick Start</a>
       <a href="concepts.html">Core Concepts</a>
       <div class="section-title">Guides</div>
-      <a href="tui.html">TUI Dashboard</a>
       <a href="web.html">Web Dashboard</a>
       <a href="cli.html">CLI Reference</a>
       <a href="configuration.html">Configuration</a>
@@ -88,18 +87,15 @@
 
           <rect class="layer" x="20" y="20" width="860" height="110" rx="8"/>
           <text class="layer-label" x="36" y="42">User Surfaces</text>
-          <rect class="box" x="60" y="58" width="160" height="52" rx="6"/>
-          <text class="box-title" x="140" y="82" text-anchor="middle">CLI</text>
-          <text class="box-item" x="140" y="98" text-anchor="middle">ark command</text>
-          <rect class="box" x="240" y="58" width="160" height="52" rx="6" opacity="0.4"/>
-          <text class="box-title" x="320" y="82" text-anchor="middle" opacity="0.4">TUI (retired)</text>
-          <text class="box-item" x="320" y="98" text-anchor="middle" opacity="0.4">React + Ink, frozen</text>
-          <rect class="box" x="420" y="58" width="160" height="52" rx="6"/>
-          <text class="box-title" x="500" y="82" text-anchor="middle">Web</text>
-          <text class="box-item" x="500" y="98" text-anchor="middle">Vite + SSE</text>
-          <rect class="box" x="600" y="58" width="160" height="52" rx="6"/>
-          <text class="box-title" x="680" y="82" text-anchor="middle">Desktop</text>
-          <text class="box-item" x="680" y="98" text-anchor="middle">Electron / Tauri</text>
+          <rect class="box" x="120" y="58" width="180" height="52" rx="6"/>
+          <text class="box-title" x="210" y="82" text-anchor="middle">CLI</text>
+          <text class="box-item" x="210" y="98" text-anchor="middle">ark command</text>
+          <rect class="box" x="320" y="58" width="180" height="52" rx="6"/>
+          <text class="box-title" x="410" y="82" text-anchor="middle">Web</text>
+          <text class="box-item" x="410" y="98" text-anchor="middle">Vite + SSE</text>
+          <rect class="box" x="520" y="58" width="180" height="52" rx="6"/>
+          <text class="box-title" x="610" y="82" text-anchor="middle">Desktop</text>
+          <text class="box-item" x="610" y="98" text-anchor="middle">Electron / Tauri</text>
 
           <rect class="layer" x="20" y="150" width="860" height="280" rx="8"/>
           <text class="layer-label" x="36" y="172">Core (AppContext, Awilix DI)</text>
@@ -186,7 +182,7 @@
           <line class="edge" x1="160" y1="370" x2="590" y2="488" marker-end="url(#arrow)"/>
           <line class="edge" x1="330" y1="370" x2="780" y2="488" marker-end="url(#arrow)"/>
         </svg>
-        <figcaption style="margin-top: 1rem; text-align: center; font-size: 0.85rem; color: #64748b; font-style: italic;">Ark high-level architecture. User surfaces (CLI, TUI, Web, Desktop) all bind to AppContext, which composes services, repositories, knowledge store, cost tracking, and tenant policy. The Conductor is a sibling HTTP server that relays channel and hook traffic. Providers and backends sit below the core.</figcaption>
+        <figcaption style="margin-top: 1rem; text-align: center; font-size: 0.85rem; color: #64748b; font-style: italic;">Ark high-level architecture. User surfaces (CLI, Web, Desktop) all bind to AppContext, which composes services, repositories, knowledge store, cost tracking, and tenant policy. The Conductor is a sibling HTTP server that relays channel and hook traffic. Providers and backends sit below the core.</figcaption>
       </figure>
 
       <figure style="margin: 2rem 0; padding: 1.5rem; background: #0d1117; border: 1px solid #1e293b; border-radius: 10px;">
@@ -213,7 +209,7 @@
 
           <rect class="node-human" x="30" y="120" width="130" height="70" rx="8"/>
           <text class="node-title" x="95" y="152" text-anchor="middle">Human</text>
-          <text class="node-sub" x="95" y="172" text-anchor="middle">TUI / Web</text>
+          <text class="node-sub" x="95" y="172" text-anchor="middle">Web / Desktop</text>
 
           <rect class="node" x="210" y="120" width="130" height="70" rx="8"/>
           <text class="node-title" x="275" y="148" text-anchor="middle">Conductor</text>
@@ -262,14 +258,14 @@
 
           <text class="flow-label" x="450" y="255" text-anchor="middle">Session dispatch writes .mcp.json with ark-channel entry on port 19200 + hash(sessionId) % 10000.</text>
           <text class="flow-label" x="450" y="272" text-anchor="middle">Agent reports via the MCP "report" tool; ark-channel forwards to arkd, which relays to the conductor.</text>
-          <text class="flow-label" x="450" y="289" text-anchor="middle">Human steering from TUI/Web pushes notifications/claude/channel events back to the agent via the same path.</text>
+          <text class="flow-label" x="450" y="289" text-anchor="middle">Human steering from Web/Desktop pushes notifications/claude/channel events back to the agent via the same path.</text>
         </svg>
         <figcaption style="margin-top: 1rem; text-align: center; font-size: 0.85rem; color: #64748b; font-style: italic;">Channel flow. Bidirectional messaging between human operators and running agents uses the claude/channel MCP protocol. Everything routes through arkd because agents may live on remote compute -- the control plane only needs to know one endpoint (port 19300) per target.</figcaption>
       </figure>
 
       <h2>Core components</h2>
       <ul>
-        <li><strong>AppContext</strong> -- central root, built on an Awilix DI container. Wires repositories, services, stores, knowledge, conductor, and config. Created at CLI startup (without conductor) or TUI startup (with conductor).</li>
+        <li><strong>AppContext</strong> -- central root, built on an Awilix DI container. Wires repositories, services, stores, knowledge, conductor, and config. Created at CLI startup (without conductor) or server daemon startup (with conductor).</li>
         <li><strong>IDatabase abstraction</strong> -- <code>database.ts</code> defines the interface, <code>database-sqlite.ts</code> implements it for <code>bun:sqlite</code> (local), <code>database-postgres.ts</code> implements it for PostgreSQL (hosted). All repositories and stores use <code>IDatabase</code>, never raw bun:sqlite.</li>
         <li><strong>Repositories</strong> -- SQL CRUD behind typed classes: <code>SessionRepository</code>, <code>ComputeRepository</code>, <code>ComputeTemplateRepository</code>, <code>EventRepository</code>, <code>MessageRepository</code>, <code>TodoRepository</code>. Column whitelists prevent injection. Accessed via <code>app.sessions</code>, <code>app.computes</code>, etc.</li>
         <li><strong>Services</strong> -- <code>SessionService</code> (lifecycle facade), <code>ComputeService</code>, <code>HistoryService</code>, and <code>session-orchestration.ts</code> for dispatch, advance, fork, clone, spawn, fan-out, handoff, worktree ops, and report handling. Every orchestration function takes <code>app: AppContext</code> as its first argument -- no global state.</li>
@@ -297,7 +293,7 @@
         <li>Relay channel reports between agents and humans.</li>
         <li>Serve the GitHub webhook endpoint for PR review monitoring.</li>
       </ul>
-      <p>The conductor receives its <code>AppContext</code> at construction via <code>startConductor(app, port)</code> -- no <code>getApp()</code> calls. It delegates hook-status and report handling to <code>session-orchestration.ts</code>. The CLI skips the conductor; the TUI runs it.</p>
+      <p>The conductor receives its <code>AppContext</code> at construction via <code>startConductor(app, port)</code> -- no <code>getApp()</code> calls. It delegates hook-status and report handling to <code>session-orchestration.ts</code>. The CLI skips the conductor; the server daemon runs it.</p>
 
       <h2>ArkD</h2>
       <p>ArkD is the universal agent daemon. A stateless HTTP server on port <code>19300</code> that runs on every compute target (local, Docker, devcontainer, EC2, K8s pod sidecar, Firecracker micro-VM). It handles agent lifecycle, file ops, exec, metrics, channel relay, and codegraph indexing.</p>
@@ -329,7 +325,7 @@
         <li>Session dispatch writes <code>.mcp.json</code> with an <code>ark-channel</code> entry and a deterministic port <code>19200 + (hash(sessionId) % 10000)</code>.</li>
         <li>Claude Code spawns <code>ark-channel</code> over stdio.</li>
         <li>Agent reports go via ark-channel -&gt; arkd (HTTP) -&gt; conductor (HTTP).</li>
-        <li>Human steering from TUI or Web goes via conductor -&gt; arkd -&gt; ark-channel -&gt; agent MCP notification.</li>
+        <li>Human steering from the Web UI or Desktop app goes via conductor -&gt; arkd -&gt; ark-channel -&gt; agent MCP notification.</li>
       </ol>
       <p>The reason agents do not talk to the conductor directly is that agents run on potentially remote compute. Going through arkd gives the control plane one HTTP endpoint (port 19300) per compute target, regardless of how many sessions are on it.</p>
 

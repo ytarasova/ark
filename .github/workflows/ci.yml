@@ -73,12 +73,6 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Shim optional deps
-        run: |
-          mkdir -p node_modules/react-devtools-core
-          cp shims/react-devtools-core.js node_modules/react-devtools-core/index.js
-          echo '{"main":"index.js"}' > node_modules/react-devtools-core/package.json
-
       - name: Build binary
         run: |
           bun build --compile --target ${{ matrix.target }} \
@@ -126,23 +120,6 @@ jobs:
 
       - name: Test CLI (--version)
         run: ./ark-${{ matrix.name }} --version
-
-      - name: Test TUI starts without crash
-        run: |
-          # CI has no TTY, so TUI correctly exits with "requires a terminal".
-          # We just need to verify it doesn't segfault or fail to load modules.
-          output=$(./ark-${{ matrix.name }} tui 2>&1 || true)
-          echo "$output"
-          if echo "$output" | grep -q "requires a terminal"; then
-            echo "TUI smoke test passed -- correct TTY check"
-          elif echo "$output" | grep -q "Missing required tools"; then
-            echo "TUI smoke test passed -- prereq check (expected for compiled binary)"
-          elif echo "$output" | grep -qi "segfault\|cannot find module\|SyntaxError"; then
-            echo "TUI smoke test FAILED -- unexpected error"
-            exit 1
-          else
-            echo "TUI smoke test passed"
-          fi
 
   test-install-sh:
     name: install.sh regression tests

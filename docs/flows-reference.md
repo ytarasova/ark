@@ -336,7 +336,7 @@ Full field reference for flow definition files.
 
 | Gate | Behavior |
 |------|----------|
-| `manual` | Human must approve before advancing (TUI: `A` or `Enter`) |
+| `manual` | Human must approve before advancing (CLI: `ark session advance <id>`; Web UI: advance button) |
 | `auto` | Advances automatically when the agent completes |
 | `review` | Advances when an external review (e.g., PR approval) is received |
 | `condition` | Advances when a condition expression evaluates to true |
@@ -390,4 +390,4 @@ ark flow show default      # Show flow definition with stages
 ark flow show quick        # Show the quick flow
 ```
 
-In the TUI, press `4` to switch to the Flows tab. Navigate with `j/k` and toggle to the detail pane with `Tab`.
+In the web dashboard, open the **Flows** view to browse flow definitions with their stages and gates.
