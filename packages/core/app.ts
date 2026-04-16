@@ -52,6 +52,10 @@ import { KnowledgeStore } from "./knowledge/store.js";
 import { PricingRegistry } from "./observability/pricing.js";
 import { UsageRecorder } from "./observability/usage.js";
 import { BurnRepository } from "./repositories/burn.js";
+import { BurnParserRegistry } from "./observability/burn/burn-parser.js";
+import { ClaudeBurnParser } from "./observability/burn/parsers/claude.js";
+import { CodexBurnParser } from "./observability/burn/parsers/codex.js";
+import { GeminiBurnParser } from "./observability/burn/parsers/gemini.js";
 import type { TensorZeroManager } from "./router/tensorzero.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -160,6 +164,10 @@ export class AppContext {
   get pricing(): PricingRegistry { return this._resolve("pricing"); }
   get usageRecorder(): UsageRecorder { return this._resolve("usageRecorder"); }
   get burn(): BurnRepository { return this._resolve("burn"); }
+
+  // ── Burn transcript parsers (per-turn classification) ─────────────────
+
+  get burnParsers(): BurnParserRegistry { return this._resolve("burnParsers"); }
 
   // ── Runtime transcript parsers ────────────────────────────────────────
 
@@ -475,6 +483,9 @@ export class AppContext {
 
       // Runtime transcript parsers (polymorphic, one per agent tool)
       transcriptParsers: asValue(this.createTranscriptParserRegistry()),
+
+      // Burn transcript parsers (per-turn classification for burn dashboard)
+      burnParsers: asValue(this.createBurnParserRegistry()),
 
       // Plugin registry -- canonical source for extensible collections
       // (executors today; compute providers, runtimes, transcript parsers in Phase 2)
@@ -804,6 +815,19 @@ export class AppContext {
     }));
     registry.register(new CodexTranscriptParser());
     registry.register(new GeminiTranscriptParser());
+    return registry;
+  }
+
+  /**
+   * Build the BurnParserRegistry with all known runtime burn parsers.
+   * Burn parsers provide per-turn classification for the burn dashboard,
+   * complementing the TranscriptParserRegistry (which handles cost/token extraction).
+   */
+  private createBurnParserRegistry(): BurnParserRegistry {
+    const registry = new BurnParserRegistry();
+    registry.register(new ClaudeBurnParser());
+    registry.register(new CodexBurnParser());
+    registry.register(new GeminiBurnParser());
     return registry;
   }
 

@@ -10,7 +10,6 @@
 import { statSync } from "fs";
 import type { AppContext } from "../../app.js";
 import type { BurnTurnRow } from "../../repositories/burn.js";
-import { parseClaudeTranscript } from "./parser.js";
 import type { ClassifiedTurn } from "./types.js";
 
 export interface SyncResult {
@@ -95,10 +94,15 @@ export function syncBurn(
         }
       }
 
-      // Parse transcript and classify turns
+      // Parse transcript and classify turns via runtime-specific burn parser
       const project =
         session.repo ?? session.workdir?.split("/").pop() ?? "unknown";
-      const { turns } = parseClaudeTranscript(transcriptPath, project);
+      const burnParser = app.burnParsers.get(kind);
+      if (!burnParser) {
+        skipped++;
+        continue;
+      }
+      const { turns } = burnParser.parseTranscript(transcriptPath, project);
       if (turns.length === 0) {
         skipped++;
         continue;
@@ -106,7 +110,7 @@ export function syncBurn(
 
       // Map ClassifiedTurns to DB rows
       const rows: BurnTurnRow[] = turns.map((turn, index) =>
-        classifiedTurnToRow(session.id, turn, index, project, mtime),
+        classifiedTurnToRow(session.id, turn, index, project, mtime, kind),
       );
 
       // Upsert into burn_turns
@@ -126,12 +130,13 @@ export function syncBurn(
 /**
  * Convert a ClassifiedTurn into a BurnTurnRow for database insertion.
  */
-function classifiedTurnToRow(
+export function classifiedTurnToRow(
   sessionId: string,
   turn: ClassifiedTurn,
   turnIndex: number,
   project: string,
   transcriptMtime: number,
+  runtimeKind: string = "claude-code",
 ): BurnTurnRow {
   // Aggregate token counts across all API calls in the turn
   let inputTokens = 0;
@@ -171,7 +176,7 @@ function classifiedTurnToRow(
     category: turn.category,
     model,
     provider,
-    runtime: "claude-code",
+    runtime: runtimeKind,
     input_tokens: inputTokens,
     output_tokens: outputTokens,
     cache_read_tokens: cacheReadTokens,

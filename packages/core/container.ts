@@ -35,6 +35,7 @@ import type { PricingRegistry } from "./observability/pricing.js";
 import type { UsageRecorder } from "./observability/usage.js";
 import type { BurnRepository } from "./repositories/burn.js";
 import type { TranscriptParserRegistry } from "./runtimes/transcript-parser.js";
+import type { BurnParserRegistry } from "./observability/burn/burn-parser.js";
 
 /**
  * The cradle -- everything resolvable from the container.
@@ -78,6 +79,9 @@ export interface Cradle {
 
   // Runtime transcript parsers
   transcriptParsers: TranscriptParserRegistry;
+
+  // Burn transcript parsers (per-turn classification)
+  burnParsers: BurnParserRegistry;
 }
 
 export type AppContainer = AwilixContainer<Cradle>;

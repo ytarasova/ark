@@ -28,3 +28,5 @@ export { extractBashCommands } from "./bash-utils.js";
 export { classifyTurn, countRetries } from "./classifier.js";
 export { parseClaudeTranscript } from "./parser.js";
 export { syncBurn, type SyncResult } from "./sync.js";
+export { type BurnTranscriptParser, BurnParserRegistry } from "./burn-parser.js";
+export { recordBurnTurns } from "./record.js";
