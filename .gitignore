@@ -19,3 +19,6 @@ dist/
 # Electron desktop app build output
 packages/desktop/out/
 packages/desktop/node_modules/
+
+# Superpowers brainstorm mockups
+.superpowers/
