@@ -7,7 +7,7 @@ describe("extractBashCommands", () => {
   });
 
   it("skips cd and extracts command after && chain", () => {
-    expect(extractBashCommands("cd /tmp && npm test")).toEqual(["npm"]);
+    expect(extractBashCommands("cd /tmp && npm test")).toEqual(["npm test"]);
   });
 
   it("extracts both sides of a pipe", () => {
