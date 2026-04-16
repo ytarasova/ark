@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 
 const VALID_VIEWS = new Set([
   "dashboard", "sessions", "agents", "flows", "compute",
-  "history", "memory", "tools", "schedules", "costs", "settings",
+  "history", "memory", "tools", "schedules", "costs", "burn", "settings",
 ]);
 
 export interface RouteState {
