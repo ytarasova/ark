@@ -278,6 +278,27 @@ export class BurnRepository {
       .map(([name, calls]) => ({ [keyName]: name, calls }));
   }
 
+  /** Check which data dimensions have non-empty values in the date range. */
+  getRuntimeCoverage(opts: BurnQueryOpts): {
+    hasToolData: boolean;
+    hasBashData: boolean;
+    hasMcpData: boolean;
+    hasOneShotData: boolean;
+  } {
+    const { where, params } = this._buildWhere(opts);
+    const check = (condition: string): boolean => {
+      const sql = `SELECT EXISTS(SELECT 1 FROM burn_turns WHERE ${where} AND ${condition}) as v`;
+      const row = this.db.prepare(sql).get(...params) as any;
+      return row.v === 1;
+    };
+    return {
+      hasToolData: check("tools_json != '[]'"),
+      hasBashData: check("bash_cmds_json != '[]'"),
+      hasMcpData: check("mcp_tools_json != '[]'"),
+      hasOneShotData: check("has_edits = 1"),
+    };
+  }
+
   /** Build WHERE clause and params array from query options. */
   private _buildWhere(opts: BurnQueryOpts): { where: string; params: any[] } {
     const conditions: string[] = ["1=1"];

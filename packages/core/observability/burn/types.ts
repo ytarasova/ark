@@ -242,4 +242,10 @@ export type BurnSummaryResponse = {
   coreTools: Array<{ tool: string; calls: number }>;
   mcpServers: Array<{ tool: string; calls: number }>;
   bashCommands: Array<{ cmd: string; calls: number }>;
+  runtimeCoverage: {
+    hasToolData: boolean;
+    hasBashData: boolean;
+    hasMcpData: boolean;
+    hasOneShotData: boolean;
+  };
 };

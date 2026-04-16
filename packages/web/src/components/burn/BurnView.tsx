@@ -112,9 +112,9 @@ export function BurnView() {
         <ByActivityPanel data={data.byCategory ?? []} />
 
         {/* Row 4: Core Tools | Shell Commands | MCP Servers */}
-        <CoreToolsPanel data={data.coreTools ?? []} />
-        <ShellCommandsPanel data={data.bashCommands ?? []} />
-        <McpServersPanel data={data.mcpServers ?? []} />
+        <CoreToolsPanel data={data.coreTools ?? []} hasData={data.runtimeCoverage?.hasToolData !== false} />
+        <ShellCommandsPanel data={data.bashCommands ?? []} hasData={data.runtimeCoverage?.hasBashData !== false} />
+        <McpServersPanel data={data.mcpServers ?? []} hasData={data.runtimeCoverage?.hasMcpData !== false} />
       </div>
     </div>
   );

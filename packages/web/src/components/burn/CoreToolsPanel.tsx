@@ -3,9 +3,10 @@ import { HBar } from "./HBar.js";
 
 interface CoreToolsPanelProps {
   data: Array<{ tool: string; calls: number }>;
+  hasData?: boolean;
 }
 
-export function CoreToolsPanel({ data }: CoreToolsPanelProps) {
+export function CoreToolsPanel({ data, hasData }: CoreToolsPanelProps) {
   const items = data.slice(0, 10).map(t => ({
     name: t.tool,
     value: t.calls,
@@ -16,7 +17,11 @@ export function CoreToolsPanel({ data }: CoreToolsPanelProps) {
       <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-cyan-400 mb-3">
         Core Tools
       </h3>
-      {items.length === 0 ? (
+      {hasData === false ? (
+        <div className="text-sm text-muted-foreground text-center py-6">
+          Tool usage data not available for some runtimes
+        </div>
+      ) : items.length === 0 ? (
         <div className="flex items-center justify-center h-24 text-sm text-muted-foreground">
           No tool data
         </div>

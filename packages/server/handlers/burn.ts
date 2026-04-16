@@ -65,6 +65,7 @@ export function registerBurnHandlers(router: Router, app: AppContext): void {
     const coreTools = app.burn.getToolBreakdown(opts);
     const mcpServers = app.burn.getMcpBreakdown(opts);
     const bashCommands = app.burn.getBashBreakdown(opts);
+    const runtimeCoverage = app.burn.getRuntimeCoverage(opts);
 
     const response: BurnSummaryResponse = {
       period: per,
@@ -77,6 +78,7 @@ export function registerBurnHandlers(router: Router, app: AppContext): void {
       coreTools,
       mcpServers,
       bashCommands,
+      runtimeCoverage,
     };
 
     return response;
