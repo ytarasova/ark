@@ -44,7 +44,10 @@ async function cleanZombieSessions(app: AppContext): Promise<number> {
 }
 
 export function registerResourceHandlers(router: Router, app: AppContext): void {
-  router.handle("agent/list", async () => ({ agents: app.agents.list() }));
+  router.handle("agent/list", async () => {
+    const projectRoot = findProjectRoot(process.cwd()) ?? undefined;
+    return { agents: app.agents.list(projectRoot) };
+  });
   router.handle("agent/read", async (p) => {
     const { name } = extract<AgentReadParams>(p, ["name"]);
     const projectRoot = findProjectRoot(process.cwd()) ?? undefined;
