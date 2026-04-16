@@ -114,7 +114,11 @@ async function installCliTools() {
 
   // Try direct symlink first (works if user has write access to /usr/local/bin)
   try {
-    try { fs.unlinkSync(targetPath); } catch { /* may not exist */ }
+    try {
+      fs.unlinkSync(targetPath);
+    } catch {
+      /* may not exist */
+    }
     fs.symlinkSync(bundledPath, targetPath);
     markCliInstalled();
     return true;
@@ -127,13 +131,15 @@ async function installCliTools() {
     // not user-supplied -- no injection risk)
     try {
       await new Promise((resolve, reject) => {
-        execFile("/usr/bin/osascript", [
-          "-e",
-          `do shell script "ln -sf '${bundledPath}' '${targetPath}'" with administrator privileges`,
-        ], { timeout: 30000 }, (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
+        execFile(
+          "/usr/bin/osascript",
+          ["-e", `do shell script "ln -sf '${bundledPath}' '${targetPath}'" with administrator privileges`],
+          { timeout: 30000 },
+          (err) => {
+            if (err) reject(err);
+            else resolve();
+          },
+        );
       });
       markCliInstalled();
       return true;
@@ -205,9 +211,7 @@ async function maybeOfferCliInstall() {
         type: "warning",
         title: "Installation Failed",
         message: "Could not install CLI tools.",
-        detail:
-          "You can install manually by running:\n\n" +
-          `  sudo ln -sf "${bundledPath}" /usr/local/bin/ark`,
+        detail: "You can install manually by running:\n\n" + `  sudo ln -sf "${bundledPath}" /usr/local/bin/ark`,
       });
     }
   }
