@@ -1,0 +1,2296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ark -- Fresh Design 1 Refined (Light + Dark)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── Reset ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── Light Theme (default) ── */
+  :root {
+    --font-sans: "Inter", "SF Pro Display", "SF Pro Text", system-ui, -apple-system, sans-serif;
+    --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+
+    --bg: #ffffff;
+    --bg-secondary: #f2f2f7;
+    --bg-tertiary: #e5e5ea;
+    --bg-user: #f2f2f7;
+    --bg-code: #f2f2f7;
+    --bg-input: #f2f2f7;
+    --bg-hover: #f2f2f7;
+    --bg-overlay: rgba(0, 0, 0, 0.3);
+
+    --text-primary: #1c1c1e;
+    --text-secondary: #636366;
+    --text-muted: #98989d;
+    --text-quaternary: #c7c7cc;
+
+    --accent: #007aff;
+    --accent-hover: #0071e3;
+    --accent-subtle: rgba(0, 122, 255, 0.08);
+
+    --border: #d1d1d6;
+    --border-light: #e5e5ea;
+
+    --green: #34c759;
+    --green-text: #248a3d;
+    --green-bg: rgba(52, 199, 89, 0.1);
+    --red: #ff3b30;
+    --red-text: #d70015;
+    --red-bg: rgba(255, 59, 48, 0.1);
+    --yellow: #ffcc00;
+    --yellow-text: #a05a00;
+
+    --diff-add-bg: rgba(52, 199, 89, 0.08);
+    --diff-add-text: #248a3d;
+    --diff-remove-bg: rgba(255, 59, 48, 0.08);
+    --diff-remove-text: #d70015;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+
+    --avatar-planner: #5856d6;
+    --avatar-implementer: #007aff;
+    --avatar-reviewer: #ff9500;
+    --avatar-verifier: #34c759;
+    --avatar-merger: #af52de;
+
+    --sidebar-w: 240px;
+    --panel-w: 300px;
+    --conversation-max: 700px;
+
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+
+    color-scheme: light;
+  }
+
+  /* ── Dark Theme ── */
+  [data-theme="dark"] {
+    --bg: #1c1c1e;
+    --bg-secondary: #2c2c2e;
+    --bg-tertiary: #3a3a3c;
+    --bg-user: #2c2c2e;
+    --bg-code: #2c2c2e;
+    --bg-input: #2c2c2e;
+    --bg-hover: #2c2c2e;
+    --bg-overlay: rgba(0, 0, 0, 0.5);
+
+    --text-primary: #f5f5f7;
+    --text-secondary: #98989d;
+    --text-muted: #636366;
+    --text-quaternary: #48484a;
+
+    --accent: #0a84ff;
+    --accent-hover: #409cff;
+    --accent-subtle: rgba(10, 132, 255, 0.12);
+
+    --border: #38383a;
+    --border-light: #2c2c2e;
+
+    --green: #30d158;
+    --green-text: #30d158;
+    --green-bg: rgba(48, 209, 88, 0.12);
+    --red: #ff453a;
+    --red-text: #ff453a;
+    --red-bg: rgba(255, 69, 58, 0.12);
+    --yellow: #ffd60a;
+    --yellow-text: #ffd60a;
+
+    --diff-add-bg: rgba(48, 209, 88, 0.1);
+    --diff-add-text: #30d158;
+    --diff-remove-bg: rgba(255, 69, 58, 0.1);
+    --diff-remove-text: #ff6961;
+
+    --shadow-sm: none;
+    --shadow-md: none;
+    --shadow-lg: none;
+
+    --avatar-planner: #7d7aff;
+    --avatar-implementer: #409cff;
+    --avatar-reviewer: #ffb340;
+    --avatar-verifier: #30d158;
+    --avatar-merger: #da8fff;
+
+    color-scheme: dark;
+  }
+
+  /* ── Transitions for theme switch ── */
+  html, body, .shell, .sidebar, .main, .topbar, .conversation-scroll,
+  .input-area, .right-panel, .panel-header, .panel-tabs, .panel-content,
+  .message-body, .code-block, .code-block-header, .code-block pre,
+  .diff-block, .diff-header, .diff-line, .sidebar-item, .sidebar-footer,
+  .sidebar-search input, .input-box, .topbar-btn, .sidebar-new-btn,
+  .cmd-palette-overlay, .cmd-palette, .cmd-palette-input, .cmd-item,
+  .tool-call, .system-event, .overview-row {
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  html, body {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── Layout Shell ── */
+  .shell {
+    display: flex;
+    height: 100vh;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: var(--sidebar-w);
+    min-width: var(--sidebar-w);
+    border-right: 1px solid var(--border);
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-header {
+    padding: 20px 20px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .sidebar-logo {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+    color: var(--text-primary);
+  }
+
+  .sidebar-new-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+  }
+  .sidebar-new-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--text-muted);
+  }
+
+  .sidebar-search {
+    padding: 0 12px 12px;
+  }
+  .sidebar-search input {
+    width: 100%;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-input);
+    padding: 0 10px;
+    font-size: 13px;
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+    outline: none;
+  }
+  .sidebar-search input::placeholder { color: var(--text-muted); }
+  .sidebar-search input:focus { border-color: var(--accent); }
+
+  .sidebar-section-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    padding: 8px 20px 6px;
+  }
+
+  .sidebar-list {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 12px;
+  }
+
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    margin: 1px 8px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    position: relative;
+  }
+  .sidebar-item:hover { background: var(--bg-hover); }
+  .sidebar-item.active { background: var(--bg-secondary); }
+
+  .sidebar-item-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .sidebar-item-dot.running { background: var(--green); }
+  .sidebar-item-dot.completed { background: var(--text-quaternary); }
+  .sidebar-item-dot.paused { background: var(--yellow); }
+
+  .sidebar-item-content {
+    min-width: 0;
+    flex: 1;
+  }
+  .sidebar-item-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sidebar-item-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sidebar-footer {
+    border-top: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .sidebar-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+  }
+
+  .sidebar-user-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  /* ── Main Area ── */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: var(--bg);
+    position: relative;
+  }
+
+  /* ── Top Bar ── */
+  .topbar {
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    flex-shrink: 0;
+    background: var(--bg);
+  }
+
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+  }
+
+  .topbar-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+
+  .topbar-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 400;
+    white-space: nowrap;
+  }
+
+  /* ── Stage Pipeline ── */
+  .stage-pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+  }
+
+  .stage-pipeline .stage {
+    color: var(--text-muted);
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+
+  .stage-pipeline .stage.completed-stage {
+    color: var(--green-text);
+  }
+
+  .stage-pipeline .stage.active-stage {
+    color: var(--accent);
+    background: var(--accent-subtle);
+  }
+
+  .stage-pipeline .stage-dot {
+    color: var(--text-quaternary);
+    padding: 0 2px;
+    font-size: 8px;
+  }
+
+  .topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .topbar-btn {
+    height: 30px;
+    padding: 0 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .topbar-btn:hover {
+    background: var(--bg-hover);
+    border-color: var(--text-muted);
+  }
+  .topbar-btn.active {
+    background: var(--accent-subtle);
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  .topbar-btn.danger {
+    color: var(--red-text);
+    border-color: var(--red);
+  }
+  .topbar-btn.danger:hover {
+    background: var(--red-bg);
+  }
+
+  /* ── Theme Toggle ── */
+  .theme-toggle {
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+  }
+  .theme-toggle:hover {
+    background: var(--bg-hover);
+    border-color: var(--text-muted);
+  }
+
+  /* ── Conversation ── */
+  .conversation-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px 24px;
+  }
+
+  .conversation {
+    max-width: var(--conversation-max);
+    margin: 0 auto;
+  }
+
+  /* ── Message ── */
+  .message {
+    margin-bottom: 24px;
+  }
+
+  .message-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .message-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+    color: #fff;
+  }
+  .message-avatar.planner { background: var(--avatar-planner); }
+  .message-avatar.implementer { background: var(--avatar-implementer); }
+  .message-avatar.reviewer { background: var(--avatar-reviewer); }
+  .message-avatar.verifier { background: var(--avatar-verifier); }
+  .message-avatar.merger { background: var(--avatar-merger); }
+  .message-avatar.user { background: var(--accent); }
+  .message-avatar.system {
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+  }
+
+  .message-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .message-model {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .message-time {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-left: auto;
+  }
+
+  .message-body {
+    padding-left: 32px;
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--text-primary);
+  }
+
+  .message-body p { margin-bottom: 8px; }
+  .message-body p:last-child { margin-bottom: 0; }
+
+  /* User message variant */
+  .message.user-msg .message-body {
+    background: var(--bg-user);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    margin-left: 32px;
+  }
+
+  /* ── Code Block ── */
+  .code-block {
+    margin: 10px 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+
+  .code-block-header {
+    background: var(--bg-secondary);
+    padding: 6px 12px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .code-block pre {
+    background: var(--bg-code);
+    padding: 12px 14px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.6;
+    overflow-x: auto;
+    color: var(--text-primary);
+  }
+
+  /* ── Tool Call ── */
+  .tool-call {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    margin: 4px 0;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .tool-call:hover { background: var(--bg-hover); }
+
+  .tool-call-icon {
+    font-size: 11px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    width: 14px;
+    text-align: center;
+  }
+
+  .tool-call-label { flex: 1; }
+
+  .tool-call-duration {
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+
+  .tool-call-status {
+    color: var(--green-text);
+    font-size: 12px;
+  }
+
+  /* ── System Event ── */
+  .system-event {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 28px 0;
+    color: var(--text-muted);
+    font-size: 12px;
+  }
+  .system-event::before,
+  .system-event::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  .system-event span {
+    white-space: nowrap;
+    font-weight: 500;
+  }
+
+  /* ── Input Area ── */
+  .input-area {
+    border-top: 1px solid var(--border);
+    padding: 16px 24px 20px;
+    flex-shrink: 0;
+    background: var(--bg);
+  }
+
+  .input-container {
+    max-width: var(--conversation-max);
+    margin: 0 auto;
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+  }
+
+  .input-box {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+    background: var(--bg);
+    outline: none;
+    resize: none;
+    min-height: 42px;
+    max-height: 160px;
+    line-height: 1.5;
+  }
+  .input-box::placeholder { color: var(--text-muted); }
+  .input-box:focus { border-color: var(--accent); }
+
+  [data-theme="dark"] .input-box {
+    background: var(--bg-secondary);
+    border-color: var(--border);
+  }
+  [data-theme="dark"] .input-box:focus {
+    border-color: var(--accent);
+  }
+
+  .send-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius-md);
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .send-btn:hover { background: var(--accent-hover); }
+
+  .input-hints {
+    max-width: var(--conversation-max);
+    margin: 6px auto 0;
+    font-size: 11px;
+    color: var(--text-quaternary);
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .input-hints kbd {
+    font-family: var(--font-sans);
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+  }
+
+  /* ── Right Panel ── */
+  .right-panel {
+    width: var(--panel-w);
+    min-width: var(--panel-w);
+    border-left: 1px solid var(--border);
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width 0.25s ease, min-width 0.25s ease, opacity 0.2s ease;
+  }
+  .right-panel.collapsed {
+    width: 0;
+    min-width: 0;
+    border-left: none;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .panel-header {
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    flex-shrink: 0;
+  }
+
+  .panel-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .panel-close {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 14px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .panel-close:hover { background: var(--bg-hover); }
+
+  .panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+    flex-shrink: 0;
+  }
+  .panel-tab {
+    padding: 10px 0;
+    margin-right: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+  }
+  .panel-tab:hover { color: var(--text-secondary); }
+  .panel-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px;
+  }
+
+  .panel-section { display: none; }
+  .panel-section.active { display: block; }
+
+  /* ── Overview Tab ── */
+  .overview-section {
+    margin-bottom: 16px;
+  }
+
+  .overview-section-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .overview-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    font-size: 13px;
+  }
+
+  .overview-label {
+    color: var(--text-secondary);
+  }
+
+  .overview-value {
+    color: var(--text-primary);
+    font-weight: 500;
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  .overview-value.status-running {
+    color: var(--green-text);
+  }
+
+  .overview-agents {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 4px;
+  }
+
+  .overview-agent {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+  }
+
+  .overview-agent-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .overview-agent-name {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .overview-agent-model {
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    margin-left: auto;
+  }
+
+  /* ── File Tree ── */
+  .file-tree-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 0;
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+  .file-tree-item:hover { color: var(--accent); }
+
+  .file-tree-disclosure {
+    width: 14px;
+    font-size: 10px;
+    color: var(--text-muted);
+    text-align: center;
+    flex-shrink: 0;
+    transition: transform 0.15s;
+    user-select: none;
+  }
+  .file-tree-disclosure.open { transform: rotate(90deg); }
+
+  .file-tree-icon {
+    font-size: 12px;
+    color: var(--text-muted);
+    width: 16px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .file-tree-name {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .file-tree-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 0 5px;
+    border-radius: 3px;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .file-tree-badge.new {
+    color: var(--green-text);
+    background: var(--green-bg);
+  }
+  .file-tree-badge.modified {
+    color: var(--accent);
+    background: var(--accent-subtle);
+  }
+
+  .file-tree-children {
+    padding-left: 20px;
+  }
+
+  /* ── Diff View ── */
+  .diff-block {
+    margin: 8px 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+
+  .diff-header {
+    padding: 6px 12px;
+    background: var(--bg-secondary);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .diff-line {
+    padding: 1px 12px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.7;
+    white-space: pre;
+  }
+  .diff-line.add {
+    color: var(--diff-add-text);
+    background: var(--diff-add-bg);
+  }
+  .diff-line.remove {
+    color: var(--diff-remove-text);
+    background: var(--diff-remove-bg);
+  }
+  .diff-line.context { color: var(--text-muted); }
+  .diff-line.hunk {
+    color: var(--text-quaternary);
+    font-size: 11px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  /* ── Metrics ── */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .metric {
+    padding: 8px 0;
+  }
+
+  .metric-value {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
+  }
+
+  .metric-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  /* ── Command Palette ── */
+  .cmd-palette-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg-overlay);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 20vh;
+    z-index: 100;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+  }
+  .cmd-palette-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .cmd-palette {
+    width: 520px;
+    max-height: 400px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    transform: scale(0.96) translateY(-8px);
+    transition: transform 0.15s ease;
+  }
+
+  [data-theme="dark"] .cmd-palette {
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+
+  .cmd-palette-overlay.open .cmd-palette {
+    transform: scale(1) translateY(0);
+  }
+
+  .cmd-palette-input-wrap {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .cmd-palette-input-wrap svg {
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .cmd-palette-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-size: 15px;
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+    outline: none;
+  }
+  .cmd-palette-input::placeholder { color: var(--text-muted); }
+
+  .cmd-palette-list {
+    overflow-y: auto;
+    max-height: 320px;
+    padding: 8px;
+  }
+
+  .cmd-section-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    padding: 8px 8px 4px;
+  }
+
+  .cmd-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-primary);
+  }
+  .cmd-item:hover { background: var(--bg-secondary); }
+  .cmd-item.selected { background: var(--accent-subtle); color: var(--accent); }
+
+  .cmd-item-icon {
+    width: 20px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .cmd-item-label { flex: 1; }
+
+  .cmd-item-shortcut {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--text-quaternary); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+  /* ── Selection ── */
+  ::selection { background: rgba(0, 122, 255, 0.15); }
+  [data-theme="dark"] ::selection { background: rgba(10, 132, 255, 0.25); }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-logo">Ark</span>
+      <button class="sidebar-new-btn" title="New session (n)">+</button>
+    </div>
+
+    <div class="sidebar-search">
+      <input type="text" placeholder="Search sessions... (/)">
+    </div>
+
+    <div class="sidebar-section-label">Active</div>
+
+    <div class="sidebar-list" id="session-list">
+      <div class="sidebar-item active" data-index="0">
+        <span class="sidebar-item-dot running"></span>
+        <div class="sidebar-item-content">
+          <div class="sidebar-item-title">Add payment webhooks</div>
+          <div class="sidebar-item-sub">autonomous-sdlc - 3 agents</div>
+        </div>
+      </div>
+
+      <div class="sidebar-item" data-index="1">
+        <span class="sidebar-item-dot running"></span>
+        <div class="sidebar-item-content">
+          <div class="sidebar-item-title">Migrate user auth to OAuth2</div>
+          <div class="sidebar-item-sub">autonomous-sdlc - 2 agents</div>
+        </div>
+      </div>
+
+      <div class="sidebar-item" data-index="2">
+        <span class="sidebar-item-dot paused"></span>
+        <div class="sidebar-item-content">
+          <div class="sidebar-item-title">Fix rate limiter edge case</div>
+          <div class="sidebar-item-sub">quick - 1 agent</div>
+        </div>
+      </div>
+
+      <div class="sidebar-section-label" style="margin-top: 8px;">Recent</div>
+
+      <div class="sidebar-item" data-index="3">
+        <span class="sidebar-item-dot completed"></span>
+        <div class="sidebar-item-content">
+          <div class="sidebar-item-title">Refactor DB connection pool</div>
+          <div class="sidebar-item-sub">completed - 12m ago</div>
+        </div>
+      </div>
+
+      <div class="sidebar-item" data-index="4">
+        <span class="sidebar-item-dot completed"></span>
+        <div class="sidebar-item-content">
+          <div class="sidebar-item-title">Add CSV export endpoint</div>
+          <div class="sidebar-item-sub">completed - 1h ago</div>
+        </div>
+      </div>
+
+      <div class="sidebar-item" data-index="5">
+        <span class="sidebar-item-dot completed"></span>
+        <div class="sidebar-item-content">
+          <div class="sidebar-item-title">Update Stripe SDK to v14</div>
+          <div class="sidebar-item-sub">completed - 3h ago</div>
+        </div>
+      </div>
+
+      <div class="sidebar-item" data-index="6">
+        <span class="sidebar-item-dot completed"></span>
+        <div class="sidebar-item-content">
+          <div class="sidebar-item-title">E2E tests for checkout flow</div>
+          <div class="sidebar-item-sub">completed - yesterday</div>
+        </div>
+      </div>
+
+      <div class="sidebar-item" data-index="7">
+        <span class="sidebar-item-dot completed"></span>
+        <div class="sidebar-item-content">
+          <div class="sidebar-item-title">Add OpenTelemetry tracing</div>
+          <div class="sidebar-item-sub">completed - yesterday</div>
+        </div>
+      </div>
+
+      <div class="sidebar-item" data-index="8">
+        <span class="sidebar-item-dot completed"></span>
+        <div class="sidebar-item-content">
+          <div class="sidebar-item-title">Fix memory leak in WS handler</div>
+          <div class="sidebar-item-sub">completed - 2d ago</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-avatar">Y</div>
+      <div class="sidebar-user-name">Yana</div>
+    </div>
+  </aside>
+
+  <!-- ── Main Content ── -->
+  <main class="main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <div>
+          <span class="topbar-title">Add payment webhooks</span>
+          <span class="topbar-meta">s-a1b2 - autonomous-sdlc - running - 8m 14s</span>
+        </div>
+        <div class="stage-pipeline">
+          <span class="stage completed-stage">plan</span>
+          <span class="stage-dot">&bull;</span>
+          <span class="stage completed-stage">implement</span>
+          <span class="stage-dot">&bull;</span>
+          <span class="stage completed-stage">verify</span>
+          <span class="stage-dot">&bull;</span>
+          <span class="stage active-stage">review</span>
+          <span class="stage-dot">&bull;</span>
+          <span class="stage">merge</span>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button class="theme-toggle" id="theme-toggle" title="Toggle theme">
+          <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+        <button class="topbar-btn" id="toggle-panel-btn">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><line x1="10" y1="2" x2="10" y2="14" stroke="currentColor" stroke-width="1.5"/></svg>
+          Workspace
+        </button>
+        <button class="topbar-btn danger">
+          Stop
+        </button>
+      </div>
+    </div>
+
+    <div class="conversation-scroll">
+      <div class="conversation">
+
+        <!-- msg 1: User -->
+        <div class="message user-msg">
+          <div class="message-header">
+            <div class="message-avatar user">Y</div>
+            <span class="message-name">You</span>
+            <span class="message-time">4:12 PM</span>
+          </div>
+          <div class="message-body">
+            <p>Add Stripe webhook handlers for payment_intent.succeeded, payment_intent.failed, and charge.refunded. Include signature verification, idempotency checks, and update the orders table accordingly. Write tests.</p>
+          </div>
+        </div>
+
+        <!-- msg 2: system event -->
+        <div class="system-event"><span>plan phase started</span></div>
+
+        <!-- msg 3: Planner -->
+        <div class="message">
+          <div class="message-header">
+            <div class="message-avatar planner">P</div>
+            <span class="message-name">planner</span>
+            <span class="message-model">opus-4</span>
+            <span class="message-time">4:12 PM</span>
+          </div>
+          <div class="message-body">
+            <p>I'll create a plan for implementing Stripe webhook handlers. Let me examine the existing codebase structure first.</p>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Read 8 files (src/payments/, src/orders/, src/middleware/)</span>
+              <span class="tool-call-duration">2.1s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Search "webhook" across codebase</span>
+              <span class="tool-call-duration">0.8s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Read package.json, tsconfig.json</span>
+              <span class="tool-call-duration">0.3s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <p>Here is the implementation plan:</p>
+
+            <p><strong>1. Create webhook handler module</strong> -- <code>src/payments/webhooks.ts</code> with signature verification using <code>stripe.webhooks.constructEvent()</code> and a dispatch map for each event type.</p>
+
+            <p><strong>2. Add idempotency layer</strong> -- new <code>webhook_events</code> table tracking processed event IDs, checked before processing to prevent duplicates.</p>
+
+            <p><strong>3. Implement event handlers</strong> -- three handlers: <code>handlePaymentSucceeded</code> (update order status to "paid"), <code>handlePaymentFailed</code> (mark as "payment_failed", notify), and <code>handleChargeRefunded</code> (mark as "refunded", adjust balance).</p>
+
+            <p><strong>4. Register route</strong> -- POST <code>/api/webhooks/stripe</code> with raw body parsing (required for signature verification).</p>
+
+            <p><strong>5. Write tests</strong> -- unit tests for each handler, integration test for signature verification, edge cases for idempotency.</p>
+          </div>
+        </div>
+
+        <!-- msg 4: system event -->
+        <div class="system-event"><span>plan completed, advancing to implement</span></div>
+
+        <!-- msg 5: Implementer - files -->
+        <div class="message">
+          <div class="message-header">
+            <div class="message-avatar implementer">I</div>
+            <span class="message-name">implementer</span>
+            <span class="message-model">sonnet-4</span>
+            <span class="message-time">4:13 PM</span>
+          </div>
+          <div class="message-body">
+            <p>Starting implementation. I'll create the webhook handler module and the migration for the idempotency table.</p>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Write src/payments/webhooks.ts (142 lines)</span>
+              <span class="tool-call-duration">1.4s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Write src/db/migrations/004_webhook_events.ts</span>
+              <span class="tool-call-duration">0.6s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Edit src/routes/index.ts (+4 lines)</span>
+              <span class="tool-call-duration">0.4s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Edit src/payments/index.ts (+1 line, export)</span>
+              <span class="tool-call-duration">0.2s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <p>Core implementation complete. The webhook handler verifies the Stripe signature, checks for duplicate events, then dispatches to the appropriate handler:</p>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <span>src/payments/webhooks.ts</span>
+                <span>lines 24-48</span>
+              </div>
+              <pre>export async function handleStripeWebhook(
+  req: Request,
+  db: Database
+): Promise&lt;Response&gt; {
+  const sig = req.headers.get("stripe-signature");
+  if (!sig) return new Response("Missing signature", { status: 400 });
+
+  const body = await req.text();
+  let event: Stripe.Event;
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      body, sig, env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    return new Response("Invalid signature", { status: 400 });
+  }
+
+  // Idempotency check
+  const existing = db.query(
+    "SELECT id FROM webhook_events WHERE event_id = ?",
+    [event.id]
+  ).get();
+  if (existing) return new Response("Already processed", { status: 200 });
+  ...</pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- msg 6: Implementer - tests -->
+        <div class="message">
+          <div class="message-header">
+            <div class="message-avatar implementer">I</div>
+            <span class="message-name">implementer</span>
+            <span class="message-model">sonnet-4</span>
+            <span class="message-time">4:14 PM</span>
+          </div>
+          <div class="message-body">
+            <p>Now writing the tests for all webhook handlers.</p>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Write src/payments/__tests__/webhooks.test.ts (98 lines)</span>
+              <span class="tool-call-duration">1.1s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Run bun test src/payments/__tests__/webhooks.test.ts</span>
+              <span class="tool-call-duration">3.2s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <p>All 7 tests passing. Implementation complete -- 3 files created, 2 files modified.</p>
+          </div>
+        </div>
+
+        <!-- msg 7: system event -->
+        <div class="system-event"><span>implement completed, advancing to verify</span></div>
+
+        <!-- msg 8: Verifier -->
+        <div class="message">
+          <div class="message-header">
+            <div class="message-avatar verifier">V</div>
+            <span class="message-name">verifier</span>
+            <span class="message-model">sonnet-4</span>
+            <span class="message-time">4:15 PM</span>
+          </div>
+          <div class="message-body">
+            <p>Running verification checks. I'll validate the implementation against the plan, check types, lint, and run the full test suite.</p>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Run bun tsc --noEmit</span>
+              <span class="tool-call-duration">4.8s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Run bun lint</span>
+              <span class="tool-call-duration">2.1s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Run bun test (full suite)</span>
+              <span class="tool-call-duration">11.4s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <p>All checks pass. Type-checking clean, zero lint warnings, 43/43 tests green (including the 7 new webhook tests). The implementation matches the plan.</p>
+          </div>
+        </div>
+
+        <!-- msg 9: system event -->
+        <div class="system-event"><span>verify completed, advancing to review</span></div>
+
+        <!-- msg 10: Reviewer -->
+        <div class="message">
+          <div class="message-header">
+            <div class="message-avatar reviewer">R</div>
+            <span class="message-name">reviewer</span>
+            <span class="message-model">opus-4</span>
+            <span class="message-time">4:16 PM</span>
+          </div>
+          <div class="message-body">
+            <p>Reviewing the webhook implementation. Checking for security issues, error handling, and test coverage.</p>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Read src/payments/webhooks.ts, webhooks.test.ts</span>
+              <span class="tool-call-duration">0.5s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Read src/db/migrations/004_webhook_events.ts</span>
+              <span class="tool-call-duration">0.2s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <p>Good implementation overall. Two items to address:</p>
+
+            <p><strong>1. Missing transaction wrapper</strong> -- the order update and webhook_events insert should be wrapped in a transaction to prevent partial writes on crash. This is a correctness issue.</p>
+
+            <p><strong>2. Add index on webhook_events.event_id</strong> -- the idempotency lookup will be O(n) without it. Should be a unique index.</p>
+
+            <p>No security concerns. Signature verification is correct. Test coverage is solid but could add a test for the transaction rollback case.</p>
+          </div>
+        </div>
+
+        <!-- msg 11: system event -->
+        <div class="system-event"><span>review feedback -- returning to implement</span></div>
+
+        <!-- msg 12: Implementer - fix 1 -->
+        <div class="message">
+          <div class="message-header">
+            <div class="message-avatar implementer">I</div>
+            <span class="message-name">implementer</span>
+            <span class="message-model">sonnet-4</span>
+            <span class="message-time">4:16 PM</span>
+          </div>
+          <div class="message-body">
+            <p>Addressing review feedback. Adding transaction wrapper and unique index.</p>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Edit src/payments/webhooks.ts (wrap handlers in db.transaction)</span>
+              <span class="tool-call-duration">0.8s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Edit src/db/migrations/004_webhook_events.ts (add UNIQUE index)</span>
+              <span class="tool-call-duration">0.3s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <p>Transaction wrapper added around each handler. The pattern now looks like:</p>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <span>src/payments/webhooks.ts</span>
+                <span>lines 52-68</span>
+              </div>
+              <pre>const processEvent = db.transaction((event: Stripe.Event) => {
+  // Record event for idempotency
+  db.run(
+    "INSERT INTO webhook_events (event_id, type, processed_at) VALUES (?, ?, ?)",
+    [event.id, event.type, new Date().toISOString()]
+  );
+
+  switch (event.type) {
+    case "payment_intent.succeeded":
+      return handlePaymentSucceeded(db, event);
+    case "payment_intent.failed":
+      return handlePaymentFailed(db, event);
+    case "charge.refunded":
+      return handleChargeRefunded(db, event);
+    default:
+      console.log(`Unhandled event type: ${event.type}`);
+  }
+});</pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- msg 13: Implementer - fix 2 -->
+        <div class="message">
+          <div class="message-header">
+            <div class="message-avatar implementer">I</div>
+            <span class="message-name">implementer</span>
+            <span class="message-model">sonnet-4</span>
+            <span class="message-time">4:17 PM</span>
+          </div>
+          <div class="message-body">
+            <p>Adding the rollback test that the reviewer suggested.</p>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Edit src/payments/__tests__/webhooks.test.ts (+18 lines)</span>
+              <span class="tool-call-duration">0.5s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Run bun test src/payments/__tests__/webhooks.test.ts</span>
+              <span class="tool-call-duration">3.4s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <p>8/8 tests passing now (added the rollback test). Both review items addressed.</p>
+          </div>
+        </div>
+
+        <!-- msg 14: system event -->
+        <div class="system-event"><span>re-verification started</span></div>
+
+        <!-- msg 15: Verifier re-check -->
+        <div class="message">
+          <div class="message-header">
+            <div class="message-avatar verifier">V</div>
+            <span class="message-name">verifier</span>
+            <span class="message-model">sonnet-4</span>
+            <span class="message-time">4:17 PM</span>
+          </div>
+          <div class="message-body">
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Run bun tsc --noEmit</span>
+              <span class="tool-call-duration">4.6s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Run bun test (full suite)</span>
+              <span class="tool-call-duration">12.1s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <p>Re-verification clean. 44/44 tests passing. Types and lint clean.</p>
+          </div>
+        </div>
+
+        <!-- msg 16: system event -->
+        <div class="system-event"><span>verify completed, advancing to review</span></div>
+
+        <!-- msg 17: Reviewer re-review -->
+        <div class="message">
+          <div class="message-header">
+            <div class="message-avatar reviewer">R</div>
+            <span class="message-name">reviewer</span>
+            <span class="message-model">opus-4</span>
+            <span class="message-time">4:18 PM</span>
+          </div>
+          <div class="message-body">
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Read src/payments/webhooks.ts (updated)</span>
+              <span class="tool-call-duration">0.3s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Read src/payments/__tests__/webhooks.test.ts (updated)</span>
+              <span class="tool-call-duration">0.2s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <p>Both issues resolved. The transaction wrapper is correct, unique index is in place, and the new rollback test validates crash safety. Approving.</p>
+          </div>
+        </div>
+
+        <!-- msg 18: system event -->
+        <div class="system-event"><span>review approved, advancing to merge</span></div>
+
+        <!-- msg 19: Merger - branch + PR -->
+        <div class="message">
+          <div class="message-header">
+            <div class="message-avatar merger">M</div>
+            <span class="message-name">merger</span>
+            <span class="message-model">sonnet-4</span>
+            <span class="message-time">4:18 PM</span>
+          </div>
+          <div class="message-body">
+            <p>Creating branch and PR for the webhook implementation.</p>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Run git checkout -b feat/stripe-webhooks</span>
+              <span class="tool-call-duration">0.4s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Run git add -A && git commit</span>
+              <span class="tool-call-duration">0.8s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Run git push -u origin feat/stripe-webhooks</span>
+              <span class="tool-call-duration">3.2s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Run gh pr create --title "feat: add Stripe webhook handlers"</span>
+              <span class="tool-call-duration">1.8s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <p>PR created: <a href="#" style="color: var(--accent); text-decoration: none;">#247 -- feat: add Stripe webhook handlers</a></p>
+          </div>
+        </div>
+
+        <!-- msg 20: Merger - CI -->
+        <div class="message">
+          <div class="message-header">
+            <div class="message-avatar merger">M</div>
+            <span class="message-name">merger</span>
+            <span class="message-model">sonnet-4</span>
+            <span class="message-time">4:19 PM</span>
+          </div>
+          <div class="message-body">
+            <p>Waiting for CI to pass before merging.</p>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Run gh pr checks 247 --watch</span>
+              <span class="tool-call-duration">48.2s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <p>CI green. All checks passed (lint, typecheck, test, build).</p>
+          </div>
+        </div>
+
+        <!-- msg 21: Merger - merge -->
+        <div class="message">
+          <div class="message-header">
+            <div class="message-avatar merger">M</div>
+            <span class="message-name">merger</span>
+            <span class="message-model">sonnet-4</span>
+            <span class="message-time">4:20 PM</span>
+          </div>
+          <div class="message-body">
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Run gh pr merge 247 --squash --auto</span>
+              <span class="tool-call-duration">1.4s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <p>PR #247 merged to main via squash. Branch cleaned up.</p>
+          </div>
+        </div>
+
+        <!-- msg 22: system event -->
+        <div class="system-event"><span>merge completed -- session finished</span></div>
+
+        <!-- msg 23: Summary -->
+        <div class="message">
+          <div class="message-header">
+            <div class="message-avatar system">&#10003;</div>
+            <span class="message-name">session summary</span>
+            <span class="message-time">4:20 PM</span>
+          </div>
+          <div class="message-body">
+            <p><strong>Completed in 8m 14s</strong> across 5 stages with 3 agents.</p>
+            <p>Created <code>src/payments/webhooks.ts</code> with Stripe webhook handlers for payment_intent.succeeded, payment_intent.failed, and charge.refunded. Includes signature verification, idempotency via webhook_events table, and transactional safety. 8 tests, all green. PR #247 merged to main.</p>
+          </div>
+        </div>
+
+        <!-- msg 24: User follow-up -->
+        <div class="message user-msg">
+          <div class="message-header">
+            <div class="message-avatar user">Y</div>
+            <span class="message-name">You</span>
+            <span class="message-time">4:21 PM</span>
+          </div>
+          <div class="message-body">
+            <p>Looks great. Can you also add a webhook for invoice.payment_failed so we can send dunning emails?</p>
+          </div>
+        </div>
+
+        <!-- msg 25: system event -->
+        <div class="system-event"><span>plan phase started</span></div>
+
+        <!-- msg 26: Planner responding -->
+        <div class="message">
+          <div class="message-header">
+            <div class="message-avatar planner">P</div>
+            <span class="message-name">planner</span>
+            <span class="message-model">opus-4</span>
+            <span class="message-time">4:21 PM</span>
+          </div>
+          <div class="message-body">
+            <p>I'll extend the existing webhook handler to support <code>invoice.payment_failed</code> events and integrate with the email service for dunning notifications.</p>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Read src/payments/webhooks.ts, src/email/service.ts</span>
+              <span class="tool-call-duration">0.6s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Search "dunning" across codebase</span>
+              <span class="tool-call-duration">0.4s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <p>Plan for the dunning extension:</p>
+
+            <p><strong>1. Add invoice.payment_failed handler</strong> -- new case in the webhook dispatch map. Extract customer ID and invoice details from the event payload.</p>
+
+            <p><strong>2. Create dunning email template</strong> -- <code>src/email/templates/dunning.ts</code> with retry link and payment update CTA.</p>
+
+            <p><strong>3. Add retry tracking</strong> -- extend webhook_events with an <code>attempt_count</code> column. Escalate email tone based on attempt (1st: friendly reminder, 2nd: urgent, 3rd: final notice).</p>
+
+            <p><strong>4. Write tests</strong> -- test each dunning tier, test email content, test idempotency for repeated invoice failures.</p>
+          </div>
+        </div>
+
+        <!-- msg 27: system event -->
+        <div class="system-event"><span>plan completed, advancing to implement</span></div>
+
+        <!-- msg 28: Implementer starting dunning -->
+        <div class="message">
+          <div class="message-header">
+            <div class="message-avatar implementer">I</div>
+            <span class="message-name">implementer</span>
+            <span class="message-model">sonnet-4</span>
+            <span class="message-time">4:22 PM</span>
+          </div>
+          <div class="message-body">
+            <p>Implementing the dunning webhook handler and email template.</p>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Write src/email/templates/dunning.ts (76 lines)</span>
+              <span class="tool-call-duration">0.9s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Edit src/payments/webhooks.ts (+34 lines, new handler)</span>
+              <span class="tool-call-duration">0.7s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Edit src/db/migrations/004_webhook_events.ts (+1 column)</span>
+              <span class="tool-call-duration">0.3s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Write src/payments/__tests__/dunning.test.ts (62 lines)</span>
+              <span class="tool-call-duration">0.8s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Run bun test src/payments/__tests__/</span>
+              <span class="tool-call-duration">4.1s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <p>12/12 tests passing (8 original + 4 new dunning tests). The handler escalates through three dunning tiers based on attempt count.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="input-area">
+      <div class="input-container">
+        <textarea class="input-box" placeholder="Send a message..." rows="1"></textarea>
+        <button class="send-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <div class="input-hints">
+        <span>Enter to send, Shift+Enter for newline</span>
+        <span><kbd>Cmd</kbd> <kbd>K</kbd> command palette</span>
+      </div>
+    </div>
+  </main>
+
+  <!-- ── Right Panel (Workspace) ── -->
+  <aside class="right-panel collapsed" id="right-panel">
+    <div class="panel-header">
+      <span class="panel-title">Workspace</span>
+      <button class="panel-close" id="panel-close-btn">&times;</button>
+    </div>
+
+    <div class="panel-tabs">
+      <div class="panel-tab" data-tab="overview">Overview</div>
+      <div class="panel-tab active" data-tab="files">Files</div>
+      <div class="panel-tab" data-tab="diff">Diff</div>
+      <div class="panel-tab" data-tab="metrics">Metrics</div>
+    </div>
+
+    <div class="panel-content">
+
+      <!-- Overview Tab -->
+      <div class="panel-section" data-panel="overview">
+        <div class="overview-section">
+          <div class="overview-section-title">Session</div>
+          <div class="overview-row">
+            <span class="overview-label">ID</span>
+            <span class="overview-value">s-a1b2</span>
+          </div>
+          <div class="overview-row">
+            <span class="overview-label">Flow</span>
+            <span class="overview-value">autonomous-sdlc</span>
+          </div>
+          <div class="overview-row">
+            <span class="overview-label">Status</span>
+            <span class="overview-value status-running">running</span>
+          </div>
+          <div class="overview-row">
+            <span class="overview-label">Runtime</span>
+            <span class="overview-value">claude</span>
+          </div>
+          <div class="overview-row">
+            <span class="overview-label">Compute</span>
+            <span class="overview-value">local</span>
+          </div>
+          <div class="overview-row">
+            <span class="overview-label">Branch</span>
+            <span class="overview-value">feat/stripe-webhooks</span>
+          </div>
+          <div class="overview-row">
+            <span class="overview-label">PR</span>
+            <span class="overview-value"><a href="#" style="color: var(--accent); text-decoration: none;">#247</a></span>
+          </div>
+        </div>
+
+        <div class="overview-section">
+          <div class="overview-section-title">Agents</div>
+          <div class="overview-agents">
+            <div class="overview-agent">
+              <span class="overview-agent-dot" style="background: var(--avatar-planner);"></span>
+              <span class="overview-agent-name">planner</span>
+              <span class="overview-agent-model">opus-4</span>
+            </div>
+            <div class="overview-agent">
+              <span class="overview-agent-dot" style="background: var(--avatar-implementer);"></span>
+              <span class="overview-agent-name">implementer</span>
+              <span class="overview-agent-model">sonnet-4</span>
+            </div>
+            <div class="overview-agent">
+              <span class="overview-agent-dot" style="background: var(--avatar-reviewer);"></span>
+              <span class="overview-agent-name">reviewer</span>
+              <span class="overview-agent-model">opus-4</span>
+            </div>
+            <div class="overview-agent">
+              <span class="overview-agent-dot" style="background: var(--avatar-verifier);"></span>
+              <span class="overview-agent-name">verifier</span>
+              <span class="overview-agent-model">sonnet-4</span>
+            </div>
+            <div class="overview-agent">
+              <span class="overview-agent-dot" style="background: var(--avatar-merger);"></span>
+              <span class="overview-agent-name">merger</span>
+              <span class="overview-agent-model">sonnet-4</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Files Tab -->
+      <div class="panel-section active" data-panel="files">
+        <div class="file-tree-item" onclick="this.querySelector('.file-tree-disclosure').classList.toggle('open'); var c = this.nextElementSibling; c.style.display = c.style.display === 'none' ? 'block' : 'none';">
+          <span class="file-tree-disclosure open">&#9654;</span>
+          <span class="file-tree-icon">&#128193;</span>
+          <span class="file-tree-name">src/payments</span>
+        </div>
+        <div class="file-tree-children">
+          <div class="file-tree-item">
+            <span class="file-tree-disclosure" style="visibility: hidden;">&#9654;</span>
+            <span class="file-tree-icon" style="color: var(--accent);">&#9679;</span>
+            <span class="file-tree-name">webhooks.ts</span>
+            <span class="file-tree-badge new">new</span>
+          </div>
+          <div class="file-tree-item">
+            <span class="file-tree-disclosure" style="visibility: hidden;">&#9654;</span>
+            <span class="file-tree-icon" style="color: var(--text-muted);">&#9679;</span>
+            <span class="file-tree-name">index.ts</span>
+            <span class="file-tree-badge modified">mod</span>
+          </div>
+          <div class="file-tree-item" onclick="event.stopPropagation(); this.querySelector('.file-tree-disclosure')?.classList.toggle('open');">
+            <span class="file-tree-disclosure open">&#9654;</span>
+            <span class="file-tree-icon">&#128193;</span>
+            <span class="file-tree-name">__tests__</span>
+          </div>
+          <div class="file-tree-children">
+            <div class="file-tree-item">
+              <span class="file-tree-disclosure" style="visibility: hidden;">&#9654;</span>
+              <span class="file-tree-icon" style="color: var(--accent);">&#9679;</span>
+              <span class="file-tree-name">webhooks.test.ts</span>
+              <span class="file-tree-badge new">new</span>
+            </div>
+            <div class="file-tree-item">
+              <span class="file-tree-disclosure" style="visibility: hidden;">&#9654;</span>
+              <span class="file-tree-icon" style="color: var(--accent);">&#9679;</span>
+              <span class="file-tree-name">dunning.test.ts</span>
+              <span class="file-tree-badge new">new</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="file-tree-item" onclick="this.querySelector('.file-tree-disclosure').classList.toggle('open'); var c = this.nextElementSibling; c.style.display = c.style.display === 'none' ? 'block' : 'none';">
+          <span class="file-tree-disclosure open">&#9654;</span>
+          <span class="file-tree-icon">&#128193;</span>
+          <span class="file-tree-name">src/db/migrations</span>
+        </div>
+        <div class="file-tree-children">
+          <div class="file-tree-item">
+            <span class="file-tree-disclosure" style="visibility: hidden;">&#9654;</span>
+            <span class="file-tree-icon" style="color: var(--accent);">&#9679;</span>
+            <span class="file-tree-name">004_webhook_events.ts</span>
+            <span class="file-tree-badge new">new</span>
+          </div>
+        </div>
+
+        <div class="file-tree-item" onclick="this.querySelector('.file-tree-disclosure').classList.toggle('open'); var c = this.nextElementSibling; c.style.display = c.style.display === 'none' ? 'block' : 'none';">
+          <span class="file-tree-disclosure open">&#9654;</span>
+          <span class="file-tree-icon">&#128193;</span>
+          <span class="file-tree-name">src/email/templates</span>
+        </div>
+        <div class="file-tree-children">
+          <div class="file-tree-item">
+            <span class="file-tree-disclosure" style="visibility: hidden;">&#9654;</span>
+            <span class="file-tree-icon" style="color: var(--accent);">&#9679;</span>
+            <span class="file-tree-name">dunning.ts</span>
+            <span class="file-tree-badge new">new</span>
+          </div>
+        </div>
+
+        <div class="file-tree-item">
+          <span class="file-tree-disclosure" style="visibility: hidden;">&#9654;</span>
+          <span class="file-tree-icon" style="color: var(--text-muted);">&#9679;</span>
+          <span class="file-tree-name">src/routes/index.ts</span>
+          <span class="file-tree-badge modified">mod</span>
+        </div>
+      </div>
+
+      <!-- Diff Tab -->
+      <div class="panel-section" data-panel="diff">
+        <div class="diff-block">
+          <div class="diff-header">src/payments/webhooks.ts (new)</div>
+          <div class="diff-line hunk">@@ +1,176 @@</div>
+          <div class="diff-line add">+ import Stripe from "stripe";</div>
+          <div class="diff-line add">+ import { env } from "../config/env.js";</div>
+          <div class="diff-line add">+ import type { Database } from "bun:sqlite";</div>
+          <div class="diff-line add">+ </div>
+          <div class="diff-line add">+ const stripe = new Stripe(env.STRIPE_SECRET_KEY);</div>
+          <div class="diff-line add">+ </div>
+          <div class="diff-line add">+ export async function handleStripeWebhook(</div>
+          <div class="diff-line add">+   req: Request,</div>
+          <div class="diff-line add">+   db: Database</div>
+          <div class="diff-line add">+ ): Promise&lt;Response&gt; {</div>
+        </div>
+
+        <div class="diff-block">
+          <div class="diff-header">src/routes/index.ts</div>
+          <div class="diff-line hunk">@@ -12,6 +12,10 @@</div>
+          <div class="diff-line context">  import { healthRoutes } from "./health.js";</div>
+          <div class="diff-line context">  import { orderRoutes } from "./orders.js";</div>
+          <div class="diff-line context"> </div>
+          <div class="diff-line add">+ import { handleStripeWebhook } from "../payments/webhooks.js";</div>
+          <div class="diff-line add">+ </div>
+          <div class="diff-line add">+ app.post("/api/webhooks/stripe",</div>
+          <div class="diff-line add">+   (req) =&gt; handleStripeWebhook(req, db));</div>
+          <div class="diff-line context">  app.use(healthRoutes);</div>
+        </div>
+
+        <div class="diff-block">
+          <div class="diff-header">src/db/migrations/004_webhook_events.ts (new)</div>
+          <div class="diff-line hunk">@@ +1,18 @@</div>
+          <div class="diff-line add">+ import type { Database } from "bun:sqlite";</div>
+          <div class="diff-line add">+ </div>
+          <div class="diff-line add">+ export function up(db: Database) {</div>
+          <div class="diff-line add">+   db.run(`</div>
+          <div class="diff-line add">+     CREATE TABLE webhook_events (</div>
+          <div class="diff-line add">+       id INTEGER PRIMARY KEY,</div>
+          <div class="diff-line add">+       event_id TEXT NOT NULL,</div>
+          <div class="diff-line add">+       type TEXT NOT NULL,</div>
+          <div class="diff-line add">+       attempt_count INTEGER DEFAULT 1,</div>
+          <div class="diff-line add">+       processed_at TEXT NOT NULL</div>
+          <div class="diff-line add">+     )</div>
+          <div class="diff-line add">+   `);</div>
+          <div class="diff-line add">+   db.run(`CREATE UNIQUE INDEX idx_event_id</div>
+          <div class="diff-line add">+     ON webhook_events(event_id)`);</div>
+          <div class="diff-line add">+ }</div>
+        </div>
+      </div>
+
+      <!-- Metrics Tab -->
+      <div class="panel-section" data-panel="metrics">
+        <div class="metrics-grid">
+          <div class="metric">
+            <div class="metric-value">5</div>
+            <div class="metric-label">Files created</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value">2</div>
+            <div class="metric-label">Files modified</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value">356</div>
+            <div class="metric-label">Lines added</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value">0</div>
+            <div class="metric-label">Lines removed</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value">12/12</div>
+            <div class="metric-label">Tests passing</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value">8m 14s</div>
+            <div class="metric-label">Duration</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value">5</div>
+            <div class="metric-label">Stages completed</div>
+          </div>
+          <div class="metric">
+            <div class="metric-value">$0.42</div>
+            <div class="metric-label">LLM cost</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </aside>
+
+</div>
+
+<!-- ── Command Palette ── -->
+<div class="cmd-palette-overlay" id="cmd-palette-overlay">
+  <div class="cmd-palette">
+    <div class="cmd-palette-input-wrap">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input class="cmd-palette-input" id="cmd-palette-input" type="text" placeholder="Type a command..." autofocus>
+    </div>
+    <div class="cmd-palette-list">
+      <div class="cmd-section-title">Actions</div>
+      <div class="cmd-item selected">
+        <span class="cmd-item-icon">+</span>
+        <span class="cmd-item-label">New session</span>
+        <span class="cmd-item-shortcut">n</span>
+      </div>
+      <div class="cmd-item">
+        <span class="cmd-item-icon">&#9654;</span>
+        <span class="cmd-item-label">Resume session</span>
+      </div>
+      <div class="cmd-item">
+        <span class="cmd-item-icon">&#9632;</span>
+        <span class="cmd-item-label">Stop session</span>
+      </div>
+      <div class="cmd-section-title">Navigation</div>
+      <div class="cmd-item">
+        <span class="cmd-item-icon">/</span>
+        <span class="cmd-item-label">Search sessions</span>
+        <span class="cmd-item-shortcut">/</span>
+      </div>
+      <div class="cmd-item">
+        <span class="cmd-item-icon">&#9881;</span>
+        <span class="cmd-item-label">Toggle workspace panel</span>
+        <span class="cmd-item-shortcut">t</span>
+      </div>
+      <div class="cmd-section-title">Theme</div>
+      <div class="cmd-item">
+        <span class="cmd-item-icon">&#9788;</span>
+        <span class="cmd-item-label">Switch to light mode</span>
+      </div>
+      <div class="cmd-item">
+        <span class="cmd-item-icon">&#9790;</span>
+        <span class="cmd-item-label">Switch to dark mode</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Theme ──
+  const html = document.documentElement;
+  const themeToggle = document.getElementById("theme-toggle");
+  const iconSun = themeToggle.querySelector(".icon-sun");
+  const iconMoon = themeToggle.querySelector(".icon-moon");
+
+  function setTheme(theme) {
+    html.setAttribute("data-theme", theme);
+    localStorage.setItem("ark-theme", theme);
+    if (theme === "dark") {
+      iconSun.style.display = "none";
+      iconMoon.style.display = "block";
+    } else {
+      iconSun.style.display = "block";
+      iconMoon.style.display = "none";
+    }
+  }
+
+  // Init from localStorage or system preference
+  const stored = localStorage.getItem("ark-theme");
+  if (stored) {
+    setTheme(stored);
+  } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    setTheme("dark");
+  } else {
+    setTheme("light");
+  }
+
+  // Listen for system changes
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
+    if (!localStorage.getItem("ark-theme")) {
+      setTheme(e.matches ? "dark" : "light");
+    }
+  });
+
+  themeToggle.addEventListener("click", () => {
+    setTheme(html.getAttribute("data-theme") === "dark" ? "light" : "dark");
+  });
+
+  // ── Toggle right panel ──
+  const panel = document.getElementById("right-panel");
+  const toggleBtn = document.getElementById("toggle-panel-btn");
+  const closeBtn = document.getElementById("panel-close-btn");
+
+  function togglePanel() {
+    panel.classList.toggle("collapsed");
+    toggleBtn.classList.toggle("active");
+  }
+
+  toggleBtn.addEventListener("click", togglePanel);
+  closeBtn.addEventListener("click", togglePanel);
+
+  // ── Panel tabs ──
+  document.querySelectorAll(".panel-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".panel-tab").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      const tabName = tab.getAttribute("data-tab");
+      document.querySelectorAll(".panel-section").forEach(s => s.classList.remove("active"));
+      const target = document.querySelector(`.panel-section[data-panel="${tabName}"]`);
+      if (target) target.classList.add("active");
+    });
+  });
+
+  // ── Auto-resize textarea ──
+  const textarea = document.querySelector(".input-box");
+  textarea.addEventListener("input", function() {
+    this.style.height = "auto";
+    this.style.height = Math.min(this.scrollHeight, 160) + "px";
+  });
+
+  // ── Command Palette ──
+  const cmdOverlay = document.getElementById("cmd-palette-overlay");
+  const cmdInput = document.getElementById("cmd-palette-input");
+
+  function openCmdPalette() {
+    cmdOverlay.classList.add("open");
+    setTimeout(() => cmdInput.focus(), 50);
+  }
+
+  function closeCmdPalette() {
+    cmdOverlay.classList.remove("open");
+    cmdInput.value = "";
+  }
+
+  cmdOverlay.addEventListener("click", (e) => {
+    if (e.target === cmdOverlay) closeCmdPalette();
+  });
+
+  // ── Keyboard shortcuts ──
+  let activeSessionIndex = 0;
+  const sessionItems = document.querySelectorAll(".sidebar-item[data-index]");
+
+  function selectSession(index) {
+    if (index < 0 || index >= sessionItems.length) return;
+    sessionItems[activeSessionIndex].classList.remove("active");
+    activeSessionIndex = index;
+    sessionItems[activeSessionIndex].classList.add("active");
+    sessionItems[activeSessionIndex].scrollIntoView({ block: "nearest" });
+  }
+
+  document.addEventListener("keydown", (e) => {
+    // Don't capture when typing in inputs
+    const isInput = e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA";
+
+    // Cmd+K - command palette (always active)
+    if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+      e.preventDefault();
+      if (cmdOverlay.classList.contains("open")) {
+        closeCmdPalette();
+      } else {
+        openCmdPalette();
+      }
+      return;
+    }
+
+    // Escape - close palette or blur input
+    if (e.key === "Escape") {
+      if (cmdOverlay.classList.contains("open")) {
+        closeCmdPalette();
+        return;
+      }
+      if (isInput) {
+        e.target.blur();
+        return;
+      }
+    }
+
+    if (isInput) return;
+
+    // j/k - navigate sessions
+    if (e.key === "j") {
+      e.preventDefault();
+      selectSession(activeSessionIndex + 1);
+    }
+    if (e.key === "k") {
+      e.preventDefault();
+      selectSession(activeSessionIndex - 1);
+    }
+
+    // t - toggle workspace
+    if (e.key === "t") {
+      e.preventDefault();
+      togglePanel();
+    }
+
+    // n - new session
+    if (e.key === "n") {
+      e.preventDefault();
+      // would open new session
+    }
+
+    // / - focus search
+    if (e.key === "/") {
+      e.preventDefault();
+      document.querySelector(".sidebar-search input").focus();
+    }
+  });
+
+  // Click to select sessions
+  sessionItems.forEach(item => {
+    item.addEventListener("click", () => {
+      selectSession(parseInt(item.getAttribute("data-index")));
+    });
+  });
+</script>
+
+</body>
+</html>
