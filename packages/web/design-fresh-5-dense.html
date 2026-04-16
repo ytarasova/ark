@@ -1,0 +1,1371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ark -- Fleet Control</title>
+<style>
+  /* ================================================================
+     RESET + BASE
+     ================================================================ */
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg:          #0d0d0d;
+    --bg-card:     #111111;
+    --bg-hover:    #1a1a1a;
+    --bg-input:    #0a0a0a;
+    --border:      #222222;
+    --border-focus:#00ff88;
+    --text:        #e4e4e7;
+    --text-dim:    #71717a;
+    --text-dimmer: #52525b;
+    --accent:      #00ff88;
+    --accent-dim:  #00cc6a;
+    --warning:     #ffaa00;
+    --error:       #ff4444;
+    --info:        #3b82f6;
+    --completed:   #3b82f6;
+    --running:     #00ff88;
+    --waiting:     #ffaa00;
+    --failed:      #ff4444;
+    --stopped:     #71717a;
+    --font:        "SF Mono", "Cascadia Code", "JetBrains Mono", "Fira Code", Consolas, monospace;
+    --grid-gap:    1px;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 12px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #333; }
+  ::-webkit-scrollbar-thumb:hover { background: #444; }
+
+  /* ================================================================
+     TOP BAR
+     ================================================================ */
+  .topbar {
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    user-select: none;
+  }
+
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .topbar-logo {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+
+  .topbar-sep {
+    width: 1px;
+    height: 14px;
+    background: var(--border);
+  }
+
+  .topbar-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .topbar-stat {
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .topbar-stat strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .topbar-indicator {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+  }
+
+  .topbar-indicator .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 0;
+    display: inline-block;
+  }
+
+  .dot-up { background: var(--accent); box-shadow: 0 0 4px var(--accent); }
+  .dot-down { background: var(--error); box-shadow: 0 0 4px var(--error); }
+  .dot-warn { background: var(--warning); box-shadow: 0 0 4px var(--warning); }
+
+  /* ================================================================
+     LAYOUT: grid of session cards + fleet panel + input bar
+     ================================================================ */
+  .layout {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 32px);
+  }
+
+  .main-area {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  /* Session grid */
+  .session-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: var(--grid-gap);
+    background: var(--border);
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .session-grid.expanded {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  /* Collapsed bar when a session is expanded */
+  .collapsed-bar {
+    display: none;
+    height: 28px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 0;
+  }
+
+  .session-grid.expanded .collapsed-bar {
+    display: flex;
+  }
+
+  .collapsed-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 12px;
+    font-size: 11px;
+    color: var(--text-dim);
+    border-right: 1px solid var(--border);
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: background 0.1s;
+  }
+
+  .collapsed-tab:hover {
+    background: var(--bg-hover);
+    color: var(--text);
+  }
+
+  .collapsed-tab .status-pip {
+    width: 5px;
+    height: 5px;
+    flex-shrink: 0;
+  }
+
+  /* ================================================================
+     SESSION CARD
+     ================================================================ */
+  .session-card {
+    background: var(--bg-card);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .session-card:hover {
+    background: #141414;
+  }
+
+  .session-card.expanded-card {
+    cursor: default;
+  }
+
+  .session-grid.expanded .session-card:not(.expanded-card) {
+    display: none;
+  }
+
+  /* Status bar at top of card */
+  .card-status-bar {
+    height: 2px;
+    flex-shrink: 0;
+  }
+
+  .card-status-bar.running  { background: var(--running); box-shadow: 0 0 6px var(--running); }
+  .card-status-bar.waiting  { background: var(--waiting); box-shadow: 0 0 6px var(--warning); }
+  .card-status-bar.completed { background: var(--completed); }
+  .card-status-bar.failed   { background: var(--failed); box-shadow: 0 0 6px var(--error); }
+  .card-status-bar.stopped  { background: var(--stopped); }
+  .card-status-bar.ready    { background: var(--text-dimmer); }
+
+  /* Card header */
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px 4px;
+    flex-shrink: 0;
+  }
+
+  .card-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .card-id {
+    font-size: 11px;
+    color: var(--text-dimmer);
+  }
+
+  .card-agent {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .card-stage {
+    font-size: 10px;
+    color: var(--text-dim);
+    padding: 1px 5px;
+    background: #1a1a1a;
+    border: 1px solid var(--border);
+  }
+
+  .card-header-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .card-status-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 1px 5px;
+  }
+
+  .card-status-label.running  { color: var(--running); }
+  .card-status-label.waiting  { color: var(--waiting); }
+  .card-status-label.completed { color: var(--completed); }
+  .card-status-label.failed   { color: var(--error); }
+  .card-status-label.stopped  { color: var(--stopped); }
+
+  .card-summary {
+    padding: 0 10px 4px;
+    font-size: 11px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+  }
+
+  /* Card body -- message feed */
+  .card-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-height: 0;
+  }
+
+  .msg {
+    font-size: 11px;
+    line-height: 1.45;
+    padding: 3px 0;
+    border-bottom: 1px solid #1a1a1a;
+  }
+
+  .msg:last-child { border-bottom: none; }
+
+  .msg-role {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-right: 6px;
+  }
+
+  .msg-role.user { color: var(--accent); }
+  .msg-role.assistant { color: var(--info); }
+  .msg-role.system { color: var(--warning); }
+  .msg-role.tool { color: #a855f7; }
+
+  .msg-text {
+    color: var(--text);
+    word-break: break-word;
+  }
+
+  .msg-text.truncated {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .msg-tool-summary {
+    font-size: 10px;
+    color: #a855f7;
+    padding: 2px 0;
+  }
+
+  .msg-tool-summary .check { color: var(--accent); }
+  .msg-tool-summary .timing { color: var(--text-dimmer); }
+
+  /* Card footer */
+  .card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 10px 6px;
+    border-top: 1px solid #1a1a1a;
+    flex-shrink: 0;
+  }
+
+  .card-footer-item {
+    font-size: 10px;
+    color: var(--text-dimmer);
+  }
+
+  .card-footer-item strong {
+    color: var(--text-dim);
+    font-weight: 600;
+  }
+
+  /* Blinking cursor for active sessions */
+  .cursor-blink {
+    display: inline-block;
+    width: 6px;
+    height: 11px;
+    background: var(--accent);
+    margin-left: 4px;
+    animation: blink 1s step-end infinite;
+    vertical-align: middle;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* ================================================================
+     FLEET OVERVIEW PANEL (right sidebar)
+     ================================================================ */
+  .fleet-panel {
+    width: 260px;
+    flex-shrink: 0;
+    background: var(--bg-card);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .fleet-section {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .fleet-section-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dimmer);
+    margin-bottom: 8px;
+  }
+
+  /* Stats grid inside fleet panel */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .stat-box {
+    background: var(--bg);
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+  }
+
+  .stat-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.1;
+  }
+
+  .stat-value.accent { color: var(--accent); }
+  .stat-value.warning { color: var(--warning); }
+  .stat-value.error { color: var(--error); }
+
+  .stat-label {
+    font-size: 9px;
+    color: var(--text-dimmer);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+  }
+
+  /* Health indicators */
+  .health-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3px 0;
+    font-size: 11px;
+  }
+
+  .health-row .service-name { color: var(--text-dim); }
+  .health-row .service-status { font-weight: 600; }
+  .health-row .service-status.up { color: var(--accent); }
+  .health-row .service-status.down { color: var(--error); }
+  .health-row .service-status.degraded { color: var(--warning); }
+
+  .health-port {
+    font-size: 9px;
+    color: var(--text-dimmer);
+    margin-left: 4px;
+  }
+
+  /* Cost sparkline */
+  .sparkline-container {
+    padding: 4px 0;
+  }
+
+  .sparkline-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 32px;
+    margin-bottom: 4px;
+  }
+
+  .spark-bar {
+    flex: 1;
+    background: var(--accent-dim);
+    min-height: 2px;
+    opacity: 0.6;
+    transition: opacity 0.15s;
+  }
+
+  .spark-bar:last-child { opacity: 1; background: var(--accent); }
+  .spark-bar:hover { opacity: 1; }
+
+  .sparkline-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    color: var(--text-dimmer);
+  }
+
+  /* Recent feed */
+  .feed-list {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+  }
+
+  .feed-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 5px 12px;
+    border-bottom: 1px solid #1a1a1a;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .feed-item:hover { background: var(--bg-hover); }
+
+  .feed-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+    font-size: 10px;
+  }
+
+  .feed-text {
+    color: var(--text-dim);
+    line-height: 1.4;
+    min-width: 0;
+  }
+
+  .feed-text strong { color: var(--text); font-weight: 600; }
+
+  .feed-time {
+    font-size: 9px;
+    color: var(--text-dimmer);
+    margin-top: 1px;
+  }
+
+  /* ================================================================
+     GLOBAL INPUT BAR
+     ================================================================ */
+  .input-bar {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .input-label {
+    font-size: 10px;
+    color: var(--text-dimmer);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+
+  .session-selector {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-family: var(--font);
+    font-size: 11px;
+    cursor: pointer;
+    flex-shrink: 0;
+    user-select: none;
+    transition: border-color 0.15s;
+  }
+
+  .session-selector:hover {
+    border-color: var(--accent);
+  }
+
+  .session-selector .chevron {
+    font-size: 8px;
+    color: var(--text-dimmer);
+  }
+
+  .input-field {
+    flex: 1;
+    height: 28px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 12px;
+    padding: 0 10px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .input-field::placeholder {
+    color: var(--text-dimmer);
+  }
+
+  .input-field:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+
+  .input-send {
+    padding: 4px 12px;
+    background: var(--accent);
+    color: #0d0d0d;
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+
+  .input-send:hover {
+    background: #00ffaa;
+  }
+
+  .input-shortcut {
+    font-size: 10px;
+    color: var(--text-dimmer);
+    flex-shrink: 0;
+  }
+
+  .input-shortcut kbd {
+    background: #1a1a1a;
+    border: 1px solid var(--border);
+    padding: 1px 4px;
+    font-family: var(--font);
+    font-size: 9px;
+  }
+
+  /* ================================================================
+     EXPANDED CONVERSATION VIEW
+     ================================================================ */
+  .expanded-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 16px;
+  }
+
+  .expanded-msg {
+    padding: 6px 0;
+    border-bottom: 1px solid #1a1a1a;
+    font-size: 12px;
+    line-height: 1.55;
+  }
+
+  .expanded-msg .msg-role {
+    font-size: 10px;
+  }
+
+  .expanded-msg .msg-text {
+    margin-top: 2px;
+    white-space: pre-wrap;
+  }
+
+  .expanded-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--bg-card);
+  }
+
+  .expanded-header-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .expanded-close {
+    font-size: 11px;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    background: none;
+    font-family: var(--font);
+    transition: all 0.1s;
+  }
+
+  .expanded-close:hover {
+    color: var(--text);
+    border-color: var(--text-dim);
+  }
+
+  .expanded-meta {
+    display: flex;
+    gap: 16px;
+    font-size: 10px;
+    color: var(--text-dimmer);
+  }
+
+  .expanded-meta strong { color: var(--text-dim); }
+
+  /* Tool call blocks in expanded view */
+  .tool-block {
+    background: #0a0a0a;
+    border: 1px solid var(--border);
+    padding: 6px 10px;
+    margin: 4px 0;
+    font-size: 11px;
+  }
+
+  .tool-name {
+    color: #a855f7;
+    font-weight: 600;
+  }
+
+  .tool-duration {
+    color: var(--text-dimmer);
+    font-size: 10px;
+    margin-left: 8px;
+  }
+
+  .tool-result {
+    color: var(--text-dim);
+    margin-top: 2px;
+    max-height: 60px;
+    overflow: hidden;
+  }
+
+  /* ================================================================
+     ANIMATIONS
+     ================================================================ */
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 4px var(--accent); }
+    50% { box-shadow: 0 0 8px var(--accent); }
+  }
+
+  .card-status-bar.running {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  /* ================================================================
+     STATUS PIP (tiny square indicator)
+     ================================================================ */
+  .status-pip {
+    width: 6px;
+    height: 6px;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
+  .status-pip.running  { background: var(--running); box-shadow: 0 0 3px var(--running); }
+  .status-pip.waiting  { background: var(--waiting); box-shadow: 0 0 3px var(--warning); }
+  .status-pip.completed { background: var(--completed); }
+  .status-pip.failed   { background: var(--failed); box-shadow: 0 0 3px var(--error); }
+  .status-pip.stopped  { background: var(--stopped); }
+  .status-pip.ready    { background: var(--text-dimmer); }
+
+  /* ================================================================
+     MODEL BADGE
+     ================================================================ */
+  .model-badge {
+    font-size: 9px;
+    padding: 0 4px;
+    border: 1px solid var(--border);
+    color: var(--text-dimmer);
+    white-space: nowrap;
+  }
+
+  /* ================================================================
+     RESPONSIVE: stack on narrow screens
+     ================================================================ */
+  @media (max-width: 900px) {
+    .fleet-panel { display: none; }
+  }
+
+  @media (max-width: 700px) {
+    .session-grid {
+      grid-template-columns: 1fr;
+      grid-template-rows: repeat(4, 1fr);
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     TOP BAR
+     ============================================================ -->
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="topbar-logo">ARK</span>
+    <span class="topbar-sep"></span>
+    <span class="topbar-label">Fleet Control</span>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-stat"><strong>8</strong> sessions</span>
+    <span class="topbar-stat"><strong>3</strong> running</span>
+    <span class="topbar-stat"><strong>$4.37</strong> today</span>
+    <span class="topbar-indicator"><span class="dot dot-up"></span> conductor</span>
+    <span class="topbar-indicator"><span class="dot dot-up"></span> arkd</span>
+    <span class="topbar-indicator"><span class="dot dot-down"></span> router</span>
+    <span class="topbar-stat" id="clock" style="color: var(--text-dimmer)">15:42:07</span>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="main-area">
+    <!-- ============================================================
+         SESSION GRID (2x2 default, expands on click)
+         ============================================================ -->
+    <div class="session-grid" id="sessionGrid">
+
+      <!-- Collapsed bar (only visible when a card is expanded) -->
+      <div class="collapsed-bar" id="collapsedBar">
+        <div class="collapsed-tab" data-card="card1" onclick="collapseAll()">
+          <span class="status-pip running"></span> s-a1b2c3 -- implement-auth
+        </div>
+        <div class="collapsed-tab" data-card="card2" onclick="collapseAll()">
+          <span class="status-pip waiting"></span> s-d4e5f6 -- review-pr-42
+        </div>
+        <div class="collapsed-tab" data-card="card3" onclick="collapseAll()">
+          <span class="status-pip completed"></span> s-g7h8i9 -- fix-memory-leak
+        </div>
+        <div class="collapsed-tab" data-card="card4" onclick="collapseAll()">
+          <span class="status-pip failed"></span> s-j0k1l2 -- migrate-db-schema
+        </div>
+      </div>
+
+      <!-- CARD 1: Running - implement auth -->
+      <div class="session-card" id="card1" onclick="expandCard('card1')">
+        <div class="card-status-bar running"></div>
+        <div class="card-header">
+          <div class="card-header-left">
+            <span class="card-id">s-a1b2c3</span>
+            <span class="card-agent">claude-opus</span>
+            <span class="card-stage">implement</span>
+          </div>
+          <div class="card-header-right">
+            <span class="model-badge">opus-4</span>
+            <span class="card-status-label running">RUNNING<span class="cursor-blink"></span></span>
+          </div>
+        </div>
+        <div class="card-summary">implement OAuth2 login flow with PKCE</div>
+        <div class="card-messages">
+          <div class="msg">
+            <span class="msg-role user">USER</span>
+            <span class="msg-text truncated">Implement OAuth2 login with PKCE flow. Support Google and GitHub providers. Store tokens in httpOnly cookies.</span>
+          </div>
+          <div class="msg">
+            <span class="msg-role assistant">AGENT</span>
+            <span class="msg-text truncated">I'll implement the OAuth2 PKCE flow. Let me start by examining the existing auth structure and then create the new providers.</span>
+          </div>
+          <div class="msg-tool-summary">
+            <span class="check">+</span> Read packages/server/auth.ts
+            <span class="timing">0.3s</span>
+          </div>
+          <div class="msg-tool-summary">
+            <span class="check">+</span> Read packages/server/routes/login.ts
+            <span class="timing">0.2s</span>
+          </div>
+          <div class="msg-tool-summary">
+            <span class="check">+</span> Write packages/server/oauth/pkce.ts
+            <span class="timing">0.8s</span>
+          </div>
+          <div class="msg">
+            <span class="msg-role assistant">AGENT</span>
+            <span class="msg-text truncated">Created the PKCE helper module. Now implementing the Google OAuth provider with the authorization URL builder and token exchange...</span>
+          </div>
+          <div class="msg-tool-summary">
+            <span class="check">+</span> Write packages/server/oauth/google.ts
+            <span class="timing">1.1s</span>
+          </div>
+          <div class="msg">
+            <span class="msg-role assistant">AGENT</span>
+            <span class="msg-text truncated">Google provider done. Working on GitHub provider next, then the callback handler and cookie management.</span>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span class="card-footer-item"><strong>$0.82</strong> cost</span>
+          <span class="card-footer-item"><strong>4m 12s</strong> elapsed</span>
+          <span class="card-footer-item"><strong>12.4k</strong> tokens</span>
+          <span class="card-footer-item">ark/auth-service</span>
+        </div>
+      </div>
+
+      <!-- CARD 2: Waiting - review PR -->
+      <div class="session-card" id="card2" onclick="expandCard('card2')">
+        <div class="card-status-bar waiting"></div>
+        <div class="card-header">
+          <div class="card-header-left">
+            <span class="card-id">s-d4e5f6</span>
+            <span class="card-agent">claude-sonnet</span>
+            <span class="card-stage">review</span>
+          </div>
+          <div class="card-header-right">
+            <span class="model-badge">sonnet-4</span>
+            <span class="card-status-label waiting">WAITING</span>
+          </div>
+        </div>
+        <div class="card-summary">review PR #42 -- add rate limiting middleware</div>
+        <div class="card-messages">
+          <div class="msg">
+            <span class="msg-role user">USER</span>
+            <span class="msg-text truncated">Review PR #42. Check for race conditions in the rate limiter and verify Redis connection handling.</span>
+          </div>
+          <div class="msg">
+            <span class="msg-role assistant">AGENT</span>
+            <span class="msg-text truncated">I'll review the PR focusing on concurrency safety and Redis connection lifecycle.</span>
+          </div>
+          <div class="msg-tool-summary">
+            <span class="check">+</span> 5 files read
+            <span class="timing">1.8s</span>
+          </div>
+          <div class="msg">
+            <span class="msg-role assistant">AGENT</span>
+            <span class="msg-text truncated">Found 2 issues: (1) sliding window counter has a TOCTOU race between GET and INCR -- use MULTI/EXEC or Lua script. (2) Redis client never calls .quit() on shutdown, leaking connections.</span>
+          </div>
+          <div class="msg">
+            <span class="msg-role system">SYS</span>
+            <span class="msg-text truncated">Awaiting user confirmation to post review comments.</span>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span class="card-footer-item"><strong>$0.34</strong> cost</span>
+          <span class="card-footer-item"><strong>1m 47s</strong> elapsed</span>
+          <span class="card-footer-item"><strong>8.1k</strong> tokens</span>
+          <span class="card-footer-item">ark/api-gateway</span>
+        </div>
+      </div>
+
+      <!-- CARD 3: Completed - fix memory leak -->
+      <div class="session-card" id="card3" onclick="expandCard('card3')">
+        <div class="card-status-bar completed"></div>
+        <div class="card-header">
+          <div class="card-header-left">
+            <span class="card-id">s-g7h8i9</span>
+            <span class="card-agent">claude-opus</span>
+            <span class="card-stage">done</span>
+          </div>
+          <div class="card-header-right">
+            <span class="model-badge">opus-4</span>
+            <span class="card-status-label completed">COMPLETED</span>
+          </div>
+        </div>
+        <div class="card-summary">fix WebSocket connection pool memory leak</div>
+        <div class="card-messages">
+          <div class="msg">
+            <span class="msg-role user">USER</span>
+            <span class="msg-text truncated">The WS pool is leaking -- connections aren't being cleaned up on client disconnect. Memory grows ~50MB/hour under load.</span>
+          </div>
+          <div class="msg">
+            <span class="msg-role assistant">AGENT</span>
+            <span class="msg-text truncated">Found the leak. The connection map stores a reference to the socket AND the heartbeat interval. On disconnect, clearInterval is called but the map entry is never deleted. The WeakRef approach won't work here because the interval closure holds a strong reference.</span>
+          </div>
+          <div class="msg-tool-summary">
+            <span class="check">+</span> 3 tools
+            <span class="timing">2.1s</span>
+          </div>
+          <div class="msg">
+            <span class="msg-role assistant">AGENT</span>
+            <span class="msg-text truncated">Fixed. Added explicit cleanup in the 'close' handler: clear interval, delete from map, null out references. Also added a periodic sweep (every 60s) for zombie entries where readyState !== OPEN. All 47 tests pass.</span>
+          </div>
+          <div class="msg-tool-summary">
+            <span class="check">+</span> 47/47 tests passed
+            <span class="timing">8.3s</span>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span class="card-footer-item"><strong>$1.24</strong> cost</span>
+          <span class="card-footer-item"><strong>6m 03s</strong> elapsed</span>
+          <span class="card-footer-item"><strong>18.7k</strong> tokens</span>
+          <span class="card-footer-item">ark/ws-pool</span>
+        </div>
+      </div>
+
+      <!-- CARD 4: Failed - migrate db schema -->
+      <div class="session-card" id="card4" onclick="expandCard('card4')">
+        <div class="card-status-bar failed"></div>
+        <div class="card-header">
+          <div class="card-header-left">
+            <span class="card-id">s-j0k1l2</span>
+            <span class="card-agent">codex</span>
+            <span class="card-stage">test</span>
+          </div>
+          <div class="card-header-right">
+            <span class="model-badge">o3-mini</span>
+            <span class="card-status-label failed">FAILED</span>
+          </div>
+        </div>
+        <div class="card-summary">migrate user table to support multi-tenant org model</div>
+        <div class="card-messages">
+          <div class="msg">
+            <span class="msg-role user">USER</span>
+            <span class="msg-text truncated">Add org_id column to users table and update all queries. Write migration. Make sure existing users get a default org.</span>
+          </div>
+          <div class="msg">
+            <span class="msg-role assistant">AGENT</span>
+            <span class="msg-text truncated">I'll create the migration and update the repository layer.</span>
+          </div>
+          <div class="msg-tool-summary">
+            <span class="check">+</span> 4 tools
+            <span class="timing">3.2s</span>
+          </div>
+          <div class="msg">
+            <span class="msg-role assistant">AGENT</span>
+            <span class="msg-text truncated">Migration written. Running tests now...</span>
+          </div>
+          <div class="msg" style="border-left: 2px solid var(--error); padding-left: 8px;">
+            <span class="msg-role tool">ERR</span>
+            <span class="msg-text truncated" style="color: var(--error);">FOREIGN KEY constraint failed: org_id references orgs(id) but orgs table doesn't exist yet. Migration order is wrong -- orgs table must be created before adding the FK to users.</span>
+          </div>
+          <div class="msg">
+            <span class="msg-role assistant">AGENT</span>
+            <span class="msg-text truncated">The migration failed because I created the FK before the referenced table. I need to split this into two migrations. Stopping -- needs manual intervention on migration ordering.</span>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span class="card-footer-item"><strong>$0.56</strong> cost</span>
+          <span class="card-footer-item"><strong>2m 31s</strong> elapsed</span>
+          <span class="card-footer-item"><strong>9.2k</strong> tokens</span>
+          <span class="card-footer-item">ark/platform</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         FLEET OVERVIEW PANEL
+         ============================================================ -->
+    <div class="fleet-panel">
+      <!-- Aggregate stats -->
+      <div class="fleet-section">
+        <div class="fleet-section-title">Fleet</div>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="stat-value">8</div>
+            <div class="stat-label">Sessions</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-value accent">3</div>
+            <div class="stat-label">Running</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-value" style="color: var(--completed)">4</div>
+            <div class="stat-label">Completed</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-value error">1</div>
+            <div class="stat-label">Failed</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- System health -->
+      <div class="fleet-section">
+        <div class="fleet-section-title">System Health</div>
+        <div class="health-row">
+          <span>
+            <span class="service-name">conductor</span>
+            <span class="health-port">:19100</span>
+          </span>
+          <span class="service-status up">UP</span>
+        </div>
+        <div class="health-row">
+          <span>
+            <span class="service-name">arkd</span>
+            <span class="health-port">:19300</span>
+          </span>
+          <span class="service-status up">UP</span>
+        </div>
+        <div class="health-row">
+          <span>
+            <span class="service-name">router</span>
+            <span class="health-port">:8080</span>
+          </span>
+          <span class="service-status down">DOWN</span>
+        </div>
+        <div class="health-row">
+          <span>
+            <span class="service-name">server</span>
+            <span class="health-port">:8420</span>
+          </span>
+          <span class="service-status up">UP</span>
+        </div>
+        <div class="health-row">
+          <span>
+            <span class="service-name">ws-daemon</span>
+            <span class="health-port">:19400</span>
+          </span>
+          <span class="service-status up">UP</span>
+        </div>
+      </div>
+
+      <!-- Costs -->
+      <div class="fleet-section">
+        <div class="fleet-section-title">Cost -- Last 12h</div>
+        <div class="sparkline-container">
+          <div class="sparkline-row">
+            <div class="spark-bar" style="height: 30%"></div>
+            <div class="spark-bar" style="height: 15%"></div>
+            <div class="spark-bar" style="height: 45%"></div>
+            <div class="spark-bar" style="height: 60%"></div>
+            <div class="spark-bar" style="height: 35%"></div>
+            <div class="spark-bar" style="height: 80%"></div>
+            <div class="spark-bar" style="height: 55%"></div>
+            <div class="spark-bar" style="height: 40%"></div>
+            <div class="spark-bar" style="height: 70%"></div>
+            <div class="spark-bar" style="height: 90%"></div>
+            <div class="spark-bar" style="height: 65%"></div>
+            <div class="spark-bar" style="height: 100%"></div>
+          </div>
+          <div class="sparkline-labels">
+            <span>12h ago</span>
+            <span>$4.37 total</span>
+            <span>now</span>
+          </div>
+        </div>
+        <div style="margin-top: 6px; font-size: 10px; color: var(--text-dimmer);">
+          <div style="display: flex; justify-content: space-between;">
+            <span>today</span>
+            <span style="color: var(--text);">$4.37</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span>this week</span>
+            <span style="color: var(--text);">$28.93</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span>this month</span>
+            <span style="color: var(--text);">$142.67</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Compute -->
+      <div class="fleet-section">
+        <div class="fleet-section-title">Compute</div>
+        <div style="font-size: 11px;">
+          <div class="health-row">
+            <span class="service-name">local</span>
+            <span style="color: var(--text);">3 active</span>
+          </div>
+          <div class="health-row">
+            <span class="service-name">docker</span>
+            <span style="color: var(--text);">1 active</span>
+          </div>
+          <div class="health-row">
+            <span class="service-name">ec2-spot</span>
+            <span style="color: var(--text-dimmer);">0 active</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent activity feed -->
+      <div class="fleet-section" style="border-bottom: none; flex: 1; display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0;">
+        <div class="fleet-section-title">Activity Feed</div>
+        <div class="feed-list">
+          <div class="feed-item">
+            <span class="feed-icon" style="color: var(--accent);">+</span>
+            <div>
+              <div class="feed-text"><strong>s-g7h8i9</strong> completed -- fix-memory-leak</div>
+              <div class="feed-time">2m ago</div>
+            </div>
+          </div>
+          <div class="feed-item">
+            <span class="feed-icon" style="color: var(--error);">x</span>
+            <div>
+              <div class="feed-text"><strong>s-j0k1l2</strong> failed -- FK constraint</div>
+              <div class="feed-time">5m ago</div>
+            </div>
+          </div>
+          <div class="feed-item">
+            <span class="feed-icon" style="color: var(--warning);">!</span>
+            <div>
+              <div class="feed-text"><strong>router</strong> went down -- connection refused</div>
+              <div class="feed-time">8m ago</div>
+            </div>
+          </div>
+          <div class="feed-item">
+            <span class="feed-icon" style="color: var(--accent);">+</span>
+            <div>
+              <div class="feed-text"><strong>s-m3n4o5</strong> completed -- refactor-tests</div>
+              <div class="feed-time">14m ago</div>
+            </div>
+          </div>
+          <div class="feed-item">
+            <span class="feed-icon" style="color: var(--info);">~</span>
+            <div>
+              <div class="feed-text"><strong>s-a1b2c3</strong> dispatched -- implement-auth</div>
+              <div class="feed-time">18m ago</div>
+            </div>
+          </div>
+          <div class="feed-item">
+            <span class="feed-icon" style="color: var(--accent);">+</span>
+            <div>
+              <div class="feed-text"><strong>s-p6q7r8</strong> completed -- add-logging</div>
+              <div class="feed-time">31m ago</div>
+            </div>
+          </div>
+          <div class="feed-item">
+            <span class="feed-icon" style="color: var(--info);">~</span>
+            <div>
+              <div class="feed-text"><strong>s-d4e5f6</strong> dispatched -- review-pr-42</div>
+              <div class="feed-time">42m ago</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       GLOBAL INPUT BAR
+       ============================================================ -->
+  <div class="input-bar">
+    <span class="input-label">Send to</span>
+    <div class="session-selector" id="sessionSelector" onclick="cycleSelectorSession()">
+      <span class="status-pip running" style="width:5px; height:5px;"></span>
+      <span id="selectorLabel">s-a1b2c3</span>
+      <span class="chevron">&#9662;</span>
+    </div>
+    <input class="input-field" type="text" placeholder="Message the selected session..." id="inputField" onkeydown="handleInputKey(event)">
+    <button class="input-send" onclick="sendMessage()">SEND</button>
+    <span class="input-shortcut"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></span>
+  </div>
+</div>
+
+<!-- ============================================================
+     JAVASCRIPT -- interactivity
+     ============================================================ -->
+<script>
+  // Track expanded state
+  var expandedCardId = null;
+
+  // Session list for cycling the selector
+  var selectorSessions = [
+    { id: 's-a1b2c3', status: 'running' },
+    { id: 's-d4e5f6', status: 'waiting' },
+    { id: 's-g7h8i9', status: 'completed' },
+    { id: 's-j0k1l2', status: 'failed' }
+  ];
+  var selectorIndex = 0;
+
+  function expandCard(cardId) {
+    if (expandedCardId === cardId) return;
+    expandedCardId = cardId;
+    var grid = document.getElementById('sessionGrid');
+    grid.classList.add('expanded');
+
+    // Mark the expanded card
+    var cards = document.querySelectorAll('.session-card');
+    for (var i = 0; i < cards.length; i++) {
+      cards[i].classList.remove('expanded-card');
+    }
+    document.getElementById(cardId).classList.add('expanded-card');
+
+    // Un-truncate messages in expanded card
+    var card = document.getElementById(cardId);
+    var truncated = card.querySelectorAll('.msg-text.truncated');
+    for (var j = 0; j < truncated.length; j++) {
+      truncated[j].classList.remove('truncated');
+    }
+
+    // Update collapsed bar highlights
+    var tabs = document.querySelectorAll('.collapsed-tab');
+    for (var k = 0; k < tabs.length; k++) {
+      if (tabs[k].dataset.card === cardId) {
+        tabs[k].style.background = 'var(--bg-hover)';
+        tabs[k].style.color = 'var(--accent)';
+      } else {
+        tabs[k].style.background = '';
+        tabs[k].style.color = '';
+      }
+    }
+
+    // Update session selector to match expanded card
+    var idEl = card.querySelector('.card-id');
+    if (idEl) {
+      document.getElementById('selectorLabel').textContent = idEl.textContent;
+    }
+  }
+
+  function collapseAll() {
+    expandedCardId = null;
+    var grid = document.getElementById('sessionGrid');
+    grid.classList.remove('expanded');
+    var cards = document.querySelectorAll('.session-card');
+    for (var i = 0; i < cards.length; i++) {
+      cards[i].classList.remove('expanded-card');
+      var texts = cards[i].querySelectorAll('.msg-text');
+      for (var j = 0; j < texts.length; j++) {
+        texts[j].classList.add('truncated');
+      }
+    }
+  }
+
+  function cycleSelectorSession() {
+    selectorIndex = (selectorIndex + 1) % selectorSessions.length;
+    var s = selectorSessions[selectorIndex];
+    document.getElementById('selectorLabel').textContent = s.id;
+    var pip = document.querySelector('#sessionSelector .status-pip');
+    pip.className = 'status-pip ' + s.status;
+    pip.style.width = '5px';
+    pip.style.height = '5px';
+  }
+
+  function handleInputKey(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      sendMessage();
+    }
+  }
+
+  function sendMessage() {
+    var input = document.getElementById('inputField');
+    var text = input.value.trim();
+    if (!text) return;
+
+    // Visual feedback -- flash the input border green
+    input.style.borderColor = 'var(--accent)';
+    input.style.boxShadow = '0 0 0 1px var(--accent)';
+    setTimeout(function() {
+      input.style.borderColor = '';
+      input.style.boxShadow = '';
+    }, 300);
+
+    input.value = '';
+    input.focus();
+  }
+
+  // Live clock in top bar
+  function updateClock() {
+    var now = new Date();
+    var hh = String(now.getHours()).padStart(2, '0');
+    var mm = String(now.getMinutes()).padStart(2, '0');
+    var ss = String(now.getSeconds()).padStart(2, '0');
+    var clockEl = document.getElementById('clock');
+    if (clockEl) clockEl.textContent = hh + ':' + mm + ':' + ss;
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // Simulate running session activity -- periodically pulse running status bars
+  setInterval(function() {
+    var bars = document.querySelectorAll('.card-status-bar.running');
+    for (var i = 0; i < bars.length; i++) {
+      bars[i].style.opacity = '0.7';
+      (function(bar) {
+        setTimeout(function() { bar.style.opacity = '1'; }, 200);
+      })(bars[i]);
+    }
+  }, 3000);
+</script>
+
+</body>
+</html>
