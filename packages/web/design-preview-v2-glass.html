@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ark -- Glass Cockpit Design Preview</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['"DM Sans"', 'system-ui', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'monospace'],
+      },
+      colors: {
+        glass: {
+          bg: '#0a0a0f',
+          panel: '#0d0d14',
+          header: '#080810',
+          code: '#07070c',
+          input: '#0d0d14',
+          border: 'rgba(255,255,255,0.08)',
+          selected: 'rgba(255,255,255,0.04)',
+        },
+        txt: {
+          bright: '#e8e8ed',
+          normal: '#9898a8',
+          dim: '#4a4a5a',
+        },
+        fn: {
+          green: '#00dd77',
+          amber: '#ffbb33',
+          red: '#ff4455',
+          cyan: '#44bbff',
+        },
+      },
+    },
+  },
+};
+</script>
+<style>
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #0a0a0f;
+    color: #e8e8ed;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Scrollbar - thin, unobtrusive */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
+
+  /* Status dot pulse for running items */
+  @keyframes pulse-amber {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .pulse { animation: pulse-amber 2s ease-in-out infinite; }
+
+  /* Layout */
+  .cockpit-frame {
+    display: grid;
+    grid-template-rows: 40px 1fr 48px;
+    grid-template-columns: 240px 1fr 280px;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  .top-bar {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .left-panel {
+    grid-column: 1;
+    grid-row: 2;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .center-panel {
+    grid-column: 2;
+    grid-row: 2;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .right-panel {
+    grid-column: 3;
+    grid-row: 2;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .bottom-bar {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+
+  /* Panel borders */
+  .border-l-panel { border-left: 1px solid rgba(255,255,255,0.08); }
+  .border-r-panel { border-right: 1px solid rgba(255,255,255,0.08); }
+  .border-b-panel { border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .border-t-panel { border-top: 1px solid rgba(255,255,255,0.08); }
+
+  /* Label style */
+  .label {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #4a4a5a;
+  }
+
+  /* Status dot */
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .dot-green { background: #00dd77; box-shadow: 0 0 6px rgba(0,221,119,0.4); }
+  .dot-amber { background: #ffbb33; box-shadow: 0 0 6px rgba(255,187,51,0.4); }
+  .dot-red { background: #ff4455; box-shadow: 0 0 6px rgba(255,68,85,0.4); }
+  .dot-dim { background: #4a4a5a; }
+  .dot-cyan { background: #44bbff; box-shadow: 0 0 6px rgba(68,187,255,0.3); }
+
+  /* Tool call line */
+  .tool-line {
+    font-size: 12px;
+    line-height: 1.7;
+    color: #9898a8;
+    padding: 1px 0;
+  }
+  .tool-line .arrow { color: #4a4a5a; margin-right: 6px; }
+  .tool-line .timing { color: #4a4a5a; margin-left: 4px; }
+  .tool-line .check { color: #00dd77; margin-left: 4px; }
+
+  /* Session row */
+  .session-row {
+    padding: 6px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.1s;
+  }
+  .session-row:hover { background: rgba(255,255,255,0.03); }
+  .session-row.active { background: rgba(255,255,255,0.05); }
+
+  /* Nav item */
+  .nav-item {
+    padding: 7px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #9898a8;
+    cursor: pointer;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 13px;
+    transition: color 0.15s, background 0.15s;
+  }
+  .nav-item:hover { color: #e8e8ed; background: rgba(255,255,255,0.03); }
+
+  /* Code block */
+  .code-block {
+    background: #07070c;
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 4px;
+    padding: 12px 14px;
+    font-size: 12px;
+    line-height: 1.6;
+    overflow-x: auto;
+  }
+
+  /* Message bubble */
+  .msg {
+    padding: 14px 20px;
+  }
+  .msg + .msg { border-top: 1px solid rgba(255,255,255,0.04); }
+
+  /* Stage event inline */
+  .stage-event {
+    padding: 8px 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: #4a4a5a;
+    border-top: 1px solid rgba(255,255,255,0.03);
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    background: rgba(255,255,255,0.01);
+  }
+
+  /* Instrument section */
+  .instrument {
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .instrument:last-child { border-bottom: none; }
+  .instrument-header {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #4a4a5a;
+    margin-bottom: 10px;
+  }
+
+  /* File row in right panel */
+  .file-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 0;
+    font-size: 11.5px;
+  }
+  .file-row .path { color: #9898a8; }
+  .file-row .adds { color: #00dd77; }
+  .file-row .dels { color: #ff4455; margin-left: 4px; }
+
+  /* Metrics row */
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+  }
+  .metric-row .metric-label { color: #4a4a5a; font-size: 11px; }
+  .metric-row .metric-value { color: #e8e8ed; font-size: 13px; font-weight: 500; }
+
+  /* Light mode */
+  .light { background: #f0f0f5; color: #0a0a0f; }
+  .light .top-bar, .light .bottom-bar { background: #e8e8ed; }
+  .light .left-panel, .light .right-panel { background: #ffffff; }
+  .light .center-panel { background: #f0f0f5; }
+  .light .border-l-panel,
+  .light .border-r-panel,
+  .light .border-b-panel,
+  .light .border-t-panel { border-color: rgba(0,0,0,0.1); }
+  .light .label, .light .instrument-header { color: #9898a8; }
+  .light .code-block { background: #f5f5fa; border-color: rgba(0,0,0,0.08); }
+  .light .msg + .msg { border-color: rgba(0,0,0,0.06); }
+  .light .session-row:hover { background: rgba(0,0,0,0.03); }
+  .light .session-row.active { background: rgba(0,0,0,0.05); }
+  .light .nav-item { color: #5a5a6a; }
+  .light .nav-item:hover { color: #0a0a0f; background: rgba(0,0,0,0.03); }
+  .light .txt-bright { color: #0a0a0f; }
+  .light .txt-normal { color: #5a5a6a; }
+  .light .txt-dim { color: #9898a8; }
+  .light .tool-line { color: #5a5a6a; }
+  .light .tool-line .arrow, .light .tool-line .timing { color: #9898a8; }
+  .light .file-row .path { color: #5a5a6a; }
+  .light .metric-row .metric-label { color: #9898a8; }
+  .light .metric-row .metric-value { color: #0a0a0f; }
+  .light .stage-event { color: #9898a8; background: rgba(0,0,0,0.02); border-color: rgba(0,0,0,0.06); }
+  .light ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); }
+  .light ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
+</style>
+</head>
+<body>
+
+<div class="cockpit-frame" id="cockpit">
+
+  <!-- ========== TOP BAR ========== -->
+  <div class="top-bar border-b-panel flex items-center justify-between px-4" style="background:#080810;">
+    <!-- Left: system status -->
+    <div class="flex items-center gap-5">
+      <div class="flex items-center gap-2">
+        <span class="dot dot-green"></span>
+        <span style="font-size:11px; color:#9898a8;">conductor</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="dot dot-green"></span>
+        <span style="font-size:11px; color:#9898a8;">arkd</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="dot dot-dim"></span>
+        <span style="font-size:11px; color:#4a4a5a;">router</span>
+      </div>
+    </div>
+
+    <!-- Center: breadcrumb -->
+    <div class="flex items-center gap-2" style="font-size:12px;">
+      <span style="color:#44bbff;">s-a3f7c2</span>
+      <span style="color:#4a4a5a;">></span>
+      <span style="color:#9898a8;">autonomous-sdlc</span>
+      <span style="color:#4a4a5a;">></span>
+      <span style="color:#ffbb33;">implement</span>
+    </div>
+
+    <!-- Right: cost + time + theme toggle -->
+    <div class="flex items-center gap-4">
+      <span style="font-size:12px; color:#e8e8ed;">$0.82</span>
+      <span style="font-size:12px; color:#4a4a5a;">18m 42s</span>
+      <button onclick="toggleTheme()" style="font-size:11px; color:#4a4a5a; background:none; border:1px solid rgba(255,255,255,0.08); border-radius:4px; padding:2px 8px; cursor:pointer;" title="Toggle light/dark">
+        <span id="theme-icon">light</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ========== LEFT PANEL ========== -->
+  <div class="left-panel border-r-panel flex flex-col" style="background:#0d0d14;">
+    <!-- Sessions -->
+    <div class="flex-1">
+      <div class="label px-4 pt-3 pb-2">Sessions</div>
+
+      <div class="session-row active">
+        <span class="dot dot-amber pulse"></span>
+        <div class="flex-1 min-w-0">
+          <div style="font-size:12px; color:#e8e8ed; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">implement oauth provider</div>
+          <div style="font-size:10px; color:#4a4a5a; margin-top:1px;">
+            <span style="color:#44bbff;">s-a3f7c2</span> -- claude-opus
+          </div>
+        </div>
+        <span style="font-size:10px; color:#ffbb33;">running</span>
+      </div>
+
+      <div class="session-row">
+        <span class="dot dot-green"></span>
+        <div class="flex-1 min-w-0">
+          <div style="font-size:12px; color:#9898a8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">fix rate limiter edge case</div>
+          <div style="font-size:10px; color:#4a4a5a; margin-top:1px;">
+            <span style="color:#44bbff;">s-d8e1b4</span> -- claude-sonnet
+          </div>
+        </div>
+        <span style="font-size:10px; color:#00dd77;">done</span>
+      </div>
+
+      <div class="session-row">
+        <span class="dot dot-green"></span>
+        <div class="flex-1 min-w-0">
+          <div style="font-size:12px; color:#9898a8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">add webhook retry logic</div>
+          <div style="font-size:10px; color:#4a4a5a; margin-top:1px;">
+            <span style="color:#44bbff;">s-f2c9a0</span> -- codex
+          </div>
+        </div>
+        <span style="font-size:10px; color:#00dd77;">done</span>
+      </div>
+
+      <div class="session-row">
+        <span class="dot dot-amber pulse"></span>
+        <div class="flex-1 min-w-0">
+          <div style="font-size:12px; color:#9898a8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">migrate user store to pg</div>
+          <div style="font-size:10px; color:#4a4a5a; margin-top:1px;">
+            <span style="color:#44bbff;">s-b7d4e6</span> -- claude-opus
+          </div>
+        </div>
+        <span style="font-size:10px; color:#ffbb33;">verify</span>
+      </div>
+
+      <div class="session-row">
+        <span class="dot dot-red"></span>
+        <div class="flex-1 min-w-0">
+          <div style="font-size:12px; color:#9898a8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">refactor channel protocol</div>
+          <div style="font-size:10px; color:#4a4a5a; margin-top:1px;">
+            <span style="color:#44bbff;">s-c1a5f3</span> -- gemini-cli
+          </div>
+        </div>
+        <span style="font-size:10px; color:#ff4455;">failed</span>
+      </div>
+
+      <div class="session-row">
+        <span class="dot dot-green"></span>
+        <div class="flex-1 min-w-0">
+          <div style="font-size:12px; color:#9898a8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">update helm chart values</div>
+          <div style="font-size:10px; color:#4a4a5a; margin-top:1px;">
+            <span style="color:#44bbff;">s-e9f0d2</span> -- claude-sonnet
+          </div>
+        </div>
+        <span style="font-size:10px; color:#00dd77;">done</span>
+      </div>
+
+      <div class="session-row">
+        <span class="dot dot-dim"></span>
+        <div class="flex-1 min-w-0">
+          <div style="font-size:12px; color:#4a4a5a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">benchmark compute providers</div>
+          <div style="font-size:10px; color:#4a4a5a; margin-top:1px;">
+            <span style="color:#4a4a5a;">s-a0b3c7</span> -- goose
+          </div>
+        </div>
+        <span style="font-size:10px; color:#4a4a5a;">queued</span>
+      </div>
+    </div>
+
+    <!-- Nav separator -->
+    <div style="border-top:1px solid rgba(255,255,255,0.06); margin:4px 16px;"></div>
+
+    <!-- Nav items -->
+    <div class="pb-1">
+      <div class="nav-item">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"/></svg>
+        Agents
+      </div>
+      <div class="nav-item">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4l6-2 6 2M2 4v8l6 2 6-2V4M2 4l6 2 6-2M8 6v8"/></svg>
+        Flows
+      </div>
+      <div class="nav-item">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1"/><path d="M2 6h12"/><circle cx="4.5" cy="4.5" r="0.5" fill="currentColor"/><circle cx="6.5" cy="4.5" r="0.5" fill="currentColor"/></svg>
+        Compute
+      </div>
+      <div class="nav-item">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 13V5l4-3 4 3v8M6 13v-4h4v4"/><path d="M10 8h4v5h-4"/></svg>
+        Costs
+      </div>
+      <div class="nav-item">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
+        Settings
+      </div>
+    </div>
+
+    <!-- Version -->
+    <div style="padding:8px 16px; font-size:10px; color:#4a4a5a; border-top:1px solid rgba(255,255,255,0.06);">
+      ark v0.17.3
+    </div>
+  </div>
+
+  <!-- ========== CENTER PANEL ========== -->
+  <div class="center-panel" style="background:#0a0a0f;">
+
+    <!-- Session start event -->
+    <div class="stage-event">
+      <span class="dot dot-cyan" style="width:5px; height:5px;"></span>
+      <span>session started</span>
+      <span style="margin-left:auto;">14:23:01</span>
+    </div>
+
+    <!-- Stage dispatch: plan -->
+    <div class="stage-event">
+      <span class="dot dot-green" style="width:5px; height:5px;"></span>
+      <span>stage <span style="color:#e8e8ed;">plan</span> dispatched to <span style="color:#44bbff;">claude-opus</span></span>
+      <span style="margin-left:auto;">14:23:02</span>
+    </div>
+
+    <!-- Agent message: analysis -->
+    <div class="msg">
+      <div class="flex items-center gap-2 mb-2">
+        <span style="font-size:10px; color:#44bbff; font-family:'DM Sans',sans-serif; font-weight:600;">CLAUDE-OPUS</span>
+        <span style="font-size:10px; color:#4a4a5a;">14:23:04</span>
+        <span style="font-size:10px; color:#4a4a5a; margin-left:auto;">plan</span>
+      </div>
+      <div style="font-size:12.5px; color:#9898a8; line-height:1.65;">
+        Analyzing the codebase to understand the current authentication architecture. I need to read the existing auth module, session handling, and route definitions before proposing changes.
+      </div>
+      <div style="margin-top:8px;">
+        <div class="tool-line"><span class="arrow">&#9656;</span>read auth.ts session.ts config.yaml routes.ts middleware.ts<span class="timing">1.2s</span><span class="check">&#10003;</span></div>
+        <div class="tool-line"><span class="arrow">&#9656;</span>search "authenticate" across packages/<span class="timing">0.8s</span><span class="check">&#10003;</span></div>
+        <div class="tool-line"><span class="arrow">&#9656;</span>read packages/server/routes/auth.ts types/auth.d.ts<span class="timing">0.4s</span><span class="check">&#10003;</span></div>
+      </div>
+    </div>
+
+    <!-- Agent message: plan output -->
+    <div class="msg">
+      <div class="flex items-center gap-2 mb-2">
+        <span style="font-size:10px; color:#44bbff; font-family:'DM Sans',sans-serif; font-weight:600;">CLAUDE-OPUS</span>
+        <span style="font-size:10px; color:#4a4a5a;">14:23:18</span>
+      </div>
+      <div style="font-size:12.5px; color:#e8e8ed; line-height:1.65;">
+        Here is the implementation plan for adding an OAuth provider abstraction:
+      </div>
+      <div style="font-size:12px; color:#9898a8; line-height:1.8; margin-top:8px; padding-left:4px;">
+        <div><span style="color:#4a4a5a;">1.</span> Create <span style="color:#44bbff;">packages/core/auth/provider.ts</span> -- base OAuthProvider interface with authorize(), callback(), refresh() methods</div>
+        <div><span style="color:#4a4a5a;">2.</span> Implement <span style="color:#44bbff;">packages/core/auth/github.ts</span> -- GitHub OAuth provider with PKCE flow support</div>
+        <div><span style="color:#4a4a5a;">3.</span> Implement <span style="color:#44bbff;">packages/core/auth/google.ts</span> -- Google OAuth provider with scope management</div>
+        <div><span style="color:#4a4a5a;">4.</span> Update <span style="color:#44bbff;">packages/server/routes/auth.ts</span> -- refactor to use provider registry instead of hardcoded GitHub</div>
+        <div><span style="color:#4a4a5a;">5.</span> Add <span style="color:#44bbff;">packages/core/auth/provider-registry.ts</span> -- dynamic provider registration and lookup</div>
+        <div><span style="color:#4a4a5a;">6.</span> Update <span style="color:#44bbff;">packages/types/auth.d.ts</span> -- add OAuthProvider, OAuthConfig, OAuthToken interfaces</div>
+        <div><span style="color:#4a4a5a;">7.</span> Write tests for provider registry and GitHub flow</div>
+      </div>
+    </div>
+
+    <!-- Stage complete: plan -->
+    <div class="stage-event">
+      <span class="dot dot-green" style="width:5px; height:5px;"></span>
+      <span>stage <span style="color:#e8e8ed;">plan</span> completed</span>
+      <span style="color:#00dd77; margin-left:4px;">16s</span>
+      <span style="margin-left:auto;">14:23:18</span>
+    </div>
+
+    <!-- Stage dispatch: implement -->
+    <div class="stage-event">
+      <span class="dot dot-amber" style="width:5px; height:5px;"></span>
+      <span>stage <span style="color:#e8e8ed;">implement</span> dispatched to <span style="color:#44bbff;">claude-opus</span></span>
+      <span style="margin-left:auto;">14:23:19</span>
+    </div>
+
+    <!-- Agent: starting implementation -->
+    <div class="msg">
+      <div class="flex items-center gap-2 mb-2">
+        <span style="font-size:10px; color:#44bbff; font-family:'DM Sans',sans-serif; font-weight:600;">CLAUDE-OPUS</span>
+        <span style="font-size:10px; color:#4a4a5a;">14:23:21</span>
+        <span style="font-size:10px; color:#4a4a5a; margin-left:auto;">implement</span>
+      </div>
+      <div style="font-size:12.5px; color:#9898a8; line-height:1.65;">
+        Starting implementation. Creating the base provider interface first, then the concrete implementations.
+      </div>
+      <div style="margin-top:8px;">
+        <div class="tool-line"><span class="arrow">&#9656;</span>create packages/core/auth/provider.ts (89 lines)<span class="check">&#10003;</span></div>
+        <div class="tool-line"><span class="arrow">&#9656;</span>create packages/types/auth.d.ts (42 lines)<span class="check">&#10003;</span></div>
+      </div>
+    </div>
+
+    <!-- Agent: GitHub provider -->
+    <div class="msg">
+      <div class="flex items-center gap-2 mb-2">
+        <span style="font-size:10px; color:#44bbff; font-family:'DM Sans',sans-serif; font-weight:600;">CLAUDE-OPUS</span>
+        <span style="font-size:10px; color:#4a4a5a;">14:24:03</span>
+      </div>
+      <div style="font-size:12.5px; color:#9898a8; line-height:1.65;">
+        GitHub provider implemented with PKCE support. Now building the Google provider and the registry.
+      </div>
+      <div style="margin-top:8px;">
+        <div class="tool-line"><span class="arrow">&#9656;</span>create packages/core/auth/github.ts (142 lines)<span class="check">&#10003;</span></div>
+        <div class="tool-line"><span class="arrow">&#9656;</span>create packages/core/auth/google.ts (128 lines)<span class="check">&#10003;</span></div>
+        <div class="tool-line"><span class="arrow">&#9656;</span>create packages/core/auth/provider-registry.ts (67 lines)<span class="check">&#10003;</span></div>
+      </div>
+    </div>
+
+    <!-- User correction -->
+    <div class="msg" style="background:rgba(68,187,255,0.03);">
+      <div class="flex items-center gap-2 mb-2">
+        <span style="font-size:10px; color:#e8e8ed; font-family:'DM Sans',sans-serif; font-weight:600;">YOU</span>
+        <span style="font-size:10px; color:#4a4a5a;">14:25:10</span>
+      </div>
+      <div style="font-size:12.5px; color:#e8e8ed; line-height:1.65;">
+        Use PKCE for Google as well, not just GitHub. All providers should enforce PKCE by default. Also make sure the state parameter is cryptographically random, not Math.random().
+      </div>
+    </div>
+
+    <!-- Agent acknowledgment -->
+    <div class="msg">
+      <div class="flex items-center gap-2 mb-2">
+        <span style="font-size:10px; color:#44bbff; font-family:'DM Sans',sans-serif; font-weight:600;">CLAUDE-OPUS</span>
+        <span style="font-size:10px; color:#4a4a5a;">14:25:14</span>
+      </div>
+      <div style="font-size:12.5px; color:#9898a8; line-height:1.65;">
+        Good catch. Updating the base provider to enforce PKCE and switching state generation to <span style="color:#e8e8ed; font-size:12px;">crypto.randomUUID()</span>. Applying to both providers.
+      </div>
+      <div style="margin-top:8px;">
+        <div class="tool-line"><span class="arrow">&#9656;</span>edit packages/core/auth/provider.ts (+12 -3)<span class="check">&#10003;</span></div>
+        <div class="tool-line"><span class="arrow">&#9656;</span>edit packages/core/auth/google.ts (+18 -8)<span class="check">&#10003;</span></div>
+        <div class="tool-line"><span class="arrow">&#9656;</span>edit packages/core/auth/github.ts (+8 -8)<span class="check">&#10003;</span></div>
+      </div>
+    </div>
+
+    <!-- Agent: route refactor -->
+    <div class="msg">
+      <div class="flex items-center gap-2 mb-2">
+        <span style="font-size:10px; color:#44bbff; font-family:'DM Sans',sans-serif; font-weight:600;">CLAUDE-OPUS</span>
+        <span style="font-size:10px; color:#4a4a5a;">14:26:38</span>
+      </div>
+      <div style="font-size:12.5px; color:#9898a8; line-height:1.65;">
+        Refactoring the auth routes to use the provider registry. The old hardcoded GitHub paths are now generic <span style="color:#e8e8ed; font-size:12px;">/auth/:provider/authorize</span> and <span style="color:#e8e8ed; font-size:12px;">/auth/:provider/callback</span>.
+      </div>
+      <div style="margin-top:8px;">
+        <div class="tool-line"><span class="arrow">&#9656;</span>edit packages/server/routes/auth.ts (+28 -45)<span class="check">&#10003;</span></div>
+        <div class="tool-line"><span class="arrow">&#9656;</span>edit packages/server/index.ts (+4 -1)<span class="check">&#10003;</span></div>
+      </div>
+    </div>
+
+    <!-- Agent: running tests -->
+    <div class="msg">
+      <div class="flex items-center gap-2 mb-2">
+        <span style="font-size:10px; color:#44bbff; font-family:'DM Sans',sans-serif; font-weight:600;">CLAUDE-OPUS</span>
+        <span style="font-size:10px; color:#4a4a5a;">14:28:15</span>
+      </div>
+      <div style="font-size:12.5px; color:#9898a8; line-height:1.65;">
+        Running the full test suite to verify nothing is broken, plus the new auth tests.
+      </div>
+      <div style="margin-top:8px;">
+        <div class="tool-line"><span class="arrow">&#9656;</span>bash bun test packages/core/auth/ -- 8 passed<span class="timing">2.1s</span><span class="check">&#10003;</span></div>
+        <div class="tool-line"><span class="arrow">&#9656;</span>bash bun test packages/server/ -- 23 passed<span class="timing">4.8s</span><span class="check">&#10003;</span></div>
+        <div class="tool-line"><span class="arrow">&#9656;</span>bash bun test -- 2857 passed, 0 failed<span class="timing">18.4s</span><span class="check">&#10003;</span></div>
+      </div>
+    </div>
+
+    <!-- Inline test results -->
+    <div class="msg">
+      <div class="flex items-center gap-2 mb-2">
+        <span style="font-size:10px; color:#44bbff; font-family:'DM Sans',sans-serif; font-weight:600;">CLAUDE-OPUS</span>
+        <span style="font-size:10px; color:#4a4a5a;">14:28:52</span>
+      </div>
+      <div style="font-size:12.5px; color:#e8e8ed; line-height:1.65; margin-bottom:8px;">
+        All 2,857 tests passing. New auth module adds 8 tests covering:
+      </div>
+      <div class="code-block" style="white-space:pre; line-height:1.7;"><span style="color:#00dd77;">PASS</span>  packages/core/auth/__tests__/provider.test.ts
+<span style="color:#00dd77;">PASS</span>  packages/core/auth/__tests__/github.test.ts
+<span style="color:#00dd77;">PASS</span>  packages/core/auth/__tests__/google.test.ts
+<span style="color:#00dd77;">PASS</span>  packages/core/auth/__tests__/registry.test.ts
+
+  <span style="color:#00dd77;">&#10003;</span> provider: enforces PKCE by default
+  <span style="color:#00dd77;">&#10003;</span> provider: generates cryptographic state
+  <span style="color:#00dd77;">&#10003;</span> github: authorize returns correct URL
+  <span style="color:#00dd77;">&#10003;</span> github: callback exchanges code for token
+  <span style="color:#00dd77;">&#10003;</span> google: authorize includes scopes
+  <span style="color:#00dd77;">&#10003;</span> google: refresh rotates token
+  <span style="color:#00dd77;">&#10003;</span> registry: registers and looks up providers
+  <span style="color:#00dd77;">&#10003;</span> registry: throws on duplicate registration</div>
+    </div>
+
+    <!-- Agent: summary -->
+    <div class="msg">
+      <div class="flex items-center gap-2 mb-2">
+        <span style="font-size:10px; color:#44bbff; font-family:'DM Sans',sans-serif; font-weight:600;">CLAUDE-OPUS</span>
+        <span style="font-size:10px; color:#4a4a5a;">14:29:04</span>
+      </div>
+      <div style="font-size:12.5px; color:#9898a8; line-height:1.65;">
+        Implementation complete. Created 4 new files, modified 4 existing files. The OAuth provider abstraction is fully wired with PKCE enforcement, cryptographic state, and generic route handling. All tests green. Ready for verification stage.
+      </div>
+    </div>
+
+    <!-- Stage event: implement complete -->
+    <div class="stage-event">
+      <span class="dot dot-green" style="width:5px; height:5px;"></span>
+      <span>stage <span style="color:#e8e8ed;">implement</span> completed</span>
+      <span style="color:#00dd77; margin-left:4px;">5m 45s</span>
+      <span style="margin-left:auto;">14:29:04</span>
+    </div>
+
+    <!-- Stage dispatch: verify -->
+    <div class="stage-event">
+      <span class="dot dot-amber" style="width:5px; height:5px;"></span>
+      <span>stage <span style="color:#e8e8ed;">verify</span> dispatched to <span style="color:#44bbff;">claude-sonnet</span></span>
+      <span style="margin-left:auto;">14:29:05</span>
+    </div>
+
+    <!-- Verify agent -->
+    <div class="msg">
+      <div class="flex items-center gap-2 mb-2">
+        <span style="font-size:10px; color:#44bbff; font-family:'DM Sans',sans-serif; font-weight:600;">CLAUDE-SONNET</span>
+        <span style="font-size:10px; color:#4a4a5a;">14:29:08</span>
+        <span style="font-size:10px; color:#4a4a5a; margin-left:auto;">verify</span>
+      </div>
+      <div style="font-size:12.5px; color:#9898a8; line-height:1.65;">
+        Running verification checks: lint, type-check, test suite, and security scan on the changed files.
+      </div>
+      <div style="margin-top:8px;">
+        <div class="tool-line"><span class="arrow">&#9656;</span>bash bun run lint -- 0 errors, 0 warnings<span class="timing">1.4s</span><span class="check">&#10003;</span></div>
+        <div class="tool-line"><span class="arrow">&#9656;</span>bash bun run typecheck -- 0 errors<span class="timing">3.2s</span><span class="check">&#10003;</span></div>
+        <div class="tool-line"><span class="arrow">&#9656;</span>bash bun test -- 2857 passed<span class="timing">17.9s</span><span class="check">&#10003;</span></div>
+        <div class="tool-line"><span class="arrow">&#9656;</span>search hardcoded secrets in auth/ (0 results)<span class="timing">0.3s</span><span class="check">&#10003;</span></div>
+      </div>
+    </div>
+
+    <!-- Bottom padding for scroll -->
+    <div style="height:20px;"></div>
+  </div>
+
+  <!-- ========== RIGHT PANEL ========== -->
+  <div class="right-panel border-l-panel" style="background:#0d0d14;">
+
+    <!-- Stage Progress -->
+    <div class="instrument">
+      <div class="instrument-header">Stage Progress</div>
+
+      <div class="flex items-center gap-3 py-1.5">
+        <span class="dot dot-green"></span>
+        <span style="font-size:12px; color:#e8e8ed; flex:1;">plan</span>
+        <span style="font-size:11px; color:#00dd77;">done</span>
+        <span style="font-size:10px; color:#4a4a5a; width:40px; text-align:right;">16s</span>
+      </div>
+
+      <div class="flex items-center gap-3 py-1.5">
+        <span class="dot dot-green"></span>
+        <span style="font-size:12px; color:#e8e8ed; flex:1;">implement</span>
+        <span style="font-size:11px; color:#00dd77;">done</span>
+        <span style="font-size:10px; color:#4a4a5a; width:40px; text-align:right;">5m 45s</span>
+      </div>
+
+      <div class="flex items-center gap-3 py-1.5">
+        <span class="dot dot-amber pulse"></span>
+        <span style="font-size:12px; color:#e8e8ed; flex:1;">verify</span>
+        <span style="font-size:11px; color:#ffbb33;">running</span>
+        <span style="font-size:10px; color:#4a4a5a; width:40px; text-align:right;">1m 12s</span>
+      </div>
+
+      <div class="flex items-center gap-3 py-1.5">
+        <span class="dot dot-dim"></span>
+        <span style="font-size:12px; color:#4a4a5a; flex:1;">review</span>
+        <span style="font-size:11px; color:#4a4a5a;">pending</span>
+        <span style="font-size:10px; color:#4a4a5a; width:40px; text-align:right;">--</span>
+      </div>
+
+      <div class="flex items-center gap-3 py-1.5">
+        <span class="dot dot-dim"></span>
+        <span style="font-size:12px; color:#4a4a5a; flex:1;">pr</span>
+        <span style="font-size:11px; color:#4a4a5a;">pending</span>
+        <span style="font-size:10px; color:#4a4a5a; width:40px; text-align:right;">--</span>
+      </div>
+    </div>
+
+    <!-- Files Changed -->
+    <div class="instrument">
+      <div class="instrument-header">Files Changed</div>
+
+      <div style="font-size:10px; color:#4a4a5a; margin-bottom:6px;">packages/core/auth/</div>
+      <div class="file-row">
+        <span class="path" style="padding-left:8px;">provider.ts</span>
+        <span><span class="adds">+89</span></span>
+      </div>
+      <div class="file-row">
+        <span class="path" style="padding-left:8px;">github.ts</span>
+        <span><span class="adds">+142</span></span>
+      </div>
+      <div class="file-row">
+        <span class="path" style="padding-left:8px;">google.ts</span>
+        <span><span class="adds">+128</span></span>
+      </div>
+      <div class="file-row">
+        <span class="path" style="padding-left:8px;">provider-registry.ts</span>
+        <span><span class="adds">+67</span></span>
+      </div>
+
+      <div style="font-size:10px; color:#4a4a5a; margin-top:8px; margin-bottom:6px;">packages/server/</div>
+      <div class="file-row">
+        <span class="path" style="padding-left:8px;">routes/auth.ts</span>
+        <span><span class="adds">+28</span> <span class="dels">-45</span></span>
+      </div>
+      <div class="file-row">
+        <span class="path" style="padding-left:8px;">index.ts</span>
+        <span><span class="adds">+4</span> <span class="dels">-1</span></span>
+      </div>
+
+      <div style="font-size:10px; color:#4a4a5a; margin-top:8px; margin-bottom:6px;">packages/types/</div>
+      <div class="file-row">
+        <span class="path" style="padding-left:8px;">auth.d.ts</span>
+        <span><span class="adds">+42</span></span>
+      </div>
+
+      <div style="font-size:10px; color:#4a4a5a; margin-top:8px; margin-bottom:6px;">tests/</div>
+      <div class="file-row">
+        <span class="path" style="padding-left:8px;">auth/provider.test.ts</span>
+        <span><span class="adds">+34</span></span>
+      </div>
+      <div class="file-row">
+        <span class="path" style="padding-left:8px;">auth/github.test.ts</span>
+        <span><span class="adds">+48</span></span>
+      </div>
+      <div class="file-row">
+        <span class="path" style="padding-left:8px;">auth/google.test.ts</span>
+        <span><span class="adds">+41</span></span>
+      </div>
+      <div class="file-row">
+        <span class="path" style="padding-left:8px;">auth/registry.test.ts</span>
+        <span><span class="adds">+29</span></span>
+      </div>
+    </div>
+
+    <!-- Session Metrics -->
+    <div class="instrument">
+      <div class="instrument-header">Session Metrics</div>
+
+      <div class="metric-row">
+        <span class="metric-label">tokens in</span>
+        <span class="metric-value">18,421</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">tokens out</span>
+        <span class="metric-value">5,892</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">total cost</span>
+        <span class="metric-value" style="color:#e8e8ed;">$0.82</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">elapsed</span>
+        <span class="metric-value">18m 42s</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">files changed</span>
+        <span class="metric-value">11</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">lines added</span>
+        <span class="metric-value" style="color:#00dd77;">+652</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">lines removed</span>
+        <span class="metric-value" style="color:#ff4455;">-54</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">tests</span>
+        <span class="metric-value"><span style="color:#00dd77;">2,857</span> <span style="font-size:11px; color:#4a4a5a;">passed</span></span>
+      </div>
+    </div>
+
+    <!-- Compute Info -->
+    <div class="instrument">
+      <div class="instrument-header">Compute</div>
+      <div class="metric-row">
+        <span class="metric-label">provider</span>
+        <span class="metric-value" style="font-size:12px;">local</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">runtime</span>
+        <span class="metric-value" style="font-size:12px;">claude-code</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">tmux</span>
+        <span class="metric-value" style="font-size:12px; color:#44bbff;">ark-s-a3f7c2</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== BOTTOM BAR ========== -->
+  <div class="bottom-bar border-t-panel flex items-center px-4 gap-3" style="background:#080810;">
+    <span style="color:#4a4a5a; font-size:14px;">&#9657;</span>
+    <input type="text" placeholder="Request changes or ask a question..." style="flex:1; background:transparent; border:none; outline:none; color:#e8e8ed; font-family:'JetBrains Mono',monospace; font-size:12.5px;" />
+    <div class="flex items-center gap-3">
+      <span style="font-size:10px; color:#4a4a5a; font-family:'DM Sans',sans-serif;">Claude Opus 4.6</span>
+      <button style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); border-radius:4px; padding:4px 14px; color:#9898a8; font-size:11px; cursor:pointer; font-family:'DM Sans',sans-serif;">Send</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function toggleTheme() {
+  const html = document.documentElement;
+  const cockpit = document.getElementById('cockpit');
+  const icon = document.getElementById('theme-icon');
+  const topBar = document.querySelector('.top-bar');
+  const bottomBar = document.querySelector('.bottom-bar');
+  const leftPanel = document.querySelector('.left-panel');
+  const rightPanel = document.querySelector('.right-panel');
+  const centerPanel = document.querySelector('.center-panel');
+
+  if (html.classList.contains('dark')) {
+    html.classList.remove('dark');
+    html.classList.add('light');
+    document.body.style.background = '#f0f0f5';
+    document.body.style.color = '#0a0a0f';
+    topBar.style.background = '#e8e8ed';
+    bottomBar.style.background = '#e8e8ed';
+    leftPanel.style.background = '#ffffff';
+    rightPanel.style.background = '#ffffff';
+    centerPanel.style.background = '#f0f0f5';
+    icon.textContent = 'dark';
+    // Fix text colors in light mode
+    document.querySelectorAll('.top-bar span, .bottom-bar span').forEach(el => {
+      if (el.style.color === 'rgb(232, 232, 237)') el.style.color = '#0a0a0f';
+    });
+  } else {
+    html.classList.remove('light');
+    html.classList.add('dark');
+    document.body.style.background = '#0a0a0f';
+    document.body.style.color = '#e8e8ed';
+    topBar.style.background = '#080810';
+    bottomBar.style.background = '#080810';
+    leftPanel.style.background = '#0d0d14';
+    rightPanel.style.background = '#0d0d14';
+    centerPanel.style.background = '#0a0a0f';
+    icon.textContent = 'light';
+  }
+}
+</script>
+
+</body>
+</html>
