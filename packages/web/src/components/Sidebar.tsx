@@ -2,7 +2,7 @@ import { cn } from "../lib/utils.js";
 import { Button } from "./ui/button.js";
 import {
   Play, Settings, Wrench, GitBranch, Clock, Server,
-  Calendar, BookOpen, DollarSign, Cog,
+  Calendar, BookOpen, DollarSign, Flame, Cog,
   ChevronLeft, ChevronRight, LayoutDashboard,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -53,6 +53,7 @@ const NAV: { id: string; icon: LucideIcon; label: string }[] = [
   { id: "tools", icon: Wrench, label: "Tools" },
   { id: "schedules", icon: Calendar, label: "Schedules" },
   { id: "costs", icon: DollarSign, label: "Costs" },
+  { id: "burn", icon: Flame, label: "Burn" },
 ];
 
 export function Sidebar({ activeView, onNavigate, readOnly, collapsed, onToggle, daemonStatus }: SidebarProps) {
