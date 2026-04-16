@@ -1,0 +1,9 @@
+# Rust build output
+src-tauri/target/
+
+# Tauri-generated assets and capability schemas (regenerated on build).
+src-tauri/gen/
+
+# Node
+node_modules/
+

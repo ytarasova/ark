@@ -3,6 +3,18 @@ import tsParser from "@typescript-eslint/parser";
 
 export default [
   {
+    // Global ignores (apply to every config below).
+    ignores: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/*.d.ts",
+      // Tauri build output -- codegen embeds binary assets as .js which
+      // trips the parser. The Rust source is out of scope for eslint.
+      "packages/desktop-tauri/src-tauri/target/**",
+      "packages/desktop-tauri/src-tauri/gen/**",
+    ],
+  },
+  {
     files: ["packages/**/*.ts", "packages/**/*.tsx"],
     ignores: ["**/node_modules/**", "**/dist/**", "**/*.d.ts"],
     languageOptions: {

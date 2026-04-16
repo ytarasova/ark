@@ -1,0 +1,75 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Ark",
+  "version": "0.16.0",
+  "identifier": "com.ark.desktop",
+  "build": {
+    "frontendDist": "../../web/dist",
+    "beforeBuildCommand": {
+      "script": "bun run build:web",
+      "cwd": "../../..",
+      "wait": true
+    },
+    "beforeDevCommand": {
+      "script": "bun run build:web",
+      "cwd": "../../..",
+      "wait": true
+    }
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Ark",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 18, "y": 18 },
+        "backgroundColor": "#1a1b26",
+        "visible": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null,
+      "dangerousDisableAssetCspModification": false
+    }
+  },
+  "bundle": {
+    "active": true,
+    "createUpdaterArtifacts": false,
+    "targets": ["app", "dmg", "appimage", "deb", "nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "category": "DeveloperTool",
+    "shortDescription": "AI Agent Orchestration",
+    "longDescription": "Ark is an autonomous agent ecosystem that orchestrates Claude agents through multi-stage SDLC flows.",
+    "copyright": "Copyright (c) 2026 Ark Contributors",
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    },
+    "linux": {
+      "deb": {
+        "depends": []
+      }
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "perMachine"
+      }
+    }
+  }
+}

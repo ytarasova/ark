@@ -1,0 +1,66 @@
+[package]
+name = "ark-desktop"
+version = "0.16.0"
+description = "Ark Desktop -- AI Agent Orchestration (Tauri preview)"
+authors = ["Ark Contributors"]
+license = "MIT"
+repository = "https://github.com/ytarasova/ark"
+edition = "2021"
+rust-version = "1.77"
+default-run = "ark-desktop"
+
+# See more keys and their definitions at
+# https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "ark_desktop_lib"
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0", features = [] }
+tauri-plugin-shell = "2.0"
+tauri-plugin-opener = "2.0"
+tauri-plugin-single-instance = "2.0"
+
+# Tauri's tauri::generate_context! + capability schemas pull in serde through
+# transitive deps; keeping explicit entries here keeps the schema at our
+# control if we ever need custom derive (e.g. IPC command payloads).
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# HTTP client for the /api/health probe
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+anyhow = "1"
+
+# (url::Url is re-exported by tauri as `tauri::Url`; no direct dep needed.)
+
+[target.'cfg(unix)'.dependencies]
+# For setsid + kill(-pgid, ...) so we can reap the full sidecar process group
+# (fixes the orphan `bun` grandchild leak known from the Electron build).
+libc = "0.2"
+
+# Windows note: the taskkill-based reaper in sidecar::shutdown uses
+# std::process::Command alone -- no windows-sys / Win32 API deps required for
+# the current scaffold. A Job-Object-based cleaner is a follow-up.
+
+[profile.release]
+panic = "abort"      # Strip expensive panic clean-up logic
+codegen-units = 1    # Compile crates one after another so compiler can optimize better
+lto = true           # Enables link-time optimizations
+opt-level = "s"      # Optimize for binary size
+strip = true         # Remove debug symbols
