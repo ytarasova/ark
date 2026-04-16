@@ -10,9 +10,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --mac --win --linux",
+    "build": "electron-builder --mac --linux",
     "build:mac": "electron-builder --mac",
-    "build:win": "electron-builder --win",
     "build:linux": "electron-builder --linux",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
@@ -47,13 +46,6 @@
         "zip"
       ],
       "icon": "icon.icns"
-    },
-    "win": {
-      "target": [
-        "nsis",
-        "zip"
-      ],
-      "icon": "icon.png"
     },
     "linux": {
       "target": [

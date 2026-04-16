@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    tags: ['v*']
+    tags: ["v*"]
     branches: [main]
 
 jobs:
@@ -530,10 +530,8 @@ jobs:
             build-flag: "--linux"
             name: linux
             ark-platform: linux-x64
-          - os: windows-latest
-            build-flag: "--win"
-            name: win
-            ark-platform: linux-x64
+          # Windows desktop skipped: Bun cannot compile ark-native for Windows.
+          # Windows users need WSL to run Ark.
 
     runs-on: ${{ matrix.os }}
     name: desktop (${{ matrix.name }})
@@ -610,7 +608,6 @@ jobs:
           path: |
             packages/desktop/out/*.dmg
             packages/desktop/out/*.zip
-            packages/desktop/out/*.exe
             packages/desktop/out/*.AppImage
             packages/desktop/out/*.deb
 
@@ -660,12 +657,11 @@ jobs:
           RELEASE_TAG: ${{ steps.release-type.outputs.tag }}
         run: |
           # Glob includes both lowercase (ark-*) and capitalized (Ark-*, "Ark Setup*")
-          # names -- electron-builder produces "Ark-<ver>-*.dmg", "Ark Setup <ver>.exe",
-          # "Ark-<ver>.AppImage" etc. with a capital A. Without this, mac + win +
-          # AppImage artifacts are silently dropped from the release (regression
-          # guard for Bug-017: desktop artifacts missing from v0.15.3).
+          # names -- electron-builder produces "Ark-<ver>-*.dmg",
+          # "Ark-<ver>.AppImage" etc. with a capital A. Without this, mac +
+          # AppImage artifacts are silently dropped from the release.
           shopt -s nullglob
-          files=(dist/ark-* dist/Ark-* dist/Ark\ Setup*)
+          files=(dist/ark-* dist/Ark-*)
           echo "Uploading ${#files[@]} release assets:"
           printf '  %s\n' "${files[@]}"
           gh release create "$RELEASE_TAG" \
