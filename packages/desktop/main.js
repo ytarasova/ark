@@ -126,12 +126,15 @@ async function installCliTools() {
     // Use osascript to prompt for admin password (inputs are hardcoded paths,
     // not user-supplied -- no injection risk)
     try {
-      execFile("/usr/bin/osascript", [
-        "-e",
-        `do shell script "ln -sf '${bundledPath}' '${targetPath}'" with administrator privileges`,
-      ], { timeout: 30000 }, (err) => { if (err) throw err; });
-      // Wait briefly for the async execFile to complete
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await new Promise((resolve, reject) => {
+        execFile("/usr/bin/osascript", [
+          "-e",
+          `do shell script "ln -sf '${bundledPath}' '${targetPath}'" with administrator privileges`,
+        ], { timeout: 30000 }, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
       markCliInstalled();
       return true;
     } catch {
@@ -142,8 +145,12 @@ async function installCliTools() {
   if (isLinux) {
     // Try pkexec for graphical sudo
     try {
-      execFile("pkexec", ["ln", "-sf", bundledPath, targetPath], { timeout: 30000 }, () => {});
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await new Promise((resolve, reject) => {
+        execFile("pkexec", ["ln", "-sf", bundledPath, targetPath], { timeout: 30000 }, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
       markCliInstalled();
       return true;
     } catch {

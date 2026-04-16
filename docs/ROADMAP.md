@@ -3,7 +3,7 @@
 > Last updated: 2026-04-14 (full background agent gap analysis) (71 PRs total -- v0.14.0 released)
 > Planning framework: **11 sub-projects (SP1-SP11)** covering all 11 layers of the background agent stack
 > Reference: [background-agents.com/landscape](https://background-agents.com/landscape) | [Ona Software Factory](https://ona.com/stories/building-a-software-factory-in-public) | [Open Agents](https://github.com/vercel-labs/open-agents)
-> Releases: v0.13.0 (2026-04-13), v0.14.0 (2026-04-14)
+> Releases: v0.13.0 (2026-04-13), v0.14.0 (2026-04-14), v0.17.0 (2026-04-15)
 > Prompt caching: 99.9% hit rate, $3,430 saved (86% reduction) across 47 agent sessions
 >
 > **2026-04-14 "ark init" meeting (Yana, Zineng, Abhimanyu, Atul) -- key decisions:**

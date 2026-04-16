@@ -1,27 +1,17 @@
 # Ark Desktop -- Installation
 
-Ark Desktop is an Electron wrapper around the Ark web dashboard. It renders the
-same UI as `ark web`, inside a native window, with native menus.
-
-> **Tauri preview (2026-04-15):** a parallel Tauri v2 shell lives under
-> [`packages/desktop-tauri/`](../desktop-tauri/README.md). It is not yet the
-> default release target; the Electron build below remains the shipping one.
-> See the roadmap (SP1) for the swap criteria.
+Ark Desktop is a fully self-contained Electron app that bundles the Ark web
+dashboard and the `ark-native` CLI binary. No prerequisites needed -- just
+download, install, and launch.
 
 ## Prerequisites
 
-Ark Desktop is a thin shell and does **not** bundle the `ark` CLI runtime yet
-(known limitation, see below). Before launching the desktop app, install the
-Ark CLI:
+None. The desktop app ships with everything it needs.
 
-```bash
-curl -fsSL https://ytarasova.github.io/ark/install.sh | bash
-```
-
-This puts `ark` on your `PATH`. On macOS it typically ends up in
-`/usr/local/bin/ark` or `~/.bun/bin/ark`. The desktop app searches both.
-
-Verify with `ark --version`.
+On first launch, Ark will offer to install CLI tools so you can use `ark` from
+the terminal. You can also do this later via the menu:
+- **macOS**: Ark > Install CLI Tools...
+- **Linux/Windows**: Tools > Install CLI Tools...
 
 ## Downloads
 
@@ -81,19 +71,26 @@ sudo dpkg -i ark-desktop_<version>_amd64.deb
 
 ## Known limitations
 
-- **Bundled CLI runtime**: the desktop app currently calls out to an `ark`
-  binary that must already be installed on `PATH`. A future release will
-  package a platform-specific `ark-native` binary inside the app bundle via
-  `extraResources`, so the desktop experience works with zero CLI setup.
 - **Unsigned macOS build**: see the Gatekeeper workaround above.
 - **Unsigned Windows build**: SmartScreen warns about unverified publisher.
 - **No auto-updater**: new versions must be downloaded manually.
 - **No system tray**: closing the window quits the app on Windows/Linux; on
   macOS it stays in the dock per platform convention.
 
+## Bundle size
+
+The desktop app is approximately 172 MB:
+- Electron shell: ~94 MB
+- ark-native binary: ~78 MB
+
+This is larger than a minimal Electron app, but the trade-off is a fully
+self-contained install with zero prerequisites.
+
 ## Troubleshooting
 
-**"Ark Not Found" dialog**: install the Ark CLI first (see Prerequisites).
+**"Ark Not Found" dialog**: this should not happen in v0.17.0+ since the
+ark-native binary is bundled. If you see this dialog, the app bundle may be
+corrupted -- re-download from the releases page.
 
 **Port already in use**: the desktop app auto-picks a free port starting at 8420. If you see the server fail to start, another Ark process may already be
 running. Close it and relaunch. Ark Desktop now enforces a single-instance
