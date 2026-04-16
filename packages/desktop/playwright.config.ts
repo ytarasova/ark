@@ -14,8 +14,11 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./tests",
   // Each Electron launch takes 5-15s on a cold boot (spawning the `ark web`
-  // subprocess + waiting for the HTTP server). 30s covers that with headroom.
-  timeout: 30_000,
+  // subprocess + waiting for the HTTP server). Linux under xvfb in CI
+  // pushes this up to ~10-20s, and we need headroom for a bounded teardown
+  // (~5s more) inside the same budget. 60s is generous but keeps a hung
+  // test from wedging the worker indefinitely.
+  timeout: 60_000,
   // Cap the whole run so a hung Electron process cannot wedge CI forever.
   globalTimeout: 300_000,
   // Electron can flake when a port collides with a pre-existing ark daemon

@@ -103,11 +103,18 @@ export async function closeArk(launched: LaunchedArk | undefined): Promise<void>
     }
   }
 
-  try {
-    await app.close();
-  } catch {
-    // Electron may have exited already; swallow.
-  }
+  // Bounded close: on Linux under xvfb, `app.close()` occasionally
+  // hangs waiting for Electron's `before-quit` handler to finish (the
+  // embedded `ark web` child delays its SIGTERM ack). We do not have
+  // 30s of test-timeout budget to burn in the afterEach hook, so race
+  // the graceful close against a 5s deadline and fall through to the
+  // hard-kill path regardless.
+  await Promise.race([
+    app.close().catch(() => {
+      /* already gone */
+    }),
+    new Promise<void>((resolve) => setTimeout(resolve, 5000)),
+  ]);
 
   // Kill all captured descendants. Each might have gone away already
   // (clean SIGTERM chain); `kill -9 <pid>` silently no-ops on dead PIDs.
@@ -118,6 +125,17 @@ export async function closeArk(launched: LaunchedArk | undefined): Promise<void>
       });
     } catch {
       /* best effort */
+    }
+  }
+
+  // Force-kill the Electron main process itself if it survived the
+  // 5s close window. Without this, a stuck Electron can keep the
+  // worker teardown alive past the 30s ceiling.
+  if (electronPid && process.platform !== "win32") {
+    try {
+      process.kill(electronPid, "SIGKILL");
+    } catch {
+      /* already dead */
     }
   }
 
