@@ -24,7 +24,7 @@ export {
   type BurnSummaryResponse,
 } from "./types.js";
 
-// TODO: export { extractBashCommands } from "./bash-utils.js";
-// TODO: export { classifyTurn, countRetries } from "./classifier.js";
-// TODO: export { parseClaudeTranscript } from "./parser.js";
-// TODO: export { syncBurn, type SyncResult } from "./sync.js";
+export { extractBashCommands } from "./bash-utils.js";
+export { classifyTurn, countRetries } from "./classifier.js";
+export { parseClaudeTranscript } from "./parser.js";
+export { syncBurn, type SyncResult } from "./sync.js";
