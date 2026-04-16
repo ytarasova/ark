@@ -69,46 +69,52 @@ export function zoneSqliteModifier(tz: string, at: Date): string {
 }
 
 /**
- * Compute ISO date range strings for a given period name.
+ * Compute ISO date range strings for a given period name, timezone-aware.
  */
-function getDateRange(period: BurnPeriod): { start: string; end: string } {
+export function getDateRange(
+  period: BurnPeriod,
+  tz: string | undefined,
+): { start: string; end: string; tz: string } {
+  const zone = tz ?? "UTC";
   const now = new Date();
   const end = now.toISOString();
+  const todayZoneMidnight = zoneMidnight(zone, now);
   let start: Date;
 
   switch (period) {
-    case "today": {
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    case "today":
+      start = todayZoneMidnight;
       break;
-    }
-    case "week": {
-      start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      start.setHours(0, 0, 0, 0);
+    case "week":
+      start = new Date(todayZoneMidnight.getTime() - 6 * 24 * 60 * 60 * 1000);
       break;
-    }
-    case "30days": {
-      start = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      start.setHours(0, 0, 0, 0);
+    case "30days":
+      start = new Date(todayZoneMidnight.getTime() - 29 * 24 * 60 * 60 * 1000);
       break;
-    }
     case "month": {
-      start = new Date(now.getFullYear(), now.getMonth(), 1);
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: zone,
+        year: "numeric", month: "2-digit",
+      }).formatToParts(now);
+      const y = Number(parts.find((p) => p.type === "year")?.value);
+      const m = Number(parts.find((p) => p.type === "month")?.value);
+      const wallUtc = Date.UTC(y, m - 1, 1);
+      const offset = zoneOffsetMinutes(zone, new Date(wallUtc));
+      start = new Date(wallUtc - offset * 60000);
       break;
     }
-    default: {
-      start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      start.setHours(0, 0, 0, 0);
-    }
+    default:
+      start = new Date(todayZoneMidnight.getTime() - 6 * 24 * 60 * 60 * 1000);
   }
 
-  return { start: start.toISOString(), end };
+  return { start: start.toISOString(), end, tz: zone };
 }
 
 export function registerBurnHandlers(router: Router, app: AppContext): void {
   router.handle("burn/summary", async (p) => {
     const { period } = extract<{ period?: BurnPeriod }>(p, []);
     const per = period ?? "week";
-    const dateRange = getDateRange(per);
+    const dateRange = getDateRange(per, undefined);
     const opts = {
       tenantId: "default",
       since: dateRange.start,
