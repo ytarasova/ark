@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ark -- Warm Engineering Design Preview v3</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,500;0,8..60,600;0,8..60,700;1,8..60,400&family=DM+Mono:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script>
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      fontFamily: {
+        serif: ['"Source Serif 4"', 'Georgia', 'serif'],
+        mono: ['"DM Mono"', '"IBM Plex Mono"', 'monospace'],
+      },
+    },
+  },
+};
+</script>
+<style>
+  /* ==========================================
+     WARM ENGINEERING -- DESIGN TOKENS
+     ========================================== */
+  :root {
+    --bg-deep: #121210;
+    --bg-panel: #15140f;
+    --bg-surface: #1a1815;
+    --bg-surface-hover: #201e19;
+    --bg-code: #0e0d0b;
+    --bg-input: #100f0d;
+    --bg-user: rgba(201, 165, 90, 0.04);
+
+    --border: #2a2824;
+    --border-strong: #3a3630;
+
+    --text-primary: #e8e4de;
+    --text-secondary: #a09888;
+    --text-muted: #6b6358;
+    --text-ghost: #453f36;
+
+    --accent: #c9a55a;
+    --accent-dim: rgba(201, 165, 90, 0.15);
+    --accent-hover: #d4b36a;
+
+    --green: #7cb342;
+    --green-dim: rgba(124, 179, 66, 0.15);
+    --red: #c62828;
+    --red-dim: rgba(198, 40, 40, 0.15);
+    --amber: #c9a55a;
+    --blue: #7b9ec7;
+  }
+
+  html.light {
+    --bg-deep: #f5f0e8;
+    --bg-panel: #ece6db;
+    --bg-surface: #e3ddd2;
+    --bg-surface-hover: #dbd4c8;
+    --bg-code: #e8e2d7;
+    --bg-input: #ede7dc;
+    --bg-user: rgba(201, 165, 90, 0.08);
+
+    --border: #d4cdc0;
+    --border-strong: #c5bdb0;
+
+    --text-primary: #2a2520;
+    --text-secondary: #5c5448;
+    --text-muted: #8a8070;
+    --text-ghost: #b0a898;
+
+    --accent: #9a7b3a;
+    --accent-dim: rgba(154, 123, 58, 0.12);
+    --accent-hover: #b08e45;
+
+    --green: #5a8c2a;
+    --green-dim: rgba(90, 140, 42, 0.12);
+    --red: #a52020;
+    --red-dim: rgba(165, 32, 32, 0.12);
+    --amber: #9a7b3a;
+    --blue: #5a7da0;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 14px;
+    line-height: 1.7;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  /* Warm noise texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.012;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--text-ghost); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+  .font-mono { font-family: 'DM Mono', 'IBM Plex Mono', monospace; }
+
+  /* Layout */
+  .app-layout {
+    display: grid;
+    grid-template-columns: 230px 1fr 280px;
+    grid-template-rows: 44px 1fr 52px;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* Header */
+  .header-bar {
+    grid-column: 1 / -1;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 18px;
+    gap: 14px;
+    font-size: 12px;
+    -webkit-app-region: drag;
+  }
+
+  /* Panels */
+  .left-panel {
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 10px 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .center-panel {
+    background: var(--bg-deep);
+    overflow-y: auto;
+    padding: 0;
+  }
+
+  .right-panel {
+    background: var(--bg-panel);
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 0;
+  }
+
+  .input-bar {
+    grid-column: 1 / -1;
+    background: var(--bg-panel);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 18px;
+    gap: 12px;
+  }
+
+  /* Session items */
+  .session-item {
+    display: flex;
+    align-items: center;
+    padding: 7px 16px;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.15s;
+    border-left: 2px solid transparent;
+  }
+  .session-item:hover { background: var(--bg-surface); }
+  .session-item.selected {
+    background: var(--bg-surface);
+    border-left-color: var(--accent);
+  }
+
+  .group-header {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent);
+    padding: 14px 16px 6px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* Messages */
+  .msg-system {
+    font-size: 11px;
+    color: var(--text-muted);
+    padding: 6px 28px;
+    font-family: 'DM Mono', monospace;
+    line-height: 1.5;
+  }
+
+  .msg-stage {
+    font-size: 11.5px;
+    color: var(--text-muted);
+    padding: 10px 28px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    font-family: 'DM Mono', monospace;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-surface);
+  }
+  .msg-stage .stage-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green);
+    flex-shrink: 0;
+  }
+  .msg-stage .stage-dot.active {
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+  }
+
+  .msg-agent {
+    padding: 10px 28px 12px;
+    line-height: 1.7;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: 'Source Serif 4', Georgia, serif;
+  }
+
+  .msg-agent-name {
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--text-muted);
+    margin-bottom: 3px;
+    font-family: 'DM Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .msg-user {
+    padding: 10px 28px;
+    background: var(--bg-user);
+    border-left: 2px solid var(--accent);
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.7;
+    font-family: 'Source Serif 4', Georgia, serif;
+  }
+
+  .msg-user-label {
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--accent);
+    margin-bottom: 3px;
+    font-family: 'DM Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .tool-call {
+    font-family: 'DM Mono', monospace;
+    font-size: 11.5px;
+    color: var(--text-muted);
+    padding: 2px 0;
+    line-height: 1.5;
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .tool-call:hover { color: var(--text-secondary); }
+  .tool-call .chevron { color: var(--text-ghost); margin-right: 4px; transition: transform 0.15s; display: inline-block; }
+  .tool-call .duration { color: var(--text-ghost); }
+  .tool-call.expanded .chevron { transform: rotate(90deg); }
+
+  .tool-detail {
+    display: none;
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin: 4px 0 4px 16px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+  .tool-call.expanded + .tool-detail { display: block; }
+
+  .code-block {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin: 8px 0;
+    font-family: 'DM Mono', monospace;
+    font-size: 11.5px;
+    line-height: 1.6;
+    overflow-x: auto;
+    color: var(--text-secondary);
+  }
+
+  .msg-agent ol {
+    padding-left: 22px;
+    margin: 6px 0;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+  .msg-agent ol li { padding: 2px 0; }
+
+  /* Diff */
+  .diff-add { color: var(--green); }
+  .diff-del { color: var(--red); }
+  .diff-hunk { color: var(--blue); }
+
+  /* Right panel tabs */
+  .panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+  }
+  .panel-tab {
+    padding: 10px 14px;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.15s;
+  }
+  .panel-tab:hover { color: var(--text-secondary); }
+  .panel-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  /* File tree */
+  .file-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 14px;
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .file-row:hover { background: var(--bg-surface); }
+  .file-dir {
+    padding: 8px 14px 3px;
+    font-size: 10.5px;
+    color: var(--text-ghost);
+    font-family: 'DM Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* Status dot */
+  .status-dot {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    margin-right: 2px;
+    flex-shrink: 0;
+  }
+  .status-dot.running { background: var(--accent); box-shadow: 0 0 5px var(--accent); }
+  .status-dot.completed { background: var(--green); }
+  .status-dot.failed { background: var(--red); }
+  .status-dot.stopped { background: var(--text-ghost); }
+
+  /* Pipeline */
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+  }
+  .pipeline-stage {
+    padding: 3px 8px;
+    color: var(--text-muted);
+    transition: color 0.15s;
+  }
+  .pipeline-stage.done { color: var(--green); }
+  .pipeline-stage.active { color: var(--accent); font-weight: 500; }
+  .pipeline-stage.pending { color: var(--text-ghost); }
+  .pipeline-connector { color: var(--text-ghost); font-size: 10px; }
+
+  /* Pulse */
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .pulse { animation: pulse-glow 2.5s ease-in-out infinite; }
+
+  /* Nav items */
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 16px;
+    font-size: 13px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: 'Source Serif 4', serif;
+  }
+  .nav-item:hover { color: var(--text-secondary); background: var(--bg-surface); }
+  .nav-item.active { color: var(--accent); }
+
+  /* Metric card */
+  .metric-card {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .metric-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.2;
+  }
+  .metric-label {
+    font-family: 'Source Serif 4', serif;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  /* Stage list in right panel */
+  .stage-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+  }
+  .stage-circle {
+    width: 8px; height: 8px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .stage-circle.done { background: var(--green); }
+  .stage-circle.active { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .stage-circle.pending { border: 1px solid var(--text-ghost); background: transparent; }
+
+  /* Theme toggle */
+  .theme-toggle {
+    cursor: pointer;
+    width: 28px; height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 14px;
+    transition: all 0.2s;
+    -webkit-app-region: no-drag;
+  }
+  .theme-toggle:hover { background: var(--bg-surface); color: var(--text-primary); }
+
+  /* Input */
+  .msg-input {
+    flex: 1;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-primary);
+    padding: 10px 16px;
+    font-size: 14px;
+    font-family: 'Source Serif 4', serif;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .msg-input:focus { border-color: var(--accent); }
+  .msg-input::placeholder { color: var(--text-ghost); }
+
+  .send-btn {
+    background: var(--accent);
+    color: #121210;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .send-btn:hover { background: var(--accent-hover); }
+
+  /* Section header in right panel */
+  .rpanel-header {
+    font-family: 'Source Serif 4', serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding: 12px 14px 6px;
+    letter-spacing: 0.01em;
+  }
+
+  /* Version tag */
+  .version-tag {
+    font-family: 'Source Serif 4', serif;
+    font-size: 11px;
+    color: var(--text-ghost);
+    padding: 8px 16px;
+    margin-top: auto;
+  }
+</style>
+</head>
+<body>
+
+<div class="app-layout" id="app">
+
+  <!-- ================================ -->
+  <!-- HEADER BAR                       -->
+  <!-- ================================ -->
+  <div class="header-bar">
+    <span style="font-family:'Source Serif 4',serif; font-weight:700; font-size:15px; color:var(--text-primary); letter-spacing:-0.02em;">ark</span>
+    <span style="color:var(--text-ghost);">|</span>
+    <span class="font-mono" style="color:var(--text-muted); font-size:11px;">s-abc123</span>
+    <span style="color:var(--text-ghost);">&rsaquo;</span>
+    <span class="font-mono" style="color:var(--text-secondary); font-size:11px;">implement</span>
+
+    <div style="flex:1;"></div>
+
+    <div class="pipeline">
+      <span class="pipeline-stage done">plan</span>
+      <span class="pipeline-connector">--&gt;</span>
+      <span class="pipeline-stage done">implement</span>
+      <span class="pipeline-connector">--&gt;</span>
+      <span class="pipeline-stage done">verify</span>
+      <span class="pipeline-connector">--&gt;</span>
+      <span class="pipeline-stage active pulse">review</span>
+      <span class="pipeline-connector">--&gt;</span>
+      <span class="pipeline-stage pending">merge</span>
+    </div>
+
+    <div style="flex:1;"></div>
+
+    <span class="font-mono" style="font-size:11px; color:var(--text-muted);">local</span>
+    <span style="color:var(--text-ghost);">|</span>
+    <span class="font-mono" style="font-size:11px; color:var(--text-muted);">opus-4</span>
+    <span style="color:var(--text-ghost);">|</span>
+    <span class="font-mono" style="font-size:11px; color:var(--green);">$0.82</span>
+    <span style="color:var(--text-ghost);">|</span>
+    <span class="font-mono" style="font-size:11px; color:var(--text-muted);">4m 32s</span>
+
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" id="theme-btn">
+      <span id="theme-icon-sun">&#9788;</span>
+      <span id="theme-icon-moon" style="display:none;">&#9790;</span>
+    </button>
+  </div>
+
+  <!-- ================================ -->
+  <!-- LEFT PANEL                       -->
+  <!-- ================================ -->
+  <div class="left-panel">
+    <div style="padding: 8px 16px 12px; font-family: 'Source Serif 4', serif; font-size: 16px; font-weight: 600; color: var(--text-primary);">Sessions</div>
+
+    <div class="group-header">autonomous-sdlc</div>
+
+    <div class="session-item selected" onclick="selectSession(this)">
+      <span class="status-dot running pulse"></span>
+      <div style="flex:1; min-width:0;">
+        <div style="font-family:'Source Serif 4',serif; font-size:13px; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Add SSH connection pooling</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:1px;">
+          <span class="font-mono" style="font-size:10px; color:var(--text-muted);">s-abc123</span>
+          <span class="font-mono" style="font-size:10px; color:var(--accent);">review</span>
+        </div>
+      </div>
+      <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">2m</span>
+    </div>
+
+    <div class="session-item" onclick="selectSession(this)">
+      <span class="status-dot completed"></span>
+      <div style="flex:1; min-width:0;">
+        <div style="font-family:'Source Serif 4',serif; font-size:13px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Fix circuit breaker timeout</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:1px;">
+          <span class="font-mono" style="font-size:10px; color:var(--text-muted);">s-def456</span>
+          <span class="font-mono" style="font-size:10px; color:var(--green);">merged</span>
+        </div>
+      </div>
+      <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">18m</span>
+    </div>
+
+    <div class="session-item" onclick="selectSession(this)">
+      <span class="status-dot completed"></span>
+      <div style="flex:1; min-width:0;">
+        <div style="font-family:'Source Serif 4',serif; font-size:13px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Refactor LLM router policies</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:1px;">
+          <span class="font-mono" style="font-size:10px; color:var(--text-muted);">s-789abc</span>
+          <span class="font-mono" style="font-size:10px; color:var(--green);">merged</span>
+        </div>
+      </div>
+      <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">45m</span>
+    </div>
+
+    <div class="group-header">quick</div>
+
+    <div class="session-item" onclick="selectSession(this)">
+      <span class="status-dot completed"></span>
+      <div style="flex:1; min-width:0;">
+        <div style="font-family:'Source Serif 4',serif; font-size:13px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Update README badges</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:1px;">
+          <span class="font-mono" style="font-size:10px; color:var(--text-muted);">s-cde012</span>
+          <span class="font-mono" style="font-size:10px; color:var(--green);">done</span>
+        </div>
+      </div>
+      <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">3m</span>
+    </div>
+
+    <div class="session-item" onclick="selectSession(this)">
+      <span class="status-dot failed"></span>
+      <div style="flex:1; min-width:0;">
+        <div style="font-family:'Source Serif 4',serif; font-size:13px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Add Kubernetes RBAC</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:1px;">
+          <span class="font-mono" style="font-size:10px; color:var(--text-muted);">s-ef3456</span>
+          <span class="font-mono" style="font-size:10px; color:var(--red);">failed</span>
+        </div>
+      </div>
+      <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">12m</span>
+    </div>
+
+    <div class="session-item" onclick="selectSession(this)">
+      <span class="status-dot stopped"></span>
+      <div style="flex:1; min-width:0;">
+        <div style="font-family:'Source Serif 4',serif; font-size:13px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Migrate to PostgreSQL</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:1px;">
+          <span class="font-mono" style="font-size:10px; color:var(--text-muted);">s-gh7890</span>
+          <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">stopped</span>
+        </div>
+      </div>
+      <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">1h</span>
+    </div>
+
+    <div class="group-header">fan-out</div>
+
+    <div class="session-item" onclick="selectSession(this)">
+      <span class="status-dot completed"></span>
+      <div style="flex:1; min-width:0;">
+        <div style="font-family:'Source Serif 4',serif; font-size:13px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Lint all compute providers</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:1px;">
+          <span class="font-mono" style="font-size:10px; color:var(--text-muted);">s-ij1234</span>
+          <span class="font-mono" style="font-size:10px; color:var(--green);">done</span>
+        </div>
+      </div>
+      <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">8m</span>
+    </div>
+
+    <!-- Nav divider -->
+    <div style="border-top: 1px solid var(--border); margin: 12px 0 8px;"></div>
+
+    <div class="nav-item active">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>
+      Sessions
+    </div>
+    <div class="nav-item">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      Flows
+    </div>
+    <div class="nav-item">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      Agents
+    </div>
+    <div class="nav-item">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      Router
+    </div>
+
+    <div class="version-tag">ark v0.17.0</div>
+  </div>
+
+  <!-- ================================ -->
+  <!-- CENTER PANEL -- CONVERSATION     -->
+  <!-- ================================ -->
+  <div class="center-panel" id="conversation">
+
+    <!-- System start -->
+    <div class="msg-system" style="padding-top: 16px;">
+      session s-abc123 started -- flow: autonomous-sdlc -- runtime: claude -- compute: local
+    </div>
+    <div class="msg-system">
+      agent: planner (claude-opus-4) -- task: "Add SSH connection pooling with ControlMaster and per-type queues"
+    </div>
+
+    <!-- PLAN STAGE -->
+    <div class="msg-stage">
+      <span class="stage-dot" style="background: var(--green);"></span>
+      stage: plan -- planner agent
+    </div>
+
+    <div class="msg-user">
+      <div class="msg-user-label">you</div>
+      Add SSH connection pooling to the compute layer. Each compute provider type should maintain its own pool with ControlMaster multiplexing. Stale connections should be dropped automatically based on metrics.
+    </div>
+
+    <div class="msg-agent">
+      <div class="msg-agent-name">planner</div>
+      I'll analyze the codebase to understand the current SSH handling and design a connection pooling architecture.
+    </div>
+
+    <div style="padding: 2px 28px 8px;">
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Read packages/compute/ssh.ts <span class="duration">-- 0.3s</span>
+      </div>
+      <div class="tool-detail">Read 142 lines from packages/compute/ssh.ts. Found: createSSHConnection(), executeRemoteCommand(), current implementation creates a new connection per invocation with no reuse.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Read packages/compute/providers/ec2-micro.ts <span class="duration">-- 0.2s</span>
+      </div>
+      <div class="tool-detail">Read 89 lines. Provider calls ssh.connect() in startSession(), executeCommand(), and cleanup() -- three separate connections per session lifecycle.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Grep "ssh.connect\|createSSH" packages/compute/ <span class="duration">-- 0.4s</span>
+      </div>
+      <div class="tool-detail">Found 23 call sites across 8 provider files. Average 2.8 connections per session operation. No connection reuse anywhere in the compute layer.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Read packages/core/metrics.ts <span class="duration">-- 0.2s</span>
+      </div>
+      <div class="tool-detail">Metrics module tracks connection_count, latency_ms, error_rate. Has staleCheck() method that returns boolean for connections older than configurable TTL.</div>
+    </div>
+
+    <div class="msg-agent">
+      <div class="msg-agent-name">planner</div>
+      After reviewing the codebase, here's my analysis and plan:
+
+      <strong style="color:var(--text-primary);">Current state:</strong> Each compute provider creates SSH connections on demand with no pooling. A single session lifecycle (start, execute, cleanup) opens 2-3 separate connections. Across 8 providers, there are 23 call sites -- all creating fresh connections.
+
+      <strong style="color:var(--text-primary);">Design for SSH connection pool:</strong>
+      <ol>
+        <li><strong>SSHPool class</strong> in <span class="font-mono" style="font-size:12px; color:var(--text-secondary);">packages/compute/ssh-pool.ts</span> -- singleton pool manager with per-provider-type queues</li>
+        <li><strong>ControlMaster integration</strong> -- each pool entry uses OpenSSH ControlMaster for multiplexing. One TCP connection, multiple logical channels</li>
+        <li><strong>Queue architecture</strong> -- Map&lt;ProviderType, ConnectionQueue&gt; where each queue has configurable max size, TTL, and health checks</li>
+        <li><strong>Stale connection eviction</strong> -- background sweep every 30s using metrics.staleCheck(). Connections with no activity beyond TTL get gracefully closed</li>
+        <li><strong>Provider migration</strong> -- update all 8 providers to use pool.acquire() / pool.release() instead of direct ssh.connect()</li>
+        <li><strong>Tests</strong> -- pool lifecycle, concurrent acquisition, eviction timing, ControlMaster failover</li>
+      </ol>
+    </div>
+
+    <div style="padding: 2px 28px 8px;">
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Write packages/compute/ssh-pool.ts (plan skeleton) <span class="duration">-- 0.1s</span>
+      </div>
+      <div class="tool-detail">Created plan skeleton with SSHPool class interface, ConnectionQueue type, and PoolConfig defaults (maxPerType: 5, ttlMs: 300000, sweepIntervalMs: 30000).</div>
+    </div>
+
+    <div class="msg-system">plan approved -- handing off to implementer</div>
+
+    <!-- IMPLEMENT STAGE -->
+    <div class="msg-stage">
+      <span class="stage-dot" style="background: var(--green);"></span>
+      stage: implement -- coder agent
+    </div>
+
+    <div class="msg-agent">
+      <div class="msg-agent-name">coder</div>
+      Starting implementation of the SSH connection pool. I'll follow the plan's architecture exactly.
+    </div>
+
+    <div style="padding: 2px 28px 8px;">
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Write packages/compute/ssh-pool.ts <span class="duration">-- 0.8s</span>
+      </div>
+      <div class="tool-detail">Created 186-line SSHPool implementation with ControlMaster support, per-type queues, TTL eviction, health checks, and graceful shutdown.</div>
+    </div>
+
+    <div class="msg-agent">
+      <div class="msg-agent-name">coder</div>
+      Core pool implementation done. The SSHPool maintains a Map&lt;ProviderType, ConnectionEntry[]&gt; where each entry tracks:
+
+      <div class="code-block"><span class="diff-add">interface ConnectionEntry {</span>
+<span class="diff-add">  id: string;</span>
+<span class="diff-add">  socket: SSHConnection;</span>
+<span class="diff-add">  providerType: ProviderType;</span>
+<span class="diff-add">  controlPath: string;       // ControlMaster socket</span>
+<span class="diff-add">  createdAt: number;</span>
+<span class="diff-add">  lastUsedAt: number;</span>
+<span class="diff-add">  useCount: number;</span>
+<span class="diff-add">  healthy: boolean;</span>
+<span class="diff-add">}</span></div>
+
+      Now migrating providers to use the pool.
+    </div>
+
+    <div style="padding: 2px 28px 8px;">
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Edit packages/compute/providers/ec2-micro.ts <span class="duration">-- 0.3s</span>
+      </div>
+      <div class="tool-detail">Replaced 3 direct ssh.connect() calls with pool.acquire('ec2-micro') and pool.release(). Added cleanup in provider.shutdown().</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Edit packages/compute/providers/ec2-medium.ts <span class="duration">-- 0.3s</span>
+      </div>
+      <div class="tool-detail">Same migration pattern. Replaced 3 ssh.connect() calls with pool.acquire('ec2-medium').</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Edit packages/compute/providers/docker.ts <span class="duration">-- 0.2s</span>
+      </div>
+      <div class="tool-detail">Docker provider uses local socket, not SSH. Skipped -- no changes needed.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Edit packages/compute/providers/e2b.ts <span class="duration">-- 0.4s</span>
+      </div>
+      <div class="tool-detail">E2B provider uses SSH tunnel. Migrated 2 call sites to pool.acquire('e2b'). Added pool.release() in session cleanup handler.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Edit packages/compute/providers/firecracker.ts <span class="duration">-- 0.3s</span>
+      </div>
+      <div class="tool-detail">Migrated 4 call sites. Firecracker had the most SSH calls due to snapshot restore needing reconnection.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Edit packages/compute/providers/k8s.ts <span class="duration">-- 0.2s</span>
+      </div>
+      <div class="tool-detail">Migrated 2 call sites to pool.acquire('k8s').</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Edit packages/compute/providers/k8s-kata.ts <span class="duration">-- 0.2s</span>
+      </div>
+      <div class="tool-detail">Same as k8s. 2 call sites migrated.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Edit packages/compute/providers/devcontainer.ts <span class="duration">-- 0.3s</span>
+      </div>
+      <div class="tool-detail">Migrated 3 call sites. Devcontainer needed special handling for workspace-mount reconnection.</div>
+    </div>
+
+    <div class="msg-agent">
+      <div class="msg-agent-name">coder</div>
+      All 8 providers migrated. 23 direct ssh.connect() calls replaced with pool.acquire()/pool.release() pairs. Docker provider skipped -- it uses local sockets, not SSH.
+
+      Now implementing the stale connection eviction with the metrics integration.
+    </div>
+
+    <div style="padding: 2px 28px 8px;">
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Edit packages/compute/ssh-pool.ts (add eviction sweep) <span class="duration">-- 0.4s</span>
+      </div>
+      <div class="tool-detail">Added sweepStale() method: iterates all pools, calls metrics.staleCheck() for each entry, closes and removes stale connections. Runs on setInterval(30000).</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Edit packages/core/metrics.ts (add pool metrics) <span class="duration">-- 0.2s</span>
+      </div>
+      <div class="tool-detail">Added pool_size, pool_hit_rate, pool_eviction_count metrics. Exposed via existing metrics endpoint.</div>
+    </div>
+
+    <div class="msg-agent">
+      <div class="msg-agent-name">coder</div>
+      Eviction sweep implemented. Every 30 seconds, the pool checks each connection against the metrics TTL. Stale connections are gracefully closed and their ControlMaster sockets cleaned up.
+
+      Writing tests now.
+    </div>
+
+    <div style="padding: 2px 28px 8px;">
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Write packages/compute/__tests__/ssh-pool.test.ts <span class="duration">-- 0.6s</span>
+      </div>
+      <div class="tool-detail">Created 4 test suites: pool lifecycle (create/shutdown), concurrent acquisition (5 simultaneous acquires), eviction timing (mock clock advance), ControlMaster failover (socket cleanup on error).</div>
+    </div>
+
+    <div class="msg-system">implement complete -- 12 files changed -- handing off to verifier</div>
+
+    <!-- VERIFY STAGE -->
+    <div class="msg-stage">
+      <span class="stage-dot" style="background: var(--green);"></span>
+      stage: verify -- verifier agent
+    </div>
+
+    <div class="msg-agent">
+      <div class="msg-agent-name">verifier</div>
+      Running the full test suite and linting the changes.
+    </div>
+
+    <div style="padding: 2px 28px 8px;">
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Bash: make test <span class="duration">-- 14.2s</span>
+      </div>
+      <div class="tool-detail">42 tests passed, 0 failed, 0 skipped. All new ssh-pool tests green. No regressions in existing compute provider tests.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Bash: make lint <span class="duration">-- 2.1s</span>
+      </div>
+      <div class="tool-detail">0 errors, 0 warnings. Clean.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Bash: make format <span class="duration">-- 1.8s</span>
+      </div>
+      <div class="tool-detail">2 files reformatted (ssh-pool.ts, firecracker.ts). No functional changes.</div>
+    </div>
+
+    <div class="msg-agent">
+      <div class="msg-agent-name">verifier</div>
+      All checks pass. 42 tests green, lint clean, formatting applied. Two files needed Prettier reformatting -- no logic changes. The implementation is solid.
+    </div>
+
+    <div class="msg-system">verify passed -- all tests green, lint clean</div>
+
+    <!-- REVIEW STAGE -->
+    <div class="msg-stage">
+      <span class="stage-dot active" style="background: var(--accent); box-shadow: 0 0 6px var(--accent);"></span>
+      stage: review -- reviewer agent
+    </div>
+
+    <div class="msg-agent">
+      <div class="msg-agent-name">reviewer</div>
+      Reviewing the SSH pool implementation and provider migrations for correctness, edge cases, and adherence to the plan.
+    </div>
+
+    <div style="padding: 2px 28px 8px;">
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Read packages/compute/ssh-pool.ts <span class="duration">-- 0.2s</span>
+      </div>
+      <div class="tool-detail">Reviewing full implementation: SSHPool class, ConnectionEntry interface, acquire(), release(), sweepStale(), shutdown() methods.</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Read packages/compute/__tests__/ssh-pool.test.ts <span class="duration">-- 0.2s</span>
+      </div>
+      <div class="tool-detail">4 test suites, 16 test cases. Good coverage of happy path and error scenarios. Missing: test for max pool size exceeded (should queue).</div>
+
+      <div class="tool-call" onclick="toggleTool(this)">
+        <span class="chevron">&#9656;</span> Grep "pool.acquire" packages/compute/providers/ <span class="duration">-- 0.1s</span>
+      </div>
+      <div class="tool-detail">Found 19 pool.acquire() calls and 19 matching pool.release() calls across 7 provider files. All balanced.</div>
+    </div>
+
+    <div class="msg-agent">
+      <div class="msg-agent-name">reviewer</div>
+      Good implementation overall. Two findings:
+
+      <ol>
+        <li><strong>Missing test:</strong> No test for max pool size exceeded. When all connections are in use and a new acquire() is called, the pool should queue the request. Add a test for this backpressure scenario.</li>
+        <li><strong>Minor:</strong> The sweepStale() interval should be cleared in shutdown() to prevent timer leaks. Currently it's only cleared if the pool is explicitly destroyed -- but shutdown() just closes connections without clearing the interval.</li>
+      </ol>
+
+      Neither is blocking. The acquire/release pairs are balanced across all providers (19/19). ControlMaster socket paths are correctly scoped to provider type. The metrics integration is clean.
+
+      <span style="color: var(--accent);">Recommendation: approve with minor fixes.</span>
+    </div>
+
+    <div class="msg-system" style="padding-bottom: 4px;">review in progress -- waiting for approval <span class="pulse" style="color:var(--accent);">...</span></div>
+
+    <!-- Spacer for scroll -->
+    <div style="height: 20px;"></div>
+  </div>
+
+  <!-- ================================ -->
+  <!-- RIGHT PANEL                      -->
+  <!-- ================================ -->
+  <div class="right-panel">
+
+    <!-- Tabs -->
+    <div class="panel-tabs">
+      <div class="panel-tab active" onclick="switchTab(this, 'tab-overview')">Overview</div>
+      <div class="panel-tab" onclick="switchTab(this, 'tab-files')">Files</div>
+      <div class="panel-tab" onclick="switchTab(this, 'tab-metrics')">Metrics</div>
+    </div>
+
+    <!-- Tab: Overview -->
+    <div id="tab-overview">
+      <div class="rpanel-header">Stages</div>
+
+      <div class="stage-item">
+        <span class="stage-circle done"></span>
+        <span style="color:var(--green); font-size:12px;">plan</span>
+        <span style="flex:1;"></span>
+        <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">0:42</span>
+      </div>
+      <div class="stage-item">
+        <span class="stage-circle done"></span>
+        <span style="color:var(--green); font-size:12px;">implement</span>
+        <span style="flex:1;"></span>
+        <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">2:18</span>
+      </div>
+      <div class="stage-item">
+        <span class="stage-circle done"></span>
+        <span style="color:var(--green); font-size:12px;">verify</span>
+        <span style="flex:1;"></span>
+        <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">0:22</span>
+      </div>
+      <div class="stage-item">
+        <span class="stage-circle active"></span>
+        <span style="color:var(--accent); font-size:12px; font-weight:500;">review</span>
+        <span style="flex:1;"></span>
+        <span class="font-mono pulse" style="font-size:10px; color:var(--accent);">1:10</span>
+      </div>
+      <div class="stage-item">
+        <span class="stage-circle pending"></span>
+        <span style="color:var(--text-ghost); font-size:12px;">merge</span>
+        <span style="flex:1;"></span>
+        <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">--</span>
+      </div>
+
+      <div style="border-top:1px solid var(--border); margin-top:8px;"></div>
+
+      <div class="rpanel-header">Agents</div>
+
+      <div style="padding:4px 14px;">
+        <div style="display:flex; align-items:center; gap:8px; padding:4px 0;">
+          <span class="font-mono" style="font-size:11px; color:var(--text-secondary);">planner</span>
+          <span style="flex:1;"></span>
+          <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">opus-4</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; padding:4px 0;">
+          <span class="font-mono" style="font-size:11px; color:var(--text-secondary);">coder</span>
+          <span style="flex:1;"></span>
+          <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">opus-4</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; padding:4px 0;">
+          <span class="font-mono" style="font-size:11px; color:var(--text-secondary);">verifier</span>
+          <span style="flex:1;"></span>
+          <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">sonnet-4</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; padding:4px 0;">
+          <span class="font-mono" style="font-size:11px; color:var(--accent);">reviewer</span>
+          <span class="pulse" style="display:inline-block; width:4px; height:4px; border-radius:50%; background:var(--accent);"></span>
+          <span style="flex:1;"></span>
+          <span class="font-mono" style="font-size:10px; color:var(--text-ghost);">opus-4</span>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid var(--border); margin-top:8px;"></div>
+
+      <div class="rpanel-header">Configuration</div>
+      <div style="padding:4px 14px;">
+        <div style="display:flex; justify-content:space-between; padding:3px 0;">
+          <span class="font-mono" style="font-size:11px; color:var(--text-muted);">flow</span>
+          <span class="font-mono" style="font-size:11px; color:var(--text-secondary);">autonomous-sdlc</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:3px 0;">
+          <span class="font-mono" style="font-size:11px; color:var(--text-muted);">runtime</span>
+          <span class="font-mono" style="font-size:11px; color:var(--text-secondary);">claude</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:3px 0;">
+          <span class="font-mono" style="font-size:11px; color:var(--text-muted);">compute</span>
+          <span class="font-mono" style="font-size:11px; color:var(--text-secondary);">local</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:3px 0;">
+          <span class="font-mono" style="font-size:11px; color:var(--text-muted);">branch</span>
+          <span class="font-mono" style="font-size:11px; color:var(--text-secondary);">feat/ssh-pool</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Files (hidden by default) -->
+    <div id="tab-files" style="display:none;">
+      <div class="rpanel-header">Changed Files</div>
+      <div style="padding:4px 0;">
+        <div class="file-dir">packages/compute/</div>
+        <div class="file-row">
+          <span style="color:var(--green);">ssh-pool.ts</span>
+          <span><span style="color:var(--green); font-size:10px;">+186</span></span>
+        </div>
+        <div class="file-row">
+          <span style="color:var(--text-secondary);">ssh.ts</span>
+          <span><span style="color:var(--green); font-size:10px;">+4</span> <span style="color:var(--red); font-size:10px;">-12</span></span>
+        </div>
+
+        <div class="file-dir">packages/compute/providers/</div>
+        <div class="file-row">
+          <span style="color:var(--text-secondary);">ec2-micro.ts</span>
+          <span><span style="color:var(--green); font-size:10px;">+8</span> <span style="color:var(--red); font-size:10px;">-14</span></span>
+        </div>
+        <div class="file-row">
+          <span style="color:var(--text-secondary);">ec2-medium.ts</span>
+          <span><span style="color:var(--green); font-size:10px;">+8</span> <span style="color:var(--red); font-size:10px;">-14</span></span>
+        </div>
+        <div class="file-row">
+          <span style="color:var(--text-secondary);">e2b.ts</span>
+          <span><span style="color:var(--green); font-size:10px;">+6</span> <span style="color:var(--red); font-size:10px;">-10</span></span>
+        </div>
+        <div class="file-row">
+          <span style="color:var(--text-secondary);">firecracker.ts</span>
+          <span><span style="color:var(--green); font-size:10px;">+10</span> <span style="color:var(--red); font-size:10px;">-18</span></span>
+        </div>
+        <div class="file-row">
+          <span style="color:var(--text-secondary);">k8s.ts</span>
+          <span><span style="color:var(--green); font-size:10px;">+6</span> <span style="color:var(--red); font-size:10px;">-8</span></span>
+        </div>
+        <div class="file-row">
+          <span style="color:var(--text-secondary);">k8s-kata.ts</span>
+          <span><span style="color:var(--green); font-size:10px;">+6</span> <span style="color:var(--red); font-size:10px;">-8</span></span>
+        </div>
+        <div class="file-row">
+          <span style="color:var(--text-secondary);">devcontainer.ts</span>
+          <span><span style="color:var(--green); font-size:10px;">+8</span> <span style="color:var(--red); font-size:10px;">-12</span></span>
+        </div>
+
+        <div class="file-dir">packages/core/</div>
+        <div class="file-row">
+          <span style="color:var(--text-secondary);">metrics.ts</span>
+          <span><span style="color:var(--green); font-size:10px;">+14</span> <span style="color:var(--red); font-size:10px;">-2</span></span>
+        </div>
+
+        <div class="file-dir">packages/compute/__tests__/</div>
+        <div class="file-row">
+          <span style="color:var(--green);">ssh-pool.test.ts</span>
+          <span><span style="color:var(--green); font-size:10px;">+128</span></span>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid var(--border); margin-top:8px; padding:10px 14px;">
+        <div style="display:flex; justify-content:space-between;">
+          <span style="font-family:'Source Serif 4',serif; font-size:12px; color:var(--text-muted);">Total</span>
+          <span>
+            <span class="font-mono" style="font-size:11px; color:var(--green);">+384</span>
+            <span class="font-mono" style="font-size:11px; color:var(--red); margin-left:6px;">-98</span>
+          </span>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-top:4px;">
+          <span style="font-family:'Source Serif 4',serif; font-size:12px; color:var(--text-muted);">Files changed</span>
+          <span class="font-mono" style="font-size:11px; color:var(--text-secondary);">12</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Metrics (hidden by default) -->
+    <div id="tab-metrics" style="display:none;">
+      <div style="display:grid; grid-template-columns:1fr 1fr;">
+        <div class="metric-card">
+          <div class="metric-value" style="color:var(--green);">$0.82</div>
+          <div class="metric-label">Total cost</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">4:32</div>
+          <div class="metric-label">Elapsed time</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">42</div>
+          <div class="metric-label">Tests passed</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value" style="color:var(--red);">0</div>
+          <div class="metric-label">Tests failed</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">38.4k</div>
+          <div class="metric-label">Tokens in</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">12.1k</div>
+          <div class="metric-label">Tokens out</div>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid var(--border);"></div>
+
+      <div class="rpanel-header">Cost by Agent</div>
+      <div style="padding:4px 14px;">
+        <div style="display:flex; justify-content:space-between; padding:4px 0;">
+          <span class="font-mono" style="font-size:11px; color:var(--text-secondary);">planner</span>
+          <span class="font-mono" style="font-size:11px; color:var(--text-secondary);">$0.24</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:4px 0;">
+          <span class="font-mono" style="font-size:11px; color:var(--text-secondary);">coder</span>
+          <span class="font-mono" style="font-size:11px; color:var(--text-secondary);">$0.38</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:4px 0;">
+          <span class="font-mono" style="font-size:11px; color:var(--text-secondary);">verifier</span>
+          <span class="font-mono" style="font-size:11px; color:var(--text-secondary);">$0.08</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:4px 0;">
+          <span class="font-mono" style="font-size:11px; color:var(--accent);">reviewer</span>
+          <span class="font-mono" style="font-size:11px; color:var(--accent);">$0.12</span>
+        </div>
+      </div>
+
+      <div style="border-top:1px solid var(--border); margin-top:4px;"></div>
+
+      <div class="rpanel-header">Router</div>
+      <div style="padding:4px 14px;">
+        <div style="display:flex; justify-content:space-between; padding:3px 0;">
+          <span class="font-mono" style="font-size:11px; color:var(--text-muted);">policy</span>
+          <span class="font-mono" style="font-size:11px; color:var(--text-secondary);">cost-aware</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:3px 0;">
+          <span class="font-mono" style="font-size:11px; color:var(--text-muted);">cache hit</span>
+          <span class="font-mono" style="font-size:11px; color:var(--green);">72%</span>
+        </div>
+        <div style="display:flex; justify-content:space-between; padding:3px 0;">
+          <span class="font-mono" style="font-size:11px; color:var(--text-muted);">breakers</span>
+          <span class="font-mono" style="font-size:11px; color:var(--green);">0 open</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================================ -->
+  <!-- INPUT BAR                        -->
+  <!-- ================================ -->
+  <div class="input-bar">
+    <input class="msg-input" type="text" placeholder="Send a message to the session..." />
+    <button class="send-btn">Send</button>
+  </div>
+
+</div>
+
+<script>
+  // Theme toggle
+  function toggleTheme() {
+    var html = document.documentElement;
+    var sunIcon = document.getElementById('theme-icon-sun');
+    var moonIcon = document.getElementById('theme-icon-moon');
+    if (html.classList.contains('dark')) {
+      html.classList.remove('dark');
+      html.classList.add('light');
+      sunIcon.style.display = 'none';
+      moonIcon.style.display = 'inline';
+    } else {
+      html.classList.remove('light');
+      html.classList.add('dark');
+      sunIcon.style.display = 'inline';
+      moonIcon.style.display = 'none';
+    }
+  }
+
+  // Session selection
+  function selectSession(el) {
+    document.querySelectorAll('.session-item').forEach(function(s) { s.classList.remove('selected'); });
+    el.classList.add('selected');
+  }
+
+  // Tool call expand/collapse
+  function toggleTool(el) {
+    el.classList.toggle('expanded');
+  }
+
+  // Right panel tab switching
+  function switchTab(tabEl, tabId) {
+    document.querySelectorAll('.panel-tab').forEach(function(t) { t.classList.remove('active'); });
+    tabEl.classList.add('active');
+    document.querySelectorAll('#tab-overview, #tab-files, #tab-metrics').forEach(function(p) { p.style.display = 'none'; });
+    document.getElementById(tabId).style.display = 'block';
+  }
+
+  // Scroll conversation to bottom on load
+  document.addEventListener('DOMContentLoaded', function() {
+    var conv = document.getElementById('conversation');
+    conv.scrollTop = conv.scrollHeight;
+  });
+</script>
+
+</body>
+</html>
