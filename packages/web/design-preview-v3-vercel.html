@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ark</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #09090b;
+    --bg-input: #111113;
+    --text-primary: #fafafa;
+    --text-secondary: #71717a;
+    --text-tertiary: #3f3f46;
+    --border: rgba(255,255,255,0.04);
+    --green: #22c55e;
+    --red: #ef4444;
+    --amber: #f59e0b;
+    --blue: #3b82f6;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: 'Geist', system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono {
+    font-family: 'Geist Mono', 'SF Mono', 'Cascadia Code', Menlo, monospace;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--text-tertiary); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+
+  /* Session list */
+  .session-item {
+    cursor: pointer;
+    transition: color 120ms;
+    color: var(--text-secondary);
+    padding: 3px 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .session-item:hover { color: var(--text-primary); }
+  .session-item.active { color: var(--text-primary); }
+  .session-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* Tool call expand */
+  .tool-detail { display: none; padding: 4px 0 4px 20px; color: var(--text-tertiary); font-size: 12px; }
+  .tool-detail.open { display: block; }
+  .tool-line { cursor: pointer; }
+  .tool-line:hover { color: var(--text-secondary) !important; }
+
+  /* Nav items */
+  .nav-item {
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color 120ms;
+    padding: 2px 0;
+  }
+  .nav-item:hover { color: var(--text-primary); }
+  .nav-item.active { color: var(--text-primary); font-weight: 500; }
+
+  /* Status dot */
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  /* Input */
+  .msg-input {
+    background: var(--bg-input);
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    width: 100%;
+    font-family: 'Geist', system-ui, sans-serif;
+    font-size: 13px;
+    padding: 12px 14px;
+    border-radius: 6px;
+  }
+  .msg-input::placeholder { color: var(--text-tertiary); }
+
+  /* Conversation */
+  .conv-scroll {
+    overflow-y: auto;
+    flex: 1;
+    padding: 20px 24px;
+  }
+  .timestamp {
+    font-family: 'Geist Mono', 'SF Mono', Menlo, monospace;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-top: 16px;
+    margin-bottom: 2px;
+  }
+  .agent-text {
+    color: var(--text-primary);
+    font-size: 14px;
+    line-height: 1.7;
+  }
+  .user-label {
+    color: #a1a1aa;
+    font-weight: 500;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+  }
+  .tool-call {
+    font-family: 'Geist Mono', 'SF Mono', Menlo, monospace;
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding: 2px 0;
+  }
+  .system-event {
+    color: var(--text-tertiary);
+    font-size: 12px;
+    padding: 2px 0;
+  }
+  .code-block {
+    background: #0c0c0e;
+    padding: 10px 12px;
+    border-radius: 4px;
+    font-family: 'Geist Mono', 'SF Mono', Menlo, monospace;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin: 6px 0;
+    line-height: 1.6;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .stage-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 2px 0;
+    font-size: 13px;
+  }
+  .file-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1px 0;
+    font-size: 12px;
+  }
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1px 0;
+    font-size: 12px;
+  }
+  .section-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-tertiary);
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+
+  /* Light theme */
+  body.light {
+    --bg: #fafafa;
+    --bg-input: #f0f0f2;
+    --text-primary: #09090b;
+    --text-secondary: #71717a;
+    --text-tertiary: #a1a1aa;
+    --border: rgba(0,0,0,0.06);
+    --green: #16a34a;
+    --red: #dc2626;
+    --amber: #d97706;
+    --blue: #2563eb;
+  }
+  body.light .code-block {
+    background: #f0f0f2;
+  }
+</style>
+</head>
+<body>
+
+<div style="height:100vh; display:flex; flex-direction:column;">
+
+  <!-- Top nav -->
+  <nav style="display:flex; align-items:center; justify-content:space-between; padding:14px 24px; flex-shrink:0;">
+    <div style="display:flex; align-items:center; gap:28px;">
+      <span style="font-weight:700; font-size:15px; letter-spacing:-0.02em; color:var(--text-primary);">ark</span>
+      <div style="display:flex; gap:20px;">
+        <span class="nav-item active">Sessions</span>
+        <span class="nav-item" onclick="switchNav(this)">Agents</span>
+        <span class="nav-item" onclick="switchNav(this)">Flows</span>
+        <span class="nav-item" onclick="switchNav(this)">Compute</span>
+        <span class="nav-item" onclick="switchNav(this)">Costs</span>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:14px;">
+      <div style="display:flex; gap:6px; align-items:center;">
+        <span class="status-dot" style="background:var(--green);" title="conductor"></span>
+        <span class="status-dot" style="background:var(--green);" title="arkd"></span>
+        <span class="status-dot" style="background:var(--text-tertiary);" title="router"></span>
+      </div>
+      <span class="nav-item mono" style="font-size:11px;" onclick="toggleTheme()">theme</span>
+    </div>
+  </nav>
+
+  <!-- Separator -->
+  <div style="height:1px; background:var(--border);"></div>
+
+  <!-- Main content -->
+  <div style="display:flex; flex:1; overflow:hidden;">
+
+    <!-- Left panel - Sessions -->
+    <aside style="width:200px; flex-shrink:0; padding:16px 16px; overflow-y:auto; border-right:1px solid var(--border); display:flex; flex-direction:column;">
+
+      <div style="flex:1;">
+      <div class="section-label" style="margin-top:0;">autonomous-sdlc</div>
+
+      <div class="session-item active" onclick="selectSession(this, 'abc')">
+        <span class="session-dot" style="background:var(--green);"></span>
+        <span class="mono" style="font-size:12px;">s-a3bf</span>
+        <span style="font-size:11px; color:var(--text-tertiary); margin-left:auto;">running</span>
+      </div>
+      <div class="session-item" onclick="selectSession(this, 'def')">
+        <span class="session-dot" style="background:var(--text-tertiary);"></span>
+        <span class="mono" style="font-size:12px;">s-d8e2</span>
+        <span style="font-size:11px; color:var(--text-tertiary); margin-left:auto;">done</span>
+      </div>
+      <div class="session-item" onclick="selectSession(this, 'ghi')">
+        <span class="session-dot" style="background:var(--text-tertiary);"></span>
+        <span class="mono" style="font-size:12px;">s-f1c4</span>
+        <span style="font-size:11px; color:var(--text-tertiary); margin-left:auto;">done</span>
+      </div>
+
+      <div class="section-label" style="margin-top:20px;">quick</div>
+
+      <div class="session-item" onclick="selectSession(this, 'jkl')">
+        <span class="session-dot" style="background:var(--amber);"></span>
+        <span class="mono" style="font-size:12px;">s-b7a1</span>
+        <span style="font-size:11px; color:var(--text-tertiary); margin-left:auto;">waiting</span>
+      </div>
+      <div class="session-item" onclick="selectSession(this, 'pqr')">
+        <span class="session-dot" style="background:var(--text-tertiary);"></span>
+        <span class="mono" style="font-size:12px;">s-c9f3</span>
+        <span style="font-size:11px; color:var(--text-tertiary); margin-left:auto;">done</span>
+      </div>
+
+      <div class="section-label" style="margin-top:20px;">review</div>
+
+      <div class="session-item" onclick="selectSession(this, 'mno')">
+        <span class="session-dot" style="background:var(--text-tertiary);"></span>
+        <span class="mono" style="font-size:12px;">s-e4d6</span>
+        <span style="font-size:11px; color:var(--text-tertiary); margin-left:auto;">done</span>
+      </div>
+
+      <div class="section-label" style="margin-top:20px;">fan-out</div>
+
+      <div class="session-item" onclick="selectSession(this, 'stu')">
+        <span class="session-dot" style="background:var(--green);"></span>
+        <span class="mono" style="font-size:12px;">s-77a2</span>
+        <span style="font-size:11px; color:var(--text-tertiary); margin-left:auto;">running</span>
+      </div>
+
+      </div>
+      <div style="padding-top:12px; flex-shrink:0;">
+        <span class="mono" style="font-size:10px; color:var(--text-tertiary);">v0.17.0</span>
+      </div>
+    </aside>
+
+    <!-- Center panel - Conversation -->
+    <main style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+
+      <div class="conv-scroll" id="conversation">
+
+        <div class="timestamp">14:34:02</div>
+        <div class="system-event">Session s-a3bf started -- flow: autonomous-sdlc -- runtime: claude</div>
+
+        <div class="timestamp">14:34:03</div>
+        <div class="system-event">Stage <span style="color:var(--text-secondary);">plan</span> dispatched to compute <span class="mono" style="font-size:11px;">local-0</span></div>
+
+        <div class="timestamp">14:34:08</div>
+        <div class="agent-text">I'll analyze the codebase to understand the current authentication architecture and design an OAuth provider abstraction.</div>
+
+        <div class="tool-call tool-line" onclick="toggleTool(this)" style="margin-top:6px;">
+          <span style="color:var(--text-tertiary);">&gt;</span> Read packages/core/src/auth/index.ts <span class="mono" style="font-size:11px; color:var(--text-tertiary);">1.2s</span> <span style="color:var(--green);">&#10003;</span>
+        </div>
+        <div class="tool-detail">Read 142 lines. Found AuthManager class with hardcoded GitHub OAuth flow.</div>
+
+        <div class="tool-call tool-line" onclick="toggleTool(this)">
+          <span style="color:var(--text-tertiary);">&gt;</span> Read packages/server/src/routes/auth.ts <span class="mono" style="font-size:11px; color:var(--text-tertiary);">0.9s</span> <span style="color:var(--green);">&#10003;</span>
+        </div>
+        <div class="tool-detail">Read 98 lines. Express routes for /auth/callback and /auth/token.</div>
+
+        <div class="tool-call tool-line" onclick="toggleTool(this)">
+          <span style="color:var(--text-tertiary);">&gt;</span> Search "OAuthProvider" across packages/ <span class="mono" style="font-size:11px; color:var(--text-tertiary);">0.8s</span> <span style="color:var(--green);">&#10003;</span>
+        </div>
+        <div class="tool-detail">No results. OAuthProvider interface does not exist yet.</div>
+
+        <div class="tool-call tool-line" onclick="toggleTool(this)">
+          <span style="color:var(--text-tertiary);">&gt;</span> Read packages/types/src/auth.ts <span class="mono" style="font-size:11px; color:var(--text-tertiary);">0.4s</span> <span style="color:var(--green);">&#10003;</span>
+        </div>
+        <div class="tool-detail">Read 34 lines. Basic AuthToken and AuthUser interfaces.</div>
+
+        <div class="tool-call tool-line" onclick="toggleTool(this)">
+          <span style="color:var(--text-tertiary);">&gt;</span> Read packages/core/src/config/providers.ts <span class="mono" style="font-size:11px; color:var(--text-tertiary);">0.6s</span> <span style="color:var(--green);">&#10003;</span>
+        </div>
+        <div class="tool-detail">Read 67 lines. Provider config schema with GitHub-specific fields.</div>
+
+        <div style="margin-top:12px;"></div>
+        <div class="agent-text">After analyzing the codebase, here's my plan for the OAuth provider abstraction:</div>
+
+        <div class="code-block" style="margin-top:8px;">Plan:
+1. Define OAuthProvider interface in packages/types
+2. Implement GitHubOAuthProvider
+3. Implement GoogleOAuthProvider
+4. Refactor AuthManager to use provider pattern
+5. Update routes to support provider selection
+6. Add token refresh logic per provider
+7. Tests for each provider + integration</div>
+
+        <div class="timestamp">14:38:14</div>
+        <div class="system-event">Stage <span style="color:var(--text-secondary);">plan</span> completed -- advancing to <span style="color:var(--text-secondary);">implement</span></div>
+
+        <div class="timestamp">14:38:18</div>
+        <div class="agent-text">Starting implementation. I'll create the provider interface first, then build out GitHub and Google providers.</div>
+
+        <div class="tool-call tool-line" onclick="toggleTool(this)" style="margin-top:6px;">
+          <span style="color:var(--text-tertiary);">&gt;</span> Create packages/types/src/oauth-provider.ts <span class="mono" style="font-size:11px; color:var(--text-tertiary);">(42 lines)</span> <span style="color:var(--green);">&#10003;</span>
+        </div>
+        <div class="tool-detail">Created OAuthProvider interface with authorize(), exchange(), refresh(), revoke() methods.</div>
+
+        <div class="tool-call tool-line" onclick="toggleTool(this)">
+          <span style="color:var(--text-tertiary);">&gt;</span> Create packages/core/src/auth/providers/github.ts <span class="mono" style="font-size:11px; color:var(--text-tertiary);">(89 lines)</span> <span style="color:var(--green);">&#10003;</span>
+        </div>
+        <div class="tool-detail">GitHubOAuthProvider: authorize URL builder, code exchange via /login/oauth/access_token, user fetch via /user.</div>
+
+        <div class="tool-call tool-line" onclick="toggleTool(this)">
+          <span style="color:var(--text-tertiary);">&gt;</span> Create packages/core/src/auth/providers/google.ts <span class="mono" style="font-size:11px; color:var(--text-tertiary);">(134 lines)</span> <span style="color:var(--green);">&#10003;</span>
+        </div>
+        <div class="tool-detail">GoogleOAuthProvider: PKCE flow, token exchange, refresh with grant_type=refresh_token, userinfo endpoint.</div>
+
+        <div class="tool-call tool-line" onclick="toggleTool(this)">
+          <span style="color:var(--text-tertiary);">&gt;</span> Edit packages/core/src/auth/index.ts <span class="mono" style="font-size:11px; color:var(--text-tertiary);">+45 -3</span> <span style="color:var(--green);">&#10003;</span>
+        </div>
+        <div class="tool-detail">Refactored AuthManager: constructor takes OAuthProvider[], register/get by name. Removed hardcoded GitHub logic.</div>
+
+        <div class="tool-call tool-line" onclick="toggleTool(this)">
+          <span style="color:var(--text-tertiary);">&gt;</span> Edit packages/server/src/routes/auth.ts <span class="mono" style="font-size:11px; color:var(--text-tertiary);">+28 -12</span> <span style="color:var(--green);">&#10003;</span>
+        </div>
+        <div class="tool-detail">Updated routes: /auth/:provider/authorize, /auth/:provider/callback. Provider resolved from URL param.</div>
+
+        <div class="tool-call tool-line" onclick="toggleTool(this)">
+          <span style="color:var(--text-tertiary);">&gt;</span> Edit packages/core/src/auth/middleware.ts <span class="mono" style="font-size:11px; color:var(--text-tertiary);">+15 -7</span> <span style="color:var(--green);">&#10003;</span>
+        </div>
+        <div class="tool-detail">Auth middleware now checks token.provider field, delegates refresh to correct provider.</div>
+
+        <div style="margin-top:16px;"></div>
+        <div class="agent-text">Implementation complete. The OAuth abstraction now supports multiple providers with a clean interface. Each provider handles its own authorization URL construction, token exchange, refresh, and revocation.</div>
+
+        <div class="timestamp">14:52:30</div>
+        <div class="system-event">Stage <span style="color:var(--text-secondary);">implement</span> completed -- advancing to <span style="color:var(--text-secondary);">verify</span></div>
+
+        <div class="timestamp">14:52:34</div>
+        <div class="agent-text">Running the test suite to verify the implementation.</div>
+
+        <div class="tool-call tool-line" onclick="toggleTool(this)" style="margin-top:6px;">
+          <span style="color:var(--text-tertiary);">&gt;</span> Run make test <span class="mono" style="font-size:11px; color:var(--text-tertiary);">18.4s</span> <span style="color:var(--green);">&#10003;</span>
+        </div>
+        <div class="tool-detail">47 tests passed. 0 failures. Coverage: auth/providers 94%, auth/index 88%.</div>
+
+        <div class="tool-call tool-line" onclick="toggleTool(this)">
+          <span style="color:var(--text-tertiary);">&gt;</span> Run make lint <span class="mono" style="font-size:11px; color:var(--text-tertiary);">3.2s</span> <span style="color:var(--green);">&#10003;</span>
+        </div>
+        <div class="tool-detail">0 errors, 0 warnings.</div>
+
+        <div class="timestamp">14:53:10</div>
+        <div class="system-event">Stage <span style="color:var(--text-secondary);">verify</span> completed -- advancing to <span style="color:var(--text-secondary);">review</span></div>
+
+        <div class="timestamp">14:53:14</div>
+        <div class="agent-text">All tests pass. Let me do a final review of the changes before creating the PR.</div>
+
+        <div class="tool-call tool-line" onclick="toggleTool(this)" style="margin-top:6px;">
+          <span style="color:var(--text-tertiary);">&gt;</span> Run git diff --stat <span class="mono" style="font-size:11px; color:var(--text-tertiary);">0.3s</span> <span style="color:var(--green);">&#10003;</span>
+        </div>
+        <div class="tool-detail">6 files changed, 319 insertions(+), 22 deletions(-)</div>
+
+        <div style="margin-top:14px;"></div>
+        <div class="user-label">YOU</div>
+        <div class="agent-text" style="margin-top:2px;">Use v2 endpoints for Google OAuth, not v1. The v1 endpoints are deprecated.</div>
+
+        <div class="timestamp">14:54:02</div>
+        <div class="agent-text">Got it -- switching the Google OAuth provider to use v2 endpoints. The authorization and token endpoints need to be updated.</div>
+
+        <div class="tool-call tool-line" onclick="toggleTool(this)" style="margin-top:6px;">
+          <span style="color:var(--text-tertiary);">&gt;</span> Edit packages/core/src/auth/providers/google.ts <span class="mono" style="font-size:11px; color:var(--text-tertiary);">+8 -8</span> <span style="color:var(--green);">&#10003;</span>
+        </div>
+        <div class="tool-detail">Updated: accounts.google.com/o/oauth2/v2/auth, oauth2.googleapis.com/token, www.googleapis.com/oauth2/v2/userinfo</div>
+
+        <div class="tool-call tool-line" onclick="toggleTool(this)">
+          <span style="color:var(--text-tertiary);">&gt;</span> Run make test <span class="mono" style="font-size:11px; color:var(--text-tertiary);">16.8s</span> <span style="color:var(--green);">&#10003;</span>
+        </div>
+        <div class="tool-detail">47 tests passed. 0 failures.</div>
+
+        <div class="agent-text" style="margin-top:8px;">Done. All Google OAuth calls now use v2 endpoints. Tests still pass.</div>
+
+        <div class="timestamp">14:55:30</div>
+        <div class="system-event">Stage <span style="color:var(--text-secondary);">review</span> completed -- advancing to <span style="color:var(--text-secondary);">pr</span></div>
+
+        <div class="timestamp">14:55:34</div>
+        <div class="agent-text">Creating the pull request with all changes.</div>
+
+        <div class="tool-call tool-line" onclick="toggleTool(this)" style="margin-top:6px;">
+          <span style="color:var(--text-tertiary);">&gt;</span> Run git push origin feat/oauth-provider-abstraction <span class="mono" style="font-size:11px; color:var(--text-tertiary);">2.1s</span> <span style="color:var(--green);">&#10003;</span>
+        </div>
+        <div class="tool-detail">Branch pushed to origin.</div>
+
+        <div class="tool-call tool-line" onclick="toggleTool(this)">
+          <span style="color:var(--text-tertiary);">&gt;</span> Run gh pr create --title "feat: OAuth provider abstraction" <span class="mono" style="font-size:11px; color:var(--text-tertiary);">1.4s</span> <span style="color:var(--green);">&#10003;</span>
+        </div>
+        <div class="tool-detail">Pull request #142 created: https://github.com/org/ark/pull/142</div>
+
+        <div class="agent-text" style="margin-top:8px;">PR <span class="mono" style="font-size:12px; color:var(--text-secondary);">#142</span> created. OAuth provider abstraction is ready for human review. Summary of changes:</div>
+
+        <div class="code-block">New files:
+  types/src/oauth-provider.ts    42 lines
+  auth/providers/github.ts       89 lines
+  auth/providers/google.ts      134 lines
+
+Modified:
+  auth/index.ts                 +45 -3
+  routes/auth.ts                +28 -12
+  auth/middleware.ts            +15 -7
+
+Tests: 47 passed, 0 failed
+Lint:  0 errors, 0 warnings</div>
+
+        <div class="timestamp">14:56:01</div>
+        <div class="system-event">Stage <span style="color:var(--text-secondary);">pr</span> completed -- session <span style="color:var(--green);">done</span></div>
+
+      </div>
+
+      <!-- Input bar -->
+      <div style="padding:8px 24px 16px 24px; flex-shrink:0;">
+        <div style="position:relative;">
+          <input type="text" class="msg-input" placeholder="Request changes or ask a question..." id="msgInput" onkeydown="handleInput(event)">
+          <div style="display:flex; justify-content:space-between; padding:6px 2px 0; font-size:10px; color:var(--text-tertiary);" class="mono">
+            <span>claude-opus-4-6</span>
+            <span>$0.82 this session</span>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Right panel - Details -->
+    <aside style="width:260px; flex-shrink:0; padding:16px 20px; overflow-y:auto; border-left:1px solid var(--border);">
+
+      <!-- Stages -->
+      <div class="section-label" style="margin-top:0;">stages</div>
+      <div class="stage-row">
+        <span style="color:var(--text-secondary);">plan</span>
+        <span style="color:var(--green); font-size:12px;">done</span>
+      </div>
+      <div class="stage-row">
+        <span style="color:var(--text-secondary);">implement</span>
+        <span style="color:var(--green); font-size:12px;">done</span>
+      </div>
+      <div class="stage-row">
+        <span style="color:var(--text-secondary);">verify</span>
+        <span style="color:var(--green); font-size:12px;">done</span>
+      </div>
+      <div class="stage-row">
+        <span style="color:var(--text-secondary);">review</span>
+        <span style="color:var(--green); font-size:12px;">done</span>
+      </div>
+      <div class="stage-row">
+        <span style="color:var(--text-secondary);">pr</span>
+        <span style="color:var(--green); font-size:12px;">done</span>
+      </div>
+
+      <!-- Files -->
+      <div class="section-label" style="margin-top:24px;">files changed</div>
+      <div class="file-row">
+        <span class="mono" style="color:var(--text-secondary);">oauth-provider.ts</span>
+        <span class="mono" style="color:var(--green);">+42</span>
+      </div>
+      <div class="file-row">
+        <span class="mono" style="color:var(--text-secondary);">github.ts</span>
+        <span class="mono" style="color:var(--green);">+89</span>
+      </div>
+      <div class="file-row">
+        <span class="mono" style="color:var(--text-secondary);">google.ts</span>
+        <span class="mono" style="color:var(--green);">+142</span>
+      </div>
+      <div class="file-row">
+        <span class="mono" style="color:var(--text-secondary);">auth/index.ts</span>
+        <span class="mono" style="color:var(--green);">+45</span>
+      </div>
+      <div class="file-row">
+        <span class="mono" style="color:var(--text-secondary);">routes/auth.ts</span>
+        <span class="mono" style="color:var(--green);">+28</span>
+      </div>
+      <div class="file-row">
+        <span class="mono" style="color:var(--text-secondary);">middleware.ts</span>
+        <span class="mono" style="color:var(--green);">+15</span>
+      </div>
+
+      <!-- Metrics -->
+      <div class="section-label" style="margin-top:24px;">metrics</div>
+      <div class="metric-row">
+        <span style="color:var(--text-secondary);">tokens</span>
+        <span class="mono" style="color:var(--text-primary);">24,310</span>
+      </div>
+      <div class="metric-row">
+        <span style="color:var(--text-secondary);">cost</span>
+        <span class="mono" style="color:var(--text-primary);">$0.82</span>
+      </div>
+      <div class="metric-row">
+        <span style="color:var(--text-secondary);">time</span>
+        <span class="mono" style="color:var(--text-primary);">22m</span>
+      </div>
+      <div class="metric-row">
+        <span style="color:var(--text-secondary);">tests</span>
+        <span class="mono" style="color:var(--green);">47 passed</span>
+      </div>
+      <div class="metric-row">
+        <span style="color:var(--text-secondary);">lint</span>
+        <span class="mono" style="color:var(--green);">0 warnings</span>
+      </div>
+
+      <!-- Session info -->
+      <div class="section-label" style="margin-top:24px;">session</div>
+      <div class="metric-row">
+        <span style="color:var(--text-secondary);">id</span>
+        <span class="mono" style="color:var(--text-primary);">s-a3bf</span>
+      </div>
+      <div class="metric-row">
+        <span style="color:var(--text-secondary);">flow</span>
+        <span class="mono" style="color:var(--text-primary);">autonomous-sdlc</span>
+      </div>
+      <div class="metric-row">
+        <span style="color:var(--text-secondary);">runtime</span>
+        <span class="mono" style="color:var(--text-primary);">claude</span>
+      </div>
+      <div class="metric-row">
+        <span style="color:var(--text-secondary);">compute</span>
+        <span class="mono" style="color:var(--text-primary);">local-0</span>
+      </div>
+      <div class="metric-row">
+        <span style="color:var(--text-secondary);">pr</span>
+        <span class="mono" style="color:var(--blue);">#142</span>
+      </div>
+
+    </aside>
+
+  </div>
+</div>
+
+<script>
+function selectSession(el, id) {
+  document.querySelectorAll('.session-item').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function switchNav(el) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function toggleTool(el) {
+  const detail = el.nextElementSibling;
+  if (detail && detail.classList.contains('tool-detail')) {
+    detail.classList.toggle('open');
+  }
+}
+
+function toggleTheme() {
+  document.body.classList.toggle('light');
+}
+
+function handleInput(e) {
+  if (e.key === 'Enter' && e.target.value.trim()) {
+    const conv = document.getElementById('conversation');
+    const label = document.createElement('div');
+    label.className = 'user-label';
+    label.style.marginTop = '14px';
+    label.textContent = 'YOU';
+    const msg = document.createElement('div');
+    msg.className = 'agent-text';
+    msg.style.marginTop = '2px';
+    msg.textContent = e.target.value;
+    conv.appendChild(label);
+    conv.appendChild(msg);
+    e.target.value = '';
+    conv.scrollTop = conv.scrollHeight;
+  }
+}
+
+// Scroll to bottom on load (conversation starts at latest)
+const conv = document.getElementById('conversation');
+conv.scrollTop = conv.scrollHeight;
+</script>
+
+</body>
+</html>
