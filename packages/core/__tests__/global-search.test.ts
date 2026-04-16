@@ -68,7 +68,6 @@ describe("global search with fixture data", () => {
       JSON.stringify({ message: { content: "This is a unique-test-sentinel value" } }),
       JSON.stringify({ message: { content: "Another line with different text" } }),
       JSON.stringify({ content: "Top-level content field also works" }),
-<<<<<<< HEAD
       "not-valid-json{{{", // malformed line -- should be skipped
     ];
     writeFileSync(join(fixtureDir, "test-session.jsonl"), lines.join("\n"));

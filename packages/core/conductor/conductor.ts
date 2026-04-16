@@ -542,7 +542,6 @@ export async function deliverToChannel(
       const client = new ArkdClient(arkdUrl);
       const result = await client.channelDeliver({ channelPort, payload });
       if (result.delivered) return;
-<<<<<<< HEAD
     } catch {
       /* arkd not available -- fall through to direct HTTP */
     }
@@ -555,7 +554,6 @@ export async function deliverToChannel(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-<<<<<<< HEAD
   } catch {
     /* channel not reachable -- expected when agent hasn't started channel yet */
   }

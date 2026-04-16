@@ -97,7 +97,6 @@ export class SSHPool {
     this.masterStarting = true;
     try {
       if (existsSync(this.socketPath)) {
-<<<<<<< HEAD
         try {
           rmSync(this.socketPath);
         } catch {

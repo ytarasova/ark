@@ -164,7 +164,6 @@ async function parseTranscriptMeta(
     for (let i = tailLines.length - 1; i >= 0; i--) {
       try {
         const entry = JSON.parse(tailLines[i]);
-<<<<<<< HEAD
         if (entry.timestamp) {
           lastActivity = entry.timestamp;
           break;
