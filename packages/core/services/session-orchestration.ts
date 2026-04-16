@@ -421,10 +421,22 @@ export async function dispatch(
 
   // Resolve runtime override from session config (set by --runtime CLI flag)
   const runtimeOverride = session.config?.runtime_override as string | undefined;
-  const agent = agentRegistry.resolveAgentWithRuntime(app, agentName, sessionAsVars(session), {
+  let agent = agentRegistry.resolveAgentWithRuntime(app, agentName, sessionAsVars(session), {
     runtimeOverride,
     projectRoot,
   });
+  // Fallback: agents created via the web UI are saved relative to the server's
+  // cwd which may differ from the session's workdir/repo (e.g. when the session
+  // targets a different repo or a worktree from a prior dispatch).
+  if (!agent) {
+    const serverRoot = agentRegistry.findProjectRoot(process.cwd()) ?? undefined;
+    if (serverRoot && serverRoot !== projectRoot) {
+      agent = agentRegistry.resolveAgentWithRuntime(app, agentName, sessionAsVars(session), {
+        runtimeOverride,
+        projectRoot: serverRoot,
+      });
+    }
+  }
   if (!agent) return { ok: false, message: `Agent '${agentName}' not found` };
 
   // Resolve autonomy level from flow stage definition
