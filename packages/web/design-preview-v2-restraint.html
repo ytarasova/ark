@@ -1,0 +1,1426 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ark -- Design Preview v2 (Monochromatic Restraint)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&family=Inter:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Geist Sans", "Inter", "system-ui", "sans-serif"],
+              mono: ["Geist Mono", "ui-monospace", "monospace"],
+            },
+            colors: {
+              surface: {
+                dark: "#0a0a0c",
+                light: "#f5f5f5",
+              },
+              page: {
+                dark: "#09090b",
+                light: "#fafafa",
+              },
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      @font-face {
+        font-family: "Geist Sans";
+        src: url("https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/Geist-Regular.woff2") format("woff2");
+        font-weight: 400;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "Geist Sans";
+        src: url("https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/Geist-Medium.woff2") format("woff2");
+        font-weight: 500;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "Geist Sans";
+        src: url("https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/Geist-SemiBold.woff2") format("woff2");
+        font-weight: 600;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "Geist Sans";
+        src: url("https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/Geist-Light.woff2") format("woff2");
+        font-weight: 300;
+        font-style: normal;
+      }
+      @font-face {
+        font-family: "Geist Mono";
+        src: url("https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-mono/GeistMono-Regular.woff2")
+          format("woff2");
+        font-weight: 400;
+        font-style: normal;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html {
+        font-family: "Geist Sans", "Inter", system-ui, sans-serif;
+      }
+
+      /* Theme variables */
+      .dark {
+        --page-bg: #09090b;
+        --surface-bg: #0a0a0c;
+        --border: rgba(255, 255, 255, 0.06);
+        --text-primary: #fafafa;
+        --text-secondary: #a1a1aa;
+        --text-muted: #52525b;
+        --accent: #a1a1aa;
+        --status-green: #22c55e;
+        --overlay: rgba(0, 0, 0, 0.6);
+        --diff-add-bg: rgba(34, 197, 94, 0.08);
+        --diff-del-bg: rgba(239, 68, 68, 0.08);
+        --diff-add-text: #4ade80;
+        --diff-del-text: #f87171;
+      }
+
+      :root:not(.dark) {
+        --page-bg: #fafafa;
+        --surface-bg: #f5f5f5;
+        --border: rgba(0, 0, 0, 0.06);
+        --text-primary: #09090b;
+        --text-secondary: #52525b;
+        --text-muted: #a1a1aa;
+        --accent: #52525b;
+        --status-green: #16a34a;
+        --overlay: rgba(0, 0, 0, 0.3);
+        --diff-add-bg: rgba(34, 197, 94, 0.06);
+        --diff-del-bg: rgba(239, 68, 68, 0.06);
+        --diff-add-text: #15803d;
+        --diff-del-text: #dc2626;
+      }
+
+      body {
+        background: var(--page-bg);
+        color: var(--text-primary);
+      }
+
+      .border-subtle {
+        border-color: var(--border);
+      }
+      .bg-page {
+        background: var(--page-bg);
+      }
+      .bg-surface {
+        background: var(--surface-bg);
+      }
+      .text-primary {
+        color: var(--text-primary);
+      }
+      .text-secondary {
+        color: var(--text-secondary);
+      }
+      .text-muted {
+        color: var(--text-muted);
+      }
+
+      /* Scrollbar */
+      ::-webkit-scrollbar {
+        width: 4px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 2px;
+      }
+
+      /* Tool call expandable */
+      .tool-summary {
+        cursor: pointer;
+      }
+      .tool-detail {
+        display: none;
+      }
+      .tool-summary.expanded + .tool-detail {
+        display: block;
+      }
+
+      /* Modal */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: var(--overlay);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 50;
+      }
+      .modal-overlay.active {
+        display: flex;
+      }
+
+      /* Tabs */
+      .tab-btn {
+        border-bottom: 2px solid transparent;
+      }
+      .tab-btn.active {
+        border-bottom-color: var(--text-primary);
+        color: var(--text-primary);
+      }
+      .tab-content {
+        display: none;
+      }
+      .tab-content.active {
+        display: block;
+      }
+    </style>
+  </head>
+  <body class="min-h-screen antialiased">
+    <!-- Theme toggle (floating, minimal) -->
+    <button
+      id="themeToggle"
+      onclick="document.documentElement.classList.toggle('dark')"
+      style="
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 100;
+        background: none;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 6px 12px;
+        color: var(--text-secondary);
+        font-size: 12px;
+        font-family: inherit;
+        cursor: pointer;
+        letter-spacing: 0.02em;
+      "
+    >
+      toggle theme
+    </button>
+
+    <!-- ============================================ -->
+    <!-- LAYOUT: Sidebar + Main -->
+    <!-- ============================================ -->
+    <div style="display: flex; min-height: 100vh">
+      <!-- 1. SIDEBAR -->
+      <aside
+        style="
+          width: 200px;
+          border-right: 1px solid var(--border);
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          padding: 24px 0;
+          flex-shrink: 0;
+        "
+      >
+        <div>
+          <!-- Logo / wordmark -->
+          <div
+            style="
+              padding: 0 20px 32px;
+              font-size: 15px;
+              font-weight: 600;
+              letter-spacing: -0.02em;
+              color: var(--text-primary);
+            "
+          >
+            ark
+          </div>
+
+          <!-- Nav items -->
+          <nav style="display: flex; flex-direction: column; gap: 2px">
+            <a
+              href="#"
+              style="
+                padding: 6px 20px;
+                font-size: 13px;
+                font-weight: 500;
+                color: var(--text-primary);
+                text-decoration: none;
+                display: block;
+              "
+              >Sessions</a
+            >
+            <a
+              href="#"
+              style="
+                padding: 6px 20px;
+                font-size: 13px;
+                font-weight: 400;
+                color: var(--text-secondary);
+                text-decoration: none;
+                display: block;
+              "
+              >Agents</a
+            >
+            <a
+              href="#"
+              style="
+                padding: 6px 20px;
+                font-size: 13px;
+                font-weight: 400;
+                color: var(--text-secondary);
+                text-decoration: none;
+                display: block;
+              "
+              >Flows</a
+            >
+            <a
+              href="#"
+              style="
+                padding: 6px 20px;
+                font-size: 13px;
+                font-weight: 400;
+                color: var(--text-secondary);
+                text-decoration: none;
+                display: block;
+              "
+              >Compute</a
+            >
+            <a
+              href="#"
+              style="
+                padding: 6px 20px;
+                font-size: 13px;
+                font-weight: 400;
+                color: var(--text-secondary);
+                text-decoration: none;
+                display: block;
+              "
+              >Router</a
+            >
+            <a
+              href="#"
+              style="
+                padding: 6px 20px;
+                font-size: 13px;
+                font-weight: 400;
+                color: var(--text-secondary);
+                text-decoration: none;
+                display: block;
+              "
+              >Settings</a
+            >
+          </nav>
+        </div>
+
+        <!-- Version -->
+        <div
+          style="
+            padding: 0 20px;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: &quot;Geist Mono&quot;, monospace;
+          "
+        >
+          v0.9.2
+        </div>
+      </aside>
+
+      <!-- MAIN CONTENT -->
+      <main style="flex: 1; display: flex; flex-direction: column; overflow: hidden">
+        <!-- ============================================ -->
+        <!-- SECTION: Stats strip -->
+        <!-- ============================================ -->
+        <div style="padding: 24px 32px 0; display: flex; gap: 48px">
+          <div>
+            <span style="font-size: 28px; font-weight: 500; letter-spacing: -0.03em; color: var(--text-primary)"
+              >3</span
+            >
+            <span style="font-size: 12px; color: var(--text-muted); margin-left: 8px">running</span>
+          </div>
+          <div>
+            <span style="font-size: 28px; font-weight: 500; letter-spacing: -0.03em; color: var(--text-primary)"
+              >47</span
+            >
+            <span style="font-size: 12px; color: var(--text-muted); margin-left: 8px">completed</span>
+          </div>
+          <div>
+            <span style="font-size: 28px; font-weight: 500; letter-spacing: -0.03em; color: var(--text-primary)"
+              >$12.40</span
+            >
+            <span style="font-size: 12px; color: var(--text-muted); margin-left: 8px">today</span>
+          </div>
+          <div>
+            <span style="font-size: 28px; font-weight: 500; letter-spacing: -0.03em; color: var(--text-primary)"
+              >2</span
+            >
+            <span style="font-size: 12px; color: var(--text-muted); margin-left: 8px">agents online</span>
+          </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- SECTION: Session list + Chat split -->
+        <!-- ============================================ -->
+        <div style="flex: 1; display: flex; margin-top: 24px; overflow: hidden">
+          <!-- 2. SESSION LIST -->
+          <div style="width: 320px; border-right: 1px solid var(--border); overflow-y: auto">
+            <!-- Selected session -->
+            <div
+              style="
+                padding: 12px 20px;
+                background: var(--surface-bg);
+                border-left: 2px solid var(--text-muted);
+                cursor: pointer;
+              "
+            >
+              <div style="font-size: 13px; color: var(--text-primary); line-height: 1.5">
+                Refactor session orchestration to use pipeline pattern
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-top: 4px">
+                <span style="font-size: 11px; color: var(--text-muted)">running</span>
+                <span style="font-size: 11px; color: var(--text-muted)">2m ago</span>
+              </div>
+            </div>
+
+            <div style="padding: 12px 20px; cursor: pointer">
+              <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.5">
+                Add circuit breaker to LLM router fallback chain
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-top: 4px">
+                <span style="font-size: 11px; color: var(--text-muted)">running</span>
+                <span style="font-size: 11px; color: var(--text-muted)">4m ago</span>
+              </div>
+            </div>
+
+            <div style="padding: 12px 20px; cursor: pointer">
+              <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.5">
+                Fix tmux session cleanup on compute teardown
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-top: 4px">
+                <span style="font-size: 11px; color: var(--text-muted)">completed</span>
+                <span style="font-size: 11px; color: var(--text-muted)">18m ago</span>
+              </div>
+            </div>
+
+            <div style="padding: 12px 20px; cursor: pointer">
+              <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.5">
+                Implement knowledge graph indexing for large repos
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-top: 4px">
+                <span style="font-size: 11px; color: var(--text-muted)">completed</span>
+                <span style="font-size: 11px; color: var(--text-muted)">1h ago</span>
+              </div>
+            </div>
+
+            <div style="padding: 12px 20px; cursor: pointer">
+              <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.5">
+                Add E2B sandbox provider with snapshot support
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-top: 4px">
+                <span style="font-size: 11px; color: var(--text-muted)">completed</span>
+                <span style="font-size: 11px; color: var(--text-muted)">3h ago</span>
+              </div>
+            </div>
+
+            <div style="padding: 12px 20px; cursor: pointer">
+              <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.5">
+                Write tests for fan-out flow DAG execution
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-top: 4px">
+                <span style="font-size: 11px; color: var(--text-muted)">completed</span>
+                <span style="font-size: 11px; color: var(--text-muted)">5h ago</span>
+              </div>
+            </div>
+
+            <div style="padding: 12px 20px; cursor: pointer">
+              <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.5">
+                Upgrade Vite config for SSE proxy in dev mode
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-top: 4px">
+                <span style="font-size: 11px; color: var(--text-muted)">failed</span>
+                <span style="font-size: 11px; color: var(--text-muted)">yesterday</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. CHAT CONVERSATION (centerpiece) -->
+          <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden">
+            <!-- Stage progress (4) -->
+            <div
+              style="
+                padding: 12px 32px;
+                border-bottom: 1px solid var(--border);
+                font-size: 12px;
+                font-family: &quot;Geist Mono&quot;, monospace;
+              "
+            >
+              <span style="color: var(--text-muted)">plan</span>
+              <span style="color: var(--text-muted); margin: 0 8px">-></span>
+              <span style="color: var(--text-primary); font-weight: 500">implement</span>
+              <span style="color: var(--text-muted); margin: 0 8px">-></span>
+              <span style="color: var(--text-muted)">verify</span>
+              <span style="color: var(--text-muted); margin: 0 8px">-></span>
+              <span style="color: var(--text-muted)">review</span>
+              <span style="color: var(--text-muted); margin: 0 8px">-></span>
+              <span style="color: var(--text-muted)">pr</span>
+            </div>
+
+            <!-- Messages area -->
+            <div style="flex: 1; overflow-y: auto; padding: 32px 32px 16px">
+              <!-- System event -->
+              <div style="text-align: center; margin-bottom: 32px">
+                <span style="font-size: 11px; color: var(--text-muted)"
+                  >Session started -- autonomous-sdlc flow -- claude-opus-4 runtime</span
+                >
+              </div>
+
+              <!-- User message -->
+              <div style="display: flex; justify-content: flex-end; margin-bottom: 32px">
+                <div
+                  style="
+                    max-width: 520px;
+                    padding: 12px 16px;
+                    border: 1px solid var(--border);
+                    border-radius: 8px;
+                    font-size: 13px;
+                    line-height: 1.7;
+                    color: var(--text-primary);
+                  "
+                >
+                  Refactor session orchestration to use a pipeline pattern. Each stage (plan, implement, verify, review,
+                  pr) should be a composable step that receives context and returns context. Remove the switch statement
+                  in runStage.
+                </div>
+              </div>
+
+              <!-- Agent message -->
+              <div style="margin-bottom: 32px; max-width: 640px">
+                <div style="font-size: 13px; line-height: 1.8; color: var(--text-primary)">
+                  I'll refactor the session orchestration to use a pipeline pattern. Let me start by understanding the
+                  current structure.
+                </div>
+              </div>
+
+              <!-- Tool call (collapsed) -->
+              <div style="margin-bottom: 32px; max-width: 640px">
+                <div
+                  class="tool-summary"
+                  style="
+                    font-size: 12px;
+                    color: var(--text-muted);
+                    font-family: &quot;Geist Mono&quot;, monospace;
+                    padding: 4px 0;
+                  "
+                  onclick="this.classList.toggle('expanded')"
+                >
+                  Read 4 files, analyzed orchestration structure
+                </div>
+                <div
+                  class="tool-detail"
+                  style="
+                    margin-top: 8px;
+                    padding: 12px 16px;
+                    border: 1px solid var(--border);
+                    border-radius: 4px;
+                    font-size: 12px;
+                    font-family: &quot;Geist Mono&quot;, monospace;
+                    line-height: 1.6;
+                    color: var(--text-secondary);
+                  "
+                >
+                  <div>read session-orchestration.ts</div>
+                  <div>read services/session.ts</div>
+                  <div>read types/session.ts</div>
+                  <div>read flows/autonomous-sdlc.yaml</div>
+                </div>
+              </div>
+
+              <!-- Agent message (longer) -->
+              <div style="margin-bottom: 32px; max-width: 640px">
+                <div style="font-size: 13px; line-height: 1.8; color: var(--text-primary)">
+                  The current
+                  <code
+                    style="
+                      font-family: &quot;Geist Mono&quot;, monospace;
+                      font-size: 12px;
+                      color: var(--text-secondary);
+                    "
+                    >runStage()</code
+                  >
+                  uses a 47-line switch statement that maps stage names to handler functions. Each handler directly
+                  mutates session state and calls the next stage recursively.
+                </div>
+                <div style="font-size: 13px; line-height: 1.8; color: var(--text-primary); margin-top: 16px">
+                  I'll replace this with a pipeline where each stage is a
+                  <code
+                    style="
+                      font-family: &quot;Geist Mono&quot;, monospace;
+                      font-size: 12px;
+                      color: var(--text-secondary);
+                    "
+                    >StageHandler</code
+                  >
+                  -- a function that takes
+                  <code
+                    style="
+                      font-family: &quot;Geist Mono&quot;, monospace;
+                      font-size: 12px;
+                      color: var(--text-secondary);
+                    "
+                    >PipelineContext</code
+                  >
+                  and returns the updated context. The pipeline runner iterates through stages sequentially, passing
+                  context forward.
+                </div>
+              </div>
+
+              <!-- Tool call (collapsed) -->
+              <div style="margin-bottom: 32px; max-width: 640px">
+                <div
+                  class="tool-summary"
+                  style="
+                    font-size: 12px;
+                    color: var(--text-muted);
+                    font-family: &quot;Geist Mono&quot;, monospace;
+                    padding: 4px 0;
+                  "
+                  onclick="this.classList.toggle('expanded')"
+                >
+                  Edited 2 files, created 1 new file
+                </div>
+                <div
+                  class="tool-detail"
+                  style="
+                    margin-top: 8px;
+                    padding: 12px 16px;
+                    border: 1px solid var(--border);
+                    border-radius: 4px;
+                    font-size: 12px;
+                    font-family: &quot;Geist Mono&quot;, monospace;
+                    line-height: 1.6;
+                    color: var(--text-secondary);
+                  "
+                >
+                  <div style="color: var(--diff-add-text)">+ core/pipeline.ts (new)</div>
+                  <div>~ session-orchestration.ts (modified)</div>
+                  <div>~ services/session.ts (modified)</div>
+                </div>
+              </div>
+
+              <!-- Agent message -->
+              <div style="margin-bottom: 32px; max-width: 640px">
+                <div style="font-size: 13px; line-height: 1.8; color: var(--text-primary)">
+                  Done. The pipeline is now defined as an array of stage handlers. Running tests to verify nothing
+                  broke.
+                </div>
+              </div>
+
+              <!-- Tool call -->
+              <div style="margin-bottom: 32px; max-width: 640px">
+                <div
+                  class="tool-summary"
+                  style="
+                    font-size: 12px;
+                    color: var(--text-muted);
+                    font-family: &quot;Geist Mono&quot;, monospace;
+                    padding: 4px 0;
+                  "
+                  onclick="this.classList.toggle('expanded')"
+                >
+                  Ran tests -- 14 passed, 0 failed
+                </div>
+                <div
+                  class="tool-detail"
+                  style="
+                    margin-top: 8px;
+                    padding: 12px 16px;
+                    border: 1px solid var(--border);
+                    border-radius: 4px;
+                    font-size: 12px;
+                    font-family: &quot;Geist Mono&quot;, monospace;
+                    line-height: 1.6;
+                    color: var(--text-secondary);
+                  "
+                >
+                  <div>$ make test-file F=packages/core/__tests__/session.test.ts</div>
+                  <div style="margin-top: 4px; color: var(--text-muted)">14 tests, 14 passed, 0 failed (1.2s)</div>
+                </div>
+              </div>
+
+              <!-- System event -->
+              <div style="text-align: center; margin-bottom: 32px">
+                <span style="font-size: 11px; color: var(--text-muted)">Stage: implement -- completed in 34s</span>
+              </div>
+            </div>
+
+            <!-- Input bar -->
+            <div style="padding: 12px 32px 16px; border-top: 1px solid var(--border)">
+              <div
+                style="
+                  display: flex;
+                  align-items: center;
+                  border: 1px solid var(--border);
+                  border-radius: 8px;
+                  padding: 10px 16px;
+                "
+              >
+                <input
+                  type="text"
+                  placeholder="Send a message..."
+                  style="
+                    flex: 1;
+                    background: none;
+                    border: none;
+                    outline: none;
+                    color: var(--text-primary);
+                    font-size: 13px;
+                    font-family: inherit;
+                  "
+                />
+                <span
+                  style="
+                    font-size: 11px;
+                    color: var(--text-muted);
+                    font-family: &quot;Geist Mono&quot;, monospace;
+                    margin-left: 12px;
+                  "
+                  >claude-opus-4</span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- SECTION: Components showcase (below fold) -->
+        <!-- ============================================ -->
+        <div style="border-top: 1px solid var(--border); padding: 64px 32px">
+          <div
+            style="
+              font-size: 11px;
+              color: var(--text-muted);
+              text-transform: uppercase;
+              letter-spacing: 0.08em;
+              margin-bottom: 48px;
+            "
+          >
+            Components
+          </div>
+
+          <!-- 6. Status indicators -->
+          <div style="margin-bottom: 64px">
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px">Status indicators</div>
+            <div style="display: flex; gap: 32px; align-items: center">
+              <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-primary)">
+                <span
+                  style="
+                    width: 4px;
+                    height: 4px;
+                    border-radius: 50%;
+                    background: var(--status-green);
+                    display: inline-block;
+                  "
+                ></span>
+                claude-opus-4
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-primary)">
+                <span
+                  style="
+                    width: 4px;
+                    height: 4px;
+                    border-radius: 50%;
+                    background: var(--status-green);
+                    display: inline-block;
+                  "
+                ></span>
+                codex-mini
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary)">
+                <span
+                  style="
+                    width: 4px;
+                    height: 4px;
+                    border-radius: 50%;
+                    background: var(--text-muted);
+                    display: inline-block;
+                  "
+                ></span>
+                gemini-2.5-pro
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary)">
+                <span
+                  style="
+                    width: 4px;
+                    height: 4px;
+                    border-radius: 50%;
+                    background: var(--text-muted);
+                    display: inline-block;
+                  "
+                ></span>
+                goose
+              </div>
+            </div>
+          </div>
+
+          <!-- 7. Empty state -->
+          <div style="margin-bottom: 64px">
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px">Empty state</div>
+            <div style="padding: 80px 0; text-align: center">
+              <span style="font-size: 13px; color: var(--text-muted)">No sessions</span>
+            </div>
+          </div>
+
+          <!-- 10. Tabs (Files / Changes / PR) -->
+          <div style="margin-bottom: 64px">
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px">Tabs</div>
+            <div style="display: flex; gap: 24px; border-bottom: 1px solid var(--border); padding-bottom: 0">
+              <button
+                class="tab-btn active"
+                onclick="switchTab(this, 'files')"
+                style="
+                  background: none;
+                  border: none;
+                  font-family: inherit;
+                  font-size: 13px;
+                  color: var(--text-primary);
+                  padding: 8px 0;
+                  cursor: pointer;
+                  border-bottom: 2px solid var(--text-primary);
+                  margin-bottom: -1px;
+                "
+              >
+                Files
+              </button>
+              <button
+                class="tab-btn"
+                onclick="switchTab(this, 'changes')"
+                style="
+                  background: none;
+                  border: none;
+                  font-family: inherit;
+                  font-size: 13px;
+                  color: var(--text-muted);
+                  padding: 8px 0;
+                  cursor: pointer;
+                  border-bottom: 2px solid transparent;
+                  margin-bottom: -1px;
+                "
+              >
+                Changes
+              </button>
+              <button
+                class="tab-btn"
+                onclick="switchTab(this, 'pr')"
+                style="
+                  background: none;
+                  border: none;
+                  font-family: inherit;
+                  font-size: 13px;
+                  color: var(--text-muted);
+                  padding: 8px 0;
+                  cursor: pointer;
+                  border-bottom: 2px solid transparent;
+                  margin-bottom: -1px;
+                "
+              >
+                Pull Request
+              </button>
+            </div>
+
+            <!-- Files tab content -->
+            <div class="tab-content active" id="tab-files" style="padding-top: 16px">
+              <div
+                style="
+                  font-size: 13px;
+                  font-family: &quot;Geist Mono&quot;, monospace;
+                  line-height: 2;
+                  color: var(--text-secondary);
+                "
+              >
+                <div>packages/core/pipeline.ts</div>
+                <div>packages/core/session-orchestration.ts</div>
+                <div>packages/core/services/session.ts</div>
+                <div>packages/core/__tests__/session.test.ts</div>
+              </div>
+            </div>
+
+            <!-- Changes tab content -->
+            <div class="tab-content" id="tab-changes" style="padding-top: 16px">
+              <!-- 9. Diff viewer -->
+              <div
+                style="
+                  font-family: &quot;Geist Mono&quot;, monospace;
+                  font-size: 12px;
+                  line-height: 1.8;
+                  border: 1px solid var(--border);
+                  border-radius: 4px;
+                  overflow: hidden;
+                "
+              >
+                <div
+                  style="
+                    padding: 8px 16px;
+                    border-bottom: 1px solid var(--border);
+                    color: var(--text-muted);
+                    font-size: 11px;
+                  "
+                >
+                  session-orchestration.ts
+                </div>
+                <div style="padding: 4px 16px; color: var(--text-muted)">@@ -23,15 +23,8 @@</div>
+                <div style="padding: 2px 16px; background: var(--diff-del-bg); color: var(--diff-del-text)">
+                  - switch (stage.name) {
+                </div>
+                <div style="padding: 2px 16px; background: var(--diff-del-bg); color: var(--diff-del-text)">
+                  - case "plan": return runPlan(app, session, stage);
+                </div>
+                <div style="padding: 2px 16px; background: var(--diff-del-bg); color: var(--diff-del-text)">
+                  - case "implement": return runImplement(app, session, stage);
+                </div>
+                <div style="padding: 2px 16px; background: var(--diff-del-bg); color: var(--diff-del-text)">
+                  - case "verify": return runVerify(app, session, stage);
+                </div>
+                <div style="padding: 2px 16px; background: var(--diff-del-bg); color: var(--diff-del-text)">
+                  - default: throw new Error(`Unknown stage: ${stage.name}`);
+                </div>
+                <div style="padding: 2px 16px; background: var(--diff-del-bg); color: var(--diff-del-text)">- }</div>
+                <div style="padding: 2px 16px; background: var(--diff-add-bg); color: var(--diff-add-text)">
+                  + const handler = pipeline.get(stage.name);
+                </div>
+                <div style="padding: 2px 16px; background: var(--diff-add-bg); color: var(--diff-add-text)">
+                  + if (!handler) throw new Error(`No handler for stage: ${stage.name}`);
+                </div>
+                <div style="padding: 2px 16px; background: var(--diff-add-bg); color: var(--diff-add-text)">
+                  + return handler(ctx);
+                </div>
+              </div>
+            </div>
+
+            <!-- PR tab content -->
+            <div class="tab-content" id="tab-pr" style="padding-top: 16px">
+              <div style="font-size: 13px; line-height: 1.8; color: var(--text-secondary)">
+                <div style="color: var(--text-primary); font-weight: 500; margin-bottom: 8px">
+                  refactor: replace stage switch with composable pipeline
+                </div>
+                <div>
+                  Each SDLC stage is now a
+                  <code style="font-family: &quot;Geist Mono&quot;, monospace; font-size: 12px">StageHandler</code>
+                  function. The pipeline runner iterates through stages, passing context forward. Removes 39 lines and
+                  makes adding new stages a one-line change.
+                </div>
+                <div style="margin-top: 16px; color: var(--text-muted); font-size: 12px">3 files changed, +42 -81</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 8. Modal -->
+          <div style="margin-bottom: 64px">
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px">Modal</div>
+            <button
+              onclick="document.getElementById('modal').classList.add('active')"
+              style="
+                background: none;
+                border: 1px solid var(--border);
+                border-radius: 6px;
+                padding: 6px 14px;
+                color: var(--text-secondary);
+                font-size: 12px;
+                font-family: inherit;
+                cursor: pointer;
+              "
+            >
+              Open modal
+            </button>
+          </div>
+
+          <!-- Stage progress (standalone demo) -->
+          <div style="margin-bottom: 64px">
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px">Stage progress variants</div>
+            <div
+              style="
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+                font-size: 12px;
+                font-family: &quot;Geist Mono&quot;, monospace;
+              "
+            >
+              <div>
+                <span style="color: var(--text-muted); text-decoration: line-through">plan</span>
+                <span style="color: var(--text-muted); margin: 0 8px">-></span>
+                <span style="color: var(--text-muted); text-decoration: line-through">implement</span>
+                <span style="color: var(--text-muted); margin: 0 8px">-></span>
+                <span style="color: var(--text-muted); text-decoration: line-through">verify</span>
+                <span style="color: var(--text-muted); margin: 0 8px">-></span>
+                <span style="color: var(--text-primary); font-weight: 500">review</span>
+                <span style="color: var(--text-muted); margin: 0 8px">-></span>
+                <span style="color: var(--text-muted)">pr</span>
+              </div>
+              <div>
+                <span style="color: var(--text-primary); font-weight: 500">plan</span>
+                <span style="color: var(--text-muted); margin: 0 8px">-></span>
+                <span style="color: var(--text-muted)">implement</span>
+                <span style="color: var(--text-muted); margin: 0 8px">-></span>
+                <span style="color: var(--text-muted)">verify</span>
+              </div>
+              <div>
+                <span style="color: var(--text-muted); text-decoration: line-through">plan</span>
+                <span style="color: var(--text-muted); margin: 0 8px">-></span>
+                <span style="color: var(--text-muted); text-decoration: line-through">implement</span>
+                <span style="color: var(--text-muted); margin: 0 8px">-></span>
+                <span style="color: var(--text-muted); text-decoration: line-through">verify</span>
+                <span style="color: var(--text-muted); margin: 0 8px">-></span>
+                <span style="color: var(--text-muted); text-decoration: line-through">review</span>
+                <span style="color: var(--text-muted); margin: 0 8px">-></span>
+                <span style="color: var(--text-muted); text-decoration: line-through">pr</span>
+                <span style="margin-left: 12px; color: var(--status-green); font-size: 11px">done</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Additional restrained components -->
+          <div style="margin-bottom: 64px">
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px">Form elements</div>
+            <div style="display: flex; flex-direction: column; gap: 16px; max-width: 360px">
+              <div>
+                <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 6px"
+                  >Session name</label
+                >
+                <input
+                  type="text"
+                  value="Refactor session orchestration"
+                  style="
+                    width: 100%;
+                    background: none;
+                    border: 1px solid var(--border);
+                    border-radius: 6px;
+                    padding: 8px 12px;
+                    color: var(--text-primary);
+                    font-size: 13px;
+                    font-family: inherit;
+                    outline: none;
+                  "
+                />
+              </div>
+              <div>
+                <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 6px"
+                  >Agent</label
+                >
+                <select
+                  style="
+                    width: 100%;
+                    background: var(--page-bg);
+                    border: 1px solid var(--border);
+                    border-radius: 6px;
+                    padding: 8px 12px;
+                    color: var(--text-secondary);
+                    font-size: 13px;
+                    font-family: inherit;
+                    outline: none;
+                  "
+                >
+                  <option>architect</option>
+                  <option>coder</option>
+                  <option>reviewer</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 6px"
+                  >Compute</label
+                >
+                <select
+                  style="
+                    width: 100%;
+                    background: var(--page-bg);
+                    border: 1px solid var(--border);
+                    border-radius: 6px;
+                    padding: 8px 12px;
+                    color: var(--text-secondary);
+                    font-size: 13px;
+                    font-family: inherit;
+                    outline: none;
+                  "
+                >
+                  <option>local</option>
+                  <option>docker</option>
+                  <option>e2b</option>
+                  <option>ec2-spot</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Buttons -->
+          <div style="margin-bottom: 64px">
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px">Buttons</div>
+            <div style="display: flex; gap: 16px; align-items: center">
+              <button
+                style="
+                  background: var(--text-primary);
+                  color: var(--page-bg);
+                  border: none;
+                  border-radius: 6px;
+                  padding: 8px 16px;
+                  font-size: 13px;
+                  font-family: inherit;
+                  cursor: pointer;
+                  font-weight: 500;
+                "
+              >
+                Start session
+              </button>
+              <button
+                style="
+                  background: none;
+                  border: 1px solid var(--border);
+                  border-radius: 6px;
+                  padding: 8px 16px;
+                  color: var(--text-secondary);
+                  font-size: 13px;
+                  font-family: inherit;
+                  cursor: pointer;
+                "
+              >
+                Cancel
+              </button>
+              <button
+                style="
+                  background: none;
+                  border: none;
+                  color: var(--text-muted);
+                  font-size: 13px;
+                  font-family: inherit;
+                  cursor: pointer;
+                  padding: 8px 0;
+                  text-decoration: underline;
+                  text-underline-offset: 3px;
+                "
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+
+          <!-- Loading / Spinner -->
+          <div style="margin-bottom: 64px">
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px">Loading state</div>
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span
+                style="font-size: 12px; color: var(--text-muted); font-family: &quot;Geist Mono&quot;, monospace"
+                id="spinner"
+                >|</span
+              >
+              <span style="font-size: 13px; color: var(--text-muted)">Provisioning compute...</span>
+            </div>
+          </div>
+
+          <!-- Toast / notification -->
+          <div style="margin-bottom: 64px">
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px">Notification</div>
+            <div
+              style="
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                padding: 8px 16px;
+                border: 1px solid var(--border);
+                border-radius: 6px;
+              "
+            >
+              <span
+                style="
+                  width: 4px;
+                  height: 4px;
+                  border-radius: 50%;
+                  background: var(--status-green);
+                  display: inline-block;
+                "
+              ></span>
+              <span style="font-size: 13px; color: var(--text-secondary)">Session s-a1b2 completed in 2m 14s</span>
+            </div>
+          </div>
+
+          <!-- Code block -->
+          <div style="margin-bottom: 64px">
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px">Code block</div>
+            <pre
+              style="
+                font-family: &quot;Geist Mono&quot;, monospace;
+                font-size: 12px;
+                line-height: 1.8;
+                color: var(--text-secondary);
+                padding: 16px 20px;
+                border: 1px solid var(--border);
+                border-radius: 4px;
+                overflow-x: auto;
+              "
+            ><span style="color:var(--text-muted)">// pipeline.ts</span>
+<span style="color:var(--text-primary)">type StageHandler</span> = (ctx: PipelineContext) => Promise&lt;PipelineContext&gt;;
+
+<span style="color:var(--text-primary)">const pipeline</span>: StageHandler[] = [
+  planStage,
+  implementStage,
+  verifyStage,
+  reviewStage,
+  prStage,
+];</pre>
+          </div>
+
+          <!-- Key-value list (agent detail) -->
+          <div style="margin-bottom: 64px">
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px">Detail view</div>
+            <div style="max-width: 480px">
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  padding: 10px 0;
+                  border-bottom: 1px solid var(--border);
+                "
+              >
+                <span style="font-size: 13px; color: var(--text-muted)">Agent</span>
+                <span style="font-size: 13px; color: var(--text-primary)">architect</span>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  padding: 10px 0;
+                  border-bottom: 1px solid var(--border);
+                "
+              >
+                <span style="font-size: 13px; color: var(--text-muted)">Runtime</span>
+                <span style="font-size: 13px; color: var(--text-primary)">claude-opus-4</span>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  padding: 10px 0;
+                  border-bottom: 1px solid var(--border);
+                "
+              >
+                <span style="font-size: 13px; color: var(--text-muted)">Compute</span>
+                <span style="font-size: 13px; color: var(--text-primary)">local</span>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  padding: 10px 0;
+                  border-bottom: 1px solid var(--border);
+                "
+              >
+                <span style="font-size: 13px; color: var(--text-muted)">Flow</span>
+                <span style="font-size: 13px; color: var(--text-primary)">autonomous-sdlc</span>
+              </div>
+              <div
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  padding: 10px 0;
+                  border-bottom: 1px solid var(--border);
+                "
+              >
+                <span style="font-size: 13px; color: var(--text-muted)">Cost</span>
+                <span style="font-size: 13px; color: var(--text-primary)">$0.84</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 10px 0">
+                <span style="font-size: 13px; color: var(--text-muted)">Duration</span>
+                <span style="font-size: 13px; color: var(--text-primary)">2m 14s</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Breadcrumb -->
+          <div style="margin-bottom: 64px">
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px">Breadcrumb</div>
+            <div style="font-size: 13px">
+              <span style="color: var(--text-muted)">Sessions</span>
+              <span style="color: var(--text-muted); margin: 0 8px">/</span>
+              <span style="color: var(--text-muted)">s-a1b2c3</span>
+              <span style="color: var(--text-muted); margin: 0 8px">/</span>
+              <span style="color: var(--text-primary)">implement</span>
+            </div>
+          </div>
+
+          <!-- Keyboard shortcut hints -->
+          <div style="margin-bottom: 64px">
+            <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 20px">Keyboard shortcuts</div>
+            <div style="display: flex; flex-direction: column; gap: 10px; max-width: 300px">
+              <div style="display: flex; justify-content: space-between; align-items: center">
+                <span style="font-size: 13px; color: var(--text-secondary)">New session</span>
+                <kbd
+                  style="
+                    font-size: 11px;
+                    color: var(--text-muted);
+                    font-family: &quot;Geist Mono&quot;, monospace;
+                    border: 1px solid var(--border);
+                    border-radius: 4px;
+                    padding: 2px 6px;
+                  "
+                  >N</kbd
+                >
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center">
+                <span style="font-size: 13px; color: var(--text-secondary)">Search</span>
+                <kbd
+                  style="
+                    font-size: 11px;
+                    color: var(--text-muted);
+                    font-family: &quot;Geist Mono&quot;, monospace;
+                    border: 1px solid var(--border);
+                    border-radius: 4px;
+                    padding: 2px 6px;
+                  "
+                  >/</kbd
+                >
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center">
+                <span style="font-size: 13px; color: var(--text-secondary)">Toggle sidebar</span>
+                <kbd
+                  style="
+                    font-size: 11px;
+                    color: var(--text-muted);
+                    font-family: &quot;Geist Mono&quot;, monospace;
+                    border: 1px solid var(--border);
+                    border-radius: 4px;
+                    padding: 2px 6px;
+                  "
+                  >[</kbd
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- 8. MODAL -->
+    <div class="modal-overlay" id="modal" onclick="if (event.target === this) this.classList.remove('active');">
+      <div
+        style="
+          background: var(--page-bg);
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          width: 420px;
+          max-width: 90vw;
+          padding: 24px;
+        "
+      >
+        <div style="font-size: 15px; font-weight: 500; color: var(--text-primary); margin-bottom: 20px">
+          New session
+        </div>
+        <div style="margin-bottom: 16px">
+          <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 6px">Prompt</label>
+          <textarea
+            rows="3"
+            placeholder="Describe the task..."
+            style="
+              width: 100%;
+              background: none;
+              border: 1px solid var(--border);
+              border-radius: 6px;
+              padding: 8px 12px;
+              color: var(--text-primary);
+              font-size: 13px;
+              font-family: inherit;
+              outline: none;
+              resize: vertical;
+            "
+          ></textarea>
+        </div>
+        <div style="margin-bottom: 16px">
+          <label style="font-size: 11px; color: var(--text-muted); display: block; margin-bottom: 6px">Flow</label>
+          <select
+            style="
+              width: 100%;
+              background: var(--page-bg);
+              border: 1px solid var(--border);
+              border-radius: 6px;
+              padding: 8px 12px;
+              color: var(--text-secondary);
+              font-size: 13px;
+              font-family: inherit;
+              outline: none;
+            "
+          >
+            <option>autonomous-sdlc</option>
+            <option>quick</option>
+            <option>fan-out</option>
+          </select>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px">
+          <button
+            onclick="document.getElementById('modal').classList.remove('active')"
+            style="
+              background: none;
+              border: 1px solid var(--border);
+              border-radius: 6px;
+              padding: 8px 16px;
+              color: var(--text-secondary);
+              font-size: 13px;
+              font-family: inherit;
+              cursor: pointer;
+            "
+          >
+            Cancel
+          </button>
+          <button
+            style="
+              background: var(--text-primary);
+              color: var(--page-bg);
+              border: none;
+              border-radius: 6px;
+              padding: 8px 16px;
+              font-size: 13px;
+              font-family: inherit;
+              cursor: pointer;
+              font-weight: 500;
+            "
+          >
+            Start
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Tab switching
+      function switchTab(btn, tabId) {
+        btn
+          .closest("div")
+          .querySelectorAll(".tab-btn")
+          .forEach((b) => {
+            b.classList.remove("active");
+            b.style.color = "var(--text-muted)";
+            b.style.borderBottomColor = "transparent";
+          });
+        btn.classList.add("active");
+        btn.style.color = "var(--text-primary)";
+        btn.style.borderBottomColor = "var(--text-primary)";
+
+        document.querySelectorAll(".tab-content").forEach((c) => c.classList.remove("active"));
+        document.getElementById("tab-" + tabId).classList.add("active");
+      }
+
+      // Spinner animation
+      const frames = ["|", "/", "-", "\\"];
+      let i = 0;
+      setInterval(() => {
+        document.getElementById("spinner").textContent = frames[i++ % frames.length];
+      }, 150);
+
+      // Escape to close modal
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          document.getElementById("modal").classList.remove("active");
+        }
+      });
+    </script>
+  </body>
+</html>
