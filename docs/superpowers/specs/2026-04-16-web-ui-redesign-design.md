@@ -18,32 +18,32 @@ This is not Apple HIG consumer polish (explored in FRESH-1 mockup -- too soft fo
 
 ### 1.1 Design Decisions Summary
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Aesthetic | Functional elegance (Linear register) | Dense operational tool, not consumer app; restraint = premium |
-| Themes | 3 switchable (Midnight Circuit default) | User choice; CSS custom properties make it trivial |
-| Layout | Icon Rail (48px) + List Panel + Detail Panel | Maximizes horizontal space; industry standard (Linear, VS Code, Cursor) |
-| Dashboard header | Status chips in page header | No KPI tiles; counts double as filters; zero wasted vertical space |
-| Session detail | Tabbed panels (Conversation, Terminal, Events, Diff, Todos) | Full-height single-panel focus; keyboard shortcuts 1-5 to switch |
-| Navigation | 6 items: Sessions (home), Agents, Compute, Knowledge, Costs, Settings | Aggressive consolidation from 10; "Agents" groups agents/flows/tools/runtimes as sub-tabs |
-| Dashboard page | Eliminated -- Sessions IS the home screen | Status chips + session list provide the overview |
-| Typography | Inter + JetBrains Mono + Geist Mono | Proven at small sizes; dual mono for code vs UI data |
-| Primary accent | Purple #7C6AEF | AI/agent alignment; distinct from Windsurf mint, GitHub blue |
-| Motion | Functional only, 150-200ms | Linear's curve; no decorative animation |
-| Density | Single compact mode | Power users managing agent fleets want maximum density |
+| Decision         | Choice                                                                | Rationale                                                                                 |
+| ---------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Aesthetic        | Functional elegance (Linear register)                                 | Dense operational tool, not consumer app; restraint = premium                             |
+| Themes           | 3 switchable (Midnight Circuit default)                               | User choice; CSS custom properties make it trivial                                        |
+| Layout           | Icon Rail (48px) + List Panel + Detail Panel                          | Maximizes horizontal space; industry standard (Linear, VS Code, Cursor)                   |
+| Dashboard header | Status chips in page header                                           | No KPI tiles; counts double as filters; zero wasted vertical space                        |
+| Session detail   | Tabbed panels (Conversation, Terminal, Events, Diff, Todos)           | Full-height single-panel focus; keyboard shortcuts 1-5 to switch                          |
+| Navigation       | 6 items: Sessions (home), Agents, Compute, Knowledge, Costs, Settings | Aggressive consolidation from 10; "Agents" groups agents/flows/tools/runtimes as sub-tabs |
+| Dashboard page   | Eliminated -- Sessions IS the home screen                             | Status chips + session list provide the overview                                          |
+| Typography       | Inter + JetBrains Mono + Geist Mono                                   | Proven at small sizes; dual mono for code vs UI data                                      |
+| Primary accent   | Purple #7C6AEF                                                        | AI/agent alignment; distinct from Windsurf mint, GitHub blue                              |
+| Motion           | Functional only, 150-200ms                                            | Linear's curve; no decorative animation                                                   |
+| Density          | Single compact mode                                                   | Power users managing agent fleets want maximum density                                    |
 
 ### 1.2 Research Synthesis
 
 This spec synthesizes six research tracks:
 
-| Input | What was adopted | What was rejected (and why) |
-|-------|------------------|---------------------------|
-| Design spec brainstorm | Icon rail, 3 themes, status chips, tabbed panels, 6-item nav, sessions as home, Cmd+K | -- (all major decisions confirmed) |
-| FRESH-1 mockup (PR #149) | Clean surface transitions (200ms), localStorage theme persistence, keyboard shortcuts | 240px text sidebar (wastes space for 6 items), right workspace panel (fragments focus), Apple HIG aesthetic (too consumer) |
-| Competitor analysis (15 products) | Three-panel layout, dark-first, keyboard-first, Linear density, Cursor tool-call blocks | Windsurf Kanban (list + grid toggle covers this), Datadog KPI tiles (wasted vertical space) |
-| Design system research | Functional elegance, 3-layer components, semantic color, cva variants, Sonner toasts | Density toggle (single compact mode is enough) |
-| Typography/color research | Inter + JetBrains + Geist Mono, purple primary, constellation metaphor, oklch for new tokens | Custom/display fonts (Inter wins at dense UI sizes) |
-| Orchestration UX patterns | ReactFlow DAGs, horizontal stepper pipeline, fan-out panel, pause-on-hover | Waterfall/Gantt view (post-v1), split-pane fan-out logs (post-v1) |
+| Input                             | What was adopted                                                                             | What was rejected (and why)                                                                                                |
+| --------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Design spec brainstorm            | Icon rail, 3 themes, status chips, tabbed panels, 6-item nav, sessions as home, Cmd+K        | -- (all major decisions confirmed)                                                                                         |
+| FRESH-1 mockup (PR #149)          | Clean surface transitions (200ms), localStorage theme persistence, keyboard shortcuts        | 240px text sidebar (wastes space for 6 items), right workspace panel (fragments focus), Apple HIG aesthetic (too consumer) |
+| Competitor analysis (15 products) | Three-panel layout, dark-first, keyboard-first, Linear density, Cursor tool-call blocks      | Windsurf Kanban (list + grid toggle covers this), Datadog KPI tiles (wasted vertical space)                                |
+| Design system research            | Functional elegance, 3-layer components, semantic color, cva variants, Sonner toasts         | Density toggle (single compact mode is enough)                                                                             |
+| Typography/color research         | Inter + JetBrains + Geist Mono, purple primary, constellation metaphor, oklch for new tokens | Custom/display fonts (Inter wins at dense UI sizes)                                                                        |
+| Orchestration UX patterns         | ReactFlow DAGs, horizontal stepper pipeline, fan-out panel, pause-on-hover                   | Waterfall/Gantt view (post-v1), split-pane fan-out logs (post-v1)                                                          |
 
 ---
 
@@ -75,15 +75,15 @@ This spec synthesizes six research tracks:
 
 6 items, top to bottom:
 
-| Position | Icon | Label | View | Contains |
-|----------|------|-------|------|----------|
-| Logo | Ark gradient mark | -- | -- | Brand mark, links to Sessions |
-| 1 | `Play` or custom | Sessions | sessions | Active + history (filter/tab), session detail |
-| 2 | `Bot` or `Settings` | Agents | agents | Sub-tabs: Agents, Flows, Tools, Runtimes (first sub-tab shares parent label) |
-| 3 | `Server` | Compute | compute | Compute templates + active instances |
-| 4 | `Brain` or `BookOpen` | Knowledge | knowledge | Memory + codegraph search |
-| 5 | `DollarSign` | Costs | costs | Spending, budgets, model breakdown |
-| Bottom | `Cog` | Settings | settings | Config, schedules, router, daemon health |
+| Position | Icon                  | Label     | View      | Contains                                                                     |
+| -------- | --------------------- | --------- | --------- | ---------------------------------------------------------------------------- |
+| Logo     | Ark gradient mark     | --        | --        | Brand mark, links to Sessions                                                |
+| 1        | `Play` or custom      | Sessions  | sessions  | Active + history (filter/tab), session detail                                |
+| 2        | `Bot` or `Settings`   | Agents    | agents    | Sub-tabs: Agents, Flows, Tools, Runtimes (first sub-tab shares parent label) |
+| 3        | `Server`              | Compute   | compute   | Compute templates + active instances                                         |
+| 4        | `Brain` or `BookOpen` | Knowledge | knowledge | Memory + codegraph search                                                    |
+| 5        | `DollarSign`          | Costs     | costs     | Spending, budgets, model breakdown                                           |
+| Bottom   | `Cog`                 | Settings  | settings  | Config, schedules, router, daemon health                                     |
 
 Daemon health dot: embedded in the logo area or Settings icon (green/amber/red glow).
 
@@ -125,32 +125,32 @@ Deep blue-black backgrounds, purple-cyan accents. Constellation/neural network a
 
 **Dark mode:**
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--background` | `#0C0C14` | Page background -- deep blue-black |
-| `--card` | `#14141E` | Card/panel surfaces |
-| `--popover` | `#18182A` | Elevated popovers |
-| `--sidebar` | `#0A0A12` | Icon rail, list panel |
-| `--foreground` | `#E4E4ED` | Primary text (off-white, not pure white) |
-| `--muted-foreground` | `#7878A0` | Secondary text |
-| `--primary` | `#7C6AEF` | Purple accent |
-| `--primary-foreground` | `#FFFFFF` | Text on primary |
-| `--secondary` | `#1E1E30` | Subtle backgrounds |
-| `--border` | `#252540` | Purple-tinted borders |
-| `--ring` | `#7C6AEF` | Focus rings |
-| `--destructive` | `#E5484D` | Error/danger |
+| Token                  | Value     | Usage                                    |
+| ---------------------- | --------- | ---------------------------------------- |
+| `--background`         | `#0C0C14` | Page background -- deep blue-black       |
+| `--card`               | `#14141E` | Card/panel surfaces                      |
+| `--popover`            | `#18182A` | Elevated popovers                        |
+| `--sidebar`            | `#0A0A12` | Icon rail, list panel                    |
+| `--foreground`         | `#E4E4ED` | Primary text (off-white, not pure white) |
+| `--muted-foreground`   | `#7878A0` | Secondary text                           |
+| `--primary`            | `#7C6AEF` | Purple accent                            |
+| `--primary-foreground` | `#FFFFFF` | Text on primary                          |
+| `--secondary`          | `#1E1E30` | Subtle backgrounds                       |
+| `--border`             | `#252540` | Purple-tinted borders                    |
+| `--ring`               | `#7C6AEF` | Focus rings                              |
+| `--destructive`        | `#E5484D` | Error/danger                             |
 
 **Light mode:**
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--background` | `#F8F8FC` | Slight purple tint |
-| `--card` | `#FFFFFF` | Cards |
-| `--sidebar` | `#F0F0F8` | Sidebar background |
-| `--foreground` | `#1A1A2E` | Primary text |
-| `--muted-foreground` | `#6B6B88` | Secondary text |
-| `--primary` | `#6C5CE7` | Darker purple for WCAG AA (4.2:1 on white) |
-| `--border` | `#DCDCE8` | Borders |
+| Token                | Value     | Usage                                      |
+| -------------------- | --------- | ------------------------------------------ |
+| `--background`       | `#F8F8FC` | Slight purple tint                         |
+| `--card`             | `#FFFFFF` | Cards                                      |
+| `--sidebar`          | `#F0F0F8` | Sidebar background                         |
+| `--foreground`       | `#1A1A2E` | Primary text                               |
+| `--muted-foreground` | `#6B6B88` | Secondary text                             |
+| `--primary`          | `#6C5CE7` | Darker purple for WCAG AA (4.2:1 on white) |
+| `--border`           | `#DCDCE8` | Borders                                    |
 
 ### 3.2 Arctic Slate
 
@@ -158,25 +158,25 @@ Cool neutral gray-blue. Electric blue accent. Vercel/GitHub feel. For users who 
 
 **Dark mode:**
 
-| Token | Value |
-|-------|-------|
-| `--background` | `#09090B` |
-| `--card` | `#111113` |
-| `--sidebar` | `#09090B` |
-| `--foreground` | `#EDEDF0` |
+| Token                | Value     |
+| -------------------- | --------- |
+| `--background`       | `#09090B` |
+| `--card`             | `#111113` |
+| `--sidebar`          | `#09090B` |
+| `--foreground`       | `#EDEDF0` |
 | `--muted-foreground` | `#71717A` |
-| `--primary` | `#3B82F6` |
-| `--border` | `#27272A` |
+| `--primary`          | `#3B82F6` |
+| `--border`           | `#27272A` |
 
 **Light mode:**
 
-| Token | Value |
-|-------|-------|
+| Token          | Value     |
+| -------------- | --------- |
 | `--background` | `#FAFAFA` |
-| `--card` | `#FFFFFF` |
+| `--card`       | `#FFFFFF` |
 | `--foreground` | `#18181B` |
-| `--primary` | `#2563EB` |
-| `--border` | `#E4E4E7` |
+| `--primary`    | `#2563EB` |
+| `--border`     | `#E4E4E7` |
 
 ### 3.3 Warm Obsidian
 
@@ -184,38 +184,38 @@ Warm dark stone. Amber/gold accent. Grafana-inspired energy. Reduces eye strain 
 
 **Dark mode:**
 
-| Token | Value |
-|-------|-------|
-| `--background` | `#0F0F0F` |
-| `--card` | `#191919` |
-| `--sidebar` | `#0C0C0C` |
-| `--foreground` | `#EDEDED` |
+| Token                | Value     |
+| -------------------- | --------- |
+| `--background`       | `#0F0F0F` |
+| `--card`             | `#191919` |
+| `--sidebar`          | `#0C0C0C` |
+| `--foreground`       | `#EDEDED` |
 | `--muted-foreground` | `#878787` |
-| `--primary` | `#D4A847` |
-| `--border` | `#2A2A2A` |
+| `--primary`          | `#D4A847` |
+| `--border`           | `#2A2A2A` |
 
 **Light mode:**
 
-| Token | Value |
-|-------|-------|
+| Token          | Value     |
+| -------------- | --------- |
 | `--background` | `#FAF9F7` |
-| `--card` | `#FFFFFF` |
+| `--card`       | `#FFFFFF` |
 | `--foreground` | `#1C1C1C` |
-| `--primary` | `#B8922E` |
-| `--border` | `#E0DFDB` |
+| `--primary`    | `#B8922E` |
+| `--border`     | `#E0DFDB` |
 
 ### 3.4 Semantic Status Colors (All Themes)
 
 Consistent across all themes. Status colors are reserved -- never use emerald for non-running states, never use red for non-error states.
 
-| Status | Dark Mode | Light Mode | Glow |
-|--------|-----------|------------|------|
-| running | `#34D399` (emerald-400) | `#059669` (emerald-600) | Subtle static glow (not pulsing) |
-| waiting | `#FBBF24` (amber-400) | `#D97706` (amber-600) | No |
-| completed | `#60A5FA` (blue-400) | `#2563EB` (blue-600) | No |
-| failed | `#F87171` (red-400) | `#DC2626` (red-600) | Subtle red |
-| stopped | `#6B7280` at 0.4 | `#9CA3AF` at 0.6 | No |
-| pending | `#6B7280` at 0.3 | `#9CA3AF` at 0.5 | No |
+| Status    | Dark Mode               | Light Mode              | Glow                             |
+| --------- | ----------------------- | ----------------------- | -------------------------------- |
+| running   | `#34D399` (emerald-400) | `#059669` (emerald-600) | Subtle static glow (not pulsing) |
+| waiting   | `#FBBF24` (amber-400)   | `#D97706` (amber-600)   | No                               |
+| completed | `#60A5FA` (blue-400)    | `#2563EB` (blue-600)    | No                               |
+| failed    | `#F87171` (red-400)     | `#DC2626` (red-600)     | Subtle red                       |
+| stopped   | `#6B7280` at 0.4        | `#9CA3AF` at 0.6        | No                               |
+| pending   | `#6B7280` at 0.3        | `#9CA3AF` at 0.5        | No                               |
 
 **Running glow is static, not pulsing.** Design system research recommends against pulsing animation -- a static glow is visually distinct without being distracting during extended monitoring.
 
@@ -223,7 +223,7 @@ Consistent across all themes. Status colors are reserved -- never use emerald fo
 
 ```css
 /* Adapts per theme -- purple-cyan for Midnight, blue-cyan for Arctic, amber-orange for Warm */
---gradient-brand: linear-gradient(135deg, var(--primary) 0%, #06B6D4 100%);
+--gradient-brand: linear-gradient(135deg, var(--primary) 0%, #06b6d4 100%);
 ```
 
 The cyan evokes "flow" and "orchestration" -- water flowing through channels.
@@ -265,14 +265,14 @@ Three typographic voices:
 
 Base: 13px. Ratio: 1.2 (minor third). Tight but legible for dense dashboards.
 
-| Token | Size | Weight | Line Height | Letter Spacing | Usage |
-|-------|------|--------|-------------|----------------|-------|
-| `text-xs` | 10px | 500 | 14px | +0.02em | Micro labels, badge text, keyboard shortcuts |
-| `text-sm` | 11px | 400-500 | 16px | +0.01em | Timestamps, secondary info, table metadata |
-| `text-base` | 13px | 400 | 20px | 0 | Body text, list items, form inputs |
-| `text-md` | 14px | 500 | 20px | -0.005em | Emphasized body, nav labels, section headers |
-| `text-lg` | 16px | 600 | 22px | -0.01em | Card titles, panel headers |
-| `text-xl` | 20px | 600 | 28px | -0.015em | Page titles (maximum size in app) |
+| Token       | Size | Weight  | Line Height | Letter Spacing | Usage                                        |
+| ----------- | ---- | ------- | ----------- | -------------- | -------------------------------------------- |
+| `text-xs`   | 10px | 500     | 14px        | +0.02em        | Micro labels, badge text, keyboard shortcuts |
+| `text-sm`   | 11px | 400-500 | 16px        | +0.01em        | Timestamps, secondary info, table metadata   |
+| `text-base` | 13px | 400     | 20px        | 0              | Body text, list items, form inputs           |
+| `text-md`   | 14px | 500     | 20px        | -0.005em       | Emphasized body, nav labels, section headers |
+| `text-lg`   | 16px | 600     | 22px        | -0.01em        | Card titles, panel headers                   |
+| `text-xl`   | 20px | 600     | 28px        | -0.015em       | Page titles (maximum size in app)            |
 
 **Monospace is always 1px smaller** than its corresponding sans context to appear optically equal.
 
@@ -280,12 +280,12 @@ Base: 13px. Ratio: 1.2 (minor third). Tight but legible for dense dashboards.
 
 ### 4.3 Weight Convention
 
-| Weight | Name | Usage |
-|--------|------|-------|
-| 400 | Regular | Body text, descriptions, form inputs |
+| Weight  | Name       | Usage                                                                                                                       |
+| ------- | ---------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 400     | Regular    | Body text, descriptions, form inputs                                                                                        |
 | **500** | **Medium** | **The workhorse.** Buttons, nav items, table headers, labels, sidebar items. This weight is what makes dense UIs scannable. |
-| 600 | Semibold | Section headings, card titles, active states. Avoid overuse. |
-| 700 | Bold | Page titles only. Appears max 1-2 times per viewport. |
+| 600     | Semibold   | Section headings, card titles, active states. Avoid overuse.                                                                |
+| 700     | Bold       | Page titles only. Appears max 1-2 times per viewport.                                                                       |
 
 **Anti-pattern:** Using only 400 and 700. The 500 weight is critical for the subtle hierarchy that makes dense UIs breathable.
 
@@ -338,13 +338,13 @@ Single row, always visible. The most information-dense element in the app:
 
 ### 5.3 Tabs
 
-| Tab | Content | Badge |
-|-----|---------|-------|
-| Conversation | Agent messages + tool calls + user messages | -- |
-| Terminal | Live terminal output (xterm.js, ANSI-rendered) | -- |
-| Events | Timeline of session events (stage changes, reports, errors) | Event count |
-| Diff | Syntax-highlighted diff viewer (files changed by agent) | +lines/-lines |
-| Todos | Agent's todo list items with status | Pending count |
+| Tab          | Content                                                     | Badge         |
+| ------------ | ----------------------------------------------------------- | ------------- |
+| Conversation | Agent messages + tool calls + user messages                 | --            |
+| Terminal     | Live terminal output (xterm.js, ANSI-rendered)              | --            |
+| Events       | Timeline of session events (stage changes, reports, errors) | Event count   |
+| Diff         | Syntax-highlighted diff viewer (files changed by agent)     | +lines/-lines |
+| Todos        | Agent's todo list items with status                         | Pending count |
 
 Keyboard shortcuts: `1` through `5` to switch tabs (when not in chat input). Tab switch uses 150ms `fade-in` animation.
 
@@ -440,19 +440,19 @@ Layer 3: Composed Patterns (Ark-specific)
 
 ### 7.2 New/Modified Components
 
-| Component | Type | Purpose |
-|-----------|------|---------|
-| `IconRail` | New | 48px navigation rail with icon buttons and tooltips |
-| `ListPanel` | New | Resizable session/resource list panel |
-| `SessionHeader` | Modified | Compact header with inline DAG pipeline |
-| `PipelineBadges` | New | Horizontal stage badges for DAG visualization (ReactFlow + Dagre for complex flows) |
-| `StatusChip` | New | Clickable filter chip ("7 running") with status color |
-| `ConversationView` | Modified | Markdown rendering (react-markdown), tool call blocks, stage banners |
-| `ToolCallBlock` | New | Collapsible tool call display (Cursor pattern) with name, file, status, duration |
-| `CommandPalette` | New | Cmd+K overlay (cmdk library) |
-| `ThemeSwitcher` | New | Theme selection in Settings |
-| `FanOutPanel` | New | Fan-out sub-session progress visualization |
-| `StatusIndicator` | New | Unified StatusDot + StatusBadge with static glow for running |
+| Component          | Type     | Purpose                                                                             |
+| ------------------ | -------- | ----------------------------------------------------------------------------------- |
+| `IconRail`         | New      | 48px navigation rail with icon buttons and tooltips                                 |
+| `ListPanel`        | New      | Resizable session/resource list panel                                               |
+| `SessionHeader`    | Modified | Compact header with inline DAG pipeline                                             |
+| `PipelineBadges`   | New      | Horizontal stage badges for DAG visualization (ReactFlow + Dagre for complex flows) |
+| `StatusChip`       | New      | Clickable filter chip ("7 running") with status color                               |
+| `ConversationView` | Modified | Markdown rendering (react-markdown), tool call blocks, stage banners                |
+| `ToolCallBlock`    | New      | Collapsible tool call display (Cursor pattern) with name, file, status, duration    |
+| `CommandPalette`   | New      | Cmd+K overlay (cmdk library)                                                        |
+| `ThemeSwitcher`    | New      | Theme selection in Settings                                                         |
+| `FanOutPanel`      | New      | Fan-out sub-session progress visualization                                          |
+| `StatusIndicator`  | New      | Unified StatusDot + StatusBadge with static glow for running                        |
 
 ### 7.3 cva Variant Convention
 
@@ -460,23 +460,23 @@ Every styled component uses cva with consistent contract: `variant`, `size`, opt
 
 ### 7.4 Libraries to Add
 
-| Library | Purpose |
-|---------|---------|
-| `cmdk` | Command palette |
-| `react-resizable-panels` | Resizable list/detail split |
-| `react-markdown` + `remark-gfm` | Conversation markdown rendering |
-| `react-syntax-highlighter` or `shiki` | Code block highlighting |
-| `sonner` | Toast notifications (replace current custom) |
-| `@xyflow/react` (ReactFlow) | DAG pipeline visualization for complex flows |
-| (Already have) `@radix-ui/*`, `lucide-react`, `class-variance-authority` | Keep |
+| Library                                                                  | Purpose                                      |
+| ------------------------------------------------------------------------ | -------------------------------------------- |
+| `cmdk`                                                                   | Command palette                              |
+| `react-resizable-panels`                                                 | Resizable list/detail split                  |
+| `react-markdown` + `remark-gfm`                                          | Conversation markdown rendering              |
+| `react-syntax-highlighter` or `shiki`                                    | Code block highlighting                      |
+| `sonner`                                                                 | Toast notifications (replace current custom) |
+| `@xyflow/react` (ReactFlow)                                              | DAG pipeline visualization for complex flows |
+| (Already have) `@radix-ui/*`, `lucide-react`, `class-variance-authority` | Keep                                         |
 
 ### 7.5 Libraries to Consider (Post-v1)
 
-| Library | Purpose | Decision |
-|---------|---------|----------|
-| `@tanstack/react-table` | Data tables for Compute, Costs | Add if table views needed |
-| `react-diff-viewer` or Monaco diff | Syntax-highlighted diffs | Recommend for Diff tab |
-| `ansi-to-react` | ANSI terminal rendering in Live Output | Recommend |
+| Library                            | Purpose                                | Decision                  |
+| ---------------------------------- | -------------------------------------- | ------------------------- |
+| `@tanstack/react-table`            | Data tables for Compute, Costs         | Add if table views needed |
+| `react-diff-viewer` or Monaco diff | Syntax-highlighted diffs               | Recommend for Diff tab    |
+| `ansi-to-react`                    | ANSI terminal rendering in Live Output | Recommend                 |
 
 ---
 
@@ -484,16 +484,16 @@ Every styled component uses cva with consistent contract: `variant`, `size`, opt
 
 ### 8.1 Keyboard Shortcuts
 
-| Shortcut | Action |
-|----------|--------|
-| `Cmd+K` | Command palette |
-| `Cmd+B` | Toggle list panel |
-| `1-5` | Switch session detail tabs |
-| `Cmd+N` | New session |
-| `Escape` | Close detail / deselect |
-| `j/k` | Navigate session list (vim-style) |
-| `Enter` | Open selected session |
-| `/` | Focus search |
+| Shortcut | Action                                                                                         |
+| -------- | ---------------------------------------------------------------------------------------------- |
+| `Cmd+K`  | Command palette                                                                                |
+| `Cmd+B`  | Toggle list panel (collapse to 0px with 200ms animation; restore to stored width on re-toggle) |
+| `1-5`    | Switch session detail tabs                                                                     |
+| `Cmd+N`  | New session                                                                                    |
+| `Escape` | Close detail / deselect                                                                        |
+| `j/k`    | Navigate session list (vim-style)                                                              |
+| `Enter`  | Open selected session                                                                          |
+| `/`      | Focus search                                                                                   |
 
 Shortcuts displayed as badge hints throughout the interface.
 
@@ -501,11 +501,11 @@ Shortcuts displayed as badge hints throughout the interface.
 
 Functional only. No decorative animation.
 
-| Category | Duration | Easing | Usage |
-|----------|----------|--------|-------|
-| Micro | 100-150ms | `ease-out` | Hover states, focus rings, opacity |
-| Standard | 200ms | `cubic-bezier(0.32, 0.72, 0, 1)` | Dropdowns, tooltips, tab switches |
-| Expand | 250ms | `cubic-bezier(0.32, 0.72, 0, 1)` | Collapsible sections, tool call expand |
+| Category | Duration  | Easing                           | Usage                                  |
+| -------- | --------- | -------------------------------- | -------------------------------------- |
+| Micro    | 100-150ms | `ease-out`                       | Hover states, focus rings, opacity     |
+| Standard | 200ms     | `cubic-bezier(0.32, 0.72, 0, 1)` | Dropdowns, tooltips, tab switches      |
+| Expand   | 250ms     | `cubic-bezier(0.32, 0.72, 0, 1)` | Collapsible sections, tool call expand |
 
 The easing `cubic-bezier(0.32, 0.72, 0, 1)` is Linear's signature curve -- fast start, gentle deceleration. Feels responsive without being jarring.
 
@@ -529,6 +529,30 @@ Single density mode -- compact. Optimized for power users managing agent fleets:
 - **Pause-on-hover** for streaming content (reuse existing `userScrolled` pattern)
 - **Brief highlight animation** (2s fade) when new items appear in lists
 - **Relative timestamps** update live without page refresh
+
+### 8.5 Empty States
+
+Every view needs a dedicated empty state. Pattern: centered icon (40px, muted) + title (text-lg) + description (text-base, muted) + optional primary action button.
+
+| View                       | Icon          | Title                | Description                                     | Action        |
+| -------------------------- | ------------- | -------------------- | ----------------------------------------------- | ------------- |
+| Sessions (no sessions)     | Play          | No sessions yet      | Start your first AI agent session               | New Session   |
+| Sessions (search empty)    | Search        | No results           | Try adjusting your search or filters            | Clear Filters |
+| Conversation (new session) | MessageSquare | No messages yet      | Dispatch the session or send a message to start | --            |
+| Events (empty)             | Activity      | No events yet        | Events will appear as the session progresses    | --            |
+| Diff (no changes)          | FileCode      | No changes yet       | File changes will appear after implementation   | --            |
+| Todos (empty)              | CheckSquare   | No todos             | The agent will create todos as it works         | --            |
+| Agents                     | Bot           | No custom agents     | Create agents to define specialized AI roles    | Browse Agents |
+| Compute                    | Server        | No compute resources | Configure compute targets for agent execution   | Add Compute   |
+
+### 8.6 Loading States
+
+Use skeleton screens, never spinners. Skeleton shapes match the content they replace:
+
+- **Session list**: 6-8 skeleton rows matching the session card layout (dot + text lines + pipeline bars)
+- **Conversation**: 3-4 skeleton message blocks with avatar + text placeholders
+- **Tab content**: Content-appropriate skeleton matching the tab's expected layout
+- **No loading states for < 200ms operations**: Show content or nothing
 
 ---
 
@@ -560,9 +584,9 @@ CSS custom properties cascade from the theme class. No JS needed for token resol
 ### 10.2 Font Loading
 
 ```html
-<link rel="preload" href="/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/fonts/jetbrains-mono-var.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/fonts/geist-mono-var.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="/fonts/jetbrains-mono-var.woff2" as="font" type="font/woff2" crossorigin />
+<link rel="preload" href="/fonts/geist-mono-var.woff2" as="font" type="font/woff2" crossorigin />
 ```
 
 Variable font versions (single file, all weights). `font-display: swap` to prevent FOIT.
