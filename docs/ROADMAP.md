@@ -10,7 +10,7 @@
 > - **TUI retired and removed** -- consensus was to drop TUI from the product surface (2026-04-14). Code deletion shipped in v0.16.0 (2026-04-15): `packages/tui/`, `packages/tui-e2e/`, `ark tui` command, ink deps, Makefile targets, and docs. Product surfaces are **Web UI + CLI + Electron desktop app**.
 > - **Web UI is the primary interface** -- everything doable from web without touching CLI. Missing: conversation interface, repo dropdown, session creation wizard.
 > - **Electron desktop app** -- wrap web UI, build DMGs for macOS + Linux (Intel + ARM). No Windows. Near-term deliverable.
-> - **Tauri v2 scaffold (2026-04-15)** -- parallel desktop package under `packages/desktop-tauri/` (Rust + tauri v2 + plugin-shell + plugin-opener + single-instance). Makefile targets `tauri-dev` / `tauri-build` / `tauri-package`. CI job `tauri-build` across macOS arm64, Linux x64, Windows x64. Electron release pipeline untouched -- default swap comes in a follow-up PR after review.
+> - **Tauri evaluated, staying with Electron (simpler toolchain, native Playwright testing)** -- Tauri v2 was scaffolded in `packages/desktop-tauri/` (2026-04-15) and evaluated. Decision (v0.17.0): stay with Electron. Rationale: Electron has mature Playwright testing support (critical for CI smoke tests), simpler build toolchain (no Rust needed), and the ~10x binary size advantage is offset by bundling ark-native (~78 MB) regardless of shell. Tauri scaffold removed in v0.17.0; evaluation notes preserved in roadmap history.
 > - **ACP (Agent Communication Protocol) POC** -- explore as parallel agent interface. Claude Code/Codex don't officially support it; Gemini does. Not a replacement for channels.
 > - **MiniMax as cheap model** -- ~1/10th Claude cost for mechanical tasks. Strategy: plan with Opus/Sonnet, implement with MiniMax. Needs OpenAI-compatible custom provider in LLM Router.
 > - **Benchmarking framework** -- Abhimanyu building task-based model benchmarks (100 real tasks on actual repos). Results could feed LLM Router routing decisions.
@@ -261,7 +261,7 @@ The orchestration platform for AI-powered software development. Manages the full
 ## Roadmap Camps (Legacy Detail)
 
 > **Note:** These camps contain detailed task breakdowns, ship-blockers, and what's already landed. The **Background Agent Landscape Gap Analysis** (below the camps) and the **Priority Sequence** (SP1-SP11) are the current planning framework. Camps map to SPs as follows:
-> - Camp 0 (Early Adopter Ship) + Camp 8 (UX Polish) -> **SP1** (TUI removal + Tauri + Web UI)
+> - Camp 0 (Early Adopter Ship) + Camp 8 (UX Polish) -> **SP1** (TUI removal + Desktop + Web UI)
 > - Camp 5 (Security) -> **SP2** (Security & Secrets)
 > - Camp 6 (Integrations) -> **SP3** (Interface Integrations)
 > - Camp 14 (Decoupled Compute) + Camp 12 (Federated) -> **SP4** (Sandbox & Compute Lifecycle)
@@ -553,7 +553,7 @@ fixture uses Bun APIs that the Node Playwright runner can't parse.
 
 | Task | Effort | Status |
 |------|--------|--------|
-| **Desktop app packaging (Electron or Tauri v2)** | 1-2 days | Electron started but incomplete. Tauri v2 (https://v2.tauri.app/) flagged as alternative -- ~10x smaller binaries, Rust backend, system webview. macOS Intel + ARM, Linux Intel + ARM. No Windows. No signing. Spike both before committing. |
+| **Desktop app packaging (Electron)** | 1-2 days | **DONE (v0.17.0)** -- Electron app with bundled ark-native, first-launch CLI install, fully self-contained. Tauri v2 evaluated and rejected (simpler toolchain wins). |
 | **Web UI conversation interface** | 1-2 days | Not started. Send messages to agents from web UI. Currently only works via CLI/TUI. |
 | **Web UI repo dropdown** | 0.5-1 day | Not started. List repos from session history + Claude projects dir. |
 | **Web UI session creation wizard** | 1 day | Not started. Guided flow selection, agent selection, compute selection. |
@@ -766,8 +766,8 @@ Ark's endgame is a **complete background agent platform** covering all 11 layers
 | Gap | Tool / Approach | Effort | Priority |
 |-----|----------------|--------|----------|
 | ~~TUI removal (complete deletion)~~ | **DONE (v0.16.0, 2026-04-15)** -- `packages/tui/`, `packages/tui-e2e/`, ink deps, Makefile targets, docs all removed | 0 | done |
-| Tauri desktop scaffold (parallel to Electron) | **SCAFFOLDED (2026-04-15)** -- `packages/desktop-tauri/` (Rust crate, tauri.conf.json, sidecar process-group cleanup, single-instance, opener plugin). `make tauri-dev` / `make tauri-build` / `make tauri-package` targets. `tauri-build` CI job across macOS arm64 / Linux x64 / Windows x64. Electron build and release pipeline untouched. | 0.5 day | done |
-| Desktop app distribution (.dmg, .app, AppImage, .deb) -- make Tauri the default | Swap `release.yml` to build Tauri bundles, delete `packages/desktop/` Electron shell, move `packages/desktop-tauri/` to `packages/desktop/`, version bump. Electron remains shipping today via existing release pipeline | 1-2 days | **SP1** |
+| ~~Tauri desktop scaffold~~ | **Evaluated and removed (v0.17.0)** -- Tauri v2 scaffolded 2026-04-15, evaluated, removed in favor of Electron (simpler toolchain, native Playwright testing). Evaluation notes in roadmap history. | 0 | done |
+| Desktop app self-contained bundle (ark-native embedded) | **DONE (v0.17.0)** -- ark-native binary bundled via extraResources, first-launch CLI install dialog on macOS, CI pipeline downloads ark-native per platform. Desktop app works with zero prerequisites. | 1 day | done |
 | Web UI production-grade overhaul | Borrow from **Open Agents** (tool renderers, git panel, todo panel, structured questions, model selector, stream recovery). 6K lines -> 30K+ | 5-7 days | **SP1** |
 | GitHub App integration (webhooks, not just `gh` CLI) | Build GitHub App: inbound webhooks (PR events, issue events trigger sessions), outbound (create issues, comment on PRs, deployment status) | 2-3 days | **SP3** |
 | Bitbucket integration | Bitbucket Cloud REST API + webhooks. PR creation, review triggers, pipeline status | 2-3 days | **SP3** |
@@ -988,8 +988,9 @@ Ark's endgame is a **complete background agent platform** covering all 11 layers
 ═══════════════════════════════════════════════════════════════════════════
 TIER 1 -- SHIP (now)
 ═══════════════════════════════════════════════════════════════════════════
-SP1:  TUI Removal + Tauri Desktop  ████         Delete TUI (15.8K lines), replace Electron with Tauri v2,
-      + Web UI Overhaul                          ship .dmg/.app + AppImage/.deb. Web UI production overhaul
+SP1:  TUI Removal + Desktop Bundle  ████        Delete TUI (15.8K lines), Electron desktop with bundled
+      + Web UI Overhaul                          ark-native (Tauri evaluated, staying with Electron).
+                                                 Ship .dmg/.app + AppImage/.deb. Web UI production overhaul
                                                  (Open Agents patterns). This is the user-facing foundation.
 
 ═══════════════════════════════════════════════════════════════════════════
@@ -1162,7 +1163,7 @@ SP11: ROI & Measurement            ██████       DX metrics, contribu
 - **Risk team (PAI-32794)**: Per-user MCP credentials, chat history on server → auth + control plane + knowledge graph + Camp 10 credential vault.
 - **Rollout discipline**: Start with individuals, not teams. Limited feature set, not everything at once. Daily feedback from recruits, weekly triage by builders. Success = an agent autonomously closing a real bug end-to-end (the Srinivasan-tweet test).
 - **2026-04-14 "ark init" meeting**: First team sync with Yana, Zineng, Abhimanyu, Atul. Architecture walkthrough confirmed two modes (user/local vs control plane), conductor as central gateway, arkd as per-compute agent manager. TUI retired by consensus. Web UI + CLI + Electron desktop as product surfaces. Zineng orienting on codebase (first tasks: web UI improvements). Abhimanyu building model benchmarks and exploring ACP. Team regroups Apr 15 for roadmap after orientation period. Yana on break until Thu Apr 17 (worked over weekend, out of Claude tokens).
-- **Tauri consideration (2026-04-14)**: Zineng flagged Tauri v2 as potential Electron alternative. Smaller binary size, Rust backend, better security model. Worth evaluating before investing heavily in Electron packaging -- both wrap a web UI, but Tauri produces ~10x smaller binaries.
+- **Tauri consideration (2026-04-14)**: Zineng flagged Tauri v2 as potential Electron alternative. Smaller binary size, Rust backend, better security model. Scaffolded 2026-04-15 under `packages/desktop-tauri/`. **Decision (v0.17.0)**: staying with Electron -- simpler toolchain (no Rust needed), native Playwright testing, and the binary size advantage is moot once ark-native (~78 MB) is bundled regardless. Tauri scaffold removed.
 - **MiniMax economics (2026-04-14)**: Input $0.30/Mtok, output $1.00/Mtok vs Claude Opus input $15/Mtok, output $75/Mtok. ~25-75x cheaper. ~90% performance for mechanical tasks per Abhimanyu's benchmarks. GLM also competitive on some benchmarks. Strategy: use cheap models for mechanical work (implement, verify) and expensive models for judgment work (plan, review).
 - **Native skill gap (2026-04-14)**: Abhimanyu asked about integrating native skills (like superpowers) into dispatched sessions. Yana: "I added native skill support at some point. Maybe dropped at some point." Needs investigation -- may have regressed during refactors.
 
