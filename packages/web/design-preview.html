@@ -1,0 +1,1085 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ark Design System Preview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Geist', 'system-ui', 'sans-serif'],
+            mono: ['Geist Mono', 'ui-monospace', 'monospace'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    :root {
+      /* Dark theme tokens */
+      --bg-base: #0f0f12;
+      --bg-elevated: #16161a;
+      --bg-surface: #1c1c22;
+      --bg-overlay: #22222a;
+      --bg-muted: #2a2a32;
+
+      --fg-primary: #ededef;
+      --fg-secondary: #a0a0ab;
+      --fg-tertiary: #6b6b76;
+      --fg-muted: #4a4a54;
+
+      --border-subtle: rgba(255,255,255,0.06);
+      --border-default: rgba(255,255,255,0.10);
+      --border-strong: rgba(255,255,255,0.16);
+
+      --accent-blue: #3b82f6;
+      --accent-blue-muted: rgba(59,130,246,0.15);
+      --accent-blue-glow: rgba(59,130,246,0.25);
+      --accent-green: #22c55e;
+      --accent-green-muted: rgba(34,197,94,0.15);
+      --accent-green-glow: rgba(34,197,94,0.25);
+      --accent-red: #ef4444;
+      --accent-red-muted: rgba(239,68,68,0.15);
+      --accent-red-glow: rgba(239,68,68,0.25);
+      --accent-amber: #f59e0b;
+      --accent-amber-muted: rgba(245,158,11,0.15);
+      --accent-amber-glow: rgba(245,158,11,0.25);
+      --accent-purple: #a855f7;
+      --accent-purple-muted: rgba(168,85,247,0.15);
+      --accent-purple-glow: rgba(168,85,247,0.25);
+    }
+
+    html.light {
+      --bg-base: #fafafa;
+      --bg-elevated: #ffffff;
+      --bg-surface: #f5f5f7;
+      --bg-overlay: #eeeef0;
+      --bg-muted: #e4e4e8;
+
+      --fg-primary: #111113;
+      --fg-secondary: #5c5c66;
+      --fg-tertiary: #8c8c96;
+      --fg-muted: #b0b0b8;
+
+      --border-subtle: rgba(0,0,0,0.06);
+      --border-default: rgba(0,0,0,0.10);
+      --border-strong: rgba(0,0,0,0.16);
+
+      --accent-blue: #2563eb;
+      --accent-blue-muted: rgba(37,99,235,0.10);
+      --accent-blue-glow: rgba(37,99,235,0.15);
+      --accent-green: #16a34a;
+      --accent-green-muted: rgba(22,163,74,0.10);
+      --accent-green-glow: rgba(22,163,74,0.15);
+      --accent-red: #dc2626;
+      --accent-red-muted: rgba(220,38,38,0.10);
+      --accent-red-glow: rgba(220,38,38,0.15);
+      --accent-amber: #d97706;
+      --accent-amber-muted: rgba(217,119,6,0.10);
+      --accent-amber-glow: rgba(217,119,6,0.15);
+      --accent-purple: #9333ea;
+      --accent-purple-muted: rgba(147,51,234,0.10);
+      --accent-purple-glow: rgba(147,51,234,0.15);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Geist', system-ui, sans-serif;
+      background: var(--bg-base);
+      color: var(--fg-primary);
+      margin: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* Utility classes using tokens */
+    .bg-base { background: var(--bg-base); }
+    .bg-elevated { background: var(--bg-elevated); }
+    .bg-surface { background: var(--bg-surface); }
+    .bg-overlay { background: var(--bg-overlay); }
+    .bg-muted { background: var(--bg-muted); }
+    .fg-primary { color: var(--fg-primary); }
+    .fg-secondary { color: var(--fg-secondary); }
+    .fg-tertiary { color: var(--fg-tertiary); }
+    .fg-muted { color: var(--fg-muted); }
+    .border-subtle { border-color: var(--border-subtle); }
+    .border-default { border-color: var(--border-default); }
+    .border-strong { border-color: var(--border-strong); }
+
+    .card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      transition: all 0.2s ease;
+    }
+    .card-interactive:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      border-color: var(--border-strong);
+    }
+
+    /* Pulse animation for status dots */
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+
+    @keyframes spin-slow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .spin-slow { animation: spin-slow 1.5s linear infinite; }
+
+    /* Sparkline SVG */
+    .sparkline { display: inline-block; vertical-align: middle; }
+
+    /* Section label */
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--fg-tertiary);
+      margin-bottom: 20px;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: 3px; }
+
+    /* Theme toggle */
+    .theme-toggle {
+      position: fixed;
+      top: 20px;
+      right: 24px;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-default);
+      border-radius: 10px;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-size: 13px;
+      color: var(--fg-secondary);
+      font-family: 'Geist', sans-serif;
+    }
+    .theme-toggle:hover {
+      border-color: var(--border-strong);
+      color: var(--fg-primary);
+    }
+
+    /* Diff viewer */
+    .diff-line-add { background: rgba(34,197,94,0.1); color: #4ade80; }
+    .diff-line-remove { background: rgba(239,68,68,0.1); color: #f87171; }
+    .diff-line-context { color: var(--fg-tertiary); }
+    html.light .diff-line-add { background: rgba(22,163,74,0.08); color: #16a34a; }
+    html.light .diff-line-remove { background: rgba(220,38,38,0.08); color: #dc2626; }
+
+    /* Modal overlay */
+    .modal-overlay {
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+    }
+    html.light .modal-overlay {
+      background: rgba(0,0,0,0.3);
+    }
+  </style>
+</head>
+<body>
+
+<!-- Theme Toggle -->
+<button class="theme-toggle" onclick="toggleTheme()">
+  <span id="theme-icon">&#9790;</span>
+  <span id="theme-label">Dark</span>
+</button>
+
+<div style="max-width: 1280px; margin: 0 auto; padding: 48px 32px 120px;">
+
+  <!-- Header -->
+  <div style="margin-bottom: 64px;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+      <div style="width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: #fff;">A</div>
+      <span style="font-size: 13px; font-weight: 500; color: var(--fg-tertiary); letter-spacing: 0.04em;">ARK DESIGN SYSTEM</span>
+    </div>
+    <h1 style="font-size: 36px; font-weight: 700; letter-spacing: -0.03em; margin: 0 0 8px; color: var(--fg-primary);">Component Preview</h1>
+    <p style="font-size: 15px; color: var(--fg-secondary); margin: 0; line-height: 1.6;">
+      Visual reference for every UI component. Toggle dark/light themes above.
+    </p>
+  </div>
+
+  <!-- ========== COLOR PALETTE ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">Color Palette</div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;">
+      <!-- Background scale -->
+      <div class="card" style="padding: 0; overflow: hidden;">
+        <div style="height: 64px; background: var(--bg-base);"></div>
+        <div style="padding: 10px 14px;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--fg-primary);">bg-base</div>
+          <div style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary);">#0f0f12 / #fafafa</div>
+        </div>
+      </div>
+      <div class="card" style="padding: 0; overflow: hidden;">
+        <div style="height: 64px; background: var(--bg-elevated);"></div>
+        <div style="padding: 10px 14px;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--fg-primary);">bg-elevated</div>
+          <div style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary);">#16161a / #ffffff</div>
+        </div>
+      </div>
+      <div class="card" style="padding: 0; overflow: hidden;">
+        <div style="height: 64px; background: var(--bg-surface);"></div>
+        <div style="padding: 10px 14px;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--fg-primary);">bg-surface</div>
+          <div style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary);">#1c1c22 / #f5f5f7</div>
+        </div>
+      </div>
+      <div class="card" style="padding: 0; overflow: hidden;">
+        <div style="height: 64px; background: var(--bg-overlay);"></div>
+        <div style="padding: 10px 14px;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--fg-primary);">bg-overlay</div>
+          <div style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary);">#22222a / #eeeef0</div>
+        </div>
+      </div>
+      <div class="card" style="padding: 0; overflow: hidden;">
+        <div style="height: 64px; background: var(--bg-muted);"></div>
+        <div style="padding: 10px 14px;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--fg-primary);">bg-muted</div>
+          <div style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary);">#2a2a32 / #e4e4e8</div>
+        </div>
+      </div>
+      <!-- Accent colors -->
+      <div class="card" style="padding: 0; overflow: hidden;">
+        <div style="height: 64px; background: var(--accent-blue);"></div>
+        <div style="padding: 10px 14px;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--fg-primary);">accent-blue</div>
+          <div style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary);">#3b82f6</div>
+        </div>
+      </div>
+      <div class="card" style="padding: 0; overflow: hidden;">
+        <div style="height: 64px; background: var(--accent-green);"></div>
+        <div style="padding: 10px 14px;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--fg-primary);">accent-green</div>
+          <div style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary);">#22c55e</div>
+        </div>
+      </div>
+      <div class="card" style="padding: 0; overflow: hidden;">
+        <div style="height: 64px; background: var(--accent-red);"></div>
+        <div style="padding: 10px 14px;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--fg-primary);">accent-red</div>
+          <div style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary);">#ef4444</div>
+        </div>
+      </div>
+      <div class="card" style="padding: 0; overflow: hidden;">
+        <div style="height: 64px; background: var(--accent-amber);"></div>
+        <div style="padding: 10px 14px;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--fg-primary);">accent-amber</div>
+          <div style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary);">#f59e0b</div>
+        </div>
+      </div>
+      <div class="card" style="padding: 0; overflow: hidden;">
+        <div style="height: 64px; background: var(--accent-purple);"></div>
+        <div style="padding: 10px 14px;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--fg-primary);">accent-purple</div>
+          <div style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary);">#a855f7</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== TYPOGRAPHY ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">Typography</div>
+    <div class="card" style="padding: 32px;">
+      <div style="margin-bottom: 28px;">
+        <span style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary); display: block; margin-bottom: 6px;">hero / 36px / 700 / -0.03em</span>
+        <div style="font-size: 36px; font-weight: 700; letter-spacing: -0.03em; color: var(--fg-primary);">Design System</div>
+      </div>
+      <div style="margin-bottom: 28px;">
+        <span style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary); display: block; margin-bottom: 6px;">heading / 24px / 600 / -0.02em</span>
+        <div style="font-size: 24px; font-weight: 600; letter-spacing: -0.02em; color: var(--fg-primary);">Session Overview</div>
+      </div>
+      <div style="margin-bottom: 28px;">
+        <span style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary); display: block; margin-bottom: 6px;">section / 11px / 600 / 0.08em / uppercase</span>
+        <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-tertiary);">Active Sessions</div>
+      </div>
+      <div style="margin-bottom: 28px;">
+        <span style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary); display: block; margin-bottom: 6px;">body / 14px / 400 / normal</span>
+        <div style="font-size: 14px; font-weight: 400; color: var(--fg-secondary); line-height: 1.6;">The autonomous SDLC flow orchestrates multiple agents through plan, implement, verify, and review stages. Each stage is dispatched to a dedicated agent runtime.</div>
+      </div>
+      <div style="margin-bottom: 28px;">
+        <span style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary); display: block; margin-bottom: 6px;">small / 13px / 400</span>
+        <div style="font-size: 13px; font-weight: 400; color: var(--fg-secondary);">Last updated 2 minutes ago</div>
+      </div>
+      <div style="margin-bottom: 28px;">
+        <span style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary); display: block; margin-bottom: 6px;">caption / 11px / 500</span>
+        <div style="font-size: 11px; font-weight: 500; color: var(--fg-tertiary);">3 of 12 sessions running</div>
+      </div>
+      <div>
+        <span style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary); display: block; margin-bottom: 6px;">mono / 13px / Geist Mono</span>
+        <div style="font-size: 13px; font-family: 'Geist Mono'; color: var(--fg-secondary);">s-abc123 | packages/core/auth.ts:47</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== STAT CARDS ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">StatCard</div>
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;">
+      <!-- Running -->
+      <div class="card card-interactive" style="padding: 20px 24px; position: relative; overflow: hidden;">
+        <div style="position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--accent-blue);"></div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-tertiary); margin-bottom: 8px;">Running</div>
+            <div style="font-size: 32px; font-weight: 700; letter-spacing: -0.03em; color: var(--fg-primary);">3</div>
+          </div>
+          <svg class="sparkline" width="64" height="32" viewBox="0 0 64 32">
+            <polyline fill="none" stroke="var(--accent-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" points="0,28 10,24 20,20 30,22 40,16 50,12 64,6" />
+            <linearGradient id="sg-blue" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--accent-blue)" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="var(--accent-blue)" stop-opacity="0"/>
+            </linearGradient>
+            <polygon fill="url(#sg-blue)" points="0,28 10,24 20,20 30,22 40,16 50,12 64,6 64,32 0,32" />
+          </svg>
+        </div>
+        <div style="margin-top: 8px; font-size: 12px; color: var(--accent-blue);">+2 from yesterday</div>
+      </div>
+      <!-- Completed -->
+      <div class="card card-interactive" style="padding: 20px 24px; position: relative; overflow: hidden;">
+        <div style="position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--accent-green);"></div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-tertiary); margin-bottom: 8px;">Completed</div>
+            <div style="font-size: 32px; font-weight: 700; letter-spacing: -0.03em; color: var(--fg-primary);">47</div>
+          </div>
+          <svg class="sparkline" width="64" height="32" viewBox="0 0 64 32">
+            <polyline fill="none" stroke="var(--accent-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" points="0,26 10,22 20,18 30,20 40,14 50,10 64,4" />
+            <linearGradient id="sg-green" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--accent-green)" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="var(--accent-green)" stop-opacity="0"/>
+            </linearGradient>
+            <polygon fill="url(#sg-green)" points="0,26 10,22 20,18 30,20 40,14 50,10 64,4 64,32 0,32" />
+          </svg>
+        </div>
+        <div style="margin-top: 8px; font-size: 12px; color: var(--accent-green);">+12 today</div>
+      </div>
+      <!-- Failed -->
+      <div class="card card-interactive" style="padding: 20px 24px; position: relative; overflow: hidden;">
+        <div style="position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--accent-red);"></div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-tertiary); margin-bottom: 8px;">Failed</div>
+            <div style="font-size: 32px; font-weight: 700; letter-spacing: -0.03em; color: var(--fg-primary);">2</div>
+          </div>
+          <svg class="sparkline" width="64" height="32" viewBox="0 0 64 32">
+            <polyline fill="none" stroke="var(--accent-red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" points="0,8 10,12 20,10 30,16 40,20 50,24 64,26" />
+            <linearGradient id="sg-red" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--accent-red)" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="var(--accent-red)" stop-opacity="0"/>
+            </linearGradient>
+            <polygon fill="url(#sg-red)" points="0,8 10,12 20,10 30,16 40,20 50,24 64,26 64,32 0,32" />
+          </svg>
+        </div>
+        <div style="margin-top: 8px; font-size: 12px; color: var(--accent-red);">-1 from yesterday</div>
+      </div>
+      <!-- Cost -->
+      <div class="card card-interactive" style="padding: 20px 24px; position: relative; overflow: hidden;">
+        <div style="position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--accent-amber);"></div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--fg-tertiary); margin-bottom: 8px;">Cost Today</div>
+            <div style="font-size: 32px; font-weight: 700; letter-spacing: -0.03em; color: var(--fg-primary);">$12.40</div>
+          </div>
+          <svg class="sparkline" width="64" height="32" viewBox="0 0 64 32">
+            <polyline fill="none" stroke="var(--accent-amber)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" points="0,28 10,22 20,24 30,18 40,14 50,16 64,10" />
+            <linearGradient id="sg-amber" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--accent-amber)" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="var(--accent-amber)" stop-opacity="0"/>
+            </linearGradient>
+            <polygon fill="url(#sg-amber)" points="0,28 10,22 20,24 30,18 40,14 50,16 64,10 64,32 0,32" />
+          </svg>
+        </div>
+        <div style="margin-top: 8px; font-size: 12px; color: var(--accent-amber);">+$3.20 vs avg</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== BADGES ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">Badge</div>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+      <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 500; background: var(--accent-blue-muted); color: var(--accent-blue); border: 1px solid rgba(59,130,246,0.2);">
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--accent-blue); box-shadow: 0 0 6px var(--accent-blue-glow);" class="pulse-dot"></span>
+        Running
+      </span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 500; background: var(--accent-amber-muted); color: var(--accent-amber); border: 1px solid rgba(245,158,11,0.2);">
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--accent-amber); box-shadow: 0 0 6px var(--accent-amber-glow);" class="pulse-dot"></span>
+        Waiting
+      </span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 500; background: var(--bg-muted); color: var(--fg-tertiary); border: 1px solid var(--border-subtle);">
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--fg-tertiary);"></span>
+        Stopped
+      </span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 500; background: var(--accent-red-muted); color: var(--accent-red); border: 1px solid rgba(239,68,68,0.2);">
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--accent-red); box-shadow: 0 0 6px var(--accent-red-glow);"></span>
+        Failed
+      </span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 500; background: var(--accent-green-muted); color: var(--accent-green); border: 1px solid rgba(34,197,94,0.2);">
+        <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--accent-green); box-shadow: 0 0 6px var(--accent-green-glow);"></span>
+        Completed
+      </span>
+    </div>
+  </section>
+
+  <!-- ========== CHIPS ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">Chip</div>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+      <span style="display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; font-family: 'Geist Mono'; background: var(--accent-purple-muted); color: var(--accent-purple); border: 1px solid rgba(168,85,247,0.15);">autonomous-sdlc</span>
+      <span style="display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; font-family: 'Geist Mono'; background: var(--accent-blue-muted); color: var(--accent-blue); border: 1px solid rgba(59,130,246,0.15);">claude-code</span>
+      <span style="display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; font-family: 'Geist Mono'; background: var(--accent-green-muted); color: var(--accent-green); border: 1px solid rgba(34,197,94,0.15);">implementer</span>
+      <span style="display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 6px; font-size: 12px; font-weight: 500; font-family: 'Geist Mono'; background: var(--accent-amber-muted); color: var(--accent-amber); border: 1px solid rgba(245,158,11,0.15);">local</span>
+    </div>
+  </section>
+
+  <!-- ========== STATUS INDICATOR ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">StatusIndicator</div>
+    <div class="card" style="padding: 20px 24px; display: flex; gap: 32px;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green-glow);" class="pulse-dot"></span>
+        <span style="font-size: 13px; color: var(--fg-secondary);">Conductor</span>
+        <span style="font-size: 11px; color: var(--accent-green); font-weight: 500;">online</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green-glow);" class="pulse-dot"></span>
+        <span style="font-size: 13px; color: var(--fg-secondary);">ArkD</span>
+        <span style="font-size: 11px; color: var(--accent-green); font-weight: 500;">online</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--fg-muted);"></span>
+        <span style="font-size: 13px; color: var(--fg-secondary);">Router</span>
+        <span style="font-size: 11px; color: var(--fg-tertiary); font-weight: 500;">offline</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== CARDS ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">Card Variants</div>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;">
+      <!-- Default -->
+      <div class="card" style="padding: 24px;">
+        <div style="font-size: 15px; font-weight: 600; color: var(--fg-primary); margin-bottom: 8px;">Default Card</div>
+        <p style="font-size: 13px; color: var(--fg-secondary); line-height: 1.6; margin: 0;">A standard card with subtle border and elevated background. Used for grouping related content.</p>
+      </div>
+      <!-- Accent top-border -->
+      <div class="card" style="padding: 24px; position: relative; overflow: hidden;">
+        <div style="position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--accent-blue);"></div>
+        <div style="font-size: 15px; font-weight: 600; color: var(--fg-primary); margin-bottom: 8px;">Accent Card</div>
+        <p style="font-size: 13px; color: var(--fg-secondary); line-height: 1.6; margin: 0;">Card with a colored top border for emphasis. Used for featured sections or active states.</p>
+      </div>
+      <!-- Interactive -->
+      <div class="card card-interactive" style="padding: 24px; cursor: pointer;">
+        <div style="font-size: 15px; font-weight: 600; color: var(--fg-primary); margin-bottom: 8px;">Interactive Card</div>
+        <p style="font-size: 13px; color: var(--fg-secondary); line-height: 1.6; margin: 0;">Hover to see the lift effect. Cards that navigate or expand use this treatment.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== BUTTONS ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">Button</div>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+      <button style="padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 500; border: none; cursor: pointer; background: var(--accent-blue); color: #fff; transition: all 0.15s; font-family: 'Geist', sans-serif;">Primary</button>
+      <button style="padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 500; border: 1px solid var(--border-default); cursor: pointer; background: transparent; color: var(--fg-primary); transition: all 0.15s; font-family: 'Geist', sans-serif;">Secondary</button>
+      <button style="padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 500; border: 1px solid transparent; cursor: pointer; background: transparent; color: var(--fg-secondary); transition: all 0.15s; font-family: 'Geist', sans-serif;">Ghost</button>
+      <button style="padding: 8px 20px; border-radius: 8px; font-size: 13px; font-weight: 500; border: none; cursor: pointer; background: var(--accent-red); color: #fff; transition: all 0.15s; font-family: 'Geist', sans-serif;">Danger</button>
+      <button style="padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 500; border: none; cursor: pointer; background: var(--accent-blue); color: #fff; transition: all 0.15s; font-family: 'Geist', sans-serif;">Small</button>
+      <button style="padding: 12px 28px; border-radius: 10px; font-size: 15px; font-weight: 500; border: none; cursor: pointer; background: var(--accent-blue); color: #fff; transition: all 0.15s; font-family: 'Geist', sans-serif;">Large</button>
+    </div>
+  </section>
+
+  <!-- ========== INPUT ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">Input</div>
+    <div style="display: flex; flex-direction: column; gap: 14px; max-width: 400px;">
+      <input type="text" placeholder="Search sessions..." style="padding: 10px 14px 10px 36px; border-radius: 10px; font-size: 13px; border: 1px solid var(--border-default); background: var(--bg-surface); color: var(--fg-primary); outline: none; font-family: 'Geist', sans-serif; transition: border-color 0.15s; background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%236b6b76%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><circle cx=%2211%22 cy=%2211%22 r=%228%22/><path d=%22m21 21-4.3-4.3%22/></svg>'); background-repeat: no-repeat; background-position: 12px center; background-size: 14px;" onfocus="this.style.borderColor='var(--accent-blue)'; this.style.boxShadow='0 0 0 3px var(--accent-blue-muted)'" onblur="this.style.borderColor='var(--border-default)'; this.style.boxShadow='none'" />
+      <input type="text" value="ark-session-planner" style="padding: 10px 14px; border-radius: 10px; font-size: 13px; border: 1px solid var(--accent-blue); background: var(--bg-surface); color: var(--fg-primary); outline: none; font-family: 'Geist', sans-serif; box-shadow: 0 0 0 3px var(--accent-blue-muted);" />
+    </div>
+  </section>
+
+  <!-- ========== CHAT INPUT ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">ChatInput</div>
+    <div class="card" style="padding: 14px 16px; display: flex; align-items: center; gap: 10px;">
+      <button style="width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border-subtle); background: transparent; color: var(--fg-tertiary); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+      </button>
+      <div style="flex: 1; padding: 8px 14px; border-radius: 10px; background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--fg-muted); font-size: 13px;">Type a message...</div>
+      <button style="width: 36px; height: 36px; border-radius: 8px; border: none; background: var(--accent-blue); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
+      </button>
+    </div>
+    <div style="text-align: right; margin-top: 6px; font-size: 11px; color: var(--fg-tertiary); font-family: 'Geist Mono';">Claude Opus 4.6 -- $0.12</div>
+  </section>
+
+  <!-- ========== DATA LIST ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">DataList</div>
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <!-- Session rows -->
+      <div style="display: flex; align-items: center; gap: 14px; padding: 14px 20px; border-bottom: 1px solid var(--border-subtle); transition: background 0.1s; cursor: pointer;" onmouseover="this.style.background='var(--bg-surface)'" onmouseout="this.style.background='transparent'">
+        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 500; background: var(--accent-blue-muted); color: var(--accent-blue); border: 1px solid rgba(59,130,246,0.2); flex-shrink: 0;">
+          <span style="width: 5px; height: 5px; border-radius: 50%; background: var(--accent-blue);" class="pulse-dot"></span>running
+        </span>
+        <span style="font-family: 'Geist Mono'; font-size: 12px; color: var(--fg-secondary); flex-shrink: 0; width: 72px;">s-a1b2c3</span>
+        <span style="font-size: 13px; color: var(--fg-primary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Implement OAuth v2 authentication flow</span>
+        <span style="padding: 2px 8px; border-radius: 5px; font-size: 11px; font-family: 'Geist Mono'; background: var(--accent-green-muted); color: var(--accent-green); flex-shrink: 0;">implementer</span>
+        <span style="padding: 2px 8px; border-radius: 5px; font-size: 11px; font-family: 'Geist Mono'; background: var(--accent-purple-muted); color: var(--accent-purple); flex-shrink: 0;">autonomous-sdlc</span>
+        <span style="font-size: 12px; color: var(--fg-tertiary); flex-shrink: 0; width: 52px; text-align: right;">2m ago</span>
+      </div>
+      <!-- Selected row -->
+      <div style="display: flex; align-items: center; gap: 14px; padding: 14px 20px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-surface); border-left: 3px solid var(--accent-blue); cursor: pointer;">
+        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 500; background: var(--accent-blue-muted); color: var(--accent-blue); border: 1px solid rgba(59,130,246,0.2); flex-shrink: 0;">
+          <span style="width: 5px; height: 5px; border-radius: 50%; background: var(--accent-blue);" class="pulse-dot"></span>running
+        </span>
+        <span style="font-family: 'Geist Mono'; font-size: 12px; color: var(--fg-secondary); flex-shrink: 0; width: 72px;">s-d4e5f6</span>
+        <span style="font-size: 13px; color: var(--fg-primary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Refactor session orchestration to support fan-out</span>
+        <span style="padding: 2px 8px; border-radius: 5px; font-size: 11px; font-family: 'Geist Mono'; background: var(--accent-purple-muted); color: var(--accent-purple); flex-shrink: 0;">planner</span>
+        <span style="padding: 2px 8px; border-radius: 5px; font-size: 11px; font-family: 'Geist Mono'; background: var(--accent-purple-muted); color: var(--accent-purple); flex-shrink: 0;">autonomous-sdlc</span>
+        <span style="font-size: 12px; color: var(--fg-tertiary); flex-shrink: 0; width: 52px; text-align: right;">5m ago</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px; padding: 14px 20px; border-bottom: 1px solid var(--border-subtle); transition: background 0.1s; cursor: pointer;" onmouseover="this.style.background='var(--bg-surface)'" onmouseout="this.style.background='transparent'">
+        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 500; background: var(--accent-green-muted); color: var(--accent-green); border: 1px solid rgba(34,197,94,0.2); flex-shrink: 0;">
+          <span style="width: 5px; height: 5px; border-radius: 50%; background: var(--accent-green);"></span>completed
+        </span>
+        <span style="font-family: 'Geist Mono'; font-size: 12px; color: var(--fg-secondary); flex-shrink: 0; width: 72px;">s-g7h8i9</span>
+        <span style="font-size: 13px; color: var(--fg-primary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Add WebSocket reconnection logic with backoff</span>
+        <span style="padding: 2px 8px; border-radius: 5px; font-size: 11px; font-family: 'Geist Mono'; background: var(--accent-green-muted); color: var(--accent-green); flex-shrink: 0;">implementer</span>
+        <span style="padding: 2px 8px; border-radius: 5px; font-size: 11px; font-family: 'Geist Mono'; background: var(--accent-amber-muted); color: var(--accent-amber); flex-shrink: 0;">quick</span>
+        <span style="font-size: 12px; color: var(--fg-tertiary); flex-shrink: 0; width: 52px; text-align: right;">18m ago</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px; padding: 14px 20px; border-bottom: 1px solid var(--border-subtle); transition: background 0.1s; cursor: pointer;" onmouseover="this.style.background='var(--bg-surface)'" onmouseout="this.style.background='transparent'">
+        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 500; background: var(--accent-red-muted); color: var(--accent-red); border: 1px solid rgba(239,68,68,0.2); flex-shrink: 0;">
+          <span style="width: 5px; height: 5px; border-radius: 50%; background: var(--accent-red);"></span>failed
+        </span>
+        <span style="font-family: 'Geist Mono'; font-size: 12px; color: var(--fg-secondary); flex-shrink: 0; width: 72px;">s-j0k1l2</span>
+        <span style="font-size: 13px; color: var(--fg-primary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Fix Docker compute provider timeout handling</span>
+        <span style="padding: 2px 8px; border-radius: 5px; font-size: 11px; font-family: 'Geist Mono'; background: var(--accent-green-muted); color: var(--accent-green); flex-shrink: 0;">implementer</span>
+        <span style="padding: 2px 8px; border-radius: 5px; font-size: 11px; font-family: 'Geist Mono'; background: var(--accent-purple-muted); color: var(--accent-purple); flex-shrink: 0;">autonomous-sdlc</span>
+        <span style="font-size: 12px; color: var(--fg-tertiary); flex-shrink: 0; width: 52px; text-align: right;">1h ago</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px; padding: 14px 20px; transition: background 0.1s; cursor: pointer;" onmouseover="this.style.background='var(--bg-surface)'" onmouseout="this.style.background='transparent'">
+        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 500; background: var(--accent-green-muted); color: var(--accent-green); border: 1px solid rgba(34,197,94,0.2); flex-shrink: 0;">
+          <span style="width: 5px; height: 5px; border-radius: 50%; background: var(--accent-green);"></span>completed
+        </span>
+        <span style="font-family: 'Geist Mono'; font-size: 12px; color: var(--fg-secondary); flex-shrink: 0; width: 72px;">s-m3n4o5</span>
+        <span style="font-size: 13px; color: var(--fg-primary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Update LLM router circuit breaker thresholds</span>
+        <span style="padding: 2px 8px; border-radius: 5px; font-size: 11px; font-family: 'Geist Mono'; background: var(--accent-blue-muted); color: var(--accent-blue); flex-shrink: 0;">reviewer</span>
+        <span style="padding: 2px 8px; border-radius: 5px; font-size: 11px; font-family: 'Geist Mono'; background: var(--accent-amber-muted); color: var(--accent-amber); flex-shrink: 0;">quick</span>
+        <span style="font-size: 12px; color: var(--fg-tertiary); flex-shrink: 0; width: 52px; text-align: right;">2h ago</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== TOOL CALL CARDS ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">ToolCallCard</div>
+    <div style="display: flex; flex-direction: column; gap: 10px; max-width: 600px;">
+      <!-- Bash running -->
+      <div class="card" style="padding: 12px 16px; display: flex; align-items: center; gap: 12px;">
+        <div style="width: 28px; height: 28px; border-radius: 7px; background: var(--accent-blue-muted); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        </div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--fg-primary); display: flex; align-items: center; gap: 6px;">
+            Bash
+            <span style="font-size: 11px; font-weight: 500; color: var(--accent-blue);">running</span>
+          </div>
+          <div style="font-size: 12px; font-family: 'Geist Mono'; color: var(--fg-tertiary); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">npm test</div>
+        </div>
+        <div class="spin-slow" style="width: 16px; height: 16px; border: 2px solid var(--border-default); border-top-color: var(--accent-blue); border-radius: 50%; flex-shrink: 0;"></div>
+      </div>
+      <!-- FileEdit completed -->
+      <div class="card" style="padding: 12px 16px; display: flex; align-items: center; gap: 12px;">
+        <div style="width: 28px; height: 28px; border-radius: 7px; background: var(--accent-green-muted); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        </div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--fg-primary); display: flex; align-items: center; gap: 6px;">
+            FileEdit
+            <span style="font-size: 11px; font-weight: 500; color: var(--accent-green);">completed</span>
+          </div>
+          <div style="font-size: 12px; font-family: 'Geist Mono'; color: var(--fg-tertiary); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">packages/web/src/App.tsx -- 12 lines changed</div>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <!-- FileRead completed -->
+      <div class="card" style="padding: 12px 16px; display: flex; align-items: center; gap: 12px;">
+        <div style="width: 28px; height: 28px; border-radius: 7px; background: var(--accent-green-muted); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-size: 12px; font-weight: 600; color: var(--fg-primary); display: flex; align-items: center; gap: 6px;">
+            FileRead
+            <span style="font-size: 11px; font-weight: 500; color: var(--accent-green);">completed</span>
+          </div>
+          <div style="font-size: 12px; font-family: 'Geist Mono'; color: var(--fg-tertiary); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">CLAUDE.md -- 100 lines</div>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== STAGE PROGRESS ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">StageProgress</div>
+    <div class="card" style="padding: 24px 32px;">
+      <div style="display: flex; align-items: center; gap: 0;">
+        <!-- plan - completed -->
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--accent-green); display: flex; align-items: center; justify-content: center;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <span style="font-size: 12px; font-weight: 600; color: var(--accent-green);">plan</span>
+        </div>
+        <div style="flex: 1; height: 2px; background: var(--accent-green); margin: 0 12px;"></div>
+        <!-- implement - running -->
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--accent-blue); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 12px var(--accent-blue-glow);" class="pulse-dot">
+            <div class="spin-slow" style="width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%;"></div>
+          </div>
+          <span style="font-size: 12px; font-weight: 600; color: var(--accent-blue);">implement</span>
+        </div>
+        <div style="flex: 1; height: 2px; background: var(--border-subtle); margin: 0 12px;"></div>
+        <!-- verify - pending -->
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--bg-muted); border: 2px solid var(--border-default); display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 10px; font-weight: 600; color: var(--fg-tertiary);">3</span>
+          </div>
+          <span style="font-size: 12px; font-weight: 500; color: var(--fg-tertiary);">verify</span>
+        </div>
+        <div style="flex: 1; height: 2px; background: var(--border-subtle); margin: 0 12px;"></div>
+        <!-- review - pending -->
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--bg-muted); border: 2px solid var(--border-default); display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 10px; font-weight: 600; color: var(--fg-tertiary);">4</span>
+          </div>
+          <span style="font-size: 12px; font-weight: 500; color: var(--fg-tertiary);">review</span>
+        </div>
+        <div style="flex: 1; height: 2px; background: var(--border-subtle); margin: 0 12px;"></div>
+        <!-- PR - pending -->
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="width: 28px; height: 28px; border-radius: 50%; background: var(--bg-muted); border: 2px solid var(--border-default); display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 10px; font-weight: 600; color: var(--fg-tertiary);">5</span>
+          </div>
+          <span style="font-size: 12px; font-weight: 500; color: var(--fg-tertiary);">PR</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== TIMELINE ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">Timeline</div>
+    <div class="card" style="padding: 24px 28px;">
+      <div style="display: flex; flex-direction: column; gap: 0;">
+        <div style="display: flex; gap: 14px;">
+          <div style="display: flex; flex-direction: column; align-items: center;">
+            <div style="width: 10px; height: 10px; border-radius: 50%; background: var(--accent-blue); box-shadow: 0 0 6px var(--accent-blue-glow); flex-shrink: 0; margin-top: 4px;"></div>
+            <div style="width: 1px; flex: 1; background: var(--border-default); min-height: 28px;"></div>
+          </div>
+          <div style="padding-bottom: 20px;">
+            <div style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary);">2:34 PM</div>
+            <div style="font-size: 13px; color: var(--fg-primary); margin-top: 2px;">Session started</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 14px;">
+          <div style="display: flex; flex-direction: column; align-items: center;">
+            <div style="width: 10px; height: 10px; border-radius: 50%; background: var(--accent-blue); box-shadow: 0 0 6px var(--accent-blue-glow); flex-shrink: 0; margin-top: 4px;"></div>
+            <div style="width: 1px; flex: 1; background: var(--border-default); min-height: 28px;"></div>
+          </div>
+          <div style="padding-bottom: 20px;">
+            <div style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary);">2:35 PM</div>
+            <div style="font-size: 13px; color: var(--fg-primary); margin-top: 2px;">Stage <span style="font-weight: 600;">plan</span> dispatched</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 14px;">
+          <div style="display: flex; flex-direction: column; align-items: center;">
+            <div style="width: 10px; height: 10px; border-radius: 50%; background: var(--accent-green); box-shadow: 0 0 6px var(--accent-green-glow); flex-shrink: 0; margin-top: 4px;"></div>
+            <div style="width: 1px; flex: 1; background: var(--border-default); min-height: 28px;"></div>
+          </div>
+          <div style="padding-bottom: 20px;">
+            <div style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary);">2:38 PM</div>
+            <div style="font-size: 13px; color: var(--fg-primary); margin-top: 2px;">Plan completed, advancing to <span style="font-weight: 600;">implement</span></div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 14px;">
+          <div style="display: flex; flex-direction: column; align-items: center;">
+            <div style="width: 10px; height: 10px; border-radius: 50%; background: var(--accent-blue); box-shadow: 0 0 6px var(--accent-blue-glow); flex-shrink: 0; margin-top: 4px;"></div>
+          </div>
+          <div>
+            <div style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary);">2:38 PM</div>
+            <div style="font-size: 13px; color: var(--fg-primary); margin-top: 2px;">Stage <span style="font-weight: 600;">implement</span> dispatched</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== EMPTY STATE ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">EmptyState</div>
+    <div class="card" style="padding: 64px 32px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+      <div style="width: 56px; height: 56px; border-radius: 14px; background: var(--bg-surface); border: 1px solid var(--border-subtle); display: flex; align-items: center; justify-content: center; margin-bottom: 20px;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--fg-muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>
+      </div>
+      <div style="font-size: 16px; font-weight: 600; color: var(--fg-primary); margin-bottom: 6px;">No sessions yet</div>
+      <div style="font-size: 13px; color: var(--fg-tertiary); margin-bottom: 20px;">Start your first coding session to see it here</div>
+      <button style="padding: 9px 20px; border-radius: 8px; font-size: 13px; font-weight: 500; border: none; cursor: pointer; background: var(--accent-blue); color: #fff; font-family: 'Geist', sans-serif; display: flex; align-items: center; gap: 6px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Session
+      </button>
+    </div>
+  </section>
+
+  <!-- ========== AVATAR ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">Avatar</div>
+    <div style="display: flex; gap: 14px; align-items: center;">
+      <div style="width: 40px; height: 40px; border-radius: 10px; background: var(--accent-purple-muted); border: 1px solid rgba(168,85,247,0.2); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; color: var(--accent-purple);">P</div>
+      <div style="width: 40px; height: 40px; border-radius: 10px; background: var(--accent-blue-muted); border: 1px solid rgba(59,130,246,0.2); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; color: var(--accent-blue);">I</div>
+      <div style="width: 40px; height: 40px; border-radius: 10px; background: var(--accent-green-muted); border: 1px solid rgba(34,197,94,0.2); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; color: var(--accent-green);">R</div>
+      <div style="width: 40px; height: 40px; border-radius: 10px; background: var(--accent-amber-muted); border: 1px solid rgba(245,158,11,0.2); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; color: var(--accent-amber);">V</div>
+      <div style="margin-left: 12px; display: flex; flex-direction: column; gap: 2px;">
+        <span style="font-size: 12px; color: var(--fg-secondary);">P = planner, I = implementer, R = reviewer, V = verifier</span>
+        <span style="font-size: 11px; color: var(--fg-tertiary);">Colored by role, rounded-lg, initials</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== PAGE HEADER ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">PageHeader</div>
+    <div class="card" style="padding: 20px 24px; display: flex; align-items: center; justify-content: space-between;">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 13px; color: var(--fg-tertiary);">Sessions</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--fg-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        <span style="font-size: 13px; font-family: 'Geist Mono'; color: var(--fg-secondary);">s-abc123</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--fg-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        <span style="font-size: 13px; font-weight: 600; color: var(--fg-primary);">implement</span>
+        <span style="display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 500; background: var(--accent-blue-muted); color: var(--accent-blue); border: 1px solid rgba(59,130,246,0.2); margin-left: 8px;">
+          <span style="width: 5px; height: 5px; border-radius: 50%; background: var(--accent-blue);" class="pulse-dot"></span>running
+        </span>
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <button style="padding: 6px 14px; border-radius: 7px; font-size: 12px; font-weight: 500; border: 1px solid var(--border-default); cursor: pointer; background: transparent; color: var(--fg-secondary); font-family: 'Geist', sans-serif;">Stop</button>
+        <button style="padding: 6px 14px; border-radius: 7px; font-size: 12px; font-weight: 500; border: 1px solid var(--border-default); cursor: pointer; background: transparent; color: var(--fg-secondary); font-family: 'Geist', sans-serif;">Retry</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== MODAL ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">Modal</div>
+    <div style="position: relative; border-radius: 16px; overflow: hidden; height: 420px;">
+      <!-- Fake overlay -->
+      <div style="position: absolute; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); border-radius: 16px;"></div>
+      <!-- Modal -->
+      <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 440px; background: var(--bg-elevated); border: 1px solid var(--border-default); border-radius: 14px; box-shadow: 0 24px 48px rgba(0,0,0,0.3); overflow: hidden;">
+        <div style="padding: 20px 24px 0;">
+          <div style="font-size: 16px; font-weight: 600; color: var(--fg-primary); margin-bottom: 4px;">New Session</div>
+          <div style="font-size: 13px; color: var(--fg-tertiary);">Configure and launch a new coding session</div>
+        </div>
+        <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 14px;">
+          <div>
+            <label style="font-size: 12px; font-weight: 500; color: var(--fg-secondary); display: block; margin-bottom: 6px;">Repository</label>
+            <input type="text" value="ark" style="width: 100%; padding: 9px 12px; border-radius: 8px; font-size: 13px; border: 1px solid var(--border-default); background: var(--bg-surface); color: var(--fg-primary); outline: none; font-family: 'Geist Mono', monospace;" readonly />
+          </div>
+          <div>
+            <label style="font-size: 12px; font-weight: 500; color: var(--fg-secondary); display: block; margin-bottom: 6px;">Flow</label>
+            <div style="width: 100%; padding: 9px 12px; border-radius: 8px; font-size: 13px; border: 1px solid var(--border-default); background: var(--bg-surface); color: var(--fg-primary); display: flex; justify-content: space-between; align-items: center;">
+              <span>autonomous-sdlc</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--fg-tertiary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+          </div>
+          <div>
+            <label style="font-size: 12px; font-weight: 500; color: var(--fg-secondary); display: block; margin-bottom: 6px;">Agent</label>
+            <div style="width: 100%; padding: 9px 12px; border-radius: 8px; font-size: 13px; border: 1px solid var(--border-default); background: var(--bg-surface); color: var(--fg-primary); display: flex; justify-content: space-between; align-items: center;">
+              <span>implementer</span>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--fg-tertiary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+          </div>
+        </div>
+        <div style="padding: 16px 24px; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 8px;">
+          <button style="padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; border: 1px solid var(--border-default); cursor: pointer; background: transparent; color: var(--fg-secondary); font-family: 'Geist', sans-serif;">Cancel</button>
+          <button style="padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; border: none; cursor: pointer; background: var(--accent-blue); color: #fff; font-family: 'Geist', sans-serif;">Create Session</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== TABS ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">Tabs</div>
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <div style="display: flex; border-bottom: 1px solid var(--border-subtle);">
+        <div style="padding: 12px 20px; font-size: 13px; font-weight: 500; color: var(--accent-blue); border-bottom: 2px solid var(--accent-blue); cursor: pointer; margin-bottom: -1px;">Chat</div>
+        <div style="padding: 12px 20px; font-size: 13px; font-weight: 500; color: var(--fg-tertiary); cursor: pointer; transition: color 0.15s;" onmouseover="this.style.color='var(--fg-secondary)'" onmouseout="this.style.color='var(--fg-tertiary)'">Pipeline</div>
+        <div style="padding: 12px 20px; font-size: 13px; font-weight: 500; color: var(--fg-tertiary); cursor: pointer; transition: color 0.15s;" onmouseover="this.style.color='var(--fg-secondary)'" onmouseout="this.style.color='var(--fg-tertiary)'">Terminal</div>
+        <div style="padding: 12px 20px; font-size: 13px; font-weight: 500; color: var(--fg-tertiary); cursor: pointer; transition: color 0.15s;" onmouseover="this.style.color='var(--fg-secondary)'" onmouseout="this.style.color='var(--fg-tertiary)'">Cost</div>
+      </div>
+      <div style="padding: 24px; font-size: 13px; color: var(--fg-tertiary);">Tab content area</div>
+    </div>
+  </section>
+
+  <!-- ========== SIDEBAR ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">Sidebar</div>
+    <div style="display: flex; gap: 16px;">
+      <!-- Expanded -->
+      <div class="card" style="width: 220px; padding: 16px 0; display: flex; flex-direction: column; overflow: hidden;">
+        <div style="padding: 0 16px 16px; border-bottom: 1px solid var(--border-subtle); margin-bottom: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="width: 24px; height: 24px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; color: #fff;">A</div>
+            <span style="font-size: 14px; font-weight: 600; color: var(--fg-primary);">Ark</span>
+          </div>
+        </div>
+        <!-- Nav items -->
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 1px; padding: 0 8px;">
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; cursor: pointer; color: var(--fg-tertiary); transition: all 0.1s;" onmouseover="this.style.background='var(--bg-surface)'; this.style.color='var(--fg-secondary)'" onmouseout="this.style.background='transparent'; this.style.color='var(--fg-tertiary)'">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            <span style="font-size: 13px;">Dashboard</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; cursor: pointer; background: var(--accent-blue-muted); color: var(--accent-blue); border-left: 3px solid var(--accent-blue); margin-left: -3px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span style="font-size: 13px; font-weight: 500;">Sessions</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; cursor: pointer; color: var(--fg-tertiary); transition: all 0.1s;" onmouseover="this.style.background='var(--bg-surface)'; this.style.color='var(--fg-secondary)'" onmouseout="this.style.background='transparent'; this.style.color='var(--fg-tertiary)'">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span style="font-size: 13px;">Agents</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; cursor: pointer; color: var(--fg-tertiary); transition: all 0.1s;" onmouseover="this.style.background='var(--bg-surface)'; this.style.color='var(--fg-secondary)'" onmouseout="this.style.background='transparent'; this.style.color='var(--fg-tertiary)'">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m8.66-13.5-5.2 3m-6.92 4-5.2 3M1.34 7.5l5.2 3m6.92 4 5.2 3"/></svg>
+            <span style="font-size: 13px;">Flows</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; cursor: pointer; color: var(--fg-tertiary); transition: all 0.1s;" onmouseover="this.style.background='var(--bg-surface)'; this.style.color='var(--fg-secondary)'" onmouseout="this.style.background='transparent'; this.style.color='var(--fg-tertiary)'">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg>
+            <span style="font-size: 13px;">Compute</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; cursor: pointer; color: var(--fg-tertiary); transition: all 0.1s;" onmouseover="this.style.background='var(--bg-surface)'; this.style.color='var(--fg-secondary)'" onmouseout="this.style.background='transparent'; this.style.color='var(--fg-tertiary)'">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m4.93 19.07 1.41-1.41"/><path d="m17.66 5.34 1.41-1.41"/><circle cx="12" cy="12" r="4"/></svg>
+            <span style="font-size: 13px;">History</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; cursor: pointer; color: var(--fg-tertiary); transition: all 0.1s;" onmouseover="this.style.background='var(--bg-surface)'; this.style.color='var(--fg-secondary)'" onmouseout="this.style.background='transparent'; this.style.color='var(--fg-tertiary)'">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span style="font-size: 13px;">Memory</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; cursor: pointer; color: var(--fg-tertiary); transition: all 0.1s;" onmouseover="this.style.background='var(--bg-surface)'; this.style.color='var(--fg-secondary)'" onmouseout="this.style.background='transparent'; this.style.color='var(--fg-tertiary)'">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            <span style="font-size: 13px;">Tools</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; cursor: pointer; color: var(--fg-tertiary); transition: all 0.1s;" onmouseover="this.style.background='var(--bg-surface)'; this.style.color='var(--fg-secondary)'" onmouseout="this.style.background='transparent'; this.style.color='var(--fg-tertiary)'">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span style="font-size: 13px;">Schedules</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; cursor: pointer; color: var(--fg-tertiary); transition: all 0.1s;" onmouseover="this.style.background='var(--bg-surface)'; this.style.color='var(--fg-secondary)'" onmouseout="this.style.background='transparent'; this.style.color='var(--fg-tertiary)'">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            <span style="font-size: 13px;">Costs</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; cursor: pointer; color: var(--fg-tertiary); transition: all 0.1s;" onmouseover="this.style.background='var(--bg-surface)'; this.style.color='var(--fg-secondary)'" onmouseout="this.style.background='transparent'; this.style.color='var(--fg-tertiary)'">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span style="font-size: 13px;">Settings</span>
+          </div>
+        </div>
+        <!-- Version -->
+        <div style="padding: 12px 20px 4px; border-top: 1px solid var(--border-subtle); margin-top: 8px;">
+          <span style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-muted); padding: 2px 8px; border-radius: 4px; background: var(--bg-surface);">v0.17.0</span>
+        </div>
+      </div>
+      <!-- Collapsed -->
+      <div class="card" style="width: 56px; padding: 16px 0; display: flex; flex-direction: column; align-items: center; overflow: hidden;">
+        <div style="margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border-subtle); width: 100%; display: flex; justify-content: center;">
+          <div style="width: 24px; height: 24px; background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; color: #fff;">A</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px; align-items: center;">
+          <div style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--fg-tertiary); cursor: pointer;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          </div>
+          <div style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: var(--accent-blue-muted); color: var(--accent-blue); cursor: pointer;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </div>
+          <div style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--fg-tertiary); cursor: pointer;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+          </div>
+          <div style="width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--fg-tertiary); cursor: pointer;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m8.66-13.5-5.2 3m-6.92 4-5.2 3M1.34 7.5l5.2 3m6.92 4 5.2 3"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== CHAT CONVERSATION ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">Chat Conversation</div>
+    <div class="card" style="padding: 0; overflow: hidden; display: flex; flex-direction: column; max-width: 720px;">
+      <div style="flex: 1; padding: 20px; display: flex; flex-direction: column; gap: 16px; max-height: 600px; overflow-y: auto;">
+        <!-- System message -->
+        <div style="text-align: center;">
+          <span style="font-size: 11px; color: var(--fg-muted); background: var(--bg-surface); padding: 4px 12px; border-radius: 6px; font-family: 'Geist Mono';">Session s-abc123 started -- flow: autonomous-sdlc</span>
+        </div>
+        <!-- System message -->
+        <div style="text-align: center;">
+          <span style="font-size: 11px; color: var(--fg-muted); background: var(--bg-surface); padding: 4px 12px; border-radius: 6px; font-family: 'Geist Mono';">Stage: plan dispatched (agent: planner)</span>
+        </div>
+        <!-- Agent message -->
+        <div style="display: flex; gap: 10px; align-items: flex-start;">
+          <div style="width: 28px; height: 28px; border-radius: 8px; background: var(--accent-purple-muted); border: 1px solid rgba(168,85,247,0.2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--accent-purple); flex-shrink: 0;">P</div>
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; border-top-left-radius: 4px; padding: 12px 16px; max-width: 85%;">
+            <div style="font-size: 13px; color: var(--fg-primary); line-height: 1.6;">I'll analyze the codebase and create a plan for the authentication feature...</div>
+          </div>
+        </div>
+        <!-- Tool call - FileRead -->
+        <div style="margin-left: 38px;">
+          <div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--border-subtle); max-width: 400px;">
+            <div style="width: 22px; height: 22px; border-radius: 5px; background: var(--accent-green-muted); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <span style="font-size: 12px; font-weight: 500; color: var(--fg-secondary);">FileRead</span>
+            <span style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary);">packages/core/auth.ts</span>
+            <span style="font-size: 11px; color: var(--fg-muted);">234 lines</span>
+          </div>
+        </div>
+        <!-- Tool call - Bash running -->
+        <div style="margin-left: 38px;">
+          <div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 8px; background: var(--bg-surface); border: 1px solid var(--accent-blue); border-color: rgba(59,130,246,0.3); max-width: 400px;">
+            <div class="spin-slow" style="width: 14px; height: 14px; border: 2px solid var(--border-default); border-top-color: var(--accent-blue); border-radius: 50%; flex-shrink: 0;"></div>
+            <span style="font-size: 12px; font-weight: 500; color: var(--fg-secondary);">Bash</span>
+            <span style="font-size: 11px; font-family: 'Geist Mono'; color: var(--fg-tertiary);">grep -rn "authenticate" packages/</span>
+          </div>
+        </div>
+        <!-- Agent message -->
+        <div style="display: flex; gap: 10px; align-items: flex-start;">
+          <div style="width: 28px; height: 28px; border-radius: 8px; background: var(--accent-purple-muted); border: 1px solid rgba(168,85,247,0.2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--accent-purple); flex-shrink: 0;">P</div>
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; border-top-left-radius: 4px; padding: 12px 16px; max-width: 85%;">
+            <div style="font-size: 13px; color: var(--fg-primary); line-height: 1.6;">Based on my analysis, here's the implementation plan:</div>
+            <ol style="margin: 8px 0 0; padding-left: 18px; font-size: 13px; color: var(--fg-secondary); line-height: 1.7;">
+              <li>Add OAuth provider abstraction</li>
+              <li>Implement GitHub OAuth flow</li>
+              <li>Add session token management</li>
+            </ol>
+          </div>
+        </div>
+        <!-- System message -->
+        <div style="text-align: center;">
+          <span style="font-size: 11px; color: var(--accent-green); background: var(--accent-green-muted); padding: 4px 12px; border-radius: 6px; font-family: 'Geist Mono';">Stage: plan completed -- advancing to implement</span>
+        </div>
+        <!-- User message -->
+        <div style="display: flex; justify-content: flex-end;">
+          <div style="background: var(--accent-blue); border-radius: 12px; border-bottom-right-radius: 4px; padding: 12px 16px; max-width: 85%;">
+            <div style="font-size: 13px; color: #fff; line-height: 1.6;">Make sure to use the v2 OAuth endpoints, not v1</div>
+          </div>
+        </div>
+        <!-- Agent message -->
+        <div style="display: flex; gap: 10px; align-items: flex-start;">
+          <div style="width: 28px; height: 28px; border-radius: 8px; background: var(--accent-blue-muted); border: 1px solid rgba(59,130,246,0.2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--accent-blue); flex-shrink: 0;">I</div>
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 12px; border-top-left-radius: 4px; padding: 12px 16px; max-width: 85%;">
+            <div style="font-size: 13px; color: var(--fg-primary); line-height: 1.6;">Got it, I'll use the v2 endpoints. Updating the OAuth configuration now...</div>
+          </div>
+        </div>
+      </div>
+      <!-- Chat input -->
+      <div style="border-top: 1px solid var(--border-subtle); padding: 14px 16px; display: flex; align-items: center; gap: 10px;">
+        <button style="width: 32px; height: 32px; border-radius: 7px; border: 1px solid var(--border-subtle); background: transparent; color: var(--fg-tertiary); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </button>
+        <div style="flex: 1; padding: 8px 14px; border-radius: 10px; background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--fg-muted); font-size: 13px;">Type a message...</div>
+        <button style="width: 32px; height: 32px; border-radius: 7px; border: none; background: var(--accent-blue); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
+        </button>
+      </div>
+      <div style="text-align: right; padding: 0 16px 10px; font-size: 11px; color: var(--fg-tertiary); font-family: 'Geist Mono';">Claude Opus 4.6 -- $0.12</div>
+    </div>
+  </section>
+
+  <!-- ========== DIFF VIEWER ========== -->
+  <section style="margin-bottom: 72px;">
+    <div class="section-label">DiffViewer</div>
+    <div class="card" style="padding: 0; overflow: hidden; max-width: 640px;">
+      <div style="padding: 10px 16px; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 8px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--fg-tertiary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/></svg>
+        <span style="font-size: 12px; font-family: 'Geist Mono'; color: var(--fg-secondary);">packages/core/auth.ts</span>
+        <span style="font-size: 11px; color: var(--accent-green); margin-left: auto;">+4</span>
+        <span style="font-size: 11px; color: var(--accent-red);">-1</span>
+      </div>
+      <div style="padding: 0; font-family: 'Geist Mono'; font-size: 12px; line-height: 1.7;">
+        <div class="diff-line-remove" style="padding: 1px 16px; display: flex;">
+          <span style="width: 32px; text-align: right; padding-right: 12px; user-select: none; opacity: 0.4;">3</span>
+          <span>- import { authenticate } from "./auth-v1.js";</span>
+        </div>
+        <div class="diff-line-add" style="padding: 1px 16px; display: flex;">
+          <span style="width: 32px; text-align: right; padding-right: 12px; user-select: none; opacity: 0.4;">3</span>
+          <span>+ import { authenticate } from "./auth-v2.js";</span>
+        </div>
+        <div class="diff-line-context" style="padding: 1px 16px; display: flex;">
+          <span style="width: 32px; text-align: right; padding-right: 12px; user-select: none; opacity: 0.4;">4</span>
+          <span>&nbsp;</span>
+        </div>
+        <div class="diff-line-add" style="padding: 1px 16px; display: flex;">
+          <span style="width: 32px; text-align: right; padding-right: 12px; user-select: none; opacity: 0.4;">5</span>
+          <span>+ export async function oauthCallback(code: string) {</span>
+        </div>
+        <div class="diff-line-add" style="padding: 1px 16px; display: flex;">
+          <span style="width: 32px; text-align: right; padding-right: 12px; user-select: none; opacity: 0.4;">6</span>
+          <span>+   const token = await exchangeCode(code);</span>
+        </div>
+        <div class="diff-line-add" style="padding: 1px 16px; display: flex;">
+          <span style="width: 32px; text-align: right; padding-right: 12px; user-select: none; opacity: 0.4;">7</span>
+          <span>+   return createSession(token);</span>
+        </div>
+        <div class="diff-line-add" style="padding: 1px 16px; display: flex;">
+          <span style="width: 32px; text-align: right; padding-right: 12px; user-select: none; opacity: 0.4;">8</span>
+          <span>+ }</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  function toggleTheme() {
+    const html = document.documentElement;
+    const icon = document.getElementById('theme-icon');
+    const label = document.getElementById('theme-label');
+    if (html.classList.contains('dark')) {
+      html.classList.remove('dark');
+      html.classList.add('light');
+      icon.textContent = '\u2600';
+      label.textContent = 'Light';
+    } else {
+      html.classList.remove('light');
+      html.classList.add('dark');
+      icon.textContent = '\u263E';
+      label.textContent = 'Dark';
+    }
+  }
+</script>
+
+</body>
+</html>
