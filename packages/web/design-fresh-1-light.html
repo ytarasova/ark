@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ark -- Fresh Design 1 (Light)</title>
+<style>
+  /* ── Reset ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── Typography ── */
+  :root {
+    --font-sans: "SF Pro Display", "SF Pro Text", system-ui, -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    --font-mono: "SF Mono", "JetBrains Mono", "Fira Code", "Cascadia Code", monospace;
+
+    --bg: #ffffff;
+    --bg-subtle: #f8f8f8;
+    --bg-input: #f5f5f5;
+    --bg-user: #f0f0f0;
+    --bg-hover: #fafafa;
+    --bg-code: #f5f5f7;
+
+    --text-primary: #1d1d1f;
+    --text-secondary: #6e6e73;
+    --text-tertiary: #aeaeb2;
+    --text-quaternary: #c7c7cc;
+
+    --accent: #0071e3;
+    --accent-hover: #0077ED;
+
+    --border: #e5e5e5;
+    --border-light: #f0f0f0;
+
+    --green: #248a3d;
+    --red: #d70015;
+
+    --sidebar-w: 240px;
+    --panel-w: 280px;
+    --conversation-max: 680px;
+
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+  }
+
+  html, body {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── Layout Shell ── */
+  .shell {
+    display: flex;
+    height: 100vh;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: var(--sidebar-w);
+    min-width: var(--sidebar-w);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-header {
+    padding: 20px 20px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .sidebar-logo {
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+    color: var(--text-primary);
+  }
+
+  .sidebar-new-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .sidebar-new-btn:hover {
+    background: var(--bg-subtle);
+    border-color: #d5d5d5;
+  }
+
+  .sidebar-search {
+    padding: 0 12px 12px;
+  }
+  .sidebar-search input {
+    width: 100%;
+    height: 32px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-input);
+    padding: 0 10px;
+    font-size: 13px;
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .sidebar-search input::placeholder { color: var(--text-tertiary); }
+  .sidebar-search input:focus { border-color: var(--accent); }
+
+  .sidebar-section-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-tertiary);
+    padding: 8px 20px 6px;
+  }
+
+  .sidebar-list {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 12px;
+  }
+
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    margin: 1px 8px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.12s;
+    position: relative;
+  }
+  .sidebar-item:hover { background: var(--bg-subtle); }
+  .sidebar-item.active { background: var(--bg-user); }
+
+  .sidebar-item-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .sidebar-item-dot.running { background: var(--green); }
+  .sidebar-item-dot.completed { background: var(--text-quaternary); }
+  .sidebar-item-dot.paused { background: #ff9f0a; }
+
+  .sidebar-item-content {
+    min-width: 0;
+    flex: 1;
+  }
+  .sidebar-item-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sidebar-item-sub {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sidebar-footer {
+    border-top: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .sidebar-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--bg-user);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+  }
+
+  .sidebar-user-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  /* ── Main Area ── */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    position: relative;
+  }
+
+  /* ── Top Bar ── */
+  .topbar {
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    flex-shrink: 0;
+  }
+
+  .topbar-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .topbar-meta {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    margin-left: 10px;
+    font-weight: 400;
+  }
+
+  .topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .topbar-btn {
+    height: 30px;
+    padding: 0 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .topbar-btn:hover {
+    background: var(--bg-subtle);
+    border-color: #d5d5d5;
+  }
+  .topbar-btn.active {
+    background: var(--bg-user);
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  /* ── Conversation ── */
+  .conversation-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px 24px;
+  }
+
+  .conversation {
+    max-width: var(--conversation-max);
+    margin: 0 auto;
+  }
+
+  /* ── Message ── */
+  .message {
+    margin-bottom: 24px;
+  }
+
+  .message-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .message-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .message-avatar.agent {
+    background: var(--bg-user);
+    color: var(--text-secondary);
+  }
+  .message-avatar.user {
+    background: var(--accent);
+    color: #fff;
+  }
+  .message-avatar.system {
+    background: var(--bg-input);
+    color: var(--text-tertiary);
+  }
+
+  .message-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .message-time {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-left: auto;
+  }
+
+  .message-body {
+    padding-left: 32px;
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--text-primary);
+  }
+
+  .message-body p { margin-bottom: 8px; }
+  .message-body p:last-child { margin-bottom: 0; }
+
+  /* User message variant */
+  .message.user-msg .message-body {
+    background: var(--bg-user);
+    border-radius: var(--radius-md);
+    padding: 12px 16px;
+    margin-left: 32px;
+  }
+
+  /* ── Code Block ── */
+  .code-block {
+    margin: 10px 0;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+
+  .code-block-header {
+    background: var(--bg-subtle);
+    padding: 6px 12px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-tertiary);
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .code-block pre {
+    background: var(--bg-code);
+    padding: 12px 14px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.6;
+    overflow-x: auto;
+    color: var(--text-primary);
+  }
+
+  /* ── Tool Call ── */
+  .tool-call {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    margin: 4px 0;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  .tool-call:hover { background: var(--bg-subtle); }
+
+  .tool-call-icon {
+    font-size: 11px;
+    color: var(--text-quaternary);
+    flex-shrink: 0;
+    width: 14px;
+    text-align: center;
+  }
+
+  .tool-call-label { flex: 1; }
+
+  .tool-call-duration {
+    color: var(--text-tertiary);
+    font-size: 11px;
+  }
+
+  .tool-call-status {
+    color: var(--green);
+    font-size: 12px;
+  }
+
+  /* ── System Event ── */
+  .system-event {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 28px 0;
+    color: var(--text-tertiary);
+    font-size: 12px;
+  }
+  .system-event::before,
+  .system-event::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  .system-event span {
+    white-space: nowrap;
+    font-weight: 500;
+  }
+
+  /* ── Input Area ── */
+  .input-area {
+    border-top: 1px solid var(--border);
+    padding: 16px 24px 20px;
+    flex-shrink: 0;
+  }
+
+  .input-container {
+    max-width: var(--conversation-max);
+    margin: 0 auto;
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+  }
+
+  .input-box {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    font-size: 14px;
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+    background: var(--bg);
+    outline: none;
+    resize: none;
+    min-height: 42px;
+    max-height: 160px;
+    line-height: 1.5;
+    transition: border-color 0.15s;
+  }
+  .input-box::placeholder { color: var(--text-tertiary); }
+  .input-box:focus { border-color: var(--accent); }
+
+  .send-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius-md);
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .send-btn:hover { background: var(--accent-hover); }
+
+  .input-hint {
+    max-width: var(--conversation-max);
+    margin: 6px auto 0;
+    font-size: 11px;
+    color: var(--text-quaternary);
+  }
+
+  /* ── Right Panel ── */
+  .right-panel {
+    width: var(--panel-w);
+    min-width: var(--panel-w);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width 0.25s ease, min-width 0.25s ease, opacity 0.2s ease;
+  }
+  .right-panel.collapsed {
+    width: 0;
+    min-width: 0;
+    border-left: none;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .panel-header {
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    flex-shrink: 0;
+  }
+
+  .panel-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .panel-close {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    font-size: 14px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.1s;
+  }
+  .panel-close:hover { background: var(--bg-subtle); }
+
+  .panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+    flex-shrink: 0;
+  }
+  .panel-tab {
+    padding: 10px 0;
+    margin-right: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.12s, border-color 0.12s;
+  }
+  .panel-tab:hover { color: var(--text-secondary); }
+  .panel-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px;
+  }
+
+  /* ── File Tree ── */
+  .file-tree-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 0;
+    font-size: 13px;
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+  .file-tree-item:hover { color: var(--accent); }
+
+  .file-tree-disclosure {
+    width: 14px;
+    font-size: 10px;
+    color: var(--text-tertiary);
+    text-align: center;
+    flex-shrink: 0;
+    transition: transform 0.15s;
+    user-select: none;
+  }
+  .file-tree-disclosure.open { transform: rotate(90deg); }
+
+  .file-tree-icon {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    width: 16px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .file-tree-name {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .file-tree-children {
+    padding-left: 20px;
+  }
+
+  /* ── Diff View ── */
+  .diff-block {
+    margin: 8px 0;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+
+  .diff-header {
+    padding: 6px 12px;
+    background: var(--bg-subtle);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-tertiary);
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .diff-line {
+    padding: 1px 12px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.7;
+    white-space: pre;
+  }
+  .diff-line.add { color: var(--green); }
+  .diff-line.remove { color: var(--red); }
+  .diff-line.context { color: var(--text-tertiary); }
+  .diff-line.hunk {
+    color: var(--text-quaternary);
+    font-size: 11px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+
+  /* ── Metrics ── */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-light);
+  }
+
+  .metric {
+    padding: 8px 0;
+  }
+
+  .metric-value {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
+  }
+
+  .metric-label {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-top: 2px;
+  }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--text-quaternary); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
+
+  /* ── Selection ── */
+  ::selection { background: rgba(0, 113, 227, 0.15); }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-logo">Ark</span>
+      <button class="sidebar-new-btn" title="New session">+</button>
+    </div>
+
+    <div class="sidebar-search">
+      <input type="text" placeholder="Search sessions...">
+    </div>
+
+    <div class="sidebar-section-label">Active</div>
+
+    <div class="sidebar-list">
+      <div class="sidebar-item active">
+        <span class="sidebar-item-dot running"></span>
+        <div class="sidebar-item-content">
+          <div class="sidebar-item-title">Add payment webhooks</div>
+          <div class="sidebar-item-sub">autonomous-sdlc - 3 agents</div>
+        </div>
+      </div>
+
+      <div class="sidebar-item">
+        <span class="sidebar-item-dot running"></span>
+        <div class="sidebar-item-content">
+          <div class="sidebar-item-title">Migrate user auth to OAuth2</div>
+          <div class="sidebar-item-sub">autonomous-sdlc - 2 agents</div>
+        </div>
+      </div>
+
+      <div class="sidebar-item">
+        <span class="sidebar-item-dot paused"></span>
+        <div class="sidebar-item-content">
+          <div class="sidebar-item-title">Fix rate limiter edge case</div>
+          <div class="sidebar-item-sub">quick - 1 agent</div>
+        </div>
+      </div>
+
+      <div class="sidebar-section-label" style="margin-top: 8px;">Recent</div>
+
+      <div class="sidebar-item">
+        <span class="sidebar-item-dot completed"></span>
+        <div class="sidebar-item-content">
+          <div class="sidebar-item-title">Refactor DB connection pool</div>
+          <div class="sidebar-item-sub">completed - 12m ago</div>
+        </div>
+      </div>
+
+      <div class="sidebar-item">
+        <span class="sidebar-item-dot completed"></span>
+        <div class="sidebar-item-content">
+          <div class="sidebar-item-title">Add CSV export endpoint</div>
+          <div class="sidebar-item-sub">completed - 1h ago</div>
+        </div>
+      </div>
+
+      <div class="sidebar-item">
+        <span class="sidebar-item-dot completed"></span>
+        <div class="sidebar-item-content">
+          <div class="sidebar-item-title">Update Stripe SDK to v14</div>
+          <div class="sidebar-item-sub">completed - 3h ago</div>
+        </div>
+      </div>
+
+      <div class="sidebar-item">
+        <span class="sidebar-item-dot completed"></span>
+        <div class="sidebar-item-content">
+          <div class="sidebar-item-title">E2E tests for checkout flow</div>
+          <div class="sidebar-item-sub">completed - yesterday</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-avatar">Y</div>
+      <div class="sidebar-user-name">Yana</div>
+    </div>
+  </aside>
+
+  <!-- ── Main Content ── -->
+  <main class="main">
+    <div class="topbar">
+      <div>
+        <span class="topbar-title">Add payment webhooks</span>
+        <span class="topbar-meta">autonomous-sdlc - running - 4m 32s</span>
+      </div>
+      <div class="topbar-actions">
+        <button class="topbar-btn">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>
+          Agents
+        </button>
+        <button class="topbar-btn active" id="toggle-panel-btn">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="14" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><line x1="10" y1="2" x2="10" y2="14" stroke="currentColor" stroke-width="1.5"/></svg>
+          Workspace
+        </button>
+        <button class="topbar-btn" style="color: var(--red); border-color: var(--red);">
+          Stop
+        </button>
+      </div>
+    </div>
+
+    <div class="conversation-scroll">
+      <div class="conversation">
+
+        <!-- User message -->
+        <div class="message user-msg">
+          <div class="message-header">
+            <div class="message-avatar user">Y</div>
+            <span class="message-name">You</span>
+            <span class="message-time">4:12 PM</span>
+          </div>
+          <div class="message-body">
+            <p>Add Stripe webhook handlers for payment_intent.succeeded, payment_intent.failed, and charge.refunded. Include signature verification, idempotency checks, and update the orders table accordingly. Write tests.</p>
+          </div>
+        </div>
+
+        <!-- System event: plan phase -->
+        <div class="system-event"><span>plan phase started</span></div>
+
+        <!-- Planner agent -->
+        <div class="message">
+          <div class="message-header">
+            <div class="message-avatar agent">P</div>
+            <span class="message-name">planner</span>
+            <span class="message-time">4:12 PM</span>
+          </div>
+          <div class="message-body">
+            <p>I'll create a plan for implementing Stripe webhook handlers. Let me examine the existing codebase structure first.</p>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Read 8 files (src/payments/, src/orders/, src/middleware/)</span>
+              <span class="tool-call-duration">2.1s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Search "webhook" across codebase</span>
+              <span class="tool-call-duration">0.8s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Read package.json, tsconfig.json</span>
+              <span class="tool-call-duration">0.3s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <p>Here is the implementation plan:</p>
+
+            <p><strong>1. Create webhook handler module</strong> -- <code>src/payments/webhooks.ts</code> with signature verification using <code>stripe.webhooks.constructEvent()</code> and a dispatch map for each event type.</p>
+
+            <p><strong>2. Add idempotency layer</strong> -- new <code>webhook_events</code> table tracking processed event IDs, checked before processing to prevent duplicates.</p>
+
+            <p><strong>3. Implement event handlers</strong> -- three handlers: <code>handlePaymentSucceeded</code> (update order status to "paid"), <code>handlePaymentFailed</code> (mark as "payment_failed", notify), and <code>handleChargeRefunded</code> (mark as "refunded", adjust balance).</p>
+
+            <p><strong>4. Register route</strong> -- POST <code>/api/webhooks/stripe</code> with raw body parsing (required for signature verification).</p>
+
+            <p><strong>5. Write tests</strong> -- unit tests for each handler, integration test for signature verification, edge cases for idempotency.</p>
+          </div>
+        </div>
+
+        <!-- System event -->
+        <div class="system-event"><span>plan completed, advancing to implement</span></div>
+
+        <!-- Implementer agent -->
+        <div class="message">
+          <div class="message-header">
+            <div class="message-avatar agent">I</div>
+            <span class="message-name">implementer</span>
+            <span class="message-time">4:13 PM</span>
+          </div>
+          <div class="message-body">
+            <p>Starting implementation. I'll create the webhook handler module and the migration for the idempotency table.</p>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Write src/payments/webhooks.ts (142 lines)</span>
+              <span class="tool-call-duration">1.4s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Write src/db/migrations/004_webhook_events.ts</span>
+              <span class="tool-call-duration">0.6s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Edit src/routes/index.ts (+4 lines)</span>
+              <span class="tool-call-duration">0.4s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Edit src/payments/index.ts (+1 line, export)</span>
+              <span class="tool-call-duration">0.2s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <p>Core implementation complete. The webhook handler verifies the Stripe signature, checks for duplicate events, then dispatches to the appropriate handler:</p>
+
+            <div class="code-block">
+              <div class="code-block-header">
+                <span>src/payments/webhooks.ts</span>
+                <span>lines 24-48</span>
+              </div>
+              <pre>export async function handleStripeWebhook(
+  req: Request,
+  db: Database
+): Promise&lt;Response&gt; {
+  const sig = req.headers.get("stripe-signature");
+  if (!sig) return new Response("Missing signature", { status: 400 });
+
+  const body = await req.text();
+  let event: Stripe.Event;
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      body, sig, env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    return new Response("Invalid signature", { status: 400 });
+  }
+
+  // Idempotency check
+  const existing = db.query(
+    "SELECT id FROM webhook_events WHERE event_id = ?",
+    [event.id]
+  ).get();
+  if (existing) return new Response("Already processed", { status: 200 });
+  ...</pre>
+            </div>
+
+            <p>Now writing the tests.</p>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Write src/payments/__tests__/webhooks.test.ts (98 lines)</span>
+              <span class="tool-call-duration">1.1s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Run bun test src/payments/__tests__/webhooks.test.ts</span>
+              <span class="tool-call-duration">3.2s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <p>All 7 tests passing. Implementation complete -- 3 files created, 2 files modified.</p>
+          </div>
+        </div>
+
+        <!-- System event -->
+        <div class="system-event"><span>implement completed, advancing to review</span></div>
+
+        <!-- Reviewer agent -->
+        <div class="message">
+          <div class="message-header">
+            <div class="message-avatar agent">R</div>
+            <span class="message-name">reviewer</span>
+            <span class="message-time">4:14 PM</span>
+          </div>
+          <div class="message-body">
+            <p>Reviewing the webhook implementation. Checking for security issues, error handling, and test coverage.</p>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Read src/payments/webhooks.ts, webhooks.test.ts</span>
+              <span class="tool-call-duration">0.5s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <div class="tool-call">
+              <span class="tool-call-icon">&#9654;</span>
+              <span class="tool-call-label">Read src/db/migrations/004_webhook_events.ts</span>
+              <span class="tool-call-duration">0.2s</span>
+              <span class="tool-call-status">&#10003;</span>
+            </div>
+
+            <p>Good implementation overall. Two items to address:</p>
+
+            <p><strong>1. Missing transaction wrapper</strong> -- the order update and webhook_events insert should be wrapped in a transaction to prevent partial writes on crash. This is a correctness issue.</p>
+
+            <p><strong>2. Add index on webhook_events.event_id</strong> -- the idempotency lookup will be O(n) without it. Should be a unique index.</p>
+
+            <p>No security concerns. Signature verification is correct. Test coverage is solid but could add a test for the transaction rollback case.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="input-area">
+      <div class="input-container">
+        <textarea class="input-box" placeholder="Send a message..." rows="1"></textarea>
+        <button class="send-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <div class="input-hint">Press Enter to send, Shift+Enter for newline</div>
+    </div>
+  </main>
+
+  <!-- ── Right Panel (Workspace) ── -->
+  <aside class="right-panel" id="right-panel">
+    <div class="panel-header">
+      <span class="panel-title">Workspace</span>
+      <button class="panel-close" id="panel-close-btn">&times;</button>
+    </div>
+
+    <div class="panel-tabs">
+      <div class="panel-tab active">Files</div>
+      <div class="panel-tab">Diff</div>
+      <div class="panel-tab">Metrics</div>
+    </div>
+
+    <div class="panel-content" id="panel-files">
+      <!-- File tree -->
+      <div class="file-tree-item" onclick="this.querySelector('.file-tree-disclosure').classList.toggle('open'); this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'block';">
+        <span class="file-tree-disclosure open">&#9654;</span>
+        <span class="file-tree-icon">&#128193;</span>
+        <span class="file-tree-name">src/payments</span>
+      </div>
+      <div class="file-tree-children">
+        <div class="file-tree-item">
+          <span class="file-tree-disclosure" style="visibility: hidden;">&#9654;</span>
+          <span class="file-tree-icon" style="color: var(--accent);">&#9679;</span>
+          <span class="file-tree-name">webhooks.ts</span>
+        </div>
+        <div class="file-tree-item">
+          <span class="file-tree-disclosure" style="visibility: hidden;">&#9654;</span>
+          <span class="file-tree-icon" style="color: var(--text-tertiary);">&#9679;</span>
+          <span class="file-tree-name">index.ts</span>
+        </div>
+        <div class="file-tree-item" onclick="event.stopPropagation(); this.querySelector('.file-tree-disclosure')?.classList.toggle('open');">
+          <span class="file-tree-disclosure open">&#9654;</span>
+          <span class="file-tree-icon">&#128193;</span>
+          <span class="file-tree-name">__tests__</span>
+        </div>
+        <div class="file-tree-children">
+          <div class="file-tree-item">
+            <span class="file-tree-disclosure" style="visibility: hidden;">&#9654;</span>
+            <span class="file-tree-icon" style="color: var(--accent);">&#9679;</span>
+            <span class="file-tree-name">webhooks.test.ts</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="file-tree-item" onclick="this.querySelector('.file-tree-disclosure').classList.toggle('open');">
+        <span class="file-tree-disclosure open">&#9654;</span>
+        <span class="file-tree-icon">&#128193;</span>
+        <span class="file-tree-name">src/db/migrations</span>
+      </div>
+      <div class="file-tree-children">
+        <div class="file-tree-item">
+          <span class="file-tree-disclosure" style="visibility: hidden;">&#9654;</span>
+          <span class="file-tree-icon" style="color: var(--accent);">&#9679;</span>
+          <span class="file-tree-name">004_webhook_events.ts</span>
+        </div>
+      </div>
+
+      <div class="file-tree-item">
+        <span class="file-tree-disclosure" style="visibility: hidden;">&#9654;</span>
+        <span class="file-tree-icon" style="color: var(--text-tertiary);">&#9679;</span>
+        <span class="file-tree-name">src/routes/index.ts</span>
+      </div>
+
+      <!-- Diff preview -->
+      <div class="diff-block" style="margin-top: 16px;">
+        <div class="diff-header">src/payments/webhooks.ts (new)</div>
+        <div class="diff-line hunk">@@ +1,142 @@</div>
+        <div class="diff-line add">+ import Stripe from "stripe";</div>
+        <div class="diff-line add">+ import { env } from "../config/env.js";</div>
+        <div class="diff-line add">+ import type { Database } from "bun:sqlite";</div>
+        <div class="diff-line add">+ </div>
+        <div class="diff-line add">+ const stripe = new Stripe(env.STRIPE_SECRET_KEY);</div>
+        <div class="diff-line add">+ </div>
+        <div class="diff-line add">+ export async function handleStripeWebhook(</div>
+        <div class="diff-line add">+   req: Request,</div>
+        <div class="diff-line add">+   db: Database</div>
+        <div class="diff-line add">+ ): Promise&lt;Response&gt; {</div>
+      </div>
+
+      <div class="diff-block">
+        <div class="diff-header">src/routes/index.ts</div>
+        <div class="diff-line hunk">@@ -12,6 +12,10 @@</div>
+        <div class="diff-line context">  import { healthRoutes } from "./health.js";</div>
+        <div class="diff-line context">  import { orderRoutes } from "./orders.js";</div>
+        <div class="diff-line context"> </div>
+        <div class="diff-line add">+ import { handleStripeWebhook } from "../payments/webhooks.js";</div>
+        <div class="diff-line add">+ </div>
+        <div class="diff-line add">+ app.post("/api/webhooks/stripe",</div>
+        <div class="diff-line add">+   (req) => handleStripeWebhook(req, db));</div>
+        <div class="diff-line context">  app.use(healthRoutes);</div>
+      </div>
+
+      <!-- Metrics -->
+      <div class="metrics-grid">
+        <div class="metric">
+          <div class="metric-value">3</div>
+          <div class="metric-label">Files created</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value">2</div>
+          <div class="metric-label">Files modified</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value">247</div>
+          <div class="metric-label">Lines added</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value">7/7</div>
+          <div class="metric-label">Tests passing</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+</div>
+
+<script>
+  // Toggle right panel
+  const panel = document.getElementById("right-panel");
+  const toggleBtn = document.getElementById("toggle-panel-btn");
+  const closeBtn = document.getElementById("panel-close-btn");
+
+  function togglePanel() {
+    panel.classList.toggle("collapsed");
+    toggleBtn.classList.toggle("active");
+  }
+
+  toggleBtn.addEventListener("click", togglePanel);
+  closeBtn.addEventListener("click", togglePanel);
+
+  // Panel tabs
+  document.querySelectorAll(".panel-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".panel-tab").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+    });
+  });
+
+  // Auto-resize textarea
+  const textarea = document.querySelector(".input-box");
+  textarea.addEventListener("input", function() {
+    this.style.height = "auto";
+    this.style.height = Math.min(this.scrollHeight, 160) + "px";
+  });
+</script>
+
+</body>
+</html>
