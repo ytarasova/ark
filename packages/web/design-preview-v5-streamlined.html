@@ -1,0 +1,1600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ark</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ================================================================
+     V5 -- EFFORTLESS PRECISION
+     No Tailwind. Every value intentional.
+     ================================================================ */
+
+  @font-face {
+    font-family: 'Geist Sans';
+    src: local('Geist'), local('system-ui');
+    font-display: swap;
+  }
+
+  :root {
+    --page: #0a0a0b;
+    --panel: #111113;
+    --recessed: #18181b;
+    --hover: #1c1c1f;
+    --active: #222226;
+
+    --text: #fafafa;
+    --text-2: #a1a1aa;
+    --text-3: #52525b;
+    --text-4: #3f3f46;
+
+    --accent: #8b5cf6;
+    --accent-faint: rgba(139, 92, 246, 0.07);
+
+    --border: #1e1e22;
+
+    --green: #4ade80;
+    --red: #f87171;
+    --amber: #fbbf24;
+
+    --sans: 'Geist Sans', system-ui, -apple-system, sans-serif;
+    --mono: 'Geist Mono', 'SF Mono', 'Cascadia Code', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    font-family: var(--sans);
+    background: var(--page);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Scrollbar -- near invisible */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--text-4); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+  ::selection { background: rgba(139, 92, 246, 0.25); }
+
+  /* ================================================================
+     LAYOUT
+     ================================================================ */
+  .shell { display: flex; flex-direction: column; height: 100vh; }
+
+  .header {
+    display: flex;
+    align-items: center;
+    height: 44px;
+    padding: 0 16px;
+    flex-shrink: 0;
+    background: var(--page);
+  }
+
+  .body { display: flex; flex: 1; min-height: 0; }
+
+  .sidebar {
+    width: 216px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .center {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--page);
+  }
+
+  .detail {
+    width: 320px;
+    flex-shrink: 0;
+    border-left: 1px solid var(--border);
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ================================================================
+     HEADER
+     ================================================================ */
+  .wordmark {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    margin-right: 32px;
+  }
+
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    font-family: var(--mono);
+    font-size: 11px;
+    margin: 0 auto;
+  }
+  .pipeline-stage {
+    padding: 3px 8px;
+    border-radius: 3px;
+    transition: color 200ms;
+  }
+  .pipeline-stage.done { color: var(--green); }
+  .pipeline-stage.active { color: var(--accent); font-weight: 500; }
+  .pipeline-stage.pending { color: var(--text-4); }
+  .pipeline-sep { color: var(--text-4); font-size: 10px; padding: 0 2px; user-select: none; }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-left: auto;
+  }
+  .header-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: var(--recessed);
+    border: 1px solid var(--border);
+    color: var(--text-3);
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color 150ms;
+  }
+  .header-search:hover { border-color: var(--text-4); }
+  .kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 17px;
+    padding: 0 4px;
+    font-family: var(--sans);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-3);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+  }
+  .header-meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-3);
+    display: flex;
+    gap: 12px;
+  }
+
+  /* ================================================================
+     SIDEBAR
+     ================================================================ */
+  .sidebar-section { padding: 12px 10px 4px 14px; }
+  .sidebar-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-4);
+    padding: 0 0 6px 0;
+  }
+
+  .session-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    margin: 0 4px 2px 4px;
+    border-radius: 6px;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    transition: background 150ms, border-color 200ms;
+  }
+  .session-item:hover { background: var(--hover); }
+  .session-item.selected {
+    background: var(--accent-faint);
+    border-left-color: var(--accent);
+  }
+  .session-name {
+    font-size: 12px;
+    color: var(--text-2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+  }
+  .session-item.selected .session-name { color: var(--text); }
+  .session-status {
+    font-size: 10px;
+    font-family: var(--mono);
+    flex-shrink: 0;
+  }
+  .session-time {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--text-4);
+    flex-shrink: 0;
+  }
+
+  .sidebar-nav {
+    border-top: 1px solid var(--border);
+    margin-top: auto;
+    padding: 8px 6px;
+  }
+  .sidebar-nav a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    font-size: 12px;
+    color: var(--text-2);
+    text-decoration: none;
+    border-radius: 5px;
+    transition: background 150ms;
+  }
+  .sidebar-nav a:hover { background: var(--hover); }
+
+  .sidebar-version {
+    padding: 6px 14px 10px;
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--text-4);
+  }
+
+  /* Pulse for running */
+  @keyframes pulse-soft {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .pulse { animation: pulse-soft 2s ease-in-out infinite; }
+
+  /* ================================================================
+     CONVERSATION
+     ================================================================ */
+  .conversation {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 32px 24px 32px;
+  }
+  .conv-inner {
+    max-width: 720px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* -- System events -- */
+  .ev-system {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .ev-ts {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text-4);
+    flex-shrink: 0;
+    width: 36px;
+    text-align: right;
+  }
+  .ev-text {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text-3);
+    line-height: 1.5;
+  }
+  .ev-text .stage-name { font-weight: 500; color: var(--text-2); }
+
+  /* -- Agent prose -- */
+  .msg-agent {
+    padding-left: 46px;
+  }
+  .msg-agent-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-3);
+    margin-bottom: 6px;
+  }
+  .msg-agent p {
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.7;
+    color: var(--text);
+    margin-bottom: 12px;
+  }
+  .msg-agent p:last-child { margin-bottom: 0; }
+  .msg-agent ol {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text);
+    padding-left: 20px;
+    margin-bottom: 12px;
+  }
+  .msg-agent ol li { margin-bottom: 4px; }
+  .msg-agent code {
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--recessed);
+    color: var(--text-2);
+  }
+
+  /* -- Tool calls -- */
+  .tools {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin: 8px 0 12px 0;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .tool-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: var(--recessed);
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--text-3);
+    cursor: pointer;
+    transition: background 120ms;
+  }
+  .tool-row:hover { background: var(--active); }
+  .tool-arrow {
+    width: 10px;
+    height: 10px;
+    color: var(--text-4);
+    transition: transform 150ms ease;
+    flex-shrink: 0;
+  }
+  .tool-arrow.open { transform: rotate(90deg); }
+  .tool-file { color: var(--text-2); }
+  .tool-time {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--text-4);
+  }
+  .tool-result {
+    font-size: 10px;
+    font-family: var(--mono);
+    margin-left: auto;
+  }
+  .tool-detail {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 200ms ease;
+    background: var(--active);
+  }
+  .tool-detail.open { max-height: 400px; }
+  .tool-detail-inner {
+    padding: 8px 12px 8px 28px;
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text-3);
+    line-height: 1.6;
+  }
+  .tool-check {
+    width: 10px;
+    height: 10px;
+    flex-shrink: 0;
+  }
+
+  /* -- User message -- */
+  .msg-user {
+    margin-left: 46px;
+    border-left: 2px solid var(--accent);
+    padding: 12px 16px;
+    background: var(--accent-faint);
+    border-radius: 0 8px 8px 0;
+  }
+  .msg-user-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .msg-user p {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text);
+  }
+
+  /* -- Review findings -- */
+  .findings {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 8px 0 12px 0;
+  }
+  .finding {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .badge {
+    font-size: 10px;
+    font-family: var(--mono);
+    font-weight: 500;
+    padding: 2px 7px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    margin-top: 3px;
+  }
+  .badge-good { color: var(--green); background: rgba(74, 222, 128, 0.08); }
+  .badge-note { color: var(--amber); background: rgba(251, 191, 36, 0.08); }
+  .finding-text {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text);
+  }
+  .finding-text strong { font-weight: 500; }
+
+  /* -- Summary block -- */
+  .summary-block {
+    border-radius: 8px;
+    background: var(--recessed);
+    border: 1px solid var(--border);
+    padding: 14px 16px;
+    font-size: 12px;
+    font-family: var(--mono);
+    line-height: 1.7;
+    margin-top: 8px;
+  }
+  .summary-label { color: var(--text-3); }
+  .summary-value { color: var(--text-2); }
+  .summary-indent { padding-left: 14px; }
+  .summary-divider {
+    border-top: 1px solid var(--border);
+    margin: 8px 0;
+  }
+
+  /* ================================================================
+     INPUT BAR
+     ================================================================ */
+  .input-bar {
+    flex-shrink: 0;
+    padding: 12px 32px;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+  }
+  .input-inner {
+    max-width: 720px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .input-field {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    background: var(--recessed);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    transition: border-color 150ms;
+  }
+  .input-field:focus-within { border-color: var(--text-4); }
+  .input-field input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 13px;
+    font-family: var(--sans);
+    color: var(--text);
+  }
+  .input-field input::placeholder { color: var(--text-4); }
+  .input-meta {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--text-4);
+    white-space: nowrap;
+  }
+  .send-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 150ms;
+    flex-shrink: 0;
+  }
+  .send-btn:hover { opacity: 0.85; }
+
+  /* ================================================================
+     RIGHT PANEL -- TABS
+     ================================================================ */
+  .detail-tabs {
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    height: 40px;
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+  .detail-tab {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-3);
+    padding: 0 12px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    position: relative;
+    transition: color 150ms;
+    background: none;
+    border: none;
+    font-family: var(--sans);
+  }
+  .detail-tab:hover { color: var(--text-2); }
+  .detail-tab.active { color: var(--text); }
+  .detail-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 12px;
+    right: 12px;
+    height: 2px;
+    background: var(--accent);
+    border-radius: 1px;
+  }
+
+  /* Tab underline slider */
+  .tab-indicator {
+    position: absolute;
+    bottom: -1px;
+    height: 2px;
+    background: var(--accent);
+    border-radius: 1px;
+    transition: left 250ms cubic-bezier(0.4, 0, 0.2, 1), width 250ms cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+  }
+
+  .detail-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+  }
+  .detail-pane { display: none; }
+  .detail-pane.active { display: block; }
+
+  /* -- Overview tab -- */
+  .ov-section {
+    margin-bottom: 24px;
+  }
+  .ov-heading {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-3);
+    margin-bottom: 10px;
+  }
+  .ov-grid {
+    display: grid;
+    grid-template-columns: 72px 1fr;
+    gap: 6px 0;
+    font-size: 12px;
+    font-family: var(--mono);
+  }
+  .ov-key { color: var(--text-4); }
+  .ov-val { color: var(--text-2); }
+  .ov-val a { color: var(--accent); text-decoration: none; }
+  .ov-val a:hover { text-decoration: underline; }
+
+  .agent-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 12px;
+    font-family: var(--mono);
+  }
+  .agent-row + .agent-row { border-top: 1px solid var(--border); }
+  .agent-name { color: var(--text-2); }
+  .agent-model { color: var(--text-4); }
+
+  .stage-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+  }
+  .stage-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .stage-dot.done { background: var(--green); }
+  .stage-dot.active { background: var(--accent); }
+  .stage-dot.pending { background: var(--text-4); }
+  .stage-label {
+    font-size: 12px;
+    font-family: var(--mono);
+    color: var(--text-2);
+  }
+  .stage-dur {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--text-4);
+    margin-left: auto;
+  }
+
+  /* -- Files tab -- */
+  .file-dir {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text-4);
+    padding: 8px 0 4px 0;
+  }
+  .file-dir:first-child { padding-top: 0; }
+  .file-entry {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px 6px 14px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 150ms;
+    font-size: 12px;
+    font-family: var(--mono);
+  }
+  .file-entry:hover { background: var(--hover); }
+  .file-entry.selected { background: var(--accent-faint); }
+  .file-entry .name { color: var(--text-2); flex: 1; }
+  .file-entry.selected .name { color: var(--text); }
+  .file-entry .counts {
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  /* -- Diff tab -- */
+  .diff-header {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--text-3);
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--recessed);
+    border-radius: 6px 6px 0 0;
+  }
+  .diff-body {
+    font-size: 11px;
+    font-family: var(--mono);
+    line-height: 1.7;
+    padding: 10px 12px;
+    background: var(--page);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    overflow-x: auto;
+  }
+  .diff-line { white-space: pre; }
+  .diff-hunk { color: var(--text-4); }
+  .diff-ctx { color: var(--text-3); }
+  .diff-add { color: var(--green); background: rgba(74, 222, 128, 0.04); }
+  .diff-del { color: var(--red); background: rgba(248, 113, 113, 0.04); }
+
+  /* -- Metrics tab -- */
+  .metric-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .metric-row:last-child { border-bottom: none; }
+  .metric-label {
+    font-size: 12px;
+    color: var(--text-3);
+  }
+  .metric-value {
+    font-size: 14px;
+    font-family: var(--mono);
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  /* ================================================================
+     COMMAND PALETTE
+     ================================================================ */
+  .cmd-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    z-index: 200;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 18vh;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 150ms ease;
+  }
+  .cmd-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .cmd-box {
+    width: 520px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+    transform: scale(0.98);
+    transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+  }
+  .cmd-overlay.open .cmd-box { transform: scale(1); }
+  .cmd-search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .cmd-search svg { color: var(--text-4); flex-shrink: 0; }
+  .cmd-search input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    font-family: var(--sans);
+    color: var(--text);
+  }
+  .cmd-search input::placeholder { color: var(--text-4); }
+  .cmd-results { padding: 6px; max-height: 280px; overflow-y: auto; }
+  .cmd-group-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-4);
+    padding: 8px 10px 4px;
+  }
+  .cmd-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--text-2);
+    cursor: pointer;
+    transition: background 120ms;
+  }
+  .cmd-item:hover { background: var(--hover); }
+  .cmd-item-id {
+    font-size: 10px;
+    font-family: var(--mono);
+    color: var(--text-4);
+  }
+
+  /* ================================================================
+     LIGHT THEME (toggle-ready)
+     ================================================================ */
+  .light {
+    --page: #ffffff;
+    --panel: #fafafa;
+    --recessed: #f4f4f5;
+    --hover: #efefef;
+    --active: #e8e8ec;
+    --text: #18181b;
+    --text-2: #52525b;
+    --text-3: #a1a1aa;
+    --text-4: #d4d4d8;
+    --accent: #7c3aed;
+    --accent-faint: rgba(124, 58, 237, 0.05);
+    --border: #e4e4e7;
+    --green: #16a34a;
+    --red: #dc2626;
+    --amber: #d97706;
+  }
+</style>
+</head>
+
+<body>
+<div class="shell">
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="header">
+    <span class="wordmark">Ark</span>
+
+    <div class="pipeline">
+      <span class="pipeline-stage done">plan</span>
+      <span class="pipeline-sep">--></span>
+      <span class="pipeline-stage done">implement</span>
+      <span class="pipeline-sep">--></span>
+      <span class="pipeline-stage done">verify</span>
+      <span class="pipeline-sep">--></span>
+      <span class="pipeline-stage done">review</span>
+      <span class="pipeline-sep">--></span>
+      <span class="pipeline-stage done">merge</span>
+    </div>
+
+    <div class="header-right">
+      <button class="header-search" onclick="toggleCmd()">
+        Search...
+        <span class="kbd">&#8984;K</span>
+      </button>
+      <div class="header-meta">
+        <span>$0.82</span>
+        <span>24m</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================== BODY ===================== -->
+  <div class="body">
+
+    <!-- ============== SIDEBAR ============== -->
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-label">Sessions <span style="float:right; font-weight:400;">8</span></div>
+      </div>
+
+      <!-- autonomous-sdlc group -->
+      <div style="padding: 4px 14px 2px; font-size:10px; font-weight:500; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-4);">autonomous-sdlc</div>
+
+      <div class="session-item selected" data-idx="0" onclick="selectSession(this)">
+        <span class="session-name">OAuth authentication</span>
+        <span class="session-status" style="color:var(--text-3)">completed</span>
+        <span class="session-time">24m</span>
+      </div>
+      <div class="session-item" data-idx="1" onclick="selectSession(this)">
+        <span class="session-name">Webhook retry logic</span>
+        <span class="session-status pulse" style="color:var(--green)">running</span>
+        <span class="session-time">2m</span>
+      </div>
+      <div class="session-item" data-idx="2" onclick="selectSession(this)">
+        <span class="session-name">Rate limit middleware</span>
+        <span class="session-status" style="color:var(--amber)">waiting</span>
+        <span class="session-time">--</span>
+      </div>
+
+      <!-- quick group -->
+      <div style="padding: 12px 14px 2px; font-size:10px; font-weight:500; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-4);">quick</div>
+
+      <div class="session-item" data-idx="3" onclick="selectSession(this)">
+        <span class="session-name">Fix test flakiness</span>
+        <span class="session-status pulse" style="color:var(--green)">running</span>
+        <span class="session-time">8m</span>
+      </div>
+      <div class="session-item" data-idx="4" onclick="selectSession(this)">
+        <span class="session-name">Update deps to latest</span>
+        <span class="session-status" style="color:var(--text-3)">completed</span>
+        <span class="session-time">1h</span>
+      </div>
+
+      <!-- pr-review group -->
+      <div style="padding: 12px 14px 2px; font-size:10px; font-weight:500; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-4);">pr-review</div>
+
+      <div class="session-item" data-idx="5" onclick="selectSession(this)">
+        <span class="session-name">Review PR #118</span>
+        <span class="session-status" style="color:var(--red)">failed</span>
+        <span class="session-time">3d</span>
+      </div>
+
+      <!-- standalone group -->
+      <div style="padding: 12px 14px 2px; font-size:10px; font-weight:500; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-4);">standalone</div>
+
+      <div class="session-item" data-idx="6" onclick="selectSession(this)">
+        <span class="session-name">Explore caching options</span>
+        <span class="session-status" style="color:var(--text-3)">completed</span>
+        <span class="session-time">5h</span>
+      </div>
+      <div class="session-item" data-idx="7" onclick="selectSession(this)">
+        <span class="session-name">Debug memory leak</span>
+        <span class="session-status" style="color:var(--text-4)">stopped</span>
+        <span class="session-time">2d</span>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a href="#">Agents <span class="kbd">A</span></a>
+        <a href="#">Flows <span class="kbd">F</span></a>
+        <a href="#">Compute <span class="kbd">C</span></a>
+        <a href="#">Costs <span class="kbd">$</span></a>
+        <a href="#">Settings <span class="kbd">,</span></a>
+      </nav>
+      <div class="sidebar-version">v0.17.0</div>
+    </aside>
+
+    <!-- ============== CENTER -- CONVERSATION ============== -->
+    <main class="center">
+      <div class="conversation" id="conversation">
+        <div class="conv-inner">
+
+          <!-- === Session started === -->
+          <div class="ev-system">
+            <span class="ev-ts">14:34</span>
+            <span class="ev-text">Session started -- flow: autonomous-sdlc -- compute: local</span>
+          </div>
+
+          <!-- === Stage: plan === -->
+          <div class="ev-system">
+            <span class="ev-ts">14:34</span>
+            <span class="ev-text">Stage <span class="stage-name">plan</span> dispatched</span>
+          </div>
+
+          <!-- Planner agent -->
+          <div class="msg-agent">
+            <div class="msg-agent-label">Planner</div>
+            <p>I'll analyze the codebase and create an implementation plan for the OAuth authentication feature.</p>
+
+            <div class="tools">
+              <div class="tool-row" onclick="toggleTool(this)">
+                <svg class="tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                <span>Read auth.ts, session.ts, config.yaml, routes.ts, middleware.ts</span>
+                <span class="tool-time">1.2s</span>
+              </div>
+              <div class="tool-detail">
+                <div class="tool-detail-inner">
+                  packages/core/auth/auth.ts (142 lines)<br>
+                  packages/core/session.ts (389 lines)<br>
+                  config.yaml (47 lines)<br>
+                  packages/server/routes.ts (215 lines)<br>
+                  packages/server/middleware.ts (89 lines)
+                </div>
+              </div>
+
+              <div class="tool-row" onclick="toggleTool(this)">
+                <svg class="tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                <span>Searched "authenticate" across packages/</span>
+                <span class="tool-time">0.8s</span>
+              </div>
+              <div class="tool-detail">
+                <div class="tool-detail-inner">
+                  12 results in 8 files<br>
+                  packages/core/auth/auth.ts:23 -- authenticateUser()<br>
+                  packages/server/middleware.ts:45 -- requireAuth()
+                </div>
+              </div>
+
+              <div class="tool-row" onclick="toggleTool(this)">
+                <svg class="tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                <span>Read CLAUDE.md</span>
+                <span class="tool-time">0.3s</span>
+              </div>
+              <div class="tool-detail">
+                <div class="tool-detail-inner">
+                  CLAUDE.md (100 lines) -- project conventions loaded
+                </div>
+              </div>
+            </div>
+
+            <p>Based on my analysis, here's the plan:</p>
+
+            <ol>
+              <li>Add OAuth provider abstraction (<code>packages/core/auth/provider.ts</code>)</li>
+              <li>Implement GitHub OAuth flow (authorize -> callback -> token exchange)</li>
+              <li>Add session token management with refresh rotation</li>
+              <li>Wire middleware for protected routes</li>
+              <li>Add user profile endpoint</li>
+            </ol>
+
+            <div style="margin-top:4px;">
+              <span style="font-size:11px; font-family:var(--mono); color:var(--text-3); background:var(--recessed); padding:3px 8px; border-radius:4px;">PLAN.md created (127 lines)</span>
+            </div>
+          </div>
+
+          <!-- === Stage: plan -> implement === -->
+          <div class="ev-system">
+            <span class="ev-ts">14:38</span>
+            <span class="ev-text">Stage <span class="stage-name">plan</span> completed -- advancing to <span class="stage-name">implement</span></span>
+          </div>
+
+          <div class="ev-system">
+            <span class="ev-ts">14:38</span>
+            <span class="ev-text">Stage <span class="stage-name">implement</span> dispatched (agent: implementer)</span>
+          </div>
+
+          <!-- Implementer agent -->
+          <div class="msg-agent">
+            <div class="msg-agent-label">Implementer</div>
+            <p>Starting implementation based on PLAN.md. Creating the OAuth provider abstraction and GitHub integration.</p>
+
+            <div class="tools">
+              <div class="tool-row" onclick="toggleTool(this)">
+                <svg class="tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                <span>Created <span class="tool-file">packages/core/auth/provider.ts</span> (89 lines)</span>
+              </div>
+              <div class="tool-detail">
+                <div class="tool-detail-inner">
+                  + export interface OAuthProvider {<br>
+                  +&nbsp;&nbsp; name: string;<br>
+                  +&nbsp;&nbsp; authorizeUrl(state: string, challenge: string): string;<br>
+                  +&nbsp;&nbsp; exchangeCode(code: string, verifier: string): Promise&lt;TokenPair&gt;;<br>
+                  +&nbsp;&nbsp; refreshToken(token: string): Promise&lt;TokenPair&gt;;<br>
+                  + }
+                </div>
+              </div>
+
+              <div class="tool-row" onclick="toggleTool(this)">
+                <svg class="tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                <span>Created <span class="tool-file">packages/core/auth/github.ts</span> (134 lines)</span>
+              </div>
+              <div class="tool-detail">
+                <div class="tool-detail-inner">
+                  + export class GitHubOAuth implements OAuthProvider {<br>
+                  +&nbsp;&nbsp; private clientId: string;<br>
+                  +&nbsp;&nbsp; private clientSecret: string;<br>
+                  +&nbsp;&nbsp; ...<br>
+                  + }
+                </div>
+              </div>
+
+              <div class="tool-row">
+                <svg class="tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                <span>Edited <span class="tool-file">packages/core/auth/session.ts</span> (+45 -3)</span>
+              </div>
+
+              <div class="tool-row">
+                <svg class="tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                <span>Edited <span class="tool-file">packages/server/routes.ts</span> (+28)</span>
+              </div>
+
+              <div class="tool-row">
+                <svg class="tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                <span>Edited <span class="tool-file">packages/server/middleware.ts</span> (+15 -2)</span>
+              </div>
+            </div>
+
+            <p>All five files written. Running a quick sanity check before handing off.</p>
+
+            <div class="tools">
+              <div class="tool-row">
+                <svg class="tool-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--green)"><polyline points="20 6 9 17 4 12"/></svg>
+                <span><span class="tool-file">bun test</span> packages/core/__tests__/auth.test.ts</span>
+                <span class="tool-result" style="color:var(--green)">12 passed</span>
+                <span class="tool-time">3.2s</span>
+              </div>
+              <div class="tool-row">
+                <svg class="tool-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--green)"><polyline points="20 6 9 17 4 12"/></svg>
+                <span><span class="tool-file">make lint</span></span>
+                <span class="tool-result" style="color:var(--green)">clean</span>
+                <span class="tool-time">1.1s</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- === USER correction === -->
+          <div class="msg-user">
+            <div class="msg-user-label">You</div>
+            <p>Use the v2 OAuth endpoints, not v1. The v1 endpoints are deprecated as of March 2026.</p>
+          </div>
+
+          <!-- Implementer responds to user -->
+          <div class="msg-agent">
+            <div class="msg-agent-label">Implementer</div>
+            <p>Got it -- switching to v2. Updating the authorize URL from <code>/login/oauth/authorize</code> to <code>/api/v2/oauth/authorize</code> and the token exchange endpoint accordingly.</p>
+
+            <div class="tools">
+              <div class="tool-row" onclick="toggleTool(this)">
+                <svg class="tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                <span>Edited <span class="tool-file">packages/core/auth/github.ts</span> (+8 -8)</span>
+              </div>
+              <div class="tool-detail">
+                <div class="tool-detail-inner">
+                  <span style="color:var(--red)">- const authorizeUrl = `https://github.com/login/oauth/authorize`;</span><br>
+                  <span style="color:var(--green)">+ const authorizeUrl = `https://github.com/api/v2/oauth/authorize`;</span><br>
+                  <span style="color:var(--red)">- const tokenUrl = `https://github.com/login/oauth/access_token`;</span><br>
+                  <span style="color:var(--green)">+ const tokenUrl = `https://github.com/api/v2/oauth/access_token`;</span>
+                </div>
+              </div>
+            </div>
+
+            <p>Implementation complete. 6 files changed, 319 additions, 13 deletions.</p>
+          </div>
+
+          <!-- === Stage: implement -> verify === -->
+          <div class="ev-system">
+            <span class="ev-ts">14:52</span>
+            <span class="ev-text">Stage <span class="stage-name">implement</span> completed -- advancing to <span class="stage-name">verify</span></span>
+          </div>
+
+          <div class="ev-system">
+            <span class="ev-ts">14:52</span>
+            <span class="ev-text">Stage <span class="stage-name">verify</span> dispatched (agent: verifier)</span>
+          </div>
+
+          <!-- Verifier agent -->
+          <div class="msg-agent">
+            <div class="msg-agent-label">Verifier</div>
+            <p>Running full verification suite against the implementation.</p>
+
+            <div class="tools">
+              <div class="tool-row">
+                <svg class="tool-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--green)"><polyline points="20 6 9 17 4 12"/></svg>
+                <span><span class="tool-file">make test</span></span>
+                <span class="tool-result" style="color:var(--green)">2,857 passed, 0 failed</span>
+                <span class="tool-time">45s</span>
+              </div>
+              <div class="tool-row">
+                <svg class="tool-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--green)"><polyline points="20 6 9 17 4 12"/></svg>
+                <span><span class="tool-file">make lint</span></span>
+                <span class="tool-result" style="color:var(--green)">clean</span>
+              </div>
+              <div class="tool-row">
+                <svg class="tool-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--green)"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>Security scan: no hardcoded tokens, no credential leaks</span>
+              </div>
+            </div>
+
+            <p>All checks passed. Tests green, lint clean, no security issues detected.</p>
+          </div>
+
+          <!-- === Stage: verify -> review === -->
+          <div class="ev-system">
+            <span class="ev-ts">14:54</span>
+            <span class="ev-text">Stage <span class="stage-name">verify</span> completed -- advancing to <span class="stage-name">review</span></span>
+          </div>
+
+          <div class="ev-system">
+            <span class="ev-ts">14:54</span>
+            <span class="ev-text">Stage <span class="stage-name">review</span> dispatched (agent: reviewer)</span>
+          </div>
+
+          <!-- Reviewer agent -->
+          <div class="msg-agent">
+            <div class="msg-agent-label">Reviewer</div>
+            <p>Reviewing implementation against PLAN.md and security best practices.</p>
+
+            <div class="tools">
+              <div class="tool-row">
+                <svg class="tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                <span>Read 6 changed files</span>
+                <span class="tool-time">0.6s</span>
+              </div>
+              <div class="tool-row">
+                <svg class="tool-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                <span>Diffed against main branch</span>
+                <span class="tool-time">0.3s</span>
+              </div>
+            </div>
+
+            <p>Review findings:</p>
+
+            <div class="findings">
+              <div class="finding">
+                <span class="badge badge-good">Good</span>
+                <span class="finding-text">PKCE flow implemented correctly with S256 challenge method</span>
+              </div>
+              <div class="finding">
+                <span class="badge badge-good">Good</span>
+                <span class="finding-text">Token refresh rotation prevents replay attacks</span>
+              </div>
+              <div class="finding">
+                <span class="badge badge-note">Note</span>
+                <span class="finding-text"><strong>Missing test:</strong> No test for max pool exhaustion backpressure scenario</span>
+              </div>
+              <div class="finding">
+                <span class="badge badge-note">Note</span>
+                <span class="finding-text"><strong>Minor:</strong> Consider adding rate limiting on the callback endpoint to prevent brute-force attacks</span>
+              </div>
+              <div class="finding">
+                <span class="badge badge-good">Good</span>
+                <span class="finding-text">Clean separation between provider abstraction and GitHub-specific logic</span>
+              </div>
+            </div>
+
+            <p>Overall: <strong>approve</strong> with minor suggestions. Neither is blocking -- the state parameter is cryptographically random and short-lived.</p>
+          </div>
+
+          <!-- === Review approved === -->
+          <div class="ev-system">
+            <span class="ev-ts">14:57</span>
+            <span class="ev-text">Review <span style="color:var(--green)">approved</span>. Creating PR...</span>
+          </div>
+
+          <!-- PR creation -->
+          <div class="msg-agent">
+            <div class="msg-agent-label">Implementer</div>
+
+            <div class="tools">
+              <div class="tool-row">
+                <svg class="tool-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--green)"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>git add -A && git commit</span>
+              </div>
+              <div class="tool-row">
+                <svg class="tool-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--green)"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>gh pr create --title "feat(auth): add OAuth authentication"</span>
+              </div>
+            </div>
+
+            <p><a href="#" style="color:var(--accent); text-decoration:none;">PR #125</a> created. Ready for human review.</p>
+
+            <div class="summary-block">
+              <span class="summary-label">New files:</span><br>
+              <div class="summary-indent">
+                <span class="summary-value">core/auth/provider.ts</span> <span class="summary-label">89 lines</span><br>
+                <span class="summary-value">core/auth/github.ts</span> <span class="summary-label">134 lines</span>
+              </div>
+              <div style="height:6px"></div>
+              <span class="summary-label">Modified:</span><br>
+              <div class="summary-indent">
+                <span class="summary-value">core/auth/session.ts</span> <span style="color:var(--green)">+45</span> <span style="color:var(--red)">-3</span><br>
+                <span class="summary-value">server/routes.ts</span> <span style="color:var(--green)">+28</span><br>
+                <span class="summary-value">server/middleware.ts</span> <span style="color:var(--green)">+15</span> <span style="color:var(--red)">-2</span>
+              </div>
+              <div class="summary-divider"></div>
+              <span class="summary-label">Tests:</span> <span style="color:var(--green)">47 passed</span>, <span class="summary-label">0 failed</span><br>
+              <span class="summary-label">Lint:</span> <span style="color:var(--green)">0 errors</span>, <span class="summary-label">0 warnings</span>
+            </div>
+          </div>
+
+          <!-- === Session completed === -->
+          <div class="ev-system">
+            <span class="ev-ts">14:58</span>
+            <span class="ev-text">Stage <span class="stage-name">merge</span> completed. Session finished.</span>
+          </div>
+
+          <div class="ev-system">
+            <span class="ev-ts"></span>
+            <span class="ev-text" style="color:var(--text-4)">Total: 6 files, +319 -13, $0.82, 24 minutes</span>
+          </div>
+
+          <!-- bottom breathing room -->
+          <div style="height:20px"></div>
+
+        </div>
+      </div>
+
+      <!-- ============ INPUT BAR ============ -->
+      <div class="input-bar">
+        <div class="input-inner">
+          <div class="input-field">
+            <input type="text" placeholder="Request changes or ask a question..." />
+          </div>
+          <span class="input-meta">Opus 4.6</span>
+          <button class="send-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- ============== RIGHT PANEL ============== -->
+    <aside class="detail">
+      <div class="detail-tabs" id="detail-tabs">
+        <button class="detail-tab active" data-tab="overview" onclick="switchTab('overview', this)">Overview</button>
+        <button class="detail-tab" data-tab="files" onclick="switchTab('files', this)">Files</button>
+        <button class="detail-tab" data-tab="diff" onclick="switchTab('diff', this)">Diff</button>
+        <button class="detail-tab" data-tab="metrics" onclick="switchTab('metrics', this)">Metrics</button>
+        <div class="tab-indicator" id="tab-indicator"></div>
+      </div>
+
+      <div class="detail-content">
+
+        <!-- === OVERVIEW === -->
+        <div class="detail-pane active" id="pane-overview">
+          <div class="ov-section">
+            <div class="ov-heading">Stages</div>
+            <div class="stage-row">
+              <span class="stage-dot done"></span>
+              <span class="stage-label">plan</span>
+              <span class="stage-dur">4m</span>
+            </div>
+            <div class="stage-row">
+              <span class="stage-dot done"></span>
+              <span class="stage-label">implement</span>
+              <span class="stage-dur">14m</span>
+            </div>
+            <div class="stage-row">
+              <span class="stage-dot done"></span>
+              <span class="stage-label">verify</span>
+              <span class="stage-dur">2m</span>
+            </div>
+            <div class="stage-row">
+              <span class="stage-dot done"></span>
+              <span class="stage-label">review</span>
+              <span class="stage-dur">3m</span>
+            </div>
+            <div class="stage-row">
+              <span class="stage-dot done"></span>
+              <span class="stage-label">merge</span>
+              <span class="stage-dur">1m</span>
+            </div>
+          </div>
+
+          <div class="ov-section">
+            <div class="ov-heading">Session</div>
+            <div class="ov-grid">
+              <span class="ov-key">id</span><span class="ov-val">s-abc123</span>
+              <span class="ov-key">flow</span><span class="ov-val">autonomous-sdlc</span>
+              <span class="ov-key">runtime</span><span class="ov-val">claude</span>
+              <span class="ov-key">compute</span><span class="ov-val">local</span>
+              <span class="ov-key">branch</span><span class="ov-val">feat/oauth-v2</span>
+              <span class="ov-key">pr</span><span class="ov-val"><a href="#">#125</a></span>
+            </div>
+          </div>
+
+          <div class="ov-section" style="margin-bottom:0;">
+            <div class="ov-heading">Agents</div>
+            <div class="agent-row">
+              <span class="agent-name">planner</span>
+              <span class="agent-model">opus-4</span>
+            </div>
+            <div class="agent-row">
+              <span class="agent-name">implementer</span>
+              <span class="agent-model">opus-4</span>
+            </div>
+            <div class="agent-row">
+              <span class="agent-name">verifier</span>
+              <span class="agent-model">sonnet-4</span>
+            </div>
+            <div class="agent-row">
+              <span class="agent-name">reviewer</span>
+              <span class="agent-model">opus-4</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- === FILES === -->
+        <div class="detail-pane" id="pane-files">
+          <div class="file-dir">packages/core/auth/</div>
+          <div class="file-entry" onclick="selectFile(this, 'provider.ts')">
+            <span class="name">provider.ts</span>
+            <span class="counts" style="color:var(--green)">+89 new</span>
+          </div>
+          <div class="file-entry selected" onclick="selectFile(this, 'github.ts')">
+            <span class="name">github.ts</span>
+            <span class="counts"><span style="color:var(--green)">+142</span> <span style="color:var(--red)">-8</span></span>
+          </div>
+          <div class="file-entry" onclick="selectFile(this, 'session.ts')">
+            <span class="name">session.ts</span>
+            <span class="counts"><span style="color:var(--green)">+45</span> <span style="color:var(--red)">-3</span></span>
+          </div>
+
+          <div class="file-dir">packages/server/</div>
+          <div class="file-entry" onclick="selectFile(this, 'routes.ts')">
+            <span class="name">routes.ts</span>
+            <span class="counts" style="color:var(--green)">+28</span>
+          </div>
+          <div class="file-entry" onclick="selectFile(this, 'middleware.ts')">
+            <span class="name">middleware.ts</span>
+            <span class="counts"><span style="color:var(--green)">+15</span> <span style="color:var(--red)">-2</span></span>
+          </div>
+
+          <div style="padding-top:16px; font-size:11px; font-family:var(--mono); color:var(--text-4);">
+            6 files -- <span style="color:var(--green)">+319</span> <span style="color:var(--red)">-13</span>
+          </div>
+        </div>
+
+        <!-- === DIFF === -->
+        <div class="detail-pane" id="pane-diff">
+          <div style="margin-bottom:12px; font-size:11px; color:var(--text-3); font-family:var(--mono);">
+            Showing: github.ts <span style="color:var(--green)">+142</span> <span style="color:var(--red)">-8</span>
+          </div>
+
+          <div>
+            <div class="diff-header">packages/core/auth/github.ts</div>
+            <div class="diff-body">
+<div class="diff-line diff-hunk">@@ -12,7 +12,7 @@</div>
+<div class="diff-line diff-ctx"> export class GitHubOAuth implements OAuthProvider {</div>
+<div class="diff-line diff-del">-  private authorizeBase = "https://github.com/login/oauth";</div>
+<div class="diff-line diff-add">+  private authorizeBase = "https://github.com/api/v2/oauth";</div>
+<div class="diff-line diff-ctx"> </div>
+<div class="diff-line diff-ctx">   async authorize(state: string, challenge: string) {</div>
+<div class="diff-line diff-del">-    const url = `${this.authorizeBase}/authorize`;</div>
+<div class="diff-line diff-add">+    const url = `${this.authorizeBase}/authorize`;</div>
+<div class="diff-line diff-ctx">     return `${url}?client_id=${this.clientId}&state=${state}`;</div>
+<div class="diff-line diff-ctx">   }</div>
+<div class="diff-line diff-hunk">@@ -34,6 +34,8 @@</div>
+<div class="diff-line diff-ctx">   async exchangeCode(code: string, verifier: string) {</div>
+<div class="diff-line diff-del">-    const tokenUrl = "https://github.com/login/oauth/access_token";</div>
+<div class="diff-line diff-add">+    const tokenUrl = "https://github.com/api/v2/oauth/access_token";</div>
+<div class="diff-line diff-ctx">     const resp = await fetch(tokenUrl, {</div>
+<div class="diff-line diff-ctx">       method: "POST",</div>
+<div class="diff-line diff-add">+      headers: { "Accept": "application/json" },</div>
+<div class="diff-line diff-ctx">       body: JSON.stringify({ code, verifier }),</div>
+<div class="diff-line diff-ctx">     });</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- === METRICS === -->
+        <div class="detail-pane" id="pane-metrics">
+          <div class="metric-row">
+            <span class="metric-label">Tokens</span>
+            <span class="metric-value">24,310</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Cost</span>
+            <span class="metric-value">$0.82</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Duration</span>
+            <span class="metric-value">24m</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Files changed</span>
+            <span class="metric-value">6</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Lines added</span>
+            <span class="metric-value" style="color:var(--green)">+319</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Lines removed</span>
+            <span class="metric-value" style="color:var(--red)">-13</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Tests</span>
+            <span class="metric-value" style="color:var(--green)">2,857 passed</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Lint</span>
+            <span class="metric-value" style="color:var(--green)">clean</span>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+  </div>
+</div>
+
+<!-- ===================== COMMAND PALETTE ===================== -->
+<div class="cmd-overlay" id="cmd-overlay" onclick="if(event.target===this)closeCmd()">
+  <div class="cmd-box">
+    <div class="cmd-search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" placeholder="Search sessions, agents, flows..." id="cmd-input" />
+      <span class="kbd">Esc</span>
+    </div>
+    <div class="cmd-results">
+      <div class="cmd-group-label">Recent</div>
+      <div class="cmd-item">
+        <span>OAuth authentication</span>
+        <span class="cmd-item-id">s-abc123</span>
+      </div>
+      <div class="cmd-item">
+        <span>Webhook retry logic</span>
+        <span class="cmd-item-id">s-def456</span>
+      </div>
+      <div class="cmd-item">
+        <span>Fix test flakiness</span>
+        <span class="cmd-item-id">s-ghi789</span>
+      </div>
+      <div class="cmd-group-label">Commands</div>
+      <div class="cmd-item">
+        <span>New session</span>
+        <span class="kbd">N</span>
+      </div>
+      <div class="cmd-item">
+        <span>Switch theme</span>
+        <span class="kbd">T</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Tab switching with sliding indicator
+  function switchTab(tabId, btnEl) {
+    // Deactivate all
+    document.querySelectorAll('.detail-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.detail-pane').forEach(p => p.classList.remove('active'));
+
+    // Activate target
+    btnEl.classList.add('active');
+    document.getElementById('pane-' + tabId).classList.add('active');
+
+    // Slide indicator
+    updateIndicator(btnEl);
+  }
+
+  function updateIndicator(btn) {
+    const indicator = document.getElementById('tab-indicator');
+    const tabsContainer = document.getElementById('detail-tabs');
+    const containerRect = tabsContainer.getBoundingClientRect();
+    const btnRect = btn.getBoundingClientRect();
+
+    indicator.style.left = (btnRect.left - containerRect.left + 12) + 'px';
+    indicator.style.width = (btnRect.width - 24) + 'px';
+  }
+
+  // Initialize indicator position
+  requestAnimationFrame(() => {
+    const activeTab = document.querySelector('.detail-tab.active');
+    if (activeTab) {
+      const indicator = document.getElementById('tab-indicator');
+      // Set initial position without transition
+      indicator.style.transition = 'none';
+      updateIndicator(activeTab);
+      // Re-enable transition after paint
+      requestAnimationFrame(() => {
+        indicator.style.transition = '';
+      });
+    }
+  });
+
+  // Session selection
+  function selectSession(el) {
+    document.querySelectorAll('.session-item').forEach(item => {
+      item.classList.remove('selected');
+    });
+    el.classList.add('selected');
+  }
+
+  // Tool expand/collapse
+  function toggleTool(el) {
+    const detail = el.nextElementSibling;
+    if (detail && detail.classList.contains('tool-detail')) {
+      detail.classList.toggle('open');
+      const arrow = el.querySelector('.tool-arrow');
+      if (arrow) arrow.classList.toggle('open');
+    }
+  }
+
+  // File selection (also switches to diff tab)
+  function selectFile(el, filename) {
+    document.querySelectorAll('.file-entry').forEach(f => f.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+
+  // Command palette
+  function toggleCmd() {
+    const overlay = document.getElementById('cmd-overlay');
+    overlay.classList.toggle('open');
+    if (overlay.classList.contains('open')) {
+      document.getElementById('cmd-input').focus();
+    }
+  }
+  function closeCmd() {
+    document.getElementById('cmd-overlay').classList.remove('open');
+  }
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      toggleCmd();
+    }
+    if (e.key === 'Escape') {
+      closeCmd();
+    }
+  });
+
+  // Theme toggle (via Cmd+K > Switch theme)
+  function toggleTheme() {
+    document.body.classList.toggle('light');
+  }
+
+  // Scroll conversation to the interesting part (implement + user correction)
+  const conv = document.getElementById('conversation');
+  conv.scrollTop = conv.scrollHeight * 0.35;
+</script>
+
+</body>
+</html>
