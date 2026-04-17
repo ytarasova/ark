@@ -35,11 +35,17 @@ interface DashboardData {
 
 interface DashboardViewProps {
   onNavigate: (view: string) => void;
+  onSelectSession?: (sessionId: string) => void;
   readOnly: boolean;
   daemonStatus?: DaemonStatus | null;
 }
 
-export function DashboardView({ onNavigate, readOnly: _readOnly, daemonStatus: _daemonStatus }: DashboardViewProps) {
+export function DashboardView({
+  onNavigate: _onNavigate,
+  onSelectSession,
+  readOnly: _readOnly,
+  daemonStatus: _daemonStatus,
+}: DashboardViewProps) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sessions, setSessions] = useState<any[]>([]);
@@ -104,7 +110,7 @@ export function DashboardView({ onNavigate, readOnly: _readOnly, daemonStatus: _
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
-      <div className="max-w-[720px] w-full mx-auto px-6 py-8 flex flex-col gap-6">
+      <div className="max-w-3xl w-full mx-auto px-6 py-8 flex flex-col gap-6">
         {/* Budget warning */}
         {hasBudgetWarning && budget && (
           <div
@@ -172,7 +178,7 @@ export function DashboardView({ onNavigate, readOnly: _readOnly, daemonStatus: _
                   <div className="flex gap-1.5 shrink-0 ml-3">
                     <button
                       type="button"
-                      onClick={() => onNavigate("sessions")}
+                      onClick={() => onSelectSession?.(s.session_id || s.id)}
                       aria-label="Review waiting session"
                       className={cn(
                         "h-6 px-2 rounded text-[10px] font-medium",
@@ -212,7 +218,7 @@ export function DashboardView({ onNavigate, readOnly: _readOnly, daemonStatus: _
                   <div className="flex gap-1.5 shrink-0 ml-3">
                     <button
                       type="button"
-                      onClick={() => onNavigate("sessions")}
+                      onClick={() => onSelectSession?.(s.session_id || s.id)}
                       aria-label="View failed session"
                       className={cn(
                         "h-6 px-2 rounded text-[10px] font-medium",
@@ -225,7 +231,7 @@ export function DashboardView({ onNavigate, readOnly: _readOnly, daemonStatus: _
                     </button>
                     <button
                       type="button"
-                      onClick={() => onNavigate("sessions")}
+                      onClick={() => onSelectSession?.(s.session_id || s.id)}
                       aria-label="Restart failed session"
                       className={cn(
                         "h-6 px-2 rounded text-[10px] font-medium",

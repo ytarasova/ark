@@ -6,6 +6,7 @@ import { NewSessionModal } from "../components/NewSessionModal.js";
 import { DashboardView } from "../components/DashboardView.js";
 import { useSessions } from "../hooks/useSessions.js";
 import { api } from "../hooks/useApi.js";
+import { ArrowLeft } from "lucide-react";
 import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
 
 interface SessionsPageProps {
@@ -238,16 +239,36 @@ export function SessionsPage({
           />
         </div>
       ) : selectedId ? (
-        <SessionDetail
-          key={selectedId}
-          sessionId={selectedId}
-          onToast={onToast}
-          readOnly={readOnly}
-          initialTab={initialTab}
-          onTabChange={onTabChange}
-        />
+        <div className="flex-1 flex flex-col min-w-0">
+          <div className="shrink-0 px-4 pt-2">
+            <button
+              type="button"
+              onClick={() => setSelectedId(null)}
+              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            >
+              <ArrowLeft size={12} />
+              Back
+            </button>
+          </div>
+          <SessionDetail
+            key={selectedId}
+            sessionId={selectedId}
+            onToast={onToast}
+            readOnly={readOnly}
+            initialTab={initialTab}
+            onTabChange={onTabChange}
+          />
+        </div>
       ) : (
-        <DashboardView onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
+        <DashboardView
+          onNavigate={onNavigate}
+          onSelectSession={(id) => {
+            setSelectedId(id);
+            setShowNew(false);
+          }}
+          readOnly={readOnly}
+          daemonStatus={daemonStatus}
+        />
       )}
     </Layout>
   );
