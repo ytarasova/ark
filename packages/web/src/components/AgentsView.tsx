@@ -449,7 +449,7 @@ function RoleDetail({
           <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
             System Prompt
           </h3>
-          <div className="bg-black/40 border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-muted-foreground">
+          <div className="bg-[var(--bg-code)] border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-muted-foreground">
             {agent.system_prompt}
           </div>
         </div>
@@ -465,7 +465,12 @@ function RoleDetail({
         </div>
       )}
       {actionMsg && (
-        <div className={cn("mt-1.5 text-xs", actionMsg.type === "error" ? "text-red-400" : "text-emerald-400")}>
+        <div
+          className={cn(
+            "mt-1.5 text-xs",
+            actionMsg.type === "error" ? "text-[var(--failed)]" : "text-[var(--running)]",
+          )}
+        >
           {actionMsg.text}
         </div>
       )}
@@ -509,7 +514,7 @@ function RuntimeDetail({ runtime }: { runtime: any }) {
       {runtime.command && runtime.command.length > 0 && (
         <div className="mb-4">
           <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Command</h3>
-          <div className="bg-black/40 border border-border rounded-lg px-3.5 py-2.5 font-mono text-[12px] text-muted-foreground">
+          <div className="bg-[var(--bg-code)] border border-border rounded-lg px-3.5 py-2.5 font-mono text-[12px] text-muted-foreground">
             {runtime.command.join(" ")}
           </div>
         </div>
@@ -536,7 +541,7 @@ function RuntimeDetail({ runtime }: { runtime: any }) {
           <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
             Environment
           </h3>
-          <div className="bg-black/40 border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] text-muted-foreground">
+          <div className="bg-[var(--bg-code)] border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] text-muted-foreground">
             {Object.entries(runtime.env).map(([k, v]) => (
               <div key={k}>
                 {k}={String(v)}

@@ -259,9 +259,9 @@ export function FlowsView({
                             className={cn(
                               "inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-mono border",
                               gate === "manual"
-                                ? "border-amber-500/30 bg-amber-500/5 text-amber-300"
+                                ? "border-[var(--waiting)]/30 bg-[var(--waiting)]/5 text-[var(--waiting)]"
                                 : isAction
-                                  ? "border-blue-500/30 bg-blue-500/5 text-blue-300"
+                                  ? "border-[var(--completed)]/30 bg-[var(--completed)]/5 text-[var(--completed)]"
                                   : "border-border bg-secondary text-foreground",
                               optional && "opacity-60",
                             )}
@@ -279,12 +279,12 @@ export function FlowsView({
                       <span className="w-2 h-2 rounded-sm border border-border bg-secondary" /> auto (no human needed)
                     </span>
                     <span className="inline-flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-sm border border-amber-500/30 bg-amber-500/5" /> manual (requires
-                      approval)
+                      <span className="w-2 h-2 rounded-sm border border-[var(--waiting)]/30 bg-[var(--waiting)]/5" />{" "}
+                      manual (requires approval)
                     </span>
                     <span className="inline-flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-sm border border-blue-500/30 bg-blue-500/5" /> action (system
-                      step)
+                      <span className="w-2 h-2 rounded-sm border border-[var(--completed)]/30 bg-[var(--completed)]/5" />{" "}
+                      action (system step)
                     </span>
                   </div>
                 </div>
@@ -339,7 +339,7 @@ export function FlowsView({
                       const stageType = typeof s !== "string" ? s.type : null;
 
                       return (
-                        <div key={i} className="border border-border/50 rounded-lg p-3 bg-black/20">
+                        <div key={i} className="border border-border/50 rounded-lg p-3 bg-[var(--bg-code)]/50">
                           <div className="flex items-center gap-2 mb-1.5">
                             <span className="text-[10px] font-mono text-muted-foreground w-5">{i + 1}</span>
                             <span className="text-[13px] font-semibold text-foreground">{stageName}</span>
@@ -386,7 +386,7 @@ export function FlowsView({
                             {onFailure && (
                               <>
                                 <span className="text-muted-foreground">On failure</span>
-                                <span className="text-amber-400 font-mono">{onFailure}</span>
+                                <span className="text-[var(--waiting)] font-mono">{onFailure}</span>
                               </>
                             )}
                             {verify && verify.length > 0 && (
@@ -415,7 +415,12 @@ export function FlowsView({
                 ) : null;
               })()}
               {actionMsg && (
-                <div className={cn("mt-1.5 text-xs", actionMsg.type === "error" ? "text-red-400" : "text-emerald-400")}>
+                <div
+                  className={cn(
+                    "mt-1.5 text-xs",
+                    actionMsg.type === "error" ? "text-[var(--failed)]" : "text-[var(--running)]",
+                  )}
+                >
                   {actionMsg.text}
                 </div>
               )}

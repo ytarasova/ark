@@ -145,7 +145,7 @@ export function FolderPickerModal({ initialPath, onSelect, onClose }: FolderPick
                     <span aria-hidden>📁</span>
                     <span className="truncate">{ent.name}</span>
                     {ent.isGitRepo && (
-                      <span className="ml-2 rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-400">
+                      <span className="ml-2 rounded bg-[var(--running)]/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--running)]">
                         git
                       </span>
                     )}

@@ -234,13 +234,13 @@ export function MemoryView({ addRequested = 0, onToast }: MemoryViewProps) {
               {stats ? (
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-black/40 border border-border rounded-lg p-3.5">
+                    <div className="bg-[var(--bg-code)] border border-border rounded-lg p-3.5">
                       <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.04em]">
                         Total Nodes
                       </div>
                       <div className="text-2xl font-bold text-foreground mt-1">{stats.nodes ?? 0}</div>
                     </div>
-                    <div className="bg-black/40 border border-border rounded-lg p-3.5">
+                    <div className="bg-[var(--bg-code)] border border-border rounded-lg p-3.5">
                       <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.04em]">
                         Total Edges
                       </div>
@@ -336,7 +336,7 @@ export function MemoryView({ addRequested = 0, onToast }: MemoryViewProps) {
                 <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
                   Content
                 </h3>
-                <div className="bg-black/40 border border-border rounded-lg p-3.5 text-[13px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-words text-foreground">
+                <div className="bg-[var(--bg-code)] border border-border rounded-lg p-3.5 text-[13px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-words text-foreground">
                   {getContent(selected)}
                 </div>
               </div>

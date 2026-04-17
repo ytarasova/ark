@@ -382,7 +382,7 @@ export function SessionDetail({
                         className={cn(
                           "font-mono text-[11px]",
                           isCurrent && "text-primary font-bold",
-                          isPast && "text-emerald-400",
+                          isPast && "text-[var(--running)]",
                           !isCurrent && !isPast && "text-muted-foreground",
                         )}
                       >
@@ -429,7 +429,7 @@ export function SessionDetail({
                 {cost.cost > 0 && (
                   <>
                     <span className="text-muted-foreground">Cost</span>
-                    <span className="text-amber-400 font-mono">{fmtCost(cost.cost)}</span>
+                    <span className="text-[var(--waiting)] font-mono">{fmtCost(cost.cost)}</span>
                   </>
                 )}
               </div>
@@ -459,7 +459,12 @@ export function SessionDetail({
               {prUrl && (
                 <div className="mt-1.5 text-xs">
                   PR:{" "}
-                  <a href={prUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+                  <a
+                    href={prUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[var(--completed)] hover:underline"
+                  >
                     {prUrl}
                   </a>
                 </div>
@@ -471,7 +476,7 @@ export function SessionDetail({
                     href={s.pr_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-400 hover:underline"
+                    className="text-[var(--completed)] hover:underline"
                   >
                     {s.pr_url}
                   </a>
@@ -516,11 +521,11 @@ export function SessionDetail({
                 {diffData.filesChanged} files changed, +{diffData.insertions} -{diffData.deletions}
               </div>
               {diffData.modifiedSinceReview?.length > 0 && (
-                <div className="text-amber-400 text-[11px] mb-1.5">
+                <div className="text-[var(--waiting)] text-[11px] mb-1.5">
                   Modified since last review: {diffData.modifiedSinceReview.join(", ")}
                 </div>
               )}
-              <pre className="bg-black/40 border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] overflow-auto whitespace-pre-wrap break-all text-muted-foreground">
+              <pre className="bg-[var(--bg-code)] border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] overflow-auto whitespace-pre-wrap break-all text-muted-foreground">
                 {diffData.stat || diffData.message || "No changes"}
               </pre>
             </div>
@@ -589,7 +594,9 @@ export function SessionDetail({
               </h3>
               <Separator className="mb-2" />
               {!verifyResult.todosResolved && (
-                <div className="text-xs text-red-400 mb-1">Pending todos: {verifyResult.pendingTodos?.join(", ")}</div>
+                <div className="text-xs text-[var(--failed)] mb-1">
+                  Pending todos: {verifyResult.pendingTodos?.join(", ")}
+                </div>
               )}
               {verifyResult.scriptResults?.map((r: any, i: number) => (
                 <div key={i} className="text-xs mb-1">
@@ -642,7 +649,7 @@ export function SessionDetail({
                         href={commitUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-400 hover:underline"
+                        className="text-[var(--completed)] hover:underline"
                       >
                         {shortSha}
                       </a>
@@ -658,7 +665,7 @@ export function SessionDetail({
           {/* Channel Port */}
           {(s.status === "running" || s.status === "waiting") && s.session_id && (
             <div className="mb-5">
-              <div className="text-[11px] text-emerald-400 font-mono">Channel: port {channelPort}</div>
+              <div className="text-[11px] text-[var(--running)] font-mono">Channel: port {channelPort}</div>
             </div>
           )}
 
@@ -714,7 +721,7 @@ export function SessionDetail({
               <Separator className="mb-2" />
               <div
                 ref={outputRef}
-                className="bg-black/40 border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] overflow-y-auto whitespace-pre-wrap break-all text-muted-foreground"
+                className="bg-[var(--bg-code)] border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] overflow-y-auto whitespace-pre-wrap break-all text-muted-foreground"
               >
                 {output}
               </div>

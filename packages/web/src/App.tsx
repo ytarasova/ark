@@ -2,6 +2,7 @@ import "./styles.css";
 import { useState, useCallback } from "react";
 import { createRoot } from "react-dom/client";
 import { queryClient, QueryClientProvider } from "./providers/QueryProvider.js";
+import { ThemeProvider } from "./themes/ThemeProvider.js";
 import { Toast } from "./components/Toast.js";
 import { SessionsPage } from "./pages/SessionsPage.js";
 import { ToolsPage } from "./pages/ToolsPage.js";
@@ -15,6 +16,7 @@ import { CostsPage } from "./pages/CostsPage.js";
 import { SettingsPage } from "./pages/SettingsPage.js";
 import { LoginPage } from "./pages/LoginPage.js";
 import { DashboardPage } from "./pages/DashboardPage.js";
+import { DesignPreviewPage } from "./pages/DesignPreviewPage.js";
 import { useDaemonStatus } from "./hooks/useDaemonStatus.js";
 import { useHashRouter } from "./hooks/useHashRouter.js";
 
@@ -52,6 +54,7 @@ function App() {
 
   return (
     <>
+      {view === "_design" && <DesignPreviewPage />}
       {view === "dashboard" && (
         <DashboardPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
       )}
@@ -122,6 +125,8 @@ function App() {
 const root = createRoot(document.getElementById("root")!);
 root.render(
   <QueryClientProvider client={queryClient}>
-    <App />
+    <ThemeProvider defaultTheme="midnight-circuit">
+      <App />
+    </ThemeProvider>
   </QueryClientProvider>,
 );

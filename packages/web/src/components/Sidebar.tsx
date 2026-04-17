@@ -35,20 +35,20 @@ function getDotState(ds: DaemonStatus | null | undefined): { color: string; glow
   const { conductor, arkd } = ds;
   if (conductor.online && arkd.online) {
     return {
-      color: "bg-emerald-400",
-      glow: "shadow-[0_0_8px_rgba(52,211,153,0.5),0_0_2px_rgba(52,211,153,0.8)] animate-[glow-pulse_2.5s_ease-in-out_infinite]",
+      color: "bg-[var(--running)]",
+      glow: "shadow-[var(--running-glow)] animate-[glow-pulse_2.5s_ease-in-out_infinite]",
       title: "Conductor and arkd online",
     };
   }
   if (conductor.online || arkd.online) {
     return {
-      color: "bg-amber-400",
-      glow: "shadow-[0_0_8px_rgba(251,191,36,0.5),0_0_2px_rgba(251,191,36,0.8)]",
+      color: "bg-[var(--waiting)]",
+      glow: "",
       title: `${conductor.online ? "Conductor" : "arkd"} online, ${conductor.online ? "arkd" : "conductor"} offline`,
     };
   }
   return {
-    color: "bg-red-400",
+    color: "bg-[var(--failed)]",
     glow: "",
     title: "Conductor and arkd offline",
   };

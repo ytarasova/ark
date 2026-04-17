@@ -187,20 +187,20 @@ export function SessionsPage({
       headerLeft={
         <div className="flex gap-1.5 items-center">
           {runningCount > 0 && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-[var(--running)]/15 text-[var(--running)] border border-[var(--running)]/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--running)] animate-pulse" />
               {runningCount}
             </span>
           )}
           {waitingCount > 0 && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-amber-500/15 text-amber-400 border border-amber-500/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-[var(--waiting)]/15 text-[var(--waiting)] border border-[var(--waiting)]/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--waiting)]" />
               {waitingCount}
             </span>
           )}
           {failedCount > 0 && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-red-500/15 text-red-400 border border-red-500/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-[var(--failed)]/15 text-[var(--failed)] border border-[var(--failed)]/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--failed)]" />
               {failedCount}
             </span>
           )}
