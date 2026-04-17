@@ -112,7 +112,29 @@ function parseUnifiedDiff(raw: string): DiffFile[] {
 }
 
 /** Event types that should be hidden from the Conversation tab. */
-const HIDDEN_EVENT_TYPES = ["checkpoint", "hook_status", "session_stopped", "session_resumed"];
+const HIDDEN_EVENT_TYPES = ["checkpoint", "session_stopped", "session_resumed"];
+
+/** Format tool input from hook data into a readable summary. */
+function formatToolInput(data: any): string {
+  if (!data) return "";
+  const input = data.tool_input || data.input;
+  if (!input) return "";
+  if (typeof input === "string") {
+    return input.length > 120 ? input.slice(0, 120) + "..." : input;
+  }
+  if (input.command) {
+    const cmd = String(input.command);
+    return cmd.length > 120 ? cmd.slice(0, 120) + "..." : cmd;
+  }
+  if (input.file_path || input.path) return input.file_path || input.path;
+  if (input.pattern) return input.pattern;
+  if (input.query) {
+    const q = String(input.query);
+    return q.length > 120 ? q.slice(0, 120) + "..." : q;
+  }
+  const json = JSON.stringify(input);
+  return json.length > 120 ? json.slice(0, 120) + "..." : json;
+}
 
 /**
  * Map session events into conversation timeline items.
@@ -126,6 +148,7 @@ function buildConversationTimeline(events: any[], messages: any[], session?: any
   const items: any[] = [];
   const hasMessages = Array.isArray(messages) && messages.length > 0;
   const all: any[] = [];
+  const pendingTools = new Map<string, number>();
   const sessionAgent = session?.agent || "agent";
 
   for (const ev of events || []) {
@@ -157,6 +180,50 @@ function buildConversationTimeline(events: any[], messages: any[], session?: any
 
       // Hide infrastructure noise from conversation
       if (HIDDEN_EVENT_TYPES.includes(evType)) continue;
+
+      // ── hook_status: render tool calls, hide infrastructure ──
+      if (evType === "hook_status") {
+        const hookData = typeof item.data === "object" ? item.data : {};
+        const hookEvent = hookData.event || "";
+
+        if (hookEvent === "PreToolUse") {
+          const toolName = hookData.tool_name || "tool";
+          const inputSummary = formatToolInput(hookData);
+          const label = inputSummary ? `${toolName}: ${inputSummary}` : toolName;
+          const idx = items.length;
+          items.push({
+            kind: "tool",
+            label,
+            timestamp: formatTime(item.created_at),
+            status: "running" as const,
+            stage: evStage,
+          });
+          pendingTools.set(toolName, idx);
+        } else if (hookEvent === "PostToolUse") {
+          const toolName = hookData.tool_name || "tool";
+          const pendingIdx = pendingTools.get(toolName);
+          if (pendingIdx !== undefined && items[pendingIdx]) {
+            items[pendingIdx].status = "done";
+            if (hookData.duration) {
+              items[pendingIdx].duration = (hookData.duration / 1000).toFixed(1) + "s";
+            }
+            pendingTools.delete(toolName);
+          } else {
+            const inputSummary = formatToolInput(hookData);
+            const label = inputSummary ? `${toolName}: ${inputSummary}` : toolName;
+            items.push({
+              kind: "tool",
+              label,
+              timestamp: formatTime(item.created_at),
+              status: "done" as const,
+              duration: hookData.duration ? (hookData.duration / 1000).toFixed(1) + "s" : undefined,
+              stage: evStage,
+            });
+          }
+        }
+        // Hide all other hook events (SessionStart, UserPromptSubmit, busy/idle)
+        continue;
+      }
 
       // When messages are present, skip agent channel events -- the messages
       // table already contains the same content with better metadata.
@@ -270,6 +337,82 @@ function buildConversationTimeline(events: any[], messages: any[], session?: any
   }
 
   return items;
+}
+
+/** Render agent message content with structured formatting for completion messages. */
+function renderAgentContent(content: string, type?: string): React.ReactNode {
+  if (!content) return <p>--</p>;
+  if (type === "completed") {
+    const lines = content.split("\n");
+    const parts: React.ReactNode[] = [];
+    let summaryLines: string[] = [];
+
+    for (const line of lines) {
+      const prMatch = line.match(/^PR:\s*(https?:\/\/\S+)/);
+      const filesMatch = line.match(/^Files:\s*(.+)/);
+      const commitsMatch = line.match(/^Commits?:\s*(.+)/);
+
+      if (prMatch) {
+        if (summaryLines.length > 0) {
+          parts.push(<p key={"s" + parts.length}>{summaryLines.join(" ")}</p>);
+          summaryLines = [];
+        }
+        parts.push(
+          <p key={"pr" + parts.length}>
+            <a
+              href={prMatch[1]}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[var(--primary)] underline hover:text-[var(--primary-hover)]"
+            >
+              View PR on GitHub
+            </a>
+          </p>,
+        );
+      } else if (filesMatch) {
+        if (summaryLines.length > 0) {
+          parts.push(<p key={"s" + parts.length}>{summaryLines.join(" ")}</p>);
+          summaryLines = [];
+        }
+        const files = filesMatch[1].split(",").map((f) => f.trim());
+        parts.push(
+          <ul key={"f" + parts.length} className="list-none pl-0 my-1">
+            {files.map((f, fi) => (
+              <li key={fi} className="text-[12px] font-[family-name:var(--font-mono)] text-[var(--fg-muted)]">
+                <span className="mr-1.5 opacity-60">{"\u{1F4C4}"}</span>
+                {f}
+              </li>
+            ))}
+          </ul>,
+        );
+      } else if (commitsMatch) {
+        if (summaryLines.length > 0) {
+          parts.push(<p key={"s" + parts.length}>{summaryLines.join(" ")}</p>);
+          summaryLines = [];
+        }
+        const commits = commitsMatch[1].split(",").map((c) => c.trim());
+        parts.push(
+          <p key={"c" + parts.length} className="text-[12px] my-1">
+            {commits.map((c, ci) => (
+              <span key={ci}>
+                {ci > 0 && ", "}
+                <code className="font-[family-name:var(--font-mono)] bg-[var(--bg-code)] px-1 py-0.5 rounded text-[11px]">
+                  {c}
+                </code>
+              </span>
+            ))}
+          </p>,
+        );
+      } else {
+        summaryLines.push(line);
+      }
+    }
+    if (summaryLines.length > 0) {
+      parts.push(<p key={"s" + parts.length}>{summaryLines.join(" ")}</p>);
+    }
+    if (parts.length > 0) return <>{parts}</>;
+  }
+  return <p>{content}</p>;
 }
 
 /** Build a rich TimelineEvent for the Events tab with contextual labels and colors. */
@@ -436,9 +579,12 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
     ? fullTimeline.filter((item: any) => item.stage === stageFilter || item.kind === "user")
     : fullTimeline;
 
-  const lastTimelineItem = timeline.length > 0 ? timeline[timeline.length - 1] : null;
-  const agentIsTyping =
-    isActive && (!lastTimelineItem || lastTimelineItem.kind === "user" || lastTimelineItem.kind === "system");
+  // Show typing indicator only when agent has recent hook activity (last 10s)
+  const lastHookTime = events
+    .filter((ev: any) => ev.type === "hook_status")
+    .reduce((latest: number, ev: any) => Math.max(latest, new Date(ev.created_at).getTime()), 0);
+  const hasRecentActivity = lastHookTime > 0 && Date.now() - lastHookTime < 10_000;
+  const agentIsTyping = isActive && hasRecentActivity;
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -691,7 +837,7 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
               if (item.kind === "agent")
                 return (
                   <AgentMessage key={"a-" + i} agentName={item.agentName} model={item.model} timestamp={item.timestamp}>
-                    <p>{item.content}</p>
+                    {renderAgentContent(item.content, item.type)}
                   </AgentMessage>
                 );
               if (item.kind === "system") return <SystemEvent key={"s-" + i}>{item.content}</SystemEvent>;
