@@ -42,7 +42,7 @@ make install          # bun install + symlink `ark` to /usr/local/bin
 # 2. Verify
 ark --version
 ark agent list        # shows 12 builtin agents
-ark flow list         # shows 9 builtin flows
+ark flow list         # shows 14 builtin flows
 
 # 3. Start a session from a recipe and dispatch it
 ark session start \
@@ -162,13 +162,18 @@ ark session delete <id>         # hard delete (worktree + rows)
 
 A flow is a DAG of stages. Each stage has an agent, a gate type, optional verify scripts, and optional dependencies. Flows live in `flows/definitions/*.yaml` and follow the same three-tier resolution as other resources (builtin, `~/.ark/flows/`, `.ark/flows/`).
 
-### Builtin flows (9)
+### Builtin flows (14)
 
 | Name | Purpose |
 |------|---------|
 | `bare` | Single stage -- just run one agent. |
 | `quick` | Plan plus implement, no review. |
 | `default` | Plan, audit, implement, verify, review, document, close. |
+| `autonomous` | Single agent, fully autonomous with auto gate. |
+| `autonomous-sdlc` | Fully autonomous SDLC: plan -> implement -> verify -> review -> PR -> merge. No human needed. |
+| `brainstorm` | Interactive ideation: explore ideas -> synthesize -> plan. Manual gates for human steering. |
+| `conditional` | Conditional routing -- branch based on review outcome (approved/needs_changes/rejected), converge at PR. |
+| `docs` | Lightweight doc flow: plan -> implement -> PR. No verify or review. |
 | `parallel` | Independent stages that run in parallel. |
 | `fan-out` | Parent dispatches N child sessions then joins. |
 | `dag-parallel` | DAG with explicit `depends_on` edges. |
@@ -216,6 +221,10 @@ Key fields:
 - `verify`: list of shell commands that must exit 0 before completion. Agents that report done while verify fails are steered back to fix it. Use `ark session complete --force` to bypass.
 - `on_failure: retry(N)`: fail-loopback. Re-dispatches the stage with the failure context injected, up to N retries.
 - `depends_on`: list of prior stage names for DAG ordering. Enables parallel execution of stages with no ordering constraint.
+- `action`: built-in action instead of an agent (e.g. `create_pr`, `auto_merge`). Used in terminal stages like PR creation.
+- `optional: true`: stage can be skipped without blocking downstream stages.
+- `task`: inline task prompt injected into the agent. Supports template variables (`{summary}`, `{repo}`, `{workdir}`).
+- `edges`: explicit edge list with `from`, `to`, `condition`, and `label` fields. Used by the `conditional` flow for branching logic (e.g. route based on review outcome).
 - Fan-out stages wait for all their spawned children before the parent advances (auto-join on child completion).
 
 ```bash
@@ -280,7 +289,7 @@ env: {}
 
 Template variables substituted at dispatch time: `{ticket}`, `{summary}`, `{repo}`, `{branch}`, `{workdir}`.
 
-### Runtimes (3 tools + 1 subscription variant)
+### Runtimes (4 tools + 1 subscription variant)
 
 | Name | Tool | Billing | Transcript parser |
 |------|------|---------|-------------------|
@@ -288,6 +297,7 @@ Template variables substituted at dispatch time: `{ticket}`, `{summary}`, `{repo
 | `claude-max` | Claude Code (Max sub) | subscription ($200/mo flat) | claude |
 | `codex` | OpenAI Codex CLI | api | codex (default model: gpt-5-codex) |
 | `gemini` | Google Gemini CLI | api | gemini |
+| `goose` | Goose (Block / AAIF) | api | goose (default model: claude-sonnet-4-6) |
 
 ```bash
 ark runtime list
@@ -299,6 +309,10 @@ ark session start --repo . --summary "Port module" \
 
 ark session start --repo . --summary "UI polish" \
   --agent worker --runtime gemini --dispatch
+
+# Use Goose (routes through Ark's LLM router)
+ark session start --repo . --summary "Add tests" \
+  --agent implementer --runtime goose --dispatch
 
 # Use Max subscription (zero per-token cost tracked, tokens still recorded)
 ark session start --repo . --summary "Big refactor" \
@@ -326,8 +340,9 @@ env:
   OPENAI_API_KEY: "${OPENAI_API_KEY}"
 ```
 
-Three executor types are registered at boot:
+Four executor types are registered at boot:
 - `claude-code` -- launches Claude Code in tmux with hooks and an MCP channel.
+- `goose` -- launches Goose in tmux with MCP extension, model pinning, and LLM router injection.
 - `cli-agent` -- any other CLI tool in tmux, with worktree isolation.
 - `subprocess` -- generic child process, no tmux.
 
@@ -385,7 +400,7 @@ ark skill show code-review
 
 Recipes are session templates with variables. They let you quick-launch a common configuration.
 
-### Builtin recipes (8)
+### Builtin recipes (10)
 
 | Recipe | Purpose |
 |--------|---------|
@@ -397,6 +412,8 @@ Recipes are session templates with variables. They let you quick-launch a common
 | `ideate` | Brainstorming and spec drafting. |
 | `islc` | Full ISLC (Intake/Spec/Landing/Close) pipeline. |
 | `islc-quick` | Shortened ISLC. |
+| `self-dogfood` | Dispatch an ark agent to work on the ark repo itself using the full autonomous-sdlc flow. |
+| `self-quick` | Quick single-agent dispatch against the ark repo for trivial tasks (docs, config, small fixes). |
 
 ### CLI
 
@@ -597,6 +614,7 @@ Per-runtime transcript parsers:
 | `ClaudeTranscriptParser` | `~/.claude/projects/<slug>/<session>.jsonl` (exact path resolved from session id) |
 | `CodexTranscriptParser` | `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` (matched by cwd) |
 | `GeminiTranscriptParser` | `~/.gemini/tmp/<slug>/chats/session-*.jsonl` (matched by projectHash) |
+| `GooseTranscriptParser` | Goose transcript logs (matched by session) |
 
 ### cost_mode column
 
@@ -819,14 +837,16 @@ ark web                 # starts Vite dev server
 make web-build          # production build
 ```
 
-Vite + React + shadcn/ui. SSE live updates, Recharts cost dashboard, widget grid, session detail pages. Dashboard, Sessions, Agents, Flows, Compute, History, Memory, Tools, Schedules, Costs, Settings pages.
+Vite + React + shadcn/ui with a custom design system (theme tokens, consistent component library). SSE live updates, Recharts cost charts (theme-aware, no animations), pipeline visualization with @xyflow/react + d3-dag. Pages: Dashboard, Sessions, Agents, Flows, Compute, History, Memory, Tools, Schedules, Costs, Settings. Login page for auth-required (hosted) mode.
 
-### Desktop
+### Desktop (Electron)
 
 ```bash
 make desktop            # launches Electron wrapper
 make desktop-build      # packages for distribution
 ```
+
+Self-contained Electron shell wrapping the web dashboard. Includes auto-start for the daemon, single-instance lock, and health probes.
 
 ---
 
@@ -1037,6 +1057,18 @@ ark session fork <parentId> --count 4 --summaries "a,b,c,d"
 ark session start --repo . --summary "Refactor parser" \
   --agent implementer --runtime codex --dispatch
 
+# Use Goose runtime
+ark session start --repo . --summary "Add endpoint tests" \
+  --agent implementer --runtime goose --dispatch
+
+# Fully autonomous SDLC (no human gates)
+ark session start --repo . --summary "Add health-check endpoint" \
+  --flow autonomous-sdlc --dispatch
+
+# Self-dogfood: ark works on itself
+ark session start --recipe self-dogfood \
+  --summary "Add health-check endpoint" --dispatch
+
 # Use Max subscription (no per-token cost)
 ark session start --repo . --summary "Long refactor" \
   --agent implementer --runtime claude-max --dispatch
@@ -1054,4 +1086,4 @@ ark --server https://ark.company.com --token ark_default_xxx web
 
 ---
 
-That is the full tour. Every concept is documented here: sessions, flows, agents, runtimes, skills, recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/Web/Desktop, knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, and deployment via Dockerfile, docker-compose, and Helm.
+That is the full tour. Every concept is documented here: sessions, 14 flows (including autonomous-sdlc, brainstorm, and conditional routing), agents, 5 runtimes (Claude, Codex, Gemini, Goose, and Claude Max), skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/Web/Desktop (Electron), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, and deployment via Dockerfile, docker-compose, and Helm.
