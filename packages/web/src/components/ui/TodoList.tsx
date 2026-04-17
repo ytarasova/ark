@@ -22,6 +22,17 @@ const PRIORITY_CLASSES: Record<string, string> = {
  * Checkbox items with priority labels.
  */
 export function TodoList({ items, onToggle, className, ...props }: TodoListProps) {
+  if (items.length === 0) {
+    return (
+      <div
+        className={cn("flex flex-col items-center justify-center py-12 text-[var(--fg-muted)] text-sm", className)}
+        {...props}
+      >
+        No todos for this session.
+      </div>
+    );
+  }
+
   return (
     <div className={cn("flex flex-col gap-0", className)} {...props}>
       {items.map((item) => (

@@ -142,6 +142,7 @@ export function SessionListPanel({
           >
             <Plus size={14} />
             New
+            <kbd className="ml-1 text-[9px] opacity-40 font-mono bg-[var(--bg-hover)] px-1 py-0.5 rounded">N</kbd>
           </Button>
         ) : undefined
       }

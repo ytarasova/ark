@@ -58,7 +58,10 @@ export function SessionList({
       {/* Header */}
       <div className="px-4 pt-4 pb-1 shrink-0">
         <div className="flex items-center justify-between mb-2.5">
-          <h2 className="text-[18px] font-semibold text-[var(--fg)]">Sessions</h2>
+          <h2 className="text-[18px] font-semibold text-[var(--fg)]">
+            Sessions
+            <kbd className="ml-2 text-[9px] opacity-40 font-mono bg-[var(--bg-hover)] px-1 py-0.5 rounded">J/K</kbd>
+          </h2>
           <div className="flex items-center gap-1">
             {onSearchChange && (
               <button
@@ -76,6 +79,7 @@ export function SessionList({
                 title="Search (/ )"
               >
                 {searchOpen ? <X size={13} /> : <Search size={13} />}
+                <kbd className="ml-0.5 text-[9px] opacity-40 font-mono bg-[var(--bg-hover)] px-1 py-0.5 rounded">/</kbd>
               </button>
             )}
             {headerAction}

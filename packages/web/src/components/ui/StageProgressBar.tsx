@@ -21,13 +21,22 @@ export function StageProgressBar({ stages, className, ...props }: StageProgressB
       {stages.map((s) => (
         <div
           key={s.name}
-          className={cn("h-[3px] flex-1 rounded-full", {
+          className={cn("h-[3px] flex-1 rounded-full overflow-hidden relative", {
             "bg-[var(--completed)]": s.state === "done",
             "bg-[var(--primary)]": s.state === "active",
             "bg-[var(--border)]": s.state === "pending",
           })}
           title={`${s.name}: ${s.state}`}
-        />
+        >
+          {s.state === "active" && (
+            <div className="absolute inset-0 bg-[var(--border)] rounded-full">
+              <div
+                className="h-full w-[40%] bg-[var(--primary)] rounded-full"
+                style={{ animation: "indeterminate 1.5s ease-in-out infinite" }}
+              />
+            </div>
+          )}
+        </div>
       ))}
     </div>
   );

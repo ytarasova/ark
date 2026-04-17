@@ -35,8 +35,6 @@ export function SessionHeader({
   className,
   ...props
 }: SessionHeaderProps) {
-  const isActive = status === "running" || status === "waiting";
-
   return (
     <div className={cn("border-b border-[var(--border)] shrink-0 flex flex-col", className)} {...props}>
       <div className="h-12 flex items-center px-5 gap-3">
@@ -67,7 +65,6 @@ export function SessionHeader({
 
         {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
       </div>
-      {isActive && <div className="indeterminate-bar" />}
     </div>
   );
 }

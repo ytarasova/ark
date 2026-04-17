@@ -3,6 +3,7 @@ import { Layout } from "../components/Layout.js";
 import { SessionListPanel } from "../components/SessionList.js";
 import { SessionDetail } from "../components/SessionDetail.js";
 import { NewSessionModal } from "../components/NewSessionModal.js";
+import { DashboardView } from "../components/DashboardView.js";
 import { useSessions } from "../hooks/useSessions.js";
 import { api } from "../hooks/useApi.js";
 import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
@@ -163,7 +164,7 @@ export function SessionsPage({
         sessions={sessions}
         selectedId={selectedId}
         onSelect={(id) => {
-          setSelectedId(id);
+          setSelectedId(id === selectedId ? null : id);
           setShowNew(false);
         }}
         filter={filter}
@@ -190,29 +191,7 @@ export function SessionsPage({
       ) : selectedId ? (
         <SessionDetail key={selectedId} sessionId={selectedId} onToast={onToast} readOnly={readOnly} />
       ) : (
-        <div className="flex-1 flex items-center justify-center text-sm text-[var(--fg-muted)]">
-          <div className="text-center">
-            <div className="text-[14px] mb-2">Select a session or create a new one</div>
-            <div className="text-[11px] text-[var(--fg-faint)] space-x-2">
-              <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border)] text-[10px] font-[family-name:var(--font-mono)]">
-                j
-              </kbd>
-              /
-              <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border)] text-[10px] font-[family-name:var(--font-mono)]">
-                k
-              </kbd>{" "}
-              navigate{" "}
-              <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border)] text-[10px] font-[family-name:var(--font-mono)]">
-                n
-              </kbd>{" "}
-              new{" "}
-              <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border)] text-[10px] font-[family-name:var(--font-mono)]">
-                /
-              </kbd>{" "}
-              search
-            </div>
-          </div>
-        </div>
+        <DashboardView onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
       )}
     </Layout>
   );

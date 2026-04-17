@@ -5,7 +5,7 @@ import { Button } from "./ui/button.js";
 import { FolderPickerModal } from "./FolderPickerModal.js";
 import { cn } from "../lib/utils.js";
 import { relTime, formatRepoName } from "../util.js";
-import { Zap, Monitor, FolderOpen, Check, ChevronDown, Search, Folder, ArrowUp } from "lucide-react";
+import { Zap, Monitor, FolderOpen, Check, ChevronDown, Search, Folder } from "lucide-react";
 
 interface FlowInfo {
   name: string;
@@ -546,7 +546,8 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
         {/* Actions */}
         <div className="flex items-center justify-end gap-2 pt-3 pb-5">
           <Button type="button" variant="outline" size="sm" onClick={onClose}>
-            Cancel <kbd className="ml-1.5 text-[9px] opacity-50 font-mono">Esc</kbd>
+            Cancel{" "}
+            <kbd className="ml-1 text-[9px] opacity-40 font-mono bg-[var(--bg-hover)] px-1 py-0.5 rounded">Esc</kbd>
           </Button>
           <Button
             type="submit"
@@ -554,7 +555,10 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
             disabled={!summary.trim() || !daemonOnline}
             title={!daemonOnline ? "Start the daemon first" : undefined}
           >
-            Start Session <kbd className="ml-1.5 text-[9px] opacity-70 font-mono">Cmd+Enter</kbd>
+            Start Session{" "}
+            <kbd className="ml-1 text-[9px] opacity-40 font-mono bg-[var(--bg-hover)] px-1 py-0.5 rounded">
+              Cmd+Enter
+            </kbd>
           </Button>
         </div>
       </form>

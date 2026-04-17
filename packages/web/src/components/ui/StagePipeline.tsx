@@ -21,42 +21,39 @@ export function StagePipeline({ stages, selectedStage, onStageClick, className, 
           type="button"
           onClick={() => onStageClick(selectedStage)}
           className={cn(
-            "text-[10px] font-medium px-1.5 py-[2px] rounded mr-1",
-            "text-[var(--primary)] hover:bg-[var(--primary-subtle)] transition-colors cursor-pointer",
-            "border border-[var(--primary)]/30 bg-transparent",
+            "text-[10px] font-medium mr-1.5 px-0 py-0",
+            "text-[var(--fg-muted)] hover:underline hover:text-[var(--fg)] transition-colors cursor-pointer",
+            "bg-transparent border-none",
           )}
         >
           All
         </button>
       )}
       {stages.map((s, i) => (
-        <span key={s.name} className="flex flex-col items-stretch">
-          <span className="flex items-center">
-            <button
-              type="button"
-              onClick={() => onStageClick?.(s.name)}
-              className={cn(
-                "text-[11px] font-medium px-2 py-[3px] rounded tracking-[0.02em] transition-colors cursor-pointer",
-                "bg-transparent border-none",
-                {
-                  "text-[var(--completed)]": s.state === "done" && selectedStage !== s.name,
-                  "text-[var(--primary)] bg-[var(--primary-subtle)]": s.state === "active" && selectedStage !== s.name,
-                  "text-[var(--fg-muted)]": s.state === "pending" && selectedStage !== s.name,
-                  "text-[var(--primary)] underline underline-offset-4 decoration-2 decoration-[var(--primary)]":
-                    selectedStage === s.name,
-                },
-                "hover:text-[var(--primary)]",
-              )}
-            >
-              {s.name}
-            </button>
-            {i < stages.length - 1 && (
-              <span className="text-[var(--fg-muted)] text-[10px] px-[1px]" aria-hidden>
-                &gt;
-              </span>
+        <span key={s.name} className="flex items-center">
+          <button
+            type="button"
+            onClick={() => onStageClick?.(s.name)}
+            className={cn(
+              "text-[11px] font-medium px-2 py-[3px] rounded tracking-[0.02em] transition-colors cursor-pointer",
+              "bg-transparent border-none",
+              {
+                "text-[var(--completed)]": s.state === "done" && selectedStage !== s.name,
+                "text-[var(--primary)] bg-[var(--primary-subtle)]": s.state === "active" && selectedStage !== s.name,
+                "text-[var(--fg-muted)]": s.state === "pending" && selectedStage !== s.name,
+                "text-[var(--primary)] underline underline-offset-4 decoration-2 decoration-[var(--primary)]":
+                  selectedStage === s.name,
+              },
+              "hover:text-[var(--primary)]",
             )}
-          </span>
-          {s.state === "active" && <div className="indeterminate-bar mx-1" />}
+          >
+            {s.name}
+          </button>
+          {i < stages.length - 1 && (
+            <span className="text-[var(--fg-muted)] text-[10px] px-[1px]" aria-hidden>
+              &gt;
+            </span>
+          )}
         </span>
       ))}
     </div>

@@ -20,7 +20,7 @@ export interface ContentTabsProps extends React.ComponentProps<"div"> {
 export function ContentTabs({ tabs, activeTab, onTabChange, className, ...props }: ContentTabsProps) {
   return (
     <div className={cn("flex border-b border-[var(--border)] px-5 shrink-0", className)} {...props}>
-      {tabs.map((tab) => {
+      {tabs.map((tab, idx) => {
         const active = tab.id === activeTab;
         return (
           <button
@@ -38,6 +38,7 @@ export function ContentTabs({ tabs, activeTab, onTabChange, className, ...props 
             )}
           >
             {tab.label}
+            <kbd className="text-[9px] opacity-40 font-mono bg-[var(--bg-hover)] px-1 py-0.5 rounded">{idx + 1}</kbd>
             {tab.badge != null && <TabBadge active={active}>{tab.badge}</TabBadge>}
           </button>
         );
