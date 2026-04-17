@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, type FormEvent } from "react";
+import { useState, useEffect, useRef, useCallback, type FormEvent } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { api } from "../hooks/useApi.js";
 import { Button } from "./ui/button.js";
 import { FolderPickerModal } from "./FolderPickerModal.js";
 import { cn } from "../lib/utils.js";
 import { relTime, formatRepoName } from "../util.js";
-import { Zap, Monitor, FolderOpen, Check, ChevronDown, Search, Folder } from "lucide-react";
+import { Zap, Monitor, FolderOpen, Check, ChevronDown, Search, Folder, ArrowUp } from "lucide-react";
 
 interface FlowInfo {
   name: string;
@@ -349,6 +349,14 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
   const [ticket, setTicket] = useState("");
   const [selectedFlow, setSelectedFlow] = useState("");
   const [selectedCompute, setSelectedCompute] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleTextareaInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setSummary(e.target.value);
+    const el = e.target;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 200) + "px";
+  }, []);
 
   const [flows, setFlows] = useState<FlowInfo[]>([]);
   const [computes, setComputes] = useState<ComputeInfo[]>([]);
@@ -479,29 +487,6 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
           </div>
         )}
 
-        {/* Spacer */}
-        <div className="flex-1 min-h-4" />
-
-        {/* Task description -- main input */}
-        <div className="mb-4 pt-4 border-t border-[var(--border)]">
-          <label className="block text-[11px] font-semibold text-[var(--fg-muted)] mb-1.5 uppercase tracking-[0.04em]">
-            What should the agent do? *
-          </label>
-          <textarea
-            autoFocus
-            value={summary}
-            onChange={(e) => setSummary(e.target.value)}
-            placeholder="Describe the task in detail..."
-            rows={5}
-            className={cn(
-              "w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] text-[var(--fg)]",
-              "text-[14px] leading-relaxed px-3 py-3 resize-y",
-              "focus:outline-none focus:ring-2 focus:ring-[var(--primary)]",
-              "placeholder:text-[var(--fg-muted)]",
-            )}
-          />
-        </div>
-
         {/* Daemon offline warning */}
         {!daemonOnline && (
           <div className="mb-3 px-3 py-2 rounded-md bg-[var(--failed)]/10 border border-[var(--failed)]/30 text-[12px] text-[var(--failed)]">
@@ -510,18 +495,47 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
           </div>
         )}
 
+        {/* Task description -- chat-style input */}
+        <div className="mb-4 mt-1">
+          <label className="block text-[11px] font-semibold text-[var(--fg-muted)] mb-1.5 uppercase tracking-[0.04em]">
+            Task
+          </label>
+          <div className="relative">
+            <textarea
+              ref={textareaRef}
+              autoFocus
+              value={summary}
+              onChange={handleTextareaInput}
+              placeholder="What should the agent do?"
+              rows={3}
+              className={cn(
+                "w-full rounded-xl border border-[var(--border)] bg-[var(--bg-hover,var(--bg))] text-[var(--fg)]",
+                "text-[14px] leading-relaxed px-4 py-3 pr-12 resize-none",
+                "focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/20",
+                "placeholder:text-[var(--fg-muted)]",
+              )}
+            />
+            <button
+              type="submit"
+              disabled={!summary.trim() || !daemonOnline}
+              title={!daemonOnline ? "Start the daemon first: ark server daemon start" : undefined}
+              className={cn(
+                "absolute right-2 bottom-2 w-7 h-7 rounded-lg flex items-center justify-center",
+                "transition-colors duration-150",
+                summary.trim() && daemonOnline
+                  ? "bg-[var(--primary)] text-white cursor-pointer hover:opacity-90"
+                  : "bg-[var(--border)] text-[var(--fg-muted)] cursor-not-allowed",
+              )}
+            >
+              <ArrowUp size={14} />
+            </button>
+          </div>
+        </div>
+
         {/* Actions */}
         <div className="flex items-center justify-end gap-2 pb-5">
           <Button type="button" variant="outline" size="sm" onClick={onClose}>
             Cancel
-          </Button>
-          <Button
-            type="submit"
-            size="sm"
-            disabled={!summary.trim() || !daemonOnline}
-            title={!daemonOnline ? "Start the daemon first: ark server daemon start" : undefined}
-          >
-            Start Session
           </Button>
         </div>
       </form>
