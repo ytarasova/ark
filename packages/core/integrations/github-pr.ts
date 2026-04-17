@@ -196,17 +196,21 @@ export function handleGitHubWebhook(app: AppContext, event: string, payload: Rec
       safeAsync(`[github-pr] deliverToChannel for ${session.id}`, async () => {
         const { deliverToChannel } = await import("../conductor/conductor.js");
         await deliverToChannel(session, channelPort, steerPayload);
-      }).then((delivered) => {
-        if (!delivered) {
-          safeAsync(`[github-pr] direct HTTP fallback for ${session.id}`, async () => {
-            await fetch(`${DEFAULT_CHANNEL_BASE_URL}:${channelPort}`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(steerPayload),
+      })
+        .then((delivered) => {
+          if (!delivered) {
+            safeAsync(`[github-pr] direct HTTP fallback for ${session.id}`, async () => {
+              await fetch(`${DEFAULT_CHANNEL_BASE_URL}:${channelPort}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(steerPayload),
+              });
             });
-          });
-        }
-      });
+          }
+        })
+        .catch(() => {
+          /* steer delivery is fire-and-forget -- session continues regardless */
+        });
     }
 
     return { action: "steer", sessionId: session.id, message: prompt };

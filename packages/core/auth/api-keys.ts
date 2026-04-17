@@ -8,6 +8,7 @@
 import { createHash, randomBytes } from "crypto";
 import type { IDatabase } from "./database/index.js";
 import type { TenantContext, ApiKey } from "../types/index.js";
+import { now } from "./util/time.js";
 
 // ── Row type ─────────────────────────────────────────────────────────────────
 
@@ -37,10 +38,6 @@ function rowToApiKey(row: ApiKeyRow): ApiKey {
 
 function hashKey(key: string): string {
   return createHash("sha256").update(key).digest("hex");
-}
-
-function now(): string {
-  return new Date().toISOString();
 }
 
 // ── ApiKeyManager ────────────────────────────────────────────────────────────

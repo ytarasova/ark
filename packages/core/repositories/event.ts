@@ -1,5 +1,6 @@
 import type { IDatabase } from "../database/index.js";
 import type { Event } from "../../types/index.js";
+import { now } from "../util/time.js";
 
 // ── Row type (data stored as JSON string) ───────────────────────────────────
 
@@ -14,10 +15,6 @@ interface EventRow {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-function now(): string {
-  return new Date().toISOString();
-}
 
 function rowToEvent(row: EventRow): Event {
   return { ...row, data: row.data ? JSON.parse(row.data) : null };

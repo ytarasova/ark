@@ -6,6 +6,7 @@ import type {
   ComputeConfig,
   CreateComputeOpts,
 } from "../../types/index.js";
+import { now } from "../util/time.js";
 
 // ── Row type (config stored as JSON string) ─────────────────────────────────
 
@@ -19,10 +20,6 @@ interface ComputeRow {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-function now(): string {
-  return new Date().toISOString();
-}
 
 function safeParseConfig(raw: unknown): ComputeConfig {
   if (typeof raw === "object" && raw !== null) return raw as ComputeConfig;

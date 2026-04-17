@@ -1,5 +1,6 @@
 import type { IDatabase } from "../database/index.js";
 import type { ComputeTemplate, ComputeProviderName, ComputeConfig } from "../../types/index.js";
+import { now } from "../util/time.js";
 
 interface TemplateRow {
   name: string;
@@ -9,10 +10,6 @@ interface TemplateRow {
   tenant_id: string;
   created_at: string;
   updated_at: string;
-}
-
-function now(): string {
-  return new Date().toISOString();
 }
 
 function rowToTemplate(row: TemplateRow): ComputeTemplate {
