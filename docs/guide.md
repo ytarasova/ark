@@ -90,7 +90,7 @@ A session is the unit of work in Ark. Each session has a repo, a summary, an age
 | `ark session delete <id>` | Removes session, worktree, and events. |
 | `ark session interrupt <id>` | Sends Ctrl+C to the running agent (tmux stays up). |
 
-Sessions use a `status` field with states: `pending`, `dispatched`, `running`, `busy`, `idle`, `paused`, `completed`, `error`, `archived`.
+Sessions use a `status` field with states: `pending`, `ready`, `running`, `waiting`, `stopped`, `blocked`, `completed`, `failed`, `archived`.
 
 ### Start and dispatch examples
 
@@ -352,7 +352,7 @@ Each executor implements 5 methods: `launch`, `kill`, `status`, `send`, `capture
 
 ## 5. Skills
 
-Skills are reusable prompt fragments. They are markdown files injected into an agent's system prompt when attached.
+Skills are reusable prompt fragments. They are YAML files whose `prompt` field is injected into an agent's system prompt when attached.
 
 ### Builtin skills (7)
 
@@ -370,9 +370,9 @@ Skills are reusable prompt fragments. They are markdown files injected into an a
 
 Skills resolve in priority order:
 
-1. Project: `.ark/skills/<name>.md` in the repo
-2. Global: `~/.ark/skills/<name>.md`
-3. Builtin: `skills/<name>.md` shipped with Ark
+1. Project: `.ark/skills/<name>.yaml` in the repo
+2. Global: `~/.ark/skills/<name>.yaml`
+3. Builtin: `skills/<name>.yaml` shipped with Ark
 
 A project-level skill with the same name overrides a global or builtin one.
 
@@ -385,7 +385,7 @@ runtime: claude
 skills: [code-review, security-scan, self-review]
 ```
 
-At dispatch, each listed skill's markdown content is inlined into the agent's system prompt.
+At dispatch, each listed skill's `prompt` field is inlined into the agent's system prompt.
 
 ### CLI
 
@@ -828,7 +828,7 @@ ark costs
 ark compute list
 ```
 
-Seventeen command modules cover sessions, compute, flows, skills, recipes, agents, runtimes, auth, router, knowledge, search, worktree, history, todo, config, tenant, and costs.
+Twenty-four command modules cover sessions, compute, flows, skills, recipes, agents, runtimes, auth, router, knowledge, search, worktree, costs, conductor, daemon, dashboard, eval, memory, misc, profile, schedule, server, server-daemon, and tenant.
 
 ### Web
 
@@ -1086,4 +1086,4 @@ ark --server https://ark.company.com --token ark_default_xxx web
 
 ---
 
-That is the full tour. Every concept is documented here: sessions, 14 flows (including autonomous-sdlc, brainstorm, and conditional routing), agents, 5 runtimes (Claude, Codex, Gemini, Goose, and Claude Max), skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/Web/Desktop (Electron), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, and deployment via Dockerfile, docker-compose, and Helm.
+That is the full tour. Every concept is documented here: sessions (with statuses: pending, ready, running, waiting, stopped, blocked, completed, failed, archived), 14 flows (including autonomous-sdlc, brainstorm, and conditional routing), agents, 5 runtimes (Claude, Codex, Gemini, Goose, and Claude Max), YAML-based skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, 24 CLI command modules, dashboards across CLI/Web/Desktop (Electron), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, and deployment via Dockerfile, docker-compose, and Helm.
