@@ -77,18 +77,32 @@ A session is the unit of work in Ark. Each session has a repo, a summary, an age
 | Command | What it does |
 |---------|--------------|
 | `ark session start` | Creates the session row and worktree. Does not launch the agent. |
+| `ark session list` | List all sessions (filterable by status, group, etc). |
+| `ark session show <id>` | Display session details. |
 | `ark session dispatch <id>` | Launches the agent executor in tmux (or remote via arkd). |
 | `ark session advance <id>` | Moves a flow to the next stage. |
 | `ark session complete <id>` | Marks stage/session complete. Runs verify gates. |
 | `ark session pause <id>` | Pauses a running session. |
 | `ark session resume <id>` | Resumes a paused session. |
 | `ark session stop <id>` | Kills the tmux session and cleans hooks. |
-| `ark session fork <id>` | Spawns N child sessions from a parent (fan-out). |
-| `ark session clone <id>` | Duplicates a session with the same config. |
+| `ark session fork <id>` | Branches the conversation (spawns a child). |
+| `ark session clone <id>` | Alias for fork. |
+| `ark session spawn <id>` | Spawn a child session for parallel work. |
+| `ark session spawn-subagent <id>` | Spawn a subagent with optional model/agent override. |
+| `ark session join <id>` | Block until forked children finish. |
 | `ark session handoff <id>` | Transfers control to another agent/runtime. |
+| `ark session attach <id>` | Attach to the session's tmux window. |
+| `ark session output <id>` | Print latest agent output. |
+| `ark session send <id> <text>` | Send a message to the running agent. |
 | `ark session archive <id>` | Hides from default list without deleting. |
+| `ark session restore <id>` | Restore an archived session. |
 | `ark session delete <id>` | Removes session, worktree, and events. |
+| `ark session undelete <id>` | Restore a recently deleted session (within 90s). |
 | `ark session interrupt <id>` | Sends Ctrl+C to the running agent (tmux stays up). |
+| `ark session events <id>` | Show event history for a session. |
+| `ark session group <name>` | Assign a session to a group. |
+| `ark session export <id>` | Export session to a portable format. |
+| `ark session import <path>` | Import session from a file. |
 
 Sessions use a `status` field with states: `pending`, `ready`, `running`, `waiting`, `stopped`, `blocked`, `completed`, `failed`, `archived`.
 
@@ -152,9 +166,32 @@ The `fan-out` and `dag-parallel` builtin flows are wired for this pattern. Paren
 ```bash
 ark session interrupt <id>      # Ctrl+C into the agent, keep tmux alive
 ark session archive <id>        # hide from `list`
-ark session archive <id> --restore
+ark session restore <id>        # restore an archived session
 ark session delete <id>         # hard delete (worktree + rows)
+ark session undelete <id>       # undo a recent delete (within 90s)
 ```
+
+### Exec and Try (headless / sandboxed shortcuts)
+
+Two top-level commands provide streamlined session workflows:
+
+**`ark exec`** -- CI/CD-oriented headless session. Starts a conductor-backed session, runs to completion, and exits with the session's result code. Useful for automated pipelines.
+
+```bash
+ark exec --repo . --summary "Run full test suite" --flow quick --timeout 600
+ark exec --repo . --summary "Deploy staging" --compute docker --output json
+```
+
+Options: `--repo`, `--summary`, `--ticket`, `--flow`, `--compute`, `--group`, `--autonomy`, `--output`, `--timeout`.
+
+**`ark try <task>`** -- one-shot sandboxed session. Starts a Docker-based session that auto-deletes after you detach. Great for experiments.
+
+```bash
+ark try "explore the auth module and suggest improvements"
+ark try "add unit tests for the parser" --image node:20
+```
+
+Options: `--image` (Docker image, default `ubuntu:22.04`).
 
 ---
 
@@ -468,13 +505,24 @@ Remote providers all run the `arkd` daemon on port 19300. The daemon is stateles
 
 ```bash
 ark compute list
-ark compute show <id>
+ark compute status <id>           # detailed status with health probes
 ark compute create --provider docker --name my-sandbox
 ark compute create --provider ec2-firecracker --region us-west-2
+ark compute update <id>           # update compute configuration
+ark compute provision <id>        # provision infrastructure (EC2, etc)
 ark compute start <id>
 ark compute stop <id>
-ark compute clean <id>
-ark compute delete <id>
+ark compute destroy <id>          # tear down underlying infrastructure
+ark compute delete <id>           # remove record from database
+ark compute sync <id>             # sync repo files to/from remote compute
+ark compute metrics <id>          # show system metrics (CPU, memory, disk)
+ark compute default <name>        # set default compute target
+ark compute ssh <id>              # SSH into a remote compute
+
+# Pool management
+ark compute pool create --name gpu-pool --providers ec2-firecracker
+ark compute pool list
+ark compute pool delete <name>
 ```
 
 ### Selecting a compute at dispatch
@@ -722,10 +770,11 @@ Ark is multi-tenant from the ground up. All entities are tenant-scoped: sessions
 Format: `ark_<tenantId>_<secret>`. Example: `ark_acme_9f8a7b...`.
 
 ```bash
-ark auth key create --tenant acme --role admin --label "CI key"
-ark auth key list
-ark auth key revoke <keyId>
-ark auth key rotate <keyId>
+ark auth setup                        # interactive API key setup
+ark auth create-key --tenant acme --role admin --label "CI key"
+ark auth list-keys
+ark auth revoke-key <keyId>
+ark auth rotate-key <keyId>
 ```
 
 ### Roles
@@ -785,10 +834,15 @@ ark session start --repo . --summary "..." --dispatch
 # See a diff stat
 ark worktree diff <sessionId>
 
+# List all active worktrees
+ark worktree list
+
 # Finish the session: merge or open a PR
-ark worktree finish <sessionId>      # interactive: merge, PR, or discard
-ark worktree merge <sessionId>       # merge into base branch
+ark worktree finish <sessionId>      # merge worktree branch, remove worktree, delete session
 ark worktree pr <sessionId>          # push and create a PR via `gh`
+
+# Clean up orphaned worktrees
+ark worktree cleanup
 ```
 
 The web dashboard shows a diff preview per session, with a "Finish" action that triggers the same merge/PR flow.
@@ -807,6 +861,7 @@ Ark ships a FTS5 full-text search index across sessions, events, messages, and C
 ark search "race condition in scheduler"
 ark search "auth middleware" --transcripts   # also scan ~/.claude/projects JSONL
 ark search "pager bug" --index               # rebuild the FTS5 index
+ark search-all "auth middleware"             # search across all Claude conversations
 ark index                                    # alias for --index
 ```
 
@@ -828,7 +883,41 @@ ark costs
 ark compute list
 ```
 
-Twenty-four command modules cover sessions, compute, flows, skills, recipes, agents, runtimes, auth, router, knowledge, search, worktree, costs, conductor, daemon, dashboard, eval, memory, misc, profile, schedule, server, server-daemon, and tenant.
+Twenty-four command modules cover sessions, compute, flows, skills, recipes, agents, runtimes, auth, router, knowledge, search, worktree, costs, conductor, daemon, dashboard, eval, memory, misc, profile, schedule, server, exec-try, and tenant.
+
+### Utility commands
+
+| Command | What it does |
+|---------|--------------|
+| `ark doctor` | Health check (bun, tmux, git, gh, API keys). |
+| `ark init` | Initialize `.ark/` in the current repo. |
+| `ark config` | Open `~/.ark/config.yaml` in your editor. |
+| `ark pr list` | List sessions bound to PRs. |
+| `ark pr status <url>` | Show session bound to a PR URL. |
+| `ark watch` | Poll for new issues/PRs and auto-dispatch sessions. |
+| `ark claude list` | List active Claude Code sessions on disk. |
+| `ark openapi` | Generate OpenAPI spec from the JSON-RPC surface. |
+| `ark mcp-proxy` | Bridge stdin/stdout to a pooled MCP socket. |
+| `ark acp` | Start headless Agent Communication Protocol server. |
+| `ark repo-map` | Generate repository structure map for context injection. |
+
+### Conductor commands
+
+| Command | What it does |
+|---------|--------------|
+| `ark conductor start` | Start the conductor server. |
+| `ark conductor learnings` | List accumulated learnings. |
+| `ark conductor learn <text>` | Record a learning. |
+| `ark conductor bridge` | Start the messaging bridge (Telegram/Slack). |
+| `ark conductor notify` | Send a notification via bridge to running sessions. |
+
+### Eval commands
+
+| Command | What it does |
+|---------|--------------|
+| `ark eval stats` | Show agent performance statistics. |
+| `ark eval drift` | Detect agent behavior drift. |
+| `ark eval list` | List recent evaluation results. |
 
 ### Web
 
@@ -1086,4 +1175,4 @@ ark --server https://ark.company.com --token ark_default_xxx web
 
 ---
 
-That is the full tour. Every concept is documented here: sessions (with statuses: pending, ready, running, waiting, stopped, blocked, completed, failed, archived), 14 flows (including autonomous-sdlc, brainstorm, and conditional routing), agents, 5 runtimes (Claude, Codex, Gemini, Goose, and Claude Max), YAML-based skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, 24 CLI command modules, dashboards across CLI/Web/Desktop (Electron), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, and deployment via Dockerfile, docker-compose, and Helm.
+That is the full tour. Every concept is documented here: sessions (with statuses: pending, ready, running, waiting, stopped, blocked, completed, failed, archived), `exec` and `try` shortcuts, 14 flows (including autonomous-sdlc, brainstorm, and conditional routing), agents, 5 runtimes (Claude, Codex, Gemini, Goose, and Claude Max), YAML-based skills, 10 recipes, all 11 compute providers with pools, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, 24 CLI command modules (including utility, conductor, and eval commands), dashboards across CLI/Web/Desktop (Electron), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, and deployment via Dockerfile, docker-compose, and Helm.
