@@ -505,11 +505,23 @@ export function startConductor(
     issueTimer = setInterval(() => safeAsync("issue polling", () => pollIssues(app, issueOpts)), POLL_INTERVAL_MS);
   }
 
+  // Stuck session recovery -- check every 60 seconds for sessions stuck in
+  // "running" status whose agent process has exited. This handles the case
+  // where the channel report was lost (arkd/conductor was down when agent reported).
+  const STUCK_POLL_INTERVAL_MS = 60_000;
+  const stuckTimer = setInterval(
+    () => safeAsync("stuck session recovery", () => recoverStuckSessions(app)),
+    STUCK_POLL_INTERVAL_MS,
+  );
+  // Run immediately on start to catch sessions stuck before conductor (re)start
+  safeAsync("stuck session recovery: initial", () => recoverStuckSessions(app));
+
   return {
     stop() {
       clearInterval(scheduleTimer);
       clearInterval(prTimer);
       clearInterval(mergeTimer);
+      clearInterval(stuckTimer);
       if (issueTimer) clearInterval(issueTimer);
       server.stop();
     },
@@ -739,6 +751,97 @@ async function proxyToRouter(req: Request, path: string): Promise<Response> {
   }
 }
 
+// ── Stuck session recovery ─────────────────────────────────────────────────
+
+/**
+ * Recover sessions stuck in "running" status whose agent process has exited.
+ *
+ * This handles the case where:
+ * 1. Agent called report(completed) but arkd/conductor was down -- report lost
+ * 2. Status poller missed the exit (e.g. poller was stopped or conductor restarted)
+ * 3. Hook status (SessionEnd) was never delivered
+ *
+ * For each stuck session, checks if the tmux session is still alive. If not,
+ * checks for new commits and triggers advancement or marks as failed.
+ */
+async function recoverStuckSessions(app: AppContext): Promise<void> {
+  const sessions = app.sessions.list({ status: "running" });
+  for (const s of sessions) {
+    if (!s.session_id) continue; // No tmux handle -- skip
+
+    // Check if the tmux session is still alive
+    try {
+      const client = new ArkdClient("http://localhost:19300");
+      const status = await client.agentStatus({ sessionName: s.session_id });
+      if (status.running) continue; // Agent is still alive -- not stuck
+    } catch {
+      // Arkd not reachable -- skip this session (can't determine status)
+      continue;
+    }
+
+    // Agent process has exited but session is still "running" -- recover
+    logInfo("conductor", `recovering stuck session ${s.id} (agent ${s.session_id} exited)`);
+
+    // Check for new commits to determine if agent completed work
+    let hasNewCommits = false;
+    if (s.workdir) {
+      try {
+        const { execFileSync } = await import("child_process");
+        const startSha = (s.config as any)?.stage_start_sha as string | undefined;
+        if (startSha) {
+          const headSha = execFileSync("git", ["rev-parse", "HEAD"], {
+            cwd: s.workdir,
+            encoding: "utf-8",
+            timeout: 5000,
+          }).trim();
+          hasNewCommits = headSha !== startSha;
+        } else {
+          const log = execFileSync("git", ["log", "--oneline", "origin/main..HEAD"], {
+            cwd: s.workdir,
+            encoding: "utf-8",
+            timeout: 5000,
+          }).trim();
+          hasNewCommits = !!log;
+        }
+      } catch {
+        hasNewCommits = true; // Allow on git error
+      }
+    } else {
+      hasNewCommits = true; // No workdir -- skip check
+    }
+
+    if (hasNewCommits) {
+      // Agent completed work -- advance the flow
+      app.sessions.update(s.id, { status: "ready", error: null, session_id: null });
+      app.events.log(s.id, "stuck_session_recovered", {
+        actor: "system",
+        stage: s.stage ?? undefined,
+        data: { action: "advance", reason: "agent exited with commits" },
+      });
+      try {
+        await session.mediateStageHandoff(app, s.id, {
+          autoDispatch: true,
+          source: "stuck_recovery",
+        });
+      } catch (e: any) {
+        logError("conductor", `stuck recovery advance failed for ${s.id}: ${e?.message ?? e}`);
+      }
+    } else {
+      // Agent exited without commits -- mark as failed
+      app.sessions.update(s.id, {
+        status: "failed",
+        error: "Agent exited without committing any changes (recovered by conductor)",
+        session_id: null,
+      });
+      app.events.log(s.id, "stuck_session_recovered", {
+        actor: "system",
+        stage: s.stage ?? undefined,
+        data: { action: "failed", reason: "agent exited without commits" },
+      });
+    }
+  }
+}
+
 // ── Report handling ─────────────────────────────────────────────────────────
 
 async function handleReport(app: AppContext, sessionId: string, report: OutboundMessage): Promise<void> {
@@ -773,6 +876,9 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
         source: "channel_report",
         outcome: result.outcome,
       });
+      if (!handoff.ok && !handoff.blockedByVerification) {
+        logWarn("conductor", `stage handoff failed for ${sessionId}: ${handoff.message}`);
+      }
       if (handoff.blockedByVerification) {
         const s = app.sessions.get(sessionId);
         await sendOSNotification(

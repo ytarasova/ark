@@ -34,6 +34,28 @@ describe("applyReport auto-gate completion", () => {
     expect(result.updates.status).toBe("ready");
   });
 
+  it("clears stale error on completed report so auto-gate passes", () => {
+    const app = getApp();
+    const session = app.sessions.create({ summary: "stale error test", flow: "autonomous" });
+    // Simulate: agent failed once, error was set, then retry succeeded
+    app.sessions.update(session.id, {
+      status: "running",
+      stage: "work",
+      error: "previous failure from first attempt",
+    });
+
+    const result = applyReport(app, session.id, {
+      type: "completed",
+      stage: "work",
+      summary: "Done on retry",
+    } as any);
+
+    expect(result.shouldAdvance).toBe(true);
+    expect(result.updates.status).toBe("ready");
+    // The error field must be explicitly cleared so evaluateGate("auto") passes
+    expect(result.updates.error).toBeNull();
+  });
+
   it("does NOT set shouldAdvance for gate:manual stage", () => {
     const app = getApp();
     const session = app.sessions.create({ summary: "manual test", flow: "bare" });

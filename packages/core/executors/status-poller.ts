@@ -47,6 +47,11 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
         const session = app.sessions.get(sessionId);
         if (!session || session.status !== "running") return;
 
+        // Guard: verify the session's current tmux handle still matches the one
+        // we are polling. After a stage handoff, the session gets a new agent
+        // with a different handle. If they don't match, this poller is stale.
+        if (session.session_id && session.session_id !== handle) return;
+
         // "not_found" means the tmux session exited (process finished) -- treat as completed
         const newStatus = status.state === "failed" ? "failed" : "completed";
         const error = status.state === "failed" ? (status as { error?: string }).error : null;
@@ -65,11 +70,17 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
 
         logInfo("session", `status-poller: ${sessionId} -> ${newStatus}`);
 
-        // Advance flow for multi-stage pipelines (same as Claude hook path)
+        // Advance flow for multi-stage pipelines (same as Claude hook path).
+        // Use mediateStageHandoff instead of raw advance() so auto-dispatch fires.
         if (newStatus === "completed") {
+          // Clear error before advancing so auto-gate doesn't reject
+          app.sessions.update(sessionId, { status: "ready", error: null });
           try {
-            const { advance } = await import("../services/session-orchestration.js");
-            await advance(app, sessionId);
+            const { mediateStageHandoff } = await import("../services/session-orchestration.js");
+            await mediateStageHandoff(app, sessionId, {
+              autoDispatch: true,
+              source: "status_poller",
+            });
           } catch {
             /* advance may fail if flow is done */
           }

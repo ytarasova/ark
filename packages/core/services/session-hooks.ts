@@ -486,6 +486,9 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
         // Auto gate: advance to next stage or complete the session
         result.updates.status = "ready";
         result.updates.session_id = null;
+        // Clear any stale error from a previous failed attempt (e.g. on_failure retry).
+        // Without this, evaluateGate("auto") rejects advancement because session.error is truthy.
+        result.updates.error = null;
         result.shouldAdvance = true;
         result.shouldAutoDispatch = true;
       }

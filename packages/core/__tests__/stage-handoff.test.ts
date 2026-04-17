@@ -299,6 +299,44 @@ describe("applyReport + mediateStageHandoff integration", () => {
     // Manual gate: shouldAdvance is falsy -- conductor should NOT call mediateStageHandoff
     expect(result.shouldAdvance).toBeFalsy();
   });
+
+  it("clears stale error before advancing so auto-gate passes", async () => {
+    const session = app.sessions.create({ summary: "stale error handoff", flow: "quick" });
+    // Simulate: session has a stale error from a previous failed attempt
+    app.sessions.update(session.id, {
+      status: "running",
+      stage: "implement",
+      error: "previous failure from retry",
+    });
+
+    // Step 1: applyReport on successful completion
+    const report: OutboundMessage = {
+      type: "completed",
+      sessionId: session.id,
+      stage: "implement",
+      summary: "Code written on retry",
+      filesChanged: ["src/feature.ts"],
+      commits: ["abc123"],
+    };
+    const result = applyReport(app, session.id, report);
+    expect(result.shouldAdvance).toBe(true);
+    expect(result.updates.error).toBeNull();
+
+    // Step 2: Apply updates as conductor would
+    app.sessions.update(session.id, result.updates);
+
+    // Step 3: Verify the error was cleared in the DB
+    const afterUpdate = app.sessions.get(session.id)!;
+    expect(afterUpdate.error).toBeNull();
+
+    // Step 4: mediateStageHandoff should succeed (gate passes with null error)
+    const handoff = await mediateStageHandoff(app, session.id, {
+      autoDispatch: false,
+      source: "test",
+    });
+    expect(handoff.ok).toBe(true);
+    expect(handoff.toStage).toBe("verify");
+  });
 });
 
 // ── Integration: applyHookStatus -> mediateStageHandoff ─────────────────
