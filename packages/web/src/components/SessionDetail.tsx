@@ -1,185 +1,196 @@
-import { useState } from "react";
-import { StatusBadge } from "./StatusDot.js";
-import { ChatPanel } from "./ChatPanel.js";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { api } from "../hooks/useApi.js";
 import { useSessionDetailData } from "../hooks/useSessionDetailData.js";
-import { relTime, fmtCost, formatRepoName } from "../util.js";
+import { useMessages } from "../hooks/useMessages.js";
+import { relTime, fmtCost } from "../util.js";
 import { cn } from "../lib/utils.js";
-import { Button } from "./ui/button.js";
-import { Input } from "./ui/input.js";
-import { Separator } from "./ui/separator.js";
-import { Badge } from "./ui/badge.js";
-import { X } from "lucide-react";
-import { TerminalPanel } from "./Terminal.js";
 
-/** Format a token count for display (e.g. 1500 -> "1.5k"). */
-function humanTokens(n: number): string {
-  if (!n) return "0";
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
+// UI components
+import { SessionHeader } from "./ui/SessionHeader.js";
+import { ContentTabs, type TabDef } from "./ui/ContentTabs.js";
+import { ChatInput } from "./ui/ChatInput.js";
+import { ScrollProgress } from "./ui/ScrollProgress.js";
+import { AgentMessage } from "./ui/AgentMessage.js";
+import { UserMessage } from "./ui/UserMessage.js";
+import { SystemEvent } from "./ui/SystemEvent.js";
+import { ToolCallRow } from "./ui/ToolCallRow.js";
+import { ToolCallFailed } from "./ui/ToolCallFailed.js";
+import { TypingIndicator } from "./ui/TypingIndicator.js";
+import { SessionSummary } from "./ui/SessionSummary.js";
+import { EventTimeline, type TimelineEvent } from "./ui/EventTimeline.js";
+import { TodoList, type TodoItem } from "./ui/TodoList.js";
+import type { StageProgress } from "./ui/StageProgressBar.js";
+import type { SessionStatus } from "./ui/StatusDot.js";
 
 interface SessionDetailProps {
   sessionId: string;
-  onClose: () => void;
   onToast: (msg: string, type: string) => void;
   readOnly: boolean;
-  chatOpen?: boolean;
-  onChatOpenChange?: (open: boolean) => void;
 }
 
-function SessionActions({
-  session,
-  onAction,
-  onAttach,
-  terminalOpen,
-  chatOpen,
-  onChatOpenChange,
-}: {
-  session: any;
-  onAction: (action: string) => void;
-  onAttach?: () => void;
-  terminalOpen?: boolean;
-  chatOpen?: boolean;
-  onChatOpenChange?: (open: boolean) => void;
-}) {
-  const s = session.status;
-  return (
-    <div className="flex gap-1.5 flex-wrap">
-      {(s === "ready" || s === "pending" || s === "blocked") && (
-        <Button size="xs" onClick={() => onAction("dispatch")}>
-          Dispatch
-        </Button>
-      )}
-      {(s === "running" || s === "waiting") && (
-        <Button variant="warning" size="xs" onClick={() => onAction("stop")}>
-          Stop
-        </Button>
-      )}
-      {(s === "running" || s === "waiting") && (
-        <Button variant="outline" size="xs" onClick={() => onAction("pause")}>
-          Pause
-        </Button>
-      )}
-      {(s === "running" || s === "waiting") && (
-        <Button variant="outline" size="xs" onClick={() => onAction("interrupt")}>
-          Interrupt
-        </Button>
-      )}
-      {(s === "ready" || s === "blocked") && (
-        <Button size="xs" onClick={() => onAction("advance")}>
-          Advance
-        </Button>
-      )}
-      {(s === "running" || s === "waiting") && (
-        <Button variant="success" size="xs" onClick={() => onAction("complete")}>
-          Complete
-        </Button>
-      )}
-      {(s === "stopped" || s === "failed" || s === "completed") && (
-        <Button variant="success" size="xs" onClick={() => onAction("restart")}>
-          Restart
-        </Button>
-      )}
-      {s !== "deleting" && (
-        <Button variant="outline" size="xs" onClick={() => onAction("fork")}>
-          Fork
-        </Button>
-      )}
-      {(s === "running" || s === "waiting") && onAttach && (
-        <Button variant={terminalOpen ? "default" : "outline"} size="xs" onClick={onAttach}>
-          {terminalOpen ? "Detach" : "Attach"}
-        </Button>
-      )}
-      {(s === "running" || s === "waiting") && (
-        <Button variant={chatOpen ? "default" : "outline"} size="xs" onClick={() => onChatOpenChange?.(!chatOpen)}>
-          {chatOpen ? "Close Chat" : "Chat"}
-        </Button>
-      )}
-      {(s === "completed" || s === "stopped" || s === "failed") && (
-        <Button variant="outline" size="xs" onClick={() => onAction("archive")}>
-          Archive
-        </Button>
-      )}
-      {s === "archived" && (
-        <Button variant="outline" size="xs" onClick={() => onAction("restore")}>
-          Restore
-        </Button>
-      )}
-      {s !== "deleting" && (
-        <Button variant="destructive" size="xs" onClick={() => onAction("delete")}>
-          Delete
-        </Button>
-      )}
-      {s === "deleting" && (
-        <Button variant="outline" size="xs" onClick={() => onAction("undelete")}>
-          Undelete
-        </Button>
-      )}
-    </div>
-  );
+function normalizeStatus(s: string): SessionStatus {
+  const valid: SessionStatus[] = ["running", "waiting", "completed", "failed", "stopped", "pending"];
+  if (valid.includes(s as SessionStatus)) return s as SessionStatus;
+  if (s === "blocked" || s === "ready") return "pending";
+  return "stopped";
 }
 
-export function SessionDetail({
-  sessionId,
-  onClose,
-  onToast,
-  readOnly,
-  chatOpen,
-  onChatOpenChange,
-}: SessionDetailProps) {
-  const { detail, setDetail, todos, setTodos, messages, flowStages, cost, output, outputRef } =
-    useSessionDetailData(sessionId);
+function buildStageProgress(session: any, flowStages: any[]): StageProgress[] {
+  if (!flowStages || flowStages.length === 0) return [];
+  const currentStage = session.stage;
+  const currentIdx = flowStages.findIndex((s: any) => s.name === currentStage);
+  const isFailed = session.status === "failed";
+  const isCompleted = session.status === "completed";
+
+  return flowStages.map((s: any, i: number) => {
+    if (isCompleted) return { name: s.name, state: "done" as const };
+    if (isFailed && i === currentIdx) return { name: s.name, state: "active" as const };
+    if (currentIdx < 0) return { name: s.name, state: "pending" as const };
+    if (i < currentIdx) return { name: s.name, state: "done" as const };
+    if (i === currentIdx) return { name: s.name, state: "active" as const };
+    return { name: s.name, state: "pending" as const };
+  });
+}
+
+function formatTime(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+/** Map session events into conversation timeline items. */
+function buildConversationTimeline(events: any[], messages: any[]) {
+  const items: any[] = [];
+
+  // Merge events and messages by time
+  const all: any[] = [];
+
+  for (const ev of events || []) {
+    all.push({ ...ev, _type: "event", _time: new Date(ev.created_at).getTime() });
+  }
+  for (const m of messages || []) {
+    all.push({ ...m, _type: "message", _time: new Date(m.created_at).getTime() });
+  }
+
+  all.sort((a, b) => a._time - b._time);
+
+  for (const item of all) {
+    if (item._type === "message") {
+      items.push({
+        kind: item.role === "user" ? "user" : "agent",
+        role: item.role,
+        content: item.content,
+        timestamp: formatTime(item.created_at),
+        agentName: item.role === "user" ? "You" : item.agent_name || item.role || "assistant",
+        model: item.model,
+        type: item.type,
+      });
+    } else {
+      // Event
+      const evType = item.type || "";
+      const evData = typeof item.data === "string" ? item.data : item.data?.message || "";
+
+      // Stage transitions become system events
+      if (evType.includes("stage_") || evType.includes("dispatch") || evType.includes("advance")) {
+        items.push({
+          kind: "system",
+          content: evData || evType.replace(/_/g, " "),
+          timestamp: formatTime(item.created_at),
+        });
+      } else if (evType.includes("tool")) {
+        // Tool calls
+        const isError = evType.includes("error") || evType.includes("fail");
+        items.push({
+          kind: "tool",
+          label: evData || evType.replace(/_/g, " "),
+          timestamp: formatTime(item.created_at),
+          status: isError ? "error" : "done",
+          duration: item.data?.duration ? `${(item.data.duration / 1000).toFixed(1)}s` : undefined,
+          error: isError ? item.data?.error || evData : undefined,
+        });
+      }
+    }
+  }
+
+  return items;
+}
+
+export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailProps) {
+  const {
+    detail,
+    setDetail,
+    todos,
+    setTodos,
+    messages: detailMessages,
+    flowStages,
+    cost,
+    output,
+  } = useSessionDetailData(sessionId);
+
+  const [activeTab, setActiveTab] = useState("conversation");
+  const [chatMsg, setChatMsg] = useState("");
+  const [scrollProgress, setScrollProgress] = useState(0);
   const [diffData, setDiffData] = useState<any>(null);
-  const [showDiff, setShowDiff] = useState(false);
-  const [showPRForm, setShowPRForm] = useState(false);
-  const [prTitle, setPrTitle] = useState("");
-  const [prDraft, setPrDraft] = useState(false);
-  const [prUrl, setPrUrl] = useState<string | null>(null);
-  const [newTodo, setNewTodo] = useState("");
-  const [verifyResult, setVerifyResult] = useState<any>(null);
-  const [terminalOpen, setTerminalOpen] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
+  const session = detail?.session;
+  const events = detail?.events || [];
+  const isActive = session?.status === "running" || session?.status === "waiting";
+
+  // Use messages hook for live chat
+  const {
+    messages: liveMessages,
+    send,
+    sending,
+  } = useMessages({
+    sessionId,
+    enabled: isActive,
+    pollMs: 2000,
+  });
+
+  // Build conversation timeline from events and messages
+  const conversationMessages = detailMessages.length > 0 ? detailMessages : liveMessages;
+  const timeline = buildConversationTimeline(events, conversationMessages);
+
+  // Scroll progress
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const max = el.scrollHeight - el.clientHeight;
+    setScrollProgress(max > 0 ? (el.scrollTop / max) * 100 : 0);
+  }, []);
+
+  // Auto-scroll on new messages
+  useEffect(() => {
+    if (bottomRef.current && activeTab === "conversation") {
+      bottomRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [conversationMessages.length, activeTab]);
+
+  // Load diff data when switching to diff tab
+  useEffect(() => {
+    if (activeTab === "diff" && !diffData && sessionId) {
+      api
+        .worktreeDiff(sessionId)
+        .then(setDiffData)
+        .catch(() => {});
+    }
+  }, [activeTab, diffData, sessionId]);
+
+  // Handle actions
   async function handleAction(action: string) {
     try {
       let res: any;
       switch (action) {
-        case "dispatch":
-          res = await api.dispatch(sessionId);
-          break;
         case "stop":
           res = await api.stop(sessionId);
           break;
+        case "dispatch":
+          res = await api.dispatch(sessionId);
+          break;
         case "restart":
           res = await api.restart(sessionId);
-          break;
-        case "delete":
-          res = await api.deleteSession(sessionId);
-          break;
-        case "undelete":
-          res = await api.undelete(sessionId);
-          break;
-        case "pause":
-          res = await api.pause(sessionId);
-          break;
-        case "interrupt":
-          res = await api.interrupt(sessionId);
-          break;
-        case "advance":
-          res = await api.advance(sessionId);
-          break;
-        case "complete":
-          res = await api.complete(sessionId);
-          break;
-        case "fork":
-          res = await api.fork(sessionId);
-          break;
-        case "archive":
-          res = await api.archive(sessionId);
-          break;
-        case "restore":
-          res = await api.restore(sessionId);
           break;
         default:
           return;
@@ -196,48 +207,13 @@ export function SessionDetail({
     }
   }
 
-  async function handlePreviewDiff() {
-    try {
-      const data = await api.worktreeDiff(sessionId);
-      setDiffData(data);
-      setShowDiff(true);
-    } catch (err: any) {
-      onToast(err.message || "Failed to load diff", "error");
-    }
-  }
-
-  async function handleCreatePR() {
-    try {
-      const res = await api.worktreeCreatePR(sessionId, {
-        title: prTitle || undefined,
-        draft: prDraft || undefined,
-      });
-      if (res.ok !== false) {
-        onToast("PR created", "success");
-        if (res.pr_url) setPrUrl(res.pr_url);
-        setShowPRForm(false);
-        const d = await api.getSession(sessionId);
-        setDetail(d);
-      } else {
-        onToast(res.message || "PR creation failed", "error");
-      }
-    } catch (err: any) {
-      onToast(err.message || "PR creation failed", "error");
-    }
-  }
-
-  async function handleAddTodo() {
-    try {
-      if (!newTodo.trim()) return;
-      const res = await api.addTodo(sessionId, newTodo.trim());
-      if (res.ok !== false && res.todo) {
-        setTodos([...todos, res.todo]);
-        setNewTodo("");
-      } else {
-        onToast("Failed to add todo", "error");
-      }
-    } catch (err: any) {
-      onToast(err.message || "Failed to add todo", "error");
+  async function handleSend() {
+    const text = chatMsg.trim();
+    if (!text) return;
+    setChatMsg("");
+    const res = await send(text);
+    if (res.ok === false) {
+      onToast(res.message || "Send failed", "error");
     }
   }
 
@@ -252,512 +228,299 @@ export function SessionDetail({
     }
   }
 
-  async function handleDeleteTodo(id: number) {
-    try {
-      const res = await api.deleteTodo(id);
-      if (res.ok !== false) {
-        setTodos(todos.filter((t) => t.id !== id));
-      }
-    } catch (err: any) {
-      onToast(err.message || "Failed to delete todo", "error");
-    }
-  }
-
-  async function handleRunVerification() {
-    try {
-      const result = await api.runVerification(sessionId);
-      setVerifyResult(result);
-      if (result.ok) {
-        onToast("Verification passed", "success");
-      } else {
-        onToast("Verification failed", "error");
-      }
-    } catch (err: any) {
-      onToast(err.message || "Verification failed", "error");
-    }
-  }
-
-  if (!detail || !detail.session) {
+  if (!session) {
     return (
-      <div className="flex flex-col h-full bg-background">
-        <div className="h-[52px] px-5 border-b border-border flex justify-between items-center shrink-0">
-          <span className="text-xs text-muted-foreground">Loading...</span>
-          <Button variant="ghost" size="icon-xs" onClick={onClose}>
-            <X size={14} />
-          </Button>
-        </div>
-      </div>
+      <div className="flex-1 flex items-center justify-center text-sm text-[var(--fg-muted)]">Loading session...</div>
     );
   }
 
-  const s = detail.session;
-  const events = detail.events || [];
+  const stages = buildStageProgress(session, flowStages);
+  const completedStages = stages.filter((s) => s.state === "done").length;
+  const totalStages = stages.length;
+  const progressPct = totalStages > 0 ? Math.round((completedStages / totalStages) * 100) : 0;
 
-  // Channel port: deterministic from session ID
-  const channelPort = 19200 + (parseInt(s.id.replace("s-", ""), 16) % 10000);
+  // Build tabs
+  const tabs: TabDef[] = [
+    { id: "conversation", label: "Conversation" },
+    { id: "terminal", label: "Terminal" },
+    { id: "events", label: "Events", badge: events.length > 0 ? events.length : undefined },
+    {
+      id: "diff",
+      label: "Diff",
+      badge: diffData?.filesChanged ? `+${diffData.insertions || 0}/-${diffData.deletions || 0}` : undefined,
+    },
+    { id: "todos", label: "Todos", badge: todos.length > 0 ? todos.length : undefined },
+  ];
+
+  // Map events for timeline tab
+  const timelineEvents: TimelineEvent[] = events.slice(-100).map((ev: any, i: number) => ({
+    id: String(ev.id || i),
+    timestamp: formatTime(ev.created_at),
+    label: `${ev.type?.replace(/_/g, " ")} ${typeof ev.data === "string" ? ev.data : ev.data?.message || ""}`.trim(),
+    status: ev.type?.includes("fail") || ev.type?.includes("error") ? ("failed" as const) : ("running" as const),
+  }));
+
+  // Map todos
+  const todoItems: TodoItem[] = todos.map((t: any) => ({
+    id: String(t.id),
+    text: t.content || t.text || "",
+    done: !!t.done,
+    priority: t.priority || undefined,
+    source: t.source || undefined,
+  }));
+
+  // Actions for header
+  const headerActions = (
+    <div className="flex gap-1.5 shrink-0">
+      {isActive && (
+        <button
+          type="button"
+          onClick={() => handleAction("stop")}
+          className={cn(
+            "h-7 px-2.5 rounded-[var(--radius-sm)] text-[11px] font-medium",
+            "border border-[var(--failed)] bg-transparent text-[var(--failed)]",
+            "hover:bg-[var(--diff-rm-bg)] transition-colors cursor-pointer",
+          )}
+        >
+          Stop
+        </button>
+      )}
+      {(session.status === "ready" || session.status === "pending" || session.status === "blocked") && (
+        <button
+          type="button"
+          onClick={() => handleAction("dispatch")}
+          className={cn(
+            "h-7 px-2.5 rounded-[var(--radius-sm)] text-[11px] font-medium",
+            "border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-fg)]",
+            "hover:bg-[var(--primary-hover)] transition-colors cursor-pointer",
+          )}
+        >
+          Dispatch
+        </button>
+      )}
+      {(session.status === "stopped" || session.status === "failed" || session.status === "completed") && (
+        <button
+          type="button"
+          onClick={() => handleAction("restart")}
+          className={cn(
+            "h-7 px-2.5 rounded-[var(--radius-sm)] text-[11px] font-medium",
+            "border border-[var(--running)] bg-transparent text-[var(--running)]",
+            "hover:bg-[var(--diff-add-bg)] transition-colors cursor-pointer",
+          )}
+        >
+          Restart
+        </button>
+      )}
+    </div>
+  );
 
   return (
-    <div className="flex flex-col h-full bg-background">
-      {/* Header */}
-      <div className="h-[52px] px-5 border-b border-border flex justify-between items-center shrink-0">
-        <div className="flex items-center gap-2">
-          <StatusBadge status={s.status} />
-          <span className="font-semibold text-[13px] text-foreground">{s.id}</span>
-        </div>
-        <Button variant="ghost" size="icon-xs" onClick={onClose}>
-          <X size={14} />
-        </Button>
-      </div>
+    <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg)]">
+      {/* Scroll Progress */}
+      <ScrollProgress progress={scrollProgress} />
 
-      {/* Actions (always visible) */}
-      {!readOnly && (
-        <div className="px-5 pt-3 pb-2 shrink-0">
-          <SessionActions
-            session={s}
-            onAction={handleAction}
-            onAttach={() => setTerminalOpen(!terminalOpen)}
-            terminalOpen={terminalOpen}
-            chatOpen={chatOpen}
-            onChatOpenChange={onChatOpenChange}
-          />
-        </div>
-      )}
+      {/* Session Header */}
+      <SessionHeader
+        sessionId={session.id}
+        summary={session.summary || session.id}
+        status={normalizeStatus(session.status)}
+        stages={stages}
+        cost={cost?.cost ? fmtCost(cost.cost) : undefined}
+        actions={!readOnly ? headerActions : undefined}
+        onCopyId={() => {
+          navigator.clipboard.writeText(session.id);
+          onToast("Copied session ID", "success");
+        }}
+      />
 
-      {/* Embedded Terminal */}
-      {terminalOpen && (s.status === "running" || s.status === "waiting") && (
-        <div className="px-5 pb-2">
-          <TerminalPanel sessionId={sessionId} onClose={() => setTerminalOpen(false)} />
-        </div>
-      )}
-
-      {/* Chat panel (replaces detail content when open) */}
-      {chatOpen ? (
-        <ChatPanel sessionId={sessionId} session={s} onClose={() => onChatOpenChange?.(false)} onToast={onToast} />
-      ) : (
-        <div className="flex-1 overflow-y-auto p-5">
-          {/* Metadata */}
-          <div className="mb-5">
-            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
-              Details
-            </h3>
-            <Separator className="mb-2" />
-            <div className="grid grid-cols-[100px_1fr] gap-x-3 gap-y-1.5 text-[13px]">
-              <span className="text-muted-foreground">Summary</span>
-              <span className="text-card-foreground break-all">{s.summary || "-"}</span>
-              <span className="text-muted-foreground">Agent</span>
-              <span className="text-card-foreground break-all">{s.agent || "-"}</span>
-              <span className="text-muted-foreground">Flow</span>
-              <span className="text-card-foreground break-all">{s.pipeline || s.flow || "-"}</span>
-              <span className="text-muted-foreground">Stage</span>
-              <span className="text-card-foreground break-all">{s.stage || "-"}</span>
-              <span className="text-muted-foreground">Repo</span>
-              <span className="text-card-foreground break-all">{formatRepoName(s.repo)}</span>
-              <span className="text-muted-foreground">Branch</span>
-              <span className="text-card-foreground break-all">{s.branch || "-"}</span>
-              <span className="text-muted-foreground">Group</span>
-              <span className="text-card-foreground break-all">{s.group_name || "-"}</span>
-              <span className="text-muted-foreground">Created</span>
-              <span className="text-card-foreground break-all">{relTime(s.created_at)}</span>
-              <span className="text-muted-foreground">Updated</span>
-              <span className="text-card-foreground break-all">{relTime(s.updated_at)}</span>
+      {/* Meta row with progress */}
+      {totalStages > 0 && (
+        <div className="h-10 border-b border-[var(--border)] flex items-center px-5 gap-2.5 shrink-0">
+          <span className="text-[11px] font-[family-name:var(--font-mono-ui)] text-[var(--fg-muted)]">
+            {session.agent || "--"}
+          </span>
+          {session.flow && (
+            <>
+              <div className="w-px h-[18px] bg-[var(--border)]" />
+              <span className="text-[11px] font-[family-name:var(--font-mono-ui)] text-[var(--fg-muted)]">
+                {session.flow}
+              </span>
+            </>
+          )}
+          <div className="flex-1" />
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-[11px] font-[family-name:var(--font-mono-ui)] text-[var(--fg-muted)]">
+              {completedStages}/{totalStages} stages
+            </span>
+            <div className="w-[60px] h-[3px] bg-[var(--border)] rounded-sm overflow-hidden">
+              <div
+                className="h-full bg-[var(--primary)] rounded-sm transition-[width] duration-300"
+                style={{ width: `${progressPct}%` }}
+              />
             </div>
+            <span className="text-[11px] font-[family-name:var(--font-mono-ui)] font-semibold text-[var(--fg)] min-w-[28px] text-right">
+              {progressPct}%
+            </span>
           </div>
+        </div>
+      )}
 
-          {/* Flow Pipeline */}
-          {flowStages.length > 1 && s.stage && (
-            <div className="mb-5">
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
-                Flow Pipeline
-              </h3>
-              <Separator className="mb-2" />
-              <div className="flex gap-0 flex-wrap items-center text-xs">
-                {flowStages.map((st: any, i: number) => {
-                  const isCurrent = st.name === s.stage;
-                  const currentIdx = flowStages.findIndex((x: any) => x.name === s.stage);
-                  const isPast = currentIdx > i;
+      {/* Content Tabs */}
+      <ContentTabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+
+      {/* Tab Content */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6" onScroll={handleScroll}>
+        {/* Conversation Tab */}
+        {activeTab === "conversation" && (
+          <div className="max-w-[720px] mx-auto">
+            {timeline.length === 0 && conversationMessages.length === 0 && (
+              <div className="text-center text-sm text-[var(--fg-muted)] py-12">
+                No conversation yet. {isActive ? "The agent is working..." : ""}
+              </div>
+            )}
+            {timeline.map((item, i) => {
+              if (item.kind === "user") {
+                return (
+                  <UserMessage key={`u-${i}`} timestamp={item.timestamp}>
+                    <p>{item.content}</p>
+                  </UserMessage>
+                );
+              }
+              if (item.kind === "agent") {
+                return (
+                  <AgentMessage key={`a-${i}`} agentName={item.agentName} model={item.model} timestamp={item.timestamp}>
+                    <p>{item.content}</p>
+                  </AgentMessage>
+                );
+              }
+              if (item.kind === "system") {
+                return <SystemEvent key={`s-${i}`}>{item.content}</SystemEvent>;
+              }
+              if (item.kind === "tool") {
+                if (item.status === "error") {
                   return (
-                    <span key={st.name} className="inline-flex items-center">
-                      {i > 0 && <span className="text-muted-foreground mx-1">&gt;</span>}
-                      <span
-                        className={cn(
-                          "font-mono text-[11px]",
-                          isCurrent && "text-primary font-bold",
-                          isPast && "text-[var(--running)]",
-                          !isCurrent && !isPast && "text-muted-foreground",
-                        )}
-                      >
-                        {isCurrent ? `[${st.name}]` : st.name}
-                      </span>
-                    </span>
+                    <ToolCallFailed key={`t-${i}`} label={item.label} duration={item.duration} error={item.error} />
                   );
-                })}
-              </div>
-            </div>
-          )}
+                }
+                return <ToolCallRow key={`t-${i}`} label={item.label} duration={item.duration} status={item.status} />;
+              }
+              return null;
+            })}
 
-          {/* Completion Summary */}
-          {s.config?.completion_summary && (
-            <div className="mb-5">
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
-                Completion Summary
-              </h3>
-              <Separator className="mb-2" />
-              <div className="text-xs text-muted-foreground leading-relaxed">{s.config.completion_summary}</div>
-            </div>
-          )}
-
-          {/* Token Usage & Cost */}
-          {cost && cost.total_tokens > 0 && (
-            <div className="mb-5">
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
-                Usage
-              </h3>
-              <Separator className="mb-2" />
-              <div className="grid grid-cols-[100px_1fr] gap-x-3 gap-y-1.5 text-[13px]">
-                <span className="text-muted-foreground">Input tokens</span>
-                <span className="text-card-foreground font-mono">{humanTokens(cost.input_tokens)}</span>
-                <span className="text-muted-foreground">Output tokens</span>
-                <span className="text-card-foreground font-mono">{humanTokens(cost.output_tokens)}</span>
-                {cost.cache_read_tokens > 0 && (
-                  <>
-                    <span className="text-muted-foreground">Cache read</span>
-                    <span className="text-card-foreground font-mono">{humanTokens(cost.cache_read_tokens)}</span>
-                  </>
-                )}
-                <span className="text-muted-foreground">Total tokens</span>
-                <span className="text-card-foreground font-mono">{humanTokens(cost.total_tokens)}</span>
-                {cost.cost > 0 && (
-                  <>
-                    <span className="text-muted-foreground">Cost</span>
-                    <span className="text-[var(--waiting)] font-mono">{fmtCost(cost.cost)}</span>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Preview Changes / Create PR */}
-          {s.workdir && s.status !== "deleting" && (
-            <div className="mb-5">
-              <div className="flex gap-1.5 flex-wrap">
-                <Button variant="outline" size="xs" onClick={handlePreviewDiff}>
-                  Preview Changes
-                </Button>
-                {!readOnly && (
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    onClick={() => {
-                      setPrTitle(s.summary || "");
-                      setShowPRForm(!showPRForm);
-                    }}
+            {/* Show raw messages if no events-based timeline */}
+            {timeline.length === 0 &&
+              conversationMessages.map((m, i) => {
+                if (m.role === "user") {
+                  return (
+                    <UserMessage key={m.id || i} timestamp={formatTime(m.created_at)}>
+                      <p>{m.content}</p>
+                    </UserMessage>
+                  );
+                }
+                return (
+                  <AgentMessage
+                    key={m.id || i}
+                    agentName={m.agent_name || m.role || "assistant"}
+                    model={m.model}
+                    timestamp={formatTime(m.created_at)}
                   >
-                    Create PR
-                  </Button>
-                )}
-              </div>
-              {prUrl && (
-                <div className="mt-1.5 text-xs">
-                  PR:{" "}
-                  <a
-                    href={prUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[var(--completed)] hover:underline"
-                  >
-                    {prUrl}
-                  </a>
-                </div>
-              )}
-              {s.pr_url && !prUrl && (
-                <div className="mt-1.5 text-xs">
-                  PR:{" "}
-                  <a
-                    href={s.pr_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[var(--completed)] hover:underline"
-                  >
-                    {s.pr_url}
-                  </a>
-                </div>
-              )}
-              {showPRForm && (
-                <div className="mt-2 flex flex-col gap-1.5">
-                  <Input
-                    className="h-7 text-xs"
-                    placeholder="PR title"
-                    value={prTitle}
-                    onChange={(e) => setPrTitle(e.target.value)}
-                  />
-                  <label className="text-[11px] flex items-center gap-1 text-muted-foreground">
-                    <input type="checkbox" checked={prDraft} onChange={(e) => setPrDraft(e.target.checked)} />
-                    Draft PR
-                  </label>
-                  <div className="flex gap-1.5 flex-wrap">
-                    <Button size="xs" onClick={handleCreatePR}>
-                      Submit PR
-                    </Button>
-                    <Button variant="outline" size="xs" onClick={() => setShowPRForm(false)}>
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+                    <p>{m.content}</p>
+                  </AgentMessage>
+                );
+              })}
 
-          {/* Diff Preview */}
-          {showDiff && diffData && (
-            <div className="mb-5">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2 flex items-center gap-2">
-                Changes: {diffData.branch} vs {diffData.baseBranch}
-                <Button variant="outline" size="xs" className="ml-2" onClick={() => setShowDiff(false)}>
-                  Close
-                </Button>
-              </div>
-              <Separator className="mb-2" />
-              <div className="text-[11px] text-muted-foreground mb-1.5 font-mono">
-                {diffData.filesChanged} files changed, +{diffData.insertions} -{diffData.deletions}
-              </div>
-              {diffData.modifiedSinceReview?.length > 0 && (
-                <div className="text-[var(--waiting)] text-[11px] mb-1.5">
-                  Modified since last review: {diffData.modifiedSinceReview.join(", ")}
-                </div>
-              )}
-              <pre className="bg-[var(--bg-code)] border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] overflow-auto whitespace-pre-wrap break-all text-muted-foreground">
-                {diffData.stat || diffData.message || "No changes"}
-              </pre>
-            </div>
-          )}
+            {/* Typing indicator */}
+            {isActive && <TypingIndicator agentName={session.agent} />}
 
-          {/* Todos */}
-          <div className="mb-5">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2 flex items-center gap-2">
-              Todos
-              {!readOnly && (
-                <Button variant="outline" size="xs" className="ml-2" onClick={handleRunVerification}>
-                  Run Verification
-                </Button>
-              )}
-            </div>
-            <Separator className="mb-2" />
-            {todos.length === 0 && <div className="text-xs text-muted-foreground">No todos</div>}
-            {todos.map((t: any) => (
-              <div key={t.id} className="flex items-center gap-1.5 mb-1">
-                {!readOnly && <input type="checkbox" checked={t.done} onChange={() => handleToggleTodo(t.id)} />}
-                <span
-                  className={cn("flex-1 text-xs", t.done ? "line-through text-muted-foreground" : "text-foreground")}
-                >
-                  {t.content}
-                </span>
-                {!readOnly && (
-                  <Button
-                    variant="destructive"
-                    size="xs"
-                    className="h-5 px-1 text-[10px]"
-                    onClick={() => handleDeleteTodo(t.id)}
-                  >
-                    x
-                  </Button>
-                )}
-              </div>
-            ))}
-            {!readOnly && (
-              <div className="flex gap-1 mt-1.5">
-                <Input
-                  className="flex-1 h-7 text-xs"
-                  placeholder="Add a todo..."
-                  value={newTodo}
-                  onChange={(e) => setNewTodo(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleAddTodo();
-                  }}
-                />
-                <Button variant="outline" size="xs" disabled={!newTodo.trim()} onClick={handleAddTodo}>
-                  Add
-                </Button>
+            {/* Session summary for completed sessions */}
+            {session.status === "completed" && cost && (
+              <SessionSummary
+                duration={relTime(session.created_at)}
+                cost={fmtCost(cost.cost)}
+                filesChanged={session.config?.filesChanged?.length || 0}
+                testsPassed={session.config?.tests_passed}
+                prLink={session.pr_url ? { href: session.pr_url, label: `View PR on GitHub` } : undefined}
+              />
+            )}
+
+            <div ref={bottomRef} />
+          </div>
+        )}
+
+        {/* Terminal Tab */}
+        {activeTab === "terminal" && (
+          <div className="font-[family-name:var(--font-mono)] text-[12px] text-[var(--fg-muted)] leading-[1.7]">
+            {output ? (
+              <pre className="whitespace-pre-wrap break-all">{output}</pre>
+            ) : (
+              <div className="text-center py-12 text-[var(--fg-faint)]">
+                No terminal output available{isActive ? " yet" : ""}
               </div>
             )}
           </div>
+        )}
 
-          {/* Verification Result */}
-          {verifyResult && (
-            <div className="mb-5">
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
-                Verification:{" "}
-                {verifyResult.ok ? (
-                  <Badge variant="success">PASSED</Badge>
-                ) : (
-                  <Badge variant="destructive">FAILED</Badge>
+        {/* Events Tab */}
+        {activeTab === "events" && <EventTimeline events={timelineEvents} />}
+
+        {/* Diff Tab */}
+        {activeTab === "diff" && (
+          <div className="max-w-[800px] mx-auto">
+            {diffData ? (
+              <div>
+                <div className="text-[11px] text-[var(--fg-muted)] mb-3 font-[family-name:var(--font-mono)]">
+                  {diffData.filesChanged} files changed, +{diffData.insertions || 0} -{diffData.deletions || 0}
+                </div>
+                {diffData.stat && (
+                  <pre className="bg-[var(--bg-code)] border border-[var(--border)] rounded-lg p-3.5 font-[family-name:var(--font-mono)] text-[11px] leading-[1.7] overflow-auto whitespace-pre-wrap text-[var(--fg-muted)]">
+                    {diffData.stat}
+                  </pre>
                 )}
-              </h3>
-              <Separator className="mb-2" />
-              {!verifyResult.todosResolved && (
-                <div className="text-xs text-[var(--failed)] mb-1">
-                  Pending todos: {verifyResult.pendingTodos?.join(", ")}
-                </div>
-              )}
-              {verifyResult.scriptResults?.map((r: any, i: number) => (
-                <div key={i} className="text-xs mb-1">
-                  <Badge variant={r.passed ? "success" : "destructive"} className="text-[10px]">
-                    {r.passed ? "PASS" : "FAIL"}
-                  </Badge>{" "}
-                  <code className="font-mono text-[11px] text-muted-foreground">{r.script}</code>
-                  {!r.passed && r.output && (
-                    <pre className="text-[10px] text-muted-foreground mt-0.5 whitespace-pre-wrap font-mono">
-                      {r.output.slice(0, 500)}
-                    </pre>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Files Changed */}
-          {s.config?.filesChanged?.length > 0 && (
-            <div className="mb-5">
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
-                Files Changed ({s.config.filesChanged.length})
-              </h3>
-              <Separator className="mb-2" />
-              <div className="overflow-y-auto">
-                {s.config.filesChanged.map((f: string) => (
-                  <div key={f} className="text-[11px] text-muted-foreground py-px font-mono">
-                    {f}
-                  </div>
-                ))}
               </div>
-            </div>
-          )}
-
-          {/* Commits */}
-          {s.config?.commits?.length > 0 && (
-            <div className="mb-5">
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
-                Commits ({s.config.commits.length})
-              </h3>
-              <Separator className="mb-2" />
-              {s.config.commits.map((c: string) => {
-                const shortSha = c.slice(0, 7);
-                const ghBase = s.config?.github_url;
-                const commitUrl = ghBase ? `${ghBase}/commit/${c}` : null;
-                return (
-                  <div key={c} className="text-[11px] text-muted-foreground font-mono py-px">
-                    {commitUrl ? (
-                      <a
-                        href={commitUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[var(--completed)] hover:underline"
-                      >
-                        {shortSha}
-                      </a>
-                    ) : (
-                      shortSha
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Channel Port */}
-          {(s.status === "running" || s.status === "waiting") && s.session_id && (
-            <div className="mb-5">
-              <div className="text-[11px] text-[var(--running)] font-mono">Channel: port {channelPort}</div>
-            </div>
-          )}
-
-          {/* Conversation */}
-          {messages.length > 0 && (
-            <div className="mb-5">
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
-                Conversation ({messages.length})
-              </h3>
-              <Separator className="mb-2" />
-              <div className="flex flex-col gap-1.5 overflow-y-auto">
-                {messages.map((m: any, i: number) => (
-                  <div
-                    key={m.id || i}
-                    className={cn(
-                      "rounded-lg px-3 py-2 text-[12px] leading-relaxed max-w-[85%]",
-                      m.role === "user"
-                        ? "bg-primary/10 border border-primary/20 self-end text-foreground"
-                        : "bg-secondary border border-border self-start text-card-foreground",
-                    )}
-                  >
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span
-                        className={cn(
-                          "text-[10px] font-semibold uppercase",
-                          m.role === "user" ? "text-primary" : "text-muted-foreground",
-                        )}
-                      >
-                        {m.role}
-                      </span>
-                      {m.type && m.type !== "text" && (
-                        <Badge variant="secondary" className="text-[9px] py-0 px-1">
-                          {m.type}
-                        </Badge>
-                      )}
-                      {m.created_at && (
-                        <span className="text-[10px] text-muted-foreground">{relTime(m.created_at)}</span>
-                      )}
-                    </div>
-                    <div className="whitespace-pre-wrap break-words">{m.content}</div>
-                  </div>
-                ))}
+            ) : (
+              <div className="text-center py-12 text-[var(--fg-faint)]">
+                {session.workdir ? "Loading diff..." : "No worktree associated with this session"}
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        )}
 
-          {/* Output */}
-          {output && (
-            <div className="mb-5">
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
-                Live Output
-              </h3>
-              <Separator className="mb-2" />
-              <div
-                ref={outputRef}
-                className="bg-[var(--bg-code)] border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] overflow-y-auto whitespace-pre-wrap break-all text-muted-foreground"
-              >
-                {output}
-              </div>
-            </div>
-          )}
+        {/* Todos Tab */}
+        {activeTab === "todos" && <TodoList items={todoItems} onToggle={(id) => handleToggleTodo(Number(id))} />}
+      </div>
 
-          {/* Events */}
-          {events.length > 0 && (
-            <div className="mb-5">
-              <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
-                Events ({events.length})
-              </h3>
-              <Separator className="mb-2" />
-              <div className="flex flex-col gap-0 relative">
-                {events
-                  .slice(-50)
-                  .reverse()
-                  .map((ev: any, i: number) => (
-                    <div
-                      key={i}
-                      className="flex gap-3 py-1.5 text-[11px] border-l border-border ml-1 pl-3.5 relative rounded-r-lg hover:bg-accent transition-colors duration-200 before:content-[''] before:absolute before:left-[-3px] before:top-[10px] before:w-[5px] before:h-[5px] before:rounded-full before:bg-muted-foreground before:z-[1] first:before:bg-primary"
-                    >
-                      <span className="text-muted-foreground whitespace-nowrap shrink-0 w-[60px] font-mono text-[10px]">
-                        {relTime(ev.created_at)}
-                      </span>
-                      <span className="text-muted-foreground text-[11px]">
-                        <b className="text-foreground font-medium">{ev.type}</b>
-                        {ev.data
-                          ? " " + (typeof ev.data === "string" ? ev.data : JSON.stringify(ev.data)).slice(0, 120)
-                          : ""}
-                      </span>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          )}
+      {/* Chat input - conversation tab only, active sessions only */}
+      {activeTab === "conversation" && (
+        <ChatInput
+          value={chatMsg}
+          onChange={setChatMsg}
+          onSend={handleSend}
+          disabled={!isActive || sending}
+          disabledText={!isActive ? "Session is not running" : undefined}
+          modelName={session.config?.model || session.agent}
+        />
+      )}
+
+      {/* Tab footer for non-conversation tabs */}
+      {activeTab === "events" && events.length > 0 && (
+        <div className="border-t border-[var(--border)] px-6 py-2 shrink-0 bg-[var(--bg)] flex items-center gap-3 text-[11px] text-[var(--fg-muted)] font-[family-name:var(--font-mono-ui)]">
+          <span>{events.length} events</span>
+          <span className="ml-auto">Last: {formatTime(events[events.length - 1]?.created_at)}</span>
+        </div>
+      )}
+      {activeTab === "diff" && diffData && (
+        <div className="border-t border-[var(--border)] px-6 py-2 shrink-0 bg-[var(--bg)] flex items-center gap-3 text-[11px] text-[var(--fg-muted)] font-[family-name:var(--font-mono-ui)]">
+          <span>{diffData.filesChanged} files changed</span>
+          <span className="text-[var(--diff-add-fg)]">+{diffData.insertions || 0}</span>
+          <span className="text-[var(--diff-rm-fg)]">-{diffData.deletions || 0}</span>
+        </div>
+      )}
+      {activeTab === "todos" && todos.length > 0 && (
+        <div className="border-t border-[var(--border)] px-6 py-2 shrink-0 bg-[var(--bg)] flex items-center gap-3 text-[11px] text-[var(--fg-muted)] font-[family-name:var(--font-mono-ui)]">
+          <span>
+            {todos.filter((t) => t.done).length} of {todos.length} completed
+          </span>
+          <span className="ml-auto">{todos.filter((t) => !t.done).length} remaining</span>
         </div>
       )}
     </div>

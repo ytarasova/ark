@@ -1,4 +1,5 @@
 import { Layout } from "../components/Layout.js";
+import { PageShell } from "../components/PageShell.js";
 import { DashboardView } from "../components/DashboardView.js";
 import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
 
@@ -11,15 +12,10 @@ interface DashboardPageProps {
 
 export function DashboardPage({ view, onNavigate, readOnly, daemonStatus }: DashboardPageProps) {
   return (
-    <Layout
-      view={view}
-      onNavigate={onNavigate}
-      readOnly={readOnly}
-      title="Dashboard"
-      padded={false}
-      daemonStatus={daemonStatus}
-    >
-      <DashboardView onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
+    <Layout view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus}>
+      <PageShell title="Dashboard" padded={false}>
+        <DashboardView onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
+      </PageShell>
     </Layout>
   );
 }

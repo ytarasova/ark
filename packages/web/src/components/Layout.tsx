@@ -1,66 +1,79 @@
-import { useState } from "react";
-import { cn } from "../lib/utils.js";
-import { Sidebar } from "./Sidebar.js";
+import { useEffect } from "react";
+import { IconRail } from "./ui/IconRail.js";
 import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
+import {
+  Play,
+  Bot,
+  Zap,
+  Monitor,
+  Clock,
+  BookOpen,
+  DollarSign,
+  Cog,
+  Wrench,
+  Calendar,
+  LayoutDashboard,
+} from "lucide-react";
 
 interface LayoutProps {
   view: string;
   onNavigate: (view: string) => void;
   readOnly: boolean;
-  title: string;
-  headerLeft?: React.ReactNode;
-  headerRight?: React.ReactNode;
-  padded?: boolean;
   daemonStatus?: DaemonStatus | null;
   children: React.ReactNode;
 }
 
-export function Layout({
-  view,
-  onNavigate,
-  readOnly,
-  title,
-  headerLeft,
-  headerRight,
-  padded = true,
-  daemonStatus,
-  children,
-}: LayoutProps) {
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("ark-sidebar-collapsed") === "true");
+const NAV_ITEMS = [
+  { id: "sessions", icon: <Play size={18} strokeWidth={1.5} />, label: "Sessions" },
+  { id: "dashboard", icon: <LayoutDashboard size={18} strokeWidth={1.5} />, label: "Dashboard" },
+  { id: "agents", icon: <Bot size={18} strokeWidth={1.5} />, label: "Agents" },
+  { id: "flows", icon: <Zap size={18} strokeWidth={1.5} />, label: "Flows" },
+  { id: "compute", icon: <Monitor size={18} strokeWidth={1.5} />, label: "Compute" },
+  { id: "history", icon: <Clock size={18} strokeWidth={1.5} />, label: "History" },
+  { id: "memory", icon: <BookOpen size={18} strokeWidth={1.5} />, label: "Knowledge" },
+  { id: "tools", icon: <Wrench size={18} strokeWidth={1.5} />, label: "Tools" },
+  { id: "schedules", icon: <Calendar size={18} strokeWidth={1.5} />, label: "Schedules" },
+  { id: "costs", icon: <DollarSign size={18} strokeWidth={1.5} />, label: "Costs" },
+];
 
-  function handleToggle() {
-    setCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem("ark-sidebar-collapsed", String(next));
-      return next;
-    });
-  }
+const SETTINGS_ITEM = { id: "settings", icon: <Cog size={18} strokeWidth={1.5} />, label: "Settings" };
+
+const SHORTCUTS: Record<string, string> = {
+  s: "sessions",
+  d: "dashboard",
+  a: "agents",
+  f: "flows",
+  c: "compute",
+  h: "history",
+  m: "memory",
+  t: "tools",
+  $: "costs",
+  ",": "settings",
+};
+
+export function Layout({ view, onNavigate, children }: LayoutProps) {
+  // Keyboard shortcuts for navigation
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      const key = e.key.toLowerCase();
+      const target = SHORTCUTS[key] || SHORTCUTS[e.key];
+      if (target) {
+        e.preventDefault();
+        onNavigate(target);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onNavigate]);
 
   return (
-    <div
-      className={cn(
-        "grid h-screen bg-transparent transition-[grid-template-columns] duration-200 ease-in-out",
-        collapsed ? "grid-cols-[48px_1fr]" : "grid-cols-[200px_1fr] max-md:grid-cols-[48px_1fr]",
-      )}
-    >
-      <Sidebar
-        activeView={view}
-        onNavigate={onNavigate}
-        readOnly={readOnly}
-        collapsed={collapsed}
-        onToggle={handleToggle}
-        daemonStatus={daemonStatus}
-      />
-      <div className="overflow-y-auto flex flex-col bg-background">
-        <div className="h-12 px-5 border-b border-border flex items-center justify-between bg-background/80 backdrop-blur-xl sticky top-0 z-10 shrink-0">
-          <div className="flex items-center gap-3">
-            <h1 className="text-[15px] font-semibold text-foreground">{title}</h1>
-            {headerLeft}
-          </div>
-          <div className="flex items-center gap-3">{headerRight}</div>
-        </div>
-        <div className={cn("flex-1 overflow-y-auto flex flex-col", padded && "p-5 px-6")}>{children}</div>
-      </div>
+    <div className="flex h-screen bg-[var(--bg)] overflow-hidden">
+      <IconRail items={NAV_ITEMS} activeId={view} onSelect={onNavigate} settingsItem={SETTINGS_ITEM} />
+      <div className="flex-1 flex min-w-0 overflow-hidden">{children}</div>
     </div>
   );
 }

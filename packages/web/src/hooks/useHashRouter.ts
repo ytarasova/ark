@@ -22,10 +22,10 @@ export interface RouteState {
 
 function parseHash(): RouteState {
   const raw = window.location.hash.replace(/^#\/?/, "");
-  if (!raw) return { view: "dashboard", subId: null };
+  if (!raw) return { view: "sessions", subId: null };
   const parts = raw.split("/");
   const view = parts[0];
-  if (!VALID_VIEWS.has(view)) return { view: "dashboard", subId: null };
+  if (!VALID_VIEWS.has(view)) return { view: "sessions", subId: null };
   const subId = parts.slice(1).join("/") || null;
   return { view, subId };
 }

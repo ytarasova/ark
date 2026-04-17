@@ -1,67 +1,141 @@
 import { useMemo } from "react";
-import { StatusDot, StatusBadge } from "./StatusDot.js";
-import { relTime } from "../util.js";
-import { cn } from "../lib/utils.js";
+import { SessionList as UISessionList, type SessionListItem } from "./ui/SessionList.js";
+import { FilterChip } from "./ui/FilterChip.js";
+import { Button } from "./ui/button.js";
+import type { StageProgress } from "./ui/StageProgressBar.js";
+import type { SessionStatus } from "./ui/StatusDot.js";
+import { relTime, fmtCost } from "../util.js";
 
 interface SessionListProps {
   sessions: any[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   filter: string;
+  onFilterChange: (f: string) => void;
   search: string;
-  groupFilter: string;
+  onSearchChange: (s: string) => void;
+  onNewSession: () => void;
+  readOnly: boolean;
+  flowStagesMap?: Record<string, any[]>;
 }
 
-export function SessionList({ sessions, selectedId, onSelect, filter, search, groupFilter }: SessionListProps) {
+/** Map raw session status to a valid SessionStatus type. */
+function normalizeStatus(status: string): SessionStatus {
+  const valid: SessionStatus[] = ["running", "waiting", "completed", "failed", "stopped", "pending"];
+  if (valid.includes(status as SessionStatus)) return status as SessionStatus;
+  // Map non-standard statuses
+  if (status === "blocked" || status === "ready") return "pending";
+  if (status === "archived" || status === "deleting") return "stopped";
+  return "stopped";
+}
+
+/** Build stage progress bars from flow stages and current stage. */
+function buildStageProgress(session: any, flowStagesMap?: Record<string, any[]>): StageProgress[] {
+  const flowName = session.pipeline || session.flow;
+  if (!flowName) return [];
+  const stages = flowStagesMap?.[flowName];
+  if (!stages || stages.length === 0) return [];
+
+  const currentStage = session.stage;
+  const currentIdx = stages.findIndex((s: any) => s.name === currentStage);
+  const isFailed = session.status === "failed";
+  const isCompleted = session.status === "completed";
+
+  return stages.map((s: any, i: number) => {
+    if (isCompleted) return { name: s.name, state: "done" as const };
+    if (isFailed && i === currentIdx) return { name: s.name, state: "active" as const };
+    if (currentIdx < 0) return { name: s.name, state: "pending" as const };
+    if (i < currentIdx) return { name: s.name, state: "done" as const };
+    if (i === currentIdx) return { name: s.name, state: "active" as const };
+    return { name: s.name, state: "pending" as const };
+  });
+}
+
+export function SessionListPanel({
+  sessions,
+  selectedId,
+  onSelect,
+  filter,
+  onFilterChange,
+  search,
+  onSearchChange,
+  onNewSession,
+  readOnly,
+  flowStagesMap,
+}: SessionListProps) {
+  // Compute status counts
+  const counts = useMemo(() => {
+    const c = { running: 0, waiting: 0, completed: 0, failed: 0 };
+    for (const s of sessions || []) {
+      if (s.status === "running") c.running++;
+      else if (s.status === "waiting") c.waiting++;
+      else if (s.status === "completed") c.completed++;
+      else if (s.status === "failed") c.failed++;
+    }
+    return c;
+  }, [sessions]);
+
+  // Filter sessions
   const filtered = useMemo(() => {
     let list = sessions || [];
-    // "archived" is filtered server-side; skip redundant client-side status filter
-    if (filter !== "all" && filter !== "archived") list = list.filter((s) => s.status === filter);
-    if (groupFilter) list = list.filter((s) => s.group_name === groupFilter);
+    if (filter !== "all") list = list.filter((s) => s.status === filter);
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(
         (s) =>
           (s.summary || "").toLowerCase().includes(q) ||
           (s.id || "").toLowerCase().includes(q) ||
-          (s.repo || "").toLowerCase().includes(q) ||
           (s.agent || "").toLowerCase().includes(q),
       );
     }
     return list;
-  }, [sessions, filter, search, groupFilter]);
+  }, [sessions, filter, search]);
 
-  if (filtered.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">No sessions found</div>
-    );
-  }
+  // Map to UI format
+  const items: SessionListItem[] = useMemo(
+    () =>
+      filtered.map((s) => ({
+        id: s.id,
+        status: normalizeStatus(s.status),
+        summary: s.summary || s.id,
+        agentName: s.agent || "--",
+        cost: s.cost != null ? fmtCost(s.cost) : "",
+        relativeTime: relTime(s.updated_at),
+        stages: buildStageProgress(s, flowStagesMap),
+      })),
+    [filtered, flowStagesMap],
+  );
 
-  return (
-    <div className="flex flex-col">
-      {filtered.map((s) => (
-        <div
-          key={s.id}
-          onClick={() => onSelect(s.id)}
-          className={cn(
-            "px-3 py-2.5 cursor-pointer border-b border-border transition-colors",
-            "hover:bg-accent",
-            selectedId === s.id && "bg-accent border-l-2 border-l-primary",
-          )}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 min-w-0">
-              <StatusDot status={s.status} />
-              <span className="text-[13px] text-foreground truncate">{s.summary || s.id}</span>
-            </div>
-            <StatusBadge status={s.status} />
-          </div>
-          <div className="flex gap-2 mt-1 text-[10px] font-mono text-muted-foreground">
-            <span>{s.id}</span>
-            <span>{relTime(s.updated_at)}</span>
-          </div>
-        </div>
+  const filterChips = (
+    <div className="flex gap-1.5 flex-wrap">
+      {(["running", "waiting", "completed", "failed"] as const).map((status) => (
+        <FilterChip
+          key={status}
+          status={status}
+          count={counts[status]}
+          active={filter === status}
+          onClick={() => onFilterChange(filter === status ? "all" : status)}
+        />
       ))}
     </div>
+  );
+
+  return (
+    <UISessionList
+      sessions={items}
+      selectedId={selectedId}
+      onSelect={onSelect}
+      search={search}
+      onSearchChange={onSearchChange}
+      filterChips={filterChips}
+      headerAction={
+        !readOnly ? (
+          <Button size="sm" className="h-7 px-2.5 text-[12px] font-medium" onClick={onNewSession}>
+            + New
+          </Button>
+        ) : undefined
+      }
+      className="w-[300px] min-w-[300px] border-r border-[var(--border)]"
+    />
   );
 }
