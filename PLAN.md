@@ -1,106 +1,112 @@
-# Plan: Update User Guide to Match Current State
+# Plan: Update the User Guide
 
 ## Summary
 
-The user guide (`docs/guide.md`) is broadly accurate but has fallen behind on several fronts: the Goose runtime was added as a 5th runtime but the guide lists only 4; 5 new flow definitions exist (autonomous-sdlc, autonomous, brainstorm, conditional, docs) but the guide lists only 9; 2 new recipes exist (self-dogfood, self-quick) but the guide lists only 8; skills are now YAML files (not markdown); the web dashboard got a complete UI rebuild with a design system, pipeline visualization, and new pages (Login, DesignPreview, Tools); Tauri was removed in favor of Electron; and several minor details need correction.
+The user guide (`docs/guide.md`) has fallen behind the codebase in several areas. CLI command coverage is incomplete (guide says "17 command modules" but there are 25+), skills are described as "markdown files" but are actually YAML with a `prompt` field, and several new CLI features (eval, profile, schedule, memory, daemon, pr, init, repo-map) are undocumented. The web pages list also omits LoginPage and DesignPreviewPage.
 
 ## Files to modify/create
 
 | File | Change |
 |------|--------|
-| `docs/guide.md` | Update all outdated sections (runtimes, flows, recipes, skills, web/desktop, goose references) |
-
-No new files needed.
+| `docs/guide.md` | Update all outdated sections (skills format, CLI count, new commands, web pages, misc commands) |
 
 ## Implementation steps
 
-### 1. Section 1 (Quickstart) -- lines 36-67
+### Step 1: Fix Skills section (Section 5, lines 355-392)
 
-- Update `ark flow list` comment from "9 builtin flows" to "14 builtin flows".
-- The rest is accurate.
+The guide says skills are "markdown files injected into an agent's system prompt." They are actually **YAML files** with a `prompt` field (`skills/*.yaml`). Update:
 
-### 2. Section 3 (Flows) -- lines 161-226
+- Line 355: Change "Skills are reusable prompt fragments. They are markdown files injected into an agent's system prompt when attached." to "Skills are reusable prompt fragments defined as YAML files. Their `prompt` field is injected into an agent's system prompt when attached."
+- Line 357 heading "Builtin skills (7)": count is correct (7 YAML files confirmed)
+- Lines 369-376 three-tier resolution: Change `.ark/skills/<name>.md` to `.ark/skills/<name>.yaml`, same for `~/.ark/skills/` and `skills/`
+- Remove or correct the statement about "markdown content is inlined" at line 388 -- it's the YAML `prompt` field that is inlined
 
-- Update heading from "Builtin flows (9)" to "Builtin flows (14)".
-- Add the 5 missing flows to the table:
+### Step 2: Fix CLI command count (Section 15, line 831)
 
-| Name | Purpose |
-|------|---------|
-| `autonomous-sdlc` | Fully autonomous SDLC: plan -> implement -> verify -> review -> PR. All gates auto. |
-| `autonomous` | Single agent, fully autonomous, auto-completes on agent report. |
-| `brainstorm` | Explore ideas -> synthesize -> plan. Interactive ideation with human steering. |
-| `conditional` | Conditional routing -- branch based on review outcome, converge at PR. |
-| `docs` | Lightweight documentation flow: plan -> implement -> PR. No verify/review. |
+Change "Seventeen command modules" to the accurate count. The actual command files in `packages/cli/commands/` (excluding `_shared.ts`):
 
-### 3. Section 4 (Agents and Runtimes) -- lines 229-336
+1. agent
+2. auth
+3. compute
+4. conductor
+5. costs
+6. daemon
+7. dashboard
+8. eval
+9. exec-try
+10. flow
+11. knowledge
+12. memory
+13. misc (contains: pr, claude, doctor, arkd, channel, config, web, openapi, mcp-proxy, acp, repo-map, init)
+14. profile
+15. recipe
+16. router
+17. runtime
+18. schedule
+19. search
+20. server-daemon
+21. server
+22. session
+23. skill
+24. tenant
+25. worktree
 
-- Update "Runtimes (3 tools + 1 subscription variant)" heading to "Runtimes (4 tools + 1 subscription variant)".
-- Add goose row to the runtime table:
+Update line 831 to say "Twenty-five command modules" and note that `misc.ts` bundles several utility commands (pr, claude, doctor, web, init, repo-map, config, etc.).
 
-| `goose` | Goose CLI (Block/AAIF) | api | goose (default model: claude-sonnet-4-6) |
+### Step 3: Document new CLI commands
 
-- Add goose example usage:
-  ```bash
-  ark session start --repo . --summary "Fix tests" \
-    --agent implementer --runtime goose --dispatch
-  ```
-- Update "Three executor types" to "Four executor types" and add the goose executor:
-  - `goose` -- launches Goose CLI in tmux with worktree isolation.
+Add a new subsection after the CLI commands table in Section 15 (around line 830) or integrate into relevant existing sections:
 
-### 4. Section 5 (Skills) -- lines 338-380
+**In Section 15 (Dashboards):**
+- Add `ark daemon start|stop|status` -- manages the arkd agent daemon
+- Add `ark eval stats|drift|list` -- agent performance evaluation
+- Add `ark profile list|create|delete` -- manage profiles
+- Add `ark schedule add|list|delete|enable|disable` -- manage scheduled recurring sessions
+- Add `ark memory list|recall|forget|add|clear` -- manage cross-session memory (backed by knowledge graph)
+- Add `ark pr list|status|watch` -- manage PR-bound sessions
+- Add `ark init` -- initialize a new project
+- Add `ark doctor` -- health check
+- Add `ark repo-map` -- generate a repo map
 
-- Update description: skills are now **YAML files** (not markdown). The YAML contains `name`, `description`, `prompt`, and `tags` fields. The `prompt` field is what gets injected into the agent's system prompt.
-- Fix the three-tier resolution paths from `.md` to `.yaml`: `.ark/skills/<name>.yaml`, `~/.ark/skills/<name>.yaml`, `skills/<name>.yaml`.
+### Step 4: Update web pages list (Section 15, line 840)
 
-### 5. Section 6 (Recipes) -- lines 382-417
+Current guide lists: "Dashboard, Sessions, Agents, Flows, Compute, History, Memory, Tools, Schedules, Costs, Settings"
 
-- Update "Builtin recipes (8)" to "Builtin recipes (10)".
-- Add 2 new recipes to the table:
+Add missing pages:
+- LoginPage (already mentioned in auth section but not in the pages list)
+- DesignPreviewPage (internal/dev page -- may omit from user guide)
 
-| `self-dogfood` | Dispatch an ark agent to work on the ark repo itself (full autonomous-sdlc). |
-| `self-quick` | Quick single-agent dispatch against the ark repo (trivial tasks). |
+Update to: "Dashboard, Sessions, Agents, Flows, Compute, History, Memory, Tools, Schedules, Costs, Settings, Login"
 
-### 6. Section 10 (Cost Tracking) -- lines 583-639
+### Step 5: Update Appendix key file locations (line 1036)
 
-- Add goose to the transcript parser table. The goose runtime's billing section specifies `transcript_parser: goose`, so a `GooseTranscriptParser` exists. Add it to the table with an appropriate transcript location note.
+The guide says skills are at paths like `~/.ark/skills/` -- ensure the description references YAML files, not markdown.
 
-### 7. Section 15 (Dashboards) -- lines 799-831
+### Step 6: Update the closing paragraph (line 1089)
 
-- **Web**: Update the description to reflect the new design system rebuild:
-  - Mention the design system with theme tokens and component library.
-  - Mention pipeline visualization with @xyflow/react and d3-dag for DAG flow rendering.
-  - Mention the embedded web terminal for session attachment.
-  - Mention the local folder picker for repository selection in session creation.
-  - Update page list: Dashboard, Sessions, Agents, Flows, Compute, History, Memory, Tools, Schedules, Costs, Settings, Login.
-- **Desktop**: Confirm Electron (Tauri was removed in v0.17.0). The current state is a self-contained Electron bundle. No Tauri references should remain.
+The final "That is the full tour" paragraph should mention the new command areas: eval, profiles, schedules, daemon management, and memory CLI.
 
-### 8. Section 17 (MCP Integration) -- line 858
+### Step 7: Run formatting
 
-- Verify MCP configs list is still accurate: atlassian.json, figma.json, github.json, linear.json. (Confirmed correct.)
-
-### 9. Appendix: Common tasks cheat sheet -- lines 1023-1053
-
-- Add goose runtime example.
-- Add self-dogfood recipe example.
+```bash
+make format
+```
 
 ## Testing strategy
 
-- **Manual review**: Read through the updated guide end-to-end to verify all counts, names, and descriptions match the actual filesystem.
-- **Cross-reference**: Verify every flow name in the table matches a file in `flows/definitions/`.
-- **Cross-reference**: Verify every recipe name matches a file in `recipes/`.
-- **Cross-reference**: Verify every runtime name matches a file in `runtimes/`.
-- **Cross-reference**: Verify skill file extension claim (.yaml) matches `skills/` directory contents.
-- **Formatting**: Run `make format` to ensure Prettier compliance.
-- **Lint**: Run `make lint` to ensure no lint warnings.
+- **Manual review**: Read through the updated guide for internal consistency (no leftover references to "markdown skills")
+- **Grep verification**: `grep -n "\.md" docs/guide.md` to check for stale `.md` references for skills
+- **Cross-reference**: Verify each CLI command mentioned in the guide exists in `packages/cli/commands/`
+- **Count check**: Verify the stated counts (agents: 12, flows: 14, skills: 7, recipes: 10, runtimes: 5, commands: 25) against `ls` output
 
 ## Risk assessment
 
 - **Low risk**: This is a documentation-only change. No code is modified.
-- **Accuracy**: The main risk is stating something incorrectly about a feature. Mitigate by reading actual YAML definitions and source code rather than guessing.
-- **Staleness**: The guide may go stale again quickly. Counts like "14 builtin flows" will drift as new flows are added.
+- **Scope creep**: The guide is 1089 lines. Only targeted sections are updated -- no rewrite of sections that are already accurate.
+- **Stale by merge**: If new commands or features land on main before this merges, counts may drift again. Acceptable.
 
 ## Open questions
 
-1. **GooseTranscriptParser location**: The goose runtime specifies `transcript_parser: goose`. Need to verify where `GooseTranscriptParser` reads transcripts from before documenting the exact path in the cost tracking section. Check `packages/core/` for the implementation.
-2. **DesignPreviewPage**: Is this a user-facing page or a dev-only page? If dev-only, omit it from the guide's page list.
-3. **LoginPage**: The login page is likely only relevant for hosted/remote mode. The guide should clarify when users see it.
+- **DesignPreviewPage**: Likely an internal dev tool. Decision: omit from user guide (developer-facing, not user-facing).
+- **exec-try command**: Appears experimental. Decision: omit from guide unless it's user-facing.
+- **misc.ts commands (acp, mcp-proxy, openapi)**: Some may be internal/experimental. Decision: document only the user-facing ones (pr, web, init, doctor, repo-map, config) and skip low-level plumbing (acp, mcp-proxy, openapi).
