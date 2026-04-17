@@ -174,12 +174,12 @@ function NewComputeForm({ onClose, onSubmit }: { onClose: () => void; onSubmit: 
 function statusDotColor(status: string): string {
   switch (status) {
     case "running":
-      return "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]";
+      return "bg-[var(--running)] shadow-[0_0_6px_rgba(52,211,153,0.5)]";
     case "stopped":
-      return "bg-red-400";
+      return "bg-[var(--failed)]";
     case "pending":
     case "provisioning":
-      return "bg-amber-400";
+      return "bg-[var(--waiting)]";
     default:
       return "bg-muted-foreground/30";
   }
@@ -331,7 +331,10 @@ export function ComputeView({ showCreate = false, onCloseCreate }: ComputeViewPr
                   <ComputeActions compute={selected} onAction={handleAction} />
                   {actionMsg && (
                     <div
-                      className={cn("mt-1.5 text-xs", actionMsg.type === "error" ? "text-red-400" : "text-emerald-400")}
+                      className={cn(
+                        "mt-1.5 text-xs",
+                        actionMsg.type === "error" ? "text-[var(--failed)]" : "text-[var(--running)]",
+                      )}
                     >
                       {actionMsg.text}
                     </div>

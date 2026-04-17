@@ -1,10 +1,10 @@
 import { cn } from "../lib/utils.js";
 
 const DOT: Record<string, string> = {
-  running: "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)] animate-[glow-pulse_2.5s_ease-in-out_infinite]",
-  waiting: "bg-amber-400",
-  completed: "bg-blue-400",
-  failed: "bg-red-400 shadow-[0_0_4px_rgba(248,113,113,0.4)]",
+  running: "bg-[var(--running)] shadow-[0_0_6px_rgba(52,211,153,0.5)] animate-[glow-pulse_2.5s_ease-in-out_infinite]",
+  waiting: "bg-[var(--waiting)]",
+  completed: "bg-[var(--completed)]",
+  failed: "bg-[var(--failed)] shadow-[0_0_4px_rgba(248,113,113,0.4)]",
   stopped: "bg-muted-foreground/30",
   pending: "bg-muted-foreground/30",
   ready: "bg-muted-foreground/30",
@@ -13,10 +13,10 @@ const DOT: Record<string, string> = {
 };
 
 const BADGE: Record<string, string> = {
-  running: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20",
-  waiting: "bg-amber-500/15 text-amber-400 border-amber-500/20",
-  completed: "bg-blue-500/15 text-blue-400 border-blue-500/20",
-  failed: "bg-red-500/15 text-red-400 border-red-500/20",
+  running: "bg-[var(--running)]/15 text-[var(--running)] border-[var(--running)]/20",
+  waiting: "bg-[var(--waiting)]/15 text-[var(--waiting)] border-[var(--waiting)]/20",
+  completed: "bg-[var(--completed)]/15 text-[var(--completed)] border-[var(--completed)]/20",
+  failed: "bg-[var(--failed)]/15 text-[var(--failed)] border-[var(--failed)]/20",
   stopped: "bg-secondary text-muted-foreground border-border",
   pending: "bg-secondary text-muted-foreground border-border",
   ready: "bg-secondary text-muted-foreground border-border",

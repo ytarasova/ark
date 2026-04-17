@@ -459,7 +459,7 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
         </div>
         <div className="mb-4">
           <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Content</h3>
-          <div className="bg-black/40 border border-border rounded-lg p-3.5 text-[13px] leading-[1.7] max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words text-foreground">
+          <div className="bg-[var(--bg-code)] border border-border rounded-lg p-3.5 text-[13px] leading-[1.7] max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words text-foreground">
             {r.matchLine || r.match || String(r.content || "")}
           </div>
         </div>
@@ -546,7 +546,7 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
                 <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
                   Match
                 </h3>
-                <div className="bg-black/40 border border-border rounded-lg p-3.5 text-[13px] leading-[1.7] max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words text-foreground">
+                <div className="bg-[var(--bg-code)] border border-border rounded-lg p-3.5 text-[13px] leading-[1.7] max-h-[400px] overflow-y-auto whitespace-pre-wrap break-words text-foreground">
                   {String(selected.match)}
                 </div>
               </div>

@@ -1,112 +1,136 @@
-import { useState, useEffect, useCallback } from "react";
 import { cn } from "../lib/utils.js";
 import { Card } from "./ui/card.js";
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Moon, Sun, Monitor, Palette } from "lucide-react";
+import { useTheme } from "../themes/ThemeProvider.js";
+import type { ThemeName, ColorMode } from "../themes/tokens.js";
 
-type Theme = "system" | "dark" | "light";
+const THEME_OPTIONS: {
+  id: ThemeName;
+  label: string;
+  accent: string;
+  description: string;
+}[] = [
+  {
+    id: "midnight-circuit",
+    label: "Midnight Circuit",
+    accent: "#7c6aef",
+    description: "Deep violet accent, dark blue-purple backgrounds",
+  },
+  {
+    id: "arctic-slate",
+    label: "Arctic Slate",
+    accent: "#3b82f6",
+    description: "Cool blue accent, neutral slate backgrounds",
+  },
+  {
+    id: "warm-obsidian",
+    label: "Warm Obsidian",
+    accent: "#d4a847",
+    description: "Gold accent, warm charcoal backgrounds",
+  },
+];
 
-const STORAGE_KEY = "ark-theme";
-
-function getStoredTheme(): Theme {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored === "system" || stored === "dark" || stored === "light") return stored;
-  return "dark";
-}
-
-function getSystemDark(): boolean {
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
-}
-
-function applyTheme(theme: Theme) {
-  const html = document.documentElement;
-  if (theme === "dark" || (theme === "system" && getSystemDark())) {
-    html.classList.add("dark");
-  } else {
-    html.classList.remove("dark");
-  }
-}
+const MODE_OPTIONS: {
+  id: ColorMode | "system";
+  label: string;
+  icon: typeof Monitor;
+}[] = [
+  { id: "system", label: "System", icon: Monitor },
+  { id: "dark", label: "Dark", icon: Moon },
+  { id: "light", label: "Light", icon: Sun },
+];
 
 export function SettingsView() {
-  const [theme, setTheme] = useState<Theme>(getStoredTheme);
+  const { themeName, colorMode, setThemeName, setColorMode } = useTheme();
 
-  const handleThemeChange = useCallback((t: Theme) => {
-    setTheme(t);
-    localStorage.setItem(STORAGE_KEY, t);
-    applyTheme(t);
-  }, []);
+  // Detect if "system" was effectively selected (no stored mode preference)
+  const storedMode = (() => {
+    try {
+      return localStorage.getItem("ark-color-mode");
+    } catch {
+      return null;
+    }
+  })();
+  const effectiveMode = storedMode === null ? "system" : colorMode;
 
-  // Listen for system theme changes when "system" is selected
-  useEffect(() => {
-    if (theme !== "system") return;
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = () => applyTheme("system");
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, [theme]);
-
-  // Apply on mount (in case stored preference differs from current HTML state)
-  useEffect(() => {
-    applyTheme(getStoredTheme());
-  }, []);
-
-  const options: {
-    id: Theme;
-    label: string;
-    icon: typeof Monitor;
-    preview: { bg: string; bar: string; card: string };
-  }[] = [
-    {
-      id: "system",
-      label: "System",
-      icon: Monitor,
-      preview: {
-        bg: "bg-gradient-to-r from-zinc-800 to-zinc-200",
-        bar: "bg-gradient-to-r from-zinc-700 to-zinc-300",
-        card: "bg-gradient-to-r from-zinc-600 to-zinc-400",
-      },
-    },
-    {
-      id: "dark",
-      label: "Dark",
-      icon: Moon,
-      preview: { bg: "bg-zinc-900", bar: "bg-zinc-700", card: "bg-zinc-800" },
-    },
-    {
-      id: "light",
-      label: "Light",
-      icon: Sun,
-      preview: { bg: "bg-zinc-100", bar: "bg-zinc-300", card: "bg-white" },
-    },
-  ];
+  function handleModeChange(mode: ColorMode | "system") {
+    if (mode === "system") {
+      // Remove stored preference so ThemeProvider follows OS
+      try {
+        localStorage.removeItem("ark-color-mode");
+      } catch {
+        /* noop */
+      }
+      const systemDark = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+      setColorMode(systemDark);
+    } else {
+      setColorMode(mode);
+    }
+  }
 
   return (
     <div className="p-6 max-w-2xl">
       <h1 className="text-lg font-semibold mb-6 text-foreground">Settings</h1>
 
-      {/* Appearance */}
+      {/* Theme Selection */}
       <section className="mb-8">
-        <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-3">Appearance</h2>
+        <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-3 flex items-center gap-1.5">
+          <Palette size={12} />
+          Theme
+        </h2>
         <div className="grid grid-cols-3 gap-3">
-          {options.map((opt) => {
-            const selected = theme === opt.id;
+          {THEME_OPTIONS.map((opt) => {
+            const isSelected = themeName === opt.id;
             return (
               <Card
                 key={opt.id}
-                onClick={() => handleThemeChange(opt.id)}
+                onClick={() => setThemeName(opt.id)}
                 className={cn(
                   "cursor-pointer p-3 transition-all",
-                  selected ? "ring-2 ring-primary border-primary" : "hover:border-ring hover:bg-accent",
+                  isSelected ? "ring-2 ring-primary border-primary" : "hover:border-ring hover:bg-accent",
                 )}
               >
-                {/* Mini preview */}
-                <div className={cn("rounded-md h-16 mb-2.5 p-2 flex flex-col gap-1", opt.preview.bg)}>
-                  <div className={cn("h-1.5 w-10 rounded-full", opt.preview.bar)} />
-                  <div className={cn("flex-1 rounded", opt.preview.card)} />
-                </div>
-                <div className="flex items-center gap-2">
-                  <opt.icon size={14} className={cn("shrink-0", selected ? "text-primary" : "text-muted-foreground")} />
+                {/* Color swatch preview */}
+                <div className="flex items-center gap-2 mb-2">
                   <span
-                    className={cn("text-[13px] font-medium", selected ? "text-foreground" : "text-muted-foreground")}
+                    className="w-5 h-5 rounded-full shrink-0 border border-border"
+                    style={{ background: opt.accent }}
+                  />
+                  <span
+                    className={cn("text-[13px] font-medium", isSelected ? "text-foreground" : "text-muted-foreground")}
+                  >
+                    {opt.label}
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">{opt.description}</p>
+              </Card>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Color Mode */}
+      <section className="mb-8">
+        <h2 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em] mb-3">Color Mode</h2>
+        <div className="grid grid-cols-3 gap-3">
+          {MODE_OPTIONS.map((opt) => {
+            const isSelected = effectiveMode === opt.id;
+            return (
+              <Card
+                key={opt.id}
+                onClick={() => handleModeChange(opt.id)}
+                className={cn(
+                  "cursor-pointer p-3 transition-all",
+                  isSelected ? "ring-2 ring-primary border-primary" : "hover:border-ring hover:bg-accent",
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <opt.icon
+                    size={14}
+                    className={cn("shrink-0", isSelected ? "text-primary" : "text-muted-foreground")}
+                  />
+                  <span
+                    className={cn("text-[13px] font-medium", isSelected ? "text-foreground" : "text-muted-foreground")}
                   >
                     {opt.label}
                   </span>

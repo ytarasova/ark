@@ -120,7 +120,7 @@ export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleView
                 <span
                   className={cn(
                     "inline-block w-2 h-2 rounded-full shrink-0",
-                    s.enabled ? "bg-emerald-400" : "bg-muted-foreground/30",
+                    s.enabled ? "bg-[var(--running)]" : "bg-muted-foreground/30",
                   )}
                 />
                 <span className="text-foreground truncate">{s.summary || s.id}</span>
@@ -158,7 +158,7 @@ export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleView
                     <span
                       className={cn(
                         "inline-block w-2 h-2 rounded-full",
-                        selected.enabled ? "bg-emerald-400" : "bg-muted-foreground/30",
+                        selected.enabled ? "bg-[var(--running)]" : "bg-muted-foreground/30",
                       )}
                     />
                     {selected.enabled ? "Enabled" : "Disabled"}
@@ -211,7 +211,10 @@ export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleView
                 </div>
                 {actionMsg && (
                   <div
-                    className={cn("mt-1.5 text-xs", actionMsg.type === "error" ? "text-red-400" : "text-emerald-400")}
+                    className={cn(
+                      "mt-1.5 text-xs",
+                      actionMsg.type === "error" ? "text-[var(--failed)]" : "text-[var(--running)]",
+                    )}
                   >
                     {actionMsg.text}
                   </div>

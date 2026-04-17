@@ -157,10 +157,10 @@ export function TerminalPanel({ sessionId, onClose }: TerminalProps) {
   }, [sessionId]);
 
   const statusColor = {
-    connecting: "text-yellow-400",
-    connected: "text-emerald-400",
+    connecting: "text-[var(--waiting)]",
+    connected: "text-[var(--running)]",
     disconnected: "text-muted-foreground",
-    error: "text-red-400",
+    error: "text-[var(--failed)]",
   }[status];
 
   const statusLabel = {

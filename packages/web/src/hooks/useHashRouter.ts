@@ -12,6 +12,7 @@ const VALID_VIEWS = new Set([
   "schedules",
   "costs",
   "settings",
+  "_design",
 ]);
 
 export interface RouteState {

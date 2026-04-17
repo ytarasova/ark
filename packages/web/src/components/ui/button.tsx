@@ -13,8 +13,10 @@ const buttonVariants = cva(
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
-        success: "border border-emerald-500/20 text-emerald-400/70 hover:text-emerald-400 hover:border-emerald-500/30",
-        warning: "border border-amber-500/20 text-amber-400/70 hover:text-amber-400 hover:border-amber-500/30",
+        success:
+          "border border-[var(--running)]/20 text-[var(--running)]/70 hover:text-[var(--running)] hover:border-[var(--running)]/30",
+        warning:
+          "border border-[var(--waiting)]/20 text-[var(--waiting)]/70 hover:text-[var(--waiting)] hover:border-[var(--waiting)]/30",
       },
       size: {
         default: "h-9 px-4 py-2",

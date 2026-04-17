@@ -86,7 +86,7 @@ export function CostsView() {
             <span className="text-[12px] text-foreground truncate leading-snug min-w-0">
               {s.summary || s.sessionId}
             </span>
-            <span className="text-[11px] text-emerald-400 font-mono font-semibold shrink-0 ml-2">
+            <span className="text-[11px] text-[var(--running)] font-mono font-semibold shrink-0 ml-2">
               {fmtCost(s.cost)}
             </span>
           </div>
@@ -109,7 +109,7 @@ export function CostsView() {
                 <span className="text-muted-foreground">Model</span>
                 <span className="text-card-foreground">{selected.model || "-"}</span>
                 <span className="text-muted-foreground">Cost</span>
-                <span className="text-emerald-400 font-semibold font-mono">{fmtCost(selected.cost)}</span>
+                <span className="text-[var(--running)] font-semibold font-mono">{fmtCost(selected.cost)}</span>
               </div>
             </div>
           </div>
@@ -120,7 +120,7 @@ export function CostsView() {
             {costs && (
               <>
                 <div className="text-center py-8">
-                  <div className="text-4xl font-bold font-mono text-emerald-400">{fmtCost(costs.total || 0)}</div>
+                  <div className="text-4xl font-bold font-mono text-[var(--running)]">{fmtCost(costs.total || 0)}</div>
                   <div className="text-sm text-muted-foreground mt-1">{sessions.length} sessions with usage data</div>
                 </div>
 
@@ -220,7 +220,7 @@ export function CostsView() {
                   <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-2.5 mb-5">
                     {Object.entries(byModel).map(([model, data]) => (
                       <Card key={model} className="p-4 transition-colors hover:bg-accent hover:border-ring">
-                        <div className="font-medium text-amber-400 text-[10px] uppercase tracking-[0.04em] font-mono">
+                        <div className="font-medium text-[var(--waiting)] text-[10px] uppercase tracking-[0.04em] font-mono">
                           {model}
                         </div>
                         <div className="text-2xl font-bold text-foreground mt-1.5 tracking-[-0.02em] font-mono">
@@ -266,7 +266,7 @@ export function CostsView() {
                               <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-card-foreground">
                                 {s.model || "-"}
                               </td>
-                              <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-right text-emerald-400 font-semibold font-mono">
+                              <td className="p-2.5 px-3 text-[13px] border-b border-border/50 text-right text-[var(--running)] font-semibold font-mono">
                                 {fmtCost(s.cost)}
                               </td>
                             </tr>

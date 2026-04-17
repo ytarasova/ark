@@ -69,7 +69,7 @@ export function ToolsView({ activeTab = "skills", onTabChange: _onTabChange }: T
                 <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
                   Content
                 </h3>
-                <div className="bg-black/40 border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-muted-foreground">
+                <div className="bg-[var(--bg-code)] border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-muted-foreground">
                   {selected.content || selected.prompt || "(no content)"}
                 </div>
               </div>
@@ -112,7 +112,7 @@ export function ToolsView({ activeTab = "skills", onTabChange: _onTabChange }: T
                     <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
                       Summary
                     </h3>
-                    <div className="bg-black/40 border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-muted-foreground">
+                    <div className="bg-[var(--bg-code)] border border-border rounded-lg p-3.5 font-mono text-[11px] leading-[1.7] max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all text-muted-foreground">
                       {selected.summary}
                     </div>
                   </div>
@@ -157,7 +157,7 @@ export function ToolsView({ activeTab = "skills", onTabChange: _onTabChange }: T
                 </Button>
               </div>
             )}
-            {actionMsg && <div className="mt-2 text-xs text-emerald-400">{actionMsg}</div>}
+            {actionMsg && <div className="mt-2 text-xs text-[var(--running)]">{actionMsg}</div>}
           </>
         ) : (
           <div className="flex items-center justify-center h-full text-sm text-muted-foreground">

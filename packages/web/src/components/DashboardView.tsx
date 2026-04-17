@@ -11,21 +11,21 @@ import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
 
 // Theme colors for charts and status
 const STATUS_COLORS: Record<string, string> = {
-  running: "text-emerald-400",
-  waiting: "text-amber-400",
+  running: "text-[var(--running)]",
+  waiting: "text-[var(--waiting)]",
   stopped: "text-muted-foreground",
-  failed: "text-red-400",
-  completed: "text-blue-400",
+  failed: "text-[var(--failed)]",
+  completed: "text-[var(--completed)]",
   ready: "text-muted-foreground/60",
   archived: "text-muted-foreground/40",
 };
 
 const STATUS_BG: Record<string, string> = {
-  running: "bg-emerald-500/10",
-  waiting: "bg-amber-500/10",
+  running: "bg-[var(--running)]/10",
+  waiting: "bg-[var(--waiting)]/10",
   stopped: "bg-secondary/50",
-  failed: "bg-red-500/10",
-  completed: "bg-blue-500/10",
+  failed: "bg-[var(--failed)]/10",
+  completed: "bg-[var(--completed)]/10",
 };
 
 interface DashboardData {
@@ -147,10 +147,12 @@ export function DashboardView({ onNavigate, readOnly, daemonStatus }: DashboardV
                 <span
                   className={cn(
                     "text-[12px] font-medium flex items-center gap-1.5",
-                    online ? "text-emerald-400" : "text-red-400",
+                    online ? "text-[var(--running)]" : "text-[var(--failed)]",
                   )}
                 >
-                  <span className={cn("w-1.5 h-1.5 rounded-full", online ? "bg-emerald-400" : "bg-red-400")} />
+                  <span
+                    className={cn("w-1.5 h-1.5 rounded-full", online ? "bg-[var(--running)]" : "bg-[var(--failed)]")}
+                  />
                   {online ? "online" : "offline"}
                 </span>
               </div>
@@ -165,11 +167,14 @@ export function DashboardView({ onNavigate, readOnly, daemonStatus }: DashboardV
                 <span
                   className={cn(
                     "text-[12px] font-medium flex items-center gap-1.5",
-                    online ? "text-emerald-400" : "text-muted-foreground/50",
+                    online ? "text-[var(--running)]" : "text-muted-foreground/50",
                   )}
                 >
                   <span
-                    className={cn("w-1.5 h-1.5 rounded-full", online ? "bg-emerald-400" : "bg-muted-foreground/30")}
+                    className={cn(
+                      "w-1.5 h-1.5 rounded-full",
+                      online ? "bg-[var(--running)]" : "bg-muted-foreground/30",
+                    )}
                   />
                   {online ? "online" : "offline"}
                 </span>
@@ -181,11 +186,14 @@ export function DashboardView({ onNavigate, readOnly, daemonStatus }: DashboardV
             <span
               className={cn(
                 "text-[12px] font-medium flex items-center gap-1.5",
-                system.router ? "text-emerald-400" : "text-muted-foreground/50",
+                system.router ? "text-[var(--running)]" : "text-muted-foreground/50",
               )}
             >
               <span
-                className={cn("w-1.5 h-1.5 rounded-full", system.router ? "bg-emerald-400" : "bg-muted-foreground/30")}
+                className={cn(
+                  "w-1.5 h-1.5 rounded-full",
+                  system.router ? "bg-[var(--running)]" : "bg-muted-foreground/30",
+                )}
               />
               {system.router ? "online" : "disabled"}
             </span>
@@ -209,7 +217,7 @@ export function DashboardView({ onNavigate, readOnly, daemonStatus }: DashboardV
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[12px] text-muted-foreground">Today</span>
-              <span className="text-[14px] font-bold font-mono text-emerald-400">{fmtCost(costs.today)}</span>
+              <span className="text-[14px] font-bold font-mono text-[var(--running)]">{fmtCost(costs.today)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-[12px] text-muted-foreground">This week</span>
@@ -230,7 +238,11 @@ export function DashboardView({ onNavigate, readOnly, daemonStatus }: DashboardV
                     : costs.budget.monthly;
                 if (!b?.limit) return null;
                 const pct = Math.min(100, b.pct);
-                const barColor = b.exceeded ? "bg-red-400" : b.warning ? "bg-amber-400" : "bg-emerald-400";
+                const barColor = b.exceeded
+                  ? "bg-[var(--failed)]"
+                  : b.warning
+                    ? "bg-[var(--waiting)]"
+                    : "bg-[var(--running)]";
                 return (
                   <div className="pt-2 border-t border-border/50">
                     <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
@@ -257,7 +269,7 @@ export function DashboardView({ onNavigate, readOnly, daemonStatus }: DashboardV
                   .sort(([, a], [, b]) => b - a)
                   .map(([model, cost]) => (
                     <div key={model} className="flex items-center justify-between">
-                      <span className="text-[11px] text-amber-400 font-mono uppercase">{model}</span>
+                      <span className="text-[11px] text-[var(--waiting)] font-mono uppercase">{model}</span>
                       <span className="text-[11px] font-mono text-muted-foreground">{fmtCost(cost)}</span>
                     </div>
                   ))}
