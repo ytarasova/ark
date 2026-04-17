@@ -133,10 +133,17 @@ export function SessionsPage({
     if (res.ok) {
       if (shouldDispatch && res.session?.id) {
         try {
+          await new Promise((r) => setTimeout(r, 500));
           await api.dispatch(res.session.id);
           onToast("Session created and dispatched", "success");
         } catch {
-          onToast("Session created but dispatch failed", "error");
+          try {
+            await new Promise((r) => setTimeout(r, 1000));
+            await api.dispatch(res.session.id);
+            onToast("Session created and dispatched (retry)", "success");
+          } catch {
+            onToast("Session created but dispatch failed", "error");
+          }
         }
       } else {
         onToast("Session created", "success");

@@ -80,18 +80,19 @@ function RailButton({
       aria-label={item.label}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "w-9 h-9 rounded-lg border-none flex items-center justify-center cursor-pointer relative",
+        "w-14 py-1.5 rounded-lg border-none flex flex-col items-center justify-center gap-0.5 cursor-pointer relative",
         "text-[var(--fg-muted)] bg-transparent transition-colors duration-150",
-        "[&_svg]:w-[18px] [&_svg]:h-[18px] [&_svg]:stroke-[1.5]",
+        "[&_svg]:w-[20px] [&_svg]:h-[20px] [&_svg]:stroke-[1.5]",
         "hover:text-[var(--fg)] hover:bg-[var(--bg-hover)]",
         active && "text-[var(--primary)] bg-[var(--primary-subtle)]",
       )}
     >
       {/* Active indicator bar */}
       {active && (
-        <span className="absolute left-[-6px] top-2 bottom-2 w-[3px] rounded-r bg-[var(--primary)]" aria-hidden />
+        <span className="absolute left-[-6px] top-1 bottom-1 w-[3px] rounded-r bg-[var(--primary)]" aria-hidden />
       )}
       {item.icon}
+      <span className="text-[9px] leading-tight truncate w-full text-center">{item.label}</span>
     </button>
   );
 }

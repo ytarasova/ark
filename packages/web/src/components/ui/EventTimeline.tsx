@@ -42,9 +42,7 @@ export function EventTimeline({ events, onStageClick, className, ...props }: Eve
   }
 
   if (events.length === 0) {
-    return (
-      <div className="text-center text-sm text-[var(--fg-muted)] py-12">No events recorded for this session.</div>
-    );
+    return <div className="text-center text-sm text-[var(--fg-muted)] py-12">No events recorded for this session.</div>;
   }
 
   return (

@@ -52,7 +52,7 @@ const SHORTCUTS: Record<string, string> = {
 };
 
 export function Layout({ view, onNavigate, daemonStatus, children }: LayoutProps) {
-  const conductorOffline = daemonStatus && !daemonStatus.conductor.online;
+  const _conductorOffline = daemonStatus && !daemonStatus.conductor.online;
   // Keyboard shortcuts for navigation
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {

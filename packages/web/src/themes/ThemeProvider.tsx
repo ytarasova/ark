@@ -36,14 +36,14 @@ function getSystemColorMode(): ColorMode {
   return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
 }
 
-function readStoredTheme(): ThemeName {
+function readStoredTheme(): ThemeName | null {
   try {
     const v = localStorage.getItem(STORAGE_KEY_THEME);
     if (v === "midnight-circuit" || v === "arctic-slate" || v === "warm-obsidian") return v;
   } catch {
     /* noop */
   }
-  return "midnight-circuit";
+  return null;
 }
 
 function readStoredMode(): ColorMode | null {
@@ -88,9 +88,11 @@ export interface ThemeProviderProps {
 }
 
 export function ThemeProvider({ children, defaultTheme, defaultColorMode }: ThemeProviderProps) {
-  const [themeName, setThemeNameRaw] = useState<ThemeName>(() => defaultTheme ?? readStoredTheme());
+  const [themeName, setThemeNameRaw] = useState<ThemeName>(
+    () => readStoredTheme() ?? defaultTheme ?? "midnight-circuit",
+  );
   const [colorMode, setColorModeRaw] = useState<ColorMode>(
-    () => defaultColorMode ?? readStoredMode() ?? getSystemColorMode(),
+    () => readStoredMode() ?? defaultColorMode ?? getSystemColorMode(),
   );
 
   // Persist + apply on change
