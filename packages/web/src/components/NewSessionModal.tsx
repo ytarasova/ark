@@ -515,27 +515,21 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
                 "placeholder:text-[var(--fg-muted)]",
               )}
             />
-            <button
-              type="submit"
-              disabled={!summary.trim() || !daemonOnline}
-              title={!daemonOnline ? "Start the daemon first: ark server daemon start" : undefined}
-              className={cn(
-                "absolute right-2 bottom-2 w-7 h-7 rounded-lg flex items-center justify-center",
-                "transition-colors duration-150",
-                summary.trim() && daemonOnline
-                  ? "bg-[var(--primary)] text-white cursor-pointer hover:opacity-90"
-                  : "bg-[var(--border)] text-[var(--fg-muted)] cursor-not-allowed",
-              )}
-            >
-              <ArrowUp size={14} />
-            </button>
           </div>
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-end gap-2 pb-5">
+        <div className="flex items-center justify-end gap-2 pt-3 pb-5">
           <Button type="button" variant="outline" size="sm" onClick={onClose}>
             Cancel
+          </Button>
+          <Button
+            type="submit"
+            size="sm"
+            disabled={!summary.trim() || !daemonOnline}
+            title={!daemonOnline ? "Start the daemon first" : undefined}
+          >
+            Start Session
           </Button>
         </div>
       </form>
