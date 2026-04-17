@@ -4,21 +4,14 @@ import { fmtCost } from "../util.js";
 import { cn } from "../lib/utils.js";
 import { Card } from "./ui/card.js";
 import { DollarSign } from "lucide-react";
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
-
-// Chart theme colors
-const CHART_COLORS = ["#82aaff", "#c3e88d", "#ffcb6b", "#ff5370", "#b4befe", "#89ddff", "#f78c6c"];
-
-const MODEL_COLORS: Record<string, string> = {
-  opus: "#ff5370",
-  sonnet: "#82aaff",
-  haiku: "#c3e88d",
-  unknown: "#b4befe",
-};
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { useChartPalette, useModelColors, ChartTooltip, AXIS_TICK_STYLE } from "./ui/chart.js";
 
 export function CostsView() {
   const { data: costs } = useCostsQuery();
   const [selected, setSelected] = useState<any>(null);
+  const palette = useChartPalette();
+  const modelColors = useModelColors();
 
   const sessions = costs?.sessions || [];
 
@@ -33,12 +26,12 @@ export function CostsView() {
   // Chart data: cost by model (pie)
   const pieData = useMemo(
     () =>
-      Object.entries(byModel).map(([model, data]) => ({
+      Object.entries(byModel).map(([model, data], idx) => ({
         name: model,
         value: Math.round(data.cost * 100) / 100,
-        fill: MODEL_COLORS[model] ?? CHART_COLORS[Object.keys(byModel).indexOf(model) % CHART_COLORS.length],
+        fill: modelColors[model] ?? palette[idx % palette.length],
       })),
-    [sessions],
+    [sessions, modelColors, palette],
   );
 
   // Chart data: top 10 sessions by cost (bar)
@@ -51,6 +44,8 @@ export function CostsView() {
       })),
     [sessions],
   );
+
+  const costFormatter = (val: number) => `$${val.toFixed(2)}`;
 
   return (
     <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
@@ -142,26 +137,27 @@ export function CostsView() {
                               innerRadius={50}
                               outerRadius={80}
                               dataKey="value"
+                              isAnimationActive={false}
                               label={({ name, value }) => `${name}: $${value.toFixed(2)}`}
                               labelLine={false}
+                              stroke="none"
                             >
                               {pieData.map((entry, idx) => (
                                 <Cell key={`cell-${idx}`} fill={entry.fill} />
                               ))}
                             </Pie>
-                            <Tooltip
-                              formatter={(val: number) => `$${val.toFixed(2)}`}
-                              contentStyle={{
-                                background: "hsl(var(--card))",
-                                border: "1px solid hsl(var(--border))",
-                                borderRadius: "8px",
-                                fontSize: "12px",
-                              }}
-                              itemStyle={{ color: "hsl(var(--foreground))" }}
-                            />
-                            <Legend wrapperStyle={{ fontSize: "11px" }} />
+                            <Tooltip content={<ChartTooltip formatter={costFormatter} />} />
                           </PieChart>
                         </ResponsiveContainer>
+                        {/* Inline legend matching app typography */}
+                        <div className="flex flex-wrap gap-3 mt-2">
+                          {pieData.map((entry) => (
+                            <div key={entry.name} className="flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: entry.fill }} />
+                              <span className="text-[11px] text-muted-foreground font-mono">{entry.name}</span>
+                            </div>
+                          ))}
+                        </div>
                       </Card>
                     )}
 
@@ -175,7 +171,7 @@ export function CostsView() {
                           <BarChart data={barData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                             <XAxis
                               dataKey="name"
-                              tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
+                              tick={{ ...AXIS_TICK_STYLE, fontSize: 9 }}
                               tickLine={false}
                               axisLine={false}
                               interval={0}
@@ -184,27 +180,18 @@ export function CostsView() {
                               height={50}
                             />
                             <YAxis
-                              tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                              tick={AXIS_TICK_STYLE}
                               tickLine={false}
                               axisLine={false}
                               tickFormatter={(v) => `$${v}`}
                               width={50}
                             />
-                            <Tooltip
-                              formatter={(val: number) => `$${val.toFixed(2)}`}
-                              contentStyle={{
-                                background: "hsl(var(--card))",
-                                border: "1px solid hsl(var(--border))",
-                                borderRadius: "8px",
-                                fontSize: "12px",
-                              }}
-                              itemStyle={{ color: "hsl(var(--foreground))" }}
-                            />
-                            <Bar dataKey="cost" radius={[4, 4, 0, 0]}>
+                            <Tooltip content={<ChartTooltip formatter={costFormatter} />} />
+                            <Bar dataKey="cost" radius={[4, 4, 0, 0]} isAnimationActive={false}>
                               {barData.map((entry, idx) => (
                                 <Cell
                                   key={`bar-${idx}`}
-                                  fill={MODEL_COLORS[entry.model] ?? CHART_COLORS[idx % CHART_COLORS.length]}
+                                  fill={modelColors[entry.model] ?? palette[idx % palette.length]}
                                 />
                               ))}
                             </Bar>
