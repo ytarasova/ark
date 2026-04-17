@@ -5,6 +5,7 @@ import { Button } from "./ui/button.js";
 import type { StageProgress } from "./ui/StageProgressBar.js";
 import type { SessionStatus } from "./ui/StatusDot.js";
 import { relTime, fmtCost } from "../util.js";
+import { Plus } from "lucide-react";
 
 interface SessionListProps {
   sessions: any[];
@@ -107,7 +108,7 @@ export function SessionListPanel({
   );
 
   const filterChips = (
-    <div className="flex gap-1.5 flex-wrap">
+    <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
       {(["running", "waiting", "completed", "failed"] as const).map((status) => (
         <FilterChip
           key={status}
@@ -130,8 +131,14 @@ export function SessionListPanel({
       filterChips={filterChips}
       headerAction={
         !readOnly ? (
-          <Button size="sm" className="h-7 px-2.5 text-[12px] font-medium" onClick={onNewSession}>
-            + New
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            className="h-6 w-6 text-[var(--fg-muted)] hover:text-[var(--fg)]"
+            onClick={onNewSession}
+            title="New session (n)"
+          >
+            <Plus size={15} />
           </Button>
         ) : undefined
       }

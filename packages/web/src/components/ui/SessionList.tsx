@@ -1,6 +1,8 @@
+import { useState, useRef, useEffect } from "react";
 import { cn } from "../../lib/utils.js";
 import { StatusDot, type SessionStatus } from "./StatusDot.js";
 import { StageProgressBar, type StageProgress } from "./StageProgressBar.js";
+import { Search, X } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -44,26 +46,60 @@ export function SessionList({
   className,
   ...props
 }: SessionListProps) {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (searchOpen) searchRef.current?.focus();
+  }, [searchOpen]);
+
   return (
     <div className={cn("flex flex-col overflow-hidden", className)} {...props}>
       {/* Header */}
-      <div className="px-4 pt-4 shrink-0">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[16px] font-semibold tracking-[-0.01em]">Sessions</h2>
-          {headerAction}
+      <div className="px-4 pt-4 pb-1 shrink-0">
+        <div className="flex items-center justify-between mb-2.5">
+          <h2 className="text-[13px] font-semibold text-[var(--fg-muted)] uppercase tracking-[0.04em]">Sessions</h2>
+          <div className="flex items-center gap-1">
+            {onSearchChange && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchOpen(!searchOpen);
+                  if (searchOpen && onSearchChange) onSearchChange("");
+                }}
+                className={cn(
+                  "h-6 w-6 flex items-center justify-center rounded",
+                  "text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-hover)]",
+                  "transition-colors duration-150",
+                  searchOpen && "text-[var(--fg)] bg-[var(--bg-hover)]",
+                )}
+                title="Search (/ )"
+              >
+                {searchOpen ? <X size={13} /> : <Search size={13} />}
+              </button>
+            )}
+            {headerAction}
+          </div>
         </div>
 
-        {/* Search */}
-        {onSearchChange && (
-          <div className="mb-2.5">
+        {/* Search -- expandable */}
+        {onSearchChange && searchOpen && (
+          <div className="mb-2">
             <input
+              ref={searchRef}
               type="text"
               placeholder="Search sessions..."
               value={search ?? ""}
               onChange={(e) => onSearchChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setSearchOpen(false);
+                  onSearchChange("");
+                }
+              }}
               className={cn(
-                "w-full h-[30px] rounded-[var(--radius-sm)] border border-[var(--border)]",
-                "bg-[var(--bg-input)] px-2.5 text-[12px] text-[var(--fg)] outline-none",
+                "w-full h-[28px] rounded-[var(--radius-sm)] border border-[var(--border)]",
+                "bg-[var(--bg-input,transparent)] px-2.5 text-[12px] text-[var(--fg)] outline-none",
                 "placeholder:text-[var(--fg-faint)] focus:border-[var(--primary)]",
                 "transition-colors duration-150",
               )}
@@ -71,8 +107,8 @@ export function SessionList({
           </div>
         )}
 
-        {/* Filter chips */}
-        {filterChips && <div className="flex gap-1.5 mb-3 flex-wrap">{filterChips}</div>}
+        {/* Filter chips -- horizontal scroll, no wrap */}
+        {filterChips && <div className="mb-2.5">{filterChips}</div>}
       </div>
 
       {/* Session list */}
