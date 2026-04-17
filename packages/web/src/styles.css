@@ -169,6 +169,12 @@
   }
 }
 
+/* ---- Sidebar label fade ---- */
+.sidebar-label {
+  opacity: 1;
+  transition: opacity 150ms ease 50ms;
+}
+
 /* ---- Electron ---- */
 .drag-region {
   -webkit-app-region: drag;
