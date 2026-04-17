@@ -1,121 +1,106 @@
-# PLAN: Fix Knowledge Graph Pipeline -- Codegraph Indexes
+# Plan: Update User Guide to Match Current State
 
 ## Summary
 
-The knowledge graph indexing pipeline crashes with `UNIQUE constraint failed: knowledge.id` when indexing any non-trivial codebase. The root cause is twofold: (1) `KnowledgeStore.addNode()` uses plain `INSERT INTO` with no conflict handling, and (2) symbol IDs are constructed as `symbol:${file}::${name}` which is not unique -- codegraph produces many symbols with the same (file, name) pair (e.g., 50 `app` parameters across different functions in `session-orchestration.ts`). The fix makes `addNode` idempotent via `INSERT OR REPLACE` and includes the line number in symbol IDs for uniqueness.
+The user guide (`docs/guide.md`) is broadly accurate but has fallen behind on several fronts: the Goose runtime was added as a 5th runtime but the guide lists only 4; 5 new flow definitions exist (autonomous-sdlc, autonomous, brainstorm, conditional, docs) but the guide lists only 9; 2 new recipes exist (self-dogfood, self-quick) but the guide lists only 8; skills are now YAML files (not markdown); the web dashboard got a complete UI rebuild with a design system, pipeline visualization, and new pages (Login, DesignPreview, Tools); Tauri was removed in favor of Electron; and several minor details need correction.
 
 ## Files to modify/create
 
 | File | Change |
 |------|--------|
-| `packages/core/knowledge/store.ts:38` | Change `INSERT INTO knowledge` to `INSERT OR REPLACE INTO knowledge` in `addNode()` |
-| `packages/core/knowledge/indexer.ts:129,145,174-175` | Include line number in nodeIdMap and symbol ID: `symbol:${file}::${name}:${line}` |
-| `packages/core/services/session-orchestration.ts:66,77-78` | Include line number in `ingestRemoteIndex` symbol IDs |
-| `packages/core/__tests__/integration-wiring.test.ts:217,229,234` | Update symbol ID expectations to include line number |
-| `packages/core/knowledge/__tests__/indexer.test.ts:83,90` | Update `getNode` calls to use new symbol ID format |
+| `docs/guide.md` | Update all outdated sections (runtimes, flows, recipes, skills, web/desktop, goose references) |
+
+No new files needed.
 
 ## Implementation steps
 
-### Step 1: Make `addNode` idempotent (store.ts)
+### 1. Section 1 (Quickstart) -- lines 36-67
 
-In `packages/core/knowledge/store.ts`, line 38, change:
-```sql
-INSERT INTO knowledge (id, type, label, content, metadata, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-```
-to:
-```sql
-INSERT OR REPLACE INTO knowledge (id, type, label, content, metadata, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-```
+- Update `ark flow list` comment from "9 builtin flows" to "14 builtin flows".
+- The rest is accurate.
 
-This is the critical crash fix. It makes `addNode` safe to call with an existing ID -- the node gets upserted instead of throwing.
+### 2. Section 3 (Flows) -- lines 161-226
 
-### Step 2: Fix symbol ID uniqueness in indexer (indexer.ts)
+- Update heading from "Builtin flows (9)" to "Builtin flows (14)".
+- Add the 5 missing flows to the table:
 
-In `packages/core/knowledge/indexer.ts`:
+| Name | Purpose |
+|------|---------|
+| `autonomous-sdlc` | Fully autonomous SDLC: plan -> implement -> verify -> review -> PR. All gates auto. |
+| `autonomous` | Single agent, fully autonomous, auto-completes on agent report. |
+| `brainstorm` | Explore ideas -> synthesize -> plan. Interactive ideation with human steering. |
+| `conditional` | Conditional routing -- branch based on review outcome, converge at PR. |
+| `docs` | Lightweight documentation flow: plan -> implement -> PR. No verify/review. |
 
-**Line 129** -- add `line` to the nodeIdMap value:
-```ts
-// Before:
-nodeIdMap.set(node.id, { kind: node.kind, name: node.name, file: node.file });
-// After:
-nodeIdMap.set(node.id, { kind: node.kind, name: node.name, file: node.file, line: node.line });
-```
+### 3. Section 4 (Agents and Runtimes) -- lines 229-336
 
-**Line 145** -- include line number in symbol ID:
-```ts
-// Before:
-const symbolId = `symbol:${node.file}::${node.name}`;
-// After:
-const symbolId = `symbol:${node.file}::${node.name}:${node.line}`;
-```
+- Update "Runtimes (3 tools + 1 subscription variant)" heading to "Runtimes (4 tools + 1 subscription variant)".
+- Add goose row to the runtime table:
 
-**Lines 174-175** -- update edge source/target IDs:
-```ts
-// Before:
-const sourceId = `symbol:${src.file}::${src.name}`;
-const targetId = `symbol:${tgt.file}::${tgt.name}`;
-// After:
-const sourceId = `symbol:${src.file}::${src.name}:${src.line}`;
-const targetId = `symbol:${tgt.file}::${tgt.name}:${tgt.line}`;
-```
+| `goose` | Goose CLI (Block/AAIF) | api | goose (default model: claude-sonnet-4-6) |
 
-### Step 3: Fix symbol ID uniqueness in remote ingestion (session-orchestration.ts)
+- Add goose example usage:
+  ```bash
+  ark session start --repo . --summary "Fix tests" \
+    --agent implementer --runtime goose --dispatch
+  ```
+- Update "Three executor types" to "Four executor types" and add the goose executor:
+  - `goose` -- launches Goose CLI in tmux with worktree isolation.
 
-In `packages/core/services/session-orchestration.ts`, function `ingestRemoteIndex()`:
+### 4. Section 5 (Skills) -- lines 338-380
 
-**Line 66** -- change symbol ID:
-```ts
-// Before:
-id: `symbol:${node.file}::${node.name}`,
-// After:
-id: `symbol:${node.file}::${node.name}:${node.line}`,
-```
+- Update description: skills are now **YAML files** (not markdown). The YAML contains `name`, `description`, `prompt`, and `tags` fields. The `prompt` field is what gets injected into the agent's system prompt.
+- Fix the three-tier resolution paths from `.md` to `.yaml`: `.ark/skills/<name>.yaml`, `~/.ark/skills/<name>.yaml`, `skills/<name>.yaml`.
 
-**Lines 77-78** -- change edge source/target IDs:
-```ts
-// Before:
-`symbol:${srcNode.file}::${srcNode.name}`,
-`symbol:${tgtNode.file}::${tgtNode.name}`,
-// After:
-`symbol:${srcNode.file}::${srcNode.name}:${srcNode.line}`,
-`symbol:${tgtNode.file}::${tgtNode.name}:${tgtNode.line}`,
-```
+### 5. Section 6 (Recipes) -- lines 382-417
 
-### Step 4: Update tests
+- Update "Builtin recipes (8)" to "Builtin recipes (10)".
+- Add 2 new recipes to the table:
 
-**`packages/core/knowledge/__tests__/indexer.test.ts`:**
-- Line 83: `store.getNode("symbol:src/app.ts::boot")` -> `store.getNode("symbol:src/app.ts::boot:10")`
-- Line 90: `store.getNode("symbol:src/db.ts::Database")` -> `store.getNode("symbol:src/db.ts::Database:5")`
+| `self-dogfood` | Dispatch an ark agent to work on the ark repo itself (full autonomous-sdlc). |
+| `self-quick` | Quick single-agent dispatch against the ark repo (trivial tasks). |
 
-**`packages/core/__tests__/integration-wiring.test.ts`:**
-- Line 217: `` id: `symbol:${node.file}::${node.name}` `` -> `` id: `symbol:${node.file}::${node.name}:${node.line}` ``
-- Line 229: `store.getNode("symbol:src/app.ts::boot")` -> `store.getNode("symbol:src/app.ts::boot:10")`
-- Line 234: `store.getNode("symbol:src/db.ts::Database")` -> `store.getNode("symbol:src/db.ts::Database:5")`
+### 6. Section 10 (Cost Tracking) -- lines 583-639
 
-### Step 5: Verify
+- Add goose to the transcript parser table. The goose runtime's billing section specifies `transcript_parser: goose`, so a `GooseTranscriptParser` exists. Add it to the table with an appropriate transcript location note.
 
-1. `make test-file F=packages/core/knowledge/__tests__/indexer.test.ts`
-2. `make test-file F=packages/core/knowledge/__tests__/store.test.ts`
-3. `make test-file F=packages/core/__tests__/integration-wiring.test.ts`
-4. Run `ark knowledge index --repo /Users/paytmlabs/Projects/ark` -- must succeed (was crashing before)
-5. Run `ark knowledge stats` -- verify nodes and edges are populated
-6. Run `ark knowledge index --repo /Users/paytmlabs/Projects/ark` again -- must succeed (re-index upsert path)
+### 7. Section 15 (Dashboards) -- lines 799-831
+
+- **Web**: Update the description to reflect the new design system rebuild:
+  - Mention the design system with theme tokens and component library.
+  - Mention pipeline visualization with @xyflow/react and d3-dag for DAG flow rendering.
+  - Mention the embedded web terminal for session attachment.
+  - Mention the local folder picker for repository selection in session creation.
+  - Update page list: Dashboard, Sessions, Agents, Flows, Compute, History, Memory, Tools, Schedules, Costs, Settings, Login.
+- **Desktop**: Confirm Electron (Tauri was removed in v0.17.0). The current state is a self-contained Electron bundle. No Tauri references should remain.
+
+### 8. Section 17 (MCP Integration) -- line 858
+
+- Verify MCP configs list is still accurate: atlassian.json, figma.json, github.json, linear.json. (Confirmed correct.)
+
+### 9. Appendix: Common tasks cheat sheet -- lines 1023-1053
+
+- Add goose runtime example.
+- Add self-dogfood recipe example.
 
 ## Testing strategy
 
-- **Existing tests**: All 10 indexer tests, 45 store tests, 12 context tests, integration-wiring tests should still pass after updates.
-- **New regression test**: Add a test in `indexer.test.ts` that verifies indexing a codegraph DB with duplicate (file, name) pairs does not crash. Insert two mock nodes with the same file and name but different line numbers, verify both appear as separate knowledge nodes.
-- **Idempotency test**: Add a test in `store.test.ts` that calls `addNode` twice with the same ID and verifies upsert behavior (no throw, second call updates the node).
-- **E2E**: Run `ark knowledge index` on the actual Ark repo (9847 nodes, 738 files) to verify it completes without error.
+- **Manual review**: Read through the updated guide end-to-end to verify all counts, names, and descriptions match the actual filesystem.
+- **Cross-reference**: Verify every flow name in the table matches a file in `flows/definitions/`.
+- **Cross-reference**: Verify every recipe name matches a file in `recipes/`.
+- **Cross-reference**: Verify every runtime name matches a file in `runtimes/`.
+- **Cross-reference**: Verify skill file extension claim (.yaml) matches `skills/` directory contents.
+- **Formatting**: Run `make format` to ensure Prettier compliance.
+- **Lint**: Run `make lint` to ensure no lint warnings.
 
 ## Risk assessment
 
-- **Knowledge graph data reset**: Changing the symbol ID format from `symbol:file::name` to `symbol:file::name:line` means existing indexed data becomes orphaned. Since the schema docs say "rm ~/.ark/ark.db" is the migration strategy and knowledge is fully re-indexable, this is acceptable. No production data at risk.
-- **Edge mapping correctness**: With line-number-based IDs, edges connect specific symbol instances rather than "any symbol named X in file Y". This is more correct -- an edge from codegraph that says node 42 calls node 87 maps to those specific symbols.
-- **INSERT OR REPLACE on addNode**: Safe because all ID-bearing callers use deterministic IDs where upsert is the desired behavior. Random-ID callers (memory/add, knowledge/remember) generate UUIDs that won't collide.
-- **No breaking API changes**: MCP tools (`knowledge/search`, `knowledge/context`, etc.) search by label/content, not by ID format. The context builder also searches by label. No external API depends on the symbol ID format.
-- **PostgreSQL compatibility**: `INSERT OR REPLACE` is SQLite syntax. The IDatabase abstraction handles this -- check that the Postgres adapter has equivalent behavior. If it uses `ON CONFLICT DO UPDATE`, verify the migration. (Low risk: hosted mode uses DB-backed resource stores, not file-level knowledge indexing.)
+- **Low risk**: This is a documentation-only change. No code is modified.
+- **Accuracy**: The main risk is stating something incorrectly about a feature. Mitigate by reading actual YAML definitions and source code rather than guessing.
+- **Staleness**: The guide may go stale again quickly. Counts like "14 builtin flows" will drift as new flows are added.
 
 ## Open questions
 
-None -- the fix is straightforward and all affected code paths are identified.
+1. **GooseTranscriptParser location**: The goose runtime specifies `transcript_parser: goose`. Need to verify where `GooseTranscriptParser` reads transcripts from before documenting the exact path in the cost tracking section. Check `packages/core/` for the implementation.
+2. **DesignPreviewPage**: Is this a user-facing page or a dev-only page? If dev-only, omit it from the guide's page list.
+3. **LoginPage**: The login page is likely only relevant for hosted/remote mode. The guide should clarify when users see it.
