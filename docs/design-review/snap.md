@@ -1,0 +1,23 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - navigation [ref=e3]:
+      - generic [ref=e4] [cursor=pointer]: A
+      - button "Sessions" [ref=e5] [cursor=pointer]
+      - button "Agents" [ref=e8] [cursor=pointer]
+      - button "Compute" [ref=e12] [cursor=pointer]
+      - button "Knowledge" [ref=e16] [cursor=pointer]
+      - button "Costs" [ref=e20] [cursor=pointer]
+      - button "Settings" [ref=e23] [cursor=pointer]
+    - complementary [ref=e27]:
+      - generic [ref=e28]
+      - generic [ref=e38]
+    - main [ref=e155]:
+      - generic [ref=e156]
+      - generic [ref=e179]
+      - generic [ref=e204]
+      - generic [ref=e215]
+      - generic [ref=e399]
+  - generic:
+    - generic:
+      - generic
+      - generic
