@@ -137,6 +137,7 @@ export function MemoryView({ addRequested = 0, onToast }: MemoryViewProps) {
                     setSearchResults(null);
                     setSearch("");
                   }}
+                  aria-label="Clear search results"
                 >
                   Clear
                 </button>
@@ -160,18 +161,21 @@ export function MemoryView({ addRequested = 0, onToast }: MemoryViewProps) {
                 setShowAdd(false);
                 setSelected(null);
               }}
+              aria-label="Toggle knowledge stats"
             >
               <BarChart3 size={10} className="inline mr-0.5" /> Stats
             </button>
             <button
               className="text-[10px] px-2 py-0.5 rounded text-muted-foreground hover:text-foreground"
               onClick={handleExport}
+              aria-label="Export knowledge"
             >
               Export
             </button>
             <button
               className="text-[10px] px-2 py-0.5 rounded text-muted-foreground hover:text-foreground"
               onClick={handleImport}
+              aria-label="Import knowledge"
             >
               Import
             </button>
