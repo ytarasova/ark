@@ -12,6 +12,7 @@ dist/
 .litellm/
 .worktrees/
 .claude/worktrees/
+.claude/scheduled_tasks.lock
 
 # Ark session hook config (written at dispatch, cleaned on stop)
 .claude/settings.local.json

@@ -746,6 +746,10 @@ export class AppContext {
         if (!sid) return;
         const session = this.sessions.get(sid);
         if (!session || !["running", "waiting"].includes(session.status)) {
+          logWarn(
+            "session",
+            `Removing stale settings for ${sid} from ${cwd} (status: ${session?.status ?? "not found"})`,
+          );
           const { removeSettings } = await import("./claude/claude.js");
           removeSettings(cwd);
         }

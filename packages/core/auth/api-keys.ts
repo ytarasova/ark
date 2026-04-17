@@ -8,7 +8,7 @@
 import { createHash, randomBytes } from "crypto";
 import type { IDatabase } from "./database/index.js";
 import type { TenantContext, ApiKey } from "../types/index.js";
-import { now } from "./util/time.js";
+import { now } from "../util/time.js";
 
 // ── Row type ─────────────────────────────────────────────────────────────────
 

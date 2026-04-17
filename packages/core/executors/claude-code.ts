@@ -5,7 +5,7 @@
  * No new behavior — this is a refactor that delegates to existing modules.
  */
 
-import { mkdirSync, writeFileSync } from "fs";
+import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join, resolve } from "path";
 
 import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../executor.js";
@@ -65,12 +65,39 @@ export const claudeCodeExecutor: Executor = {
       originalRepoDir,
     });
 
-    // Status hooks + permissions allow-list
-    claude.writeSettings(session.id, conductorUrl, effectiveWorkdir, {
+    // Verify MCP channel config was written
+    try {
+      const mcpContent = readFileSync(mcpConfigPath, "utf-8");
+      const mcpParsed = JSON.parse(mcpContent);
+      const hasChannel = !!mcpParsed?.mcpServers?.["ark-channel"];
+      if (!hasChannel) {
+        log(`CRITICAL: writeChannelConfig missing ark-channel in ${mcpConfigPath}`);
+      }
+    } catch (e: any) {
+      log(`CRITICAL: failed to verify MCP config at ${mcpConfigPath}: ${e?.message ?? e}`);
+    }
+
+    // Status hooks + permissions allow-list -- MUST happen before agent launch.
+    // The settings file configures Claude Code hooks (PreToolUse, Stop, etc.) that
+    // report status back to the conductor. Without it, the conversation stays empty.
+    const settingsPath = claude.writeSettings(session.id, conductorUrl, effectiveWorkdir, {
       autonomy: opts.autonomy,
       agent: { tools: opts.agent.tools, mcp_servers: opts.agent.mcp_servers },
       tenantId: session.tenant_id ?? "default",
     });
+
+    // Verify the settings file was actually written with hooks
+    try {
+      const settingsContent = readFileSync(settingsPath, "utf-8");
+      const parsed = JSON.parse(settingsContent);
+      if (!parsed.hooks || Object.keys(parsed.hooks).length === 0) {
+        log(`CRITICAL: writeSettings produced empty hooks for ${session.id} at ${settingsPath}`);
+      } else {
+        log(`Settings written to ${settingsPath}: ${Object.keys(parsed.hooks).join(", ")}`);
+      }
+    } catch (e: any) {
+      log(`CRITICAL: failed to verify settings at ${settingsPath}: ${e?.message ?? e}`);
+    }
 
     // Build launch env from agent config + provider-specific env + router URL (if enabled)
     const { buildRouterEnv } = await import("./router-env.js");
