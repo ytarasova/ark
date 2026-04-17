@@ -505,7 +505,7 @@ export class AppContext {
     const messages = new MessageRepository(db);
     const todos = new TodoRepository(db);
     const artifacts = new ArtifactRepository(db);
-    const sessionService = new SessionService(sessions, events, messages);
+    const sessionService = new SessionService(sessions, events, messages, this);
     const computeService = new ComputeService(computes);
     const historyService = new HistoryService(db);
 

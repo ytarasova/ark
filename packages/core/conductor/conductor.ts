@@ -48,7 +48,14 @@ const DEFAULT_PORT = DEFAULT_CONDUCTOR_PORT;
 /** Interval between schedule and PR review poll ticks */
 const POLL_INTERVAL_MS = 60_000;
 
-/** Module-level AppContext set by startConductor(). Used by all handler functions. */
+/**
+ * Module-level AppContext set by startConductor(). Used by handler functions
+ * that are called outside the startConductor() closure (e.g. deliverToChannel,
+ * which is exported and called from other modules).
+ *
+ * Internal handlers defined inside startConductor() close over the `app`
+ * parameter directly and do not use this variable.
+ */
 let _app: AppContext;
 
 /** Extract a path segment by index, returning null if missing. */
