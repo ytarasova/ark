@@ -42,6 +42,10 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
 
   router.handle("session/dispatch", async (params, notify) => {
     const { sessionId } = extract<SessionDispatchParams>(params, ["sessionId"]);
+    app.events.log(sessionId, "session_dispatched", {
+      actor: "user",
+      stage: app.sessions.get(sessionId)?.stage ?? undefined,
+    });
     const result = await app.sessionService.dispatch(sessionId);
     const session = app.sessions.get(sessionId);
     if (session) notify("session/updated", { session });
@@ -59,6 +63,11 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
 
   router.handle("session/advance", async (params, notify) => {
     const { sessionId, force } = extract<SessionAdvanceParams>(params, ["sessionId"]);
+    app.events.log(sessionId, "stage_advanced", {
+      actor: "user",
+      stage: app.sessions.get(sessionId)?.stage ?? undefined,
+      data: { force: force ?? false },
+    });
     const result = await app.sessionService.advance(sessionId, force ?? false);
     const session = app.sessions.get(sessionId);
     if (session) notify("session/updated", { session });

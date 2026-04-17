@@ -341,6 +341,23 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         </div>
       )}
 
+      {session.status === "failed" && session.error && (
+        <div className="mx-5 mt-3 mb-1 p-4 rounded-lg border border-[var(--failed)] bg-[var(--failed)]/5">
+          <div className="text-[var(--failed)] font-semibold text-[13px] mb-1">Session Failed</div>
+          <div className="text-[13px] text-[var(--fg)] font-[family-name:var(--font-mono)] whitespace-pre-wrap break-words">
+            {session.error}
+          </div>
+          <div className="text-[11px] text-[var(--fg-muted)] mt-2">
+            {session.stage && <>Stage: {session.stage}</>}
+            {session.stage && session.agent && " | "}
+            {session.agent && <>Agent: {session.agent}</>}
+          </div>
+          <div className="text-[11px] text-[var(--fg-muted)] mt-1.5">
+            <span>Restart the session, check the terminal output, or review the Events tab for details.</span>
+          </div>
+        </div>
+      )}
+
       <ContentTabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6" onScroll={handleScroll}>
@@ -487,6 +504,34 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
       {activeTab === "events" && events.length > 0 && (
         <div className="border-t border-[var(--border)] px-6 py-2 shrink-0 bg-[var(--bg)] flex items-center gap-3 text-[11px] text-[var(--fg-muted)] font-[family-name:var(--font-mono-ui)]">
           <span>{events.length} events</span>
+          <button
+            type="button"
+            onClick={() => {
+              const exportData = events.map((ev: any) => ({
+                id: ev.id,
+                type: ev.type,
+                stage: ev.stage,
+                actor: ev.actor,
+                data: ev.data,
+                created_at: ev.created_at,
+              }));
+              const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `${session.id}-events.json`;
+              a.click();
+              URL.revokeObjectURL(url);
+              onToast("Events exported", "success");
+            }}
+            className={cn(
+              "px-2 py-0.5 rounded-[var(--radius-sm)] text-[10px] font-medium",
+              "border border-[var(--border)] bg-transparent text-[var(--fg-muted)]",
+              "hover:bg-[var(--bg-hover)] hover:text-[var(--fg)] transition-colors cursor-pointer",
+            )}
+          >
+            Export JSON
+          </button>
           <span className="ml-auto">Last: {formatTime(events[events.length - 1]?.created_at)}</span>
         </div>
       )}

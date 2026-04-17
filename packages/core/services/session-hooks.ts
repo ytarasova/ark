@@ -184,6 +184,41 @@ export function applyHookStatus(
     if (newStatus === "failed" && !updates.error) {
       updates.error = String(payload.error ?? payload.error_details ?? "unknown error");
     }
+    // Enrich failure events with actionable context
+    if (newStatus === "failed") {
+      const errorMsg = updates.error ?? String(payload.error ?? payload.error_details ?? "unknown error");
+      const suggestions: string[] = [];
+      if (errorMsg.includes("permission") || errorMsg.includes("denied")) {
+        suggestions.push("Check file permissions and tool access settings");
+      }
+      if (errorMsg.includes("timeout") || errorMsg.includes("timed out")) {
+        suggestions.push("Consider increasing the timeout or breaking the task into smaller steps");
+      }
+      if (errorMsg.includes("commit")) {
+        suggestions.push("Ensure the agent commits changes before completing");
+      }
+      if (errorMsg.includes("OOM") || errorMsg.includes("memory")) {
+        suggestions.push("Reduce context size or use a smaller model");
+      }
+      if (suggestions.length === 0) {
+        suggestions.push("Check terminal output for details", "Try restarting the session");
+      }
+      result.events!.push({
+        type: "session_failed",
+        opts: {
+          actor: "system",
+          stage: session.stage ?? undefined,
+          data: {
+            error: errorMsg,
+            agent: session.agent,
+            stage: session.stage,
+            hook_event: hookEvent,
+            command: payload.command ?? null,
+            suggestions,
+          },
+        },
+      });
+    }
     // Mark messages as read on terminal states so badges clear
     if (newStatus === "completed" || newStatus === "failed" || newStatus === "stopped") {
       result.markRead = true;
@@ -502,8 +537,39 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
     }
     case "error": {
       const er = report as unknown as Record<string, unknown>;
+      const errorMsg = String(er.error ?? er.message ?? "unknown error");
       result.updates.status = "failed";
-      result.updates.error = (er.error ?? er.message) as string | null;
+      result.updates.error = errorMsg;
+
+      // Build actionable suggestions based on error content
+      const suggestions: string[] = [];
+      if (errorMsg.includes("permission") || errorMsg.includes("denied")) {
+        suggestions.push("Check file permissions and tool access settings");
+      }
+      if (errorMsg.includes("timeout") || errorMsg.includes("timed out")) {
+        suggestions.push("Consider increasing the timeout or breaking the task into smaller steps");
+      }
+      if (errorMsg.includes("rate limit") || errorMsg.includes("429")) {
+        suggestions.push("Wait a few minutes and retry, or switch to a different model provider");
+      }
+      if (suggestions.length === 0) {
+        suggestions.push("Check terminal output for details", "Try restarting the session");
+      }
+
+      result.logEvents!.push({
+        type: "session_failed",
+        opts: {
+          stage: session.stage ?? undefined,
+          actor: "agent",
+          data: {
+            error: errorMsg,
+            agent: session.agent,
+            stage: session.stage,
+            command: er.command ?? null,
+            suggestions,
+          },
+        },
+      });
 
       // Check on_failure directive for automatic retry
       if (session.stage && session.flow) {

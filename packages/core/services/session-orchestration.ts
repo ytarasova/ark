@@ -211,6 +211,19 @@ export function startSession(
 
   const session = app.sessions.create(mergedOpts);
 
+  // Audit: log session creation with full context
+  app.events.log(session.id, "session_created", {
+    actor: "user",
+    data: {
+      summary: opts.summary,
+      flow: mergedOpts.flow ?? "default",
+      agent: opts.agent ?? null,
+      compute: mergedOpts.compute_name ?? "local",
+      repo: opts.repo ?? opts.workdir ?? null,
+      group: mergedOpts.group_name ?? null,
+    },
+  });
+
   // Telemetry: track session creation
   track("session_created", { flow: mergedOpts.flow ?? "default" });
 
@@ -2802,6 +2815,13 @@ export async function send(
   } catch {
     /* skip prompt guard on error */
   }
+
+  // Audit: log user message sent
+  app.events.log(sessionId, "message_sent", {
+    actor: "user",
+    stage: session.stage ?? undefined,
+    data: { length: message.length, preview: message.slice(0, 100) },
+  });
 
   // Persist user message to conversation history before sending to agent
   app.messages.send(sessionId, "user", message, "text");

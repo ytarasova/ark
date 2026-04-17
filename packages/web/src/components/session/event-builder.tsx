@@ -172,6 +172,102 @@ export function buildRichTimelineEvent(ev: any, i: number): TimelineEvent {
       </span>
     );
     color = "blue";
+  } else if (evType === "session_failed") {
+    const msg = data.error || "";
+    const agent = data.agent || "";
+    const failStage = data.stage || stageName || "";
+    const suggestions: string[] = Array.isArray(data.suggestions) ? data.suggestions : [];
+    label = (
+      <span>
+        <strong className="text-[var(--failed)]">Session failed</strong>
+        {msg && <span className="text-[var(--fg-muted)]">: {msg}</span>}
+      </span>
+    );
+    const detailParts: string[] = [];
+    if (failStage) detailParts.push("Stage: " + failStage);
+    if (agent) detailParts.push("Agent: " + agent);
+    if (data.command) detailParts.push("Command: " + data.command);
+    if (suggestions.length > 0)
+      detailParts.push("Suggestions:\n" + suggestions.map((s: string) => "  - " + s).join("\n"));
+    detail = detailParts.join("\n");
+    color = "red";
+  } else if (evType === "session_created") {
+    const flowName = data.flow || "";
+    const agent = data.agent || "";
+    const compute = data.compute || "";
+    const parts = [
+      flowName && "flow: " + flowName,
+      agent && "agent: " + agent,
+      compute && "compute: " + compute,
+    ].filter(Boolean);
+    label = (
+      <span>
+        Session created
+        {parts.length > 0 && <span className="text-[var(--fg-muted)]"> ({parts.join(", ")})</span>}
+      </span>
+    );
+    color = "blue";
+  } else if (evType === "message_sent") {
+    const preview = data.preview || "";
+    label = (
+      <span>
+        Message sent to agent
+        {preview && (
+          <span className="text-[var(--fg-muted)]">
+            : {preview.length > 60 ? preview.slice(0, 60) + "..." : preview}
+          </span>
+        )}
+      </span>
+    );
+    color = "blue";
+  } else if (evType === "session_dispatched") {
+    label = (
+      <span>
+        Session dispatched
+        {stageName && (
+          <span className="text-[var(--fg-muted)]">
+            {" "}
+            -- stage: <strong>{stageName}</strong>
+          </span>
+        )}
+      </span>
+    );
+    color = "blue";
+  } else if (evType === "stage_advanced") {
+    const force = data.force ? " (forced)" : "";
+    label = (
+      <span>
+        Stage manually advanced{force}
+        {stageName && (
+          <span className="text-[var(--fg-muted)]">
+            {" "}
+            from <strong>{stageName}</strong>
+          </span>
+        )}
+      </span>
+    );
+    color = "blue";
+  } else if (evType === "retry_with_context") {
+    const attempt = data.attempt || "?";
+    const retryError = data.error || "";
+    label = (
+      <span>
+        <strong className="text-[var(--waiting)]">Retry #{String(attempt)}</strong>
+        {retryError && <span className="text-[var(--fg-muted)]">: {retryError}</span>}
+      </span>
+    );
+    color = "amber";
+  } else if (evType === "stuck_session_recovered") {
+    const action = data.action || "";
+    const reason = data.reason || "";
+    label = (
+      <span>
+        <strong className="text-[var(--waiting)]">Stuck session recovered</strong>
+        {action && <span className="text-[var(--fg-muted)]"> -- {action}</span>}
+        {reason && <span className="text-[var(--fg-muted)]">: {reason}</span>}
+      </span>
+    );
+    color = "amber";
   } else if (evType.includes("error") || evType.includes("fail")) {
     const msg = data.error || data.message || (typeof ev.data === "string" ? ev.data : "");
     label = (
