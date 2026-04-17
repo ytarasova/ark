@@ -18,10 +18,9 @@ export function buildStageProgress(session: any, flowStages: any[]): StageProgre
 
   return flowStages.map((s: any, i: number) => {
     if (isCompleted) return { name: s.name, state: "done" as const };
-    if (isFailed && i === currentIdx) return { name: s.name, state: "active" as const };
     if (currentIdx < 0) return { name: s.name, state: "pending" as const };
     if (i < currentIdx) return { name: s.name, state: "done" as const };
-    if (i === currentIdx) return { name: s.name, state: "active" as const };
+    if (i === currentIdx) return { name: s.name, state: isFailed ? ("failed" as const) : ("active" as const) };
     return { name: s.name, state: "pending" as const };
   });
 }

@@ -394,7 +394,18 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
             {agentIsTyping && <TypingIndicator agentName={session.agent || "agent"} />}
             {session.status === "completed" && cost && (
               <SessionSummary
-                duration={fmtDuration(session.created_at)}
+                duration={(() => {
+                  // Use actual run time: last event time - first event time (or created_at)
+                  const evts = detail?.events || [];
+                  if (evts.length > 1) {
+                    const start = new Date(evts[0].created_at).getTime();
+                    const end = new Date(evts[evts.length - 1].created_at).getTime();
+                    const mins = Math.round((end - start) / 60000);
+                    if (mins < 60) return `${mins}m`;
+                    return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+                  }
+                  return fmtDuration(session.created_at);
+                })()}
                 cost={fmtCost(cost.cost)}
                 filesChanged={session.config?.filesChanged?.length || 0}
                 testsPassed={session.config?.tests_passed}
