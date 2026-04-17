@@ -548,7 +548,20 @@ async function agentLaunch(req: AgentLaunchReq): Promise<AgentLaunchRes> {
   await writeFile(scriptPath, req.script, { mode: 0o755 });
 
   const proc = Bun.spawn({
-    cmd: ["tmux", "new-session", "-d", "-s", req.sessionName, "-c", req.workdir, `bash ${scriptPath}`],
+    cmd: [
+      "tmux",
+      "new-session",
+      "-d",
+      "-s",
+      req.sessionName,
+      "-x",
+      "200",
+      "-y",
+      "50",
+      "-c",
+      req.workdir,
+      `bash ${scriptPath}`,
+    ],
     stdout: "pipe",
     stderr: "pipe",
   });
