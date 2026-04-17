@@ -37,11 +37,17 @@ import type {
 } from "./types.js";
 
 export class ArkdClient {
-  constructor(private baseUrl: string) {
+  private token: string | null;
+
+  constructor(
+    private baseUrl: string,
+    opts?: { token?: string },
+  ) {
     // Strip trailing slash
     if (this.baseUrl.endsWith("/")) {
       this.baseUrl = this.baseUrl.slice(0, -1);
     }
+    this.token = opts?.token ?? process.env.ARK_ARKD_TOKEN ?? null;
   }
 
   // ── File operations ───────────────────────────────────────────────────────
@@ -132,10 +138,15 @@ export class ArkdClient {
 
   // ── Internal ──────────────────────────────────────────────────────────────
 
+  private authHeaders(): Record<string, string> {
+    if (this.token) return { Authorization: `Bearer ${this.token}` };
+    return {};
+  }
+
   private async post<Req, Res>(path: string, body: Req): Promise<Res> {
     const resp = await fetch(`${this.baseUrl}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...this.authHeaders() },
       body: JSON.stringify(body),
     });
     const data = await resp.json();
@@ -147,7 +158,9 @@ export class ArkdClient {
   }
 
   private async get<Res>(path: string): Promise<Res> {
-    const resp = await fetch(`${this.baseUrl}${path}`);
+    const resp = await fetch(`${this.baseUrl}${path}`, {
+      headers: this.authHeaders(),
+    });
     const data = await resp.json();
     if (!resp.ok) {
       const err = data as ArkdError;

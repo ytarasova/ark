@@ -15,7 +15,7 @@
 
 import { readFileSync, existsSync } from "fs";
 import { execFileSync } from "child_process";
-import { join } from "path";
+import { join, resolve } from "path";
 import type { AppContext } from "../app.js";
 import { eventBus } from "../hooks.js";
 import { Router } from "../../server/router.js";
@@ -37,6 +37,7 @@ import {
   sanitizeSessionName,
 } from "./terminal-bridge.js";
 import { VERSION } from "../version.js";
+import { createHmac, timingSafeEqual } from "crypto";
 
 const WEB_DIST: string = resolveWebDist();
 const SERVER_BOOT_TIME = Date.now();
@@ -357,7 +358,22 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
       if (url.pathname === "/api/webhooks/github/issues" && req.method === "POST") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {
-          const payload = (await req.json()) as IssueWebhookPayload;
+          const rawBody = await req.text();
+          // Verify webhook signature if a secret is configured
+          const webhookSecret = process.env.ARK_GITHUB_WEBHOOK_SECRET;
+          if (webhookSecret) {
+            const signature = req.headers.get("x-hub-signature-256");
+            if (!signature) {
+              return jsonResponse({ ok: false, message: "Missing webhook signature" }, 401);
+            }
+            const expected = "sha256=" + createHmac("sha256", webhookSecret).update(rawBody).digest("hex");
+            const sigBuf = Buffer.from(signature);
+            const expBuf = Buffer.from(expected);
+            if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) {
+              return jsonResponse({ ok: false, message: "Invalid webhook signature" }, 401);
+            }
+          }
+          const payload = JSON.parse(rawBody) as IssueWebhookPayload;
           const config: IssueWebhookConfig = {
             triggerLabel: url.searchParams.get("label") ?? "ark",
             autoDispatch: url.searchParams.get("dispatch") === "true",
@@ -382,7 +398,10 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
       };
       const ext = url.pathname.slice(url.pathname.lastIndexOf("."));
       if (staticExts[ext]) {
-        const filePath = join(WEB_DIST, url.pathname);
+        const filePath = resolve(join(WEB_DIST, url.pathname));
+        if (!filePath.startsWith(resolve(WEB_DIST))) {
+          return new Response("Forbidden", { status: 403, headers: CORS });
+        }
         if (existsSync(filePath)) {
           return new Response(Bun.file(filePath), {
             headers: { "Content-Type": staticExts[ext], ...CORS },
@@ -390,8 +409,8 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
         }
       }
 
-      // SPA index.html
-      if (url.pathname === "/" || url.pathname === "/index.html") {
+      // SPA index.html -- serve for all non-API, non-static routes (catchall for client-side routing)
+      if (!staticExts[ext]) {
         const indexPath = join(WEB_DIST, "index.html");
         if (existsSync(indexPath)) {
           let html = readFileSync(indexPath, "utf-8");

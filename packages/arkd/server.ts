@@ -29,8 +29,9 @@ declare const Bun: {
 };
 
 import { readFile, writeFile, stat, mkdir, readdir } from "fs/promises";
+import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
-import { hostname, platform, uptime, totalmem, freemem, cpus } from "os";
+import { hostname, platform, uptime, totalmem, freemem, cpus, homedir } from "os";
 import { DEFAULT_CHANNEL_BASE_URL } from "../core/constants.js";
 import type {
   ReadFileReq,
@@ -79,12 +80,79 @@ export interface ArkdOpts {
   quiet?: boolean;
   conductorUrl?: string;
   hostname?: string;
+  /** Bearer token for auth. Overrides ARK_ARKD_TOKEN env var. */
+  token?: string;
 }
+
+/** Paths that bypass authentication (health probes). */
+const AUTH_EXEMPT_PATHS = new Set(["/health"]);
+
+/** Commands allowed by the /exec endpoint. */
+const EXEC_ALLOWED_COMMANDS = new Set([
+  "git",
+  "bun",
+  "make",
+  "npm",
+  "npx",
+  "node",
+  "cat",
+  "ls",
+  "head",
+  "tail",
+  "grep",
+  "find",
+  "wc",
+  "diff",
+  "echo",
+  "pwd",
+  "mkdir",
+  "cp",
+  "mv",
+  "rm",
+  "touch",
+  "chmod",
+  "sh",
+  "bash",
+  "zsh",
+  "tmux",
+  "df",
+  "ps",
+  "pgrep",
+  "top",
+  "uptime",
+  "sysctl",
+  "vm_stat",
+  "lsof",
+  "ss",
+  "docker",
+  "devcontainer",
+  "claude",
+  "codex",
+  "gemini",
+  "goose",
+  "codegraph",
+]);
 
 export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void; setConductorUrl(url: string): void } {
   // Mutable runtime config
   let conductorUrl: string | null = opts?.conductorUrl ?? process.env.ARK_CONDUCTOR_URL ?? "http://localhost:19100";
   const bindHost = opts?.hostname ?? "0.0.0.0";
+
+  // Auth token
+  const arkdToken: string | null = opts?.token ?? process.env.ARK_ARKD_TOKEN ?? null;
+  if (arkdToken) {
+    const arkDir = join(homedir(), ".ark");
+    if (!existsSync(arkDir)) mkdirSync(arkDir, { recursive: true });
+    writeFileSync(join(arkDir, "arkd.token"), arkdToken, { mode: 0o600 });
+  }
+
+  function checkAuth(req: Request, path: string): Response | null {
+    if (!arkdToken) return null;
+    if (AUTH_EXEMPT_PATHS.has(path)) return null;
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader === `Bearer ${arkdToken}`) return null;
+    return json({ error: "Unauthorized" }, 401);
+  }
 
   // Control plane registration
   const controlPlaneUrl = process.env.ARK_CONTROL_PLANE_URL;
@@ -142,6 +210,10 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
             platform: platform(),
           });
         }
+
+        // Auth check (after health, which is exempt)
+        const authErr = checkAuth(req, path);
+        if (authErr) return authErr;
 
         // ── Metrics ───────────────────────────────────────────────────
         if (req.method === "GET" && path === "/metrics") {
@@ -425,6 +497,17 @@ async function readStream(stream: ReadableStream<Uint8Array>): Promise<string> {
 }
 
 async function runExec(req: ExecReq): Promise<ExecRes> {
+  // Validate command against allowlist
+  const baseCmd = req.command.includes("/") ? req.command.split("/").pop()! : req.command;
+  if (!EXEC_ALLOWED_COMMANDS.has(baseCmd)) {
+    return { exitCode: 1, stdout: "", stderr: `Command not allowed: ${req.command}`, timedOut: false };
+  }
+
+  // Audit log
+  const ts = new Date().toISOString();
+  const cmdStr = [req.command, ...(req.args ?? [])].join(" ");
+  process.stderr.write(`[arkd] [exec] ${ts} cwd=${req.cwd ?? "."} cmd=${cmdStr}\n`);
+
   const cmd = [req.command, ...(req.args ?? [])];
   const timeout = req.timeout ?? 30_000;
 
