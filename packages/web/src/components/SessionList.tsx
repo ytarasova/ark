@@ -134,13 +134,14 @@ export function SessionListPanel({
       headerAction={
         !readOnly ? (
           <Button
-            size="icon-xs"
-            variant="ghost"
-            className="h-6 w-6 text-[var(--fg-muted)] hover:text-[var(--fg)]"
+            size="sm"
+            variant="default"
+            className="h-7 px-2.5 text-[12px] font-medium bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] gap-1"
             onClick={onNewSession}
             title="New session (n)"
           >
-            <Plus size={15} />
+            <Plus size={14} />
+            New
           </Button>
         ) : undefined
       }

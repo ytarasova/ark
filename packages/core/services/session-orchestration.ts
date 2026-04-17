@@ -459,6 +459,8 @@ export async function dispatch(
   // Build task with handoff context
   log("Building task...");
   let task = await buildTaskWithHandoff(app, session, stage, agentName);
+  // Capture clean user task before context/repo-map injection for event previews
+  const taskPreview = (session.summary || task.slice(0, 200)).slice(0, 200);
 
   // Index codebase into knowledge graph
   if (session.repo) {
@@ -609,7 +611,7 @@ export async function dispatch(
       tools: agent.tools,
       skills: agent.skills,
       memories: agent.memories,
-      task_preview: task.slice(0, 200),
+      task_preview: taskPreview,
       stage_start_sha: stageStartSha,
     },
   });

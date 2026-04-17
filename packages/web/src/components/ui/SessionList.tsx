@@ -58,7 +58,7 @@ export function SessionList({
       {/* Header */}
       <div className="px-4 pt-4 pb-1 shrink-0">
         <div className="flex items-center justify-between mb-2.5">
-          <h2 className="text-[13px] font-semibold text-[var(--fg-muted)] uppercase tracking-[0.04em]">Sessions</h2>
+          <h2 className="text-[18px] font-semibold text-[var(--fg)]">Sessions</h2>
           <div className="flex items-center gap-1">
             {onSearchChange && (
               <button
@@ -139,7 +139,7 @@ function SessionCard({
       type="button"
       onClick={() => onSelect(session.id)}
       className={cn(
-        "flex flex-col gap-0.5 w-full text-left px-2 py-2 rounded-[var(--radius-sm)]",
+        "flex flex-col gap-1 w-full text-left px-2 py-3 rounded-[var(--radius-sm)]",
         "cursor-pointer border-l-[3px] border-transparent min-h-[52px] justify-center",
         "hover:bg-[var(--bg-hover)] transition-colors duration-150",
         selected && "bg-[var(--primary-subtle)] border-l-[var(--primary)]",
@@ -148,18 +148,20 @@ function SessionCard({
       {/* Top row: dot + id + time */}
       <div className="flex items-center gap-1.5">
         <StatusDot status={session.status} size="md" />
-        <span className="font-[family-name:var(--font-mono-ui)] text-[11px] text-[var(--fg-muted)]">{session.id}</span>
-        <span className="text-[10px] text-[var(--fg-muted)] ml-auto">{session.relativeTime}</span>
+        <span className="font-[family-name:var(--font-mono-ui)] text-[12px] text-[var(--fg-muted)]">{session.id}</span>
+        <span className="text-[11px] text-[var(--fg-muted)] ml-auto">{session.relativeTime}</span>
       </div>
 
       {/* Summary */}
-      <div className="text-[12px] font-medium truncate pl-[13px]">{session.summary}</div>
+      <div className="text-[14px] font-medium truncate pl-[13px]">{session.summary}</div>
 
       {/* Bottom row: pipeline + agent + cost */}
       <div className="flex items-center gap-1.5 pl-[13px]">
         <StageProgressBar stages={session.stages} />
-        <span className="text-[10px] text-[var(--fg-muted)]">{session.agentName}</span>
-        <span className="font-[family-name:var(--font-mono-ui)] text-[10px] text-[var(--fg-muted)]">
+        <span className="font-[family-name:var(--font-mono-ui)] text-[11px] text-[var(--fg-muted)]">
+          {session.agentName}
+        </span>
+        <span className="font-[family-name:var(--font-mono-ui)] text-[11px] text-[var(--fg-muted)]">
           {session.cost}
         </span>
       </div>
