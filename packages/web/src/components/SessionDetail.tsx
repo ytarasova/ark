@@ -139,14 +139,21 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
           return;
       }
       if (res.ok !== false) {
-        onToast(action + " successful", "success");
+        onToast(`Session ${sessionId} ${action} successful`, "success");
         const d = await api.getSession(sessionId);
         setDetail(d);
       } else {
-        onToast(res.message || "Action failed", "error");
+        const hint =
+          action === "dispatch"
+            ? ". Check that the conductor is running: ark server daemon start"
+            : action === "stop"
+              ? ". The session may have already exited"
+              : "";
+        onToast(`Failed to ${action} session ${sessionId}: ${res.message || "unknown error"}${hint}`, "error");
       }
     } catch (err: any) {
-      onToast(err.message || "Action failed", "error");
+      const hint = action === "dispatch" ? ". Check that the conductor is running: ark server daemon start" : "";
+      onToast(`Failed to ${action} session ${sessionId}: ${err.message || "network error"}${hint}`, "error");
     } finally {
       setActionLoading(null);
     }
@@ -157,7 +164,8 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
     if (!text) return;
     setChatMsg("");
     const res = await send(text);
-    if (res.ok === false) onToast(res.message || "Send failed", "error");
+    if (res.ok === false)
+      onToast(`Send to ${sessionId} failed: ${res.message || "session may not be running"}`, "error");
   }
 
   async function handleToggleTodo(id: number) {
@@ -165,7 +173,7 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
       const res = await api.toggleTodo(id);
       if (res.ok !== false && res.todo) setTodos(todos.map((t) => (t.id === id ? res.todo : t)));
     } catch (err: any) {
-      onToast(err.message || "Failed to toggle todo", "error");
+      onToast(`Failed to toggle todo: ${err.message || "network error"}`, "error");
     }
   }
 

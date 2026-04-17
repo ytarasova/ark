@@ -165,24 +165,27 @@ export function SessionsPage({
         try {
           await new Promise((r) => setTimeout(r, 500));
           await api.dispatch(res.session.id);
-          onToast("Session created and dispatched", "success");
+          onToast(`Session ${res.session.id} created and dispatched`, "success");
         } catch {
           try {
             await new Promise((r) => setTimeout(r, 1000));
             await api.dispatch(res.session.id);
-            onToast("Session created and dispatched (retry)", "success");
+            onToast(`Session ${res.session.id} created and dispatched (retry)`, "success");
           } catch {
-            onToast("Session created but dispatch failed", "error");
+            onToast(
+              `Session ${res.session.id} created but dispatch failed. Check that the conductor is running: ark server daemon start`,
+              "error",
+            );
           }
         }
       } else {
-        onToast("Session created", "success");
+        onToast(`Session ${res.session?.id || ""} created`, "success");
       }
       setShowNew(false);
       setSelectedId(res.session?.id || null);
       refresh();
     } else {
-      onToast(res.message || "Failed to create session", "error");
+      onToast(`Failed to create session: ${res.message || "unknown error"}`, "error");
     }
   }
 

@@ -42,7 +42,7 @@ export function ChatPanel({ sessionId, session, onClose, onToast }: ChatPanelPro
     setUserScrolled(false);
     const res = await send(text);
     if (res.ok === false) {
-      onToast(res.message || "Send failed", "error");
+      onToast(`Send to ${sessionId} failed: ${res.message || "session may not be running"}`, "error");
     }
   }
 
