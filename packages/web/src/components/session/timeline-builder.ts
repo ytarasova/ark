@@ -84,6 +84,11 @@ export function parseUnifiedDiff(raw: string): DiffFile[] {
 /** Event types that should be hidden from the Conversation tab. */
 const HIDDEN_EVENT_TYPES = ["session_stopped", "session_resumed"];
 
+/** Truncate a string to maxLen, appending "..." if truncated. */
+function truncate(s: string, maxLen = 120): string {
+  return s.length > maxLen ? s.slice(0, maxLen) + "..." : s;
+}
+
 /** Format tool input from hook data into a readable summary. */
 function formatToolInput(data: any): string {
   if (!data) return "";
@@ -121,6 +126,10 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
   const pendingTools = new Map<string, number>();
   const sessionAgent = session?.agent || "agent";
 
+  // Dedup tracking: one event per stage transition, first checkpoint per stage
+  const seenStageTransitions = new Set<string>();
+  const seenCheckpointStages = new Set<string>();
+
   for (const ev of events || []) {
     all.push({ ...ev, _type: "event", _time: new Date(ev.created_at).getTime() });
   }
@@ -146,6 +155,7 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
       const evType = item.type || "";
       const evData = typeof item.data === "string" ? item.data : item.data?.message || "";
       const nested = typeof item.data === "object" ? item.data?.data : null;
+      const evDataObj = typeof item.data === "object" ? item.data : {};
       const evStage = item.stage || item.data?.stage || nested?.stage || undefined;
 
       if (HIDDEN_EVENT_TYPES.includes(evType)) continue;
@@ -210,7 +220,12 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
       }
 
       if (evType === "checkpoint") {
-        const cpData = typeof item.data === "object" ? item.data : {};
+        // Only show the FIRST checkpoint per stage to avoid noise
+        const cpKey = evStage || "__global__";
+        if (seenCheckpointStages.has(cpKey)) continue;
+        seenCheckpointStages.add(cpKey);
+
+        const cpData = evDataObj;
         const status = cpData.status || "";
         const compute = cpData.compute || cpData.compute_type || "";
         const label = (evStage || "session") + (status ? " " + status : "");
@@ -280,8 +295,14 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
           stage: evStage,
         });
       } else if (evType === "stage_ready") {
-        const stageData = typeof item.data === "object" ? item.data : {};
-        const agent = stageData.agent || "";
+        // Deduplicate: if we already showed a stage_handoff for this stage, skip stage_ready
+        const readyKey = "ready:" + (evStage || "unknown");
+        const handoffKey = "handoff:" + (evStage || "unknown");
+        if (seenStageTransitions.has(handoffKey) || seenStageTransitions.has(readyKey)) continue;
+        seenStageTransitions.add(readyKey);
+
+        const stageData = evDataObj;
+        const agent = stageData.agent || stageData.stage_agent || "";
         const gate = stageData.gate || "";
         const parts = [agent && "agent: " + agent, gate && "gate: " + gate].filter(Boolean);
         const detail = parts.length > 0 ? " (" + parts.join(", ") + ")" : "";
@@ -292,7 +313,7 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
           stage: evStage,
         });
       } else if (evType === "stage_started") {
-        const stageData = typeof item.data === "object" ? item.data : {};
+        const stageData = evDataObj;
         const agent = stageData.agent || "";
         const model = stageData.model || "";
         const taskPreview: string = stageData.task || stageData.summary || "";
@@ -307,20 +328,75 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
           stage: evStage,
         });
       } else if (evType === "stage_completed") {
-        const stageData = typeof item.data === "object" ? item.data : {};
+        const stageData = evDataObj;
         const agent = stageData.agent || "";
+        const note = stageData.note || stageData.summary || stageData.message || "";
         const agentSuffix = agent ? " (" + agent + ")" : "";
+        const noteSuffix = note ? " -- " + truncate(note, 100) : "";
         items.push({
           kind: "system",
-          content: "Stage " + (evStage || "unknown") + " completed" + agentSuffix,
+          content: "Stage " + (evStage || "unknown") + " completed" + agentSuffix + noteSuffix,
           timestamp: formatTime(item.created_at),
           stage: evStage,
         });
       } else if (evType === "stage_handoff") {
-        const target = evStage || nested?.stage || "";
+        const handoffData = evDataObj;
+        const toStage = handoffData.to_stage || evStage || nested?.stage || "";
+        const fromStage = handoffData.from_stage || "";
+
+        // Deduplicate: only one handoff event per target stage
+        const handoffKey = "handoff:" + (toStage || "unknown");
+        if (seenStageTransitions.has(handoffKey)) continue;
+        seenStageTransitions.add(handoffKey);
+        // Also mark ready as seen so stage_ready for the same stage is suppressed
+        seenStageTransitions.add("ready:" + (toStage || "unknown"));
+
+        const fromSuffix = fromStage ? " (from " + fromStage + ")" : "";
         items.push({
           kind: "system",
-          content: target ? "advancing to " + target : "advancing to next stage",
+          content: toStage ? "Advancing to " + toStage + fromSuffix : "Advancing to next stage",
+          timestamp: formatTime(item.created_at),
+          stage: evStage,
+        });
+      } else if (evType === "pr_detected") {
+        const prUrl = evDataObj.pr_url || nested?.pr_url || "";
+        const label = prUrl ? "PR detected: " + prUrl : "PR detected";
+        items.push({
+          kind: "system",
+          content: label,
+          timestamp: formatTime(item.created_at),
+          stage: evStage,
+        });
+      } else if (evType === "action_executed") {
+        const action = evDataObj.action || nested?.action || "";
+        const prUrl = evDataObj.pr_url || nested?.pr_url || "";
+        const skipped = evDataObj.skipped || nested?.skipped || "";
+        const parts: string[] = [];
+        if (action === "create_pr" || action === "auto_create_pr") {
+          parts.push(prUrl ? "PR created: " + prUrl : "PR created");
+        } else if (action === "merge_pr" || action === "merge" || action === "auto_merge") {
+          parts.push(prUrl ? "PR merged: " + prUrl : "PR merged");
+        } else if (action === "close") {
+          parts.push("Session closed");
+        } else {
+          parts.push("Action: " + (action || "unknown"));
+        }
+        if (skipped) parts.push("(" + skipped.replace(/_/g, " ") + ")");
+        items.push({
+          kind: "system",
+          content: parts.join(" "),
+          timestamp: formatTime(item.created_at),
+          stage: evStage,
+        });
+      } else if (evType === "session_completed") {
+        const finalStage = evDataObj.final_stage || evStage || "";
+        const flow = evDataObj.flow || "";
+        const summaryParts: string[] = ["Session completed"];
+        if (finalStage) summaryParts.push("at stage " + finalStage);
+        if (flow) summaryParts.push("(flow: " + flow + ")");
+        items.push({
+          kind: "system",
+          content: summaryParts.join(" "),
           timestamp: formatTime(item.created_at),
           stage: evStage,
         });
@@ -355,10 +431,14 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
           stage: evStage,
         });
       } else {
-        // Show all other events with their message data (match the events tab)
-        const evDataObj = typeof item.data === "object" ? item.data : {};
-        const msg = evDataObj.message || (typeof item.data === "string" ? item.data : "");
-        const label = msg ? evType.replace(/_/g, " ") + " -- " + msg : evType.replace(/_/g, " ");
+        // Show all other events with context from their data field
+        const msg =
+          evDataObj.message ||
+          evDataObj.reason ||
+          evDataObj.summary ||
+          evDataObj.pr_url ||
+          (typeof item.data === "string" ? item.data : "");
+        const label = msg ? evType.replace(/_/g, " ") + " -- " + truncate(String(msg), 120) : evType.replace(/_/g, " ");
         if (label) {
           items.push({ kind: "system", content: label, timestamp: formatTime(item.created_at), stage: evStage });
         }
