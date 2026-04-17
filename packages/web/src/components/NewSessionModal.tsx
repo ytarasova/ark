@@ -415,6 +415,31 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
     ((currentFlow.description || "").toLowerCase().includes("ticket") ||
       (currentFlow.stages || []).some((s) => s.toLowerCase().includes("ticket")));
 
+  // Keyboard shortcuts: Cmd+Enter to submit, Escape to cancel
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && summary.trim() && daemonOnline) {
+        e.preventDefault();
+        onSubmit({
+          summary,
+          repo,
+          flow: selectedFlow,
+          ticket,
+          compute_name: selectedCompute,
+          agent: "",
+          group_name: "",
+          dispatch: true,
+        });
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [summary, repo, selectedFlow, ticket, selectedCompute, daemonOnline, onClose, onSubmit]);
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!summary.trim()) return;
@@ -521,7 +546,7 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
         {/* Actions */}
         <div className="flex items-center justify-end gap-2 pt-3 pb-5">
           <Button type="button" variant="outline" size="sm" onClick={onClose}>
-            Cancel
+            Cancel <kbd className="ml-1.5 text-[9px] opacity-50 font-mono">Esc</kbd>
           </Button>
           <Button
             type="submit"
@@ -529,7 +554,7 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
             disabled={!summary.trim() || !daemonOnline}
             title={!daemonOnline ? "Start the daemon first" : undefined}
           >
-            Start Session
+            Start Session <kbd className="ml-1.5 text-[9px] opacity-70 font-mono">Cmd+Enter</kbd>
           </Button>
         </div>
       </form>
