@@ -183,12 +183,12 @@
 }
 
 /* ---- Indeterminate progress bar ---- */
-@keyframes indeterminate {
+@keyframes slideRight {
   0% {
-    transform: translateX(-100%);
+    left: -30%;
   }
   100% {
-    transform: translateX(200%);
+    left: 100%;
   }
 }
 .indeterminate-bar {
@@ -202,11 +202,13 @@
 .indeterminate-bar::after {
   content: "";
   position: absolute;
+  top: 0;
+  left: -30%;
   height: 100%;
-  width: 40%;
-  background: var(--primary);
+  width: 30%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
   border-radius: 1px;
-  animation: indeterminate 1.5s ease-in-out infinite;
+  animation: slideRight 1.5s ease-in-out infinite;
 }
 
 /* ---- Skeleton shimmer ---- */

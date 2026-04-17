@@ -23,18 +23,19 @@ export function StageProgressBar({ stages, className, ...props }: StageProgressB
           key={s.name}
           className={cn("h-[3px] flex-1 rounded-full overflow-hidden relative", {
             "bg-[var(--completed)]": s.state === "done",
-            "bg-[var(--primary)]": s.state === "active",
+            "bg-[var(--running)]": s.state === "active",
             "bg-[var(--border)]": s.state === "pending",
           })}
           title={`${s.name}: ${s.state}`}
         >
           {s.state === "active" && (
-            <div className="absolute inset-0 bg-[var(--border)] rounded-full">
-              <div
-                className="h-full w-[40%] bg-[var(--primary)] rounded-full"
-                style={{ animation: "indeterminate 1.5s ease-in-out infinite" }}
-              />
-            </div>
+            <div
+              className="absolute top-0 h-full w-[30%]"
+              style={{
+                background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)",
+                animation: "slideRight 1.5s ease-in-out infinite",
+              }}
+            />
           )}
         </div>
       ))}

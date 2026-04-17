@@ -47,7 +47,7 @@ function stateToColor(state: "done" | "active" | "pending"): string {
     case "done":
       return "bg-[var(--running)]";
     case "active":
-      return "bg-[var(--primary)]";
+      return "bg-[var(--running)]";
     case "pending":
       return "bg-[var(--border)]";
   }
@@ -148,8 +148,8 @@ describe("stateToColor mapping", () => {
     expect(stateToColor("done")).toBe("bg-[var(--running)]");
   });
 
-  test("active maps to primary color", () => {
-    expect(stateToColor("active")).toBe("bg-[var(--primary)]");
+  test("active maps to running color", () => {
+    expect(stateToColor("active")).toBe("bg-[var(--running)]");
   });
 
   test("pending maps to border color (dim)", () => {
