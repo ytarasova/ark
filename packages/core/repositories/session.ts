@@ -7,6 +7,7 @@ import type {
   CreateSessionOpts,
   SessionListFilters,
 } from "../../types/index.js";
+import { now } from "../util/time.js";
 
 // ── Row type (config stored as JSON string) ─────────────────────────────────
 
@@ -40,10 +41,6 @@ interface SessionRow {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-function now(): string {
-  return new Date().toISOString();
-}
 
 function safeParseConfig(raw: unknown): SessionConfig {
   if (typeof raw === "object" && raw !== null) return raw as SessionConfig;

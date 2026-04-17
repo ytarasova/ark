@@ -3,6 +3,14 @@
  *
  * This is the main orchestration module. All session state mutations go through here.
  * Direct interaction with the store is for reads only - writes go through these functions.
+ *
+ * TODO(refactor): This file is ~3000 lines and should be split into modules:
+ *   - dispatch.ts -- session dispatch logic (dispatch(), ~340 lines)
+ *   - advance.ts -- stage advancement and flow routing (advance(), ~240 lines)
+ *   - worktree.ts -- git worktree operations (worktreeDiff, finishWorktree, setupWorktree, ~500 lines)
+ *   - lifecycle.ts -- stop, resume, clone, fork/join
+ *   - launch.ts -- agent launching (_launchAgentTmux, ~100 lines)
+ * Each function already takes app: AppContext as first arg, so extraction is mechanical.
  */
 
 import { randomUUID } from "crypto";
@@ -623,7 +631,7 @@ export async function dispatch(
     const { startStatusPoller } = await import("../executors/status-poller.js");
     startStatusPoller(app, sessionId, tmuxName, runtime);
   } catch {
-    /* ignore */
+    /* status poller is best-effort -- agent runs fine without it */
   }
 
   // Observability + telemetry
@@ -674,7 +682,7 @@ export async function advance(
         try {
           markStageCompleted(app, sessionId, stage);
         } catch {
-          /* skip */
+          /* flow-state persistence is best-effort -- stage still advances */
         }
 
         // Compute which stages should be skipped due to conditional branching
@@ -685,7 +693,7 @@ export async function advance(
             try {
               markStagesSkipped(app, sessionId, newSkipped);
             } catch {
-              /* skip */
+              /* flow-state persistence is best-effort -- stage still advances */
             }
           }
         }
@@ -696,7 +704,7 @@ export async function advance(
         try {
           setCurrentStage(app, sessionId, graphNextStage, flowName);
         } catch {
-          /* skip */
+          /* flow-state persistence is best-effort -- stage still advances */
         }
 
         // Stage isolation: clear runtime handles so next stage gets a fresh runtime.
@@ -748,7 +756,7 @@ export async function advance(
         try {
           markStageCompleted(app, sessionId, stage);
         } catch {
-          /* skip */
+          /* flow-state persistence is best-effort -- stage still advances */
         }
         app.sessions.update(sessionId, { status: "waiting" });
         app.events.log(sessionId, "stage_waiting", {
@@ -763,7 +771,7 @@ export async function advance(
       try {
         markStageCompleted(app, sessionId, stage);
       } catch {
-        /* skip */
+        /* flow-state persistence is best-effort -- stage still advances */
       }
       app.sessions.update(sessionId, { status: "completed" });
       app.events.log(sessionId, "session_completed", {
@@ -796,7 +804,7 @@ export async function advance(
     try {
       markStageCompleted(app, sessionId, stage, outcome ? { outcome } : undefined);
     } catch {
-      /* skip */
+      /* flow-state persistence is best-effort -- stage still advances */
     }
     app.sessions.update(sessionId, { status: "completed" });
     app.events.log(sessionId, "session_completed", {
@@ -840,12 +848,12 @@ export async function advance(
   try {
     markStageCompleted(app, sessionId, stage, outcome ? { outcome } : undefined);
   } catch {
-    /* skip */
+    /* flow-state persistence is best-effort -- stage still advances */
   }
   try {
     setCurrentStage(app, sessionId, nextStage, flowName);
   } catch {
-    /* skip */
+    /* flow-state persistence is best-effort -- stage still advances */
   }
 
   const nextAction = flow.getStageAction(app, flowName, nextStage);
@@ -932,7 +940,7 @@ export async function stop(
     const { stopStatusPoller } = await import("../executors/status-poller.js");
     stopStatusPoller(sessionId);
   } catch {
-    /* ignore */
+    /* poller may not be running -- safe to ignore */
   }
 
   // Checkpoint before state transition
@@ -2243,7 +2251,7 @@ export async function worktreeDiff(
       });
       branch = stdout.trim();
     } catch {
-      /* ignore */
+      /* worktree dir may not be a git repo yet -- branch stays undefined */
     }
   }
   if (!branch)
@@ -2448,7 +2456,7 @@ export async function createWorktreePR(
       });
       branch = stdout.trim();
     } catch {
-      /* ignore */
+      /* worktree dir may not be a git repo yet -- branch stays undefined */
     }
   }
   if (!branch) return { ok: false, message: "Cannot determine worktree branch" };
@@ -2590,7 +2598,7 @@ export async function finishWorktree(
       });
       branch = stdout.trim();
     } catch {
-      /* ignore */
+      /* worktree dir may not be a git repo yet -- branch stays undefined */
     }
   }
 
@@ -2650,7 +2658,7 @@ export async function finishWorktree(
           stdio: ["ignore", "pipe", "pipe"],
         });
       } catch {
-        /* ignore */
+        /* merge --abort may fail if no merge in progress -- safe to ignore */
       }
       return {
         ok: false,
@@ -2686,7 +2694,7 @@ export async function finishWorktree(
           stdio: ["ignore", "pipe", "pipe"],
         });
       } catch {
-        /* ignore */
+        /* force delete also failed -- branch may already be gone */
       }
     }
   }
@@ -2973,7 +2981,7 @@ export function findOrphanedWorktrees(app: AppContext): string[] {
       }
     }
   } catch {
-    /* ignore */
+    /* worktrees dir may not exist -- no orphans to report */
   }
 
   return orphans;

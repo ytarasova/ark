@@ -1,5 +1,6 @@
 import type { IDatabase } from "../database/index.js";
 import type { Message, MessageRole, MessageType } from "../../types/index.js";
+import { now } from "../util/time.js";
 
 // ── Row type (read stored as integer 0/1) ───────────────────────────────────
 
@@ -14,10 +15,6 @@ interface MessageRow {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-function now(): string {
-  return new Date().toISOString();
-}
 
 function rowToMessage(row: MessageRow): Message {
   return {

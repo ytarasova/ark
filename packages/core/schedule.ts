@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 import type { AppContext } from "./app.js";
+import { now } from "./util/time.js";
 
 export interface Schedule {
   id: string;
@@ -33,9 +34,6 @@ interface ScheduleRow {
   created_at: string;
 }
 
-function now() {
-  return new Date().toISOString();
-}
 function genId() {
   return `sched-${randomBytes(3).toString("hex")}`;
 }

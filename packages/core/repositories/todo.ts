@@ -1,8 +1,5 @@
 import type { IDatabase } from "../database/index.js";
-
-function now(): string {
-  return new Date().toISOString();
-}
+import { now } from "../util/time.js";
 
 export interface Todo {
   id: number;
