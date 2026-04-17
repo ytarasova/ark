@@ -24,16 +24,23 @@ export class SessionService {
     private sessions: SessionRepository,
     private events: EventRepository,
     private messages: MessageRepository,
-  ) {}
+    app?: AppContext,
+  ) {
+    if (app) this._app = app;
+  }
 
-  /** Inject AppContext after construction (called by app.ts boot). */
+  /**
+   * Inject AppContext after construction.
+   * Prefer passing `app` via the constructor. This setter exists for cases
+   * where the AppContext is not yet available at construction time (legacy).
+   */
   setApp(app: AppContext): void {
     this._app = app;
   }
 
   /** Get the injected AppContext. Throws if not set. */
   private get app(): AppContext {
-    if (!this._app) throw new Error("SessionService: AppContext not set -- call setApp() first");
+    if (!this._app) throw new Error("SessionService: AppContext not set -- pass app to constructor or call setApp()");
     return this._app;
   }
 
