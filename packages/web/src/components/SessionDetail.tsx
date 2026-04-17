@@ -19,8 +19,62 @@ import { TypingIndicator } from "./ui/TypingIndicator.js";
 import { SessionSummary } from "./ui/SessionSummary.js";
 import { EventTimeline, type TimelineEvent } from "./ui/EventTimeline.js";
 import { TodoList, type TodoItem } from "./ui/TodoList.js";
+import { DiffViewer, type DiffFile, type DiffLine } from "./ui/DiffViewer.js";
 import type { StageProgress } from "./ui/StageProgressBar.js";
 import type { SessionStatus } from "./ui/StatusDot.js";
+
+/** Parse a unified diff string into DiffFile[] for the DiffViewer component. */
+function parseUnifiedDiff(raw: string): DiffFile[] {
+  if (!raw || !raw.trim()) return [];
+
+  const files: DiffFile[] = [];
+  const chunks = raw.split(/^diff --git /m).filter(Boolean);
+
+  for (const chunk of chunks) {
+    const headerMatch = chunk.match(/^a\/(.+?) b\/(.+)/m);
+    const filename = headerMatch ? headerMatch[2] : "unknown";
+
+    let additions = 0;
+    let deletions = 0;
+    const lines: DiffLine[] = [];
+
+    const rawLines = chunk.split("\n");
+    let inHunk = false;
+    let lineNum = 0;
+
+    for (const line of rawLines) {
+      const hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      if (hunkMatch) {
+        inHunk = true;
+        lineNum = parseInt(hunkMatch[1], 10);
+        lines.push({ type: "context", content: line });
+        continue;
+      }
+
+      if (!inHunk) continue;
+
+      if (line.startsWith("+")) {
+        additions++;
+        lines.push({ type: "add", lineNumber: lineNum, content: line.slice(1) });
+        lineNum++;
+      } else if (line.startsWith("-")) {
+        deletions++;
+        lines.push({ type: "remove", content: line.slice(1) });
+      } else if (line.startsWith(" ")) {
+        lines.push({ type: "context", lineNumber: lineNum, content: line.slice(1) });
+        lineNum++;
+      } else if (line.startsWith("\\")) {
+        // "\ No newline at end of file" -- skip
+      }
+    }
+
+    if (lines.length > 0) {
+      files.push({ filename, additions, deletions, lines });
+    }
+  }
+
+  return files;
+}
 
 interface SessionDetailProps {
   sessionId: string;
@@ -188,6 +242,7 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
   const [chatMsg, setChatMsg] = useState("");
   const [scrollProgress, setScrollProgress] = useState(0);
   const [diffData, setDiffData] = useState<any>(null);
+  const [activeDiffFile, setActiveDiffFile] = useState<string | undefined>(undefined);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -531,16 +586,26 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
 
         {/* Diff Tab */}
         {activeTab === "diff" && (
-          <div className="max-w-[800px] mx-auto">
+          <div className="max-w-[960px] mx-auto">
             {diffData ? (
               <div>
                 <div className="text-[11px] text-[var(--fg-muted)] mb-3 font-[family-name:var(--font-mono)]">
                   {diffData.filesChanged} files changed, +{diffData.insertions || 0} -{diffData.deletions || 0}
                 </div>
-                {diffData.stat && (
+                {diffData.diff ? (
+                  <div className="border border-[var(--border)] rounded-lg overflow-hidden">
+                    <DiffViewer
+                      files={parseUnifiedDiff(diffData.diff)}
+                      activeFile={activeDiffFile}
+                      onFileSelect={setActiveDiffFile}
+                    />
+                  </div>
+                ) : diffData.stat ? (
                   <pre className="bg-[var(--bg-code)] border border-[var(--border)] rounded-lg p-3.5 font-[family-name:var(--font-mono)] text-[11px] leading-[1.7] overflow-auto whitespace-pre-wrap text-[var(--fg-muted)]">
                     {diffData.stat}
                   </pre>
+                ) : (
+                  <div className="text-center py-12 text-[var(--fg-faint)]">No changes detected</div>
                 )}
               </div>
             ) : (
