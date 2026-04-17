@@ -356,4 +356,4 @@ ark agent copy implementer --global    # Copy to global scope
 ark agent delete my-agent              # Delete custom agent (cannot delete builtins)
 ```
 
-In the TUI, press `2` to switch to the Agents tab. Use `n` to create, `e` to edit, `c` to copy, `x` to delete.
+In the web dashboard, open the **Agents** view to browse built-in and custom agents. Create, edit, copy, and delete agents from that view.

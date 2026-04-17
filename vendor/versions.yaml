@@ -19,31 +19,27 @@ goose:
   env: GOOSE_VERSION
   platforms: [darwin-arm64, darwin-x64, linux-arm64, linux-x64]
   notes: "Block / Linux Foundation AAIF. Rust binary, pre-built per platform."
-
 codex:
   repo: openai/codex
-  version: rust-v0.120.0
+  version: rust-v0.121.0
   env: CODEX_VERSION
   platforms: [darwin-arm64, darwin-x64, linux-arm64, linux-x64]
   notes: "OpenAI Codex CLI. Rust binary; tags follow 'rust-vX.Y.Z' pattern."
-
 tmux:
   repo: tmux/tmux
-  version: "3.5a"
+  version: "3.6a"
   env: TMUX_VERSION
   platforms: [darwin-arm64, darwin-x64, linux-arm64, linux-x64]
   notes: "Built from source (static libevent) rather than downloaded. Version pin in vendor-tmux.sh."
-
 tensorzero:
   repo: tensorzero/tensorzero
-  version: main
+  version: 2026.4.0
   env: TENSORZERO_REF
   platforms: [darwin-arm64, darwin-x64, linux-arm64, linux-x64]
   notes: "Built from HEAD of main via cargo. Pin a specific tag when stability becomes a concern."
-
 codegraph:
   repo: optave/codegraph
-  version: latest
+  version: v3.9.3
   env: ""
   platforms: [darwin-arm64, darwin-x64, linux-arm64, linux-x64]
   notes: "Extracted from @optave/codegraph-<arch> npm packages. Version tracked by package.json's bun lockfile, not this file."

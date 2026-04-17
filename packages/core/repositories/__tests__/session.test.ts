@@ -34,7 +34,12 @@ describe("SessionRepository", () => {
     expect(s.ticket).toBe("PROJ-123");
     expect(s.summary).toBe("Fix the bug");
     expect(s.repo).toBe("my/repo");
-    expect(s.branch).toBe("feat/PROJ-123-fix-the-bug");
+    expect(s.branch).toBe("feat/proj-123-fix-the-bug");
+  });
+
+  it("create sanitizes special characters from branch name", () => {
+    const s = repo.create({ ticket: "PROJ-456", summary: "Fix login, signup & OAuth" });
+    expect(s.branch).toBe("feat/proj-456-fix-login-signup-oauth");
   });
 
   it("create with no ticket sets branch to null", () => {

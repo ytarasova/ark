@@ -16,7 +16,6 @@
       <a href="quickstart.html">Quick Start</a>
       <a href="concepts.html">Core Concepts</a>
       <div class="section-title">Guides</div>
-      <a href="tui.html">TUI Dashboard</a>
       <a href="web.html">Web Dashboard</a>
       <a href="cli.html">CLI Reference</a>
       <a href="configuration.html">Configuration</a>
@@ -118,7 +117,7 @@
       <p>Check that the channel relay chain is intact:</p>
       <ol>
         <li>ArkD is running: <code>curl http://localhost:19300/health</code></li>
-        <li>Conductor is running: <code>curl http://localhost:19100/health</code> (only if using TUI)</li>
+        <li>Conductor is running: <code>curl http://localhost:19100/health</code> (only if using the server daemon, web UI, or desktop app)</li>
         <li>Channel port is reachable. The port is derived from the session ID.</li>
       </ol>
 
@@ -133,12 +132,12 @@
       <h3>Database locked errors</h3>
       <p>SQLite has a 5-second busy timeout. If you see "database is locked" errors, check for multiple Ark processes accessing the same database:</p>
       <pre><code><span class="prompt">$</span> ps aux | grep ark</code></pre>
-      <p>Only one TUI/conductor instance should run at a time. Multiple CLI commands are fine (they use <code>skipConductor: true</code>).</p>
+      <p>Only one server daemon/conductor instance should run at a time. Multiple CLI commands are fine (they use <code>skipConductor: true</code>).</p>
 
       <h3>Schema mismatch after upgrade</h3>
       <p>Ark does not have formal migrations (pre-pilot). If a column type changed or was renamed, delete the database and let it recreate:</p>
       <pre><code><span class="prompt">$</span> rm ~/.ark/ark.db
-<span class="prompt">$</span> ark tui  <span class="comment"># tables recreate from schema.ts on boot</span></code></pre>
+<span class="prompt">$</span> ark web  <span class="comment"># tables recreate from schema.ts on boot</span></code></pre>
       <div class="callout warn">
         <strong>Warning:</strong> This deletes all session history, events, and messages. Only do this during development -- not in production.
       </div>
@@ -146,7 +145,7 @@
       <h3>FTS5 search returning nothing</h3>
       <p>The full-text search index may not be built. Rebuild it:</p>
       <pre><code><span class="prompt">$</span> ark index</code></pre>
-      <p>Or from the TUI History tab, press <kbd>r</kbd> to refresh and reindex.</p>
+      <p>Or from the web dashboard's History view, click the refresh button to rebuild the index.</p>
 
       <h2>Compute Issues</h2>
 
@@ -168,17 +167,6 @@
 
 <span class="comment"># Or use Ark's cleanup command</span>
 <span class="prompt">$</span> ark worktree cleanup</code></pre>
-
-      <h2>TUI Issues</h2>
-
-      <h3>TUI looks garbled or has rendering artifacts</h3>
-      <p>Try resizing your terminal or pressing <kbd>Ctrl+L</kbd> to force a re-render. Ink (the TUI framework) can sometimes have rendering issues with certain terminal emulators.</p>
-
-      <h3>Keyboard shortcuts not working</h3>
-      <p>Check if an overlay or form is active. When a form is open, it captures all keyboard input. Press <kbd>Esc</kbd> to close any active overlay. The status bar at the bottom shows the currently available shortcuts.</p>
-
-      <h3>TUI freezes during an operation</h3>
-      <p>All I/O operations in the TUI must be non-blocking. If the TUI appears frozen, it may be waiting for a synchronous operation to complete. Press <kbd>Ctrl+C</kbd> to interrupt, then try again.</p>
 
       <h2>LLM Router Issues</h2>
 

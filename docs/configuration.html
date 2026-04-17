@@ -16,7 +16,6 @@
       <a href="quickstart.html">Quick Start</a>
       <a href="concepts.html">Core Concepts</a>
       <div class="section-title">Guides</div>
-      <a href="tui.html">TUI Dashboard</a>
       <a href="web.html">Web Dashboard</a>
       <a href="cli.html">CLI Reference</a>
       <a href="configuration.html">Configuration</a>
@@ -66,7 +65,6 @@
           <tr><td><code>~/.ark/config.yaml</code></td><td>Global user preferences</td><td>User</td></tr>
           <tr><td><code>~/.ark/bridge.json</code></td><td>Messaging bridge credentials</td><td>User</td></tr>
           <tr><td><code>~/.ark/profiles.json</code></td><td>Profile definitions</td><td><code>ark profile</code> commands</td></tr>
-          <tr><td><code>~/.ark/ui-state.json</code></td><td>TUI state persistence</td><td>Auto-managed by TUI</td></tr>
           <tr><td><code>.ark.yaml</code> (repo root)</td><td>Per-repository defaults</td><td>User</td></tr>
         </tbody>
       </table>
@@ -78,7 +76,7 @@
           <tr><th>Aspect</th><th>Local (default)</th><th>Hosted control plane</th></tr>
         </thead>
         <tbody>
-          <tr><td>Entry point</td><td><code>ark tui</code>, <code>ark cli</code>, <code>ark web</code></td><td><code>ark server start --hosted</code></td></tr>
+          <tr><td>Entry point</td><td><code>ark cli</code>, <code>ark web</code></td><td><code>ark server start --hosted</code></td></tr>
           <tr><td>Database</td><td>SQLite at <code>~/.ark/ark.db</code></td><td>PostgreSQL via <code>DATABASE_URL</code></td></tr>
           <tr><td>Stores</td><td>File-backed three-tier (builtin &gt; <code>~/.ark/...</code> &gt; <code>.ark/...</code>)</td><td>DB-backed <code>DbResourceStore</code>, tenant-scoped</td></tr>
           <tr><td>SSE bus</td><td>In-memory</td><td>Redis via <code>REDIS_URL</code></td></tr>
@@ -92,37 +90,6 @@
       <!-- ── config.yaml ──────────────────────────────────────────────────── -->
       <h2>~/.ark/config.yaml</h2>
       <p>The main configuration file. Open it with <code>ark config</code> (creates a default if missing).</p>
-
-      <h3>Hotkey Remapping</h3>
-      <p>All TUI keyboard shortcuts can be remapped. Set a value to <code>null</code> to disable the shortcut.</p>
-      <pre><code><span class="yaml-key">hotkeys</span>:
-  <span class="yaml-key">dispatch</span>: <span class="yaml-value">Enter</span>
-  <span class="yaml-key">stop</span>: <span class="yaml-value">s</span>
-  <span class="yaml-key">restart</span>: <span class="yaml-value">r</span>
-  <span class="yaml-key">fork</span>: <span class="yaml-value">f</span>
-  <span class="yaml-key">delete</span>: <span class="yaml-value">x</span>
-  <span class="yaml-key">attach</span>: <span class="yaml-value">a</span>
-  <span class="yaml-key">talk</span>: <span class="yaml-value">t</span>
-  <span class="yaml-key">mcp</span>: <span class="yaml-value">M</span>
-  <span class="yaml-key">move</span>: <span class="yaml-value">m</span>
-  <span class="yaml-key">search</span>: <span class="yaml-value">/</span>
-  <span class="yaml-key">newSession</span>: <span class="yaml-value">n</span>
-  <span class="yaml-key">complete</span>: <span class="yaml-value">d</span>
-  <span class="yaml-key">clone</span>: <span class="yaml-value">C</span>
-  <span class="yaml-key">group</span>: <span class="yaml-value">o</span>
-  <span class="yaml-key">inbox</span>: <span class="yaml-value">T</span>
-  <span class="yaml-key">events</span>: <span class="yaml-value">e</span>
-  <span class="yaml-key">undo</span>: <span class="yaml-value">ctrl+z</span>
-  <span class="yaml-key">advance</span>: <span class="yaml-value">A</span>
-  <span class="yaml-key">worktreeFinish</span>: <span class="yaml-value">W</span>
-  <span class="yaml-key">interrupt</span>: <span class="yaml-value">I</span>
-  <span class="yaml-key">verify</span>: <span class="yaml-value">V</span>
-  <span class="yaml-key">archive</span>: <span class="yaml-value">Z</span></code></pre>
-      <p>Example customization:</p>
-      <pre><code><span class="yaml-key">hotkeys</span>:
-  <span class="yaml-key">clone</span>: <span class="yaml-value">null</span>        <span class="yaml-comment"># disable the clone shortcut</span>
-  <span class="yaml-key">fork</span>: <span class="yaml-value">F</span>            <span class="yaml-comment"># remap fork to uppercase F</span>
-  <span class="yaml-key">undo</span>: <span class="yaml-value">ctrl+z</span>       <span class="yaml-comment"># ctrl+ prefix for modifier keys</span></code></pre>
 
       <h3>Budget Limits</h3>
       <p>Set spending limits to prevent runaway costs. All values in USD.</p>
@@ -474,7 +441,6 @@
           <tr><td><code>~/.ark/config.yaml</code></td><td>User configuration</td></tr>
           <tr><td><code>~/.ark/bridge.json</code></td><td>Messaging bridge credentials</td></tr>
           <tr><td><code>~/.ark/profiles.json</code></td><td>Profile definitions</td></tr>
-          <tr><td><code>~/.ark/ui-state.json</code></td><td>TUI state persistence</td></tr>
           <tr><td><code>~/.ark/claude-oauth-token</code></td><td>Saved OAuth token from <code>ark auth</code></td></tr>
           <tr><td><code>~/.ark/tracks/&lt;sessionId&gt;/</code></td><td>Launcher scripts, channel configs per session</td></tr>
           <tr><td><code>~/.ark/worktrees/&lt;sessionId&gt;/</code></td><td>Git worktrees for isolated sessions</td></tr>

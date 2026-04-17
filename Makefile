@@ -181,10 +181,6 @@ build: build-cli build-web ## Build CLI binary + web frontend
 
 build-cli: ## Build native macOS CLI binary (current arch)
 	@echo "Building native binary..."
-	@mkdir -p node_modules/react-devtools-core 2>/dev/null; \
-	  test -f shims/react-devtools-core.js && \
-	  cp shims/react-devtools-core.js node_modules/react-devtools-core/index.js && \
-	  echo '{"main":"index.js"}' > node_modules/react-devtools-core/package.json || true
 	@$(BUN) run scripts/inject-version.ts
 	$(BUN) build --compile packages/cli/index.ts --outfile ark-native
 	@echo "Built: ark-native ($$(du -h ark-native | cut -f1))"
@@ -192,7 +188,12 @@ build-cli: ## Build native macOS CLI binary (current arch)
 build-web: ## Build web frontend (Vite production)
 	@cd packages/web && npx vite build --logLevel error 2>/dev/null || $(BUN) run packages/web/build.ts
 
-build-desktop: build-web ## Build Electron app for current platform
+build-desktop: build-web ## Build Electron app with bundled ark-native
+	@echo "Building ark-native for current platform..."
+	@$(MAKE) build-cli --no-print-directory
+	@mkdir -p packages/desktop/binaries/$$(uname -s | tr A-Z a-z)-$$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')
+	@cp ark-native packages/desktop/binaries/$$(uname -s | tr A-Z a-z)-$$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')/ark-native
+	@echo "Bundled ark-native into packages/desktop/binaries/"
 	cd packages/desktop && npm install --silent 2>/dev/null && npx electron-builder
 
 # ── Packaging (all platforms) ────────────────────────────────────────────────
@@ -201,10 +202,7 @@ package: package-cli package-desktop ## Package CLI + Electron for all platforms
 
 package-cli: build-web ## Build self-contained CLI bundles for macOS + Linux (4 targets)
 	@echo "Building Ark bundles for all platforms..."
-	@mkdir -p dist node_modules/react-devtools-core 2>/dev/null; \
-	  test -f shims/react-devtools-core.js && \
-	  cp shims/react-devtools-core.js node_modules/react-devtools-core/index.js && \
-	  echo '{"main":"index.js"}' > node_modules/react-devtools-core/package.json || true
+	@mkdir -p dist
 	$(BUN) build --compile --target bun-darwin-arm64 packages/cli/index.ts --outfile dist/bin/ark-darwin-arm64
 	$(BUN) build --compile --target bun-darwin-x64   packages/cli/index.ts --outfile dist/bin/ark-darwin-x64
 	$(BUN) build --compile --target bun-linux-arm64  packages/cli/index.ts --outfile dist/bin/ark-linux-arm64
@@ -289,7 +287,7 @@ package-desktop: build-web ## Package Electron app (.dmg + .AppImage)
 # ── Other ────────────────────────────────────────────────────────────────────
 
 clean: ## Remove all build artifacts
-	rm -rf dist packages/web/dist packages/desktop/out node_modules/.cache
+	rm -rf dist packages/web/dist packages/desktop/out packages/desktop/binaries node_modules/.cache
 	rm -f ark-native ark-darwin-arm64 ark-darwin-x64 ark-linux-arm64 ark-linux-x64
 	@echo "Cleaned."
 

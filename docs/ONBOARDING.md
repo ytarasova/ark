@@ -22,8 +22,7 @@ This symlinks `ark` to `/usr/local/bin`. Verify with `ark --help`.
 - **Local sessions with Claude Code** -- dispatch a task, agent works in an isolated git worktree, creates a PR
 - **Autonomous SDLC flow** -- plan -> implement -> verify -> review -> PR -> merge (all auto-gated)
 - **Quick flow** -- implement -> verify -> PR -> merge (skip planning/review)
-- **TUI dashboard** -- real-time session monitoring, attach to agent tmux, event timeline
-- **Web dashboard** -- `ark web` for a browser-based view (local mode)
+- **Web dashboard** -- `ark web` for a browser-based view, or the Electron desktop app
 - **Knowledge graph** -- auto-indexes your codebase at dispatch for agent context
 - **Cost tracking** -- per-session token usage, works with subscription mode ($0 cost display)
 - **Multiple runtimes** -- `claude` (API), `claude-max` (subscription), `codex`, `gemini`, `goose`
@@ -31,20 +30,24 @@ This symlinks `ark` to `/usr/local/bin`. Verify with `ark --help`.
 ## Quick Start
 
 ```bash
-# 1. Start the TUI (starts conductor + arkd automatically)
-make tui
+# 1. Start the server daemon (conductor + arkd + WS)
+ark server daemon start --detach
 
-# 2. In another terminal, dispatch a session
+# 2. Launch the web UI (in a browser tab) or the Electron desktop app
+ark web                 # browser
+# or: open the Ark Desktop app
+
+# 3. In another terminal, dispatch a session
 ark session start --flow quick --repo /path/to/your/repo \
   --summary "Fix the login validation bug" --dispatch
 
-# 3. Watch it work
+# 4. Watch it work
 ark session list                    # see status
 ark session events <session-id>     # event timeline
 tmux attach -t ark-s-<session-id>   # watch the agent live
 ```
 
-Or use the TUI directly: press `n` to create a session, fill in repo + summary, press Enter to dispatch.
+Or use the web UI directly: click "New Session", fill in repo + summary, click Dispatch.
 
 ## Flows
 
@@ -86,7 +89,7 @@ auto_rebase: true
 curl localhost:19100/health   # conductor
 curl localhost:19300/health   # arkd
 ```
-If either is down, restart the TUI.
+If either is down, restart the server daemon: `ark server daemon stop && ark server daemon start --detach`.
 
 **Agent exits without advancing:** Check `ark session events <id>` for errors. Common cause: agent didn't commit its changes (completion is rejected without new commits).
 

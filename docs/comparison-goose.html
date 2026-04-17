@@ -16,7 +16,6 @@
       <a href="quickstart.html">Quick Start</a>
       <a href="concepts.html">Core Concepts</a>
       <div class="section-title">Guides</div>
-      <a href="tui.html">TUI Dashboard</a>
       <a href="web.html">Web Dashboard</a>
       <a href="cli.html">CLI Reference</a>
       <a href="configuration.html">Configuration</a>
@@ -84,8 +83,8 @@
           <tr><td>Multi-tenant</td><td>Yes (tenant_id on every entity, API keys, policies)</td><td>No</td></tr>
           <tr><td>Multi-user</td><td>Yes (user_id on sessions, roles)</td><td>No (single local user)</td></tr>
           <tr><td>Billing modes</td><td><code>api</code>, <code>subscription</code>, <code>free</code></td><td>API only</td></tr>
-          <tr><td>Web dashboard</td><td>Yes (Vite + React + shadcn/ui + SSE)</td><td>No (CLI + TUI)</td></tr>
-          <tr><td>TUI dashboard</td><td>Yes (React + Ink, 10 tabs, theme-driven)</td><td>Yes (basic)</td></tr>
+          <tr><td>Web dashboard</td><td>Yes (Vite + React + shadcn/ui + SSE)</td><td>No (CLI-only)</td></tr>
+          <tr><td>Desktop app</td><td>Yes (Electron wrapping the web UI)</td><td>No</td></tr>
           <tr><td>Transcript parsers</td><td>Polymorphic per runtime (Claude, Codex, Gemini)</td><td>N/A</td></tr>
           <tr><td>MCP socket pooling</td><td>Yes (85-90% memory reduction)</td><td>No</td></tr>
           <tr><td>Control plane</td><td>Yes (<code>ark server --hosted</code>, worker registry, scheduler)</td><td>No</td></tr>
@@ -160,7 +159,7 @@
         <li>You need multi-tenant isolation, API keys, per-tenant policies, and cost caps.</li>
         <li>You want universal cost tracking across Claude, Codex, Gemini, and subscription plans.</li>
         <li>You want a knowledge graph that spans code + sessions + memories.</li>
-        <li>You want a TUI, a Web dashboard, and a Desktop app for the same control plane.</li>
+        <li>You want a Web dashboard and a Desktop app for the same control plane.</li>
         <li>You prefer a Bun runtime with no Python dependency.</li>
       </ul>
 

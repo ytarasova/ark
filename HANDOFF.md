@@ -47,12 +47,13 @@
 ## What works now
 
 - **Ark-on-Ark dogfooding**: dispatch sessions that plan, implement, verify, review, create PR, and merge autonomously
-- **Daemon-client**: `make dev-daemon` (hot-reload) + `make dev-tui` / `make dev-web`
+- **Daemon-client**: `make dev-daemon` (hot-reload) + `make dev-web`
 - **Action stages**: create_pr and auto_merge execute reliably (await safeAsync + branch check)
 - **Knowledge graph**: codegraph indexes codebase, nodes ingested into knowledge store, context injected at dispatch
 - **Prompt caching**: 99.9% cache hit rate, $3,430 saved (86% reduction) across 47 sessions
-- **TUI**: group headers visible, Events tab, Costs tab (0), stable scroll (ink-scroll-list)
 - **Web UI**: contextual session controls, auto-refresh polling, toast notifications, deep links, flow docs
+
+> Note: TUI (`ark tui`, `packages/tui/`, `packages/tui-e2e/`) was removed in v0.16.0 (2026-04-15). Historical entries below describe shipments that happened before removal -- they are retained as history.
 
 ## Known issues
 
@@ -62,7 +63,7 @@
 
 ### Important
 3. **Web UI session list doesn't auto-refresh in all cases**: polling is 5s but SSE would be better for real-time updates.
-4. **Web UI needs conversation interface**: no way to send messages to agents from web UI (only TUI has `t` shortcut). Zineng flagged this as a blocker for his workflow.
+4. **Web UI needs conversation interface**: no way to send messages to agents from web UI (currently only works via CLI). Zineng flagged this as a blocker for his workflow.
 5. **Web UI needs repo dropdown**: users must type repo paths manually. Should list known repos from session history / Claude projects.
 6. **Stage timeline in session detail**: doesn't show completed/failed icons or elapsed times per stage.
 7. **Compute details overlapping** in web UI detail pane.
@@ -80,7 +81,7 @@
 - **Drop TUI** from the product surface. Focus on **Web UI + CLI + Electron desktop app**.
 - TUI is the most expensive surface to maintain, hardest to test, and least intuitive for new users (Zineng: "I spend half an hour and I don't know what to do").
 - Yana: "let's not spend time on text UI. I'm happy not to."
-- TUI code stays in the repo (no active deletion) but receives no further investment.
+- TUI code was fully deleted in v0.16.0 (2026-04-15).
 
 ### Web UI is the primary interface
 - Everything should be doable from web UI without touching CLI.
@@ -159,13 +160,9 @@
 ## Dev workflow
 
 ```bash
-# Development (3 terminals)
+# Development (2 terminals)
 make dev-daemon    # terminal 1: hot-reload daemon (conductor + arkd + WS)
-make dev-tui       # terminal 2: TUI connects to daemon
-make dev-web       # terminal 3: API + Vite frontend
-
-# Standalone (1 terminal, no hot-reload)
-make tui-standalone
+make dev-web       # terminal 2: API + Vite frontend (Web UI)
 
 # Dispatch work via Ark
 ark session start --flow autonomous-sdlc --repo . --summary "description" --dispatch
@@ -181,27 +178,24 @@ tmux attach -t ark-s-<id>
 ## Key architecture decisions locked in this session
 
 1. **Agents always route through arkd** (single path, no conductor fallback)
-2. **TUI is a thin client** (daemon owns state, TUI connects via WS)
-3. **TreeList is a proper tree** (groups are parent nodes, not flat array with headers)
-4. **ScrollBox uses ink-scroll-list** (no manual row counting)
-5. **SplitPane provides height via context** (AvailableHeightContext)
-6. **Action stages are awaited** (`await safeAsync`, not fire-and-forget)
-7. **Planner uses opus** (sonnet hit context limits on complex tasks)
-8. **PostCompact hook re-injects task** (prevents context loss after compaction)
+2. **Web UI is the primary interface** (daemon owns state, web connects via SSE/REST)
+3. **Action stages are awaited** (`await safeAsync`, not fire-and-forget)
+4. **Planner uses opus** (sonnet hit context limits on complex tasks)
+5. **PostCompact hook re-injects task** (prevents context loss after compaction)
 
 ### Added Apr 14 (ark init meeting)
 
-9. **TUI retired** -- no further investment. Product surfaces: Web UI + CLI + Electron desktop.
-10. **Web UI is the primary interface** -- everything doable from web without touching CLI.
-11. **Channels remain the Claude Code path** -- ACP is exploratory, not a replacement.
-12. **Hierarchical config: builtin -> tenant -> user** -- confirmed for flows, skills, agents, MCPs, compute.
-13. **Conductor is the single gateway** -- all state behind conductor. Web, CLI, Electron, Claude Code all talk to conductor.
-14. **Arkd is per-compute agent manager** -- installs on every compute target, manages agent lifecycle, proxies MCP.
-15. **Plan with Opus, implement with cheap models** -- LLM Router should support this split.
-16. **Stay on GitHub** -- free CI with macOS runners, no Bitbucket migration.
+6. **TUI retired** -- removed in v0.16.0. Product surfaces: Web UI + CLI + Electron desktop.
+7. **Web UI is the primary interface** -- everything doable from web without touching CLI.
+8. **Channels remain the Claude Code path** -- ACP is exploratory, not a replacement.
+9. **Hierarchical config: builtin -> tenant -> user** -- confirmed for flows, skills, agents, MCPs, compute.
+10. **Conductor is the single gateway** -- all state behind conductor. Web, CLI, Electron, Claude Code all talk to conductor.
+11. **Arkd is per-compute agent manager** -- installs on every compute target, manages agent lifecycle, proxies MCP.
+12. **Plan with Opus, implement with cheap models** -- LLM Router should support this split.
+13. **Stay on GitHub** -- free CI with macOS runners, no Bitbucket migration.
 
 ### Added Apr 14 (post-meeting, Open Agents analysis)
 
-17. **Decoupled compute architecture (target)** -- separate agent fleet from compute fleet. Current: Session 1:1 Agent 1:1 Compute. Target: Session 1:N Agent 1:M Compute. Agents are cheap/stateless (just LLM loop), compute is expensive/persistent (repo, tools, dev servers). Scale independently, hibernate compute without losing agent state. Inspired by Open Agents' "agent outside sandbox" pattern. Arkd is already the network boundary -- extend it.
-18. **Compute lifecycle: hibernate/snapshot/restore** -- compute targets should support hibernate (stop billing), snapshot (save state), restore (resume from snapshot). E2B already supports snapshots. EC2 has AMIs. Docker has commit/checkpoint. Firecracker has snapshotting. Expose this universally.
-19. **Web UI needs production-grade overhaul** -- borrow heavily from Open Agents (tool call renderers, git panel, todo panel, structured questions, model selector, contribution charts, stream recovery). Current web UI is ~6K lines, theirs is ~43K. Gap is significant.
+14. **Decoupled compute architecture (target)** -- separate agent fleet from compute fleet. Current: Session 1:1 Agent 1:1 Compute. Target: Session 1:N Agent 1:M Compute. Agents are cheap/stateless (just LLM loop), compute is expensive/persistent (repo, tools, dev servers). Scale independently, hibernate compute without losing agent state. Inspired by Open Agents' "agent outside sandbox" pattern. Arkd is already the network boundary -- extend it.
+15. **Compute lifecycle: hibernate/snapshot/restore** -- compute targets should support hibernate (stop billing), snapshot (save state), restore (resume from snapshot). E2B already supports snapshots. EC2 has AMIs. Docker has commit/checkpoint. Firecracker has snapshotting. Expose this universally.
+16. **Web UI needs production-grade overhaul** -- borrow heavily from Open Agents (tool call renderers, git panel, todo panel, structured questions, model selector, contribution charts, stream recovery). Current web UI is ~6K lines, theirs is ~43K. Gap is significant.

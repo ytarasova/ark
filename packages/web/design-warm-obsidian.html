@@ -165,7 +165,7 @@
         height: 100vh;
       }
 
-      /* -- Icon Rail (48px) -- */
+      /* -- Icon Rail (48px collapsed / 200px expanded) -- */
       .icon-rail {
         width: var(--rail-w);
         min-width: var(--rail-w);
@@ -173,30 +173,58 @@
         border-right: 1px solid var(--border);
         display: flex;
         flex-direction: column;
-        align-items: center;
-        padding: 12px 0;
+        align-items: stretch;
+        padding: 8px 4px;
         gap: 2px;
+        overflow: hidden;
+        transition: width 200ms ease, min-width 200ms ease;
+      }
+      .icon-rail.expanded {
+        width: 200px;
+        min-width: 200px;
+      }
+
+      .icon-rail-header {
+        display: flex;
+        align-items: center;
+        padding: 4px 8px;
+        margin-bottom: 8px;
+        gap: 8px;
       }
 
       .icon-rail-logo {
         width: 28px;
         height: 28px;
+        min-width: 28px;
         border-radius: var(--radius-sm);
         background: var(--gradient-brand);
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-bottom: 16px;
         font-weight: 700;
         font-size: 12px;
         color: #fff;
         cursor: pointer;
       }
 
-      .icon-rail-btn {
-        width: 36px;
-        height: 36px;
-        border-radius: var(--radius-md);
+      .icon-rail-brand {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--fg);
+        letter-spacing: -0.03em;
+        opacity: 0;
+        transition: opacity 150ms ease 50ms;
+        white-space: nowrap;
+      }
+      .icon-rail.expanded .icon-rail-brand {
+        opacity: 1;
+      }
+
+      .icon-rail-toggle {
+        margin-left: auto;
+        width: 24px;
+        height: 24px;
+        border-radius: var(--radius-sm);
         border: none;
         background: transparent;
         color: var(--fg-muted);
@@ -204,7 +232,42 @@
         align-items: center;
         justify-content: center;
         cursor: pointer;
+        transition: color 150ms ease, background 150ms ease;
+        flex-shrink: 0;
+      }
+      .icon-rail-toggle:hover {
+        color: var(--fg);
+        background: var(--bg-hover);
+      }
+      .icon-rail-toggle svg {
+        width: 14px;
+        height: 14px;
+        stroke-width: 1.5;
+        transition: transform 200ms ease;
+      }
+      .icon-rail.expanded .icon-rail-toggle svg {
+        transform: rotate(180deg);
+      }
+
+      .icon-rail-btn {
+        height: 36px;
+        border-radius: var(--radius-md);
+        border: none;
+        background: transparent;
+        color: var(--fg-muted);
+        display: flex;
+        align-items: center;
+        cursor: pointer;
         position: relative;
+        padding: 0 10px;
+        gap: 10px;
+        white-space: nowrap;
+      }
+      .icon-rail:not(.expanded) .icon-rail-btn {
+        justify-content: center;
+        padding: 0;
+        width: 36px;
+        margin: 0 auto;
       }
       .icon-rail-btn:hover {
         color: var(--fg);
@@ -217,12 +280,48 @@
       .icon-rail-btn.active::before {
         content: "";
         position: absolute;
-        left: -6px;
+        left: 0;
         top: 8px;
         bottom: 8px;
         width: 3px;
         border-radius: 0 2px 2px 0;
         background: var(--primary);
+      }
+      .icon-rail:not(.expanded) .icon-rail-btn.active::before {
+        left: -4px;
+      }
+
+      .icon-rail-label {
+        font-size: 13px;
+        font-weight: 500;
+        flex: 1;
+        opacity: 0;
+        transition: opacity 150ms ease 50ms;
+      }
+      .icon-rail.expanded .icon-rail-label {
+        opacity: 1;
+      }
+      .icon-rail:not(.expanded) .icon-rail-label {
+        display: none;
+      }
+
+      .icon-rail-kbd {
+        font-family: var(--font-mono);
+        font-size: 10px;
+        color: var(--fg-faint);
+        border: 1px solid var(--border);
+        background: var(--bg-card);
+        border-radius: 4px;
+        padding: 1px 5px;
+        line-height: 1.6;
+        opacity: 0;
+        transition: opacity 150ms ease 50ms;
+      }
+      .icon-rail.expanded .icon-rail-kbd {
+        opacity: 1;
+      }
+      .icon-rail:not(.expanded) .icon-rail-kbd {
+        display: none;
       }
 
       .icon-rail-spacer {
@@ -233,6 +332,33 @@
         width: 18px;
         height: 18px;
         stroke-width: 1.5;
+        flex-shrink: 0;
+      }
+
+      /* Tooltip for collapsed rail */
+      .icon-rail-tooltip {
+        position: absolute;
+        left: 52px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: var(--bg-popover);
+        color: var(--fg);
+        font-size: 12px;
+        padding: 4px 10px;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 150ms ease;
+        white-space: nowrap;
+        z-index: 100;
+      }
+      .icon-rail-btn:hover .icon-rail-tooltip {
+        opacity: 1;
+      }
+      .icon-rail.expanded .icon-rail-tooltip {
+        display: none;
       }
 
       /* -- List Panel (300px, resizable) -- */
@@ -1686,54 +1812,80 @@
   <body>
     <div class="shell">
       <!-- Icon Rail -->
-      <nav class="icon-rail">
-        <div class="icon-rail-logo">A</div>
+      <nav class="icon-rail" id="icon-rail">
+        <div class="icon-rail-header">
+          <div class="icon-rail-logo" onclick="document.querySelector('.icon-rail-btn.active')?.click()">A</div>
+          <span class="icon-rail-brand">ark</span>
+          <button class="icon-rail-toggle" id="rail-toggle" title="Toggle sidebar (Cmd+B)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        </div>
 
-        <button class="icon-rail-btn active" title="Sessions">
+        <button class="icon-rail-btn active" title="Sessions" data-shortcut="S">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="5 3 19 12 5 21 5 3" />
           </svg>
+          <span class="icon-rail-label">Sessions</span>
+          <kbd class="icon-rail-kbd">S</kbd>
+          <span class="icon-rail-tooltip">Sessions (S)</span>
         </button>
 
-        <button class="icon-rail-btn" title="Agents">
+        <button class="icon-rail-btn" title="Agents" data-shortcut="A">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="11" width="18" height="11" rx="2" />
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
+          <span class="icon-rail-label">Agents</span>
+          <kbd class="icon-rail-kbd">A</kbd>
+          <span class="icon-rail-tooltip">Agents (A)</span>
         </button>
 
-        <button class="icon-rail-btn" title="Compute">
+        <button class="icon-rail-btn" title="Compute" data-shortcut="C">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
             <rect x="2" y="2" width="20" height="8" rx="2" />
             <rect x="2" y="14" width="20" height="8" rx="2" />
             <line x1="6" y1="6" x2="6.01" y2="6" />
             <line x1="6" y1="18" x2="6.01" y2="18" />
           </svg>
+          <span class="icon-rail-label">Compute</span>
+          <kbd class="icon-rail-kbd">C</kbd>
+          <span class="icon-rail-tooltip">Compute (C)</span>
         </button>
 
-        <button class="icon-rail-btn" title="Knowledge">
+        <button class="icon-rail-btn" title="Knowledge" data-shortcut="M">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
             <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
             <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
           </svg>
+          <span class="icon-rail-label">Knowledge</span>
+          <kbd class="icon-rail-kbd">M</kbd>
+          <span class="icon-rail-tooltip">Knowledge (M)</span>
         </button>
 
-        <button class="icon-rail-btn" title="Costs">
+        <button class="icon-rail-btn" title="Costs" data-shortcut="$">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
             <line x1="12" y1="1" x2="12" y2="23" />
             <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
           </svg>
+          <span class="icon-rail-label">Costs</span>
+          <kbd class="icon-rail-kbd">$</kbd>
+          <span class="icon-rail-tooltip">Costs ($)</span>
         </button>
 
         <div class="icon-rail-spacer"></div>
 
-        <button class="icon-rail-btn" title="Settings">
+        <button class="icon-rail-btn" title="Settings" data-shortcut=",">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3" />
             <path
               d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
             />
           </svg>
+          <span class="icon-rail-label">Settings</span>
+          <kbd class="icon-rail-kbd">,</kbd>
+          <span class="icon-rail-tooltip">Settings (,)</span>
         </button>
       </nav>
 
@@ -2765,7 +2917,29 @@ export async function handleStripeWebhook(
             switchTab(tabs[idx].getAttribute("data-tab"));
           }
         }
+
+        // Cmd+B / Ctrl+B to toggle rail
+        if ((e.metaKey || e.ctrlKey) && e.key === "b") {
+          e.preventDefault();
+          toggleRail();
+        }
       });
+
+      // -- Icon Rail expand/collapse --
+      const iconRail = document.getElementById("icon-rail");
+      const railToggle = document.getElementById("rail-toggle");
+
+      function toggleRail() {
+        iconRail.classList.toggle("expanded");
+        localStorage.setItem("ark-rail-expanded", iconRail.classList.contains("expanded"));
+      }
+
+      // Restore persisted state
+      if (localStorage.getItem("ark-rail-expanded") === "true") {
+        iconRail.classList.add("expanded");
+      }
+
+      railToggle.addEventListener("click", toggleRail);
     </script>
   </body>
 </html>
