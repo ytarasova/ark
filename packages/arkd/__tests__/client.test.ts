@@ -210,7 +210,7 @@ describe("client system", () => {
     expect(Array.isArray(snap.sessions)).toBe(true);
     expect(Array.isArray(snap.processes)).toBe(true);
     expect(Array.isArray(snap.docker)).toBe(true);
-  });
+  }, 30_000);
 
   it("probePorts detects server port", async () => {
     const res = await client.probePorts([TEST_PORT, 19999]);

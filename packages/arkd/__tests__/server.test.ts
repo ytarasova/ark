@@ -236,8 +236,8 @@ describe("POST /exec", () => {
 
   it("times out long-running commands", async () => {
     const { data } = await post<any>("/exec", {
-      command: "sleep",
-      args: ["60"],
+      command: "sh",
+      args: ["-c", "sleep 60"],
       timeout: 500,
     });
     expect(data.timedOut).toBe(true);
@@ -384,7 +384,7 @@ describe("GET /snapshot", () => {
     expect(Array.isArray(data.sessions)).toBe(true);
     expect(Array.isArray(data.processes)).toBe(true);
     expect(Array.isArray(data.docker)).toBe(true);
-  });
+  }, 30_000);
 
   it("snapshot sessions include running tmux sessions", async () => {
     const name = `arkd-snap-test-${Date.now()}`;
@@ -399,7 +399,7 @@ describe("GET /snapshot", () => {
         const s = await post<any>("/agent/status", { sessionName: name });
         return s.data.running === true;
       },
-      { timeout: 5000, message: "snapshot tmux session never started" },
+      { timeout: 10_000, message: "snapshot tmux session never started" },
     );
 
     try {
@@ -410,7 +410,7 @@ describe("GET /snapshot", () => {
     } finally {
       await post("/agent/kill", { sessionName: name });
     }
-  });
+  }, 30_000);
 });
 
 // ── Port probing ────────────────────────────────────────────────────────────

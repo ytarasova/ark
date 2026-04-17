@@ -1,0 +1,26 @@
+[     800ms] [LOG] %c
+▲
+
+__  __                                     _            __
+\ \/ /___  __  __   _________ _____       (_)_  _______/ /_
+ \  / __ \/ / / /  / ___/ __ `/ __ \     / / / / / ___/ __/
+ / / /_/ / /_/ /  / /__/ /_/ / / / /    / / /_/ (__  ) /_
+/_/\____/\__,_/   \___/\__,_/_/ /_/  __/ /\__,_/____/\__/
+         __    _          __  __    /___/
+   _____/ /_  (_)___     / /_/ /_  (_)___  ____ ______
+  / ___/ __ \/ / __ \   / __/ __ \/ / __ \/ __ `/ ___/
+ (__  ) / / / / /_/ /  / /_/ / / / / / / / /_/ (__  )
+/____/_/ /_/_/ .___/   \__/_/ /_/_/_/ /_/\__, /____/
+            /_/                         /____/
+  
+
+Hello!
+
+- Open Source https://vercel.com/oss
+- Careers https://vercel.com/careers
+- Status https://vercel-status.com
+
+ font-family: "Geist Mono", monospace; white-space: pre; line-height: 1; @ https://vercel.com/vc-ap-vercel-marketing/_next/static/chunks/3je1pqzd_11zi.js?dpl=dpl_nUmbUdEjpysf7ThcyDX1T1rUWZYK:72
+[    2397ms] [ERROR] Failed to load resource: the server responded with a status of 403 () @ https://vercel.com/api/jwt:0
+[    3266ms] [WARNING] Deprecated API for given entry type. @ https://vercel.com/vc-ap-vercel-marketing/_next/static/chunks/31rxnsq0uuzvd.js?dpl=dpl_nUmbUdEjpysf7ThcyDX1T1rUWZYK:18
+[    3625ms] [ERROR] Failed to load resource: the server responded with a status of 429 () @ https://o205439.ingest.us.sentry.io/api/4507726617772032/envelope/?sentry_key=285c77642188feae6e662bd2903e2d52&sentry_version=7&sentry_client=sentry.javascript.browser%2F7.111.0:0

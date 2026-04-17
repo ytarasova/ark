@@ -295,7 +295,7 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
         const stageData = typeof item.data === "object" ? item.data : {};
         const agent = stageData.agent || "";
         const model = stageData.model || "";
-        const taskPreview: string = stageData.task_preview || "";
+        const taskPreview: string = stageData.task || stageData.summary || "";
         const preview = taskPreview.length > 80 ? taskPreview.slice(0, 80) + "..." : taskPreview;
         const agentLabel = agent || evStage || "agent";
         const modelSuffix = model ? " (" + model + ")" : "";

@@ -1,0 +1,417 @@
+- generic [ref=e1]:
+  - generic [ref=e2]:
+    - navigation [ref=e3]:
+      - generic [ref=e4] [cursor=pointer]: A
+      - button "Sessions" [ref=e5] [cursor=pointer]:
+        - img [ref=e6]
+      - button "Agents" [ref=e8] [cursor=pointer]:
+        - img [ref=e9]
+      - button "Compute" [ref=e12] [cursor=pointer]:
+        - img [ref=e13]
+      - button "Knowledge" [ref=e16] [cursor=pointer]:
+        - img [ref=e17]
+      - button "Costs" [ref=e20] [cursor=pointer]:
+        - img [ref=e21]
+      - button "Settings" [ref=e23] [cursor=pointer]:
+        - img [ref=e24]
+    - complementary [ref=e27]:
+      - generic [ref=e29]:
+        - generic [ref=e30]:
+          - generic [ref=e31]: Sessions
+          - button "+ New" [ref=e32] [cursor=pointer]
+        - textbox "Search sessions... (/)" [ref=e34]
+        - generic [ref=e35]:
+          - button "7 running" [ref=e36] [cursor=pointer]
+          - button "2 waiting" [ref=e37] [cursor=pointer]
+          - button "12 completed" [ref=e38] [cursor=pointer]
+          - button "1 failed" [ref=e39] [cursor=pointer]
+      - generic [ref=e40]:
+        - generic [ref=e41] [cursor=pointer]:
+          - generic [ref=e42]:
+            - generic [ref=e44]: s-a1b2
+            - generic [ref=e45]: 2m ago
+          - generic [ref=e46]: Add payment webhooks
+          - generic [ref=e47]:
+            - generic [ref=e54]: implementer
+            - generic [ref=e55]: $0.42
+        - generic [ref=e56] [cursor=pointer]:
+          - generic [ref=e57]:
+            - generic [ref=e59]: s-c3d4
+            - generic [ref=e60]: 5m ago
+          - generic [ref=e61]: Migrate user auth to OAuth2
+          - generic [ref=e62]:
+            - generic [ref=e69]: planner
+            - generic [ref=e70]: $0.18
+        - generic [ref=e71] [cursor=pointer]:
+          - generic [ref=e72]:
+            - generic [ref=e74]: s-e5f6
+            - generic [ref=e75]: 8m ago
+          - generic [ref=e76]: Fix rate limiter edge case
+          - generic [ref=e77]:
+            - generic [ref=e82]: verifier
+            - generic [ref=e83]: $0.09
+        - generic [ref=e84] [cursor=pointer]:
+          - generic [ref=e85]:
+            - generic [ref=e87]: s-g7h8
+            - generic [ref=e88]: 12m ago
+          - generic [ref=e89]: Add OpenTelemetry tracing
+          - generic [ref=e90]:
+            - generic [ref=e97]: merger
+            - generic [ref=e98]: $0.67
+        - generic [ref=e99] [cursor=pointer]:
+          - generic [ref=e100]:
+            - generic [ref=e102]: s-i9j0
+            - generic [ref=e103]: 28m ago
+          - generic [ref=e104]: Refactor DB connection pool
+          - generic [ref=e105]:
+            - generic [ref=e112]: "--"
+            - generic [ref=e113]: $0.51
+        - generic [ref=e114] [cursor=pointer]:
+          - generic [ref=e115]:
+            - generic [ref=e117]: s-k1l2
+            - generic [ref=e118]: 1h ago
+          - generic [ref=e119]: Add CSV export endpoint
+          - generic [ref=e120]:
+            - generic [ref=e127]: "--"
+            - generic [ref=e128]: $0.33
+        - generic [ref=e129] [cursor=pointer]:
+          - generic [ref=e130]:
+            - generic [ref=e132]: s-m3n4
+            - generic [ref=e133]: 2h ago
+          - generic [ref=e134]: Update Stripe SDK to v14
+          - generic [ref=e135]:
+            - generic [ref=e142]: verifier
+            - generic [ref=e143]: $0.28
+        - generic [ref=e144] [cursor=pointer]:
+          - generic [ref=e145]:
+            - generic [ref=e147]: s-o5p6
+            - generic [ref=e148]: yesterday
+          - generic [ref=e149]: E2E tests for checkout flow
+          - generic [ref=e150]:
+            - generic [ref=e155]: "--"
+            - generic [ref=e156]: $0.14
+    - main [ref=e157]:
+      - generic [ref=e159]:
+        - generic [ref=e161] [cursor=pointer]: s-a1b2
+        - generic [ref=e162]: Add payment webhooks
+        - generic [ref=e163]:
+          - generic [ref=e164]: plan
+          - generic [ref=e165]: ›
+          - generic [ref=e166]: implement
+          - generic [ref=e167]: ›
+          - generic [ref=e168]: verify
+          - generic [ref=e169]: ›
+          - generic [ref=e170]: review
+          - generic [ref=e171]: ›
+          - generic [ref=e172]: merge
+        - generic [ref=e173] [cursor=pointer]: $0.42
+        - button "Stop" [ref=e174] [cursor=pointer]
+        - button "Toggle light/dark" [ref=e175] [cursor=pointer]:
+          - img [ref=e176]
+      - generic [ref=e182]:
+        - button "Open in Claude" [ref=e183] [cursor=pointer]:
+          - img [ref=e184]
+          - text: Open in Claude
+        - button "Terminal" [ref=e186] [cursor=pointer]:
+          - img [ref=e187]
+          - text: Terminal
+        - generic [ref=e190]:
+          - img [ref=e191]
+          - text: Jira
+          - generic [ref=e193]: PROJ-123
+        - generic [ref=e194]:
+          - img [ref=e195]
+          - text: GitHub
+          - generic [ref=e197]: "PR #42"
+        - generic [ref=e198]:
+          - img [ref=e199]
+          - text: CI
+          - generic [ref=e201]: passing
+        - generic [ref=e202]:
+          - generic [ref=e203]: 4/5 stages
+          - generic [ref=e206]: 80%
+      - generic [ref=e207]:
+        - generic [ref=e208] [cursor=pointer]: Conversation
+        - generic [ref=e209] [cursor=pointer]: Terminal
+        - generic [ref=e210] [cursor=pointer]:
+          - text: Events
+          - generic [ref=e211]: "24"
+        - generic [ref=e212] [cursor=pointer]:
+          - text: Diff
+          - generic [ref=e213]: +42/-8
+        - generic [ref=e214] [cursor=pointer]:
+          - text: Todos
+          - generic [ref=e215]: "6"
+      - generic [ref=e218]:
+        - generic [ref=e219]:
+          - generic [ref=e220]:
+            - generic [ref=e221]: "Y"
+            - generic [ref=e222]: You
+            - generic [ref=e223]: 4:12 PM
+          - paragraph [ref=e225]:
+            - text: Add Stripe webhook handlers for
+            - code [ref=e226]: payment_intent.succeeded
+            - text: ","
+            - code [ref=e227]: payment_intent.failed
+            - text: ", and"
+            - code [ref=e228]: charge.refunded
+            - text: . Include signature verification, idempotency checks, and update the orders table accordingly. Write tests.
+        - generic [ref=e230]: plan phase started
+        - generic [ref=e231]:
+          - generic [ref=e232]:
+            - generic [ref=e233]: P
+            - generic [ref=e234]: planner
+            - generic [ref=e235]: opus-4
+            - generic [ref=e236]: 4:12 PM
+          - generic [ref=e237]:
+            - paragraph [ref=e238]: I'll create a plan for implementing Stripe webhook handlers. Let me examine the existing codebase structure first.
+            - generic [ref=e239] [cursor=pointer]:
+              - generic [ref=e240]: ▶
+              - generic [ref=e241]: Read 8 files (src/payments/, src/orders/, src/middleware/)
+              - generic [ref=e242]: 2.1s
+              - generic [ref=e243]: ✓
+            - generic [ref=e244] [cursor=pointer]:
+              - generic [ref=e245]: ▶
+              - generic [ref=e246]: Search "webhook" across codebase
+              - generic [ref=e247]: 0.8s
+              - generic [ref=e248]: ✓
+            - paragraph [ref=e249]:
+              - strong [ref=e250]: 1. Create webhook handler module
+              - text: "--"
+              - code [ref=e251]: src/payments/webhooks.ts
+              - text: with signature verification and dispatch map.
+            - paragraph [ref=e252]:
+              - strong [ref=e253]: 2. Add idempotency layer
+              - text: "-- new"
+              - code [ref=e254]: webhook_events
+              - text: table tracking processed event IDs.
+            - paragraph [ref=e255]:
+              - strong [ref=e256]: 3. Implement event handlers
+              - text: "-- three handlers: handlePaymentSucceeded, handlePaymentFailed, handleChargeRefunded."
+            - paragraph [ref=e257]:
+              - strong [ref=e258]: 4. Register route
+              - text: "-- POST"
+              - code [ref=e259]: /api/webhooks/stripe
+              - text: with raw body parsing.
+            - paragraph [ref=e260]:
+              - strong [ref=e261]: 5. Write tests
+              - text: "-- unit + integration tests for each handler and signature verification."
+        - generic [ref=e263]: plan completed, advancing to implement
+        - generic [ref=e264]:
+          - generic [ref=e265]:
+            - generic [ref=e266]: I
+            - generic [ref=e267]: implementer
+            - generic [ref=e268]: sonnet-4
+            - generic [ref=e269]: 4:13 PM
+          - generic [ref=e270]:
+            - paragraph [ref=e271]: Starting implementation. Creating the webhook handler module and migration.
+            - generic [ref=e272] [cursor=pointer]:
+              - generic [ref=e273]: ▶
+              - generic [ref=e274]: Write src/payments/webhooks.ts (142 lines)
+              - generic [ref=e275]: 1.4s
+              - generic [ref=e276]: ✓
+            - generic [ref=e277] [cursor=pointer]:
+              - generic [ref=e278]: ▶
+              - generic [ref=e279]: Write src/db/migrations/004_webhook_events.ts
+              - generic [ref=e280]: 0.6s
+              - generic [ref=e281]: ✓
+            - generic [ref=e282] [cursor=pointer]:
+              - generic [ref=e283]: ▶
+              - generic [ref=e284]: Edit src/routes/index.ts (+4 lines)
+              - generic [ref=e285]: 0.4s
+              - generic [ref=e286]: ✓
+            - generic [ref=e287]:
+              - generic [ref=e288]:
+                - generic [ref=e289]: src/payments/webhooks.ts
+                - generic [ref=e290]: lines 24-48
+              - generic [ref=e291]: "export async function handleStripeWebhook( req: Request, db: Database ): Promise<Response> { const sig = req.headers.get(\"stripe-signature\"); if (!sig) return new Response(\"Missing signature\", { status: 400 }); const body = await req.text(); let event: Stripe.Event; try { event = stripe.webhooks.constructEvent( body, sig, env.STRIPE_WEBHOOK_SECRET ); } catch (err) { return new Response(\"Invalid signature\", { status: 400 }); } // Idempotency check const existing = db.query( \"SELECT id FROM webhook_events WHERE event_id = ?\", [event.id] ).get(); if (existing) return new Response(\"Already processed\"); ..."
+        - generic [ref=e292]:
+          - generic [ref=e293]:
+            - generic [ref=e294]: I
+            - generic [ref=e295]: implementer
+            - generic [ref=e296]: sonnet-4
+            - generic [ref=e297]: 4:14 PM
+          - generic [ref=e298]:
+            - generic [ref=e299] [cursor=pointer]:
+              - generic [ref=e300]: ▶
+              - generic [ref=e301]: Write src/payments/__tests__/webhooks.test.ts (98 lines)
+              - generic [ref=e302]: 1.1s
+              - generic [ref=e303]: ✓
+            - generic [ref=e304] [cursor=pointer]:
+              - generic [ref=e305]: ▶
+              - generic [ref=e306]: Run bun test src/payments/__tests__/webhooks.test.ts
+              - generic [ref=e307]: 8.2s
+              - generic [ref=e308]: ✗
+            - generic [ref=e309]:
+              - text: "FAIL: handleChargeRefunded - expected refund amount to be negative"
+              - text: 2 passed, 1 failed
+            - generic [ref=e310] [cursor=pointer]:
+              - generic [ref=e311]: ▶
+              - generic [ref=e312]: Edit src/payments/webhooks.ts (fix refund amount sign)
+              - generic [ref=e313]: 0.3s
+              - generic [ref=e314]: ✓
+            - generic [ref=e315] [cursor=pointer]:
+              - generic [ref=e316]: ▶
+              - generic [ref=e317]: Run bun test src/payments/__tests__/webhooks.test.ts
+              - generic [ref=e318]: 3.2s
+              - generic [ref=e319]: ✓
+            - paragraph [ref=e320]: All 7 tests passing after fixing the refund sign. 3 files created, 2 modified.
+        - generic [ref=e322]: implement completed, advancing to verify
+        - generic [ref=e323]:
+          - generic [ref=e324]:
+            - generic [ref=e325]: V
+            - generic [ref=e326]: verifier
+            - generic [ref=e327]: sonnet-4
+            - generic [ref=e328]: 4:15 PM
+          - generic [ref=e329]:
+            - generic [ref=e330] [cursor=pointer]:
+              - generic [ref=e331]: ▶
+              - generic [ref=e332]: Run bun tsc --noEmit
+              - generic [ref=e333]: 4.8s
+              - generic [ref=e334]: ✓
+            - generic [ref=e335] [cursor=pointer]:
+              - generic [ref=e336]: ▶
+              - generic [ref=e337]: Run bun lint
+              - generic [ref=e338]: 2.1s
+              - generic [ref=e339]: ✓
+            - generic [ref=e340] [cursor=pointer]:
+              - generic [ref=e341]: ▶
+              - generic [ref=e342]: Run bun test (full suite)
+              - generic [ref=e343]: 11.4s
+              - generic [ref=e344]: ✓
+            - paragraph [ref=e345]: All checks pass. 43/43 tests green. Implementation matches the plan.
+        - generic [ref=e347]: verify completed, advancing to review
+        - generic [ref=e348]:
+          - generic [ref=e349]:
+            - generic [ref=e350]: R
+            - generic [ref=e351]: reviewer
+            - generic [ref=e352]: opus-4
+            - generic [ref=e353]: 4:16 PM
+          - generic [ref=e354]:
+            - paragraph [ref=e355]: "Reviewing the webhook implementation. Two items to address:"
+            - paragraph [ref=e356]:
+              - strong [ref=e357]: 1. Missing transaction wrapper
+              - text: "-- the order update and webhook_events insert should be wrapped in a transaction."
+            - paragraph [ref=e358]:
+              - strong [ref=e359]: 2. Add index on webhook_events.event_id
+              - text: "-- idempotency lookup will be O(n) without it."
+        - generic [ref=e361]: review feedback -- returning to implement
+        - generic [ref=e362]:
+          - generic [ref=e363]:
+            - generic [ref=e364]: I
+            - generic [ref=e365]: implementer
+            - generic [ref=e366]: sonnet-4
+            - generic [ref=e367]: 4:16 PM
+          - generic [ref=e368]:
+            - paragraph [ref=e369]: Addressing review feedback. Adding transaction wrapper and unique index.
+            - generic [ref=e370] [cursor=pointer]:
+              - generic [ref=e371]: ▶
+              - generic [ref=e372]: Edit src/payments/webhooks.ts (wrap in db.transaction)
+              - generic [ref=e373]: 0.8s
+              - generic [ref=e374]: ✓
+            - generic [ref=e375] [cursor=pointer]:
+              - generic [ref=e376]: ▶
+              - generic [ref=e377]: Edit src/db/migrations/004_webhook_events.ts (UNIQUE index)
+              - generic [ref=e378]: 0.3s
+              - generic [ref=e379]: ✓
+            - generic [ref=e380] [cursor=pointer]:
+              - generic [ref=e381]: ▶
+              - generic [ref=e382]: Run bun test (full suite)
+              - generic [ref=e383]: 12.1s
+              - generic [ref=e384]: ✓
+            - paragraph [ref=e385]: 44/44 tests passing. Both review items addressed.
+        - generic [ref=e387]: review approved, advancing to merge
+        - generic [ref=e388]:
+          - generic [ref=e389]:
+            - generic [ref=e390]: "Y"
+            - generic [ref=e391]: You
+            - generic [ref=e392]: 4:21 PM
+          - paragraph [ref=e394]:
+            - text: Looks great. Can you also add a webhook for
+            - code [ref=e395]: invoice.payment_failed
+            - text: so we can send dunning emails?
+        - generic [ref=e397]: plan phase started
+        - generic [ref=e398]:
+          - generic [ref=e399]:
+            - generic [ref=e400]: P
+            - generic [ref=e401]: planner
+            - generic [ref=e402]: opus-4
+            - generic [ref=e403]: 4:21 PM
+          - generic [ref=e404]:
+            - paragraph [ref=e405]: I'll extend the webhook handler for invoice.payment_failed and integrate dunning emails.
+            - generic [ref=e406] [cursor=pointer]:
+              - generic [ref=e407]: ▶
+              - generic [ref=e408]: Read src/payments/webhooks.ts, src/email/service.ts
+              - generic [ref=e409]: 0.6s
+              - generic [ref=e410]: ✓
+            - paragraph [ref=e411]:
+              - strong [ref=e412]: 1. Add invoice.payment_failed handler
+              - text: "-- new case in the dispatch map."
+            - paragraph [ref=e413]:
+              - strong [ref=e414]: 2. Create dunning email template
+              - text: "-- three tiers based on attempt count."
+            - paragraph [ref=e415]:
+              - strong [ref=e416]: 3. Add retry tracking
+              - text: "-- extend webhook_events with attempt_count column."
+        - generic [ref=e417]:
+          - generic [ref=e418]: P
+          - generic [ref=e423]: planner is working...
+        - generic [ref=e424]:
+          - generic [ref=e425]: Session Summary
+          - generic [ref=e426]:
+            - generic [ref=e427]:
+              - generic [ref=e428]: Duration
+              - generic [ref=e429]: 9m 14s
+            - generic [ref=e430]:
+              - generic [ref=e431]: Total Cost
+              - generic [ref=e432]: $0.42
+            - generic [ref=e433]:
+              - generic [ref=e434]: Files Changed
+              - generic [ref=e435]: "5"
+            - generic [ref=e436]:
+              - generic [ref=e437]: Tests
+              - generic [ref=e438]: 44/44
+          - 'link "View PR #42 on GitHub" [ref=e439] [cursor=pointer]':
+            - /url: "#"
+            - img [ref=e440]
+            - text: "View PR #42 on GitHub"
+      - generic [ref=e444]:
+        - generic [ref=e445]:
+          - textbox "Send message to agent..." [ref=e446]
+          - button [ref=e447] [cursor=pointer]:
+            - img [ref=e448]
+        - generic [ref=e450]:
+          - generic [ref=e451]: Enter to send, Shift+Enter for newline
+          - generic [ref=e452]: Cmd K command palette
+  - generic:
+    - generic:
+      - generic:
+        - img
+        - textbox "Type a command..." [active]
+      - generic:
+        - generic: Actions
+        - generic:
+          - generic: +
+          - generic: New session
+          - generic: Cmd+N
+        - generic:
+          - generic: ▶
+          - generic: Resume session
+        - generic:
+          - generic: ■
+          - generic: Stop session
+        - generic: Navigation
+        - generic:
+          - generic: /
+          - generic: Search sessions
+          - generic: /
+        - generic:
+          - generic: ⚙
+          - generic: Settings
+        - generic: Theme
+        - generic:
+          - generic: ☼
+          - generic: Switch to light mode
+        - generic:
+          - generic: ☾
+          - generic: Switch to dark mode
