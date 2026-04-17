@@ -106,8 +106,14 @@ export class SessionRepository {
   create(opts: CreateSessionOpts): Session {
     const id = this.generateId();
     const ts = now();
+    const sanitize = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/[^a-z0-9-]+/g, "-")
+        .replace(/-{2,}/g, "-")
+        .replace(/^-|-$/g, "");
     const branch = opts.ticket
-      ? `feat/${opts.ticket}-${(opts.summary ?? "work").toLowerCase().replace(/\s+/g, "-").slice(0, 30)}`
+      ? `feat/${sanitize(opts.ticket)}-${sanitize(opts.summary ?? "work").slice(0, 30)}`
       : null;
 
     this.db
