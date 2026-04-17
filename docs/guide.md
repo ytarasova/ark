@@ -102,7 +102,7 @@ A session is the unit of work in Ark. Each session has a repo, a summary, an age
 | `ark session delete <id>`    | Removes session, worktree, and events.                           |
 | `ark session interrupt <id>` | Sends Ctrl+C to the running agent (tmux stays up).               |
 
-Sessions use a `status` field with states: `pending`, `dispatched`, `running`, `busy`, `idle`, `paused`, `completed`, `error`, `archived`.
+Sessions use a `status` field with states: `pending`, `ready`, `running`, `waiting`, `stopped`, `blocked`, `completed`, `failed`, `archived`.
 
 ### Start and dispatch examples
 
@@ -158,6 +158,12 @@ ark session join <parentId>     # block until children finish
 ```
 
 The `fan-out` and `dag-parallel` builtin flows are wired for this pattern. Parent auto-joins when the last child hits `completed`.
+
+### Session replay
+
+After a session completes, you can replay its timeline event-by-event. Replay builds a step-by-step view with elapsed timestamps, stage transitions, and human-readable summaries.
+
+The web dashboard surfaces this as a visual timeline. Programmatically, the `session.replay` JSON-RPC method returns an array of `ReplayStep` objects (index, timestamp, elapsed, type, stage, actor, summary, detail).
 
 ### Interrupt, archive, delete
 
@@ -364,7 +370,7 @@ Each executor implements 5 methods: `launch`, `kill`, `status`, `send`, `capture
 
 ## 5. Skills
 
-Skills are reusable prompt fragments. They are markdown files injected into an agent's system prompt when attached.
+Skills are reusable prompt fragments. They are YAML files whose `prompt` field is injected into an agent's system prompt when attached.
 
 ### Builtin skills (7)
 
@@ -382,9 +388,9 @@ Skills are reusable prompt fragments. They are markdown files injected into an a
 
 Skills resolve in priority order:
 
-1. Project: `.ark/skills/<name>.md` in the repo
-2. Global: `~/.ark/skills/<name>.md`
-3. Builtin: `skills/<name>.md` shipped with Ark
+1. Project: `.ark/skills/<name>.yaml` in the repo
+2. Global: `~/.ark/skills/<name>.yaml`
+3. Builtin: `skills/<name>.yaml` shipped with Ark
 
 A project-level skill with the same name overrides a global or builtin one.
 
@@ -397,7 +403,7 @@ runtime: claude
 skills: [code-review, security-scan, self-review]
 ```
 
-At dispatch, each listed skill's markdown content is inlined into the agent's system prompt.
+At dispatch, each listed skill's `prompt` field is inlined into the agent's system prompt.
 
 ### CLI
 
@@ -839,7 +845,7 @@ ark costs
 ark compute list
 ```
 
-Seventeen command modules cover sessions, compute, flows, skills, recipes, agents, runtimes, auth, router, knowledge, search, worktree, history, todo, config, tenant, and costs.
+Twenty-four command modules cover sessions, compute, flows, skills, recipes, agents, runtimes, auth, router, knowledge, search, worktree, costs, conductor, daemon, dashboard, eval, memory, misc, profile, schedule, server, server-daemon, and tenant.
 
 ### Web
 
@@ -849,7 +855,18 @@ ark web --with-daemon   # explicit: starts conductor (:19100) + arkd (:19300) in
 make web-build          # production build
 ```
 
-Vite + React + shadcn/ui. SSE live updates, Recharts cost dashboard, widget grid, session detail pages. Dashboard, Sessions, Agents, Flows, Compute, History, Memory, Tools, Schedules, Costs, Settings pages.
+Vite + React + shadcn/ui with a custom design system (theme tokens, component library). Pages: Dashboard, Sessions, Agents, Flows, Compute, History, Memory, Tools, Schedules, Costs, Settings.
+
+Key web features (v0.18):
+
+- **Pipeline visualization**: interactive DAG viewer using @xyflow/react + d3-dag. Each flow stage is a draggable node with live status. Click a stage to see details, logs, and tool calls.
+- **Session replay**: step through a completed session event-by-event with elapsed timestamps, stage transitions, and expandable detail panels.
+- **Rich task input**: markdown toolbar, file attachments, issue references. Cmd+Enter to start a session, Esc to cancel.
+- **Deep links**: `/sessions/<id>`, `/agents/<name>`, `/flows/<name>` with tab support (`?tab=conversation`).
+- **Keyboard shortcuts**: Cmd+K opens the command palette, single-key navigation (D=Dashboard, S=Sessions, A=Agents, F=Flows, C=Compute, H=History, M=Memory).
+- **Unread badges**: sessions with new messages show a red dot in the sidebar and session list.
+- **Compute detail drawer**: click a process, container, or tmux session for full details and live system metrics.
+- **SSE live updates**: real-time event streaming, Recharts cost charts, conversation messages with typing indicators.
 
 The `--with-daemon` flag starts the conductor and arkd in-process so you get a fully working instance with a single command. If daemons are already running on those ports, Ark detects them via a `/health` probe and reuses them.
 
@@ -1226,4 +1243,4 @@ ark --server https://ark.company.com --token ark_default_xxx web
 
 ---
 
-That is the full tour. Every concept is documented here: sessions, 14 flows (including autonomous-sdlc and conditional routing), 12 agents, 5 runtimes (Claude, Claude Max, Codex, Gemini, Goose), skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/Web/Desktop, knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, deployment via Dockerfile/docker-compose/Helm, daemon architecture, messaging bridges (Telegram/Slack/Discord), profiles, schedules, and CLI utilities.
+That is the full tour. Every concept is documented here: sessions (with replay), 14 flows (including autonomous-sdlc and conditional routing), 12 agents, 5 runtimes (Claude, Claude Max, Codex, Gemini, Goose), skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/Web/Desktop (with pipeline visualization, deep links, and keyboard shortcuts), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, deployment via Dockerfile/docker-compose/Helm, daemon architecture, messaging bridges (Telegram/Slack/Discord), profiles, schedules, and CLI utilities.
