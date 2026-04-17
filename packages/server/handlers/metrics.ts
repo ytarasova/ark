@@ -1,9 +1,13 @@
+import { execFile } from "child_process";
+import { promisify } from "util";
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { getProvider } from "../../compute/index.js";
 import { getAllSessionCosts } from "../../core/observability/costs.js";
 import type { MetricsSnapshotParams } from "../../types/index.js";
+
+const execFileAsync = promisify(execFile);
 
 export function registerMetricsHandlers(router: Router, app: AppContext): void {
   router.handle("metrics/snapshot", async (p) => {
@@ -76,5 +80,49 @@ export function registerMetricsHandlers(router: Router, app: AppContext): void {
       source: params.source ?? "api",
     });
     return { ok: true };
+  });
+
+  // ── Process / container actions (local compute only) ─────────────────────
+
+  router.handle("compute/kill-process", async (p) => {
+    const params = (p ?? {}) as Record<string, any>;
+    const pid = params.pid;
+    if (!pid) throw new Error("pid is required");
+    try {
+      await execFileAsync("kill", ["-15", String(pid)], { timeout: 5000 });
+      return { ok: true };
+    } catch (err: any) {
+      throw new Error(`Failed to kill process ${pid}: ${err.message}`);
+    }
+  });
+
+  router.handle("compute/docker-logs", async (p) => {
+    const params = (p ?? {}) as Record<string, any>;
+    const container = params.container;
+    if (!container) throw new Error("container name is required");
+    const tail = String(params.tail ?? 100);
+    try {
+      const { stdout } = await execFileAsync("docker", ["logs", container, "--tail", tail], {
+        timeout: 10_000,
+        encoding: "utf-8",
+      });
+      return { logs: stdout };
+    } catch (err: any) {
+      throw new Error(`Failed to get logs for ${container}: ${err.message}`);
+    }
+  });
+
+  router.handle("compute/docker-action", async (p) => {
+    const params = (p ?? {}) as Record<string, any>;
+    const container = params.container;
+    const action = params.action;
+    if (!container) throw new Error("container name is required");
+    if (!action || !["stop", "restart"].includes(action)) throw new Error("action must be stop or restart");
+    try {
+      await execFileAsync("docker", [action, container], { timeout: 30_000 });
+      return { ok: true };
+    } catch (err: any) {
+      throw new Error(`Failed to ${action} container ${container}: ${err.message}`);
+    }
   });
 }

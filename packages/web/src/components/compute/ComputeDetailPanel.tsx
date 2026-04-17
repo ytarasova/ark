@@ -1,3 +1,4 @@
+import { useState, useCallback } from "react";
 import { cn } from "../../lib/utils.js";
 import { Badge } from "../ui/badge.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card.js";
@@ -7,6 +8,7 @@ import { MetricBar } from "./MetricBar.js";
 import { MetricSparkline } from "./MetricSparkline.js";
 import { MetricsSkeleton } from "./MetricsSkeleton.js";
 import { ComputeActions } from "./ComputeActions.js";
+import { ComputeDrawer, type DrawerItem } from "./ComputeDrawer.js";
 import type { ComputeSnapshot, MetricHistoryPoint } from "./types.js";
 
 export function ComputeDetailPanel({
@@ -18,6 +20,7 @@ export function ComputeDetailPanel({
   actionMsg,
   metricsState,
   onRetryMetrics,
+  onNavigateToSession,
 }: {
   compute: any;
   snapshot: ComputeSnapshot | null;
@@ -27,7 +30,11 @@ export function ComputeDetailPanel({
   actionMsg: { text: string; type: string } | null;
   metricsState: "loading" | "loaded" | "error";
   onRetryMetrics: () => void;
+  onNavigateToSession?: (sessionId: string) => void;
 }) {
+  const [drawerItem, setDrawerItem] = useState<DrawerItem | null>(null);
+  const closeDrawer = useCallback(() => setDrawerItem(null), []);
+
   const m = snapshot?.metrics;
   const arkProcs = (snapshot?.processes ?? []).filter((p) => isArkProcess(p.command));
   const otherProcs = (snapshot?.processes ?? []).filter((p) => !isArkProcess(p.command));
@@ -174,7 +181,11 @@ export function ComputeDetailPanel({
               </thead>
               <tbody>
                 {snapshot.sessions.map((s) => (
-                  <tr key={s.name} className="border-t border-border/50 hover:bg-accent/30 transition-colors">
+                  <tr
+                    key={s.name}
+                    className="border-t border-border/50 hover:bg-accent/30 transition-colors cursor-pointer"
+                    onClick={() => setDrawerItem({ kind: "tmux", tmux: s })}
+                  >
                     <td className="px-3 py-1.5 font-mono text-foreground">{s.name}</td>
                     <td className="px-3 py-1.5">
                       <Badge variant={s.status === "attached" ? "default" : "secondary"} className="text-[10px]">
@@ -252,7 +263,11 @@ export function ComputeDetailPanel({
               </thead>
               <tbody>
                 {arkProcs.map((p) => (
-                  <tr key={p.pid} className="border-t border-border/50 hover:bg-accent/30 transition-colors">
+                  <tr
+                    key={p.pid}
+                    className="border-t border-border/50 hover:bg-accent/30 transition-colors cursor-pointer"
+                    onClick={() => setDrawerItem({ kind: "process", process: p })}
+                  >
                     <td className="px-3 py-1.5 font-mono text-muted-foreground">{p.pid}</td>
                     <td className="px-3 py-1.5 font-mono text-foreground truncate max-w-[350px]" title={p.command}>
                       {p.command.length > 80 ? p.command.slice(0, 80) + "..." : p.command}
@@ -261,13 +276,23 @@ export function ComputeDetailPanel({
                     <td className="px-3 py-1.5 text-right font-mono text-foreground">{p.mem}</td>
                   </tr>
                 ))}
-                {otherProcs.length > 0 && (
-                  <tr className="border-t border-border/50 bg-secondary/20">
-                    <td colSpan={4} className="px-3 py-1.5 text-muted-foreground italic">
-                      + {otherProcs.length} other process{otherProcs.length === 1 ? "" : "es"}
+                {otherProcs.map((p) => (
+                  <tr
+                    key={p.pid}
+                    className="border-t border-border/50 hover:bg-accent/30 transition-colors cursor-pointer bg-secondary/10"
+                    onClick={() => setDrawerItem({ kind: "process", process: p })}
+                  >
+                    <td className="px-3 py-1.5 font-mono text-muted-foreground">{p.pid}</td>
+                    <td
+                      className="px-3 py-1.5 font-mono text-muted-foreground truncate max-w-[350px]"
+                      title={p.command}
+                    >
+                      {p.command.length > 80 ? p.command.slice(0, 80) + "..." : p.command}
                     </td>
+                    <td className="px-3 py-1.5 text-right font-mono text-muted-foreground">{p.cpu}</td>
+                    <td className="px-3 py-1.5 text-right font-mono text-muted-foreground">{p.mem}</td>
                   </tr>
-                )}
+                ))}
               </tbody>
             </table>
           </div>
@@ -293,7 +318,11 @@ export function ComputeDetailPanel({
               </thead>
               <tbody>
                 {snapshot.docker.map((c) => (
-                  <tr key={c.name} className="border-t border-border/50 hover:bg-accent/30 transition-colors">
+                  <tr
+                    key={c.name}
+                    className="border-t border-border/50 hover:bg-accent/30 transition-colors cursor-pointer"
+                    onClick={() => setDrawerItem({ kind: "docker", docker: c })}
+                  >
                     <td className="px-3 py-1.5 font-mono text-foreground">{c.name}</td>
                     <td className="px-3 py-1.5 font-mono text-muted-foreground truncate max-w-[200px]">{c.image}</td>
                     <td className="px-3 py-1.5 text-right font-mono text-foreground">{c.cpu}</td>
@@ -364,6 +393,8 @@ export function ComputeDetailPanel({
           )}
         </div>
       </div>
+
+      <ComputeDrawer item={drawerItem} onClose={closeDrawer} onNavigateToSession={onNavigateToSession} />
     </div>
   );
 }

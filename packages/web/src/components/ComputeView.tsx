@@ -14,11 +14,12 @@ import type { ComputeSnapshot, MetricHistoryPoint } from "./compute/types.js";
 interface ComputeViewProps {
   showCreate?: boolean;
   onCloseCreate?: () => void;
+  onNavigate?: (view: string, subId?: string) => void;
 }
 
 const MAX_HISTORY = 60;
 
-export function ComputeView({ showCreate = false, onCloseCreate }: ComputeViewProps) {
+export function ComputeView({ showCreate = false, onCloseCreate, onNavigate }: ComputeViewProps) {
   const queryClient = useQueryClient();
   const { data: computes = [] } = useComputeQuery();
   const [selected, setSelected] = useState<any>(null);
@@ -202,6 +203,7 @@ export function ComputeView({ showCreate = false, onCloseCreate }: ComputeViewPr
               actionMsg={actionMsg}
               metricsState={metricsState}
               onRetryMetrics={loadSnapshot}
+              onNavigateToSession={(sessionId) => onNavigate?.("sessions", sessionId)}
             />
           ) : (
             <div className="flex items-center justify-center h-full text-sm text-muted-foreground">

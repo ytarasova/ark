@@ -28,7 +28,7 @@ export function ComputePage({ view, onNavigate, readOnly, daemonStatus }: Comput
           ) : undefined
         }
       >
-        <ComputeView showCreate={showNew} onCloseCreate={() => setShowNew(false)} />
+        <ComputeView showCreate={showNew} onCloseCreate={() => setShowNew(false)} onNavigate={onNavigate} />
       </PageShell>
     </Layout>
   );
