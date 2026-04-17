@@ -18,6 +18,7 @@ interface SessionListProps {
   onNewSession: () => void;
   readOnly: boolean;
   flowStagesMap?: Record<string, any[]>;
+  unreadCounts?: Record<string, number>;
 }
 
 /** Map raw session status to a valid SessionStatus type. */
@@ -63,6 +64,7 @@ export function SessionListPanel({
   onNewSession,
   readOnly,
   flowStagesMap,
+  unreadCounts,
 }: SessionListProps) {
   // Compute status counts
   const counts = useMemo(() => {
@@ -103,8 +105,9 @@ export function SessionListPanel({
         cost: s.cost != null ? fmtCost(s.cost) : "",
         relativeTime: relTime(s.updated_at),
         stages: buildStageProgress(s, flowStagesMap),
+        unreadCount: unreadCounts?.[s.id] ?? 0,
       })),
-    [filtered, flowStagesMap],
+    [filtered, flowStagesMap, unreadCounts],
   );
 
   const filterChips = (

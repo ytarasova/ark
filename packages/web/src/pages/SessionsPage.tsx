@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { Layout } from "../components/Layout.js";
 import { SessionListPanel } from "../components/SessionList.js";
 import { SessionDetail } from "../components/SessionDetail.js";
@@ -40,6 +40,31 @@ export function SessionsPage({
   const serverStatus = filter === "archived" ? "archived" : undefined;
   const { sessions, refresh } = useSessions(serverStatus);
   const [showNew, setShowNew] = useState(false);
+
+  // ── Unread counts ──────────────────────────────────────────────────────────
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const unreadTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchUnreadCounts = useCallback(() => {
+    api
+      .getUnreadCounts()
+      .then(setUnreadCounts)
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetchUnreadCounts();
+    unreadTimerRef.current = setInterval(fetchUnreadCounts, 10_000);
+    return () => {
+      if (unreadTimerRef.current) clearInterval(unreadTimerRef.current);
+    };
+  }, [fetchUnreadCounts]);
+
+  const totalUnread = useMemo(() => {
+    let sum = 0;
+    for (const v of Object.values(unreadCounts)) sum += v;
+    return sum;
+  }, [unreadCounts]);
 
   // Load flow stages for pipeline visualization
   const [flowStagesMap, setFlowStagesMap] = useState<Record<string, any[]>>({});
@@ -158,14 +183,30 @@ export function SessionsPage({
   }
 
   return (
-    <Layout view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus}>
+    <Layout
+      view={view}
+      onNavigate={onNavigate}
+      readOnly={readOnly}
+      daemonStatus={daemonStatus}
+      totalUnread={totalUnread}
+    >
       {/* Session List Panel */}
       <SessionListPanel
         sessions={sessions}
         selectedId={selectedId}
         onSelect={(id) => {
-          setSelectedId(id === selectedId ? null : id);
+          const next = id === selectedId ? null : id;
+          setSelectedId(next);
           setShowNew(false);
+          if (next && unreadCounts[next]) {
+            api.markRead(next).then(() => {
+              setUnreadCounts((prev) => {
+                const copy = { ...prev };
+                delete copy[next];
+                return copy;
+              });
+            });
+          }
         }}
         filter={filter}
         onFilterChange={setFilter}
@@ -177,6 +218,7 @@ export function SessionsPage({
         }}
         readOnly={readOnly}
         flowStagesMap={flowStagesMap}
+        unreadCounts={unreadCounts}
       />
 
       {/* Center Panel */}

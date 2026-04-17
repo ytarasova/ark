@@ -5,6 +5,7 @@ export interface IconRailItem {
   id: string;
   icon: React.ReactNode;
   label: string;
+  badge?: number;
 }
 
 export interface IconRailProps extends React.ComponentProps<"nav"> {
@@ -126,6 +127,19 @@ function RailButton({
       {/* Active indicator bar */}
       {active && (
         <span className="absolute left-[-6px] top-1 bottom-1 w-[3px] rounded-r bg-[var(--primary)]" aria-hidden />
+      )}
+      {/* Unread badge */}
+      {item.badge != null && item.badge > 0 && (
+        <span
+          className={cn(
+            "absolute top-0 right-0.5 min-w-[16px] h-[16px] rounded-full",
+            "bg-red-500 text-white text-[9px] font-bold leading-none",
+            "flex items-center justify-center px-1",
+          )}
+          aria-label={`${item.badge} unread`}
+        >
+          {item.badge > 99 ? "99+" : item.badge}
+        </span>
       )}
       {item.icon}
       <span className="text-[9px] leading-tight truncate w-full text-center">{item.label}</span>

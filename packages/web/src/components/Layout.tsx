@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { IconRail } from "./ui/IconRail.js";
+import type { IconRailItem } from "./ui/IconRail.js";
 import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
 import {
   Play,
@@ -21,9 +22,11 @@ interface LayoutProps {
   readOnly: boolean;
   daemonStatus?: DaemonStatus | null;
   children: React.ReactNode;
+  /** Total unread message count to badge on Sessions icon */
+  totalUnread?: number;
 }
 
-const NAV_ITEMS = [
+const BASE_NAV_ITEMS: IconRailItem[] = [
   { id: "sessions", icon: <Play size={18} strokeWidth={1.5} />, label: "Sessions" },
   { id: "dashboard", icon: <LayoutDashboard size={18} strokeWidth={1.5} />, label: "Dashboard" },
   { id: "agents", icon: <Bot size={18} strokeWidth={1.5} />, label: "Agents" },
@@ -51,7 +54,12 @@ const SHORTCUTS: Record<string, string> = {
   ",": "settings",
 };
 
-export function Layout({ view, onNavigate, daemonStatus, children }: LayoutProps) {
+export function Layout({ view, onNavigate, daemonStatus, children, totalUnread }: LayoutProps) {
+  const navItems = useMemo(() => {
+    if (!totalUnread) return BASE_NAV_ITEMS;
+    return BASE_NAV_ITEMS.map((item) => (item.id === "sessions" ? { ...item, badge: totalUnread } : item));
+  }, [totalUnread]);
+
   // Keyboard shortcuts for navigation
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -73,7 +81,7 @@ export function Layout({ view, onNavigate, daemonStatus, children }: LayoutProps
   return (
     <div className="flex h-screen bg-[var(--bg)] overflow-hidden">
       <IconRail
-        items={NAV_ITEMS}
+        items={navItems}
         activeId={view}
         onSelect={onNavigate}
         settingsItem={SETTINGS_ITEM}

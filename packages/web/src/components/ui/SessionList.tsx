@@ -16,6 +16,7 @@ export interface SessionListItem {
   cost: string;
   relativeTime: string;
   stages: StageProgress[];
+  unreadCount?: number;
 }
 
 export interface SessionListProps extends React.ComponentProps<"div"> {
@@ -149,10 +150,22 @@ function SessionCard({
         selected && "bg-[var(--primary-subtle)] border-l-[var(--primary)]",
       )}
     >
-      {/* Top row: dot + id + time */}
+      {/* Top row: dot + id + unread badge + time */}
       <div className="flex items-center gap-1.5">
         <StatusDot status={session.status} size="md" />
         <span className="font-[family-name:var(--font-mono-ui)] text-[12px] text-[var(--fg-muted)]">{session.id}</span>
+        {session.unreadCount != null && session.unreadCount > 0 && (
+          <span
+            className={cn(
+              "min-w-[18px] h-[18px] rounded-full",
+              "bg-[var(--primary)] text-white text-[10px] font-bold leading-none",
+              "flex items-center justify-center px-1 shrink-0",
+            )}
+            aria-label={`${session.unreadCount} unread`}
+          >
+            {session.unreadCount > 99 ? "99+" : session.unreadCount}
+          </span>
+        )}
         <span className="text-[11px] text-[var(--fg-muted)] ml-auto">{session.relativeTime}</span>
       </div>
 

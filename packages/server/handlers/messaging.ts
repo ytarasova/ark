@@ -21,4 +21,9 @@ export function registerMessagingHandlers(router: Router, app: AppContext): void
     app.messages.markRead(sessionId);
     return { ok: true };
   });
+
+  router.handle("session/unread-counts", async () => {
+    const counts = app.messages.unreadCounts();
+    return { counts };
+  });
 }

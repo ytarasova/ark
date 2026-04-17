@@ -81,4 +81,18 @@ export class MessageRepository {
       .get(sessionId, this.tenantId) as { count: number } | undefined;
     return row?.count ?? 0;
   }
+
+  /** Return unread counts for all sessions that have at least one unread agent message. */
+  unreadCounts(): Record<string, number> {
+    const rows = this.db
+      .prepare(
+        "SELECT session_id, COUNT(*) as count FROM messages WHERE tenant_id = ? AND role = 'agent' AND read = 0 GROUP BY session_id",
+      )
+      .all(this.tenantId) as { session_id: string; count: number }[];
+    const result: Record<string, number> = {};
+    for (const row of rows) {
+      result[row.session_id] = row.count;
+    }
+    return result;
+  }
 }
