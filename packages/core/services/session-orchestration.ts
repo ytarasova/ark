@@ -703,7 +703,13 @@ export async function advance(
         // If the next stage has isolation="continue", preserve claude_session_id for --resume.
         const graphNextStageDef = flow.getStage(app, flowName, graphNextStage);
         const graphIsolation = graphNextStageDef?.isolation ?? "fresh";
+        const graphNextAction = flow.getStageAction(app, flowName, graphNextStage);
         const graphSessionUpdates: Partial<Session> = { stage: graphNextStage, status: "ready", session_id: null };
+        // Update agent to reflect the next stage's agent (keeps display accurate).
+        // For action stages (no agent), preserve the last dispatched agent.
+        if (graphNextAction.agent) {
+          graphSessionUpdates.agent = graphNextAction.agent;
+        }
         if (graphIsolation === "fresh") {
           graphSessionUpdates.claude_session_id = null;
         }
@@ -714,8 +720,8 @@ export async function advance(
           data: {
             from_stage: stage,
             to_stage: graphNextStage,
-            stage_type: flow.getStageAction(app, flowName, graphNextStage).type,
-            stage_agent: flow.getStageAction(app, flowName, graphNextStage).agent,
+            stage_type: graphNextAction.type,
+            stage_agent: graphNextAction.agent,
             forced: force,
             isolation: graphIsolation,
             via: "graph-flow-conditional",
@@ -724,9 +730,12 @@ export async function advance(
           },
         });
         emitStageSpanEnd(sessionId, { status: "completed" });
-        const graphAction = flow.getStageAction(app, flowName, graphNextStage);
         const graphStageDef = flow.getStage(app, flowName, graphNextStage);
-        emitStageSpanStart(sessionId, { stage: graphNextStage, agent: graphAction?.agent, gate: graphStageDef?.gate });
+        emitStageSpanStart(sessionId, {
+          stage: graphNextStage,
+          agent: graphNextAction?.agent,
+          gate: graphStageDef?.gate,
+        });
         saveCheckpoint(app, sessionId);
         return { ok: true, message: `Advanced to ${graphNextStage} (graph-flow)` };
       }
@@ -847,6 +856,11 @@ export async function advance(
   const nextStageDef = flow.getStage(app, flowName, nextStage);
   const isolation = nextStageDef?.isolation ?? "fresh";
   const sessionUpdates: Partial<Session> = { stage: nextStage, status: "ready", error: null, session_id: null };
+  // Update agent to reflect the next stage's agent (keeps display accurate).
+  // For action stages (no agent), preserve the last dispatched agent.
+  if (nextAction.agent) {
+    sessionUpdates.agent = nextAction.agent;
+  }
   if (isolation === "fresh") {
     sessionUpdates.claude_session_id = null;
   }

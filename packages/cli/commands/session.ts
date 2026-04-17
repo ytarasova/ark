@@ -222,18 +222,28 @@ export function registerSessionCommands(program: Command) {
     .argument("<id>", "Session ID")
     .action(async (id) => {
       const ark = await getArkClient();
-      const { session: s } = await ark.sessionRead(id);
+      let s: any;
+      try {
+        const result = await ark.sessionRead(id);
+        s = result.session;
+      } catch (e: any) {
+        console.log(chalk.red(e.message ?? `Session ${id} not found`));
+        return;
+      }
       if (!s) {
         console.log(chalk.red(`Session ${id} not found`));
         return;
       }
       console.log(chalk.bold(`\n${s.ticket ?? s.id}: ${s.summary ?? ""}`));
       console.log(`  ID:       ${s.id}`);
-      console.log(`  Status:   ${s.status}`);
+      console.log(`  Status:   ${s.status ?? "unknown"}`);
       console.log(`  Stage:    ${s.stage ?? "-"}`);
       console.log(`  Repo:     ${s.repo ?? "-"}`);
-      console.log(`  Flow:     ${s.flow}`);
-      if (s.agent) console.log(`  Agent:    ${s.agent}`);
+      console.log(`  Flow:     ${s.flow ?? "-"}`);
+      console.log(`  Agent:    ${s.agent ?? "-"}`);
+      if (s.branch) console.log(`  Branch:   ${s.branch}`);
+      if (s.pr_url) console.log(`  PR:       ${s.pr_url}`);
+      if (s.workdir) console.log(`  Workdir:  ${s.workdir}`);
       if (s.error) console.log(chalk.red(`  Error:    ${s.error}`));
       if (s.breakpoint_reason) console.log(chalk.yellow(`  Waiting:  ${s.breakpoint_reason}`));
     });

@@ -924,9 +924,10 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
     await sendOSNotification(`Ark: ${notifyTitle}`, notifyBody);
   }
 
-  // PR URL detection (agent-provided)
+  // PR URL detection (agent-provided) -- pr_url is already persisted via
+  // result.updates (applied above) so the action stage sees it in time.
+  // Only log the pr_detected event here for observability.
   if (result.prUrl) {
-    app.sessions.update(sessionId, { pr_url: result.prUrl });
     app.events.log(sessionId, "pr_detected", {
       actor: "agent",
       data: { pr_url: result.prUrl },

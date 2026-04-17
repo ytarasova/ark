@@ -526,10 +526,12 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
     }
   }
 
-  // PR URL from agent report
+  // PR URL from agent report -- must be in updates so it's persisted
+  // BEFORE mediateStageHandoff runs (the create_pr action checks s.pr_url).
   const prUrl = (report as unknown as Record<string, unknown>).pr_url as string | undefined;
   if (prUrl && !session.pr_url) {
     result.prUrl = prUrl;
+    result.updates.pr_url = prUrl;
   }
 
   return result;
