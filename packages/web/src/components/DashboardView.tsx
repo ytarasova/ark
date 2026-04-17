@@ -5,8 +5,7 @@ import { fmtCost } from "../util.js";
 import { cn } from "../lib/utils.js";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card.js";
 import { StatusDot } from "./StatusDot.js";
-import { Activity, DollarSign, Cpu, Heart, Plus, Search, Upload } from "lucide-react";
-import { Button } from "./ui/button.js";
+import { Activity, DollarSign, Heart } from "lucide-react";
 import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
 
 // Theme colors for charts and status
@@ -61,7 +60,7 @@ interface DashboardViewProps {
   daemonStatus?: DaemonStatus | null;
 }
 
-export function DashboardView({ onNavigate, readOnly, daemonStatus }: DashboardViewProps) {
+export function DashboardView({ onNavigate, readOnly: _readOnly, daemonStatus }: DashboardViewProps) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -321,41 +320,33 @@ export function DashboardView({ onNavigate, readOnly, daemonStatus }: DashboardV
         </CardContent>
       </Card>
 
-      {/* Quick Actions Widget */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-[13px] font-semibold text-muted-foreground uppercase tracking-[0.08em] flex items-center gap-2">
-            <Cpu size={14} className="opacity-50" />
-            Quick Actions
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {!readOnly && (
-            <Button size="sm" className="w-full justify-start gap-2 text-[12px]" onClick={() => onNavigate("sessions")}>
-              <Plus size={14} />
-              New Session
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full justify-start gap-2 text-[12px]"
-            onClick={() => onNavigate("sessions")}
-          >
-            <Search size={14} />
-            Search Sessions
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full justify-start gap-2 text-[12px]"
-            onClick={() => onNavigate("history")}
-          >
-            <Upload size={14} />
-            Import Claude Session
-          </Button>
-        </CardContent>
-      </Card>
+      {/* Top Cost Sessions Widget */}
+      {data.topCostSessions && data.topCostSessions.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-[13px] font-semibold text-muted-foreground uppercase tracking-[0.08em] flex items-center gap-2">
+              <DollarSign size={14} className="opacity-50" />
+              Top Cost Sessions
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="divide-y divide-border/50">
+              {data.topCostSessions.slice(0, 5).map((s, i) => (
+                <div
+                  key={`${s.sessionId}-${i}`}
+                  className="px-4 py-2 hover:bg-accent transition-colors cursor-pointer"
+                  onClick={() => onNavigate("sessions")}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] text-foreground truncate">{s.summary || s.sessionId}</span>
+                    <span className="text-[11px] font-mono text-[var(--primary)]">{fmtCost(s.cost)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
