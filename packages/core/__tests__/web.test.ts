@@ -68,10 +68,14 @@ describe("web server", () => {
     expect(result).toHaveProperty("costs");
   });
 
-  it("returns 404 for unknown routes", async () => {
+  it("SPA fallback returns index.html for unknown routes", async () => {
     server = startWebServer(getApp(), { port: 18423 });
     const resp = await fetch("http://localhost:18423/nope");
-    expect(resp.status).toBe(404);
+    // SPA fallback: any non-API, non-static route serves index.html (200)
+    // so client-side routing can handle it. This is standard SPA behavior.
+    expect(resp.status).toBe(200);
+    const html = await resp.text();
+    expect(html).toContain("root");
   });
 
   it("/api/health returns 200 with version + uptime", async () => {

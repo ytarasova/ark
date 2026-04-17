@@ -10,7 +10,7 @@ import { startArkd } from "../server.js";
 // ── Auth tests ────────────────────────────────────────────────────────────────
 
 describe("ArkD auth (token option)", () => {
-  const AUTH_PORT = 19360;
+  const AUTH_PORT = 19370;
   const AUTH_BASE = `http://localhost:${AUTH_PORT}`;
   const TOKEN = "test-secret-token-12345";
   let server: { stop(): void };
@@ -78,7 +78,7 @@ describe("ArkD auth (token option)", () => {
 // ── Exec allowlist tests ──────────────────────────────────────────────────────
 
 describe("ArkD exec command allowlist", () => {
-  const EXEC_PORT = 19361;
+  const EXEC_PORT = 19371;
   const EXEC_BASE = `http://localhost:${EXEC_PORT}`;
   let server: { stop(): void };
 
