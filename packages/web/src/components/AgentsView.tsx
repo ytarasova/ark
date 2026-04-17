@@ -331,7 +331,11 @@ export function AgentsView({
       <SubTabBar active={subTab} onChange={handleTabChange} />
       <div className="grid grid-cols-[260px_1fr] overflow-hidden flex-1">
         {/* Left: list panel */}
-        <div className="border-r border-border overflow-y-auto">
+        <div
+          className="border-r border-border overflow-y-auto"
+          role="listbox"
+          aria-label={subTab === "roles" ? "Agent roles" : "Runtimes"}
+        >
           {subTab === "roles"
             ? agents.map((a: any) => (
                 <div

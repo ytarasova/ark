@@ -158,7 +158,11 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
               <span className="text-muted-foreground text-[10px] font-mono">
                 {allResults.length} result{allResults.length !== 1 ? "s" : ""}
               </span>
-              <button className="text-[10px] text-muted-foreground hover:text-foreground" onClick={handleClear}>
+              <button
+                className="text-[10px] text-muted-foreground hover:text-foreground"
+                onClick={handleClear}
+                aria-label="Clear search results"
+              >
                 Clear
               </button>
             </div>
@@ -315,6 +319,7 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
             onClick={handleRefresh}
             disabled={refreshing}
             title="Refresh and re-index transcripts"
+            aria-label="Refresh and re-index transcripts"
           >
             <RefreshCw size={10} className={cn(refreshing && "animate-spin")} />
             {refreshing ? "Refreshing..." : "Refresh"}
@@ -333,7 +338,11 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
           <div className="flex flex-col items-center justify-center py-12 px-4">
             <FileText size={20} className="text-muted-foreground/30 mb-2" />
             <p className="text-[11px] text-muted-foreground text-center">No Claude Code transcripts found</p>
-            <button className="text-[10px] text-primary hover:underline mt-2" onClick={handleRefresh}>
+            <button
+              className="text-[10px] text-primary hover:underline mt-2"
+              onClick={handleRefresh}
+              aria-label="Scan for transcripts"
+            >
               Scan for transcripts
             </button>
           </div>
@@ -618,6 +627,7 @@ function TranscriptMessages({ sessionId }: { sessionId: string }) {
           className={cn("text-primary hover:underline", indexing && "opacity-50 pointer-events-none")}
           onClick={handleIndex}
           disabled={indexing}
+          aria-label="Index transcripts"
         >
           {indexing ? "Indexing..." : "Index transcripts"}
         </button>

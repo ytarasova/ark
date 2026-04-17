@@ -98,7 +98,7 @@ export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleView
     <>
       <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
         {/* Left: list panel */}
-        <div className="border-r border-border overflow-y-auto">
+        <div className="border-r border-border overflow-y-auto" role="listbox" aria-label="Schedules">
           {/* Empty state in left panel */}
           {!schedules.length && !showCreate && (
             <div className="flex flex-col items-center justify-center py-12 px-4">
@@ -247,18 +247,28 @@ function NewScheduleForm({ onClose, onSubmit }: { onClose: () => void; onSubmit:
   const [groups, setGroups] = useState<string[]>([]);
 
   useEffect(() => {
+    let cancelled = false;
     api
       .getFlows()
-      .then(setFlows)
+      .then((f) => {
+        if (!cancelled) setFlows(f);
+      })
       .catch(() => {});
     api
       .getCompute()
-      .then(setComputes)
+      .then((c) => {
+        if (!cancelled) setComputes(c);
+      })
       .catch(() => {});
     api
       .getGroups()
-      .then(setGroups)
+      .then((g) => {
+        if (!cancelled) setGroups(g);
+      })
       .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function update(key: string, val: string) {

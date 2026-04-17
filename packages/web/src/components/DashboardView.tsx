@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../hooks/useApi.js";
 import { useSmartPoll } from "../hooks/useSmartPoll.js";
 import { fmtCost } from "../util.js";
@@ -48,14 +48,27 @@ export function DashboardView({ onNavigate, readOnly: _readOnly, daemonStatus }:
   const [error, setError] = useState<string | null>(null);
   const [sessions, setSessions] = useState<any[]>([]);
 
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const load = () => {
     api
       .getDashboardSummary()
-      .then(setData)
-      .catch((e: any) => setError(e.message));
+      .then((d) => {
+        if (mountedRef.current) setData(d);
+      })
+      .catch((e: any) => {
+        if (mountedRef.current) setError(e.message);
+      });
     api
       .getSessions({})
-      .then(setSessions)
+      .then((s) => {
+        if (mountedRef.current) setSessions(s);
+      })
       .catch(() => {});
   };
 
@@ -196,6 +209,7 @@ export function DashboardView({ onNavigate, readOnly: _readOnly, daemonStatus }:
                     <button
                       type="button"
                       onClick={() => onNavigate("sessions")}
+                      aria-label="Review waiting session"
                       className={cn(
                         "h-6 px-2 rounded text-[10px] font-medium",
                         "border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-fg)]",
@@ -235,6 +249,7 @@ export function DashboardView({ onNavigate, readOnly: _readOnly, daemonStatus }:
                     <button
                       type="button"
                       onClick={() => onNavigate("sessions")}
+                      aria-label="View failed session"
                       className={cn(
                         "h-6 px-2 rounded text-[10px] font-medium",
                         "border border-border bg-transparent text-foreground",
@@ -247,6 +262,7 @@ export function DashboardView({ onNavigate, readOnly: _readOnly, daemonStatus }:
                     <button
                       type="button"
                       onClick={() => onNavigate("sessions")}
+                      aria-label="Restart failed session"
                       className={cn(
                         "h-6 px-2 rounded text-[10px] font-medium",
                         "border border-[var(--running)] bg-transparent text-[var(--running)]",
@@ -274,6 +290,7 @@ export function DashboardView({ onNavigate, readOnly: _readOnly, daemonStatus }:
             </span>
             <button
               onClick={() => onNavigate("costs")}
+              aria-label="View all costs"
               className="text-[11px] text-primary hover:underline ml-auto cursor-pointer bg-transparent border-none"
             >
               View all costs

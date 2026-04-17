@@ -356,9 +356,11 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
   const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     api
       .getFlows()
       .then((f: any[]) => {
+        if (cancelled) return;
         setFlows(f);
         if (f.length > 0 && !selectedFlow) setSelectedFlow(f[0].name);
       })
@@ -366,6 +368,7 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
     api
       .getCompute()
       .then((c: any[]) => {
+        if (cancelled) return;
         setComputes(c);
         if (c.length > 0 && !selectedCompute) setSelectedCompute(c[0].name);
       })
@@ -374,6 +377,7 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
     api
       .getSessions()
       .then((sessions: any[]) => {
+        if (cancelled) return;
         const seen = new Map<string, string>();
         for (const s of sessions) {
           if (s.repo && s.repo !== "." && !seen.has(s.repo)) {
@@ -391,6 +395,9 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
         setRecentRepos(repos.slice(0, 15));
       })
       .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Check if the selected flow looks like it uses tickets

@@ -18,530 +18,24 @@ import { ToolCallRow } from "./ui/ToolCallRow.js";
 import { ToolCallFailed } from "./ui/ToolCallFailed.js";
 import { TypingIndicator } from "./ui/TypingIndicator.js";
 import { SessionSummary } from "./ui/SessionSummary.js";
-import { EventTimeline, type TimelineEvent, type EventColor } from "./ui/EventTimeline.js";
+import { EventTimeline, type TimelineEvent } from "./ui/EventTimeline.js";
 import { TodoList, type TodoItem } from "./ui/TodoList.js";
-import { DiffViewer, type DiffFile, type DiffLine } from "./ui/DiffViewer.js";
-import type { StageProgress } from "./ui/StageProgressBar.js";
-import type { SessionStatus } from "./ui/StatusDot.js";
+import { DiffViewer, type DiffFile } from "./ui/DiffViewer.js";
+
+// Extracted helpers
+import {
+  normalizeStatus,
+  buildStageProgress,
+  formatTime,
+  parseUnifiedDiff,
+  buildConversationTimeline,
+} from "./session/timeline-builder.js";
+import { renderAgentContent, buildRichTimelineEvent } from "./session/event-builder.js";
 
 interface SessionDetailProps {
   sessionId: string;
   onToast: (msg: string, type: string) => void;
   readOnly: boolean;
-}
-
-function normalizeStatus(s: string): SessionStatus {
-  const valid: SessionStatus[] = ["running", "waiting", "completed", "failed", "stopped", "pending"];
-  if (valid.includes(s as SessionStatus)) return s as SessionStatus;
-  if (s === "blocked" || s === "ready") return "pending";
-  return "stopped";
-}
-
-function buildStageProgress(session: any, flowStages: any[]): StageProgress[] {
-  if (!flowStages || flowStages.length === 0) return [];
-  const currentStage = session.stage;
-  const currentIdx = flowStages.findIndex((s: any) => s.name === currentStage);
-  const isFailed = session.status === "failed";
-  const isCompleted = session.status === "completed";
-
-  return flowStages.map((s: any, i: number) => {
-    if (isCompleted) return { name: s.name, state: "done" as const };
-    if (isFailed && i === currentIdx) return { name: s.name, state: "active" as const };
-    if (currentIdx < 0) return { name: s.name, state: "pending" as const };
-    if (i < currentIdx) return { name: s.name, state: "done" as const };
-    if (i === currentIdx) return { name: s.name, state: "active" as const };
-    return { name: s.name, state: "pending" as const };
-  });
-}
-
-function formatTime(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
-/** Parse a unified diff string into DiffFile[] for the DiffViewer component. */
-function parseUnifiedDiff(raw: string): DiffFile[] {
-  const files: DiffFile[] = [];
-  const fileChunks = raw.split(/^diff --git /m).filter(Boolean);
-
-  for (const chunk of fileChunks) {
-    // Extract filename from "a/path b/path" header
-    const headerMatch = chunk.match(/^a\/(.+?)\s+b\/(.+)/m);
-    const filename = headerMatch ? headerMatch[2] : "unknown";
-    const lines: DiffLine[] = [];
-    let additions = 0;
-    let deletions = 0;
-    let lineNumber = 0;
-
-    const rawLines = chunk.split("\n");
-    let inHunk = false;
-
-    for (const line of rawLines) {
-      // Detect hunk header: @@ -a,b +c,d @@
-      const hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)/);
-      if (hunkMatch) {
-        lineNumber = parseInt(hunkMatch[1], 10);
-        inHunk = true;
-        lines.push({ type: "context", content: line });
-        continue;
-      }
-      if (!inHunk) continue;
-
-      if (line.startsWith("+")) {
-        additions++;
-        lines.push({ type: "add", lineNumber, content: line.slice(1) });
-        lineNumber++;
-      } else if (line.startsWith("-")) {
-        deletions++;
-        lines.push({ type: "remove", content: line.slice(1) });
-      } else if (line.startsWith(" ")) {
-        lines.push({ type: "context", lineNumber, content: line.slice(1) });
-        lineNumber++;
-      } else if (line.startsWith("\\")) {
-        // "\ No newline at end of file" -- skip
-      }
-    }
-
-    if (lines.length > 0) {
-      files.push({ filename, additions, deletions, lines });
-    }
-  }
-
-  return files;
-}
-
-/** Event types that should be hidden from the Conversation tab. */
-const HIDDEN_EVENT_TYPES = ["checkpoint", "session_stopped", "session_resumed"];
-
-/** Format tool input from hook data into a readable summary. */
-function formatToolInput(data: any): string {
-  if (!data) return "";
-  const input = data.tool_input || data.input;
-  if (!input) return "";
-  if (typeof input === "string") {
-    return input.length > 120 ? input.slice(0, 120) + "..." : input;
-  }
-  if (input.command) {
-    const cmd = String(input.command);
-    return cmd.length > 120 ? cmd.slice(0, 120) + "..." : cmd;
-  }
-  if (input.file_path || input.path) return input.file_path || input.path;
-  if (input.pattern) return input.pattern;
-  if (input.query) {
-    const q = String(input.query);
-    return q.length > 120 ? q.slice(0, 120) + "..." : q;
-  }
-  const json = JSON.stringify(input);
-  return json.length > 120 ? json.slice(0, 120) + "..." : json;
-}
-
-/**
- * Map session events into conversation timeline items.
- *
- * Messages (from the messages table) are the authoritative source for agent
- * output. Events duplicate that content but lack role/type metadata. When
- * messages exist we skip the event-based agent items (agent_progress,
- * agent_completed, agent_question, agent_error) to avoid showing duplicates.
- */
-function buildConversationTimeline(events: any[], messages: any[], session?: any) {
-  const items: any[] = [];
-  const hasMessages = Array.isArray(messages) && messages.length > 0;
-  const all: any[] = [];
-  const pendingTools = new Map<string, number>();
-  const sessionAgent = session?.agent || "agent";
-
-  for (const ev of events || []) {
-    all.push({ ...ev, _type: "event", _time: new Date(ev.created_at).getTime() });
-  }
-  for (const m of messages || []) {
-    all.push({ ...m, _type: "message", _time: new Date(m.created_at).getTime() });
-  }
-
-  all.sort((a, b) => a._time - b._time);
-
-  for (const item of all) {
-    if (item._type === "message") {
-      items.push({
-        kind: item.role === "user" ? "user" : item.role === "system" ? "system" : "agent",
-        role: item.role,
-        content: item.content,
-        timestamp: formatTime(item.created_at),
-        agentName: item.role === "user" ? "You" : item.agent_name || sessionAgent || "assistant",
-        model: item.model,
-        type: item.type,
-        stage: undefined,
-      });
-    } else {
-      const evType = item.type || "";
-      const evData = typeof item.data === "string" ? item.data : item.data?.message || "";
-      const nested = typeof item.data === "object" ? item.data?.data : null;
-      const evStage = item.stage || item.data?.stage || nested?.stage || undefined;
-
-      // Hide infrastructure noise from conversation
-      if (HIDDEN_EVENT_TYPES.includes(evType)) continue;
-
-      // ── hook_status: render tool calls, hide infrastructure ──
-      if (evType === "hook_status") {
-        const hookData = typeof item.data === "object" ? item.data : {};
-        const hookEvent = hookData.event || "";
-
-        if (hookEvent === "PreToolUse") {
-          const toolName = hookData.tool_name || "tool";
-          const inputSummary = formatToolInput(hookData);
-          const label = inputSummary ? `${toolName}: ${inputSummary}` : toolName;
-          const idx = items.length;
-          items.push({
-            kind: "tool",
-            label,
-            timestamp: formatTime(item.created_at),
-            status: "running" as const,
-            stage: evStage,
-          });
-          pendingTools.set(toolName, idx);
-        } else if (hookEvent === "PostToolUse") {
-          const toolName = hookData.tool_name || "tool";
-          const pendingIdx = pendingTools.get(toolName);
-          if (pendingIdx !== undefined && items[pendingIdx]) {
-            items[pendingIdx].status = "done";
-            if (hookData.duration) {
-              items[pendingIdx].duration = (hookData.duration / 1000).toFixed(1) + "s";
-            }
-            pendingTools.delete(toolName);
-          } else {
-            const inputSummary = formatToolInput(hookData);
-            const label = inputSummary ? `${toolName}: ${inputSummary}` : toolName;
-            items.push({
-              kind: "tool",
-              label,
-              timestamp: formatTime(item.created_at),
-              status: "done" as const,
-              duration: hookData.duration ? (hookData.duration / 1000).toFixed(1) + "s" : undefined,
-              stage: evStage,
-            });
-          }
-        }
-        // Hide all other hook events (SessionStart, UserPromptSubmit, busy/idle)
-        continue;
-      }
-
-      // When messages are present, skip agent channel events -- the messages
-      // table already contains the same content with better metadata.
-      const isAgentChannelEvent =
-        evType === "agent_progress" ||
-        evType === "agent_completed" ||
-        evType === "agent_question" ||
-        evType === "agent_error";
-      if (hasMessages && isAgentChannelEvent) {
-        continue;
-      }
-
-      if (evType === "agent_progress") {
-        const msg = nested?.message || evData;
-        if (msg) {
-          items.push({
-            kind: "agent",
-            content: msg,
-            timestamp: formatTime(item.created_at),
-            agentName: evStage || sessionAgent,
-            model: nested?.model,
-            type: "progress",
-            stage: evStage,
-          });
-        }
-      } else if (evType === "agent_completed") {
-        const summary = nested?.summary || nested?.message || evData;
-        const extras: string[] = [];
-        if (nested?.pr_url) extras.push("PR: " + nested.pr_url);
-        if (Array.isArray(nested?.filesChanged) && nested.filesChanged.length > 0)
-          extras.push("Files: " + nested.filesChanged.join(", "));
-        const content = extras.length > 0 ? summary + "\n" + extras.join("\n") : summary;
-        items.push({
-          kind: "agent",
-          content: content || "Stage completed",
-          timestamp: formatTime(item.created_at),
-          agentName: evStage || sessionAgent,
-          model: nested?.model,
-          type: "completed",
-          stage: evStage,
-        });
-      } else if (evType === "agent_question") {
-        items.push({
-          kind: "agent",
-          content: nested?.question || evData || "Agent has a question",
-          timestamp: formatTime(item.created_at),
-          agentName: evStage || sessionAgent,
-          model: undefined,
-          type: "question",
-          stage: evStage,
-        });
-      } else if (evType === "agent_error") {
-        items.push({
-          kind: "system",
-          content: "Error: " + (nested?.error || evData || "Unknown error"),
-          timestamp: formatTime(item.created_at),
-          stage: evStage,
-        });
-      } else if (evType === "stage_ready" || evType === "stage_started" || evType === "stage_completed") {
-        items.push({
-          kind: "system",
-          content: evData || evType.replace(/_/g, " "),
-          timestamp: formatTime(item.created_at),
-          stage: evStage,
-        });
-      } else if (evType === "stage_handoff") {
-        const target = evStage || nested?.stage || "";
-        items.push({
-          kind: "system",
-          content: target ? "advancing to " + target : "advancing to next stage",
-          timestamp: formatTime(item.created_at),
-          stage: evStage,
-        });
-      } else if (evType.includes("dispatch") || evType.includes("advance")) {
-        items.push({
-          kind: "system",
-          content: evData || evType.replace(/_/g, " "),
-          timestamp: formatTime(item.created_at),
-          stage: evStage,
-        });
-      } else if (evType.includes("tool")) {
-        const isError = evType.includes("error") || evType.includes("fail");
-        items.push({
-          kind: "tool",
-          label: evData || evType.replace(/_/g, " "),
-          timestamp: formatTime(item.created_at),
-          status: isError ? "error" : "done",
-          duration: item.data?.duration ? (item.data.duration / 1000).toFixed(1) + "s" : undefined,
-          error: isError ? item.data?.error || evData : undefined,
-          stage: evStage,
-        });
-      } else if (
-        evType.includes("completion_rejected") ||
-        evType.includes("guardrail") ||
-        evType.includes("retry") ||
-        evType.includes("verification")
-      ) {
-        items.push({
-          kind: "system",
-          content: evData || evType.replace(/_/g, " "),
-          timestamp: formatTime(item.created_at),
-          stage: evStage,
-        });
-      } else {
-        const label = evData || evType.replace(/_/g, " ");
-        if (label) {
-          items.push({ kind: "system", content: label, timestamp: formatTime(item.created_at), stage: evStage });
-        }
-      }
-    }
-  }
-
-  return items;
-}
-
-/** Render agent message content with structured formatting for completion messages. */
-function renderAgentContent(content: string, type?: string): React.ReactNode {
-  if (!content) return <p>--</p>;
-  if (type === "completed") {
-    const lines = content.split("\n");
-    const parts: React.ReactNode[] = [];
-    let summaryLines: string[] = [];
-
-    for (const line of lines) {
-      const prMatch = line.match(/^PR:\s*(https?:\/\/\S+)/);
-      const filesMatch = line.match(/^Files:\s*(.+)/);
-      const commitsMatch = line.match(/^Commits?:\s*(.+)/);
-
-      if (prMatch) {
-        if (summaryLines.length > 0) {
-          parts.push(<p key={"s" + parts.length}>{summaryLines.join(" ")}</p>);
-          summaryLines = [];
-        }
-        parts.push(
-          <p key={"pr" + parts.length}>
-            <a
-              href={prMatch[1]}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[var(--primary)] underline hover:text-[var(--primary-hover)]"
-            >
-              View PR on GitHub
-            </a>
-          </p>,
-        );
-      } else if (filesMatch) {
-        if (summaryLines.length > 0) {
-          parts.push(<p key={"s" + parts.length}>{summaryLines.join(" ")}</p>);
-          summaryLines = [];
-        }
-        const files = filesMatch[1].split(",").map((f) => f.trim());
-        parts.push(
-          <ul key={"f" + parts.length} className="list-none pl-0 my-1">
-            {files.map((f, fi) => (
-              <li key={fi} className="text-[12px] font-[family-name:var(--font-mono)] text-[var(--fg-muted)]">
-                <span className="mr-1.5 opacity-60">{"\u{1F4C4}"}</span>
-                {f}
-              </li>
-            ))}
-          </ul>,
-        );
-      } else if (commitsMatch) {
-        if (summaryLines.length > 0) {
-          parts.push(<p key={"s" + parts.length}>{summaryLines.join(" ")}</p>);
-          summaryLines = [];
-        }
-        const commits = commitsMatch[1].split(",").map((c) => c.trim());
-        parts.push(
-          <p key={"c" + parts.length} className="text-[12px] my-1">
-            {commits.map((c, ci) => (
-              <span key={ci}>
-                {ci > 0 && ", "}
-                <code className="font-[family-name:var(--font-mono)] bg-[var(--bg-code)] px-1 py-0.5 rounded text-[11px]">
-                  {c}
-                </code>
-              </span>
-            ))}
-          </p>,
-        );
-      } else {
-        summaryLines.push(line);
-      }
-    }
-    if (summaryLines.length > 0) {
-      parts.push(<p key={"s" + parts.length}>{summaryLines.join(" ")}</p>);
-    }
-    if (parts.length > 0) return <>{parts}</>;
-  }
-  return <p>{content}</p>;
-}
-
-/** Build a rich TimelineEvent for the Events tab with contextual labels and colors. */
-function buildRichTimelineEvent(ev: any, i: number): TimelineEvent {
-  const id = String(ev.id || i);
-  const timestamp = formatTime(ev.created_at);
-  const evType: string = ev.type || "";
-  const data = typeof ev.data === "object" && ev.data !== null ? ev.data : {};
-  const stageName: string = ev.stage || data.stage || "";
-
-  let color: EventColor = "gray";
-  if (evType.includes("completed") || evType.includes("done")) color = "green";
-  else if (evType.includes("started") || evType.includes("ready") || evType.includes("resumed")) color = "blue";
-  else if (evType.includes("error") || evType.includes("fail")) color = "red";
-  else if (evType.includes("stopped") || evType.includes("checkpoint")) color = "amber";
-
-  let label: React.ReactNode;
-  let detail: string | undefined;
-  const rawData: Record<string, unknown> | undefined = Object.keys(data).length > 0 ? data : undefined;
-
-  if (evType === "stage_ready") {
-    const agent = data.agent || "";
-    const gate = data.gate || "";
-    const parts = [agent && "agent: " + agent, gate && "gate: " + gate].filter(Boolean);
-    label = (
-      <span>
-        Stage <strong>{stageName}</strong> ready
-        {parts.length > 0 && <span className="text-[var(--fg-muted)]"> ({parts.join(", ")})</span>}
-      </span>
-    );
-  } else if (evType === "stage_started") {
-    const agent = data.agent || "";
-    const model = data.model || "";
-    const tools: string[] = Array.isArray(data.tools) ? data.tools : [];
-    const taskPreview: string = data.task_preview || "";
-    const previewText = taskPreview.length > 80 ? taskPreview.slice(0, 80) + "..." : taskPreview;
-    label = (
-      <span>
-        <strong>{agent || stageName || "agent"}</strong> started
-        {model && <span className="text-[var(--fg-muted)]"> ({model})</span>}
-        {previewText && <span className="text-[var(--fg-muted)]">{" -- " + previewText}</span>}
-      </span>
-    );
-    if (tools.length > 0) {
-      detail = "Tools: " + tools.join(", ");
-      if (taskPreview.length > 80) detail += "\nTask: " + taskPreview;
-    }
-  } else if (evType === "stage_completed") {
-    const agent = data.agent || "";
-    label = (
-      <span>
-        Stage <strong>{stageName}</strong> completed
-        {agent && <span className="text-[var(--fg-muted)]"> ({agent})</span>}
-      </span>
-    );
-    color = "green";
-  } else if (evType === "checkpoint") {
-    const status = data.status || "";
-    const compute = data.compute || data.compute_type || "";
-    const worktree = data.worktree || "";
-    label = (
-      <span>
-        Checkpoint: <strong>{stageName || "session"}</strong>
-        {status && (
-          <>
-            {" "}
-            <strong>{status}</strong>
-          </>
-        )}
-        {compute && <span className="text-[var(--fg-muted)]"> on {compute}</span>}
-      </span>
-    );
-    if (worktree) detail = "Worktree: " + worktree;
-  } else if (evType === "session_completed") {
-    const reason = data.reason || data.message || "";
-    label = <span>Session completed{reason && <span className="text-[var(--fg-muted)]">: {reason}</span>}</span>;
-    color = "green";
-  } else if (evType === "session_stopped") {
-    const actor = data.actor || ev.actor || "";
-    label = <span>Session stopped{actor && <span className="text-[var(--fg-muted)]"> by {actor}</span>}</span>;
-    color = "red";
-  } else if (evType === "session_resumed") {
-    const actor = data.actor || ev.actor || "";
-    label = <span>Session resumed{actor && <span className="text-[var(--fg-muted)]"> by {actor}</span>}</span>;
-    color = "blue";
-  } else if (evType === "session_started") {
-    const flow = data.flow || "";
-    const agent = data.agent || "";
-    const parts = [flow && "flow: " + flow, agent && "agent: " + agent].filter(Boolean);
-    label = (
-      <span>
-        Session started
-        {parts.length > 0 && <span className="text-[var(--fg-muted)]"> ({parts.join(", ")})</span>}
-      </span>
-    );
-    color = "blue";
-  } else if (evType.includes("error") || evType.includes("fail")) {
-    const msg = data.error || data.message || (typeof ev.data === "string" ? ev.data : "");
-    label = (
-      <span>
-        <strong className="text-[var(--failed)]">{evType.replace(/_/g, " ")}</strong>
-        {msg && <span className="text-[var(--fg-muted)]">: {msg}</span>}
-      </span>
-    );
-    color = "red";
-  } else if (evType === "dispatch" || evType === "advance") {
-    label = (
-      <span>
-        {evType.charAt(0).toUpperCase() + evType.slice(1)}
-        {stageName && (
-          <span className="text-[var(--fg-muted)]">
-            {" -- stage: "}
-            <strong>{stageName}</strong>
-          </span>
-        )}
-      </span>
-    );
-    color = "blue";
-  } else {
-    const msg = data.message || (typeof ev.data === "string" ? ev.data : "");
-    label = (
-      <span>
-        {evType.replace(/_/g, " ")}
-        {msg && <span className="text-[var(--fg-muted)]">{" -- " + msg}</span>}
-      </span>
-    );
-  }
-
-  return { id, timestamp, label, color, detail, rawData, stage: stageName || undefined };
 }
 
 export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailProps) {
@@ -600,12 +94,18 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
   }, [conversationMessages.length, activeTab]);
 
   useEffect(() => {
+    let cancelled = false;
     if (activeTab === "diff" && !diffData && sessionId) {
       api
         .worktreeDiff(sessionId)
-        .then(setDiffData)
+        .then((data) => {
+          if (!cancelled) setDiffData(data);
+        })
         .catch(() => {});
     }
+    return () => {
+      cancelled = true;
+    };
   }, [activeTab, diffData, sessionId]);
 
   async function handleAction(action: string) {
@@ -702,6 +202,7 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
           type="button"
           onClick={() => handleAction("stop")}
           disabled={actionLoading === "stop"}
+          aria-label="Stop session"
           className={cn(
             "h-7 px-2.5 rounded-[var(--radius-sm)] text-[11px] font-medium",
             "border border-[var(--failed)] bg-transparent text-[var(--failed)]",
@@ -724,6 +225,7 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
           type="button"
           onClick={() => handleAction("dispatch")}
           disabled={actionLoading === "dispatch"}
+          aria-label="Dispatch session"
           className={cn(
             "h-7 px-2.5 rounded-[var(--radius-sm)] text-[11px] font-medium",
             "border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-fg)]",
@@ -746,6 +248,7 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
           type="button"
           onClick={() => handleAction("restart")}
           disabled={actionLoading === "restart"}
+          aria-label="Restart session"
           className={cn(
             "h-7 px-2.5 rounded-[var(--radius-sm)] text-[11px] font-medium",
             "border border-[var(--running)] bg-transparent text-[var(--running)]",
