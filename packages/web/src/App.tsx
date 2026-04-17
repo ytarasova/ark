@@ -25,7 +25,7 @@ const READ_ONLY = document.getElementById("root")?.dataset.readonly === "true";
 const AUTH_REQUIRED = document.getElementById("root")?.dataset.auth === "true";
 
 function App() {
-  const { view, subId, navigate, setSubId } = useHashRouter();
+  const { view, subId, tab, navigate, setSubId, setTab } = useHashRouter();
   const [toast, setToast] = useState<{ msg: string; type: string } | null>(null);
   const [toastKey, setToastKey] = useState(0);
   const [cmdkOpen, setCmdkOpen] = useState(false);
@@ -48,8 +48,8 @@ function App() {
     setToastKey((k) => k + 1);
   }
 
-  // Navigate to a view (clears subId)
-  const onNavigate = useCallback((v: string) => navigate(v), [navigate]);
+  // Navigate to a view (clears subId and tab)
+  const onNavigate = useCallback((v: string, id?: string | null, t?: string | null) => navigate(v, id, t), [navigate]);
 
   const { setThemeName, colorMode, toggleColorMode } = useTheme();
 
@@ -118,6 +118,8 @@ function App() {
           daemonStatus={daemonStatus}
           initialSelectedId={subId}
           onSelectedChange={setSubId}
+          initialTab={tab}
+          onTabChange={setTab}
         />
       )}
       {view === "agents" && (
@@ -147,7 +149,14 @@ function App() {
         <HistoryPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
       )}
       {view === "compute" && (
-        <ComputePage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
+        <ComputePage
+          view={view}
+          onNavigate={onNavigate}
+          readOnly={readOnly}
+          daemonStatus={daemonStatus}
+          initialSelectedId={subId}
+          onSelectedChange={setSubId}
+        />
       )}
       {view === "schedules" && (
         <SchedulesPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />

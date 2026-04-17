@@ -16,6 +16,8 @@ interface SessionsPageProps {
   daemonStatus?: DaemonStatus | null;
   initialSelectedId?: string | null;
   onSelectedChange?: (id: string | null) => void;
+  initialTab?: string | null;
+  onTabChange?: (tab: string | null) => void;
 }
 
 export function SessionsPage({
@@ -26,6 +28,8 @@ export function SessionsPage({
   daemonStatus,
   initialSelectedId,
   onSelectedChange,
+  initialTab,
+  onTabChange,
 }: SessionsPageProps) {
   const [selectedId, setSelectedIdInternal] = useState<string | null>(initialSelectedId ?? null);
   const setSelectedId = useCallback(
@@ -231,7 +235,14 @@ export function SessionsPage({
           />
         </div>
       ) : selectedId ? (
-        <SessionDetail key={selectedId} sessionId={selectedId} onToast={onToast} readOnly={readOnly} />
+        <SessionDetail
+          key={selectedId}
+          sessionId={selectedId}
+          onToast={onToast}
+          readOnly={readOnly}
+          initialTab={initialTab}
+          onTabChange={onTabChange}
+        />
       ) : (
         <DashboardView onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
       )}

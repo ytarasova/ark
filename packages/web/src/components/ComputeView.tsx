@@ -15,14 +15,29 @@ interface ComputeViewProps {
   showCreate?: boolean;
   onCloseCreate?: () => void;
   onNavigate?: (view: string, subId?: string) => void;
+  initialSelectedName?: string | null;
+  onSelectedChange?: (name: string | null) => void;
 }
 
 const MAX_HISTORY = 60;
 
-export function ComputeView({ showCreate = false, onCloseCreate, onNavigate }: ComputeViewProps) {
+export function ComputeView({
+  showCreate = false,
+  onCloseCreate,
+  onNavigate,
+  initialSelectedName,
+  onSelectedChange,
+}: ComputeViewProps) {
   const queryClient = useQueryClient();
   const { data: computes = [] } = useComputeQuery();
-  const [selected, setSelected] = useState<any>(null);
+  const [selectedInternal, setSelectedInternal] = useState<any>(null);
+  const selected =
+    selectedInternal ??
+    (initialSelectedName ? computes.find((c: any) => (c.name || c.id) === initialSelectedName) : null);
+  const setSelected = (item: any) => {
+    setSelectedInternal(item);
+    onSelectedChange?.(item ? item.name || item.id || null : null);
+  };
   const [actionMsg, setActionMsg] = useState<{ text: string; type: string } | null>(null);
   const [snapshot, setSnapshot] = useState<ComputeSnapshot | null>(null);
   const [sessions, setSessions] = useState<any[]>([]);

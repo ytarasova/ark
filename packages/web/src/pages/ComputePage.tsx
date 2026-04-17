@@ -10,9 +10,18 @@ interface ComputePageProps {
   onNavigate: (view: string) => void;
   readOnly: boolean;
   daemonStatus?: DaemonStatus | null;
+  initialSelectedId?: string | null;
+  onSelectedChange?: (id: string | null) => void;
 }
 
-export function ComputePage({ view, onNavigate, readOnly, daemonStatus }: ComputePageProps) {
+export function ComputePage({
+  view,
+  onNavigate,
+  readOnly,
+  daemonStatus,
+  initialSelectedId,
+  onSelectedChange,
+}: ComputePageProps) {
   const [showNew, setShowNew] = useState(false);
 
   return (
@@ -28,7 +37,13 @@ export function ComputePage({ view, onNavigate, readOnly, daemonStatus }: Comput
           ) : undefined
         }
       >
-        <ComputeView showCreate={showNew} onCloseCreate={() => setShowNew(false)} onNavigate={onNavigate} />
+        <ComputeView
+          showCreate={showNew}
+          onCloseCreate={() => setShowNew(false)}
+          onNavigate={onNavigate}
+          initialSelectedName={initialSelectedId}
+          onSelectedChange={onSelectedChange}
+        />
       </PageShell>
     </Layout>
   );

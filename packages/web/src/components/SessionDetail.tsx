@@ -37,9 +37,11 @@ interface SessionDetailProps {
   sessionId: string;
   onToast: (msg: string, type: string) => void;
   readOnly: boolean;
+  initialTab?: string | null;
+  onTabChange?: (tab: string | null) => void;
 }
 
-export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailProps) {
+export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabChange }: SessionDetailProps) {
   const {
     detail,
     setDetail,
@@ -51,7 +53,17 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
     output,
   } = useSessionDetailData(sessionId);
 
-  const [activeTab, setActiveTab] = useState("conversation");
+  const VALID_TABS = new Set(["conversation", "terminal", "events", "diff", "todos"]);
+  const [activeTab, setActiveTabInternal] = useState(
+    initialTab && VALID_TABS.has(initialTab) ? initialTab : "conversation",
+  );
+  const setActiveTab = useCallback(
+    (tab: string) => {
+      setActiveTabInternal(tab);
+      onTabChange?.(tab === "conversation" ? null : tab);
+    },
+    [onTabChange],
+  );
   const [chatMsg, setChatMsg] = useState("");
   const [scrollProgress, setScrollProgress] = useState(0);
   const [diffData, setDiffData] = useState<any>(null);
