@@ -121,10 +121,13 @@ export function resolveAgentWithRuntime(
     agent.env = { ...runtime.env, ...agent.env };
   }
 
-  // model: if the agent model isn't in the runtime's model list, use runtime default
-  if (runtime.models && runtime.models.length > 0) {
+  // model: only apply runtime default when the agent uses a generic alias
+  // (opus/sonnet/haiku) that doesn't map to a real model ID on this runtime.
+  // Custom model IDs set by the user (e.g. "MiniMax-M2.5") are always respected.
+  if (runtime.models && runtime.models.length > 0 && runtime.default_model) {
+    const GENERIC_ALIASES = ["opus", "sonnet", "haiku"];
     const validModels = runtime.models.map((m) => m.id);
-    if (!validModels.includes(agent.model) && runtime.default_model) {
+    if (GENERIC_ALIASES.includes(agent.model) && !validModels.includes(agent.model)) {
       agent.model = runtime.default_model;
     }
   }

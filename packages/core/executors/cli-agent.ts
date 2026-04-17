@@ -15,6 +15,9 @@ import * as tmux from "../infra/tmux.js";
 import { join } from "path";
 import { writeFileSync, mkdirSync } from "fs";
 
+/** Single-quote a string for safe bash interpolation (no expansion). */
+const shellQuote = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
+
 export const cliAgentExecutor: Executor = {
   name: "cli-agent",
 
@@ -66,15 +69,16 @@ export const cliAgentExecutor: Executor = {
 
     const envFile = join(trackDir, "env.sh");
     const envLines = Object.entries(mergedEnv)
-      .map(([k, v]) => `export ${k}=${JSON.stringify(v)}`)
+      .map(([k, v]) => `export ${k}=${shellQuote(v)}`)
       .join("\n");
     writeFileSync(envFile, envLines);
-    const envPrefix = envLines ? `source ${JSON.stringify(envFile)} && ` : "";
+    const envPrefix = envLines ? `source ${shellQuote(envFile)} && ` : "";
 
     // Determine the effective prompt: initialPrompt overrides task for delivery
     const effectiveTask = initialPrompt ?? task;
 
-    // Build the command line
+    // Build the command line. Use single-quote shell escaping for user-supplied
+    // values (task text, paths) to prevent bash from expanding backticks / $().
     let cmdLine: string;
     const cmdStr = command.join(" ");
     let sendPromptAfterLaunch = false;
@@ -83,24 +87,24 @@ export const cliAgentExecutor: Executor = {
       case "file": {
         // Write the effective prompt to the task file for file-based delivery
         if (initialPrompt) writeFileSync(taskFile, initialPrompt);
-        cmdLine = `${envPrefix}cd ${JSON.stringify(effectiveWorkdir)} && ${cmdStr} ${JSON.stringify(taskFile)}`;
+        cmdLine = `${envPrefix}cd ${shellQuote(effectiveWorkdir)} && ${cmdStr} ${shellQuote(taskFile)}`;
         break;
       }
       case "arg": {
         // Pass task as the last CLI argument (truncated to 4000 chars for shell safety)
         const shortTask = effectiveTask.slice(0, 4000);
-        cmdLine = `${envPrefix}cd ${JSON.stringify(effectiveWorkdir)} && ${cmdStr} ${JSON.stringify(shortTask)}`;
+        cmdLine = `${envPrefix}cd ${shellQuote(effectiveWorkdir)} && ${cmdStr} ${shellQuote(shortTask)}`;
         break;
       }
       case "stdin":
       default:
         if (initialPrompt) {
           // Launch the CLI without piping, then send the prompt via tmux send-keys
-          cmdLine = `${envPrefix}cd ${JSON.stringify(effectiveWorkdir)} && ${cmdStr}`;
+          cmdLine = `${envPrefix}cd ${shellQuote(effectiveWorkdir)} && ${cmdStr}`;
           sendPromptAfterLaunch = true;
         } else {
           // Pipe task via stdin using file
-          cmdLine = `${envPrefix}cd ${JSON.stringify(effectiveWorkdir)} && cat ${JSON.stringify(taskFile)} | ${cmdStr}`;
+          cmdLine = `${envPrefix}cd ${shellQuote(effectiveWorkdir)} && cat ${shellQuote(taskFile)} | ${cmdStr}`;
         }
         break;
     }

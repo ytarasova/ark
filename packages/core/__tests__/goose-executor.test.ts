@@ -43,12 +43,9 @@ describe("buildGooseCommand", () => {
     expect(argv[0]).toBe("/usr/local/share/ark/bin/goose");
   });
 
-  it("always passes --no-session, --quiet, and --output-format stream-json", () => {
+  it("always passes --no-session", () => {
     const argv = buildGooseCommand({ agent: makeAgent(), task: "hello", sessionId: "s-1" });
     expect(argv).toContain("--no-session");
-    expect(argv).toContain("--quiet");
-    expect(argv).toContain("--output-format");
-    expect(argv[argv.indexOf("--output-format") + 1]).toBe("stream-json");
   });
 
   it("passes --model from agent.model", () => {

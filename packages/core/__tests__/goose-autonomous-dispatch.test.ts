@@ -183,8 +183,6 @@ describe("buildGooseCommand for autonomous dispatch", () => {
     expect(argv[0]).toBe("goose");
     expect(argv[1]).toBe("run");
     expect(argv).toContain("--no-session");
-    expect(argv).toContain("--quiet");
-    expect(argv).toContain("--output-format");
     expect(argv).toContain("-t");
     expect(argv[argv.indexOf("-t") + 1]).toBe("Fix the failing test in parser.ts");
     // Autonomous (no interactive flag) should NOT have -s

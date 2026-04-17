@@ -19,8 +19,6 @@
  *     model without touching goose config.
  *   - Stateless: `--no-session` disables goose's own session store so Ark
  *     owns all session state.
- *   - Structured output: `--output-format stream-json` gives a parseable
- *     event stream (future: hook-like status parsing).
  */
 
 import { mkdirSync, writeFileSync } from "fs";
@@ -29,6 +27,9 @@ import { join } from "path";
 import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../executor.js";
 import * as tmux from "../infra/tmux.js";
 import * as claude from "../claude/claude.js";
+
+/** Single-quote a string for safe bash interpolation (no expansion). */
+const shellQuote = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
 
 // ── Pure command-line builder (unit-testable) ──────────────────────────────
 
@@ -52,7 +53,7 @@ export interface GooseCommandOpts {
  */
 export function buildGooseCommand(opts: GooseCommandOpts): string[] {
   const bin = opts.binaryPath ?? "goose";
-  const args: string[] = [bin, "run", "--no-session", "--quiet", "--output-format", "stream-json"];
+  const args: string[] = [bin, "run", "--no-session"];
 
   if (opts.agent.model) {
     args.push("--model", opts.agent.model);
@@ -165,15 +166,16 @@ export const gooseExecutor: Executor = {
     mkdirSync(trackDir, { recursive: true });
     const envFile = join(trackDir, "env.sh");
     const envLines = Object.entries(mergedEnv)
-      .map(([k, v]) => `export ${k}=${JSON.stringify(v)}`)
+      .map(([k, v]) => `export ${k}=${shellQuote(v)}`)
       .join("\n");
     writeFileSync(envFile, envLines);
     writeFileSync(join(trackDir, "task.txt"), opts.task);
 
-    // Shell-quote the argv for a single bash line
-    const quotedArgv = argv.map((a) => JSON.stringify(a)).join(" ");
-    const envPrefix = envLines ? `source ${JSON.stringify(envFile)} && ` : "";
-    const cmdLine = `${envPrefix}cd ${JSON.stringify(effectiveWorkdir)} && ${quotedArgv}`;
+    // Shell-quote the argv for a single bash line. Use single quotes to
+    // prevent bash from expanding backticks / $() in the task text.
+    const quotedArgv = argv.map((a) => shellQuote(a)).join(" ");
+    const envPrefix = envLines ? `source ${shellQuote(envFile)} && ` : "";
+    const cmdLine = `${envPrefix}cd ${shellQuote(effectiveWorkdir)} && ${quotedArgv}`;
 
     log("Launching goose in tmux...");
     await tmux.createSessionAsync(tmuxName, cmdLine, { arkDir: app.config.arkDir });

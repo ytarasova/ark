@@ -17,11 +17,13 @@ function AgentForm({
   onSubmit,
   agent,
   isEdit,
+  runtimes = [],
 }: {
   onClose: () => void;
   onSubmit: (form: any) => void;
   agent?: any;
   isEdit?: boolean;
+  runtimes?: any[];
 }) {
   const [form, setForm] = useState({
     name: agent?.name ?? "",
@@ -85,19 +87,44 @@ function AgentForm({
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
             Model
           </label>
-          <select className={selectClassName} value={form.model} onChange={(e) => update("model", e.target.value)}>
-            <option value="opus">opus</option>
-            <option value="sonnet">sonnet</option>
-            <option value="haiku">haiku</option>
-          </select>
+          <Input
+            list="model-suggestions"
+            value={form.model}
+            onChange={(e) => update("model", e.target.value)}
+            placeholder="e.g. sonnet, opus, claude-sonnet-4-6"
+          />
+          <datalist id="model-suggestions">
+            <option value="opus" />
+            <option value="sonnet" />
+            <option value="haiku" />
+            {runtimes
+              .flatMap((r: any) => (r.models || []).map((m: any) => m.id))
+              .filter(
+                (id: string, i: number, arr: string[]) =>
+                  arr.indexOf(id) === i && !["opus", "sonnet", "haiku"].includes(id),
+              )
+              .map((id: string) => (
+                <option key={id} value={id} />
+              ))}
+          </datalist>
         </div>
         <div className="mb-3.5">
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
             Runtime
           </label>
           <select className={selectClassName} value={form.runtime} onChange={(e) => update("runtime", e.target.value)}>
-            <option value="claude-code">claude-code</option>
-            <option value="cli-agent">cli-agent</option>
+            {runtimes.length > 0 ? (
+              runtimes.map((r: any) => (
+                <option key={r.name} value={r.name}>
+                  {r.name}
+                </option>
+              ))
+            ) : (
+              <>
+                <option value="claude-code">claude-code</option>
+                <option value="cli-agent">cli-agent</option>
+              </>
+            )}
           </select>
         </div>
         <div className="mb-3.5">
@@ -351,9 +378,15 @@ export function AgentsView({
         {/* Right: detail panel or create form */}
         <div className="overflow-y-auto bg-background">
           {showCreate ? (
-            <AgentForm onClose={() => onCloseCreate?.()} onSubmit={handleCreate} />
+            <AgentForm onClose={() => onCloseCreate?.()} onSubmit={handleCreate} runtimes={runtimes} />
           ) : editing ? (
-            <AgentForm onClose={() => setEditing(null)} onSubmit={handleUpdate} agent={editing} isEdit />
+            <AgentForm
+              onClose={() => setEditing(null)}
+              onSubmit={handleUpdate}
+              agent={editing}
+              isEdit
+              runtimes={runtimes}
+            />
           ) : selected?._kind === "role" ? (
             <RoleDetail
               agent={selected}
