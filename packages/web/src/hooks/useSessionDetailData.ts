@@ -106,6 +106,12 @@ export function useSessionDetailData(sessionId: string): SessionDetailData {
         })
         .catch(() => {});
       api
+        .getMessages(sessionId)
+        .then((data) => {
+          if (active) setMessages(Array.isArray(data?.messages) ? data.messages : Array.isArray(data) ? data : []);
+        })
+        .catch(() => {});
+      api
         .getSessionCost(sessionId)
         .then((d) => {
           if (active) setCost(d);

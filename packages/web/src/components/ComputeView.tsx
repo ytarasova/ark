@@ -59,10 +59,11 @@ interface ComputeSnapshot {
   docker: DockerContainer[];
 }
 
-interface CpuHistoryPoint {
+interface MetricHistoryPoint {
   t: number;
   cpu: number;
   mem: number;
+  disk: number;
 }
 
 // ── New Compute Form ────────────────────────────────────────────────────────
@@ -286,32 +287,62 @@ function MetricBar({ value, total, unit, pct }: { value: string; total?: string;
   );
 }
 
-// ── CPU Sparkline ───────────────────────────────────────────────────────────
+// ── Metric Sparkline ────────────────────────────────────────────────────────
 
-function CpuSparkline({ history }: { history: CpuHistoryPoint[] }) {
+function MetricSparkline({
+  history,
+  dataKey,
+  gradientId,
+  color,
+}: {
+  history: MetricHistoryPoint[];
+  dataKey: string;
+  gradientId: string;
+  color: string;
+}) {
   if (history.length < 2) return null;
   return (
     <div className="h-[60px] w-full mt-2">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={history} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
           <defs>
-            <linearGradient id="cpuGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--primary, #7c6aef)" stopOpacity={0.3} />
-              <stop offset="100%" stopColor="var(--primary, #7c6aef)" stopOpacity={0} />
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.3} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
             </linearGradient>
           </defs>
           <Tooltip content={<ChartTooltip formatter={(v: number) => `${v}%`} />} />
           <Area
             type="monotone"
-            dataKey="cpu"
-            stroke="var(--primary, #7c6aef)"
+            dataKey={dataKey}
+            stroke={color}
             strokeWidth={1.5}
-            fill="url(#cpuGrad)"
+            fill={`url(#${gradientId})`}
             isAnimationActive={false}
             dot={false}
           />
         </AreaChart>
       </ResponsiveContainer>
+    </div>
+  );
+}
+
+// ── Metrics Skeleton ────────────────────────────────────────────────────────
+
+function MetricsSkeleton() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+      {[0, 1, 2, 3].map((i) => (
+        <Card key={i}>
+          <CardHeader className="pb-1 pt-3 px-3">
+            <div className="h-3 w-12 rounded skeleton-shimmer" />
+          </CardHeader>
+          <CardContent className="px-3 pb-3">
+            <div className="h-7 w-16 rounded skeleton-shimmer mb-2" />
+            <div className="h-[60px] w-full rounded skeleton-shimmer" />
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }
@@ -356,17 +387,21 @@ function ComputeActions({ compute, onAction }: { compute: any; onAction: (action
 function ComputeDetailPanel({
   compute,
   snapshot,
-  cpuHistory,
+  metricHistory,
   sessions,
   onAction,
   actionMsg,
+  metricsState,
+  onRetryMetrics,
 }: {
   compute: any;
   snapshot: ComputeSnapshot | null;
-  cpuHistory: CpuHistoryPoint[];
+  metricHistory: MetricHistoryPoint[];
   sessions: any[];
   onAction: (action: string) => void;
   actionMsg: { text: string; type: string } | null;
+  metricsState: "loading" | "loaded" | "error";
+  onRetryMetrics: () => void;
 }) {
   const m = snapshot?.metrics;
   const arkProcs = (snapshot?.processes ?? []).filter((p) => isArkProcess(p.command));
@@ -409,9 +444,22 @@ function ComputeDetailPanel({
       )}
 
       {/* System Metrics Cards */}
-      {m ? (
+      {metricsState === "loading" && !m && <MetricsSkeleton />}
+      {metricsState === "error" && !m && (
+        <div className="rounded-lg border border-border bg-secondary/30 p-4 mb-5 text-[13px] text-muted-foreground flex items-center gap-2">
+          <Activity size={14} className="opacity-50" />
+          <span>Could not reach arkd</span>
+          <button
+            type="button"
+            onClick={onRetryMetrics}
+            className="ml-2 text-[11px] font-medium text-primary hover:underline cursor-pointer bg-transparent border-none"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+      {m && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-          {/* CPU */}
           <Card>
             <CardHeader className="pb-1 pt-3 px-3">
               <CardTitle className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em] flex items-center gap-1.5">
@@ -423,11 +471,14 @@ function ComputeDetailPanel({
               <div className="text-2xl font-mono font-bold" style={{ color: pctColor(m.cpu) }}>
                 {m.cpu}%
               </div>
-              <CpuSparkline history={cpuHistory} />
+              <MetricSparkline
+                history={metricHistory}
+                dataKey="cpu"
+                gradientId="cpuGrad"
+                color="var(--primary, #7c6aef)"
+              />
             </CardContent>
           </Card>
-
-          {/* Memory */}
           <Card>
             <CardHeader className="pb-1 pt-3 px-3">
               <CardTitle className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em] flex items-center gap-1.5">
@@ -437,10 +488,14 @@ function ComputeDetailPanel({
             </CardHeader>
             <CardContent className="px-3 pb-3">
               <MetricBar value={`${m.memUsedGb}`} total={`${m.memTotalGb}`} unit="GB" pct={m.memPct} />
+              <MetricSparkline
+                history={metricHistory}
+                dataKey="mem"
+                gradientId="memGrad"
+                color="var(--running, #34d399)"
+              />
             </CardContent>
           </Card>
-
-          {/* Disk */}
           <Card>
             <CardHeader className="pb-1 pt-3 px-3">
               <CardTitle className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em] flex items-center gap-1.5">
@@ -450,10 +505,14 @@ function ComputeDetailPanel({
             </CardHeader>
             <CardContent className="px-3 pb-3">
               <MetricBar value={`${m.diskPct}`} unit="% used" pct={m.diskPct} />
+              <MetricSparkline
+                history={metricHistory}
+                dataKey="disk"
+                gradientId="diskGrad"
+                color="var(--waiting, #fbbf24)"
+              />
             </CardContent>
           </Card>
-
-          {/* Uptime */}
           <Card>
             <CardHeader className="pb-1 pt-3 px-3">
               <CardTitle className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.08em] flex items-center gap-1.5">
@@ -465,11 +524,6 @@ function ComputeDetailPanel({
               <div className="text-lg font-mono font-semibold text-foreground">{m.uptime || "-"}</div>
             </CardContent>
           </Card>
-        </div>
-      ) : (
-        <div className="rounded-lg border border-border bg-secondary/30 p-4 mb-5 text-[13px] text-muted-foreground">
-          <Activity size={14} className="inline-block mr-1.5 opacity-50" />
-          Metrics unavailable - compute may be offline or provider does not support metrics.
         </div>
       )}
 
@@ -704,8 +758,9 @@ export function ComputeView({ showCreate = false, onCloseCreate }: ComputeViewPr
   const [actionMsg, setActionMsg] = useState<{ text: string; type: string } | null>(null);
   const [snapshot, setSnapshot] = useState<ComputeSnapshot | null>(null);
   const [sessions, setSessions] = useState<any[]>([]);
-  const cpuHistoryRef = useRef<Map<string, CpuHistoryPoint[]>>(new Map());
-  const [cpuHistory, setCpuHistory] = useState<CpuHistoryPoint[]>([]);
+  const [metricsState, setMetricsState] = useState<"loading" | "loaded" | "error">("loading");
+  const metricHistoryRef = useRef<Map<string, MetricHistoryPoint[]>>(new Map());
+  const [metricHistory, setMetricHistory] = useState<MetricHistoryPoint[]>([]);
 
   // Fetch sessions for compute assignment
   useEffect(() => {
@@ -719,6 +774,7 @@ export function ComputeView({ showCreate = false, onCloseCreate }: ComputeViewPr
   const loadSnapshot = useCallback(() => {
     if (!selected) {
       setSnapshot(null);
+      setMetricsState("loading");
       return;
     }
     const name = selected.name || selected.id;
@@ -726,16 +782,20 @@ export function ComputeView({ showCreate = false, onCloseCreate }: ComputeViewPr
       .getComputeSnapshot(name === "local" ? undefined : name)
       .then((snap) => {
         setSnapshot(snap);
+        setMetricsState(snap?.metrics ? "loaded" : "error");
         if (snap?.metrics) {
           const key = name;
-          const history = cpuHistoryRef.current.get(key) ?? [];
-          history.push({ t: Date.now(), cpu: snap.metrics.cpu, mem: snap.metrics.memPct });
+          const history = metricHistoryRef.current.get(key) ?? [];
+          history.push({ t: Date.now(), cpu: snap.metrics.cpu, mem: snap.metrics.memPct, disk: snap.metrics.diskPct });
           if (history.length > MAX_HISTORY) history.shift();
-          cpuHistoryRef.current.set(key, history);
-          setCpuHistory([...history]);
+          metricHistoryRef.current.set(key, history);
+          setMetricHistory([...history]);
         }
       })
-      .catch(() => setSnapshot(null));
+      .catch(() => {
+        setSnapshot(null);
+        setMetricsState("error");
+      });
   }, [selected]);
 
   useEffect(() => {
@@ -830,7 +890,10 @@ export function ComputeView({ showCreate = false, onCloseCreate }: ComputeViewPr
                 (selected?.name || selected?.id) === (c.name || c.id) &&
                   "bg-accent border-l-2 border-l-primary font-semibold",
               )}
-              onClick={() => setSelected(c)}
+              onClick={() => {
+                setSelected(c);
+                setMetricsState("loading");
+              }}
             >
               <div className="flex items-center gap-2 min-w-0">
                 <span
@@ -852,10 +915,12 @@ export function ComputeView({ showCreate = false, onCloseCreate }: ComputeViewPr
             <ComputeDetailPanel
               compute={selected}
               snapshot={snapshot}
-              cpuHistory={cpuHistory}
+              metricHistory={metricHistory}
               sessions={sessions}
               onAction={handleAction}
               actionMsg={actionMsg}
+              metricsState={metricsState}
+              onRetryMetrics={loadSnapshot}
             />
           ) : (
             <div className="flex items-center justify-center h-full text-sm text-muted-foreground">

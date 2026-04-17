@@ -12,6 +12,10 @@ export interface SessionHeaderProps extends React.ComponentProps<"div"> {
   /** Action buttons (Stop, Dispatch, etc.) */
   actions?: React.ReactNode;
   onCopyId?: () => void;
+  /** Currently selected stage filter (null = show all) */
+  selectedStage?: string | null;
+  /** Called when a stage is clicked in the pipeline */
+  onStageClick?: (stageName: string) => void;
 }
 
 /**
@@ -26,6 +30,8 @@ export function SessionHeader({
   cost,
   actions,
   onCopyId,
+  selectedStage,
+  onStageClick,
   className,
   ...props
 }: SessionHeaderProps) {
@@ -51,7 +57,7 @@ export function SessionHeader({
 
       <span className="text-[14px] font-medium truncate min-w-0">{summary}</span>
 
-      <StagePipeline stages={stages} className="ml-auto" />
+      <StagePipeline stages={stages} className="ml-auto" selectedStage={selectedStage} onStageClick={onStageClick} />
 
       {cost && (
         <span className="font-[family-name:var(--font-mono-ui)] text-[12px] font-medium text-[var(--primary)] shrink-0 px-2">

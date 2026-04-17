@@ -4,6 +4,8 @@ import { useSessionDetailData } from "../hooks/useSessionDetailData.js";
 import { useMessages } from "../hooks/useMessages.js";
 import { relTime, fmtCost } from "../util.js";
 import { cn } from "../lib/utils.js";
+import { Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 // UI components
 import { SessionHeader } from "./ui/SessionHeader.js";
@@ -112,9 +114,17 @@ function formatTime(iso: string | null | undefined): string {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-/** Map session events into conversation timeline items. */
+/**
+ * Map session events into conversation timeline items.
+ *
+ * Messages (from the messages table) are the authoritative source for agent
+ * output. Events duplicate that content but lack role/type metadata. When
+ * messages exist we skip the event-based agent items (agent_progress,
+ * agent_completed, agent_question, agent_error) to avoid showing duplicates.
+ */
 function buildConversationTimeline(events: any[], messages: any[]) {
   const items: any[] = [];
+  const hasMessages = Array.isArray(messages) && messages.length > 0;
 
   // Merge events and messages by time
   const all: any[] = [];
@@ -131,21 +141,35 @@ function buildConversationTimeline(events: any[], messages: any[]) {
   for (const item of all) {
     if (item._type === "message") {
       items.push({
-        kind: item.role === "user" ? "user" : "agent",
+        kind: item.role === "user" ? "user" : item.role === "system" ? "system" : "agent",
         role: item.role,
         content: item.content,
         timestamp: formatTime(item.created_at),
         agentName: item.role === "user" ? "You" : item.agent_name || item.role || "assistant",
         model: item.model,
         type: item.type,
+        stage: undefined,
       });
     } else {
       // Event
       const evType = item.type || "";
       const evData = typeof item.data === "string" ? item.data : item.data?.message || "";
       const nested = typeof item.data === "object" ? item.data?.data : null;
+      const evStage = item.stage || item.data?.stage || nested?.stage || undefined;
+
+      // When messages are present, skip agent channel events -- the messages
+      // table already contains the same content with better metadata.
+      const isAgentChannelEvent =
+        evType === "agent_progress" ||
+        evType === "agent_completed" ||
+        evType === "agent_question" ||
+        evType === "agent_error";
+      if (hasMessages && isAgentChannelEvent) {
+        continue;
+      }
 
       // Agent channel messages -- progress, completed, question, error
+      // (only reached when there are no stored messages)
       if (evType === "agent_progress") {
         const msg = nested?.message || evData;
         if (msg) {
@@ -153,9 +177,10 @@ function buildConversationTimeline(events: any[], messages: any[]) {
             kind: "agent",
             content: msg,
             timestamp: formatTime(item.created_at),
-            agentName: nested?.stage || item.data?.stage || "agent",
+            agentName: evStage || "agent",
             model: nested?.model,
             type: "progress",
+            stage: evStage,
           });
         }
       } else if (evType === "agent_completed") {
@@ -170,24 +195,27 @@ function buildConversationTimeline(events: any[], messages: any[]) {
           kind: "agent",
           content: content || "Stage completed",
           timestamp: formatTime(item.created_at),
-          agentName: nested?.stage || item.data?.stage || "agent",
+          agentName: evStage || "agent",
           model: nested?.model,
           type: "completed",
+          stage: evStage,
         });
       } else if (evType === "agent_question") {
         items.push({
           kind: "agent",
           content: nested?.question || evData || "Agent has a question",
           timestamp: formatTime(item.created_at),
-          agentName: nested?.stage || item.data?.stage || "agent",
+          agentName: evStage || "agent",
           model: undefined,
           type: "question",
+          stage: evStage,
         });
       } else if (evType === "agent_error") {
         items.push({
           kind: "system",
           content: `Error: ${nested?.error || evData || "Unknown error"}`,
           timestamp: formatTime(item.created_at),
+          stage: evStage,
         });
       } else if (evType.includes("stage_") || evType.includes("dispatch") || evType.includes("advance")) {
         // Stage transitions become system events
@@ -195,6 +223,7 @@ function buildConversationTimeline(events: any[], messages: any[]) {
           kind: "system",
           content: evData || evType.replace(/_/g, " "),
           timestamp: formatTime(item.created_at),
+          stage: evStage,
         });
       } else if (evType.includes("tool")) {
         // Tool calls
@@ -206,6 +235,7 @@ function buildConversationTimeline(events: any[], messages: any[]) {
           status: isError ? "error" : "done",
           duration: item.data?.duration ? `${(item.data.duration / 1000).toFixed(1)}s` : undefined,
           error: isError ? item.data?.error || evData : undefined,
+          stage: evStage,
         });
       } else if (
         evType.includes("completion_rejected") ||
@@ -213,12 +243,23 @@ function buildConversationTimeline(events: any[], messages: any[]) {
         evType.includes("retry") ||
         evType.includes("verification")
       ) {
-        // Other notable system events
         items.push({
           kind: "system",
           content: evData || evType.replace(/_/g, " "),
           timestamp: formatTime(item.created_at),
+          stage: evStage,
         });
+      } else {
+        // Catch-all for checkpoint, session_completed, session_stopped, etc.
+        const label = evData || evType.replace(/_/g, " ");
+        if (label) {
+          items.push({
+            kind: "system",
+            content: label,
+            timestamp: formatTime(item.created_at),
+            stage: evStage,
+          });
+        }
       }
     }
   }
@@ -242,6 +283,9 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
   const [chatMsg, setChatMsg] = useState("");
   const [scrollProgress, setScrollProgress] = useState(0);
   const [diffData, setDiffData] = useState<any>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [stageFilter, setStageFilter] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [activeDiffFile, setActiveDiffFile] = useState<string | undefined>(undefined);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -266,7 +310,10 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
   // For inactive sessions, use whichever has data.
   const conversationMessages =
     isActive && liveMessages.length > 0 ? liveMessages : detailMessages.length > 0 ? detailMessages : liveMessages;
-  const timeline = buildConversationTimeline(events, conversationMessages);
+  const fullTimeline = buildConversationTimeline(events, conversationMessages);
+  const timeline = stageFilter
+    ? fullTimeline.filter((item: any) => item.stage === stageFilter || item.kind === "user")
+    : fullTimeline;
 
   // Check if the last timeline item is from an agent -- if so, hide typing indicator
   // (it will reappear when the user sends a new message and there's no agent reply yet)
@@ -299,8 +346,9 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
     }
   }, [activeTab, diffData, sessionId]);
 
-  // Handle actions
+  // Handle actions with loading state
   async function handleAction(action: string) {
+    setActionLoading(action);
     try {
       let res: any;
       switch (action) {
@@ -325,6 +373,8 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
       }
     } catch (err: any) {
       onToast(err.message || "Action failed", "error");
+    } finally {
+      setActionLoading(null);
     }
   }
 
@@ -397,39 +447,66 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
         <button
           type="button"
           onClick={() => handleAction("stop")}
+          disabled={actionLoading === "stop"}
           className={cn(
             "h-7 px-2.5 rounded-[var(--radius-sm)] text-[11px] font-medium",
             "border border-[var(--failed)] bg-transparent text-[var(--failed)]",
             "hover:bg-[var(--diff-rm-bg)] transition-colors cursor-pointer",
+            "disabled:opacity-50 disabled:cursor-not-allowed",
+            "flex items-center gap-1",
           )}
         >
-          Stop
+          {actionLoading === "stop" ? (
+            <>
+              <Loader2 className="animate-spin" size={12} /> Stopping...
+            </>
+          ) : (
+            "Stop"
+          )}
         </button>
       )}
       {(session.status === "ready" || session.status === "pending" || session.status === "blocked") && (
         <button
           type="button"
           onClick={() => handleAction("dispatch")}
+          disabled={actionLoading === "dispatch"}
           className={cn(
             "h-7 px-2.5 rounded-[var(--radius-sm)] text-[11px] font-medium",
             "border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-fg)]",
             "hover:bg-[var(--primary-hover)] transition-colors cursor-pointer",
+            "disabled:opacity-50 disabled:cursor-not-allowed",
+            "flex items-center gap-1",
           )}
         >
-          Dispatch
+          {actionLoading === "dispatch" ? (
+            <>
+              <Loader2 className="animate-spin" size={12} /> Dispatching...
+            </>
+          ) : (
+            "Dispatch"
+          )}
         </button>
       )}
       {(session.status === "stopped" || session.status === "failed" || session.status === "completed") && (
         <button
           type="button"
           onClick={() => handleAction("restart")}
+          disabled={actionLoading === "restart"}
           className={cn(
             "h-7 px-2.5 rounded-[var(--radius-sm)] text-[11px] font-medium",
             "border border-[var(--running)] bg-transparent text-[var(--running)]",
             "hover:bg-[var(--diff-add-bg)] transition-colors cursor-pointer",
+            "disabled:opacity-50 disabled:cursor-not-allowed",
+            "flex items-center gap-1",
           )}
         >
-          Restart
+          {actionLoading === "restart" ? (
+            <>
+              <Loader2 className="animate-spin" size={12} /> Restarting...
+            </>
+          ) : (
+            "Restart"
+          )}
         </button>
       )}
     </div>
@@ -451,6 +528,10 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
         onCopyId={() => {
           navigator.clipboard.writeText(session.id);
           onToast("Copied session ID", "success");
+        }}
+        selectedStage={stageFilter}
+        onStageClick={(stageName) => {
+          setStageFilter(stageFilter === stageName ? null : stageName);
         }}
       />
 
