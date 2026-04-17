@@ -20,6 +20,7 @@ import { TypingIndicator } from "./ui/TypingIndicator.js";
 import { SessionSummary } from "./ui/SessionSummary.js";
 import { EventTimeline, type TimelineEvent, type EventColor } from "./ui/EventTimeline.js";
 import { TodoList, type TodoItem } from "./ui/TodoList.js";
+import { DiffViewer, type DiffFile, type DiffLine } from "./ui/DiffViewer.js";
 import type { StageProgress } from "./ui/StageProgressBar.js";
 import type { SessionStatus } from "./ui/StatusDot.js";
 
@@ -59,6 +60,60 @@ function formatTime(iso: string | null | undefined): string {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Parse a unified diff string into DiffFile[] for the DiffViewer component. */
+function parseUnifiedDiff(raw: string): DiffFile[] {
+  const files: DiffFile[] = [];
+  const fileChunks = raw.split(/^diff --git /m).filter(Boolean);
+
+  for (const chunk of fileChunks) {
+    // Extract filename from "a/path b/path" header
+    const headerMatch = chunk.match(/^a\/(.+?)\s+b\/(.+)/m);
+    const filename = headerMatch ? headerMatch[2] : "unknown";
+    const lines: DiffLine[] = [];
+    let additions = 0;
+    let deletions = 0;
+    let lineNumber = 0;
+
+    const rawLines = chunk.split("\n");
+    let inHunk = false;
+
+    for (const line of rawLines) {
+      // Detect hunk header: @@ -a,b +c,d @@
+      const hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)/);
+      if (hunkMatch) {
+        lineNumber = parseInt(hunkMatch[1], 10);
+        inHunk = true;
+        lines.push({ type: "context", content: line });
+        continue;
+      }
+      if (!inHunk) continue;
+
+      if (line.startsWith("+")) {
+        additions++;
+        lines.push({ type: "add", lineNumber, content: line.slice(1) });
+        lineNumber++;
+      } else if (line.startsWith("-")) {
+        deletions++;
+        lines.push({ type: "remove", content: line.slice(1) });
+      } else if (line.startsWith(" ")) {
+        lines.push({ type: "context", lineNumber, content: line.slice(1) });
+        lineNumber++;
+      } else if (line.startsWith("\\")) {
+        // "\ No newline at end of file" -- skip
+      }
+    }
+
+    if (lines.length > 0) {
+      files.push({ filename, additions, deletions, lines });
+    }
+  }
+
+  return files;
+}
+
+/** Event types that should be hidden from the Conversation tab. */
+const HIDDEN_EVENT_TYPES = ["checkpoint", "hook_status", "session_stopped", "session_resumed"];
+
 /**
  * Map session events into conversation timeline items.
  *
@@ -67,10 +122,11 @@ function formatTime(iso: string | null | undefined): string {
  * messages exist we skip the event-based agent items (agent_progress,
  * agent_completed, agent_question, agent_error) to avoid showing duplicates.
  */
-function buildConversationTimeline(events: any[], messages: any[]) {
+function buildConversationTimeline(events: any[], messages: any[], session?: any) {
   const items: any[] = [];
   const hasMessages = Array.isArray(messages) && messages.length > 0;
   const all: any[] = [];
+  const sessionAgent = session?.agent || "agent";
 
   for (const ev of events || []) {
     all.push({ ...ev, _type: "event", _time: new Date(ev.created_at).getTime() });
@@ -88,7 +144,7 @@ function buildConversationTimeline(events: any[], messages: any[]) {
         role: item.role,
         content: item.content,
         timestamp: formatTime(item.created_at),
-        agentName: item.role === "user" ? "You" : item.agent_name || item.role || "assistant",
+        agentName: item.role === "user" ? "You" : item.agent_name || sessionAgent || "assistant",
         model: item.model,
         type: item.type,
         stage: undefined,
@@ -98,6 +154,9 @@ function buildConversationTimeline(events: any[], messages: any[]) {
       const evData = typeof item.data === "string" ? item.data : item.data?.message || "";
       const nested = typeof item.data === "object" ? item.data?.data : null;
       const evStage = item.stage || item.data?.stage || nested?.stage || undefined;
+
+      // Hide infrastructure noise from conversation
+      if (HIDDEN_EVENT_TYPES.includes(evType)) continue;
 
       // When messages are present, skip agent channel events -- the messages
       // table already contains the same content with better metadata.
@@ -117,7 +176,7 @@ function buildConversationTimeline(events: any[], messages: any[]) {
             kind: "agent",
             content: msg,
             timestamp: formatTime(item.created_at),
-            agentName: evStage || "agent",
+            agentName: evStage || sessionAgent,
             model: nested?.model,
             type: "progress",
             stage: evStage,
@@ -134,7 +193,7 @@ function buildConversationTimeline(events: any[], messages: any[]) {
           kind: "agent",
           content: content || "Stage completed",
           timestamp: formatTime(item.created_at),
-          agentName: evStage || "agent",
+          agentName: evStage || sessionAgent,
           model: nested?.model,
           type: "completed",
           stage: evStage,
@@ -144,7 +203,7 @@ function buildConversationTimeline(events: any[], messages: any[]) {
           kind: "agent",
           content: nested?.question || evData || "Agent has a question",
           timestamp: formatTime(item.created_at),
-          agentName: evStage || "agent",
+          agentName: evStage || sessionAgent,
           model: undefined,
           type: "question",
           stage: evStage,
@@ -156,7 +215,22 @@ function buildConversationTimeline(events: any[], messages: any[]) {
           timestamp: formatTime(item.created_at),
           stage: evStage,
         });
-      } else if (evType.includes("stage_") || evType.includes("dispatch") || evType.includes("advance")) {
+      } else if (evType === "stage_ready" || evType === "stage_started" || evType === "stage_completed") {
+        items.push({
+          kind: "system",
+          content: evData || evType.replace(/_/g, " "),
+          timestamp: formatTime(item.created_at),
+          stage: evStage,
+        });
+      } else if (evType === "stage_handoff") {
+        const target = evStage || nested?.stage || "";
+        items.push({
+          kind: "system",
+          content: target ? "advancing to " + target : "advancing to next stage",
+          timestamp: formatTime(item.created_at),
+          stage: evStage,
+        });
+      } else if (evType.includes("dispatch") || evType.includes("advance")) {
         items.push({
           kind: "system",
           content: evData || evType.replace(/_/g, " "),
@@ -345,6 +419,7 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
   const [diffData, setDiffData] = useState<any>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [stageFilter, setStageFilter] = useState<string | null>(null);
+  const [activeDiffFile, setActiveDiffFile] = useState<string | undefined>(undefined);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -356,7 +431,7 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
 
   const conversationMessages =
     isActive && liveMessages.length > 0 ? liveMessages : detailMessages.length > 0 ? detailMessages : liveMessages;
-  const fullTimeline = buildConversationTimeline(events, conversationMessages);
+  const fullTimeline = buildConversationTimeline(events, conversationMessages, session);
   const timeline = stageFilter
     ? fullTimeline.filter((item: any) => item.stage === stageFilter || item.kind === "user")
     : fullTimeline;
@@ -470,6 +545,9 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
     priority: t.priority || undefined,
     source: t.source || undefined,
   }));
+
+  // Parse diff for DiffViewer when available
+  const diffFiles: DiffFile[] = diffData?.diff ? parseUnifiedDiff(diffData.diff) : [];
 
   const headerActions = (
     <div className="flex gap-1.5 shrink-0">
@@ -637,7 +715,7 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
                 return (
                   <AgentMessage
                     key={m.id || i}
-                    agentName={m.agent_name || m.role || "assistant"}
+                    agentName={m.agent_name || session.agent || m.role || "assistant"}
                     model={m.model}
                     timestamp={formatTime(m.created_at)}
                   >
@@ -645,7 +723,7 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
                   </AgentMessage>
                 );
               })}
-            {agentIsTyping && <TypingIndicator agentName={session.agent} />}
+            {agentIsTyping && <TypingIndicator agentName={session.agent || "agent"} />}
             {session.status === "completed" && cost && (
               <SessionSummary
                 duration={relTime(session.created_at)}
@@ -685,11 +763,18 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
                 <div className="text-[11px] text-[var(--fg-muted)] mb-3 font-[family-name:var(--font-mono)]">
                   {diffData.filesChanged} files changed, +{diffData.insertions || 0} -{diffData.deletions || 0}
                 </div>
-                {diffData.stat && (
+                {diffFiles.length > 0 ? (
+                  <DiffViewer
+                    files={diffFiles}
+                    activeFile={activeDiffFile}
+                    onFileSelect={setActiveDiffFile}
+                    className="border border-[var(--border)] rounded-lg overflow-hidden"
+                  />
+                ) : diffData.stat ? (
                   <pre className="bg-[var(--bg-code)] border border-[var(--border)] rounded-lg p-3.5 font-[family-name:var(--font-mono)] text-[11px] leading-[1.7] overflow-auto whitespace-pre-wrap text-[var(--fg-muted)]">
                     {diffData.stat}
                   </pre>
-                )}
+                ) : null}
               </div>
             ) : (
               <div className="text-center py-12 text-[var(--fg-faint)]">
