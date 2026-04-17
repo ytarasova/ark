@@ -51,7 +51,8 @@ const SHORTCUTS: Record<string, string> = {
   ",": "settings",
 };
 
-export function Layout({ view, onNavigate, children }: LayoutProps) {
+export function Layout({ view, onNavigate, daemonStatus, children }: LayoutProps) {
+  const conductorOffline = daemonStatus && !daemonStatus.conductor.online;
   // Keyboard shortcuts for navigation
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -73,7 +74,15 @@ export function Layout({ view, onNavigate, children }: LayoutProps) {
   return (
     <div className="flex h-screen bg-[var(--bg)] overflow-hidden">
       <IconRail items={NAV_ITEMS} activeId={view} onSelect={onNavigate} settingsItem={SETTINGS_ITEM} />
-      <div className="flex-1 flex min-w-0 overflow-hidden">{children}</div>
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {conductorOffline && (
+          <div className="h-8 bg-[var(--failed)] text-white flex items-center justify-center text-[11px] font-medium shrink-0 gap-2">
+            <span>Daemon offline -- sessions cannot be orchestrated.</span>
+            <code className="bg-white/20 px-1.5 py-0.5 rounded text-[10px]">ark server daemon start</code>
+          </div>
+        )}
+        <div className="flex-1 flex min-w-0 overflow-hidden">{children}</div>
+      </div>
     </div>
   );
 }

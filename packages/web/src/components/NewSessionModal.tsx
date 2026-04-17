@@ -37,6 +37,8 @@ interface NewSessionModalProps {
     agent: string;
     dispatch: boolean;
   }) => void;
+  /** Whether the daemon conductor is online. When false, session creation is blocked. */
+  daemonOnline?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -341,7 +343,7 @@ function ComputeDropdown({
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
+export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewSessionModalProps) {
   const [summary, setSummary] = useState("");
   const [repo, setRepo] = useState(".");
   const [ticket, setTicket] = useState("");
@@ -493,12 +495,25 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
           />
         </div>
 
+        {/* Daemon offline warning */}
+        {!daemonOnline && (
+          <div className="mb-3 px-3 py-2 rounded-md bg-[var(--failed)]/10 border border-[var(--failed)]/30 text-[12px] text-[var(--failed)]">
+            Daemon is offline -- sessions cannot be orchestrated. Start it first:{" "}
+            <code className="bg-[var(--failed)]/10 px-1 py-0.5 rounded text-[11px]">ark server daemon start</code>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex items-center justify-end gap-2 pb-5">
           <Button type="button" variant="outline" size="sm" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" size="sm" disabled={!summary.trim()}>
+          <Button
+            type="submit"
+            size="sm"
+            disabled={!summary.trim() || !daemonOnline}
+            title={!daemonOnline ? "Start the daemon first: ark server daemon start" : undefined}
+          >
             Start Session
           </Button>
         </div>

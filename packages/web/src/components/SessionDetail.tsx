@@ -5,7 +5,6 @@ import { useMessages } from "../hooks/useMessages.js";
 import { relTime, fmtCost } from "../util.js";
 import { cn } from "../lib/utils.js";
 import { Loader2 } from "lucide-react";
-import { Loader2 } from "lucide-react";
 
 // UI components
 import { SessionHeader } from "./ui/SessionHeader.js";
@@ -19,64 +18,10 @@ import { ToolCallRow } from "./ui/ToolCallRow.js";
 import { ToolCallFailed } from "./ui/ToolCallFailed.js";
 import { TypingIndicator } from "./ui/TypingIndicator.js";
 import { SessionSummary } from "./ui/SessionSummary.js";
-import { EventTimeline, type TimelineEvent } from "./ui/EventTimeline.js";
+import { EventTimeline, type TimelineEvent, type EventColor } from "./ui/EventTimeline.js";
 import { TodoList, type TodoItem } from "./ui/TodoList.js";
-import { DiffViewer, type DiffFile, type DiffLine } from "./ui/DiffViewer.js";
 import type { StageProgress } from "./ui/StageProgressBar.js";
 import type { SessionStatus } from "./ui/StatusDot.js";
-
-/** Parse a unified diff string into DiffFile[] for the DiffViewer component. */
-function parseUnifiedDiff(raw: string): DiffFile[] {
-  if (!raw || !raw.trim()) return [];
-
-  const files: DiffFile[] = [];
-  const chunks = raw.split(/^diff --git /m).filter(Boolean);
-
-  for (const chunk of chunks) {
-    const headerMatch = chunk.match(/^a\/(.+?) b\/(.+)/m);
-    const filename = headerMatch ? headerMatch[2] : "unknown";
-
-    let additions = 0;
-    let deletions = 0;
-    const lines: DiffLine[] = [];
-
-    const rawLines = chunk.split("\n");
-    let inHunk = false;
-    let lineNum = 0;
-
-    for (const line of rawLines) {
-      const hunkMatch = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-      if (hunkMatch) {
-        inHunk = true;
-        lineNum = parseInt(hunkMatch[1], 10);
-        lines.push({ type: "context", content: line });
-        continue;
-      }
-
-      if (!inHunk) continue;
-
-      if (line.startsWith("+")) {
-        additions++;
-        lines.push({ type: "add", lineNumber: lineNum, content: line.slice(1) });
-        lineNum++;
-      } else if (line.startsWith("-")) {
-        deletions++;
-        lines.push({ type: "remove", content: line.slice(1) });
-      } else if (line.startsWith(" ")) {
-        lines.push({ type: "context", lineNumber: lineNum, content: line.slice(1) });
-        lineNum++;
-      } else if (line.startsWith("\\")) {
-        // "\ No newline at end of file" -- skip
-      }
-    }
-
-    if (lines.length > 0) {
-      files.push({ filename, additions, deletions, lines });
-    }
-  }
-
-  return files;
-}
 
 interface SessionDetailProps {
   sessionId: string;
@@ -125,8 +70,6 @@ function formatTime(iso: string | null | undefined): string {
 function buildConversationTimeline(events: any[], messages: any[]) {
   const items: any[] = [];
   const hasMessages = Array.isArray(messages) && messages.length > 0;
-
-  // Merge events and messages by time
   const all: any[] = [];
 
   for (const ev of events || []) {
@@ -151,7 +94,6 @@ function buildConversationTimeline(events: any[], messages: any[]) {
         stage: undefined,
       });
     } else {
-      // Event
       const evType = item.type || "";
       const evData = typeof item.data === "string" ? item.data : item.data?.message || "";
       const nested = typeof item.data === "object" ? item.data?.data : null;
@@ -168,8 +110,6 @@ function buildConversationTimeline(events: any[], messages: any[]) {
         continue;
       }
 
-      // Agent channel messages -- progress, completed, question, error
-      // (only reached when there are no stored messages)
       if (evType === "agent_progress") {
         const msg = nested?.message || evData;
         if (msg) {
@@ -186,11 +126,10 @@ function buildConversationTimeline(events: any[], messages: any[]) {
       } else if (evType === "agent_completed") {
         const summary = nested?.summary || nested?.message || evData;
         const extras: string[] = [];
-        if (nested?.pr_url) extras.push(`PR: ${nested.pr_url}`);
-        if (Array.isArray(nested?.filesChanged) && nested.filesChanged.length > 0) {
-          extras.push(`Files: ${nested.filesChanged.join(", ")}`);
-        }
-        const content = extras.length > 0 ? `${summary}\n${extras.join("\n")}` : summary;
+        if (nested?.pr_url) extras.push("PR: " + nested.pr_url);
+        if (Array.isArray(nested?.filesChanged) && nested.filesChanged.length > 0)
+          extras.push("Files: " + nested.filesChanged.join(", "));
+        const content = extras.length > 0 ? summary + "\n" + extras.join("\n") : summary;
         items.push({
           kind: "agent",
           content: content || "Stage completed",
@@ -213,12 +152,11 @@ function buildConversationTimeline(events: any[], messages: any[]) {
       } else if (evType === "agent_error") {
         items.push({
           kind: "system",
-          content: `Error: ${nested?.error || evData || "Unknown error"}`,
+          content: "Error: " + (nested?.error || evData || "Unknown error"),
           timestamp: formatTime(item.created_at),
           stage: evStage,
         });
       } else if (evType.includes("stage_") || evType.includes("dispatch") || evType.includes("advance")) {
-        // Stage transitions become system events
         items.push({
           kind: "system",
           content: evData || evType.replace(/_/g, " "),
@@ -226,14 +164,13 @@ function buildConversationTimeline(events: any[], messages: any[]) {
           stage: evStage,
         });
       } else if (evType.includes("tool")) {
-        // Tool calls
         const isError = evType.includes("error") || evType.includes("fail");
         items.push({
           kind: "tool",
           label: evData || evType.replace(/_/g, " "),
           timestamp: formatTime(item.created_at),
           status: isError ? "error" : "done",
-          duration: item.data?.duration ? `${(item.data.duration / 1000).toFixed(1)}s` : undefined,
+          duration: item.data?.duration ? (item.data.duration / 1000).toFixed(1) + "s" : undefined,
           error: isError ? item.data?.error || evData : undefined,
           stage: evStage,
         });
@@ -250,21 +187,144 @@ function buildConversationTimeline(events: any[], messages: any[]) {
           stage: evStage,
         });
       } else {
-        // Catch-all for checkpoint, session_completed, session_stopped, etc.
         const label = evData || evType.replace(/_/g, " ");
         if (label) {
-          items.push({
-            kind: "system",
-            content: label,
-            timestamp: formatTime(item.created_at),
-            stage: evStage,
-          });
+          items.push({ kind: "system", content: label, timestamp: formatTime(item.created_at), stage: evStage });
         }
       }
     }
   }
 
   return items;
+}
+
+/** Build a rich TimelineEvent for the Events tab with contextual labels and colors. */
+function buildRichTimelineEvent(ev: any, i: number): TimelineEvent {
+  const id = String(ev.id || i);
+  const timestamp = formatTime(ev.created_at);
+  const evType: string = ev.type || "";
+  const data = typeof ev.data === "object" && ev.data !== null ? ev.data : {};
+  const stageName: string = ev.stage || data.stage || "";
+
+  let color: EventColor = "gray";
+  if (evType.includes("completed") || evType.includes("done")) color = "green";
+  else if (evType.includes("started") || evType.includes("ready") || evType.includes("resumed")) color = "blue";
+  else if (evType.includes("error") || evType.includes("fail")) color = "red";
+  else if (evType.includes("stopped") || evType.includes("checkpoint")) color = "amber";
+
+  let label: React.ReactNode;
+  let detail: string | undefined;
+  const rawData: Record<string, unknown> | undefined = Object.keys(data).length > 0 ? data : undefined;
+
+  if (evType === "stage_ready") {
+    const agent = data.agent || "";
+    const gate = data.gate || "";
+    const parts = [agent && "agent: " + agent, gate && "gate: " + gate].filter(Boolean);
+    label = (
+      <span>
+        Stage <strong>{stageName}</strong> ready
+        {parts.length > 0 && <span className="text-[var(--fg-muted)]"> ({parts.join(", ")})</span>}
+      </span>
+    );
+  } else if (evType === "stage_started") {
+    const agent = data.agent || "";
+    const model = data.model || "";
+    const tools: string[] = Array.isArray(data.tools) ? data.tools : [];
+    const taskPreview: string = data.task_preview || "";
+    const previewText = taskPreview.length > 80 ? taskPreview.slice(0, 80) + "..." : taskPreview;
+    label = (
+      <span>
+        <strong>{agent || stageName || "agent"}</strong> started
+        {model && <span className="text-[var(--fg-muted)]"> ({model})</span>}
+        {previewText && <span className="text-[var(--fg-muted)]">{" -- " + previewText}</span>}
+      </span>
+    );
+    if (tools.length > 0) {
+      detail = "Tools: " + tools.join(", ");
+      if (taskPreview.length > 80) detail += "\nTask: " + taskPreview;
+    }
+  } else if (evType === "stage_completed") {
+    const agent = data.agent || "";
+    label = (
+      <span>
+        Stage <strong>{stageName}</strong> completed
+        {agent && <span className="text-[var(--fg-muted)]"> ({agent})</span>}
+      </span>
+    );
+    color = "green";
+  } else if (evType === "checkpoint") {
+    const status = data.status || "";
+    const compute = data.compute || data.compute_type || "";
+    const worktree = data.worktree || "";
+    label = (
+      <span>
+        Checkpoint: <strong>{stageName || "session"}</strong>
+        {status && (
+          <>
+            {" "}
+            <strong>{status}</strong>
+          </>
+        )}
+        {compute && <span className="text-[var(--fg-muted)]"> on {compute}</span>}
+      </span>
+    );
+    if (worktree) detail = "Worktree: " + worktree;
+  } else if (evType === "session_completed") {
+    const reason = data.reason || data.message || "";
+    label = <span>Session completed{reason && <span className="text-[var(--fg-muted)]">: {reason}</span>}</span>;
+    color = "green";
+  } else if (evType === "session_stopped") {
+    const actor = data.actor || ev.actor || "";
+    label = <span>Session stopped{actor && <span className="text-[var(--fg-muted)]"> by {actor}</span>}</span>;
+    color = "red";
+  } else if (evType === "session_resumed") {
+    const actor = data.actor || ev.actor || "";
+    label = <span>Session resumed{actor && <span className="text-[var(--fg-muted)]"> by {actor}</span>}</span>;
+    color = "blue";
+  } else if (evType === "session_started") {
+    const flow = data.flow || "";
+    const agent = data.agent || "";
+    const parts = [flow && "flow: " + flow, agent && "agent: " + agent].filter(Boolean);
+    label = (
+      <span>
+        Session started
+        {parts.length > 0 && <span className="text-[var(--fg-muted)]"> ({parts.join(", ")})</span>}
+      </span>
+    );
+    color = "blue";
+  } else if (evType.includes("error") || evType.includes("fail")) {
+    const msg = data.error || data.message || (typeof ev.data === "string" ? ev.data : "");
+    label = (
+      <span>
+        <strong className="text-[var(--failed)]">{evType.replace(/_/g, " ")}</strong>
+        {msg && <span className="text-[var(--fg-muted)]">: {msg}</span>}
+      </span>
+    );
+    color = "red";
+  } else if (evType === "dispatch" || evType === "advance") {
+    label = (
+      <span>
+        {evType.charAt(0).toUpperCase() + evType.slice(1)}
+        {stageName && (
+          <span className="text-[var(--fg-muted)]">
+            {" -- stage: "}
+            <strong>{stageName}</strong>
+          </span>
+        )}
+      </span>
+    );
+    color = "blue";
+  } else {
+    const msg = data.message || (typeof ev.data === "string" ? ev.data : "");
+    label = (
+      <span>
+        {evType.replace(/_/g, " ")}
+        {msg && <span className="text-[var(--fg-muted)]">{" -- " + msg}</span>}
+      </span>
+    );
+  }
+
+  return { id, timestamp, label, color, detail, rawData, stage: stageName || undefined };
 }
 
 export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailProps) {
@@ -285,8 +345,6 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
   const [diffData, setDiffData] = useState<any>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [stageFilter, setStageFilter] = useState<string | null>(null);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [activeDiffFile, setActiveDiffFile] = useState<string | undefined>(undefined);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -294,20 +352,8 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
   const events = detail?.events || [];
   const isActive = session?.status === "running" || session?.status === "waiting";
 
-  // Use messages hook for live chat
-  const {
-    messages: liveMessages,
-    send,
-    sending,
-  } = useMessages({
-    sessionId,
-    enabled: isActive,
-    pollMs: 2000,
-  });
+  const { messages: liveMessages, send, sending } = useMessages({ sessionId, enabled: isActive, pollMs: 2000 });
 
-  // Build conversation timeline from events and messages.
-  // For active sessions, prefer liveMessages (polled every 2s) over the static detailMessages.
-  // For inactive sessions, use whichever has data.
   const conversationMessages =
     isActive && liveMessages.length > 0 ? liveMessages : detailMessages.length > 0 ? detailMessages : liveMessages;
   const fullTimeline = buildConversationTimeline(events, conversationMessages);
@@ -315,13 +361,10 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
     ? fullTimeline.filter((item: any) => item.stage === stageFilter || item.kind === "user")
     : fullTimeline;
 
-  // Check if the last timeline item is from an agent -- if so, hide typing indicator
-  // (it will reappear when the user sends a new message and there's no agent reply yet)
   const lastTimelineItem = timeline.length > 0 ? timeline[timeline.length - 1] : null;
   const agentIsTyping =
     isActive && (!lastTimelineItem || lastTimelineItem.kind === "user" || lastTimelineItem.kind === "system");
 
-  // Scroll progress
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -329,14 +372,12 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
     setScrollProgress(max > 0 ? (el.scrollTop / max) * 100 : 0);
   }, []);
 
-  // Auto-scroll on new messages
   useEffect(() => {
     if (bottomRef.current && activeTab === "conversation") {
       bottomRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [conversationMessages.length, activeTab]);
 
-  // Load diff data when switching to diff tab
   useEffect(() => {
     if (activeTab === "diff" && !diffData && sessionId) {
       api
@@ -346,7 +387,6 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
     }
   }, [activeTab, diffData, sessionId]);
 
-  // Handle actions with loading state
   async function handleAction(action: string) {
     setActionLoading(action);
     try {
@@ -365,7 +405,7 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
           return;
       }
       if (res.ok !== false) {
-        onToast(`${action} successful`, "success");
+        onToast(action + " successful", "success");
         const d = await api.getSession(sessionId);
         setDetail(d);
       } else {
@@ -383,17 +423,13 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
     if (!text) return;
     setChatMsg("");
     const res = await send(text);
-    if (res.ok === false) {
-      onToast(res.message || "Send failed", "error");
-    }
+    if (res.ok === false) onToast(res.message || "Send failed", "error");
   }
 
   async function handleToggleTodo(id: number) {
     try {
       const res = await api.toggleTodo(id);
-      if (res.ok !== false && res.todo) {
-        setTodos(todos.map((t) => (t.id === id ? res.todo : t)));
-      }
+      if (res.ok !== false && res.todo) setTodos(todos.map((t) => (t.id === id ? res.todo : t)));
     } catch (err: any) {
       onToast(err.message || "Failed to toggle todo", "error");
     }
@@ -410,7 +446,6 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
   const totalStages = stages.length;
   const progressPct = totalStages > 0 ? Math.round((completedStages / totalStages) * 100) : 0;
 
-  // Build tabs
   const tabs: TabDef[] = [
     { id: "conversation", label: "Conversation" },
     { id: "terminal", label: "Terminal" },
@@ -418,20 +453,16 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
     {
       id: "diff",
       label: "Diff",
-      badge: diffData?.filesChanged ? `+${diffData.insertions || 0}/-${diffData.deletions || 0}` : undefined,
+      badge: diffData?.filesChanged ? "+" + (diffData.insertions || 0) + "/-" + (diffData.deletions || 0) : undefined,
     },
     { id: "todos", label: "Todos", badge: todos.length > 0 ? todos.length : undefined },
   ];
 
-  // Map events for timeline tab
-  const timelineEvents: TimelineEvent[] = events.slice(-100).map((ev: any, i: number) => ({
-    id: String(ev.id || i),
-    timestamp: formatTime(ev.created_at),
-    label: `${ev.type?.replace(/_/g, " ")} ${typeof ev.data === "string" ? ev.data : ev.data?.message || ""}`.trim(),
-    status: ev.type?.includes("fail") || ev.type?.includes("error") ? ("failed" as const) : ("running" as const),
-  }));
+  // Build rich timeline events for the Events tab
+  const timelineEvents: TimelineEvent[] = events.slice(-200).map((ev: any, i: number) => {
+    return buildRichTimelineEvent(ev, i);
+  });
 
-  // Map todos
   const todoItems: TodoItem[] = todos.map((t: any) => ({
     id: String(t.id),
     text: t.content || t.text || "",
@@ -440,7 +471,6 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
     source: t.source || undefined,
   }));
 
-  // Actions for header
   const headerActions = (
     <div className="flex gap-1.5 shrink-0">
       {isActive && (
@@ -514,10 +544,7 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-[var(--bg)]">
-      {/* Scroll Progress */}
       <ScrollProgress progress={scrollProgress} />
-
-      {/* Session Header */}
       <SessionHeader
         sessionId={session.id}
         summary={session.summary || session.id}
@@ -535,7 +562,6 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
         }}
       />
 
-      {/* Meta row with progress */}
       {totalStages > 0 && (
         <div className="h-10 border-b border-[var(--border)] flex items-center px-5 gap-2.5 shrink-0">
           <span className="text-[11px] font-[family-name:var(--font-mono-ui)] text-[var(--fg-muted)]">
@@ -557,7 +583,7 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
             <div className="w-[60px] h-[3px] bg-[var(--border)] rounded-sm overflow-hidden">
               <div
                 className="h-full bg-[var(--primary)] rounded-sm transition-[width] duration-300"
-                style={{ width: `${progressPct}%` }}
+                style={{ width: progressPct + "%" }}
               />
             </div>
             <span className="text-[11px] font-[family-name:var(--font-mono-ui)] font-semibold text-[var(--fg)] min-w-[28px] text-right">
@@ -567,12 +593,9 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
         </div>
       )}
 
-      {/* Content Tabs */}
       <ContentTabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {/* Tab Content */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6" onScroll={handleScroll}>
-        {/* Conversation Tab */}
         {activeTab === "conversation" && (
           <div className="max-w-[720px] mx-auto">
             {timeline.length === 0 && conversationMessages.length === 0 && (
@@ -581,44 +604,36 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
               </div>
             )}
             {timeline.map((item, i) => {
-              if (item.kind === "user") {
+              if (item.kind === "user")
                 return (
-                  <UserMessage key={`u-${i}`} timestamp={item.timestamp}>
+                  <UserMessage key={"u-" + i} timestamp={item.timestamp}>
                     <p>{item.content}</p>
                   </UserMessage>
                 );
-              }
-              if (item.kind === "agent") {
+              if (item.kind === "agent")
                 return (
-                  <AgentMessage key={`a-${i}`} agentName={item.agentName} model={item.model} timestamp={item.timestamp}>
+                  <AgentMessage key={"a-" + i} agentName={item.agentName} model={item.model} timestamp={item.timestamp}>
                     <p>{item.content}</p>
                   </AgentMessage>
                 );
-              }
-              if (item.kind === "system") {
-                return <SystemEvent key={`s-${i}`}>{item.content}</SystemEvent>;
-              }
+              if (item.kind === "system") return <SystemEvent key={"s-" + i}>{item.content}</SystemEvent>;
               if (item.kind === "tool") {
-                if (item.status === "error") {
+                if (item.status === "error")
                   return (
-                    <ToolCallFailed key={`t-${i}`} label={item.label} duration={item.duration} error={item.error} />
+                    <ToolCallFailed key={"t-" + i} label={item.label} duration={item.duration} error={item.error} />
                   );
-                }
-                return <ToolCallRow key={`t-${i}`} label={item.label} duration={item.duration} status={item.status} />;
+                return <ToolCallRow key={"t-" + i} label={item.label} duration={item.duration} status={item.status} />;
               }
               return null;
             })}
-
-            {/* Show raw messages if no events-based timeline */}
             {timeline.length === 0 &&
               conversationMessages.map((m, i) => {
-                if (m.role === "user") {
+                if (m.role === "user")
                   return (
                     <UserMessage key={m.id || i} timestamp={formatTime(m.created_at)}>
                       <p>{m.content}</p>
                     </UserMessage>
                   );
-                }
                 return (
                   <AgentMessage
                     key={m.id || i}
@@ -630,26 +645,19 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
                   </AgentMessage>
                 );
               })}
-
-            {/* Typing indicator -- shows when session is active and last item isn't an agent message */}
             {agentIsTyping && <TypingIndicator agentName={session.agent} />}
-
-            {/* Session summary for completed sessions */}
             {session.status === "completed" && cost && (
               <SessionSummary
                 duration={relTime(session.created_at)}
                 cost={fmtCost(cost.cost)}
                 filesChanged={session.config?.filesChanged?.length || 0}
                 testsPassed={session.config?.tests_passed}
-                prLink={session.pr_url ? { href: session.pr_url, label: `View PR on GitHub` } : undefined}
+                prLink={session.pr_url ? { href: session.pr_url, label: "View PR on GitHub" } : undefined}
               />
             )}
-
             <div ref={bottomRef} />
           </div>
         )}
-
-        {/* Terminal Tab */}
         {activeTab === "terminal" && (
           <div className="font-[family-name:var(--font-mono)] text-[12px] text-[var(--fg-muted)] leading-[1.7]">
             {output ? (
@@ -661,32 +669,26 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
             )}
           </div>
         )}
-
-        {/* Events Tab */}
-        {activeTab === "events" && <EventTimeline events={timelineEvents} />}
-
-        {/* Diff Tab */}
+        {activeTab === "events" && (
+          <EventTimeline
+            events={timelineEvents}
+            onStageClick={(stage) => {
+              setStageFilter(stageFilter === stage ? null : stage);
+              setActiveTab("conversation");
+            }}
+          />
+        )}
         {activeTab === "diff" && (
-          <div className="max-w-[960px] mx-auto">
+          <div className="max-w-[800px] mx-auto">
             {diffData ? (
               <div>
                 <div className="text-[11px] text-[var(--fg-muted)] mb-3 font-[family-name:var(--font-mono)]">
                   {diffData.filesChanged} files changed, +{diffData.insertions || 0} -{diffData.deletions || 0}
                 </div>
-                {diffData.diff ? (
-                  <div className="border border-[var(--border)] rounded-lg overflow-hidden">
-                    <DiffViewer
-                      files={parseUnifiedDiff(diffData.diff)}
-                      activeFile={activeDiffFile}
-                      onFileSelect={setActiveDiffFile}
-                    />
-                  </div>
-                ) : diffData.stat ? (
+                {diffData.stat && (
                   <pre className="bg-[var(--bg-code)] border border-[var(--border)] rounded-lg p-3.5 font-[family-name:var(--font-mono)] text-[11px] leading-[1.7] overflow-auto whitespace-pre-wrap text-[var(--fg-muted)]">
                     {diffData.stat}
                   </pre>
-                ) : (
-                  <div className="text-center py-12 text-[var(--fg-faint)]">No changes detected</div>
                 )}
               </div>
             ) : (
@@ -696,12 +698,9 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
             )}
           </div>
         )}
-
-        {/* Todos Tab */}
         {activeTab === "todos" && <TodoList items={todoItems} onToggle={(id) => handleToggleTodo(Number(id))} />}
       </div>
 
-      {/* Chat input - conversation tab only, active sessions only */}
       {activeTab === "conversation" && (
         <ChatInput
           value={chatMsg}
@@ -713,7 +712,6 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
         />
       )}
 
-      {/* Tab footer for non-conversation tabs */}
       {activeTab === "events" && events.length > 0 && (
         <div className="border-t border-[var(--border)] px-6 py-2 shrink-0 bg-[var(--bg)] flex items-center gap-3 text-[11px] text-[var(--fg-muted)] font-[family-name:var(--font-mono-ui)]">
           <span>{events.length} events</span>

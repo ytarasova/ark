@@ -109,15 +109,17 @@ export function SessionListPanel({
 
   const filterChips = (
     <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
-      {(["running", "waiting", "completed", "failed"] as const).map((status) => (
-        <FilterChip
-          key={status}
-          status={status}
-          count={counts[status]}
-          active={filter === status}
-          onClick={() => onFilterChange(filter === status ? "all" : status)}
-        />
-      ))}
+      {(["running", "waiting", "completed", "failed"] as const)
+        .filter((status) => counts[status] > 0 || filter === status)
+        .map((status) => (
+          <FilterChip
+            key={status}
+            status={status}
+            count={counts[status]}
+            active={filter === status}
+            onClick={() => onFilterChange(filter === status ? "all" : status)}
+          />
+        ))}
     </div>
   );
 
