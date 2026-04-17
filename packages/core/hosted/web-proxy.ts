@@ -7,7 +7,7 @@
  */
 
 import { readFileSync, existsSync } from "fs";
-import { join } from "path";
+import { join, resolve } from "path";
 import { resolveWebDist } from "../install-paths.js";
 
 // Shared install-aware resolver. In a compiled binary this points at
@@ -126,7 +126,10 @@ export function startWebProxy(opts: WebProxyOptions): { stop: () => void; url: s
       };
       const ext = url.pathname.slice(url.pathname.lastIndexOf("."));
       if (staticExts[ext]) {
-        const filePath = join(WEB_DIST, url.pathname);
+        const filePath = resolve(join(WEB_DIST, url.pathname));
+        if (!filePath.startsWith(resolve(WEB_DIST))) {
+          return new Response("Forbidden", { status: 403, headers: CORS });
+        }
         if (existsSync(filePath)) {
           return new Response(Bun.file(filePath), {
             headers: { "Content-Type": staticExts[ext], ...CORS },
