@@ -352,7 +352,7 @@ Each executor implements 5 methods: `launch`, `kill`, `status`, `send`, `capture
 
 ## 5. Skills
 
-Skills are reusable prompt fragments. They are markdown files injected into an agent's system prompt when attached.
+Skills are reusable prompt fragments defined as YAML files. Their `prompt` field is injected into an agent's system prompt when attached.
 
 ### Builtin skills (7)
 
@@ -370,9 +370,9 @@ Skills are reusable prompt fragments. They are markdown files injected into an a
 
 Skills resolve in priority order:
 
-1. Project: `.ark/skills/<name>.md` in the repo
-2. Global: `~/.ark/skills/<name>.md`
-3. Builtin: `skills/<name>.md` shipped with Ark
+1. Project: `.ark/skills/<name>.yaml` in the repo
+2. Global: `~/.ark/skills/<name>.yaml`
+3. Builtin: `skills/<name>.yaml` shipped with Ark
 
 A project-level skill with the same name overrides a global or builtin one.
 
@@ -385,7 +385,7 @@ runtime: claude
 skills: [code-review, security-scan, self-review]
 ```
 
-At dispatch, each listed skill's markdown content is inlined into the agent's system prompt.
+At dispatch, each listed skill's `prompt` field is inlined into the agent's system prompt.
 
 ### CLI
 
@@ -828,7 +828,21 @@ ark costs
 ark compute list
 ```
 
-Seventeen command modules cover sessions, compute, flows, skills, recipes, agents, runtimes, auth, router, knowledge, search, worktree, history, todo, config, tenant, and costs.
+Twenty-five command modules cover sessions, compute, flows, skills, recipes, agents, runtimes, auth, router, knowledge, search, worktree, history, todo, config, tenant, costs, daemon, eval, profile, schedule, memory, and server-daemon. The `misc` module bundles utility commands: pr, web, init, doctor, repo-map, config, and more.
+
+### Additional CLI commands
+
+| Command | What it does |
+|---------|--------------|
+| `ark daemon start\|stop\|status` | Manage the arkd agent daemon lifecycle. |
+| `ark eval stats\|drift\|list` | Agent performance evaluation and drift detection. |
+| `ark profile list\|create\|delete` | Manage configuration profiles. |
+| `ark schedule add\|list\|delete\|enable\|disable` | Manage scheduled recurring sessions. |
+| `ark memory list\|recall\|forget\|add\|clear` | Manage cross-session memory (backed by knowledge graph). |
+| `ark pr list\|status\|watch` | Manage PR-bound sessions. |
+| `ark init` | Initialize a new project. |
+| `ark doctor` | Run a health check on the Ark installation. |
+| `ark repo-map` | Generate a repository map. |
 
 ### Web
 
@@ -837,7 +851,7 @@ ark web                 # starts Vite dev server
 make web-build          # production build
 ```
 
-Vite + React + shadcn/ui with a custom design system (theme tokens, consistent component library). SSE live updates, Recharts cost charts (theme-aware, no animations), pipeline visualization with @xyflow/react + d3-dag. Pages: Dashboard, Sessions, Agents, Flows, Compute, History, Memory, Tools, Schedules, Costs, Settings. Login page for auth-required (hosted) mode.
+Vite + React + shadcn/ui with a custom design system (theme tokens, consistent component library). SSE live updates, Recharts cost charts (theme-aware, no animations), pipeline visualization with @xyflow/react + d3-dag. Pages: Dashboard, Sessions, Agents, Flows, Compute, History, Memory, Tools, Schedules, Costs, Settings, Login. Login page appears in auth-required (hosted) mode.
 
 ### Desktop (Electron)
 
@@ -1026,7 +1040,7 @@ helm install ark .infra/helm/ark \
 | `~/.ark/ark.db` | SQLite database (local mode). Includes knowledge graph tables. |
 | `~/.ark/worktrees/<sessionId>/` | Session git worktrees. |
 | `~/.ark/tracks/<sessionId>/` | Launcher scripts, channel configs. |
-| `~/.ark/skills/` | Global user skills. |
+| `~/.ark/skills/` | Global user skills (YAML). |
 | `~/.ark/recipes/` | Global user recipes. |
 | `~/.ark/flows/` | Global user flows. |
 | `~/.ark/agents/` | Global user agents. |
@@ -1086,4 +1100,4 @@ ark --server https://ark.company.com --token ark_default_xxx web
 
 ---
 
-That is the full tour. Every concept is documented here: sessions, 14 flows (including autonomous-sdlc, brainstorm, and conditional routing), agents, 5 runtimes (Claude, Codex, Gemini, Goose, and Claude Max), skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, dashboards across CLI/Web/Desktop (Electron), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, and deployment via Dockerfile, docker-compose, and Helm.
+That is the full tour. Every concept is documented here: sessions, 14 flows (including autonomous-sdlc, brainstorm, and conditional routing), agents, 5 runtimes (Claude, Codex, Gemini, Goose, and Claude Max), YAML skills, 10 recipes, all 11 compute providers, compute templates, the ops-codegraph knowledge graph, universal cost tracking with cost modes, the LLM router with optional TensorZero backend, multi-tenant auth, git worktrees, search, 25 CLI command modules (including eval, profiles, schedules, daemon management, memory, and PR tracking), dashboards across CLI/Web/Desktop (Electron), knowledge export/import, MCP integration with socket pooling, remote client mode, the hosted control plane, and deployment via Dockerfile, docker-compose, and Helm.
