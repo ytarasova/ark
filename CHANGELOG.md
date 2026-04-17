@@ -1,5 +1,56 @@
 # Changelog
 
+## v0.18.0 (2026-04-17)
+
+### Web UI Redesign
+- **Design system**: theme tokens, core component library, and design spec with mockups (#154, #156)
+- **Pipeline visualization**: interactive DAG viewer using @xyflow/react + d3-dag for flow stage visualization (#157, #158)
+- **Full UI rebuild**: all pages migrated to new design system, legacy components removed (#159, #161)
+- **Restyled charts**: killed animations, theme-aware colors, custom tooltips (#160)
+- **New Session form**: rich dropdowns for agent/flow/compute selection, decluttered session list
+- **Compute page rewrite**: live system metrics with real-time resource monitoring
+- **Conversation tab**: rich event details with expandable rows, live tool calls, smart typing indicator, channel messages rendered inline
+- **Events tab**: expandable rich event details matching conversation tab fidelity
+- **DiffViewer**: unified diff viewer wired into SessionDetail Diff tab
+- **Theme persistence**: theme selection survives page reload, icon rail labels added
+- **Skeleton loading**: loading states for compute charts, conversation messages, clickable pipeline stages
+- **Dashboard attention center**: highlights sessions needing user action
+- **Accessibility**: split large components, added aria labels, fixed useEffect cleanup (#168)
+
+### Security
+- **Path traversal protection**: validate file paths in arkd endpoints (#166)
+- **ArkD authentication**: require auth tokens for daemon API access (#166)
+- **Exec restrictions**: limit executable commands in agent sandboxes (#166)
+- **Webhook HMAC verification**: validate webhook signatures before processing (#166)
+
+### Fixes
+- **Branch name sanitization**: remove commas and special characters from generated branch names (#133)
+- **Agent dropdown and model input**: fixed selection and Goose integration issues (#134)
+- **Pre-launch settings**: ensure Claude settings and hooks are written before agent launch
+- **PR action stage completion**: fix completion detection for create_pr action stages
+- **Session recovery**: clear stale errors on completion, recover stuck sessions
+- **Autonomous mode**: override question-asking behavior, remove banner, widen icon rail
+- **Daemon offline handling**: warn when daemon is offline, block session creation, deduplicate conversation entries, add filter chips
+- **Dispatch retry**: retry failed dispatches from the web UI
+- **Agent name display**: fix agent names in session show and conversation views
+
+### Code Quality
+- **DI container formalization**: typed Cradle interface for AppContext dependency injection (#164)
+- **Error handling cleanup**: deduplicate `now()` calls, descriptive catch blocks, missing `.catch()` handlers (#167)
+- **Component architecture**: split monolithic web components for maintainability (#168)
+
+### CI
+- **Remove Windows desktop build**: dropped from release pipeline due to signing issues
+
+### Documentation
+- **Web UI design spec**: mockups and v0 research documenting the redesign direction (#154)
+- **User guide sync**: updated for Goose runtime, new flows, recipes, and web redesign (#162)
+- **Codebase review report**: comprehensive architecture and quality assessment (#163)
+- **Guide fixes**: corrected session statuses, skill format, CLI command count (#165)
+
+### Testing
+- **Web UI test suite**: unit and e2e tests for UI rebuild, themes, conversation, and pipeline visualization
+
 ## v0.17.0 (2026-04-15)
 
 ### Desktop App
