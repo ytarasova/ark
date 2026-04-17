@@ -23,6 +23,7 @@
 
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
+import { recordingPath } from "../recordings.js";
 
 import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../executor.js";
 import * as tmux from "../infra/tmux.js";
@@ -180,6 +181,11 @@ export const gooseExecutor: Executor = {
     log("Launching goose in tmux...");
     await tmux.createSessionAsync(tmuxName, cmdLine, { arkDir: app.config.arkDir });
     const rootPid = await tmux.getPanePidAsync(tmuxName);
+
+    // Start recording terminal output for post-session replay
+    const recPath = recordingPath(app.config.arkDir, session.id);
+    mkdirSync(join(app.config.arkDir, "recordings"), { recursive: true });
+    await tmux.pipePaneAsync(tmuxName, recPath);
 
     return { ok: true, handle: tmuxName, pid: rootPid ?? undefined };
   },

@@ -1621,6 +1621,14 @@ export async function deleteSessionAsync(
   // ensures cleanup even when no compute is assigned or provider doesn't handle local worktrees)
   await removeSessionWorktree(app, session);
 
+  // 3b. Clean up terminal recording file
+  try {
+    const { removeRecording } = await import("../recordings.js");
+    removeRecording(app.config.arkDir, sessionId);
+  } catch {
+    /* non-fatal */
+  }
+
   // 4. Soft-delete (keeps DB row for 90s undo window)
   app.sessions.softDelete(sessionId);
 
@@ -2750,13 +2758,21 @@ export async function getOutput(
   opts?: { lines?: number; ansi?: boolean },
 ): Promise<string> {
   const session = app.sessions.get(sessionId);
-  if (!session?.session_id) return "";
+  if (!session) return "";
 
-  const { provider, compute } = resolveProvider(session);
-  if (provider && compute) {
-    return provider.captureOutput(compute, session, opts);
+  // For running sessions, capture live from tmux
+  if (session.session_id) {
+    const { provider, compute } = resolveProvider(session);
+    if (provider && compute) {
+      const live = await provider.captureOutput(compute, session, opts);
+      if (live) return live;
+    }
   }
-  return "";
+
+  // For completed/stopped sessions (or when live capture returns empty),
+  // fall back to the recorded terminal output file.
+  const { readRecording } = await import("../recordings.js");
+  return readRecording(app.config.arkDir, sessionId) ?? "";
 }
 
 export async function send(

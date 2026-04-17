@@ -56,8 +56,11 @@ install: ## Install deps and symlink `ark` to PATH
 	@ln -sf "$(CURDIR)/ark" $(ARK_BIN) 2>/dev/null || true
 	@echo "Done."
 
-dev: ## Hot-reload: ark web (:8420) + Vite dev server (:5173) with HMR
+dev: ## Hot-reload: API + Vite HMR + daemon
 	@$(BUN) install --silent
+	@# Start daemon if not already running
+	@curl -sf http://localhost:19100/health > /dev/null 2>&1 || \
+		(echo "Starting daemon..." && ./ark server daemon start --detach 2>/dev/null && sleep 1) || true
 	@echo "\033[1mArk dev mode\033[0m"
 	@echo "  API:  http://localhost:8420  (bun --watch, auto-restarts on changes)"
 	@echo "  Web:  http://localhost:5173  (Vite HMR, proxies /api to :8420)"

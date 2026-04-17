@@ -189,6 +189,13 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     return { output };
   });
 
+  router.handle("session/recording", async (params, _notify) => {
+    const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
+    const { readRecording } = await import("../../core/recordings.js");
+    const output = readRecording(app.config.arkDir, sessionId);
+    return { ok: output !== null, output };
+  });
+
   router.handle("session/handoff", async (params, notify) => {
     const { sessionId, agent, instructions } = extract<SessionHandoffParams>(params, ["sessionId", "agent"]);
     const result = await app.sessionService.handoff(sessionId, agent, instructions);

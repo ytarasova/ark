@@ -14,6 +14,7 @@ import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../exec
 import * as tmux from "../infra/tmux.js";
 import { join } from "path";
 import { writeFileSync, mkdirSync } from "fs";
+import { recordingPath } from "../recordings.js";
 
 /** Single-quote a string for safe bash interpolation (no expansion). */
 const shellQuote = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
@@ -113,6 +114,11 @@ export const cliAgentExecutor: Executor = {
     log(`Launching ${command[0]} in tmux...`);
     await tmux.createSessionAsync(tmuxName, cmdLine, { arkDir: app.config.arkDir });
     const rootPid = await tmux.getPanePidAsync(tmuxName);
+
+    // Start recording terminal output for post-session replay
+    const recPath = recordingPath(app.config.arkDir, sessionId);
+    mkdirSync(join(app.config.arkDir, "recordings"), { recursive: true });
+    await tmux.pipePaneAsync(tmuxName, recPath);
 
     // For stdin delivery with initialPrompt, send via tmux after the process starts
     if (sendPromptAfterLaunch && initialPrompt) {

@@ -52,7 +52,6 @@ const SHORTCUTS: Record<string, string> = {
 };
 
 export function Layout({ view, onNavigate, daemonStatus, children }: LayoutProps) {
-  const _conductorOffline = daemonStatus && !daemonStatus.conductor.online;
   // Keyboard shortcuts for navigation
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -73,7 +72,13 @@ export function Layout({ view, onNavigate, daemonStatus, children }: LayoutProps
 
   return (
     <div className="flex h-screen bg-[var(--bg)] overflow-hidden">
-      <IconRail items={NAV_ITEMS} activeId={view} onSelect={onNavigate} settingsItem={SETTINGS_ITEM} />
+      <IconRail
+        items={NAV_ITEMS}
+        activeId={view}
+        onSelect={onNavigate}
+        settingsItem={SETTINGS_ITEM}
+        daemonStatus={daemonStatus}
+      />
       <div className="flex-1 flex min-w-0 overflow-hidden">{children}</div>
     </div>
   );

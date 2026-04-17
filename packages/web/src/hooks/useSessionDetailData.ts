@@ -148,6 +148,24 @@ export function useSessionDetailData(sessionId: string): SessionDetailData {
     };
   }, [detail?.session?.status, sessionId]);
 
+  // Fetch recorded output for completed/stopped/failed sessions
+  useEffect(() => {
+    if (!detail || !detail.session) return;
+    const TERMINAL_STATES = ["completed", "stopped", "failed"];
+    if (!TERMINAL_STATES.includes(detail.session.status)) return;
+    if (output) return; // already have output from polling
+    let active = true;
+    api
+      .getRecording(sessionId)
+      .then((d) => {
+        if (active && d.ok && d.output) setOutput(d.output);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [detail?.session?.status, sessionId]);
+
   // Auto-scroll output
   useEffect(() => {
     if (outputRef.current) outputRef.current.scrollTop = outputRef.current.scrollHeight;

@@ -21,6 +21,7 @@ import { SessionSummary } from "./ui/SessionSummary.js";
 import { EventTimeline, type TimelineEvent } from "./ui/EventTimeline.js";
 import { TodoList, type TodoItem } from "./ui/TodoList.js";
 import { DiffViewer, type DiffFile } from "./ui/DiffViewer.js";
+import { StaticTerminal } from "./StaticTerminal.js";
 
 // Extracted helpers
 import {
@@ -394,7 +395,7 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
         {activeTab === "terminal" && (
           <div className="font-[family-name:var(--font-mono)] text-[12px] text-[var(--fg-muted)] leading-[1.7]">
             {output ? (
-              <pre className="whitespace-pre-wrap break-all">{output}</pre>
+              <StaticTerminal output={output} />
             ) : (
               <div className="text-center py-12 text-[var(--fg-faint)]">
                 No terminal output available{isActive ? " yet" : ""}

@@ -229,6 +229,15 @@ export async function sendKeysAsync(name: string, ...keys: string[]): Promise<vo
   await execFileAsync(tmuxBin(), ["send-keys", "-t", name, ...keys]);
 }
 
+/** Start piping pane output to a file via tmux pipe-pane (async) */
+export async function pipePaneAsync(name: string, outputPath: string): Promise<void> {
+  try {
+    await execFileAsync(tmuxBin(), ["pipe-pane", "-t", name, `cat >> ${outputPath}`]);
+  } catch {
+    /* pipe-pane may fail if session already gone -- non-fatal */
+  }
+}
+
 /** Get the attach command for a session */
 export function attachCommand(
   name: string,

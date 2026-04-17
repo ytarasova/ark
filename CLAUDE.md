@@ -10,7 +10,7 @@ make test             # run all tests sequentially (NEVER parallel -- ports coll
 make test-file F=path # run a single test file
 make lint             # ESLint (zero warnings allowed)
 make format           # Prettier auto-fix
-make dev              # hot-reload: API (:8420) + Vite HMR (:5173)
+make dev              # hot-reload: API (:8420) + Vite HMR (:5173) + auto-starts daemon
 make dev-daemon       # hot-reload: server daemon (conductor + arkd + WS)
 ./ark <command>       # run CLI directly via bun
 ```

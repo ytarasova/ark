@@ -7,6 +7,7 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join, resolve } from "path";
+import { recordingPath } from "../recordings.js";
 
 import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../executor.js";
 import * as claude from "../claude/claude.js";
@@ -155,6 +156,12 @@ export const claudeCodeExecutor: Executor = {
     log("Starting local tmux session...");
     await tmux.createSessionAsync(tmuxName, `bash ${launcher}`, { arkDir: app.config.arkDir });
     const rootPid = await tmux.getPanePidAsync(tmuxName);
+
+    // Start recording terminal output for post-session replay
+    const recPath = recordingPath(app.config.arkDir, session.id);
+    mkdirSync(join(app.config.arkDir, "recordings"), { recursive: true });
+    await tmux.pipePaneAsync(tmuxName, recPath);
+
     claude.autoAcceptChannelPrompt(tmuxName);
     app.sessions.update(session.id, { claude_session_id: claudeSessionId });
 

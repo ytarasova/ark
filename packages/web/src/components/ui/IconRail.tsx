@@ -1,4 +1,5 @@
 import { cn } from "../../lib/utils.js";
+import type { DaemonStatus } from "../../hooks/useDaemonStatus.js";
 
 export interface IconRailItem {
   id: string;
@@ -14,13 +15,39 @@ export interface IconRailProps extends React.ComponentProps<"nav"> {
   settingsItem?: IconRailItem;
   /** Optional brand logo node */
   logo?: React.ReactNode;
+  /** Daemon health status -- drives the status dot on the logo */
+  daemonStatus?: DaemonStatus | null;
 }
 
 /**
  * 48px-wide left icon navigation rail.
  * Icons for sessions/agents/flows/compute/costs + settings at bottom.
  */
-export function IconRail({ items, activeId, onSelect, settingsItem, logo, className, ...props }: IconRailProps) {
+/** Derive a status dot color + tooltip from daemon probe results. */
+function getDaemonDot(ds: DaemonStatus | null | undefined): { color: string; title: string } {
+  if (!ds) return { color: "bg-gray-500/40", title: "Checking daemons..." };
+  const { conductor, arkd } = ds;
+  if (conductor.online && arkd.online) return { color: "bg-green-500", title: "Conductor and arkd online" };
+  if (conductor.online || arkd.online) {
+    return {
+      color: "bg-yellow-500",
+      title: `${conductor.online ? "Conductor" : "arkd"} online, ${conductor.online ? "arkd" : "conductor"} offline`,
+    };
+  }
+  return { color: "bg-red-500", title: "Daemon offline -- run: ark server daemon start" };
+}
+
+export function IconRail({
+  items,
+  activeId,
+  onSelect,
+  settingsItem,
+  logo,
+  daemonStatus,
+  className,
+  ...props
+}: IconRailProps) {
+  const dot = getDaemonDot(daemonStatus);
   return (
     <nav
       className={cn(
@@ -33,19 +60,28 @@ export function IconRail({ items, activeId, onSelect, settingsItem, logo, classN
     >
       {/* Logo */}
       {logo ?? (
-        <div
-          className={cn(
-            "w-7 h-7 rounded-[var(--radius-sm)] flex items-center justify-center",
-            "mb-4 font-bold text-[12px] text-white cursor-pointer",
-          )}
-          style={{ background: "var(--gradient-brand)" }}
-          role="button"
-          tabIndex={0}
-          onClick={() => onSelect(items[0]?.id ?? "sessions")}
-          onKeyDown={(e) => e.key === "Enter" && onSelect(items[0]?.id ?? "sessions")}
-          aria-label="Home"
-        >
-          A
+        <div className="relative mb-4">
+          <div
+            className={cn(
+              "w-7 h-7 rounded-[var(--radius-sm)] flex items-center justify-center",
+              "font-bold text-[12px] text-white cursor-pointer",
+            )}
+            style={{ background: "var(--gradient-brand)" }}
+            role="button"
+            tabIndex={0}
+            onClick={() => onSelect(items[0]?.id ?? "sessions")}
+            onKeyDown={(e) => e.key === "Enter" && onSelect(items[0]?.id ?? "sessions")}
+            aria-label="Home"
+          >
+            A
+          </div>
+          <span
+            className={cn(
+              "absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[var(--bg-sidebar)]",
+              dot.color,
+            )}
+            title={dot.title}
+          />
         </div>
       )}
 
