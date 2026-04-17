@@ -5,7 +5,22 @@ import { Button } from "./ui/button.js";
 import { FolderPickerModal } from "./FolderPickerModal.js";
 import { cn } from "../lib/utils.js";
 import { relTime, formatRepoName } from "../util.js";
-import { Zap, Monitor, FolderOpen, Check, ChevronDown, Search, Folder } from "lucide-react";
+import {
+  Zap,
+  Monitor,
+  FolderOpen,
+  Check,
+  ChevronDown,
+  Search,
+  Folder,
+  Bold,
+  Italic,
+  Code,
+  List,
+  Paperclip,
+  Link,
+  X,
+} from "lucide-react";
 
 interface FlowInfo {
   name: string;
@@ -25,6 +40,18 @@ interface RecentRepo {
   lastUsed: string;
 }
 
+interface DetectedReference {
+  type: "jira" | "github" | "url";
+  value: string;
+  label: string;
+}
+
+interface AttachmentInfo {
+  name: string;
+  size: number;
+  type: string;
+}
+
 interface NewSessionModalProps {
   onClose: () => void;
   onSubmit: (form: {
@@ -36,6 +63,8 @@ interface NewSessionModalProps {
     compute_name: string;
     agent: string;
     dispatch: boolean;
+    attachments: AttachmentInfo[];
+    references: DetectedReference[];
   }) => void;
   /** Whether the daemon conductor is online. When false, session creation is blocked. */
   daemonOnline?: boolean;
@@ -341,6 +370,282 @@ function ComputeDropdown({
 }
 
 // ---------------------------------------------------------------------------
+// Reference detection
+// ---------------------------------------------------------------------------
+const JIRA_RE = /\b([A-Z][A-Z0-9]+-\d+)\b/g;
+const GITHUB_ISSUE_RE = /(?:https?:\/\/github\.com\/([^\s/]+\/[^\s/]+)\/issues\/(\d+))|(?:#(\d+))/g;
+const URL_RE = /https?:\/\/[^\s,)]+/g;
+
+function detectReferences(text: string): DetectedReference[] {
+  const refs: DetectedReference[] = [];
+  const seen = new Set<string>();
+
+  // Jira references
+  for (const m of text.matchAll(JIRA_RE)) {
+    const key = `jira:${m[1]}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      refs.push({ type: "jira", value: m[1], label: `${m[1]} (Jira)` });
+    }
+  }
+
+  // GitHub issue references
+  for (const m of text.matchAll(GITHUB_ISSUE_RE)) {
+    if (m[1] && m[2]) {
+      const key = `github:${m[1]}#${m[2]}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        refs.push({ type: "github", value: `${m[1]}/issues/${m[2]}`, label: `${m[1]}#${m[2]} (GitHub)` });
+      }
+    } else if (m[3]) {
+      const key = `github:#${m[3]}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        refs.push({ type: "github", value: `#${m[3]}`, label: `#${m[3]} (GitHub)` });
+      }
+    }
+  }
+
+  // Generic URLs (skip already-captured GitHub URLs)
+  for (const m of text.matchAll(URL_RE)) {
+    const url = m[0];
+    if (url.includes("github.com") && url.includes("/issues/")) continue;
+    const key = `url:${url}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      const short = url.replace(/^https?:\/\//, "").slice(0, 50);
+      refs.push({ type: "url", value: url, label: short });
+    }
+  }
+
+  return refs;
+}
+
+// ---------------------------------------------------------------------------
+// Markdown toolbar + rich textarea
+// ---------------------------------------------------------------------------
+const ACCEPTED_FILE_TYPES = ".png,.jpg,.jpeg,.gif,.txt,.pdf,.md,.json,.yaml,.yml,.ts,.tsx,.js,.jsx";
+
+function RichTaskInput({
+  value,
+  onChange,
+  textareaRef,
+  attachments,
+  onAttachmentsChange,
+  references,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  textareaRef: React.RefObject<HTMLTextAreaElement>;
+  attachments: AttachmentInfo[];
+  onAttachmentsChange: (a: AttachmentInfo[]) => void;
+  references: DetectedReference[];
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const wrapSelection = useCallback(
+    (prefix: string, suffix: string) => {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      const start = ta.selectionStart;
+      const end = ta.selectionEnd;
+      const selected = value.slice(start, end);
+      const before = value.slice(0, start);
+      const after = value.slice(end);
+      const wrapped = `${before}${prefix}${selected || "text"}${suffix}${after}`;
+      onChange(wrapped);
+      // Restore focus and selection after React render
+      requestAnimationFrame(() => {
+        ta.focus();
+        const newStart = start + prefix.length;
+        const newEnd = selected ? newStart + selected.length : newStart + 4; // "text" length
+        ta.setSelectionRange(newStart, newEnd);
+      });
+    },
+    [value, onChange, textareaRef],
+  );
+
+  const insertPrefix = useCallback(
+    (prefix: string) => {
+      const ta = textareaRef.current;
+      if (!ta) return;
+      const start = ta.selectionStart;
+      const before = value.slice(0, start);
+      const after = value.slice(start);
+      // If we are at the start of a line, just insert prefix; otherwise add newline first
+      const needsNewline = before.length > 0 && before[before.length - 1] !== "\n";
+      const inserted = `${before}${needsNewline ? "\n" : ""}${prefix}`;
+      onChange(`${inserted}${after}`);
+      requestAnimationFrame(() => {
+        ta.focus();
+        const pos = inserted.length;
+        ta.setSelectionRange(pos, pos);
+      });
+    },
+    [value, onChange, textareaRef],
+  );
+
+  const handleFilePick = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files) return;
+      const newAttachments: AttachmentInfo[] = [...attachments];
+      for (const f of Array.from(files)) {
+        if (!newAttachments.some((a) => a.name === f.name)) {
+          newAttachments.push({ name: f.name, size: f.size, type: f.type });
+        }
+      }
+      onAttachmentsChange(newAttachments);
+      // Reset input so the same file can be re-selected
+      e.target.value = "";
+    },
+    [attachments, onAttachmentsChange],
+  );
+
+  const removeAttachment = useCallback(
+    (name: string) => {
+      onAttachmentsChange(attachments.filter((a) => a.name !== name));
+    },
+    [attachments, onAttachmentsChange],
+  );
+
+  const toolbarBtnClass = cn(
+    "p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--fg-muted)]",
+    "hover:text-[var(--fg)] transition-colors duration-100 cursor-pointer",
+  );
+
+  return (
+    <div>
+      {/* Container with toolbar + textarea */}
+      <div
+        className={cn(
+          "rounded-xl border border-[var(--border)] bg-[var(--bg-hover,var(--bg))]",
+          "focus-within:border-[var(--primary)] focus-within:ring-1 focus-within:ring-[var(--primary)]/20",
+          "transition-colors duration-150",
+        )}
+      >
+        {/* Toolbar */}
+        <div className="flex items-center gap-0.5 px-3 py-1.5 border-b border-[var(--border)]">
+          <button
+            type="button"
+            className={toolbarBtnClass}
+            title="Bold (Ctrl+B)"
+            onClick={() => wrapSelection("**", "**")}
+          >
+            <Bold size={14} />
+          </button>
+          <button
+            type="button"
+            className={toolbarBtnClass}
+            title="Italic (Ctrl+I)"
+            onClick={() => wrapSelection("_", "_")}
+          >
+            <Italic size={14} />
+          </button>
+          <button type="button" className={toolbarBtnClass} title="Code" onClick={() => wrapSelection("`", "`")}>
+            <Code size={14} />
+          </button>
+          <button type="button" className={toolbarBtnClass} title="List item" onClick={() => insertPrefix("- ")}>
+            <List size={14} />
+          </button>
+          <div className="w-px h-4 bg-[var(--border)] mx-1" />
+          <button
+            type="button"
+            className={toolbarBtnClass}
+            title="Attach file"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Paperclip size={14} />
+          </button>
+          <button
+            type="button"
+            className={toolbarBtnClass}
+            title="Insert link"
+            onClick={() => wrapSelection("[", "](url)")}
+          >
+            <Link size={14} />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPTED_FILE_TYPES}
+            multiple
+            className="hidden"
+            onChange={handleFilePick}
+          />
+        </div>
+
+        {/* Textarea */}
+        <textarea
+          ref={textareaRef}
+          autoFocus
+          value={value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            const el = e.target;
+            el.style.height = "auto";
+            el.style.height = Math.min(el.scrollHeight, 200) + "px";
+          }}
+          placeholder="What should the agent do?"
+          rows={3}
+          className={cn(
+            "w-full bg-transparent text-[var(--fg)]",
+            "text-[14px] leading-relaxed px-4 py-3 resize-none",
+            "focus:outline-none",
+            "placeholder:text-[var(--fg-muted)]",
+          )}
+        />
+      </div>
+
+      {/* Attachment chips */}
+      {attachments.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {attachments.map((a) => (
+            <span
+              key={a.name}
+              className={cn(
+                "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px]",
+                "bg-[var(--primary)]/10 text-[var(--fg)] border border-[var(--border)]",
+              )}
+            >
+              <Paperclip size={10} className="text-[var(--fg-muted)]" />
+              {a.name}
+              <button
+                type="button"
+                onClick={() => removeAttachment(a.name)}
+                className="ml-0.5 text-[var(--fg-muted)] hover:text-[var(--fg)] cursor-pointer"
+              >
+                <X size={10} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Detected references */}
+      {references.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {references.map((r) => (
+            <span
+              key={`${r.type}:${r.value}`}
+              className={cn(
+                "inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px]",
+                r.type === "jira" && "bg-blue-500/10 text-blue-400 border border-blue-500/20",
+                r.type === "github" && "bg-purple-500/10 text-purple-400 border border-purple-500/20",
+                r.type === "url" && "bg-[var(--fg-muted)]/10 text-[var(--fg-muted)] border border-[var(--border)]",
+              )}
+            >
+              <Link size={10} />
+              {r.label}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewSessionModalProps) {
@@ -349,14 +654,10 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
   const [ticket, setTicket] = useState("");
   const [selectedFlow, setSelectedFlow] = useState("");
   const [selectedCompute, setSelectedCompute] = useState("");
+  const [attachments, setAttachments] = useState<AttachmentInfo[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleTextareaInput = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setSummary(e.target.value);
-    const el = e.target;
-    el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 200) + "px";
-  }, []);
+  const references = detectReferences(summary);
 
   const [flows, setFlows] = useState<FlowInfo[]>([]);
   const [computes, setComputes] = useState<ComputeInfo[]>([]);
@@ -433,12 +734,14 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
           agent: "",
           group_name: "",
           dispatch: true,
+          attachments,
+          references,
         });
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [summary, repo, selectedFlow, ticket, selectedCompute, daemonOnline, onClose, onSubmit]);
+  }, [summary, repo, selectedFlow, ticket, selectedCompute, daemonOnline, onClose, onSubmit, attachments, references]);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -452,6 +755,8 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
       agent: "",
       group_name: "",
       dispatch: true,
+      attachments,
+      references,
     });
   }
 
@@ -520,27 +825,19 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
           </div>
         )}
 
-        {/* Task description -- chat-style input */}
+        {/* Task description -- rich input with markdown toolbar */}
         <div className="mb-4 mt-1">
           <label className="block text-[11px] font-semibold text-[var(--fg-muted)] mb-1.5 uppercase tracking-[0.04em]">
             Task
           </label>
-          <div className="relative">
-            <textarea
-              ref={textareaRef}
-              autoFocus
-              value={summary}
-              onChange={handleTextareaInput}
-              placeholder="What should the agent do?"
-              rows={3}
-              className={cn(
-                "w-full rounded-xl border border-[var(--border)] bg-[var(--bg-hover,var(--bg))] text-[var(--fg)]",
-                "text-[14px] leading-relaxed px-4 py-3 pr-12 resize-none",
-                "focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/20",
-                "placeholder:text-[var(--fg-muted)]",
-              )}
-            />
-          </div>
+          <RichTaskInput
+            value={summary}
+            onChange={setSummary}
+            textareaRef={textareaRef}
+            attachments={attachments}
+            onAttachmentsChange={setAttachments}
+            references={references}
+          />
         </div>
 
         {/* Actions */}
