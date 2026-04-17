@@ -17,6 +17,12 @@ dist/
 # Ark session hook config (written at dispatch, cleaned on stop)
 .claude/settings.local.json
 
+# Junk / test artifacts
+.playwright-mcp/
+ark-native
+packages/web/design-audit/
+packages/web/DESIGN-BRIEF.md
+
 # Electron desktop app build output
 packages/desktop/out/
 packages/desktop/node_modules/

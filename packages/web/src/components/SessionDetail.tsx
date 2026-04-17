@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { api } from "../hooks/useApi.js";
 import { useSessionDetailData } from "../hooks/useSessionDetailData.js";
 import { useMessages } from "../hooks/useMessages.js";
-import { relTime, fmtCost } from "../util.js";
+import { fmtCost, fmtDuration } from "../util.js";
 import { cn } from "../lib/utils.js";
 import { Loader2 } from "lucide-react";
 
@@ -381,7 +381,7 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
             {agentIsTyping && <TypingIndicator agentName={session.agent || "agent"} />}
             {session.status === "completed" && cost && (
               <SessionSummary
-                duration={relTime(session.created_at)}
+                duration={fmtDuration(session.created_at)}
                 cost={fmtCost(cost.cost)}
                 filesChanged={session.config?.filesChanged?.length || 0}
                 testsPassed={session.config?.tests_passed}

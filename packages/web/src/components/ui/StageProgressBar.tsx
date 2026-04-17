@@ -22,7 +22,7 @@ export function StageProgressBar({ stages, className, ...props }: StageProgressB
         <div
           key={s.name}
           className={cn("h-[3px] flex-1 rounded-full", {
-            "bg-[var(--running)]": s.state === "done",
+            "bg-[var(--completed)]": s.state === "done",
             "bg-[var(--primary)]": s.state === "active",
             "bg-[var(--border)]": s.state === "pending",
           })}

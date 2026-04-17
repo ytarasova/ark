@@ -91,7 +91,7 @@ export const midnightCircuit: ThemeTokens = {
 
   statusRunning: "#34d399",
   statusWaiting: "#fbbf24",
-  statusCompleted: "#60a5fa",
+  statusCompleted: "#34d399",
   statusFailed: "#f87171",
   statusStopped: "rgba(107, 114, 128, 0.4)",
 
@@ -138,7 +138,7 @@ export const midnightCircuitLight: ThemeTokens = {
 
   statusRunning: "#059669",
   statusWaiting: "#d97706",
-  statusCompleted: "#2563eb",
+  statusCompleted: "#059669",
   statusFailed: "#dc2626",
   statusStopped: "rgba(156, 163, 175, 0.6)",
 
@@ -189,7 +189,7 @@ export const arcticSlate: ThemeTokens = {
 
   statusRunning: "#34d399",
   statusWaiting: "#fbbf24",
-  statusCompleted: "#60a5fa",
+  statusCompleted: "#34d399",
   statusFailed: "#f87171",
   statusStopped: "rgba(107, 114, 128, 0.4)",
 
@@ -236,7 +236,7 @@ export const arcticSlateLight: ThemeTokens = {
 
   statusRunning: "#059669",
   statusWaiting: "#d97706",
-  statusCompleted: "#2563eb",
+  statusCompleted: "#059669",
   statusFailed: "#dc2626",
   statusStopped: "rgba(156, 163, 175, 0.6)",
 
@@ -287,7 +287,7 @@ export const warmObsidian: ThemeTokens = {
 
   statusRunning: "#34d399",
   statusWaiting: "#fbbf24",
-  statusCompleted: "#60a5fa",
+  statusCompleted: "#34d399",
   statusFailed: "#f87171",
   statusStopped: "rgba(107, 114, 128, 0.4)",
 
@@ -334,7 +334,7 @@ export const warmObsidianLight: ThemeTokens = {
 
   statusRunning: "#059669",
   statusWaiting: "#d97706",
-  statusCompleted: "#2563eb",
+  statusCompleted: "#059669",
   statusFailed: "#dc2626",
   statusStopped: "rgba(156, 163, 175, 0.6)",
 

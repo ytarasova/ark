@@ -182,6 +182,33 @@
   }
 }
 
+/* ---- Indeterminate progress bar ---- */
+@keyframes indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+.indeterminate-bar {
+  height: 2px;
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  background: var(--border);
+  border-radius: 1px;
+}
+.indeterminate-bar::after {
+  content: "";
+  position: absolute;
+  height: 100%;
+  width: 40%;
+  background: var(--primary);
+  border-radius: 1px;
+  animation: indeterminate 1.5s ease-in-out infinite;
+}
+
 /* ---- Skeleton shimmer ---- */
 @keyframes shimmer {
   0% {

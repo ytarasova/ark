@@ -8,6 +8,17 @@ export function relTime(iso: string | null | undefined): string {
   return Math.floor(s / 86400) + "d ago";
 }
 
+/** Format elapsed time since `iso` as a plain duration (e.g. "31m", "1h 12m"). */
+export function fmtDuration(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return s + "s";
+  if (s < 3600) return Math.floor(s / 60) + "m";
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  return m > 0 ? h + "h " + m + "m" : h + "h";
+}
+
 export function fmtCost(n: number): string {
   return n < 0.01 && n > 0 ? "<$0.01" : "$" + n.toFixed(2);
 }
