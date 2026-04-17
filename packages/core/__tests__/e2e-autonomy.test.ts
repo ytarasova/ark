@@ -205,9 +205,9 @@ describe("E2E: writeSettings writes permission deny rules", () => {
     writeSettings("s-e2e", "http://localhost:19100", app.config.arkDir, { autonomy: "read-only" });
     // removeSettings should not throw
     removeSettings(app.config.arkDir);
-    // After removal, hooks should be gone
-    const settings = JSON.parse(readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"));
-    expect(settings.hooks).toBeUndefined();
+    // After removal, file should be deleted entirely (only ark content existed)
+    const settingsPath = join(app.config.arkDir, ".claude", "settings.local.json");
+    expect(existsSync(settingsPath)).toBe(false);
   });
 });
 

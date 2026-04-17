@@ -1,10 +1,17 @@
 /**
- * Tests for claude.ts settings bundle — writeSettings / removeSettings.
+ * Tests for claude.ts settings bundle -- writeSettings / removeSettings / verifySettings.
  */
 import { describe, it, expect } from "bun:test";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
-import { writeSettings, removeSettings, buildPermissionsAllow, buildToolHints } from "../claude/claude.js";
+import {
+  writeSettings,
+  writeSettingsVerified,
+  removeSettings,
+  verifySettings,
+  buildPermissionsAllow,
+  buildToolHints,
+} from "../claude/claude.js";
 import { withTestContext } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
@@ -74,7 +81,7 @@ describe("writeSettings", () => {
     expect(settings.hooks).toBeDefined();
   });
 
-  it("is idempotent — calling twice doesn't duplicate hooks", () => {
+  it("is idempotent -- calling twice doesn't duplicate hooks", () => {
     writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
     writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
@@ -112,6 +119,100 @@ describe("writeSettings", () => {
     writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
     expect(settings.hooks.Notification[0].matcher).toBe("permission_prompt|idle_prompt");
+  });
+
+  it("all ark hook entries have _ark: true tag", () => {
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
+    const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
+    for (const [_event, matchers] of Object.entries(settings.hooks) as [string, any[]][]) {
+      for (const matcher of matchers) {
+        expect(matcher._ark).toBe(true);
+      }
+    }
+  });
+
+  it("tracks session metadata in _ark", () => {
+    writeSettings("s-meta", "http://localhost:19100", getCtx().arkDir);
+    const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
+    expect(settings._ark.sessionId).toBe("s-meta");
+    expect(settings._ark.conductorUrl).toBe("http://localhost:19100");
+    expect(settings._ark.updatedAt).toBeDefined();
+  });
+
+  it("ark hooks come before user hooks in each event", () => {
+    const claudeDir = join(getCtx().arkDir, ".claude");
+    mkdirSync(claudeDir, { recursive: true });
+    writeFileSync(
+      join(claudeDir, "settings.local.json"),
+      JSON.stringify({
+        hooks: {
+          Stop: [{ hooks: [{ type: "command", command: "user-hook.sh", async: true }] }],
+        },
+      }),
+    );
+
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
+    const settings = JSON.parse(readFileSync(join(claudeDir, "settings.local.json"), "utf-8"));
+    // Ark hook should be first, user hook second
+    expect(settings.hooks.Stop.length).toBe(2);
+    expect(settings.hooks.Stop[0]._ark).toBe(true);
+    expect(settings.hooks.Stop[1]._ark).toBeUndefined();
+    expect(settings.hooks.Stop[1].hooks[0].command).toBe("user-hook.sh");
+  });
+
+  it("handles corrupted settings file gracefully", () => {
+    const claudeDir = join(getCtx().arkDir, ".claude");
+    mkdirSync(claudeDir, { recursive: true });
+    writeFileSync(join(claudeDir, "settings.local.json"), "not json {{{");
+
+    // Should not throw -- starts fresh
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
+    const settings = JSON.parse(readFileSync(join(claudeDir, "settings.local.json"), "utf-8"));
+    expect(settings.hooks).toBeDefined();
+    expect(Object.keys(settings.hooks).length).toBe(9);
+  });
+});
+
+describe("writeSettingsVerified", () => {
+  it("returns verified: true for correct settings", () => {
+    const result = writeSettingsVerified("s-test", "http://localhost:19100", getCtx().arkDir);
+    expect(result.verified).toBe(true);
+    expect(result.hookCount).toBe(9);
+    expect(result.errors).toEqual([]);
+  });
+
+  it("returns the path", () => {
+    const result = writeSettingsVerified("s-test", "http://localhost:19100", getCtx().arkDir);
+    expect(result.path).toContain("settings.local.json");
+  });
+});
+
+describe("verifySettings", () => {
+  it("returns errors for missing file", () => {
+    const errors = verifySettings("/nonexistent/settings.local.json");
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0]).toContain("does not exist");
+  });
+
+  it("returns errors for invalid JSON", () => {
+    const path = join(getCtx().arkDir, "bad.json");
+    writeFileSync(path, "not json");
+    const errors = verifySettings(path);
+    expect(errors.length).toBeGreaterThan(0);
+    expect(errors[0]).toContain("not valid JSON");
+  });
+
+  it("returns errors for empty hooks", () => {
+    const path = join(getCtx().arkDir, "empty.json");
+    writeFileSync(path, JSON.stringify({ hooks: {} }));
+    const errors = verifySettings(path);
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it("returns no errors for valid settings", () => {
+    const path = writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
+    const errors = verifySettings(path);
+    expect(errors).toEqual([]);
   });
 });
 
@@ -156,6 +257,36 @@ describe("removeSettings", () => {
     expect(settings.hooks.Stop).toBeDefined();
     expect(settings.hooks.Stop.length).toBe(1);
     expect(settings.hooks.Stop[0].hooks[0].command).toBe("my-custom-hook.sh");
+  });
+
+  it("deletes the file entirely when only ark content remains", () => {
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
+    removeSettings(getCtx().arkDir);
+    const settingsPath = join(getCtx().arkDir, ".claude", "settings.local.json");
+    expect(existsSync(settingsPath)).toBe(false);
+  });
+
+  it("handles legacy untagged ark hooks via command string fallback", () => {
+    const claudeDir = join(getCtx().arkDir, ".claude");
+    mkdirSync(claudeDir, { recursive: true });
+    // Simulate a legacy settings file without _ark tags
+    writeFileSync(
+      join(claudeDir, "settings.local.json"),
+      JSON.stringify({
+        hooks: {
+          Stop: [
+            { hooks: [{ type: "command", command: "curl -sf ... # ark-status", async: true }] },
+            { hooks: [{ type: "command", command: "user-hook.sh", async: true }] },
+          ],
+        },
+      }),
+    );
+
+    removeSettings(getCtx().arkDir);
+
+    const settings = JSON.parse(readFileSync(join(claudeDir, "settings.local.json"), "utf-8"));
+    expect(settings.hooks.Stop.length).toBe(1);
+    expect(settings.hooks.Stop[0].hooks[0].command).toBe("user-hook.sh");
   });
 });
 
@@ -228,7 +359,7 @@ describe("buildPermissionsAllow", () => {
   });
 });
 
-// ── writeSettings: agent → permissions.allow integration ────────────────
+// ── writeSettings: agent -> permissions.allow integration ────────────────
 
 describe("writeSettings with agent", () => {
   it("writes permissions.allow from agent.tools when agent is provided", () => {
@@ -307,8 +438,6 @@ describe("writeSettings with agent", () => {
   });
 });
 
-// ── removeSettings: ark-managed permissions cleanup ────────────────────
-
 // ── buildToolHints unit tests ───────────────────────────────────────────────
 
 describe("buildToolHints", () => {
@@ -364,14 +493,13 @@ describe("buildToolHints", () => {
 });
 
 describe("removeSettings with agent permissions", () => {
-  it("removes ark-managed allow list but preserves user allow entries added after", () => {
+  it("removes ark-managed allow list", () => {
     writeSettings("s-test", "http://localhost:19100", getCtx().arkDir, {
       agent: { tools: ["Bash", "Read"], mcp_servers: [] },
     });
     removeSettings(getCtx().arkDir);
-    const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
-    expect(settings.permissions?.allow).toBeUndefined();
-    expect(settings._ark).toBeUndefined();
+    // File should be deleted entirely since only ark content existed
+    expect(existsSync(join(getCtx().arkDir, ".claude", "settings.local.json"))).toBe(false);
   });
 
   it("preserves pre-existing allow list when no agent was provided", () => {
@@ -388,5 +516,37 @@ describe("removeSettings with agent permissions", () => {
     const settings = JSON.parse(readFileSync(join(claudeDir, "settings.local.json"), "utf-8"));
     // No agent = no managedAllow, so user's pre-existing allow list is preserved
     expect(settings.permissions?.allow).toEqual(["UserTool"]);
+  });
+});
+
+// ── ensureGitignore integration ─────────────────────────────────────────────
+
+describe("writeSettings gitignore", () => {
+  it("adds settings.local.json to .gitignore when present", () => {
+    // Create a .gitignore without the entry
+    writeFileSync(join(getCtx().arkDir, ".gitignore"), "node_modules/\n");
+
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
+
+    const gitignore = readFileSync(join(getCtx().arkDir, ".gitignore"), "utf-8");
+    expect(gitignore).toContain(".claude/settings.local.json");
+    expect(gitignore).toContain(".mcp.json");
+  });
+
+  it("does not duplicate gitignore entries", () => {
+    writeFileSync(join(getCtx().arkDir, ".gitignore"), "node_modules/\n.claude/settings.local.json\n.mcp.json\n");
+
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
+
+    const gitignore = readFileSync(join(getCtx().arkDir, ".gitignore"), "utf-8");
+    const matches = gitignore.match(/settings\.local\.json/g);
+    expect(matches?.length).toBe(1);
+  });
+
+  it("does not create .gitignore if none exists", () => {
+    // No .gitignore in the workdir
+    writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
+    // Should not have created a .gitignore
+    expect(existsSync(join(getCtx().arkDir, ".gitignore"))).toBe(false);
   });
 });

@@ -327,25 +327,35 @@ function buildHooksConfig(sessionId: string, conductorUrl: string, tenantId?: st
   const asyncHook = { type: "command" as const, command: cmd, async: true };
   const syncHook = { type: "command" as const, command: cmd, async: false };
 
+  // Each matcher group is tagged with _ark: true for reliable identification.
+  // filterOutArkHooks uses this tag (with command-string fallback for old data).
   return {
-    PreToolUse: [{ hooks: [syncHook] }],
-    SessionStart: [{ matcher: "startup|resume", hooks: [asyncHook] }],
-    UserPromptSubmit: [{ hooks: [asyncHook] }],
-    Stop: [{ hooks: [asyncHook] }],
-    StopFailure: [{ hooks: [asyncHook] }],
-    SessionEnd: [{ hooks: [asyncHook] }],
-    Notification: [{ matcher: "permission_prompt|idle_prompt", hooks: [asyncHook] }],
-    PreCompact: [{ hooks: [asyncHook] }],
-    PostCompact: [{ hooks: [asyncHook, postCompactTaskHook(sessionId)] }],
+    PreToolUse: [{ _ark: true, hooks: [syncHook] }],
+    SessionStart: [{ _ark: true, matcher: "startup|resume", hooks: [asyncHook] }],
+    UserPromptSubmit: [{ _ark: true, hooks: [asyncHook] }],
+    Stop: [{ _ark: true, hooks: [asyncHook] }],
+    StopFailure: [{ _ark: true, hooks: [asyncHook] }],
+    SessionEnd: [{ _ark: true, hooks: [asyncHook] }],
+    Notification: [{ _ark: true, matcher: "permission_prompt|idle_prompt", hooks: [asyncHook] }],
+    PreCompact: [{ _ark: true, hooks: [asyncHook] }],
+    PostCompact: [{ _ark: true, hooks: [asyncHook, postCompactTaskHook(sessionId)] }],
   };
 }
 
-/** Remove all ark-managed hook entries from a hooks object, mutating it in place. */
+/**
+ * Remove all ark-managed hook entries from a hooks object, mutating it in place.
+ * Uses the `_ark: true` tag as primary identification, falls back to command
+ * string matching for backward compatibility with pre-tag settings files.
+ */
 function filterOutArkHooks(hooks: Record<string, unknown[]>): void {
   for (const [event, matchers] of Object.entries(hooks)) {
     hooks[event] = matchers.filter((m) => {
-      const matcher = m as { hooks?: Array<{ command?: string }> };
-      return !matcher.hooks?.some((h) => h.command?.includes(ARK_HOOK_MARKER));
+      const entry = m as { _ark?: boolean; hooks?: Array<{ command?: string }> };
+      // Primary: tagged entries
+      if (entry._ark === true) return false;
+      // Fallback: command string matching (backward compat with untagged entries)
+      if (entry.hooks?.some((h) => h.command?.includes(ARK_HOOK_MARKER))) return false;
+      return true;
     });
     if (hooks[event].length === 0) delete hooks[event];
   }
@@ -358,6 +368,88 @@ export interface ClaudeSettingsOpts {
   tenantId?: string;
 }
 
+/** Result of writeSettings -- includes path and verification status. */
+export interface WriteSettingsResult {
+  path: string;
+  verified: boolean;
+  hookCount: number;
+  errors: string[];
+}
+
+/**
+ * Ensure .claude/settings.local.json and .mcp.json are listed in the workdir's
+ * .gitignore. Idempotent -- skips if already present. Only appends to an
+ * existing .gitignore; does not create one (worktrees inherit from root).
+ */
+function ensureGitignore(workdir: string): void {
+  const gitignorePath = join(workdir, ".gitignore");
+  const entries = [".claude/settings.local.json", ".mcp.json"];
+
+  if (!existsSync(gitignorePath)) return;
+
+  let content = "";
+  try {
+    content = readFileSync(gitignorePath, "utf-8");
+  } catch {
+    return;
+  }
+
+  const lines = content.split("\n");
+  const missing = entries.filter((e) => !lines.some((l) => l.trim() === e));
+  if (missing.length === 0) return;
+
+  const suffix = content.endsWith("\n") ? "" : "\n";
+  const block = `${suffix}# Ark-managed (written at dispatch, cleaned on stop)\n${missing.join("\n")}\n`;
+  try {
+    writeFileSync(gitignorePath, content + block);
+  } catch (e: any) {
+    console.error(`ensureGitignore: failed to update ${gitignorePath}:`, e?.message ?? e);
+  }
+}
+
+/**
+ * Verify that a settings file contains the expected ark hooks.
+ * Returns a list of problems (empty = all good).
+ */
+export function verifySettings(settingsPath: string): string[] {
+  const errors: string[] = [];
+  if (!existsSync(settingsPath)) {
+    errors.push(`Settings file does not exist: ${settingsPath}`);
+    return errors;
+  }
+
+  let settings: Record<string, unknown>;
+  try {
+    settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
+  } catch (e: any) {
+    errors.push(`Settings file is not valid JSON: ${e?.message ?? e}`);
+    return errors;
+  }
+
+  if (!settings.hooks || typeof settings.hooks !== "object") {
+    errors.push("Settings file has no hooks object");
+    return errors;
+  }
+
+  const hooks = settings.hooks as Record<string, unknown[]>;
+  const required = ["PreToolUse", "Stop", "SessionStart", "SessionEnd"];
+  for (const event of required) {
+    if (!hooks[event] || !Array.isArray(hooks[event]) || hooks[event].length === 0) {
+      errors.push(`Missing required hook event: ${event}`);
+    }
+  }
+
+  // Verify ark-tagged entries exist
+  const arkEntries = Object.values(hooks)
+    .flat()
+    .filter((m) => (m as { _ark?: boolean })._ark === true);
+  if (arkEntries.length === 0) {
+    errors.push("No ark-tagged hook entries found");
+  }
+
+  return errors;
+}
+
 /**
  * Write the unified Claude settings bundle to .claude/settings.local.json.
  *
@@ -365,6 +457,12 @@ export interface ClaudeSettingsOpts {
  *   1. Status hooks -- curl-based event reporting to the conductor
  *   2. Permissions -- allow list (from agent tools) and deny list (from autonomy level)
  *   3. _ark metadata -- tracks which settings are ark-managed for clean teardown
+ *
+ * Tagged entries: every ark-managed matcher group carries `_ark: true` so
+ * filterOutArkHooks can identify them without fragile string matching.
+ *
+ * Idempotent: calling twice with the same args produces identical output.
+ * User hooks are never clobbered -- ark entries are removed first, then re-added.
  */
 export function writeSettings(
   sessionId: string,
@@ -376,12 +474,16 @@ export function writeSettings(
   mkdirSync(claudeDir, { recursive: true });
   const settingsPath = join(claudeDir, "settings.local.json");
 
+  // Ensure the settings file won't be tracked by git
+  ensureGitignore(workdir);
+
   let existing: Record<string, unknown> = {};
   if (existsSync(settingsPath)) {
     try {
       existing = JSON.parse(readFileSync(settingsPath, "utf-8"));
     } catch (e: any) {
-      console.error(`writeSettings: failed to parse ${settingsPath}:`, e?.message ?? e);
+      console.error(`writeSettings: failed to parse ${settingsPath}, starting fresh:`, e?.message ?? e);
+      existing = {};
     }
   }
 
@@ -391,16 +493,19 @@ export function writeSettings(
     if (Object.keys(existing.hooks as object).length === 0) delete existing.hooks;
   }
 
-  // Merge new hooks
+  // Merge new hooks -- ark entries go first so they fire before user hooks
   const newHooks = buildHooksConfig(sessionId, conductorUrl, opts?.tenantId);
   const existingHooks = (existing.hooks ?? {}) as Record<string, unknown[]>;
   for (const [event, matchers] of Object.entries(newHooks)) {
-    existingHooks[event] = [...(existingHooks[event] ?? []), ...matchers];
+    existingHooks[event] = [...matchers, ...(existingHooks[event] ?? [])];
   }
   existing.hooks = existingHooks;
 
   // Ark-managed state tracker
   const arkMeta = (existing._ark ?? {}) as Record<string, unknown>;
+  arkMeta.sessionId = sessionId;
+  arkMeta.conductorUrl = conductorUrl;
+  arkMeta.updatedAt = new Date().toISOString();
 
   // Build permissions.allow from agent.tools + declared mcp_servers (if agent provided).
   // autonomy=full / --dangerously-skip-permissions is the explicit override: when set,
@@ -432,16 +537,37 @@ export function writeSettings(
     arkMeta.managedDeny = true;
   }
 
-  if (Object.keys(arkMeta).length > 0) {
-    existing._ark = arkMeta;
-  }
+  existing._ark = arkMeta;
 
-  // Atomic write
+  // Atomic write via tmp + rename
   const tmpPath = settingsPath + ".tmp";
   writeFileSync(tmpPath, JSON.stringify(existing, null, 2));
   renameSync(tmpPath, settingsPath);
 
   return settingsPath;
+}
+
+/**
+ * Write settings with verification. Returns detailed result including
+ * verification status. Use this from executors that need fail-fast behavior.
+ */
+export function writeSettingsVerified(
+  sessionId: string,
+  conductorUrl: string,
+  workdir: string,
+  opts?: ClaudeSettingsOpts,
+): WriteSettingsResult {
+  const path = writeSettings(sessionId, conductorUrl, workdir, opts);
+  const errors = verifySettings(path);
+  const hookCount = (() => {
+    try {
+      const s = JSON.parse(readFileSync(path, "utf-8"));
+      return Object.keys(s.hooks ?? {}).length;
+    } catch {
+      return 0;
+    }
+  })();
+  return { path, verified: errors.length === 0, hookCount, errors };
 }
 
 /**
@@ -478,7 +604,11 @@ export function removeChannelConfig(workdir: string): void {
   }
 }
 
-/** Remove ark-managed settings from .claude/settings.local.json (hooks, permissions, metadata). */
+/**
+ * Remove ark-managed settings from .claude/settings.local.json.
+ * Only removes entries tagged by ark -- user hooks and other settings are preserved.
+ * If nothing remains after cleanup, the file is deleted entirely.
+ */
 export function removeSettings(workdir: string): void {
   const settingsPath = join(workdir, ".claude", "settings.local.json");
   if (!existsSync(settingsPath)) return;
@@ -508,7 +638,17 @@ export function removeSettings(workdir: string): void {
 
   delete settings._ark;
 
-  writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+  // If nothing meaningful remains, remove the file entirely
+  const remainingKeys = Object.keys(settings);
+  if (remainingKeys.length === 0) {
+    try {
+      unlinkSync(settingsPath);
+    } catch {
+      /* already gone */
+    }
+  } else {
+    writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+  }
 }
 
 /** @deprecated Use writeSettings instead */
@@ -633,10 +773,10 @@ const CLAUDE_WORKING_MARKERS = ["ctrl+o to expand", "esc to interrupt"];
  * working -- we don't return after the first accept.
  *
  * Four outcomes per poll:
- * 1. Prompt found → send "1" + Enter, keep polling for a second prompt
- * 2. No prompt and Claude is working (tool use visible) → done
- * 3. No prompt but previously accepted one → keep polling briefly
- * 4. Neither → keep polling (Claude still starting up)
+ * 1. Prompt found -> send "1" + Enter, keep polling for a second prompt
+ * 2. No prompt and Claude is working (tool use visible) -> done
+ * 3. No prompt but previously accepted one -> keep polling briefly
+ * 4. Neither -> keep polling (Claude still starting up)
  */
 export async function autoAcceptChannelPrompt(
   tmuxName: string,

@@ -1,8 +1,8 @@
 /**
- * Claude Code executor — wraps existing launch/kill/status/send/capture logic
+ * Claude Code executor -- wraps existing launch/kill/status/send/capture logic
  * from claude.ts, tmux.ts, and session.ts into the Executor interface.
  *
- * No new behavior — this is a refactor that delegates to existing modules.
+ * No new behavior -- this is a refactor that delegates to existing modules.
  */
 
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
@@ -80,24 +80,20 @@ export const claudeCodeExecutor: Executor = {
     // Status hooks + permissions allow-list -- MUST happen before agent launch.
     // The settings file configures Claude Code hooks (PreToolUse, Stop, etc.) that
     // report status back to the conductor. Without it, the conversation stays empty.
-    const settingsPath = claude.writeSettings(session.id, conductorUrl, effectiveWorkdir, {
+    // Uses writeSettingsVerified for fail-fast: if hooks are missing, the agent
+    // would launch blind with no status reporting.
+    const settingsResult = claude.writeSettingsVerified(session.id, conductorUrl, effectiveWorkdir, {
       autonomy: opts.autonomy,
       agent: { tools: opts.agent.tools, mcp_servers: opts.agent.mcp_servers },
       tenantId: session.tenant_id ?? "default",
     });
 
-    // Verify the settings file was actually written with hooks
-    try {
-      const settingsContent = readFileSync(settingsPath, "utf-8");
-      const parsed = JSON.parse(settingsContent);
-      if (!parsed.hooks || Object.keys(parsed.hooks).length === 0) {
-        log(`CRITICAL: writeSettings produced empty hooks for ${session.id} at ${settingsPath}`);
-      } else {
-        log(`Settings written to ${settingsPath}: ${Object.keys(parsed.hooks).join(", ")}`);
-      }
-    } catch (e: any) {
-      log(`CRITICAL: failed to verify settings at ${settingsPath}: ${e?.message ?? e}`);
+    if (!settingsResult.verified) {
+      const errMsg = `Settings verification failed for ${session.id}: ${settingsResult.errors.join("; ")}`;
+      log(`CRITICAL: ${errMsg}`);
+      return { ok: false, handle: "", message: errMsg };
     }
+    log(`Settings verified at ${settingsResult.path}: ${settingsResult.hookCount} hook events`);
 
     // Build launch env from agent config + provider-specific env + router URL (if enabled)
     const { buildRouterEnv } = await import("./router-env.js");
