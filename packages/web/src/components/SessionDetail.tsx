@@ -327,7 +327,13 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
           <div className="max-w-[720px] mx-auto">
             {timeline.length === 0 && conversationMessages.length === 0 && (
               <div className="text-center text-sm text-[var(--fg-muted)] py-12">
-                No conversation yet. {isActive ? "The agent is working..." : ""}
+                No conversation yet.{" "}
+                {isActive ? "The agent is working... Switch to the Terminal tab to see live output." : ""}
+              </div>
+            )}
+            {timeline.length > 0 && timeline.every((item: any) => item.kind === "system") && isActive && (
+              <div className="text-center text-[12px] text-[var(--fg-muted)] py-4 mt-2 border border-dashed border-[var(--border)] rounded-lg">
+                {session.agent || "Agent"} is working... Switch to the Terminal tab to see live output.
               </div>
             )}
             {timeline.map((item, i) => {

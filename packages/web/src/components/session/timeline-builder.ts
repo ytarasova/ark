@@ -82,7 +82,7 @@ export function parseUnifiedDiff(raw: string): DiffFile[] {
 }
 
 /** Event types that should be hidden from the Conversation tab. */
-const HIDDEN_EVENT_TYPES = ["checkpoint", "session_stopped", "session_resumed"];
+const HIDDEN_EVENT_TYPES = ["session_stopped", "session_resumed"];
 
 /** Format tool input from hook data into a readable summary. */
 function formatToolInput(data: any): string {
@@ -188,7 +188,39 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
               stage: evStage,
             });
           }
+        } else if (hookEvent === "SessionStart" || hookEvent === "UserPromptSubmit") {
+          // Infrastructure events -- skip
+        } else if (hookData.agent_status === "busy") {
+          const agentName = hookData.agent || evStage || sessionAgent;
+          const toolName = hookData.tool_name || "";
+          let activity = "working";
+          if (toolName === "Read" || toolName === "read_file") activity = "reading files";
+          else if (toolName === "Bash" || toolName === "bash") activity = "running commands";
+          else if (toolName === "Edit" || toolName === "write_file") activity = "editing files";
+          else if (toolName === "Grep" || toolName === "search") activity = "searching";
+          else if (toolName) activity = "using " + toolName;
+          items.push({
+            kind: "system",
+            content: agentName + " is " + activity + "...",
+            timestamp: formatTime(item.created_at),
+            stage: evStage,
+          });
         }
+        continue;
+      }
+
+      if (evType === "checkpoint") {
+        const cpData = typeof item.data === "object" ? item.data : {};
+        const status = cpData.status || "";
+        const compute = cpData.compute || cpData.compute_type || "";
+        const label = (evStage || "session") + (status ? " " + status : "");
+        const suffix = compute ? " on " + compute + " compute" : "";
+        items.push({
+          kind: "system",
+          content: label + suffix,
+          timestamp: formatTime(item.created_at),
+          stage: evStage,
+        });
         continue;
       }
 
@@ -247,10 +279,40 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
           timestamp: formatTime(item.created_at),
           stage: evStage,
         });
-      } else if (evType === "stage_ready" || evType === "stage_started" || evType === "stage_completed") {
+      } else if (evType === "stage_ready") {
+        const stageData = typeof item.data === "object" ? item.data : {};
+        const agent = stageData.agent || "";
+        const gate = stageData.gate || "";
+        const parts = [agent && "agent: " + agent, gate && "gate: " + gate].filter(Boolean);
+        const detail = parts.length > 0 ? " (" + parts.join(", ") + ")" : "";
         items.push({
           kind: "system",
-          content: evData || evType.replace(/_/g, " "),
+          content: "Stage " + (evStage || "unknown") + " ready" + detail,
+          timestamp: formatTime(item.created_at),
+          stage: evStage,
+        });
+      } else if (evType === "stage_started") {
+        const stageData = typeof item.data === "object" ? item.data : {};
+        const agent = stageData.agent || "";
+        const model = stageData.model || "";
+        const taskPreview: string = stageData.task_preview || "";
+        const preview = taskPreview.length > 80 ? taskPreview.slice(0, 80) + "..." : taskPreview;
+        const agentLabel = agent || evStage || "agent";
+        const modelSuffix = model ? " (" + model + ")" : "";
+        const previewSuffix = preview ? " -- " + preview : "";
+        items.push({
+          kind: "system",
+          content: agentLabel + " started" + modelSuffix + previewSuffix,
+          timestamp: formatTime(item.created_at),
+          stage: evStage,
+        });
+      } else if (evType === "stage_completed") {
+        const stageData = typeof item.data === "object" ? item.data : {};
+        const agent = stageData.agent || "";
+        const agentSuffix = agent ? " (" + agent + ")" : "";
+        items.push({
+          kind: "system",
+          content: "Stage " + (evStage || "unknown") + " completed" + agentSuffix,
           timestamp: formatTime(item.created_at),
           stage: evStage,
         });
@@ -293,7 +355,10 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
           stage: evStage,
         });
       } else {
-        const label = evData || evType.replace(/_/g, " ");
+        // Show all other events with their message data (match the events tab)
+        const evDataObj = typeof item.data === "object" ? item.data : {};
+        const msg = evDataObj.message || (typeof item.data === "string" ? item.data : "");
+        const label = msg ? evType.replace(/_/g, " ") + " -- " + msg : evType.replace(/_/g, " ");
         if (label) {
           items.push({ kind: "system", content: label, timestamp: formatTime(item.created_at), stage: evStage });
         }
