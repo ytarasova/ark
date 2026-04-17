@@ -1,5 +1,7 @@
 // Existing components
 export { Badge, badgeVariants } from "./badge.js";
+export { RichSelect } from "./RichSelect.js";
+export type { RichSelectOption, RichSelectProps } from "./RichSelect.js";
 export { Button, buttonVariants } from "./button.js";
 export { Card, CardHeader, CardTitle, CardDescription, CardContent } from "./card.js";
 export { Input } from "./input.js";

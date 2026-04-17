@@ -6,6 +6,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import type { FlowStageDefinition } from "../pipeline/types.js";
+import { RichSelect } from "../ui/RichSelect.js";
 
 export interface FlowPropertiesPanelProps {
   stage: FlowStageDefinition | null;
@@ -387,28 +388,11 @@ function PropSelect({
   onChange: (value: string) => void;
 }) {
   return (
-    <select
+    <RichSelect
       value={value}
       disabled={readOnly}
-      onChange={(e) => onChange(e.target.value)}
-      style={{
-        width: "100%",
-        padding: "6px 10px",
-        fontSize: 12,
-        background: "var(--background)",
-        border: "1px solid var(--border)",
-        borderRadius: 5,
-        color: "var(--foreground)",
-        outline: "none",
-        appearance: "none",
-        cursor: readOnly ? "default" : "pointer",
-      }}
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+      onChange={onChange}
+      options={options.map((o) => ({ value: o.value, label: o.label }))}
+    />
   );
 }

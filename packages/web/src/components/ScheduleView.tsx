@@ -6,7 +6,7 @@ import { cn } from "../lib/utils.js";
 import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
 import { Calendar } from "lucide-react";
-import { selectClassName } from "./ui/styles.js";
+import { RichSelect } from "./ui/RichSelect.js";
 
 interface ScheduleViewProps {
   showCreate?: boolean;
@@ -300,13 +300,12 @@ function NewScheduleForm({ onClose, onSubmit }: { onClose: () => void; onSubmit:
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
             Flow
           </label>
-          <select className={selectClassName} value={form.flow} onChange={(e) => update("flow", e.target.value)}>
-            {flows.map((f) => (
-              <option key={f.name} value={f.name}>
-                {f.name}
-              </option>
-            ))}
-          </select>
+          <RichSelect
+            value={form.flow}
+            onChange={(v) => update("flow", v)}
+            placeholder="Select a flow..."
+            options={flows.map((f) => ({ value: f.name, label: f.name }))}
+          />
         </div>
         <div className="mb-3.5">
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
@@ -318,35 +317,24 @@ function NewScheduleForm({ onClose, onSubmit }: { onClose: () => void; onSubmit:
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
             Compute
           </label>
-          <select
-            className={selectClassName}
+          <RichSelect
             value={form.compute_name}
-            onChange={(e) => update("compute_name", e.target.value)}
-          >
-            {computes.map((c) => (
-              <option key={c.name} value={c.name}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => update("compute_name", v)}
+            placeholder="Select compute..."
+            options={computes.map((c) => ({ value: c.name, label: c.name }))}
+          />
         </div>
         <div className="mb-3.5">
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
             Group
           </label>
           {groups.length > 0 && (
-            <select
-              className={selectClassName}
+            <RichSelect
               value={groups.includes(form.group_name) ? form.group_name : ""}
-              onChange={(e) => update("group_name", e.target.value)}
-            >
-              <option value="">none</option>
-              {groups.map((g) => (
-                <option key={g} value={g}>
-                  {g}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => update("group_name", v)}
+              placeholder="none"
+              options={[{ value: "", label: "none" }, ...groups.map((g) => ({ value: g, label: g }))]}
+            />
           )}
           <Input
             className={groups.length > 0 ? "mt-1.5" : ""}

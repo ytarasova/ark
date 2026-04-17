@@ -8,7 +8,7 @@ import { Badge } from "./ui/badge.js";
 import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
 import { Settings } from "lucide-react";
-import { selectClassName } from "./ui/styles.js";
+import { RichSelect } from "./ui/RichSelect.js";
 
 const TOOL_OPTIONS = ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebSearch"];
 
@@ -112,20 +112,22 @@ function AgentForm({
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
             Runtime
           </label>
-          <select className={selectClassName} value={form.runtime} onChange={(e) => update("runtime", e.target.value)}>
-            {runtimes.length > 0 ? (
-              runtimes.map((r: any) => (
-                <option key={r.name} value={r.name}>
-                  {r.name}
-                </option>
-              ))
-            ) : (
-              <>
-                <option value="claude-code">claude-code</option>
-                <option value="cli-agent">cli-agent</option>
-              </>
-            )}
-          </select>
+          <RichSelect
+            value={form.runtime}
+            onChange={(v) => update("runtime", v)}
+            options={
+              runtimes.length > 0
+                ? runtimes.map((r: any) => ({
+                    value: r.name,
+                    label: r.name,
+                    description: r.description || r.type || undefined,
+                  }))
+                : [
+                    { value: "claude-code", label: "claude-code", description: "Claude Code CLI runtime" },
+                    { value: "cli-agent", label: "cli-agent", description: "Generic CLI agent" },
+                  ]
+            }
+          />
         </div>
         <div className="mb-3.5">
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
@@ -155,24 +157,28 @@ function AgentForm({
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
             Permission Mode
           </label>
-          <select
-            className={selectClassName}
+          <RichSelect
             value={form.permission_mode}
-            onChange={(e) => update("permission_mode", e.target.value)}
-          >
-            <option value="bypassPermissions">bypassPermissions</option>
-            <option value="default">default</option>
-          </select>
+            onChange={(v) => update("permission_mode", v)}
+            options={[
+              { value: "bypassPermissions", label: "bypassPermissions", description: "Skip all permission prompts" },
+              { value: "default", label: "default", description: "Prompt for dangerous operations" },
+            ]}
+          />
         </div>
         {!isEdit && (
           <div className="mb-3.5">
             <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
               Scope
             </label>
-            <select className={selectClassName} value={form.scope} onChange={(e) => update("scope", e.target.value)}>
-              <option value="project">project</option>
-              <option value="global">global</option>
-            </select>
+            <RichSelect
+              value={form.scope}
+              onChange={(v) => update("scope", v)}
+              options={[
+                { value: "project", label: "project", description: "Available only in this project" },
+                { value: "global", label: "global", description: "Available across all projects" },
+              ]}
+            />
           </div>
         )}
         <div className="mb-3.5">

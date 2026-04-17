@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, useMemo, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../hooks/useApi.js";
 import { useFlowsQuery, useFlowDetail } from "../hooks/useFlowQueries.js";
@@ -8,8 +8,10 @@ import { Badge } from "./ui/badge.js";
 import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
 import { Separator } from "./ui/separator.js";
-import { GitBranch, ChevronRight } from "lucide-react";
-import { selectClassName } from "./ui/styles.js";
+import { GitBranch } from "lucide-react";
+import { RichSelect } from "./ui/RichSelect.js";
+import { PipelineViewer } from "./pipeline/PipelineViewer.js";
+import type { PipelineStage, PipelineEdge as PipelineEdgeType } from "./pipeline/types.js";
 
 const GATE_VARIANT: Record<string, "success" | "warning" | "info" | "default"> = {
   auto: "success",
@@ -99,29 +101,35 @@ function FlowForm({
                 value={stage.name}
                 onChange={(e) => updateStage(i, "name", e.target.value)}
               />
-              <select
-                className={cn(selectClassName, "w-[140px] flex-shrink-0")}
-                value={stage.agent}
-                onChange={(e) => updateStage(i, "agent", e.target.value)}
-              >
-                <option value="">-- agent --</option>
-                {agents.map((a: any) => (
-                  <option key={a.name} value={a.name}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                className={cn(selectClassName, "w-[120px] flex-shrink-0")}
-                value={stage.gate}
-                onChange={(e) => updateStage(i, "gate", e.target.value)}
-              >
-                {GATE_OPTIONS.map((g) => (
-                  <option key={g} value={g}>
-                    {g}
-                  </option>
-                ))}
-              </select>
+              <div className="w-[140px] flex-shrink-0">
+                <RichSelect
+                  value={stage.agent}
+                  onChange={(v) => updateStage(i, "agent", v)}
+                  placeholder="-- agent --"
+                  options={[
+                    { value: "", label: "-- agent --" },
+                    ...agents.map((a: any) => ({ value: a.name, label: a.name })),
+                  ]}
+                />
+              </div>
+              <div className="w-[120px] flex-shrink-0">
+                <RichSelect
+                  value={stage.gate}
+                  onChange={(v) => updateStage(i, "gate", v)}
+                  options={GATE_OPTIONS.map((g) => ({
+                    value: g,
+                    label: g,
+                    description:
+                      g === "auto"
+                        ? "No human intervention"
+                        : g === "manual"
+                          ? "Requires approval"
+                          : g === "condition"
+                            ? "Expression-based"
+                            : "External review",
+                  }))}
+                />
+              </div>
               <Button type="button" size="xs" variant="destructive" onClick={() => removeStage(i)}>
                 x
               </Button>
@@ -140,6 +148,93 @@ function FlowForm({
           </Button>
         </div>
       </form>
+    </div>
+  );
+}
+
+/** Convert flow definition stages to PipelineStage[] for the DAG viewer. */
+function flowStagesToPipeline(stages: any[]): PipelineStage[] {
+  return (stages || []).map((s: any) => {
+    const name = typeof s === "string" ? s : s.name;
+    const gate = typeof s === "string" ? "auto" : s.gate || "auto";
+    return {
+      name,
+      agent: typeof s === "string" ? null : s.agent || null,
+      action: typeof s === "string" ? null : s.action || null,
+      type: typeof s !== "string" && s.type === "fan_out" ? "fan_out" : "normal",
+      gate: gate as "auto" | "manual" | "condition" | "review",
+      status: "pending" as const,
+      duration: null,
+      cost: null,
+      model: null,
+      tokenCount: null,
+      summary: null,
+      toolCalls: [],
+      on_failure: typeof s === "string" ? null : s.on_failure || null,
+      verify: typeof s === "string" ? null : s.verify || null,
+      depends_on: typeof s === "string" ? [] : s.depends_on || [],
+      workers: null,
+    };
+  });
+}
+
+/** Build edges from explicit edges + depends_on + implicit linear chain. */
+function flowEdgesToPipeline(stages: any[], explicitEdges: any[]): PipelineEdgeType[] {
+  const edges: PipelineEdgeType[] = [];
+  const edgeSet = new Set<string>();
+
+  // Add explicit edges first
+  for (const e of explicitEdges || []) {
+    const key = `${e.from}->${e.to}`;
+    if (!edgeSet.has(key)) {
+      edgeSet.add(key);
+      edges.push({
+        from: e.from,
+        to: e.to,
+        condition: e.condition || null,
+        label: e.label || null,
+        isBackEdge: false,
+      });
+    }
+  }
+
+  // Add edges from depends_on
+  for (const s of stages || []) {
+    if (typeof s === "string") continue;
+    for (const dep of s.depends_on || []) {
+      const key = `${dep}->${s.name}`;
+      if (!edgeSet.has(key)) {
+        edgeSet.add(key);
+        edges.push({ from: dep, to: s.name, condition: null, label: null, isBackEdge: false });
+      }
+    }
+  }
+
+  // If no edges at all, build a linear chain
+  if (edges.length === 0 && stages && stages.length > 1) {
+    for (let i = 1; i < stages.length; i++) {
+      const prev = typeof stages[i - 1] === "string" ? stages[i - 1] : stages[i - 1].name;
+      const curr = typeof stages[i] === "string" ? stages[i] : stages[i].name;
+      edges.push({ from: prev, to: curr, condition: null, label: null, isBackEdge: false });
+    }
+  }
+
+  return edges;
+}
+
+/** DAG visualization for a flow definition using PipelineViewer. */
+function FlowDAG({ selected }: { selected: any }) {
+  const pipelineStages = useMemo(() => flowStagesToPipeline(selected.stages), [selected.stages]);
+  const pipelineEdges = useMemo(
+    () => flowEdgesToPipeline(selected.stages, selected.edges),
+    [selected.stages, selected.edges],
+  );
+
+  if (!selected.stages || selected.stages.length === 0) return null;
+
+  return (
+    <div className="mb-5">
+      <PipelineViewer stages={pipelineStages} edges={pipelineEdges} currentStage={null} flowName={selected.name} />
     </div>
   );
 }
@@ -239,85 +334,8 @@ export function FlowsView({
               <h2 className="text-lg font-semibold text-foreground mb-1">{selected.name}</h2>
               {selected.description && <p className="text-sm text-muted-foreground mb-5">{selected.description}</p>}
 
-              {/* Visual pipeline diagram */}
-              {selected.stages && selected.stages.length > 0 && (
-                <div className="mb-5">
-                  <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
-                    Pipeline
-                  </h3>
-                  <Separator className="mb-3" />
-                  <div className="flex items-center gap-0 flex-wrap">
-                    {selected.stages.map((s: any, i: number) => {
-                      const stageName = typeof s === "string" ? s : s.name;
-                      const gate = typeof s === "string" ? "auto" : s.gate || "auto";
-                      const isAction = !!(typeof s !== "string" && s.action);
-                      const optional = typeof s !== "string" && s.optional;
-                      return (
-                        <span key={stageName || i} className="inline-flex items-center">
-                          {i > 0 && <ChevronRight size={12} className="text-muted-foreground mx-0.5 shrink-0" />}
-                          <span
-                            className={cn(
-                              "inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-mono border",
-                              gate === "manual"
-                                ? "border-[var(--waiting)]/30 bg-[var(--waiting)]/5 text-[var(--waiting)]"
-                                : isAction
-                                  ? "border-[var(--completed)]/30 bg-[var(--completed)]/5 text-[var(--completed)]"
-                                  : "border-border bg-secondary text-foreground",
-                              optional && "opacity-60",
-                            )}
-                          >
-                            {stageName}
-                            {optional && <span className="text-[9px] text-muted-foreground">?</span>}
-                          </span>
-                        </span>
-                      );
-                    })}
-                  </div>
-                  {/* Gate legend */}
-                  <div className="flex gap-4 mt-2 text-[10px] text-muted-foreground">
-                    <span className="inline-flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-sm border border-border bg-secondary" /> auto (no human needed)
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-sm border border-[var(--waiting)]/30 bg-[var(--waiting)]/5" />{" "}
-                      manual (requires approval)
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-sm border border-[var(--completed)]/30 bg-[var(--completed)]/5" />{" "}
-                      action (system step)
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Conditional edges diagram */}
-              {selected.edges && selected.edges.length > 0 && (
-                <div className="mb-5">
-                  <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
-                    Routing
-                  </h3>
-                  <Separator className="mb-2" />
-                  <div className="flex flex-col gap-1">
-                    {selected.edges.map((e: any, i: number) => (
-                      <div key={i} className="flex items-center gap-2 text-[11px] font-mono">
-                        <span className="text-foreground">{e.from}</span>
-                        <ChevronRight size={10} className="text-muted-foreground" />
-                        <span className="text-foreground">{e.to}</span>
-                        {e.label && (
-                          <Badge variant="info" className="text-[9px] py-0 px-1">
-                            {e.label}
-                          </Badge>
-                        )}
-                        {e.condition && (
-                          <span className="text-muted-foreground text-[10px] truncate max-w-[300px]">
-                            ({e.condition})
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* DAG pipeline visualization */}
+              <FlowDAG selected={selected} />
 
               {/* Stage details */}
               {selected.stages && selected.stages.length > 0 && (

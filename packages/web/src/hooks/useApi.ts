@@ -229,6 +229,8 @@ export const api = {
   stopCompute: (name: string) => rpc<any>("compute/stop-instance", { name }),
   destroyCompute: (name: string) => rpc<any>("compute/destroy", { name }),
   deleteCompute: (name: string) => rpc<any>("compute/delete", { name }),
+  getComputeSnapshot: (computeName?: string) =>
+    rpc<{ snapshot: any }>("metrics/snapshot", computeName ? { computeName } : {}).then((r) => r.snapshot),
 
   // Compute Templates
   listComputeTemplates: () => rpc<{ templates: any[] }>("compute/template/list").then((r) => r.templates),

@@ -89,9 +89,54 @@ function buildConversationTimeline(events: any[], messages: any[]) {
       // Event
       const evType = item.type || "";
       const evData = typeof item.data === "string" ? item.data : item.data?.message || "";
+      const nested = typeof item.data === "object" ? item.data?.data : null;
 
-      // Stage transitions become system events
-      if (evType.includes("stage_") || evType.includes("dispatch") || evType.includes("advance")) {
+      // Agent channel messages -- progress, completed, question, error
+      if (evType === "agent_progress") {
+        const msg = nested?.message || evData;
+        if (msg) {
+          items.push({
+            kind: "agent",
+            content: msg,
+            timestamp: formatTime(item.created_at),
+            agentName: nested?.stage || item.data?.stage || "agent",
+            model: nested?.model,
+            type: "progress",
+          });
+        }
+      } else if (evType === "agent_completed") {
+        const summary = nested?.summary || nested?.message || evData;
+        const extras: string[] = [];
+        if (nested?.pr_url) extras.push(`PR: ${nested.pr_url}`);
+        if (Array.isArray(nested?.filesChanged) && nested.filesChanged.length > 0) {
+          extras.push(`Files: ${nested.filesChanged.join(", ")}`);
+        }
+        const content = extras.length > 0 ? `${summary}\n${extras.join("\n")}` : summary;
+        items.push({
+          kind: "agent",
+          content: content || "Stage completed",
+          timestamp: formatTime(item.created_at),
+          agentName: nested?.stage || item.data?.stage || "agent",
+          model: nested?.model,
+          type: "completed",
+        });
+      } else if (evType === "agent_question") {
+        items.push({
+          kind: "agent",
+          content: nested?.question || evData || "Agent has a question",
+          timestamp: formatTime(item.created_at),
+          agentName: nested?.stage || item.data?.stage || "agent",
+          model: undefined,
+          type: "question",
+        });
+      } else if (evType === "agent_error") {
+        items.push({
+          kind: "system",
+          content: `Error: ${nested?.error || evData || "Unknown error"}`,
+          timestamp: formatTime(item.created_at),
+        });
+      } else if (evType.includes("stage_") || evType.includes("dispatch") || evType.includes("advance")) {
+        // Stage transitions become system events
         items.push({
           kind: "system",
           content: evData || evType.replace(/_/g, " "),
@@ -107,6 +152,18 @@ function buildConversationTimeline(events: any[], messages: any[]) {
           status: isError ? "error" : "done",
           duration: item.data?.duration ? `${(item.data.duration / 1000).toFixed(1)}s` : undefined,
           error: isError ? item.data?.error || evData : undefined,
+        });
+      } else if (
+        evType.includes("completion_rejected") ||
+        evType.includes("guardrail") ||
+        evType.includes("retry") ||
+        evType.includes("verification")
+      ) {
+        // Other notable system events
+        items.push({
+          kind: "system",
+          content: evData || evType.replace(/_/g, " "),
+          timestamp: formatTime(item.created_at),
         });
       }
     }
@@ -149,9 +206,18 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
     pollMs: 2000,
   });
 
-  // Build conversation timeline from events and messages
-  const conversationMessages = detailMessages.length > 0 ? detailMessages : liveMessages;
+  // Build conversation timeline from events and messages.
+  // For active sessions, prefer liveMessages (polled every 2s) over the static detailMessages.
+  // For inactive sessions, use whichever has data.
+  const conversationMessages =
+    isActive && liveMessages.length > 0 ? liveMessages : detailMessages.length > 0 ? detailMessages : liveMessages;
   const timeline = buildConversationTimeline(events, conversationMessages);
+
+  // Check if the last timeline item is from an agent -- if so, hide typing indicator
+  // (it will reappear when the user sends a new message and there's no agent reply yet)
+  const lastTimelineItem = timeline.length > 0 ? timeline[timeline.length - 1] : null;
+  const agentIsTyping =
+    isActive && (!lastTimelineItem || lastTimelineItem.kind === "user" || lastTimelineItem.kind === "system");
 
   // Scroll progress
   const handleScroll = useCallback(() => {
@@ -429,8 +495,8 @@ export function SessionDetail({ sessionId, onToast, readOnly }: SessionDetailPro
                 );
               })}
 
-            {/* Typing indicator */}
-            {isActive && <TypingIndicator agentName={session.agent} />}
+            {/* Typing indicator -- shows when session is active and last item isn't an agent message */}
+            {agentIsTyping && <TypingIndicator agentName={session.agent} />}
 
             {/* Session summary for completed sessions */}
             {session.status === "completed" && cost && (

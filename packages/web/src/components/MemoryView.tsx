@@ -7,7 +7,7 @@ import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
 import { Badge } from "./ui/badge.js";
 import { BookOpen, Search, BarChart3 } from "lucide-react";
-import { selectClassName } from "./ui/styles.js";
+import { RichSelect } from "./ui/RichSelect.js";
 
 interface MemoryViewProps {
   addRequested?: number;
@@ -312,10 +312,14 @@ export function MemoryView({ addRequested = 0, onToast }: MemoryViewProps) {
                   <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
                     Scope
                   </label>
-                  <select className={selectClassName} value={newScope} onChange={(e) => setNewScope(e.target.value)}>
-                    <option value="global">global</option>
-                    <option value="project">project</option>
-                  </select>
+                  <RichSelect
+                    value={newScope}
+                    onChange={setNewScope}
+                    options={[
+                      { value: "global", label: "global", description: "Available across all projects" },
+                      { value: "project", label: "project", description: "Available only in this project" },
+                    ]}
+                  />
                 </div>
               </div>
               <div className="flex gap-2 pt-4 border-t border-border mt-auto">

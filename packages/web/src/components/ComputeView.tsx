@@ -7,7 +7,7 @@ import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
 import { Badge } from "./ui/badge.js";
 import { Server } from "lucide-react";
-import { selectClassName } from "./ui/styles.js";
+import { RichSelect } from "./ui/RichSelect.js";
 
 function NewComputeForm({ onClose, onSubmit }: { onClose: () => void; onSubmit: (form: any) => void }) {
   const [form, setForm] = useState({
@@ -62,19 +62,20 @@ function NewComputeForm({ onClose, onSubmit }: { onClose: () => void; onSubmit: 
             <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
               Template
             </label>
-            <select
-              className={selectClassName}
+            <RichSelect
               value={selectedTemplate}
-              onChange={(e) => handleTemplateChange(e.target.value)}
-            >
-              <option value="">(None)</option>
-              {templates.map((t: any) => (
-                <option key={t.name} value={t.name}>
-                  {t.name}
-                  {t.description ? ` - ${t.description}` : ""} [{t.provider}]
-                </option>
-              ))}
-            </select>
+              onChange={handleTemplateChange}
+              placeholder="(None)"
+              options={[
+                { value: "", label: "(None)" },
+                ...templates.map((t: any) => ({
+                  value: t.name,
+                  label: t.name,
+                  description: t.description || undefined,
+                  badge: t.provider,
+                })),
+              ]}
+            />
           </div>
         )}
         <div className="mb-3.5">
@@ -92,18 +93,18 @@ function NewComputeForm({ onClose, onSubmit }: { onClose: () => void; onSubmit: 
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
             Provider
           </label>
-          <select
-            className={selectClassName}
+          <RichSelect
             value={form.provider}
-            onChange={(e) => update("provider", e.target.value)}
-          >
-            <option value="local">local</option>
-            <option value="docker">docker</option>
-            <option value="devcontainer">devcontainer</option>
-            <option value="ec2">ec2</option>
-            <option value="ec2-docker">ec2-docker</option>
-            <option value="ec2-devcontainer">ec2-devcontainer</option>
-          </select>
+            onChange={(v) => update("provider", v)}
+            options={[
+              { value: "local", label: "local", description: "Run on this machine" },
+              { value: "docker", label: "docker", description: "Run in a Docker container" },
+              { value: "devcontainer", label: "devcontainer", description: "Run in a Dev Container" },
+              { value: "ec2", label: "ec2", description: "Bare EC2 instance" },
+              { value: "ec2-docker", label: "ec2-docker", description: "Docker on EC2" },
+              { value: "ec2-devcontainer", label: "ec2-devcontainer", description: "Dev Container on EC2" },
+            ]}
+          />
         </div>
         {form.provider.startsWith("ec2") && (
           <>
@@ -111,14 +112,18 @@ function NewComputeForm({ onClose, onSubmit }: { onClose: () => void; onSubmit: 
               <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
                 Size
               </label>
-              <select className={selectClassName} value={form.size} onChange={(e) => update("size", e.target.value)}>
-                <option value="">Default</option>
-                <option value="xs">XS (2 vCPU, 8 GB)</option>
-                <option value="s">S (4 vCPU, 16 GB)</option>
-                <option value="m">M (8 vCPU, 32 GB)</option>
-                <option value="l">L (16 vCPU, 64 GB)</option>
-                <option value="xl">XL (32 vCPU, 128 GB)</option>
-              </select>
+              <RichSelect
+                value={form.size}
+                onChange={(v) => update("size", v)}
+                options={[
+                  { value: "", label: "Default" },
+                  { value: "xs", label: "XS", description: "2 vCPU, 8 GB" },
+                  { value: "s", label: "S", description: "4 vCPU, 16 GB" },
+                  { value: "m", label: "M", description: "8 vCPU, 32 GB" },
+                  { value: "l", label: "L", description: "16 vCPU, 64 GB" },
+                  { value: "xl", label: "XL", description: "32 vCPU, 128 GB" },
+                ]}
+              />
             </div>
             <div className="mb-3.5">
               <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
