@@ -24,7 +24,7 @@ export function IconRail({ items, activeId, onSelect, settingsItem, logo, classN
   return (
     <nav
       className={cn(
-        "w-12 min-w-12 bg-[var(--bg-sidebar)] border-r border-[var(--border)]",
+        "w-16 min-w-16 bg-[var(--bg-sidebar)] border-r border-[var(--border)]",
         "flex flex-col items-center py-3 gap-0.5",
         className,
       )}

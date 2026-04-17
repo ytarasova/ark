@@ -152,6 +152,12 @@ export function buildClaudeArgs(
 ): string[] {
   let systemPrompt = agent.system_prompt;
 
+  // Autonomous mode: override question-asking behavior
+  if (opts?.autonomy === "full") {
+    systemPrompt +=
+      "\n\n## Autonomous Mode\nYou are running in FULLY AUTONOMOUS mode. Do NOT call report with type='question'. Do NOT wait for human input. Make your own decisions on any ambiguities and proceed directly to completion. Document your decisions in your output for later review.";
+  }
+
   // Tool hints: tell the agent what's available so it doesn't probe around.
   // Runs regardless of autonomy -- the permissions.allow list is defense-in-depth
   // but hints are how the agent actually knows what to call.
