@@ -12,7 +12,6 @@ import {
   Cog,
   ChevronLeft,
   ChevronRight,
-  LayoutDashboard,
   Bot,
   Zap,
   Monitor,
@@ -62,7 +61,6 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { id: "dashboard", icon: LayoutDashboard, label: "Dashboard", shortcut: "D" },
   { id: "sessions", icon: Play, label: "Sessions", shortcut: "S" },
   { id: "agents", icon: Bot, label: "Agents", shortcut: "A" },
   { id: "flows", icon: Zap, label: "Flows", shortcut: "F" },

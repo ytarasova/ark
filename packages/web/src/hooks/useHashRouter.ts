@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
 const VALID_VIEWS = new Set([
-  "dashboard",
   "sessions",
   "agents",
   "flows",
@@ -25,7 +24,8 @@ function parseHash(): RouteState {
   const raw = window.location.hash.replace(/^#\/?/, "");
   if (!raw) return { view: "sessions", subId: null, tab: null };
   const parts = raw.split("/");
-  const view = parts[0];
+  let view = parts[0];
+  if (view === "dashboard") view = "sessions"; // redirect legacy dashboard URL
   if (!VALID_VIEWS.has(view)) return { view: "sessions", subId: null, tab: null };
   const subId = parts[1] || null;
   const tab = parts[2] || null;

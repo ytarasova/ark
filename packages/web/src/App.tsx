@@ -16,7 +16,6 @@ import { MemoryPage } from "./pages/MemoryPage.js";
 import { CostsPage } from "./pages/CostsPage.js";
 import { SettingsPage } from "./pages/SettingsPage.js";
 import { LoginPage } from "./pages/LoginPage.js";
-import { DashboardPage } from "./pages/DashboardPage.js";
 import { DesignPreviewPage } from "./pages/DesignPreviewPage.js";
 import { useDaemonStatus } from "./hooks/useDaemonStatus.js";
 import { useHashRouter } from "./hooks/useHashRouter.js";
@@ -64,7 +63,6 @@ function App() {
       },
       { id: "nav-agents", label: "Go to Agents", section: "Navigation", onSelect: () => onNavigate("agents") },
       { id: "nav-flows", label: "Go to Flows", section: "Navigation", onSelect: () => onNavigate("flows") },
-      { id: "nav-dashboard", label: "Go to Dashboard", section: "Navigation", onSelect: () => onNavigate("dashboard") },
       { id: "nav-history", label: "Go to History", section: "Navigation", onSelect: () => onNavigate("history") },
       { id: "nav-compute", label: "Go to Compute", section: "Navigation", onSelect: () => onNavigate("compute") },
       { id: "nav-schedules", label: "Go to Schedules", section: "Navigation", onSelect: () => onNavigate("schedules") },
@@ -106,9 +104,6 @@ function App() {
   return (
     <>
       {view === "_design" && <DesignPreviewPage />}
-      {view === "dashboard" && (
-        <DashboardPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
-      )}
       {view === "sessions" && (
         <SessionsPage
           view={view}

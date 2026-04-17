@@ -39,11 +39,7 @@ interface DashboardViewProps {
   daemonStatus?: DaemonStatus | null;
 }
 
-function formatEventType(type: string): string {
-  return type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-export function DashboardView({ onNavigate, readOnly: _readOnly, daemonStatus }: DashboardViewProps) {
+export function DashboardView({ onNavigate, readOnly: _readOnly, daemonStatus: _daemonStatus }: DashboardViewProps) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sessions, setSessions] = useState<any[]>([]);
@@ -91,7 +87,7 @@ export function DashboardView({ onNavigate, readOnly: _readOnly, daemonStatus }:
     );
   }
 
-  const { counts, costs, recentEvents, system } = data;
+  const { costs } = data;
 
   const waitingSessions = sessions.filter((s) => s.status === "waiting" || s.status === "blocked");
   const failedSessions = sessions.filter((s) => s.status === "failed");
@@ -106,41 +102,9 @@ export function DashboardView({ onNavigate, readOnly: _readOnly, daemonStatus }:
         : null;
   const hasBudgetWarning = budget && (budget.warning || budget.exceeded);
 
-  const conductorOnline = daemonStatus ? daemonStatus.conductor.online : system.conductor;
-  const arkdOnline = daemonStatus?.arkd.online ?? false;
-  const routerStatus = system.router;
-
   return (
     <div className="flex flex-col h-full overflow-y-auto">
       <div className="max-w-[720px] w-full mx-auto px-6 py-8 flex flex-col gap-6">
-        {/* System health status line */}
-        <div className="flex items-center gap-4 text-[12px] text-muted-foreground font-[family-name:var(--font-mono)]">
-          <span className="flex items-center gap-1.5">
-            <span
-              className={cn("w-1.5 h-1.5 rounded-full", conductorOnline ? "bg-[var(--running)]" : "bg-[var(--failed)]")}
-            />
-            Conductor {conductorOnline ? "up" : "down"}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span
-              className={cn("w-1.5 h-1.5 rounded-full", arkdOnline ? "bg-[var(--running)]" : "bg-muted-foreground/30")}
-            />
-            ArkD {arkdOnline ? "up" : "off"}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span
-              className={cn(
-                "w-1.5 h-1.5 rounded-full",
-                routerStatus ? "bg-[var(--running)]" : "bg-muted-foreground/30",
-              )}
-            />
-            Router {routerStatus ? "up" : "off"}
-          </span>
-          <span className="ml-auto text-muted-foreground/60">
-            {counts.running ?? 0} running, {counts.total ?? 0} total
-          </span>
-        </div>
-
         {/* Budget warning */}
         {hasBudgetWarning && budget && (
           <div
@@ -177,7 +141,7 @@ export function DashboardView({ onNavigate, readOnly: _readOnly, daemonStatus }:
         )}
 
         {/* All clear */}
-        {!needsAttention && (
+        {!needsAttention && !hasBudgetWarning && (
           <div className="flex items-center justify-center py-12">
             <div className="flex items-center gap-2.5 text-[14px] text-muted-foreground">
               <CheckCircle2 size={18} className="text-[var(--running)] opacity-70" />
@@ -273,52 +237,6 @@ export function DashboardView({ onNavigate, readOnly: _readOnly, daemonStatus }:
                       <RotateCcw size={10} /> Restart
                     </button>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Cost summary line */}
-        {(costs.today > 0 || costs.week > 0) && (
-          <div className="flex items-center gap-4 text-[12px] text-muted-foreground border-t border-border/50 pt-4">
-            <span>
-              Today: <span className="font-mono font-medium text-foreground">{fmtCost(costs.today)}</span>
-            </span>
-            <span>
-              This week: <span className="font-mono font-medium text-foreground">{fmtCost(costs.week)}</span>
-            </span>
-            <button
-              onClick={() => onNavigate("costs")}
-              aria-label="View all costs"
-              className="text-[11px] text-primary hover:underline ml-auto cursor-pointer bg-transparent border-none"
-            >
-              View all costs
-            </button>
-          </div>
-        )}
-
-        {/* Recent activity feed */}
-        {recentEvents.length > 0 && (
-          <div>
-            <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
-              Recent Activity
-            </h3>
-            <div className="space-y-0">
-              {recentEvents.slice(0, 8).map((ev, i) => (
-                <div
-                  key={ev.sessionId + "-" + ev.created_at + "-" + i}
-                  className="flex items-start gap-2.5 py-1.5 text-[12px]"
-                >
-                  <span className="text-muted-foreground/60 font-mono shrink-0 w-[44px] text-right">
-                    {new Date(ev.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                  </span>
-                  <span className="text-muted-foreground truncate">
-                    <span className="text-foreground">{ev.sessionSummary || ev.sessionId}</span>
-                    {" -- "}
-                    {formatEventType(ev.type)}
-                    {ev.data?.message ? ": " + ev.data.message.slice(0, 60) : ""}
-                  </span>
                 </div>
               ))}
             </div>
