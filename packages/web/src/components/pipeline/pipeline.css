@@ -1,0 +1,359 @@
+/* Pipeline visualization styles for @xyflow/react integration. */
+@import "@xyflow/react/dist/style.css";
+
+/* ── React Flow container overrides ── */
+.pipeline-flow-container .react-flow__background {
+  background-color: var(--card);
+}
+
+.pipeline-flow-container .react-flow__controls button {
+  background-color: var(--secondary);
+  border-color: var(--border);
+  color: var(--foreground);
+  fill: var(--foreground);
+}
+
+.pipeline-flow-container .react-flow__controls button:hover {
+  background-color: var(--accent);
+}
+
+.pipeline-flow-container .react-flow__minimap {
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+/* ── Stage node ── */
+.pipeline-stage-node {
+  min-width: 140px;
+  min-height: 60px;
+  padding: 10px 12px;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    background-color 0.2s,
+    box-shadow 0.2s;
+  font-family: inherit;
+  position: relative;
+}
+
+.pipeline-stage-node:hover {
+  border-color: var(--muted-foreground);
+  background: var(--accent);
+}
+
+/* Status variants */
+.pipeline-stage-node.status-completed {
+  border-color: #34d399;
+  background: rgba(52, 211, 153, 0.12);
+}
+
+.pipeline-stage-node.status-running {
+  border-color: var(--primary);
+  background: rgba(124, 106, 239, 0.12);
+  animation: pipeline-pulse-border 2s ease-in-out infinite;
+}
+
+.pipeline-stage-node.status-pending {
+  border-color: var(--border);
+  opacity: 0.6;
+}
+
+.pipeline-stage-node.status-failed {
+  border-color: #f87171;
+  background: rgba(248, 113, 113, 0.12);
+}
+
+.pipeline-stage-node.status-waiting {
+  border-color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+}
+
+.pipeline-stage-node.expanded {
+  border-color: var(--primary);
+}
+
+@keyframes pipeline-pulse-border {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(124, 106, 239, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 12px 2px rgba(124, 106, 239, 0.2);
+  }
+}
+
+/* ── Stage node internal elements ── */
+.pipeline-stage-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--foreground);
+  margin-bottom: 2px;
+}
+
+.pipeline-stage-agent {
+  font-size: 10px;
+  color: var(--muted-foreground);
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+}
+
+.pipeline-stage-duration {
+  font-size: 10px;
+  color: var(--muted-foreground);
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  margin-top: 4px;
+  opacity: 0.7;
+}
+
+.pipeline-stage-cost {
+  font-size: 10px;
+  color: #34d399;
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  margin-top: 2px;
+}
+
+.pipeline-stage-gate-icon {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 11px;
+  opacity: 0.7;
+  line-height: 1;
+}
+
+.pipeline-stage-status-dot {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid var(--card);
+}
+
+.pipeline-stage-status-dot.completed {
+  background: #34d399;
+}
+.pipeline-stage-status-dot.running {
+  background: var(--primary);
+}
+.pipeline-stage-status-dot.failed {
+  background: #f87171;
+}
+.pipeline-stage-status-dot.waiting {
+  background: #fbbf24;
+}
+
+/* ── Edge animations ── */
+@keyframes pipeline-dash-flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+.pipeline-edge-active {
+  animation: pipeline-dash-flow 1s linear infinite;
+}
+
+/* ── Detail panel ── */
+.pipeline-detail-panel {
+  animation: pipeline-slide-down 0.2s ease;
+}
+
+@keyframes pipeline-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+/* ── Fan-out group ── */
+.pipeline-fanout-label {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.pipeline-fanout-detail {
+  display: grid;
+  gap: 1px;
+  background: var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.pipeline-fanout-cell {
+  background: var(--background);
+  padding: 14px 16px;
+}
+
+/* ── Flow editor specific ── */
+.flow-editor-container .react-flow__background pattern circle {
+  fill: var(--border);
+}
+
+.flow-editor-node {
+  width: 160px;
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  cursor: grab;
+  transition:
+    box-shadow 0.15s,
+    border-color 0.15s;
+  user-select: none;
+}
+
+.flow-editor-node:hover {
+  border-color: var(--muted-foreground);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.flow-editor-node.selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(124, 106, 239, 0.12);
+}
+
+.flow-editor-node-header {
+  padding: 8px 10px 6px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.flow-editor-node-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.flow-editor-node-body {
+  padding: 8px 10px;
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+
+.flow-editor-node-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.flow-editor-node-field-label {
+  color: var(--muted-foreground);
+  font-size: 9px;
+  width: 48px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.flow-editor-node-field-value {
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+
+/* Gate badge variants */
+.gate-badge {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.gate-badge.gate-auto {
+  background: rgba(52, 211, 153, 0.12);
+  color: #34d399;
+}
+.gate-badge.gate-manual {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+}
+.gate-badge.gate-condition {
+  background: rgba(96, 165, 250, 0.12);
+  color: #60a5fa;
+}
+.gate-badge.gate-review {
+  background: var(--secondary);
+  color: var(--muted-foreground);
+}
+
+/* Outcome routes in editor nodes */
+.flow-editor-outcome {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  margin-bottom: 2px;
+}
+
+.flow-editor-outcome-label {
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+}
+
+.flow-editor-outcome-arrow {
+  color: var(--muted-foreground);
+  opacity: 0.5;
+}
+
+.flow-editor-outcome-target {
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  color: var(--muted-foreground);
+}
+
+/* ── Validation bar ── */
+.flow-validation-bar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 11px;
+  z-index: 10;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.flow-validation-bar.valid {
+  background: rgba(52, 211, 153, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  color: #34d399;
+}
+
+.flow-validation-bar.invalid {
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  color: #f87171;
+}
+
+/* ── YAML modal ── */
+.yaml-code-block {
+  font-family: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--foreground);
+  white-space: pre;
+  background: var(--background);
+  padding: 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  overflow-x: auto;
+}
