@@ -6,7 +6,7 @@ import { NewSessionModal } from "../components/NewSessionModal.js";
 import { DashboardView } from "../components/DashboardView.js";
 import { useSessions } from "../hooks/useSessions.js";
 import { api } from "../hooks/useApi.js";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Maximize2, Minimize2 } from "lucide-react";
 import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
 
 interface SessionsPageProps {
@@ -33,10 +33,12 @@ export function SessionsPage({
   onTabChange,
 }: SessionsPageProps) {
   const [selectedId, setSelectedIdInternal] = useState<string | null>(initialSelectedId ?? null);
+  const [maximized, setMaximized] = useState(false);
   const setSelectedId = useCallback(
     (id: string | null) => {
       setSelectedIdInternal(id);
       onSelectedChange?.(id);
+      if (!id) setMaximized(false);
     },
     [onSelectedChange],
   );
@@ -198,36 +200,38 @@ export function SessionsPage({
       daemonStatus={daemonStatus}
       totalUnread={totalUnread}
     >
-      {/* Session List Panel */}
-      <SessionListPanel
-        sessions={sessions}
-        selectedId={selectedId}
-        onSelect={(id) => {
-          const next = id === selectedId ? null : id;
-          setSelectedId(next);
-          setShowNew(false);
-          if (next && unreadCounts[next]) {
-            api.markRead(next).then(() => {
-              setUnreadCounts((prev) => {
-                const copy = { ...prev };
-                delete copy[next];
-                return copy;
+      {/* Session List Panel -- hidden only when maximized */}
+      {!maximized && (
+        <SessionListPanel
+          sessions={sessions}
+          selectedId={selectedId}
+          onSelect={(id) => {
+            const next = id === selectedId ? null : id;
+            setSelectedId(next);
+            setShowNew(false);
+            if (next && unreadCounts[next]) {
+              api.markRead(next).then(() => {
+                setUnreadCounts((prev) => {
+                  const copy = { ...prev };
+                  delete copy[next];
+                  return copy;
+                });
               });
-            });
-          }
-        }}
-        filter={filter}
-        onFilterChange={setFilter}
-        search={search}
-        onSearchChange={setSearch}
-        onNewSession={() => {
-          setShowNew(true);
-          setSelectedId(null);
-        }}
-        readOnly={readOnly}
-        flowStagesMap={flowStagesMap}
-        unreadCounts={unreadCounts}
-      />
+            }
+          }}
+          filter={filter}
+          onFilterChange={setFilter}
+          search={search}
+          onSearchChange={setSearch}
+          onNewSession={() => {
+            setShowNew(true);
+            setSelectedId(null);
+          }}
+          readOnly={readOnly}
+          flowStagesMap={flowStagesMap}
+          unreadCounts={unreadCounts}
+        />
+      )}
 
       {/* Center Panel */}
       {showNew ? (
@@ -239,8 +243,8 @@ export function SessionsPage({
           />
         </div>
       ) : selectedId ? (
-        <div className="flex-1 flex flex-col min-w-0">
-          <div className="shrink-0 px-4 pt-2">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <div className="shrink-0 px-4 pt-2 flex items-center justify-between">
             <button
               type="button"
               onClick={() => setSelectedId(null)}
@@ -248,6 +252,14 @@ export function SessionsPage({
             >
               <ArrowLeft size={12} />
               Back
+            </button>
+            <button
+              type="button"
+              onClick={() => setMaximized((prev) => !prev)}
+              className="inline-flex items-center justify-center h-6 w-6 rounded text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+              title={maximized ? "Restore session list" : "Maximize session view"}
+            >
+              {maximized ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
             </button>
           </div>
           <SessionDetail

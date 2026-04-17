@@ -32,10 +32,6 @@ export interface SessionListProps extends React.ComponentProps<"div"> {
   filterChips?: React.ReactNode;
 }
 
-/**
- * Enhanced session list panel with search, filter chips, and session cards
- * with stage progress bars and cost per session.
- */
 export function SessionList({
   sessions,
   selectedId,

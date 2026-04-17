@@ -2,8 +2,8 @@
  * Static terminal renderer -- displays recorded terminal output using xterm.js
  * so ANSI escape codes (colors, formatting) render correctly.
  *
- * Unlike TerminalPanel (which connects via WebSocket for live I/O), this
- * component simply writes pre-recorded output into an xterm instance.
+ * Uses FitAddon to match the container width. The parent should maximize
+ * the container (hide session list) when the Terminal tab is active.
  */
 
 import { useEffect, useRef } from "react";
@@ -24,12 +24,12 @@ export function StaticTerminal({ output }: StaticTerminalProps) {
     const term = new XTerm({
       cursorBlink: false,
       disableStdin: true,
-      fontSize: 13,
+      fontSize: 10,
       fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', monospace",
       theme: {
         background: "#0a0a0a",
         foreground: "#e4e4e7",
-        cursor: "#0a0a0a", // hide cursor
+        cursor: "#0a0a0a",
         selectionBackground: "#3f3f46",
         black: "#09090b",
         red: "#ef4444",
@@ -56,13 +56,9 @@ export function StaticTerminal({ output }: StaticTerminalProps) {
     term.loadAddon(fit);
     term.open(containerRef.current);
     fit.fit();
-
-    // Write the recorded output
     term.write(output);
 
-    const resizeObserver = new ResizeObserver(() => {
-      fit.fit();
-    });
+    const resizeObserver = new ResizeObserver(() => fit.fit());
     resizeObserver.observe(containerRef.current);
 
     return () => {
@@ -71,7 +67,5 @@ export function StaticTerminal({ output }: StaticTerminalProps) {
     };
   }, [output]);
 
-  return (
-    <div ref={containerRef} className="w-full rounded-lg overflow-hidden bg-[#0a0a0a]" style={{ minHeight: "400px" }} />
-  );
+  return <div ref={containerRef} className="w-full h-full min-h-0 overflow-hidden bg-[#0a0a0a]" />;
 }

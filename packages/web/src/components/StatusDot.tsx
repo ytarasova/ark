@@ -1,9 +1,9 @@
 import { cn } from "../lib/utils.js";
 
 const DOT: Record<string, string> = {
-  running: "bg-[var(--running)] shadow-[0_0_6px_rgba(52,211,153,0.5)] animate-[glow-pulse_2.5s_ease-in-out_infinite]",
+  running: "bg-[var(--running)] shadow-[0_0_6px_rgba(96,165,250,0.5)] animate-pulse",
   waiting: "bg-[var(--waiting)]",
-  completed: "bg-[var(--completed)]",
+  completed: "bg-[var(--completed)] shadow-[0_0_4px_rgba(52,211,153,0.4)]",
   failed: "bg-[var(--failed)] shadow-[0_0_4px_rgba(248,113,113,0.4)]",
   stopped: "bg-muted-foreground/30",
   pending: "bg-muted-foreground/30",

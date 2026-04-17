@@ -25,6 +25,7 @@ export type { ChatInputProps } from "./ChatInput.js";
 // Design system -- conversation
 export { AgentMessage } from "./AgentMessage.js";
 export type { AgentMessageProps } from "./AgentMessage.js";
+export { MarkdownContent } from "./MarkdownContent.js";
 export { UserMessage } from "./UserMessage.js";
 export type { UserMessageProps } from "./UserMessage.js";
 export { SystemEvent } from "./SystemEvent.js";

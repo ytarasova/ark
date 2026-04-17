@@ -1,4 +1,5 @@
 import type { TimelineEvent, EventColor } from "../ui/EventTimeline.js";
+import { MarkdownContent } from "../ui/MarkdownContent.js";
 import { formatTime } from "./timeline-builder.js";
 
 /** Render agent message content with structured formatting for completion messages. */
@@ -75,7 +76,7 @@ export function renderAgentContent(content: string, type?: string): React.ReactN
     }
     if (parts.length > 0) return <>{parts}</>;
   }
-  return <p>{content}</p>;
+  return <MarkdownContent content={content} />;
 }
 
 /** Build a rich TimelineEvent for the Events tab with contextual labels and colors. */
@@ -277,6 +278,22 @@ export function buildRichTimelineEvent(ev: any, i: number): TimelineEvent {
       </span>
     );
     color = "red";
+  } else if (evType === "prompt_sent") {
+    const agent = data.agent || "";
+    const preview: string = data.task_preview || "";
+    const taskLen: number = data.task_length || 0;
+    const previewText = preview.length > 100 ? preview.slice(0, 100) + "..." : preview;
+    label = (
+      <span>
+        Prompt sent to <strong>{agent || "agent"}</strong>
+        {previewText && <span className="text-[var(--fg-muted)]">{" -- " + previewText}</span>}
+      </span>
+    );
+    const detailParts: string[] = [];
+    if (taskLen > 0) detailParts.push("Prompt length: " + String(taskLen) + " chars");
+    if (data.task_full) detailParts.push("Full prompt:\n" + data.task_full);
+    detail = detailParts.join("\n\n");
+    color = "blue";
   } else if (evType === "dispatch" || evType === "advance") {
     label = (
       <span>
@@ -300,5 +317,5 @@ export function buildRichTimelineEvent(ev: any, i: number): TimelineEvent {
     );
   }
 
-  return { id, timestamp, label, color, detail, rawData, stage: stageName || undefined };
+  return { id, timestamp, label, color, detail, rawData, stage: stageName || undefined, eventType: evType };
 }

@@ -8,9 +8,9 @@ export interface FilterChipProps extends React.ComponentProps<"button"> {
 }
 
 const STATUS_ACTIVE_CLASSES: Record<SessionStatus, string> = {
-  running: "border-transparent bg-[rgba(52,211,153,0.12)] text-[var(--running)]",
+  running: "border-transparent bg-[rgba(96,165,250,0.12)] text-[var(--running)]",
   waiting: "border-transparent bg-[rgba(251,191,36,0.12)] text-[var(--waiting)]",
-  completed: "border-transparent bg-[rgba(96,165,250,0.12)] text-[var(--completed)]",
+  completed: "border-transparent bg-[rgba(52,211,153,0.12)] text-[var(--completed)]",
   failed: "border-transparent bg-[rgba(248,113,113,0.12)] text-[var(--failed)]",
   stopped: "border-transparent bg-[var(--bg-hover)] text-[var(--fg-muted)]",
   pending: "border-transparent bg-[var(--bg-hover)] text-[var(--fg-muted)]",

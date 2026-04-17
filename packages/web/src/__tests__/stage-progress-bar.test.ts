@@ -14,7 +14,7 @@ import { describe, test, expect } from "bun:test";
 
 interface StageProgress {
   name: string;
-  state: "done" | "active" | "pending";
+  state: "done" | "active" | "pending" | "failed";
 }
 
 // ---------------------------------------------------------------------------
@@ -27,13 +27,14 @@ function buildStageProgress(session: any, flowStages: any[]): StageProgress[] {
   const currentIdx = flowStages.findIndex((s: any) => s.name === currentStage);
   const isFailed = session.status === "failed";
   const isCompleted = session.status === "completed";
+  const isRunning = session.status === "running" || session.status === "waiting";
 
   return flowStages.map((s: any, i: number) => {
     if (isCompleted) return { name: s.name, state: "done" as const };
-    if (isFailed && i === currentIdx) return { name: s.name, state: "active" as const };
+    if (isFailed && i === currentIdx) return { name: s.name, state: "failed" as const };
     if (currentIdx < 0) return { name: s.name, state: "pending" as const };
     if (i < currentIdx) return { name: s.name, state: "done" as const };
-    if (i === currentIdx) return { name: s.name, state: "active" as const };
+    if (i === currentIdx) return { name: s.name, state: isRunning ? ("active" as const) : ("pending" as const) };
     return { name: s.name, state: "pending" as const };
   });
 }
@@ -42,14 +43,17 @@ function buildStageProgress(session: any, flowStages: any[]): StageProgress[] {
 // CSS class mapping (mirrors StageProgressBar.tsx render logic)
 // ---------------------------------------------------------------------------
 
-function stateToColor(state: "done" | "active" | "pending"): string {
+function stateToColor(state: "done" | "active" | "pending" | "failed"): string {
+  // --running = #60a5fa (blue), --completed = #34d399 (green)
   switch (state) {
     case "done":
-      return "bg-[var(--running)]";
+      return "bg-[var(--completed)]"; // green
     case "active":
-      return "bg-[var(--running)]";
+      return "bg-[var(--running)]"; // blue
+    case "failed":
+      return "bg-[var(--failed)]"; // red
     case "pending":
-      return "bg-[var(--border)]";
+      return "bg-[var(--border)]"; // gray
   }
 }
 
@@ -90,15 +94,27 @@ describe("buildStageProgress", () => {
     }
   });
 
-  test("failed session marks current stage as active, rest as expected", () => {
+  test("failed session marks current stage as failed, rest as expected", () => {
     const session = { stage: "verify", status: "failed" };
     const result = buildStageProgress(session, STAGES);
 
     expect(result[0]).toEqual({ name: "plan", state: "done" });
     expect(result[1]).toEqual({ name: "implement", state: "done" });
-    expect(result[2]).toEqual({ name: "verify", state: "active" });
+    expect(result[2]).toEqual({ name: "verify", state: "failed" });
     expect(result[3]).toEqual({ name: "review", state: "pending" });
     expect(result[4]).toEqual({ name: "pr", state: "pending" });
+  });
+
+  test("failed session at last stage shows red, not green", () => {
+    const session = { stage: "pr", status: "failed" };
+    const result = buildStageProgress(session, STAGES);
+
+    // All prior stages done
+    for (let i = 0; i < result.length - 1; i++) {
+      expect(result[i].state).toBe("done");
+    }
+    // Last stage must be failed, not active/done
+    expect(result[result.length - 1]).toEqual({ name: "pr", state: "failed" });
   });
 
   test("handles empty stages array", () => {
@@ -111,6 +127,18 @@ describe("buildStageProgress", () => {
     const session = { stage: "plan", status: "running" };
     expect(buildStageProgress(session, null as any)).toHaveLength(0);
     expect(buildStageProgress(session, undefined as any)).toHaveLength(0);
+  });
+
+  test("stopped session does not show active shimmer", () => {
+    const session = { stage: "verify", status: "stopped" };
+    const result = buildStageProgress(session, STAGES);
+
+    expect(result[0]).toEqual({ name: "plan", state: "done" });
+    expect(result[1]).toEqual({ name: "implement", state: "done" });
+    // Current stage should be pending (no shimmer), not active
+    expect(result[2]).toEqual({ name: "verify", state: "pending" });
+    expect(result[3]).toEqual({ name: "review", state: "pending" });
+    expect(result[4]).toEqual({ name: "pr", state: "pending" });
   });
 
   test("all stages pending when current stage is not found", () => {
@@ -144,12 +172,16 @@ describe("buildStageProgress", () => {
 });
 
 describe("stateToColor mapping", () => {
-  test("done maps to running color (green)", () => {
-    expect(stateToColor("done")).toBe("bg-[var(--running)]");
+  test("done maps to green (--completed)", () => {
+    expect(stateToColor("done")).toBe("bg-[var(--completed)]");
   });
 
-  test("active maps to running color", () => {
+  test("active maps to blue (--running)", () => {
     expect(stateToColor("active")).toBe("bg-[var(--running)]");
+  });
+
+  test("failed maps to failed color (red)", () => {
+    expect(stateToColor("failed")).toBe("bg-[var(--failed)]");
   });
 
   test("pending maps to border color (dim)", () => {

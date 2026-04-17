@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../hooks/useApi.js";
 import { useSmartPoll } from "../hooks/useSmartPoll.js";
-import { fmtCost } from "../util.js";
+import { fmtCost, relTime } from "../util.js";
 import { cn } from "../lib/utils.js";
 import { AlertCircle, CheckCircle2, Clock, RotateCcw, Eye } from "lucide-react";
 import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
@@ -110,7 +110,7 @@ export function DashboardView({
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
-      <div className="max-w-3xl w-full mx-auto px-6 py-8 flex flex-col gap-6">
+      <div className="w-full px-6 py-8 flex flex-col gap-6">
         {/* Budget warning */}
         {hasBudgetWarning && budget && (
           <div
@@ -203,44 +203,47 @@ export function DashboardView({
               <AlertCircle size={12} />
               Failed ({failedSessions.length})
             </h3>
-            <div className="border border-border rounded-lg divide-y divide-border/50 overflow-hidden">
+            <div className="overflow-hidden">
               {failedSessions.slice(0, 10).map((s) => (
                 <div
                   key={s.session_id || s.id}
-                  className="flex items-center justify-between px-4 py-2.5 hover:bg-accent transition-colors"
+                  className="flex items-center gap-3 px-3 py-2 border-l-2 border-l-[var(--failed)] border-b border-b-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="text-[13px] text-foreground truncate">{s.summary || s.session_id || s.id}</div>
-                    <div className="text-[11px] text-[var(--failed)] font-mono mt-0.5">
-                      {s.error || s.stage || "failed"}
-                    </div>
+                    {(s.error || s.stage) && (
+                      <div className="text-[11px] text-muted-foreground truncate mt-0.5">{s.error || s.stage}</div>
+                    )}
                   </div>
-                  <div className="flex gap-1.5 shrink-0 ml-3">
+                  <span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">
+                    {relTime(s.updated_at || s.created_at)}
+                  </span>
+                  <div className="flex gap-1 shrink-0">
                     <button
                       type="button"
                       onClick={() => onSelectSession?.(s.session_id || s.id)}
                       aria-label="View failed session"
                       className={cn(
-                        "h-6 px-2 rounded text-[10px] font-medium",
+                        "h-5 px-1.5 rounded text-[10px] font-medium",
                         "border border-border bg-transparent text-foreground",
                         "hover:bg-accent transition-colors cursor-pointer",
-                        "flex items-center gap-1",
+                        "flex items-center gap-0.5",
                       )}
                     >
-                      <Eye size={10} /> View
+                      <Eye size={9} /> View
                     </button>
                     <button
                       type="button"
                       onClick={() => onSelectSession?.(s.session_id || s.id)}
                       aria-label="Restart failed session"
                       className={cn(
-                        "h-6 px-2 rounded text-[10px] font-medium",
+                        "h-5 px-1.5 rounded text-[10px] font-medium",
                         "border border-[var(--running)] bg-transparent text-[var(--running)]",
                         "hover:bg-[var(--diff-add-bg)] transition-colors cursor-pointer",
-                        "flex items-center gap-1",
+                        "flex items-center gap-0.5",
                       )}
                     >
-                      <RotateCcw size={10} /> Restart
+                      <RotateCcw size={9} /> Restart
                     </button>
                   </div>
                 </div>

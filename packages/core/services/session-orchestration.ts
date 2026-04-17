@@ -186,6 +186,7 @@ export function startSession(
     workdir?: string;
     group_name?: string;
     config?: Record<string, unknown>;
+    attachments?: Array<{ name: string; content: string; type: string }>;
   },
 ): Session {
   const repoDir = opts.workdir ?? opts.repo;
@@ -207,6 +208,18 @@ export function startSession(
   const repoUrl = resolveGitHubUrl(opts.workdir ?? opts.repo);
   if (repoUrl) {
     mergedOpts.config = { ...(mergedOpts.config ?? {}), github_url: repoUrl };
+  }
+
+  // Store file attachments in config so they are available for agent prompts
+  if (opts.attachments?.length) {
+    mergedOpts.config = {
+      ...(mergedOpts.config ?? {}),
+      attachments: opts.attachments.map((a) => ({
+        name: a.name,
+        content: a.content,
+        type: a.type,
+      })),
+    };
   }
 
   const session = app.sessions.create(mergedOpts);
@@ -546,6 +559,18 @@ export async function dispatch(
       /* skip repo map on error */
     }
   }
+
+  // Log the fully assembled prompt for audit trail
+  app.events.log(sessionId, "prompt_sent", {
+    stage,
+    actor: "orchestrator",
+    data: {
+      agent: agentName,
+      task_preview: task.slice(0, 500),
+      task_length: task.length,
+      task_full: task,
+    },
+  });
 
   // Resolve executor -- use resolved runtime type (from RuntimeStore merge), fall back to agent.runtime, then claude-code.
   // Reads through app.pluginRegistry, the canonical source for extensible collections.
@@ -1765,6 +1790,25 @@ export async function setupSessionWorktree(
     (session as { workdir: string | null }).workdir = persisted;
   }
 
+  // Write file attachments to the worktree so the agent can access them on disk
+  const attachments = (session.config as any)?.attachments as
+    | Array<{ name: string; content: string; type: string }>
+    | undefined;
+  if (attachments?.length) {
+    const { mkdirSync, writeFileSync } = await import("fs");
+    const attachDir = join(effectiveWorkdir, ".ark", "attachments");
+    mkdirSync(attachDir, { recursive: true });
+    for (const att of attachments) {
+      if (att.content?.startsWith("data:")) {
+        // Binary file: strip data URL prefix and write as buffer
+        const base64 = att.content.replace(/^data:[^;]+;base64,/, "");
+        writeFileSync(join(attachDir, att.name), Buffer.from(base64, "base64"));
+      } else if (att.content) {
+        writeFileSync(join(attachDir, att.name), att.content, "utf-8");
+      }
+    }
+  }
+
   return effectiveWorkdir;
 }
 
@@ -1992,6 +2036,22 @@ function formatTaskHeader(app: AppContext, session: Session, stage: string, agen
   parts.push(
     `When you finish your work, call \`report\` with type='completed' and a concise summary of what you accomplished (files changed, tests added, key decisions). This summary is shown to the user in the dashboard.`,
   );
+
+  // Append file attachments if present
+  const attachments = (session.config as any)?.attachments as
+    | Array<{ name: string; content: string; type: string }>
+    | undefined;
+  if (attachments?.length) {
+    parts.push("\n## Attached Files\n");
+    parts.push("Files are saved to `.ark/attachments/` in the working directory.\n");
+    for (const att of attachments) {
+      if (att.content?.startsWith("data:")) {
+        parts.push(`### ${att.name}\nBinary file (${att.type}) at \`.ark/attachments/${att.name}\`\n`);
+      } else {
+        parts.push(`### ${att.name}\n\`\`\`\n${att.content}\n\`\`\`\n`);
+      }
+    }
+  }
 
   return parts;
 }

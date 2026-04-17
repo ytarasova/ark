@@ -89,7 +89,8 @@ export class LocalProvider implements ComputeProvider {
 
   async captureOutput(_compute: Compute, session: Session, opts?: { lines?: number }): Promise<string> {
     if (!session.session_id) return "";
-    return tmux.capturePaneAsync(session.session_id, opts);
+    // Always capture with ANSI codes so xterm.js renders at the correct column width
+    return tmux.capturePaneAsync(session.session_id, { ...opts, ansi: true });
   }
 
   async cleanupSession(_compute: Compute, session: Session): Promise<void> {

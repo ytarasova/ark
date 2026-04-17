@@ -50,6 +50,46 @@ interface AttachmentInfo {
   name: string;
   size: number;
   type: string;
+  content?: string;
+}
+
+const TEXT_EXTENSIONS = new Set([
+  ".md",
+  ".txt",
+  ".ts",
+  ".tsx",
+  ".js",
+  ".jsx",
+  ".py",
+  ".yaml",
+  ".yml",
+  ".json",
+  ".csv",
+  ".xml",
+  ".html",
+  ".css",
+  ".sh",
+  ".sql",
+  ".toml",
+  ".cfg",
+  ".ini",
+  ".log",
+  ".env",
+  ".rs",
+  ".go",
+  ".java",
+  ".rb",
+  ".c",
+  ".h",
+  ".cpp",
+  ".hpp",
+]);
+
+const MAX_FILE_SIZE = 500 * 1024; // 500KB
+
+function isTextFile(name: string, mimeType: string): boolean {
+  const ext = "." + name.split(".").pop()?.toLowerCase();
+  return TEXT_EXTENSIONS.has(ext) || mimeType.startsWith("text/");
 }
 
 interface NewSessionModalProps {
@@ -438,7 +478,7 @@ function RichTaskInput({
   onChange: (val: string) => void;
   textareaRef: React.RefObject<HTMLTextAreaElement>;
   attachments: AttachmentInfo[];
-  onAttachmentsChange: (a: AttachmentInfo[]) => void;
+  onAttachmentsChange: (a: AttachmentInfo[] | ((prev: AttachmentInfo[]) => AttachmentInfo[])) => void;
   references: DetectedReference[];
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -489,15 +529,42 @@ function RichTaskInput({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
       if (!files) return;
-      const newAttachments: AttachmentInfo[] = [...attachments];
-      for (const f of Array.from(files)) {
-        if (!newAttachments.some((a) => a.name === f.name)) {
-          newAttachments.push({ name: f.name, size: f.size, type: f.type });
-        }
-      }
-      onAttachmentsChange(newAttachments);
+      const fileList = Array.from(files);
       // Reset input so the same file can be re-selected
       e.target.value = "";
+
+      for (const f of fileList) {
+        if (f.size > MAX_FILE_SIZE) {
+          alert(`File "${f.name}" exceeds the 500KB size limit and was skipped.`);
+          continue;
+        }
+        if (attachments.some((a) => a.name === f.name)) continue;
+
+        const reader = new FileReader();
+        const fileName = f.name;
+        const fileSize = f.size;
+        const fileType = f.type;
+
+        if (isTextFile(f.name, f.type)) {
+          reader.onload = () => {
+            const content = reader.result as string;
+            onAttachmentsChange((prev: AttachmentInfo[]) => [
+              ...prev.filter((a) => a.name !== fileName),
+              { name: fileName, size: fileSize, type: fileType, content },
+            ]);
+          };
+          reader.readAsText(f);
+        } else {
+          reader.onload = () => {
+            const content = reader.result as string;
+            onAttachmentsChange((prev: AttachmentInfo[]) => [
+              ...prev.filter((a) => a.name !== fileName),
+              { name: fileName, size: fileSize, type: fileType, content },
+            ]);
+          };
+          reader.readAsDataURL(f);
+        }
+      }
     },
     [attachments, onAttachmentsChange],
   );
@@ -507,6 +574,36 @@ function RichTaskInput({
       onAttachmentsChange(attachments.filter((a) => a.name !== name));
     },
     [attachments, onAttachmentsChange],
+  );
+
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of Array.from(items)) {
+        if (!item.type.startsWith("image/")) continue;
+        e.preventDefault();
+        const blob = item.getAsFile();
+        if (!blob) continue;
+        if (blob.size > MAX_FILE_SIZE) {
+          alert("Pasted image exceeds the 500KB size limit.");
+          return;
+        }
+        const ext = item.type.split("/")[1] || "png";
+        const name = `clipboard-${Date.now()}.${ext}`;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const content = reader.result as string;
+          onAttachmentsChange((prev: AttachmentInfo[]) => [
+            ...prev,
+            { name, size: blob.size, type: item.type, content },
+          ]);
+        };
+        reader.readAsDataURL(blob);
+        break; // only handle first image
+      }
+    },
+    [onAttachmentsChange],
   );
 
   const toolbarBtnClass = cn(
@@ -584,10 +681,11 @@ function RichTaskInput({
             onChange(e.target.value);
             const el = e.target;
             el.style.height = "auto";
-            el.style.height = Math.min(el.scrollHeight, 200) + "px";
+            el.style.height = Math.min(el.scrollHeight, 400) + "px";
           }}
+          onPaste={handlePaste}
           placeholder="What should the agent do?"
-          rows={3}
+          rows={8}
           className={cn(
             "w-full bg-transparent text-[var(--fg)]",
             "text-[14px] leading-relaxed px-4 py-3 resize-none",
