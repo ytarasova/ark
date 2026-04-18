@@ -65,9 +65,9 @@ test("dashboard/summary RPC returns the shape DashboardView consumes", async () 
   expect(typeof summary.system.conductor).toBe("boolean");
 });
 
-// Dashboard was removed from the top-level nav -- attention items now live on
-// the Sessions view. The RPC contract is still tested above, but the nav-click
-// path no longer exists.
+// TODO(#175): Dashboard was removed from the top-level nav -- attention
+// items now live on the Sessions view. The RPC contract is still tested
+// above, but the nav-click path no longer exists.
 test.skip("clicking a Dashboard widget navigates to the linked view", async () => {
   await goToDashboard();
   await page.click('text="View all costs"');
