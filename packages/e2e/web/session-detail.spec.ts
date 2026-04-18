@@ -52,7 +52,7 @@ test("click session opens detail panel with ID and status", async () => {
   await expect(page.locator(`text=${id}`).first()).toBeVisible({ timeout: 5_000 });
 
   // Should show "Details" section heading
-  await expect(page.locator("text=Details").first()).toBeVisible();
+  await expect(page.locator("text=Conversation").first()).toBeVisible();
 
   // Should show Summary label with value
   await expect(page.locator("text=Detail panel test").first()).toBeVisible();
@@ -75,7 +75,7 @@ test("add todo via API and verify in detail panel", async () => {
   await page.waitForSelector("nav", { timeout: 10_000 });
   await goToSessions();
   await page.locator("text=Todo test session").click();
-  await expect(page.locator("text=Details").first()).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator("text=Conversation").first()).toBeVisible({ timeout: 5_000 });
 
   // Verify todos are displayed in the detail panel
   await expect(page.locator("text=Review the code")).toBeVisible({ timeout: 5_000 });
@@ -88,7 +88,7 @@ test("add todo via detail panel UI", async () => {
   await page.waitForSelector("nav", { timeout: 10_000 });
   await goToSessions();
   await page.locator("text=Todo UI test").click();
-  await expect(page.locator("text=Details").first()).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator("text=Conversation").first()).toBeVisible({ timeout: 5_000 });
 
   // Use the Add a todo input
   const todoInput = page.locator('input[placeholder="Add a todo..."]');
@@ -113,7 +113,7 @@ test("send message form appears and submits", async () => {
   await page.waitForSelector("nav", { timeout: 10_000 });
   await goToSessions();
   await page.locator("text=Message test").click();
-  await expect(page.locator("text=Details").first()).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator("text=Conversation").first()).toBeVisible({ timeout: 5_000 });
 
   // For a ready/pending session, Send button should NOT be visible
   // but Dispatch should be visible
@@ -128,7 +128,7 @@ test("complete action changes session status", async () => {
   await page.waitForSelector("nav", { timeout: 10_000 });
   await goToSessions();
   await page.locator("text=Complete test").first().click();
-  await expect(page.locator("text=Details").first()).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator("text=Conversation").first()).toBeVisible({ timeout: 5_000 });
 
   // Complete the session via RPC (the UI button only shows for running/waiting/blocked)
   await ws.rpc("session/complete", { sessionId: id });

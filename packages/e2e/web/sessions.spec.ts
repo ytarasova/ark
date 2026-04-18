@@ -62,7 +62,7 @@ test("create session via New Session inline form", async () => {
   await expect(page.locator("text=New Session").first()).toBeVisible();
 
   // Fill in the summary field
-  const summaryInput = page.locator('input[placeholder="What should the agent work on?"]');
+  const summaryInput = page.locator('textarea[placeholder="What should the agent work on?"]');
   await expect(summaryInput).toBeVisible();
   await summaryInput.fill("E2E test session alpha");
 

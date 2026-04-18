@@ -684,7 +684,7 @@ function RichTaskInput({
             el.style.height = Math.min(el.scrollHeight, 400) + "px";
           }}
           onPaste={handlePaste}
-          placeholder="What should the agent do?"
+          placeholder="What should the agent work on?"
           rows={8}
           className={cn(
             "w-full bg-transparent text-[var(--fg)]",

@@ -55,7 +55,7 @@ test("create session via form with flow, repo, and task description", async () =
   await expect(page.locator("text=New Session").first()).toBeVisible({ timeout: 5_000 });
 
   // Fill in the summary / task description
-  const summaryInput = page.locator('input[placeholder="What should the agent work on?"]');
+  const summaryInput = page.locator('textarea[placeholder="What should the agent work on?"]');
   await expect(summaryInput).toBeVisible();
   await summaryInput.fill("Test session from e2e creation spec");
 

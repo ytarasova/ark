@@ -62,7 +62,7 @@ test("conversation tab shows even for new sessions", async () => {
 
   await page.locator("text=Conv tab test").click();
   // Conversation tab should be active by default
-  await expect(page.locator('button:has-text("Conversation")').first()).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator('button[role="tab"]:has-text("Conversation")').first()).toBeVisible({ timeout: 5_000 });
 });
 
 // -- Terminal tab -------------------------------------------------------------
@@ -75,10 +75,10 @@ test("switching to Terminal tab renders terminal area", async () => {
   await goToSessions();
 
   await page.locator("text=Terminal tab test").click();
-  await expect(page.locator('button:has-text("Conversation")').first()).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator('button[role="tab"]:has-text("Conversation")').first()).toBeVisible({ timeout: 5_000 });
 
   // Click Terminal tab
-  await page.locator('button:has-text("Terminal")').click();
+  await page.locator('button[role="tab"]:has-text("Terminal")').click();
 
   // Terminal area should render (either output or empty state)
   await expect(page.locator("text=No terminal output").first()).toBeVisible({ timeout: 5_000 });
@@ -95,10 +95,10 @@ test("switching to Events tab renders events list with timestamps", async () => 
   await goToSessions();
 
   await page.locator("text=Events tab test").click();
-  await expect(page.locator('button:has-text("Conversation")').first()).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator('button[role="tab"]:has-text("Conversation")').first()).toBeVisible({ timeout: 5_000 });
 
   // Click Events tab
-  await page.locator('button:has-text("Events")').click();
+  await page.locator('button[role="tab"]:has-text("Events")').click();
 
   // The events tab content should render (could be empty or have events)
   // We verify the tab is active by checking the events tab button state
@@ -120,10 +120,10 @@ test("switching to Diff tab renders diff content area", async () => {
   await goToSessions();
 
   await page.locator("text=Diff tab test").click();
-  await expect(page.locator('button:has-text("Conversation")').first()).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator('button[role="tab"]:has-text("Conversation")').first()).toBeVisible({ timeout: 5_000 });
 
   // Click Diff tab
-  await page.locator('button:has-text("Diff")').click();
+  await page.locator('button[role="tab"]:has-text("Diff")').click();
 
   // Diff area should render (empty state for new session or loading)
   // Either "Loading diff..." or "No worktree associated" should appear
@@ -142,17 +142,17 @@ test("switching back to Conversation tab from another tab works", async () => {
   await goToSessions();
 
   await page.locator("text=Switch back test").click();
-  await expect(page.locator('button:has-text("Conversation")').first()).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator('button[role="tab"]:has-text("Conversation")').first()).toBeVisible({ timeout: 5_000 });
 
   // Navigate away
-  await page.locator('button:has-text("Terminal")').click();
+  await page.locator('button[role="tab"]:has-text("Terminal")').click();
   await expect(page.locator("text=No terminal output").first()).toBeVisible({ timeout: 5_000 });
 
   // Navigate back
-  await page.locator('button:has-text("Conversation")').click();
+  await page.locator('button[role="tab"]:has-text("Conversation")').click();
 
   // Conversation content should render (empty state or messages)
   await expect(
-    page.locator("text=No conversation yet").or(page.locator('button:has-text("Conversation")')),
+    page.locator("text=No conversation yet").or(page.locator('button[role="tab"]:has-text("Conversation")')),
   ).toBeVisible({ timeout: 5_000 });
 });
