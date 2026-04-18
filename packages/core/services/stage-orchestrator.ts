@@ -31,7 +31,7 @@ import { loadRepoConfig } from "../repo-config.js";
 
 import { sessionAsVars, buildTaskWithHandoff, extractSubtasks } from "./task-builder.js";
 import { recordSessionUsage, runVerification, cloneSession } from "./session-lifecycle.js";
-import { createWorktreePR, mergeWorktreePR, finishWorktree } from "./worktree-service.js";
+import { createWorktreePR, mergeWorktreePR, finishWorktree } from "./workspace-service.js";
 
 /** Ingest nodes/edges from a remote arkd /codegraph/index response into the knowledge store. */
 function ingestRemoteIndex(app: AppContext, data: any, log: (msg: string) => void): void {

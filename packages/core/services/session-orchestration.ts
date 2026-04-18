@@ -5,7 +5,7 @@
  *   - session-lifecycle.ts -- Session CRUD, stop/resume/pause/archive, delete, verification
  *   - stage-orchestrator.ts -- dispatch, advance, fork/join, fan-out, subagents, actions
  *   - task-builder.ts -- Prompt construction, subtask extraction
- *   - worktree-service.ts -- Git worktree create/remove, file copy, diff, PR, cleanup
+ *   - workspace-service.ts -- Git worktree create/remove, file copy, diff, PR, cleanup
  *   - agent-launcher.ts -- Agent process launching, remote environment prep
  *   - session-output.ts -- Output capture, message sending
  *
@@ -64,7 +64,7 @@ export {
   removeSessionWorktree,
   findOrphanedWorktrees,
   cleanupWorktrees,
-} from "./worktree-service.js";
+} from "./workspace-service.js";
 
 // ── Agent launching ──────────────────────────────────────────────────────────
 export { prepareRemoteEnvironment } from "./agent-launcher.js";
@@ -95,7 +95,7 @@ export {
 export type { HookStatusResult, ReportResult, StageHandoffResult } from "./session-hooks.js";
 
 // ── Inject cross-module dependencies to break circular imports ──────────────
-import { injectWorktreeDeps } from "./worktree-service.js";
+import { injectWorktreeDeps } from "./workspace-service.js";
 import { deleteSessionAsync, stop, runVerification } from "./session-lifecycle.js";
 
 injectWorktreeDeps({ deleteSessionAsync, stop, runVerification });

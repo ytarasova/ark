@@ -14,7 +14,7 @@ import * as agentRegistry from "../agent/agent.js";
 import * as claude from "../claude/claude.js";
 import { getProvider } from "../../compute/index.js";
 import { resolvePortDecls, parseArcJson } from "../../compute/arc-json.js";
-import { setupSessionWorktree } from "./worktree-service.js";
+import { setupSessionWorktree } from "./workspace-service.js";
 
 /** Apply arc.json container setup: Docker Compose and devcontainer. */
 async function applyContainerSetup(

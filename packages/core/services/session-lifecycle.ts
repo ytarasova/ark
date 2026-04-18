@@ -31,7 +31,7 @@ import {
   emitStageSpanEnd,
   flushSpans,
 } from "../observability/otlp.js";
-import { removeSessionWorktree } from "./worktree-service.js";
+import { removeSessionWorktree } from "./workspace-service.js";
 
 export type SessionOpResult = { ok: true; sessionId: string } | { ok: false; message: string };
 
