@@ -1,0 +1,127 @@
+/**
+ * Deny-path tests for P1-1 (spoofable tenant identity).
+ *
+ * Preconditions the tests pin down:
+ *   - `X-Ark-Tenant-Id` alone is never trusted. A request with only the
+ *     header (no Bearer token) is rejected.
+ *   - A Bearer token that does not resolve to an api_keys row is rejected.
+ *   - `"default"` is still permitted when neither header is present AND
+ *     the conductor is in local single-tenant mode (no databaseUrl).
+ *
+ * The tests simulate hosted mode (auth required) by setting
+ * `config.databaseUrl = "sqlite://local"` -- the conductor reads this as
+ * "not local single-tenant" and denies unauthenticated calls. A real
+ * hosted deployment would use a Postgres URL; the conductor only checks
+ * that the field is truthy.
+ *
+ * We probe the POST /api/channel/:id endpoint, which has always flowed
+ * through `appForRequest`, so the auth-side-only P1-1 fix is observable
+ * here without also requiring the P1-2 REST-scoping fix. Cross-tenant
+ * REST leak coverage (P1-2) is added in the follow-up commit.
+ */
+
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { AppContext, setApp, clearApp } from "../app.js";
+import { startConductor } from "../conductor/conductor.js";
+
+const TEST_PORT = 19198;
+const BASE = `http://localhost:${TEST_PORT}`;
+
+let app: AppContext;
+let server: { stop(): void };
+
+async function boot(opts: { hostedMode: boolean }): Promise<void> {
+  if (app) {
+    try {
+      server?.stop();
+    } catch {
+      /* stop may throw if double-stopped */
+    }
+    await app.shutdown();
+    clearApp();
+  }
+  app = AppContext.forTest();
+  if (opts.hostedMode) {
+    (app.config as { databaseUrl?: string }).databaseUrl = "sqlite://test-hosted";
+  }
+  setApp(app);
+  await app.boot();
+  server = startConductor(app, TEST_PORT, { quiet: true });
+}
+
+async function postChannel(sessionId: string, headers: Record<string, string> = {}): Promise<Response> {
+  return fetch(`${BASE}/api/channel/${sessionId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...headers },
+    body: JSON.stringify({ type: "progress", sessionId, stage: "work", message: "hi" }),
+  });
+}
+
+beforeEach(async () => {
+  await boot({ hostedMode: true });
+});
+
+afterEach(async () => {
+  try {
+    server.stop();
+  } catch {
+    /* already stopped */
+  }
+  await app.shutdown();
+  clearApp();
+});
+
+describe("P1-1 -- conductor tenant identity must not be spoofable", () => {
+  it("rejects X-Ark-Tenant-Id header without a Bearer token", async () => {
+    const resp = await postChannel("s-nope", { "X-Ark-Tenant-Id": "attacker-picks-anything" });
+    expect(resp.status).toBe(401);
+    const body = (await resp.json()) as any;
+    expect(body.error).toMatch(/requires a validated Authorization/i);
+  });
+
+  it("rejects a Bearer token that does not match any api_keys row", async () => {
+    const resp = await postChannel("s-nope", { Authorization: "Bearer ark_fake_not-a-real-secret" });
+    expect(resp.status).toBe(401);
+    const body = (await resp.json()) as any;
+    expect(body.error).toMatch(/invalid or expired/i);
+  });
+
+  it("rejects unauthenticated request in hosted mode", async () => {
+    const resp = await postChannel("s-nope");
+    expect(resp.status).toBe(401);
+  });
+
+  it("rejects when X-Ark-Tenant-Id disagrees with the validated token", async () => {
+    const { key } = app.apiKeys.create("tenant-a", "test key", "admin");
+    const resp = await postChannel("s-nope", {
+      Authorization: `Bearer ${key}`,
+      "X-Ark-Tenant-Id": "tenant-b-victim",
+    });
+    expect(resp.status).toBe(403);
+    const body = (await resp.json()) as any;
+    expect(body.error).toMatch(/tenant header does not match/i);
+  });
+
+  it("a valid token is accepted (positive control)", async () => {
+    const { key } = app.apiKeys.create("tenant-a", "test key", "admin");
+    const resp = await postChannel("s-anything", { Authorization: `Bearer ${key}` });
+    // The session does not exist but auth passed -- either 200 (accepted and
+    // ignored because no session) or a non-auth error. It must NOT be 401/403.
+    expect(resp.status).not.toBe(401);
+    expect(resp.status).not.toBe(403);
+  });
+});
+
+describe("P1-1 -- local single-tenant mode is preserved when no credentials are present", () => {
+  it("allows unauthenticated requests in local mode (no databaseUrl)", async () => {
+    await boot({ hostedMode: false });
+    const resp = await postChannel("s-local");
+    expect(resp.status).toBe(200);
+  });
+
+  it("still rejects a header-only request in local mode (spoofable)", async () => {
+    await boot({ hostedMode: false });
+    const resp = await postChannel("s-local", { "X-Ark-Tenant-Id": "attacker" });
+    expect(resp.status).toBe(401);
+  });
+});
