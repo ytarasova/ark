@@ -61,7 +61,8 @@ export async function setupE2E(): Promise<E2EEnv> {
     tmuxSessions: [],
     sessionIds: [],
     teardown: async () => {
-      // Kill all test tmux sessions
+      // Kill all test tmux sessions. tmux's `kill-session` is a local command
+      // but can still hang if the tmux server socket is wedged -- bound it.
       for (const name of env.tmuxSessions) {
         try {
           tmux.killSession(name);
@@ -70,8 +71,11 @@ export async function setupE2E(): Promise<E2EEnv> {
         }
       }
 
-      // Shutdown AppContext (closes DB, removes temp dir)
-      await app.shutdown();
+      // Shutdown AppContext (closes DB, stops pollers, removes temp arkDir).
+      // app.shutdown() itself is async and generally finishes in <1s, but
+      // race it against a hard ceiling so a stuck DB checkpoint or
+      // unresponsive provider teardown can't freeze the whole afterAll.
+      await Promise.race([app.shutdown(), new Promise<void>((r) => setTimeout(r, 10_000))]);
       clearApp();
 
       // Clean up workdir
@@ -82,9 +86,12 @@ export async function setupE2E(): Promise<E2EEnv> {
         /* cleanup */
       }
 
-      // Prune any leaked worktrees pointing to our temp dir
+      // Prune any leaked worktrees pointing to our temp dir. `git worktree
+      // prune` on a big repo is usually <100ms, but it touches locks under
+      // .git/worktrees; cap its wall-clock so a rare flock contention can't
+      // push us past the afterAll hook ceiling.
       try {
-        execFileSync("git", ["worktree", "prune"], { stdio: "pipe", cwd: process.cwd() });
+        execFileSync("git", ["worktree", "prune"], { stdio: "pipe", cwd: process.cwd(), timeout: 5_000 });
       } catch {
         /* cleanup */
       }
