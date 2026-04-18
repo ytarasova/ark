@@ -3,6 +3,8 @@ import { useState, useCallback, useMemo, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { queryClient, QueryClientProvider } from "./providers/QueryProvider.js";
 import { ThemeProvider, useTheme } from "./themes/ThemeProvider.js";
+import { TransportProvider } from "./transport/TransportContext.js";
+import { HttpTransport } from "./transport/HttpTransport.js";
 import { Toast } from "./components/Toast.js";
 import { CommandPalette, type CommandItem } from "./components/ui/CommandPalette.js";
 import { PageFallback } from "./components/ui/PageFallback.js";
@@ -203,9 +205,11 @@ function App() {
 // ---- Mount ----
 const root = createRoot(document.getElementById("root")!);
 root.render(
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider defaultTheme="midnight-circuit">
-      <App />
-    </ThemeProvider>
-  </QueryClientProvider>,
+  <TransportProvider transport={new HttpTransport()}>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider defaultTheme="midnight-circuit">
+        <App />
+      </ThemeProvider>
+    </QueryClientProvider>
+  </TransportProvider>,
 );
