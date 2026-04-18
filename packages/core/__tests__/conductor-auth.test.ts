@@ -1,23 +1,30 @@
 /**
- * Deny-path tests for P1-1 (spoofable tenant identity).
+ * Deny-path tests for P1-1 (spoofable tenant identity) and P1-2
+ * (cross-tenant REST leak).
  *
  * Preconditions the tests pin down:
- *   - `X-Ark-Tenant-Id` alone is never trusted. A request with only the
- *     header (no Bearer token) is rejected.
- *   - A Bearer token that does not resolve to an api_keys row is rejected.
- *   - `"default"` is still permitted when neither header is present AND
- *     the conductor is in local single-tenant mode (no databaseUrl).
+ *   P1-1:
+ *     - `X-Ark-Tenant-Id` alone is never trusted. A request with only the
+ *       header (no Bearer token) is rejected.
+ *     - A Bearer token that does not resolve to an api_keys row is rejected.
+ *     - A validated Bearer + mismatched X-Ark-Tenant-Id returns 403.
+ *     - `"default"` is still permitted when neither header is present AND
+ *       the conductor is in local single-tenant mode (no databaseUrl).
+ *
+ *   P1-2:
+ *     - `GET /api/sessions` with a tenant-A token returns only tenant-A
+ *       rows. A tenant-B session is invisible.
+ *     - `GET /api/sessions/:id` of tenant-B's session via a tenant-A
+ *       token returns 404 (not 200 with the foreign row).
+ *     - `GET /api/events/:id` of tenant-B's session via a tenant-A token
+ *       returns 404.
+ *     - `GET /health` continues to work unauthenticated.
  *
  * The tests simulate hosted mode (auth required) by setting
  * `config.databaseUrl = "sqlite://local"` -- the conductor reads this as
  * "not local single-tenant" and denies unauthenticated calls. A real
  * hosted deployment would use a Postgres URL; the conductor only checks
  * that the field is truthy.
- *
- * We probe the POST /api/channel/:id endpoint, which has always flowed
- * through `appForRequest`, so the auth-side-only P1-1 fix is observable
- * here without also requiring the P1-2 REST-scoping fix. Cross-tenant
- * REST leak coverage (P1-2) is added in the follow-up commit.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
@@ -123,5 +130,63 @@ describe("P1-1 -- local single-tenant mode is preserved when no credentials are 
     await boot({ hostedMode: false });
     const resp = await postChannel("s-local", { "X-Ark-Tenant-Id": "attacker" });
     expect(resp.status).toBe(401);
+  });
+});
+
+describe("P1-2 -- cross-tenant REST leak", () => {
+  async function createSessionForTenant(tenantId: string, summary: string): Promise<string> {
+    const scoped = app.forTenant(tenantId);
+    const session = scoped.sessions.create({ summary });
+    return session.id;
+  }
+
+  it("GET /api/sessions scopes rows to the caller's tenant", async () => {
+    const { key: keyA } = app.apiKeys.create("tenant-a", "a", "admin");
+    app.apiKeys.create("tenant-b", "b", "admin");
+
+    await createSessionForTenant("tenant-a", "a-session");
+    const bSessionId = await createSessionForTenant("tenant-b", "b-session");
+
+    const resp = await fetch(`${BASE}/api/sessions`, {
+      headers: { Authorization: `Bearer ${keyA}` },
+    });
+    expect(resp.status).toBe(200);
+    const list = (await resp.json()) as Array<{ id: string; summary: string }>;
+    const summaries = list.map((s) => s.summary);
+    expect(summaries).toContain("a-session");
+    expect(summaries).not.toContain("b-session");
+    // Extra-specific: tenant-a must not see tenant-b's row even by id.
+    expect(list.find((s) => s.id === bSessionId)).toBeUndefined();
+  });
+
+  it("GET /api/sessions scopes rows -- unauthenticated hosted-mode call is 401", async () => {
+    await createSessionForTenant("tenant-b", "b-session");
+    const resp = await fetch(`${BASE}/api/sessions`);
+    expect(resp.status).toBe(401);
+  });
+
+  it("GET /api/sessions/:id of another tenant's session returns 404", async () => {
+    const { key: keyA } = app.apiKeys.create("tenant-a", "a", "admin");
+    const bSessionId = await createSessionForTenant("tenant-b", "b-session");
+    const resp = await fetch(`${BASE}/api/sessions/${bSessionId}`, {
+      headers: { Authorization: `Bearer ${keyA}` },
+    });
+    expect(resp.status).toBe(404);
+  });
+
+  it("GET /api/events/:id of another tenant's session returns 404", async () => {
+    const { key: keyA } = app.apiKeys.create("tenant-a", "a", "admin");
+    const bSessionId = await createSessionForTenant("tenant-b", "b-session");
+    const resp = await fetch(`${BASE}/api/events/${bSessionId}`, {
+      headers: { Authorization: `Bearer ${keyA}` },
+    });
+    expect(resp.status).toBe(404);
+  });
+
+  it("GET /health still works without auth (used by probes)", async () => {
+    const resp = await fetch(`${BASE}/health`);
+    expect(resp.status).toBe(200);
+    const body = (await resp.json()) as any;
+    expect(body.status).toBe("ok");
   });
 });

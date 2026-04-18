@@ -300,25 +300,37 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
   return Response.json({ status: "ok", mapped: result.newStatus ?? "no-op" });
 }
 
-function handleRestApi(path: string): Response {
-  if (path === "/api/sessions") return Response.json(_app.sessions.list());
+function handleRestApi(req: Request, path: string): Response {
+  // `/health` does not require authentication (used by load balancers /
+  // process supervisors). It also does not expose tenant data -- return
+  // only a minimal status payload.
+  if (path === "/health") {
+    return Response.json({
+      status: "ok",
+      arkDir: _app.config.arkDir,
+    });
+  }
+
+  // All data-returning endpoints must run through the same tenant
+  // resolution as JSON-RPC. P1-2 fix: previously `_app.sessions.list()`
+  // returned ALL sessions regardless of who asked.
+  const resolved = appForRequest(req);
+  if (!resolved.ok) return resolved.response;
+  const app = resolved.app;
+
+  if (path === "/api/sessions") return Response.json(app.sessions.list());
   if (path.startsWith("/api/sessions/")) {
     const id = extractPathSegment(path, 3);
     if (!id) return Response.json({ error: "missing session id" }, { status: 400 });
-    const s = _app.sessions.get(id);
+    const s = app.sessions.get(id);
     return s ? Response.json(s) : Response.json({ error: "not found" }, { status: 404 });
   }
   if (path.startsWith("/api/events/")) {
     const id = extractPathSegment(path, 3);
     if (!id) return Response.json({ error: "missing session id" }, { status: 400 });
-    return Response.json(_app.events.list(id));
-  }
-  if (path === "/health") {
-    return Response.json({
-      status: "ok",
-      sessions: _app.sessions.list().length,
-      arkDir: _app.config.arkDir,
-    });
+    // Scope events by ensuring the session is visible to this tenant.
+    if (!app.sessions.get(id)) return Response.json({ error: "not found" }, { status: 404 });
+    return Response.json(app.events.list(id));
   }
   return new Response("Not found", { status: 404 });
 }
@@ -502,7 +514,7 @@ export function startConductor(
         }
 
         if (req.method === "GET") {
-          return handleRestApi(path);
+          return handleRestApi(req, path);
         }
 
         return new Response("Not found", { status: 404 });
