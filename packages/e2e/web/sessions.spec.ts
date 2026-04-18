@@ -37,6 +37,8 @@ async function goToSessions() {
 
 test("sessions page shows search input", async () => {
   await goToSessions();
+  // Search is collapsed behind an icon toggle -- click to expand the input.
+  await page.locator('button[title="Search (/ )"]').click();
   await expect(page.locator('input[placeholder*="Search"]')).toBeVisible();
 });
 
@@ -66,9 +68,12 @@ test("create session via New Session inline form", async () => {
   await expect(summaryInput).toBeVisible();
   await summaryInput.fill("E2E test session alpha");
 
-  // Fill in the repo field
-  const repoInput = page.locator('input[placeholder="/path/to/repo or ."]');
+  // Fill in the repo field via the popover picker.
+  await page.locator('button:has-text("Select repository")').click();
+  const repoInput = page.locator('input[placeholder="Type path or search..."]');
+  await expect(repoInput).toBeVisible({ timeout: 5_000 });
   await repoInput.fill(ws.env.workdir);
+  await repoInput.press("Enter");
 
   // Submit the form
   await page.click('button:has-text("Create Session")');
