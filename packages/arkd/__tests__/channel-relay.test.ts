@@ -15,10 +15,11 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { startArkd } from "../server.js";
 import { ArkdClient } from "../client.js";
+import { allocatePort } from "../../core/config/port-allocator.js";
 
-const ARKD_PORT = 19310;
-const CONDUCTOR_PORT = 19311;
-const CHANNEL_PORT = 19312;
+let ARKD_PORT: number;
+let CONDUCTOR_PORT: number;
+let CHANNEL_PORT: number;
 
 let arkdServer: ReturnType<typeof startArkd>;
 let client: ArkdClient;
@@ -29,7 +30,10 @@ let channelRequests: { body: Record<string, unknown> }[] = [];
 let mockConductor: { stop(closeActiveConnections?: boolean): void };
 let mockChannel: { stop(closeActiveConnections?: boolean): void };
 
-beforeAll(() => {
+beforeAll(async () => {
+  ARKD_PORT = await allocatePort();
+  CONDUCTOR_PORT = await allocatePort();
+  CHANNEL_PORT = await allocatePort();
   // Start arkd with conductor URL pointing to our mock
   arkdServer = startArkd(ARKD_PORT, {
     quiet: true,

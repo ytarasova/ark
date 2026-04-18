@@ -10,13 +10,16 @@ import { writeFileSync, mkdirSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { startArkd } from "../server.js";
+import { allocatePort } from "../../core/config/port-allocator.js";
 
-const TEST_PORT = 19351;
-const BASE = `http://localhost:${TEST_PORT}`;
+let TEST_PORT: number;
+let BASE: string;
 let server: { stop(): void };
 let repoDir: string;
 
-beforeAll(() => {
+beforeAll(async () => {
+  TEST_PORT = await allocatePort();
+  BASE = `http://localhost:${TEST_PORT}`;
   repoDir = join(tmpdir(), `arkd-cg-test-${Date.now()}`);
   mkdirSync(repoDir, { recursive: true });
 

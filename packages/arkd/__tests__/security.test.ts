@@ -6,16 +6,19 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { startArkd } from "../server.js";
+import { allocatePort } from "../../core/config/port-allocator.js";
 
 // ── Auth tests ────────────────────────────────────────────────────────────────
 
 describe("ArkD auth (token option)", () => {
-  const AUTH_PORT = 19370;
-  const AUTH_BASE = `http://localhost:${AUTH_PORT}`;
+  let AUTH_PORT: number;
+  let AUTH_BASE: string;
   const TOKEN = "test-secret-token-12345";
   let server: { stop(): void };
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    AUTH_PORT = await allocatePort();
+    AUTH_BASE = `http://localhost:${AUTH_PORT}`;
     server = startArkd(AUTH_PORT, { quiet: true, token: TOKEN });
   });
 
@@ -78,11 +81,13 @@ describe("ArkD auth (token option)", () => {
 // ── Exec allowlist tests ──────────────────────────────────────────────────────
 
 describe("ArkD exec command allowlist", () => {
-  const EXEC_PORT = 19371;
-  const EXEC_BASE = `http://localhost:${EXEC_PORT}`;
+  let EXEC_PORT: number;
+  let EXEC_BASE: string;
   let server: { stop(): void };
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    EXEC_PORT = await allocatePort();
+    EXEC_BASE = `http://localhost:${EXEC_PORT}`;
     // No auth token for these tests -- simpler
     server = startArkd(EXEC_PORT, { quiet: true });
   });

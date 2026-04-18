@@ -9,13 +9,15 @@ import { tmpdir } from "os";
 import { startArkd } from "../server.js";
 import { ArkdClient, ArkdClientError } from "../client.js";
 import { waitFor } from "../../core/__tests__/test-helpers.js";
+import { allocatePort } from "../../core/config/port-allocator.js";
 
-const TEST_PORT = 19351;
+let TEST_PORT: number;
 let server: { stop(): void };
 let client: ArkdClient;
 let tempDir: string;
 
-beforeAll(() => {
+beforeAll(async () => {
+  TEST_PORT = await allocatePort();
   tempDir = join(tmpdir(), `arkd-client-test-${Date.now()}`);
   mkdirSync(tempDir, { recursive: true });
   server = startArkd(TEST_PORT, { quiet: true });
