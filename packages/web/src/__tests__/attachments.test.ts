@@ -90,26 +90,30 @@ describe("CreateSessionOpts in types/session.ts", () => {
   });
 });
 
-describe("session-orchestration.ts attachment handling", () => {
-  const src = readFile(join(ROOT, "packages/core/services/session-orchestration.ts"));
+describe("session-orchestration attachment handling", () => {
+  // Attachment storage logic is in session-lifecycle.ts, prompt formatting in task-builder.ts,
+  // and worktree file materialization in workspace-service.ts (extracted from session-orchestration.ts).
+  const lifecycleSrc = readFile(join(ROOT, "packages/core/services/session-lifecycle.ts"));
+  const taskBuilderSrc = readFile(join(ROOT, "packages/core/services/task-builder.ts"));
+  const worktreeSrc = readFile(join(ROOT, "packages/core/services/workspace-service.ts"));
 
   test("stores attachments in session config", () => {
-    expect(src).toContain("attachments: opts.attachments.map");
+    expect(lifecycleSrc).toContain("attachments: opts.attachments.map");
   });
 
   test("writes attachments to .ark/attachments/ directory", () => {
-    expect(src).toContain('.ark", "attachments"');
-    expect(src).toContain("mkdirSync(attachDir");
+    expect(worktreeSrc).toContain('.ark", "attachments"');
+    expect(worktreeSrc).toContain("mkdirSync(attachDir");
   });
 
   test("formatTaskHeader injects attachment info into agent prompt", () => {
-    expect(src).toContain("## Attached Files");
-    expect(src).toContain("Files are saved to `.ark/attachments/`");
+    expect(taskBuilderSrc).toContain("## Attached Files");
+    expect(taskBuilderSrc).toContain("Files are saved to `.ark/attachments/`");
   });
 
   test("handles binary files differently from text files in prompt", () => {
     // Binary files show path reference, text files show inline content
-    expect(src).toContain('att.content?.startsWith("data:")');
-    expect(src).toContain("Binary file");
+    expect(taskBuilderSrc).toContain('att.content?.startsWith("data:")');
+    expect(taskBuilderSrc).toContain("Binary file");
   });
 });
