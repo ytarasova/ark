@@ -131,8 +131,15 @@ async function goToCostsFresh(): Promise<void> {
   // UI re-fetches our freshly-seeded rows instead of serving a stale
   // zero from the beforeAll navigation. We can't invalidate the query
   // cache directly (it lives in the subprocess).
+  //
+  // Cold-CI headroom: after a sqlite DELETE + INSERTs, the first reload
+  // often spends 10-12s rebuilding the react-query graph before any DOM
+  // paints. The previous 15s cap tripped intermittently; the failed wait
+  // surfaced as a suite-level hook timeout because the spec's afterAll
+  // then had to clean up a page that was mid-nav. 30s gives comfortable
+  // headroom without masking genuine regressions.
   await page.goto(ws.baseUrl);
-  await page.waitForSelector("nav", { timeout: 15_000 });
+  await page.waitForSelector("nav", { timeout: 30_000 });
   await page.click('nav button:has-text("Costs")');
   await expect(page.locator("h1")).toContainText("Costs");
 }

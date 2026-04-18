@@ -8,16 +8,29 @@
  *
  * We only kill processes whose PPID is 1 (reparented to init/launchd --
  * i.e. definitively orphaned), never live children of other workers.
+ *
+ * Bounded: the entire sweep must finish within TOTAL_BUDGET_MS. A slow `ps`
+ * (e.g. a stuck uninterruptible process scan) previously could block
+ * shutdown long enough to count against Playwright's 300s global timeout.
  */
 
 import { execFileSync } from "node:child_process";
 
 const CMD_PATTERN = /bun.*packages\/cli\/index\.ts\s+web/;
 
+/** Upper bound on total sweep time. Safely under Playwright's ~300s ceiling. */
+const TOTAL_BUDGET_MS = 15_000;
+
+/** ps command wall-clock budget. `ps -ax` should return in <1s under load. */
+const PS_BUDGET_MS = 3_000;
+
 function listOrphanPids(): number[] {
   let out: string;
   try {
-    out = execFileSync("ps", ["-o", "pid=,ppid=,command=", "-ax"], { encoding: "utf8" });
+    out = execFileSync("ps", ["-o", "pid=,ppid=,command=", "-ax"], {
+      encoding: "utf8",
+      timeout: PS_BUDGET_MS,
+    });
   } catch {
     return [];
   }
@@ -50,27 +63,45 @@ function alive(pid: number): boolean {
 }
 
 export default async function globalTeardown(): Promise<void> {
-  const orphans = listOrphanPids();
-  if (orphans.length === 0) return;
+  const deadline = Date.now() + TOTAL_BUDGET_MS;
+  const remaining = () => Math.max(0, deadline - Date.now());
 
-  console.warn(`[globalTeardown] Killing ${orphans.length} orphan ark web process(es): ${orphans.join(", ")}`);
+  const sweep = (async () => {
+    const orphans = listOrphanPids();
+    if (orphans.length === 0) return;
 
-  for (const pid of orphans) {
-    try {
-      process.kill(pid, "SIGTERM");
-    } catch {
-      /* already gone */
+    console.warn(`[globalTeardown] Killing ${orphans.length} orphan ark web process(es): ${orphans.join(", ")}`);
+
+    for (const pid of orphans) {
+      try {
+        process.kill(pid, "SIGTERM");
+      } catch {
+        /* already gone */
+      }
     }
-  }
 
-  await new Promise((r) => setTimeout(r, 500));
+    // Give SIGTERM a moment, then SIGKILL any that ignored it. Clamp the
+    // wait to the remaining total budget so a stuck process can't push us
+    // past TOTAL_BUDGET_MS.
+    await new Promise((r) => setTimeout(r, Math.min(500, remaining())));
 
-  for (const pid of orphans) {
-    if (!alive(pid)) continue;
-    try {
-      process.kill(pid, "SIGKILL");
-    } catch {
-      /* already gone */
+    for (const pid of orphans) {
+      if (!alive(pid)) continue;
+      try {
+        process.kill(pid, "SIGKILL");
+      } catch {
+        /* already gone */
+      }
     }
-  }
+  })();
+
+  await Promise.race([
+    sweep,
+    new Promise<void>((r) =>
+      setTimeout(() => {
+        console.warn(`[globalTeardown] Sweep budget ${TOTAL_BUDGET_MS}ms exceeded; abandoning`);
+        r();
+      }, TOTAL_BUDGET_MS),
+    ),
+  ]);
 }

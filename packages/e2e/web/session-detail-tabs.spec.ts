@@ -42,13 +42,17 @@ async function goToSessions() {
 test("selecting a session from the list opens detail panel", async () => {
   const id = await createSession("Tab switching test");
 
+  // page.reload() can take 10-20s on cold CI while the web subprocess rebuilds
+  // its in-memory caches after the sqlite seed. The previous 10s cap tripped
+  // frequently -- forSelector("nav") never fired, the test failed, and its
+  // spec-level afterAll chain ran teardown under pressure. 30s gives headroom.
   await page.reload();
-  await page.waitForSelector("nav", { timeout: 10_000 });
+  await page.waitForSelector("nav", { timeout: 30_000 });
   await goToSessions();
 
   await page.locator("text=Tab switching test").click();
   // The detail panel should show the session ID
-  await expect(page.locator(`text=${id}`).first()).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator(`text=${id}`).first()).toBeVisible({ timeout: 15_000 });
 });
 
 // -- Conversation tab ---------------------------------------------------------
@@ -57,7 +61,7 @@ test("conversation tab shows even for new sessions", async () => {
   await createSession("Conv tab test");
 
   await page.reload();
-  await page.waitForSelector("nav", { timeout: 10_000 });
+  await page.waitForSelector("nav", { timeout: 30_000 });
   await goToSessions();
 
   await page.locator("text=Conv tab test").click();
@@ -71,7 +75,7 @@ test("switching to Terminal tab renders terminal area", async () => {
   await createSession("Terminal tab test");
 
   await page.reload();
-  await page.waitForSelector("nav", { timeout: 10_000 });
+  await page.waitForSelector("nav", { timeout: 30_000 });
   await goToSessions();
 
   await page.locator("text=Terminal tab test").click();
@@ -91,7 +95,7 @@ test("switching to Events tab renders events list with timestamps", async () => 
 
   // The session starts with no events, but the tab should still render
   await page.reload();
-  await page.waitForSelector("nav", { timeout: 10_000 });
+  await page.waitForSelector("nav", { timeout: 30_000 });
   await goToSessions();
 
   await page.locator("text=Events tab test").click();
@@ -116,7 +120,7 @@ test("switching to Diff tab renders diff content area", async () => {
   await createSession("Diff tab test");
 
   await page.reload();
-  await page.waitForSelector("nav", { timeout: 10_000 });
+  await page.waitForSelector("nav", { timeout: 30_000 });
   await goToSessions();
 
   await page.locator("text=Diff tab test").click();
@@ -125,11 +129,18 @@ test("switching to Diff tab renders diff content area", async () => {
   // Click Diff tab
   await page.locator('button[role="tab"]:has-text("Diff")').click();
 
-  // Diff area should render (empty state for new session or loading)
-  // Either "Loading diff..." or "No worktree associated" should appear
+  // Diff area should render (empty state for new session or loading).
+  // The "files changed" string appears twice in the rendered diff panel
+  // (header + row), so we use `.first()` to keep the assertion out of
+  // Playwright's strict-mode trap -- we only care that SOMETHING in the
+  // empty-state hierarchy renders, not that it's unique.
   await expect(
-    page.locator("text=Loading diff").or(page.locator("text=No worktree")).or(page.locator("text=files changed")),
-  ).toBeVisible({ timeout: 5_000 });
+    page
+      .locator("text=Loading diff")
+      .or(page.locator("text=No worktree"))
+      .or(page.locator("text=files changed"))
+      .first(),
+  ).toBeVisible({ timeout: 10_000 });
 });
 
 // -- Switch back to Conversation tab ------------------------------------------
@@ -138,7 +149,7 @@ test("switching back to Conversation tab from another tab works", async () => {
   await createSession("Switch back test");
 
   await page.reload();
-  await page.waitForSelector("nav", { timeout: 10_000 });
+  await page.waitForSelector("nav", { timeout: 30_000 });
   await goToSessions();
 
   await page.locator("text=Switch back test").click();
