@@ -13,8 +13,11 @@ export class HttpTransport implements WebTransport {
   private rpcId = 0;
 
   constructor(opts: { base?: string; token?: string | null } = {}) {
-    this.base = opts.base ?? window.location.origin;
-    this.token = opts.token ?? new URLSearchParams(window.location.search).get("token");
+    // Guard window access so this module can be imported in SSR/test contexts
+    // where window is undefined. In the browser the defaults kick in.
+    const hasWindow = typeof window !== "undefined";
+    this.base = opts.base ?? (hasWindow ? window.location.origin : "");
+    this.token = opts.token ?? (hasWindow ? new URLSearchParams(window.location.search).get("token") : null);
   }
 
   private authHeaders(): Record<string, string> {

@@ -99,7 +99,12 @@ export function sseUrl(): string {
  * back to `window.location.origin` with no auth (primarily for tests).
  */
 export async function fetchApi<T>(path: string, opts?: RequestInit): Promise<T> {
-  const base = _transport instanceof HttpTransport ? _transport.getBase() : window.location.origin;
+  const base =
+    _transport instanceof HttpTransport
+      ? _transport.getBase()
+      : typeof window !== "undefined"
+        ? window.location.origin
+        : "";
   const token = _transport instanceof HttpTransport ? _transport.getToken() : null;
 
   const sep = path.includes("?") ? "&" : "?";
