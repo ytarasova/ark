@@ -94,10 +94,12 @@ export function SessionList({
                   onSearchChange("");
                 }
               }}
+              aria-label="Search sessions"
               className={cn(
                 "w-full h-[28px] rounded-[var(--radius-sm)] border border-[var(--border)]",
                 "bg-[var(--bg-input,transparent)] px-2.5 text-[12px] text-[var(--fg)] outline-none",
                 "placeholder:text-[var(--fg-faint)] focus:border-[var(--primary)]",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]",
                 "transition-colors duration-150",
               )}
             />

@@ -127,6 +127,7 @@ export function ChatInput({
             "text-[13px] text-[var(--fg)] bg-[var(--bg-input)] outline-none resize-none",
             "min-h-[38px] max-h-[160px] leading-[1.5]",
             "placeholder:text-[var(--fg-faint)] focus:border-[var(--primary)]",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]",
             "transition-colors duration-150",
             "disabled:opacity-50 disabled:cursor-not-allowed",
           )}
