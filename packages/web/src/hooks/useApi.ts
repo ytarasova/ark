@@ -1,3 +1,5 @@
+import { HttpTransport } from "../transport/HttpTransport.js";
+import type { WebTransport } from "../transport/types.js";
 import type {
   SessionStartRequest,
   SessionStartResponse,
@@ -51,15 +53,25 @@ import type {
   KnowledgeStatsResponse,
 } from "../../../../protocol/rpc-schemas.js";
 
-const BASE = window.location.origin;
-const TOKEN = new URLSearchParams(window.location.search).get("token");
+/**
+ * Module-level transport. Defaults to `HttpTransport` so that call sites that
+ * run before `<TransportProvider>` mounts still work (matches previous
+ * direct-fetch behaviour). `setTransport()` is called by `TransportProvider`
+ * to swap in a different implementation -- notably `MockTransport` in tests.
+ *
+ * See `packages/web/src/transport/TransportContext.tsx` for the provider and
+ * `packages/web/src/transport/types.ts` for the interface.
+ */
+let _transport: WebTransport = new HttpTransport();
 
-let rpcId = 0;
+/** Replace the transport used by `api.*` and `fetchApi`. */
+export function setTransport(t: WebTransport): void {
+  _transport = t;
+}
 
-function authHeaders(): Record<string, string> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (TOKEN) headers["Authorization"] = `Bearer ${TOKEN}`;
-  return headers;
+/** Get the current module-level transport. */
+export function getTransport(): WebTransport {
+  return _transport;
 }
 
 /**
@@ -69,42 +81,40 @@ function authHeaders(): Record<string, string> {
  * Zod schemas in `packages/protocol/rpc-schemas.ts`. Methods not yet covered
  * by a schema keep their ad-hoc shapes and are marked with a TODO.
  */
-async function rpc<T>(method: string, params?: Record<string, unknown>): Promise<T> {
-  const id = ++rpcId;
-  const res = await fetch(`${BASE}/api/rpc`, {
-    method: "POST",
-    headers: authHeaders(),
-    body: JSON.stringify({ jsonrpc: "2.0", id, method, params: params ?? {} }),
-  });
-  const data = await res.json();
-  if (data.error) {
-    throw new Error(data.error.message || "RPC error");
-  }
-  return data.result as T;
+function rpc<T>(method: string, params?: Record<string, unknown>): Promise<T> {
+  return _transport.rpc<T>(method, params);
 }
 
 /**
- * SSE event source URL (still a separate endpoint).
+ * SSE event source URL for the main events stream. Returned fully-qualified.
  */
 export function sseUrl(): string {
-  const sep = "?";
-  return `${BASE}/api/events/stream${TOKEN ? `${sep}token=${TOKEN}` : ""}`;
+  return _transport.sseUrl("/api/events/stream");
 }
 
 /**
  * Fetch helper for non-RPC endpoints (SSE URL construction, etc).
  * Kept for backward compatibility but most callers should use `api.*` below.
+ * Uses `HttpTransport`-provided base+token when available; otherwise falls
+ * back to `window.location.origin` with no auth (primarily for tests).
  */
 export async function fetchApi<T>(path: string, opts?: RequestInit): Promise<T> {
+  const base = _transport instanceof HttpTransport ? _transport.getBase() : window.location.origin;
+  const token = _transport instanceof HttpTransport ? _transport.getToken() : null;
+
   const sep = path.includes("?") ? "&" : "?";
   const url =
     opts?.method === "POST" || opts?.method === "PUT" || opts?.method === "DELETE"
-      ? `${BASE}${path}`
-      : `${BASE}${path}${TOKEN ? `${sep}token=${TOKEN}` : ""}`;
+      ? `${base}${path}`
+      : `${base}${path}${token ? `${sep}token=${token}` : ""}`;
+
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
   const resp = await fetch(url, {
     ...opts,
     headers: {
-      ...authHeaders(),
+      ...headers,
       ...opts?.headers,
     },
   });
