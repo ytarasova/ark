@@ -61,9 +61,11 @@ export function IconRail({
       aria-label="Main navigation"
       {...props}
     >
-      {/* Logo */}
+      {/* Logo -- drag-region so the rail top doubles as a window drag handle
+          on Electron; macOS adds top padding via styles.css so the brand
+          clears the traffic-light buttons. */}
       {logo ?? (
-        <div className="relative mb-4">
+        <div className="relative mb-4 drag-region">
           <div
             data-testid="sidebar-brand"
             className={cn(

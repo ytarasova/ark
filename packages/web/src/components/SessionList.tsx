@@ -146,7 +146,7 @@ export function SessionListPanel({
             title="New session (n)"
           >
             <Plus size={14} />
-            New
+            New Session
           </Button>
         ) : undefined
       }
