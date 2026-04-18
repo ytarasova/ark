@@ -76,12 +76,12 @@ test("click compute target shows detail panel", async () => {
   await expect(page.locator("text=Provider").first()).toBeVisible();
 });
 
-// -- Delete compute via API and verify removed from UI ------------------------
+// -- Destroy compute via API and verify removed from UI ----------------------
 
-test("delete compute target via API and verify removal", async () => {
-  // Delete via RPC
-  const deleteData = await ws.rpc("compute/delete", { name: "e2e-test-compute" });
-  expect(deleteData.ok).toBe(true);
+test("destroy compute target via API and verify removal", async () => {
+  // Destroy via RPC (cascades infra teardown + DB row removal)
+  const destroyData = await ws.rpc("compute/destroy", { name: "e2e-test-compute" });
+  expect(destroyData.ok).toBe(true);
 
   // Reload and verify the compute target is gone
   await page.reload();
@@ -122,6 +122,6 @@ test("create compute via New Compute inline form", async () => {
   await goToCompute();
   await expect(page.locator("text=e2e-ui-compute")).toBeVisible({ timeout: 10_000 });
 
-  // Cleanup: delete via RPC
-  await ws.rpc("compute/delete", { name: "e2e-ui-compute" });
+  // Cleanup: destroy via RPC
+  await ws.rpc("compute/destroy", { name: "e2e-ui-compute" });
 });

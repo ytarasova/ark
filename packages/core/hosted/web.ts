@@ -103,7 +103,6 @@ const WRITE_METHODS = new Set([
   "flow/create",
   "flow/delete",
   "compute/create",
-  "compute/delete",
   "compute/update",
   "compute/provision",
   "compute/start-instance",

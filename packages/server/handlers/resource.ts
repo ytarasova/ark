@@ -257,11 +257,6 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const compute = app.computes.create({ name, provider, config });
     return { compute };
   });
-  router.handle("compute/delete", async (p) => {
-    const { name } = extract<ComputeNameParams>(p, ["name"]);
-    app.computes.delete(name);
-    return { ok: true };
-  });
   router.handle("compute/update", async (p) => {
     const { name, fields } = extract<ComputeUpdateParams>(p, ["name", "fields"]);
     app.computes.update(name, fields as Record<string, unknown>);
@@ -327,7 +322,9 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const provider = getProvider(compute.provider);
     if (!provider) throw new Error(`Provider '${compute.provider}' not found`);
     await provider.destroy(compute);
-    app.computes.update(compute.name, { status: "destroyed" });
+    // destroy cascades to the DB row. There is no "destroyed but still
+    // listed" state -- if a user asks for destroy, they want it gone.
+    app.computes.delete(compute.name);
     return { ok: true };
   });
   router.handle("compute/clean", async (p) => {

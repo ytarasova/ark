@@ -130,9 +130,6 @@ export function ComputeView({
         case "destroy":
           res = await api.destroyCompute(name);
           break;
-        case "delete":
-          res = await api.deleteCompute(name);
-          break;
         default:
           return;
       }

@@ -172,11 +172,6 @@ const fixtures: Record<string, MethodFixture> = {
     invalidRequest: { name: "devbox", provider: "mystery-cloud" },
     sampleResponse: { compute: sampleCompute },
   },
-  "compute/delete": {
-    validRequest: { name: "devbox" },
-    invalidRequest: { name: "" },
-    sampleResponse: { ok: true },
-  },
   "compute/read": {
     validRequest: { name: "devbox" },
     invalidRequest: {},

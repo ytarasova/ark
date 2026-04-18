@@ -214,7 +214,7 @@ export function registerComputeCommands(program: Command) {
 
   computeCmd
     .command("destroy")
-    .description("Destroy a compute resource (remove infrastructure)")
+    .description("Destroy a compute resource (removes infrastructure and DB record)")
     .argument("<name>", "Compute name")
     .action(async (name) => {
       const ark = await getArkClient();
@@ -223,25 +223,6 @@ export function registerComputeCommands(program: Command) {
         console.log(chalk.green(`Compute '${name}' destroyed`));
       } catch (e: any) {
         console.log(chalk.red(`Destroy failed: ${e.message}`));
-      }
-    });
-
-  computeCmd
-    .command("delete")
-    .description("Delete a compute record from the database")
-    .argument("<name>", "Compute name")
-    .action(async (name) => {
-      const ark = await getArkClient();
-      try {
-        const compute = await ark.computeRead(name);
-        if (compute.status === "running") {
-          console.log(chalk.red("Compute is running. Stop or destroy it first."));
-          return;
-        }
-        await ark.computeDelete(name);
-        console.log(chalk.green(`Compute '${name}' deleted`));
-      } catch {
-        console.log(chalk.red(`Compute '${name}' not found`));
       }
     });
 
