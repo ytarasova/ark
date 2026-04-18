@@ -7,6 +7,7 @@ import {
   type JsonRpcResponse,
   type JsonRpcError,
 } from "../protocol/types.js";
+import { validateRequest } from "./validate.js";
 
 export type NotifyFn = (method: string, params?: Record<string, unknown>) => void;
 export type Handler = (params: Record<string, unknown>, notify: NotifyFn) => Promise<unknown>;
@@ -39,8 +40,12 @@ export class Router {
     }
 
     try {
+      // Validate request params against the Zod schema registered for this
+      // method (if any). Methods without a schema pass through unchanged so
+      // handlers using the legacy `extract<T>` helper keep working.
+      const params = validateRequest(req.method, req.params);
       const noop: NotifyFn = () => {};
-      const result = await handler(req.params ?? {}, notify ?? noop);
+      const result = await handler(params, notify ?? noop);
       return createResponse(req.id, result);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
