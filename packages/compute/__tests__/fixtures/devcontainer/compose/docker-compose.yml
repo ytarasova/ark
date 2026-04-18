@@ -1,0 +1,4 @@
+services:
+  devcontainer:
+    image: ubuntu:22.04
+    command: sleep infinity

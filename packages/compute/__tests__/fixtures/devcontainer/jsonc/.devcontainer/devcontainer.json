@@ -1,0 +1,6 @@
+{
+  // base image for the devcontainer
+  "image": "ubuntu:22.04",
+  /* ports the dev workflow expects exposed */
+  "forwardPorts": [8080]
+}
