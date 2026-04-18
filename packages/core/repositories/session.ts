@@ -278,8 +278,45 @@ export class SessionRepository {
     return count;
   }
 
+  /**
+   * Hash a sessionId into a port in [basePort, basePort + range).
+   *
+   * Historically this parsed the suffix as base-16, which worked for
+   * the current generator (`randomBytes(3).toString("hex")`) but would
+   * silently produce NaN if we ever move to a base-36 / nanoid
+   * generator. We now parse base-36 (a superset of hex), and fall back
+   * to a stable string-hash if that still fails. The result is always
+   * a finite integer in the configured range.
+   *
+   * The base port and range come from `AppContext.config.channels`,
+   * which is set per-profile (local/test/control-plane). If the repo
+   * was constructed without the app (legacy call sites), we read from
+   * process.env as a last resort.
+   */
   channelPort(sessionId: string): number {
-    return 19200 + (parseInt(sessionId.replace("s-", ""), 16) % 10000);
+    const { basePort, range } = this.getChannelBounds();
+    const suffix = sessionId.startsWith("s-") ? sessionId.slice(2) : sessionId;
+    // Try base-36 first (superset of hex, supports nanoid alphabets)
+    const n = parseInt(suffix, 36);
+    const h = Number.isFinite(n) ? n : stableStringHash(suffix);
+    return basePort + (Math.abs(h) % range);
+  }
+
+  private _channelBounds: { basePort: number; range: number } | null = null;
+
+  /** Override channel bounds (AppContext pushes config.channels here). */
+  setChannelBounds(basePort: number, range: number): void {
+    this._channelBounds = { basePort, range };
+  }
+
+  private getChannelBounds(): { basePort: number; range: number } {
+    if (this._channelBounds) return this._channelBounds;
+    const base = parseInt(process.env.ARK_CHANNEL_BASE_PORT ?? "19200", 10);
+    const range = parseInt(process.env.ARK_CHANNEL_RANGE ?? "10000", 10);
+    return {
+      basePort: Number.isFinite(base) ? base : 19200,
+      range: Number.isFinite(range) ? range : 10000,
+    };
   }
 
   mergeConfig(sessionId: string, patch: Partial<SessionConfig>): void {
@@ -382,4 +419,17 @@ export class SessionRepository {
       .all(this.tenantId, excludeSessionId ?? "") as { id: string }[];
     return !sessions.some((s) => this.channelPort(s.id) === port);
   }
+}
+
+/**
+ * Djb2-style string hash -- stable across processes, always finite.
+ * Used as a fallback when a sessionId suffix can't be parsed as an
+ * integer (e.g. a nanoid with non-alphanumeric-range chars).
+ */
+function stableStringHash(s: string): number {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) + h + s.charCodeAt(i)) | 0; // |0 keeps it 32-bit
+  }
+  return h;
 }

@@ -7,13 +7,16 @@ import { writeFileSync, mkdirSync, existsSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { startArkd } from "../server.js";
+import { allocatePort } from "../../core/config/port-allocator.js";
 
-const TEST_PORT = 19350;
-const BASE = `http://localhost:${TEST_PORT}`;
+let TEST_PORT: number;
+let BASE: string;
 let server: { stop(): void };
 let tempDir: string;
 
-beforeAll(() => {
+beforeAll(async () => {
+  TEST_PORT = await allocatePort();
+  BASE = `http://localhost:${TEST_PORT}`;
   tempDir = join(tmpdir(), `arkd-test-${Date.now()}`);
   mkdirSync(tempDir, { recursive: true });
   server = startArkd(TEST_PORT, { quiet: true });
@@ -490,7 +493,7 @@ describe("Concurrent requests", () => {
 
 describe("Server lifecycle", () => {
   it("stop() makes the server unreachable", async () => {
-    const ephemeralPort = TEST_PORT + 50;
+    const ephemeralPort = await allocatePort();
     const ephemeral = startArkd(ephemeralPort, { quiet: true });
 
     try {

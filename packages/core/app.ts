@@ -16,7 +16,7 @@ import { resolveStoreBaseDir } from "./install-paths.js";
 
 import { asValue } from "awilix";
 import { createAppContainer, type AppContainer } from "./container.js";
-import { loadConfig, type ArkConfig } from "./config.js";
+import { loadConfig, loadAppConfig, type ArkConfig } from "./config.js";
 import { configureOtlp } from "./observability/otlp.js";
 import { safeAsync } from "./safe.js";
 import { eventBus } from "./hooks.js";
@@ -499,6 +499,10 @@ export class AppContext {
     // SessionService(constructor(a, b, c)) can't be matched against the
     // cradle. Constructing eagerly side-steps that entirely.
     const sessions = new SessionRepository(db);
+    // Push channel port bounds from config into the repo so its
+    // channelPort(id) respects the active profile (test profile
+    // randomizes the base port to avoid cross-worker collisions).
+    sessions.setChannelBounds(this.config.channels.basePort, this.config.channels.range);
     const computes = new ComputeRepository(db);
     const computeTemplates = new ComputeTemplateRepository(db);
     const events = new EventRepository(db);
@@ -1044,6 +1048,12 @@ export class AppContext {
   /**
    * Create an AppContext for tests with an isolated temp directory.
    * The temp dir is cleaned up on shutdown.
+   *
+   * Uses fixed well-known ports (via the sync `loadConfig`), which is
+   * fine when tests run serially (current `make test --concurrency 1`).
+   * New test files that want parallel-safe ports should use
+   * `forTestAsync()` instead, which routes through the test-profile
+   * resolver and allocates ephemeral ports per-call.
    */
   static forTest(overrides?: Partial<ArkConfig>): AppContext {
     const tempDir = mkdtempSync(join(tmpdir(), "ark-test-"));
@@ -1052,6 +1062,27 @@ export class AppContext {
       env: "test",
       ...overrides,
     });
+    return new AppContext(config, {
+      skipConductor: true,
+      skipMetrics: true,
+      skipSignals: true,
+      cleanupOnShutdown: true,
+    });
+  }
+
+  /**
+   * Parallel-safe test AppContext factory.
+   *
+   * Routes through `loadAppConfig({ profile: "test" })`, which:
+   *   - binds :0 to allocate 4 unique ports (conductor/arkd/server/web);
+   *   - mkdtemp's a per-pid unique arkDir under os.tmpdir();
+   *   - randomizes channels.basePort so concurrent test workers don't
+   *     collide on the sessionId -> channel-port hash.
+   *
+   * Prefer this for any new test that boots a real server/daemon.
+   */
+  static async forTestAsync(overrides?: Partial<ArkConfig>): Promise<AppContext> {
+    const config = await loadAppConfig({ profile: "test", ...overrides });
     return new AppContext(config, {
       skipConductor: true,
       skipMetrics: true,

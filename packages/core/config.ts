@@ -1,9 +1,59 @@
+/**
+ * ark config -- Spring-Boot-style typed configuration surface.
+ *
+ * One authoritative `AppConfig` value for every tunable -- ports, dirs,
+ * feature flags, deployment profile. Assembled by `loadConfig()` from
+ * the following layers, highest precedence first:
+ *
+ *   1. Explicit programmatic overrides (test harness, embedding host).
+ *   2. CLI flags (surfaced via the overrides arg from Commander).
+ *   3. `ARK_*` env vars, read by `./config/env-source.ts`.
+ *   4. `{arkDir}/config.yaml`, read by `./config/yaml-source.ts`.
+ *      Supports Spring-style `profiles.<name>:` overlay blocks.
+ *   5. Compiled defaults baked into the profile module under
+ *      `./config/profiles.ts`.
+ *
+ * The profile (`local` / `control-plane` / `test`) is selected first
+ * (see `detectProfile`), then the profile's defaults load, then each
+ * higher-precedence layer merges on top.
+ *
+ * The returned value carries BOTH the legacy flat fields (`arkDir`,
+ * `conductorPort`, etc.) required by existing callers AND the new
+ * nested sections (`config.ports.conductor`). New code should prefer
+ * the nested accessors; legacy code keeps working unchanged.
+ */
+
 import { join } from "path";
 import { homedir } from "os";
 import { existsSync, readFileSync } from "fs";
 import YAML from "yaml";
 import { DEFAULT_CONDUCTOR_URL, DEFAULT_ROUTER_URL } from "./constants.js";
 import type { AuthConfig } from "./auth/index.js";
+import type {
+  ArkProfile,
+  DirsConfig,
+  PortsConfig,
+  ChannelsConfig,
+  ObservabilityConfig,
+  AuthSectionConfig,
+  FeaturesConfig,
+  DatabaseConfig,
+  ProfileDefaults,
+} from "./config/types.js";
+import { detectProfile, loadProfileDefaults } from "./config/profiles.js";
+import { readEnv, type EnvOverrides } from "./config/env-source.js";
+import { loadYamlOverrides, mergeOverrides } from "./config/yaml-source.js";
+
+export type {
+  ArkProfile,
+  DirsConfig,
+  PortsConfig,
+  ChannelsConfig,
+  ObservabilityConfig,
+  AuthSectionConfig,
+  FeaturesConfig,
+  DatabaseConfig,
+} from "./config/types.js";
 
 export interface OtlpSettings {
   enabled: boolean;
@@ -58,16 +108,48 @@ export interface ComputeTemplateConfig {
   config: Record<string, unknown>;
 }
 
+/**
+ * Authoritative app config.
+ *
+ * The `ArkConfig` name and its flat fields are retained for back-compat
+ * with callers that have not yet migrated to nested accessors. The new
+ * nested sections (`profile`, `dirs`, `ports`, `channels`, `observability`,
+ * `auth`, `features`, `database`) are the preferred surface going forward.
+ */
 export interface ArkConfig {
+  // ── New Spring-style nested sections ───────────────────────────────────
+
+  /** Active profile -- `local` (default), `control-plane`, or `test`. */
+  profile: ArkProfile;
+  dirs: DirsConfig;
+  ports: PortsConfig;
+  channels: ChannelsConfig;
+  observability: ObservabilityConfig;
+  authSection: AuthSectionConfig;
+  features: FeaturesConfig;
+  database: DatabaseConfig;
+
+  // ── Legacy flat fields (derived from nested sections) ──────────────────
+
+  /** @deprecated prefer `config.dirs.ark` */
   arkDir: string;
+  /** Path to SQLite DB file (SQLite only; undefined with a postgres databaseUrl). */
   dbPath: string;
+  /** @deprecated prefer `config.dirs.tracks` */
   tracksDir: string;
+  /** @deprecated prefer `config.dirs.worktrees` */
   worktreesDir: string;
+  /** @deprecated prefer `config.dirs.logs` */
   logDir: string;
+  /** @deprecated prefer `config.ports.conductor` */
   conductorPort: number;
   conductorUrl: string;
+  /** @deprecated prefer `config.ports.arkd` */
   arkdPort: number;
   env: "production" | "test";
+
+  // ── Unchanged nested blocks (not yet part of the Spring-style surface) ──
+
   otlp: OtlpSettings;
   rollback: RollbackSettings;
   telemetry: TelemetrySettings;
@@ -84,14 +166,23 @@ export interface ArkConfig {
   tensorZero?: TensorZeroSettings;
   /** Predefined compute templates (local mode). */
   computeTemplates?: ComputeTemplateConfig[];
-  /** Database URL for hosted deployments. postgres://... uses PostgresAdapter; empty/undefined uses SQLite. */
+  /** @deprecated prefer `config.database.url` */
   databaseUrl?: string;
   /** Redis URL for hosted SSE bus and cross-instance pub/sub. redis://... */
   redisUrl?: string;
 }
 
+/** Alias -- future-facing name for the same shape. Use this in new code. */
+export type AppConfig = ArkConfig;
+
+/** Options accepted by `loadConfig`. */
+export interface LoadConfigOptions extends Partial<ArkConfig> {
+  /** Explicit profile override; skips auto-detect. */
+  profile?: ArkProfile;
+}
+
 /** Load ~/.ark/config.yaml if it exists. Returns empty object on failure. */
-function loadYamlConfig(arkDir: string): Record<string, unknown> {
+function loadLegacyYaml(arkDir: string): Record<string, unknown> {
   const configPath = join(arkDir, "config.yaml");
   if (!existsSync(configPath)) return {};
   try {
@@ -101,92 +192,224 @@ function loadYamlConfig(arkDir: string): Record<string, unknown> {
   }
 }
 
-export function loadConfig(overrides?: Partial<ArkConfig>): ArkConfig {
-  const arkDir = overrides?.arkDir ?? process.env.ARK_TEST_DIR ?? join(homedir(), ".ark");
-  const conductorPort = overrides?.conductorPort ?? parseInt(process.env.ARK_CONDUCTOR_PORT ?? "19100", 10);
+/**
+ * Resolve an AppConfig from profile + YAML + env + programmatic overrides.
+ *
+ * This is the async, profile-aware resolver. Because the `test` profile
+ * allocates ports dynamically (bind :0 + read), it is async.
+ *
+ * Callers that cannot be async (legacy sync paths) should use `loadConfig()`
+ * below, which skips dynamic port allocation and keeps the existing sync
+ * semantics.
+ */
+export async function loadAppConfig(overrides: LoadConfigOptions = {}): Promise<ArkConfig> {
+  const profile = detectProfile(overrides.profile);
+  const defaults = await loadProfileDefaults(profile);
+  return assemble(defaults, overrides, profile);
+}
 
-  // Load user config from ~/.ark/config.yaml
-  const yaml = overrides?.env === "test" ? {} : loadYamlConfig(arkDir);
+/**
+ * Synchronous loader -- maintains the existing contract used across the
+ * codebase. In `test` profile, the sync loader does NOT auto-allocate
+ * ports; callers that want dynamic allocation use `loadAppConfig`
+ * (which is what `AppContext.forTest` uses).
+ */
+export function loadConfig(overrides: LoadConfigOptions = {}): ArkConfig {
+  // Synchronously pick a profile and use fixed defaults. Tests that want
+  // dynamic ports go through AppContext.forTest(), which awaits
+  // loadAppConfig().
+  const profile = detectProfile(overrides.profile);
+  const defaults: ProfileDefaults = {
+    profile,
+    ports: { conductor: 19100, arkd: 19300, server: 19400, web: 8420 },
+    channels: { basePort: 19200, range: 10000 },
+    auth: { requireToken: profile === "control-plane", defaultTenant: null },
+    features: { autoRebase: profile === "control-plane", codegraph: false },
+    observability: { logLevel: profile === "test" ? "error" : "info" },
+  };
+  return assemble(defaults, overrides, profile);
+}
+
+/** Merge profile defaults with env + YAML + programmatic overrides. */
+function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profile: ArkProfile): ArkConfig {
+  // Step 1: arkDir
+  //   - overrides win always
+  //   - in `test` profile, defaults.arkDir (freshly-mkdtemp'd) beats env
+  //     (ARK_TEST_DIR is a legacy single-worker knob; the test profile
+  //      replaces it with a per-call unique dir).
+  //   - in other profiles: env beats defaults.
+  const envOverrides = readEnv();
+  const explicitArkDir = overrides.arkDir ?? (overrides.dirs as Partial<DirsConfig> | undefined)?.ark;
+  const arkDir =
+    explicitArkDir ??
+    (profile === "test"
+      ? (defaults.arkDir ?? envOverrides.arkDir ?? join(homedir(), ".ark"))
+      : (envOverrides.arkDir ?? defaults.arkDir ?? join(homedir(), ".ark")));
+
+  // Step 2: layered overrides (YAML + env + programmatic flat fields)
+  const yamlOverrides = profile === "test" ? emptyEnvOverrides() : loadYamlOverrides(arkDir, profile);
+  const layered = mergeOverrides(yamlOverrides, envOverrides);
+
+  // Step 3: programmatic flat-field overrides as a final layer
+  const programmaticOverrides = flatOverridesFromLegacy(overrides);
+  const merged = mergeOverrides(layered, programmaticOverrides);
+
+  // Step 4: compute final nested sections
+  const ports: PortsConfig = {
+    conductor: merged.ports.conductor ?? defaults.ports.conductor,
+    arkd: merged.ports.arkd ?? defaults.ports.arkd,
+    server: merged.ports.server ?? defaults.ports.server,
+    web: merged.ports.web ?? defaults.ports.web,
+  };
+  const channels: ChannelsConfig = {
+    basePort: merged.channels.basePort ?? defaults.channels.basePort,
+    range: merged.channels.range ?? defaults.channels.range,
+  };
+  const observability: ObservabilityConfig = {
+    logLevel: merged.observability.logLevel ?? defaults.observability.logLevel,
+    otlpEndpoint: merged.observability.otlpEndpoint,
+  };
+  const authSection: AuthSectionConfig = {
+    requireToken: merged.auth.requireToken ?? defaults.auth.requireToken,
+    defaultTenant: merged.auth.defaultTenant ?? defaults.auth.defaultTenant,
+  };
+  const features: FeaturesConfig = {
+    autoRebase: merged.features.autoRebase ?? defaults.features.autoRebase,
+    codegraph: merged.features.codegraph ?? defaults.features.codegraph,
+  };
+  const databaseUrl = overrides.databaseUrl ?? merged.databaseUrl ?? process.env.DATABASE_URL;
+  const database: DatabaseConfig = { url: databaseUrl };
+
+  const dirs: DirsConfig = {
+    ark: arkDir,
+    worktrees: overrides.worktreesDir ?? join(arkDir, "worktrees"),
+    tracks: overrides.tracksDir ?? join(arkDir, "tracks"),
+    logs: overrides.logDir ?? join(arkDir, "logs"),
+    tmp: join(arkDir, "tmp"),
+  };
+
+  // Step 5: legacy YAML for sections not yet migrated to Spring-style
+  const legacyYaml = profile === "test" ? {} : loadLegacyYaml(arkDir);
+
+  // Step 6: synthesize the legacy-compat flat config
+  const conductorUrl =
+    overrides.conductorUrl ??
+    process.env.ARK_CONDUCTOR_URL ??
+    (ports.conductor !== 19100 ? `http://localhost:${ports.conductor}` : DEFAULT_CONDUCTOR_URL);
+
+  // Legacy `env` field: matches original semantics (ARK_TEST_DIR presence only).
+  // The new profile system captures test-mode more broadly via `profile`.
+  const isTestEnv = process.env.ARK_TEST_DIR !== undefined;
 
   const base: ArkConfig = {
+    // Nested Spring-style sections (preferred)
+    profile,
+    dirs,
+    ports,
+    channels,
+    observability,
+    authSection,
+    features,
+    database,
+
+    // Legacy flat fields
     arkDir,
     dbPath: join(arkDir, "ark.db"),
-    tracksDir: join(arkDir, "tracks"),
-    worktreesDir: join(arkDir, "worktrees"),
-    logDir: join(arkDir, "logs"),
-    conductorPort,
-    conductorUrl:
-      process.env.ARK_CONDUCTOR_URL ??
-      (conductorPort !== 19100 ? `http://localhost:${conductorPort}` : DEFAULT_CONDUCTOR_URL),
-    arkdPort: overrides?.arkdPort ?? parseInt(process.env.ARK_ARKD_PORT ?? "19300", 10),
-    env: process.env.ARK_TEST_DIR !== undefined ? "test" : "production",
+    tracksDir: dirs.tracks,
+    worktreesDir: dirs.worktrees,
+    logDir: dirs.logs,
+    conductorPort: ports.conductor,
+    conductorUrl,
+    arkdPort: ports.arkd,
+    env: isTestEnv ? "test" : "production",
+
     otlp: {
-      enabled: (yaml.otlp as Record<string, unknown>)?.enabled === true,
-      endpoint: (yaml.otlp as Record<string, unknown>)?.endpoint as string | undefined,
-      headers: (yaml.otlp as Record<string, unknown>)?.headers as Record<string, string> | undefined,
+      enabled: (legacyYaml.otlp as Record<string, unknown>)?.enabled === true,
+      endpoint: (legacyYaml.otlp as Record<string, unknown>)?.endpoint as string | undefined,
+      headers: (legacyYaml.otlp as Record<string, unknown>)?.headers as Record<string, string> | undefined,
     },
     rollback: {
-      enabled: (yaml.rollback as Record<string, unknown>)?.enabled === true,
-      timeout: ((yaml.rollback as Record<string, unknown>)?.timeout as number) ?? 600,
-      on_timeout: ((yaml.rollback as Record<string, unknown>)?.on_timeout as "rollback" | "ignore") ?? "ignore",
-      auto_merge: (yaml.rollback as Record<string, unknown>)?.auto_merge === true,
-      health_url: ((yaml.rollback as Record<string, unknown>)?.health_url as string) ?? null,
+      enabled: (legacyYaml.rollback as Record<string, unknown>)?.enabled === true,
+      timeout: ((legacyYaml.rollback as Record<string, unknown>)?.timeout as number) ?? 600,
+      on_timeout: ((legacyYaml.rollback as Record<string, unknown>)?.on_timeout as "rollback" | "ignore") ?? "ignore",
+      auto_merge: (legacyYaml.rollback as Record<string, unknown>)?.auto_merge === true,
+      health_url: ((legacyYaml.rollback as Record<string, unknown>)?.health_url as string) ?? null,
     },
     telemetry: {
-      enabled: process.env.ARK_TELEMETRY === "1" || (yaml.telemetry as Record<string, unknown>)?.enabled === true,
-      endpoint: (yaml.telemetry as Record<string, unknown>)?.endpoint as string | undefined,
+      enabled: process.env.ARK_TELEMETRY === "1" || (legacyYaml.telemetry as Record<string, unknown>)?.enabled === true,
+      endpoint: (legacyYaml.telemetry as Record<string, unknown>)?.endpoint as string | undefined,
     },
     router: {
-      enabled: (yaml.router as Record<string, unknown>)?.enabled === true,
-      url: ((yaml.router as Record<string, unknown>)?.url as string) ?? DEFAULT_ROUTER_URL,
-      policy: ((yaml.router as Record<string, unknown>)?.policy as "quality" | "balanced" | "cost") ?? "balanced",
-      autoStart: (yaml.router as Record<string, unknown>)?.auto_start === true,
+      enabled: (legacyYaml.router as Record<string, unknown>)?.enabled === true,
+      url: ((legacyYaml.router as Record<string, unknown>)?.url as string) ?? DEFAULT_ROUTER_URL,
+      policy: ((legacyYaml.router as Record<string, unknown>)?.policy as "quality" | "balanced" | "cost") ?? "balanced",
+      autoStart: (legacyYaml.router as Record<string, unknown>)?.auto_start === true,
     },
     knowledge: {
-      autoIndex: (yaml.knowledge as Record<string, unknown>)?.auto_index === true || process.env.ARK_AUTO_INDEX === "1",
-      incrementalIndex: (yaml.knowledge as Record<string, unknown>)?.incremental_index !== false,
+      autoIndex:
+        (legacyYaml.knowledge as Record<string, unknown>)?.auto_index === true || process.env.ARK_AUTO_INDEX === "1",
+      incrementalIndex: (legacyYaml.knowledge as Record<string, unknown>)?.incremental_index !== false,
     },
-    default_compute: process.env.ARK_DEFAULT_COMPUTE ?? (yaml.default_compute as string) ?? null,
-    hotkeys: yaml.hotkeys as Record<string, string | null> | undefined,
-    budgets: yaml.budgets as ArkConfig["budgets"],
-    theme: yaml.theme as string | undefined,
-    notifications: yaml.notifications as boolean | undefined,
+    default_compute: process.env.ARK_DEFAULT_COMPUTE ?? (legacyYaml.default_compute as string) ?? null,
+    hotkeys: legacyYaml.hotkeys as Record<string, string | null> | undefined,
+    budgets: legacyYaml.budgets as ArkConfig["budgets"],
+    theme: legacyYaml.theme as string | undefined,
+    notifications: legacyYaml.notifications as boolean | undefined,
     auth: {
-      enabled: (yaml.auth as Record<string, unknown>)?.enabled === true,
+      enabled: (legacyYaml.auth as Record<string, unknown>)?.enabled === true || authSection.requireToken,
       apiKeyEnabled:
-        (yaml.auth as Record<string, unknown>)?.apiKeyEnabled === true ||
-        (yaml.auth as Record<string, unknown>)?.api_key_enabled === true,
+        (legacyYaml.auth as Record<string, unknown>)?.apiKeyEnabled === true ||
+        (legacyYaml.auth as Record<string, unknown>)?.api_key_enabled === true,
     },
     tensorZero: {
       enabled:
         process.env.ARK_TENSORZERO_ENABLED === "1" ||
-        (yaml.tensorzero as Record<string, unknown>)?.enabled === true ||
-        (yaml.tensor_zero as Record<string, unknown>)?.enabled === true,
+        (legacyYaml.tensorzero as Record<string, unknown>)?.enabled === true ||
+        (legacyYaml.tensor_zero as Record<string, unknown>)?.enabled === true,
       port: parseInt(process.env.ARK_TENSORZERO_PORT ?? "3000", 10),
       configDir:
-        ((yaml.tensorzero as Record<string, unknown>)?.config_dir as string) ??
-        ((yaml.tensor_zero as Record<string, unknown>)?.config_dir as string) ??
+        ((legacyYaml.tensorzero as Record<string, unknown>)?.config_dir as string) ??
+        ((legacyYaml.tensor_zero as Record<string, unknown>)?.config_dir as string) ??
         undefined,
       autoStart:
-        (yaml.tensorzero as Record<string, unknown>)?.auto_start === true ||
-        (yaml.tensor_zero as Record<string, unknown>)?.auto_start === true,
+        (legacyYaml.tensorzero as Record<string, unknown>)?.auto_start === true ||
+        (legacyYaml.tensor_zero as Record<string, unknown>)?.auto_start === true,
     },
-    computeTemplates: parseComputeTemplates(yaml.compute_templates),
-    databaseUrl: process.env.DATABASE_URL ?? (yaml.database_url as string) ?? undefined,
-    redisUrl: process.env.REDIS_URL ?? (yaml.redis_url as string) ?? undefined,
+    computeTemplates: parseComputeTemplates(legacyYaml.compute_templates),
+    databaseUrl: database.url,
+    redisUrl: process.env.REDIS_URL ?? (legacyYaml.redis_url as string) ?? merged.redisUrl,
   };
 
+  // Step 7: final programmatic override (legacy fields) wins
   if (overrides) {
-    const { arkDir: _a, ...rest } = overrides;
+    const { arkDir: _a, profile: _p, ...rest } = overrides;
     Object.assign(base, rest);
   }
 
   return base;
 }
 
+function emptyEnvOverrides(): EnvOverrides {
+  return { ports: {}, channels: {}, observability: {}, auth: {}, features: {} };
+}
+
+/** Extract partial Spring-style overrides from a legacy-flat overrides arg. */
+function flatOverridesFromLegacy(o: LoadConfigOptions): EnvOverrides {
+  const out = emptyEnvOverrides();
+  if (o.conductorPort !== undefined) out.ports.conductor = o.conductorPort;
+  if (o.arkdPort !== undefined) out.ports.arkd = o.arkdPort;
+  if (o.ports) Object.assign(out.ports, o.ports);
+  if (o.channels) Object.assign(out.channels, o.channels);
+  if (o.observability) Object.assign(out.observability, o.observability);
+  if (o.authSection) Object.assign(out.auth, o.authSection);
+  if (o.features) Object.assign(out.features, o.features);
+  if (o.database?.url) out.databaseUrl = o.database.url;
+  return out;
+}
+
 /**
  * Parse compute_templates from config.yaml.
- * Accepts a map of name → { provider, description?, ...config } entries.
+ * Accepts a map of name -> { provider, description?, ...config } entries.
  */
 function parseComputeTemplates(raw: unknown): ComputeTemplateConfig[] | undefined {
   if (!raw || typeof raw !== "object") return undefined;
