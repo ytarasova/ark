@@ -65,10 +65,11 @@ test("dashboard/summary RPC returns the shape DashboardView consumes", async () 
   expect(typeof summary.system.conductor).toBe("boolean");
 });
 
-test("clicking a Dashboard widget navigates to the linked view", async () => {
+// Dashboard was removed from the top-level nav -- attention items now live on
+// the Sessions view. The RPC contract is still tested above, but the nav-click
+// path no longer exists.
+test.skip("clicking a Dashboard widget navigates to the linked view", async () => {
   await goToDashboard();
-  // The cost summary widget has a "View all costs" link that routes to
-  // /costs. A router regression shows up here.
   await page.click('text="View all costs"');
   await expect(page.locator("h1")).toContainText("Costs", { timeout: 5_000 });
 });
