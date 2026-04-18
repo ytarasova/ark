@@ -12,6 +12,7 @@ import { getApp } from "../app.js";
 import { applyReport, applyHookStatus } from "../services/session-orchestration.js";
 import { startConductor } from "../conductor/conductor.js";
 import { withTestContext } from "./test-helpers.js";
+import { allocatePort } from "./helpers/test-env.js";
 
 const { getCtx } = withTestContext();
 
@@ -116,12 +117,13 @@ describe("applyHookStatus SessionEnd auto-gate fallback", () => {
 
 // ── Integration test via conductor HTTP ─────────────────────────────────────
 
-const TEST_PORT = 19197;
+let TEST_PORT: number;
 
 describe("autonomous flow via conductor", () => {
   let server: { stop(): void };
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    TEST_PORT = await allocatePort();
     server = startConductor(getApp(), TEST_PORT, { quiet: true });
   });
 

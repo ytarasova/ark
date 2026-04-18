@@ -13,8 +13,9 @@ import { join } from "path";
 import { AppContext, getApp, setApp, clearApp } from "../app.js";
 import { startConductor } from "../conductor/conductor.js";
 import { getSessionConversation, searchSessionConversation, searchTranscripts } from "../search/search.js";
+import { allocatePort } from "./helpers/test-env.js";
 
-const TEST_PORT = 19197;
+let TEST_PORT: number;
 let app: AppContext;
 let server: { stop(app): void };
 
@@ -27,6 +28,7 @@ beforeEach(async () => {
   setApp(app);
   await app.boot();
 
+  TEST_PORT = await allocatePort();
   server = startConductor(app, TEST_PORT, { quiet: true });
 });
 

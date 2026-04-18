@@ -15,6 +15,7 @@ import { getApp } from "../app.js";
 import { applyReport, applyHookStatus, parseOnFailure, retryWithContext } from "../services/session-orchestration.js";
 import { startConductor } from "../conductor/conductor.js";
 import { withTestContext } from "./test-helpers.js";
+import { allocatePort } from "./helpers/test-env.js";
 
 const { getCtx } = withTestContext();
 
@@ -166,12 +167,13 @@ describe("applyHookStatus failure with on_failure retry", () => {
 
 // ── Conductor integration: retry loop ───────────────────────────────────────
 
-const TEST_PORT = 19198;
+let TEST_PORT: number;
 
 describe("conductor on_failure retry loop", () => {
   let server: { stop(): void };
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    TEST_PORT = await allocatePort();
     server = startConductor(getApp(), TEST_PORT, { quiet: true });
   });
 

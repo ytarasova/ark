@@ -16,8 +16,9 @@ import { AppContext, getApp, setApp, clearApp } from "../app.js";
 import { startConductor } from "../conductor/conductor.js";
 import { applyReport, applyHookStatus, advance } from "../services/session-orchestration.js";
 import type { OutboundMessage } from "../conductor/channel-types.js";
+import { allocatePort } from "./helpers/test-env.js";
 
-const TEST_PORT = 19197;
+let TEST_PORT: number;
 
 let app: AppContext;
 let server: { stop(): void } | null = null;
@@ -30,6 +31,7 @@ beforeEach(async () => {
   app = AppContext.forTest();
   setApp(app);
   await app.boot();
+  TEST_PORT = await allocatePort();
 });
 
 afterEach(() => {

@@ -11,8 +11,9 @@ import { startArkd } from "../../arkd/server.js";
 import { ArkdBackedProvider } from "../providers/arkd-backed.js";
 import type { Compute, Session, ProvisionOpts, SyncOpts, IsolationMode } from "../types.js";
 import { waitFor } from "../../core/__tests__/test-helpers.js";
+import { allocatePort } from "../../core/__tests__/helpers/test-env.js";
 
-const TEST_PORT = 19360;
+let TEST_PORT: number;
 let server: { stop(): void };
 let tempDir: string;
 
@@ -70,9 +71,10 @@ function makeSession(sessionId?: string): Session {
   } as Session;
 }
 
-beforeAll(() => {
-  tempDir = join(tmpdir(), `arkd-backed-test-${Date.now()}`);
+beforeAll(async () => {
+  tempDir = join(tmpdir(), `arkd-backed-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   mkdirSync(tempDir, { recursive: true });
+  TEST_PORT = await allocatePort();
   server = startArkd(TEST_PORT, { quiet: true });
 });
 
@@ -178,9 +180,10 @@ describe("ArkdBackedProvider getMetrics", () => {
 
 describe("ArkdBackedProvider probePorts", () => {
   it("probes ports and maps back to PortDecl", async () => {
+    const deadPort = await allocatePort();
     const ports = [
       { port: TEST_PORT, name: "arkd", source: "test" },
-      { port: 19999, name: "dead", source: "test" },
+      { port: deadPort, name: "dead", source: "test" },
     ];
     const results = await provider.probePorts(compute, ports);
 
@@ -191,7 +194,7 @@ describe("ArkdBackedProvider probePorts", () => {
     expect(arkd?.name).toBe("arkd");
     expect(arkd?.source).toBe("test");
 
-    const dead = results.find((r) => r.port === 19999);
+    const dead = results.find((r) => r.port === deadPort);
     expect(dead?.listening).toBe(false);
   });
 });

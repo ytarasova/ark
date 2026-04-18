@@ -8,13 +8,13 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { startRouter } from "../server.js";
 import type { RouterConfig, RouterServer } from "../index.js";
+import { allocatePort } from "../../core/__tests__/helpers/test-env.js";
 
-// Use a high port to avoid conflicts with other tests
-const TEST_PORT = 18430;
+let TEST_PORT: number;
 
-function makeTestConfig(): RouterConfig {
+function makeTestConfig(port: number): RouterConfig {
   return {
-    port: TEST_PORT,
+    port,
     policy: "balanced",
     quality_floor: 0.8,
     providers: [], // No real providers -- will get 400/502 on actual completions
@@ -28,8 +28,9 @@ function makeTestConfig(): RouterConfig {
 describe("Router Server", () => {
   let server: RouterServer;
 
-  beforeAll(() => {
-    server = startRouter(makeTestConfig());
+  beforeAll(async () => {
+    TEST_PORT = await allocatePort();
+    server = startRouter(makeTestConfig(TEST_PORT));
   });
 
   afterAll(() => {

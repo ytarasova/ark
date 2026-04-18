@@ -2,8 +2,22 @@ import { describe, it, expect, afterEach } from "bun:test";
 import { startWebServer } from "../hosted/web.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "../app.js";
+import { allocatePort } from "./helpers/test-env.js";
 
 withTestContext();
+
+type WebServerHandle = { stop: () => void; url: string; port: number };
+
+/**
+ * Start the web server on an ephemeral port. Returns a handle where `.url`
+ * is the bare origin (`http://localhost:PORT`) -- no query-string token
+ * appended -- so tests can compose `${handle.url}/api/...` paths safely.
+ */
+async function startWeb(opts?: Omit<Parameters<typeof startWebServer>[1], "port">): Promise<WebServerHandle> {
+  const port = await allocatePort();
+  const server = startWebServer(getApp(), { port, ...(opts ?? {}) });
+  return { stop: server.stop, url: `http://localhost:${port}`, port };
+}
 
 /** Helper: send a JSON-RPC request to the web server. */
 async function rpc(port: number, method: string, params: Record<string, unknown> = {}, opts?: { token?: string }) {
@@ -29,7 +43,7 @@ async function rpcResult(
 }
 
 describe("web server", () => {
-  let server: { stop: () => void; url: string } | null = null;
+  let server: WebServerHandle | null = null;
   afterEach(() => {
     server?.stop();
     server = null;
@@ -43,8 +57,8 @@ describe("web server", () => {
       console.log("Skipping: packages/web/dist not built");
       return;
     }
-    server = startWebServer(getApp(), { port: 18420 });
-    const resp = await fetch("http://localhost:18420/");
+    server = await startWeb();
+    const resp = await fetch(`${server!.url}/`);
     expect(resp.status).toBe(200);
     const html = await resp.text();
     expect(html).toContain("<title>Ark</title>");
@@ -52,8 +66,8 @@ describe("web server", () => {
 
   it("serves session list via RPC", async () => {
     getApp().sessions.create({ summary: "web-test" });
-    server = startWebServer(getApp(), { port: 18421 });
-    const data = await rpcResult(18421, "session/list", { limit: 200 });
+    server = await startWeb();
+    const data = await rpcResult(server!.port, "session/list", { limit: 200 });
     expect(data.result).toBeDefined();
     const result = data.result as Record<string, unknown>;
     expect(Array.isArray(result.sessions)).toBe(true);
@@ -61,16 +75,16 @@ describe("web server", () => {
   });
 
   it("serves costs via RPC", async () => {
-    server = startWebServer(getApp(), { port: 18422 });
-    const data = await rpcResult(18422, "costs/read");
+    server = await startWeb();
+    const data = await rpcResult(server!.port, "costs/read");
     const result = data.result as Record<string, unknown>;
     expect(result).toHaveProperty("total");
     expect(result).toHaveProperty("costs");
   });
 
   it("SPA fallback returns index.html for unknown routes", async () => {
-    server = startWebServer(getApp(), { port: 18423 });
-    const resp = await fetch("http://localhost:18423/nope");
+    server = await startWeb();
+    const resp = await fetch(`${server!.url}/nope`);
     // SPA fallback: any non-API, non-static route serves index.html (200)
     // so client-side routing can handle it. This is standard SPA behavior.
     expect(resp.status).toBe(200);
@@ -79,8 +93,8 @@ describe("web server", () => {
   });
 
   it("/api/health returns 200 with version + uptime", async () => {
-    server = startWebServer(getApp(), { port: 18426 });
-    const resp = await fetch("http://localhost:18426/api/health");
+    server = await startWeb();
+    const resp = await fetch(`${server!.url}/api/health`);
     expect(resp.status).toBe(200);
     const body = (await resp.json()) as { ok: boolean; version: string; uptime: number };
     expect(body.ok).toBe(true);
@@ -90,51 +104,51 @@ describe("web server", () => {
   });
 
   it("/api/health works in read-only mode (no auth required)", async () => {
-    server = startWebServer(getApp(), { port: 18427, readOnly: true });
-    const resp = await fetch("http://localhost:18427/api/health");
+    server = await startWeb({ readOnly: true });
+    const resp = await fetch(`${server!.url}/api/health`);
     expect(resp.status).toBe(200);
   });
 
   it("/api/health works even when token auth is enabled", async () => {
     // Health is intentionally unauthenticated so the desktop app can probe
     // it before the user has supplied a token.
-    server = startWebServer(getApp(), { port: 18428, token: "secret" });
-    const resp = await fetch("http://localhost:18428/api/health");
+    server = await startWeb({ token: "secret" });
+    const resp = await fetch(`${server!.url}/api/health`);
     expect(resp.status).toBe(200);
   });
 
   it("enforces token auth when configured", async () => {
-    server = startWebServer(getApp(), { port: 18424, token: "secret123" });
+    server = await startWeb({ token: "secret123" });
     // No auth should be rejected
-    const noAuth = await fetch("http://localhost:18424/api/rpc", {
+    const noAuth = await fetch(`${server!.url}/api/rpc`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "session/list", params: {} }),
     });
     expect(noAuth.status).toBe(401);
     // With auth should succeed
-    const data = await rpcResult(18424, "session/list", {}, { token: "secret123" });
+    const data = await rpcResult(server!.port, "session/list", {}, { token: "secret123" });
     expect(data.result).toBeDefined();
   });
 
   it("returns session detail with events via RPC", async () => {
     const s = getApp().sessions.create({ summary: "detail-test" });
-    server = startWebServer(getApp(), { port: 18425 });
-    const data = await rpcResult(18425, "session/read", { sessionId: s.id, include: ["events"] });
+    server = await startWeb();
+    const data = await rpcResult(server!.port, "session/read", { sessionId: s.id, include: ["events"] });
     const result = data.result as Record<string, unknown>;
     expect((result.session as any).id).toBe(s.id);
     expect(Array.isArray(result.events)).toBe(true);
   });
 
   it("returns error for missing session", async () => {
-    server = startWebServer(getApp(), { port: 18426 });
-    const data = await rpcResult(18426, "session/read", { sessionId: "nonexistent" });
+    server = await startWeb();
+    const data = await rpcResult(server!.port, "session/read", { sessionId: "nonexistent" });
     expect(data.error).toBeDefined();
   });
 
   it("creates a session via RPC", async () => {
-    server = startWebServer(getApp(), { port: 18430 });
-    const data = await rpcResult(18430, "session/start", { summary: "web-create-test", repo: "." });
+    server = await startWeb();
+    const data = await rpcResult(server!.port, "session/start", { summary: "web-create-test", repo: "." });
     const result = data.result as Record<string, unknown>;
     expect(result.session).toBeDefined();
     expect((result.session as any).summary).toBe("web-create-test");
@@ -143,8 +157,8 @@ describe("web server", () => {
   it("returns system status via RPC", async () => {
     getApp().sessions.create({ summary: "status-test-1" });
     getApp().sessions.create({ summary: "status-test-2" });
-    server = startWebServer(getApp(), { port: 18431 });
-    const data = await rpcResult(18431, "status/get");
+    server = await startWeb();
+    const data = await rpcResult(server!.port, "status/get");
     const result = data.result as Record<string, unknown>;
     expect(result).toHaveProperty("total");
     expect(result).toHaveProperty("byStatus");
@@ -153,22 +167,22 @@ describe("web server", () => {
   });
 
   it("returns groups via RPC", async () => {
-    server = startWebServer(getApp(), { port: 18432 });
-    const data = await rpcResult(18432, "group/list");
+    server = await startWeb();
+    const data = await rpcResult(server!.port, "group/list");
     const result = data.result as Record<string, unknown>;
     expect(Array.isArray(result.groups)).toBe(true);
   });
 
   it("handles CORS preflight", async () => {
-    server = startWebServer(getApp(), { port: 18433 });
-    const resp = await fetch("http://localhost:18433/api/rpc", { method: "OPTIONS" });
+    server = await startWeb();
+    const resp = await fetch(`${server!.url}/api/rpc`, { method: "OPTIONS" });
     expect(resp.status).toBe(204);
     expect(resp.headers.get("Access-Control-Allow-Origin")).toBe("*");
   });
 
   it("rejects write methods in read-only mode", async () => {
-    server = startWebServer(getApp(), { port: 18434, readOnly: true });
-    const resp = await rpc(18434, "session/start", { summary: "should-fail" });
+    server = await startWeb({ readOnly: true });
+    const resp = await rpc(server!.port, "session/start", { summary: "should-fail" });
     expect(resp.status).toBe(403);
     const data = (await resp.json()) as Record<string, unknown>;
     expect(data.error).toBeDefined();
@@ -178,51 +192,51 @@ describe("web server", () => {
 
   it("session/clone works via RPC", async () => {
     const s = getApp().sessions.create({ summary: "fork-me" });
-    server = startWebServer(getApp(), { port: 18535 });
-    const data = await rpcResult(18535, "session/clone", { sessionId: s.id, name: "forked-copy" });
+    server = await startWeb();
+    const data = await rpcResult(server!.port, "session/clone", { sessionId: s.id, name: "forked-copy" });
     const result = data.result as Record<string, unknown>;
     expect(result.session).toBeDefined();
   });
 
   it("profile/list returns profiles via RPC", async () => {
-    server = startWebServer(getApp(), { port: 18536 });
-    const data = await rpcResult(18536, "profile/list");
+    server = await startWeb();
+    const data = await rpcResult(server!.port, "profile/list");
     const result = data.result as Record<string, unknown>;
     expect(Array.isArray(result.profiles)).toBe(true);
     expect((result.profiles as any[]).some((p) => p.name === "default")).toBe(true);
   });
 
   it("search/sessions requires query param", async () => {
-    server = startWebServer(getApp(), { port: 18538 });
-    const data = await rpcResult(18538, "search/sessions", {});
+    server = await startWeb();
+    const data = await rpcResult(server!.port, "search/sessions", {});
     // Missing required param "query" should return an error
     expect(data.error).toBeDefined();
   });
 
   it("agent/list returns agents via RPC", async () => {
-    server = startWebServer(getApp(), { port: 18539 });
-    const data = await rpcResult(18539, "agent/list");
+    server = await startWeb();
+    const data = await rpcResult(server!.port, "agent/list");
     const result = data.result as Record<string, unknown>;
     expect(Array.isArray(result.agents)).toBe(true);
   });
 
   it("memory/list returns memories via RPC", async () => {
-    server = startWebServer(getApp(), { port: 18540 });
-    const data = await rpcResult(18540, "memory/list");
+    server = await startWeb();
+    const data = await rpcResult(server!.port, "memory/list");
     const result = data.result as Record<string, unknown>;
     expect(Array.isArray(result.memories)).toBe(true);
   });
 
   it("compute/list returns computes via RPC", async () => {
-    server = startWebServer(getApp(), { port: 18541 });
-    const data = await rpcResult(18541, "compute/list");
+    server = await startWeb();
+    const data = await rpcResult(server!.port, "compute/list");
     const result = data.result as Record<string, unknown>;
     expect(Array.isArray(result.targets)).toBe(true);
   });
 
   it("config/get returns system config via RPC", async () => {
-    server = startWebServer(getApp(), { port: 18542 });
-    const data = await rpcResult(18542, "config/get");
+    server = await startWeb();
+    const data = await rpcResult(server!.port, "config/get");
     const result = data.result as Record<string, unknown>;
     expect(result).toHaveProperty("hotkeys");
     expect(result).toHaveProperty("theme");
@@ -231,29 +245,29 @@ describe("web server", () => {
 
   it("session/events returns events via RPC", async () => {
     const s = getApp().sessions.create({ summary: "events-test" });
-    server = startWebServer(getApp(), { port: 18543 });
-    const data = await rpcResult(18543, "session/events", { sessionId: s.id });
+    server = await startWeb();
+    const data = await rpcResult(server!.port, "session/events", { sessionId: s.id });
     const result = data.result as Record<string, unknown>;
     expect(Array.isArray(result.events)).toBe(true);
   });
 
   it("flow/list returns flows via RPC", async () => {
-    server = startWebServer(getApp(), { port: 18544 });
-    const data = await rpcResult(18544, "flow/list");
+    server = await startWeb();
+    const data = await rpcResult(server!.port, "flow/list");
     const result = data.result as Record<string, unknown>;
     expect(Array.isArray(result.flows)).toBe(true);
   });
 
   it("returns method not found for unknown RPC method", async () => {
-    server = startWebServer(getApp(), { port: 18545 });
-    const data = await rpcResult(18545, "nonexistent/method");
+    server = await startWeb();
+    const data = await rpcResult(server!.port, "nonexistent/method");
     expect(data.error).toBeDefined();
     expect((data.error as any).code).toBe(-32601);
   });
 
   it("returns error for invalid JSON-RPC request", async () => {
-    server = startWebServer(getApp(), { port: 18546 });
-    const resp = await fetch("http://localhost:18546/api/rpc", {
+    server = await startWeb();
+    const resp = await fetch(`${server!.url}/api/rpc`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ not: "valid" }),
@@ -262,8 +276,8 @@ describe("web server", () => {
   });
 
   it("daemon/status returns conductor and arkd health", async () => {
-    server = startWebServer(getApp(), { port: 18547 });
-    const data = await rpcResult(18547, "daemon/status");
+    server = await startWeb();
+    const data = await rpcResult(server!.port, "daemon/status");
     const result = data.result as Record<string, any>;
     // Verify response shape
     expect(result).toHaveProperty("conductor");
@@ -281,30 +295,30 @@ describe("web server", () => {
   // --- Terminal WebSocket endpoint tests ---
 
   it("terminal endpoint returns 400 without session param", async () => {
-    server = startWebServer(getApp(), { port: 18548 });
-    const resp = await fetch("http://localhost:18548/api/terminal");
+    server = await startWeb();
+    const resp = await fetch(`${server!.url}/api/terminal`);
     expect(resp.status).toBe(400);
   });
 
   it("terminal endpoint returns 404 for nonexistent session", async () => {
-    server = startWebServer(getApp(), { port: 18549 });
-    const resp = await fetch("http://localhost:18549/api/terminal?session=s-nonexistent");
+    server = await startWeb();
+    const resp = await fetch(`${server!.url}/api/terminal?session=s-nonexistent`);
     expect(resp.status).toBe(404);
   });
 
   it("terminal endpoint is blocked in read-only mode", async () => {
     const s = getApp().sessions.create({ summary: "terminal-readonly-test" });
-    server = startWebServer(getApp(), { port: 18550, readOnly: true });
-    const resp = await fetch(`http://localhost:18550/api/terminal?session=${s.id}`);
+    server = await startWeb({ readOnly: true });
+    const resp = await fetch(`${server!.url}/api/terminal?session=${s.id}`);
     expect(resp.status).toBe(403);
   });
 
   it("terminal WebSocket upgrade works for valid session", async () => {
     const s = getApp().sessions.create({ summary: "terminal-ws-test" });
-    server = startWebServer(getApp(), { port: 18551 });
+    server = await startWeb();
     // Attempt WebSocket connection -- the tmux session won't exist,
     // so the bridge will send an error and close, but upgrade should succeed
-    const ws = new WebSocket(`ws://localhost:18551/api/terminal?session=${s.id}`);
+    const ws = new WebSocket(`${server!.url.replace("http://", "ws://")}/api/terminal?session=${s.id}`);
     const messages: string[] = [];
     await new Promise<void>((resolve) => {
       ws.onmessage = (e) => {

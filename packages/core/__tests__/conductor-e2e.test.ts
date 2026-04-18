@@ -8,9 +8,10 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll } from "bun:test";
 import { AppContext, getApp, setApp, clearApp } from "../app.js";
 import { startConductor } from "../conductor/conductor.js";
+import { allocatePort } from "./helpers/test-env.js";
 
-// Use a non-default port to avoid conflicts with a running conductor
-const TEST_PORT = 19199;
+// Each test run grabs its own ephemeral port so files can run in parallel
+let TEST_PORT: number;
 
 let app: AppContext;
 let server: { stop(app): void };
@@ -23,6 +24,7 @@ beforeEach(async () => {
   app = AppContext.forTest();
   setApp(app);
   await app.boot();
+  TEST_PORT = await allocatePort();
   server = startConductor(app, TEST_PORT, { quiet: true });
 });
 

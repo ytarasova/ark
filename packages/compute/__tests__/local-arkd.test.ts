@@ -23,8 +23,14 @@ import {
 } from "../providers/local-arkd.js";
 import type { Compute, Session } from "../types.js";
 import { waitFor } from "../../core/__tests__/test-helpers.js";
+import { allocatePort } from "../../core/__tests__/helpers/test-env.js";
 
-// Use the default arkd port (19300) that local providers expect
+// Local providers call getArkdUrl() which returns DEFAULT_ARKD_URL
+// (localhost:19300). That constant is frozen at module load, so this test
+// still has to exercise port 19300 -- we can't swap it out dynamically
+// without rebuilding the providers. The beforeAll reuses an existing arkd
+// on 19300 if it's already running, so parallel test runs that land on
+// this file share one arkd instance which is fine for read-only probes.
 const ARKD_PORT = 19300;
 let server: { stop(): void };
 let tempDir: string;
@@ -235,9 +241,10 @@ describe("LocalWorktreeProvider", () => {
 
   describe("probePorts via arkd", () => {
     it("detects arkd port and maps back PortDecl fields", async () => {
+      const deadPort = await allocatePort(); // grab an ephemeral port, then let it close
       const results = await provider.probePorts(compute, [
         { port: ARKD_PORT, name: "arkd", source: "test" },
-        { port: 19999, name: "dead", source: "test" },
+        { port: deadPort, name: "dead", source: "test" },
       ]);
       expect(results.length).toBe(2);
 
@@ -246,7 +253,7 @@ describe("LocalWorktreeProvider", () => {
       expect(arkd?.name).toBe("arkd");
       expect(arkd?.source).toBe("test");
 
-      const dead = results.find((r) => r.port === 19999);
+      const dead = results.find((r) => r.port === deadPort);
       expect(dead?.listening).toBe(false);
     });
   });

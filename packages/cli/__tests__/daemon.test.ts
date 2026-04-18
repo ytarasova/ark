@@ -10,18 +10,21 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { startArkd } from "../../arkd/server.js";
+import { allocatePort } from "../../core/__tests__/helpers/test-env.js";
 
-// Use a unique port to avoid collisions with other tests
-const TEST_PORT = 19360;
-const BASE = `http://localhost:${TEST_PORT}`;
+// Allocate a unique ephemeral port per test run so files can run in parallel
+let TEST_PORT: number;
+let BASE: string;
 
 // ── PID file helpers (re-implemented for testing) ─────────────────────────────
 
 let tempDir: string;
 
-beforeAll(() => {
-  tempDir = join(tmpdir(), `ark-daemon-test-${Date.now()}`);
+beforeAll(async () => {
+  tempDir = join(tmpdir(), `ark-daemon-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   mkdirSync(tempDir, { recursive: true });
+  TEST_PORT = await allocatePort();
+  BASE = `http://localhost:${TEST_PORT}`;
 });
 
 afterAll(() => {
@@ -176,7 +179,7 @@ describe("daemon start/stop lifecycle", () => {
   });
 
   it("returns config from a running daemon", async () => {
-    const configPort = TEST_PORT + 2;
+    const configPort = await allocatePort();
     server = startArkd(configPort, { quiet: true, conductorUrl: "http://localhost:19100" });
 
     const resp = await fetch(`http://localhost:${configPort}/config`);
@@ -192,9 +195,10 @@ describe("daemon start/stop lifecycle", () => {
 
 describe("daemon status detection", () => {
   it("detects daemon is not running on unused port", async () => {
-    // Port 19361 should not have anything running
+    // Allocate an ephemeral port and let it close so nothing is listening there
+    const unusedPort = await allocatePort();
     try {
-      await fetch("http://localhost:19361/health", { signal: AbortSignal.timeout(500) });
+      await fetch(`http://localhost:${unusedPort}/health`, { signal: AbortSignal.timeout(500) });
       // If something is actually running there, skip this assertion
     } catch {
       // Expected - nothing running
@@ -203,9 +207,10 @@ describe("daemon status detection", () => {
   });
 
   it("detects daemon is running after start", async () => {
-    const server = startArkd(TEST_PORT + 1, { quiet: true });
+    const port = await allocatePort();
+    const server = startArkd(port, { quiet: true });
     try {
-      const resp = await fetch(`http://localhost:${TEST_PORT + 1}/health`, { signal: AbortSignal.timeout(2000) });
+      const resp = await fetch(`http://localhost:${port}/health`, { signal: AbortSignal.timeout(2000) });
       expect(resp.ok).toBe(true);
       const data = (await resp.json()) as { status: string };
       expect(data.status).toBe("ok");

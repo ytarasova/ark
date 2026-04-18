@@ -6,6 +6,7 @@ import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext, setApp, clearApp } from "../../core/app.js";
 import { ArkServer } from "../index.js";
 import { registerAllHandlers } from "../register.js";
+import { allocatePort } from "../../core/__tests__/helpers/test-env.js";
 
 let app: AppContext;
 let server: ArkServer;
@@ -20,8 +21,8 @@ beforeAll(async () => {
   server = new ArkServer();
   registerAllHandlers(server.router, app);
 
-  // Use a high port to avoid collisions with other tests
-  port = 19489;
+  // Allocate an ephemeral port so parallel test files don't collide
+  port = await allocatePort();
   ws = server.startWebSocket(port);
 });
 

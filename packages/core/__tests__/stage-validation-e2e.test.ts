@@ -16,6 +16,7 @@ import { join } from "path";
 import { AppContext, setApp, clearApp } from "../app.js";
 import { mediateStageHandoff, runVerification, complete } from "../services/session-orchestration.js";
 import { startConductor } from "../conductor/conductor.js";
+import { allocatePort } from "./helpers/test-env.js";
 
 let app: AppContext;
 
@@ -534,10 +535,14 @@ describe("full verification lifecycle", () => {
 
 // ── 8. Conductor HTTP integration with verification ─────────────────────
 
-const TEST_PORT = 19198;
+let TEST_PORT: number;
 
 describe("conductor HTTP integration with stage validation", () => {
   let server: { stop(): void } | null = null;
+
+  beforeEach(async () => {
+    TEST_PORT = await allocatePort();
+  });
 
   afterEach(() => {
     if (server) {

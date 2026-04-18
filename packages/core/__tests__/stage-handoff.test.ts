@@ -19,6 +19,7 @@ import { AppContext, getApp, setApp, clearApp } from "../app.js";
 import { mediateStageHandoff, applyReport, applyHookStatus, advance } from "../services/session-orchestration.js";
 import { startConductor } from "../conductor/conductor.js";
 import type { OutboundMessage } from "../conductor/channel-types.js";
+import { allocatePort } from "./helpers/test-env.js";
 
 let app: AppContext;
 
@@ -369,10 +370,14 @@ describe("applyHookStatus + mediateStageHandoff integration", () => {
 
 // ── Integration via conductor HTTP ──────────────────────────────────────
 
-const TEST_PORT = 19197;
+let TEST_PORT: number;
 
 describe("mediateStageHandoff via conductor HTTP", () => {
   let server: { stop(): void } | null = null;
+
+  beforeEach(async () => {
+    TEST_PORT = await allocatePort();
+  });
 
   afterEach(() => {
     if (server) {

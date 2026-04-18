@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from "bun:test";
 import { startWebServer } from "../hosted/web.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "../app.js";
+import { allocatePort } from "./helpers/test-env.js";
 
 withTestContext();
 
@@ -14,16 +15,22 @@ async function rpcResult(port: number, method: string, params: Record<string, un
   return resp.json() as Promise<Record<string, unknown>>;
 }
 
+async function startWeb(): Promise<{ stop: () => void; url: string; port: number }> {
+  const port = await allocatePort();
+  const server = startWebServer(getApp(), { port });
+  return { stop: server.stop, url: `http://localhost:${port}`, port };
+}
+
 describe("daemon/status RPC handler", () => {
-  let server: { stop: () => void; url: string } | null = null;
+  let server: { stop: () => void; url: string; port: number } | null = null;
   afterEach(() => {
     server?.stop();
     server = null;
   });
 
   it("returns correct shape with conductor, arkd, and router fields", async () => {
-    server = startWebServer(getApp(), { port: 18560 });
-    const data = await rpcResult(18560, "daemon/status");
+    server = await startWeb();
+    const data = await rpcResult(server.port, "daemon/status");
     const result = data.result as Record<string, any>;
 
     // Top-level keys
@@ -46,15 +53,16 @@ describe("daemon/status RPC handler", () => {
   });
 
   it("reports arkd offline when nothing is listening on the arkd port", async () => {
-    // Point arkd URL to a port that is definitely not in use
+    // Allocate an ephemeral port, then let it close -- guaranteed nothing listening there
+    const deadPort = await allocatePort();
     const origUrl = process.env.ARK_ARKD_URL;
-    process.env.ARK_ARKD_URL = "http://localhost:19399";
+    process.env.ARK_ARKD_URL = `http://localhost:${deadPort}`;
     try {
-      server = startWebServer(getApp(), { port: 18561 });
-      const data = await rpcResult(18561, "daemon/status");
+      server = await startWeb();
+      const data = await rpcResult(server.port, "daemon/status");
       const result = data.result as Record<string, any>;
 
-      // ArkD should be offline (no daemon on port 19399)
+      // ArkD should be offline (no daemon on the allocated port)
       expect(result.arkd.online).toBe(false);
     } finally {
       if (origUrl !== undefined) process.env.ARK_ARKD_URL = origUrl;
@@ -63,8 +71,8 @@ describe("daemon/status RPC handler", () => {
   });
 
   it("includes proper URLs from config/env", async () => {
-    server = startWebServer(getApp(), { port: 18562 });
-    const data = await rpcResult(18562, "daemon/status");
+    server = await startWeb();
+    const data = await rpcResult(server.port, "daemon/status");
     const result = data.result as Record<string, any>;
 
     // URLs should be real HTTP URLs

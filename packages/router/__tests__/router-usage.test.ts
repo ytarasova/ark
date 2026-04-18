@@ -24,10 +24,12 @@ describe("onUsage callback wiring", () => {
     // Import the server module to access emitUsage indirectly via startRouter
     const { startRouter } = await import("../server.js");
     const { loadRouterConfig } = await import("../config.js");
+    const { allocatePort } = await import("../../core/__tests__/helpers/test-env.js");
 
     const usageEvents: RouterUsageEvent[] = [];
 
-    const config = loadRouterConfig({ port: 18431, policy: "balanced" });
+    const port = await allocatePort();
+    const config = loadRouterConfig({ port, policy: "balanced" });
 
     // Skip if no providers configured (no API keys)
     if (config.providers.length === 0) {
@@ -40,7 +42,7 @@ describe("onUsage callback wiring", () => {
     });
 
     // Verify server started with the callback
-    expect(server.port).toBe(18431);
+    expect(server.port).toBe(port);
 
     server.stop();
   });

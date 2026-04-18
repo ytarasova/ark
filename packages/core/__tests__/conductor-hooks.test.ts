@@ -9,14 +9,16 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { getApp } from "../app.js";
 import { startConductor } from "../conductor/conductor.js";
 import { withTestContext } from "./test-helpers.js";
+import { allocatePort } from "./helpers/test-env.js";
 
-const TEST_PORT = 19198;
+let TEST_PORT: number;
 
 const { getCtx } = withTestContext();
 
 let server: { stop(): void };
 
-beforeEach(() => {
+beforeEach(async () => {
+  TEST_PORT = await allocatePort();
   server = startConductor(getApp(), TEST_PORT, { quiet: true });
 });
 
