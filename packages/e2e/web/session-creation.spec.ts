@@ -69,7 +69,7 @@ test("create session via form with flow, repo, and task description", async () =
   await repoInput.press("Enter");
 
   // Submit the form
-  await page.click('button:has-text("Create Session")');
+  await page.click('button:has-text("Start Session")');
 
   // Verify session appears in the list
   await expect(page.locator("text=Test session from e2e creation spec")).toBeVisible({ timeout: 10_000 });
