@@ -461,10 +461,6 @@ export class ArkClient {
     return compute;
   }
 
-  async computeDelete(name: string): Promise<void> {
-    await this.rpc("compute/delete", { name });
-  }
-
   async computeUpdate(name: string, fields: Record<string, unknown>): Promise<void> {
     await this.rpc("compute/update", { name, fields });
   }

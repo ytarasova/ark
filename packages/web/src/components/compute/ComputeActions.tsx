@@ -19,14 +19,9 @@ export function ComputeActions({ compute, onAction }: { compute: any; onAction: 
           Stop
         </Button>
       )}
-      {s === "running" && (
+      {s !== "provisioning" && (
         <Button variant="destructive" size="xs" onClick={() => onAction("destroy")} aria-label="Destroy compute target">
           Destroy
-        </Button>
-      )}
-      {s !== "provisioning" && (
-        <Button variant="destructive" size="xs" onClick={() => onAction("delete")} aria-label="Delete compute target">
-          Delete
         </Button>
       )}
     </div>

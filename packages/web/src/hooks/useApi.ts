@@ -25,8 +25,6 @@ import type {
   ComputeListResponse,
   ComputeCreateRequest,
   ComputeCreateResponse,
-  ComputeDeleteRequest,
-  ComputeDeleteResponse,
   ComputeReadRequest,
   ComputeReadResponse,
   FlowListRequest,
@@ -390,14 +388,13 @@ export const api = {
     rpc<ComputeCreateResponse>("compute/create", data).then((r) => ({ ok: true as const, compute: r.compute })),
   getComputeDetail: (name: string) =>
     rpc<ComputeReadResponse>("compute/read", { name } satisfies ComputeReadRequest).then((r) => r.compute),
-  deleteCompute: (name: string) =>
-    rpc<ComputeDeleteResponse>("compute/delete", { name } satisfies ComputeDeleteRequest),
   // TODO: add Zod schema for compute/provision
   provisionCompute: (name: string) => rpc<any>("compute/provision", { name }),
   // TODO: add Zod schema for compute/start-instance
   startCompute: (name: string) => rpc<any>("compute/start-instance", { name }),
   // TODO: add Zod schema for compute/stop-instance
   stopCompute: (name: string) => rpc<any>("compute/stop-instance", { name }),
+  // compute/destroy cascades infra removal + DB row removal.
   // TODO: add Zod schema for compute/destroy
   destroyCompute: (name: string) => rpc<any>("compute/destroy", { name }),
   // TODO: add Zod schema for metrics/snapshot

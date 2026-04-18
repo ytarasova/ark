@@ -255,14 +255,6 @@ export type ComputeCreateRequest = z.infer<typeof computeCreateRequest>;
 export const computeCreateResponse = z.object({ compute: computeSchema });
 export type ComputeCreateResponse = z.infer<typeof computeCreateResponse>;
 
-// ── compute/delete ──────────────────────────────────────────────────────────
-
-export const computeDeleteRequest = z.object({ name: z.string().min(1) });
-export type ComputeDeleteRequest = z.infer<typeof computeDeleteRequest>;
-
-export const computeDeleteResponse = z.object({ ok: z.boolean() });
-export type ComputeDeleteResponse = z.infer<typeof computeDeleteResponse>;
-
 // ── compute/read ────────────────────────────────────────────────────────────
 
 export const computeReadRequest = z.object({ name: z.string().min(1) });
@@ -552,7 +544,6 @@ export const rpcMethodSchemas: Record<string, RpcMethodSchemas> = {
   "session/restore": { request: sessionRestoreRequest, response: sessionRestoreResponse },
   "compute/list": { request: computeListRequest, response: computeListResponse },
   "compute/create": { request: computeCreateRequest, response: computeCreateResponse },
-  "compute/delete": { request: computeDeleteRequest, response: computeDeleteResponse },
   "compute/read": { request: computeReadRequest, response: computeReadResponse },
   "flow/list": { request: flowListRequest, response: flowListResponse },
   "flow/read": { request: flowReadRequest, response: flowReadResponse },
