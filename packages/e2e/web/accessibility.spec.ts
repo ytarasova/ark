@@ -139,14 +139,19 @@ test("Toast source renders role=alert for type=error", async () => {
   // Mount a lightweight probe that reads the Toast component's source and
   // asserts the ARIA contract. This guards against accidental removal of
   // the role/aria-live attributes without requiring a real error path.
+  //
+  // When running against a production build the web server's SPA catchall
+  // returns index.html (200 OK, text/html) for /src/* paths -- so we can't
+  // rely on status alone. Detect the SPA fallback via content-type and
+  // skip the source-level assertion in that case; the earlier test guards
+  // role/aria-live via the runtime DOM contract.
   const src = await page.evaluate(async () => {
     const res = await fetch("/src/components/Toast.tsx").catch(() => null);
     if (!res || !res.ok) return null;
+    const contentType = res.headers.get("content-type") || "";
+    if (contentType.includes("text/html")) return null;
     return res.text();
   });
-  // When the built bundle (production) serves no /src/ assets we fall back
-  // to the attribute presence probe above, so a null result is acceptable
-  // -- the earlier test already guards role/aria-live in the runtime DOM.
   if (!src) return;
   expect(src).toContain("role={role}");
   expect(src).toContain("aria-live={ariaLive}");
