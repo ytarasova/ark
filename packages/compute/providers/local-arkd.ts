@@ -20,8 +20,14 @@ import {
   startContainer,
   stopContainer,
   removeContainer,
+  bootstrapContainer,
+  startArkdInContainer,
+  waitForArkdHealth,
+  resolveArkSourceRoot,
   DEFAULT_IMAGE,
+  type BootstrapOpts,
 } from "./docker/helpers.js";
+import { allocatePort } from "../../core/config/port-allocator.js";
 import type { Compute, Session, ProvisionOpts, SyncOpts, IsolationMode, LaunchOpts } from "../types.js";
 import { DEFAULT_ARKD_URL, DEFAULT_CONDUCTOR_URL } from "../../core/constants.js";
 import { channelLaunchSpec } from "../../core/install-paths.js";
@@ -124,11 +130,30 @@ export class LocalWorktreeProvider extends LocalArkdBase {
   }
 }
 
-// ── Local Docker Provider ───────────────────────────────────────────────────
+// ── Local Docker Provider (arkd sidecar) ────────────────────────────────────
 
+/**
+ * Docker compute target that runs arkd as a sidecar inside the container.
+ *
+ * Architecture:
+ *   - Container is created with a loopback port mapping 127.0.0.1:H -> :19300.
+ *   - Bootstrap installs bun + tmux + claude (idempotent; skipped on images
+ *     that already have them via `config.bootstrap: { skip: true }`).
+ *   - arkd is started INSIDE the container bound to 0.0.0.0:19300.
+ *   - Host conductor talks to arkd at http://localhost:H. No docker exec
+ *     wrappers, no host->container path parity tricks: arkd resolves paths
+ *     against the container's own filesystem.
+ *
+ * Mounts (see createContainer):
+ *   - /opt/ark   <- host ark repo (ro)      arkd source for `bun run`
+ *   - arkDir     <- host arkDir  (rw)       tracks, launchers, recordings
+ *   - workdir    <- host workdir (rw)       session workspace at same path
+ *   - ~/.claude  <- ~/.claude (ro)          agent credentials
+ *   - ~/.ssh     <- ~/.ssh    (ro)          git push over SSH
+ */
 export class LocalDockerProvider extends LocalArkdBase {
   readonly name = "docker";
-  readonly isolationModes: IsolationMode[] = [{ value: "container", label: "Docker container (isolated)" }];
+  readonly isolationModes: IsolationMode[] = [{ value: "container", label: "Docker container (arkd sidecar)" }];
   readonly canDelete = true;
   readonly supportsWorktree = false;
   readonly initialStatus = "stopped";
@@ -137,20 +162,73 @@ export class LocalDockerProvider extends LocalArkdBase {
     return `ark-${compute.name}`;
   }
 
+  /**
+   * Per-compute arkd URL. Stored on the compute config during provision so
+   * restarts reuse the same port. Falls back to the legacy DEFAULT_ARKD_URL
+   * only if no port was persisted (legacy compute records from pre-sidecar).
+   */
+  override getArkdUrl(compute: Compute): string {
+    const cfg = compute.config as Record<string, unknown>;
+    const hostPort = cfg.arkd_host_port as number | undefined;
+    if (typeof hostPort === "number") return `http://localhost:${hostPort}`;
+    return DEFAULT_ARKD_URL;
+  }
+
   async provision(compute: Compute, _opts?: ProvisionOpts): Promise<void> {
     const cfg = compute.config as Record<string, unknown>;
     const name = this.containerName(compute);
     const image = (cfg.image as string) || DEFAULT_IMAGE;
     const extraVolumes = (cfg.volumes as string[]) ?? [];
+    const bootstrapOpts = (cfg.bootstrap as BootstrapOpts) ?? {};
+    const workdir = (cfg.workdir as string) || undefined;
+
+    const arkSource = resolveArkSourceRoot();
+    if (!arkSource) {
+      throw new Error(
+        "Cannot locate ark source tree on host. The arkd-sidecar Docker provider needs the repo root mounted " +
+          "into the container at /opt/ark. Run from a source checkout or set ARK_SOURCE_ROOT.",
+      );
+    }
 
     this.app.computes.update(compute.name, { status: "provisioning" });
 
     try {
+      const arkdHostPort = await allocatePort();
+      const arkdUrl = `http://localhost:${arkdHostPort}`;
+
       await pullImage(image);
-      await createContainer(name, image, extraVolumes);
+      await createContainer(name, image, {
+        extraVolumes,
+        arkDir: this.app.config.dirs.ark,
+        arkSource,
+        workdir,
+        arkdHostPort,
+      });
       await startContainer(name);
 
-      this.app.computes.mergeConfig(compute.name, { image, container_name: name });
+      // Bootstrap is idempotent; users with a pre-built image can set
+      // `bootstrap: { skip: true }` to short-circuit.
+      await bootstrapContainer(name, bootstrapOpts);
+
+      // Launch arkd inside the container, then wait for the host-side port
+      // mapping to respond. The conductor URL we pass is the host's conductor
+      // as seen from the container -- docker's default bridge exposes the
+      // host via host.docker.internal (macOS/Windows) or the gateway IP
+      // (Linux). We use host.docker.internal which Docker Desktop provides
+      // on macOS/Windows; on Linux we rely on --add-host support or a
+      // fallback loopback route. For now we pass the raw URL; sessions that
+      // do not need conductor callbacks (most) will not hit this path.
+      const conductorUrl = `http://host.docker.internal:${this.app.config.ports.conductor}`;
+      await startArkdInContainer(name, conductorUrl);
+      await waitForArkdHealth(arkdUrl, 30_000);
+
+      this.app.computes.mergeConfig(compute.name, {
+        image,
+        container_name: name,
+        arkd_host_port: arkdHostPort,
+        arkd_url: arkdUrl,
+        ark_source_host: arkSource,
+      });
       this.app.computes.update(compute.name, { status: "running" });
     } catch (err) {
       this.app.computes.mergeConfig(compute.name, { last_error: err instanceof Error ? err.message : String(err) });
@@ -168,8 +246,19 @@ export class LocalDockerProvider extends LocalArkdBase {
   }
 
   async start(compute: Compute): Promise<void> {
+    const cfg = compute.config as Record<string, unknown>;
     const name = this.containerName(compute);
     await startContainer(name);
+
+    // docker start preserves the -p port mapping set at create time, but
+    // arkd inside the container is NOT started automatically on restart.
+    // Re-launch it and wait for health.
+    const arkdUrl = this.getArkdUrl(compute);
+    const conductorUrl =
+      (cfg.conductor_url as string) || `http://host.docker.internal:${this.app.config.ports.conductor}`;
+    await startArkdInContainer(name, conductorUrl);
+    await waitForArkdHealth(arkdUrl, 30_000);
+
     this.app.computes.update(compute.name, { status: "running" });
   }
 
@@ -181,28 +270,17 @@ export class LocalDockerProvider extends LocalArkdBase {
     this.app.computes.update(compute.name, { status: "stopped" });
   }
 
-  async cleanupSession(compute: Compute, _session: Session): Promise<void> {
-    const name = this.containerName(compute);
-    await safeAsync(`[docker] cleanupSession: stop container ${name}`, async () => {
-      await stopContainer(name);
-    });
+  async cleanupSession(_compute: Compute, _session: Session): Promise<void> {
+    // Sidecar model: nothing to clean up at the container level when a session
+    // ends. arkd inside the container already tore down the tmux session via
+    // killAgent. The container keeps running to serve the next session.
   }
 
-  async launch(compute: Compute, _session: Session, opts: LaunchOpts): Promise<string> {
-    const client = this.getClient(compute);
-    const container = this.containerName(compute);
-
-    // Write launcher to host, copy into container, exec inside
-    const scriptPath = `/tmp/arkd-launcher-${opts.tmuxName}.sh`;
-    await client.writeFile({ path: scriptPath, content: opts.launcherContent, mode: 0o755 });
-    await client.run({ command: "docker", args: ["cp", scriptPath, `${container}:${scriptPath}`] });
-    await client.launchAgent({
-      sessionName: opts.tmuxName,
-      script: `#!/bin/bash\ndocker exec -i ${container} bash ${scriptPath}`,
-      workdir: opts.workdir,
-    });
-    return opts.tmuxName;
-  }
+  /**
+   * ArkdBackedProvider.launch already does the right thing -- it calls
+   * arkd.launchAgent, which runs inside the container. No docker cp / docker
+   * exec needed. We inherit that default.
+   */
 }
 
 // ── Local Devcontainer Provider ─────────────────────────────────────────────
