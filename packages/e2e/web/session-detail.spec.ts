@@ -199,3 +199,24 @@ test("session detail shows events when available", async () => {
   expect(detail.session).toBeTruthy();
   expect(Array.isArray(detail.events)).toBe(true);
 });
+
+// -- Back button navigation ---------------------------------------------------
+
+test("back button returns from detail to the dashboard view", async () => {
+  // Ported from the now-deleted packages/web/e2e/session-view.spec.ts — the
+  // only assertion in that file not already covered by session-detail-tabs.
+  await createSession("Back nav test");
+  await page.reload();
+  await page.waitForSelector("nav", { timeout: 10_000 });
+  await goToSessions();
+
+  // Open the detail panel
+  await page.locator("text=Back nav test").first().click();
+  await expect(page.locator('button[role="tab"]:has-text("Conversation")').first()).toBeVisible({ timeout: 5_000 });
+
+  // Click the Back button
+  await page.locator("button:has-text('Back')").click();
+
+  // The detail tab bar must be gone (dashboard view replaces it)
+  await expect(page.locator('button[role="tab"]:has-text("Conversation")')).not.toBeVisible({ timeout: 5_000 });
+});
