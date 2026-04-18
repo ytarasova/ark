@@ -557,9 +557,13 @@ export class AppContext {
     await safeAsync("boot: load compute providers", async () => {
       const compute = await import("../compute/index.js");
       compute.setComputeApp(this);
+      // Docker is the arkd-sidecar LocalDockerProvider (arkd runs INSIDE the
+      // container on a loopback-mapped port). The legacy "host tmux + docker
+      // exec" DockerProvider class stays exported for compatibility but is
+      // no longer registered.
       const providers = [
         new compute.LocalProvider(),
-        new compute.DockerProvider(),
+        new compute.LocalDockerProvider(),
         new compute.LocalDevcontainerProvider(),
         new compute.LocalFirecrackerProvider(),
         new compute.RemoteDockerProvider(),

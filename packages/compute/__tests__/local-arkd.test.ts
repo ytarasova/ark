@@ -265,7 +265,14 @@ describe("LocalDockerProvider", () => {
     expect(provider.needsAuth).toBe(false);
   });
 
-  it("getArkdUrl returns localhost:19300", () => {
+  it("getArkdUrl returns mapped host port when provisioned", () => {
+    // Sidecar model: URL is per-compute, stored in config.arkd_host_port.
+    const provisioned = { ...compute, name: "provisioned-docker", config: { arkd_host_port: 19412 } } as Compute;
+    expect(provider.getArkdUrl(provisioned)).toBe("http://localhost:19412");
+  });
+
+  it("getArkdUrl falls back to DEFAULT_ARKD_URL for unprovisioned compute", () => {
+    // Legacy / pre-sidecar records with no persisted port.
     expect(provider.getArkdUrl(compute)).toBe("http://localhost:19300");
   });
 
@@ -273,45 +280,10 @@ describe("LocalDockerProvider", () => {
     expect(provider.isolationModes[0].value).toBe("container");
   });
 
-  it("launch writes script and creates docker-exec wrapper", async () => {
-    const TMUX_NAME = `local-docker-test-${Date.now()}`;
-    const dockerCompute = { ...compute, name: "test-docker-box", config: {} } as Compute;
-
-    try {
-      await provider.launch(dockerCompute, makeSession(), {
-        tmuxName: TMUX_NAME,
-        workdir: tempDir,
-        launcherContent: "#!/bin/bash\necho hello-docker",
-        ports: [],
-      });
-
-      await waitFor(
-        () => {
-          const scriptPath = `/tmp/arkd-launcher-${TMUX_NAME}.sh`;
-          return existsSync(scriptPath);
-        },
-        { timeout: 5000 },
-      );
-
-      // The script on disk is the wrapper (agentLaunch overwrites the writeFile content)
-      const scriptPath = `/tmp/arkd-launcher-${TMUX_NAME}.sh`;
-      expect(existsSync(scriptPath)).toBe(true);
-      const scriptContent = readFileSync(scriptPath, "utf-8");
-      // Wrapper should contain docker exec into the container
-      expect(scriptContent).toContain("docker exec");
-      expect(scriptContent).toContain(scriptPath);
-
-      // Verify tmux session was created (even though docker exec will fail - container doesn't exist)
-      const status = await client.agentStatus({ sessionName: TMUX_NAME });
-      expect(typeof status.running).toBe("boolean");
-    } finally {
-      try {
-        await client.killAgent({ sessionName: TMUX_NAME });
-      } catch {
-        /* cleanup */
-      }
-    }
-  });
+  // Legacy "launch writes docker-exec wrapper" test removed: LocalDockerProvider
+  // now inherits ArkdBackedProvider.launch, which calls arkd.launchAgent
+  // directly inside the container (arkd sidecar). There is no host-side
+  // wrapper to inspect. End-to-end coverage lives in docker-sidecar-e2e.test.ts.
 });
 
 // ── LocalDevcontainerProvider ───────────────────────────────────────────────
