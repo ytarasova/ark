@@ -56,4 +56,34 @@ export default [
       "no-console": "off",
     },
   },
+  {
+    // Hex boundary: ports and domain code MUST NOT reach raw infrastructure.
+    // Every I/O side effect goes through an adapter injected via the container.
+    files: ["packages/core/ports/**", "packages/core/domain/**"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        paths: [
+          { name: "fs", message: "Ports/domain must not import fs. Use Workspace port." },
+          { name: "fs/promises", message: "Ports/domain must not import fs. Use Workspace port." },
+          { name: "node:fs", message: "Ports/domain must not import fs. Use Workspace port." },
+          { name: "node:fs/promises", message: "Ports/domain must not import fs. Use Workspace port." },
+          { name: "child_process", message: "Ports/domain must not import child_process. Use ProcessRunner port." },
+          { name: "node:child_process", message: "Ports/domain must not import child_process. Use ProcessRunner port." },
+          { name: "bun:sqlite", message: "Ports/domain must not import SQLite directly. Use SessionStore/EventStore ports." },
+        ],
+      }],
+    },
+  },
+  {
+    // Hex boundary: adapters are siblings; one adapter must not reach into
+    // another adapter's internals. Composition happens in the binding module.
+    files: ["packages/core/adapters/**"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: [
+          { group: ["../local/*", "../control-plane/*", "../test/*"], message: "Adapters must not import each other. Compose via binding modules." },
+        ],
+      }],
+    },
+  },
 ];
