@@ -276,7 +276,14 @@ async function startServer() {
   // The ark script is a bash wrapper, so spawn it directly (not via bun).
   serverProcess = spawn(arkBin, ["web", "--with-daemon", "--port", String(serverPort)], {
     stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, PATH: `${process.env.HOME}/.bun/bin:${process.env.PATH}` },
+    env: {
+      ...process.env,
+      PATH: `${process.env.HOME}/.bun/bin:${process.env.PATH}`,
+      // If Electron is force-quit (kill -9, crash), our stopServer() never
+      // runs and the child would leak as an immortal zombie holding the port.
+      // The watchdog notices ppid -> 1 and exits on its own.
+      ARK_WATCH_PARENT: "1",
+    },
   });
 
   serverProcess.stdout.on("data", (data) => {
