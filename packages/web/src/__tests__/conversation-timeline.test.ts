@@ -17,7 +17,7 @@ import { describe, test, expect } from "bun:test";
 function formatTime(iso: string | null | undefined): string {
   if (!iso) return "";
   const d = new Date(iso);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
 function formatToolInput(data: any): string {

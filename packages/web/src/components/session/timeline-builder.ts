@@ -15,12 +15,17 @@ export function buildStageProgress(session: any, flowStages: any[]): StageProgre
   const currentIdx = flowStages.findIndex((s: any) => s.name === currentStage);
   const isFailed = session.status === "failed";
   const isCompleted = session.status === "completed";
+  const isRunning = session.status === "running" || session.status === "waiting";
 
   return flowStages.map((s: any, i: number) => {
     if (isCompleted) return { name: s.name, state: "done" as const };
     if (currentIdx < 0) return { name: s.name, state: "pending" as const };
     if (i < currentIdx) return { name: s.name, state: "done" as const };
-    if (i === currentIdx) return { name: s.name, state: isFailed ? ("failed" as const) : ("active" as const) };
+    if (i === currentIdx) {
+      if (isFailed) return { name: s.name, state: "failed" as const };
+      if (isRunning) return { name: s.name, state: "active" as const };
+      return { name: s.name, state: "pending" as const };
+    }
     return { name: s.name, state: "pending" as const };
   });
 }
@@ -28,7 +33,7 @@ export function buildStageProgress(session: any, flowStages: any[]): StageProgre
 export function formatTime(iso: string | null | undefined): string {
   if (!iso) return "";
   const d = new Date(iso);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
 /** Parse a unified diff string into DiffFile[] for the DiffViewer component. */

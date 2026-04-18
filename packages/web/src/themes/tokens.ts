@@ -89,13 +89,13 @@ export const midnightCircuit: ThemeTokens = {
   borderDefault: "#252540",
   borderLight: "#1e1e30",
 
-  statusRunning: "#34d399",
+  statusRunning: "#60a5fa",
   statusWaiting: "#fbbf24",
   statusCompleted: "#34d399",
   statusFailed: "#f87171",
   statusStopped: "rgba(107, 114, 128, 0.4)",
 
-  runningGlow: "0 0 8px rgba(52, 211, 153, 0.4)",
+  runningGlow: "0 0 8px rgba(96, 165, 250, 0.4)",
   failedGlow: "0 0 8px rgba(248, 113, 113, 0.3)",
 
   diffAddBg: "rgba(52, 211, 153, 0.08)",
@@ -136,13 +136,13 @@ export const midnightCircuitLight: ThemeTokens = {
   borderDefault: "#dcdce8",
   borderLight: "#ededf5",
 
-  statusRunning: "#059669",
+  statusRunning: "#2563eb",
   statusWaiting: "#d97706",
-  statusCompleted: "#059669",
+  statusCompleted: "#16a34a",
   statusFailed: "#dc2626",
   statusStopped: "rgba(156, 163, 175, 0.6)",
 
-  runningGlow: "0 0 8px rgba(5, 150, 105, 0.3)",
+  runningGlow: "0 0 8px rgba(37, 99, 235, 0.3)",
   failedGlow: "0 0 8px rgba(220, 38, 38, 0.2)",
 
   diffAddBg: "rgba(5, 150, 105, 0.08)",
@@ -187,13 +187,13 @@ export const arcticSlate: ThemeTokens = {
   borderDefault: "#27272a",
   borderLight: "#1c1c1e",
 
-  statusRunning: "#34d399",
+  statusRunning: "#60a5fa",
   statusWaiting: "#fbbf24",
   statusCompleted: "#34d399",
   statusFailed: "#f87171",
   statusStopped: "rgba(107, 114, 128, 0.4)",
 
-  runningGlow: "0 0 8px rgba(52, 211, 153, 0.4)",
+  runningGlow: "0 0 8px rgba(96, 165, 250, 0.4)",
   failedGlow: "0 0 8px rgba(248, 113, 113, 0.3)",
 
   diffAddBg: "rgba(52, 211, 153, 0.08)",
@@ -234,13 +234,13 @@ export const arcticSlateLight: ThemeTokens = {
   borderDefault: "#e4e4e7",
   borderLight: "#f4f4f5",
 
-  statusRunning: "#059669",
+  statusRunning: "#2563eb",
   statusWaiting: "#d97706",
-  statusCompleted: "#059669",
+  statusCompleted: "#16a34a",
   statusFailed: "#dc2626",
   statusStopped: "rgba(156, 163, 175, 0.6)",
 
-  runningGlow: "0 0 8px rgba(5, 150, 105, 0.3)",
+  runningGlow: "0 0 8px rgba(37, 99, 235, 0.3)",
   failedGlow: "0 0 8px rgba(220, 38, 38, 0.2)",
 
   diffAddBg: "rgba(5, 150, 105, 0.08)",
@@ -285,13 +285,13 @@ export const warmObsidian: ThemeTokens = {
   borderDefault: "#2a2a2a",
   borderLight: "#242424",
 
-  statusRunning: "#34d399",
+  statusRunning: "#60a5fa",
   statusWaiting: "#fbbf24",
   statusCompleted: "#34d399",
   statusFailed: "#f87171",
   statusStopped: "rgba(107, 114, 128, 0.4)",
 
-  runningGlow: "0 0 8px rgba(52, 211, 153, 0.4)",
+  runningGlow: "0 0 8px rgba(96, 165, 250, 0.4)",
   failedGlow: "0 0 8px rgba(248, 113, 113, 0.3)",
 
   diffAddBg: "rgba(52, 211, 153, 0.08)",
@@ -332,13 +332,13 @@ export const warmObsidianLight: ThemeTokens = {
   borderDefault: "#e0dfdb",
   borderLight: "#f2f1ee",
 
-  statusRunning: "#059669",
+  statusRunning: "#2563eb",
   statusWaiting: "#d97706",
-  statusCompleted: "#059669",
+  statusCompleted: "#16a34a",
   statusFailed: "#dc2626",
   statusStopped: "rgba(156, 163, 175, 0.6)",
 
-  runningGlow: "0 0 8px rgba(5, 150, 105, 0.3)",
+  runningGlow: "0 0 8px rgba(37, 99, 235, 0.3)",
   failedGlow: "0 0 8px rgba(220, 38, 38, 0.2)",
 
   diffAddBg: "rgba(5, 150, 105, 0.08)",

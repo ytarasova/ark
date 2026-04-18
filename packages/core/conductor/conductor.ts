@@ -261,6 +261,7 @@ function handleRestApi(path: string): Response {
     return Response.json({
       status: "ok",
       sessions: _app.sessions.list().length,
+      arkDir: _app.config.arkDir,
     });
   }
   return new Response("Not found", { status: 404 });

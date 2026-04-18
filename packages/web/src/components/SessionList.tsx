@@ -42,13 +42,15 @@ function buildStageProgress(session: any, flowStagesMap?: Record<string, any[]>)
   const currentIdx = stages.findIndex((s: any) => s.name === currentStage);
   const isFailed = session.status === "failed";
   const isCompleted = session.status === "completed";
+  const isRunning = session.status === "running" || session.status === "waiting";
 
   return stages.map((s: any, i: number) => {
     if (isCompleted) return { name: s.name, state: "done" as const };
-    if (isFailed && i === currentIdx) return { name: s.name, state: "active" as const };
+    if (isFailed && i === currentIdx) return { name: s.name, state: "failed" as const };
     if (currentIdx < 0) return { name: s.name, state: "pending" as const };
     if (i < currentIdx) return { name: s.name, state: "done" as const };
-    if (i === currentIdx) return { name: s.name, state: "active" as const };
+    // Only show shimmer animation for actively running sessions
+    if (i === currentIdx) return { name: s.name, state: isRunning ? ("active" as const) : ("pending" as const) };
     return { name: s.name, state: "pending" as const };
   });
 }
@@ -144,7 +146,7 @@ export function SessionListPanel({
             title="New session (n)"
           >
             <Plus size={14} />
-            New
+            New Session
           </Button>
         ) : undefined
       }

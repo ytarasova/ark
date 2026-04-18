@@ -55,16 +55,21 @@ test("create session via form with flow, repo, and task description", async () =
   await expect(page.locator("text=New Session").first()).toBeVisible({ timeout: 5_000 });
 
   // Fill in the summary / task description
-  const summaryInput = page.locator('input[placeholder="What should the agent work on?"]');
+  const summaryInput = page.locator('textarea[placeholder="What should the agent work on?"]');
   await expect(summaryInput).toBeVisible();
   await summaryInput.fill("Test session from e2e creation spec");
 
-  // Fill in the repo path
-  const repoInput = page.locator('input[placeholder="/path/to/repo or ."]');
+  // Fill in the repo path. Repo is now a combobox-style popover picker:
+  // click the trigger to open the popover, type the path in the search
+  // input, then press Enter to commit.
+  await page.locator('button:has-text("Select repository")').click();
+  const repoInput = page.locator('input[placeholder="Type path or search..."]');
+  await expect(repoInput).toBeVisible({ timeout: 5_000 });
   await repoInput.fill(ws.env.workdir);
+  await repoInput.press("Enter");
 
   // Submit the form
-  await page.click('button:has-text("Create Session")');
+  await page.click('button:has-text("Start Session")');
 
   // Verify session appears in the list
   await expect(page.locator("text=Test session from e2e creation spec")).toBeVisible({ timeout: 10_000 });

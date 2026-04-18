@@ -12,7 +12,7 @@
 #   make package       Package everything for distribution
 
 .PHONY: help install dev dev-daemon dev-arkd dev-web claude-tfy web desktop \
-        test test-file test-e2e test-e2e-fast test-e2e-web test-install test-watch lint lint-fix \
+        test test-file test-e2e test-e2e-fast test-e2e-web test-e2e-web-dev test-install test-watch lint lint-fix \
         format format-check \
         build build-cli build-web build-desktop \
         package package-cli package-desktop \
@@ -153,6 +153,12 @@ test-web-e2e: build-web ## Run web end-to-end tests (Playwright against the web 
 	@# spec file.
 	@cd packages/e2e && bun install --silent 2>/dev/null; \
 	  bunx --bun playwright install chromium --with-deps 2>/dev/null; \
+	  bunx --bun playwright test
+
+test-e2e-web-dev: ## Run web e2e tests against running dev server (localhost:5173)
+	@echo "Running Playwright e2e tests against localhost:5173..."
+	@echo "Make sure the dev server is running: make dev"
+	@cd packages/web && bunx --bun playwright install chromium --with-deps 2>/dev/null; \
 	  bunx --bun playwright test
 
 test-install: ## Run install.sh regression tests (docs/install.sh)

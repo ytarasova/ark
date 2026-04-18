@@ -102,6 +102,7 @@ export interface CreateSessionOpts {
   group_name?: string;
   config?: Partial<SessionConfig>;
   user_id?: string;
+  attachments?: Array<{ name: string; content: string; type: string }>;
 }
 
 export interface SessionListFilters {

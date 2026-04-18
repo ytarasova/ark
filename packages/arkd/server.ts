@@ -555,7 +555,7 @@ async function agentLaunch(req: AgentLaunchReq): Promise<AgentLaunchRes> {
       "-s",
       req.sessionName,
       "-x",
-      "200",
+      "120",
       "-y",
       "50",
       "-c",
@@ -591,7 +591,7 @@ async function agentStatus(req: AgentStatusReq): Promise<AgentStatusRes> {
 async function agentCapture(req: AgentCaptureReq): Promise<AgentCaptureRes> {
   const lines = req.lines ?? 100;
   const proc = Bun.spawn({
-    cmd: ["tmux", "capture-pane", "-t", req.sessionName, "-p", "-S", `-${lines}`],
+    cmd: ["tmux", "capture-pane", "-t", req.sessionName, "-p", "-e", "-S", `-${lines}`],
     stdout: "pipe",
     stderr: "pipe",
   });

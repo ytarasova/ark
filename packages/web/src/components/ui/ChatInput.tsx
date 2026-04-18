@@ -1,10 +1,16 @@
-import { useRef, useCallback } from "react";
+import { useState, useRef, useCallback } from "react";
 import { cn } from "../../lib/utils.js";
+import { X } from "lucide-react";
+
+interface PastedImage {
+  name: string;
+  dataUrl: string;
+}
 
 export interface ChatInputProps extends React.ComponentProps<"div"> {
   value: string;
   onChange: (value: string) => void;
-  onSend: () => void;
+  onSend: (attachments?: PastedImage[]) => void;
   disabled?: boolean;
   disabledText?: string;
   modelName?: string;
@@ -13,7 +19,7 @@ export interface ChatInputProps extends React.ComponentProps<"div"> {
 
 /**
  * Bottom input bar for sending messages to agents.
- * Supports Cmd+K hint, model name display, and send button.
+ * Supports Cmd+K hint, model name display, send button, and Cmd+V image paste.
  * Enter to send, Shift+Enter for newline.
  */
 export function ChatInput({
@@ -28,28 +34,91 @@ export function ChatInput({
   ...props
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [pastedImages, setPastedImages] = useState<PastedImage[]>([]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === "Enter" && !e.shiftKey && !disabled) {
         e.preventDefault();
-        onSend();
+        onSend(pastedImages.length > 0 ? pastedImages : undefined);
+        setPastedImages([]);
       }
     },
-    [onSend, disabled],
+    [onSend, disabled, pastedImages],
   );
+
+  const handleSendClick = useCallback(() => {
+    onSend(pastedImages.length > 0 ? pastedImages : undefined);
+    setPastedImages([]);
+  }, [onSend, pastedImages]);
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (!item.type.startsWith("image/")) continue;
+      e.preventDefault();
+      const blob = item.getAsFile();
+      if (!blob) continue;
+      const ext = item.type.split("/")[1] || "png";
+      const name = `clipboard-${Date.now()}.${ext}`;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        setPastedImages((prev) => [...prev, { name, dataUrl }]);
+      };
+      reader.readAsDataURL(blob);
+      break; // only handle first image
+    }
+  }, []);
+
+  const removeImage = useCallback((name: string) => {
+    setPastedImages((prev) => prev.filter((img) => img.name !== name));
+  }, []);
 
   return (
     <div
       className={cn("border-t border-[var(--border)] px-6 py-3.5 pb-4 shrink-0 bg-[var(--bg)]", className)}
       {...props}
     >
+      {/* Pasted image previews */}
+      {pastedImages.length > 0 && (
+        <div className="max-w-[720px] mx-auto mb-2 flex flex-wrap gap-2">
+          {pastedImages.map((img) => (
+            <div
+              key={img.name}
+              className={cn(
+                "relative group w-16 h-16 rounded-md overflow-hidden",
+                "border border-[var(--border)] bg-[var(--bg-card)]",
+              )}
+            >
+              <img src={img.dataUrl} alt={img.name} className="w-full h-full object-cover" />
+              <button
+                type="button"
+                onClick={() => removeImage(img.name)}
+                className={cn(
+                  "absolute top-0.5 right-0.5 w-4 h-4 rounded-full",
+                  "bg-black/60 text-white flex items-center justify-center",
+                  "opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer",
+                )}
+              >
+                <X size={10} />
+              </button>
+              <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-[8px] text-white px-1 truncate">
+                {img.name}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="max-w-[720px] mx-auto flex items-end gap-2">
         <textarea
           ref={textareaRef}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder={disabled ? (disabledText ?? "Session is not running") : placeholder}
           disabled={disabled}
           rows={1}
@@ -64,8 +133,8 @@ export function ChatInput({
         />
         <button
           type="button"
-          onClick={onSend}
-          disabled={disabled || !value.trim()}
+          onClick={handleSendClick}
+          disabled={disabled || (!value.trim() && pastedImages.length === 0)}
           className={cn(
             "w-[38px] h-[38px] rounded-lg border-none shrink-0",
             "bg-[var(--primary)] text-[var(--primary-fg)] cursor-pointer",

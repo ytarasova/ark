@@ -25,17 +25,19 @@ export interface IconRailProps extends React.ComponentProps<"nav"> {
  * Icons for sessions/agents/flows/compute/costs + settings at bottom.
  */
 /** Derive a status dot color + tooltip from daemon probe results. */
-function getDaemonDot(ds: DaemonStatus | null | undefined): { color: string; title: string } {
-  if (!ds) return { color: "bg-gray-500/40", title: "Checking daemons..." };
+function getDaemonDot(ds: DaemonStatus | null | undefined): { color: string; title: string; status: string } {
+  if (!ds) return { color: "bg-gray-500/40", title: "Checking daemons...", status: "loading" };
   const { conductor, arkd } = ds;
-  if (conductor.online && arkd.online) return { color: "bg-green-500", title: "Conductor and arkd online" };
+  if (conductor.online && arkd.online)
+    return { color: "bg-green-500", title: "Conductor and arkd online", status: "online" };
   if (conductor.online || arkd.online) {
     return {
       color: "bg-yellow-500",
       title: `${conductor.online ? "Conductor" : "arkd"} online, ${conductor.online ? "arkd" : "conductor"} offline`,
+      status: "partial",
     };
   }
-  return { color: "bg-red-500", title: "Daemon offline -- run: ark server daemon start" };
+  return { color: "bg-red-500", title: "Daemon offline -- run: ark server daemon start", status: "offline" };
 }
 
 export function IconRail({
@@ -59,10 +61,13 @@ export function IconRail({
       aria-label="Main navigation"
       {...props}
     >
-      {/* Logo */}
+      {/* Logo -- drag-region so the rail top doubles as a window drag handle
+          on Electron; macOS adds top padding via styles.css so the brand
+          clears the traffic-light buttons. */}
       {logo ?? (
-        <div className="relative mb-4">
+        <div className="relative mb-4 drag-region">
           <div
+            data-testid="sidebar-brand"
             className={cn(
               "w-7 h-7 rounded-[var(--radius-sm)] flex items-center justify-center",
               "font-bold text-[12px] text-white cursor-pointer",
@@ -77,6 +82,8 @@ export function IconRail({
             A
           </div>
           <span
+            data-testid="daemon-status-dot"
+            data-status={dot.status}
             className={cn(
               "absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[var(--bg-sidebar)]",
               dot.color,

@@ -4,9 +4,9 @@ import { cn } from "../../lib/utils.js";
 const dotVariants = cva("rounded-full shrink-0", {
   variants: {
     status: {
-      running: "bg-[var(--running)] shadow-[var(--running-glow)]",
+      running: "bg-[var(--running)] shadow-[0_0_8px_rgba(96,165,250,0.4)]",
       waiting: "bg-[var(--waiting)]",
-      completed: "bg-[var(--completed)]",
+      completed: "bg-[var(--completed)] shadow-[0_0_4px_rgba(52,211,153,0.4)]",
       failed: "bg-[var(--failed)] shadow-[var(--failed-glow)]",
       stopped: "bg-[var(--stopped)]",
       pending: "bg-[var(--stopped)] opacity-60",

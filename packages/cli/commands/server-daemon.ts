@@ -143,6 +143,16 @@ export function registerServerDaemonCommands(serverCmd: Command) {
       const { registerAllHandlers } = await import("../../server/register.js");
 
       const config = loadConfig();
+
+      // Warn if ARK_TEST_DIR is set -- this causes the daemon to use a different
+      // database than the default ~/.ark/ark.db, which can silently break session
+      // dispatch and stage advancement.
+      if (process.env.ARK_TEST_DIR) {
+        console.log(chalk.yellow(`WARNING: ARK_TEST_DIR is set (${process.env.ARK_TEST_DIR})`));
+        console.log(chalk.yellow(`Daemon will use ${config.arkDir} instead of ~/.ark`));
+        console.log(chalk.yellow(`Unset ARK_TEST_DIR if this is not intentional.`));
+      }
+
       const app = new AppContext(config);
       await app.boot();
 

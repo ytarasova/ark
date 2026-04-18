@@ -150,7 +150,7 @@ export async function createSessionAsync(
     "-s",
     name,
     "-x",
-    String(opts?.width ?? 220),
+    String(opts?.width ?? 120),
     "-y",
     String(opts?.height ?? 50),
     "bash",
@@ -179,7 +179,7 @@ export async function createSessionWithSendKeysAsync(
     "-s",
     name,
     "-x",
-    String(opts?.width ?? 220),
+    String(opts?.width ?? 120),
     "-y",
     String(opts?.height ?? 50),
   ]);

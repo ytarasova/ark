@@ -2,17 +2,31 @@
  * Static terminal renderer -- displays recorded terminal output using xterm.js
  * so ANSI escape codes (colors, formatting) render correctly.
  *
- * Unlike TerminalPanel (which connects via WebSocket for live I/O), this
- * component simply writes pre-recorded output into an xterm instance.
+ * Uses manual column detection (not FitAddon) so horizontal scroll works:
+ * we size the terminal to the widest line in the output, and the container
+ * has overflow-x-auto so users can scroll to see long lines.
  */
 
 import { useEffect, useRef } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
-import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 
 interface StaticTerminalProps {
   output: string;
+}
+
+const ANSI_RE = /\x1b\[[0-9;?]*[A-Za-z]/g;
+
+function stripAnsi(s: string): string {
+  return s.replace(ANSI_RE, "");
+}
+
+function detectCols(output: string): number {
+  let max = 80;
+  for (const line of stripAnsi(output).split("\n")) {
+    if (line.length > max) max = line.length;
+  }
+  return max;
 }
 
 export function StaticTerminal({ output }: StaticTerminalProps) {
@@ -21,15 +35,19 @@ export function StaticTerminal({ output }: StaticTerminalProps) {
   useEffect(() => {
     if (!containerRef.current || !output) return;
 
+    const cols = detectCols(output);
+    const cellHeight = 14;
+
     const term = new XTerm({
+      cols,
       cursorBlink: false,
       disableStdin: true,
-      fontSize: 13,
+      fontSize: 10,
       fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', monospace",
       theme: {
         background: "#0a0a0a",
         foreground: "#e4e4e7",
-        cursor: "#0a0a0a", // hide cursor
+        cursor: "#0a0a0a",
         selectionBackground: "#3f3f46",
         black: "#09090b",
         red: "#ef4444",
@@ -52,17 +70,18 @@ export function StaticTerminal({ output }: StaticTerminalProps) {
       allowProposedApi: true,
     });
 
-    const fit = new FitAddon();
-    term.loadAddon(fit);
     term.open(containerRef.current);
-    fit.fit();
-
-    // Write the recorded output
     term.write(output);
 
-    const resizeObserver = new ResizeObserver(() => {
-      fit.fit();
-    });
+    const fitRows = () => {
+      const host = containerRef.current;
+      if (!host) return;
+      const rows = Math.max(1, Math.floor(host.clientHeight / cellHeight));
+      term.resize(cols, rows);
+    };
+    fitRows();
+
+    const resizeObserver = new ResizeObserver(fitRows);
     resizeObserver.observe(containerRef.current);
 
     return () => {
@@ -71,7 +90,5 @@ export function StaticTerminal({ output }: StaticTerminalProps) {
     };
   }, [output]);
 
-  return (
-    <div ref={containerRef} className="w-full rounded-lg overflow-hidden bg-[#0a0a0a]" style={{ minHeight: "400px" }} />
-  );
+  return <div ref={containerRef} className="w-full h-full min-h-0 overflow-x-auto overflow-y-hidden bg-[#0a0a0a]" />;
 }

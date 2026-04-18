@@ -23,12 +23,12 @@
   --primary-fg: #ffffff;
   --border: #252540;
   --border-light: #1e1e30;
-  --running: #34d399;
+  --running: #60a5fa;
   --waiting: #fbbf24;
-  --completed: #60a5fa;
+  --completed: #34d399;
   --failed: #f87171;
   --stopped: rgba(107, 114, 128, 0.4);
-  --running-glow: 0 0 8px rgba(52, 211, 153, 0.4);
+  --running-glow: 0 0 8px rgba(96, 165, 250, 0.4);
   --failed-glow: 0 0 8px rgba(248, 113, 113, 0.3);
   --diff-add-bg: rgba(52, 211, 153, 0.08);
   --diff-add-fg: #34d399;
