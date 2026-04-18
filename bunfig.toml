@@ -1,3 +1,8 @@
 [test]
 preload = ["./packages/test-setup.ts"]
 root = ["./packages"]
+# Exclude Playwright specs from bun:test discovery. `.spec.ts` files live under
+# `packages/e2e/` and `packages/desktop/tests/` and are run only by
+# `bunx playwright test`. Without this, bun's auto-scanner loads them and
+# crashes on `test.beforeAll()` (Playwright's runner isn't set up).
+pathIgnorePatterns = ["**/*.spec.ts"]
