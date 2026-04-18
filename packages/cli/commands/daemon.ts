@@ -61,6 +61,10 @@ export function registerDaemonCommands(program: Command) {
     .option("-p, --port <port>", "Port", "19300")
     .option("--hostname <host>", "Bind address", "0.0.0.0")
     .option("--conductor-url <url>", "Conductor URL for channel relay")
+    .option(
+      "--workspace-root <path>",
+      "Confine /file/* and /exec to this directory (recommended in hosted / multi-tenant deployments)",
+    )
     .option("-d, --detach", "Run in background (detached mode)")
     .action(async (opts) => {
       const port = parseInt(opts.port, 10);
@@ -82,6 +86,7 @@ export function registerDaemonCommands(program: Command) {
         const arkBin = process.argv[1];
         const args = ["daemon", "start", "--port", String(port), "--hostname", host];
         if (opts.conductorUrl) args.push("--conductor-url", opts.conductorUrl);
+        if (opts.workspaceRoot) args.push("--workspace-root", opts.workspaceRoot);
 
         const proc = Bun.spawn({
           cmd: ["bun", arkBin, ...args],
@@ -133,7 +138,11 @@ export function registerDaemonCommands(program: Command) {
         startedAt: new Date().toISOString(),
       });
 
-      const daemon = startArkd(port, { conductorUrl, hostname: host });
+      const daemon = startArkd(port, {
+        conductorUrl,
+        hostname: host,
+        workspaceRoot: opts.workspaceRoot,
+      });
 
       console.log(chalk.green(`Daemon started on ${host}:${port} (pid ${process.pid})`));
       console.log(chalk.dim("Press Ctrl+C to stop"));

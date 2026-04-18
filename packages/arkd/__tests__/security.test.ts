@@ -2,9 +2,13 @@
  * Security tests for ArkD server:
  * - Bearer token authentication
  * - Exec command allowlist
+ * - P1-4 workspace confinement for /file/* and /exec
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 import { startArkd } from "../server.js";
 
 // ── Auth tests ────────────────────────────────────────────────────────────────
@@ -137,5 +141,135 @@ describe("ArkD exec command allowlist", () => {
     const data = (await resp.json()) as any;
     expect(data.exitCode).toBe(0);
     expect(data.stdout.trim()).toBe("ok");
+  });
+});
+
+// ── P1-4: workspace-root confinement ──────────────────────────────────────────
+//
+// When arkd is booted with `workspaceRoot`, /file/* and /exec must reject
+// every path that resolves outside that root, and honour the confinement
+// for cwd on /exec. The legacy no-confinement mode is preserved for
+// local-only / single-user deployments (tested elsewhere).
+
+describe("ArkD workspace confinement (P1-4)", () => {
+  const CONFINE_PORT = 19372;
+  const CONFINE_BASE = `http://localhost:${CONFINE_PORT}`;
+  let server: { stop(): void };
+  let workspaceRoot: string;
+
+  beforeAll(() => {
+    workspaceRoot = mkdtempSync(join(tmpdir(), "arkd-confined-"));
+    // Seed a readable file inside the root so happy-path tests have something
+    // to read back without depending on the host filesystem.
+    writeFileSync(join(workspaceRoot, "ok.txt"), "inside");
+    server = startArkd(CONFINE_PORT, { quiet: true, workspaceRoot });
+  });
+
+  afterAll(() => {
+    server.stop();
+    try {
+      rmSync(workspaceRoot, { recursive: true, force: true });
+    } catch {
+      /* best-effort cleanup */
+    }
+  });
+
+  it("/file/read of /etc/passwd returns 403", async () => {
+    const resp = await fetch(`${CONFINE_BASE}/file/read`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: "/etc/passwd" }),
+    });
+    expect(resp.status).toBe(403);
+    const data = (await resp.json()) as any;
+    expect(data.error).toMatch(/workspace/);
+  });
+
+  it("/file/read with ../../escape is rejected with 403", async () => {
+    const resp = await fetch(`${CONFINE_BASE}/file/read`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: "../../etc/passwd" }),
+    });
+    expect(resp.status).toBe(403);
+  });
+
+  it("/file/write to an absolute path outside root returns 403", async () => {
+    const resp = await fetch(`${CONFINE_BASE}/file/write`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: "/tmp/evil-should-not-exist.txt", content: "nope" }),
+    });
+    expect(resp.status).toBe(403);
+  });
+
+  it("/file/mkdir outside root returns 403", async () => {
+    const resp = await fetch(`${CONFINE_BASE}/file/mkdir`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: "/var/tmp/arkd-breakout" }),
+    });
+    expect(resp.status).toBe(403);
+  });
+
+  it("/file/list of / is rejected with 403", async () => {
+    const resp = await fetch(`${CONFINE_BASE}/file/list`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: "/" }),
+    });
+    expect(resp.status).toBe(403);
+  });
+
+  it("/file/read of a path inside the root succeeds", async () => {
+    const resp = await fetch(`${CONFINE_BASE}/file/read`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: join(workspaceRoot, "ok.txt") }),
+    });
+    expect(resp.status).toBe(200);
+    const data = (await resp.json()) as any;
+    expect(data.content).toBe("inside");
+  });
+
+  it("/file/write inside the root succeeds", async () => {
+    const target = join(workspaceRoot, "subdir/new.txt");
+    // Create the parent first via /file/mkdir (also confined).
+    const mkResp = await fetch(`${CONFINE_BASE}/file/mkdir`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: join(workspaceRoot, "subdir") }),
+    });
+    expect(mkResp.status).toBe(200);
+    const resp = await fetch(`${CONFINE_BASE}/file/write`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: target, content: "ok" }),
+    });
+    expect(resp.status).toBe(200);
+  });
+
+  it("/exec with cwd outside root returns 403", async () => {
+    const resp = await fetch(`${CONFINE_BASE}/exec`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ command: "echo", args: ["hi"], cwd: "/etc" }),
+    });
+    expect(resp.status).toBe(403);
+  });
+
+  it("/exec without cwd defaults to the workspace root", async () => {
+    const resp = await fetch(`${CONFINE_BASE}/exec`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ command: "pwd", args: [] }),
+    });
+    expect(resp.status).toBe(200);
+    const data = (await resp.json()) as any;
+    // resolved workspaceRoot may differ by one trailing symlink segment on
+    // macOS (/var vs /private/var). Compare by endsWith on the last path
+    // component, which is unique per `mkdtempSync` invocation.
+    const lastSeg = workspaceRoot.split("/").filter(Boolean).pop()!;
+    expect(data.stdout.trim()).toContain(lastSeg);
   });
 });

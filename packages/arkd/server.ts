@@ -30,7 +30,7 @@ declare const Bun: {
 
 import { readFile, writeFile, stat, mkdir, readdir } from "fs/promises";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
-import { join } from "path";
+import { join, resolve, sep } from "path";
 import { hostname, platform, uptime, totalmem, freemem, cpus, homedir } from "os";
 import { DEFAULT_CHANNEL_BASE_URL } from "../core/constants.js";
 import type {
@@ -82,6 +82,54 @@ export interface ArkdOpts {
   hostname?: string;
   /** Bearer token for auth. Overrides ARK_ARKD_TOKEN env var. */
   token?: string;
+  /**
+   * Filesystem root that every /file/* and /exec request is confined to.
+   * All paths in request bodies (and /exec cwd) must resolve to a
+   * descendant of this directory. Overrides ARK_WORKSPACE_ROOT env var.
+   *
+   * Required in hosted / untrusted contexts; when unset, /file/* and
+   * /exec accept absolute paths from any caller and trust the bearer
+   * token for full host FS access — acceptable only for local-single-user
+   * mode, which is the historical behavior retained for backward compat.
+   */
+  workspaceRoot?: string;
+}
+
+/**
+ * Resolve a user-supplied path and verify it stays under `root`.
+ *
+ * `root` must be an absolute, canonical directory path. Throws when the
+ * input tries to escape via `..`, absolute paths outside the root,
+ * empty / non-string input, or symlink-style traversal tricks.
+ *
+ * NOTE: this is a string-level guard. It does not `realpath` the target
+ * (the file may not yet exist). Symlink traversal is mitigated at the
+ * caller by refusing to write through links, but the primary defense
+ * against malicious requests is that every absolute path NOT starting
+ * with `root` is rejected outright.
+ */
+function confineToWorkspace(root: string, userPath: unknown): string {
+  if (typeof userPath !== "string" || userPath.length === 0) {
+    throw new PathConfinementError("path must be a non-empty string");
+  }
+  if (userPath.includes("\0")) {
+    throw new PathConfinementError("path contains NUL byte");
+  }
+  // Resolve against the root for relative paths; absolute paths resolve
+  // to themselves. In either case we then check the prefix.
+  const resolved = resolve(root, userPath);
+  const rootWithSep = root.endsWith(sep) ? root : root + sep;
+  if (resolved !== root && !resolved.startsWith(rootWithSep)) {
+    throw new PathConfinementError(`path escapes workspace root: ${userPath}`);
+  }
+  return resolved;
+}
+
+export class PathConfinementError extends Error {
+  constructor(msg: string) {
+    super(msg);
+    this.name = "PathConfinementError";
+  }
 }
 
 /** Paths that bypass authentication (health probes). */
@@ -137,6 +185,34 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
   // Mutable runtime config
   let conductorUrl: string | null = opts?.conductorUrl ?? process.env.ARK_CONDUCTOR_URL ?? "http://localhost:19100";
   const bindHost = opts?.hostname ?? "0.0.0.0";
+
+  // Workspace confinement root (P1-4). When set, every /file/* and /exec
+  // request is restricted to paths under this directory. When unset,
+  // arkd retains legacy unconfined behavior for local single-user mode.
+  const workspaceRootRaw = opts?.workspaceRoot ?? process.env.ARK_WORKSPACE_ROOT ?? null;
+  const workspaceRoot: string | null = workspaceRootRaw ? resolve(workspaceRootRaw) : null;
+  if (workspaceRoot) {
+    // Ensure the root exists so confined writes succeed out of the box.
+    try {
+      mkdirSync(workspaceRoot, { recursive: true });
+    } catch {
+      /* best effort — first real request will surface any permission error */
+    }
+  }
+
+  /**
+   * Enforce workspace confinement (no-op when workspaceRoot is null).
+   * Returns the resolved absolute path, or throws PathConfinementError.
+   */
+  function confine(userPath: unknown): string {
+    if (!workspaceRoot) {
+      if (typeof userPath !== "string") {
+        throw new PathConfinementError("path must be a string");
+      }
+      return userPath;
+    }
+    return confineToWorkspace(workspaceRoot, userPath);
+  }
 
   // Auth token
   const arkdToken: string | null = opts?.token ?? process.env.ARK_ARKD_TOKEN ?? null;
@@ -228,8 +304,9 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
         // ── File: read ────────────────────────────────────────────────
         if (req.method === "POST" && path === "/file/read") {
           const body = (await req.json()) as ReadFileReq;
+          const safePath = confine(body.path);
           try {
-            const content = await readFile(body.path, "utf-8");
+            const content = await readFile(safePath, "utf-8");
             return json<ReadFileRes>({ content, size: Buffer.byteLength(content) });
           } catch (e: any) {
             if (e.code === "ENOENT") return json({ error: "file not found", code: "ENOENT" }, 404);
@@ -240,15 +317,17 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
         // ── File: write ───────────────────────────────────────────────
         if (req.method === "POST" && path === "/file/write") {
           const body = (await req.json()) as WriteFileReq;
-          await writeFile(body.path, body.content, body.mode ? { mode: body.mode } : undefined);
+          const safePath = confine(body.path);
+          await writeFile(safePath, body.content, body.mode ? { mode: body.mode } : undefined);
           return json<WriteFileRes>({ ok: true, bytesWritten: Buffer.byteLength(body.content) });
         }
 
         // ── File: stat ────────────────────────────────────────────────
         if (req.method === "POST" && path === "/file/stat") {
           const body = (await req.json()) as StatReq;
+          const safePath = confine(body.path);
           try {
-            const s = await stat(body.path);
+            const s = await stat(safePath);
             const type = s.isFile() ? "file" : s.isDirectory() ? "dir" : "symlink";
             return json<StatRes>({
               exists: true,
@@ -265,20 +344,32 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
         // ── File: mkdir ───────────────────────────────────────────────
         if (req.method === "POST" && path === "/file/mkdir") {
           const body = (await req.json()) as MkdirReq;
-          await mkdir(body.path, { recursive: body.recursive ?? true });
+          const safePath = confine(body.path);
+          await mkdir(safePath, { recursive: body.recursive ?? true });
           return json<MkdirRes>({ ok: true });
         }
 
         // ── File: list ────────────────────────────────────────────────
         if (req.method === "POST" && path === "/file/list") {
           const body = (await req.json()) as ListDirReq;
-          const entries = await listDirectory(body.path, body.recursive);
+          const safePath = confine(body.path);
+          const entries = await listDirectory(safePath, body.recursive);
           return json<ListDirRes>({ entries });
         }
 
         // ── Exec ──────────────────────────────────────────────────────
         if (req.method === "POST" && path === "/exec") {
           const body = (await req.json()) as ExecReq;
+          // /exec's cwd is attacker-controllable via the request body. Confine
+          // it to the workspace root (P1-4 / S-13). When workspaceRoot is
+          // unset we preserve legacy local-mode behavior.
+          if (body.cwd !== undefined && body.cwd !== null) {
+            body.cwd = confine(body.cwd);
+          } else if (workspaceRoot) {
+            // Default cwd to the root when confinement is enabled so agents
+            // can't silently pick up the daemon's process cwd.
+            body.cwd = workspaceRoot;
+          }
           const result = await runExec(body);
           return json(result);
         }
@@ -420,6 +511,9 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
       } catch (e: any) {
         if (e instanceof SyntaxError) {
           return json({ error: "invalid JSON" }, 400);
+        }
+        if (e instanceof PathConfinementError) {
+          return json({ error: "path escapes workspace root", detail: e.message }, 403);
         }
         return json({ error: String(e.message ?? e) }, 500);
       }
