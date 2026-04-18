@@ -947,8 +947,8 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
           <Button
             type="submit"
             size="sm"
-            disabled={!summary.trim() || !daemonOnline}
-            title={!daemonOnline ? "Start the daemon first" : undefined}
+            disabled={!summary.trim()}
+            title={!daemonOnline ? "Daemon offline -- session will be created but not dispatched" : undefined}
           >
             Start Session{" "}
             <kbd className="ml-1 text-[9px] opacity-40 font-mono bg-[var(--bg-hover)] px-1 py-0.5 rounded">

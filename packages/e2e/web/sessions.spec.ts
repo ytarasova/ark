@@ -55,12 +55,13 @@ test("sessions page shows filter chips", async () => {
   await page.reload();
   await page.waitForSelector("nav", { timeout: 10_000 });
   await goToSessions();
-  // Chips render as "{count} {status}" so match by status substring.
+  // Chips render as "{count} {status}" -- match any chip with a status word.
   await expect(
-    page.locator('button:text-matches("\\\\d+ (running|waiting|completed|failed)", "i")').first(),
-  ).toBeVisible({
-    timeout: 10_000,
-  });
+    page
+      .locator("button")
+      .filter({ hasText: /\d+ (running|waiting|completed|failed)/i })
+      .first(),
+  ).toBeVisible({ timeout: 10_000 });
 });
 
 test("sessions page shows New Session button", async () => {
