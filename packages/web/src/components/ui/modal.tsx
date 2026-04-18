@@ -1,4 +1,5 @@
-import { useEffect, type ReactNode, type MouseEvent } from "react";
+import type { ReactNode } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 import { cn } from "../../lib/utils.js";
 
 interface ModalProps {
@@ -10,42 +11,36 @@ interface ModalProps {
 }
 
 /**
- * Minimal overlay modal used by the folder picker. Intentionally tiny --
- * backdrop, centered panel, Escape/backdrop-click to close. Reach for
- * something heavier only if a second consumer needs it.
+ * Minimal overlay modal used by the folder picker. Built on Radix
+ * `Dialog` for focus trap, focus restoration, Esc-to-close,
+ * `aria-modal`, and `aria-labelledby` wiring.
+ *
+ * See `.workflow/audit/8-a11y.md` findings A4 + B5.
  */
 export function Modal({ open, onClose, title, className, children }: ModalProps) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
-  const stop = (e: MouseEvent) => e.stopPropagation();
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-    >
-      <div
-        className={cn(
-          "flex max-h-[85vh] w-[min(560px,90vw)] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl",
-          className,
-        )}
-        onClick={stop}
-      >
-        {title && <div className="border-b border-border px-5 py-3 text-sm font-semibold text-foreground">{title}</div>}
-        <div className="flex min-h-0 flex-1 flex-col">{children}</div>
-      </div>
-    </div>
+    <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60" />
+        <Dialog.Content
+          className={cn(
+            "fixed top-1/2 left-1/2 z-50 -translate-x-1/2 -translate-y-1/2",
+            "flex max-h-[85vh] w-[min(560px,90vw)] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl",
+            "focus:outline-none",
+            className,
+          )}
+          aria-describedby={undefined}
+        >
+          {title ? (
+            <Dialog.Title className="border-b border-border px-5 py-3 text-sm font-semibold text-foreground">
+              {title}
+            </Dialog.Title>
+          ) : (
+            <Dialog.Title className="sr-only">Dialog</Dialog.Title>
+          )}
+          <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

@@ -270,7 +270,8 @@ function RepoDropdown({
                   }
                 }}
                 placeholder="Type path or search..."
-                className="w-full bg-transparent text-[12px] text-[var(--fg)] outline-none placeholder:text-[var(--fg-faint)]"
+                aria-label="Repository path"
+                className="w-full bg-transparent text-[12px] text-[var(--fg)] outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] rounded-[4px] placeholder:text-[var(--fg-faint)]"
               />
             </div>
           </div>
@@ -689,7 +690,8 @@ function RichTaskInput({
           className={cn(
             "w-full bg-transparent text-[var(--fg)]",
             "text-[14px] leading-relaxed px-4 py-3 resize-none",
-            "focus:outline-none",
+            "focus:outline-none focus-visible:outline-none",
+            "focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-inset rounded-lg",
             "placeholder:text-[var(--fg-muted)]",
           )}
         />
@@ -754,6 +756,25 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
   const [selectedCompute, setSelectedCompute] = useState("");
   const [attachments, setAttachments] = useState<AttachmentInfo[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  // Save trigger so we can restore focus on close.
+  // See `.workflow/audit/8-a11y.md` finding A4.
+  // Capture BEFORE the component's autoFocus textarea steals focus -- lazy
+  // useState init runs during first render (pre-commit), whereas useEffect
+  // runs after commit (post-autoFocus), by which time activeElement is the
+  // textarea, not the trigger button.
+  const [triggerElement] = useState<HTMLElement | null>(() =>
+    typeof document !== "undefined" ? (document.activeElement as HTMLElement | null) : null,
+  );
+  useEffect(() => {
+    return () => {
+      try {
+        triggerElement?.focus?.();
+      } catch {
+        /* ignore */
+      }
+    };
+  }, [triggerElement]);
 
   const references = detectReferences(summary);
 
@@ -814,12 +835,13 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
     ((currentFlow.description || "").toLowerCase().includes("ticket") ||
       (currentFlow.stages || []).some((s) => s.toLowerCase().includes("ticket")));
 
-  // Keyboard shortcuts: Cmd+Enter to submit, Escape to cancel
+  // Keyboard shortcuts: Cmd+Enter to submit, Escape to cancel, Tab/Shift+Tab focus trap.
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.preventDefault();
         onClose();
+        return;
       }
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && summary.trim() && daemonOnline) {
         e.preventDefault();
@@ -835,6 +857,57 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
           attachments,
           references,
         });
+        return;
+      }
+      // Focus trap: keep Tab cycling inside the panel while it's open.
+      // The panel renders inline (not as a true modal overlay), so without
+      // this trap Tab escapes to the surrounding page chrome (sidebar nav,
+      // header actions, etc.) and violates the a11y invariant that the
+      // active configuration surface "owns" keyboard focus.
+      // See `.workflow/audit/8-a11y.md` finding A3.
+      //
+      // Edge case: Radix Popover content is rendered through a portal
+      // (outside panelRef). When a popover is open we leave focus alone so
+      // the user can navigate its items -- Radix manages that focus scope
+      // itself and returns focus to the trigger on close.
+      if (e.key === "Tab") {
+        const panel = panelRef.current;
+        if (!panel) return;
+        const active = document.activeElement as HTMLElement | null;
+        const inPortal = !!active?.closest("[data-radix-popper-content-wrapper], [role=dialog]");
+        if (inPortal) return;
+        const focusables = Array.from(
+          panel.querySelectorAll<HTMLElement>(
+            'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          ),
+        ).filter((el) => {
+          if (el.hasAttribute("disabled")) return false;
+          if (el.getAttribute("aria-hidden") === "true") return false;
+          // Exclude hidden inputs (file inputs rendered with class="hidden").
+          const style = window.getComputedStyle(el);
+          if (style.display === "none" || style.visibility === "hidden") return false;
+          return true;
+        });
+        if (focusables.length === 0) {
+          e.preventDefault();
+          panel.focus();
+          return;
+        }
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        const activeInside = active && panel.contains(active);
+        if (!activeInside) {
+          e.preventDefault();
+          first.focus();
+          return;
+        }
+        if (e.shiftKey && active === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && active === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -859,9 +932,18 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
   }
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto">
+    <div
+      ref={panelRef}
+      tabIndex={-1}
+      className="flex flex-col h-full overflow-y-auto"
+      role="region"
+      aria-labelledby="new-session-title"
+      data-testid="new-session-modal"
+    >
       <div className="p-5 pb-0">
-        <h2 className="text-base font-semibold text-[var(--fg)] mb-1">New Session</h2>
+        <h2 id="new-session-title" className="text-base font-semibold text-[var(--fg)] mb-1">
+          New Session
+        </h2>
         <p className="text-[12px] text-[var(--fg-muted)] mb-5">Configure and launch an agent session</p>
       </div>
 

@@ -19,8 +19,17 @@ export function Toast({ message, type, onDone }: { message: string; type: string
     });
   }
 
+  // SR announcement: errors are assertive (role=alert), others polite (role=status).
+  // See `.workflow/audit/8-a11y.md` finding B2.
+  const isError = type === "error";
+  const role = isError ? "alert" : "status";
+  const ariaLive = isError ? "assertive" : "polite";
+
   return (
     <div
+      role={role}
+      aria-live={ariaLive}
+      aria-atomic="true"
       className={cn(
         "fixed bottom-5 right-5 px-[18px] py-2.5 bg-card border border-border rounded-xl text-foreground text-[13px] font-medium z-[300] shadow-[0_4px_20px_rgba(0,0,0,0.4)] animate-[slide-up_300ms_cubic-bezier(0.32,0.72,0,1)] flex items-start gap-2",
         type === "success" && "border-l-[3px] border-l-[var(--running)]",

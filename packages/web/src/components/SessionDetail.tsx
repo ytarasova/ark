@@ -8,7 +8,7 @@ import { Loader2 } from "lucide-react";
 
 // UI components
 import { SessionHeader } from "./ui/SessionHeader.js";
-import { ContentTabs, type TabDef } from "./ui/ContentTabs.js";
+import { ContentTabs, tabButtonId, tabPanelId, type TabDef } from "./ui/ContentTabs.js";
 import { ChatInput } from "./ui/ChatInput.js";
 import { ScrollProgress } from "./ui/ScrollProgress.js";
 import { AgentMessage } from "./ui/AgentMessage.js";
@@ -445,13 +445,18 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         </div>
       )}
 
-      <ContentTabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
+      <ContentTabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} ariaLabel="Session detail tabs" />
 
       <div
         ref={scrollRef}
+        role="tabpanel"
+        id={tabPanelId(activeTab)}
+        aria-labelledby={tabButtonId(activeTab)}
+        tabIndex={0}
         className={cn(
           "flex-1 min-h-0",
           activeTab === "terminal" ? "flex flex-col overflow-hidden p-2" : "overflow-y-auto px-6 py-6",
+          "focus-visible:outline-none",
         )}
         onScroll={handleScroll}
       >

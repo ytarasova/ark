@@ -49,15 +49,29 @@ export function Layout({ view, onNavigate, daemonStatus, children, totalUnread }
   // Keyboard shortcuts for navigation
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
+      // Do not fire nav shortcuts when focus is in any interactive/text-entry
+      // element. We check both the event target and document.activeElement
+      // because Tab-stops like buttons and [contenteditable] divs won't set
+      // e.target the way inputs do.
+      // See `.workflow/audit/8-a11y.md` finding A1.
+      const target = e.target as HTMLElement | null;
+      const active = document.activeElement as HTMLElement | null;
+      const el = target ?? active;
+      if (el) {
+        const tag = el.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "BUTTON") return;
+        if (el.isContentEditable) return;
+        const role = el.getAttribute?.("role");
+        if (role === "textbox" || role === "combobox" || role === "searchbox") return;
+      }
+
       const key = e.key.toLowerCase();
-      const target = SHORTCUTS[key] || SHORTCUTS[e.key];
-      if (target) {
+      const dest = SHORTCUTS[key] || SHORTCUTS[e.key];
+      if (dest) {
         e.preventDefault();
-        onNavigate(target);
+        onNavigate(dest);
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -73,7 +87,9 @@ export function Layout({ view, onNavigate, daemonStatus, children, totalUnread }
         settingsItem={SETTINGS_ITEM}
         daemonStatus={daemonStatus}
       />
-      <div className="flex-1 flex min-w-0 overflow-hidden">{children}</div>
+      <main id="main" className="flex-1 flex min-w-0 overflow-hidden">
+        {children}
+      </main>
     </div>
   );
 }
