@@ -21,12 +21,24 @@ describe("SessionRepository", () => {
 
   it("create returns session with correct defaults", () => {
     const s = repo.create({});
-    expect(s.id).toMatch(/^s-[0-9a-f]{6}$/);
+    // Session IDs are `s-<10 url-safe lowercase alphanumeric>` via nanoid.
+    expect(s.id).toMatch(/^s-[0-9a-z]{10}$/);
     expect(s.status).toBe("pending");
     expect(s.flow).toBe("default");
     expect(s.config).toEqual({});
     expect(s.created_at).toBeTruthy();
     expect(s.updated_at).toBeTruthy();
+  });
+
+  it("create generates unique, collision-free IDs across a batch", () => {
+    const ids = new Set<string>();
+    for (let i = 0; i < 200; i++) {
+      const s = repo.create({});
+      expect(s.id).toMatch(/^s-[0-9a-z]{10}$/);
+      expect(ids.has(s.id)).toBe(false);
+      ids.add(s.id);
+    }
+    expect(ids.size).toBe(200);
   });
 
   it("create stores ticket, summary, repo and generates branch", () => {

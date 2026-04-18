@@ -5,6 +5,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
+import { nanoid } from "nanoid";
 import type { AppContext } from "./app.js";
 
 export interface LedgerEntry {
@@ -56,7 +57,7 @@ export function addEntry(
 ): LedgerEntry {
   const ledger = loadLedger(app, conductorId);
   const entry: LedgerEntry = {
-    id: `le-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    id: `le-${nanoid(10)}`,
     type,
     content,
     status: type === "plan_step" ? "pending" : undefined,
@@ -97,7 +98,7 @@ export function detectStall(app: AppContext, conductorId: string, thresholdMinut
     // Mutate and save in one step to avoid addEntry overwriting our stallCount bump
     ledger.stallCount++;
     ledger.entries.push({
-      id: `le-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      id: `le-${nanoid(10)}`,
       type: "stall",
       content: `No progress for ${thresholdMinutes} minutes`,
       createdAt: new Date().toISOString(),

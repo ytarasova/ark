@@ -59,9 +59,13 @@ export function cleanupLogs(app: AppContext, opts?: LogManagerOptions): { trunca
 
       // Remove orphaned logs
       if (o.removeOrphans) {
-        // Extract session ID from filename (ark-s-<id>.log pattern)
-        const match = file.match(/s-([a-f0-9]+)/);
-        if (match && !sessionIds.has(`s-${match[1]}`)) {
+        // Extract session ID from filename (ark-s-<id>.log pattern).
+        // Session ids use the lowercase alphanumeric alphabet (0-9a-z); match
+        // the full suffix up to `.log` so ids longer than the legacy 6-hex
+        // format are not truncated (which would make every live session log
+        // look orphaned).
+        const match = file.match(/^ark-(s-[0-9a-z]+)\.log$/);
+        if (match && !sessionIds.has(match[1])) {
           unlinkSync(filePath);
           removed++;
         }

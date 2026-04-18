@@ -1,24 +1,32 @@
 import "./styles.css";
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { queryClient, QueryClientProvider } from "./providers/QueryProvider.js";
 import { ThemeProvider, useTheme } from "./themes/ThemeProvider.js";
 import { Toast } from "./components/Toast.js";
 import { CommandPalette, type CommandItem } from "./components/ui/CommandPalette.js";
-import { SessionsPage } from "./pages/SessionsPage.js";
-import { ToolsPage } from "./pages/ToolsPage.js";
-import { AgentsPage } from "./pages/AgentsPage.js";
-import { FlowsPage } from "./pages/FlowsPage.js";
-import { HistoryPage } from "./pages/HistoryPage.js";
-import { ComputePage } from "./pages/ComputePage.js";
-import { SchedulesPage } from "./pages/SchedulesPage.js";
-import { MemoryPage } from "./pages/MemoryPage.js";
-import { CostsPage } from "./pages/CostsPage.js";
-import { SettingsPage } from "./pages/SettingsPage.js";
-import { LoginPage } from "./pages/LoginPage.js";
-import { DesignPreviewPage } from "./pages/DesignPreviewPage.js";
+import { PageFallback } from "./components/ui/PageFallback.js";
 import { useDaemonStatus } from "./hooks/useDaemonStatus.js";
 import { useHashRouter } from "./hooks/useHashRouter.js";
+
+// Pages are lazy-loaded so each one ships as its own chunk. Heavy libraries
+// (@xyflow/react via FlowsPage, recharts via CostsPage + ComputePage,
+// @xterm/xterm via SessionsPage) ride along with their page chunk and stay
+// out of the initial bundle.
+const SessionsPage = lazy(() => import("./pages/SessionsPage.js").then((m) => ({ default: m.SessionsPage })));
+const ToolsPage = lazy(() => import("./pages/ToolsPage.js").then((m) => ({ default: m.ToolsPage })));
+const AgentsPage = lazy(() => import("./pages/AgentsPage.js").then((m) => ({ default: m.AgentsPage })));
+const FlowsPage = lazy(() => import("./pages/FlowsPage.js").then((m) => ({ default: m.FlowsPage })));
+const HistoryPage = lazy(() => import("./pages/HistoryPage.js").then((m) => ({ default: m.HistoryPage })));
+const ComputePage = lazy(() => import("./pages/ComputePage.js").then((m) => ({ default: m.ComputePage })));
+const SchedulesPage = lazy(() => import("./pages/SchedulesPage.js").then((m) => ({ default: m.SchedulesPage })));
+const MemoryPage = lazy(() => import("./pages/MemoryPage.js").then((m) => ({ default: m.MemoryPage })));
+const CostsPage = lazy(() => import("./pages/CostsPage.js").then((m) => ({ default: m.CostsPage })));
+const SettingsPage = lazy(() => import("./pages/SettingsPage.js").then((m) => ({ default: m.SettingsPage })));
+const LoginPage = lazy(() => import("./pages/LoginPage.js").then((m) => ({ default: m.LoginPage })));
+const DesignPreviewPage = lazy(() =>
+  import("./pages/DesignPreviewPage.js").then((m) => ({ default: m.DesignPreviewPage })),
+);
 
 const READ_ONLY = document.getElementById("root")?.dataset.readonly === "true";
 const AUTH_REQUIRED = document.getElementById("root")?.dataset.auth === "true";
@@ -98,79 +106,85 @@ function App() {
   );
 
   if (!authenticated) {
-    return <LoginPage onLogin={() => setAuthenticated(true)} />;
+    return (
+      <Suspense fallback={<PageFallback />}>
+        <LoginPage onLogin={() => setAuthenticated(true)} />
+      </Suspense>
+    );
   }
 
   return (
     <>
-      {view === "_design" && <DesignPreviewPage />}
-      {view === "sessions" && (
-        <SessionsPage
-          view={view}
-          onNavigate={onNavigate}
-          readOnly={readOnly}
-          onToast={showToast}
-          daemonStatus={daemonStatus}
-          initialSelectedId={subId}
-          onSelectedChange={setSubId}
-          initialTab={tab}
-          onTabChange={setTab}
-        />
-      )}
-      {view === "agents" && (
-        <AgentsPage
-          view={view}
-          onNavigate={onNavigate}
-          readOnly={readOnly}
-          daemonStatus={daemonStatus}
-          initialSelectedId={subId}
-          onSelectedChange={setSubId}
-        />
-      )}
-      {view === "tools" && (
-        <ToolsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
-      )}
-      {view === "flows" && (
-        <FlowsPage
-          view={view}
-          onNavigate={onNavigate}
-          readOnly={readOnly}
-          daemonStatus={daemonStatus}
-          initialSelectedId={subId}
-          onSelectedChange={setSubId}
-        />
-      )}
-      {view === "history" && (
-        <HistoryPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
-      )}
-      {view === "compute" && (
-        <ComputePage
-          view={view}
-          onNavigate={onNavigate}
-          readOnly={readOnly}
-          daemonStatus={daemonStatus}
-          initialSelectedId={subId}
-          onSelectedChange={setSubId}
-        />
-      )}
-      {view === "schedules" && (
-        <SchedulesPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
-      )}
-      {view === "memory" && (
-        <MemoryPage
-          view={view}
-          onNavigate={onNavigate}
-          readOnly={readOnly}
-          daemonStatus={daemonStatus}
-          onToast={showToast}
-        />
-      )}
-      {view === "costs" && (
-        <CostsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
-      )}
-      {view === "settings" && (
-        <SettingsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
-      )}
+      <Suspense fallback={<PageFallback />}>
+        {view === "_design" && <DesignPreviewPage />}
+        {view === "sessions" && (
+          <SessionsPage
+            view={view}
+            onNavigate={onNavigate}
+            readOnly={readOnly}
+            onToast={showToast}
+            daemonStatus={daemonStatus}
+            initialSelectedId={subId}
+            onSelectedChange={setSubId}
+            initialTab={tab}
+            onTabChange={setTab}
+          />
+        )}
+        {view === "agents" && (
+          <AgentsPage
+            view={view}
+            onNavigate={onNavigate}
+            readOnly={readOnly}
+            daemonStatus={daemonStatus}
+            initialSelectedId={subId}
+            onSelectedChange={setSubId}
+          />
+        )}
+        {view === "tools" && (
+          <ToolsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
+        )}
+        {view === "flows" && (
+          <FlowsPage
+            view={view}
+            onNavigate={onNavigate}
+            readOnly={readOnly}
+            daemonStatus={daemonStatus}
+            initialSelectedId={subId}
+            onSelectedChange={setSubId}
+          />
+        )}
+        {view === "history" && (
+          <HistoryPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
+        )}
+        {view === "compute" && (
+          <ComputePage
+            view={view}
+            onNavigate={onNavigate}
+            readOnly={readOnly}
+            daemonStatus={daemonStatus}
+            initialSelectedId={subId}
+            onSelectedChange={setSubId}
+          />
+        )}
+        {view === "schedules" && (
+          <SchedulesPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
+        )}
+        {view === "memory" && (
+          <MemoryPage
+            view={view}
+            onNavigate={onNavigate}
+            readOnly={readOnly}
+            daemonStatus={daemonStatus}
+            onToast={showToast}
+          />
+        )}
+        {view === "costs" && (
+          <CostsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
+        )}
+        {view === "settings" && (
+          <SettingsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
+        )}
+      </Suspense>
       <CommandPalette
         open={cmdkOpen}
         onOpenChange={(v) => {

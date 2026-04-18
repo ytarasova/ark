@@ -62,7 +62,7 @@ describe("core lifecycle: startSession", () => {
     });
     sessionIds.push(session.id);
 
-    expect(session.id).toMatch(/^s-[0-9a-f]+$/);
+    expect(session.id).toMatch(/^s-[0-9a-z]+$/);
     expect(session.status).toBe("ready");
     expect(session.flow).toBe("bare");
     expect(session.stage).toBe("work");

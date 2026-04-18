@@ -26,13 +26,15 @@ interface ComputeDrawerProps {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
+// Session id suffix uses the lowercase alphanumeric alphabet (0-9a-z); match
+// that, not just hex, so ids from the post-nanoid format resolve.
 function extractArkSessionId(command: string): string | null {
-  const match = command.match(/ark-s-([\da-f]+)/i);
+  const match = command.match(/ark-s-([\da-z]+)/i);
   return match ? `s-${match[1]}` : null;
 }
 
 function extractTmuxSessionId(name: string): string | null {
-  const match = name.match(/^ark-s-([\da-f]+)/i);
+  const match = name.match(/^ark-s-([\da-z]+)/i);
   return match ? `s-${match[1]}` : null;
 }
 

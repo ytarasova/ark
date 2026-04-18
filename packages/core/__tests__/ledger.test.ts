@@ -37,7 +37,9 @@ describe("loadLedger / saveLedger", () => {
 describe("addEntry", () => {
   it("creates an entry and persists it", () => {
     const entry = addEntry(getApp(), CID, "fact", "project has 10 files", "s-123");
-    expect(entry.id).toMatch(/^le-/);
+    // Ledger IDs are `le-<10 url-safe chars>` via nanoid -- non-crypto
+    // Math.random fallback is no longer acceptable here.
+    expect(entry.id).toMatch(/^le-[A-Za-z0-9_-]{10}$/);
     expect(entry.type).toBe("fact");
     expect(entry.content).toBe("project has 10 files");
     expect(entry.sessionId).toBe("s-123");
@@ -51,6 +53,17 @@ describe("addEntry", () => {
   it("sets status to pending for plan_step entries", () => {
     const entry = addEntry(getApp(), CID, "plan_step", "implement auth module");
     expect(entry.status).toBe("pending");
+  });
+
+  it("emits unique ids across a burst of entries", () => {
+    const ids = new Set<string>();
+    for (let i = 0; i < 100; i++) {
+      const e = addEntry(getApp(), CID, "fact", `burst ${i}`);
+      expect(e.id).toMatch(/^le-[A-Za-z0-9_-]{10}$/);
+      expect(ids.has(e.id)).toBe(false);
+      ids.add(e.id);
+    }
+    expect(ids.size).toBe(100);
   });
 });
 

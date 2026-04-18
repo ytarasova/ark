@@ -30,7 +30,7 @@ describe("SessionService", () => {
   describe("start", () => {
     it("creates a session with correct defaults", () => {
       const s = svc.start({});
-      expect(s.id).toMatch(/^s-[0-9a-f]{6}$/);
+      expect(s.id).toMatch(/^s-[0-9a-z]{10}$/);
       expect(s.status).toBe("pending");
       expect(s.flow).toBe("default");
     });

@@ -22,10 +22,10 @@ describe("generateId", () => {
     expect(ids.size).toBe(50);
   });
 
-  it("returns 6 hex chars after s-", () => {
+  it("returns 10 url-safe lowercase chars after s-", () => {
     const id = getApp().sessions.generateId();
-    const hex = id.slice(2);
-    expect(hex).toMatch(/^[a-f0-9]{6}$/);
+    const suffix = id.slice(2);
+    expect(suffix).toMatch(/^[a-z0-9]{10}$/);
   });
 });
 
