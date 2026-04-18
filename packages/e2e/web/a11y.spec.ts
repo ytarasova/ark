@@ -1,13 +1,13 @@
 /**
- * Accessibility invariants — guards against the critical findings from
+ * Accessibility invariants -- guards against the critical findings from
  * `.workflow/audit/8-a11y.md` agent 8 report. These are narrow behaviour
  * checks, not a full WCAG sweep:
  *
- *   1. Overlay focus discipline  — Tab cycles within an open modal.
- *   2. Esc + focus restore       — Esc closes the modal and returns focus to the trigger.
- *   3. Toast ARIA                — Error toasts expose role="alert" + aria-live.
- *   4. Tablist semantics         — ContentTabs renders role="tablist" + role="tabpanel".
- *   5. Main landmark             — Layout wraps children in a `<main>` element.
+ *   1. Overlay focus discipline  -- Tab cycles within an open modal.
+ *   2. Esc + focus restore       -- Esc closes the modal and returns focus to the trigger.
+ *   3. Toast ARIA                -- Error toasts expose role="alert" + aria-live.
+ *   4. Tablist semantics         -- ContentTabs renders role="tablist" + role="tabpanel".
+ *   5. Main landmark             -- Layout wraps children in a `<main>` element.
  */
 
 import { test, expect, type Page, type Browser } from "@playwright/test";
@@ -148,8 +148,8 @@ test("Toast source renders role=alert for type=error", async () => {
   // to the attribute presence probe above, so a null result is acceptable
   // -- the earlier test already guards role/aria-live in the runtime DOM.
   if (!src) return;
-  expect(src).toContain('role={role}');
-  expect(src).toContain('aria-live={ariaLive}');
+  expect(src).toContain("role={role}");
+  expect(src).toContain("aria-live={ariaLive}");
   expect(src).toContain('"alert"');
   expect(src).toContain('"assertive"');
 });
