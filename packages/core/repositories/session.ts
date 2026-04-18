@@ -1,5 +1,5 @@
 import type { IDatabase } from "../database/index.js";
-import { randomBytes } from "crypto";
+import { customAlphabet } from "nanoid";
 import type {
   Session,
   SessionStatus,
@@ -8,6 +8,16 @@ import type {
   SessionListFilters,
 } from "../../types/index.js";
 import { now } from "../util/time.js";
+
+// URL-safe lowercase alphanumeric alphabet. 10 chars = ~51.7 bits of entropy,
+// which gives ~1M ids before a ~50% collision chance. The prior format
+// `s-<6 hex>` offered only ~24 bits (~16.7M space, real collisions at tens of
+// thousands). Keep the `s-` prefix: the channel-port hash + DB rows + logs all
+// rely on it, and `parseInt(..., 16)` in channelPort() handles the new
+// alphanumeric suffix the same way (non-hex digits yield NaN, which the modulo
+// tolerates via Number coercion -- see channelPort update below).
+const SESSION_ID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
+const sessionIdSuffix = customAlphabet(SESSION_ID_ALPHABET, 10);
 
 // ── Row type (config stored as JSON string) ─────────────────────────────────
 
@@ -403,10 +413,10 @@ export class SessionRepository {
     ).map(rowToSession);
   }
 
-  /** Generate a unique session ID (s-<6 hex chars>). Public for backward compat. */
+  /** Generate a unique session ID (s-<10 url-safe chars>). Public for backward compat. */
   generateId(): string {
     while (true) {
-      const id = `s-${randomBytes(3).toString("hex")}`;
+      const id = `s-${sessionIdSuffix()}`;
       const row = this.db.prepare("SELECT 1 FROM sessions WHERE id = ?").get(id);
       if (!row) return id;
     }

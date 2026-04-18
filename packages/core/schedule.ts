@@ -1,4 +1,4 @@
-import { randomBytes } from "crypto";
+import { nanoid } from "nanoid";
 import type { AppContext } from "./app.js";
 import { now } from "./util/time.js";
 
@@ -35,7 +35,7 @@ interface ScheduleRow {
 }
 
 function genId() {
-  return `sched-${randomBytes(3).toString("hex")}`;
+  return `sched-${nanoid(10)}`;
 }
 
 export function createSchedule(

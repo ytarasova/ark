@@ -143,7 +143,7 @@ describe("service dependency injection", () => {
 
     const svc = app.sessionService;
     const session = svc.start({ summary: "DI test", ticket: "DI-1" });
-    expect(session.id).toMatch(/^s-[0-9a-f]{6}$/);
+    expect(session.id).toMatch(/^s-[0-9a-z]{10}$/);
     expect(session.summary).toBe("DI test");
 
     // Verify it's in the DB via the repository
