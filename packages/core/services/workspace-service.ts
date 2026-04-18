@@ -5,11 +5,40 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync } from "fs";
-import { dirname, join, resolve } from "path";
+import { basename, dirname, join, resolve } from "path";
 import { promisify } from "util";
 import { execFile } from "child_process";
 
 const execFileAsync = promisify(execFile);
+
+/**
+ * Return a safe leaf filename for a user-controlled attachment name. Strips
+ * any directory components and rejects traversal payloads (`..`, separators,
+ * absolute paths, NULs, control chars). Throws on unsafe input rather than
+ * silently sanitizing — callers MUST treat the returned value as authoritative.
+ */
+export function safeAttachmentName(raw: string): string {
+  if (typeof raw !== "string" || raw.length === 0) {
+    throw new Error("attachment name must be a non-empty string");
+  }
+  // Reject NUL bytes, control chars, and path separators up front so the
+  // attacker never gets a chance to smuggle a traversal past `basename()`.
+  if (/[\x00-\x1f]/.test(raw)) {
+    throw new Error(`unsafe attachment name (control chars): ${JSON.stringify(raw)}`);
+  }
+  if (raw.includes("/") || raw.includes("\\")) {
+    throw new Error(`unsafe attachment name (path separator): ${JSON.stringify(raw)}`);
+  }
+  // `basename` is belt-and-suspenders for platform-specific edge cases.
+  const cleaned = basename(raw);
+  if (cleaned === "" || cleaned === "." || cleaned === "..") {
+    throw new Error(`unsafe attachment name: ${JSON.stringify(raw)}`);
+  }
+  if (cleaned !== raw) {
+    throw new Error(`unsafe attachment name (normalized mismatch): ${JSON.stringify(raw)}`);
+  }
+  return cleaned;
+}
 
 import type { AppContext } from "../app.js";
 import type { Session, Compute } from "../../types/index.js";
@@ -110,12 +139,22 @@ export async function setupSessionWorktree(
     const attachDir = join(effectiveWorkdir, ".ark", "attachments");
     mkdirSync(attachDir, { recursive: true });
     for (const att of attachments) {
+      // Guard against path traversal — attacker-controlled `att.name` must
+      // stay inside `attachDir`. `safeAttachmentName` throws on any `..`,
+      // separator, absolute path, or control-char payload.
+      let safeName: string;
+      try {
+        safeName = safeAttachmentName(att.name);
+      } catch (e: any) {
+        logWarn("workspace", `skipping unsafe attachment for session ${session.id}: ${e?.message ?? e}`);
+        continue;
+      }
       if (att.content?.startsWith("data:")) {
         // Binary file: strip data URL prefix and write as buffer
         const base64 = att.content.replace(/^data:[^;]+;base64,/, "");
-        writeFileSync(join(attachDir, att.name), Buffer.from(base64, "base64"));
+        writeFileSync(join(attachDir, safeName), Buffer.from(base64, "base64"));
       } else if (att.content) {
-        writeFileSync(join(attachDir, att.name), att.content, "utf-8");
+        writeFileSync(join(attachDir, safeName), att.content, "utf-8");
       }
     }
   }

@@ -30,7 +30,12 @@ async function applyContainerSetup(
   if (arcJson?.compose === true && compute.config?.ip) {
     onLog("Starting Docker Compose services...");
     const { sshExec, sshKeyPath } = await import("../../compute/providers/ec2/ssh.js");
-    sshExec(sshKeyPath(compute.name), compute.config.ip as string, `cd ${effectiveWorkdir} && docker compose up -d`);
+    const { shellEscape } = await import("../../compute/providers/ec2/shell-escape.js");
+    // `effectiveWorkdir` is a DB-persisted value derived (transitively) from
+    // session.workdir / session.repo, both attacker-controllable in hosted
+    // mode. Escape before interpolating into the remote shell.
+    const quotedWorkdir = shellEscape(effectiveWorkdir);
+    sshExec(sshKeyPath(compute.name), compute.config.ip as string, `cd ${quotedWorkdir} && docker compose up -d`);
   }
 
   // Devcontainer - only used when explicitly enabled in arc.json { "devcontainer": true }

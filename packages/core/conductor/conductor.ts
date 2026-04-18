@@ -64,44 +64,98 @@ function extractPathSegment(path: string, index: number): string | null {
 }
 
 /**
- * Extract tenant id from an inbound HTTP request.
- * Priority:
- *   1. Authorization Bearer header in the format `ark_<tenantId>_<secret>`
- *   2. `X-Ark-Tenant-Id` header (direct)
- *   3. `"default"` fallback (local single-tenant mode)
+ * Resolution result for inbound request tenant identity.
  */
-function extractTenantId(req: Request): string {
+type TenantResolution = { ok: true; tenantId: string } | { ok: false; status: number; error: string };
+
+const BEARER_PATTERN = /^Bearer\s+(.+)$/i;
+
+/**
+ * Resolve the tenant id for an inbound HTTP request.
+ *
+ * Security model (P1-1):
+ *   - A Bearer token MUST be validated against `api_keys`. The tenant id
+ *     is read from the matched row, NOT parsed from the token body -- this
+ *     closes the bug where any caller could submit a token like
+ *     `ark_victim_whatever` and be scoped to `victim`.
+ *   - The `X-Ark-Tenant-Id` header is NEVER trusted on its own. It must
+ *     match the tenant resolved from a valid Bearer token, else it is
+ *     rejected. Legacy clients that send the header without a token are
+ *     rejected too.
+ *   - The `"default"` fallback is only permitted when BOTH no Authorization
+ *     header AND no `X-Ark-Tenant-Id` header are present AND the conductor
+ *     is in local single-tenant mode (no `databaseUrl` configured).
+ */
+function resolveTenant(req: Request): TenantResolution {
   const auth = req.headers.get("authorization") ?? req.headers.get("Authorization");
+  const hdrTenant = req.headers.get("x-ark-tenant-id") ?? req.headers.get("X-Ark-Tenant-Id");
+  const isHostedMode = !!_app.config.databaseUrl;
+
   if (auth) {
-    const match = /^Bearer\s+ark_([^_]+)_/i.exec(auth);
-    if (match && match[1]) return match[1];
+    const match = auth.match(BEARER_PATTERN);
+    const token = match?.[1]?.trim();
+    if (!token) {
+      return { ok: false, status: 401, error: "malformed Authorization header" };
+    }
+    const ctx = _app.apiKeys.validate(token);
+    if (!ctx) {
+      return { ok: false, status: 401, error: "invalid or expired API key" };
+    }
+    // If caller also set X-Ark-Tenant-Id, it must match the validated tenant
+    // -- we refuse to honor an override that could cross tenants.
+    if (hdrTenant && hdrTenant !== ctx.tenantId) {
+      return { ok: false, status: 403, error: "tenant header does not match API key" };
+    }
+    return { ok: true, tenantId: ctx.tenantId };
   }
-  const hdr = req.headers.get("x-ark-tenant-id") ?? req.headers.get("X-Ark-Tenant-Id");
-  if (hdr) return hdr;
-  return "default";
+
+  if (hdrTenant) {
+    // Header without a validated token -- spoofable. Reject.
+    return {
+      ok: false,
+      status: 401,
+      error: "X-Ark-Tenant-Id requires a validated Authorization: Bearer token",
+    };
+  }
+
+  // Neither header present. "default" is only safe in local single-tenant mode.
+  if (isHostedMode) {
+    return { ok: false, status: 401, error: "authentication required" };
+  }
+  return { ok: true, tenantId: "default" };
 }
 
-/** Return a tenant-scoped AppContext view for this request. */
-function appForRequest(req: Request): AppContext {
-  return _app.forTenant(extractTenantId(req));
+/**
+ * Return a tenant-scoped AppContext view for this request, or a Response
+ * the caller should return directly on rejection.
+ */
+function appForRequest(req: Request): { ok: true; app: AppContext } | { ok: false; response: Response } {
+  const r = resolveTenant(req);
+  if (!r.ok) {
+    return { ok: false, response: Response.json({ error: r.error }, { status: r.status }) };
+  }
+  return { ok: true, app: _app.forTenant(r.tenantId) };
 }
 
 // ── Route handlers ──────────────────────────────────────────────────────────
 
 async function handleChannelReport(req: Request, sessionId: string): Promise<Response> {
+  const resolved = appForRequest(req);
+  if (!resolved.ok) return resolved.response;
   const report = (await req.json()) as OutboundMessage;
-  const scoped = appForRequest(req);
-  await handleReport(scoped, sessionId, report);
+  await handleReport(resolved.app, sessionId, report);
   return Response.json({ status: "ok" });
 }
 
 async function handleAgentRelay(req: Request): Promise<Response> {
+  const resolved = appForRequest(req);
+  if (!resolved.ok) return resolved.response;
   const { from, target, message } = (await req.json()) as {
     from: string;
     target: string;
     message: string;
   };
-  const scoped = appForRequest(req);
+  const scoped = resolved.app;
   const targetSession = scoped.sessions.get(target);
   if (targetSession) {
     const channelPort = scoped.sessions.channelPort(target);
@@ -115,7 +169,9 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
   const sessionId = url.searchParams.get("session");
   if (!sessionId) return Response.json({ error: "missing session param" }, { status: 400 });
 
-  const app = appForRequest(req);
+  const resolved = appForRequest(req);
+  if (!resolved.ok) return resolved.response;
+  const app = resolved.app;
   const s = app.sessions.get(sessionId);
   if (!s) return Response.json({ error: "session not found" }, { status: 404 });
 
@@ -244,25 +300,37 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
   return Response.json({ status: "ok", mapped: result.newStatus ?? "no-op" });
 }
 
-function handleRestApi(path: string): Response {
-  if (path === "/api/sessions") return Response.json(_app.sessions.list());
+function handleRestApi(req: Request, path: string): Response {
+  // `/health` does not require authentication (used by load balancers /
+  // process supervisors). It also does not expose tenant data -- return
+  // only a minimal status payload.
+  if (path === "/health") {
+    return Response.json({
+      status: "ok",
+      arkDir: _app.config.arkDir,
+    });
+  }
+
+  // All data-returning endpoints must run through the same tenant
+  // resolution as JSON-RPC. P1-2 fix: previously `_app.sessions.list()`
+  // returned ALL sessions regardless of who asked.
+  const resolved = appForRequest(req);
+  if (!resolved.ok) return resolved.response;
+  const app = resolved.app;
+
+  if (path === "/api/sessions") return Response.json(app.sessions.list());
   if (path.startsWith("/api/sessions/")) {
     const id = extractPathSegment(path, 3);
     if (!id) return Response.json({ error: "missing session id" }, { status: 400 });
-    const s = _app.sessions.get(id);
+    const s = app.sessions.get(id);
     return s ? Response.json(s) : Response.json({ error: "not found" }, { status: 404 });
   }
   if (path.startsWith("/api/events/")) {
     const id = extractPathSegment(path, 3);
     if (!id) return Response.json({ error: "missing session id" }, { status: 400 });
-    return Response.json(_app.events.list(id));
-  }
-  if (path === "/health") {
-    return Response.json({
-      status: "ok",
-      sessions: _app.sessions.list().length,
-      arkDir: _app.config.arkDir,
-    });
+    // Scope events by ensuring the session is visible to this tenant.
+    if (!app.sessions.get(id)) return Response.json({ error: "not found" }, { status: 404 });
+    return Response.json(app.events.list(id));
   }
   return new Response("Not found", { status: 404 });
 }
@@ -446,7 +514,7 @@ export function startConductor(
         }
 
         if (req.method === "GET") {
-          return handleRestApi(path);
+          return handleRestApi(req, path);
         }
 
         return new Response("Not found", { status: 404 });

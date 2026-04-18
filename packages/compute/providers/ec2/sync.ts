@@ -9,7 +9,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFil
 import { homedir, tmpdir, userInfo } from "os";
 import { join } from "path";
 
-import { rsyncPush, rsyncPull, sshExec } from "./ssh.js";
+import { rsyncPush, rsyncPull, sshExec, sshExecArgs } from "./ssh.js";
+import { shellEscape } from "./shell-escape.js";
 import { REMOTE_USER, REMOTE_HOME } from "./constants.js";
 import { safeAsync } from "../../../core/safe.js";
 
@@ -228,11 +229,18 @@ export async function refreshRemoteToken(key: string, ip: string): Promise<void>
   const token = process.env.CLAUDE_CODE_SESSION_ACCESS_TOKEN;
   if (!token) return;
   // Write token to the remote's environment for running tmux sessions
-  // The token is picked up by Claude when it refreshes its auth
+  // The token is picked up by Claude when it refreshes its auth.
+  //
+  // The token is env-supplied and therefore not directly attacker-controlled,
+  // but a single-quote in the value (or future leakage from less-trusted
+  // sources) breaks out of the old `'${token}'` interpolation and runs on
+  // the remote shell. Shell-escape defensively so this is safe by
+  // construction regardless of the token's contents.
+  const escapedToken = shellEscape(token);
   await sshExec(
     key,
     ip,
-    `for sess in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ark-'); do tmux set-environment -t "$sess" CLAUDE_CODE_SESSION_ACCESS_TOKEN '${token}' 2>/dev/null; done`,
+    `for sess in $(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep '^ark-'); do tmux set-environment -t "$sess" CLAUDE_CODE_SESSION_ACCESS_TOKEN ${escapedToken} 2>/dev/null; done`,
     { timeout: 10_000 },
   );
 }
@@ -296,7 +304,10 @@ export async function syncProjectFiles(
   localDir: string,
   remoteDir: string,
 ): Promise<void> {
-  await sshExec(key, ip, `mkdir -p ${remoteDir}`);
+  // `remoteDir` is derived from session.workdir / arc.json. Both can be
+  // attacker-controlled in hosted mode — use argv-based exec so shell
+  // metacharacters are quoted rather than interpreted.
+  await sshExecArgs(key, ip, ["mkdir", "-p", remoteDir]);
   for (const file of files) {
     const localPath = join(localDir, file);
     if (!existsSync(localPath)) continue;
@@ -304,7 +315,7 @@ export async function syncProjectFiles(
     const parts = file.split("/");
     if (parts.length > 1) {
       const subdir = parts.slice(0, -1).join("/");
-      await sshExec(key, ip, `mkdir -p ${remoteDir}/${subdir}`);
+      await sshExecArgs(key, ip, ["mkdir", "-p", `${remoteDir}/${subdir}`]);
     }
     await rsyncPush(key, ip, localPath, `${remoteDir}/${file}`);
   }
