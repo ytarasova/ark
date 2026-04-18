@@ -79,11 +79,13 @@ export const midnightCircuit: ThemeTokens = {
 
   fgDefault: "#e4e4ed",
   fgMuted: "#7878a0",
-  fgFaint: "#606082",
+  // WCAG AA: #8080a8 on #0c0c14 = 5.17:1 (was #606082 @ 3.24:1)
+  fgFaint: "#8080a8",
 
-  primary: "#7c6aef",
-  primaryHover: "#6b59de",
-  primarySubtle: "rgba(124, 106, 239, 0.1)",
+  // WCAG AA: white on #6b59de = 5.11:1 (was #7c6aef @ 4.07:1)
+  primary: "#6b59de",
+  primaryHover: "#5b47d4",
+  primarySubtle: "rgba(107, 89, 222, 0.1)",
   primaryFg: "#ffffff",
 
   borderDefault: "#252540",
@@ -103,7 +105,7 @@ export const midnightCircuit: ThemeTokens = {
   diffRemoveBg: "rgba(248, 113, 113, 0.08)",
   diffRemoveFg: "#f87171",
 
-  gradientBrand: "linear-gradient(135deg, #7c6aef 0%, #06b6d4 100%)",
+  gradientBrand: "linear-gradient(135deg, #6b59de 0%, #06b6d4 100%)",
 
   radiusSm: "6px",
   radiusMd: "8px",
@@ -126,11 +128,13 @@ export const midnightCircuitLight: ThemeTokens = {
 
   fgDefault: "#1a1a2e",
   fgMuted: "#6b6b88",
-  fgFaint: "#a0a0b8",
+  // WCAG AA: #6b6b8a on #f8f8fc = 4.84:1 (was #a0a0b8 @ 2.41:1)
+  fgFaint: "#6b6b8a",
 
-  primary: "#6c5ce7",
-  primaryHover: "#5b4bd6",
-  primarySubtle: "rgba(108, 92, 231, 0.08)",
+  // WCAG AA: white on #5b4bd6 = 6.14:1 (was #6c5ce7 @ 4.86:1)
+  primary: "#5b4bd6",
+  primaryHover: "#4a3bc5",
+  primarySubtle: "rgba(91, 75, 214, 0.08)",
   primaryFg: "#ffffff",
 
   borderDefault: "#dcdce8",
@@ -150,7 +154,7 @@ export const midnightCircuitLight: ThemeTokens = {
   diffRemoveBg: "rgba(220, 38, 38, 0.08)",
   diffRemoveFg: "#dc2626",
 
-  gradientBrand: "linear-gradient(135deg, #6c5ce7 0%, #06b6d4 100%)",
+  gradientBrand: "linear-gradient(135deg, #5b4bd6 0%, #06b6d4 100%)",
 
   radiusSm: "6px",
   radiusMd: "8px",
@@ -177,11 +181,13 @@ export const arcticSlate: ThemeTokens = {
 
   fgDefault: "#ededf0",
   fgMuted: "#8a8a93",
-  fgFaint: "#5f5f68",
+  // WCAG AA: #7a7a84 on #09090b = 4.68:1 (was #5f5f68 @ 3.15:1)
+  fgFaint: "#7a7a84",
 
-  primary: "#3b82f6",
-  primaryHover: "#2563eb",
-  primarySubtle: "rgba(59, 130, 246, 0.1)",
+  // WCAG AA: white on #2563eb = 5.17:1 (was #3b82f6 @ 3.68:1)
+  primary: "#2563eb",
+  primaryHover: "#1d4ed8",
+  primarySubtle: "rgba(37, 99, 235, 0.1)",
   primaryFg: "#ffffff",
 
   borderDefault: "#27272a",
@@ -201,7 +207,7 @@ export const arcticSlate: ThemeTokens = {
   diffRemoveBg: "rgba(248, 113, 113, 0.08)",
   diffRemoveFg: "#f87171",
 
-  gradientBrand: "linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%)",
+  gradientBrand: "linear-gradient(135deg, #2563eb 0%, #06b6d4 100%)",
 
   radiusSm: "6px",
   radiusMd: "8px",
@@ -224,7 +230,8 @@ export const arcticSlateLight: ThemeTokens = {
 
   fgDefault: "#18181b",
   fgMuted: "#71717a",
-  fgFaint: "#a1a1aa",
+  // WCAG AA: #71717a on #fafafa = 4.63:1 (was #a1a1aa @ 2.46:1)
+  fgFaint: "#71717a",
 
   primary: "#2563eb",
   primaryHover: "#1d4ed8",
@@ -275,7 +282,8 @@ export const warmObsidian: ThemeTokens = {
 
   fgDefault: "#ededed",
   fgMuted: "#878787",
-  fgFaint: "#626262",
+  // WCAG AA: #818181 on #0f0f0f = 4.92:1 (was #626262 @ 3.14:1)
+  fgFaint: "#818181",
 
   primary: "#d4a847",
   primaryHover: "#c49a3a",
@@ -322,12 +330,14 @@ export const warmObsidianLight: ThemeTokens = {
 
   fgDefault: "#1c1c1c",
   fgMuted: "#787878",
-  fgFaint: "#ababab",
+  // WCAG AA: #6f6f6f on #faf9f7 = 4.78:1 (was #ababab @ 2.18:1)
+  fgFaint: "#6f6f6f",
 
   primary: "#b8922e",
   primaryHover: "#a68228",
   primarySubtle: "rgba(184, 146, 46, 0.08)",
-  primaryFg: "#ffffff",
+  // WCAG AA: #1c1c1c on #b8922e = 5.83:1 (was #ffffff @ 2.92:1)
+  primaryFg: "#1c1c1c",
 
   borderDefault: "#e0dfdb",
   borderLight: "#f2f1ee",
