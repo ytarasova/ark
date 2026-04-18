@@ -10,14 +10,15 @@ import { writeFileSync, mkdirSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { startArkd } from "../server.js";
+import { allocatePort } from "../../core/__tests__/helpers/test-env.js";
 
-const TEST_PORT = 19351;
-const BASE = `http://localhost:${TEST_PORT}`;
+let TEST_PORT: number;
+let BASE: string;
 let server: { stop(): void };
 let repoDir: string;
 
-beforeAll(() => {
-  repoDir = join(tmpdir(), `arkd-cg-test-${Date.now()}`);
+beforeAll(async () => {
+  repoDir = join(tmpdir(), `arkd-cg-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   mkdirSync(repoDir, { recursive: true });
 
   // Create a minimal TS file for codegraph to parse
@@ -36,6 +37,8 @@ export class Greeter {
 `,
   );
 
+  TEST_PORT = await allocatePort();
+  BASE = `http://localhost:${TEST_PORT}`;
   server = startArkd(TEST_PORT, { quiet: true });
 });
 

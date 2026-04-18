@@ -7,15 +7,18 @@ import { writeFileSync, mkdirSync, existsSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { startArkd } from "../server.js";
+import { allocatePort, allocatePorts } from "../../core/__tests__/helpers/test-env.js";
 
-const TEST_PORT = 19350;
-const BASE = `http://localhost:${TEST_PORT}`;
+let TEST_PORT: number;
+let BASE: string;
 let server: { stop(): void };
 let tempDir: string;
 
-beforeAll(() => {
-  tempDir = join(tmpdir(), `arkd-test-${Date.now()}`);
+beforeAll(async () => {
+  tempDir = join(tmpdir(), `arkd-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   mkdirSync(tempDir, { recursive: true });
+  TEST_PORT = await allocatePort();
+  BASE = `http://localhost:${TEST_PORT}`;
   server = startArkd(TEST_PORT, { quiet: true });
 });
 
@@ -417,13 +420,14 @@ describe("GET /snapshot", () => {
 
 describe("POST /ports/probe", () => {
   it("detects the arkd server's own port as listening", async () => {
-    const { data } = await post<any>("/ports/probe", { ports: [TEST_PORT, 19999] });
+    const deadPortNum = await allocatePort(); // snag an ephemeral port, then let it close
+    const { data } = await post<any>("/ports/probe", { ports: [TEST_PORT, deadPortNum] });
     expect(data.results.length).toBe(2);
 
     const arkdPort = data.results.find((r: any) => r.port === TEST_PORT);
     expect(arkdPort?.listening).toBe(true);
 
-    const deadPort = data.results.find((r: any) => r.port === 19999);
+    const deadPort = data.results.find((r: any) => r.port === deadPortNum);
     expect(deadPort?.listening).toBe(false);
   });
 });
@@ -490,7 +494,7 @@ describe("Concurrent requests", () => {
 
 describe("Server lifecycle", () => {
   it("stop() makes the server unreachable", async () => {
-    const ephemeralPort = TEST_PORT + 50;
+    const ephemeralPort = await allocatePort();
     const ephemeral = startArkd(ephemeralPort, { quiet: true });
 
     try {
@@ -531,10 +535,11 @@ describe("Channel report forwarding", () => {
   });
 
   it("returns ok:false when conductor is unreachable", async () => {
-    // Start arkd with a bogus conductor URL
-    const ephemeral = startArkd(19380, { conductorUrl: "http://localhost:19999", quiet: true });
+    // Start arkd with a bogus conductor URL (pointing at an ephemeral port that's closed)
+    const [arkdPort, deadPort] = await allocatePorts(2);
+    const ephemeral = startArkd(arkdPort, { conductorUrl: `http://localhost:${deadPort}`, quiet: true });
     try {
-      const resp = await fetch("http://localhost:19380/channel/test-session", {
+      const resp = await fetch(`http://localhost:${arkdPort}/channel/test-session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "completed", summary: "test" }),
@@ -549,10 +554,11 @@ describe("Channel report forwarding", () => {
   });
 
   it("forwards report to conductor and returns forwarded:true", async () => {
+    const [conductorPort, arkdPort] = await allocatePorts(2);
     // Start a mock conductor that accepts channel reports
     const received: any[] = [];
     const mockConductor = Bun.serve({
-      port: 19381,
+      port: conductorPort,
       async fetch(req) {
         if (req.method === "POST" && new URL(req.url).pathname.startsWith("/api/channel/")) {
           const body = await req.json();
@@ -566,10 +572,10 @@ describe("Channel report forwarding", () => {
     // Give the mock server a moment to bind
     await Bun.sleep(50);
 
-    const ephemeral = startArkd(19382, { conductorUrl: "http://localhost:19381", quiet: true });
+    const ephemeral = startArkd(arkdPort, { conductorUrl: `http://localhost:${conductorPort}`, quiet: true });
     await Bun.sleep(50);
     try {
-      const resp = await fetch("http://localhost:19382/channel/s-test123", {
+      const resp = await fetch(`http://localhost:${arkdPort}/channel/s-test123`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "completed", summary: "test report" }),

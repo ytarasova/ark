@@ -9,15 +9,17 @@ import { tmpdir } from "os";
 import { startArkd } from "../server.js";
 import { ArkdClient, ArkdClientError } from "../client.js";
 import { waitFor } from "../../core/__tests__/test-helpers.js";
+import { allocatePort } from "../../core/__tests__/helpers/test-env.js";
 
-const TEST_PORT = 19351;
+let TEST_PORT: number;
 let server: { stop(): void };
 let client: ArkdClient;
 let tempDir: string;
 
-beforeAll(() => {
-  tempDir = join(tmpdir(), `arkd-client-test-${Date.now()}`);
+beforeAll(async () => {
+  tempDir = join(tmpdir(), `arkd-client-test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   mkdirSync(tempDir, { recursive: true });
+  TEST_PORT = await allocatePort();
   server = startArkd(TEST_PORT, { quiet: true });
   client = new ArkdClient(`http://localhost:${TEST_PORT}`);
 });
@@ -213,10 +215,11 @@ describe("client system", () => {
   }, 30_000);
 
   it("probePorts detects server port", async () => {
-    const res = await client.probePorts([TEST_PORT, 19999]);
+    const deadPort = await allocatePort(); // allocate then let the kernel free it
+    const res = await client.probePorts([TEST_PORT, deadPort]);
     const arkd = res.results.find((r) => r.port === TEST_PORT);
     expect(arkd?.listening).toBe(true);
-    const dead = res.results.find((r) => r.port === 19999);
+    const dead = res.results.find((r) => r.port === deadPort);
     expect(dead?.listening).toBe(false);
   });
 });
@@ -236,7 +239,8 @@ describe("client errors", () => {
   });
 
   it("client to dead server throws", async () => {
-    const dead = new ArkdClient("http://localhost:19399");
+    const deadPort = await allocatePort(); // port closes as soon as we get the number
+    const dead = new ArkdClient(`http://localhost:${deadPort}`);
     try {
       await dead.health();
       expect(true).toBe(false);
