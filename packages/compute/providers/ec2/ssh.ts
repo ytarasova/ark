@@ -9,6 +9,7 @@ import { poll } from "../../util.js";
 import { existsSync, mkdirSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
+import { shellEscape } from "./shell-escape.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -71,6 +72,38 @@ export async function sshExec(
 
 /** Alias for backward compatibility */
 export const sshExecAsync = sshExec;
+
+/**
+ * Execute a remote command from an argv array, shell-escaping each argument.
+ *
+ * Prefer this over `sshExec(key, ip, `... ${var} ...`)` whenever any element
+ * is derived from user input (session id, tenant id, workdir, attachment
+ * name, repo path, etc.). SSH passes a single string to the remote shell,
+ * so every interpolated value MUST be single-quote escaped first or a value
+ * like `'; rm -rf /` will shell-expand on the remote.
+ *
+ * Example:
+ *   sshExecArgs(key, ip, ["mkdir", "-p", remoteDir])
+ * is equivalent to `sshExec(key, ip, `mkdir -p ${shellEscape(remoteDir)}`)`
+ * — but without the template-string footgun.
+ */
+export async function sshExecArgs(
+  key: string,
+  ip: string,
+  argv: string[],
+  opts?: { timeout?: number },
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  if (!Array.isArray(argv) || argv.length === 0) {
+    throw new Error("sshExecArgs: argv must be a non-empty array");
+  }
+  const escaped = argv.map((a) => {
+    if (typeof a !== "string") {
+      throw new Error(`sshExecArgs: argv elements must be strings, got ${typeof a}`);
+    }
+    return shellEscape(a);
+  });
+  return sshExec(key, ip, escaped.join(" "), opts);
+}
 
 // ---------------------------------------------------------------------------
 // rsync helpers
