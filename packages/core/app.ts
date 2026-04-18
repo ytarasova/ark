@@ -1044,13 +1044,22 @@ export class AppContext {
   /**
    * Create an AppContext for tests with an isolated temp directory.
    * The temp dir is cleaned up on shutdown.
+   *
+   * Callers can pass `overrides.arkDir` to reuse an existing tmp directory
+   * (e.g. from `createTestEnv()`); otherwise a fresh unique `mkdtempSync`
+   * directory is allocated so each call to forTest() is isolated from every
+   * other -- important for parallel test runs.
+   *
+   * Port overrides (`conductorPort`, `arkdPort`) are forwarded through to
+   * ArkConfig untouched, letting tests that boot real servers allocate
+   * ephemeral ports via the test-env helpers.
    */
   static forTest(overrides?: Partial<ArkConfig>): AppContext {
-    const tempDir = mkdtempSync(join(tmpdir(), "ark-test-"));
+    const arkDir = overrides?.arkDir ?? mkdtempSync(join(tmpdir(), "ark-test-"));
     const config = loadConfig({
-      arkDir: tempDir,
-      env: "test",
       ...overrides,
+      arkDir,
+      env: "test",
     });
     return new AppContext(config, {
       skipConductor: true,
