@@ -200,6 +200,7 @@ export function SessionsPage({
       daemonStatus={daemonStatus}
       totalUnread={totalUnread}
     >
+      <h1 className="sr-only">Sessions</h1>
       {/* Session List Panel -- hidden only when maximized */}
       {!maximized && (
         <SessionListPanel

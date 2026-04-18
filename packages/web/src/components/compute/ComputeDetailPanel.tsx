@@ -335,11 +335,9 @@ export function ComputeDetailPanel({
         </div>
       )}
 
-      {/* Connection Info */}
+      {/* Details */}
       <div className="mb-4">
-        <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
-          Connection Info
-        </h3>
+        <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Details</h3>
         <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
           <span className="text-muted-foreground">Provider</span>
           <span className="text-card-foreground font-mono">{compute.provider || compute.type || "-"}</span>

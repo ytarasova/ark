@@ -179,23 +179,19 @@ test("session detail pane renders the current flow stage", async () => {
 
   // Open the session detail pane.
   await page.locator(`text=${summary}`).first().click();
-  await expect(page.locator("text=Details").first()).toBeVisible({
+  // The detail pane renders a Conversation tab (unique to SessionDetail).
+  await expect(page.locator("text=Conversation").first()).toBeVisible({
     timeout: 5_000,
   });
 
-  // The detail pane's metadata grid renders `Stage` as a label and the
-  // stage name in the next cell. We assert the stage name appears in
-  // the rendered detail view. `plan` is a short string that could
-  // appear elsewhere in principle, so we check it's visible in the
-  // detail region (identified by the `Details` heading above).
-  // Fallback: just assert the stage name is visible somewhere on the page.
-  // The detail pane is the only place where `Stage` label + `plan` value
-  // coexists, and `plan` is present in the flow pipeline breadcrumb too.
+  // The SessionHeader renders a StagePipeline whose stage-name buttons
+  // include the current stage. `plan` should appear in the pipeline
+  // breadcrumb once the session has advanced one step.
   await expect(page.locator("text=plan").first()).toBeVisible({
     timeout: 5_000,
   });
 
-  // Flow name should also be rendered next to the `Flow` label.
+  // Flow name is rendered in the sub-header row next to the agent name.
   await expect(page.locator("text=default").first()).toBeVisible({
     timeout: 5_000,
   });
@@ -220,13 +216,14 @@ test("session flow field survives a web UI reload", async () => {
   await expect(page.locator("h1")).toContainText("Sessions");
 
   await page.locator(`text=${summary}`).first().click();
-  await expect(page.locator("text=Details").first()).toBeVisible({
+  // The detail pane renders a Conversation tab (unique to SessionDetail).
+  await expect(page.locator("text=Conversation").first()).toBeVisible({
     timeout: 5_000,
   });
 
-  // The `Flow` label + `default` value both live in the detail grid.
-  // We verify via RPC (authoritative) and via the rendered page
-  // (surface the user sees).
+  // The flow name renders in the detail sub-header and the stage name in
+  // the StagePipeline breadcrumb. We verify via RPC (authoritative) and
+  // via the rendered page (surface the user sees).
   const { session: refetched } = await ws.rpc<{ session: any }>("session/read", { sessionId: session.id });
   expect(refetched.flow).toBe("default");
   expect(refetched.stage).toBe(DEFAULT_STAGES[0]);

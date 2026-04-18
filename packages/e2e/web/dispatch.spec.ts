@@ -166,7 +166,8 @@ test("dispatched session shows in UI with updated status", async () => {
 
   // Click on the session to see detail
   await page.locator("text=E2E UI dispatch check").click();
-  await expect(page.locator("text=Details").first()).toBeVisible({ timeout: 5_000 });
+  // The detail pane renders a Conversation tab (unique to SessionDetail).
+  await expect(page.locator("text=Conversation").first()).toBeVisible({ timeout: 5_000 });
 
   // The status badge should not be "pending" or "ready" anymore
   // It could be running, waiting, failed, or stopped
