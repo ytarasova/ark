@@ -279,7 +279,15 @@ export class SessionRepository {
   }
 
   channelPort(sessionId: string): number {
-    return 19200 + (parseInt(sessionId.replace("s-", ""), 16) % 10000);
+    // Parse the id stem in base-36 so non-hex id schemes (url-safe nanoid,
+    // lowercase alphanumeric, etc.) still produce a deterministic port
+    // without silently collapsing to NaN. Fall back to 0 for any remaining
+    // unparseable chars, which yields a stable-but-shared port -- the
+    // isChannelPortAvailable check will rotate away on the next attempt.
+    const stem = sessionId.replace(/^s-/, "").toLowerCase();
+    const parsed = parseInt(stem, 36);
+    const base = Number.isFinite(parsed) ? parsed : 0;
+    return 19200 + (base % 10000);
   }
 
   mergeConfig(sessionId: string, patch: Partial<SessionConfig>): void {
