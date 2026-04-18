@@ -270,7 +270,8 @@ function RepoDropdown({
                   }
                 }}
                 placeholder="Type path or search..."
-                className="w-full bg-transparent text-[12px] text-[var(--fg)] outline-none placeholder:text-[var(--fg-faint)]"
+                aria-label="Repository path"
+                className="w-full bg-transparent text-[12px] text-[var(--fg)] outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] rounded-[4px] placeholder:text-[var(--fg-faint)]"
               />
             </div>
           </div>
@@ -689,7 +690,8 @@ function RichTaskInput({
           className={cn(
             "w-full bg-transparent text-[var(--fg)]",
             "text-[14px] leading-relaxed px-4 py-3 resize-none",
-            "focus:outline-none",
+            "focus:outline-none focus-visible:outline-none",
+            "focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-inset rounded-lg",
             "placeholder:text-[var(--fg-muted)]",
           )}
         />
@@ -754,6 +756,19 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
   const [selectedCompute, setSelectedCompute] = useState("");
   const [attachments, setAttachments] = useState<AttachmentInfo[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Save trigger so we can restore focus on close.
+  // See `.workflow/audit/8-a11y.md` finding A4.
+  const triggerRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    triggerRef.current = document.activeElement as HTMLElement | null;
+    return () => {
+      try {
+        triggerRef.current?.focus?.();
+      } catch {
+        /* ignore */
+      }
+    };
+  }, []);
 
   const references = detectReferences(summary);
 
@@ -859,9 +874,16 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
   }
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto">
+    <div
+      className="flex flex-col h-full overflow-y-auto"
+      role="region"
+      aria-labelledby="new-session-title"
+      data-testid="new-session-modal"
+    >
       <div className="p-5 pb-0">
-        <h2 className="text-base font-semibold text-[var(--fg)] mb-1">New Session</h2>
+        <h2 id="new-session-title" className="text-base font-semibold text-[var(--fg)] mb-1">
+          New Session
+        </h2>
         <p className="text-[12px] text-[var(--fg-muted)] mb-5">Configure and launch an agent session</p>
       </div>
 
