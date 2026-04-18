@@ -100,7 +100,7 @@ export function CostsView() {
             <div className="text-2xl font-bold font-mono text-[var(--running)] tracking-[-0.02em]">
               {fmtCost(costs.total || 0)}
             </div>
-            <div className="text-[11px] text-muted-foreground mt-1">{sessions.length} sessions with usage</div>
+            <div className="text-[11px] text-muted-foreground mt-1">{sessions.length} sessions with usage data</div>
           </Card>
           <Card className="p-4">
             <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-1">

@@ -63,6 +63,7 @@ export function IconRail({
       {logo ?? (
         <div className="relative mb-4">
           <div
+            data-testid="sidebar-brand"
             className={cn(
               "w-7 h-7 rounded-[var(--radius-sm)] flex items-center justify-center",
               "font-bold text-[12px] text-white cursor-pointer",
