@@ -85,9 +85,10 @@ test("add todo via API and verify in detail panel", async () => {
   await expect(page.locator("text=Run the tests")).toBeVisible();
 });
 
-// The inline "Add a todo..." input was removed when the Todos tab became
-// a read-only checklist (todos are now authored by agents via the todo
-// RPC, not directly by users). Re-enable this test if that UI returns.
+// TODO(#174): The inline "Add a todo..." input was removed when the Todos
+// tab became a read-only checklist (todos are now authored by agents via
+// the todo RPC, not directly by users). Re-enable this test if that UI
+// returns, or delete if design is permanent.
 test.skip("add todo via detail panel UI", async () => {
   const _id = await createSession("Todo UI test");
   await page.reload();
@@ -198,4 +199,33 @@ test("session detail shows events when available", async () => {
   const detail = await ws.rpc("session/read", { sessionId: id, include: ["events"] });
   expect(detail.session).toBeTruthy();
   expect(Array.isArray(detail.events)).toBe(true);
+});
+
+// -- Back button navigation ---------------------------------------------------
+
+test("back button dismisses session detail and returns to the Sessions landing view", async () => {
+  // Ported from the now-deleted packages/web/e2e/session-view.spec.ts — the
+  // only assertion in that file not already covered by session-detail-tabs.
+  //
+  // "Dashboard" was removed from the top-level nav; the Sessions landing view
+  // (rendered when no session is selected) is the post-back target. We only
+  // assert that the detail tab bar disappears — that is the load-bearing
+  // contract of the Back button.
+  const summary = "Back nav detail test";
+  await createSession(summary);
+  await page.reload();
+  await page.waitForSelector("nav", { timeout: 10_000 });
+  await goToSessions();
+
+  // Open the detail panel.
+  await page.locator(`text=${summary}`).first().click();
+  await expect(page.locator('button[role="tab"]:has-text("Conversation")').first()).toBeVisible({ timeout: 5_000 });
+
+  // Click the Back button. The session list row's accessible name also
+  // contains "Back" (from the summary), so we match by exact name to target
+  // the chevron-prefixed Back control inside the detail header only.
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+
+  // The detail tab bar must be gone — the Sessions landing view has replaced it.
+  await expect(page.locator('button[role="tab"]:has-text("Conversation")')).not.toBeVisible({ timeout: 5_000 });
 });
