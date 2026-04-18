@@ -37,12 +37,14 @@ test("sidebar renders every navigation item (Sessions through Dashboard)", async
   expect(count).toBeGreaterThanOrEqual(9);
 });
 
-test("sidebar shows ark brand text", async () => {
-  await expect(page.locator("text=ark").first()).toBeVisible();
+test("sidebar shows ark brand tile", async () => {
+  // The icon rail renders a compact brand tile (data-testid=sidebar-brand)
+  // instead of a full "ark" wordmark.
+  await expect(page.locator('[data-testid="sidebar-brand"]')).toBeVisible();
 });
 
 test("sidebar nav items have correct labels", async () => {
-  const expected = ["Sessions", "Agents", "Flows", "Compute", "History", "Memory", "Tools", "Schedules", "Costs"];
+  const expected = ["Sessions", "Agents", "Flows", "Compute", "History", "Knowledge", "Tools", "Schedules", "Costs"];
   for (const label of expected) {
     await expect(page.locator(`nav button:has-text("${label}")`)).toBeVisible();
   }
@@ -86,8 +88,9 @@ test("click Schedules tab navigates to schedules page", async () => {
   await expect(page.locator("h1")).toContainText("Schedules");
 });
 
-test("click Memory tab navigates to memory page", async () => {
-  await page.click('nav button:has-text("Memory")');
+test("click Knowledge tab navigates to memory page", async () => {
+  // Nav label is "Knowledge" but the page still uses "Memory" terminology internally.
+  await page.click('nav button:has-text("Knowledge")');
   await expect(page.locator("h1")).toContainText("Memory");
 });
 
