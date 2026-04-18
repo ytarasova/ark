@@ -116,6 +116,10 @@ export async function setupWebServer(): Promise<WebServerEnv> {
     env: {
       ...process.env,
       ARK_TEST_DIR: env.app.arkDir,
+      // Belt-and-suspenders against orphan leak: if Playwright SIGKILLs this
+      // worker (timeout, whole-run abort), our in-process reap hooks do not
+      // fire. The child's parent-death watchdog notices ppid -> 1 and exits.
+      ARK_WATCH_PARENT: "1",
     },
     stdout: "pipe",
     stderr: "pipe",

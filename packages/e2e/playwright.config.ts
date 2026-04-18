@@ -11,6 +11,10 @@ export default defineConfig({
   retries: 2,
   workers: 1,
   reporter: "list",
+  // Sweep any leftover orphan `ark web` processes (PPID=1, reparented to
+  // launchd/init) after the whole run. Last line of defense behind the
+  // per-worker reap hooks and the child-side ARK_WATCH_PARENT watchdog.
+  globalTeardown: "./fixtures/global-teardown.ts",
   use: {
     trace: "on-first-retry",
   },

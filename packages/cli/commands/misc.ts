@@ -215,6 +215,45 @@ export function registerMiscCommands(program: Command, _app: AppContext | null) 
     .option("--api-only", "API only, skip static file serving (for dev with Vite)")
     .option("--with-daemon", "Also start conductor + arkd in-process (for desktop app / standalone use)")
     .action(async (opts) => {
+      // Parent-death watchdog.
+      //
+      // When ARK_WATCH_PARENT=1 is set (by the e2e fixture or desktop shell),
+      // check every 2s whether the original parent is still alive. If it is
+      // gone, exit(0) -- otherwise we leak as an immortal zombie holding
+      // the port open until reboot (exactly what SIGKILLing Playwright on
+      // timeout did before this landed).
+      //
+      // Why not just compare process.ppid? On macOS the Bun/libuv
+      // process.ppid value is captured at startup and is NOT refreshed when
+      // the process reparents to launchd -- process.ppid keeps returning the
+      // dead parent's pid forever. `kill(pid, 0)` does an actual ESRCH
+      // lookup via the kernel, so it detects the reparent correctly on both
+      // macOS and Linux.
+      //
+      // Unset by default so a bare `ark web` invocation keeps running after
+      // the user closes their shell.
+      if (process.env.ARK_WATCH_PARENT === "1") {
+        const startingPpid = process.ppid;
+        let logged = false;
+        setInterval(() => {
+          let parentAlive = true;
+          try {
+            // Signal 0 = existence probe, no signal delivered. Throws ESRCH
+            // if the pid is gone.
+            process.kill(startingPpid, 0);
+          } catch {
+            parentAlive = false;
+          }
+          if (!parentAlive) {
+            if (!logged) {
+              logged = true;
+              console.log(chalk.yellow(`ark web: parent process ${startingPpid} died, exiting`));
+            }
+            process.exit(0);
+          }
+        }, 2000).unref();
+      }
+
       const globalOpts = program.opts();
       const remoteUrl = globalOpts.server || process.env.ARK_SERVER;
       const remoteAuthToken = globalOpts.token || process.env.ARK_TOKEN;
