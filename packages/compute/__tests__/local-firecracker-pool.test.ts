@@ -6,7 +6,7 @@
  * surface (same pattern as `firecracker-compute.test.ts`). No real
  * firecracker binary or network setup -- every side effect is stubbed.
  *
- * Coverage checklist (see Phase 4 spec):
+ * Coverage checklist:
  *   - start() pre-warms `target` VMs
  *   - start() is idempotent
  *   - acquire() pops warm; empty pool falls through to provision()

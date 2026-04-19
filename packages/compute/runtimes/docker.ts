@@ -1,5 +1,5 @@
 /**
- * DockerRuntime -- Wave 2 runtime that launches agents inside a per-session
+ * DockerRuntime -- runtime that launches agents inside a per-session
  * arkd-sidecar Docker container.
  *
  * Architecture (mirrors the current `LocalDockerProvider`, but split along
@@ -14,9 +14,9 @@
  * `handle.meta.docker.arkdUrl` and overrides the compute's default
  * `getArkdUrl` for all `launchAgent` calls.
  *
- * This file only implements the Wave 2 `Runtime` interface. The legacy
+ * This file only implements the new `Runtime` interface. The legacy
  * `LocalDockerProvider` (same sidecar model, older abstraction) stays live
- * and untouched -- Wave 3 is when dispatch flips over.
+ * and untouched until dispatch flips over through the ComputeTarget adapter.
  */
 
 import type { AppContext } from "../../core/app.js";

@@ -1,5 +1,5 @@
 /**
- * ComputeTarget pool-consult tests (Phase 4 wiring).
+ * ComputeTarget pool-consult tests.
  *
  * The pool-consult layer sits between ComputeTarget.provision/destroy and the
  * underlying Compute. It's entirely governed by three inputs:

@@ -14,10 +14,9 @@
  *   - `ip` from iproute2 for TAP/bridge setup. Busybox `ip` is acceptable
  *     but unusual; we only verify the command resolves.
  *
- * This function is explicitly non-throwing. Callers (Phase 2
- * FirecrackerCompute, or the CLI probe command) need to make scheduling
- * decisions based on the result -- on macOS for example we fall back to
- * Docker, not crash.
+ * This function is explicitly non-throwing. Callers (FirecrackerCompute, or
+ * the CLI probe command) need to make scheduling decisions based on the
+ * result -- on macOS for example we fall back to Docker, not crash.
  */
 
 import { accessSync, constants as fsConstants } from "fs";

@@ -129,7 +129,7 @@ describe("KataCompute", () => {
     expect(harness.lastPod.spec.containers[0].ports).toEqual([{ containerPort: 19300, name: "arkd" }]);
   });
 
-  it("snapshot still throws NotSupportedError (Phase 3 wires up the real impl)", async () => {
+  it("snapshot still throws NotSupportedError (real impl deferred)", async () => {
     const harness = makeHarness();
     const c = makeKataCompute(harness.deps);
     const h = await c.provision({ tags: { name: "micro" }, config: {} });

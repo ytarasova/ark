@@ -1,5 +1,5 @@
 /**
- * LocalFirecrackerPool -- Phase 4 warm-pool of microVMs on a single host.
+ * LocalFirecrackerPool -- warm-pool of microVMs on a single host.
  *
  * Why a pool?
  *   Provisioning a cold Firecracker microVM costs ~500ms-2s (rootfs attach,

@@ -1,7 +1,7 @@
 /**
  * LocalCompute unit tests.
  *
- * Verifies the Wave 1 capability surface, arkd URL resolution (reads
+ * Verifies the capability surface, arkd URL resolution (reads
  * `app.config.ports.arkd`), and the NotSupportedError surface for snapshot /
  * restore / start / stop / destroy.
  */

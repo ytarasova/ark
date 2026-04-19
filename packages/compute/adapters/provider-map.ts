@@ -1,9 +1,10 @@
 /**
  * Legacy provider-name -> (Compute, Runtime) pair mapping.
  *
- * Wave 3 flips dispatch to ComputeTarget. Existing DB rows and CLI callers
- * still use legacy provider names; this mapping is the single authoritative
- * place that turns a legacy name into the new two-axis representation.
+ * Dispatch resolves a session through ComputeTarget keyed by the new two-axis
+ * columns. Existing DB rows and CLI callers still use legacy provider names;
+ * this mapping is the single authoritative place that turns a legacy name
+ * into the new two-axis representation.
  *
  * Rules:
  *   - "local"              -> local + direct      (host running ark itself, worktree)

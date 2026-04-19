@@ -345,10 +345,10 @@ export class RemoteWorktreeProvider extends RemoteArkdBase {
 
 // ── Remote Docker Provider ──────────────────────────────────────────────────
 //
-// @deprecated -- Superseded by `EC2Compute + DockerRuntime` (Wave 2). The
+// @deprecated -- Superseded by `EC2Compute + DockerRuntime`. The
 // RemoteDocker / RemoteDevcontainer / RemoteFirecracker classes below are
 // kept registered until the EC2Compute + runtime pairs ship. Sessions
-// dispatched via Wave 3 ComputeTarget fall through to these classes for
+// dispatched via ComputeTarget fall through to these classes for
 // killAgent / cleanupSession / metrics because the new Compute interface
 // does not cover those verbs yet.
 

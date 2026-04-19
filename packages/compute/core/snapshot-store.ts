@@ -7,11 +7,11 @@
  * those bytes so the `Compute` impl doesn't have to care whether the caller
  * is on the ark host or a control-plane worker.
  *
- * Phase 3 ships a single filesystem-backed implementation
+ * Ships today with a single filesystem-backed implementation
  * (`FsSnapshotStore`). Future PRs add S3 / GCS backends; the interface is
  * shaped to keep that door open (stream-based, metadata opaque).
  *
- * See `.workflow/plan/compute-runtime-vision.md` Phase 3.
+ * See `.workflow/plan/compute-runtime-vision.md` for design context.
  */
 
 import type { ComputeKind } from "./types.js";

@@ -222,12 +222,12 @@ async function withProvider(
 }
 
 /**
- * Wave 3: invoke a ComputeTarget method for a session when the compute row
- * maps to a registered (compute, runtime) pair. Returns true on success, false
- * when no target is available (caller should fall back to the legacy provider
- * path in that case). Errors during dispatch are logged and swallowed -- the
- * session lifecycle always prefers proceeding with cleanup over blocking on a
- * runtime that refuses to shut down.
+ * Invoke a ComputeTarget method for a session when the compute row maps to a
+ * registered (compute, runtime) pair. Returns true on success, false when no
+ * target is available (caller should fall back to the legacy provider path
+ * in that case). Errors during dispatch are logged and swallowed -- the
+ * session lifecycle always prefers proceeding with cleanup over blocking on
+ * a runtime that refuses to shut down.
  */
 async function withComputeTarget(
   app: AppContext,
@@ -275,8 +275,8 @@ export async function stop(
   // Kill agent + clean up provider resources FIRST (before any DB writes).
   // This ensures processes are stopped even if subsequent DB ops fail.
   //
-  // Wave 3: legacy ComputeProvider still owns killAgent/cleanupSession (the
-  // new Compute/Runtime interfaces do not cover them yet). After the provider
+  // Legacy ComputeProvider still owns killAgent/cleanupSession (the new
+  // Compute/Runtime interfaces do not cover them yet). After the provider
   // path runs we give the Runtime a chance to shut down per-session state via
   // ComputeTarget.shutdown -- DirectRuntime / LocalCompute is a no-op;
   // DockerRuntime tears down its sidecar container.
@@ -289,9 +289,9 @@ export async function stop(
     await app.launcher.kill(session.session_id);
   }
 
-  // Wave 3: runtime-level teardown via ComputeTarget.shutdown. Builds a stub
-  // handle from the compute name; runtimes that stashed per-session meta on
-  // the handle (e.g. DockerRuntime.DockerHandleMeta) will detect the missing
+  // Runtime-level teardown via ComputeTarget.shutdown. Builds a stub handle
+  // from the compute name; runtimes that stashed per-session meta on the
+  // handle (e.g. DockerRuntime.DockerHandleMeta) will detect the missing
   // meta and no-op safely, matching today's cleanupSession semantics.
   await withComputeTarget(app, session, `stop ${sessionId}: shutdown runtime`, async (target, c) => {
     await target.shutdown({ kind: target.compute.kind, name: c.name, meta: {} });

@@ -1,40 +1,29 @@
 /**
  * Back-compat adapter: legacy `ComputeProvider` -> new `ComputeTarget`.
  *
- * Wave 1 wired `LocalWorktreeProvider` onto `LocalCompute` + `DirectRuntime`.
- * Wave 2 adds the `LocalDockerProvider` mapping: it now returns a
- * `ComputeTarget(LocalCompute, DockerRuntime)`. Existing DB rows with
- * `provider: "docker"` keep working through this mapping -- no migration.
+ * Maps every known legacy provider onto its matching `(Compute, Runtime)`
+ * pair:
  *
- * Wave 3 extends the mapping to the remote (EC2-backed) providers:
- *
+ *   LocalWorktreeProvider      -> ComputeTarget(LocalCompute, DirectRuntime)
+ *   LocalDockerProvider        -> ComputeTarget(LocalCompute, DockerRuntime)
+ *   LocalFirecrackerProvider   -> ComputeTarget(FirecrackerCompute, DirectRuntime)
  *   RemoteWorktreeProvider     -> ComputeTarget(EC2Compute, DirectRuntime)
  *   RemoteDockerProvider       -> ComputeTarget(EC2Compute, DockerRuntime)
  *   RemoteDevcontainerProvider -> ComputeTarget(EC2Compute, DevcontainerRuntime)
- *   RemoteFirecrackerProvider  -> null (Phase 2 owns the microVM side)
+ *   RemoteFirecrackerProvider  -> null (microVM-on-EC2 composition not yet wired)
+ *   K8sProvider                -> ComputeTarget(K8sCompute,  DirectRuntime)
+ *   KataProvider               -> ComputeTarget(KataCompute, DirectRuntime)
  *
- * Existing DB rows with `provider: "ec2" | "ec2-docker" | "ec2-devcontainer"`
- * keep working through this mapping -- no schema migration.
- *
- * Phase 2 adds the local microVM mapping:
- *
- *   LocalFirecrackerProvider   -> ComputeTarget(FirecrackerCompute, DirectRuntime)
+ * Existing DB rows (eg `provider: "docker"`, `"ec2"`, `"k8s"`, ...) keep
+ * working through this mapping -- no schema migration.
  *
  * The FirecrackerCompute's own availability gate fires at provision time, so
  * constructing the target here is safe even on hosts that don't support KVM:
  * mapping the ComputeProvider onto a target never touches the kernel.
  *
- * Wave 3 also maps the Kubernetes providers:
- *
- *   K8sProvider  -> ComputeTarget(K8sCompute,  DirectRuntime)
- *   KataProvider -> ComputeTarget(KataCompute, DirectRuntime)
- *
- * Existing DB rows with `provider: "k8s"` / `"k8s-kata"` keep working through
- * this mapping -- no schema migration.
- *
  * Every other provider still returns null, and callers fall through to the
- * legacy `ComputeProvider` API as before. Wave 3 deletes this file entirely
- * once every call site runs through ComputeTarget.
+ * legacy `ComputeProvider` API as before. This file can be deleted once every
+ * call site runs through ComputeTarget.
  *
  * Invariants honoured by this adapter:
  *   - LocalCompute.getArkdUrl() already reads `app.config.ports.arkd`, but
@@ -55,7 +44,7 @@
  *     arkd on that URL.
  *   - The returned ComputeTarget is a thin view -- it does NOT re-run
  *     lifecycle on its own. Callers hold onto the legacy provider until
- *     Wave 3 wires dispatch.
+ *     dispatch is wired through ComputeTarget.
  */
 
 import type { AppContext } from "../../core/app.js";
@@ -104,8 +93,8 @@ export function computeProviderToTarget(provider: ComputeProvider, app: AppConte
     return new ComputeTarget(compute, runtime, app);
   }
   if (provider instanceof LocalFirecrackerProvider) {
-    // Phase 2 composition: the Firecracker microVM IS the compute; inside
-    // the VM the agent runs natively via arkd, so the runtime is `direct`.
+    // Firecracker microVM IS the compute; inside the VM the agent runs
+    // natively via arkd, so the runtime is `direct`.
     const compute = new FirecrackerCompute();
     compute.setApp(app);
     const runtime = new DirectRuntime();
@@ -141,8 +130,8 @@ export function computeProviderToTarget(provider: ComputeProvider, app: AppConte
     return new ComputeTarget(compute, runtime, app);
   }
   if (provider instanceof RemoteFirecrackerProvider) {
-    // Deferred: Phase 2 owns the microVM-on-EC2 composition. Until then the
-    // legacy provider stays authoritative; the null return preserves that.
+    // microVM-on-EC2 composition is not yet wired; until then the legacy
+    // provider stays authoritative; the null return preserves that.
     return null;
   }
   // Kata must be checked before K8s because KataProvider extends K8sProvider

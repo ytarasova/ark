@@ -255,8 +255,8 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   router.handle("session/resume", async (params, notify) => {
     const { sessionId, snapshotId } = extract<SessionResumeParams>(params, ["sessionId"]);
 
-    // Phase 3: if the session has a persisted snapshot (or the caller supplied
-    // one explicitly), prefer the snapshot-based restore path. Otherwise fall
+    // If the session has a persisted snapshot (or the caller supplied one
+    // explicitly), prefer the snapshot-based restore path. Otherwise fall
     // back to the state-only resume for backends that don't snapshot.
     const session = app.sessions.get(sessionId);
     const lastSnapshotId =
@@ -287,9 +287,9 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   router.handle("session/pause", async (params, notify) => {
     const { sessionId, reason } = extract<SessionPauseParams>(params, ["sessionId"]);
 
-    // Phase 3: try the snapshot-backed pause first. If the underlying compute
-    // doesn't support snapshot we transparently fall back to a state-only
-    // pause so local sessions keep working the way they did pre-Phase-3.
+    // Try the snapshot-backed pause first. If the underlying compute doesn't
+    // support snapshot we transparently fall back to a state-only pause so
+    // local sessions keep working the way they did before snapshotting.
     const { pauseWithSnapshot } = await import("../../core/services/session-snapshot.js");
     const snapResult = await pauseWithSnapshot(app, sessionId, { reason });
     const session = app.sessions.get(sessionId);

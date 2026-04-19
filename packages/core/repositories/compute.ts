@@ -74,7 +74,7 @@ export class ComputeRepository {
   create(opts: CreateComputeOpts): Compute {
     const ts = now();
 
-    // Wave 3: when caller passes the new axes (`compute`, `runtime`) without a
+    // When caller passes the new axes (`compute`, `runtime`) without a
     // legacy `provider`, reverse-map to the best legacy name so back-compat
     // reads (`compute.provider`) keep working and the singleton check below
     // uses the correct key.

@@ -11,7 +11,7 @@
  *   - Snapshot and restore using Firecracker's native snapshot API.
  *
  * It does NOT know about:
- *   - the ark Compute interface (Phase 2 wraps this from `FirecrackerCompute`),
+ *   - the ark Compute interface (`FirecrackerCompute` wraps this module),
  *   - networking host-side setup (see `network.ts`),
  *   - kernel/rootfs acquisition (see `paths.ts`, plus a future image module).
  *

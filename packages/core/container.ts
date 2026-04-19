@@ -78,7 +78,7 @@ export interface Cradle {
   // Plugin registry (executors, compute providers, etc.)
   pluginRegistry: PluginRegistry;
 
-  // Snapshot persistence (Phase 3)
+  // Snapshot persistence
   snapshotStore: SnapshotStore;
 }
 

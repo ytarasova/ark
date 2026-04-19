@@ -1,5 +1,5 @@
 /**
- * Compute / Runtime split -- Wave 1 primary abstractions.
+ * Compute / Runtime split -- primary abstractions.
  *
  * See `.workflow/plan/compute-runtime-vision.md` (section "Core interfaces") for
  * the intended shape. Today's `ComputeProvider` interface in `../types.ts`
@@ -10,10 +10,9 @@
  *   - `Runtime`        -- how the agent process is launched inside that host
  *   - `ComputeTarget`  -- the composed (compute, runtime) pair used at dispatch
  *
- * Wave 1 only lands the interfaces plus a `LocalCompute` + `DirectRuntime`
- * pair. Wave 2 migrates the other providers; Wave 3 flips the dispatch layer.
  * The legacy `ComputeProvider` interface stays live and unchanged -- the
- * adapter in `../adapters/legacy.ts` bridges the old world into the new.
+ * adapter in `../adapters/legacy.ts` bridges the old world into the new until
+ * every dispatch path reads from the new interfaces.
  */
 
 import type { AppContext } from "../../core/app.js";
@@ -61,7 +60,7 @@ export interface ComputeHandle {
 /**
  * Handle returned by `Runtime.launchAgent`. For the direct / docker / ...
  * runtimes this is just the tmux session name arkd launched, kept
- * structured so Wave 2 runtimes can attach extra state (compose project,
+ * structured so future runtimes can attach extra state (compose project,
  * devcontainer id) without a breaking change.
  */
 export interface AgentHandle {

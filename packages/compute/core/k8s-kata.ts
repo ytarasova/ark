@@ -4,11 +4,11 @@
  * Inherits the full K8sCompute lifecycle but flips two things:
  *   1. Capabilities -- `snapshot: true` and `networkIsolation: true`
  *      (Kata gives us a microVM per pod; Firecracker-class snapshotting
- *      is achievable, but the wiring itself lands in Phase 3).
+ *      is achievable, but the wiring itself is not yet done).
  *   2. Pod spec -- every pod is annotated with `runtimeClassName: kata`
  *      (or the override from `ProvisionOpts.config.runtimeClassName`).
  *
- * `snapshot` and `restore` still throw `NotSupportedError`; Phase 3's PR
+ * `snapshot` and `restore` still throw `NotSupportedError`; a follow-up PR
  * replaces them with real impls. Gating the capability flag already lets
  * the registry treat Kata as a snapshot-capable backend without forcing
  * callers to special-case the in-progress state.
@@ -39,9 +39,9 @@ export class KataCompute extends K8sCompute {
     return { ...base, runtimeClassName: cfg.runtimeClassName ?? DEFAULT_KATA_RUNTIME_CLASS };
   }
 
-  // Phase 3 replaces these with real snapshot/restore against the Kata
-  // runtime. Capability flag is `true` so the registry routes through us,
-  // but we fail loudly until that work lands.
+  // A follow-up PR replaces these with real snapshot/restore against the
+  // Kata runtime. Capability flag is `true` so the registry routes through
+  // us, but we fail loudly until that work lands.
 
   async snapshot(_h: ComputeHandle): Promise<Snapshot> {
     throw new NotSupportedError(this.kind, "snapshot");

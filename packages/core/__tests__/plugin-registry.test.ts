@@ -1,9 +1,9 @@
 /**
  * Unit tests for the PluginRegistry primitive.
  *
- * These tests pin the contract so Phase 2 (compute providers, runtimes,
- * transcript parsers moving to the same registry) doesn't silently break
- * the API shape.
+ * These tests pin the contract so upcoming extensions (compute providers,
+ * runtimes, transcript parsers moving to the same registry) don't silently
+ * break the API shape.
  */
 
 import { describe, it, expect } from "bun:test";

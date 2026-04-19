@@ -1,12 +1,12 @@
 /**
- * K8sCompute -- Wave 2 migration of the legacy `K8sProvider` onto the
- * new (Compute, Runtime) split.
+ * K8sCompute -- migration of the legacy `K8sProvider` onto the new
+ * (Compute, Runtime) split.
  *
  * Model: one Kubernetes Pod per provisioned compute. The pod runs arkd as
  * its main container; the host conductor reaches arkd through a
  * `kubectl port-forward` subprocess bound to a local loopback port. This
- * matches the arkd-sidecar invariant from the Wave 1 plan -- every compute
- * target must expose an arkd URL reachable from the host.
+ * matches the arkd-sidecar invariant -- every compute target must expose
+ * an arkd URL reachable from the host.
  *
  * Lifecycle:
  *   - `provision` creates the pod + spawns the port-forward, stashing both
@@ -16,10 +16,10 @@
  *   - `destroy` deletes the pod (and kills the port-forward).
  *   - `snapshot` / `restore` throw `NotSupportedError` -- vanilla k8s has
  *     no VM-style snapshot primitive. The `k8s-kata` subclass flips the
- *     capability flag on but still defers to Phase 3 for the real impl.
+ *     capability flag on but still defers the real impl to a follow-up.
  *
- * Wave 3 wires `K8sProvider` -> this class via the legacy adapter. Until
- * then both live side-by-side.
+ * The legacy adapter wires `K8sProvider` -> this class; until every
+ * dispatch path goes through that adapter both live side-by-side.
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
@@ -31,8 +31,8 @@ import { logDebug } from "../../core/observability/structured-log.js";
 
 /**
  * Config payload read from `ProvisionOpts.config`. Same shape as the legacy
- * `K8sConfig` -- kept unchanged so the Wave 3 migration can copy the DB
- * column straight across.
+ * `K8sConfig` -- kept unchanged so dispatch can copy the DB column straight
+ * across when the legacy row is migrated.
  */
 export interface K8sComputeConfig {
   /** Target namespace; defaults to "ark". */

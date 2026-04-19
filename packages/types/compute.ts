@@ -47,9 +47,9 @@ export interface Compute {
   name: string;
   /** @deprecated Use `compute_kind` + `runtime_kind`. Kept for back-compat reads. */
   provider: ComputeProviderName;
-  /** Where the compute lives (Wave 3 dispatch axis). */
+  /** Where the compute lives (dispatch axis). */
   compute_kind: ComputeKindName;
-  /** How the agent process is launched (Wave 3 dispatch axis). */
+  /** How the agent process is launched (dispatch axis). */
   runtime_kind: RuntimeKindName;
   status: ComputeStatus;
   config: ComputeConfig;
@@ -61,9 +61,9 @@ export interface CreateComputeOpts {
   name: string;
   /** @deprecated Use `compute` + `runtime`. Accepted for back-compat. */
   provider?: ComputeProviderName;
-  /** Wave 3: compute axis (e.g. "local", "ec2"). */
+  /** Compute axis (e.g. "local", "ec2"). */
   compute?: ComputeKindName;
-  /** Wave 3: runtime axis (e.g. "direct", "docker"). */
+  /** Runtime axis (e.g. "direct", "docker"). */
   runtime?: RuntimeKindName;
   config?: Partial<ComputeConfig>;
   /** Apply a named template's defaults before user config overrides. */

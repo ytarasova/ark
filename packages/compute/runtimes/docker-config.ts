@@ -3,8 +3,8 @@
  *
  * Today's `LocalDockerProvider` reads the same keys off a loose
  * `Record<string, unknown>` bag on `compute.config`. Pulling them into a
- * named type keeps the Runtime call sites explicit and lets future Wave 2
- * work (`ComposeRuntime`, `DevcontainerRuntime`) diverge cleanly.
+ * named type keeps the Runtime call sites explicit and lets sibling
+ * runtimes (`ComposeRuntime`, `DevcontainerRuntime`) diverge cleanly.
  */
 
 import type { BootstrapOpts } from "../providers/docker/helpers.js";

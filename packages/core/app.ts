@@ -93,12 +93,12 @@ export class AppContext {
   private _eventBus: typeof eventBus | null = null;
   private _providers = new Map<string, ComputeProvider>();
 
-  // Wave 1 Compute + Runtime registries. Live alongside `_providers`; Wave 3
-  // retires the old registry once every dispatch path reads from these.
+  // Compute + Runtime registries. Live alongside `_providers`; the legacy
+  // registry retires once every dispatch path reads from these.
   private _computes = new Map<ComputeKind, NewCompute>();
   private _runtimes = new Map<RuntimeKind, NewRuntime>();
   /**
-   * Phase 4: warm pools keyed by compute kind. At most one pool per kind;
+   * Warm pools keyed by compute kind. At most one pool per kind;
    * dispatch consults `getComputePool(kind)` before falling back to a direct
    * `Compute.provision()` call. Pools are registered by the caller that
    * instantiates them (eg. a boot hook or a test harness), not by the
@@ -216,7 +216,7 @@ export class AppContext {
     return this._resolve("knowledge");
   }
 
-  // ── Snapshot persistence (Phase 3) ─────────────────────────────────────
+  // ── Snapshot persistence ───────────────────────────────────────────────
 
   /** Snapshot store used by `session/pause` + `session/resume`. */
   get snapshotStore(): SnapshotStore {
@@ -417,12 +417,11 @@ export class AppContext {
     return [...this._providers.keys()];
   }
 
-  // ── Compute / Runtime registry (Wave 1) ───────────────────────────────
+  // ── Compute / Runtime registry ────────────────────────────────────────
   //
-  // Wave 1 lands the interfaces and a single `LocalCompute` + `DirectRuntime`
-  // pair. Wave 2 migrates the remaining providers. Wave 3 retires
-  // `registerProvider` / `getProvider` above and wires dispatch through
-  // these registries instead.
+  // Lives alongside the legacy `registerProvider` / `getProvider` registry
+  // above; dispatch flips to reading from these registries exclusively once
+  // every path is migrated.
 
   registerCompute(c: NewCompute): void {
     c.setApp?.(this);
@@ -450,7 +449,7 @@ export class AppContext {
     return [...this._runtimes.keys()];
   }
 
-  // ── Compute pool registry (Phase 4) ───────────────────────────────────
+  // ── Compute pool registry ─────────────────────────────────────────────
   //
   // Pools are optional -- only registered when a caller explicitly wants to
   // amortise provision latency (eg. local Firecracker). Dispatch should
@@ -483,7 +482,7 @@ export class AppContext {
   }
 
   /**
-   * Wave 3: resolve the ComputeTarget for a session.
+   * Resolve the ComputeTarget for a session.
    *
    * Reads `compute_kind` + `runtime_kind` from the compute row. For legacy
    * rows that pre-date the schema change, falls back to `providerToPair`
@@ -643,7 +642,7 @@ export class AppContext {
       // Knowledge graph
       knowledge: asValue(new KnowledgeStore(db)),
 
-      // Snapshot persistence (Phase 3). Default to an FS-backed store under
+      // Snapshot persistence. Default to an FS-backed store under
       // `<arkDir>/snapshots`. Hosted deployments can replace with an S3/GCS
       // impl via `container.register({ snapshotStore: asValue(...) })`.
       snapshotStore: asValue(new FsSnapshotStore(join(this.config.arkDir, "snapshots"))),
@@ -656,7 +655,7 @@ export class AppContext {
       transcriptParsers: asValue(this.createTranscriptParserRegistry()),
 
       // Plugin registry -- canonical source for extensible collections
-      // (executors today; compute providers, runtimes, transcript parsers in Phase 2)
+      // (executors today; compute providers, runtimes, transcript parsers next)
       pluginRegistry: asValue(createPluginRegistry()),
     });
 
@@ -700,8 +699,8 @@ export class AppContext {
         logDebug("general", "@kubernetes/client-node not installed");
       }
 
-      // Wave 2 Compute registrations for Kubernetes. Gated the same way as
-      // the legacy K8sProvider above -- if `@kubernetes/client-node` isn't
+      // Compute registrations for Kubernetes. Gated the same way as the
+      // legacy K8sProvider above -- if `@kubernetes/client-node` isn't
       // installed, skip silently and leave the registry without a `k8s` /
       // `k8s-kata` kind.
       try {
@@ -714,9 +713,9 @@ export class AppContext {
         logDebug("general", "@kubernetes/client-node not installed");
       }
 
-      // Wave 1/2 Compute + Runtime registry. Additive -- the legacy provider
-      // registry above still runs every dispatch path. Wave 3 flips dispatch
-      // to consume these.
+      // Compute + Runtime registry. Additive -- the legacy provider registry
+      // above still runs every dispatch path; dispatch flips to consume these
+      // once every call site is migrated.
       const { LocalCompute } = await import("../compute/core/local.js");
       const { EC2Compute } = await import("../compute/core/ec2.js");
       const { DirectRuntime } = await import("../compute/runtimes/direct.js");
@@ -730,8 +729,8 @@ export class AppContext {
       this.registerRuntime(new DevcontainerRuntime());
       this.registerRuntime(new DockerComposeRuntime());
 
-      // Phase 2: FirecrackerCompute. Gated on the availability probe so we
-      // don't register on macOS (no /dev/kvm). `registerFirecrackerIfAvailable`
+      // FirecrackerCompute. Gated on the availability probe so we don't
+      // register on macOS (no /dev/kvm). `registerFirecrackerIfAvailable`
       // logs at info level when the gating fires so the skip is observable.
       const { registerFirecrackerIfAvailable } = await import("../compute/core/firecracker/compute.js");
       registerFirecrackerIfAvailable(this);

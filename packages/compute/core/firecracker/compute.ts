@@ -1,5 +1,5 @@
 /**
- * FirecrackerCompute -- Phase 2 integration of the VM manager from PR #193.
+ * FirecrackerCompute -- integration of the low-level Firecracker VM manager.
  *
  * This compute:
  *   1. Checks Firecracker availability on the host (Linux + /dev/kvm + binary).
@@ -19,14 +19,14 @@
  * Runtime composition:
  *   - `FirecrackerCompute × DirectRuntime` = agent runs natively in the VM.
  *   - `FirecrackerCompute × DockerRuntime` = VM hosts docker with arkd
- *     sidecar (Wave later; no different from the compute's perspective).
+ *     sidecar (not yet wired; no different from the compute's perspective).
  *
  * Snapshot / restore delegate to the VM manager's native pause+snapshot and
  * load+resume APIs, writing / reading from per-VM paths under
- * `~/.ark/firecracker/vms/<vmId>/snapshot/`. Phase 3 wires a higher-level
- * SnapshotStore (object storage, cross-host restore); the compute-level
- * API here is intentionally end-to-end against the local filesystem so
- * existing tests can exercise snapshot() -> restore() today.
+ * `~/.ark/firecracker/vms/<vmId>/snapshot/`. A higher-level SnapshotStore
+ * (object storage, cross-host restore) is wired separately; the compute-
+ * level API here is intentionally end-to-end against the local filesystem
+ * so existing tests can exercise snapshot() -> restore() today.
  */
 
 import type { AppContext } from "../../../core/app.js";
@@ -57,7 +57,7 @@ const ARKD_POLL_INTERVAL_MS = 500;
  *
  * We factor the deps through a `Deps` struct rather than individual setters
  * so tests can pass one object with a subset overridden (the default object
- * fills in the rest). Matches the pattern used in `docker.ts` for Wave 2.
+ * fills in the rest). Matches the pattern used in `docker.ts`.
  */
 export interface FirecrackerComputeDeps {
   isFirecrackerAvailable: typeof isFirecrackerAvailable;
@@ -391,7 +391,7 @@ async function safe(fn: () => Promise<unknown>): Promise<void> {
 /**
  * Parse a `size` hint like "small" / "2x4" (2 vcpu, 4 GiB) into vcpus. The
  * hint is entirely optional and informal for now; a structured size enum
- * lands with the pool layer (Phase 4).
+ * lands with the pool layer.
  */
 function parseVcpus(size: string | undefined): number {
   if (!size) return 2;

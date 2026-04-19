@@ -1,8 +1,7 @@
 /**
  * Firecracker kernel + rootfs acquisition.
  *
- * Responsibility split (see `.workflow/plan/compute-runtime-vision.md`,
- * Phase 2 PR 2.2):
+ * Responsibility split (see `.workflow/plan/compute-runtime-vision.md`):
  *
  *   - `paths.ts` owns the ON-DISK LAYOUT (content-addressed under
  *     `~/.ark/firecracker/`), but NOT how the artifacts got there.
@@ -30,9 +29,9 @@
  *      rc.local) that:
  *        a. If `/usr/local/bin/bun` is missing, curls the bun installer and
  *           installs bun into /usr/local. First boot: ~15s.
- *        b. Clones `/opt/ark` from a block-device mount if present (Phase 3
- *           turns this into a 9p / virtio-fs share; today we bake arkd into
- *           the image for speed). Missing -> assume baked.
+ *        b. Clones `/opt/ark` from a block-device mount if present (a
+ *           follow-up turns this into a 9p / virtio-fs share; today we bake
+ *           arkd into the image for speed). Missing -> assume baked.
  *        c. Starts arkd on :19300 bound to 0.0.0.0.
  *   3. TODO(phase-2b): replace the baked-rootfs download with a "build from
  *      Dockerfile" path (OCI image -> ext4 via `docker export | mksquashfs`
@@ -51,10 +50,10 @@
  *     (plus the KERNEL equivalents). The env vars are intentionally
  *     undocumented in the CLI -- they're an escape hatch, not a supported
  *     feature.
- *   - First boot is slow (bun install over the network). Phase 2b bakes bun
- *     into the rootfs.
+ *   - First boot is slow (bun install over the network). A follow-up bakes
+ *     bun into the rootfs.
  *   - The rootfs has no persistent state. Each provision starts from the
- *     base image; a diff drive lands with snapshots (Phase 3).
+ *     base image; a diff drive lands with snapshots.
  *   - No retry on download failure. One-shot; caller re-runs `provision` to
  *     retry.
  */
@@ -144,7 +143,7 @@ export function __resetRootfsHooksForTesting(): void {
  * The second sees a partial file from the first, the verify step catches the
  * mismatch, and the second retries after the first has won. For first cut we
  * accept this race -- the expected call pattern is "one-shot on first boot".
- * A mutex belongs in the pool layer (Phase 4) where cold calls are batched.
+ * A mutex belongs in the pool layer where cold calls are batched.
  */
 export async function ensureRootfs(): Promise<RootfsPaths> {
   const kernelUrl = process.env.ARK_FC_KERNEL_URL ?? DEFAULT_KERNEL_URL;
