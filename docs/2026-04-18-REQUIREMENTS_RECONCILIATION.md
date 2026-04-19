@@ -263,9 +263,9 @@ The research on code-graph / KB tooling alternatives landed a set of decisions d
 - Sage-KB and any external tenant MCPs (Atlassian, Bitbucket, Figma) proxy through the same conductor surface.
 
 ### Tool choice: **staged**
-1. **Keep ops-codegraph as the base** -- already vendored, 34 languages, Java tree-sitter good. Add repo-map generator on top (~440 LOC, ~2 days).
-2. **Embed codebase-memory-mcp** alongside -- MIT-licensed static C binary, 66 languages, claimed 10× fewer tokens + 2.1× fewer tool calls (arXiv:2603.27277). Vendored via same pattern as goose/codex/codegraph. See `docs/2026-04-18-CODE_INTELLIGENCE_DESIGN.md` §6a for the 6 concrete deltas.
-3. **Pilot both in parallel** on Paytm repos, measure token-per-query + precision, keep the winner as default.
+1. **Keep ops-codegraph as the base** (for now) -- already vendored, 34 languages, Java tree-sitter good. Add repo-map generator on top (~440 LOC, ~2 days).
+2. **codebase-memory-mcp SHIPPED 2026-04-18 (commit b9356da)** -- v0.6.0 vendored alongside ops-codegraph. MIT, 66 languages, 14 MCP tools auto-injected into every session's `.mcp.json`. CLI (`ark knowledge codebase status/tools/reindex`) and Web UI (`CodebaseMemoryPanel` on Memory page) shipped.
+3. **Pilot both in parallel** on Paytm repos, measure token-per-query + precision, keep the winner as default (next milestone, post-shipping).
 4. **Consider GitNexus** for cross-repo Cypher IF PolyForm NC license can be resolved with akonlabs.com.
 5. **Skip**: Serena (LSP per-repo too heavy to pool), Understand-Anything (no MCP server), graphify (multimodal overhead), Bloop (stale, desktop-only), Sourcegraph src-cli (enterprise/cloud).
 
@@ -275,8 +275,11 @@ Two items move from ❌ GAP to 📍 PLANNED (with concrete design):
 - **#4 Centralized MCP Router** → design exists, ~780 LOC to build
 - **Sage-KB integration contract** → conductor-side proxy path, no code on Ark's knowledge side
 
+One item moves from GAP to ✅ **SHIPPED 2026-04-18** (commit b9356da):
+- **Embedded code-intelligence engine for agents** -- codebase-memory-mcp vendored at v0.6.0, auto-exposed via `.mcp.json` for Claude + `--with-extension` for Goose. 14 tools available. CLI + Web UI surfaces live.
+
 One new requirement surfaces from the design:
-- **Aider-style repo-map generator** on top of existing ops-codegraph -- not in original canvas but required to make system-prompt delivery cost-effective
+- **Aider-style repo-map generator** on top of existing ops-codegraph -- not in original canvas but required to make system-prompt delivery cost-effective (now optional since codebase-memory-mcp's `get_architecture` can serve the same role)
 
 ## Sources consulted
 

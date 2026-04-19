@@ -1,5 +1,8 @@
 # Supporting Rohit's and Abhimanyu's flows in Ark -- 2026-04-18
 
+> **Update 2026-04-18 (later in day, commit b9356da):** codebase-memory-mcp now vendored and auto-injected into every session's `.mcp.json`. This means BOTH Rohit's and Abhimanyu's agents (when running under Ark) automatically get 14 additional code-intelligence tools (`search_graph`, `trace_path`, `get_architecture`, `search_code`, `manage_adr`, etc.) on top of what their recipes declare. The 4 of 5 Sage-KB equivalents discussed in §7 are now covered by codebase-memory-mcp's tool set (modulo `kb_status` which has no direct analog). Cross-repo queries still need Camp 11.
+---
+
 > **Status:** deep-dive spec. No code changes. Companion to `2026-04-18-REQUIREMENTS_RECONCILIATION.md`.
 > **Artifacts inspected on disk:**
 >

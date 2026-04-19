@@ -30,11 +30,19 @@
 >
 > **Code intelligence decisions (2026-04-18, see dedicated doc):**
 > - **Delivery: hybrid** -- cached repo-map in system prompt + MCP drilldown (not exclusively either)
-> - **Pooling: arkd hosts + conductor routes** -- one MCP instance per `(tenant, repo, tool)`, not per-session
-> - **Vendor codebase-memory-mcp** (MIT, static C binary, 66 languages including required Python/JS/TS/Java, 14 MCP tools, 10× token reduction per arXiv:2603.27277) alongside existing ops-codegraph. Pin v0.6.0 via `vendor/versions.yaml`. Same pattern as goose/codex/codegraph.
-> - **KB/KG integration: facade model** -- Ark's existing 6 `knowledge/*` MCP tools become the agent-facing surface; conductor routes to codebase-memory-mcp for code-structural queries and Ark native KG (ark.db) for memory/learning/session queries
+> - **Pooling: arkd hosts + conductor routes** -- one MCP instance per `(tenant, repo, tool)`, not per-session *(design landed; implementation deferred)*
+> - **codebase-memory-mcp SHIPPED 2026-04-18 (commit b9356da)** -- v0.6.0 vendored, MIT, static C binary (~160 MB per platform), 66 languages incl. Python/JS/TS/Java, 14 MCP tools, 10x token reduction per arXiv:2603.27277. Currently per-session `.mcp.json` injection; arkd pooling is the next iteration. Runs alongside ops-codegraph until pilot validates.
+> - **Agent exposure SHIPPED** -- `writeChannelConfig` auto-injects `codebase-memory` MCP entry alongside `ark-channel`; `permissions.allow` auto-includes `mcp__codebase-memory__*`; Goose gets a second `--with-extension`. No agent YAML changes required.
+> - **CLI surface SHIPPED** -- `ark knowledge codebase {status,tools,reindex}`.
+> - **Web UI surface SHIPPED** -- `CodebaseMemoryPanel` on the Memory page (status + version + path + 14 tool names).
+> - **KB/KG integration: facade model** -- Ark's existing 6 `knowledge/*` MCP tools remain the agent-facing surface for memory/history/recall; codebase-memory-mcp exposes its own 14 tools alongside. Future: conductor routes between them for a unified `knowledge/*` namespace.
 > - **Storage backend in control-plane mode: S3 or Postgres** (both approved, pick per workload after pilot)
 > - **Multi-repo sessions**: federated query fan-out with repo-tagged merged results (intersects Camp 11)
+>
+> **Deferred** (from the codebase-memory-mcp rollout, see commit b9356da message):
+> - Remove `codegraph` from `vendor/versions.yaml` (kept as fallback until pilot validates)
+> - Retire `knowledge/search`, `knowledge/context`, `knowledge/impact` Ark-native handlers that duplicate codebase-memory-mcp tools
+> - Pool via arkd/conductor (currently per-session `.mcp.json` injection)
 >
 > **Flow dispatch decisions (2026-04-18):**
 > - **Rohit (Sage) -- ad-hoc recipe file path**: new `ark session start --recipe-file <path>` for machine-generated Goose recipes (upstream from Sage at `pi-team.mypaytm.com/sage`). Rohit's `PAI-31080` spans 3 repos, needs Camp 11.

@@ -6,6 +6,9 @@
 > - `docs/2026-04-18-REQUIREMENTS_RECONCILIATION.md` -- every canvas feature vs Ark state with file:line evidence
 > - `docs/2026-04-18-SUPPORTING_ROHIT_AND_ABHIMANYU_FLOWS.md` -- deep dive on dispatching the two external Goose recipes
 > - `docs/2026-04-18-CODE_INTELLIGENCE_DESIGN.md` -- hybrid repo-map + pooled MCP architecture, codebase-memory-mcp vendoring + KB/KG integration, storage model for local + control-plane modes
+> - `docs/2026-04-18-COLLATED_ROADMAP.md` -- one-page collated agreed plan combining canvas + 4 review docs + ROADMAP.md
+>
+> **2026-04-18 implementation shipped:** codebase-memory-mcp v0.6.0 vendored (commit `b9356da`); 14 code-intelligence tools now auto-injected into every agent session; CLI + Web UI surfaces live. See Section 12 file inventory.
 
 ---
 
