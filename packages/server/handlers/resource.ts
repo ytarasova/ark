@@ -1,9 +1,9 @@
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
-import { findProjectRoot } from "../../core/agent/agent.js";
 import { instantiateRecipe } from "../../core/agent/recipe.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
+import { guardBuiltin, projectArg, resolveProjectRoot, resolveScope, type Scope } from "./scope-helpers.js";
 import type {
   AgentDefinition,
   AgentReadParams,
@@ -45,13 +45,11 @@ async function cleanZombieSessions(app: AppContext): Promise<number> {
 
 export function registerResourceHandlers(router: Router, app: AppContext): void {
   router.handle("agent/list", async () => {
-    const projectRoot = findProjectRoot(process.cwd()) ?? undefined;
-    return { agents: app.agents.list(projectRoot) };
+    return { agents: app.agents.list(resolveProjectRoot()) };
   });
   router.handle("agent/read", async (p) => {
     const { name } = extract<AgentReadParams>(p, ["name"]);
-    const projectRoot = findProjectRoot(process.cwd()) ?? undefined;
-    const agent = app.agents.get(name, projectRoot);
+    const agent = app.agents.get(name, resolveProjectRoot());
     if (!agent) throw new Error(`Agent '${name}' not found`);
     return { agent };
   });
@@ -63,9 +61,9 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
    * to spell out every required field.
    */
   router.handle("agent/create", async (p) => {
-    const params = extract<Partial<AgentDefinition> & { name: string; scope?: "global" | "project" }>(p, ["name"]);
+    const params = extract<Partial<AgentDefinition> & { name: string; scope?: Scope }>(p, ["name"]);
     const { scope, ...rest } = params;
-    const projectRoot = findProjectRoot(process.cwd()) ?? undefined;
+    const projectRoot = resolveProjectRoot();
     const existing = app.agents.get(params.name, projectRoot);
     if (existing && existing._source !== "builtin") {
       throw new Error(`Agent '${params.name}' already exists. Use agent/update to modify it.`);
@@ -87,36 +85,32 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
       ...(rest.command ? { command: rest.command } : {}),
       ...(rest.task_delivery ? { task_delivery: rest.task_delivery } : {}),
     };
-    const resolvedScope: "global" | "project" = scope === "project" && projectRoot ? "project" : "global";
-    app.agents.save(agent.name, agent, resolvedScope, resolvedScope === "project" ? projectRoot : undefined);
+    const resolvedScope = resolveScope(scope, null, projectRoot);
+    app.agents.save(agent.name, agent, resolvedScope, projectArg(resolvedScope, projectRoot));
     return { ok: true, name: agent.name, scope: resolvedScope };
   });
 
   router.handle("agent/update", async (p) => {
-    const params = extract<Partial<AgentDefinition> & { name: string; scope?: "global" | "project" }>(p, ["name"]);
+    const params = extract<Partial<AgentDefinition> & { name: string; scope?: Scope }>(p, ["name"]);
     const { scope, ...rest } = params;
-    const projectRoot = findProjectRoot(process.cwd()) ?? undefined;
+    const projectRoot = resolveProjectRoot();
     const existing = app.agents.get(params.name, projectRoot);
     if (!existing) throw new Error(`Agent '${params.name}' not found`);
-    if (existing._source === "builtin") {
-      throw new Error(`Agent '${params.name}' is builtin -- copy it to global/project before editing.`);
-    }
+    guardBuiltin(existing, "Agent", params.name, "edit");
     const merged: AgentDefinition = { ...existing, ...rest, name: params.name };
-    const resolvedScope: "global" | "project" = scope ?? (existing._source === "project" ? "project" : "global");
-    app.agents.save(merged.name, merged, resolvedScope, resolvedScope === "project" ? projectRoot : undefined);
+    const resolvedScope = resolveScope(scope, existing, projectRoot);
+    app.agents.save(merged.name, merged, resolvedScope, projectArg(resolvedScope, projectRoot));
     return { ok: true, name: merged.name, scope: resolvedScope };
   });
 
   router.handle("agent/delete", async (p) => {
-    const { name, scope } = extract<{ name: string; scope?: "global" | "project" }>(p, ["name"]);
-    const projectRoot = findProjectRoot(process.cwd()) ?? undefined;
+    const { name, scope } = extract<{ name: string; scope?: Scope }>(p, ["name"]);
+    const projectRoot = resolveProjectRoot();
     const existing = app.agents.get(name, projectRoot);
     if (!existing) throw new Error(`Agent '${name}' not found`);
-    if (existing._source === "builtin") {
-      throw new Error(`Cannot delete builtin agent '${name}'.`);
-    }
-    const resolvedScope: "global" | "project" = scope ?? (existing._source === "project" ? "project" : "global");
-    const ok = app.agents.delete(name, resolvedScope, resolvedScope === "project" ? projectRoot : undefined);
+    guardBuiltin(existing, "Agent", name, "delete");
+    const resolvedScope = resolveScope(scope, existing, projectRoot);
+    const ok = app.agents.delete(name, resolvedScope, projectArg(resolvedScope, projectRoot));
     return { ok };
   });
 
@@ -185,30 +179,28 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
    * registering the handler unblocks the broken form.
    */
   router.handle("skill/save", async (p) => {
-    const params = extract<Partial<SkillDefinition> & { name: string; scope?: "global" | "project" }>(p, ["name"]);
+    const params = extract<Partial<SkillDefinition> & { name: string; scope?: Scope }>(p, ["name"]);
     const { scope, ...rest } = params;
-    const projectRoot = findProjectRoot(process.cwd()) ?? undefined;
+    const projectRoot = resolveProjectRoot();
     const skill: SkillDefinition = {
       name: params.name,
       description: rest.description ?? "",
       prompt: rest.prompt ?? "",
       tags: rest.tags ?? [],
     };
-    const resolvedScope: "global" | "project" = scope === "project" && projectRoot ? "project" : "global";
-    app.skills.save(skill.name, skill, resolvedScope, resolvedScope === "project" ? projectRoot : undefined);
+    const resolvedScope = resolveScope(scope, null, projectRoot);
+    app.skills.save(skill.name, skill, resolvedScope, projectArg(resolvedScope, projectRoot));
     return { ok: true, name: skill.name, scope: resolvedScope };
   });
 
   router.handle("skill/delete", async (p) => {
-    const { name, scope } = extract<{ name: string; scope?: "global" | "project" }>(p, ["name"]);
-    const projectRoot = findProjectRoot(process.cwd()) ?? undefined;
+    const { name, scope } = extract<{ name: string; scope?: Scope }>(p, ["name"]);
+    const projectRoot = resolveProjectRoot();
     const existing = app.skills.get(name, projectRoot);
     if (!existing) throw new Error(`Skill '${name}' not found`);
-    if (existing._source === "builtin") {
-      throw new Error(`Cannot delete builtin skill '${name}'.`);
-    }
-    const resolvedScope: "global" | "project" = scope ?? (existing._source === "project" ? "project" : "global");
-    const ok = app.skills.delete(name, resolvedScope, resolvedScope === "project" ? projectRoot : undefined);
+    guardBuiltin(existing, "Skill", name, "delete");
+    const resolvedScope = resolveScope(scope, existing, projectRoot);
+    const ok = app.skills.delete(name, resolvedScope, projectArg(resolvedScope, projectRoot));
     return { ok };
   });
   router.handle("runtime/list", async () => ({ runtimes: app.runtimes.list() }));
@@ -236,15 +228,13 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   });
 
   router.handle("recipe/delete", async (p) => {
-    const { name, scope } = extract<{ name: string; scope?: "global" | "project" }>(p, ["name"]);
-    const projectRoot = findProjectRoot(process.cwd()) ?? undefined;
+    const { name, scope } = extract<{ name: string; scope?: Scope }>(p, ["name"]);
+    const projectRoot = resolveProjectRoot();
     const existing = app.recipes.get(name, projectRoot);
     if (!existing) throw new Error(`Recipe '${name}' not found`);
-    if (existing._source === "builtin") {
-      throw new Error(`Cannot delete builtin recipe '${name}'.`);
-    }
-    const resolvedScope: "global" | "project" = scope ?? (existing._source === "project" ? "project" : "global");
-    const ok = app.recipes.delete(name, resolvedScope, resolvedScope === "project" ? projectRoot : undefined);
+    guardBuiltin(existing, "Recipe", name, "delete");
+    const resolvedScope = resolveScope(scope, existing, projectRoot);
+    const ok = app.recipes.delete(name, resolvedScope, projectArg(resolvedScope, projectRoot));
     return { ok };
   });
   router.handle("compute/list", async () => ({ targets: app.computes.list() }));
