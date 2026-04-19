@@ -434,7 +434,13 @@ describe("writeSettings with agent", () => {
     writeSettings("s-test", "http://localhost:19100", getCtx().arkDir, { agent });
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
     const allow = settings.permissions.allow;
-    expect(allow).toEqual(["Bash", "Read", "mcp__atlassian__*", "mcp__ark-channel__*"]);
+    expect(allow).toEqual([
+      "Bash",
+      "Read",
+      "mcp__atlassian__*",
+      "mcp__ark-channel__*",
+      "mcp__codebase-memory__*",
+    ]);
   });
 });
 

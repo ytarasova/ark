@@ -368,6 +368,10 @@ export const api = {
   knowledgeExport: (dir?: string) => rpc<any>("knowledge/export", { dir }),
   // TODO: add Zod schema for knowledge/import
   knowledgeImport: (dir?: string) => rpc<any>("knowledge/import", { dir }),
+  codebaseMemoryStatus: () =>
+    rpc<{ available: boolean; path: string | null; version: string | null; tools?: string[] }>(
+      "knowledge/codebase/status",
+    ),
 
   // ── Schedules ────────────────────────────────────────────────────────────
   getSchedules: () =>

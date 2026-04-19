@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Layout } from "../components/Layout.js";
 import { PageShell } from "../components/PageShell.js";
 import { MemoryView } from "../components/MemoryView.js";
+import { CodebaseMemoryPanel } from "../components/CodebaseMemoryPanel.js";
 import { Button } from "../components/ui/button.js";
 import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
 
@@ -29,7 +30,10 @@ export function MemoryPage({ view, onNavigate, readOnly, daemonStatus, onToast }
           ) : undefined
         }
       >
-        <MemoryView addRequested={addCounter} onToast={onToast} />
+        <div className="p-4 space-y-4">
+          <CodebaseMemoryPanel />
+          <MemoryView addRequested={addCounter} onToast={onToast} />
+        </div>
       </PageShell>
     </Layout>
   );

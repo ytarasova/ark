@@ -218,7 +218,7 @@ package-cli: build-web ## Build self-contained CLI bundles for macOS + Linux (4 
 	$(BUN) build --compile --target bun-linux-x64    packages/cli/index.ts --outfile dist/bin/ark-linux-x64
 	@echo ""
 	@echo "Downloading vendored binaries..."
-	@$(MAKE) vendor-tmux vendor-tensorzero vendor-codegraph vendor-goose vendor-codex --no-print-directory
+	@$(MAKE) vendor-tmux vendor-tensorzero vendor-codegraph vendor-goose vendor-codex vendor-codebase-memory-mcp --no-print-directory
 	@echo ""
 	@echo "Creating distribution tarballs..."
 	@for plat in darwin-arm64 darwin-x64 linux-arm64 linux-x64; do \
@@ -230,6 +230,7 @@ package-cli: build-web ## Build self-contained CLI bundles for macOS + Linux (4 
 	  if [ -f dist/vendor/codegraph-$$plat ]; then cp dist/vendor/codegraph-$$plat dist/ark-$$plat/bin/codegraph; fi; \
 	  if [ -f dist/vendor/goose-$$plat ]; then cp dist/vendor/goose-$$plat dist/ark-$$plat/bin/goose; fi; \
 	  if [ -f dist/vendor/codex-$$plat ]; then cp dist/vendor/codex-$$plat dist/ark-$$plat/bin/codex; fi; \
+	  if [ -f dist/vendor/codebase-memory-mcp-$$plat ]; then cp dist/vendor/codebase-memory-mcp-$$plat dist/ark-$$plat/bin/codebase-memory-mcp; fi; \
 	  cd dist && tar czf ark-$$plat.tar.gz ark-$$plat && cd ..; \
 	  echo "  dist/ark-$$plat.tar.gz ($$(du -h dist/ark-$$plat.tar.gz | cut -f1))"; \
 	done
@@ -273,6 +274,13 @@ vendor-codex: ## Download codex binaries from openai/codex GitHub releases
 	@echo "  codex: downloading release binaries..."
 	@for plat in darwin-arm64 darwin-x64 linux-arm64 linux-x64; do \
 	  ./scripts/vendor-codex.sh $$plat || echo "  codex-$$plat: skipped"; \
+	done
+
+vendor-codebase-memory-mcp: ## Download codebase-memory-mcp binaries from DeusData GitHub releases
+	@mkdir -p dist/vendor
+	@echo "  codebase-memory-mcp: downloading release binaries..."
+	@for plat in darwin-arm64 darwin-x64 linux-arm64 linux-x64; do \
+	  ./scripts/vendor-codebase-memory-mcp.sh $$plat || echo "  codebase-memory-mcp-$$plat: skipped"; \
 	done
 
 vendor-tensorzero: ## Build TensorZero gateway from source for all platforms
