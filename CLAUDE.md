@@ -69,6 +69,8 @@ No workspaces -- packages coordinated via relative imports.
 
 **SQL columns match TS fields 1:1.** Add new Session fields to the whitelist in `repositories/session.ts`.
 
+**Compute dispatch is two-axis.** The compute table stores both the legacy `provider` column (one of `local`, `docker`, `ec2`, ...) and the new `compute_kind` + `runtime_kind` columns (`local`/`ec2`/`k8s`/... x `direct`/`docker`/`devcontainer`/...). Wave 3 flipped dispatch to `ComputeTarget(Compute, Runtime)` resolved from the new columns; legacy rows without the columns fall back to `packages/compute/adapters/provider-map.ts:providerToPair()` (e.g. `docker` -> `local + docker`). Always write both the legacy provider and the new axes when creating rows -- `ComputeRepository.create` does this for you.
+
 **Port map:** 19100 (conductor), 19300 (arkd), 19400 (server daemon WS), 8420 (web). Channel ports: `config.channels.basePort + (hash(sessionId) % config.channels.range)` (default basePort 19200, range 10000; test profile randomizes basePort). Use `config.channels.*` -- don't hardcode.
 
 **Never use em dashes** (U+2014). Use hyphens (-) or double dashes (--) everywhere.

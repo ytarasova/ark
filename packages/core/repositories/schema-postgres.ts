@@ -68,11 +68,13 @@ export function initPostgresSchema(db: IDatabase): void {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_group ON sessions(group_name)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_pr_url ON sessions(pr_url)`);
 
-  // Compute table
+  // Compute table. Wave 3 adds compute_kind + runtime_kind columns.
   db.exec(`
     CREATE TABLE IF NOT EXISTS compute (
       name TEXT PRIMARY KEY,
       provider TEXT NOT NULL DEFAULT 'local',
+      compute_kind TEXT NOT NULL DEFAULT 'local',
+      runtime_kind TEXT NOT NULL DEFAULT 'direct',
       status TEXT NOT NULL DEFAULT 'stopped',
       config TEXT DEFAULT '{}',
       tenant_id TEXT NOT NULL DEFAULT 'default',
@@ -82,6 +84,8 @@ export function initPostgresSchema(db: IDatabase): void {
   `);
 
   db.exec(`CREATE INDEX IF NOT EXISTS idx_compute_provider ON compute(provider)`);
+  safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_compute_kind ON compute(compute_kind)`);
+  safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_compute_runtime_kind ON compute(runtime_kind)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_compute_status ON compute(status)`);
 
   // Compute templates table
@@ -286,8 +290,8 @@ export function seedLocalComputePostgres(db: IDatabase): void {
   const ts = new Date().toISOString();
   db.prepare(
     `
-    INSERT INTO compute (name, provider, status, config, created_at, updated_at)
-    VALUES ($1, 'local', 'running', '{}', $2, $3)
+    INSERT INTO compute (name, provider, compute_kind, runtime_kind, status, config, created_at, updated_at)
+    VALUES ($1, 'local', 'local', 'direct', 'running', '{}', $2, $3)
     ON CONFLICT (name) DO NOTHING
   `,
   ).run("local", ts, ts);

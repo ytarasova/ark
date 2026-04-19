@@ -136,3 +136,6 @@ export { computeProviderToTarget } from "./adapters/legacy.js";
 // network helpers for the pool layer (Phase 4).
 export { FirecrackerCompute, registerFirecrackerIfAvailable } from "./core/firecracker/compute.js";
 export type { FirecrackerComputeDeps, FirecrackerMeta } from "./core/firecracker/compute.js";
+
+export { providerToPair, pairToProvider, isKnownProvider, knownProviders } from "./adapters/provider-map.js";
+export type { ComputeRuntimePair } from "./adapters/provider-map.js";

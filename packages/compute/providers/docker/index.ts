@@ -85,6 +85,15 @@ async function assertDockerAvailable(): Promise<void> {
 
 // ── Provider ─────────────────────────────────────────────────────────────────
 
+/**
+ * @deprecated Superseded by `LocalCompute + DockerRuntime` (Wave 2).
+ *
+ * This class implements the legacy "host tmux + docker exec" model and is no
+ * longer registered at boot (see app.ts step 4 -- LocalDockerProvider /
+ * DockerRuntime took over). Kept exported for existing tests and for
+ * downstream consumers that referenced it directly. Will be removed in a
+ * follow-up once those dependencies migrate.
+ */
 export class DockerProvider implements ComputeProvider {
   readonly name = "docker";
   readonly isolationModes = [{ value: "container", label: "Docker container (isolated)" }];

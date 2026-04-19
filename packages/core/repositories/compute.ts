@@ -3,9 +3,12 @@ import type {
   Compute,
   ComputeStatus,
   ComputeProviderName,
+  ComputeKindName,
+  RuntimeKindName,
   ComputeConfig,
   CreateComputeOpts,
 } from "../../types/index.js";
+import { providerToPair, pairToProvider } from "../../compute/adapters/provider-map.js";
 import { now } from "../util/time.js";
 
 // ── Row type (config stored as JSON string) ─────────────────────────────────
@@ -13,6 +16,8 @@ import { now } from "../util/time.js";
 interface ComputeRow {
   name: string;
   provider: string;
+  compute_kind?: string | null;
+  runtime_kind?: string | null;
   status: string;
   config: string;
   created_at: string;
@@ -31,16 +36,23 @@ function safeParseConfig(raw: unknown): ComputeConfig {
 }
 
 function rowToCompute(row: ComputeRow): Compute {
+  // Legacy rows may not carry compute_kind/runtime_kind -- fall back via the
+  // provider-map so every consumer sees both axes regardless of row age.
+  const fallback = providerToPair(row.provider);
+  const compute_kind = (row.compute_kind as ComputeKindName | undefined | null) ?? fallback.compute;
+  const runtime_kind = (row.runtime_kind as RuntimeKindName | undefined | null) ?? fallback.runtime;
   return {
     ...row,
     provider: row.provider as ComputeProviderName,
+    compute_kind: compute_kind as ComputeKindName,
+    runtime_kind: runtime_kind as RuntimeKindName,
     status: row.status as ComputeStatus,
     config: safeParseConfig(row.config),
   };
 }
 
 // Valid compute columns (from schema).
-const COMPUTE_COLUMNS = new Set(["provider", "status", "config", "updated_at"]);
+const COMPUTE_COLUMNS = new Set(["provider", "compute_kind", "runtime_kind", "status", "config", "updated_at"]);
 
 // Providers that allow only one compute instance per tenant.
 const SINGLETON_PROVIDERS = new Set(["local"]);
@@ -61,7 +73,16 @@ export class ComputeRepository {
 
   create(opts: CreateComputeOpts): Compute {
     const ts = now();
-    const provider = opts.provider ?? "local";
+
+    // Wave 3: when caller passes the new axes (`compute`, `runtime`) without a
+    // legacy `provider`, reverse-map to the best legacy name so back-compat
+    // reads (`compute.provider`) keep working and the singleton check below
+    // uses the correct key.
+    let provider = opts.provider;
+    if (!provider && opts.compute && opts.runtime) {
+      provider = (pairToProvider({ compute: opts.compute, runtime: opts.runtime }) ?? opts.compute) as any;
+    }
+    provider = provider ?? "local";
 
     // Singleton providers allow only one compute instance per tenant.
     if (SINGLETON_PROVIDERS.has(provider)) {
@@ -75,14 +96,30 @@ export class ComputeRepository {
 
     const initialStatus: ComputeStatus = provider === "local" ? "running" : "stopped";
 
+    // Derive compute_kind + runtime_kind. Callers may pass the new axes
+    // explicitly; otherwise we compute them from the legacy provider name.
+    const fallback = providerToPair(provider);
+    const computeKind = (opts.compute ?? fallback.compute) as ComputeKindName;
+    const runtimeKind = (opts.runtime ?? fallback.runtime) as RuntimeKindName;
+
     this.db
       .prepare(
         `
-      INSERT INTO compute (name, provider, status, config, tenant_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO compute (name, provider, compute_kind, runtime_kind, status, config, tenant_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       )
-      .run(opts.name, provider, initialStatus, JSON.stringify(opts.config ?? {}), this.tenantId, ts, ts);
+      .run(
+        opts.name,
+        provider,
+        computeKind,
+        runtimeKind,
+        initialStatus,
+        JSON.stringify(opts.config ?? {}),
+        this.tenantId,
+        ts,
+        ts,
+      );
 
     return this.get(opts.name)!;
   }

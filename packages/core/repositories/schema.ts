@@ -57,6 +57,8 @@ export function initSchema(db: IDatabase): void {
     CREATE TABLE IF NOT EXISTS compute (
       name TEXT PRIMARY KEY,
       provider TEXT NOT NULL DEFAULT 'local',
+      compute_kind TEXT NOT NULL DEFAULT 'local',
+      runtime_kind TEXT NOT NULL DEFAULT 'direct',
       status TEXT NOT NULL DEFAULT 'stopped',
       config TEXT DEFAULT '{}',
       tenant_id TEXT NOT NULL DEFAULT 'default',
@@ -65,6 +67,8 @@ export function initSchema(db: IDatabase): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_compute_provider ON compute(provider);
+    CREATE INDEX IF NOT EXISTS idx_compute_kind ON compute(compute_kind);
+    CREATE INDEX IF NOT EXISTS idx_compute_runtime_kind ON compute(runtime_kind);
     CREATE INDEX IF NOT EXISTS idx_compute_status ON compute(status);
     CREATE INDEX IF NOT EXISTS idx_compute_tenant ON compute(tenant_id);
 
@@ -294,8 +298,8 @@ export function seedLocalCompute(db: IDatabase): void {
   const ts = new Date().toISOString();
   db.prepare(
     `
-    INSERT OR IGNORE INTO compute (name, provider, status, config, created_at, updated_at)
-    VALUES ('local', 'local', 'running', '{}', ?, ?)
+    INSERT OR IGNORE INTO compute (name, provider, compute_kind, runtime_kind, status, config, created_at, updated_at)
+    VALUES ('local', 'local', 'local', 'direct', 'running', '{}', ?, ?)
   `,
   ).run(ts, ts);
 }

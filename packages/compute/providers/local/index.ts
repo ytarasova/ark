@@ -40,6 +40,15 @@ async function checkLocalPort(port: number): Promise<boolean> {
   }
 }
 
+/**
+ * @deprecated Superseded by `LocalCompute + DirectRuntime` (Wave 1).
+ *
+ * This class implements the pre-arkd local execution model (raw tmux + host
+ * filesystem). `LocalWorktreeProvider` (providers/local-arkd.ts) registered in
+ * app.ts takes over the "local" name today; this class stays exported for
+ * tests and for edge cases that invoke it directly. Will be removed once
+ * those consumers migrate.
+ */
 export class LocalProvider implements ComputeProvider {
   readonly name = "local";
   readonly singleton = true;

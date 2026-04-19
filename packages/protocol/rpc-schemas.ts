@@ -99,6 +99,10 @@ const computeSchema = z
   .object({
     name: z.string(),
     provider: computeProviderSchema,
+    // Wave 3 axes. Optional on the wire so responses from a server that
+    // hasn't shipped the schema change yet still parse.
+    compute_kind: z.string().optional(),
+    runtime_kind: z.string().optional(),
     status: computeStatusSchema,
     config: z.record(z.string(), z.unknown()),
     created_at: z.string(),
@@ -246,7 +250,10 @@ export type ComputeListResponse = z.infer<typeof computeListResponse>;
 
 export const computeCreateRequest = z.object({
   name: z.string().min(1),
+  // Wave 3: `provider` is legacy; new callers pass `compute` + `runtime`.
   provider: computeProviderSchema.optional(),
+  compute: z.string().optional(),
+  runtime: z.string().optional(),
   config: z.record(z.string(), z.unknown()).optional(),
   template: z.string().optional(),
 });
