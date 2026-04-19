@@ -44,6 +44,7 @@ import {
   resolveArkSourceRoot,
   DEFAULT_IMAGE,
 } from "../providers/docker/helpers.js";
+import { logDebug } from "../../core/observability/structured-log.js";
 
 /**
  * Injectable helper surface for tests. Production wiring passes the real
@@ -170,7 +171,7 @@ export class DockerRuntime implements Runtime {
         try {
           await this.helpers.removeContainer(containerName);
         } catch {
-          /* swallow -- primary error already in flight */
+          logDebug("compute", "swallow -- primary error already in flight");
         }
       }
       throw err;
@@ -211,12 +212,12 @@ export class DockerRuntime implements Runtime {
     try {
       await this.helpers.stopContainer(meta.containerName);
     } catch {
-      /* already stopped, or container vanished -- proceed to rm */
+      logDebug("compute", "already stopped, or container vanished -- proceed to rm");
     }
     try {
       await this.helpers.removeContainer(meta.containerName);
     } catch {
-      /* already gone */
+      logDebug("compute", "already gone");
     }
 
     // Clean up any host-side temp files the runtime staged. Empty today;
@@ -228,7 +229,7 @@ export class DockerRuntime implements Runtime {
         try {
           rmSync(p, { force: true, recursive: true });
         } catch {
-          /* best-effort */
+          logDebug("compute", "best-effort");
         }
       }
     }

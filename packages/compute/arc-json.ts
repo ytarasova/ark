@@ -8,6 +8,7 @@ import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 import stripJsonComments from "strip-json-comments";
 import type { ArcComposeConfig, ArcDevcontainerConfig, ArcJson, PortDecl } from "./types.js";
+import { logDebug } from "../core/observability/structured-log.js";
 
 /** Compose file name candidates in priority order (shared with compose.ts). */
 export const COMPOSE_FILE_NAMES = ["docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"] as const;
@@ -200,7 +201,7 @@ function parseDevcontainerPorts(repoDir: string): number[] {
         return json.forwardPorts.filter((p: unknown): p is number => typeof p === "number");
       }
     } catch {
-      /* invalid JSON -- skip */
+      logDebug("compute", "invalid JSON -- skip");
     }
   }
 

@@ -10,6 +10,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { COMPOSE_FILE_NAMES } from "../../arc-json.js";
+import { logDebug } from "../../../core/observability/structured-log.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -68,7 +69,7 @@ export async function composePs(workdir: string): Promise<string[]> {
         const entry = JSON.parse(line);
         if (entry.Name) names.push(entry.Name);
       } catch {
-        // skip malformed lines
+        logDebug("compute", "skip malformed lines");
       }
     }
     return names;
@@ -139,7 +140,7 @@ export async function resolveComposeNetwork(workdir: string, files?: string[]): 
       }
     }
   } catch {
-    /* fall through to basename heuristic */
+    logDebug("compute", "fall through to basename heuristic");
   }
   return `${defaultComposeProjectName(workdir)}_default`;
 }
@@ -169,7 +170,7 @@ function safeParseComposeLs(stdout: string): Array<{ Name?: string; ConfigFiles?
     const parsed = JSON.parse(trimmed);
     if (Array.isArray(parsed)) return parsed;
   } catch {
-    /* fall through to ndjson */
+    logDebug("compute", "fall through to ndjson");
   }
   const out: Array<{ Name?: string; ConfigFiles?: string }> = [];
   for (const line of trimmed.split("\n")) {
@@ -177,7 +178,7 @@ function safeParseComposeLs(stdout: string): Array<{ Name?: string; ConfigFiles?
     try {
       out.push(JSON.parse(line));
     } catch {
-      /* skip malformed */
+      logDebug("compute", "skip malformed");
     }
   }
   return out;

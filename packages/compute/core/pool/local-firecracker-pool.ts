@@ -201,8 +201,10 @@ export class LocalFirecrackerPool implements ComputePool<FirecrackerCompute> {
       try {
         entry.baseline = await this.compute.snapshot(entry.handle);
       } catch {
-        /* snapshot not available -- leave baseline null, next release will
-         * take the stop/start path again. Explicit no-op. */
+        logInfo(
+          "pool",
+          "snapshot not available -- leave baseline null, next release will take the stop/start path again. Explicit no-op.",
+        );
       }
     }
 

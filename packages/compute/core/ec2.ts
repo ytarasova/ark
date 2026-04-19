@@ -47,6 +47,7 @@ import { spawn } from "child_process";
 import type { AppContext } from "../../core/app.js";
 import type { Compute, ComputeCapabilities, ComputeHandle, ComputeKind, ProvisionOpts, Snapshot } from "./types.js";
 import { NotSupportedError } from "./types.js";
+import { logDebug } from "../../core/observability/structured-log.js";
 
 // ── Config read from ProvisionOpts / AppContext ─────────────────────────────
 
@@ -222,7 +223,7 @@ function defaultKillSshTunnel(pid: number): void {
   try {
     process.kill(pid, "SIGTERM");
   } catch {
-    // already gone -- best-effort.
+    logDebug("compute", "already gone -- best-effort.");
   }
 }
 

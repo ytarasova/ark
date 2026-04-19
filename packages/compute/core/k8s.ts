@@ -27,6 +27,7 @@ import type { AppContext } from "../../core/app.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
 import type { Compute, ComputeCapabilities, ComputeHandle, ComputeKind, ProvisionOpts, Snapshot } from "./types.js";
 import { NotSupportedError } from "./types.js";
+import { logDebug } from "../../core/observability/structured-log.js";
 
 /**
  * Config payload read from `ProvisionOpts.config`. Same shape as the legacy
@@ -155,7 +156,7 @@ export class K8sCompute implements Compute {
       try {
         await api.createNamespace({ body: { metadata: { name: namespace } } });
       } catch {
-        /* raced another caller; ignore */
+        logDebug("compute", "raced another caller; ignore");
       }
     }
 
@@ -237,7 +238,7 @@ export class K8sCompute implements Compute {
       try {
         process.kill(meta.portForwardPid, "SIGTERM");
       } catch {
-        /* process may already be gone */
+        logDebug("compute", "process may already be gone");
       }
       meta.portForwardPid = null;
       this.writeMeta(h, meta);
@@ -251,7 +252,7 @@ export class K8sCompute implements Compute {
     try {
       await api.deleteNamespacedPod({ name: meta.podName, namespace: meta.namespace });
     } catch {
-      /* already gone */
+      logDebug("compute", "already gone");
     }
   }
 

@@ -20,6 +20,7 @@ import type {
   PortStatus,
 } from "../types.js";
 import { DEFAULT_CONDUCTOR_URL } from "../../core/constants.js";
+import { logDebug } from "../../core/observability/structured-log.js";
 
 export interface K8sConfig {
   provider: "k8s" | "k8s-kata";
@@ -150,7 +151,7 @@ export class K8sProvider implements ComputeProvider {
     try {
       await api.deleteNamespacedPod({ name: this.podName(session), namespace: ns });
     } catch {
-      /* pod may already be gone */
+      logDebug("compute", "pod may already be gone");
     }
   }
 
@@ -173,7 +174,7 @@ export class K8sProvider implements ComputeProvider {
         labelSelector: `ark.dev/compute=${compute.name}`,
       });
     } catch {
-      /* namespace may not exist yet */
+      logDebug("compute", "namespace may not exist yet");
     }
     this.app!.computes.update(compute.name, { status: "stopped" });
   }
