@@ -27,25 +27,35 @@ import type {
 const SESSION_NOT_FOUND = ErrorCodes.SESSION_NOT_FOUND;
 
 /**
- * Kick dispatch for a freshly-created session without blocking the RPC
- * response. Status transitions + final outcome are streamed via the standard
- * `session/updated` notification channel.
+ * Dispatch a freshly-created session.
+ *
+ * The dispatch itself can take multiple seconds (agent resolve + knowledge
+ * context injection + launcher.launch + status poller registration), so
+ * the RPC response does NOT block on it: we fire the promise, surface
+ * progress + final state via `session/updated` notifications, and track
+ * in-flight dispatches on the AppContext so `app.shutdown()` can await
+ * them (tests + server restart) instead of leaking tmux panes + claude
+ * CLIs into the user's shell.
  */
-function fireAndDispatch(app: AppContext, sessionId: string, notify: (event: string, data: unknown) => void): void {
-  app.sessionService
+function dispatchNewSession(
+  app: AppContext,
+  sessionId: string,
+  notify: (event: string, data: unknown) => void,
+): void {
+  const promise = app.sessionService
     .dispatch(sessionId)
-    .then(() => {
-      const after = app.sessions.get(sessionId);
-      if (after) notify("session/updated", { session: after });
-    })
     .catch((err) => {
       app.events.log(sessionId, "dispatch_failed", {
         actor: "system",
         data: { reason: err instanceof Error ? err.message : String(err) },
       });
+      return { ok: false, message: "" } as { ok: boolean; message: string };
+    })
+    .then(() => {
       const after = app.sessions.get(sessionId);
       if (after) notify("session/updated", { session: after });
     });
+  app.trackDispatch(promise);
 }
 
 export function registerSessionHandlers(router: Router, app: AppContext): void {
@@ -64,7 +74,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const { startSession } = await import("../../core/services/session-orchestration.js");
     const session = startSession(app, opts);
     notify("session/created", { session });
-    fireAndDispatch(app, session.id, notify);
+    dispatchNewSession(app, session.id, notify);
     return { session };
   });
 
@@ -157,7 +167,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const session = result.sessionId ? app.sessions.get(result.sessionId) : null;
     if (session) notify("session/created", { session });
     if (result.sessionId) {
-      fireAndDispatch(app, result.sessionId, notify);
+      dispatchNewSession(app, result.sessionId, notify);
     }
     return { session };
   });
@@ -171,7 +181,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const session = result.sessionId ? app.sessions.get(result.sessionId) : null;
     if (session) notify("session/created", { session });
     if (result.sessionId) {
-      fireAndDispatch(app, result.sessionId, notify);
+      dispatchNewSession(app, result.sessionId, notify);
     }
     return { session };
   });
@@ -280,7 +290,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     if (result.sessionId) {
       const session = app.sessions.get(result.sessionId);
       if (session) notify("session/created", { session });
-      fireAndDispatch(app, result.sessionId, notify);
+      dispatchNewSession(app, result.sessionId, notify);
     }
     return result;
   });
