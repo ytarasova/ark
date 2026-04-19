@@ -128,7 +128,12 @@ export class FlyMachinesCompute implements Compute {
   readonly kind: ComputeKind = "fly-machines";
   readonly capabilities: ComputeCapabilities = {
     snapshot: true,
-    pool: false,
+    // Fly supports pool semantics: suspend/resume is the rewind primitive a
+    // FlyPool would use, and the 6PN network lets warm machines sit idle
+    // cheaply. The concrete FlyPool impl is a follow-up -- until one is
+    // registered against this compute kind, ComputeTarget.provision falls
+    // through to direct provisioning, so flipping this flag is safe.
+    pool: true,
     networkIsolation: true,
     provisionLatency: "seconds",
   };
