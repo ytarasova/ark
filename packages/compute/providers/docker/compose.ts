@@ -3,11 +3,12 @@
  * Detects compose files, starts/stops stacks, lists containers, and resolves ports.
  */
 
-import { existsSync, readFileSync } from "fs";
-import { join } from "path";
+import { existsSync, readFileSync, mkdirSync } from "fs";
+import { writeFile } from "fs/promises";
+import { basename, dirname, join } from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { parse as parseYaml } from "yaml";
+import { parse as parseYaml, stringify as stringifyYaml } from "yaml";
 import { COMPOSE_FILE_NAMES } from "../../arc-json.js";
 
 const execFileAsync = promisify(execFile);
@@ -75,6 +76,114 @@ export async function composePs(workdir: string): Promise<string[]> {
     return [];
   }
 }
+
+// ── Inline compose + multi-file variants (used by DockerComposeRuntime) ─────
+
+/**
+ * Serialize an inline compose spec to YAML and write it to `outPath`.
+ * Parent directories are created on demand. Replaces any existing file.
+ */
+export async function writeInlineCompose(inline: Record<string, unknown>, outPath: string): Promise<void> {
+  mkdirSync(dirname(outPath), { recursive: true });
+  const yaml = stringifyYaml(inline);
+  await writeFile(outPath, yaml, { encoding: "utf-8" });
+}
+
+/** Run `docker compose -f <files> up -d` in a workdir. Paired with composeDownWithFiles. */
+export async function composeUpWithFiles(workdir: string, files: string[]): Promise<{ ok: boolean; error?: string }> {
+  if (files.length === 0) return { ok: false, error: "no compose files provided" };
+  const args = ["compose", ...flagFiles(files), "up", "-d"];
+  try {
+    await execFileAsync("docker", args, { cwd: workdir });
+    return { ok: true };
+  } catch (err: unknown) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** Paired `down` for composeUpWithFiles. Same `-f` set must be passed so
+ *  compose resolves the same project name and stops every service. */
+export async function composeDownWithFiles(workdir: string, files: string[]): Promise<{ ok: boolean; error?: string }> {
+  if (files.length === 0) return { ok: false, error: "no compose files provided" };
+  const args = ["compose", ...flagFiles(files), "down"];
+  try {
+    await execFileAsync("docker", args, { cwd: workdir });
+    return { ok: true };
+  } catch (err: unknown) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Resolve the network name for a compose project in `workdir`. Docker
+ * Compose names the default network `<project>_default`; the project name
+ * defaults to the basename of the workdir but can be overridden by
+ * `COMPOSE_PROJECT_NAME` or `-p`.
+ *
+ * We prefer `docker compose ls --format json` (reliable, machine-readable)
+ * and fall back to the workdir basename if the lookup fails.
+ */
+export async function resolveComposeNetwork(workdir: string, files?: string[]): Promise<string> {
+  const args = ["compose"];
+  if (files && files.length > 0) args.push(...flagFiles(files));
+  args.push("ls", "--format", "json", "--all");
+  try {
+    const { stdout } = await execFileAsync("docker", args, { cwd: workdir, encoding: "utf-8" });
+    const entries = safeParseComposeLs(stdout);
+    // docker compose ls reports ConfigFiles as an absolute path; match on cwd.
+    for (const entry of entries) {
+      const configFiles = typeof entry.ConfigFiles === "string" ? entry.ConfigFiles.split(",") : [];
+      const hit = configFiles.some((p) => dirname(p) === workdir);
+      if (hit && typeof entry.Name === "string" && entry.Name.length > 0) {
+        return `${entry.Name}_default`;
+      }
+    }
+  } catch {
+    /* fall through to basename heuristic */
+  }
+  return `${defaultComposeProjectName(workdir)}_default`;
+}
+
+/** Returns the default compose project name for a given workdir. */
+export function defaultComposeProjectName(workdir: string): string {
+  // Compose lowercases + strips characters outside [a-z0-9_-]. Match that
+  // behaviour so our fallback lines up with what compose actually creates.
+  return basename(workdir)
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "");
+}
+
+function flagFiles(files: string[]): string[] {
+  const out: string[] = [];
+  for (const f of files) {
+    out.push("-f", f);
+  }
+  return out;
+}
+
+function safeParseComposeLs(stdout: string): Array<{ Name?: string; ConfigFiles?: string }> {
+  const trimmed = stdout.trim();
+  if (!trimmed) return [];
+  // docker compose ls --format json emits a single JSON array (not ndjson).
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) return parsed;
+  } catch {
+    /* fall through to ndjson */
+  }
+  const out: Array<{ Name?: string; ConfigFiles?: string }> = [];
+  for (const line of trimmed.split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      out.push(JSON.parse(line));
+    } catch {
+      /* skip malformed */
+    }
+  }
+  return out;
+}
+
+// ── Legacy single-file helpers (retained for existing callers) ──────────────
 
 /** Parse compose file for exposed ports. Returns host port numbers. */
 export function resolveComposePorts(repoDir: string): number[] {

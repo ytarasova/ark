@@ -36,7 +36,9 @@ describe("parseArcJson", () => {
         { port: 5432, name: "postgres" },
       ],
       sync: ["config.yaml", ".env"],
-      compose: true,
+      // `compose: true` is normalized to the default file form so downstream
+      // callers have a single object shape to work with. See arc-json-compose.test.ts.
+      compose: { file: "docker-compose.yml" },
       devcontainer: false,
     });
   });

@@ -167,9 +167,34 @@ export type { K8sConfig } from "./providers/k8s.js";
 
 // ── arc.json types ──────────────────────────────────────────────────────────
 
+/**
+ * Compose configuration embedded in arc.json. Users may declare any of:
+ *   - a `file` path to an existing compose file (defaults to docker-compose.yml)
+ *   - an `inline` compose spec (serialized to a tempfile at prepare time)
+ *   - both, in which case they are merged via `docker compose -f A -f B`
+ */
+export interface ArcComposeConfig {
+  /** Path to an existing docker-compose.yml, relative to repo. Default `docker-compose.yml`. */
+  file?: string;
+  /** Inline compose spec (services/networks/volumes/etc.). Written to a tempfile. */
+  inline?: Record<string, unknown>;
+  /** Skip `docker compose up -d`. Default false. */
+  skipUp?: boolean;
+}
+
+/** Devcontainer configuration embedded in arc.json. */
+export interface ArcDevcontainerConfig {
+  config?: string;
+}
+
 export interface ArcJson {
   ports?: Array<{ port: number; name?: string }>;
   sync?: string[];
-  compose?: boolean;
-  devcontainer?: boolean;
+  /**
+   * Compose integration. `true` is sugar for `{ file: "docker-compose.yml" }`;
+   * `false` / missing disables. Use an object for inline or custom file paths.
+   */
+  compose?: boolean | ArcComposeConfig;
+  /** Devcontainer integration. `true` enables defaults; object lets you override. */
+  devcontainer?: boolean | ArcDevcontainerConfig;
 }
