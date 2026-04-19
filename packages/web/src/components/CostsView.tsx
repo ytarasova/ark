@@ -11,7 +11,7 @@ export function CostsView() {
   const palette = useChartPalette();
   const modelColors = useModelColors();
 
-  const sessions = costs?.sessions || [];
+  const sessions = useMemo(() => costs?.sessions ?? [], [costs?.sessions]);
 
   // Aggregate by model
   const byModel = useMemo(() => {

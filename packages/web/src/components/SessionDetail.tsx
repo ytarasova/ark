@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { api } from "../hooks/useApi.js";
-import { useSessionDetailData } from "../hooks/useSessionDetailData.js";
+import { useSessionStream } from "../hooks/useSessionStream.js";
 import { useMessages } from "../hooks/useMessages.js";
 import { fmtCost, fmtDuration } from "../util.js";
 import { cn } from "../lib/utils.js";
@@ -126,14 +127,14 @@ interface SessionDetailProps {
 export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabChange }: SessionDetailProps) {
   const {
     detail,
-    setDetail,
     todos,
     setTodos,
     messages: detailMessages,
     flowStages,
     cost,
     output,
-  } = useSessionDetailData(sessionId);
+    refetchDetail,
+  } = useSessionStream(sessionId);
 
   const VALID_TABS = new Set(["conversation", "terminal", "events", "diff", "todos", "errors"]);
   const [activeTab, setActiveTabInternal] = useState(
@@ -148,7 +149,6 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
   );
   const [chatMsg, setChatMsg] = useState("");
   const [scrollProgress, setScrollProgress] = useState(0);
-  const [diffData, setDiffData] = useState<any>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [stageFilter, setStageFilter] = useState<string | null>(null);
   const [activeDiffFile, setActiveDiffFile] = useState<string | undefined>(undefined);
@@ -196,20 +196,13 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
     }
   }, [conversationMessages.length, activeTab, isActive]);
 
-  useEffect(() => {
-    let cancelled = false;
-    if (activeTab === "diff" && !diffData && sessionId) {
-      api
-        .worktreeDiff(sessionId)
-        .then((data) => {
-          if (!cancelled) setDiffData(data);
-        })
-        .catch(() => {});
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [activeTab, diffData, sessionId]);
+  // Diff is only fetched when the user opens the Diff tab. TanStack Query
+  // caches per sessionId so switching tabs does not re-fetch.
+  const { data: diffData } = useQuery({
+    queryKey: ["session", sessionId, "diff"],
+    queryFn: () => api.worktreeDiff(sessionId),
+    enabled: !!sessionId && activeTab === "diff",
+  });
 
   async function handleAction(action: string) {
     setActionLoading(action);
@@ -230,8 +223,7 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
       }
       if (res.ok !== false) {
         onToast(`Session ${sessionId} ${action} successful`, "success");
-        const d = await api.getSession(sessionId);
-        setDetail(d);
+        refetchDetail();
       } else {
         const hint = action === "stop" ? ". The session may have already exited" : "";
         onToast(`Failed to ${action} session ${sessionId}: ${res.message || "unknown error"}${hint}`, "error");

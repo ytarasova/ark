@@ -1,10 +1,8 @@
-import { useEffect, useRef, useState } from "react";
-import { api } from "../hooks/useApi.js";
-import { useSmartPoll } from "../hooks/useSmartPoll.js";
 import { fmtCost, relTime } from "../util.js";
 import { cn } from "../lib/utils.js";
 import { AlertCircle, CheckCircle2, Clock, RotateCcw, Eye } from "lucide-react";
 import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
+import { useDashboardSummaryQuery, useRunningSessionsQuery } from "../hooks/useDashboardQuery.js";
 
 interface DashboardData {
   counts: Record<string, number>;
@@ -46,43 +44,16 @@ export function DashboardView({
   readOnly: _readOnly,
   daemonStatus: _daemonStatus,
 }: DashboardViewProps) {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [sessions, setSessions] = useState<any[]>([]);
+  const summaryQuery = useDashboardSummaryQuery();
+  const sessionsQuery = useRunningSessionsQuery();
+  const data = summaryQuery.data as DashboardData | undefined;
+  const sessions = sessionsQuery.data ?? [];
 
-  const mountedRef = useRef(true);
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  const load = () => {
-    api
-      .getDashboardSummary()
-      .then((d) => {
-        if (mountedRef.current) setData(d);
-      })
-      .catch((e: any) => {
-        if (mountedRef.current) setError(e.message);
-      });
-    api
-      .getSessions({})
-      .then((s) => {
-        if (mountedRef.current) setSessions(s);
-      })
-      .catch(() => {});
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
-  useSmartPoll(load, 5000);
-
-  if (error) {
+  if (summaryQuery.isError) {
+    const err: any = summaryQuery.error;
     return (
       <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-        Failed to load dashboard: {error}
+        Failed to load dashboard: {err?.message ?? "unknown error"}
       </div>
     );
   }
@@ -95,8 +66,8 @@ export function DashboardView({
 
   const { costs } = data;
 
-  const waitingSessions = sessions.filter((s) => s.status === "waiting" || s.status === "blocked");
-  const failedSessions = sessions.filter((s) => s.status === "failed");
+  const waitingSessions = sessions.filter((s: any) => s.status === "waiting" || s.status === "blocked");
+  const failedSessions = sessions.filter((s: any) => s.status === "failed");
   const needsAttention = waitingSessions.length > 0 || failedSessions.length > 0;
 
   const budget = costs.budget?.daily?.limit

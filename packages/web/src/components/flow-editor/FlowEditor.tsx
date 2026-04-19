@@ -6,7 +6,7 @@
  * Toolbar with: Add Stage, Auto-layout, Validate, Export YAML, Import YAML.
  */
 
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
   ReactFlow,
   Background,
@@ -147,6 +147,29 @@ export function FlowEditor({ flow, onChange, readOnly: initialReadOnly = false, 
     return backSet;
   }, [currentFlow]);
 
+  // Declared early so `initialEdges` below can reference it. Uses setCurrentFlow
+  // directly since `updateFlow` (with the `onChange` side-effect) is declared
+  // later. Keeping a single handleConditionChange avoids a circular hoisting
+  // problem between initialEdges and updateFlow.
+  const handleConditionChange = useCallback(
+    (edgeId: string, condition: string) => {
+      const [from, to] = edgeId.split("->");
+      setCurrentFlow((prev) => {
+        const next = {
+          ...prev,
+          edges: prev.edges.map((e) => (`${e.from}->${e.to}` === edgeId ? { ...e, condition: condition || null } : e)),
+        };
+        onChange?.(next);
+        // Silence the linter for `from`/`to` being consumed via the template
+        // match above -- kept for clarity when reading in place.
+        void from;
+        void to;
+        return next;
+      });
+    },
+    [onChange],
+  );
+
   // Build initial nodes and edges for ReactFlow
   const initialNodes: Node[] = useMemo(
     () =>
@@ -193,17 +216,18 @@ export function FlowEditor({ flow, onChange, readOnly: initialReadOnly = false, 
           },
         };
       }),
-    [currentFlow.edges, backEdgeSet, readOnly],
+    [currentFlow.edges, backEdgeSet, readOnly, handleConditionChange],
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // Sync when flow changes externally
-  useMemo(() => {
+  // Sync when flow changes externally. This is a side-effect (setState), so
+  // it belongs in useEffect, not useMemo.
+  useEffect(() => {
     setNodes(initialNodes);
     setEdges(initialEdges);
-  }, [initialNodes, initialEdges]);
+  }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   const updateFlow = useCallback(
     (newFlow: FlowDefinition) => {
@@ -229,16 +253,6 @@ export function FlowEditor({ flow, onChange, readOnly: initialReadOnly = false, 
     },
     [readOnly, currentFlow, updateFlow],
   );
-
-  function handleConditionChange(edgeId: string, condition: string) {
-    const [from, to] = edgeId.split("->");
-    updateFlow({
-      ...currentFlow,
-      edges: currentFlow.edges.map((e) =>
-        e.from === from && e.to === to ? { ...e, condition: condition || null } : e,
-      ),
-    });
-  }
 
   const handleAddStage = useCallback(() => {
     const id = `stage-${++nodeIdCounter.current}`;
