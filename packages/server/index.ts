@@ -1,6 +1,7 @@
 import { Router, type Handler } from "./router.js";
 import { createNotification, isRequest, isNotification, parseMessage, type JsonRpcMessage } from "../protocol/types.js";
 import { createStdioTransport, type Transport } from "../protocol/transport.js";
+import { logDebug } from "../core/observability/structured-log.js";
 
 export interface ServerConnection {
   id: string;
@@ -166,7 +167,7 @@ export class ArkServer {
             const meta = wsMetadata.get(ws);
             if (meta) for (const h of meta.handlers) h(msg);
           } catch {
-            /* ignore malformed messages */
+            logDebug("web", "ignore malformed messages");
           }
         },
         close(ws) {

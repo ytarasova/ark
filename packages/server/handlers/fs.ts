@@ -10,6 +10,7 @@ import { homedir } from "os";
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { RpcError } from "../../protocol/types.js";
+import { logDebug } from "../../core/observability/structured-log.js";
 
 interface DirEntry {
   name: string;
@@ -115,7 +116,7 @@ export function registerFsHandlers(router: Router, app: AppContext): void {
           entry.isGitRepo = true;
         }
       } catch {
-        // ignore -- non-fatal
+        logDebug("web", "ignore -- non-fatal");
       }
       entries.push(entry);
     }
