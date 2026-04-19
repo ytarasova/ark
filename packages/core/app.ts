@@ -636,13 +636,15 @@ export class AppContext {
         /* @kubernetes/client-node not installed */
       }
 
-      // Wave 1 Compute + Runtime registry. Additive -- the legacy provider
+      // Wave 1/2 Compute + Runtime registry. Additive -- the legacy provider
       // registry above still runs every dispatch path. Wave 3 flips dispatch
       // to consume these.
       const { LocalCompute } = await import("../compute/core/local.js");
       const { DirectRuntime } = await import("../compute/runtimes/direct.js");
+      const { DockerRuntime } = await import("../compute/runtimes/docker.js");
       this.registerCompute(new LocalCompute());
       this.registerRuntime(new DirectRuntime());
+      this.registerRuntime(new DockerRuntime());
     });
   }
 

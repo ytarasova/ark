@@ -6,10 +6,11 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 
-import { LocalWorktreeProvider, LocalDockerProvider } from "../providers/local-arkd.js";
+import { LocalWorktreeProvider, LocalDockerProvider, LocalDevcontainerProvider } from "../providers/local-arkd.js";
 import { computeProviderToTarget } from "../adapters/legacy.js";
 import { LocalCompute } from "../core/local.js";
 import { DirectRuntime } from "../runtimes/direct.js";
+import { DockerRuntime } from "../runtimes/docker.js";
 import { AppContext, setApp, clearApp } from "../../core/app.js";
 
 let app: AppContext;
@@ -44,8 +45,17 @@ describe("computeProviderToTarget", () => {
     expect(target.getArkdUrl(handle)).toBe(`http://localhost:${app.config.ports.arkd}`);
   });
 
-  it("returns null for providers that have not been migrated yet", () => {
+  it("maps LocalDockerProvider onto LocalCompute + DockerRuntime", () => {
     const legacy = new LocalDockerProvider();
+    legacy.setApp?.(app);
+    const target = computeProviderToTarget(legacy, app);
+    expect(target).not.toBeNull();
+    expect(target!.compute).toBeInstanceOf(LocalCompute);
+    expect(target!.runtime).toBeInstanceOf(DockerRuntime);
+  });
+
+  it("returns null for providers that have not been migrated yet", () => {
+    const legacy = new LocalDevcontainerProvider();
     legacy.setApp?.(app);
     const target = computeProviderToTarget(legacy, app);
     expect(target).toBeNull();
