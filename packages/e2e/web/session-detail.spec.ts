@@ -46,7 +46,7 @@ test("click session opens detail panel with ID and status", async () => {
   await goToSessions();
 
   // Click the session in the list
-  await page.locator("text=Detail panel test").click();
+  await page.locator("text=Detail panel test").first().click();
 
   // The detail panel should show the session ID
   await expect(page.locator(`text=${id}`).first()).toBeVisible({ timeout: 5_000 });
@@ -74,7 +74,7 @@ test("add todo via API and verify in detail panel", async () => {
   await page.reload();
   await page.waitForSelector("nav", { timeout: 10_000 });
   await goToSessions();
-  await page.locator("text=Todo test session").click();
+  await page.locator("text=Todo test session").first().click();
   await expect(page.locator("text=Conversation").first()).toBeVisible({ timeout: 5_000 });
 
   // Todos are now on their own tab -- click to reveal the list.
@@ -94,7 +94,7 @@ test.skip("add todo via detail panel UI", async () => {
   await page.reload();
   await page.waitForSelector("nav", { timeout: 10_000 });
   await goToSessions();
-  await page.locator("text=Todo UI test").click();
+  await page.locator("text=Todo UI test").first().click();
   await expect(page.locator("text=Conversation").first()).toBeVisible({ timeout: 5_000 });
 
   const todoInput = page.locator('input[placeholder="Add a todo..."]');
@@ -109,19 +109,18 @@ test.skip("add todo via detail panel UI", async () => {
 test("send message form appears and submits", async () => {
   const _id = await createSession("Message test");
 
-  // Set session to running so the Send button appears
-  // We need to dispatch it or manually set status -- use complete instead
-  // Actually, "Send" only shows for running/waiting status.
-  // Let's verify the Send button is NOT visible for a non-running session
+  // session/start now auto-dispatches, so there's no standalone Dispatch
+  // button in the header. For any non-running state the UI surfaces a
+  // "Restart" action instead (retry via session/resume). Assert that.
   await page.reload();
   await page.waitForSelector("nav", { timeout: 10_000 });
   await goToSessions();
-  await page.locator("text=Message test").click();
+  await page.locator("text=Message test").first().click();
   await expect(page.locator("text=Conversation").first()).toBeVisible({ timeout: 5_000 });
 
-  // For a ready/pending session, Send button should NOT be visible
-  // but Dispatch should be visible
-  await expect(page.locator('button:has-text("Dispatch")')).toBeVisible();
+  // For any non-running session (ready / pending / blocked / stopped /
+  // failed / completed), the unified Restart button covers retry + resume.
+  await expect(page.locator('button:has-text("Restart")').first()).toBeVisible({ timeout: 10_000 });
 });
 
 // -- Session actions: complete ------------------------------------------------

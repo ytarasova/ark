@@ -151,7 +151,7 @@ test("dispatched session shows in UI with updated status", async () => {
   await page.reload();
   await page.waitForSelector("nav", { timeout: 10_000 });
   await goToSessions();
-  await expect(page.locator("text=E2E UI dispatch check")).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator("text=E2E UI dispatch check").first()).toBeVisible({ timeout: 10_000 });
 
   // Dispatch
   // session/start dispatches atomically now -- no separate dispatch call.
@@ -165,7 +165,7 @@ test("dispatched session shows in UI with updated status", async () => {
   await goToSessions();
 
   // Click on the session to see detail
-  await page.locator("text=E2E UI dispatch check").click();
+  await page.locator("text=E2E UI dispatch check").first().click();
   // The detail pane renders a Conversation tab (unique to SessionDetail).
   await expect(page.locator("text=Conversation").first()).toBeVisible({ timeout: 5_000 });
 

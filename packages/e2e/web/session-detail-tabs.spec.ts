@@ -50,7 +50,7 @@ test("selecting a session from the list opens detail panel", async () => {
   await page.waitForSelector("nav", { timeout: 30_000 });
   await goToSessions();
 
-  await page.locator("text=Tab switching test").click();
+  await page.locator("text=Tab switching test").first().click();
   // The detail panel should show the session ID
   await expect(page.locator(`text=${id}`).first()).toBeVisible({ timeout: 15_000 });
 });
@@ -64,7 +64,7 @@ test("conversation tab shows even for new sessions", async () => {
   await page.waitForSelector("nav", { timeout: 30_000 });
   await goToSessions();
 
-  await page.locator("text=Conv tab test").click();
+  await page.locator("text=Conv tab test").first().click();
   // Conversation tab should be active by default
   await expect(page.locator('button[role="tab"]:has-text("Conversation")').first()).toBeVisible({ timeout: 5_000 });
 });
@@ -78,14 +78,17 @@ test("switching to Terminal tab renders terminal area", async () => {
   await page.waitForSelector("nav", { timeout: 30_000 });
   await goToSessions();
 
-  await page.locator("text=Terminal tab test").click();
+  await page.locator("text=Terminal tab test").first().click();
   await expect(page.locator('button[role="tab"]:has-text("Conversation")').first()).toBeVisible({ timeout: 5_000 });
 
   // Click Terminal tab
   await page.locator('button[role="tab"]:has-text("Terminal")').click();
 
-  // Terminal area should render (either output or empty state)
-  await expect(page.locator("text=No terminal output").first()).toBeVisible({ timeout: 5_000 });
+  // Terminal area should render. Before auto-dispatch, a fresh session
+  // always showed the empty-state "No terminal output". Now the session
+  // may already be launching so the terminal can contain real output OR
+  // the empty-state string -- accept either as long as the tab panel exists.
+  await expect(page.locator('[role="tabpanel"]').first()).toBeVisible({ timeout: 5_000 });
 });
 
 // -- Events tab ---------------------------------------------------------------
@@ -98,7 +101,7 @@ test("switching to Events tab renders events list with timestamps", async () => 
   await page.waitForSelector("nav", { timeout: 30_000 });
   await goToSessions();
 
-  await page.locator("text=Events tab test").click();
+  await page.locator("text=Events tab test").first().click();
   await expect(page.locator('button[role="tab"]:has-text("Conversation")').first()).toBeVisible({ timeout: 5_000 });
 
   // Click Events tab
@@ -123,7 +126,7 @@ test("switching to Diff tab renders diff content area", async () => {
   await page.waitForSelector("nav", { timeout: 30_000 });
   await goToSessions();
 
-  await page.locator("text=Diff tab test").click();
+  await page.locator("text=Diff tab test").first().click();
   await expect(page.locator('button[role="tab"]:has-text("Conversation")').first()).toBeVisible({ timeout: 5_000 });
 
   // Click Diff tab
@@ -152,12 +155,15 @@ test("switching back to Conversation tab from another tab works", async () => {
   await page.waitForSelector("nav", { timeout: 30_000 });
   await goToSessions();
 
-  await page.locator("text=Switch back test").click();
+  await page.locator("text=Switch back test").first().click();
   await expect(page.locator('button[role="tab"]:has-text("Conversation")').first()).toBeVisible({ timeout: 5_000 });
 
   // Navigate away
   await page.locator('button[role="tab"]:has-text("Terminal")').click();
-  await expect(page.locator("text=No terminal output").first()).toBeVisible({ timeout: 5_000 });
+  // Terminal may show output or the empty-state string depending on whether
+  // the auto-dispatched launcher has started producing output yet. Just
+  // assert the tabpanel rendered.
+  await expect(page.locator('[role="tabpanel"]').first()).toBeVisible({ timeout: 5_000 });
 
   // Navigate back
   await page.locator('button[role="tab"]:has-text("Conversation")').click();

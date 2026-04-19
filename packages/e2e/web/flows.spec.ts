@@ -117,9 +117,18 @@ test("advancing a default-flow session walks every stage in order", async () => 
   });
   expect(finalAdvance.ok).toBe(true);
 
-  const { session: done } = await ws.rpc<{ session: any }>("session/read", {
-    sessionId: id,
-  });
+  // session/start now auto-dispatches. If the first-stage launcher is still
+  // spinning up when we force-advance through the whole flow, its delayed
+  // status write can race with "completed". Poll for the expected terminal
+  // status (guarded by the dispatch stage-changed check in the server) so
+  // the assertion is deterministic.
+  let done: any = null;
+  for (let i = 0; i < 20; i++) {
+    const read = await ws.rpc<{ session: any }>("session/read", { sessionId: id });
+    done = read.session;
+    if (done.status === "completed") break;
+    await new Promise((r) => setTimeout(r, 250));
+  }
   expect(done.status).toBe("completed");
   // Stage field still reflects the final stage that completed.
   expect(done.stage).toBe(DEFAULT_STAGES[DEFAULT_STAGES.length - 1]);
