@@ -126,3 +126,10 @@ export { DirectRuntime } from "./runtimes/direct.js";
 export { DockerComposeRuntime } from "./runtimes/docker-compose.js";
 export { ComputeTarget } from "./core/compute-target.js";
 export { computeProviderToTarget } from "./adapters/legacy.js";
+
+// Phase 2: FirecrackerCompute. Re-export from the firecracker barrel so
+// consumers don't have to reach into the core subtree. The sibling barrel
+// (`./core/firecracker/index.ts`) also exports the low-level `createVm` and
+// network helpers for the pool layer (Phase 4).
+export { FirecrackerCompute, registerFirecrackerIfAvailable } from "./core/firecracker/compute.js";
+export type { FirecrackerComputeDeps, FirecrackerMeta } from "./core/firecracker/compute.js";

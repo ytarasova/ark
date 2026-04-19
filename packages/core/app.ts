@@ -651,6 +651,12 @@ export class AppContext {
       this.registerRuntime(new DockerRuntime());
       this.registerRuntime(new DevcontainerRuntime());
       this.registerRuntime(new DockerComposeRuntime());
+
+      // Phase 2: FirecrackerCompute. Gated on the availability probe so we
+      // don't register on macOS (no /dev/kvm). `registerFirecrackerIfAvailable`
+      // logs at info level when the gating fires so the skip is observable.
+      const { registerFirecrackerIfAvailable } = await import("../compute/core/firecracker/compute.js");
+      registerFirecrackerIfAvailable(this);
     });
   }
 

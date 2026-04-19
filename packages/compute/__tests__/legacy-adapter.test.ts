@@ -6,7 +6,12 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 
-import { LocalWorktreeProvider, LocalDockerProvider, LocalDevcontainerProvider } from "../providers/local-arkd.js";
+import {
+  LocalWorktreeProvider,
+  LocalDockerProvider,
+  LocalDevcontainerProvider,
+  LocalFirecrackerProvider,
+} from "../providers/local-arkd.js";
 import {
   RemoteWorktreeProvider,
   RemoteDockerProvider,
@@ -16,6 +21,7 @@ import {
 import { computeProviderToTarget } from "../adapters/legacy.js";
 import { LocalCompute } from "../core/local.js";
 import { EC2Compute } from "../core/ec2.js";
+import { FirecrackerCompute } from "../core/firecracker/compute.js";
 import { DirectRuntime } from "../runtimes/direct.js";
 import { DockerRuntime } from "../runtimes/docker.js";
 import { DevcontainerRuntime } from "../runtimes/devcontainer.js";
@@ -60,6 +66,15 @@ describe("computeProviderToTarget", () => {
     expect(target).not.toBeNull();
     expect(target!.compute).toBeInstanceOf(LocalCompute);
     expect(target!.runtime).toBeInstanceOf(DockerRuntime);
+  });
+
+  it("maps LocalFirecrackerProvider onto FirecrackerCompute + DirectRuntime (Phase 2)", () => {
+    const legacy = new LocalFirecrackerProvider();
+    legacy.setApp?.(app);
+    const target = computeProviderToTarget(legacy, app);
+    expect(target).not.toBeNull();
+    expect(target!.compute).toBeInstanceOf(FirecrackerCompute);
+    expect(target!.runtime).toBeInstanceOf(DirectRuntime);
   });
 
   it("returns null for providers that have not been migrated yet", () => {

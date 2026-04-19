@@ -22,3 +22,7 @@ export {
 } from "./paths.js";
 export { isFirecrackerAvailable } from "./availability.js";
 export type { AvailabilityResult } from "./availability.js";
+export { ensureRootfs, __setRootfsHooksForTesting, __resetRootfsHooksForTesting } from "./rootfs.js";
+export type { RootfsPaths, RootfsHooks } from "./rootfs.js";
+export { FirecrackerCompute, registerFirecrackerIfAvailable } from "./compute.js";
+export type { FirecrackerComputeDeps, FirecrackerMeta } from "./compute.js";
