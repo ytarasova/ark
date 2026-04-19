@@ -72,6 +72,7 @@ import type {
   ConfigReq,
   ConfigRes,
 } from "./types.js";
+import { logInfo, logDebug } from "../core/observability/structured-log.js";
 
 const VERSION = "0.1.0";
 const DEFAULT_PORT = 19300;
@@ -196,7 +197,7 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
     try {
       mkdirSync(workspaceRoot, { recursive: true });
     } catch {
-      /* best effort -- first real request will surface any permission error */
+      logDebug("compute", "best effort -- first real request will surface any permission error");
     }
   }
 
@@ -564,7 +565,7 @@ async function listDirectory(dirPath: string, recursive?: boolean): Promise<DirE
       try {
         size = (await stat(fullPath)).size;
       } catch {
-        /* stat may fail for broken symlinks */
+        logInfo("compute", "stat may fail for broken symlinks");
       }
     }
 
@@ -736,7 +737,7 @@ async function collectMetrics(): Promise<MetricsRes> {
       diskPct = parseInt(parts[4]?.replace("%", "") ?? "0", 10);
     }
   } catch {
-    /* disk usage command may not be available */
+    logDebug("compute", "disk usage command may not be available");
   }
 
   // Uptime
@@ -987,7 +988,7 @@ async function probePorts(req: ProbePortsReq): Promise<ProbePortsRes> {
         await proc.exited;
         listening = out.trim().length > 0;
       } catch {
-        /* port check command may fail */
+        logInfo("compute", "port check command may fail");
       }
       return { port, listening };
     }),
