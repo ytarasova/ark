@@ -439,6 +439,21 @@ export async function dispatch(
     }
   }
 
+  // Guard against a race: if the session was force-advanced (or stopped /
+  // completed) while we were spinning up the launcher, don't stomp its
+  // current status/session_id with "running" for a stage that no longer
+  // belongs to it. Best-effort: tear the just-launched tmux down and log.
+  const currentSession = app.sessions.get(sessionId);
+  if (!currentSession || currentSession.stage !== stage || currentSession.status === "completed") {
+    log(`Session moved past stage '${stage}' during dispatch -- aborting write.`);
+    try {
+      await app.launcher.kill(tmuxName);
+    } catch {
+      /* tmux may already be gone */
+    }
+    return { ok: false, message: `Session moved on during dispatch` };
+  }
+
   app.sessions.update(sessionId, { status: "running", agent: agentName, session_id: tmuxName });
   if (stageStartSha) {
     app.sessions.mergeConfig(sessionId, { stage_start_sha: stageStartSha });
