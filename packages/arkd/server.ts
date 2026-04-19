@@ -32,6 +32,7 @@ import { readFile, writeFile, stat, mkdir, readdir } from "fs/promises";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join, resolve, sep } from "path";
 import { hostname, platform, uptime, totalmem, freemem, cpus, homedir } from "os";
+import { timingSafeEqual } from "crypto";
 import { DEFAULT_CHANNEL_BASE_URL } from "../core/constants.js";
 import type {
   ReadFileReq,
@@ -223,11 +224,25 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
     writeFileSync(join(arkDir, "arkd.token"), arkdToken, { mode: 0o600 });
   }
 
+  // Pre-compute the expected header bytes so the timing-safe comparison
+  // sees a fixed-length reference. timingSafeEqual throws on length mismatch,
+  // so we pre-pad the provided header to the expected length before compare
+  // and still return 401 -- this collapses "unauthorized" and "wrong length"
+  // into a single timing path, removing the obvious side channel.
+  const expectedAuth = arkdToken ? Buffer.from(`Bearer ${arkdToken}`) : null;
+
   function checkAuth(req: Request, path: string): Response | null {
-    if (!arkdToken) return null;
+    if (!arkdToken || !expectedAuth) return null;
     if (AUTH_EXEMPT_PATHS.has(path)) return null;
-    const authHeader = req.headers.get("Authorization");
-    if (authHeader === `Bearer ${arkdToken}`) return null;
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const providedBuf = Buffer.from(authHeader);
+    // Mismatched length => definitely wrong; still run a constant-time compare
+    // against a fixed-size dummy so the timing does not leak "wrong length".
+    if (providedBuf.length !== expectedAuth.length) {
+      timingSafeEqual(expectedAuth, expectedAuth);
+      return json({ error: "Unauthorized" }, 401);
+    }
+    if (timingSafeEqual(providedBuf, expectedAuth)) return null;
     return json({ error: "Unauthorized" }, 401);
   }
 
@@ -637,7 +652,23 @@ async function runExec(req: ExecReq): Promise<ExecRes> {
 
 // ── Agent (tmux) operations ──────────────────────────────────────────────────
 
+// tmux session names must be usable as a shell argument and a POSIX filename
+// component. We restrict to a safe charset to close two injection surfaces:
+//   1. The `/tmp/arkd-launcher-<sessionName>.sh` path below -- without this
+//      guard, an attacker can write `../../../../etc/cron.d/poison` or
+//      clobber arbitrary files writable by the arkd user.
+//   2. The tmux shell-command argument `bash <scriptPath>` -- tmux parses
+//      the final argv as a shell command, so spaces / metacharacters in the
+//      session name bleed into shell parsing.
+const SAFE_TMUX_NAME_RE = /^[A-Za-z0-9_-]{1,64}$/;
+
 async function agentLaunch(req: AgentLaunchReq): Promise<AgentLaunchRes> {
+  if (typeof req.sessionName !== "string" || !SAFE_TMUX_NAME_RE.test(req.sessionName)) {
+    throw new Error("invalid sessionName: must match [A-Za-z0-9_-]{1,64}");
+  }
+  if (typeof req.workdir !== "string" || req.workdir.includes("\0")) {
+    throw new Error("invalid workdir");
+  }
   // Write launcher script to a temp file
   const scriptPath = `/tmp/arkd-launcher-${req.sessionName}.sh`;
   await writeFile(scriptPath, req.script, { mode: 0o755 });
@@ -665,7 +696,14 @@ async function agentLaunch(req: AgentLaunchReq): Promise<AgentLaunchRes> {
   return { ok: true };
 }
 
+function requireSafeTmuxName(name: unknown): asserts name is string {
+  if (typeof name !== "string" || !SAFE_TMUX_NAME_RE.test(name)) {
+    throw new Error("invalid sessionName: must match [A-Za-z0-9_-]{1,64}");
+  }
+}
+
 async function agentKill(req: AgentKillReq): Promise<AgentKillRes> {
+  requireSafeTmuxName(req.sessionName);
   const wasRunning = await isTmuxRunning(req.sessionName);
   if (wasRunning) {
     const proc = Bun.spawn({
@@ -679,12 +717,15 @@ async function agentKill(req: AgentKillReq): Promise<AgentKillRes> {
 }
 
 async function agentStatus(req: AgentStatusReq): Promise<AgentStatusRes> {
+  requireSafeTmuxName(req.sessionName);
   const running = await isTmuxRunning(req.sessionName);
   return { running };
 }
 
 async function agentCapture(req: AgentCaptureReq): Promise<AgentCaptureRes> {
-  const lines = req.lines ?? 100;
+  requireSafeTmuxName(req.sessionName);
+  const linesNum = Math.trunc(Number(req.lines ?? 100));
+  const lines = Number.isFinite(linesNum) && linesNum > 0 && linesNum <= 100000 ? linesNum : 100;
   const proc = Bun.spawn({
     cmd: ["tmux", "capture-pane", "-t", req.sessionName, "-p", "-e", "-S", `-${lines}`],
     stdout: "pipe",
@@ -696,6 +737,9 @@ async function agentCapture(req: AgentCaptureReq): Promise<AgentCaptureRes> {
 }
 
 async function isTmuxRunning(sessionName: string): Promise<boolean> {
+  // Callers of isTmuxRunning have already validated sessionName via
+  // requireSafeTmuxName. Re-check here so a future caller cannot drop it.
+  if (!SAFE_TMUX_NAME_RE.test(sessionName)) return false;
   const proc = Bun.spawn({
     cmd: ["tmux", "has-session", "-t", sessionName],
     stdout: "pipe",
