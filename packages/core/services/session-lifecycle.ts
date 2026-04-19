@@ -344,20 +344,46 @@ export async function stop(
   return { ok: true, message: "Session stopped" };
 }
 
-/**
- * Run verification for a session: check todos are resolved and verify scripts pass.
- * Returns structured results for display and enforcement.
- */
-export async function runVerification(
-  app: AppContext,
-  sessionId: string,
-): Promise<{
+export interface VerificationResult {
   ok: boolean;
   todosResolved: boolean;
   pendingTodos: string[];
   scriptResults: Array<{ script: string; passed: boolean; output: string }>;
   message: string;
-}> {
+}
+
+/**
+ * Function signature for running a single verify script. Abstracted so tests
+ * can stub out the bash shell-out. Resolves on success, rejects on non-zero
+ * exit -- the rejection shape mirrors the underlying promisified execFile
+ * (`e.stdout`, `e.stderr`, `e.message`).
+ */
+export type VerifyScriptRunner = (
+  script: string,
+  opts: { cwd?: string; timeoutMs: number },
+) => Promise<{ stdout: string; stderr: string }>;
+
+const defaultVerifyScriptRunner: VerifyScriptRunner = async (script, opts) => {
+  const { stdout, stderr } = await execFileAsync("bash", ["-c", script], {
+    cwd: opts.cwd,
+    encoding: "utf-8",
+    timeout: opts.timeoutMs,
+  });
+  return { stdout: stdout ?? "", stderr: stderr ?? "" };
+};
+
+/**
+ * Run verification for a session: check todos are resolved and verify scripts
+ * pass. Returns structured results for display and enforcement.
+ *
+ * The `runScript` seam lets tests replace the default shell-out with a stub;
+ * production callers should omit it.
+ */
+export async function runVerification(
+  app: AppContext,
+  sessionId: string,
+  opts?: { runScript?: VerifyScriptRunner; timeoutMs?: number },
+): Promise<VerificationResult> {
   const session = app.sessions.get(sessionId);
   if (!session)
     return { ok: false, todosResolved: true, pendingTodos: [], scriptResults: [], message: "Session not found" };
@@ -376,14 +402,12 @@ export async function runVerification(
   // Run each script in the session workdir
   const workdir = session.workdir ?? session.repo;
   const scriptResults: Array<{ script: string; passed: boolean; output: string }> = [];
+  const runScript = opts?.runScript ?? defaultVerifyScriptRunner;
+  const timeoutMs = opts?.timeoutMs ?? 120_000;
   for (const script of scripts) {
     try {
-      const { stdout, stderr } = await execFileAsync("bash", ["-c", script], {
-        cwd: workdir ?? undefined,
-        encoding: "utf-8",
-        timeout: 120_000,
-      });
-      scriptResults.push({ script, passed: true, output: ((stdout ?? "") + (stderr ?? "")).slice(0, 5000) });
+      const { stdout, stderr } = await runScript(script, { cwd: workdir ?? undefined, timeoutMs });
+      scriptResults.push({ script, passed: true, output: (stdout + stderr).slice(0, 5000) });
     } catch (e: any) {
       const output = ((e?.stderr ?? "") + (e?.stdout ?? "") + (e?.message ?? "")).slice(0, 5000);
       scriptResults.push({ script, passed: false, output });
