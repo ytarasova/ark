@@ -62,6 +62,23 @@ describe("UsageRecorder", () => {
       expect(records[0].tenant_id).toBe("default");
       expect(records[0].source).toBe("api");
     });
+
+    it("ignores a caller-supplied tenantId that does not match the scoped tenant", () => {
+      // Security: a remote RPC (costs/record) must not be able to attribute
+      // usage to another tenant by passing tenantId in the request body.
+      const session = app.sessions.create({ summary: "cross-tenant-record" });
+      app.usageRecorder.record({
+        sessionId: session.id,
+        tenantId: "victim-tenant",
+        model: "gpt-4.1",
+        provider: "openai",
+        usage: { input_tokens: 10, output_tokens: 5 },
+      });
+      // The row is attributed to the recorder's scoped tenant ("default"),
+      // not to "victim-tenant".
+      const { records } = app.usageRecorder.getSessionCost(session.id);
+      expect(records[0].tenant_id).toBe("default");
+    });
   });
 
   describe("getSessionCost", () => {
@@ -141,20 +158,35 @@ describe("UsageRecorder", () => {
       expect(() => app.usageRecorder.getSummary({ groupBy: "DROP TABLE sessions" })).toThrow();
     });
 
-    it("filters by tenant", () => {
-      const session = app.sessions.create({ summary: "tenant-test" });
-      app.usageRecorder.record({
+    it("filters by the scoped tenant only", () => {
+      // Security: a caller in tenant A cannot query tenant B's summary by
+      // passing tenantId: "team-alpha". We scope a child recorder to
+      // "team-alpha" and verify that the caller on the default app sees
+      // zero rows for that tenant regardless of the opts.tenantId value.
+      const scoped = app.forTenant("team-alpha");
+      const session = scoped.sessions.create({ summary: "tenant-test" });
+      scoped.usageRecorder.record({
         sessionId: session.id,
-        tenantId: "team-alpha",
         model: "claude-sonnet-4-6",
         provider: "anthropic",
         usage: { input_tokens: 1000, output_tokens: 500 },
       });
 
-      const summary = app.usageRecorder.getSummary({ tenantId: "team-alpha", groupBy: "model" });
-      expect(summary.length).toBeGreaterThan(0);
-      const total = summary.reduce((s, r) => s + r.count, 0);
-      expect(total).toBe(1);
+      // Caller scoped to "team-alpha" sees their row.
+      const scopedSummary = scoped.usageRecorder.getSummary({ groupBy: "model" });
+      const scopedTotal = scopedSummary.reduce((s, r) => s + r.count, 0);
+      expect(scopedTotal).toBeGreaterThanOrEqual(1);
+
+      // Caller on the default tenant can NOT see team-alpha's row even if
+      // they try to specify tenantId: "team-alpha" explicitly -- the
+      // recorder ignores the override and keeps its own tenant scope.
+      const crossTenant = app.usageRecorder.getSummary({ tenantId: "team-alpha", groupBy: "model" });
+      const crossTenantTotal = crossTenant.reduce((s, r) => s + r.count, 0);
+      // Default-tenant rows may exist from earlier tests; what matters is
+      // that the team-alpha record is not mixed in.
+      const defaultSummary = app.usageRecorder.getSummary({ groupBy: "model" });
+      const defaultTotal = defaultSummary.reduce((s, r) => s + r.count, 0);
+      expect(crossTenantTotal).toBe(defaultTotal);
     });
   });
 
@@ -174,9 +206,11 @@ describe("UsageRecorder", () => {
       expect(trend[0].cost).toBeGreaterThan(0);
     });
 
-    it("returns empty for no data in range", () => {
-      const trend = app.usageRecorder.getDailyTrend({ tenantId: "nonexistent-tenant", days: 1 });
-      expect(trend).toHaveLength(0);
+    it("is scoped to the recorder's tenant regardless of opts.tenantId", () => {
+      // Caller cannot probe another tenant's data via opts.tenantId;
+      // the scoped-tenant rows are what count.
+      const scopedEmpty = app.forTenant("nonexistent-tenant").usageRecorder.getDailyTrend({ days: 1 });
+      expect(scopedEmpty).toHaveLength(0);
     });
   });
 
@@ -186,8 +220,11 @@ describe("UsageRecorder", () => {
       expect(total).toBeGreaterThan(0);
     });
 
-    it("filters by tenant", () => {
-      const total = app.usageRecorder.getTotalCost({ tenantId: "nonexistent-tenant" });
+    it("is scoped to the recorder's tenant regardless of opts.tenantId", () => {
+      // Security: opts.tenantId is ignored in favor of the scoped tenant,
+      // so scoping to a tenant with no rows returns 0 even if the caller
+      // attempts to pass a populated tenant's id.
+      const total = app.forTenant("nonexistent-tenant").usageRecorder.getTotalCost({ tenantId: "default" });
       expect(total).toBe(0);
     });
   });
