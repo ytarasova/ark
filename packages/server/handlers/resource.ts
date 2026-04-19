@@ -158,12 +158,11 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   });
 
   router.handle("flow/delete", async (p) => {
-    const { name, scope } = extract<{ name: string; scope?: "global" | "project" }>(p, ["name"]);
+    const { name, scope } = extract<{ name: string; scope?: Scope }>(p, ["name"]);
     const summary = app.flows.list().find((f) => f.name === name);
     if (!summary) throw new Error(`Flow '${name}' not found`);
-    if (summary.source === "builtin") {
-      throw new Error(`Cannot delete builtin flow '${name}'.`);
-    }
+    // Flow summaries use `source` (not `_source`); adapt to the shared guard.
+    guardBuiltin({ _source: summary.source }, "Flow", name, "delete");
     const ok = app.flows.delete(name, scope ?? "global");
     return { ok };
   });
