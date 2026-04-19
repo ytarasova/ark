@@ -21,7 +21,7 @@ import type { AppContext } from "../../core/app.js";
 // ── Kinds ──────────────────────────────────────────────────────────────────
 
 /** Where the compute lives. Mirrors the vision doc's target set. */
-export type ComputeKind = "local" | "firecracker" | "ec2" | "fly-machines" | "k8s" | "k8s-kata" | "e2b";
+export type ComputeKind = "local" | "firecracker" | "ec2" | "k8s" | "k8s-kata";
 
 /** How the agent process is launched inside the compute. */
 export type RuntimeKind = "direct" | "docker" | "compose" | "devcontainer" | "firecracker-in-container";

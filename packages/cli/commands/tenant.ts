@@ -20,7 +20,7 @@ export function registerTenantCommands(program: Command) {
     .command("set")
     .description("Set compute policy for a tenant")
     .argument("<tenant-id>", "Tenant ID")
-    .option("--providers <list>", "Comma-separated allowed providers (e.g. k8s,ec2,e2b)")
+    .option("--providers <list>", "Comma-separated allowed providers (e.g. k8s,ec2)")
     .option("--default-provider <provider>", "Default provider", "k8s")
     .option("--max-sessions <n>", "Maximum concurrent sessions", "10")
     .option("--max-cost <usd>", "Maximum daily cost in USD")

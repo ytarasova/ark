@@ -13,7 +13,7 @@ import type { Compute, ComputeProviderName } from "../../types/index.js";
 
 export interface ComputePool {
   name: string;
-  provider: string; // "ec2", "k8s", "e2b", "docker", etc.
+  provider: string; // "ec2", "k8s", "docker", etc.
   min: number; // minimum warm instances
   max: number; // maximum instances
   config: Record<string, unknown>; // provider-specific config

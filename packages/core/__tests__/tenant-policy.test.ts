@@ -129,7 +129,7 @@ describe("TenantPolicyManager", () => {
       });
       pm.setPolicy({
         tenant_id: "list-b",
-        allowed_providers: ["ec2", "e2b"],
+        allowed_providers: ["ec2", "docker"],
         default_provider: "ec2",
         max_concurrent_sessions: 5,
         max_cost_per_day_usd: 25.0,
@@ -148,7 +148,7 @@ describe("TenantPolicyManager", () => {
       // Default policy has empty allowed_providers
       expect(pm.isProviderAllowed("no-policy-tenant", "k8s")).toBe(true);
       expect(pm.isProviderAllowed("no-policy-tenant", "ec2")).toBe(true);
-      expect(pm.isProviderAllowed("no-policy-tenant", "e2b")).toBe(true);
+      expect(pm.isProviderAllowed("no-policy-tenant", "docker")).toBe(true);
     });
 
     it("allows only listed providers", () => {
@@ -164,7 +164,7 @@ describe("TenantPolicyManager", () => {
       expect(pm.isProviderAllowed("restricted-tenant", "k8s")).toBe(true);
       expect(pm.isProviderAllowed("restricted-tenant", "k8s-kata")).toBe(true);
       expect(pm.isProviderAllowed("restricted-tenant", "ec2")).toBe(false);
-      expect(pm.isProviderAllowed("restricted-tenant", "e2b")).toBe(false);
+      expect(pm.isProviderAllowed("restricted-tenant", "docker")).toBe(false);
     });
   });
 

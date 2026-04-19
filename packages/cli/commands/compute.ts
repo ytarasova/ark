@@ -18,12 +18,12 @@ export function registerComputeCommands(program: Command) {
     .description("Create a new compute resource")
     .argument("<name>", "Compute name")
     // Wave 3 axes:
-    .option("--compute <kind>", "Compute kind (local, firecracker, ec2, fly-machines, k8s, k8s-kata, e2b)")
+    .option("--compute <kind>", "Compute kind (local, firecracker, ec2, k8s, k8s-kata)")
     .option("--runtime <kind>", "Runtime kind (direct, docker, compose, devcontainer, firecracker-in-container)")
     // Legacy single-axis flag, kept for one release:
     .option(
       "--provider <type>",
-      "[deprecated] Provider type (local, docker, ec2, e2b, k8s, k8s-kata). Use --compute + --runtime.",
+      "[deprecated] Provider type (local, docker, ec2, k8s, k8s-kata). Use --compute + --runtime.",
     )
     // EC2-specific options
     .option(
@@ -56,8 +56,6 @@ export function registerComputeCommands(program: Command) {
       },
       [] as string[],
     )
-    // E2B-specific options
-    .option("--template <template>", "E2B sandbox template (e2b provider)")
     // K8s-specific options
     .option("--namespace <ns>", "K8s namespace (k8s/k8s-kata provider)", "ark")
     .option("--kubeconfig <path>", "Path to kubeconfig (k8s/k8s-kata provider)")
@@ -134,10 +132,6 @@ export function registerComputeCommands(program: Command) {
             ...(opts.subnetId ? { subnet_id: opts.subnetId } : {}),
             ...(Object.keys(tags).length ? { tags } : {}),
           };
-        } else if (opts.provider === "e2b") {
-          config = {
-            ...(opts.template ? { template: opts.template } : {}),
-          };
         } else if (opts.provider === "k8s" || opts.provider === "k8s-kata") {
           config = {
             ...(opts.namespace ? { namespace: opts.namespace } : {}),
@@ -191,8 +185,6 @@ export function registerComputeCommands(program: Command) {
           console.log(`  Size:     ${sizeLabel}`);
           console.log(`  Arch:     ${opts.arch}`);
           console.log(`  Region:   ${opts.region}`);
-        } else if (opts.provider === "e2b") {
-          console.log(`  Template: ${(config.template as string) ?? "base"}`);
         } else if (opts.provider === "k8s" || opts.provider === "k8s-kata") {
           console.log(`  Namespace:  ${(config.namespace as string) ?? "ark"}`);
           console.log(`  Image:      ${(config.image as string) ?? "ubuntu:22.04"}`);
@@ -489,7 +481,7 @@ export function registerComputeCommands(program: Command) {
     .command("create")
     .description("Create a compute pool")
     .argument("<name>", "Pool name")
-    .option("--provider <type>", "Provider type (ec2, docker, k8s, e2b)", "ec2")
+    .option("--provider <type>", "Provider type (ec2, docker, k8s)", "ec2")
     .option("--min <n>", "Minimum warm instances", "0")
     .option("--max <n>", "Maximum instances", "10")
     .option("--size <size>", "Instance size (provider-specific)", "m")

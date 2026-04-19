@@ -6,7 +6,7 @@ import { selectClassName } from "../ui/styles.js";
 
 // Wave 3: surface both compute + runtime axes. Static defaults render while
 // the server reply is in flight; useEffect below overwrites with the live list.
-const DEFAULT_COMPUTE_KINDS = ["local", "firecracker", "ec2", "fly-machines", "k8s", "k8s-kata", "e2b"] as const;
+const DEFAULT_COMPUTE_KINDS = ["local", "firecracker", "ec2", "k8s", "k8s-kata"] as const;
 const DEFAULT_RUNTIME_KINDS = ["direct", "docker", "compose", "devcontainer", "firecracker-in-container"] as const;
 
 /**
@@ -26,8 +26,6 @@ function providerToPairLocal(name: string): { compute: string; runtime: string }
     "ec2-firecracker": { compute: "ec2", runtime: "firecracker-in-container" },
     k8s: { compute: "k8s", runtime: "direct" },
     "k8s-kata": { compute: "k8s-kata", runtime: "direct" },
-    e2b: { compute: "e2b", runtime: "direct" },
-    "fly-machines": { compute: "fly-machines", runtime: "direct" },
   };
   return map[name] ?? { compute: "local", runtime: "direct" };
 }

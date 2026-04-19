@@ -689,15 +689,6 @@ export class AppContext {
 
       // Optional providers (skip if their SDK isn't installed)
       try {
-        const { E2BProvider } = await import("../compute/providers/e2b.js");
-        const e2b = new E2BProvider();
-        e2b.setApp(this);
-        this.registerProvider(e2b);
-      } catch {
-        /* e2b SDK not installed */
-      }
-
-      try {
         const { K8sProvider, KataProvider } = await import("../compute/providers/k8s.js");
         const k8s = new K8sProvider();
         k8s.setApp(this);
@@ -744,12 +735,6 @@ export class AppContext {
       // logs at info level when the gating fires so the skip is observable.
       const { registerFirecrackerIfAvailable } = await import("../compute/core/firecracker/compute.js");
       registerFirecrackerIfAvailable(this);
-
-      // Phase 5: FlyMachinesCompute. Gated on FLY_API_TOKEN being present --
-      // without the token the provider is inert, and registering it would
-      // only surface unhelpful errors downstream.
-      const { registerFlyIfAvailable } = await import("../compute/core/fly/compute.js");
-      registerFlyIfAvailable(this);
     });
   }
 

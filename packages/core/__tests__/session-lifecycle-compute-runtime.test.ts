@@ -62,22 +62,22 @@ describe("session-lifecycle compute/runtime dispatch", () => {
   });
 
   it("returns {target: null} when (compute, runtime) pair is not registered", async () => {
-    // `fly-machines` is a future backend -- it's in the type enum but no
-    // impl is registered. resolveComputeTarget should refuse gracefully.
+    // Seed a row with an unregistered compute_kind. resolveComputeTarget
+    // should refuse gracefully instead of dispatching.
     const ts = new Date().toISOString();
     app.db
       .prepare(
         `INSERT INTO compute (name, provider, compute_kind, runtime_kind, status, config, tenant_id, created_at, updated_at)
-       VALUES (?, 'fly-machines', 'fly-machines', 'direct', 'stopped', '{}', 'default', ?, ?)`,
+       VALUES (?, 'unknown', 'unregistered-kind', 'direct', 'stopped', '{}', 'default', ?, ?)`,
       )
-      .run("fly-test", ts, ts);
+      .run("unregistered-test", ts, ts);
     const session = app.sessions.create({
       summary: "lifecycle cr test 3",
-      compute_name: "fly-test",
+      compute_name: "unregistered-test",
     });
     const { target, compute } = await app.resolveComputeTarget(app.sessions.get(session.id)!);
     expect(compute).not.toBeNull();
-    expect(target).toBeNull(); // no registered Compute impl for fly-machines yet
+    expect(target).toBeNull(); // no registered Compute impl
   });
 
   it("round-trips compute_kind + runtime_kind on a new row", () => {

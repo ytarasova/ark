@@ -107,7 +107,7 @@ describe("SessionScheduler with tenant policies", () => {
   it("allows dispatch when provider is in allowed list", async () => {
     pm.setPolicy({
       tenant_id: "multi-prov-tenant",
-      allowed_providers: ["k8s", "ec2", "e2b"],
+      allowed_providers: ["k8s", "ec2", "docker"],
       default_provider: "ec2",
       max_concurrent_sessions: 10,
       max_cost_per_day_usd: null,
