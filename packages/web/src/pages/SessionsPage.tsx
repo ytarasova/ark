@@ -161,28 +161,14 @@ export function SessionsPage({
   }, [filteredSessions, selectedId, readOnly, showNew]);
 
   async function handleNewSession(form: any) {
-    const shouldDispatch = form.dispatch;
+    // Control plane owns the atomic create+dispatch -- no post-create RPC here.
     const res = await api.createSession(form);
     if (res.ok) {
-      if (shouldDispatch && res.session?.id) {
-        try {
-          await new Promise((r) => setTimeout(r, 500));
-          await api.dispatch(res.session.id);
-          onToast(`Session ${res.session.id} created and dispatched`, "success");
-        } catch {
-          try {
-            await new Promise((r) => setTimeout(r, 1000));
-            await api.dispatch(res.session.id);
-            onToast(`Session ${res.session.id} created and dispatched (retry)`, "success");
-          } catch {
-            onToast(
-              `Session ${res.session.id} created but dispatch failed. Check that the conductor is running: ark server daemon start`,
-              "error",
-            );
-          }
-        }
+      const err = (res.session as any)?.error;
+      if (err) {
+        onToast(`Session ${res.session?.id || ""} created but dispatch failed: ${err}`, "error");
       } else {
-        onToast(`Session ${res.session?.id || ""} created`, "success");
+        onToast(`Session ${res.session?.id || ""} started`, "success");
       }
       setShowNew(false);
       setSelectedId(res.session?.id || null);

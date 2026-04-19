@@ -6,7 +6,6 @@ import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import type {
   SessionIdParams,
   SessionStartParams,
-  SessionDispatchParams,
   SessionAdvanceParams,
   SessionReadParams,
   SessionUpdateParams,
@@ -27,16 +26,45 @@ import type {
 
 const SESSION_NOT_FOUND = ErrorCodes.SESSION_NOT_FOUND;
 
+/**
+ * Kick dispatch for a freshly-created session without blocking the RPC
+ * response. Status transitions + final outcome are streamed via the standard
+ * `session/updated` notification channel.
+ */
+function fireAndDispatch(app: AppContext, sessionId: string, notify: (event: string, data: unknown) => void): void {
+  app.sessionService
+    .dispatch(sessionId)
+    .then(() => {
+      const after = app.sessions.get(sessionId);
+      if (after) notify("session/updated", { session: after });
+    })
+    .catch((err) => {
+      app.events.log(sessionId, "dispatch_failed", {
+        actor: "system",
+        data: { reason: err instanceof Error ? err.message : String(err) },
+      });
+      const after = app.sessions.get(sessionId);
+      if (after) notify("session/updated", { session: after });
+    });
+}
+
 export function registerSessionHandlers(router: Router, app: AppContext): void {
   // ── Session lifecycle ──────────────────────────────────────────────────────
 
   router.handle("session/start", async (params, notify) => {
     const opts = extract<SessionStartParams>(params, []);
-    // Use orchestration startSession which resolves first stage and sets status=ready.
-    // SessionService.start() is a stripped-down helper that doesn't wire the flow.
+    // Atomic create + dispatch: splitting these across two RPCs used to force
+    // every caller (CLI, web, tests) to remember the second call or live with
+    // a session stuck at status=ready until the conductor's 60s poll tick.
+    // Removing the window closes a real UX cliff and deletes a class of bugs.
+    //
+    // Dispatch runs fire-and-forget: callers get the session record back
+    // immediately (for UI placement), and status transitions arrive via the
+    // `session/updated` notification as the launcher progresses.
     const { startSession } = await import("../../core/services/session-orchestration.js");
     const session = startSession(app, opts);
     notify("session/created", { session });
+    fireAndDispatch(app, session.id, notify);
     return { session };
   });
 
@@ -66,18 +94,6 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
       writeFileSync(path, content, "utf-8");
     }
     return { path };
-  });
-
-  router.handle("session/dispatch", async (params, notify) => {
-    const { sessionId } = extract<SessionDispatchParams>(params, ["sessionId"]);
-    app.events.log(sessionId, "session_dispatched", {
-      actor: "user",
-      stage: app.sessions.get(sessionId)?.stage ?? undefined,
-    });
-    const result = await app.sessionService.dispatch(sessionId);
-    const session = app.sessions.get(sessionId);
-    if (session) notify("session/updated", { session });
-    return result;
   });
 
   router.handle("session/stop", async (params, notify) => {
@@ -140,6 +156,9 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     }
     const session = result.sessionId ? app.sessions.get(result.sessionId) : null;
     if (session) notify("session/created", { session });
+    if (result.sessionId) {
+      fireAndDispatch(app, result.sessionId, notify);
+    }
     return { session };
   });
 
@@ -151,6 +170,9 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     }
     const session = result.sessionId ? app.sessions.get(result.sessionId) : null;
     if (session) notify("session/created", { session });
+    if (result.sessionId) {
+      fireAndDispatch(app, result.sessionId, notify);
+    }
     return { session };
   });
 
@@ -258,6 +280,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     if (result.sessionId) {
       const session = app.sessions.get(result.sessionId);
       if (session) notify("session/created", { session });
+      fireAndDispatch(app, result.sessionId, notify);
     }
     return result;
   });
@@ -273,6 +296,8 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
       const session = app.sessions.get(childId);
       if (session) notify("session/created", { session });
     }
+    // Fan-out children are dispatched en masse by the orchestrator (see
+    // stage-orchestrator.ts:1252). No need to loop here.
     return result;
   });
 

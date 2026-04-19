@@ -72,13 +72,8 @@ export function registerExecTryCommands(program: Command, app: AppContext | null
         console.log(chalk.yellow("Warning: Docker not available. Running without sandbox."));
       }
 
-      try {
-        await ark.sessionDispatch(session.id);
-      } catch (e: any) {
-        console.log(chalk.red(`Dispatch failed: ${e.message}`));
-      }
-
-      // Re-fetch session (dispatch updates session_id in DB)
+      // session/start now dispatches atomically -- just re-read to pick up
+      // the populated session_id that the server set post-dispatch.
       const { session: updated } = await ark.sessionRead(session.id);
       if (updated?.session_id) {
         try {

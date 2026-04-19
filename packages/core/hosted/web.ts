@@ -68,7 +68,6 @@ function errorResponse(err: unknown, status = 500): Response {
 /** Set of RPC methods that mutate state -- blocked in readOnly mode. */
 const WRITE_METHODS = new Set([
   "session/start",
-  "session/dispatch",
   "session/stop",
   "session/advance",
   "session/complete",

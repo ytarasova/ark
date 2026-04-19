@@ -247,10 +247,6 @@ export class ArkClient {
     return session;
   }
 
-  async sessionDispatch(sessionId: string): Promise<SessionOpResult> {
-    return this.rpc<SessionOpResult>("session/dispatch", { sessionId });
-  }
-
   async sessionStop(sessionId: string): Promise<SessionOpResult> {
     return this.rpc<SessionOpResult>("session/stop", { sessionId });
   }

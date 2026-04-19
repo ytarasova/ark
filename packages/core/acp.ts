@@ -4,15 +4,7 @@
  */
 
 import readline from "readline";
-import {
-  startSession,
-  dispatch,
-  stop,
-  resume,
-  deleteSessionAsync,
-  getOutput,
-  send,
-} from "./services/session-orchestration.js";
+import { startSession, stop, resume, deleteSessionAsync, getOutput, send } from "./services/session-orchestration.js";
 import type { AppContext } from "./app.js";
 
 export interface AcpRequest {
@@ -43,12 +35,6 @@ export async function handleAcpRequest(app: AppContext, req: AcpRequest): Promis
           workdir: p.workdir as string,
         });
         return { jsonrpc: "2.0", result: { sessionId: session.id, status: session.status }, id };
-      }
-
-      case "session/dispatch": {
-        const sessionId = req.params?.sessionId as string;
-        await dispatch(app, sessionId);
-        return { jsonrpc: "2.0", result: { ok: true }, id };
       }
 
       case "session/stop": {
