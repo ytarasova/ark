@@ -14,6 +14,7 @@ const execFileAsync = promisify(execFile);
 import type { AppContext } from "../app.js";
 import type { Session, Compute } from "../../types/index.js";
 import type { ComputeProvider } from "../../compute/types.js";
+import type { ComputeTarget } from "../../compute/core/compute-target.js";
 import * as flow from "../state/flow.js";
 import * as claude from "../claude/claude.js";
 import { loadRepoConfig } from "../repo-config.js";
@@ -203,6 +204,30 @@ async function withProvider(
   return safeAsync(label, () => fn(provider, compute));
 }
 
+/**
+ * Wave 3: invoke a ComputeTarget method for a session when the compute row
+ * maps to a registered (compute, runtime) pair. Returns true on success, false
+ * when no target is available (caller should fall back to the legacy provider
+ * path in that case). Errors during dispatch are logged and swallowed -- the
+ * session lifecycle always prefers proceeding with cleanup over blocking on a
+ * runtime that refuses to shut down.
+ */
+async function withComputeTarget(
+  app: AppContext,
+  session: Session,
+  label: string,
+  fn: (target: ComputeTarget, compute: Compute) => Promise<void>,
+): Promise<boolean> {
+  try {
+    const { target, compute } = await app.resolveComputeTarget(session);
+    if (!target || !compute) return false;
+    return safeAsync(label, () => fn(target, compute));
+  } catch (e: any) {
+    logError("session", `${label}: resolveComputeTarget failed: ${e?.message ?? e}`);
+    return false;
+  }
+}
+
 export async function stop(
   app: AppContext,
   sessionId: string,
@@ -230,8 +255,14 @@ export async function stop(
     /* fall through to tmux kill */
   }
 
-  // Kill agent + clean up provider resources FIRST (before any DB writes)
-  // This ensures processes are stopped even if subsequent DB ops fail
+  // Kill agent + clean up provider resources FIRST (before any DB writes).
+  // This ensures processes are stopped even if subsequent DB ops fail.
+  //
+  // Wave 3: legacy ComputeProvider still owns killAgent/cleanupSession (the
+  // new Compute/Runtime interfaces do not cover them yet). After the provider
+  // path runs we give the Runtime a chance to shut down per-session state via
+  // ComputeTarget.shutdown -- DirectRuntime / LocalCompute is a no-op;
+  // DockerRuntime tears down its sidecar container.
   const stopped = await withProvider(session, `stop ${sessionId}`, async (p, c) => {
     await p.killAgent(c, session);
     await p.cleanupSession(c, session);
@@ -240,6 +271,14 @@ export async function stop(
     // Fallback: kill via launcher (no compute assigned)
     await app.launcher.kill(session.session_id);
   }
+
+  // Wave 3: runtime-level teardown via ComputeTarget.shutdown. Builds a stub
+  // handle from the compute name; runtimes that stashed per-session meta on
+  // the handle (e.g. DockerRuntime.DockerHandleMeta) will detect the missing
+  // meta and no-op safely, matching today's cleanupSession semantics.
+  await withComputeTarget(app, session, `stop ${sessionId}: shutdown runtime`, async (target, c) => {
+    await target.shutdown({ kind: target.compute.kind, name: c.name, meta: {} });
+  });
 
   // Stop status poller if active (non-Claude executors)
   try {

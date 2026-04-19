@@ -444,6 +444,36 @@ export class AppContext {
     return { provider: provider ?? null, compute };
   }
 
+  /**
+   * Wave 3: resolve the ComputeTarget for a session.
+   *
+   * Reads `compute_kind` + `runtime_kind` from the compute row. For legacy
+   * rows that pre-date the schema change, falls back to `providerToPair`
+   * so dispatch still works.
+   *
+   * Returns null if the (compute, runtime) pair is not registered. Callers
+   * should fall back to the legacy `ComputeProvider` path in that case.
+   */
+  async resolveComputeTarget(
+    session: Session,
+  ): Promise<{ target: import("../compute/core/compute-target.js").ComputeTarget | null; compute: Compute | null }> {
+    const { compute } = this.resolveProvider(session);
+    if (!compute) return { target: null, compute: null };
+
+    // Prefer explicit columns; fall back to provider-map for legacy rows.
+    const { providerToPair } = await import("../compute/adapters/provider-map.js");
+    const fallback = providerToPair(compute.provider);
+    const computeKind = ((compute as any).compute_kind ?? fallback.compute) as ComputeKind;
+    const runtimeKind = ((compute as any).runtime_kind ?? fallback.runtime) as RuntimeKind;
+
+    const c = this.getCompute(computeKind);
+    const r = this.getRuntime(runtimeKind);
+    if (!c || !r) return { target: null, compute };
+
+    const { ComputeTarget } = await import("../compute/core/compute-target.js");
+    return { target: new ComputeTarget(c, r), compute };
+  }
+
   // ── Boot ───────────────────────────────────────────────────────────────
 
   async boot(): Promise<void> {

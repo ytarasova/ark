@@ -4,10 +4,39 @@ import { Button } from "../ui/button.js";
 import { Input } from "../ui/input.js";
 import { selectClassName } from "../ui/styles.js";
 
+// Wave 3: surface both compute + runtime axes. Static defaults render while
+// the server reply is in flight; useEffect below overwrites with the live list.
+const DEFAULT_COMPUTE_KINDS = ["local", "firecracker", "ec2", "fly-machines", "k8s", "k8s-kata", "e2b"] as const;
+const DEFAULT_RUNTIME_KINDS = ["direct", "docker", "compose", "devcontainer", "firecracker-in-container"] as const;
+
+/**
+ * Inline copy of providerToPair for the web bundle. The server maintains the
+ * canonical table in packages/compute/adapters/provider-map.ts -- keep both
+ * in sync. Kept short so drift is obvious.
+ */
+function providerToPairLocal(name: string): { compute: string; runtime: string } {
+  const map: Record<string, { compute: string; runtime: string }> = {
+    local: { compute: "local", runtime: "direct" },
+    docker: { compute: "local", runtime: "docker" },
+    devcontainer: { compute: "local", runtime: "devcontainer" },
+    firecracker: { compute: "local", runtime: "firecracker-in-container" },
+    ec2: { compute: "ec2", runtime: "direct" },
+    "ec2-docker": { compute: "ec2", runtime: "docker" },
+    "ec2-devcontainer": { compute: "ec2", runtime: "devcontainer" },
+    "ec2-firecracker": { compute: "ec2", runtime: "firecracker-in-container" },
+    k8s: { compute: "k8s", runtime: "direct" },
+    "k8s-kata": { compute: "k8s-kata", runtime: "direct" },
+    e2b: { compute: "e2b", runtime: "direct" },
+    "fly-machines": { compute: "fly-machines", runtime: "direct" },
+  };
+  return map[name] ?? { compute: "local", runtime: "direct" };
+}
+
 export function NewComputeForm({ onClose, onSubmit }: { onClose: () => void; onSubmit: (form: any) => void }) {
   const [form, setForm] = useState({
     name: "",
-    provider: "local",
+    compute: "local",
+    runtime: "direct",
     size: "",
     region: "",
     aws_profile: "",
@@ -17,6 +46,8 @@ export function NewComputeForm({ onClose, onSubmit }: { onClose: () => void; onS
   const [templates, setTemplates] = useState<any[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const [templateConfig, setTemplateConfig] = useState<Record<string, unknown>>({});
+  const [computeKinds, setComputeKinds] = useState<string[]>([...DEFAULT_COMPUTE_KINDS]);
+  const [runtimeKinds, setRuntimeKinds] = useState<string[]>([...DEFAULT_RUNTIME_KINDS]);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -27,6 +58,20 @@ export function NewComputeForm({ onClose, onSubmit }: { onClose: () => void; onS
         if (mountedRef.current) setTemplates(data);
       })
       .catch(() => {});
+    // Fetch live (compute, runtime) kind lists from the server. Falls back to
+    // the static defaults above on network error.
+    (api as any)
+      .listComputeKinds?.()
+      .then((data: any) => {
+        if (mountedRef.current && Array.isArray(data?.kinds) && data.kinds.length) setComputeKinds(data.kinds);
+      })
+      .catch?.(() => {});
+    (api as any)
+      .listRuntimeKinds?.()
+      .then((data: any) => {
+        if (mountedRef.current && Array.isArray(data?.kinds) && data.kinds.length) setRuntimeKinds(data.kinds);
+      })
+      .catch?.(() => {});
     return () => {
       mountedRef.current = false;
     };
@@ -44,7 +89,9 @@ export function NewComputeForm({ onClose, onSubmit }: { onClose: () => void; onS
     }
     const tmpl = templates.find((t) => t.name === templateName);
     if (tmpl) {
-      setForm((prev) => ({ ...prev, provider: tmpl.provider }));
+      // Template still carries a legacy `provider`; map to (compute, runtime).
+      const pair = providerToPairLocal(tmpl.provider as string);
+      setForm((prev) => ({ ...prev, compute: pair.compute, runtime: pair.runtime }));
       setTemplateConfig(tmpl.config ?? {});
     }
   }
@@ -94,23 +141,39 @@ export function NewComputeForm({ onClose, onSubmit }: { onClose: () => void; onS
         </div>
         <div className="mb-3.5">
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
-            Provider
+            Compute
           </label>
           <select
             className={selectClassName}
-            value={form.provider}
-            onChange={(e) => update("provider", e.target.value)}
-            aria-label="Select compute provider"
+            value={form.compute}
+            onChange={(e) => update("compute", e.target.value)}
+            aria-label="Select compute kind"
           >
-            <option value="local">local</option>
-            <option value="docker">docker</option>
-            <option value="devcontainer">devcontainer</option>
-            <option value="ec2">ec2</option>
-            <option value="ec2-docker">ec2-docker</option>
-            <option value="ec2-devcontainer">ec2-devcontainer</option>
+            {computeKinds.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
           </select>
         </div>
-        {form.provider.startsWith("ec2") && (
+        <div className="mb-3.5">
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+            Runtime
+          </label>
+          <select
+            className={selectClassName}
+            value={form.runtime}
+            onChange={(e) => update("runtime", e.target.value)}
+            aria-label="Select runtime kind"
+          >
+            {runtimeKinds.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
+          </select>
+        </div>
+        {form.compute === "ec2" && (
           <>
             <div className="mb-3.5">
               <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">

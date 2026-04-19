@@ -249,14 +249,44 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   });
   router.handle("compute/list", async () => ({ targets: app.computes.list() }));
   router.handle("compute/create", async (p) => {
-    const { name, provider, config } = extract<{
+    // Wave 3: accept either legacy `{provider}` or new `{compute, runtime}`.
+    // When only `provider` is given the repo derives the pair via
+    // providerToPair. When only the new axes are given we reverse-map to the
+    // best-matching legacy provider name so back-compat reads keep working.
+    const {
+      name,
+      provider,
+      compute: computeKind,
+      runtime: runtimeKind,
+      config,
+    } = extract<{
       name: string;
       provider?: import("../../types/index.js").ComputeProviderName;
+      compute?: import("../../types/index.js").ComputeKindName;
+      runtime?: import("../../types/index.js").RuntimeKindName;
       config?: Partial<import("../../types/index.js").ComputeConfig>;
     }>(p, ["name"]);
-    const compute = app.computes.create({ name, provider, config });
+
+    let effectiveProvider = provider;
+    if (!effectiveProvider && computeKind && runtimeKind) {
+      const { pairToProvider } = await import("../../compute/adapters/provider-map.js");
+      effectiveProvider = (pairToProvider({ compute: computeKind, runtime: runtimeKind }) ??
+        "local") as import("../../types/index.js").ComputeProviderName;
+    }
+
+    const compute = app.computes.create({
+      name,
+      provider: effectiveProvider,
+      compute: computeKind,
+      runtime: runtimeKind,
+      config,
+    });
     return { compute };
   });
+  // Wave 3: surface registered Compute / Runtime kinds so the web UI can
+  // populate dropdowns without duplicating our enum.
+  router.handle("compute/kinds", async () => ({ kinds: app.listComputes() }));
+  router.handle("runtime/kinds", async () => ({ kinds: app.listRuntimes() }));
   router.handle("compute/update", async (p) => {
     const { name, fields } = extract<ComputeUpdateParams>(p, ["name", "fields"]);
     app.computes.update(name, fields as Record<string, unknown>);

@@ -17,7 +17,14 @@ export function registerComputeCommands(program: Command) {
     .command("create")
     .description("Create a new compute resource")
     .argument("<name>", "Compute name")
-    .option("--provider <type>", "Provider type (local, docker, ec2, e2b, k8s, k8s-kata)", "local")
+    // Wave 3 axes:
+    .option("--compute <kind>", "Compute kind (local, firecracker, ec2, fly-machines, k8s, k8s-kata, e2b)")
+    .option("--runtime <kind>", "Runtime kind (direct, docker, compose, devcontainer, firecracker-in-container)")
+    // Legacy single-axis flag, kept for one release:
+    .option(
+      "--provider <type>",
+      "[deprecated] Provider type (local, docker, ec2, e2b, k8s, k8s-kata). Use --compute + --runtime.",
+    )
     // EC2-specific options
     .option(
       "--size <size>",
@@ -57,7 +64,35 @@ export function registerComputeCommands(program: Command) {
     .option("--runtime-class <class>", "K8s runtime class (kata-fc for Firecracker)")
     .option("--from-template <name>", "Use a compute template as defaults")
     .action(async (name, opts) => {
-      if (opts.provider === "local" && !opts.fromTemplate) {
+      // Wave 3: resolve either --compute + --runtime (new) or --provider (legacy).
+      // We mutate `opts.provider` to a concrete value before the big switch
+      // below so the existing config-shaping logic keeps working.
+      const { providerToPair, pairToProvider } = await import("../../compute/adapters/provider-map.js");
+
+      const newCompute: string | undefined = opts.compute;
+      const newRuntime: string | undefined = opts.runtime;
+
+      if (opts.provider) {
+        const pair = providerToPair(opts.provider);
+        console.log(
+          chalk.yellow(
+            `--provider is deprecated; pass --compute + --runtime instead. ` +
+              `Auto-mapping '${opts.provider}' -> --compute ${pair.compute} --runtime ${pair.runtime}.`,
+          ),
+        );
+      }
+
+      // Default when nothing is specified: local + direct (local auto-created).
+      if (!opts.provider && !newCompute && !newRuntime) {
+        opts.provider = "local";
+      }
+
+      // Derive legacy provider name for the downstream switch + display.
+      if (!opts.provider && newCompute && newRuntime) {
+        opts.provider = pairToProvider({ compute: newCompute as any, runtime: newRuntime as any }) ?? newCompute;
+      }
+
+      if (opts.provider === "local" && !opts.fromTemplate && !newCompute) {
         console.log(chalk.red("Local compute is auto-created. Use 'ec2' or 'docker' provider, or --from-template."));
         return;
       }
@@ -125,11 +160,17 @@ export function registerComputeCommands(program: Command) {
         const compute = await ark.computeCreate({
           name,
           provider: opts.provider,
+          ...(newCompute ? { compute: newCompute } : {}),
+          ...(newRuntime ? { runtime: newRuntime } : {}),
           config,
-        });
+        } as any);
 
         console.log(chalk.green(`Compute '${compute.name}' created`));
         console.log(`  Provider: ${compute.provider}`);
+        if ((compute as any).compute_kind || (compute as any).runtime_kind) {
+          console.log(`  Compute:  ${(compute as any).compute_kind ?? "-"}`);
+          console.log(`  Runtime:  ${(compute as any).runtime_kind ?? "-"}`);
+        }
         console.log(`  Status:   ${compute.status}`);
 
         if (opts.provider === "docker") {
@@ -282,13 +323,17 @@ export function registerComputeCommands(program: Command) {
       const ark = await getArkClient();
       const computes = await ark.computeList();
       if (!computes.length) {
-        console.log(chalk.dim("No compute. Create one: ark compute create <name> --provider local"));
+        console.log(chalk.dim("No compute. Create one: ark compute create <name> --compute local --runtime direct"));
         return;
       }
-      console.log(`  ${"NAME".padEnd(20)} ${"PROVIDER".padEnd(10)} ${"STATUS".padEnd(14)} IP`);
+      console.log(
+        `  ${"NAME".padEnd(20)} ${"COMPUTE".padEnd(12)} ${"RUNTIME".padEnd(12)} ${"PROVIDER".padEnd(10)} ${"STATUS".padEnd(14)} IP`,
+      );
       for (const h of computes) {
         const ip = (h.config as { ip?: string }).ip ?? "-";
-        console.log(`  ${h.name.padEnd(20)} ${h.provider.padEnd(10)} ${h.status.padEnd(14)} ${ip}`);
+        const ck = String((h as any).compute_kind ?? "-").padEnd(12);
+        const rk = String((h as any).runtime_kind ?? "-").padEnd(12);
+        console.log(`  ${h.name.padEnd(20)} ${ck} ${rk} ${h.provider.padEnd(10)} ${h.status.padEnd(14)} ${ip}`);
       }
     });
 

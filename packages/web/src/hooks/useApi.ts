@@ -413,6 +413,10 @@ export const api = {
   // TODO: add Zod schema for compute/template/list
   listComputeTemplates: () => rpc<{ templates: any[] }>("compute/template/list").then((r) => r.templates),
 
+  // ── Compute / Runtime kinds (Wave 3) ─────────────────────────────────────
+  listComputeKinds: () => rpc<{ kinds: string[] }>("compute/kinds"),
+  listRuntimeKinds: () => rpc<{ kinds: string[] }>("runtime/kinds"),
+
   // ── Repo Map ─────────────────────────────────────────────────────────────
   // TODO: add Zod schema for repo-map/get
   getRepoMap: (dir?: string) => rpc<any>("repo-map/get", { dir }),
