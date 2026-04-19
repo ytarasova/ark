@@ -17,10 +17,17 @@
  *   restore:   POST /machines/<id>/start with the handle reconstructed from
  *              snapshot metadata.
  *
- * Runtime composition: FlyMachinesCompute pairs with any Runtime. The
- * getArkdUrl returns http://[<privateIp>]:19300 -- the conductor host must
- * have a WireGuard / `fly proxy` route into 6PN. In a pure managed deploy
- * the conductor runs on Fly itself and reaches 6PN without extra setup.
+ * Runtime composition: FlyMachinesCompute pairs with any Runtime. By
+ * default `getArkdUrl` returns http://[<privateIp>]:19300 -- the conductor
+ * host must have a WireGuard / `fly proxy` route into 6PN. In a pure
+ * managed deploy the conductor runs on Fly itself and reaches 6PN without
+ * extra setup.
+ *
+ * Non-Fly conductors (local dev, a laptop, a bare EC2 box) can enable the
+ * optional `flyctl proxy` tunnel via `new FlyMachinesCompute({ useTunnel:
+ * true })` or the `ARK_FLY_TUNNEL=1` env var. When active, provision
+ * spawns a `flyctl proxy` child that forwards a local loopback port to
+ * 6PN, and `getArkdUrl` returns `http://localhost:<port>`. See `./tunnel.ts`.
  *
  * Every HTTP call is routed through `FlyMachinesComputeDeps.fetchFn` so
  * unit tests can stub responses without touching the real Fly API. The
@@ -43,6 +50,7 @@ import {
   type FlyFetchFn,
   type FlyMachineConfig,
 } from "./api.js";
+import { openFlyTunnel, type FlyTunnel, type OpenFlyTunnelOpts, type SpawnFn } from "./tunnel.js";
 
 /** Arkd port inside the Fly machine. Always 19300 to match the arkd-sidecar contract. */
 const ARKD_PORT = 19300;
@@ -70,12 +78,43 @@ export interface FlyMachinesComputeDeps {
   sleep: (ms: number) => Promise<void>;
   /** Current time for snapshot createdAt. Overridable for deterministic tests. */
   now: () => number;
+  /**
+   * Spawn impl used when `useTunnel` is active. Defaults to node's
+   * `child_process#spawn`. Tests pass a stub that returns a fake
+   * `ChildProcess` without touching the real flyctl binary.
+   */
+  spawn: SpawnFn;
+  /**
+   * Allocate a local loopback port. Defaults to `port-allocator#allocatePort`.
+   * Tests can stub to return a deterministic port.
+   */
+  allocatePort: () => Promise<number>;
+  /**
+   * Optional override for opening a tunnel. Defaults to the production
+   * `openFlyTunnel` helper. Tests prefer stubbing `spawn` + `allocatePort`
+   * + `fetchFn` because that covers the tunnel module's behavior too, but
+   * end-to-end replacement is available for cases where that is easier.
+   */
+  openTunnel: (opts: OpenFlyTunnelOpts) => Promise<FlyTunnel>;
 }
 
 const productionDeps: FlyMachinesComputeDeps = {
   fetchFn: (input, init) => fetch(input, init),
   sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
   now: () => Date.now(),
+  // Lazy default -- node's child_process is only pulled in when a caller
+  // actually enables the tunnel. Keeps the import graph lean for Fly-native
+  // deployments that don't need it.
+  spawn: ((command, args, options) => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { spawn } = require("node:child_process");
+    return spawn(command, args, options);
+  }) as SpawnFn,
+  allocatePort: async () => {
+    const { allocatePort } = await import("../../../core/config/port-allocator.js");
+    return allocatePort();
+  },
+  openTunnel: (opts) => openFlyTunnel(opts),
 };
 
 let testingHooks: Partial<FlyMachinesComputeDeps> | null = null;
@@ -117,9 +156,36 @@ export interface FlyMeta {
   region: string;
   privateIp: string;
   arkdPort: number;
+  /**
+   * Arkd URL the conductor should hit. When a tunnel is active this is the
+   * `http://localhost:<localPort>` loopback; otherwise it's the 6PN URL.
+   * `getArkdUrl(handle)` always returns this.
+   */
   arkdUrl: string;
   image: string;
   size: string;
+  /**
+   * Original 6PN URL kept for diagnostics. Even when a tunnel is active the
+   * 6PN URL stays recorded so debug logs / future pool logic can see it.
+   */
+  arkdRemoteUrl?: string;
+  /** Host-side loopback port when a `flyctl proxy` tunnel is active. */
+  arkdLocalPort?: number;
+  /** PID of the `flyctl proxy` subprocess, if one was spawned. */
+  tunnelPid?: number;
+}
+
+/** Construction options for `FlyMachinesCompute`. */
+export interface FlyMachinesComputeOptions {
+  /**
+   * When true, `provision` spawns a `flyctl proxy` tunnel so the machine's
+   * arkd is reachable from a non-Fly conductor via `http://localhost:<port>`.
+   * Default: `false`. Also enabled when `ARK_FLY_TUNNEL=1` is set in the env.
+   *
+   * Leave OFF when the conductor itself runs on Fly -- the 6PN IPv6 URL
+   * works natively there and a tunnel would just add overhead.
+   */
+  useTunnel?: boolean;
 }
 
 // ── Compute ────────────────────────────────────────────────────────────────
@@ -140,12 +206,25 @@ export class FlyMachinesCompute implements Compute {
 
   private app: AppContext | null = null;
   private deps: FlyMachinesComputeDeps;
+  private readonly useTunnel: boolean;
 
-  constructor(deps?: Partial<FlyMachinesComputeDeps>) {
+  constructor(optsOrDeps?: FlyMachinesComputeOptions | Partial<FlyMachinesComputeDeps>) {
+    // Back-compat: historically this constructor took `Partial<Deps>` directly.
+    // Still accept that shape -- detect FlyMachinesComputeOptions by the
+    // presence of the `useTunnel` key (no Deps field collides with it).
+    const opts: FlyMachinesComputeOptions = {};
+    const deps: Partial<FlyMachinesComputeDeps> = {};
+    if (optsOrDeps) {
+      for (const [key, value] of Object.entries(optsOrDeps)) {
+        if (key === "useTunnel") opts.useTunnel = value as boolean;
+        else (deps as Record<string, unknown>)[key] = value;
+      }
+    }
+    this.useTunnel = opts.useTunnel ?? process.env.ARK_FLY_TUNNEL === "1";
     // Merge order: production -> global testing hooks -> per-instance overrides.
     // Per-instance wins so individual tests can still pin a specific fetchFn
     // while leaving global deps alone.
-    this.deps = { ...productionDeps, ...(testingHooks ?? {}), ...(deps ?? {}) };
+    this.deps = { ...productionDeps, ...(testingHooks ?? {}), ...deps };
   }
 
   setApp(app: AppContext): void {
@@ -204,19 +283,54 @@ export class FlyMachinesCompute implements Compute {
       throw new Error(`Fly machine ${created.id} reached state=${ready.state} but has no private_ip`);
     }
 
-    const arkdUrl = buildArkdUrl(privateIp);
+    const remoteUrl = buildArkdUrl(privateIp);
     const meta: FlyMeta = {
       appName,
       machineId: ready.id,
       region: ready.region ?? region,
       privateIp,
       arkdPort: ARKD_PORT,
-      arkdUrl,
+      arkdUrl: remoteUrl,
       image,
       size,
     };
 
-    opts.onLog?.(`fly: machine ${ready.id} ready at ${arkdUrl}`);
+    // 4. Optional `flyctl proxy` tunnel for conductors running off-Fly.
+    //    Rolled into a best-effort destroy of the machine on failure so we
+    //    don't leak a half-provisioned resource back to the caller.
+    if (this.useTunnel) {
+      opts.onLog?.(`fly: opening flyctl proxy tunnel to machine ${ready.id}...`);
+      try {
+        const tunnel = await this.deps.openTunnel({
+          appName,
+          machineId: ready.id,
+          remotePort: ARKD_PORT,
+          spawn: this.deps.spawn,
+          allocatePort: this.deps.allocatePort,
+          fetchFn: (input, init) => this.deps.fetchFn(input, init),
+          sleep: this.deps.sleep,
+          now: this.deps.now,
+          onLog: opts.onLog,
+        });
+        meta.arkdRemoteUrl = remoteUrl;
+        meta.arkdLocalPort = tunnel.localPort;
+        meta.tunnelPid = tunnel.pid;
+        meta.arkdUrl = `http://localhost:${tunnel.localPort}`;
+        opts.onLog?.(`fly: tunnel ready at ${meta.arkdUrl} (pid=${tunnel.pid})`);
+      } catch (err) {
+        opts.onLog?.(`fly: tunnel failed for machine ${ready.id}; destroying machine`);
+        // Best-effort rollback -- swallow teardown errors so the original
+        // cause surfaces to the caller.
+        try {
+          await destroyMachine(client, appName, ready.id);
+        } catch {
+          /* intentionally ignored -- original error wins */
+        }
+        throw err;
+      }
+    }
+
+    opts.onLog?.(`fly: machine ${ready.id} ready at ${meta.arkdUrl}`);
 
     return { kind: this.kind, name, meta: { fly: meta } };
   }
@@ -229,18 +343,27 @@ export class FlyMachinesCompute implements Compute {
 
   async stop(h: ComputeHandle): Promise<void> {
     const meta = readMeta(h);
+    // Tear the tunnel down before stopping the machine -- stopping the
+    // machine drops the WireGuard endpoint anyway, but killing explicitly
+    // frees the local port and the flyctl subprocess.
+    await this.killTunnelIfAny(meta);
     const client = makeFlyClient(requireFlyToken(), this.deps.fetchFn);
     await stopMachine(client, meta.appName, meta.machineId);
   }
 
   async destroy(h: ComputeHandle): Promise<void> {
     const meta = readMeta(h);
+    await this.killTunnelIfAny(meta);
     const client = makeFlyClient(requireFlyToken(), this.deps.fetchFn);
     await destroyMachine(client, meta.appName, meta.machineId);
   }
 
   getArkdUrl(h: ComputeHandle): string {
-    return readMeta(h).arkdUrl;
+    const meta = readMeta(h);
+    // Prefer the localhost URL when a tunnel is active -- that's the only
+    // thing a non-Fly conductor can actually reach.
+    if (meta.arkdLocalPort) return `http://localhost:${meta.arkdLocalPort}`;
+    return meta.arkdUrl;
   }
 
   /**
@@ -307,6 +430,38 @@ export class FlyMachinesCompute implements Compute {
   }
 
   // ── internals ────────────────────────────────────────────────────────────
+
+  /**
+   * Best-effort SIGTERM+SIGKILL on a lingering `flyctl proxy` PID recorded
+   * on the handle. Used by `stop` / `destroy`. Swallows ESRCH so calling
+   * twice (e.g. stop then destroy) is safe. Always clears the meta fields
+   * so a subsequent `start` knows it needs to respawn.
+   */
+  private async killTunnelIfAny(meta: FlyMeta): Promise<void> {
+    const pid = meta.tunnelPid;
+    if (!pid || pid <= 0) return;
+    try {
+      process.kill(pid, "SIGTERM");
+    } catch {
+      /* already gone */
+    }
+    // Give the child 2s to exit, then escalate.
+    await this.deps.sleep(2_000);
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      /* already gone */
+    }
+    meta.tunnelPid = undefined;
+    meta.arkdLocalPort = undefined;
+    // Restore the 6PN URL so a future in-Fly caller still has something
+    // to look at. getArkdUrl prefers arkdLocalPort when set, so clearing
+    // it means the compute falls back to whatever's in arkdUrl.
+    if (meta.arkdRemoteUrl) {
+      meta.arkdUrl = meta.arkdRemoteUrl;
+      meta.arkdRemoteUrl = undefined;
+    }
+  }
 
   private async waitUntilStarted(
     client: ReturnType<typeof makeFlyClient>,
