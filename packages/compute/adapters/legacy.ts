@@ -15,6 +15,14 @@
  * Existing DB rows with `provider: "ec2" | "ec2-docker" | "ec2-devcontainer"`
  * keep working through this mapping -- no schema migration.
  *
+ * Phase 2 adds the local microVM mapping:
+ *
+ *   LocalFirecrackerProvider   -> ComputeTarget(FirecrackerCompute, DirectRuntime)
+ *
+ * The FirecrackerCompute's own availability gate fires at provision time, so
+ * constructing the target here is safe even on hosts that don't support KVM:
+ * mapping the ComputeProvider onto a target never touches the kernel.
+ *
  * Every other provider still returns null, and callers fall through to the
  * legacy `ComputeProvider` API as before. Wave 3 deletes this file entirely
  * once every call site runs through ComputeTarget.
@@ -32,6 +40,10 @@
  *     owns the container lifecycle via the same docker / devcontainer
  *     helpers, so the DockerRuntime / DevcontainerRuntime `handle.meta.*.arkdUrl`
  *     still points at an in-instance loopback port reachable over the tunnel.
+ *   - FirecrackerCompute.getArkdUrl() reads `handle.meta.firecracker.arkdUrl`
+ *     (the VM's guest IP over the host-reachable TAP bridge). The caller
+ *     provisions the compute, then the DirectRuntime launchAgent talks to
+ *     arkd on that URL.
  *   - The returned ComputeTarget is a thin view -- it does NOT re-run
  *     lifecycle on its own. Callers hold onto the legacy provider until
  *     Wave 3 wires dispatch.
@@ -41,10 +53,11 @@ import type { AppContext } from "../../core/app.js";
 import { ComputeTarget } from "../core/compute-target.js";
 import { LocalCompute } from "../core/local.js";
 import { EC2Compute } from "../core/ec2.js";
+import { FirecrackerCompute } from "../core/firecracker/compute.js";
 import { DirectRuntime } from "../runtimes/direct.js";
 import { DockerRuntime } from "../runtimes/docker.js";
 import { DevcontainerRuntime } from "../runtimes/devcontainer.js";
-import { LocalWorktreeProvider, LocalDockerProvider } from "../providers/local-arkd.js";
+import { LocalWorktreeProvider, LocalDockerProvider, LocalFirecrackerProvider } from "../providers/local-arkd.js";
 import {
   RemoteWorktreeProvider,
   RemoteDockerProvider,
@@ -75,6 +88,15 @@ export function computeProviderToTarget(provider: ComputeProvider, app: AppConte
     const compute = new LocalCompute();
     compute.setApp(app);
     const runtime = new DockerRuntime();
+    runtime.setApp(app);
+    return new ComputeTarget(compute, runtime);
+  }
+  if (provider instanceof LocalFirecrackerProvider) {
+    // Phase 2 composition: the Firecracker microVM IS the compute; inside
+    // the VM the agent runs natively via arkd, so the runtime is `direct`.
+    const compute = new FirecrackerCompute();
+    compute.setApp(app);
+    const runtime = new DirectRuntime();
     runtime.setApp(app);
     return new ComputeTarget(compute, runtime);
   }
