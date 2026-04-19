@@ -1,8 +1,14 @@
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
+import { RpcError } from "../../protocol/types.js";
 import type { NodeType } from "../../core/knowledge/types.js";
 import { logInfo } from "../../core/observability/structured-log.js";
+
+/** True when Ark is running in hosted/multi-tenant mode. */
+function isHostedMode(app: AppContext): boolean {
+  return typeof app.config.databaseUrl === "string" && app.config.databaseUrl.length > 0;
+}
 
 export function registerKnowledgeHandlers(router: Router, app: AppContext): void {
   router.handle("knowledge/search", async (p) => {
@@ -49,6 +55,13 @@ export function registerKnowledgeHandlers(router: Router, app: AppContext): void
   });
 
   router.handle("knowledge/index", async (p) => {
+    // knowledge/index reads arbitrary directories on the server's
+    // filesystem. In hosted multi-tenant mode there is no well-defined
+    // per-tenant filesystem view, so refuse the call outright rather
+    // than let one tenant read another's (or the control plane's) files.
+    if (isHostedMode(app)) {
+      throw new RpcError("knowledge/index is disabled in hosted mode", -32601);
+    }
     const { repo } = extract<{ repo?: string }>(p, []);
     const repoPath = repo ?? process.cwd();
     try {
@@ -61,6 +74,11 @@ export function registerKnowledgeHandlers(router: Router, app: AppContext): void
   });
 
   router.handle("knowledge/export", async (p) => {
+    // Export writes markdown files to an arbitrary directory -- refuse in
+    // hosted mode to prevent cross-tenant filesystem writes.
+    if (isHostedMode(app)) {
+      throw new RpcError("knowledge/export is disabled in hosted mode", -32601);
+    }
     const { dir } = extract<{ dir?: string }>(p, []);
     const { exportToMarkdown } = await import("../../core/knowledge/export.js");
     const result = exportToMarkdown(app.knowledge, dir ?? "./knowledge-export");
@@ -68,6 +86,11 @@ export function registerKnowledgeHandlers(router: Router, app: AppContext): void
   });
 
   router.handle("knowledge/import", async (p) => {
+    // Import reads markdown files from an arbitrary directory -- refuse in
+    // hosted mode to prevent cross-tenant filesystem reads.
+    if (isHostedMode(app)) {
+      throw new RpcError("knowledge/import is disabled in hosted mode", -32601);
+    }
     const { dir } = extract<{ dir?: string }>(p, []);
     const { importFromMarkdown } = await import("../../core/knowledge/export.js");
     const result = importFromMarkdown(app.knowledge, dir ?? "./knowledge-export");
