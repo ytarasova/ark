@@ -18,10 +18,13 @@ import {
   RemoteDevcontainerProvider,
   RemoteFirecrackerProvider,
 } from "../providers/remote-arkd.js";
+import { K8sProvider, KataProvider } from "../providers/k8s.js";
 import { computeProviderToTarget } from "../adapters/legacy.js";
 import { LocalCompute } from "../core/local.js";
 import { EC2Compute } from "../core/ec2.js";
 import { FirecrackerCompute } from "../core/firecracker/compute.js";
+import { K8sCompute } from "../core/k8s.js";
+import { KataCompute } from "../core/k8s-kata.js";
 import { DirectRuntime } from "../runtimes/direct.js";
 import { DockerRuntime } from "../runtimes/docker.js";
 import { DevcontainerRuntime } from "../runtimes/devcontainer.js";
@@ -74,6 +77,28 @@ describe("computeProviderToTarget", () => {
     const target = computeProviderToTarget(legacy, app);
     expect(target).not.toBeNull();
     expect(target!.compute).toBeInstanceOf(FirecrackerCompute);
+    expect(target!.runtime).toBeInstanceOf(DirectRuntime);
+  });
+
+  it("maps K8sProvider onto K8sCompute + DirectRuntime", () => {
+    const legacy = new K8sProvider();
+    legacy.setApp?.(app);
+    const target = computeProviderToTarget(legacy, app);
+    expect(target).not.toBeNull();
+    expect(target!.compute).toBeInstanceOf(K8sCompute);
+    expect(target!.runtime).toBeInstanceOf(DirectRuntime);
+  });
+
+  it("maps KataProvider onto KataCompute + DirectRuntime (Kata checked before K8s)", () => {
+    const legacy = new KataProvider();
+    legacy.setApp?.(app);
+    const target = computeProviderToTarget(legacy, app);
+    expect(target).not.toBeNull();
+    // KataCompute extends K8sCompute, so instanceof K8sCompute also passes --
+    // the point of this assertion is that we got the *Kata* subclass back,
+    // not the base K8sCompute.
+    expect(target!.compute).toBeInstanceOf(KataCompute);
+    expect(target!.compute.kind).toBe("k8s-kata");
     expect(target!.runtime).toBeInstanceOf(DirectRuntime);
   });
 
