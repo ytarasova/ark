@@ -83,7 +83,9 @@ export function InputsSection({ flowName, value, onChange, onValidityChange }: P
     };
   }, [flowName]);
 
-  // Seed declared param defaults once schema arrives.
+  // Seed declared param defaults once schema arrives. Deliberately ignoring
+  // `value` / `onChange` in the dep array -- we only want to re-seed when the
+  // schema itself changes, otherwise any param edit would retrigger seeding.
   useEffect(() => {
     if (!schema?.params) return;
     const nextParams = { ...value.params };
@@ -95,6 +97,7 @@ export function InputsSection({ flowName, value, onChange, onValidityChange }: P
       }
     }
     if (changed) onChange({ ...value, params: nextParams });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schema]);
 
   const declaredFileRoles = Object.keys(schema?.files ?? {});

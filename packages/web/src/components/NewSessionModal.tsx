@@ -1,5 +1,9 @@
-import { useState, useEffect, useRef, useCallback, type FormEvent } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import * as Popover from "@radix-ui/react-popover";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useQuery } from "@tanstack/react-query";
 import { api } from "../hooks/useApi.js";
 import { Button } from "./ui/button.js";
 import { FolderPickerModal } from "./FolderPickerModal.js";
@@ -746,14 +750,32 @@ function RichTaskInput({
 }
 
 // ---------------------------------------------------------------------------
+// Zod schema for the NewSession form. Attachments, references and flow
+// inputs are managed as separate state because they have non-trivial
+// client-only semantics (file reads, regex detection, flow-driven shapes).
+// ---------------------------------------------------------------------------
+export const NewSessionSchema = z.object({
+  summary: z.string().trim().min(1, "Describe the task"),
+  repo: z.string().min(1),
+  ticket: z.string().default(""),
+  flow: z.string().default(""),
+  compute: z.string().default(""),
+});
+export type NewSessionFormValues = z.infer<typeof NewSessionSchema>;
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
-  const [summary, setSummary] = useState("");
-  const [repo, setRepo] = useState(".");
-  const [ticket, setTicket] = useState("");
-  const [selectedFlow, setSelectedFlow] = useState("");
-  const [selectedCompute, setSelectedCompute] = useState("");
+  const { control, handleSubmit, watch, setValue, formState } = useForm<NewSessionFormValues>({
+    resolver: zodResolver(NewSessionSchema),
+    defaultValues: { summary: "", repo: ".", ticket: "", flow: "", compute: "" },
+  });
+  const summary = watch("summary");
+  const repo = watch("repo");
+  const selectedFlow = watch("flow");
+  const selectedCompute = watch("compute");
+
   const [attachments, setAttachments] = useState<AttachmentInfo[]>([]);
   const [inputs, setInputs] = useState<InputsValue>({ files: {}, params: {} });
   const [inputsValid, setInputsValid] = useState(true);
@@ -780,60 +802,45 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
 
   const references = detectReferences(summary);
 
-  const [flows, setFlows] = useState<FlowInfo[]>([]);
-  const [computes, setComputes] = useState<ComputeInfo[]>([]);
-  const [recentRepos, setRecentRepos] = useState<RecentRepo[]>([]);
+  const flowsQuery = useQuery<FlowInfo[]>({ queryKey: ["flows"], queryFn: api.getFlows });
+  const computesQuery = useQuery<ComputeInfo[]>({ queryKey: ["compute"], queryFn: api.getCompute });
+  const recentReposQuery = useQuery<RecentRepo[]>({
+    queryKey: ["sessions", "recent-repos"],
+    queryFn: async () => {
+      const sessions: any[] = await api.getSessions();
+      const seen = new Map<string, string>();
+      for (const s of sessions) {
+        if (s.repo && s.repo !== "." && !seen.has(s.repo)) {
+          seen.set(s.repo, s.updated_at || s.created_at || "");
+        }
+      }
+      const repos: RecentRepo[] = [];
+      for (const [path, lastUsed] of seen) {
+        repos.push({ path, basename: formatRepoName(path), lastUsed: relTime(lastUsed) });
+      }
+      return repos.slice(0, 15);
+    },
+  });
+  // Memoized defaults so dependent effects don't see a fresh [] each render.
+  const flows = useMemo<FlowInfo[]>(() => flowsQuery.data ?? [], [flowsQuery.data]);
+  const computes = useMemo<ComputeInfo[]>(() => computesQuery.data ?? [], [computesQuery.data]);
+  const recentRepos = useMemo<RecentRepo[]>(() => recentReposQuery.data ?? [], [recentReposQuery.data]);
+
   const [pickerOpen, setPickerOpen] = useState(false);
 
+  // Auto-select the first flow / compute once the lists load, unless the
+  // user has already chosen one. RHF's setValue makes this a one-liner.
   useEffect(() => {
-    let cancelled = false;
-    api
-      .getFlows()
-      .then((f: any[]) => {
-        if (cancelled) return;
-        setFlows(f);
-        if (f.length > 0 && !selectedFlow) setSelectedFlow(f[0].name);
-      })
-      .catch(() => {});
-    api
-      .getCompute()
-      .then((c: any[]) => {
-        if (cancelled) return;
-        setComputes(c);
-        if (c.length > 0 && !selectedCompute) setSelectedCompute(c[0].name);
-      })
-      .catch(() => {});
-    // Fetch recent repos from past sessions
-    api
-      .getSessions()
-      .then((sessions: any[]) => {
-        if (cancelled) return;
-        const seen = new Map<string, string>();
-        for (const s of sessions) {
-          if (s.repo && s.repo !== "." && !seen.has(s.repo)) {
-            seen.set(s.repo, s.updated_at || s.created_at || "");
-          }
-        }
-        const repos: RecentRepo[] = [];
-        for (const [path, lastUsed] of seen) {
-          repos.push({
-            path,
-            basename: formatRepoName(path),
-            lastUsed: relTime(lastUsed),
-          });
-        }
-        setRecentRepos(repos.slice(0, 15));
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (!selectedFlow && flows.length > 0) setValue("flow", flows[0].name);
+  }, [flows, selectedFlow, setValue]);
+  useEffect(() => {
+    if (!selectedCompute && computes.length > 0) setValue("compute", computes[0].name);
+  }, [computes, selectedCompute, setValue]);
 
   // Check if the selected flow looks like it uses tickets
   const currentFlow = flows.find((f) => f.name === selectedFlow);
   const showTicket =
-    currentFlow &&
+    !!currentFlow &&
     ((currentFlow.description || "").toLowerCase().includes("ticket") ||
       (currentFlow.stages || []).some((s) => s.toLowerCase().includes("ticket")));
 
@@ -847,21 +854,7 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
       }
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && summary.trim()) {
         e.preventDefault();
-        onSubmit({
-          summary,
-          repo,
-          flow: selectedFlow,
-          ticket,
-          compute_name: selectedCompute,
-          agent: "",
-          group_name: "",
-          dispatch: true,
-          attachments,
-          references,
-          ...(Object.keys(inputs.files).length || Object.keys(inputs.params).length
-            ? { inputs: { files: { ...inputs.files }, params: { ...inputs.params } } }
-            : {}),
-        });
+        submit();
         return;
       }
       // Focus trap: keep Tab cycling inside the panel while it's open.
@@ -917,24 +910,29 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [summary, repo, selectedFlow, ticket, selectedCompute, onClose, onSubmit, attachments, references, inputs]);
+    // submit is the handle_submit callback below; summary is included so the
+    // Cmd+Enter guard uses the latest value. The RHF-bound values we pass to
+    // onSubmit are read from the closure at submit time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [summary, onClose]);
 
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!summary.trim()) return;
+  const submit = handleSubmit((values) => {
     onSubmit({
-      summary,
-      repo,
-      flow: selectedFlow,
-      ticket,
-      compute_name: selectedCompute,
+      summary: values.summary,
+      repo: values.repo,
+      flow: values.flow,
+      ticket: values.ticket,
+      compute_name: values.compute,
       agent: "",
       group_name: "",
       dispatch: true,
       attachments,
       references,
+      ...(Object.keys(inputs.files).length || Object.keys(inputs.params).length
+        ? { inputs: { files: { ...inputs.files }, params: { ...inputs.params } } }
+        : {}),
     });
-  }
+  });
 
   return (
     <div
@@ -952,14 +950,18 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
         <p className="text-[12px] text-[var(--fg-muted)] mb-5">Configure and launch an agent session</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 px-5">
+      <form onSubmit={submit} className="flex flex-col flex-1 min-h-0 px-5" noValidate>
         {/* Flow */}
         <div className="mb-4">
           <label className="block text-[11px] font-semibold text-[var(--fg-muted)] mb-1.5 uppercase tracking-[0.04em]">
             <Zap size={12} className="inline mr-1 opacity-60" />
             Flow
           </label>
-          <FlowDropdown flows={flows} selected={selectedFlow} onSelect={setSelectedFlow} />
+          <Controller
+            name="flow"
+            control={control}
+            render={({ field }) => <FlowDropdown flows={flows} selected={field.value} onSelect={field.onChange} />}
+          />
         </div>
 
         {/* Repository */}
@@ -967,11 +969,17 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
           <label className="block text-[11px] font-semibold text-[var(--fg-muted)] mb-1.5 uppercase tracking-[0.04em]">
             Repository
           </label>
-          <RepoDropdown
-            value={repo}
-            onChange={setRepo}
-            recentRepos={recentRepos}
-            onBrowse={() => setPickerOpen(true)}
+          <Controller
+            name="repo"
+            control={control}
+            render={({ field }) => (
+              <RepoDropdown
+                value={field.value}
+                onChange={field.onChange}
+                recentRepos={recentRepos}
+                onBrowse={() => setPickerOpen(true)}
+              />
+            )}
           />
         </div>
 
@@ -980,7 +988,13 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
           <label className="block text-[11px] font-semibold text-[var(--fg-muted)] mb-1.5 uppercase tracking-[0.04em]">
             Compute
           </label>
-          <ComputeDropdown computes={computes} selected={selectedCompute} onSelect={setSelectedCompute} />
+          <Controller
+            name="compute"
+            control={control}
+            render={({ field }) => (
+              <ComputeDropdown computes={computes} selected={field.value} onSelect={field.onChange} />
+            )}
+          />
         </div>
 
         {/* Flow inputs (files + params) -- driven by the selected flow's
@@ -993,14 +1007,20 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
             <label className="block text-[11px] text-[var(--fg-muted)] mb-1.5 tracking-[0.04em]">
               Ticket <span className="opacity-50">(optional)</span>
             </label>
-            <input
-              value={ticket}
-              onChange={(e) => setTicket(e.target.value)}
-              placeholder="JIRA-123, github.com/org/repo/issues/42"
-              className={cn(
-                "flex h-9 w-full rounded-md border border-[var(--border)] bg-transparent",
-                "px-3 py-1 text-[13px] text-[var(--fg)] transition-colors",
-                "placeholder:text-[var(--fg-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]",
+            <Controller
+              name="ticket"
+              control={control}
+              render={({ field }) => (
+                <input
+                  value={field.value}
+                  onChange={field.onChange}
+                  placeholder="JIRA-123, github.com/org/repo/issues/42"
+                  className={cn(
+                    "flex h-9 w-full rounded-md border border-[var(--border)] bg-transparent",
+                    "px-3 py-1 text-[13px] text-[var(--fg)] transition-colors",
+                    "placeholder:text-[var(--fg-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]",
+                  )}
+                />
               )}
             />
           </div>
@@ -1011,14 +1031,23 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
           <label className="block text-[11px] font-semibold text-[var(--fg-muted)] mb-1.5 uppercase tracking-[0.04em]">
             Task
           </label>
-          <RichTaskInput
-            value={summary}
-            onChange={setSummary}
-            textareaRef={textareaRef}
-            attachments={attachments}
-            onAttachmentsChange={setAttachments}
-            references={references}
+          <Controller
+            name="summary"
+            control={control}
+            render={({ field }) => (
+              <RichTaskInput
+                value={field.value}
+                onChange={field.onChange}
+                textareaRef={textareaRef}
+                attachments={attachments}
+                onAttachmentsChange={setAttachments}
+                references={references}
+              />
+            )}
           />
+          {formState.errors.summary && (
+            <p className="mt-1 text-[11px] text-[var(--failed)]">{formState.errors.summary.message}</p>
+          )}
         </div>
 
         {/* Actions */}
@@ -1030,7 +1059,7 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
           <Button
             type="submit"
             size="sm"
-            disabled={!summary.trim() || !inputsValid}
+            disabled={!summary.trim() || !inputsValid || formState.isSubmitting}
             title={!inputsValid ? "Fill in all required flow inputs before starting" : undefined}
           >
             Start Session{" "}
@@ -1045,7 +1074,7 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
         <FolderPickerModal
           initialPath={repo && repo !== "." ? repo : undefined}
           onSelect={(path) => {
-            setRepo(path);
+            setValue("repo", path, { shouldDirty: true });
             setPickerOpen(false);
           }}
           onClose={() => setPickerOpen(false)}

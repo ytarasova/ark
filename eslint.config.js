@@ -1,5 +1,6 @@
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
+import reactHooks from "eslint-plugin-react-hooks";
 
 export default [
   {
@@ -39,6 +40,18 @@ export default [
       "no-console": ["warn", { allow: ["warn", "error"] }],
       // No empty catch blocks
       "no-empty": ["error", { allowEmptyCatch: false }],
+    },
+  },
+  {
+    // React hooks rules enforced for the web frontend. Error level so CI
+    // rejects stale-closure / conditional-hook regressions.
+    files: ["packages/web/**/*.ts", "packages/web/**/*.tsx", "packages/desktop/**/*.ts", "packages/desktop/**/*.tsx"],
+    plugins: {
+      "react-hooks": reactHooks,
+    },
+    rules: {
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "error",
     },
   },
   {

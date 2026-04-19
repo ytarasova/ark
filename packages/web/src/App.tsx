@@ -8,6 +8,7 @@ import { HttpTransport } from "./transport/HttpTransport.js";
 import { Toast } from "./components/Toast.js";
 import { CommandPalette, type CommandItem } from "./components/ui/CommandPalette.js";
 import { PageFallback } from "./components/ui/PageFallback.js";
+import { RouteErrorBoundary } from "./components/ui/ErrorBoundary.js";
 import { useDaemonStatus } from "./hooks/useDaemonStatus.js";
 import { useHashRouter } from "./hooks/useHashRouter.js";
 
@@ -117,76 +118,78 @@ function App() {
 
   return (
     <>
-      <Suspense fallback={<PageFallback />}>
-        {view === "_design" && <DesignPreviewPage />}
-        {view === "sessions" && (
-          <SessionsPage
-            view={view}
-            onNavigate={onNavigate}
-            readOnly={readOnly}
-            onToast={showToast}
-            daemonStatus={daemonStatus}
-            initialSelectedId={subId}
-            onSelectedChange={setSubId}
-            initialTab={tab}
-            onTabChange={setTab}
-          />
-        )}
-        {view === "agents" && (
-          <AgentsPage
-            view={view}
-            onNavigate={onNavigate}
-            readOnly={readOnly}
-            daemonStatus={daemonStatus}
-            initialSelectedId={subId}
-            onSelectedChange={setSubId}
-          />
-        )}
-        {view === "tools" && (
-          <ToolsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
-        )}
-        {view === "flows" && (
-          <FlowsPage
-            view={view}
-            onNavigate={onNavigate}
-            readOnly={readOnly}
-            daemonStatus={daemonStatus}
-            initialSelectedId={subId}
-            onSelectedChange={setSubId}
-          />
-        )}
-        {view === "history" && (
-          <HistoryPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
-        )}
-        {view === "compute" && (
-          <ComputePage
-            view={view}
-            onNavigate={onNavigate}
-            readOnly={readOnly}
-            daemonStatus={daemonStatus}
-            initialSelectedId={subId}
-            onSelectedChange={setSubId}
-          />
-        )}
-        {view === "schedules" && (
-          <SchedulesPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
-        )}
-        {view === "memory" && (
-          <MemoryPage
-            view={view}
-            onNavigate={onNavigate}
-            readOnly={readOnly}
-            daemonStatus={daemonStatus}
-            onToast={showToast}
-          />
-        )}
-        {view === "costs" && (
-          <CostsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
-        )}
-        {view === "settings" && (
-          <SettingsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
-        )}
-      </Suspense>
+      <RouteErrorBoundary view={view}>
+        <Suspense fallback={<PageFallback />}>
+          {view === "_design" && <DesignPreviewPage />}
+          {view === "sessions" && (
+            <SessionsPage
+              view={view}
+              onNavigate={onNavigate}
+              readOnly={readOnly}
+              onToast={showToast}
+              daemonStatus={daemonStatus}
+              initialSelectedId={subId}
+              onSelectedChange={setSubId}
+              initialTab={tab}
+              onTabChange={setTab}
+            />
+          )}
+          {view === "agents" && (
+            <AgentsPage
+              view={view}
+              onNavigate={onNavigate}
+              readOnly={readOnly}
+              daemonStatus={daemonStatus}
+              initialSelectedId={subId}
+              onSelectedChange={setSubId}
+            />
+          )}
+          {view === "tools" && (
+            <ToolsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
+          )}
+          {view === "flows" && (
+            <FlowsPage
+              view={view}
+              onNavigate={onNavigate}
+              readOnly={readOnly}
+              daemonStatus={daemonStatus}
+              initialSelectedId={subId}
+              onSelectedChange={setSubId}
+            />
+          )}
+          {view === "history" && (
+            <HistoryPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
+          )}
+          {view === "compute" && (
+            <ComputePage
+              view={view}
+              onNavigate={onNavigate}
+              readOnly={readOnly}
+              daemonStatus={daemonStatus}
+              initialSelectedId={subId}
+              onSelectedChange={setSubId}
+            />
+          )}
+          {view === "schedules" && (
+            <SchedulesPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
+          )}
+          {view === "memory" && (
+            <MemoryPage
+              view={view}
+              onNavigate={onNavigate}
+              readOnly={readOnly}
+              daemonStatus={daemonStatus}
+              onToast={showToast}
+            />
+          )}
+          {view === "costs" && (
+            <CostsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
+          )}
+          {view === "settings" && (
+            <SettingsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
+          )}
+        </Suspense>
+      </RouteErrorBoundary>
       <CommandPalette
         open={cmdkOpen}
         onOpenChange={(v) => {

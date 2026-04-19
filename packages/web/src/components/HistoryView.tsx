@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "../hooks/useApi.js";
+import {
+  useClaudeSessionsQuery,
+  useRecentSessionsQuery,
+  useRefreshHistoryMutation,
+} from "../hooks/useHistoryQueries.js";
 import { cn } from "../lib/utils.js";
 import { relTime } from "../util.js";
 import { Button } from "./ui/button.js";
@@ -23,71 +28,25 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
   const _setMode = onModeChange ?? setInternalMode;
   const [sessionResults, setSessionResults] = useState<any[]>([]);
   const [transcriptResults, setTranscriptResults] = useState<any[]>([]);
-  const [recentSessions, setRecentSessions] = useState<any[]>([]);
-  const [claudeSessions, setClaudeSessions] = useState<any[]>([]);
   const [searched, setSearched] = useState(false);
   const [_loading, setLoading] = useState(false);
-  const [loadingRecent, setLoadingRecent] = useState(true);
-  const [loadingClaude, setLoadingClaude] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [selected, setSelected] = useState<any>(null);
   const [selectedType, setSelectedType] = useState<"session" | "transcript">("session");
 
-  // Load recent sessions on mount (for Sessions tab)
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const sessions = await api.getSessions();
-        if (!cancelled) {
-          const sorted = (sessions || [])
-            .sort((a: any, b: any) => {
-              const da = new Date(a.updated_at || 0).getTime();
-              const db = new Date(b.updated_at || 0).getTime();
-              return db - da;
-            })
-            .slice(0, 20);
-          setRecentSessions(sorted);
-        }
-      } catch {
-        // ignore
-      } finally {
-        if (!cancelled) setLoadingRecent(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Recent Ark sessions -- TanStack Query handles mounted tracking + error
+  // boundaries + re-fetch on focus. The hook file keeps the sort/slice logic.
+  const recentSessionsQuery = useRecentSessionsQuery();
+  const recentSessions = recentSessionsQuery.data ?? [];
+  const loadingRecent = recentSessionsQuery.isPending;
 
-  // Load Claude Code sessions (for Transcripts tab)
-  const loadClaudeSessions = useCallback(async () => {
-    setLoadingClaude(true);
-    try {
-      const items = await api.getClaudeSessions();
-      setClaudeSessions(Array.isArray(items) ? items : []);
-    } catch {
-      // ignore
-    } finally {
-      setLoadingClaude(false);
-    }
-  }, []);
+  // Claude Code transcripts.
+  const claudeSessionsQuery = useClaudeSessionsQuery();
+  const claudeSessions = claudeSessionsQuery.data ?? [];
+  const loadingClaude = claudeSessionsQuery.isPending;
 
-  useEffect(() => {
-    loadClaudeSessions();
-  }, [loadClaudeSessions]);
-
-  const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await api.refreshHistory();
-      await loadClaudeSessions();
-    } catch {
-      // ignore
-    } finally {
-      setRefreshing(false);
-    }
-  }, [loadClaudeSessions]);
+  const refreshMutation = useRefreshHistoryMutation();
+  const refreshing = refreshMutation.isPending;
+  const handleRefresh = useCallback(() => refreshMutation.mutate(), [refreshMutation]);
 
   const doSearch = useCallback(async () => {
     if (!query.trim()) return;
@@ -112,12 +71,26 @@ export function HistoryView({ onSelectSession, mode: controlledMode, onModeChang
     if (e.key === "Enter") doSearch();
   }
 
-  // Re-search when mode changes and there's an active query
+  // Re-run the search when the user toggles between sessions / transcripts.
+  // We keep both the previous mode and the latest doSearch in refs updated
+  // inside a post-commit effect (no ref writes during render). The effect
+  // below depends on `mode` only -- query + searched are read through the
+  // ref so keystrokes don't fire network calls.
+  const prevModeRef = useRef<SearchMode>(mode);
+  const latestSearchRef = useRef<{ fn: () => Promise<void>; query: string; searched: boolean }>({
+    fn: doSearch,
+    query,
+    searched,
+  });
   useEffect(() => {
-    if (searched && query.trim()) {
-      doSearch();
-    }
-  }, [mode, doSearch]);
+    latestSearchRef.current = { fn: doSearch, query, searched };
+  });
+  useEffect(() => {
+    if (prevModeRef.current === mode) return;
+    prevModeRef.current = mode;
+    const { fn, query: q, searched: s } = latestSearchRef.current;
+    if (s && q.trim()) fn();
+  }, [mode]);
 
   function handleClear() {
     setQuery("");

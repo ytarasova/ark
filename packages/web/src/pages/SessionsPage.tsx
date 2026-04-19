@@ -4,6 +4,7 @@ import { SessionListPanel } from "../components/SessionList.js";
 import { SessionDetail } from "../components/SessionDetail.js";
 import { NewSessionModal } from "../components/NewSessionModal.js";
 import { DashboardView } from "../components/DashboardView.js";
+import { SessionStreamErrorBoundary } from "../components/ui/ErrorBoundary.js";
 import { useSessions } from "../hooks/useSessions.js";
 import { api } from "../hooks/useApi.js";
 import { ArrowLeft, Maximize2, Minimize2 } from "lucide-react";
@@ -77,22 +78,29 @@ export function SessionsPage({
   const [flowStagesMap, setFlowStagesMap] = useState<Record<string, any[]>>({});
 
   useEffect(() => {
-    // Collect unique flow names from sessions
-    const flowNames = new Set<string>();
+    // Collect unique flow names from sessions. We read `flowStagesMap` from
+    // inside the updater so this effect only needs to depend on `sessions`
+    // -- avoids refetching every flow whenever one entry is added.
+    const sessionFlowNames = new Set<string>();
     for (const s of sessions || []) {
       const f = s.pipeline || s.flow;
-      if (f && !flowStagesMap[f]) flowNames.add(f);
+      if (f) sessionFlowNames.add(f);
     }
-    for (const name of flowNames) {
-      api
-        .getFlowDetail(name)
-        .then((d: any) => {
-          if (d.stages?.length) {
-            setFlowStagesMap((prev) => ({ ...prev, [name]: d.stages }));
-          }
-        })
-        .catch(() => {});
-    }
+    setFlowStagesMap((prev) => {
+      for (const name of sessionFlowNames) {
+        if (prev[name]) continue;
+        // Kick off a fetch for each unknown flow; update map when it resolves.
+        api
+          .getFlowDetail(name)
+          .then((d: any) => {
+            if (d.stages?.length) {
+              setFlowStagesMap((inner) => (inner[name] ? inner : { ...inner, [name]: d.stages }));
+            }
+          })
+          .catch(() => {});
+      }
+      return prev;
+    });
   }, [sessions]);
 
   // Compute filtered sessions for keyboard navigation
@@ -158,7 +166,7 @@ export function SessionsPage({
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [filteredSessions, selectedId, readOnly, showNew]);
+  }, [filteredSessions, selectedId, readOnly, showNew, setSelectedId]);
 
   async function handleNewSession(form: any) {
     // Control plane owns the atomic create+dispatch -- no post-create RPC here.
@@ -245,14 +253,16 @@ export function SessionsPage({
               {maximized ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
             </button>
           </div>
-          <SessionDetail
-            key={selectedId}
-            sessionId={selectedId}
-            onToast={onToast}
-            readOnly={readOnly}
-            initialTab={initialTab}
-            onTabChange={onTabChange}
-          />
+          <SessionStreamErrorBoundary sessionId={selectedId}>
+            <SessionDetail
+              key={selectedId}
+              sessionId={selectedId}
+              onToast={onToast}
+              readOnly={readOnly}
+              initialTab={initialTab}
+              onTabChange={onTabChange}
+            />
+          </SessionStreamErrorBoundary>
         </div>
       ) : (
         <DashboardView
