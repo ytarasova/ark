@@ -155,9 +155,19 @@ docker-compose up -d          # Ark + Postgres + Redis
 
 # Kubernetes (Helm)
 helm install ark .infra/helm/ark -f .infra/helm/ark/values-production.yaml
+
+# Fly Machines compute backend (arkd-bundled image)
+FLY_API_TOKEN=... make fly-image   # builds + pushes registry.fly.io/ark-arkd:latest
 ```
 
 The Helm chart deploys: control plane, worker pool, PostgreSQL, Redis, Ingress.
+
+The `fly-image` target builds the image that `FlyMachinesCompute` pulls
+when provisioning a Fly machine (default tag `registry.fly.io/ark-arkd:latest`,
+see `packages/compute/core/fly/compute.ts`). Without this image the
+provider is inert -- Fly creates a machine, but the container has no arkd
+inside. Set `FLY_APP` / `TAG` env vars to override the target repo/tag; see
+`scripts/build-fly-image.sh` for the full workflow.
 
 ## Data
 

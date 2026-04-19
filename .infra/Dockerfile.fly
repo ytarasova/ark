@@ -1,0 +1,77 @@
+# Ark -- arkd-bundled image for the Fly Machines compute backend
+#
+# This image is the default `image` for `FlyMachinesCompute` (see
+# packages/compute/core/fly/compute.ts -- DEFAULT_IMAGE = "registry.fly.io/ark-arkd:latest").
+# Without it the Fly provider is inert: provision() would create a machine
+# whose container has no arkd to serve /snapshot, /launch, etc.
+#
+# Entry point: the universal arkd daemon bound to :19300 on all interfaces,
+# reachable from the conductor over Fly's 6PN private IPv6 network.
+#
+# Build + push:
+#   make fly-image
+# or, directly:
+#   FLY_APP=ark-arkd TAG=latest ./scripts/build-fly-image.sh
+#
+# The script uses `.infra/.dockerignore.fly` as the build context filter.
+# See scripts/build-fly-image.sh for the full push flow (flyctl auth docker +
+# docker push registry.fly.io/$FLY_APP:$TAG).
+
+FROM oven/bun:1.3
+
+# OS deps:
+#   tmux              -- CLAUDE.md mandates tmux for every arkd target.
+#   git               -- arkd runs git for session worktrees + remote ops.
+#   curl              -- used by the Claude Code installer + diagnostics.
+#   ca-certificates   -- TLS for bun installs and LLM egress.
+#   unzip             -- bun's installer shells out to unzip (see
+#                        packages/compute/providers/docker/helpers.ts notes).
+#   python3 + build-essential -- ark pulls in better-sqlite3 (native
+#                        node-gyp build) transitively; without python +
+#                        a C++ toolchain the `bun install` step fails
+#                        with "Could not find any Python installation".
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        git \
+        tmux \
+        curl \
+        ca-certificates \
+        unzip \
+        python3 \
+        build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Claude Code CLI. Best-effort: if the upstream installer fails we keep
+# going so the image still boots for non-claude runtimes (codex, gemini,
+# goose). Matches the same "best-effort" policy used by the runtime
+# bootstrapContainer script in the Docker sidecar provider.
+RUN set -eux; \
+    curl -fsSL https://claude.ai/install.sh | bash >/dev/null 2>&1 || true; \
+    if [ -x "$HOME/.local/bin/claude" ]; then \
+      ln -sf "$HOME/.local/bin/claude" /usr/local/bin/claude; \
+    fi; \
+    command -v claude >/dev/null 2>&1 && echo "[fly-image] claude installed" \
+      || echo "[fly-image] claude install skipped"
+
+WORKDIR /opt/ark
+
+# Layer-friendly install: copy the manifest + lockfile first so repo edits
+# below don't re-trigger `bun install`. The existing text-format `bun.lock`
+# (Bun >= 1.1) is the authoritative lockfile in this repo -- the older
+# binary `bun.lockb` is no longer produced.
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --production
+
+# Now copy the full repo. `.infra/.dockerignore.fly` (applied by
+# scripts/build-fly-image.sh) trims node_modules, dist, .git, worktrees,
+# and CI/test output so the context stays small.
+COPY . /opt/ark
+
+# arkd binds here inside the machine. The Fly provider exposes the same
+# port over 6PN without a public edge -- see FlyMachinesCompute.provision.
+EXPOSE 19300
+
+# Bind to 0.0.0.0 so the conductor can reach us over 6PN. Mirrors the flag
+# pattern used by startArkdInContainer in the local Docker sidecar
+# (packages/compute/providers/docker/helpers.ts).
+ENTRYPOINT ["bun", "run", "/opt/ark/packages/cli/index.ts", "arkd", "--port", "19300", "--hostname", "0.0.0.0"]
