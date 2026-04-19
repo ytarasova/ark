@@ -5,6 +5,7 @@
  * Wave 2 adds the `LocalDockerProvider` mapping: it now returns a
  * `ComputeTarget(LocalCompute, DockerRuntime)`. Existing DB rows with
  * `provider: "docker"` keep working through this mapping -- no migration.
+ *
  * Wave 3 extends the mapping to the remote (EC2-backed) providers:
  *
  *   RemoteWorktreeProvider     -> ComputeTarget(EC2Compute, DirectRuntime)
@@ -22,6 +23,14 @@
  * The FirecrackerCompute's own availability gate fires at provision time, so
  * constructing the target here is safe even on hosts that don't support KVM:
  * mapping the ComputeProvider onto a target never touches the kernel.
+ *
+ * Wave 3 also maps the Kubernetes providers:
+ *
+ *   K8sProvider  -> ComputeTarget(K8sCompute,  DirectRuntime)
+ *   KataProvider -> ComputeTarget(KataCompute, DirectRuntime)
+ *
+ * Existing DB rows with `provider: "k8s"` / `"k8s-kata"` keep working through
+ * this mapping -- no schema migration.
  *
  * Every other provider still returns null, and callers fall through to the
  * legacy `ComputeProvider` API as before. Wave 3 deletes this file entirely
@@ -54,6 +63,8 @@ import { ComputeTarget } from "../core/compute-target.js";
 import { LocalCompute } from "../core/local.js";
 import { EC2Compute } from "../core/ec2.js";
 import { FirecrackerCompute } from "../core/firecracker/compute.js";
+import { K8sCompute } from "../core/k8s.js";
+import { KataCompute } from "../core/k8s-kata.js";
 import { DirectRuntime } from "../runtimes/direct.js";
 import { DockerRuntime } from "../runtimes/docker.js";
 import { DevcontainerRuntime } from "../runtimes/devcontainer.js";
@@ -64,6 +75,7 @@ import {
   RemoteDevcontainerProvider,
   RemoteFirecrackerProvider,
 } from "../providers/remote-arkd.js";
+import { K8sProvider, KataProvider } from "../providers/k8s.js";
 import type { ComputeProvider } from "../types.js";
 
 /**
@@ -132,6 +144,22 @@ export function computeProviderToTarget(provider: ComputeProvider, app: AppConte
     // Deferred: Phase 2 owns the microVM-on-EC2 composition. Until then the
     // legacy provider stays authoritative; the null return preserves that.
     return null;
+  }
+  // Kata must be checked before K8s because KataProvider extends K8sProvider
+  // -- an `instanceof K8sProvider` match would otherwise swallow Kata instances.
+  if (provider instanceof KataProvider) {
+    const compute = new KataCompute();
+    compute.setApp(app);
+    const runtime = new DirectRuntime();
+    runtime.setApp(app);
+    return new ComputeTarget(compute, runtime);
+  }
+  if (provider instanceof K8sProvider) {
+    const compute = new K8sCompute();
+    compute.setApp(app);
+    const runtime = new DirectRuntime();
+    runtime.setApp(app);
+    return new ComputeTarget(compute, runtime);
   }
   // Everything else: future waves.
   return null;

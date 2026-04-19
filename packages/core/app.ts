@@ -636,6 +636,20 @@ export class AppContext {
         /* @kubernetes/client-node not installed */
       }
 
+      // Wave 2 Compute registrations for Kubernetes. Gated the same way as
+      // the legacy K8sProvider above -- if `@kubernetes/client-node` isn't
+      // installed, skip silently and leave the registry without a `k8s` /
+      // `k8s-kata` kind.
+      try {
+        await import("@kubernetes/client-node");
+        const { K8sCompute } = await import("../compute/core/k8s.js");
+        const { KataCompute } = await import("../compute/core/k8s-kata.js");
+        this.registerCompute(new K8sCompute());
+        this.registerCompute(new KataCompute());
+      } catch {
+        /* @kubernetes/client-node not installed */
+      }
+
       // Wave 1/2 Compute + Runtime registry. Additive -- the legacy provider
       // registry above still runs every dispatch path. Wave 3 flips dispatch
       // to consume these.
