@@ -219,10 +219,10 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         case "stop":
           res = await api.stop(sessionId);
           break;
-        case "dispatch":
-          res = await api.dispatch(sessionId);
-          break;
         case "restart":
+          // Covers both "retry after failed dispatch" (status=ready/pending/blocked)
+          // and "restart terminal session" (status=stopped/failed/completed).
+          // `session/resume` is the single re-dispatch surface.
           res = await api.restart(sessionId);
           break;
         default:
@@ -233,17 +233,11 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         const d = await api.getSession(sessionId);
         setDetail(d);
       } else {
-        const hint =
-          action === "dispatch"
-            ? ". Check that the conductor is running: ark server daemon start"
-            : action === "stop"
-              ? ". The session may have already exited"
-              : "";
+        const hint = action === "stop" ? ". The session may have already exited" : "";
         onToast(`Failed to ${action} session ${sessionId}: ${res.message || "unknown error"}${hint}`, "error");
       }
     } catch (err: any) {
-      const hint = action === "dispatch" ? ". Check that the conductor is running: ark server daemon start" : "";
-      onToast(`Failed to ${action} session ${sessionId}: ${err.message || "network error"}${hint}`, "error");
+      onToast(`Failed to ${action} session ${sessionId}: ${err.message || "network error"}`, "error");
     } finally {
       setActionLoading(null);
     }
@@ -345,30 +339,12 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
           )}
         </button>
       )}
-      {(session.status === "ready" || session.status === "pending" || session.status === "blocked") && (
-        <button
-          type="button"
-          onClick={() => handleAction("dispatch")}
-          disabled={actionLoading === "dispatch"}
-          aria-label="Dispatch session"
-          className={cn(
-            "h-7 px-2.5 rounded-[var(--radius-sm)] text-[11px] font-medium",
-            "border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-fg)]",
-            "hover:bg-[var(--primary-hover)] transition-colors cursor-pointer",
-            "disabled:opacity-50 disabled:cursor-not-allowed",
-            "flex items-center gap-1",
-          )}
-        >
-          {actionLoading === "dispatch" ? (
-            <>
-              <Loader2 className="animate-spin" size={12} /> Dispatching...
-            </>
-          ) : (
-            "Dispatch"
-          )}
-        </button>
-      )}
-      {(session.status === "stopped" || session.status === "failed" || session.status === "completed") && (
+      {(session.status === "ready" ||
+        session.status === "pending" ||
+        session.status === "blocked" ||
+        session.status === "stopped" ||
+        session.status === "failed" ||
+        session.status === "completed") && (
         <button
           type="button"
           onClick={() => handleAction("restart")}

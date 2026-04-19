@@ -158,6 +158,7 @@ export function registerServerDaemonCommands(serverCmd: Command) {
 
       const server = new ArkServer();
       registerAllHandlers(server.router, app);
+      server.attachLifecycle(app);
 
       const ws = server.startWebSocket(port);
 

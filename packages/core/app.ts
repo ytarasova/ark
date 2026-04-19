@@ -55,6 +55,7 @@ import { DbResourceStore, initResourceDefinitionsTable } from "./stores/db-resou
 import type { FlowStore, SkillStore, AgentStore, RecipeStore, RuntimeStore } from "./stores/index.js";
 import type { SessionLauncher } from "./session-launcher.js";
 import { TmuxLauncher } from "./launchers/tmux.js";
+import { NoopLauncher } from "./launchers/noop.js";
 import { ApiKeyManager } from "./auth/index.js";
 import type { WorkerRegistry } from "./hosted/worker-registry.js";
 import type { SessionScheduler } from "./hosted/scheduler.js";
@@ -940,8 +941,9 @@ export class AppContext {
 
     // Reverse order of boot
 
-    // Shutdown in reverse order of boot.
-    // Step 0: stop running sessions (test mode only -- production sessions survive)
+    // Step 0: drain in-flight background dispatches + stop running sessions.
+    // SessionService owns both, so shutdown is one call instead of two.
+    await this.sessionService.drainPendingDispatches();
     if (this.options?.cleanupOnShutdown) {
       await this.sessionService.stopAll();
     }
@@ -1185,12 +1187,18 @@ export class AppContext {
       env: "test",
       ...overrides,
     });
-    return new AppContext(config, {
+    const app = new AppContext(config, {
       skipConductor: true,
       skipMetrics: true,
       skipSignals: true,
       cleanupOnShutdown: true,
     });
+    // Tests create sessions whose first-stage dispatch would spawn real tmux
+    // + claude CLIs. Swap in a Noop launcher so test runs don't leak ark-s-*
+    // sessions + live agent processes. Tests that specifically exercise tmux
+    // can call `setLauncher(new TmuxLauncher())` after boot.
+    app.setLauncher(new NoopLauncher());
+    return app;
   }
 
   /**
@@ -1206,12 +1214,16 @@ export class AppContext {
    */
   static async forTestAsync(overrides?: Partial<ArkConfig>): Promise<AppContext> {
     const config = await loadAppConfig({ profile: "test", ...overrides });
-    return new AppContext(config, {
+    const app = new AppContext(config, {
       skipConductor: true,
       skipMetrics: true,
       skipSignals: true,
       cleanupOnShutdown: true,
     });
+    // See forTest(): NoopLauncher prevents leaking tmux sessions + live
+    // agent processes when tests exercise session/start's atomic dispatch.
+    app.setLauncher(new NoopLauncher());
+    return app;
   }
 }
 

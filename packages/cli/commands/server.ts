@@ -58,6 +58,7 @@ export function registerServerCommands(program: Command) {
 
       const server = new ArkServer();
       registerAllHandlers(server.router, serverApp);
+      server.attachLifecycle(serverApp);
 
       if (opts.stdio) {
         server.startStdio();

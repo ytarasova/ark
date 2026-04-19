@@ -79,8 +79,10 @@ test("create session via New Session inline form", async () => {
   // Submit the form
   await page.click('button:has-text("Start Session")');
 
-  // Wait for session to appear in the list
-  await expect(page.locator("text=E2E test session alpha")).toBeVisible({ timeout: 10_000 });
+  // Wait for session to appear in the list. Use .first() because once the
+  // session is selected the detail pane (and its event feed) also contain
+  // the summary -- strict mode would otherwise flag multiple matches.
+  await expect(page.locator("text=E2E test session alpha").first()).toBeVisible({ timeout: 10_000 });
 });
 
 // -- Create a second session for filtering tests ------------------------------
@@ -94,27 +96,35 @@ test("create second session for filtering", async () => {
   await page.reload();
   await page.waitForSelector("nav", { timeout: 10_000 });
   await goToSessions();
-  await expect(page.locator("text=E2E test session beta")).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator("text=E2E test session beta").first()).toBeVisible({ timeout: 10_000 });
 });
 
 // -- Search sessions ----------------------------------------------------------
 
 test("search filters sessions by summary text", async () => {
   await goToSessions();
+  // Dismiss any lingering selection so the detail pane + its event feed
+  // don't leak extra matches of the session summary into the page (auto-
+  // dispatch writes a `session_created` event that the conversation
+  // timeline echoes, which violates Playwright's strict-mode locator).
+  await page.keyboard.press("Escape");
+
   // Search is collapsed behind an icon toggle -- click to open the input.
   await page.locator('button[title="Search (/ )"]').click();
   const searchInput = page.locator('input[placeholder*="Search"]');
   await expect(searchInput).toBeVisible({ timeout: 5_000 });
   await searchInput.fill("alpha");
 
-  // Alpha session should be visible
-  await expect(page.locator("text=E2E test session alpha")).toBeVisible();
+  // Alpha session should be visible. Use .first() because even with the
+  // detail pane closed the SessionCard + nav breadcrumb both contain the
+  // summary; we only care that filtering shows *at least one* alpha row.
+  await expect(page.locator("text=E2E test session alpha").first()).toBeVisible();
   // Beta session should be hidden
   await expect(page.locator("text=E2E test session beta")).not.toBeVisible();
 
   // Clear search
   await searchInput.fill("");
-  await expect(page.locator("text=E2E test session beta")).toBeVisible();
+  await expect(page.locator("text=E2E test session beta").first()).toBeVisible();
 });
 
 // -- Filter by status chips ---------------------------------------------------

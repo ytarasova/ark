@@ -63,7 +63,7 @@ test("create and dispatch session, verify running status via API", async () => {
   const id = await createSession("E2E dispatch test");
 
   // Dispatch via RPC
-  await ws.rpc("session/dispatch", { sessionId: id });
+  // session/start dispatches atomically now -- no separate dispatch call.
 
   // Wait for session to be running (or waiting -- both mean dispatch worked)
   // It might fail quickly if claude is not available, so accept failed too
@@ -94,7 +94,7 @@ test("stop session changes status", async () => {
   const id = await createSession("E2E stop test");
 
   // Dispatch
-  await ws.rpc("session/dispatch", { sessionId: id });
+  // session/start dispatches atomically now -- no separate dispatch call.
 
   // Wait for it to start or fail
   const startStatus = await waitForStatus(id, ["running", "waiting", "failed", "stopped"], 30_000);
@@ -151,10 +151,10 @@ test("dispatched session shows in UI with updated status", async () => {
   await page.reload();
   await page.waitForSelector("nav", { timeout: 10_000 });
   await goToSessions();
-  await expect(page.locator("text=E2E UI dispatch check")).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator("text=E2E UI dispatch check").first()).toBeVisible({ timeout: 10_000 });
 
   // Dispatch
-  await ws.rpc("session/dispatch", { sessionId: id });
+  // session/start dispatches atomically now -- no separate dispatch call.
 
   // Wait a moment for status to change
   await waitForStatus(id, ["running", "waiting", "failed", "stopped"], 30_000);
@@ -165,7 +165,7 @@ test("dispatched session shows in UI with updated status", async () => {
   await goToSessions();
 
   // Click on the session to see detail
-  await page.locator("text=E2E UI dispatch check").click();
+  await page.locator("text=E2E UI dispatch check").first().click();
   // The detail pane renders a Conversation tab (unique to SessionDetail).
   await expect(page.locator("text=Conversation").first()).toBeVisible({ timeout: 5_000 });
 

@@ -164,8 +164,6 @@ export const api = {
   exportSession: (id: string) => rpc<any>("session/export-data", { sessionId: id }),
   // TODO: add Zod schema for session/import
   importSession: (data: any) => rpc<any>("session/import", data),
-  // TODO: add Zod schema for session/dispatch
-  dispatch: (id: string) => rpc<any>("session/dispatch", { sessionId: id }),
   // TODO: add Zod schema for session/resume
   restart: (id: string) => rpc<any>("session/resume", { sessionId: id }),
   // TODO: add Zod schema for session/clone (separate from fork above)

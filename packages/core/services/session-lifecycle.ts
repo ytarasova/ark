@@ -125,6 +125,9 @@ export function startSession(
   }
 
   const session = app.sessions.create(mergedOpts);
+  // Broadcast lifecycle hook so the service layer can react (the default
+  // listener kicks a background dispatch).
+  app.sessionService.emitSessionCreated(session.id);
 
   // Audit: log session creation with full context
   app.events.log(session.id, "session_created", {
@@ -519,6 +522,7 @@ export function forkSession(app: AppContext, sessionId: string, newName?: string
     data: { forked_from: sessionId },
   });
 
+  app.sessionService.emitSessionCreated(fork.id);
   return { ok: true, sessionId: fork.id };
 }
 
@@ -553,6 +557,7 @@ export function cloneSession(app: AppContext, sessionId: string, newName?: strin
     data: { cloned_from: sessionId, claude_session_id: original.claude_session_id },
   });
 
+  app.sessionService.emitSessionCreated(clone.id);
   return { ok: true, sessionId: clone.id };
 }
 

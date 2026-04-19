@@ -9,13 +9,13 @@ import { runVerification } from "../../core/services/session-orchestration.js";
 import { getArkClient } from "./_shared.js";
 import { sanitizeSummary, formatBytes } from "../helpers.js";
 
-async function forkCloneHandler(id: string, opts: { task?: string; group?: string; dispatch?: boolean }) {
+async function forkCloneHandler(id: string, opts: { task?: string; group?: string }) {
   const ark = await getArkClient();
   try {
+    // Server auto-dispatches clones (see handler in packages/server/handlers/session.ts).
     const forked = await ark.sessionClone(id, opts.task);
     if (opts.group) await ark.sessionUpdate(forked.id, { group_name: opts.group });
-    console.log(chalk.green(`Forked → ${forked.id}`));
-    if (opts.dispatch) await ark.sessionDispatch(forked.id);
+    console.log(chalk.green(`Forked -> ${forked.id}`));
   } catch (e: any) {
     console.log(chalk.red(e.message));
   }
@@ -34,8 +34,7 @@ export function registerSessionCommands(program: Command) {
     .option("-p, --flow <name>", "Flow name", "default")
     .option("-c, --compute <name>", "Compute name")
     .option("-g, --group <name>", "Group name")
-    .option("-d, --dispatch", "Auto-dispatch the first stage agent")
-    .option("-a, --attach", "Dispatch and attach to the session")
+    .option("-a, --attach", "Attach to the session's tmux pane after starting")
     .option("--claude-session <id>", "Create from an existing Claude Code session (use 'ark claude list' to find IDs)")
     .option("--recipe <name>", "Create session from a recipe template")
     .option("--runtime <name>", "Override agent runtime (e.g. codex, gemini, claude)")
@@ -225,7 +224,7 @@ export function registerSessionCommands(program: Command) {
         );
       }
 
-      console.log(chalk.green(`Session ${s.id} created`));
+      console.log(chalk.green(`Session ${s.id} created + dispatched`));
       console.log(`  Summary:  ${s.summary ?? "-"}`);
       console.log(`  Repo:     ${s.repo ?? "-"}`);
       console.log(`  Flow:     ${s.flow}`);
@@ -233,16 +232,15 @@ export function registerSessionCommands(program: Command) {
       if (workdir) console.log(`  Workdir:  ${workdir}`);
       if (opts.runtime) console.log(`  Runtime:  ${opts.runtime}`);
 
-      if (opts.dispatch || opts.attach) {
-        const result = await ark.sessionDispatch(s.id);
-        if (result.ok) {
-          console.log(chalk.green(`Agent dispatched - session: ${result.message}`));
-          if (opts.attach) {
-            const cmd = core.attachCommand(result.message);
-            execSync(cmd, { stdio: "inherit" });
-          }
-        } else {
-          console.log(chalk.red(`Dispatch failed: ${result.message}`));
+      // Server handler now dispatches the first-stage agent atomically. Re-read
+      // the session so --attach picks up the now-populated session_id.
+      if (opts.attach) {
+        const { session: ready } = await ark.sessionRead(s.id);
+        if (ready?.session_id) {
+          const attachCmd = core.attachCommand(ready.session_id);
+          execSync(attachCmd, { stdio: "inherit" });
+        } else if (ready?.error) {
+          console.log(chalk.red(`Dispatch failed: ${ready.error}`));
         }
       }
     });
@@ -323,16 +321,6 @@ export function registerSessionCommands(program: Command) {
       if (s.workdir) console.log(`  Workdir:  ${s.workdir}`);
       if (s.error) console.log(chalk.red(`  Error:    ${s.error}`));
       if (s.breakpoint_reason) console.log(chalk.yellow(`  Waiting:  ${s.breakpoint_reason}`));
-    });
-
-  session
-    .command("dispatch")
-    .description("Dispatch the agent for the current stage")
-    .argument("<id>", "Session ID")
-    .action(async (id) => {
-      const ark = await getArkClient();
-      const r = await ark.sessionDispatch(id);
-      console.log(r.ok ? chalk.green(r.message) : chalk.red(r.message));
     });
 
   session
@@ -461,21 +449,19 @@ export function registerSessionCommands(program: Command) {
     .argument("<id>")
     .action(async (id) => {
       const ark = await getArkClient();
-      let { session: s } = await ark.sessionRead(id);
+      const { session: s } = await ark.sessionRead(id);
       if (!s) {
         console.log(chalk.red("Not found"));
         return;
       }
       if (!s.session_id) {
-        console.log(chalk.yellow("No active session. Dispatching..."));
-        const r = await ark.sessionDispatch(id);
-        if (!r.ok) {
-          console.log(chalk.red(r.message));
-          return;
-        }
-        s = (await ark.sessionRead(id)).session;
+        // Sessions now dispatch at start/fork/clone/spawn time. If there's
+        // still no tmux session after that, it failed to launch -- `session
+        // resume` is the right tool for restarting.
+        console.log(chalk.red("Session is not running. Try `ark session resume`."));
+        return;
       }
-      const cmd = core.attachCommand(s.session_id!);
+      const cmd = core.attachCommand(s.session_id);
       execSync(cmd, { stdio: "inherit" });
     });
 
@@ -525,7 +511,6 @@ export function registerSessionCommands(program: Command) {
     .argument("<id>")
     .option("-t, --task <text>", "Task description for forked session")
     .option("-g, --group <name>", "Group for forked session")
-    .option("-d, --dispatch", "Auto-dispatch")
     .action(forkCloneHandler);
 
   session
@@ -534,7 +519,6 @@ export function registerSessionCommands(program: Command) {
     .argument("<id>")
     .option("-t, --task <text>", "Task description for forked session")
     .option("-g, --group <name>", "Group for forked session")
-    .option("-d, --dispatch", "Auto-dispatch")
     .action(forkCloneHandler);
 
   session
@@ -638,7 +622,6 @@ export function registerSessionCommands(program: Command) {
     .argument("<task>")
     .option("-a, --agent <agent>", "Agent override")
     .option("-m, --model <model>", "Model override (e.g., haiku, sonnet, opus)")
-    .option("-d, --dispatch", "Auto-dispatch after spawning")
     .action(async (parentId, task, opts) => {
       const ark = await getArkClient();
       const r = await ark.sessionSpawn(parentId, {
@@ -647,11 +630,8 @@ export function registerSessionCommands(program: Command) {
         model: opts.model,
       });
       if (r.ok) {
-        console.log(chalk.green(`Spawned -> ${r.sessionId}`));
-        if (opts.dispatch && r.sessionId) {
-          const d = await ark.sessionDispatch(r.sessionId);
-          console.log(d.ok ? chalk.green(`Dispatched: ${d.message}`) : chalk.red(d.message));
-        }
+        // Server handler dispatches spawned children automatically.
+        console.log(chalk.green(`Spawned + dispatched -> ${r.sessionId}`));
       } else {
         console.log(chalk.red(r.message));
       }
@@ -665,7 +645,6 @@ export function registerSessionCommands(program: Command) {
     .option("-m, --model <model>", "Model override (e.g., haiku, sonnet, opus)")
     .option("-a, --agent <agent>", "Agent override")
     .option("-g, --group <name>", "Group name")
-    .option("-d, --dispatch", "Auto-dispatch after spawning")
     .action(async (parentId, task, opts) => {
       const ark = await getArkClient();
       const r = await ark.sessionSpawn(parentId, {
@@ -675,11 +654,7 @@ export function registerSessionCommands(program: Command) {
         group_name: opts.group,
       });
       if (r.ok) {
-        console.log(chalk.green(`Subagent spawned → ${r.sessionId}`));
-        if (opts.dispatch && r.sessionId) {
-          const d = await ark.sessionDispatch(r.sessionId);
-          console.log(d.ok ? chalk.green(`Dispatched: ${d.message}`) : chalk.red(d.message));
-        }
+        console.log(chalk.green(`Subagent spawned + dispatched -> ${r.sessionId}`));
       } else {
         console.log(chalk.red(r.message));
       }

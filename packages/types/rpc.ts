@@ -50,9 +50,6 @@ export interface SessionUpdateResult {
   session: Session;
 }
 
-export interface SessionDispatchParams {
-  sessionId: string;
-}
 export interface SessionAdvanceParams {
   sessionId: string;
   force?: boolean;

@@ -17,6 +17,14 @@ export class Router {
   private initialized = false;
   private requireInit = false;
 
+  /**
+   * Broadcast notify -- set by the transport owner (e.g. ArkServer) so that
+   * non-request event flows (lifecycle listeners, schedulers) can push
+   * notifications to every subscribed connection without threading a
+   * per-request `notify` through. Defaults to a no-op until wired.
+   */
+  broadcast: NotifyFn = () => {};
+
   handle(method: string, handler: Handler): void {
     this.handlers.set(method, handler);
   }

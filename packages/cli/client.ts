@@ -80,6 +80,7 @@ export async function getArkClient(): Promise<ArkClient> {
   // Local mode: start server in-process
   _server = new ArkServer();
   registerAllHandlers(_server.router, getApp());
+  _server.attachLifecycle(getApp());
 
   const { clientTransport, serverTransport } = createInMemoryPair();
   _server.addConnection(serverTransport);

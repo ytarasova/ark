@@ -39,16 +39,6 @@ describe("spawn command wiring", () => {
     expect(spawnBlock).toContain("--model");
   });
 
-  test("spawn command has --dispatch option", () => {
-    const spawnBlockMatch = source.match(
-      /session\s*\.command\("spawn"\)([\s\S]*?)session\s*\.command\("spawn-subagent"\)/,
-    );
-    expect(spawnBlockMatch).toBeTruthy();
-    const spawnBlock = spawnBlockMatch![1];
-
-    expect(spawnBlock).toContain("--dispatch");
-  });
-
   test("spawn command passes task, agent, and model to sessionSpawn", () => {
     const spawnBlockMatch = source.match(
       /session\s*\.command\("spawn"\)([\s\S]*?)session\s*\.command\("spawn-subagent"\)/,
@@ -61,14 +51,14 @@ describe("spawn command wiring", () => {
     expect(spawnBlock).toContain("opts.model");
   });
 
-  test("spawn command handles dispatch after spawning", () => {
+  test("spawn command no longer surfaces --dispatch (server auto-dispatches)", () => {
     const spawnBlockMatch = source.match(
       /session\s*\.command\("spawn"\)([\s\S]*?)session\s*\.command\("spawn-subagent"\)/,
     );
     expect(spawnBlockMatch).toBeTruthy();
     const spawnBlock = spawnBlockMatch![1];
 
-    expect(spawnBlock).toContain("opts.dispatch");
-    expect(spawnBlock).toContain("sessionDispatch");
+    expect(spawnBlock).not.toContain("--dispatch");
+    expect(spawnBlock).not.toContain("sessionDispatch");
   });
 });

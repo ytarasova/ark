@@ -68,7 +68,6 @@ function errorResponse(err: unknown, status = 500): Response {
 /** Set of RPC methods that mutate state -- blocked in readOnly mode. */
 const WRITE_METHODS = new Set([
   "session/start",
-  "session/dispatch",
   "session/stop",
   "session/advance",
   "session/complete",
@@ -150,6 +149,14 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
   const router = new Router();
   registerAllHandlers(router, app);
   router.markInitialized();
+
+  // Kick the background dispatcher on every session_created lifecycle
+  // event. The 3s broadcastSessions interval below relays the resulting
+  // status transitions to SSE clients, so we don't need to push a
+  // per-session notification from here.
+  app.sessionService.registerDefaultDispatcher(() => {
+    /* status propagated via broadcastSessions polling */
+  });
 
   // Auto-build web frontend if dist doesn't exist (skip in API-only mode)
   if (!apiOnly && !existsSync(WEB_DIST)) {

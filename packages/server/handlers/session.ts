@@ -6,7 +6,6 @@ import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import type {
   SessionIdParams,
   SessionStartParams,
-  SessionDispatchParams,
   SessionAdvanceParams,
   SessionReadParams,
   SessionUpdateParams,
@@ -32,8 +31,12 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
 
   router.handle("session/start", async (params, notify) => {
     const opts = extract<SessionStartParams>(params, []);
-    // Use orchestration startSession which resolves first stage and sets status=ready.
-    // SessionService.start() is a stripped-down helper that doesn't wire the flow.
+    // Atomic create + dispatch: splitting these across two RPCs used to force
+    // every caller (CLI, web, tests) to remember the second call or live with
+    // a session stuck at status=ready until the conductor's 60s poll tick.
+    //
+    // `startSession` emits `session_created` before returning; the default
+    // dispatcher listener (registered above) kicks the background launcher.
     const { startSession } = await import("../../core/services/session-orchestration.js");
     const session = startSession(app, opts);
     notify("session/created", { session });
@@ -41,43 +44,13 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   });
 
   router.handle("input/upload", async (params) => {
-    const { name, role, content, contentEncoding } = extract<{
+    const opts = extract<{
       name: string;
       role: string;
       content: string;
       contentEncoding?: "base64" | "utf-8";
     }>(params, ["name", "role", "content"]);
-
-    // Persist under arkDir/inputs/<timestamp-role>/<basename>. The folder
-    // per-upload keeps collisions (same `name` uploaded for different roles)
-    // from stomping on each other.
-    const { join, basename } = await import("path");
-    const { mkdirSync, writeFileSync } = await import("fs");
-    const safeName = basename(name).replace(/[^\w.\-]/g, "_");
-    const safeRole = role.replace(/[^\w.\-]/g, "_");
-    const dir = join(app.arkDir, "inputs", `${Date.now().toString(36)}-${safeRole}`);
-    mkdirSync(dir, { recursive: true });
-    const path = join(dir, safeName);
-
-    const encoding = contentEncoding ?? "utf-8";
-    if (encoding === "base64") {
-      writeFileSync(path, Buffer.from(content, "base64"));
-    } else {
-      writeFileSync(path, content, "utf-8");
-    }
-    return { path };
-  });
-
-  router.handle("session/dispatch", async (params, notify) => {
-    const { sessionId } = extract<SessionDispatchParams>(params, ["sessionId"]);
-    app.events.log(sessionId, "session_dispatched", {
-      actor: "user",
-      stage: app.sessions.get(sessionId)?.stage ?? undefined,
-    });
-    const result = await app.sessionService.dispatch(sessionId);
-    const session = app.sessions.get(sessionId);
-    if (session) notify("session/updated", { session });
-    return result;
+    return app.sessionService.saveInput(opts);
   });
 
   router.handle("session/stop", async (params, notify) => {
@@ -258,6 +231,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     if (result.sessionId) {
       const session = app.sessions.get(result.sessionId);
       if (session) notify("session/created", { session });
+      // spawn() emits session_created internally; the default listener handles dispatch.
     }
     return result;
   });
@@ -273,6 +247,8 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
       const session = app.sessions.get(childId);
       if (session) notify("session/created", { session });
     }
+    // Fan-out children are dispatched en masse by the orchestrator (see
+    // stage-orchestrator.ts:1252). No need to loop here.
     return result;
   });
 
