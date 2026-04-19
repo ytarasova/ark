@@ -5,6 +5,12 @@
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
+import { RpcError } from "../../protocol/types.js";
+
+/** True when Ark is running in hosted/multi-tenant mode. */
+function isHostedMode(app: AppContext): boolean {
+  return typeof app.config.databaseUrl === "string" && app.config.databaseUrl.length > 0;
+}
 import { searchSessions, searchTranscripts } from "../../core/search/search.js";
 import { searchAllConversations } from "../../core/search/global-search.js";
 import type { KnowledgeNode } from "../../core/knowledge/types.js";
@@ -88,7 +94,15 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
   });
 
   // ── MCP attach/detach by directory (web-specific contract) ───────────────
+  //
+  // These RPCs write to `<dir>/.claude.json` on the server's filesystem.
+  // In hosted / multi-tenant mode there is no per-tenant filesystem view,
+  // so refuse the call -- otherwise any tenant could clobber other tenants'
+  // or the control plane's `.claude.json` files.
   router.handle("mcp/attach-by-dir", async (p) => {
+    if (isHostedMode(app)) {
+      throw new RpcError("mcp/attach-by-dir is disabled in hosted mode", -32601);
+    }
     const { dir, name, config } = extract<{ dir: string; name: string; config: Record<string, unknown> }>(p, [
       "dir",
       "name",
@@ -99,6 +113,9 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
   });
 
   router.handle("mcp/detach-by-dir", async (p) => {
+    if (isHostedMode(app)) {
+      throw new RpcError("mcp/detach-by-dir is disabled in hosted mode", -32601);
+    }
     const { dir, name } = extract<{ dir: string; name: string }>(p, ["dir", "name"]);
     removeMcpServer(dir, name);
     return { ok: true };
@@ -106,6 +123,10 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
 
   // ── Knowledge ingestion ──────────────────────────────────────────────────
   router.handle("knowledge/ingest", async (p) => {
+    // Indexes arbitrary server-side paths -- disable in hosted mode.
+    if (isHostedMode(app)) {
+      throw new RpcError("knowledge/ingest is disabled in hosted mode", -32601);
+    }
     const { path: inputPath, directory } = extract<{
       path: string;
       directory?: boolean;
@@ -173,6 +194,11 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
 
   // ── Repo map ─────────────────────────────────────────────────────────────
   router.handle("repo-map/get", async (p) => {
+    // generateRepoMap reads arbitrary server-side directories. Disable in
+    // hosted mode to prevent cross-tenant filesystem reads.
+    if (isHostedMode(app)) {
+      throw new RpcError("repo-map/get is disabled in hosted mode", -32601);
+    }
     const { dir } = extract<{ dir?: string }>(p, []);
     return generateRepoMap(dir ?? ".");
   });

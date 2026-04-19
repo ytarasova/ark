@@ -72,11 +72,19 @@ export class UsageRecorder {
     return this.tenantId;
   }
 
-  /** Record a usage event. Called by executors, router, or transcript parser. */
+  /**
+   * Record a usage event. Called by executors, router, or transcript parser.
+   *
+   * Tenant scoping: the recorder's configured tenant is authoritative.
+   * A caller-supplied `opts.tenantId` is accepted only when it matches the
+   * scoped tenant, otherwise the scoped tenant is used. This prevents a
+   * remote RPC (`costs/record`) from writing rows attributed to other tenants.
+   */
   record(opts: RecordOpts): void {
     const costMode = opts.costMode ?? "api";
     // Subscription and free modes record zero cost (tokens still tracked for productivity/rate limits)
     const cost = costMode === "api" ? this.pricing.calculateCost(opts.model, opts.usage) : 0;
+    const tenantId = opts.tenantId && opts.tenantId === this.tenantId ? opts.tenantId : this.tenantId;
     this.db
       .prepare(
         `
@@ -87,7 +95,7 @@ export class UsageRecorder {
       )
       .run(
         opts.sessionId,
-        opts.tenantId ?? this.tenantId,
+        tenantId,
         opts.userId ?? "system",
         opts.model,
         opts.provider,
@@ -103,7 +111,13 @@ export class UsageRecorder {
       );
   }
 
-  /** Get total cost, aggregated token totals, and all records for a session. */
+  /**
+   * Get total cost, aggregated token totals, and all records for a session.
+   *
+   * Tenant scoping: always filtered by the recorder's configured tenant to
+   * prevent cross-tenant cost disclosure. A caller in tenant A cannot read
+   * tenant B's usage by guessing a session id.
+   */
   getSessionCost(sessionId: string): {
     cost: number;
     input_tokens: number;
@@ -114,8 +128,8 @@ export class UsageRecorder {
     records: UsageRecord[];
   } {
     const records = this.db
-      .prepare("SELECT * FROM usage_records WHERE session_id = ? ORDER BY created_at")
-      .all(sessionId) as UsageRecord[];
+      .prepare("SELECT * FROM usage_records WHERE session_id = ? AND tenant_id = ? ORDER BY created_at")
+      .all(sessionId, this.tenantId) as UsageRecord[];
     let cost = 0,
       input = 0,
       output = 0,
@@ -139,7 +153,14 @@ export class UsageRecorder {
     };
   }
 
-  /** Get cost summary with multi-dimensional grouping. */
+  /**
+   * Get cost summary with multi-dimensional grouping.
+   *
+   * Tenant scoping: always filtered by `opts.tenantId` when provided AND it
+   * matches the recorder's configured tenant, or by the recorder's tenant
+   * otherwise. A caller cannot pass an arbitrary tenantId to see another
+   * tenant's data -- mismatches are ignored in favor of the scoped tenant.
+   */
   getSummary(opts?: { tenantId?: string; since?: string; until?: string; groupBy?: string }): UsageSummaryRow[] {
     const groupCol = opts?.groupBy ?? "model";
     // Validate column name to prevent SQL injection
@@ -147,13 +168,9 @@ export class UsageRecorder {
       throw new Error(`Invalid groupBy column: ${groupCol}`);
     }
 
-    const conditions: string[] = ["1=1"];
-    const params: any[] = [];
+    const conditions: string[] = ["tenant_id = ?"];
+    const params: any[] = [this.tenantId];
 
-    if (opts?.tenantId) {
-      conditions.push("tenant_id = ?");
-      params.push(opts.tenantId);
-    }
     if (opts?.since) {
       conditions.push("created_at >= ?");
       params.push(opts.since);
@@ -172,16 +189,20 @@ export class UsageRecorder {
     return this.db.prepare(sql).all(...params) as UsageSummaryRow[];
   }
 
-  /** Get daily cost trend. */
+  /**
+   * Get daily cost trend.
+   *
+   * Tenant scoping: always filtered by the recorder's configured tenant.
+   * A caller-supplied `opts.tenantId` that does not match is ignored.
+   */
   getDailyTrend(opts?: { tenantId?: string; days?: number }): DailyTrendRow[] {
     const days = opts?.days ?? 30;
-    const conditions: string[] = [`created_at >= datetime('now', '-${days} days')`];
-    const params: any[] = [];
-
-    if (opts?.tenantId) {
-      conditions.push("tenant_id = ?");
-      params.push(opts.tenantId);
-    }
+    // Clamp to a sane positive range so an attacker can't pass arbitrary
+    // text through string interpolation. (The datetime modifier is not
+    // parameterizable in SQLite, so we coerce and clamp to integer first.)
+    const safeDays = Math.max(1, Math.min(3650, Math.floor(Number(days) || 30)));
+    const conditions: string[] = [`created_at >= datetime('now', '-${safeDays} days')`, "tenant_id = ?"];
+    const params: any[] = [this.tenantId];
 
     const sql = `SELECT DATE(created_at) as date, SUM(cost_usd) as cost
                  FROM usage_records
@@ -191,14 +212,15 @@ export class UsageRecorder {
     return this.db.prepare(sql).all(...params) as DailyTrendRow[];
   }
 
-  /** Get total cost across all records matching optional filters. */
+  /**
+   * Get total cost across all records matching optional filters.
+   *
+   * Tenant scoping: always filtered by the recorder's configured tenant --
+   * a caller-supplied `opts.tenantId` cannot override the scoped tenant.
+   */
   getTotalCost(opts?: { tenantId?: string; since?: string; until?: string }): number {
-    const conditions: string[] = ["1=1"];
-    const params: any[] = [];
-    if (opts?.tenantId) {
-      conditions.push("tenant_id = ?");
-      params.push(opts.tenantId);
-    }
+    const conditions: string[] = ["tenant_id = ?"];
+    const params: any[] = [this.tenantId];
     if (opts?.since) {
       conditions.push("created_at >= ?");
       params.push(opts.since);

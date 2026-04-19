@@ -118,20 +118,40 @@ export class ApiKeyManager {
 
   /**
    * Revoke (delete) an API key by id.
+   *
+   * When `tenantId` is provided the delete is scoped to that tenant so a
+   * caller in tenant A cannot revoke tenant B's keys by guessing an id.
+   * When omitted (local CLI / admin tooling) the key is removed regardless
+   * of tenant -- callers that reach this path already hold the local DB
+   * file and have full access anyway.
    */
-  revoke(id: string): boolean {
+  revoke(id: string, tenantId?: string): boolean {
+    if (tenantId) {
+      const result = this.db.prepare("DELETE FROM api_keys WHERE id = ? AND tenant_id = ?").run(id, tenantId);
+      return result.changes > 0;
+    }
     const result = this.db.prepare("DELETE FROM api_keys WHERE id = ?").run(id);
     return result.changes > 0;
   }
 
   /**
    * Rotate an API key: revoke the old one and create a new one with the same metadata.
+   *
+   * When `tenantId` is provided the lookup and delete are scoped to that
+   * tenant -- this prevents a caller from rotating another tenant's keys
+   * (which would both invalidate the victim's key and leak a new key
+   * belonging to the victim's tenant back to the attacker).
    */
-  rotate(id: string): { key: string } | null {
-    const row = this.db.prepare("SELECT * FROM api_keys WHERE id = ?").get(id) as ApiKeyRow | undefined;
+  rotate(id: string, tenantId?: string): { key: string } | null {
+    const sql = tenantId
+      ? "SELECT * FROM api_keys WHERE id = ? AND tenant_id = ?"
+      : "SELECT * FROM api_keys WHERE id = ?";
+    const row = (tenantId ? this.db.prepare(sql).get(id, tenantId) : this.db.prepare(sql).get(id)) as
+      | ApiKeyRow
+      | undefined;
     if (!row) return null;
 
-    this.revoke(id);
+    this.revoke(id, tenantId);
     const result = this.create(row.tenant_id, row.name, row.role as ApiKey["role"], row.expires_at ?? undefined);
     return { key: result.key };
   }
