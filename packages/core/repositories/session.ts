@@ -96,6 +96,33 @@ const SESSION_COLUMNS = new Set([
   "updated_at",
 ]);
 
+// Columns whose TS value is an object we must stringify before binding to
+// SQLite. Kept as a set next to SESSION_COLUMNS so adding a new JSON column
+// is one-line.
+const JSON_COLUMNS = new Set(["config"]);
+
+/**
+ * Turn a `Partial<Session>` into `[ "col = ?", ... ]` + matching value array,
+ * honouring the whitelist and JSON-ifying object columns. Callers splice the
+ * returned fragments into their SQL. Shared between `update` and `claim` so
+ * the two methods don't drift in how they handle columns.
+ */
+function buildSetClause(fields: Partial<Session>): { fragments: string[]; values: any[] } {
+  const fragments: string[] = [];
+  const values: any[] = [];
+  for (const [key, value] of Object.entries(fields)) {
+    if (key === "id" || key === "created_at") continue;
+    if (!SESSION_COLUMNS.has(key)) continue;
+    fragments.push(`${key} = ?`);
+    if (JSON_COLUMNS.has(key) && typeof value === "object" && value !== null) {
+      values.push(JSON.stringify(value));
+    } else {
+      values.push(value ?? null);
+    }
+  }
+  return { fragments, values };
+}
+
 // ── Repository ──────────────────────────────────────────────────────────────
 
 export class SessionRepository {
@@ -201,23 +228,12 @@ export class SessionRepository {
   }
 
   update(id: string, fields: Partial<Session>): Session | null {
-    const updates: string[] = ["updated_at = ?"];
-    const values: any[] = [now()];
+    const { fragments, values } = buildSetClause(fields);
+    // updated_at is always refreshed on write
+    const updates = ["updated_at = ?", ...fragments];
+    const bound = [now(), ...values, id, this.tenantId];
 
-    for (const [key, value] of Object.entries(fields)) {
-      if (key === "id" || key === "created_at") continue;
-      if (!SESSION_COLUMNS.has(key)) continue;
-      if (key === "config" && typeof value === "object") {
-        updates.push("config = ?");
-        values.push(JSON.stringify(value));
-      } else {
-        updates.push(`${key} = ?`);
-        values.push(value ?? null);
-      }
-    }
-    values.push(id, this.tenantId);
-
-    this.db.prepare(`UPDATE sessions SET ${updates.join(", ")} WHERE id = ? AND tenant_id = ?`).run(...values);
+    this.db.prepare(`UPDATE sessions SET ${updates.join(", ")} WHERE id = ? AND tenant_id = ?`).run(...bound);
     return this.get(id);
   }
 
@@ -250,21 +266,19 @@ export class SessionRepository {
   }
 
   claim(id: string, expected: SessionStatus, next: SessionStatus, extra?: Partial<Session>): boolean {
-    const updates: string[] = ["status = ?", "updated_at = ?"];
-    const values: any[] = [next, now()];
-
-    if (extra) {
-      for (const [key, value] of Object.entries(extra)) {
-        if (!SESSION_COLUMNS.has(key)) continue;
-        updates.push(`${key} = ?`);
-        values.push(key === "config" ? JSON.stringify(value) : (value ?? null));
-      }
-    }
-    values.push(id, expected, this.tenantId);
+    // `status` + `updated_at` are fixed by the claim semantics; the caller's
+    // `extra` may add further column assignments, filtered through the same
+    // whitelist used by `update()` so the two paths can't drift. Strip any
+    // caller-supplied `status` so the fixed claim value wins.
+    const safeExtra: Partial<Session> = extra ? { ...extra } : {};
+    delete (safeExtra as { status?: SessionStatus }).status;
+    const { fragments: extraFragments, values: extraValues } = buildSetClause(safeExtra);
+    const updates = ["status = ?", "updated_at = ?", ...extraFragments];
+    const bound = [next, now(), ...extraValues, id, expected, this.tenantId];
 
     const result = this.db
       .prepare(`UPDATE sessions SET ${updates.join(", ")} WHERE id = ? AND status = ? AND tenant_id = ?`)
-      .run(...values);
+      .run(...bound);
     return result.changes > 0;
   }
 
