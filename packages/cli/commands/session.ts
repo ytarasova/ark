@@ -7,7 +7,7 @@ import * as core from "../../core/index.js";
 import { SESSION_STATUSES } from "../../types/index.js";
 import { runVerification } from "../../core/services/session-orchestration.js";
 import { getArkClient } from "./_shared.js";
-import { sanitizeSummary } from "../helpers.js";
+import { sanitizeSummary, formatBytes } from "../helpers.js";
 
 async function forkCloneHandler(id: string, opts: { task?: string; group?: string; dispatch?: boolean }) {
   const ark = await getArkClient();
@@ -274,12 +274,18 @@ export function registerSessionCommands(program: Command) {
 
   session
     .command("resume")
-    .description("Resume a stopped/paused session")
+    .description("Resume a stopped/paused session (restores snapshot when available)")
     .argument("<id>")
-    .action(async (id) => {
+    .option("--snapshot-id <id>", "Restore from a specific snapshot id (defaults to the session's latest)")
+    .action(async (id, opts) => {
       const ark = await getArkClient();
-      const r = await ark.sessionResume(id);
-      console.log(r.ok ? chalk.green(r.message) : chalk.red(r.message));
+      const r = await ark.sessionResume(id, opts.snapshotId);
+      if (r.ok) {
+        const extra = r.snapshotId ? chalk.dim(`  (snapshot ${r.snapshotId})`) : "";
+        console.log(chalk.green(r.message ?? "Resumed") + extra);
+      } else {
+        console.log(chalk.red(r.message));
+      }
     });
 
   session
@@ -321,13 +327,25 @@ export function registerSessionCommands(program: Command) {
 
   session
     .command("pause")
-    .description("Pause a session")
+    .description("Pause a session (persists a snapshot when the compute supports it)")
     .argument("<id>")
     .option("-r, --reason <text>")
     .action(async (id, opts) => {
       const ark = await getArkClient();
       const r = await ark.sessionPause(id, opts.reason);
-      console.log(r.ok ? chalk.yellow("Paused") : chalk.red(r.message));
+      if (!r.ok) {
+        console.log(chalk.red(r.message));
+        return;
+      }
+      if (r.snapshot) {
+        console.log(
+          chalk.yellow("Paused") + chalk.dim(`  (snapshot ${r.snapshot.id}, ${formatBytes(r.snapshot.sizeBytes)})`),
+        );
+      } else if (r.notSupported) {
+        console.log(chalk.yellow("Paused") + chalk.dim("  (no snapshot: compute does not support snapshots)"));
+      } else {
+        console.log(chalk.yellow("Paused"));
+      }
     });
 
   session
