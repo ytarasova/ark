@@ -204,12 +204,12 @@ test("session detail shows events when available", async () => {
 // -- Back button navigation ---------------------------------------------------
 
 test("back button dismisses session detail and returns to the Sessions landing view", async () => {
-  // Ported from the now-deleted packages/web/e2e/session-view.spec.ts — the
+  // Ported from the now-deleted packages/web/e2e/session-view.spec.ts -- the
   // only assertion in that file not already covered by session-detail-tabs.
   //
   // "Dashboard" was removed from the top-level nav; the Sessions landing view
   // (rendered when no session is selected) is the post-back target. We only
-  // assert that the detail tab bar disappears — that is the load-bearing
+  // assert that the detail tab bar disappears -- that is the load-bearing
   // contract of the Back button.
   const summary = "Back nav detail test";
   await createSession(summary);
@@ -226,6 +226,6 @@ test("back button dismisses session detail and returns to the Sessions landing v
   // the chevron-prefixed Back control inside the detail header only.
   await page.getByRole("button", { name: "Back", exact: true }).click();
 
-  // The detail tab bar must be gone — the Sessions landing view has replaced it.
+  // The detail tab bar must be gone -- the Sessions landing view has replaced it.
   await expect(page.locator('button[role="tab"]:has-text("Conversation")')).not.toBeVisible({ timeout: 5_000 });
 });

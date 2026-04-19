@@ -14,6 +14,7 @@ import { homedir } from "os";
 import * as tmux from "../infra/tmux.js";
 import { DEFAULT_CONDUCTOR_URL, DEFAULT_CHANNEL_BASE_URL } from "../constants.js";
 import { channelLaunchSpec } from "../install-paths.js";
+import { findCodebaseMemoryBinary } from "../knowledge/codebase-memory-finder.js";
 
 // ── Model mapping ────────────────────────────────────────────────────────────
 
@@ -183,6 +184,25 @@ export function writeChannelConfig(
 
   if (!existing.mcpServers) existing.mcpServers = {};
   existing.mcpServers["ark-channel"] = config;
+
+  // Inject codebase-memory-mcp if the vendored binary is available.
+  // It speaks MCP over stdio with no args -- invoking the binary directly
+  // gives the agent its 14 code-intelligence tools (search_graph, trace_path,
+  // get_architecture, search_code, manage_adr, etc.).
+  // See docs/2026-04-18-CODE_INTELLIGENCE_DESIGN.md.
+  const cbmBin = findCodebaseMemoryBinary();
+  const cbmAvailable = cbmBin !== "codebase-memory-mcp" && existsSync(cbmBin);
+  if (cbmAvailable && !existing.mcpServers["codebase-memory"]) {
+    existing.mcpServers["codebase-memory"] = {
+      command: cbmBin,
+      args: [],
+      env: {
+        // Keep the HTTP graph UI disabled by default; arkd pool may override.
+        CBM_UI_ENABLED: "false",
+      },
+    };
+  }
+
   writeFileSync(mcpConfigPath, JSON.stringify(existing, null, 2));
 
   // Also write a copy to tracks dir for reference
@@ -517,6 +537,12 @@ export function writeSettings(
     const allow = buildPermissionsAllow(opts.agent);
     if (!allow.includes("mcp__ark-channel__*")) {
       allow.push("mcp__ark-channel__*");
+    }
+    // codebase-memory-mcp is system infrastructure injected by dispatch
+    // (see writeChannelConfig). Agents get its 14 code-intelligence tools
+    // for free without declaring it in mcp_servers.
+    if (!allow.includes("mcp__codebase-memory__*")) {
+      allow.push("mcp__codebase-memory__*");
     }
     const perms = (existing.permissions ?? {}) as Record<string, unknown>;
     perms.allow = allow;

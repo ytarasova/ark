@@ -72,4 +72,43 @@ export function registerKnowledgeHandlers(router: Router, app: AppContext): void
     const result = importFromMarkdown(app.knowledge, dir ?? "./knowledge-export");
     return { ok: true, ...result };
   });
+
+  // codebase-memory-mcp introspection: is it vendored, what version, what tools
+  router.handle("knowledge/codebase/status", async () => {
+    const { findCodebaseMemoryBinary } = await import("../../core/knowledge/codebase-memory-finder.js");
+    const { existsSync } = await import("fs");
+    const { execFileSync } = await import("child_process");
+    const bin = findCodebaseMemoryBinary();
+    const available = bin !== "codebase-memory-mcp" && existsSync(bin);
+    if (!available) {
+      return { available: false, path: null, version: null };
+    }
+    let version: string | null = null;
+    try {
+      version = execFileSync(bin, ["--version"], { encoding: "utf-8" }).trim();
+    } catch {
+      // binary present but --version failed; still report available
+    }
+    return {
+      available: true,
+      path: bin,
+      version,
+      tools: [
+        "index_repository",
+        "index_status",
+        "detect_changes",
+        "search_graph",
+        "query_graph",
+        "trace_path",
+        "get_code_snippet",
+        "get_graph_schema",
+        "get_architecture",
+        "search_code",
+        "list_projects",
+        "delete_project",
+        "manage_adr",
+        "ingest_traces",
+      ],
+    };
+  });
 }

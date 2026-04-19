@@ -1,5 +1,5 @@
 /**
- * Tests for channel-types.ts — verify message type shapes compile and
+ * Tests for channel-types.ts -- verify message type shapes compile and
  * have the expected required fields.
  */
 

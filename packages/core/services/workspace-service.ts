@@ -15,7 +15,7 @@ const execFileAsync = promisify(execFile);
  * Return a safe leaf filename for a user-controlled attachment name. Strips
  * any directory components and rejects traversal payloads (`..`, separators,
  * absolute paths, NULs, control chars). Throws on unsafe input rather than
- * silently sanitizing — callers MUST treat the returned value as authoritative.
+ * silently sanitizing -- callers MUST treat the returned value as authoritative.
  */
 export function safeAttachmentName(raw: string): string {
   if (typeof raw !== "string" || raw.length === 0) {
@@ -139,7 +139,7 @@ export async function setupSessionWorktree(
     const attachDir = join(effectiveWorkdir, ".ark", "attachments");
     mkdirSync(attachDir, { recursive: true });
     for (const att of attachments) {
-      // Guard against path traversal — attacker-controlled `att.name` must
+      // Guard against path traversal -- attacker-controlled `att.name` must
       // stay inside `attachDir`. `safeAttachmentName` throws on any `..`,
       // separator, absolute path, or control-char payload.
       let safeName: string;

@@ -42,4 +42,26 @@ codegraph:
   version: v3.9.3
   env: ""
   platforms: [darwin-arm64, darwin-x64, linux-arm64, linux-x64]
-  notes: "Extracted from @optave/codegraph-<arch> npm packages. Version tracked by package.json's bun lockfile, not this file."
+  notes: |
+    DEPRECATED 2026-04-18. Superseded by codebase-memory-mcp (below).
+    Extracted from @optave/codegraph-<arch> npm packages. Version
+    tracked by package.json's bun lockfile, not this file. Keep entry
+    until the deprecation migration lands + is verified in CI.
+
+codebase-memory-mcp:
+  repo: DeusData/codebase-memory-mcp
+  version: v0.6.0
+  env: CODEBASE_MEMORY_MCP_VERSION
+  platforms: [darwin-arm64, darwin-x64, linux-arm64, linux-x64]
+  notes: |
+    Static C binary, MIT license, 66 tree-sitter grammars vendored in.
+    Speaks MCP over stdio when invoked with no args. 14 tools including
+    search_graph, trace_path, get_architecture, search_code, manage_adr,
+    index_repository, index_status, detect_changes, manage_adr.
+    Paper: arXiv:2603.27277 (10x fewer tokens, 2.1x fewer tool calls).
+    LSP-style type resolution only for Go/C/C++; Python/JS/TS/Java rely
+    on tree-sitter AST only (Good tier per upstream benchmarks).
+    Ark exposes via .mcp.json entry at session dispatch for all runtimes.
+    Design: docs/2026-04-18-CODE_INTELLIGENCE_DESIGN.md.
+    Note: upstream asset names use -amd64 suffix; vendor-codebase-memory-mcp.sh
+    maps Ark's -x64 platform label to upstream's -amd64.

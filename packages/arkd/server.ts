@@ -89,7 +89,7 @@ export interface ArkdOpts {
    *
    * Required in hosted / untrusted contexts; when unset, /file/* and
    * /exec accept absolute paths from any caller and trust the bearer
-   * token for full host FS access — acceptable only for local-single-user
+   * token for full host FS access -- acceptable only for local-single-user
    * mode, which is the historical behavior retained for backward compat.
    */
   workspaceRoot?: string;
@@ -196,7 +196,7 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
     try {
       mkdirSync(workspaceRoot, { recursive: true });
     } catch {
-      /* best effort — first real request will surface any permission error */
+      /* best effort -- first real request will surface any permission error */
     }
   }
 

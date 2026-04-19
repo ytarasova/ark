@@ -1,5 +1,5 @@
 /**
- * Unified tool discovery — finds ALL tool types in a project directory.
+ * Unified tool discovery -- finds ALL tool types in a project directory.
  *
  * Discovers: MCP servers (.mcp.json), commands (.claude/commands/),
  * Claude Code skills (.claude/skills/), CLAUDE.md context,

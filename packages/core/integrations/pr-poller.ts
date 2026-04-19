@@ -17,7 +17,7 @@ import { DEFAULT_CHANNEL_BASE_URL } from "../constants.js";
 
 const execFileAsync = promisify(execFile);
 
-/** Cooldown between PR checks per session — slightly under the 60s poll interval to account for jitter */
+/** Cooldown between PR checks per session -- slightly under the 60s poll interval to account for jitter */
 const POLL_COOLDOWN_MS = 55_000;
 
 type GhExecFn = (args: string[]) => Promise<{ stdout: string }>;

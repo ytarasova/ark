@@ -119,7 +119,7 @@ describe("soft delete edge cases", () => {
     const s = getApp().sessions.create({ summary: "double-delete" });
     getApp().sessions.update(s.id, { status: "running" });
     getApp().sessions.softDelete(s.id);
-    // Delete again — should update _deleted_at
+    // Delete again -- should update _deleted_at
     const before = getApp().sessions.get(s.id)!;
     const beforeTime = before.config._deleted_at;
     // Small delay to ensure different timestamp

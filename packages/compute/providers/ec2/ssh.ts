@@ -1,6 +1,6 @@
 /**
  * SSH, rsync, and key-generation primitives for EC2 hosts.
- * ALL operations are async — no sync exec calls.
+ * ALL operations are async -- no sync exec calls.
  */
 
 import { execFile } from "child_process";
@@ -85,7 +85,7 @@ export const sshExecAsync = sshExec;
  * Example:
  *   sshExecArgs(key, ip, ["mkdir", "-p", remoteDir])
  * is equivalent to `sshExec(key, ip, `mkdir -p ${shellEscape(remoteDir)}`)`
- * — but without the template-string footgun.
+ * -- but without the template-string footgun.
  */
 export async function sshExecArgs(
   key: string,

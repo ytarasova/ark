@@ -1,5 +1,5 @@
 /**
- * Auto-rollback pipeline — monitors merged PRs, polls CI, creates revert PRs on failure.
+ * Auto-rollback pipeline -- monitors merged PRs, polls CI, creates revert PRs on failure.
  */
 
 import type { AppContext } from "../app.js";

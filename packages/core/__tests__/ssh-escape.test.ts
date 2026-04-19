@@ -24,7 +24,7 @@ import { sshExecArgs } from "../../compute/providers/ec2/ssh.js";
 
 const ROOT = join(import.meta.dir, "..", "..", "..");
 
-describe("shellEscape — primitive sanity", () => {
+describe("shellEscape -- primitive sanity", () => {
   test("wraps benign value in single quotes", () => {
     expect(shellEscape("hello")).toBe("'hello'");
   });
@@ -63,13 +63,13 @@ describe("shellEscape — primitive sanity", () => {
   });
 });
 
-describe("sshExecArgs — argv-based remote exec validates + escapes inputs", () => {
+describe("sshExecArgs -- argv-based remote exec validates + escapes inputs", () => {
   test("rejects empty argv", async () => {
     await expect(sshExecArgs("key", "ip", [])).rejects.toThrow(/non-empty/);
   });
 
   test("rejects non-string argv elements", async () => {
-    // @ts-expect-error — deliberately bad input
+    // @ts-expect-error -- deliberately bad input
     await expect(sshExecArgs("key", "ip", ["mkdir", 123])).rejects.toThrow(/must be strings/);
   });
 
@@ -80,7 +80,7 @@ describe("sshExecArgs — argv-based remote exec validates + escapes inputs", ()
     //   (a) the function does NOT throw synchronously on a `; rm -rf /`
     //       payload (it must accept + escape, not reject).
     //   (b) the resolved result comes from the timeout path, not from a
-    //       syntax error — proving ssh was handed a syntactically intact
+    //       syntax error -- proving ssh was handed a syntactically intact
     //       single-quoted command, not a half-formed injection.
     const maliciousSessionId = "s-abc; rm -rf /";
     const result = await sshExecArgs(
@@ -93,7 +93,7 @@ describe("sshExecArgs — argv-based remote exec validates + escapes inputs", ()
     // must be "exec produced stderr / nonzero", NOT an unhandled exception.
     expect(typeof result.exitCode).toBe("number");
     expect(result.exitCode).not.toBe(0);
-    // The injection payload must not have been interpreted — the function
+    // The injection payload must not have been interpreted -- the function
     // returned a single structured result rather than (e.g.) firing a
     // subprocess that interpreted `rm -rf /`. We can't directly observe
     // the remote shell here, but the unit-level assertion that
@@ -102,7 +102,7 @@ describe("sshExecArgs — argv-based remote exec validates + escapes inputs", ()
   });
 });
 
-describe("call-site regression guards — user-derived vars never land unescaped", () => {
+describe("call-site regression guards -- user-derived vars never land unescaped", () => {
   test("sync.ts syncProjectFiles uses sshExecArgs, not template-string mkdir", () => {
     const src = readFileSync(join(ROOT, "packages/compute/providers/ec2/sync.ts"), "utf-8");
     // Old vulnerable patterns MUST be gone.

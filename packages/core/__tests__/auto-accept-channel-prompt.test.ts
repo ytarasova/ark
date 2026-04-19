@@ -1,5 +1,5 @@
 /**
- * Tests for autoAcceptChannelPrompt — verifies that the channel development
+ * Tests for autoAcceptChannelPrompt -- verifies that the channel development
  * prompt is properly detected and accepted, including the resume-fallback
  * scenario where the prompt appears twice.
  *

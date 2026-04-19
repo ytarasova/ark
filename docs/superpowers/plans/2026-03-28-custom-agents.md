@@ -41,7 +41,7 @@ describe("findProjectRoot", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `bun test packages/core/__tests__/agent.test.ts`
-Expected: FAIL — `findProjectRoot` is not exported
+Expected: FAIL -- `findProjectRoot` is not exported
 
 - [ ] **Step 3: Implement `findProjectRoot()` in `agent.ts`**
 
@@ -134,7 +134,7 @@ describe("three-tier resolution", () => {
 - [ ] **Step 6: Run test to verify it fails**
 
 Run: `bun test packages/core/__tests__/agent.test.ts`
-Expected: FAIL — `loadAgent` doesn't accept `projectRoot` parameter
+Expected: FAIL -- `loadAgent` doesn't accept `projectRoot` parameter
 
 - [ ] **Step 7: Update `loadAgent()` for three-tier resolution**
 
@@ -204,7 +204,7 @@ describe("listAgents with project tier", () => {
 - [ ] **Step 10: Run test to verify it fails**
 
 Run: `bun test packages/core/__tests__/agent.test.ts`
-Expected: FAIL — `listAgents` doesn't accept `projectRoot`
+Expected: FAIL -- `listAgents` doesn't accept `projectRoot`
 
 - [ ] **Step 11: Update `listAgents()` for three-tier resolution**
 
@@ -287,7 +287,7 @@ describe("deleteAgent with scope", () => {
 - [ ] **Step 14: Run test to verify it fails**
 
 Run: `bun test packages/core/__tests__/agent.test.ts`
-Expected: FAIL — `saveAgent` and `deleteAgent` don't accept scope parameters
+Expected: FAIL -- `saveAgent` and `deleteAgent` don't accept scope parameters
 
 - [ ] **Step 15: Update `saveAgent()` and `deleteAgent()` signatures**
 
@@ -346,13 +346,13 @@ export { loadAgent, listAgents, saveAgent, deleteAgent, resolveAgent, buildClaud
 - [ ] **Step 19: Run all core tests**
 
 Run: `bun test packages/core`
-Expected: PASS (existing tests should still pass — `loadAgent("worker")` still works without `projectRoot`)
+Expected: PASS (existing tests should still pass -- `loadAgent("worker")` still works without `projectRoot`)
 
 - [ ] **Step 20: Commit**
 
 ```bash
 git add packages/core/agent.ts packages/core/__tests__/agent.test.ts packages/core/index.ts
-git commit -m "feat: three-tier agent resolution — project > global > builtin
+git commit -m "feat: three-tier agent resolution -- project > global > builtin
 
 Add findProjectRoot(), PROJECT_DIR, scope-aware saveAgent/deleteAgent.
 loadAgent and listAgents accept optional projectRoot parameter.
@@ -535,7 +535,7 @@ Expected: List shows P/G/B source column, copy/delete work
 
 ```bash
 git add packages/cli/index.ts
-git commit -m "feat: CLI agent CRUD — create, edit, delete, copy commands
+git commit -m "feat: CLI agent CRUD -- create, edit, delete, copy commands
 
 ark agent create/edit/delete/copy with --global flag.
 Default scope is project (.ark/agents/), falls back to global.
@@ -552,7 +552,7 @@ Agent list now shows P/G/B source column."
 
 - [ ] **Step 1: Pass `projectRoot` through `useStore` data loading**
 
-In `packages/tui/hooks/useStore.ts`, find where `core.listAgents()` is called (appears twice — in `loadData()` and in the initial state). Update both to pass a project root:
+In `packages/tui/hooks/useStore.ts`, find where `core.listAgents()` is called (appears twice -- in `loadData()` and in the initial state). Update both to pass a project root:
 
 ```typescript
 // At the top of the file or inside loadData, compute project root once:
@@ -772,7 +772,7 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
         />
       )}
 
-      {/* System prompt — opens $EDITOR */}
+      {/* System prompt -- opens $EDITOR */}
       <Box>
         <Text color={active === "prompt" ? "cyan" : "gray"}>
           {active === "prompt" ? "> " : "  "}
@@ -783,7 +783,7 @@ export function AgentForm({ agent, onDone, asyncState, projectRoot }: AgentFormP
         <Text dimColor>
           {agent?.system_prompt
             ? `${agent.system_prompt.split("\n")[0].slice(0, 40)}...`
-            : "(empty — press Enter to edit in $EDITOR)"}
+            : "(empty -- press Enter to edit in $EDITOR)"}
         </Text>
       </Box>
     </Box>
@@ -875,7 +875,7 @@ export function AgentsTab({ agents, pane, asyncState, onOverlayChange, refresh }
     // e = edit
     if (input === "e") {
       if (selected._source === "builtin") {
-        status.show("Cannot edit builtin — press 'c' to copy first");
+        status.show("Cannot edit builtin -- press 'c' to copy first");
         return;
       }
       setFormMode("edit");
@@ -1052,7 +1052,7 @@ Expected: Agents tab shows CRUD hints in status bar. `n` opens create form, `e` 
 
 ```bash
 git add packages/tui/tabs/AgentsTab.tsx packages/tui/forms/AgentForm.tsx packages/tui/App.tsx packages/tui/components/StatusBar.tsx
-git commit -m "feat: TUI agent CRUD — create, edit, copy, delete in agents tab
+git commit -m "feat: TUI agent CRUD -- create, edit, copy, delete in agents tab
 
 New AgentForm overlay for create/edit. Keybindings: n/e/c/x.
 StatusBar shows agent-specific hints. Overlay signals parent."
@@ -1122,7 +1122,7 @@ Update the prompt display at the bottom of the form:
   <Text dimColor>
     {systemPrompt
       ? `${systemPrompt.split("\n")[0].slice(0, 40)}... (Enter to edit)`
-      : "(empty — Enter to edit in $EDITOR)"}
+      : "(empty -- Enter to edit in $EDITOR)"}
   </Text>
 </Box>
 ```
@@ -1164,12 +1164,12 @@ const projectRoot = findProjectRoot(session.workdir || session.repo) ?? undefine
 const agent = resolveAgent(agentName, session as unknown as Record<string, unknown>, projectRoot);
 ```
 
-This ensures that when a session dispatches an agent, it resolves from the session's working directory — picking up project-local agents.
+This ensures that when a session dispatches an agent, it resolves from the session's working directory -- picking up project-local agents.
 
 - [ ] **Step 2: Run existing tests**
 
 Run: `bun test packages/core`
-Expected: PASS — the `projectRoot` parameter is optional so existing behavior unchanged
+Expected: PASS -- the `projectRoot` parameter is optional so existing behavior unchanged
 
 - [ ] **Step 3: Commit**
 

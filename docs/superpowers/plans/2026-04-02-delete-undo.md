@@ -97,7 +97,7 @@ describe("soft delete", () => {
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `bun test packages/core/__tests__/store-soft-delete.test.ts`
-Expected: FAIL — `softDeleteSession` is not exported from `../store.js`
+Expected: FAIL -- `softDeleteSession` is not exported from `../store.js`
 
 - [ ] **Step 3: Implement soft-delete functions in store.ts**
 
@@ -243,7 +243,7 @@ describe("undeleteSessionAsync", () => {
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `bun test packages/core/__tests__/store-soft-delete.test.ts`
-Expected: FAIL — `undeleteSessionAsync` not found
+Expected: FAIL -- `undeleteSessionAsync` not found
 
 - [ ] **Step 3: Modify deleteSessionAsync to use soft delete**
 

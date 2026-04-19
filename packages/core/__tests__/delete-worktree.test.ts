@@ -59,7 +59,7 @@ describe("deleteSessionAsync worktree cleanup", () => {
     const session = getApp().sessions.create({ summary: "wt-no-repo-test" });
     const wtPath = join(getApp().config.worktreesDir, session.id);
 
-    // Create a worktree dir but session has no repo — should still delete
+    // Create a worktree dir but session has no repo -- should still delete
     mkdirSync(wtPath, { recursive: true });
 
     const result = await deleteSessionAsync(app, session.id);
@@ -68,7 +68,7 @@ describe("deleteSessionAsync worktree cleanup", () => {
     const after = getApp().sessions.get(session.id);
     expect(after).not.toBeNull();
     expect(after!.status).toBe("deleting");
-    // Without a repo, falls back to rmSync — directory should be cleaned up
+    // Without a repo, falls back to rmSync -- directory should be cleaned up
     expect(existsSync(wtPath)).toBe(false);
   });
 });

@@ -200,7 +200,7 @@ function parseDevcontainerPorts(repoDir: string): number[] {
         return json.forwardPorts.filter((p: unknown): p is number => typeof p === "number");
       }
     } catch {
-      /* invalid JSON — skip */
+      /* invalid JSON -- skip */
     }
   }
 

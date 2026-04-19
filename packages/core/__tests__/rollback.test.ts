@@ -18,7 +18,7 @@ const defaultConfig: RollbackConfig = {
   health_url: null,
 };
 
-describe("rollback — shouldRollback", () => {
+describe("rollback -- shouldRollback", () => {
   it("returns false when all checks pass", () => {
     const suites: CheckSuiteResult[] = [
       { id: 1, conclusion: "success", status: "completed" },
@@ -41,7 +41,7 @@ describe("rollback — shouldRollback", () => {
   });
 });
 
-describe("rollback — createRevertPayload", () => {
+describe("rollback -- createRevertPayload", () => {
   it("creates correct revert PR payload", () => {
     const payload = createRevertPayload({
       owner: "org",
@@ -58,7 +58,7 @@ describe("rollback — createRevertPayload", () => {
   });
 });
 
-describe("rollback — pollCheckSuites", () => {
+describe("rollback -- pollCheckSuites", () => {
   it("calls fetcher and returns results", async () => {
     const mockFetcher = async () => ({
       check_suites: [{ id: 1, conclusion: "success", status: "completed" }],

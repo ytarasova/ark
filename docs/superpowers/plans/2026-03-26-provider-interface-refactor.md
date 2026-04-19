@@ -1,8 +1,8 @@
-# Provider Interface Refactor — Eliminate Local vs Remote Branching
+# Provider Interface Refactor -- Eliminate Local vs Remote Branching
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Remove all `provider === "local"` / `provider !== "local"` conditional logic from callers. Every compute operation goes through `ComputeProvider` methods — zero branching on provider type.
+**Goal:** Remove all `provider === "local"` / `provider !== "local"` conditional logic from callers. Every compute operation goes through `ComputeProvider` methods -- zero branching on provider type.
 
 **Architecture:** Extend the `ComputeProvider` interface with capability flags (`canReboot`, `canDelete`, `supportsWorktree`) and new methods (`checkSession`, `getAttachCommand`, `buildChannelConfig`, `buildLaunchEnv`). Implement in both `LocalProvider` and `EC2Provider`. Then replace all 30+ branching sites with provider method calls.
 
@@ -82,7 +82,7 @@ describe("ComputeProvider interface", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `bun test packages/compute/__tests__/provider-interface.test.ts --timeout 15000`
-Expected: FAIL — properties/methods don't exist yet
+Expected: FAIL -- properties/methods don't exist yet
 
 - [ ] **Step 3: Add new members to ComputeProvider interface**
 
@@ -253,7 +253,7 @@ git commit -m "feat: implement extended provider interface in EC2Provider"
 
 ---
 
-### Task 4: Refactor session.ts — Remove isLocal/isRemote
+### Task 4: Refactor session.ts -- Remove isLocal/isRemote
 
 **Files:**
 - Modify: `packages/core/session.ts`
@@ -300,7 +300,7 @@ git commit -m "refactor: session dispatch uses provider methods, no isLocal/isRe
 
 ---
 
-### Task 5: Refactor store.ts — Provider Sets Initial Status
+### Task 5: Refactor store.ts -- Provider Sets Initial Status
 
 **Files:**
 - Modify: `packages/core/store.ts`
@@ -331,7 +331,7 @@ git commit -m "refactor: createCompute uses provider.initialStatus"
 
 ---
 
-### Task 6: Refactor useStore.ts — reconcileSessions via Provider
+### Task 6: Refactor useStore.ts -- reconcileSessions via Provider
 
 **Files:**
 - Modify: `packages/tui/hooks/useStore.ts`
@@ -367,7 +367,7 @@ git commit -m "refactor: reconcileSessions uses provider.checkSession"
 
 ---
 
-### Task 7: Refactor SessionsTab.tsx — Attach and Auth via Provider
+### Task 7: Refactor SessionsTab.tsx -- Attach and Auth via Provider
 
 **Files:**
 - Modify: `packages/tui/tabs/SessionsTab.tsx`
@@ -408,7 +408,7 @@ git commit -m "refactor: attach and auth use provider methods"
 
 ---
 
-### Task 8: Refactor useComputeActions.ts — Use Provider Flags
+### Task 8: Refactor useComputeActions.ts -- Use Provider Flags
 
 **Files:**
 - Modify: `packages/tui/hooks/useComputeActions.ts`
@@ -437,7 +437,7 @@ git commit -m "refactor: compute actions use provider capability flags"
 
 ---
 
-### Task 9: Refactor ComputeTab.tsx — Use Provider Flags
+### Task 9: Refactor ComputeTab.tsx -- Use Provider Flags
 
 **Files:**
 - Modify: `packages/tui/tabs/ComputeTab.tsx`

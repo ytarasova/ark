@@ -168,7 +168,7 @@ describe("recoverSession", () => {
       session_id: "ark-dead",
     });
 
-    // No checkpoint saved — recover from current state
+    // No checkpoint saved -- recover from current state
     const result = recoverSession(getApp(), session.id);
     expect(result.ok).toBe(true);
     expect(result.message).toContain("no checkpoint");

@@ -2,15 +2,15 @@
 
 ## Summary
 
-Add user-created agents at two scopes — **project-local** (`.ark/agents/`) and **global** (`~/.ark/agents/`) — with full CRUD via CLI and TUI. Three-tier resolution: project > global > builtin.
+Add user-created agents at two scopes -- **project-local** (`.ark/agents/`) and **global** (`~/.ark/agents/`) -- with full CRUD via CLI and TUI. Three-tier resolution: project > global > builtin.
 
 ## Resolution Order
 
 First match wins:
 
-1. `<project-root>/.ark/agents/<name>.yaml` — `_source: "project"`
-2. `~/.ark/agents/<name>.yaml` — `_source: "global"` (renamed from `"user"`)
-3. `<repo>/agents/<name>.yaml` — `_source: "builtin"`
+1. `<project-root>/.ark/agents/<name>.yaml` -- `_source: "project"`
+2. `~/.ark/agents/<name>.yaml` -- `_source: "global"` (renamed from `"user"`)
+3. `<repo>/agents/<name>.yaml` -- `_source: "builtin"`
 
 **Project root discovery**: Walk up from `cwd` looking for `.git/`. If not found, project-level agents are skipped.
 
@@ -60,8 +60,8 @@ PROJECT_DIR(root: string) = join(root, ".ark", "agents")   // new
 ## CLI Commands (`packages/cli/index.ts`)
 
 ```bash
-ark agent list                            # existing — add source column (P/G/B)
-ark agent show <name>                     # existing — no changes
+ark agent list                            # existing -- add source column (P/G/B)
+ark agent show <name>                     # existing -- no changes
 ark agent create <name> [--global]        # scaffold YAML, open $EDITOR. Default: project
 ark agent edit <name>                     # open in $EDITOR; prompt to copy if builtin
 ark agent delete <name>                   # refuse builtins, confirm for others
@@ -76,7 +76,7 @@ ark agent copy <name> [new-name] [--global]  # copy any agent to project/global
 
 ## TUI Changes (`packages/tui/tabs/AgentsTab.tsx`)
 
-### Left Pane — Agent List
+### Left Pane -- Agent List
 
 Source indicators in list rows:
 
@@ -105,10 +105,10 @@ Inline fields:
 - **max_turns**: number input
 - **tools**: checkbox list (Bash, Read, Write, Edit, Glob, Grep, WebSearch)
 - **permission_mode**: selector (bypassPermissions / default)
-- **scope**: selector (project / global) — create only
+- **scope**: selector (project / global) -- create only
 
 Hybrid field:
-- **system_prompt**: "Press Enter to edit in $EDITOR" — opens temp file, reads result back
+- **system_prompt**: "Press Enter to edit in $EDITOR" -- opens temp file, reads result back
 
 On save: calls `saveAgent(agent, scope, projectRoot)`.
 
@@ -130,9 +130,9 @@ Agent tab hints update to show available keybindings. When form overlay is activ
 
 ## What Doesn't Change
 
-- `store.ts` / `session.ts` — sessions store agent name as string, resolution at dispatch time
-- `conductor.ts` — no agent loading
-- `claude.ts` — `buildArgs()` unchanged, receives resolved agent
-- Template system — `resolveAgent()` just threads project root through
-- Flow definitions — reference agents by name, resolution handles the rest
-- Agent YAML format — identical across all three tiers
+- `store.ts` / `session.ts` -- sessions store agent name as string, resolution at dispatch time
+- `conductor.ts` -- no agent loading
+- `claude.ts` -- `buildArgs()` unchanged, receives resolved agent
+- Template system -- `resolveAgent()` just threads project root through
+- Flow definitions -- reference agents by name, resolution handles the rest
+- Agent YAML format -- identical across all three tiers

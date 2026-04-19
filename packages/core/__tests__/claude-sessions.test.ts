@@ -1,5 +1,5 @@
 /**
- * Tests for Claude Code session discovery — listClaudeSessions, getClaudeSession.
+ * Tests for Claude Code session discovery -- listClaudeSessions, getClaudeSession.
  */
 
 import { getApp } from "../app.js";
@@ -33,7 +33,7 @@ for (let i = 0; i < 12; i++) {
 }
 
 /** Write a fake JSONL transcript. Pads to >=10 messages + 10KB if needed.
- *  Local to this test file — each test file has its own variant with a different
+ *  Local to this test file -- each test file has its own variant with a different
  *  signature tailored to its needs (claude-transcript, e2e-conversation). */
 function writeTranscript(projectDirName: string, filename: string, lines: object[]) {
   const dir = join(baseDir(), projectDirName);
@@ -292,7 +292,7 @@ describe("incremental refresh", () => {
     const first = await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
     expect(first).toBeGreaterThanOrEqual(1);
 
-    // Second refresh with no file changes — should return 0 new entries
+    // Second refresh with no file changes -- should return 0 new entries
     const second = await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
     expect(second).toBe(0);
   });

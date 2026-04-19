@@ -103,7 +103,7 @@ packages/tui/__tests__/       update store imports
 
 ---
 
-## Task 1: Create `packages/types/` — Domain Interfaces
+## Task 1: Create `packages/types/` -- Domain Interfaces
 
 All domain types in one dependency-free package.
 
@@ -597,12 +597,12 @@ Expected: no errors from packages/types/
 
 ```bash
 git add packages/types/
-git commit -m "feat: add packages/types — shared domain interfaces"
+git commit -m "feat: add packages/types -- shared domain interfaces"
 ```
 
 ---
 
-## Task 2: Create `packages/core/repositories/schema.ts` — Renamed Schema
+## Task 2: Create `packages/core/repositories/schema.ts` -- Renamed Schema
 
 Port `initSchema()` from `store.ts` with column renames: `jira_key` -> `ticket`, `jira_summary` -> `summary`, `pipeline` -> `flow`.
 
@@ -628,7 +628,7 @@ git commit -m "feat: schema.ts with renamed columns (ticket, summary, flow)"
 
 ## Task 3: Create Repository Classes
 
-Port SQL operations from `store.ts` into focused repository classes. Each repository takes a `Database` in its constructor. No fieldMap — columns match TS fields.
+Port SQL operations from `store.ts` into focused repository classes. Each repository takes a `Database` in its constructor. No fieldMap -- columns match TS fields.
 
 **Files:**
 - Create: `packages/core/repositories/session.ts`
@@ -647,9 +647,9 @@ Test `create`, `get`, `list`, `update`, `delete`, `softDelete`, `undelete`, `cla
 
 - [ ] **Step 2: Write SessionRepository implementation**
 
-Port from `store.ts` functions: `createSession` (L351-390), `getSession` (L391-397), `listSessions` (L398-434), `updateSession` (L435-461 — remove fieldMap, use SESSION_COLUMNS whitelist), `deleteSession` (L462-469), `softDeleteSession` (L470-478), `undeleteSession` (L479-488), `claimSession` (L515-541 — remove fieldMap), `purgeDeleted` (L489-497), `sessionChannelPort` (L712-714).
+Port from `store.ts` functions: `createSession` (L351-390), `getSession` (L391-397), `listSessions` (L398-434), `updateSession` (L435-461 -- remove fieldMap, use SESSION_COLUMNS whitelist), `deleteSession` (L462-469), `softDeleteSession` (L470-478), `undeleteSession` (L479-488), `claimSession` (L515-541 -- remove fieldMap), `purgeDeleted` (L489-497), `sessionChannelPort` (L712-714).
 
-No `rowToSession()` needed — SQL columns already match TS fields. Just `JSON.parse(row.config)` for the config field.
+No `rowToSession()` needed -- SQL columns already match TS fields. Just `JSON.parse(row.config)` for the config field.
 
 - [ ] **Step 3: Run SessionRepository tests**
 
@@ -662,7 +662,7 @@ Test `create`, `get`, `list`, `update`, `delete`, `mergeConfig`. Verify `mergeCo
 
 - [ ] **Step 5: Write ComputeRepository implementation**
 
-Port from `store.ts`: `createCompute` (L586-615), `getCompute` (L616-622), `listCompute` (L623-641), `updateCompute` (L642-667 — use COMPUTE_COLUMNS whitelist), `deleteCompute` (L697-705), `mergeComputeConfig` (L668-684 — wrap in transaction), `mergeSessionConfig` (L685-696 — moved to SessionRepository as `mergeConfig`).
+Port from `store.ts`: `createCompute` (L586-615), `getCompute` (L616-622), `listCompute` (L623-641), `updateCompute` (L642-667 -- use COMPUTE_COLUMNS whitelist), `deleteCompute` (L697-705), `mergeComputeConfig` (L668-684 -- wrap in transaction), `mergeSessionConfig` (L685-696 -- moved to SessionRepository as `mergeConfig`).
 
 - [ ] **Step 6: Run ComputeRepository tests**
 
@@ -696,7 +696,7 @@ export { initSchema, seedLocalCompute } from "./schema.js";
 
 ```bash
 git add packages/core/repositories/
-git commit -m "feat: repository classes — SessionRepository, ComputeRepository, EventRepository, MessageRepository"
+git commit -m "feat: repository classes -- SessionRepository, ComputeRepository, EventRepository, MessageRepository"
 ```
 
 ---
@@ -763,7 +763,7 @@ Expected: all pass
 
 ```bash
 git add packages/core/services/
-git commit -m "feat: service classes — SessionService, ComputeService, HistoryService"
+git commit -m "feat: service classes -- SessionService, ComputeService, HistoryService"
 ```
 
 ---
@@ -924,7 +924,7 @@ Expected: all pass
 
 ```bash
 git add packages/protocol/client.ts
-git commit -m "feat: typed ArkClient — all methods return concrete types"
+git commit -m "feat: typed ArkClient -- all methods return concrete types"
 ```
 
 ---
@@ -987,7 +987,7 @@ Update all `useState<any[]>([])` to `useState<Session[]>([])`, etc.
 
 - [ ] **Step 3: Fix sessionFormatting.ts**
 
-Change function signatures from `session: any` to `session: Session`. Remove all `(session.config as any)` — access `session.config.usage`, `session.config.filesChanged` etc. directly.
+Change function signatures from `session: any` to `session: Session`. Remove all `(session.config as any)` -- access `session.config.usage`, `session.config.filesChanged` etc. directly.
 
 - [ ] **Step 4: Fix color casts across TUI components**
 
@@ -1002,7 +1002,7 @@ Expected: all pass
 
 ```bash
 git add packages/tui/
-git commit -m "feat: typed TUI — StoreData, SessionConfig, InkColor"
+git commit -m "feat: typed TUI -- StoreData, SessionConfig, InkColor"
 ```
 
 ---
@@ -1028,7 +1028,7 @@ Replace `import * as session from "./session.js"` with access through `getApp().
 
 - [ ] **Step 3: Update web.ts**
 
-Same pattern — replace store/session imports with AppContext service access.
+Same pattern -- replace store/session imports with AppContext service access.
 
 - [ ] **Step 4: Update acp.ts, recipe-eval.ts, github-webhook.ts**
 
@@ -1081,11 +1081,11 @@ git commit -m "refactor: delete store.ts/session.ts/context.ts, all imports upda
 
 After all 9 tasks are complete:
 
-- [ ] `bun test packages/ --concurrency 1` — 0 failures
-- [ ] `npx tsc --noEmit` — 0 errors
-- [ ] `grep -rn "as any" packages/ --include='*.ts' --include='*.tsx' | grep -v node_modules | grep -v __tests__ | wc -l` — significantly reduced from ~80
-- [ ] `grep -rn "fieldMap" packages/ | grep -v node_modules` — 0 results
-- [ ] `grep -rn "jira_key\|jira_summary\|pipeline" packages/ --include='*.ts' | grep -v node_modules` — 0 results (except maybe CLAUDE.md references)
-- [ ] `grep -rn "Record<string, unknown>" packages/types/ | wc -l` — minimal (only in Event.data and extensible configs)
+- [ ] `bun test packages/ --concurrency 1` -- 0 failures
+- [ ] `npx tsc --noEmit` -- 0 errors
+- [ ] `grep -rn "as any" packages/ --include='*.ts' --include='*.tsx' | grep -v node_modules | grep -v __tests__ | wc -l` -- significantly reduced from ~80
+- [ ] `grep -rn "fieldMap" packages/ | grep -v node_modules` -- 0 results
+- [ ] `grep -rn "jira_key\|jira_summary\|pipeline" packages/ --include='*.ts' | grep -v node_modules` -- 0 results (except maybe CLAUDE.md references)
+- [ ] `grep -rn "Record<string, unknown>" packages/types/ | wc -l` -- minimal (only in Event.data and extensible configs)
 - [ ] CLI works: `bun packages/cli/index.ts --version`
 - [ ] TUI starts: `bun packages/tui/index.tsx` (with TTY)

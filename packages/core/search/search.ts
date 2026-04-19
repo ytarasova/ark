@@ -1,5 +1,5 @@
 /**
- * Session search — grep across metadata, events, messages, and Claude transcripts.
+ * Session search -- grep across metadata, events, messages, and Claude transcripts.
  * Supports FTS5-indexed transcript search for sub-100ms queries.
  */
 
@@ -116,7 +116,7 @@ export function searchTranscripts(app: AppContext, query: string, opts?: SearchO
     return searchTranscriptsFiles(query, opts);
   }
 
-  // Use FTS5 index when the table exists (even if empty — empty means no transcripts indexed yet)
+  // Use FTS5 index when the table exists (even if empty -- empty means no transcripts indexed yet)
   if (ftsTableExists(app)) {
     return searchTranscriptsFTS(app, query, limit);
   }

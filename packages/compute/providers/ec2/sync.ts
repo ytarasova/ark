@@ -153,7 +153,7 @@ async function syncClaudePush(key: string, ip: string): Promise<void> {
       try {
         const tmpFile = join(tmp, ".claude.json");
         writeFileSync(tmpFile, JSON.stringify(remote, null, 2));
-        // scp directly — rsync has edge cases with dotfiles and --update
+        // scp directly -- rsync has edge cases with dotfiles and --update
         await execFileAsync(
           "scp",
           [
@@ -305,7 +305,7 @@ export async function syncProjectFiles(
   remoteDir: string,
 ): Promise<void> {
   // `remoteDir` is derived from session.workdir / arc.json. Both can be
-  // attacker-controlled in hosted mode — use argv-based exec so shell
+  // attacker-controlled in hosted mode -- use argv-based exec so shell
   // metacharacters are quoted rather than interpreted.
   await sshExecArgs(key, ip, ["mkdir", "-p", remoteDir]);
   for (const file of files) {

@@ -1,5 +1,56 @@
 # Ark Platform Roadmap
 
+> Last updated: **2026-04-18** (requirements reconciliation + code intelligence design)
+>
+> ## 2026-04-18 Review Findings (deep reconciliation against Paytm requirements)
+>
+> **Authoritative source:** Foundary-Ark Requirements canvas (F0AUHKDHXME, Abhimanyu 2026-04-17) + Harinder's thread feedback + Abhimanyu's reply. Harinder: *"we are 90% there."*
+>
+> **Four companion docs produced this day** (keep in sync with this roadmap):
+> - `docs/2026-04-18-REQUIREMENTS_RECONCILIATION.md` -- canvas vs Ark state, file:line evidence, 8 off-roadmap gaps
+> - `docs/2026-04-18-SUPPORTING_ROHIT_AND_ABHIMANYU_FLOWS.md` -- how Ark dispatches Rohit's Sage-generated recipes + Abhimanyu's ISLC recipes (~135 LOC first slice)
+> - `docs/2026-04-18-CODE_INTELLIGENCE_DESIGN.md` -- hybrid repo-map + pooled MCP via arkd/conductor, codebase-memory-mcp vendoring plan, KB/KG integration, storage model for local + control-plane
+> - `docs/2026-04-18-UNIFIED_SUMMARY.md` -- ties all four together
+>
+> **Docs-staleness corrections applied to this roadmap:**
+> - **O6 -- `.ark.yaml` worktree provisioning**: WAS "NOT BUILT"; ACTUAL state is DONE under `worktree.copy[]` + `worktree.setup` keys (not `provision.*`). See `packages/core/repo-config.ts:5-18`. Moved to DONE table below.
+> - **O7 -- E2E test count**: claim of "89 TUI + 78 web = 167 tests" is post-TUI-retirement stale. Reality: TUI retired (0 tests), web ~13 spec files. Count updated below.
+>
+> **Six of eight ⚠️ VERIFY items confirmed DONE** after deep source read (O1-O6). Two remain: O7 (test count -- broken claim, fixed above) and O8 (knowledge-graph auto-index -- confirmed 🟡 PARTIAL, remote-only + no completion hook).
+>
+> **Eight requirements confirmed OFF-ROADMAP** (see reconciliation doc §8) -- product decisions needed:
+> 1. Canonical 15-stage SDLC vocabulary (Thoughts → Monitor)
+> 2. Node modes (manual / agentic / co-paired / conversational) -- distinct from existing `gate`
+> 3. Loop nodes (Archon `until` / `until_bash` / `max_iterations` / `fresh_context`)
+> 4. Approval with rework (Archon `on_reject.prompt`) -- `gate: review` is just a pause
+> 5. Centralized MCP Router -- socket pooling is not a router (**design landed 2026-04-18**, see code-intel design doc §3 + §5)
+> 6. Sage-KB MCP integration contract (accept goose-recipe.yaml as session input; Rohit's use case)
+> 7. In-App browser (element-selection UI on live app)
+> 8. Foundry 2.0 Track 2 -- AI Monitor + Self-Healing (Atul's deck 2026-04-20 deadline)
+>
+> **Code intelligence decisions (2026-04-18, see dedicated doc):**
+> - **Delivery: hybrid** -- cached repo-map in system prompt + MCP drilldown (not exclusively either)
+> - **Pooling: arkd hosts + conductor routes** -- one MCP instance per `(tenant, repo, tool)`, not per-session *(design landed; implementation deferred)*
+> - **codebase-memory-mcp SHIPPED 2026-04-18 (commit b9356da)** -- v0.6.0 vendored, MIT, static C binary (~160 MB per platform), 66 languages incl. Python/JS/TS/Java, 14 MCP tools, 10x token reduction per arXiv:2603.27277. Currently per-session `.mcp.json` injection; arkd pooling is the next iteration. Runs alongside ops-codegraph until pilot validates.
+> - **Agent exposure SHIPPED** -- `writeChannelConfig` auto-injects `codebase-memory` MCP entry alongside `ark-channel`; `permissions.allow` auto-includes `mcp__codebase-memory__*`; Goose gets a second `--with-extension`. No agent YAML changes required.
+> - **CLI surface SHIPPED** -- `ark knowledge codebase {status,tools,reindex}`.
+> - **Web UI surface SHIPPED** -- `CodebaseMemoryPanel` on the Memory page (status + version + path + 14 tool names).
+> - **KB/KG integration: facade model** -- Ark's existing 6 `knowledge/*` MCP tools remain the agent-facing surface for memory/history/recall; codebase-memory-mcp exposes its own 14 tools alongside. Future: conductor routes between them for a unified `knowledge/*` namespace.
+> - **Storage backend in control-plane mode: S3 or Postgres** (both approved, pick per workload after pilot)
+> - **Multi-repo sessions**: federated query fan-out with repo-tagged merged results (intersects Camp 11)
+>
+> **Deferred** (from the codebase-memory-mcp rollout, see commit b9356da message):
+> - Remove `codegraph` from `vendor/versions.yaml` (kept as fallback until pilot validates)
+> - Retire `knowledge/search`, `knowledge/context`, `knowledge/impact` Ark-native handlers that duplicate codebase-memory-mcp tools
+> - Pool via arkd/conductor (currently per-session `.mcp.json` injection)
+>
+> **Flow dispatch decisions (2026-04-18):**
+> - **Rohit (Sage) -- ad-hoc recipe file path**: new `ark session start --recipe-file <path>` for machine-generated Goose recipes (upstream from Sage at `pi-team.mypaytm.com/sage`). Rohit's `PAI-31080` spans 3 repos, needs Camp 11.
+> - **Abhimanyu (ISLC) -- registered recipes**: install 9 ISLC recipes to `~/.ark/recipes/goose/`, dispatch via `--recipe islc-orchestrate --param jira_key=IN-1234 --param auto=false --param from_stage=plan`
+> - **Blocker for both: MCP credentials** -- per-user MCP creds (Atlassian/Bitbucket/Figma/Sage-KB) needed day-1 of pilot. Camp 10 secrets vault (~5-6 days) jumps priority.
+>
+> ---
+>
 > Last updated: 2026-04-14 (full background agent gap analysis) (71 PRs total -- v0.14.0 released)
 > Planning framework: **11 sub-projects (SP1-SP11)** covering all 11 layers of the background agent stack
 > Reference: [background-agents.com/landscape](https://background-agents.com/landscape) | [Ona Software Factory](https://ona.com/stories/building-a-software-factory-in-public) | [Open Agents](https://github.com/vercel-labs/open-agents)
@@ -238,8 +289,8 @@ The orchestration platform for AI-powered software development. Manages the full
 | **Decoupled agent-compute architecture** | Three-phase progression: (1) now: agent CLI + repo on same box (1:1:1), (2) near: agent CLI on cheap box, repo on heavy box with arkd proxy between them, (3) target: serverless agent loop (durable workflow) + pooled repo compute via arkd tools. Phase 2 needs arkd-to-arkd tool proxying. Phase 3 needs conductor-hosted channels (currently MCP in tmux) and durable workflow engine. Enables: independent fleet scaling, compute hibernate/snapshot, multi-repo via N compute attachments, compute pooling. Session 1:N Agent 1:M Compute. | 2026-04-14 analysis |
 | **Compute lifecycle (hibernate/snapshot/restore)** | Compute targets should support hibernate (stop billing), snapshot (save state), restore (resume from snapshot). E2B already supports snapshots. EC2 has AMIs. Docker has checkpoint/CRIU. Firecracker has native snapshotting. Expose universally via ComputeProvider interface. | 2026-04-14 analysis |
 | **Higress gateway integration** | Custom router works for dev. Enterprise needs CNCF-grade gateway. | LLM Router research |
-| **Zoekt code search** | Sourcegraph's fast trigram-based code search engine (github.com/sourcegraph/zoekt). Could complement or replace FTS5 transcript search for large-scale code search across repos. Evaluate as a backend for `ark search` and knowledge graph queries. | Abhimanyu 2026-04-13 |
-| **Worktree untracked file setup** | Git worktrees don't include untracked files (.env, .envrc, config/local.yaml). Agents in worktrees lose access to env vars and local config. Add `.ark.yaml` `worktree.copy` list and optional `worktree.setup` script hook. | Abhimanyu 2026-04-13 |
+| **Zoekt code search** | ~~Sourcegraph's fast trigram-based code search engine (github.com/sourcegraph/zoekt). Could complement or replace FTS5 transcript search for large-scale code search across repos.~~ **Superseded 2026-04-18:** evaluation landed on **codebase-memory-mcp** (MIT, static C binary, 66 langs, 14 MCP tools, ~10× token reduction per arXiv:2603.27277) instead. See `docs/2026-04-18-CODE_INTELLIGENCE_DESIGN.md`. Zoekt remains a possible future complement for pure full-text/regex at scale but is not on the critical path. | Abhimanyu 2026-04-13; superseded 2026-04-18 |
+| ~~**Worktree untracked file setup**~~ | ~~Git worktrees don't include untracked files. Add `.ark.yaml` `worktree.copy` list and optional `worktree.setup` script hook.~~ **DONE (2026-04-18 verification):** shipped under `worktree.copy[]` + `worktree.setup` keys. See `packages/core/repo-config.ts:5-18`, `session-orchestration.ts:1681-1690`, test at `repo-config.test.ts:98-127`. This entry moved to the DONE table above; kept here strikethrough for audit-trail. | Abhimanyu 2026-04-13; verified DONE 2026-04-18 |
 | **ACP (Agent Communication Protocol) integration** | Standard agent interface for cross-tool communication. Goose uses it via Claude SDP adapter. Claude Code/Codex don't officially support it; Gemini does natively. Explore as parallel interface alongside channels. Would make the platform more agent-runtime-agnostic. | 2026-04-14 meeting |
 | **Task-based benchmarking framework** | Model comparison on real-world tasks (not just prompting). 100 tasks across categories: JWT updates, code graph, PR review, MCP tool calling. Results feed LLM Router routing weights (model X good at tool calling, model Y good at review). Abhimanyu building. | 2026-04-14 meeting |
 | **Web UI conversation interface** | Send messages to running agents from web UI. Channels work for Claude Code; need tmux send-keys fallback for other runtimes. Borrow structured question pattern from Open Agents (`ask_user_question` tool with options UI) instead of plain free-text. | 2026-04-14 meeting (Zineng) |
@@ -330,7 +381,7 @@ The orchestration platform for AI-powered software development. Manages the full
 - Native Goose runtime (`runtimes/goose.yaml` + `packages/core/executors/goose.ts`) with recipe dispatch, channel MCP via `--with-extension`, LLM router routing
 - Vendored binary freshness manifest (`vendor/versions.yaml`) + CI workflow for goose / codex version bumps
 - PluginRegistry as a first-class Awilix service (Camp 13 Phase 1) -- all executors flow through it; extension point is ready for compute providers + stores in Phase 2
-- Full end-to-end test suite: 89 TUI tests + 78 web tests, 0 skips, 0 failures, covers real flow progression, real cost aggregation, CRUD round-trips, and dispatch state transitions (see Camp 1 below for the full story)
+- ~~Full end-to-end test suite: 89 TUI tests + 78 web tests~~ **[STALE as of 2026-04-18: TUI retired (0 tests remain); web harness ~13 spec files. Recount needed: run `bunx --bun playwright test --list` for current number.]** The original 2026-04-11 claim covered real flow progression, real cost aggregation, CRUD round-trips, and dispatch state transitions (see Camp 1 below for the full story)
 - Schema cleanup -- removed in-place migration dead code now that there is no production data to preserve
 - Multi-tenant channel + hook hardening -- `/api/channel`, `/api/relay`, `/hooks/status` all tenant-scoped via `X-Ark-Tenant-Id` extraction and `app.forTenant()` routing. Unblocks hosted multi-tenant rollout (audit-flagged gap closed)
 - Session send paste-buffer race fix + worker agent `{summary}` auto-start -- `make self TASK="..."` and `ark session send` both now work end-to-end without human intervention. Closes the ark-on-ark dogfood loop

@@ -1,4 +1,4 @@
-# PR Monitoring + Comment Resolution — Plan
+# PR Monitoring + Comment Resolution -- Plan
 
 ## Overview
 
@@ -22,9 +22,9 @@ Developer creates PR → Reviewer leaves comments → GitHub webhook fires
 New endpoint in conductor: `POST /api/webhook/github`
 
 Accepts GitHub webhook events:
-- `pull_request_review` — new review submitted
-- `pull_request_review_comment` — individual line comment
-- `issue_comment` — PR-level comment (not line-specific)
+- `pull_request_review` -- new review submitted
+- `pull_request_review_comment` -- individual line comment
+- `issue_comment` -- PR-level comment (not line-specific)
 
 Validates HMAC signature (`X-Hub-Signature-256`) against a shared secret.
 
@@ -32,7 +32,7 @@ Validates HMAC signature (`X-Hub-Signature-256`) against a shared secret.
 
 A PR maps to an Ark session. When a webhook fires:
 1. Check if a session already exists for this PR (lookup by `pr_url` or `pr_id` in sessions table)
-2. If exists and running: send a steer message via channel ("New review comments — address them")
+2. If exists and running: send a steer message via channel ("New review comments -- address them")
 3. If exists and stopped/completed: resume with `--resume` to continue the conversation
 4. If doesn't exist: create a new session with:
    - `summary`: PR title
@@ -68,11 +68,11 @@ Address each comment, push changes, and reply to confirm.
 ### 4. Agent tools
 
 The agent needs:
-- `gh pr view` — read PR details
-- `gh pr diff` — read the diff
-- `gh api` — read/write comments, push reviews
-- Standard file tools (Read, Write, Edit) — make changes
-- `git push` — push the fix
+- `gh pr view` -- read PR details
+- `gh pr diff` -- read the diff
+- `gh api` -- read/write comments, push reviews
+- Standard file tools (Read, Write, Edit) -- make changes
+- `git push` -- push the fix
 
 These are already available via Claude Code's built-in tools + the `gh` CLI.
 
@@ -139,7 +139,7 @@ For local development: use `gh webhook forward` or ngrok.
 - HMAC signature validation on every webhook
 - Webhook secret stored in env var, never in config files
 - Agent runs with whatever autonomy the flow specifies
-- No auto-merge — agent addresses comments, human merges
+- No auto-merge -- agent addresses comments, human merges
 
 ## Effort
 

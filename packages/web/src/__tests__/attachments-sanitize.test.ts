@@ -14,7 +14,7 @@ import { safeAttachmentName } from "../../../core/services/workspace-service.js"
 
 const ROOT = join(import.meta.dir, "..", "..", "..", "..");
 
-describe("safeAttachmentName — rejects traversal payloads", () => {
+describe("safeAttachmentName -- rejects traversal payloads", () => {
   test("throws on ../../escape.txt", () => {
     expect(() => safeAttachmentName("../../escape.txt")).toThrow(/unsafe/);
   });
@@ -60,7 +60,7 @@ describe("safeAttachmentName — rejects traversal payloads", () => {
   });
 });
 
-describe("safeAttachmentName — accepts safe leaf names", () => {
+describe("safeAttachmentName -- accepts safe leaf names", () => {
   test("plain filename passes through", () => {
     expect(safeAttachmentName("spec.md")).toBe("spec.md");
   });
@@ -86,7 +86,7 @@ describe("workspace-service wires the helper into the attachment write path", ()
   });
 
   test("attachment write uses safeAttachmentName (not raw att.name)", () => {
-    // The raw `att.name` must no longer be joined directly — it must pass through
+    // The raw `att.name` must no longer be joined directly -- it must pass through
     // safeAttachmentName first. Regression guard: if someone re-introduces
     // `join(attachDir, att.name)` we want this test to fail.
     expect(src).not.toMatch(/join\(attachDir,\s*att\.name\)/);

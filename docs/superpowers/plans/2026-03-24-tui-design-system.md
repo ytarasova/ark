@@ -1,4 +1,4 @@
-# TUI Design System Cleanup — Implementation Plan
+# TUI Design System Cleanup -- Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -32,14 +32,14 @@
 
 ---
 
-### Task 1: Rewrite StatusBar — panel-aware hints, spinner icon only
+### Task 1: Rewrite StatusBar -- panel-aware hints, spinner icon only
 
 **Files:**
 - Modify: `packages/tui/components/StatusBar.tsx`
 
 The StatusBar currently receives: `tab`, `sessions`, `selectedSession`, `loading`, `error`, `label`, `pane`.
 
-Add new props: `overlay` (which overlay is active — form, move, talk, group, search, etc.)
+Add new props: `overlay` (which overlay is active -- form, move, talk, group, search, etc.)
 
 Rewrite the hint logic:
 
@@ -84,7 +84,7 @@ interface StatusBarProps {
 }
 ```
 
-Remove `label` from the spinner display — show only the spinner icon.
+Remove `label` from the spinner display -- show only the spinner icon.
 
 Rewrite hint functions to be panel-aware:
 
@@ -136,7 +136,7 @@ Update spinner display:
 - [ ] **Step 2: Commit**
 
 ```bash
-git commit -am "refactor: StatusBar — panel-aware hints, spinner icon only, no label"
+git commit -am "refactor: StatusBar -- panel-aware hints, spinner icon only, no label"
 ```
 
 ---
@@ -148,14 +148,14 @@ git commit -am "refactor: StatusBar — panel-aware hints, spinner icon only, no
 - Modify: `packages/tui/tabs/SessionsTab.tsx`
 - Modify: `packages/tui/tabs/ComputeTab.tsx`
 
-- [ ] **Step 1: HistoryTab — remove "Enter to import into Ark" from detail pane**
+- [ ] **Step 1: HistoryTab -- remove "Enter to import into Ark" from detail pane**
 
 In `HistoryDetail`, remove:
 ```tsx
 <Text dimColor>Enter to import into Ark</Text>
 ```
 
-- [ ] **Step 2: SessionsTab — remove inline hints from overlays**
+- [ ] **Step 2: SessionsTab -- remove inline hints from overlays**
 
 Search for "Enter to confirm", "Esc to cancel", "Enter to create", "Esc to go back" in SessionsTab.tsx and remove those `<Text>` elements.
 
@@ -163,16 +163,16 @@ Look for patterns like:
 ```tsx
 <Text dimColor>{"  Enter to confirm, Esc to cancel"}</Text>
 ```
-Remove all of them — the status bar handles this via the `overlay` prop.
+Remove all of them -- the status bar handles this via the `overlay` prop.
 
-- [ ] **Step 3: ComputeTab — check for inline hints**
+- [ ] **Step 3: ComputeTab -- check for inline hints**
 
 Scan for any inline hint text and remove.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git commit -am "refactor: remove all inline hints from tab panels — status bar is the single source"
+git commit -am "refactor: remove all inline hints from tab panels -- status bar is the single source"
 ```
 
 ---
@@ -236,7 +236,7 @@ git commit -am "feat: pass overlay state to StatusBar for context-aware hints"
 
 ---
 
-### Task 4: Fix History conversation preview — show more messages
+### Task 4: Fix History conversation preview -- show more messages
 
 **Files:**
 - Modify: `packages/tui/tabs/HistoryTab.tsx`
@@ -264,7 +264,7 @@ setConversationPreview(msgs.slice(-15));
 - [ ] **Step 2: Commit**
 
 ```bash
-git commit -am "fix: History conversation preview — scan more lines, show 15 messages"
+git commit -am "fix: History conversation preview -- scan more lines, show 15 messages"
 ```
 
 ---
@@ -281,8 +281,8 @@ Under TUI Async Rules, add:
 **Status bar = single source of truth for shortcuts.** Hints update based on active tab + pane + overlay. No shortcut text inside panels, overlays, or forms.
 
 **Spinners:**
-- Status bar: icon only (no label) — signals "system is busy"
-- Panel: detailed progress text ("Indexing... 50 files") — shows what's happening
+- Status bar: icon only (no label) -- signals "system is busy"
+- Panel: detailed progress text ("Indexing... 50 files") -- shows what's happening
 
 **Overlay hints:** When a form/overlay is active, status bar shows form controls (Enter:confirm Esc:cancel) instead of tab hints.
 ```
