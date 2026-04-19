@@ -64,11 +64,30 @@ export interface FlowEdgeDefinition {
   label?: string;
 }
 
+export interface FlowFileInput {
+  description?: string;
+  required?: boolean;
+  accept?: string;
+}
+
+export interface FlowParamInput {
+  description?: string;
+  required?: boolean;
+  default?: string;
+  pattern?: string;
+}
+
+export interface FlowInputsSchema {
+  files?: Record<string, FlowFileInput>;
+  params?: Record<string, FlowParamInput>;
+}
+
 export interface FlowDefinition {
   name: string;
   description?: string;
   stages: StageDefinition[];
   edges?: FlowEdgeDefinition[];
+  inputs?: FlowInputsSchema;
 }
 
 // ── Stage navigation ────────────────────────────────────────────────────────

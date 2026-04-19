@@ -3,6 +3,7 @@ import * as Popover from "@radix-ui/react-popover";
 import { api } from "../hooks/useApi.js";
 import { Button } from "./ui/button.js";
 import { FolderPickerModal } from "./FolderPickerModal.js";
+import { InputsSection, type InputsValue } from "./session/InputsSection.js";
 import { cn } from "../lib/utils.js";
 import { relTime, formatRepoName } from "../util.js";
 import {
@@ -105,9 +106,8 @@ interface NewSessionModalProps {
     dispatch: boolean;
     attachments: AttachmentInfo[];
     references: DetectedReference[];
+    inputs?: InputsValue;
   }) => void;
-  /** Whether the daemon conductor is online. When false, session creation is blocked. */
-  daemonOnline?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -748,13 +748,15 @@ function RichTaskInput({
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewSessionModalProps) {
+export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
   const [summary, setSummary] = useState("");
   const [repo, setRepo] = useState(".");
   const [ticket, setTicket] = useState("");
   const [selectedFlow, setSelectedFlow] = useState("");
   const [selectedCompute, setSelectedCompute] = useState("");
   const [attachments, setAttachments] = useState<AttachmentInfo[]>([]);
+  const [inputs, setInputs] = useState<InputsValue>({ files: {}, params: {} });
+  const [inputsValid, setInputsValid] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   // Save trigger so we can restore focus on close.
@@ -843,7 +845,7 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
         onClose();
         return;
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && summary.trim() && daemonOnline) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && summary.trim()) {
         e.preventDefault();
         onSubmit({
           summary,
@@ -856,6 +858,9 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
           dispatch: true,
           attachments,
           references,
+          ...(Object.keys(inputs.files).length || Object.keys(inputs.params).length
+            ? { inputs: { files: { ...inputs.files }, params: { ...inputs.params } } }
+            : {}),
         });
         return;
       }
@@ -912,7 +917,7 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [summary, repo, selectedFlow, ticket, selectedCompute, daemonOnline, onClose, onSubmit, attachments, references]);
+  }, [summary, repo, selectedFlow, ticket, selectedCompute, onClose, onSubmit, attachments, references, inputs]);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -978,6 +983,10 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
           <ComputeDropdown computes={computes} selected={selectedCompute} onSelect={setSelectedCompute} />
         </div>
 
+        {/* Flow inputs (files + params) -- driven by the selected flow's
+            declarative `inputs:` schema plus any ad-hoc extras the user adds. */}
+        <InputsSection flowName={selectedFlow} value={inputs} onChange={setInputs} onValidityChange={setInputsValid} />
+
         {/* Ticket -- conditional */}
         {showTicket && (
           <div className="mb-4">
@@ -994,14 +1003,6 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
                 "placeholder:text-[var(--fg-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]",
               )}
             />
-          </div>
-        )}
-
-        {/* Daemon offline warning */}
-        {!daemonOnline && (
-          <div className="mb-3 px-3 py-2 rounded-md bg-[var(--failed)]/10 border border-[var(--failed)]/30 text-[12px] text-[var(--failed)]">
-            Daemon is offline -- sessions cannot be orchestrated. Start it first:{" "}
-            <code className="bg-[var(--failed)]/10 px-1 py-0.5 rounded text-[11px]">ark server daemon start</code>
           </div>
         )}
 
@@ -1029,8 +1030,8 @@ export function NewSessionModal({ onClose, onSubmit, daemonOnline = true }: NewS
           <Button
             type="submit"
             size="sm"
-            disabled={!summary.trim()}
-            title={!daemonOnline ? "Daemon offline -- session will be created but not dispatched" : undefined}
+            disabled={!summary.trim() || !inputsValid}
+            title={!inputsValid ? "Fill in all required flow inputs before starting" : undefined}
           >
             Start Session{" "}
             <kbd className="ml-1 text-[9px] opacity-40 font-mono bg-[var(--bg-hover)] px-1 py-0.5 rounded">

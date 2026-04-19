@@ -116,6 +116,11 @@ const fixtures: Record<string, MethodFixture> = {
     invalidRequest: { summary: 42 },
     sampleResponse: { session: sampleSession },
   },
+  "input/upload": {
+    validRequest: { name: "goose.yaml", role: "recipe", content: "aGVsbG8=", contentEncoding: "base64" },
+    invalidRequest: { name: "x.yaml", role: "r" },
+    sampleResponse: { path: "/tmp/ark/inputs/abc-recipe/goose.yaml" },
+  },
   "session/read": {
     validRequest: { sessionId: "s-1", include: ["events"] },
     invalidRequest: { sessionId: "" },

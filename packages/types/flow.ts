@@ -86,10 +86,46 @@ export interface StageDefinition {
   subtasks?: { name: string; task: string }[];
 }
 
+/** Declarative description of a file input slot a flow requires. */
+export interface FlowFileInput {
+  /** User-facing description of what this file is for. */
+  description?: string;
+  /** Whether dispatch is blocked without this input. Default false. */
+  required?: boolean;
+  /** Comma-separated list of suggested file extensions (".yaml,.yml"). UI hint. */
+  accept?: string;
+}
+
+/** Declarative description of a param input a flow requires. */
+export interface FlowParamInput {
+  description?: string;
+  required?: boolean;
+  /** Default value if user does not supply one. */
+  default?: string;
+  /** Optional regex the submitted value must match. */
+  pattern?: string;
+}
+
+/**
+ * Declarative inputs contract for a flow. Drives the dispatch-time form
+ * in the web UI and the CLI validator. All inputs end up flattened into
+ * `session.config.inputs.{files,params}` and reachable via
+ * `{inputs.files.<role>}` / `{inputs.params.<key>}` templating.
+ *
+ * Dispatch always accepts additional ad-hoc params beyond what is declared
+ * here. Files are role-keyed and only the declared roles are validated; the
+ * UI may still allow attaching arbitrary extras.
+ */
+export interface FlowInputsSchema {
+  files?: Record<string, FlowFileInput>;
+  params?: Record<string, FlowParamInput>;
+}
+
 export interface FlowDefinition {
   name: string;
   description?: string;
   stages: StageDefinition[];
   edges?: FlowEdgeDefinition[];
+  inputs?: FlowInputsSchema;
   source?: "builtin" | "user";
 }

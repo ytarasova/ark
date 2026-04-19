@@ -40,6 +40,34 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     return { session };
   });
 
+  router.handle("input/upload", async (params) => {
+    const { name, role, content, contentEncoding } = extract<{
+      name: string;
+      role: string;
+      content: string;
+      contentEncoding?: "base64" | "utf-8";
+    }>(params, ["name", "role", "content"]);
+
+    // Persist under arkDir/inputs/<timestamp-role>/<basename>. The folder
+    // per-upload keeps collisions (same `name` uploaded for different roles)
+    // from stomping on each other.
+    const { join, basename } = await import("path");
+    const { mkdirSync, writeFileSync } = await import("fs");
+    const safeName = basename(name).replace(/[^\w.\-]/g, "_");
+    const safeRole = role.replace(/[^\w.\-]/g, "_");
+    const dir = join(app.arkDir, "inputs", `${Date.now().toString(36)}-${safeRole}`);
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, safeName);
+
+    const encoding = contentEncoding ?? "utf-8";
+    if (encoding === "base64") {
+      writeFileSync(path, Buffer.from(content, "base64"));
+    } else {
+      writeFileSync(path, content, "utf-8");
+    }
+    return { path };
+  });
+
   router.handle("session/dispatch", async (params, notify) => {
     const { sessionId } = extract<SessionDispatchParams>(params, ["sessionId"]);
     app.events.log(sessionId, "session_dispatched", {

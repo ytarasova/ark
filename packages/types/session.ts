@@ -91,6 +91,13 @@ export interface Session {
   updated_at: string;
 }
 
+export interface SessionInputs {
+  /** Role-keyed absolute paths to files the session should consume. */
+  files?: Record<string, string>;
+  /** Arbitrary k=v params. Flattened into `{inputs.params.<key>}` templating. */
+  params?: Record<string, string>;
+}
+
 export interface CreateSessionOpts {
   ticket?: string;
   summary?: string;
@@ -102,6 +109,7 @@ export interface CreateSessionOpts {
   group_name?: string;
   config?: Partial<SessionConfig>;
   user_id?: string;
+  inputs?: SessionInputs;
   attachments?: Array<{ name: string; content: string; type: string }>;
 }
 
