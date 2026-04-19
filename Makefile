@@ -17,6 +17,7 @@
         build build-cli build-web build-desktop \
         package package-cli package-desktop \
         vendor-tmux vendor-tensorzero vendor-codegraph \
+        fly-image \
         clean uninstall
 
 BUN := bun
@@ -300,6 +301,9 @@ vendor-tensorzero: ## Build TensorZero gateway from source for all platforms
 
 package-desktop: build-web ## Package Electron app (.dmg + .AppImage)
 	cd packages/desktop && npm install --silent 2>/dev/null && npx electron-builder --mac --linux
+
+fly-image: ## Build + push the arkd-bundled image used by FlyMachinesCompute
+	./scripts/build-fly-image.sh
 
 # ── Other ────────────────────────────────────────────────────────────────────
 
