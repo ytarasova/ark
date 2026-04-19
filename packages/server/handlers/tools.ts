@@ -1,4 +1,6 @@
 import { unlinkSync, existsSync } from "fs";
+import { resolve } from "path";
+import { homedir } from "os";
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
@@ -10,6 +12,23 @@ import type {
   McpAttachParams,
   McpDetachParams,
 } from "../../types/index.js";
+
+/**
+ * Whitelist the directories a claude-skill file may live in.
+ *
+ * Without this guard the `tools/delete` RPC would unlink any path the
+ * server process has write access to -- a remote JSON-RPC client could
+ * pass `source: "/etc/passwd"` (or any config file under the ark user's
+ * home) and the handler would oblige. Restricting deletions to the known
+ * Claude skill directories reduces the blast radius to files the user
+ * already owns via the normal skill lifecycle.
+ */
+function isSafeClaudeSkillPath(p: string): boolean {
+  const abs = resolve(p);
+  const home = homedir();
+  const roots = [resolve(home, ".claude", "skills"), resolve(process.cwd(), ".claude", "skills")];
+  return roots.some((root) => abs === root || abs.startsWith(root + "/"));
+}
 
 export function registerToolsHandlers(router: Router, app: AppContext): void {
   router.handle("tools/list", async (p) => {
@@ -29,6 +48,9 @@ export function registerToolsHandlers(router: Router, app: AppContext): void {
         break;
       case "claude-skill": {
         if (source && source !== "builtin") {
+          if (typeof source !== "string" || !isSafeClaudeSkillPath(source)) {
+            throw new Error("Invalid claude-skill source path");
+          }
           if (existsSync(source)) unlinkSync(source);
         }
         break;
