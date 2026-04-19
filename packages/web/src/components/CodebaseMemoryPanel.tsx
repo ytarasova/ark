@@ -94,7 +94,9 @@ export function CodebaseMemoryPanel() {
 
           {status.tools && status.tools.length > 0 && (
             <div>
-              <div className="text-xs font-medium mb-1 text-foreground">Tools available to agents ({status.tools.length})</div>
+              <div className="text-xs font-medium mb-1 text-foreground">
+                Tools available to agents ({status.tools.length})
+              </div>
               <div className="flex flex-wrap gap-1">
                 {status.tools.map((t) => (
                   <span

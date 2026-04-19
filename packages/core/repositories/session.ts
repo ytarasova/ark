@@ -376,7 +376,7 @@ export class SessionRepository {
       .all(this.tenantId) as Array<{ name: string; created_at: string }>;
   }
 
-  /** Return all group names — union of groups table + distinct session group_names, sorted. */
+  /** Return all group names -- union of groups table + distinct session group_names, sorted. */
   getGroupNames(): string[] {
     const rows = this.db
       .prepare(

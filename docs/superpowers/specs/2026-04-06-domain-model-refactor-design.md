@@ -2,13 +2,13 @@
 
 **Date:** 2026-04-06
 **Status:** Approved
-**Approach:** C — Full repository/service rewrite with shared types package
+**Approach:** C -- Full repository/service rewrite with shared types package
 
 ## Problem
 
 The codebase has no proper domain model layer. Types decay across boundaries:
 
-- `Session.config` and `Compute.config` are `Record<string, unknown>` — every access requires `as any`
+- `Session.config` and `Compute.config` are `Record<string, unknown>` -- every access requires `as any`
 - `ArkClient` returns `Promise<any>` from all 40+ methods
 - Server handlers cast `params as any` on every entry point
 - TUI stores all entities as `any[]`
@@ -47,7 +47,7 @@ packages/
     common.ts         SessionOpResult, PortDecl, ComputeSnapshot, etc.
 
   core/
-    repositories/     SQL layer — one class per entity
+    repositories/     SQL layer -- one class per entity
       session.ts      SessionRepository
       compute.ts      ComputeRepository
       event.ts        EventRepository
@@ -210,7 +210,7 @@ interface Message {
 }
 ```
 
-**RPC param/result types — one pair per method:**
+**RPC param/result types -- one pair per method:**
 
 ```ts
 // Session
@@ -253,7 +253,7 @@ class SessionRepository {
 }
 ```
 
-Column whitelist enforced internally — `update()` skips unknown keys, no SQL injection possible.
+Column whitelist enforced internally -- `update()` skips unknown keys, no SQL injection possible.
 
 **ComputeRepository:**
 
@@ -551,21 +551,21 @@ packages/
 
 ## Deleted Files
 
-- `packages/core/store.ts` — replaced by repositories + schema.ts
-- `packages/core/session.ts` — replaced by SessionService
-- `packages/core/context.ts` — DB lifecycle fully owned by AppContext
-- `packages/core/compute.ts` — replaced by ComputeService
+- `packages/core/store.ts` -- replaced by repositories + schema.ts
+- `packages/core/session.ts` -- replaced by SessionService
+- `packages/core/context.ts` -- DB lifecycle fully owned by AppContext
+- `packages/core/compute.ts` -- replaced by ComputeService
 
 ## Migration Order
 
 Each step compiles and tests pass before proceeding:
 
 1. Create `packages/types/` with all interfaces
-2. Create `packages/core/repositories/` — port SQL from store.ts, rename columns
-3. Create `packages/core/services/` — port logic from session.ts
+2. Create `packages/core/repositories/` -- port SQL from store.ts, rename columns
+3. Create `packages/core/services/` -- port logic from session.ts
 4. Wire into AppContext, update `core/index.ts` re-exports
-5. Update server handlers — AppContext injection + `extract<T>`
-6. Update protocol client — typed returns
-7. Update TUI — typed StoreData + Ink color fix
+5. Update server handlers -- AppContext injection + `extract<T>`
+6. Update protocol client -- typed returns
+7. Update TUI -- typed StoreData + Ink color fix
 8. Delete old files, clean up imports
 9. Reorganize tests to match new structure

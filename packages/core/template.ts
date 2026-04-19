@@ -1,5 +1,5 @@
 /**
- * Template variable substitution — shared by agents and flows.
+ * Template variable substitution -- shared by agents and flows.
  * Replaces {variable} placeholders with session data.
  */
 

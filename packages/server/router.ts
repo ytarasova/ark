@@ -31,7 +31,7 @@ export class Router {
 
   async dispatch(req: JsonRpcRequest, notify?: NotifyFn): Promise<JsonRpcResponse | JsonRpcError> {
     if (this.requireInit && !this.initialized && req.method !== "initialize") {
-      return createErrorResponse(req.id, ErrorCodes.NOT_INITIALIZED, "Not initialized — call initialize first");
+      return createErrorResponse(req.id, ErrorCodes.NOT_INITIALIZED, "Not initialized -- call initialize first");
     }
 
     const handler = this.handlers.get(req.method);

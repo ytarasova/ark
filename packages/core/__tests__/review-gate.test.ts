@@ -1,5 +1,5 @@
 /**
- * Tests for the review gate type — blocks flow until PR is approved,
+ * Tests for the review gate type -- blocks flow until PR is approved,
  * then approveReviewGate(getApp()) force-advances past the gate.
  */
 
@@ -41,7 +41,7 @@ describe("approveReviewGate", () => {
     });
 
     const session = startSession(getApp(), { flow: "pr-flow", summary: "test review gate" });
-    // startSession puts us at stage "code" — advance past auto gate to "wait-review"
+    // startSession puts us at stage "code" -- advance past auto gate to "wait-review"
     const adv = await advance(getApp(), session.id, true);
     expect(adv.ok).toBe(true);
     expect(adv.message).toContain("wait-review");

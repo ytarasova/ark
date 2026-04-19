@@ -14,23 +14,23 @@
 
 ```
 packages/core/
-  claude.ts          — (MODIFY) Add PreToolUse hook to buildHooksConfig
-  conductor.ts       — (MODIFY) Handle PreToolUse guardrail evaluation
-  session.ts         — (MODIFY) Call extractSkillCandidates on completion, add guardrail eval to dispatch
-  telemetry.ts       — (MODIFY) Implement real flush() with HTTP POST
-  config.ts          — (MODIFY) Add telemetry + default_compute config
-  app.ts             — (MODIFY) Init telemetry config at boot
-  update-check.ts    — (MODIFY) Fix TODO — use env var with real default
-  exec.ts            — (DELETE) Dead code
-  index.ts           — (MODIFY) Remove exec export, add new config types
+  claude.ts          -- (MODIFY) Add PreToolUse hook to buildHooksConfig
+  conductor.ts       -- (MODIFY) Handle PreToolUse guardrail evaluation
+  session.ts         -- (MODIFY) Call extractSkillCandidates on completion, add guardrail eval to dispatch
+  telemetry.ts       -- (MODIFY) Implement real flush() with HTTP POST
+  config.ts          -- (MODIFY) Add telemetry + default_compute config
+  app.ts             -- (MODIFY) Init telemetry config at boot
+  update-check.ts    -- (MODIFY) Fix TODO -- use env var with real default
+  exec.ts            -- (DELETE) Dead code
+  index.ts           -- (MODIFY) Remove exec export, add new config types
 packages/web/src/
-  App.tsx             — (MODIFY) Add new views
-  components/Sidebar.tsx — (MODIFY) Add nav items
-  components/AgentsView.tsx    — (CREATE) Agent list + detail
-  components/ToolsView.tsx     — (CREATE) Skills, recipes, MCP servers
-  components/FlowsView.tsx     — (CREATE) Flow list + stage detail
-  components/ComputeView.tsx   — (CREATE) Compute list + metrics
-  components/HistoryView.tsx   — (CREATE) Search + Claude session import
+  App.tsx             -- (MODIFY) Add new views
+  components/Sidebar.tsx -- (MODIFY) Add nav items
+  components/AgentsView.tsx    -- (CREATE) Agent list + detail
+  components/ToolsView.tsx     -- (CREATE) Skills, recipes, MCP servers
+  components/FlowsView.tsx     -- (CREATE) Flow list + stage detail
+  components/ComputeView.tsx   -- (CREATE) Compute list + metrics
+  components/HistoryView.tsx   -- (CREATE) Search + Claude session import
 ```
 
 ---
@@ -83,7 +83,7 @@ describe("guardrails integration", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `bun test packages/core/__tests__/guardrails-integration.test.ts --timeout 30000`
-Expected: FAIL — `evaluateToolCall` not exported
+Expected: FAIL -- `evaluateToolCall` not exported
 
 - [ ] **Step 3: Add `evaluateToolCall` wrapper to guardrails.ts**
 
@@ -225,7 +225,7 @@ describe("skill extraction integration", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `bun test packages/core/__tests__/skill-extractor-integration.test.ts --timeout 30000`
-Expected: FAIL — `extractAndSaveSkills` not exported
+Expected: FAIL -- `extractAndSaveSkills` not exported
 
 - [ ] **Step 3: Add `extractAndSaveSkills` to skill-extractor.ts**
 
@@ -343,7 +343,7 @@ describe("telemetry flush", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `bun test packages/core/__tests__/telemetry-flush.test.ts --timeout 30000`
-Expected: FAIL — `configureTelemetry` not exported
+Expected: FAIL -- `configureTelemetry` not exported
 
 - [ ] **Step 3: Implement real flush in telemetry.ts**
 
@@ -351,7 +351,7 @@ Replace the telemetry.ts content:
 
 ```typescript
 /**
- * Optional telemetry — tracks usage events for improving Ark.
+ * Optional telemetry -- tracks usage events for improving Ark.
  * Disabled by default. Enable via config or ARK_TELEMETRY=1.
  * All data is anonymized (no PII, no session content).
  */
@@ -409,7 +409,7 @@ export async function flush(): Promise<void> {
       body: JSON.stringify({ events }),
     });
   } catch {
-    // Fire-and-forget — telemetry failure never blocks
+    // Fire-and-forget -- telemetry failure never blocks
   }
 }
 ```
@@ -492,7 +492,7 @@ describe("compute default config", () => {
 - [ ] **Step 2: Run test to verify it fails**
 
 Run: `bun test packages/core/__tests__/compute-default.test.ts --timeout 30000`
-Expected: FAIL — `default_compute` not in ArkConfig
+Expected: FAIL -- `default_compute` not in ArkConfig
 
 - [ ] **Step 3: Add default_compute to ArkConfig**
 
@@ -552,13 +552,13 @@ With:
 const REPO = process.env.ARK_GITHUB_REPO ?? "yana/ark";
 ```
 
-Just remove the TODO comment — the code already uses `"yana/ark"` as default and `ARK_GITHUB_REPO` env var as override. The TODO was stale.
+Just remove the TODO comment -- the code already uses `"yana/ark"` as default and `ARK_GITHUB_REPO` env var as override. The TODO was stale.
 
 - [ ] **Step 2: Commit**
 
 ```bash
 git add packages/core/update-check.ts
-git commit -m "chore: remove stale TODO from update-check — repo default is correct"
+git commit -m "chore: remove stale TODO from update-check -- repo default is correct"
 ```
 
 ---
@@ -592,7 +592,7 @@ Expected: PASS (no other file imports exec.ts)
 
 ```bash
 git add -A packages/core/exec.ts packages/core/__tests__/exec.test.ts packages/core/index.ts
-git commit -m "chore: remove dead exec.ts FFI module — unused by any caller"
+git commit -m "chore: remove dead exec.ts FFI module -- unused by any caller"
 ```
 
 ---
@@ -685,7 +685,7 @@ git commit -m "feat: extend prompt injection guard to session dispatch"
 - Create: `packages/web/src/components/HistoryView.tsx`
 - Modify: `packages/web/src/hooks/useApi.ts` (add missing API calls)
 
-This task is large but self-contained — it's all React frontend calling existing API endpoints. The web server (`packages/core/web.ts`) already has all the endpoints: `/api/agents`, `/api/skills`, `/api/recipes`, `/api/flows`, `/api/search`, etc.
+This task is large but self-contained -- it's all React frontend calling existing API endpoints. The web server (`packages/core/web.ts`) already has all the endpoints: `/api/agents`, `/api/skills`, `/api/recipes`, `/api/flows`, `/api/search`, etc.
 
 - [ ] **Step 1: Check the existing useApi hook**
 
@@ -815,7 +815,7 @@ export function ToolsView() {
             <div className="detail-section">
               <div className="label">Variables:</div>
               {selected.variables.map((v: any) => (
-                <div key={v.name} className="detail-row">  {v.name}{v.required ? " *" : ""} — {v.description}</div>
+                <div key={v.name} className="detail-row">  {v.name}{v.required ? " *" : ""} -- {v.description}</div>
               ))}
             </div>
           )}
@@ -864,7 +864,7 @@ export function FlowsView() {
               <thead><tr><th>#</th><th>Name</th><th>Agent</th><th>Gate</th></tr></thead>
               <tbody>
                 {(selected.stages ?? []).map((s: any, i: number) => (
-                  <tr key={s.name}><td>{i + 1}</td><td>{s.name}</td><td>{s.agent ?? "—"}</td><td>{s.gate ?? "auto"}</td></tr>
+                  <tr key={s.name}><td>{i + 1}</td><td>{s.name}</td><td>{s.agent ?? "--"}</td><td>{s.gate ?? "auto"}</td></tr>
                 ))}
               </tbody>
             </table>
@@ -1025,5 +1025,5 @@ cd packages/web && bun run build.ts
 
 ```bash
 git add packages/web/
-git commit -m "feat: expand web UI to full feature parity — agents, tools, flows, compute, history"
+git commit -m "feat: expand web UI to full feature parity -- agents, tools, flows, compute, history"
 ```

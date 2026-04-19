@@ -1,4 +1,4 @@
-# Cron Scheduling + Tiered Autonomy — Implementation Plan
+# Cron Scheduling + Tiered Autonomy -- Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -6,7 +6,7 @@
 
 **Architecture:** Two independent features sharing a plan. Cron: a `schedules` table + `ark schedule` CLI commands + a background poller in the conductor that creates sessions on schedule. Autonomy: an `autonomy` field on `StageDefinition` that maps to Claude Code permission flags and `.claude/settings.local.json` permission rules at dispatch time.
 
-**Tech Stack:** SQLite (schedules table), cron expression parsing (simple custom parser — no dependency), existing flow/session/claude infrastructure
+**Tech Stack:** SQLite (schedules table), cron expression parsing (simple custom parser -- no dependency), existing flow/session/claude infrastructure
 
 ---
 
@@ -28,8 +28,8 @@
 ### Task 1: Schedules table + CRUD
 
 **Files:**
-- Modify: `packages/core/store.ts` — add `schedules` table
-- Create: `packages/core/schedule.ts` — CRUD + cron matching
+- Modify: `packages/core/store.ts` -- add `schedules` table
+- Create: `packages/core/schedule.ts` -- CRUD + cron matching
 - Create: `packages/core/__tests__/schedule.test.ts`
 - Modify: `packages/core/index.ts`
 
@@ -171,7 +171,7 @@ ark schedule disable <id>
 - [ ] **Step 3: Commit**
 
 ```bash
-git commit -m "feat: ark schedule CLI — add, list, delete, enable, disable"
+git commit -m "feat: ark schedule CLI -- add, list, delete, enable, disable"
 ```
 
 ---
@@ -227,7 +227,7 @@ export interface ClaudeArgsOpts {
 if (opts.autonomy === "full" || opts.autonomy === "execute" || !opts.autonomy) {
   args.push("--dangerously-skip-permissions");
 } else {
-  // edit or read-only — don't add --dangerously-skip-permissions
+  // edit or read-only -- don't add --dangerously-skip-permissions
   // Permission restrictions go in .claude/settings.local.json via writeHooksConfig
 }
 ```
@@ -297,7 +297,7 @@ Tests:
 - [ ] **Step 7: Commit**
 
 ```bash
-git commit -m "feat: tiered autonomy — full/execute/edit/read-only per flow stage"
+git commit -m "feat: tiered autonomy -- full/execute/edit/read-only per flow stage"
 ```
 
 ---

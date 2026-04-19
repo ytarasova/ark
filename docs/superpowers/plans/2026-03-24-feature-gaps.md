@@ -1,6 +1,6 @@
 # Ark Feature Gap Analysis & Roadmap
 
-> **Based on:** Competitive research across 8 tools — DeerFlow (ByteDance), Conductor.build (Melty Labs), Agent-Deck, OpenCode, E2B, Factory AI, Pi (badlogic), Goose (Block) — plus Claude Code settings/hooks documentation.
+> **Based on:** Competitive research across 8 tools -- DeerFlow (ByteDance), Conductor.build (Melty Labs), Agent-Deck, OpenCode, E2B, Factory AI, Pi (badlogic), Goose (Block) -- plus Claude Code settings/hooks documentation.
 
 **Goal:** Identify the highest-impact feature gaps between Ark and the competitive landscape, then prioritize them into actionable work.
 
@@ -14,22 +14,22 @@ The gaps fall into 4 tiers:
 
 | Tier | Theme | Impact |
 |------|-------|--------|
-| **P0 — Do Now** | Agent status via hooks, context compaction | Fixes critical fragility |
-| **P1 — High Value** | Session persistence, headless CI mode, OTEL observability, sub-agent fan-out, cost tracking | Unlocks new use cases |
-| **P2 — Differentiators** | Checkpoints, recipe templating, plugin/skill system, session forking, structured review, cron scheduling, tiered autonomy, guardrails | Polish and extensibility |
-| **P3 — Future** | Web UI, MicroVM sandboxing, multi-provider LLM, MCP socket pool, chat bridges, in-VM daemon | Larger architectural shifts |
+| **P0 -- Do Now** | Agent status via hooks, context compaction | Fixes critical fragility |
+| **P1 -- High Value** | Session persistence, headless CI mode, OTEL observability, sub-agent fan-out, cost tracking | Unlocks new use cases |
+| **P2 -- Differentiators** | Checkpoints, recipe templating, plugin/skill system, session forking, structured review, cron scheduling, tiered autonomy, guardrails | Polish and extensibility |
+| **P3 -- Future** | Web UI, MicroVM sandboxing, multi-provider LLM, MCP socket pool, chat bridges, in-VM daemon | Larger architectural shifts |
 
 ---
 
-## P0 — Do Now (Critical)
+## P0 -- Do Now (Critical)
 
 ### 1. Hook-Based Agent Status Detection
 
-**Gap:** Ark polls tmux pane output to detect agent status — fragile, high-latency, unreliable.
+**Gap:** Ark polls tmux pane output to detect agent status -- fragile, high-latency, unreliable.
 
 **Solution (from agent-deck + Claude Code docs):**
 
-Use `.claude/settings.local.json` in the **session working directory** (not global `~/.claude/settings.json`). Claude Code merges hook arrays additively across scopes — no clobbering.
+Use `.claude/settings.local.json` in the **session working directory** (not global `~/.claude/settings.json`). Claude Code merges hook arrays additively across scopes -- no clobbering.
 
 **Architecture:**
 
@@ -43,7 +43,7 @@ claude.writeHooksConfig() called at dispatch time (next to writeChannelConfig)
             → TUI refreshes via existing poll cycle
 ```
 
-**This belongs in `claude.ts` as a new `writeHooksConfig()` function** — the same module that already handles `writeChannelConfig()`, `buildLauncher()`, and `trustDirectory()`. It's called from `launchAgentTmux()` in `session.ts` right after `writeChannelConfig()` (line 345).
+**This belongs in `claude.ts` as a new `writeHooksConfig()` function** -- the same module that already handles `writeChannelConfig()`, `buildLauncher()`, and `trustDirectory()`. It's called from `launchAgentTmux()` in `session.ts` right after `writeChannelConfig()` (line 345).
 
 **Important: Hooks are ONLY for agent status detection.** They are NOT part of the channel/conductor communication system. The conductor already handles agent↔human messaging via MCP channels. Hooks solve a different, narrower problem: knowing when the agent's status changes (running/idle/error/done) without polling tmux output. The hook HTTP endpoint is a simple status receiver, completely separate from the channel protocol.
 
@@ -56,7 +56,7 @@ claude.writeHooksConfig() called at dispatch time (next to writeChannelConfig)
 | **Docker/devcontainer** | `http://host.docker.internal:19100` | Docker bridge |
 | **Worktree** | Same as parent | Writes to worktree's `.claude/` dir |
 
-The `conductorUrl` logic already exists in `launchAgentTmux` (lines 339-341) — reuse it.
+The `conductorUrl` logic already exists in `launchAgentTmux` (lines 339-341) -- reuse it.
 
 **Settings merge strategy:**
 
@@ -72,13 +72,13 @@ The `conductorUrl` logic already exists in `launchAgentTmux` (lines 339-341) —
 |-------------|------------|---------|
 | `SessionStart` (startup) | `running` | `startup` |
 | `SessionStart` (resume) | `running` | `resume` |
-| `UserPromptSubmit` | `running` | — |
-| `Stop` | `idle` (turn complete) | — |
-| `StopFailure` | `error` | — |
-| `SessionEnd` | `completed` or `failed` | — |
+| `UserPromptSubmit` | `running` | -- |
+| `Stop` | `idle` (turn complete) | -- |
+| `StopFailure` | `error` | -- |
+| `SessionEnd` | `completed` or `failed` | -- |
 | `Notification` | `waiting` | `permission_prompt\|idle_prompt` |
 
-**Hook format (HTTP type — no shell scripts needed):**
+**Hook format (HTTP type -- no shell scripts needed):**
 
 ```json
 {
@@ -108,18 +108,18 @@ The `conductorUrl` logic already exists in `launchAgentTmux` (lines 339-341) —
 ```
 
 **Key details:**
-- `type: "http"` hooks POST the full hook payload (session_id, transcript_path, hook_event_name, event-specific fields) directly to the conductor — no shell scripts, no file watchers
-- Conductor URL varies by compute target (local vs docker vs EC2) — same logic as channel config
+- `type: "http"` hooks POST the full hook payload (session_id, transcript_path, hook_event_name, event-specific fields) directly to the conductor -- no shell scripts, no file watchers
+- Conductor URL varies by compute target (local vs docker vs EC2) -- same logic as channel config
 - `ARK_SESSION_ID` set as tmux env var for correlation (already done for channel)
-- Fallback: keep tmux polling as degraded path (agent-deck pattern — 2-min freshness window)
+- Fallback: keep tmux polling as degraded path (agent-deck pattern -- 2-min freshness window)
 - Atomic write (write to `.tmp`, rename) to avoid partial reads
 - Cleanup: remove ark hooks from settings.local.json on session delete (like `writeChannelConfig` writes `.mcp.json`)
 
 **Files to touch:**
-- `claude.ts` — new `writeHooksConfig(sessionId, statusUrl, workdir)` + `removeHooksConfig(workdir)`. This is purely a Claude config writer, like `writeChannelConfig()` is for MCP.
-- `session.ts:launchAgentTmux()` — call `writeHooksConfig()` after `writeChannelConfig()` (line 345)
-- `conductor.ts` — new `POST /hooks/status` endpoint. This is a **tiny** status receiver (parse event → update session status in SQLite). It is NOT part of the channel protocol — channels handle agent↔human messaging via MCP; hooks just report agent busy/idle/error/done.
-- `store.ts` — no changes (existing `updateSession` handles status)
+- `claude.ts` -- new `writeHooksConfig(sessionId, statusUrl, workdir)` + `removeHooksConfig(workdir)`. This is purely a Claude config writer, like `writeChannelConfig()` is for MCP.
+- `session.ts:launchAgentTmux()` -- call `writeHooksConfig()` after `writeChannelConfig()` (line 345)
+- `conductor.ts` -- new `POST /hooks/status` endpoint. This is a **tiny** status receiver (parse event → update session status in SQLite). It is NOT part of the channel protocol -- channels handle agent↔human messaging via MCP; hooks just report agent busy/idle/error/done.
+- `store.ts` -- no changes (existing `updateSession` handles status)
 
 **Effort:** ~2 days.
 
@@ -140,7 +140,7 @@ The `conductorUrl` logic already exists in `launchAgentTmux` (lines 339-341) —
 
 ---
 
-## P1 — High Value
+## P1 -- High Value
 
 ### 3. Headless CI/CD Execution Mode
 
@@ -166,12 +166,12 @@ The `conductorUrl` logic already exists in `launchAgentTmux` (lines 339-341) —
 **Found in:** Factory AI (13 OTEL metrics), Goose (Langfuse + MLflow integration).
 
 **Recommended metrics (OTEL):
-- `ark.session.duration` — per session
-- `ark.session.count` — by status
-- `ark.stage.duration` — per pipeline stage
-- `ark.agent.tokens` — per model/session
-- `ark.compute.cost` — per provider
-- `ark.tool.invocations` — per tool name
+- `ark.session.duration` -- per session
+- `ark.session.count` -- by status
+- `ark.stage.duration` -- per pipeline stage
+- `ark.agent.tokens` -- per model/session
+- `ark.compute.cost` -- per provider
+- `ark.tool.invocations` -- per tool name
 
 **Effort:** ~2 days. Add OTLP HTTP exporter, instrument conductor and session lifecycle.
 
@@ -223,7 +223,7 @@ The `conductorUrl` logic already exists in `launchAgentTmux` (lines 339-341) —
 
 ---
 
-## P2 — Differentiators
+## P2 -- Differentiators
 
 ### 8. Turn-Level Checkpoints (Git Refs)
 
@@ -267,7 +267,7 @@ stages:
 **Found in:** Pi (full extension lifecycle with event hooks, custom tools, UI components), Goose (MCP-native extensions), Factory AI (plugin registry), DeerFlow (middleware pipeline).
 
 **Solution (phased):**
-- **Phase 1:** Implement the Agent Skills standard (agentskills.io) — SKILL.md discovery from `.ark/skills/`, `~/.ark/skills/`, and walking up directories. Ark already references "Pi-style SKILL.md discovery" in agent.ts.
+- **Phase 1:** Implement the Agent Skills standard (agentskills.io) -- SKILL.md discovery from `.ark/skills/`, `~/.ark/skills/`, and walking up directories. Ark already references "Pi-style SKILL.md discovery" in agent.ts.
 - **Phase 2:** Hook-based lifecycle events (pre/post stage transition, pre/post tool use) for custom validation, formatting, notification.
 - **Phase 3:** Custom tool registration via MCP servers declared in agent definitions (already partially supported).
 
@@ -356,7 +356,7 @@ Conductor parses this on stage completion. P0 issues auto-block the pipeline (li
 
 ### 15. Tiered Autonomy Controls
 
-**Gap:** Ark uses `permission_mode: bypassPermissions` — all or nothing. No granular control.
+**Gap:** Ark uses `permission_mode: bypassPermissions` -- all or nothing. No granular control.
 
 **Found in:** Factory AI (read-only/low/medium/high/unsafe levels with fail-fast), Goose (4 permission modes: auto/approve/smart_approve/chat with per-tool granularity).
 
@@ -391,7 +391,7 @@ Set per-stage in flow definitions: `autonomy: edit`. Conductor enforces via Clau
 
 ---
 
-## P3 — Future / Larger Efforts
+## P3 -- Future / Larger Efforts
 
 ### 17. Session Search (Conversations, Memories, Events)
 
@@ -400,14 +400,14 @@ Set per-stage in flow definitions: `autonomy: edit`. Conductor enforces via Clau
 **Found in:** Agent-Deck (fuzzy + regex search across all Claude JSONL transcripts), Goose (SQLite-backed conversation persistence with query).
 
 **Solution:** Two approaches (can do both):
-- **Simple (grep-style):** `ark search "auth bug"` — scans Claude transcript JSONL files in `~/.claude/projects/*/` and Ark's event log in SQLite. Fast, no indexing needed. Filter by session, date range, role (agent/user).
+- **Simple (grep-style):** `ark search "auth bug"` -- scans Claude transcript JSONL files in `~/.claude/projects/*/` and Ark's event log in SQLite. Fast, no indexing needed. Filter by session, date range, role (agent/user).
 - **Fancy (embeddings):** Index conversation chunks with embeddings, store in SQLite (or a vector extension). Semantic search across all sessions. Higher effort, better recall.
 
-Start with grep-style — it's immediate and covers 90% of use cases. Add semantic search later if needed.
+Start with grep-style -- it's immediate and covers 90% of use cases. Add semantic search later if needed.
 
 Also searchable: Ark's event audit trail (`store.logEvent` entries), agent definitions, flow definitions.
 
-**TUI integration:** Add search to the Sessions tab — `/` key opens search, results filter the session list or show matching conversation excerpts.
+**TUI integration:** Add search to the Sessions tab -- `/` key opens search, results filter the session list or show matching conversation excerpts.
 
 **Effort:** ~2 days for grep-style. ~5 days with embeddings.
 
@@ -419,7 +419,7 @@ Also searchable: Ark's event audit trail (`store.logEvent` entries), agent defin
 
 **Solution:** `ark session import --claude-session <id> --repo /path/to/repo`
 
-1. List available Claude sessions: `ark claude sessions` — reads from Claude's local storage, shows session IDs, dates, repos, summaries
+1. List available Claude sessions: `ark claude sessions` -- reads from Claude's local storage, shows session IDs, dates, repos, summaries
 2. Import a session: creates an Ark session bound to:
    - The Claude session ID (for `--resume`)
    - The repo/workdir where the Claude session was created
@@ -496,7 +496,7 @@ Replace SSH + tmux for remote compute interaction with a purpose-built daemon. F
 
 **Found in:** DeerFlow (LLM-powered fact extraction), Goose (memory extension), Pi (MEMORY.md).
 
-An organizational knowledge base that persists across sessions — user preferences, repo conventions, past decisions. Currently Ark has per-agent `memories` references but no extraction or persistence system.
+An organizational knowledge base that persists across sessions -- user preferences, repo conventions, past decisions. Currently Ark has per-agent `memories` references but no extraction or persistence system.
 
 **Effort:** Medium. Memory extraction hook + SQLite storage + system prompt injection.
 
@@ -516,16 +516,16 @@ Remote agent monitoring and control via messaging platforms.
 
 The recommended execution order for maximum impact:
 
-1. **Hook-based status detection** (#1, P0) — eliminates the biggest fragility
-2. **Cost tracking from transcripts** (#7, P1) — quick win once hooks exist
-3. **Session search** (#17, P2) — grep-style, immediate value
-4. **Import Claude sessions** (#18, P2) — bridges existing Claude work into Ark
-5. **Pipeline templating** (#9, P2) — quick win, extends existing pattern
-6. **Headless CI mode** (#3, P1) — unlocks automation use cases
-7. **OTEL observability** (#4, P1) — visibility into pipeline execution
-8. **Session conversation persistence** (#5, P1) — enables search/fork/analytics
-9. **SKILL.md discovery** (#10 Phase 1, P2) — foundational for extensibility
-10. **Sub-agent fan-out** (#6, P1) — enhances existing fork infrastructure
+1. **Hook-based status detection** (#1, P0) -- eliminates the biggest fragility
+2. **Cost tracking from transcripts** (#7, P1) -- quick win once hooks exist
+3. **Session search** (#17, P2) -- grep-style, immediate value
+4. **Import Claude sessions** (#18, P2) -- bridges existing Claude work into Ark
+5. **Pipeline templating** (#9, P2) -- quick win, extends existing pattern
+6. **Headless CI mode** (#3, P1) -- unlocks automation use cases
+7. **OTEL observability** (#4, P1) -- visibility into pipeline execution
+8. **Session conversation persistence** (#5, P1) -- enables search/fork/analytics
+9. **SKILL.md discovery** (#10 Phase 1, P2) -- foundational for extensibility
+10. **Sub-agent fan-out** (#6, P1) -- enhances existing fork infrastructure
 
 ---
 

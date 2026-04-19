@@ -47,7 +47,7 @@ const mcp = new Server(
       "When you have a question for the human, call `report` with type='question'.",
       "When you encounter an error, call `report` with type='error'.",
       "Periodically call `report` with type='progress' to update on your work.",
-      "When you receive a steer message from a user, always call `report` with type='progress' to acknowledge and respond — this is how your replies appear in the chat UI.",
+      "When you receive a steer message from a user, always call `report` with type='progress' to acknowledge and respond -- this is how your replies appear in the chat UI.",
     ].join("\n"),
   },
 );
@@ -69,7 +69,7 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
           },
           message: {
             type: "string",
-            description: "Report content — summary, question text, or error message",
+            description: "Report content -- summary, question text, or error message",
           },
           filesChanged: {
             type: "array",
@@ -120,7 +120,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
 
   if (req.params.name === "report") {
     const reportType = args.type as string;
-    // Agents sometimes pass "summary" instead of "message" — accept both
+    // Agents sometimes pass "summary" instead of "message" -- accept both
     const message = (args.message ?? args.summary ?? args.question ?? args.error ?? "") as string;
 
     const report: OutboundMessage = (() => {

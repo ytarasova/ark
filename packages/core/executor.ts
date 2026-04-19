@@ -1,5 +1,5 @@
 /**
- * Executor abstraction — pluggable agent runtime interface.
+ * Executor abstraction -- pluggable agent runtime interface.
  *
  * Decouples session dispatch from Claude Code. Each executor
  * implements launch/kill/status/send/capture for a specific runtime.

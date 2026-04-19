@@ -1,5 +1,5 @@
 /**
- * Tests for store context DI — verifies test isolation works via AppContext.
+ * Tests for store context DI -- verifies test isolation works via AppContext.
  */
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";

@@ -1,5 +1,5 @@
 /**
- * Notification daemon — watches session status transitions
+ * Notification daemon -- watches session status transitions
  * and sends bridge notifications with adaptive polling.
  */
 

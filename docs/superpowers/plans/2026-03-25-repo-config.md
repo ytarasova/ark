@@ -1,4 +1,4 @@
-# Repo-Scoped Config (.ark.yaml) — Implementation Plan
+# Repo-Scoped Config (.ark.yaml) -- Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -30,7 +30,7 @@ All fields optional. Explicit CLI/TUI options override everything.
 
 | File | Change |
 |------|--------|
-| `packages/core/repo-config.ts` | **Create:** `loadRepoConfig(dir)` — reads and parses `.ark.yaml` |
+| `packages/core/repo-config.ts` | **Create:** `loadRepoConfig(dir)` -- reads and parses `.ark.yaml` |
 | `packages/core/index.ts` | **Modify:** Re-export |
 | `packages/core/session.ts` | **Modify:** `startSession` merges repo config defaults |
 | `packages/tui/forms/NewSessionForm.tsx` | **Modify:** Pre-fill from repo config when repo changes |
@@ -141,7 +141,7 @@ Tests: add to existing `session-compute.test.ts` or create new:
 - [ ] **Step 4: Commit**
 
 ```bash
-git commit -m "feat: startSession merges .ark.yaml defaults — flow, compute, group"
+git commit -m "feat: startSession merges .ark.yaml defaults -- flow, compute, group"
 ```
 
 ---
@@ -169,7 +169,7 @@ useEffect(() => {
 }, [repoConfig]);
 ```
 
-This is a UX enhancement — when you pick a repo that has `.ark.yaml`, the form auto-fills with project defaults.
+This is a UX enhancement -- when you pick a repo that has `.ark.yaml`, the form auto-fills with project defaults.
 
 - [ ] **Step 1: Add repo config loading to form**
 - [ ] **Step 2: Test manually in TUI**

@@ -1,4 +1,4 @@
-# Review Gate + GitHub Webhook — Implementation Plan
+# Review Gate + GitHub Webhook -- Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -15,9 +15,9 @@
 | File | Change |
 |------|--------|
 | `packages/core/flow.ts` | **Modify:** Add `review` gate type to `evaluateGate` |
-| `packages/core/github-webhook.ts` | **Create:** Webhook handler — HMAC validation, comment extraction, session binding |
+| `packages/core/github-webhook.ts` | **Create:** Webhook handler -- HMAC validation, comment extraction, session binding |
 | `packages/core/conductor.ts` | **Modify:** Add `/api/webhook/github` endpoint, wire to handler |
-| `packages/core/session.ts` | **Modify:** Add `approveReviewGate()` — opens review gate for a session |
+| `packages/core/session.ts` | **Modify:** Add `approveReviewGate()` -- opens review gate for a session |
 | `packages/core/store.ts` | **Modify:** Add index on `pr_url` for fast PR→session lookup |
 | `packages/core/index.ts` | **Modify:** Re-exports |
 | `packages/cli/index.ts` | **Modify:** Add `ark pr` commands |
@@ -46,7 +46,7 @@ Like `manual`, it always blocks. The conductor opens it via `session.advance(id,
 In `session.ts`, add:
 
 ```ts
-/** Open a review gate — called when PR is approved via webhook. */
+/** Open a review gate -- called when PR is approved via webhook. */
 export function approveReviewGate(sessionId: string): { ok: boolean; message: string } {
   const s = store.getSession(sessionId);
   if (!s) return { ok: false, message: "Session not found" };
@@ -71,7 +71,7 @@ Re-export `approveReviewGate` from `index.ts`.
 Tests:
 - `evaluateGate` with `review` returns `canProceed: false`
 - `approveReviewGate` advances a session past a review stage
-- Session with no review stage — approveReviewGate returns error
+- Session with no review stage -- approveReviewGate returns error
 
 - [ ] **Step 1: Add review gate + approveReviewGate + index**
 - [ ] **Step 2: Write tests**
@@ -79,7 +79,7 @@ Tests:
 - [ ] **Step 4: Commit**
 
 ```bash
-git commit -m "feat: review gate type — blocks flow until PR approved"
+git commit -m "feat: review gate type -- blocks flow until PR approved"
 ```
 
 ---
@@ -280,7 +280,7 @@ Tests:
 - [ ] **Step 4: Commit**
 
 ```bash
-git commit -m "feat: GitHub webhook handler — HMAC validation, comment extraction, session binding"
+git commit -m "feat: GitHub webhook handler -- HMAC validation, comment extraction, session binding"
 ```
 
 ---
@@ -340,7 +340,7 @@ git commit -m "feat: conductor /api/webhook/github endpoint + ark pr CLI"
 
 Full flow test:
 1. Create a session with a flow that has `gate: review`
-2. Dispatch — session runs, agent completes the implement stage
+2. Dispatch -- session runs, agent completes the implement stage
 3. Agent completes → advance → hits review gate → blocks
 4. Simulate GitHub webhook with `changes_requested` → verify steer
 5. Simulate GitHub webhook with `approved` → verify gate opens, flow advances

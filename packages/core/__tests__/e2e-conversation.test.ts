@@ -47,7 +47,7 @@ afterAll(async () => {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Claude session ID used in hook payloads — must appear in the transcript path
+/** Claude session ID used in hook payloads -- must appear in the transcript path
  *  to pass the conductor's "belongs to this session" guard. */
 const CLAUDE_SESSION_ID = "test-claude-session";
 
@@ -145,7 +145,7 @@ describe("E2E: Incremental indexing", () => {
       assistantTurn("I will implement the Redis caching layer now", "2026-01-01T00:02:00Z"),
     ]);
 
-    // First Stop hook — indexes initial messages
+    // First Stop hook -- indexes initial messages
     await postHookStatus(session.id, {
       hook_event_name: "Stop",
       transcript_path: transcriptPath,
@@ -177,7 +177,7 @@ describe("E2E: Incremental indexing", () => {
 
 describe("E2E: Per-session search", () => {
   it("searchSessionConversation is scoped to one session", async () => {
-    // Session A — talks about authentication
+    // Session A -- talks about authentication
     const sessionA = getApp().sessions.create({ summary: "e2e-search-A" });
     app.sessions.update(sessionA.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
     const pathA = writeTranscript(app.config.arkDir, "conv-a.jsonl", [
@@ -186,7 +186,7 @@ describe("E2E: Per-session search", () => {
     ]);
     await postHookStatus(sessionA.id, { hook_event_name: "Stop", transcript_path: pathA });
 
-    // Session B — talks about database
+    // Session B -- talks about database
     const sessionB = getApp().sessions.create({ summary: "e2e-search-B" });
     app.sessions.update(sessionB.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
     const pathB = writeTranscript(app.config.arkDir, "conv-b.jsonl", [
@@ -195,18 +195,18 @@ describe("E2E: Per-session search", () => {
     ]);
     await postHookStatus(sessionB.id, { hook_event_name: "Stop", transcript_path: pathB });
 
-    // Search A for "authentication" — should find results
+    // Search A for "authentication" -- should find results
     const resultsA = searchSessionConversation(getApp(), sessionA.id, "authentication");
     expect(resultsA.length).toBeGreaterThan(0);
     for (const r of resultsA) {
       expect(r.sessionId).toBe(sessionA.id);
     }
 
-    // Search B for "authentication" — should find nothing (it's about database)
+    // Search B for "authentication" -- should find nothing (it's about database)
     const resultsB = searchSessionConversation(getApp(), sessionB.id, "authentication");
     expect(resultsB.length).toBe(0);
 
-    // Search B for "database" — should find results
+    // Search B for "database" -- should find results
     const resultsBdb = searchSessionConversation(getApp(), sessionB.id, "database");
     expect(resultsBdb.length).toBeGreaterThan(0);
     for (const r of resultsBdb) {
@@ -217,7 +217,7 @@ describe("E2E: Per-session search", () => {
 
 describe("E2E: Cross-session search", () => {
   it("searchTranscripts finds matches across both sessions via FTS5", async () => {
-    // Session C — mentions "deployment pipeline"
+    // Session C -- mentions "deployment pipeline"
     const sessionC = getApp().sessions.create({ summary: "e2e-cross-C" });
     app.sessions.update(sessionC.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
     const pathC = writeTranscript(app.config.arkDir, "conv-c.jsonl", [
@@ -225,7 +225,7 @@ describe("E2E: Cross-session search", () => {
     ]);
     await postHookStatus(sessionC.id, { hook_event_name: "Stop", transcript_path: pathC });
 
-    // Session D — also mentions "deployment"
+    // Session D -- also mentions "deployment"
     const sessionD = getApp().sessions.create({ summary: "e2e-cross-D" });
     app.sessions.update(sessionD.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
     const pathD = writeTranscript(app.config.arkDir, "conv-d.jsonl", [

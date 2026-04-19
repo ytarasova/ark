@@ -1,5 +1,5 @@
 /**
- * GitHub Issues polling — auto-creates sessions from labeled issues.
+ * GitHub Issues polling -- auto-creates sessions from labeled issues.
  *
  * Polls `gh issue list` for issues with a specific label.
  * For each new issue (not already linked to a session), creates a session

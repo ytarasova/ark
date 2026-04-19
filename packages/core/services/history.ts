@@ -1,5 +1,5 @@
 /**
- * HistoryService — wraps search and indexing operations.
+ * HistoryService -- wraps search and indexing operations.
  *
  * Kept minimal: delegates to the existing search module functions.
  * Full transcript indexing integration will be added in a later pass.
