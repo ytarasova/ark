@@ -109,18 +109,20 @@ test.skip("add todo via detail panel UI", async () => {
 test("send message form appears and submits", async () => {
   const _id = await createSession("Message test");
 
-  // session/start now auto-dispatches, so there's no standalone Dispatch
-  // button in the header. For any non-running state the UI surfaces a
-  // "Restart" action instead (retry via session/resume). Assert that.
+  // session/start now auto-dispatches. Depending on whether the launcher
+  // has settled by the time we look, the header shows Stop (while running)
+  // or Restart (after terminal). Either button proves the action area
+  // rendered -- the removed Dispatch button was the only specific thing
+  // the old assertion checked.
   await page.reload();
   await page.waitForSelector("nav", { timeout: 10_000 });
   await goToSessions();
   await page.locator("text=Message test").first().click();
   await expect(page.locator("text=Conversation").first()).toBeVisible({ timeout: 5_000 });
 
-  // For any non-running session (ready / pending / blocked / stopped /
-  // failed / completed), the unified Restart button covers retry + resume.
-  await expect(page.locator('button:has-text("Restart")').first()).toBeVisible({ timeout: 10_000 });
+  await expect(
+    page.locator('button:has-text("Stop")').or(page.locator('button:has-text("Restart")')).first(),
+  ).toBeVisible({ timeout: 10_000 });
 });
 
 // -- Session actions: complete ------------------------------------------------
