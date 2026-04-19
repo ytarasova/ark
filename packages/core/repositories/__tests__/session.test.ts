@@ -165,6 +165,64 @@ describe("SessionRepository", () => {
     expect(result.length).toBe(2);
   });
 
+  it("list filters by group_name", () => {
+    repo.create({ group_name: "team-alpha", summary: "alpha-work" });
+    repo.create({ group_name: "team-beta", summary: "beta-work" });
+    repo.create({ summary: "ungrouped" });
+    const result = repo.list({ group_name: "team-alpha" });
+    expect(result.length).toBe(1);
+    expect(result[0].group_name).toBe("team-alpha");
+  });
+
+  it("list filters by groupPrefix", () => {
+    repo.create({ group_name: "team-alpha-1" });
+    repo.create({ group_name: "team-alpha-2" });
+    repo.create({ group_name: "team-beta" });
+    const result = repo.list({ groupPrefix: "team-alpha" });
+    expect(result.length).toBe(2);
+    expect(result.every((s) => s.group_name!.startsWith("team-alpha"))).toBe(true);
+  });
+
+  it("list filters by parent_id", () => {
+    const parent = repo.create({ summary: "parent" });
+    const child1 = repo.create({});
+    const child2 = repo.create({});
+    repo.create({});
+    repo.update(child1.id, { parent_id: parent.id });
+    repo.update(child2.id, { parent_id: parent.id });
+    const result = repo.list({ parent_id: parent.id });
+    expect(result.length).toBe(2);
+    expect(result.every((s) => s.parent_id === parent.id)).toBe(true);
+  });
+
+  it("list combines multiple filters", () => {
+    repo.create({ repo: "my/repo", group_name: "team-a" });
+    const match = repo.create({ repo: "my/repo", group_name: "team-b" });
+    repo.update(match.id, { status: "running" as SessionStatus });
+    repo.create({ repo: "other/repo", group_name: "team-b" });
+    const result = repo.list({ repo: "my/repo", status: "running" as SessionStatus });
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe(match.id);
+  });
+
+  it("list returns sessions ordered by created_at descending", () => {
+    const s1 = repo.create({ summary: "first" });
+    repo.update(s1.id, { status: "running" as SessionStatus });
+    db.prepare("UPDATE sessions SET created_at = '2024-01-01T00:00:00.000Z' WHERE id = ?").run(s1.id);
+    const s2 = repo.create({ summary: "second" });
+    db.prepare("UPDATE sessions SET created_at = '2024-01-02T00:00:00.000Z' WHERE id = ?").run(s2.id);
+    const s3 = repo.create({ summary: "third" });
+    db.prepare("UPDATE sessions SET created_at = '2024-01-03T00:00:00.000Z' WHERE id = ?").run(s3.id);
+    const result = repo.list();
+    expect(result[0].id).toBe(s3.id);
+    expect(result[result.length - 1].id).toBe(s1.id);
+  });
+
+  it("list with no filters returns empty array when no sessions exist", () => {
+    const result = repo.list();
+    expect(result).toEqual([]);
+  });
+
   // ── update ──────────────────────────────────────────────────────────────
 
   it("update changes fields and returns updated session", () => {
