@@ -5,196 +5,166 @@ import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { homedir } from "os";
 import { execFileSync } from "child_process";
 import * as core from "../../core/index.js";
-import { getProvider } from "../../compute/index.js";
+import { getProvider, allFlagSpecs, getFlagSpec } from "../../compute/index.js";
+import type { ProviderFlagOption } from "../../compute/index.js";
 import { getArkClient } from "./_shared.js";
 import { ComputePoolManager } from "../../core/compute/pool.js";
 import type { ComputeProviderName } from "../../types/index.js";
 
+/**
+ * Apply every registered provider's Commander options to `create`, de-duped
+ * by flag header (docker `--image` and k8s `--image` are the same flag and
+ * must only be registered once). Repeatable list-style flags get an
+ * accumulator; everything else is a plain option (possibly with a default).
+ */
+function registerProviderFlags(cmd: Command): Command {
+  const seen = new Set<string>();
+  const appendToList = (val: string, acc: string[] = []) => {
+    acc.push(val);
+    return acc;
+  };
+
+  for (const spec of allFlagSpecs()) {
+    for (const opt of spec.options) {
+      const header = flagHeader(opt.flag);
+      if (seen.has(header)) continue;
+      seen.add(header);
+
+      if (isRepeatableListOption(opt)) {
+        cmd.option(opt.flag, opt.description, appendToList, [] as string[]);
+      } else if (opt.default !== undefined) {
+        cmd.option(opt.flag, opt.description, opt.default);
+      } else {
+        cmd.option(opt.flag, opt.description);
+      }
+    }
+  }
+  return cmd;
+}
+
+/** Extract the canonical long-flag header (eg `"--image"` from `"--image <image>"`). */
+function flagHeader(flag: string): string {
+  const parts = flag.trim().split(/\s+/);
+  return parts[0] ?? flag;
+}
+
+/** Heuristic: repeatable flags say so in their description. Cheaper than a 2nd field. */
+function isRepeatableListOption(opt: ProviderFlagOption): boolean {
+  return /\(repeatable\)/i.test(opt.description);
+}
+
 export function registerComputeCommands(program: Command) {
   const computeCmd = program.command("compute").description("Manage compute resources");
 
-  computeCmd
+  const createCmd = computeCmd
     .command("create")
     .description("Create a new compute resource")
     .argument("<name>", "Compute name")
-    // Wave 3 axes:
+    // Two-axis flags:
     .option("--compute <kind>", "Compute kind (local, firecracker, ec2, k8s, k8s-kata)")
     .option("--runtime <kind>", "Runtime kind (direct, docker, compose, devcontainer, firecracker-in-container)")
     // Legacy single-axis flag, kept for one release:
     .option(
       "--provider <type>",
       "[deprecated] Provider type (local, docker, ec2, k8s, k8s-kata). Use --compute + --runtime.",
-    )
-    // EC2-specific options
-    .option(
-      "--size <size>",
-      "Instance size: xs (2vCPU/8GB), s (4/16), m (8/32), l (16/64), xl (32/128), xxl (48/192), xxxl (64/256)",
-      "m",
-    )
-    .option("--arch <arch>", "Architecture: x64, arm", "x64")
-    .option("--region <region>", "Region", "us-east-1")
-    .option("--profile <profile>", "AWS profile")
-    .option("--subnet-id <id>", "Subnet ID")
-    .option(
-      "--tag <key=value>",
-      "Tag (repeatable)",
-      (val: string, acc: string[]) => {
-        acc.push(val);
-        return acc;
-      },
-      [] as string[],
-    )
-    // Docker-specific options
-    .option("--image <image>", "Docker image (default: ubuntu:22.04)")
-    .option("--devcontainer", "Use devcontainer.json from project")
-    .option(
-      "--volume <mount>",
-      "Extra volume mount (repeatable)",
-      (val: string, acc: string[]) => {
-        acc.push(val);
-        return acc;
-      },
-      [] as string[],
-    )
-    // K8s-specific options
-    .option("--namespace <ns>", "K8s namespace (k8s/k8s-kata provider)", "ark")
-    .option("--kubeconfig <path>", "Path to kubeconfig (k8s/k8s-kata provider)")
-    .option("--runtime-class <class>", "K8s runtime class (kata-fc for Firecracker)")
-    .option("--from-template <name>", "Use a compute template as defaults")
-    .action(async (name, opts) => {
-      // Wave 3: resolve either --compute + --runtime (new) or --provider (legacy).
-      // We mutate `opts.provider` to a concrete value before the big switch
-      // below so the existing config-shaping logic keeps working.
-      const { providerToPair, pairToProvider } = await import("../../compute/adapters/provider-map.js");
+    );
 
-      const newCompute: string | undefined = opts.compute;
-      const newRuntime: string | undefined = opts.runtime;
+  // Per-provider flags come from the flag-spec registry; each provider owns
+  // its own knobs via `packages/compute/flag-specs/*.ts`. Adding a new
+  // provider means shipping a new flag spec -- this command does not change.
+  registerProviderFlags(createCmd);
 
-      if (opts.provider) {
-        const pair = providerToPair(opts.provider);
-        console.log(
-          chalk.yellow(
-            `--provider is deprecated; pass --compute + --runtime instead. ` +
-              `Auto-mapping '${opts.provider}' -> --compute ${pair.compute} --runtime ${pair.runtime}.`,
-          ),
-        );
+  createCmd.option("--from-template <name>", "Use a compute template as defaults").action(async (name, opts) => {
+    // Resolve either --compute + --runtime (new) or --provider (legacy).
+    // We mutate `opts.provider` to a concrete value before handing off to
+    // the per-provider flag spec so the spec sees the real provider key.
+    const { providerToPair, pairToProvider } = await import("../../compute/adapters/provider-map.js");
+
+    const newCompute: string | undefined = opts.compute;
+    const newRuntime: string | undefined = opts.runtime;
+
+    if (opts.provider) {
+      const pair = providerToPair(opts.provider);
+      console.log(
+        chalk.yellow(
+          `--provider is deprecated; pass --compute + --runtime instead. ` +
+            `Auto-mapping '${opts.provider}' -> --compute ${pair.compute} --runtime ${pair.runtime}.`,
+        ),
+      );
+    }
+
+    // Default when nothing is specified: local + direct (local auto-created).
+    if (!opts.provider && !newCompute && !newRuntime) {
+      opts.provider = "local";
+    }
+
+    // Derive legacy provider name for the downstream spec lookup + display.
+    if (!opts.provider && newCompute && newRuntime) {
+      opts.provider = pairToProvider({ compute: newCompute as any, runtime: newRuntime as any }) ?? newCompute;
+    }
+
+    if (opts.provider === "local" && !opts.fromTemplate && !newCompute) {
+      console.log(chalk.red("Local compute is auto-created. Use 'ec2' or 'docker' provider, or --from-template."));
+      return;
+    }
+    try {
+      const ark = await getArkClient();
+
+      // Apply template defaults if specified
+      if (opts.fromTemplate) {
+        const tmpl = await ark.computeTemplateGet(opts.fromTemplate);
+        if (!tmpl) {
+          console.log(chalk.red(`Template '${opts.fromTemplate}' not found.`));
+          return;
+        }
+        // Template sets provider unless user overrides
+        if (!opts.provider || opts.provider === "local") {
+          opts.provider = tmpl.provider;
+        }
       }
 
-      // Default when nothing is specified: local + direct (local auto-created).
-      if (!opts.provider && !newCompute && !newRuntime) {
-        opts.provider = "local";
+      // Delegate config construction to the provider's flag spec. Unknown
+      // providers fall through to an empty config with a warning -- every
+      // provider that ships today has a spec, so this branch is a safety net.
+      const spec = getFlagSpec(opts.provider);
+      if (!spec) {
+        console.log(chalk.yellow(`Unknown provider '${opts.provider}'; creating with empty config.`));
+      }
+      let config: Record<string, unknown> = spec ? spec.configFromFlags(opts) : {};
+
+      // Merge template config as base, user options override
+      if (opts.fromTemplate) {
+        const tmpl = await ark.computeTemplateGet(opts.fromTemplate);
+        if (tmpl?.config) {
+          config = { ...tmpl.config, ...config };
+        }
       }
 
-      // Derive legacy provider name for the downstream switch + display.
-      if (!opts.provider && newCompute && newRuntime) {
-        opts.provider = pairToProvider({ compute: newCompute as any, runtime: newRuntime as any }) ?? newCompute;
+      const compute = await ark.computeCreate({
+        name,
+        provider: opts.provider,
+        ...(newCompute ? { compute: newCompute } : {}),
+        ...(newRuntime ? { runtime: newRuntime } : {}),
+        config,
+      } as any);
+
+      console.log(chalk.green(`Compute '${compute.name}' created`));
+      console.log(`  Provider: ${compute.provider}`);
+      if ((compute as any).compute_kind || (compute as any).runtime_kind) {
+        console.log(`  Compute:  ${(compute as any).compute_kind ?? "-"}`);
+        console.log(`  Runtime:  ${(compute as any).runtime_kind ?? "-"}`);
       }
+      console.log(`  Status:   ${compute.status}`);
 
-      if (opts.provider === "local" && !opts.fromTemplate && !newCompute) {
-        console.log(chalk.red("Local compute is auto-created. Use 'ec2' or 'docker' provider, or --from-template."));
-        return;
+      if (spec) {
+        for (const line of spec.displaySummary(config, opts)) {
+          console.log(line);
+        }
       }
-      try {
-        const ark = await getArkClient();
-
-        // Apply template defaults if specified
-        if (opts.fromTemplate) {
-          const tmpl = await ark.computeTemplateGet(opts.fromTemplate);
-          if (!tmpl) {
-            console.log(chalk.red(`Template '${opts.fromTemplate}' not found.`));
-            return;
-          }
-          // Template sets provider unless user overrides
-          if (!opts.provider || opts.provider === "local") {
-            opts.provider = tmpl.provider;
-          }
-        }
-
-        let config: Record<string, unknown>;
-
-        if (opts.provider === "docker") {
-          config = {
-            image: opts.image ?? "ubuntu:22.04",
-            ...(opts.devcontainer ? { devcontainer: true } : {}),
-            ...(opts.volume?.length ? { volumes: opts.volume } : {}),
-          };
-        } else if (opts.provider === "ec2") {
-          const tags: Record<string, string> = {};
-          for (const t of opts.tag) {
-            const [k, ...rest] = t.split("=");
-            if (k && rest.length) tags[k] = rest.join("=");
-          }
-          config = {
-            size: opts.size,
-            arch: opts.arch,
-            region: opts.region,
-            ...(opts.profile ? { aws_profile: opts.profile } : {}),
-            ...(opts.subnetId ? { subnet_id: opts.subnetId } : {}),
-            ...(Object.keys(tags).length ? { tags } : {}),
-          };
-        } else if (opts.provider === "k8s" || opts.provider === "k8s-kata") {
-          config = {
-            ...(opts.namespace ? { namespace: opts.namespace } : {}),
-            ...(opts.image ? { image: opts.image } : {}),
-            ...(opts.kubeconfig ? { kubeconfig: opts.kubeconfig } : {}),
-            ...(opts.runtimeClass ? { runtimeClassName: opts.runtimeClass } : {}),
-          };
-        } else {
-          config = {};
-        }
-
-        // Merge template config as base, user options override
-        if (opts.fromTemplate) {
-          const tmpl = await ark.computeTemplateGet(opts.fromTemplate);
-          if (tmpl?.config) {
-            config = { ...tmpl.config, ...config };
-          }
-        }
-
-        const compute = await ark.computeCreate({
-          name,
-          provider: opts.provider,
-          ...(newCompute ? { compute: newCompute } : {}),
-          ...(newRuntime ? { runtime: newRuntime } : {}),
-          config,
-        } as any);
-
-        console.log(chalk.green(`Compute '${compute.name}' created`));
-        console.log(`  Provider: ${compute.provider}`);
-        if ((compute as any).compute_kind || (compute as any).runtime_kind) {
-          console.log(`  Compute:  ${(compute as any).compute_kind ?? "-"}`);
-          console.log(`  Runtime:  ${(compute as any).runtime_kind ?? "-"}`);
-        }
-        console.log(`  Status:   ${compute.status}`);
-
-        if (opts.provider === "docker") {
-          console.log(`  Image:    ${(config.image as string) ?? "ubuntu:22.04"}`);
-          if (config.devcontainer) console.log(`  Devcontainer: yes`);
-          if ((config.volumes as string[] | undefined)?.length) {
-            console.log(`  Volumes:  ${(config.volumes as string[]).join(", ")}`);
-          }
-        } else if (opts.provider === "ec2") {
-          let sizeLabel = opts.size;
-          try {
-            const { INSTANCE_SIZES } = await import("../../compute/providers/ec2/provision.js");
-            const tier = INSTANCE_SIZES[opts.size];
-            if (tier) sizeLabel = tier.label;
-          } catch {
-            /* not ec2 provider */
-          }
-          console.log(`  Size:     ${sizeLabel}`);
-          console.log(`  Arch:     ${opts.arch}`);
-          console.log(`  Region:   ${opts.region}`);
-        } else if (opts.provider === "k8s" || opts.provider === "k8s-kata") {
-          console.log(`  Namespace:  ${(config.namespace as string) ?? "ark"}`);
-          console.log(`  Image:      ${(config.image as string) ?? "ubuntu:22.04"}`);
-          if (config.runtimeClassName) console.log(`  Runtime:    ${config.runtimeClassName}`);
-          if (config.kubeconfig) console.log(`  Kubeconfig: ${config.kubeconfig}`);
-        }
-      } catch (e: any) {
-        console.log(chalk.red(`Failed to create compute: ${e.message}`));
-      }
-    });
+    } catch (e: any) {
+      console.log(chalk.red(`Failed to create compute: ${e.message}`));
+    }
+  });
 
   computeCmd
     .command("provision")
