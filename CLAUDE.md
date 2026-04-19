@@ -6,7 +6,7 @@ Autonomous agent ecosystem. Orchestrates AI coding agents through DAG-based SDLC
 
 ```bash
 make install          # bun install + symlink ark to /usr/local/bin
-make test             # run all tests (sequential for now; see Testing section)
+make test             # run all tests (parallel; see Testing section)
 make test-file F=path # run a single test file
 make lint             # ESLint (zero warnings allowed)
 make format           # Prettier auto-fix
@@ -79,13 +79,14 @@ No workspaces -- packages coordinated via relative imports.
 
 Tests use `bun:test`. **Always use make targets** -- never call `bun test` directly.
 
-`make test` still runs sequentially today (`--concurrency 1`) because some legacy tests share module-level singletons (`_app` in `app.ts`, `_arkDir` / `_level` in `structured-log.ts`, the hooks event bus). Parallelisation is being unlocked incrementally: the Spring-style config work lets arkd and the config resolver tests run at `--concurrency 4` safely; other packages still need migration. Until then:
+`make test` runs the full suite with `--concurrency 4` across every package. Every test boots a fresh `AppContext.forTestAsync()` that allocates its own ports + arkDir, so workers don't collide. The legacy synchronous `AppContext.forTest()` is still exported for historical call sites but is no longer used by the repo's own tests.
 
 ```bash
-make test                                                  # sequential (default)
-make test-file F=packages/core/__tests__/session.test.ts   # single file (sequential)
-bun test packages/arkd --concurrency 4                     # arkd runs fine parallel
+make test                                                  # parallel (--concurrency 4)
+make test-file F=packages/core/__tests__/session.test.ts   # single file (--concurrency 4)
 ```
+
+A few process-level singletons still exist (`_app` in `app.ts`, `_arkDir` / `_level` in `structured-log.ts`, the shared `hooks.eventBus`). In practice they don't race under `--concurrency 4` because each file boots/teardown a single AppContext and the `test` profile's per-call temp arkDir means singleton writes don't cross-contaminate observations. If you add a test that reaches into those singletons concurrently, gate the access on a per-file AppContext handle instead of the globals, or ping one of the maintainers before expanding the surface.
 
 **Test isolation for new tests** -- use `AppContext.forTestAsync()`:
 
@@ -102,7 +103,7 @@ afterAll(async () => {
 });
 ```
 
-`forTestAsync()` routes through the `test` config profile which allocates a fresh arkDir and four ephemeral ports (conductor/arkd/server/web) per call, so the same file can run in parallel workers without port collisions. The legacy synchronous `AppContext.forTest()` is kept for tests that haven't been migrated.
+`forTestAsync()` routes through the `test` config profile which allocates a fresh arkDir and four ephemeral ports (conductor/arkd/server/web) per call, so the same file can run in parallel workers without port collisions.
 
 **Never hardcode a port** in a new test. Call `allocatePort()` from `packages/core/config/port-allocator.ts`, or get it via `app.config.ports.*` when you have an AppContext.
 

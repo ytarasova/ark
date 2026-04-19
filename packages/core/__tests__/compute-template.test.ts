@@ -4,7 +4,7 @@ import { AppContext, setApp, clearApp } from "../app.js";
 let app: AppContext;
 
 beforeAll(async () => {
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   await app.boot();
   setApp(app);
 });

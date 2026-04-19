@@ -15,7 +15,7 @@ import { startSession } from "../services/session-orchestration.js";
 
 let app: AppContext;
 beforeAll(async () => {
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   setApp(app);
   await app.boot();
 });

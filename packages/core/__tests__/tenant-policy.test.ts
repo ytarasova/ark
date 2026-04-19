@@ -6,7 +6,7 @@ let app: AppContext;
 let pm: TenantPolicyManager;
 
 beforeAll(async () => {
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   await app.boot();
   setApp(app);
   pm = new TenantPolicyManager(app.db);

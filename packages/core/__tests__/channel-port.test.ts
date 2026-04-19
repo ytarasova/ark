@@ -6,10 +6,11 @@ import { withTestContext } from "./test-helpers.js";
 withTestContext();
 
 describe("sessionChannelPort", () => {
-  it("returns a number in valid range (19200-29199)", () => {
+  it("returns a number in the configured range", () => {
+    const { basePort, range } = getApp().config.channels;
     const port = getApp().sessions.channelPort("s-abc123");
-    expect(port).toBeGreaterThanOrEqual(19200);
-    expect(port).toBeLessThan(29200);
+    expect(port).toBeGreaterThanOrEqual(basePort);
+    expect(port).toBeLessThan(basePort + range);
   });
 
   it("different session IDs produce different ports (100 random IDs)", () => {
@@ -18,8 +19,9 @@ describe("sessionChannelPort", () => {
       const id = `s-${Math.random().toString(16).slice(2, 10)}`;
       ports.add(getApp().sessions.channelPort(id));
     }
-    // With 10000-port range and 100 IDs, collisions should be very rare
-    expect(ports.size).toBeGreaterThan(90);
+    // With a range of >=1000 ports and 100 IDs, collisions are rare.
+    // Conservative threshold so the test-profile 1000-port range also passes.
+    expect(ports.size).toBeGreaterThan(80);
   });
 
   it("is deterministic (same ID = same port)", () => {

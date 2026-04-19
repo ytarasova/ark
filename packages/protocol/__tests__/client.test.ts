@@ -8,7 +8,7 @@ import type { JsonRpcMessage } from "../types.js";
 
 let app: AppContext;
 beforeAll(async () => {
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   setApp(app);
   await app.boot();
 });

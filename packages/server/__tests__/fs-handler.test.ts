@@ -21,7 +21,7 @@ let router: Router;
 let tmpRoot: string;
 
 beforeAll(async () => {
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   setApp(app);
   await app.boot();
 });

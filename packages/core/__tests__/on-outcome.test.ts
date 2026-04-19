@@ -21,7 +21,7 @@ import { applyReport, advance } from "../services/session-orchestration.js";
 let app: AppContext;
 
 beforeAll(async () => {
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   await app.boot();
   setApp(app);
 });

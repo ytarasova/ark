@@ -32,7 +32,7 @@ afterEach(async () => {
 
 describe("DI container registration", () => {
   it("boot() registers all cradle keys", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -54,15 +54,15 @@ describe("DI container registration", () => {
     expect(container.resolve("recipes")).toBeDefined();
   });
 
-  it("config is registered before boot (in constructor)", () => {
-    app = AppContext.forTest();
+  it("config is registered before boot (in constructor)", async () => {
+    app = await AppContext.forTestAsync();
     // Config is registered in constructor, not boot
     expect(app.container.resolve("config")).toBeDefined();
     expect(app.container.resolve("config").arkDir).toBeTruthy();
   });
 
-  it("db and repos require boot()", () => {
-    app = AppContext.forTest();
+  it("db and repos require boot()", async () => {
+    app = await AppContext.forTestAsync();
     expect(() => app!.container.resolve("db")).toThrow();
     expect(() => app!.container.resolve("sessions")).toThrow();
   });
@@ -72,7 +72,7 @@ describe("DI container registration", () => {
 
 describe("AppContext accessors resolve from container", () => {
   it("accessors return the same instances as direct container resolve", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -92,7 +92,7 @@ describe("AppContext accessors resolve from container", () => {
   });
 
   it("singleton registrations return same instance on repeated resolve", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -111,7 +111,7 @@ describe("AppContext accessors resolve from container", () => {
 
 describe("resolved instances have correct types", () => {
   it("repositories are correct classes", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -123,7 +123,7 @@ describe("resolved instances have correct types", () => {
   });
 
   it("services are correct classes", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -137,7 +137,7 @@ describe("resolved instances have correct types", () => {
 
 describe("service dependency injection", () => {
   it("SessionService can create and query sessions (repos wired)", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -157,7 +157,7 @@ describe("service dependency injection", () => {
   });
 
   it("SessionService stop writes through to same DB", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -171,7 +171,7 @@ describe("service dependency injection", () => {
   });
 
   it("ComputeService delegates to ComputeRepository correctly", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -186,7 +186,7 @@ describe("service dependency injection", () => {
   });
 
   it("HistoryService shares the same DB as repositories", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -202,11 +202,11 @@ describe("service dependency injection", () => {
 
 describe("forTest() isolation", () => {
   it("two forTest() instances have independent databases", async () => {
-    const app1 = AppContext.forTest();
+    const app1 = await AppContext.forTestAsync();
     setApp(app1);
     await app1.boot();
 
-    const app2 = AppContext.forTest();
+    const app2 = await AppContext.forTestAsync();
     await app2.boot();
 
     // Create session in app1
@@ -223,13 +223,13 @@ describe("forTest() isolation", () => {
     app = null; // prevent afterEach double-shutdown
   });
 
-  it("forTest() uses temp directory for arkDir", () => {
-    app = AppContext.forTest();
+  it("forTest() uses temp directory for arkDir", async () => {
+    app = await AppContext.forTestAsync();
     expect(app.arkDir).toContain("ark-test-");
   });
 
   it("forTest() sets skipConductor, skipMetrics, skipSignals", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -238,7 +238,7 @@ describe("forTest() isolation", () => {
   });
 
   it("shutdown cleans up temp directory", async () => {
-    const tempApp = AppContext.forTest();
+    const tempApp = await AppContext.forTestAsync();
     setApp(tempApp);
     await tempApp.boot();
     const dir = tempApp.arkDir;
@@ -256,7 +256,7 @@ describe("forTest() isolation", () => {
 
 describe("container lifecycle phases", () => {
   it("phase transitions: created -> booting -> ready -> shutting_down -> stopped", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     expect(app.phase).toBe("created");
 
@@ -269,7 +269,7 @@ describe("container lifecycle phases", () => {
   });
 
   it("double boot throws", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -277,7 +277,7 @@ describe("container lifecycle phases", () => {
   });
 
   it("double shutdown is idempotent", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -288,7 +288,7 @@ describe("container lifecycle phases", () => {
   }, 15_000);
 
   it("shutdown without boot (fast path) reaches stopped", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     expect(app.phase).toBe("created");
 
     await app.shutdown();
@@ -297,7 +297,7 @@ describe("container lifecycle phases", () => {
   });
 
   it("shutdown without boot cleans up temp directory", async () => {
-    const tempApp = AppContext.forTest();
+    const tempApp = await AppContext.forTestAsync();
     const dir = tempApp.arkDir;
 
     const { existsSync } = await import("fs");
@@ -312,7 +312,7 @@ describe("container lifecycle phases", () => {
   });
 
   it("shutdown without boot clears global singleton", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
 
     expect(getApp()).toBe(app);
@@ -327,7 +327,7 @@ describe("container lifecycle phases", () => {
 
 describe("resource stores via container", () => {
   it("flows store is accessible and has list()", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -339,7 +339,7 @@ describe("resource stores via container", () => {
   });
 
   it("skills store is accessible and has list()", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -348,7 +348,7 @@ describe("resource stores via container", () => {
   });
 
   it("agents store is accessible and has list()", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -357,7 +357,7 @@ describe("resource stores via container", () => {
   });
 
   it("recipes store is accessible and has list()", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -370,7 +370,7 @@ describe("resource stores via container", () => {
 
 describe("cross-service integration through container", () => {
   it("full session lifecycle through DI-wired services", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -417,7 +417,7 @@ describe("cross-service integration through container", () => {
   });
 
   it("session + compute coexist in same container", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -435,7 +435,7 @@ describe("cross-service integration through container", () => {
   });
 
   it("messages sent through repo are visible via service complete()", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -453,7 +453,7 @@ describe("cross-service integration through container", () => {
 
 describe("transitive dependency sharing", () => {
   it("SessionService and SessionRepository share the same DB", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -466,7 +466,7 @@ describe("transitive dependency sharing", () => {
   });
 
   it("HistoryService queries the same DB that repos write to", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -477,7 +477,7 @@ describe("transitive dependency sharing", () => {
   });
 
   it("all repos resolve with the same DB instance", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -492,7 +492,7 @@ describe("transitive dependency sharing", () => {
   });
 
   it("todos repo shares DB with sessions repo", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -508,7 +508,7 @@ describe("transitive dependency sharing", () => {
 
 describe("container override", () => {
   it("can override a singleton registration with asValue", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -525,7 +525,7 @@ describe("container override", () => {
   });
 
   it("override does not affect previously resolved singletons held by reference", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -544,7 +544,7 @@ describe("container override", () => {
 
 describe("post-shutdown behavior", () => {
   it("phase is stopped after shutdown and DB is closed", async () => {
-    const tempApp = AppContext.forTest();
+    const tempApp = await AppContext.forTestAsync();
     setApp(tempApp);
     await tempApp.boot();
 
@@ -560,7 +560,7 @@ describe("post-shutdown behavior", () => {
   });
 
   it("boot after shutdown throws (no reuse)", async () => {
-    const tempApp = AppContext.forTest();
+    const tempApp = await AppContext.forTestAsync();
     setApp(tempApp);
     await tempApp.boot();
     await tempApp.shutdown();
@@ -570,7 +570,7 @@ describe("post-shutdown behavior", () => {
   });
 
   it("temp directory is removed after shutdown with cleanupOnShutdown", async () => {
-    const tempApp = AppContext.forTest();
+    const tempApp = await AppContext.forTestAsync();
     setApp(tempApp);
     await tempApp.boot();
     const dir = tempApp.arkDir;
@@ -588,7 +588,7 @@ describe("post-shutdown behavior", () => {
 
 describe("getApp() global singleton integration", () => {
   it("getApp() resolves same instances as direct container access", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -605,11 +605,11 @@ describe("getApp() global singleton integration", () => {
   });
 
   it("setApp replaces the global singleton", async () => {
-    const app1 = AppContext.forTest();
+    const app1 = await AppContext.forTestAsync();
     setApp(app1);
     await app1.boot();
 
-    const app2 = AppContext.forTest();
+    const app2 = await AppContext.forTestAsync();
     setApp(app2);
     await app2.boot();
 
@@ -623,7 +623,7 @@ describe("getApp() global singleton integration", () => {
   });
 
   it("data written through getApp() is visible through direct app reference", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 

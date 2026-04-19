@@ -83,7 +83,7 @@ export function killNewArkTmuxSessions(preExisting: Set<string>): void {
 
 /**
  * Sets up beforeEach/afterAll hooks for test context isolation.
- * Each test gets a fresh AppContext.forTest() with an isolated temp DB.
+ * Each test gets a fresh AppContext.forTestAsync() with an isolated temp DB.
  * Automatically cleans up sessions and their processes on teardown.
  */
 export function withTestContext(): { getCtx: () => AppContext } {
@@ -97,7 +97,7 @@ export function withTestContext(): { getCtx: () => AppContext } {
       clearApp();
     }
     tmuxSnapshot = snapshotArkTmuxSessions();
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
   });

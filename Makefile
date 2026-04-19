@@ -136,11 +136,11 @@ desktop: build-web ## Launch the Electron desktop app
 
 # ── Testing ──────────────────────────────────────────────────────────────────
 
-test: build-web ## Run all unit tests (sequential -- never parallel)
-	$(BUN) test packages/core packages/compute packages/server packages/protocol packages/arkd packages/web --concurrency 1
+test: build-web ## Run all unit tests (parallel workers)
+	$(BUN) test packages/core packages/compute packages/server packages/protocol packages/arkd packages/web --concurrency 4
 
 test-file: ## Run a single test: make test-file F=packages/core/__tests__/foo.test.ts
-	$(BUN) test $(F) --concurrency 1
+	$(BUN) test $(F) --concurrency 4
 
 test-e2e: test-web-e2e ## Run all end-to-end tests (web Playwright)
 

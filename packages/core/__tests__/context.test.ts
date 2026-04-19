@@ -12,7 +12,7 @@ beforeEach(async () => {
     await app.shutdown();
     clearApp();
   }
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   setApp(app);
   await app.boot();
 });
@@ -38,7 +38,7 @@ describe("Store context isolation", () => {
     expect(sessions1[0].summary).toBe("ctx1-session");
 
     // Switch to new context
-    const app2 = AppContext.forTest();
+    const app2 = await AppContext.forTestAsync();
     await app2.boot();
     setApp(app2);
 
@@ -89,7 +89,7 @@ describe("Store context isolation", () => {
   });
 
   it("cleanup removes temp directory", async () => {
-    const tempApp = AppContext.forTest();
+    const tempApp = await AppContext.forTestAsync();
     await tempApp.boot();
     const dir = tempApp.config.arkDir;
     await tempApp.shutdown();

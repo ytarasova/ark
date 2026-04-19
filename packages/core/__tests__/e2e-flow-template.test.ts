@@ -35,7 +35,7 @@ beforeEach(async () => {
     await app.shutdown();
     clearApp();
   }
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   setApp(app);
   await app.boot();
   rmSync(flowDir(), { recursive: true, force: true });

@@ -9,19 +9,19 @@ afterEach(async () => {
 });
 
 describe("AppContext", () => {
-  it("starts in created phase", () => {
-    app = AppContext.forTest();
+  it("starts in created phase", async () => {
+    app = await AppContext.forTestAsync();
     expect(app.phase).toBe("created");
   });
 
   it("boots to ready phase", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     await app.boot();
     expect(app.phase).toBe("ready");
   });
 
   it("creates directories on boot", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     await app.boot();
     expect(existsSync(app.config.arkDir)).toBe(true);
     expect(existsSync(app.config.tracksDir)).toBe(true);
@@ -30,7 +30,7 @@ describe("AppContext", () => {
   });
 
   it("initializes database with schema on boot", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     await app.boot();
     const row = app.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'").get() as
       | { name: string }
@@ -39,21 +39,21 @@ describe("AppContext", () => {
   });
 
   it("seeds local compute row on boot", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     await app.boot();
     const row = app.db.prepare("SELECT name FROM compute WHERE name='local'").get() as { name: string } | undefined;
     expect(row?.name).toBe("local");
   });
 
   it("shuts down to stopped phase", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     await app.boot();
     await app.shutdown();
     expect(app.phase).toBe("stopped");
   });
 
   it("shutdown is idempotent", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     await app.boot();
     await app.shutdown();
     await app.shutdown();
@@ -61,13 +61,13 @@ describe("AppContext", () => {
   });
 
   it("boot throws if called twice", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     await app.boot();
     expect(app.boot()).rejects.toThrow();
   });
 
   it("forTest cleans up temp dir on shutdown", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     await app.boot();
     const dir = app.config.arkDir;
     expect(existsSync(dir)).toBe(true);
@@ -76,7 +76,7 @@ describe("AppContext", () => {
   });
 
   it("creates event bus on boot", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     await app.boot();
     expect(app.eventBus).toBeDefined();
     expect(typeof app.eventBus.emit).toBe("function");
@@ -94,14 +94,14 @@ describe("getApp / setApp / clearApp", () => {
   });
 
   it("setApp + getApp returns the same instance", async () => {
-    const testApp = AppContext.forTest();
+    const testApp = await AppContext.forTestAsync();
     setApp(testApp);
     expect(getApp()).toBe(testApp);
     await testApp.shutdown();
   });
 
   it("clearApp resets the singleton", async () => {
-    const testApp = AppContext.forTest();
+    const testApp = await AppContext.forTestAsync();
     setApp(testApp);
     clearApp();
     expect(() => getApp()).toThrow();

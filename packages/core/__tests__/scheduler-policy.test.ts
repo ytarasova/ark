@@ -10,7 +10,7 @@ let registry: WorkerRegistry;
 let pm: TenantPolicyManager;
 
 beforeAll(async () => {
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   await app.boot();
   setApp(app);
 

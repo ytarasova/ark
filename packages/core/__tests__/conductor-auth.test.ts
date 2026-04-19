@@ -47,7 +47,7 @@ async function boot(opts: { hostedMode: boolean }): Promise<void> {
     await app.shutdown();
     clearApp();
   }
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   if (opts.hostedMode) {
     (app.config as { databaseUrl?: string }).databaseUrl = "sqlite://test-hosted";
   }

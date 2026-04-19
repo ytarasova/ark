@@ -277,7 +277,7 @@ describe("conditional routing - flow state integration", () => {
   let app: AppContext;
 
   beforeAll(async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     await app.boot();
     setApp(app);
   });
