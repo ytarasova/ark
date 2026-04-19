@@ -11,7 +11,9 @@ export function useSse<T>(path: string): T | null {
       try {
         setData(JSON.parse(e.data));
       } catch {
-        /* ignore parse errors */
+        // SSE payload is not valid JSON -- expected when the server sends
+        // a heartbeat or an unrelated event type. Silent by design; the next
+        // valid frame will update state.
       }
     });
     source.onerror = () => {

@@ -54,10 +54,11 @@ export function useMessages({ sessionId, enabled, pollMs = 2000 }: UseMessagesOp
           return prev;
         });
       }
-      // Mark as read
+      // Mark as read; failure is harmless, next poll retries.
       api.markRead(sessionId).catch(() => {});
     } catch {
-      // ignore fetch errors
+      // Polling loop (every pollMs). A single bad fetch (network blip, 5xx) is
+      // self-healing -- the next tick will retry. Logging would spam the console.
     }
   }, [sessionId]);
 
