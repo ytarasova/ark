@@ -190,59 +190,64 @@ export async function indexCodebase(
   return { files, symbols, edges, duration_ms: Date.now() - start };
 }
 
+/**
+ * Codegraph edge kind -> Ark edge relation. Unknown kinds collapse to
+ * `depends_on` so dispatch never drops an edge silently. Adding a new kind
+ * means one new entry below.
+ */
+const EDGE_RELATION_MAP: Record<string, EdgeRelation> = {
+  imports: "imports",
+  "imports-type": "imports",
+  "dynamic-imports": "imports",
+  reexports: "imports",
+  co_changes: "co_changes",
+};
+
 function mapEdgeRelation(kind: string): EdgeRelation {
-  switch (kind) {
-    case "imports":
-    case "imports-type":
-    case "dynamic-imports":
-    case "reexports":
-      return "imports";
-    case "co_changes":
-      return "co_changes";
-    case "calls":
-    case "extends":
-    case "implements":
-    case "contains":
-    default:
-      return "depends_on";
-  }
+  return EDGE_RELATION_MAP[kind] ?? "depends_on";
 }
+
+/**
+ * File extension -> language label. Module-level so new languages can be
+ * added without reopening `detectLanguage`. Keys are lowercase extension
+ * suffixes (no leading dot).
+ */
+const LANGUAGE_BY_EXTENSION: Record<string, string> = {
+  ts: "typescript",
+  tsx: "typescript",
+  js: "javascript",
+  jsx: "javascript",
+  py: "python",
+  go: "go",
+  rs: "rust",
+  java: "java",
+  kt: "kotlin",
+  c: "c",
+  cpp: "cpp",
+  h: "c",
+  hpp: "cpp",
+  cs: "csharp",
+  rb: "ruby",
+  php: "php",
+  swift: "swift",
+  dart: "dart",
+  scala: "scala",
+  ex: "elixir",
+  erl: "erlang",
+  hs: "haskell",
+  ml: "ocaml",
+  lua: "lua",
+  zig: "zig",
+  r: "r",
+  sol: "solidity",
+  v: "verilog",
+  sh: "bash",
+  bash: "bash",
+};
 
 function detectLanguage(filePath: string): string {
   const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
-  const langMap: Record<string, string> = {
-    ts: "typescript",
-    tsx: "typescript",
-    js: "javascript",
-    jsx: "javascript",
-    py: "python",
-    go: "go",
-    rs: "rust",
-    java: "java",
-    kt: "kotlin",
-    c: "c",
-    cpp: "cpp",
-    h: "c",
-    hpp: "cpp",
-    cs: "csharp",
-    rb: "ruby",
-    php: "php",
-    swift: "swift",
-    dart: "dart",
-    scala: "scala",
-    ex: "elixir",
-    erl: "erlang",
-    hs: "haskell",
-    ml: "ocaml",
-    lua: "lua",
-    zig: "zig",
-    r: "r",
-    sol: "solidity",
-    v: "verilog",
-    sh: "bash",
-    bash: "bash",
-  };
-  return langMap[ext] ?? "unknown";
+  return LANGUAGE_BY_EXTENSION[ext] ?? "unknown";
 }
 
 interface CodegraphNode {

@@ -31,7 +31,7 @@ import { loadRepoConfig } from "../repo-config.js";
 
 import { sessionAsVars, buildTaskWithHandoff, extractSubtasks } from "./task-builder.js";
 import { recordSessionUsage, runVerification, cloneSession } from "./session-lifecycle.js";
-import { createWorktreePR, mergeWorktreePR, finishWorktree } from "./workspace-service.js";
+import { executeAction as dispatchAction } from "./actions/index.js";
 
 /** Ingest nodes/edges from a remote arkd /codegraph/index response into the knowledge store. */
 function ingestRemoteIndex(app: AppContext, data: any, log: (msg: string) => void): void {
@@ -788,111 +788,17 @@ export async function resume(
  * Execute an action stage (create_pr, merge, close, etc.).
  * Called by the conductor when auto-advancing into an action stage.
  */
+/**
+ * Dispatch a non-agent stage action (create_pr / merge_pr / auto_merge /
+ * close_ticket / ...). Handlers live under `./actions/`; see
+ * `packages/core/services/actions/index.ts` for the registry.
+ */
 export async function executeAction(
   app: AppContext,
   sessionId: string,
   action: string,
 ): Promise<{ ok: boolean; message: string }> {
-  const s = app.sessions.get(sessionId);
-  if (!s) return { ok: false, message: "Session not found" };
-
-  switch (action) {
-    case "create_pr": {
-      // Skip if we already know about a PR
-      if (s.pr_url) {
-        app.events.log(sessionId, "action_executed", {
-          stage: s.stage ?? undefined,
-          actor: "system",
-          data: { action, pr_url: s.pr_url, skipped: "pr_already_exists" },
-        });
-        return { ok: true, message: `Action '${action}' executed (PR already exists)` };
-      }
-      // Also check if a PR exists on the branch (agent may have created one without reporting pr_url)
-      if (s.branch && s.workdir) {
-        try {
-          const { stdout: prUrl } = await execFileAsync("gh", ["pr", "view", s.branch, "--json", "url", "-q", ".url"], {
-            cwd: s.workdir,
-            encoding: "utf-8",
-            timeout: 10_000,
-          });
-          if (prUrl?.trim()) {
-            const url = prUrl.trim();
-            app.sessions.update(sessionId, { pr_url: url });
-            app.events.log(sessionId, "action_executed", {
-              stage: s.stage ?? undefined,
-              actor: "system",
-              data: { action, pr_url: url, skipped: "pr_found_on_branch" },
-            });
-            return { ok: true, message: `Action '${action}' executed (PR found on branch)` };
-          }
-        } catch {
-          logInfo("session", "no PR exists for this branch -- proceed to create");
-        }
-      }
-      const result = await createWorktreePR(app, sessionId, { title: s.summary ?? undefined });
-      if (result.ok) {
-        app.events.log(sessionId, "action_executed", {
-          stage: s.stage ?? undefined,
-          actor: "system",
-          data: { action, pr_url: result.pr_url },
-        });
-        return { ok: true, message: `Action '${action}' executed` };
-      }
-      return result;
-    }
-    case "merge_pr":
-    case "merge": {
-      const result = await finishWorktree(app, sessionId, { force: true });
-      if (result.ok) {
-        app.events.log(sessionId, "action_executed", {
-          stage: s.stage ?? undefined,
-          actor: "system",
-          data: { action },
-        });
-      }
-      return result;
-    }
-    case "auto_merge": {
-      const result = await mergeWorktreePR(app, sessionId);
-      if (result.ok) {
-        app.events.log(sessionId, "action_executed", {
-          stage: s.stage ?? undefined,
-          actor: "system",
-          data: { action, pr_url: s.pr_url ?? undefined },
-        });
-        // Don't advance yet -- gh pr merge --auto only queues the merge.
-        // Transition to waiting; pr-merge-poller will advance once PR is actually merged.
-        app.sessions.update(sessionId, {
-          status: "waiting",
-          breakpoint_reason: "Waiting for CI checks to pass and PR to merge",
-          config: {
-            ...(s.config ?? {}),
-            merge_queued_at: new Date().toISOString(),
-          },
-        });
-        app.events.log(sessionId, "merge_waiting", {
-          stage: s.stage ?? undefined,
-          actor: "system",
-          data: { pr_url: s.pr_url ?? undefined, reason: "gh pr merge --auto queued, waiting for CI" },
-        });
-        return { ok: true, message: "Auto-merge queued -- waiting for CI to pass" };
-      }
-      return result;
-    }
-    case "close_ticket":
-    case "close": {
-      app.events.log(sessionId, "action_executed", { stage: s.stage ?? undefined, actor: "system", data: { action } });
-      return { ok: true, message: `Action '${action}' executed` };
-    }
-    default: {
-      app.events.log(sessionId, "action_skipped", {
-        stage: s.stage ?? undefined,
-        actor: "system",
-        data: { action, reason: "unknown action type" },
-      });
-      return { ok: true, message: `Action '${action}' skipped (unknown)` };
-    }
-  }
+  return dispatchAction(app, sessionId, action);
 }
 
 export async function complete(

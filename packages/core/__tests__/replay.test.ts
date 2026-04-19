@@ -128,6 +128,17 @@ describe("buildReplay", () => {
     expect(completed!.detail).toContain("summary");
   });
 
+  it("falls back to title-cased type for unknown event types", () => {
+    const session = getApp().sessions.create({ summary: "unknown type test" });
+    getApp().events.log(session.id, "some_new_thing", { data: {} });
+
+    const steps = buildReplay(getApp(), session.id);
+    const unknown = steps.find((s) => s.type === "some_new_thing");
+    expect(unknown).toBeDefined();
+    // defaultSummary title-cases and replaces underscores: "Some new thing"
+    expect(unknown!.summary).toBe("Some new thing");
+  });
+
   it("preserves stage and actor from events", () => {
     const session = getApp().sessions.create({ summary: "stage test" });
     getApp().events.log(session.id, "stage_started", {

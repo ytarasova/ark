@@ -338,6 +338,42 @@ describe("SessionRepository", () => {
     expect(updated.stage).toBe("code");
   });
 
+  it("claim JSON-ifies config like update does", () => {
+    const s = repo.create({});
+    repo.claim(s.id, "pending", "running", {
+      config: { launch_pid: 4242, attachments: [{ name: "x" }] } as SessionConfig,
+    });
+    const updated = repo.get(s.id)!;
+    expect(updated.status).toBe("running");
+    expect(updated.config.launch_pid).toBe(4242);
+    expect((updated.config as any).attachments[0].name).toBe("x");
+  });
+
+  it("claim ignores caller-supplied status in extra (fixed by `next`)", () => {
+    const s = repo.create({});
+    // Caller sneaks `status: "completed"` into `extra`; the claim must still
+    // land `running` because that's what `next` specifies.
+    repo.claim(s.id, "pending", "running", {
+      status: "completed" as SessionStatus,
+      agent: "planner",
+    });
+    const updated = repo.get(s.id)!;
+    expect(updated.status).toBe("running");
+    expect(updated.agent).toBe("planner");
+  });
+
+  it("claim drops unknown columns like update does", () => {
+    const s = repo.create({});
+    // `totally_made_up` is not in SESSION_COLUMNS, so the claim should land
+    // without error and silently skip it (parity with update()).
+    expect(() =>
+      repo.claim(s.id, "pending", "running", { totally_made_up: "ignore" } as unknown as Partial<
+        ReturnType<typeof repo.get>
+      >),
+    ).not.toThrow();
+    expect(repo.get(s.id)!.status).toBe("running");
+  });
+
   // ── purgeDeleted ────────────────────────────────────────────────────────
 
   it("purgeDeleted removes expired soft-deleted sessions", () => {

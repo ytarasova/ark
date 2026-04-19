@@ -354,6 +354,72 @@ describe("runVerification(getApp())", () => {
     expect(result.todosResolved).toBe(true);
     expect(result.pendingTodos).toHaveLength(0);
   });
+
+  it("routes verify scripts through the injected runScript seam", async () => {
+    // Use a throwaway temp dir as workdir so loadRepoConfig returns clean
+    // (no inherited verify scripts); configure a flow with two verify
+    // scripts so the seam is hit twice, once successful and once failing.
+    const tmp = join(process.env.TMPDIR ?? "/tmp", `ark-verify-seam-${Date.now()}`);
+    mkdirSync(tmp, { recursive: true });
+
+    getApp().flows.save("verify-flow", {
+      name: "verify-flow",
+      stages: [{ name: "only", agent: "worker", verify: ["good", "bad"] }],
+    } as any);
+
+    const session = getApp().sessions.create({
+      summary: "verify-stub",
+      flow: "verify-flow",
+      workdir: tmp,
+    });
+    getApp().sessions.update(session.id, { stage: "only" });
+
+    const calls: Array<{ script: string; cwd: string | undefined }> = [];
+    const result = await runVerification(getApp(), session.id, {
+      runScript: async (script, opts) => {
+        calls.push({ script, cwd: opts.cwd });
+        if (script === "good") return { stdout: "ok\n", stderr: "" };
+        throw { stdout: "", stderr: "boom", message: "failed" };
+      },
+      timeoutMs: 1000,
+    });
+
+    expect(calls).toEqual([
+      { script: "good", cwd: tmp },
+      { script: "bad", cwd: tmp },
+    ]);
+    expect(result.ok).toBe(false);
+    expect(result.scriptResults).toHaveLength(2);
+    expect(result.scriptResults[0]).toEqual({ script: "good", passed: true, output: "ok\n" });
+    expect(result.scriptResults[1].passed).toBe(false);
+    expect(result.scriptResults[1].output).toContain("boom");
+    expect(result.message).toContain("verify failed: bad");
+  });
+
+  it("reports verify success when all injected scripts pass", async () => {
+    const tmp = join(process.env.TMPDIR ?? "/tmp", `ark-verify-pass-${Date.now()}`);
+    mkdirSync(tmp, { recursive: true });
+
+    getApp().flows.save("verify-flow-pass", {
+      name: "verify-flow-pass",
+      stages: [{ name: "only", agent: "worker", verify: ["lint", "test"] }],
+    } as any);
+
+    const session = getApp().sessions.create({
+      summary: "verify-stub-pass",
+      flow: "verify-flow-pass",
+      workdir: tmp,
+    });
+    getApp().sessions.update(session.id, { stage: "only" });
+
+    const result = await runVerification(getApp(), session.id, {
+      runScript: async () => ({ stdout: "", stderr: "" }),
+    });
+    expect(result.ok).toBe(true);
+    expect(result.scriptResults).toHaveLength(2);
+    expect(result.scriptResults.every((r) => r.passed)).toBe(true);
+    expect(result.message).toBe("Verification passed");
+  });
 });
 
 // ── Test 6: Flow verify field ─────────────────────────────────────────────────
