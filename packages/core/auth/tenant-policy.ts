@@ -13,7 +13,7 @@ import type { IDatabase } from "./database/index.js";
 
 export interface TenantComputePolicy {
   tenant_id: string;
-  allowed_providers: string[]; // ["k8s", "k8s-kata", "ec2", "e2b"]
+  allowed_providers: string[]; // ["k8s", "k8s-kata", "ec2"]
   default_provider: string; // "k8s"
   max_concurrent_sessions: number; // 20
   max_cost_per_day_usd: number | null; // budget limit

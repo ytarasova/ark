@@ -162,7 +162,6 @@ export interface PortStatus extends PortDecl {
 
 // ── Provider config types ───────────────────────────────────────────────────
 
-export type { E2BConfig } from "./providers/e2b.js";
 export type { K8sConfig } from "./providers/k8s.js";
 
 // ── arc.json types ──────────────────────────────────────────────────────────

@@ -132,7 +132,7 @@ export class FirecrackerCompute implements Compute {
       throw new Error(
         `Firecracker compute unavailable: ${availability.reason ?? "unknown reason"}. ` +
           "Firecracker requires a Linux host with /dev/kvm; on macOS fall back to " +
-          "a remote compute (ec2-firecracker, fly-machines) or use a Linux VM.",
+          "ec2-firecracker or use a Linux VM.",
       );
     }
 

@@ -87,10 +87,6 @@ import {
 } from "./providers/remote-arkd.js";
 export { RemoteWorktreeProvider, RemoteDockerProvider, RemoteDevcontainerProvider, RemoteFirecrackerProvider };
 
-// E2B managed sandbox provider
-import { E2BProvider } from "./providers/e2b.js";
-export { E2BProvider };
-
 // Kubernetes providers (vanilla + Kata/Firecracker)
 import { K8sProvider, KataProvider } from "./providers/k8s.js";
 export { K8sProvider, KataProvider };
@@ -136,12 +132,6 @@ export { computeProviderToTarget } from "./adapters/legacy.js";
 // network helpers for the pool layer (Phase 4).
 export { FirecrackerCompute, registerFirecrackerIfAvailable } from "./core/firecracker/compute.js";
 export type { FirecrackerComputeDeps, FirecrackerMeta } from "./core/firecracker/compute.js";
-
-// Phase 5: FlyMachinesCompute. Remote microVM backend via Fly.io Machines.
-// Registration is gated on `FLY_API_TOKEN`; `registerFlyIfAvailable` returns
-// null (and logs at debug) when the token is absent.
-export { FlyMachinesCompute, registerFlyIfAvailable, setFlyHooksForTesting } from "./core/fly/compute.js";
-export type { FlyMachinesComputeDeps, FlyMachinesProvisionConfig, FlyMeta } from "./core/fly/compute.js";
 
 export { providerToPair, pairToProvider, isKnownProvider, knownProviders } from "./adapters/provider-map.js";
 export type { ComputeRuntimePair } from "./adapters/provider-map.js";

@@ -66,7 +66,7 @@ ark search "authentication"
 | **Dashboard** | Fleet status overview with cost charts (Recharts), budget tracking, and recent activity | [CLI](docs/cli-reference.md#ark-dashboard) |
 | **Web Dashboard** | Browser-based session management with SSE live updates, token auth, read-only mode | [Guide](docs/guide.md#web-dashboard) |
 | **Desktop App** | Electron wrapper around the web dashboard -- native menus, local-first | [Install](packages/desktop/INSTALL.md) |
-| **Compute Providers** | Local, Docker, DevContainer, Firecracker, EC2 + arkd (base/docker/devcontainer/firecracker), E2B (managed sandbox), K8s, K8s+Kata | [Guide](docs/guide.md#compute) |
+| **Compute Providers** | Local, Docker, DevContainer, Firecracker, EC2 + arkd (base/docker/devcontainer/firecracker), K8s, K8s+Kata (self-hosted only) | [Guide](docs/guide.md#compute) |
 | **Git Worktrees** | Automatic branch isolation per session, diff preview, merge + auto-PR in one command | [Guide](docs/guide.md#git-worktrees) |
 | **Skills & Recipes** | Reusable prompt fragments and session templates with three-tier resolution | [Guide](docs/guide.md#skills--recipes) |
 | **Cost Tracking** | Automatic token usage collection, per-model pricing, budget limits, cost export | [Guide](docs/guide.md#cost-tracking) |
@@ -95,8 +95,8 @@ packages/
                 or DbResourceStore (resource_definitions table) in hosted mode
     runtimes/   Polymorphic transcript parsers (claude, codex, gemini)
     router/     TensorZero lifecycle manager
-  compute/    11 providers: local, docker, devcontainer, firecracker, ec2 (+arkd variants),
-              e2b, k8s, k8s-kata
+  compute/    Self-hosted providers: local, docker, devcontainer, firecracker,
+              ec2 (+arkd variants), k8s, k8s-kata
   arkd/       Universal agent daemon -- HTTP server on every compute target
   router/     LLM Router -- OpenAI-compatible proxy with routing policies
   web/        Vite-based web dashboard (SSE live updates, Dashboard page)
@@ -155,19 +155,9 @@ docker-compose up -d          # Ark + Postgres + Redis
 
 # Kubernetes (Helm)
 helm install ark .infra/helm/ark -f .infra/helm/ark/values-production.yaml
-
-# Fly Machines compute backend (arkd-bundled image)
-FLY_API_TOKEN=... make fly-image   # builds + pushes registry.fly.io/ark-arkd:latest
 ```
 
 The Helm chart deploys: control plane, worker pool, PostgreSQL, Redis, Ingress.
-
-The `fly-image` target builds the image that `FlyMachinesCompute` pulls
-when provisioning a Fly machine (default tag `registry.fly.io/ark-arkd:latest`,
-see `packages/compute/core/fly/compute.ts`). Without this image the
-provider is inert -- Fly creates a machine, but the container has no arkd
-inside. Set `FLY_APP` / `TAG` env vars to override the target repo/tag; see
-`scripts/build-fly-image.sh` for the full workflow.
 
 ## Data
 

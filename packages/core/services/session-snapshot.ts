@@ -81,10 +81,10 @@ export function resolveSessionCompute(
 function inferComputeKind(name: string): ComputeKind {
   if (name.startsWith("firecracker")) return "firecracker";
   if (name.startsWith("ec2")) return "ec2";
-  if (name.startsWith("fly")) return "fly-machines";
+
   if (name.startsWith("k8s-kata")) return "k8s-kata";
   if (name.startsWith("k8s")) return "k8s";
-  if (name.startsWith("e2b")) return "e2b";
+
   return "local";
 }
 

@@ -4,7 +4,6 @@
  * Every name that today's code registers or persists must map to a real
  * (ComputeKind, RuntimeKind) pair, and the reverse mapping must round-trip.
  */
-
 import { describe, it, expect } from "bun:test";
 import {
   providerToPair,
@@ -13,7 +12,6 @@ import {
   knownProviders,
   type ComputeRuntimePair,
 } from "../adapters/provider-map.js";
-
 describe("providerToPair", () => {
   // Every provider name that ships today (see app.ts step 4, plus legacy
   // aliases kept for back-compat reads from older DB rows).
@@ -33,33 +31,26 @@ describe("providerToPair", () => {
     ["remote-firecracker", { compute: "ec2", runtime: "firecracker-in-container" }],
     ["k8s", { compute: "k8s", runtime: "direct" }],
     ["k8s-kata", { compute: "k8s-kata", runtime: "direct" }],
-    ["e2b", { compute: "e2b", runtime: "direct" }],
-    ["fly-machines", { compute: "fly-machines", runtime: "direct" }],
   ];
-
   for (const [name, expected] of CASES) {
     it(`maps '${name}' to ${expected.compute} + ${expected.runtime}`, () => {
       expect(providerToPair(name)).toEqual(expected);
     });
   }
-
   it("falls back to local + direct for unknown names", () => {
     expect(providerToPair("fake-provider-xyz")).toEqual({ compute: "local", runtime: "direct" });
   });
 });
-
 describe("isKnownProvider", () => {
   it("returns true for registered names", () => {
     expect(isKnownProvider("local")).toBe(true);
     expect(isKnownProvider("ec2-docker")).toBe(true);
     expect(isKnownProvider("k8s-kata")).toBe(true);
   });
-
   it("returns false for unknown names", () => {
     expect(isKnownProvider("totally-made-up")).toBe(false);
   });
 });
-
 describe("knownProviders", () => {
   it("lists at least every provider registered today", () => {
     const names = knownProviders();
@@ -75,13 +66,11 @@ describe("knownProviders", () => {
       "ec2-firecracker",
       "k8s",
       "k8s-kata",
-      "e2b",
     ]) {
       expect(names).toContain(expected);
     }
   });
 });
-
 describe("pairToProvider", () => {
   it("round-trips every mapped pair", () => {
     for (const name of knownProviders()) {
@@ -95,8 +84,7 @@ describe("pairToProvider", () => {
       expect(providerToPair(back!)).toEqual(pair);
     }
   });
-
   it("returns null for impossible pairs", () => {
-    expect(pairToProvider({ compute: "fly-machines", runtime: "devcontainer" } as any)).toBeNull();
+    expect(pairToProvider({ compute: "k8s", runtime: "devcontainer" } as any)).toBeNull();
   });
 });

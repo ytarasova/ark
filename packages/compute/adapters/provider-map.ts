@@ -20,8 +20,8 @@
  *   - "remote-firecracker" -> ec2 + firecracker-in-container
  *   - "k8s"                -> k8s + direct
  *   - "k8s-kata"           -> k8s-kata + direct
- *   - "e2b"                -> e2b + direct
- *   - "fly-machines"       -> fly-machines + direct
+
+
  *
  * Unknown names fall through to `local + direct` with a warning so callers
  * with bad data do not crash dispatch.
@@ -57,12 +57,6 @@ const PROVIDER_MAP: Record<string, ComputeRuntimePair> = {
   // Kubernetes
   k8s: { compute: "k8s", runtime: "direct" },
   "k8s-kata": { compute: "k8s-kata", runtime: "direct" },
-
-  // Managed sandboxes
-  e2b: { compute: "e2b", runtime: "direct" },
-
-  // Hosted microVM backends (future, Phase 5)
-  "fly-machines": { compute: "fly-machines", runtime: "direct" },
 };
 
 /**

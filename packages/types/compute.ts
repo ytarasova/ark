@@ -5,7 +5,7 @@ export type ComputeProviderName = "local" | "docker" | "ec2" | "remote-arkd";
  * Where the compute lives. Mirrors `ComputeKind` in packages/compute/core/types.ts
  * (duplicated here as a string union to avoid a cross-package import cycle).
  */
-export type ComputeKindName = "local" | "firecracker" | "ec2" | "fly-machines" | "k8s" | "k8s-kata" | "e2b";
+export type ComputeKindName = "local" | "firecracker" | "ec2" | "k8s" | "k8s-kata";
 
 /**
  * How the agent process is launched inside the compute. Mirrors `RuntimeKind`.
