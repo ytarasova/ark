@@ -8,6 +8,7 @@
 
 import type { AppContext } from "../app.js";
 import type { Compute, ComputeProviderName } from "../../types/index.js";
+import { logDebug } from "../observability/structured-log.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -195,7 +196,7 @@ export class ComputePoolManager {
     try {
       config = JSON.parse(row.config);
     } catch {
-      /* default */
+      logDebug("pool", "default");
     }
     return {
       name: row.name,

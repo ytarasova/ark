@@ -5,6 +5,7 @@
 
 import { readdirSync, readFileSync, statSync, existsSync, openSync, readSync, closeSync, fstatSync } from "fs";
 import { join } from "path";
+import { logInfo, logDebug } from "../observability/structured-log.js";
 
 export interface GlobalSearchResult {
   projectPath: string;
@@ -79,19 +80,19 @@ export function searchAllConversations(
                   });
                 }
               } catch {
-                /* malformed JSONL line */
+                logDebug("general", "malformed JSONL line");
               }
             }
           } catch {
-            /* file read error */
+            logInfo("general", "file read error");
           }
         }
       } catch {
-        /* directory read error */
+        logInfo("general", "directory read error");
       }
     }
   } catch {
-    /* projects dir error */
+    logInfo("general", "projects dir error");
   }
 
   // Sort by recency

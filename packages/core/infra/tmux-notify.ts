@@ -9,6 +9,7 @@
 import type { AppContext } from "../app.js";
 import { execFileSync } from "child_process";
 import { tmuxBin } from "./tmux.js";
+import { logDebug } from "../observability/structured-log.js";
 
 /** Update tmux status bar with waiting session indicators. */
 export function updateTmuxStatusBar(app: AppContext): void {
@@ -30,7 +31,7 @@ export function updateTmuxStatusBar(app: AppContext): void {
     const bar = `#[fg=yellow,bold]⚡ ${entries.join(" ")} `;
     execFileSync(tmuxBin(), ["set-option", "-g", "status-left", bar], { stdio: "ignore" });
   } catch {
-    // tmux not available or not in tmux -- silently ignore
+    logDebug("session", "tmux not available or not in tmux -- silently ignore");
   }
 }
 
@@ -39,6 +40,6 @@ export function clearTmuxStatusBar(): void {
   try {
     execFileSync(tmuxBin(), ["set-option", "-g", "status-left", ""], { stdio: "ignore" });
   } catch {
-    /* ignore */
+    logDebug("session", "ignore");
   }
 }

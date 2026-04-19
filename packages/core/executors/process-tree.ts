@@ -15,6 +15,7 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
 import type { ProcessInfo } from "../executor.js";
+import { logInfo, logDebug } from "../observability/structured-log.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -87,7 +88,7 @@ export async function getProcessTree(rootPid: number): Promise<ProcessInfo> {
       children.push({ pid, ppid, command, cpu, mem });
     }
   } catch {
-    // ps failed -- return empty children
+    logInfo("general", "ps failed -- return empty children");
   }
 
   return { rootPid, children, capturedAt: new Date().toISOString() };
@@ -116,7 +117,7 @@ export async function killProcessTree(rootPid: number): Promise<void> {
     try {
       process.kill(pid, "SIGTERM");
     } catch {
-      /* ESRCH: already dead */
+      logDebug("general", "ESRCH: already dead");
     }
   }
 
@@ -128,7 +129,7 @@ export async function killProcessTree(rootPid: number): Promise<void> {
     try {
       process.kill(pid, "SIGKILL");
     } catch {
-      /* ESRCH: already dead */
+      logDebug("general", "ESRCH: already dead");
     }
   }
 }

@@ -8,6 +8,7 @@
  */
 
 import type { IDatabase } from "./database/index.js";
+import { logInfo, logDebug } from "../observability/structured-log.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -86,7 +87,7 @@ export class TenantPolicyManager {
       try {
         this.db.prepare(`ALTER TABLE tenant_policies ADD COLUMN ${col} ${def}`).run();
       } catch {
-        /* exists */
+        logInfo("general", "exists");
       }
     }
   }
@@ -219,7 +220,7 @@ export class TenantPolicyManager {
         .get(tenantId) as { cnt: number } | undefined;
       if (row) return row.cnt;
     } catch {
-      // tenant_id column may not exist on sessions table in some setups
+      logDebug("general", "tenant_id column may not exist on sessions table in some setups");
     }
     return 0;
   }
@@ -274,12 +275,12 @@ export class TenantPolicyManager {
     try {
       allowedProviders = JSON.parse(row.allowed_providers);
     } catch {
-      /* default */
+      logDebug("general", "default");
     }
     try {
       computePools = JSON.parse(row.compute_pools);
     } catch {
-      /* default */
+      logDebug("general", "default");
     }
 
     return {

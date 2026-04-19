@@ -2,6 +2,7 @@ import { execFileSync } from "child_process";
 import { existsSync } from "fs";
 import type { AppContext } from "./app.js";
 import type { Session } from "../types/index.js";
+import { logInfo } from "./observability/structured-log.js";
 
 export async function mergeChildBranches(
   app: AppContext,
@@ -38,7 +39,7 @@ export async function mergeChildBranches(
         try {
           execFileSync("git", ["-C", parentWorktree, "merge", "--abort"], { stdio: "pipe" });
         } catch {
-          /* merge abort may fail if no merge in progress */
+          logInfo("session", "merge abort may fail if no merge in progress");
         }
         conflicts.push(child.id);
       }

@@ -1,3 +1,4 @@
+import { logInfo } from "../observability/structured-log.js";
 /**
  * SSE broadcast bus -- abstraction over the SSE publish/subscribe mechanism.
  *
@@ -41,7 +42,7 @@ export class InMemorySSEBus implements SSEBus {
       try {
         listener(event, data);
       } catch {
-        // Don't let one bad listener break others
+        logInfo("web", "Don't let one bad listener break others");
       }
     }
   }

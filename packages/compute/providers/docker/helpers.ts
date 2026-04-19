@@ -10,6 +10,7 @@ import { promisify } from "util";
 import { homedir } from "os";
 import { join, dirname, resolve as pathResolve } from "path";
 import { existsSync } from "fs";
+import { logDebug } from "../../../core/observability/structured-log.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -291,7 +292,7 @@ export function resolveArkSourceRoot(): string | null {
       return pathResolve(root);
     }
   } catch {
-    /* fall through */
+    logDebug("compute", "resolveArkSourceRoot: path walk failed -- compiled install, returning null");
   }
   return null;
 }

@@ -384,7 +384,7 @@ async function safe(fn: () => Promise<unknown>): Promise<void> {
   try {
     await fn();
   } catch {
-    /* intentional */
+    logInfo("compute", "intentional");
   }
 }
 

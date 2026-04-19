@@ -23,6 +23,7 @@ import { join, resolve } from "path";
 import { homedir } from "os";
 import { createHash } from "crypto";
 import type { TranscriptParser, ParseResult, FindOpts } from "../transcript-parser.js";
+import { logDebug } from "../../observability/structured-log.js";
 
 export class GeminiTranscriptParser implements TranscriptParser {
   readonly kind = "gemini";
@@ -61,7 +62,7 @@ export class GeminiTranscriptParser implements TranscriptParser {
         usage.output_tokens += (t.output ?? 0) + (t.thoughts ?? 0) + (t.tool ?? 0);
         usage.cache_read_tokens += t.cached ?? 0;
       } catch {
-        /* skip malformed lines */
+        logDebug("session", "skip malformed lines");
       }
     }
 
@@ -120,7 +121,7 @@ export class GeminiTranscriptParser implements TranscriptParser {
           return path;
         }
       } catch {
-        /* skip files we can't read/parse */
+        logDebug("session", "skip files we can't read/parse");
       }
     }
 

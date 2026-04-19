@@ -7,6 +7,7 @@
 import type { AppContext } from "../app.js";
 import { resolveProvider } from "../provider-registry.js";
 import { detectInjection } from "../session/prompt-guard.js";
+import { logDebug } from "../observability/structured-log.js";
 
 export async function getOutput(
   app: AppContext,
@@ -56,7 +57,7 @@ export async function send(
       });
     }
   } catch {
-    /* skip prompt guard on error */
+    logDebug("session", "skip prompt guard on error");
   }
 
   // Audit: log user message sent

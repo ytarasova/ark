@@ -14,6 +14,7 @@ import * as flow from "../state/flow.js";
 import { formatReviewPrompt, type ReviewComment } from "./github-pr.js";
 import { safeAsync } from "../safe.js";
 import { DEFAULT_CHANNEL_BASE_URL } from "../constants.js";
+import { logInfo, logDebug } from "../observability/structured-log.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -111,7 +112,7 @@ export async function processReviewFeedback(
       const { approveReviewGate } = await import("../services/session-orchestration.js");
       await approveReviewGate(app, session.id);
     } catch {
-      /* gate may already be advanced */
+      logDebug("bridge", "gate may already be advanced");
     }
     return;
   }
@@ -181,7 +182,7 @@ export async function pollPRReviews(app: AppContext, opts?: PRPollerOptions): Pr
     try {
       await checkSessionPR(app, s, opts);
     } catch {
-      // Don't let one session's failure block others
+      logInfo("bridge", "Don't let one session's failure block others");
     }
   }
 }

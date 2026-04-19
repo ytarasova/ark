@@ -11,6 +11,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import type { Session } from "../../types/index.js";
 import type { AppContext } from "../app.js";
+import { logInfo } from "../observability/structured-log.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -74,7 +75,7 @@ export async function pollPRMerges(app: AppContext, opts?: MergePollerOptions): 
     try {
       await checkSessionMerge(app, s, opts);
     } catch {
-      // Don't let one session's failure block others
+      logInfo("bridge", "Don't let one session's failure block others");
     }
   }
 }

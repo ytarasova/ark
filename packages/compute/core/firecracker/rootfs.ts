@@ -65,6 +65,7 @@ import { mkdir, open, rm } from "fs/promises";
 import { dirname } from "path";
 
 import { kernelPath, rootfsPath } from "./paths.js";
+import { logDebug } from "../../../core/observability/structured-log.js";
 
 /** Pinned kernel release. vmlinux-5.10.x built by the Firecracker team. */
 const DEFAULT_KERNEL_URL = "https://s3.amazonaws.com/spec.ccfc.min/firecracker-ci/v1.5/x86_64/vmlinux-5.10.186";
@@ -186,7 +187,7 @@ async function ensureArtifact(url: string, sha256: string, dest: string, label: 
   try {
     chmodSync(dest, 0o644);
   } catch {
-    // best-effort; tmpfs / bind mounts may not support chmod
+    logDebug("compute", "best-effort; tmpfs / bind mounts may not support chmod");
   }
 }
 

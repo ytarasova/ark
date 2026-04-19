@@ -32,7 +32,7 @@ import { pollIssues } from "../integrations/issue-poller.js";
 import { ArkdClient } from "../../arkd/client.js";
 import { safeAsync } from "../safe.js";
 import { addEntry } from "../ledger.js";
-import { logError, logInfo, logWarn } from "../observability/structured-log.js";
+import { logDebug, logError, logInfo, logWarn } from "../observability/structured-log.js";
 import { sendOSNotification } from "../notify.js";
 import { watchMergedPR, type RollbackConfig } from "../integrations/rollback.js";
 import { emitStageSpanEnd, emitSessionSpanEnd, flushSpans } from "../observability/otlp.js";
@@ -268,7 +268,7 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
         const freshSession = app.sessions.get(sessionId);
         if (freshSession) evaluateSession(app, freshSession);
       } catch {
-        /* skip eval on error */
+        logDebug("conductor", "skip eval on error");
       }
     }
   }
@@ -293,7 +293,7 @@ async function handleHookStatus(req: Request, url: URL): Promise<Response> {
     try {
       addEntry(app, "default", "progress", `Session ${sessionId} status: ${result.newStatus}`, sessionId);
     } catch {
-      /* skip ledger on error */
+      logDebug("conductor", "skip ledger on error");
     }
   }
 
@@ -631,7 +631,7 @@ export async function deliverToChannel(
       const result = await client.channelDeliver({ channelPort, payload });
       if (result.delivered) return;
     } catch {
-      /* arkd not available -- fall through to direct HTTP */
+      logDebug("conductor", "arkd not available -- fall through to direct HTTP");
     }
   }
 
@@ -643,7 +643,7 @@ export async function deliverToChannel(
       body: JSON.stringify(payload),
     });
   } catch {
-    /* channel not reachable -- expected when agent hasn't started channel yet */
+    logDebug("conductor", "channel not reachable -- expected when agent hasn't started channel yet");
   }
 }
 
@@ -1020,7 +1020,7 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
       app.artifacts.add(sessionId, "branch", [s.branch]);
     }
   } catch {
-    /* best-effort artifact tracking */
+    logDebug("conductor", "best-effort artifact tracking");
   }
 
   // Index session completion in knowledge graph (best-effort)
@@ -1031,7 +1031,7 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
       const changedFiles = ((report as Record<string, unknown>).filesChanged as string[] | undefined) ?? [];
       indexSessionCompletion(app.knowledge, sessionId, s?.summary ?? "", "completed", changedFiles);
     } catch {
-      /* best-effort knowledge indexing */
+      logDebug("conductor", "best-effort knowledge indexing");
     }
   }
 

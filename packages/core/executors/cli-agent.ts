@@ -15,6 +15,7 @@ import * as tmux from "../infra/tmux.js";
 import { join } from "path";
 import { writeFileSync, mkdirSync } from "fs";
 import { recordingPath } from "../recordings.js";
+import { logInfo } from "../observability/structured-log.js";
 
 /** Single-quote a string for safe bash interpolation (no expansion). */
 const shellQuote = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
@@ -45,7 +46,7 @@ export const cliAgentExecutor: Executor = {
         if (result) effectiveWorkdir = result;
       }
     } catch {
-      /* worktree setup optional */
+      logInfo("general", "worktree setup optional");
     }
 
     // Build tmux session name

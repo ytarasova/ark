@@ -8,6 +8,7 @@
 
 import { join } from "path";
 import { existsSync, readFileSync, unlinkSync } from "fs";
+import { logDebug } from "./observability/structured-log.js";
 
 /** Return the canonical recording file path for a session. */
 export function recordingPath(arkDir: string, sessionId: string): string {
@@ -31,6 +32,6 @@ export function removeRecording(arkDir: string, sessionId: string): void {
   try {
     unlinkSync(p);
   } catch {
-    /* already gone or never created */
+    logDebug("session", "already gone or never created");
   }
 }

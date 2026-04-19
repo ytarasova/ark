@@ -9,6 +9,7 @@ import { promisify } from "util";
 import { readFileSync } from "fs";
 import { createHash } from "crypto";
 import { rsyncPush } from "./ssh.js";
+import { logDebug } from "../../../core/observability/structured-log.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -93,7 +94,7 @@ export function watchClipboard(
       await uploadToSession(key, ip, imgPath, remoteDest);
       opts?.onUpload?.(filename);
     } catch {
-      // best-effort - skip this tick
+      logDebug("compute", "best-effort - skip this tick");
     }
   }, intervalMs);
 

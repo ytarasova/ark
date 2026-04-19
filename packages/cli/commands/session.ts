@@ -8,6 +8,7 @@ import { SESSION_STATUSES } from "../../types/index.js";
 import { runVerification } from "../../core/services/session-orchestration.js";
 import { getArkClient } from "./_shared.js";
 import { sanitizeSummary, formatBytes } from "../helpers.js";
+import { logDebug } from "../../core/observability/structured-log.js";
 
 async function forkCloneHandler(id: string, opts: { task?: string; group?: string }) {
   const ark = await getArkClient();
@@ -193,7 +194,7 @@ export function registerSessionCommands(program: Command) {
           }
         }
       } catch {
-        // flow/read may 404 for ad-hoc flows; fall through without validation.
+        logDebug("session", "flow/read may 404 for ad-hoc flows; fall through without validation.");
       }
 
       const inputs =

@@ -15,6 +15,7 @@ import * as tmux from "../infra/tmux.js";
 import { DEFAULT_CONDUCTOR_URL, DEFAULT_CHANNEL_BASE_URL } from "../constants.js";
 import { channelLaunchSpec } from "../install-paths.js";
 import { findCodebaseMemoryBinary } from "../knowledge/codebase-memory-finder.js";
+import { logInfo, logDebug } from "../observability/structured-log.js";
 
 // ── Model mapping ────────────────────────────────────────────────────────────
 
@@ -623,7 +624,7 @@ export function removeChannelConfig(workdir: string): void {
     try {
       unlinkSync(mcpConfigPath);
     } catch {
-      /* already gone */
+      logDebug("session", "already gone");
     }
   } else {
     writeFileSync(mcpConfigPath, JSON.stringify(config, null, 2));
@@ -670,7 +671,7 @@ export function removeSettings(workdir: string): void {
     try {
       unlinkSync(settingsPath);
     } catch {
-      /* already gone */
+      logDebug("session", "already gone");
     }
   } else {
     writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
@@ -843,7 +844,7 @@ export async function autoAcceptChannelPrompt(
         return;
       }
     } catch {
-      /* tmux pane may not exist yet during startup */
+      logDebug("session", "tmux pane may not exist yet during startup");
     }
   }
 }
@@ -898,7 +899,7 @@ export async function deliverTask(
           return;
         }
       } catch {
-        /* channel port not ready yet -- retry */
+        logInfo("session", "channel port not ready yet -- retry");
       }
       await Bun.sleep(1000);
     }

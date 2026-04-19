@@ -2,6 +2,7 @@ import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import type { NodeType } from "../../core/knowledge/types.js";
+import { logInfo } from "../../core/observability/structured-log.js";
 
 export function registerKnowledgeHandlers(router: Router, app: AppContext): void {
   router.handle("knowledge/search", async (p) => {
@@ -87,7 +88,7 @@ export function registerKnowledgeHandlers(router: Router, app: AppContext): void
     try {
       version = execFileSync(bin, ["--version"], { encoding: "utf-8" }).trim();
     } catch {
-      // binary present but --version failed; still report available
+      logInfo("web", "binary present but --version failed; still report available");
     }
     return {
       available: true,

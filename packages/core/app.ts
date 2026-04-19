@@ -32,7 +32,7 @@ import { setProviderResolver, clearProviderResolver } from "./provider-registry.
 import { updateTmuxStatusBar, clearTmuxStatusBar } from "./infra/tmux-notify.js";
 import { startNotifyDaemon } from "./infra/notify-daemon.js";
 import { track, configureTelemetry } from "./observability/telemetry.js";
-import { logError, logWarn, setLogArkDir } from "./observability/structured-log.js";
+import { logDebug, logError, logWarn, setLogArkDir } from "./observability/structured-log.js";
 import { setProfilesArkDir } from "./state/profiles.js";
 import { registerExecutor } from "./executor.js";
 import { builtinExecutors, loadPluginExecutors } from "./executors/index.js";
@@ -697,7 +697,7 @@ export class AppContext {
         kata.setApp(this);
         this.registerProvider(kata);
       } catch {
-        /* @kubernetes/client-node not installed */
+        logDebug("general", "@kubernetes/client-node not installed");
       }
 
       // Wave 2 Compute registrations for Kubernetes. Gated the same way as
@@ -711,7 +711,7 @@ export class AppContext {
         this.registerCompute(new K8sCompute());
         this.registerCompute(new KataCompute());
       } catch {
-        /* @kubernetes/client-node not installed */
+        logDebug("general", "@kubernetes/client-node not installed");
       }
 
       // Wave 1/2 Compute + Runtime registry. Additive -- the legacy provider
@@ -849,7 +849,7 @@ export class AppContext {
           }
         }
       } catch {
-        /* container may be disposed during shutdown */
+        logDebug("general", "container may be disposed during shutdown");
       }
     }, 30_000);
 
@@ -901,7 +901,7 @@ export class AppContext {
           removeSettings(cwd);
         }
       } catch {
-        /* settings.local.json may be malformed; safe to skip */
+        logDebug("general", "settings.local.json may be malformed; safe to skip");
       }
     });
 
@@ -920,7 +920,7 @@ export class AppContext {
           removeChannelConfig(cwd);
         }
       } catch {
-        /* .mcp.json may be malformed; safe to skip */
+        logDebug("general", ".mcp.json may be malformed; safe to skip");
       }
     });
 
@@ -974,7 +974,7 @@ export class AppContext {
       const { stopAllPollers } = await import("./executors/status-poller.js");
       stopAllPollers();
     } catch {
-      /* poller module may not be loaded */
+      logDebug("general", "poller module may not be loaded");
     }
 
     if (this._notifyDaemon) {
@@ -1023,7 +1023,7 @@ export class AppContext {
       await flushSpans();
       resetOtlp();
     } catch {
-      /* telemetry flush is best-effort */
+      logDebug("general", "telemetry flush is best-effort");
     }
 
     // Step 3: tear down compute + DI container (reverse of boot steps 3-5)
@@ -1031,7 +1031,7 @@ export class AppContext {
     try {
       this._container.resolve("db").close();
     } catch {
-      /* db may already be closed */
+      logDebug("general", "db may already be closed");
     }
     await this._container.dispose();
 

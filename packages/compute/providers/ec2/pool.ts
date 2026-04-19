@@ -12,6 +12,7 @@ import { homedir } from "os";
 import { join } from "path";
 import { SSH_OPTS } from "./ssh.js";
 import { safeAsync } from "../../../core/safe.js";
+import { logDebug } from "../../../core/observability/structured-log.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -100,7 +101,7 @@ export class SSHPool {
         try {
           rmSync(this.socketPath);
         } catch {
-          // Stale socket file may already be gone -- safe to ignore
+          logDebug("pool", "Stale socket file may already be gone -- safe to ignore");
         }
       }
 
@@ -254,13 +255,13 @@ export class SSHPool {
         timeout: SSH_CHECK_TIMEOUT_MS,
       });
     } catch {
-      // Master may already be dead -- expected during cleanup
+      logDebug("pool", "Master may already be dead -- expected during cleanup");
     }
     try {
       // Clean up control socket file at this.socketPath
       if (existsSync(this.socketPath)) rmSync(this.socketPath);
     } catch {
-      // Socket file at this.socketPath may already be removed -- safe to ignore
+      logDebug("pool", "Socket file at this.socketPath may already be removed -- safe to ignore");
     }
   }
 

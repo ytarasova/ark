@@ -1,3 +1,4 @@
+import { logDebug } from "../observability/structured-log.js";
 /**
  * Guardrails -- pattern-based tool authorization.
  *
@@ -34,7 +35,7 @@ export function evaluateGuardrail(
         return rule.action;
       }
     } catch {
-      // Invalid regex - skip rule
+      logDebug("session", "Invalid regex - skip rule");
     }
   }
 
@@ -70,7 +71,7 @@ export function evaluateToolCall(
         return { action: rule.action, rule };
       }
     } catch {
-      /* skip invalid regex */
+      logDebug("session", "skip invalid regex");
     }
   }
 

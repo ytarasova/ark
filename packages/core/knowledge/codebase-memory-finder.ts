@@ -12,6 +12,7 @@
 import { existsSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
+import { logDebug } from "../observability/structured-log.js";
 
 /**
  * Find the codebase-memory-mcp binary. Search order:
@@ -41,7 +42,7 @@ export function findCodebaseMemoryBinary(): string {
       const devVendor = join(repoRoot, "dist", "vendor", `codebase-memory-mcp-${platform}`);
       if (existsSync(devVendor)) return devVendor;
     } catch {
-      // import.meta.url unavailable (compiled bundle uses virtual FS) -- fall through
+      logDebug("session", "import.meta.url unavailable (compiled bundle uses virtual FS) -- fall through");
     }
   }
 

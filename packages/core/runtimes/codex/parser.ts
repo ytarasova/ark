@@ -20,6 +20,7 @@ import { join, resolve } from "path";
 import { homedir } from "os";
 import { realpathSync } from "fs";
 import type { TranscriptParser, ParseResult, FindOpts } from "../transcript-parser.js";
+import { logDebug } from "../../observability/structured-log.js";
 
 function normalizePath(p: string): string {
   try {
@@ -68,7 +69,7 @@ export class CodexTranscriptParser implements TranscriptParser {
           }
         }
       } catch {
-        /* skip malformed lines */
+        logDebug("session", "skip malformed lines");
       }
     }
 
@@ -134,7 +135,7 @@ export class CodexTranscriptParser implements TranscriptParser {
           return path;
         }
       } catch {
-        /* skip files we can't read/parse */
+        logDebug("session", "skip files we can't read/parse");
       }
     }
 

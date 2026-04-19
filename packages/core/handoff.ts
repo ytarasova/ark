@@ -1,3 +1,4 @@
+import { logDebug } from "./observability/structured-log.js";
 /**
  * Agent-initiated handoff -- agents signal which agent should run next.
  * Detected from agent output patterns like "HANDOFF: reviewer" or structured JSON.
@@ -30,7 +31,7 @@ export function detectHandoff(output: string): HandoffSignal | null {
         };
       }
     } catch {
-      /* fall through */
+      logDebug("session", "fall through");
     }
     // Fallback: extract handoff value with simple regex
     const fallback = jsonBlockMatch[1].match(/"handoff"\s*:\s*"(\w+)"/);

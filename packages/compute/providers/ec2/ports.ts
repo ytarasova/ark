@@ -6,6 +6,7 @@ import { execFile, spawn } from "child_process";
 import { promisify } from "util";
 import type { PortDecl, PortStatus } from "../../types.js";
 import { SSH_OPTS, sshExec } from "./ssh.js";
+import { logInfo, logDebug } from "../../../core/observability/structured-log.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -57,12 +58,12 @@ export async function teardownTunnels(ports: PortDecl[]): Promise<void> {
           try {
             process.kill(Number(pid), "SIGTERM");
           } catch {
-            // process may already be gone
+            logDebug("compute", "process may already be gone");
           }
         }
       }
     } catch {
-      // lsof returns non-zero when no matching processes found
+      logInfo("compute", "lsof returns non-zero when no matching processes found");
     }
   }
 }

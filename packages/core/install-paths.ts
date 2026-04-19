@@ -47,6 +47,7 @@
 import { existsSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
+import { logDebug } from "./observability/structured-log.js";
 
 export interface ResolveEnv {
   /** Path to the currently-executing binary (typically `process.execPath`). */
@@ -92,7 +93,7 @@ export function resolveInstallPrefixWith(env: ResolveEnv): string | null {
       return prefix;
     }
   } catch {
-    /* fall through */
+    logDebug("session", "fall through");
   }
   return null;
 }

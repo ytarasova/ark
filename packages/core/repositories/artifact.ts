@@ -1,6 +1,7 @@
 import type { IDatabase } from "../database/index.js";
 import type { SessionArtifact, ArtifactType, ArtifactQuery } from "../../types/index.js";
 import { now } from "../util/time.js";
+import { logDebug } from "../observability/structured-log.js";
 
 interface ArtifactRow {
   id: number;
@@ -17,7 +18,7 @@ function rowToArtifact(row: ArtifactRow): SessionArtifact {
   try {
     metadata = JSON.parse(row.metadata || "{}");
   } catch {
-    /* malformed JSON in metadata column -- use empty default */
+    logDebug("general", "malformed JSON in metadata column -- use empty default");
   }
   return {
     ...row,

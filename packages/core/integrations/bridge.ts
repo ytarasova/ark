@@ -175,7 +175,7 @@ export class Bridge {
       try {
         sessions = app.sessions.list({ limit: 100 });
       } catch {
-        /* app not booted */
+        logInfo("bridge", "app not booted");
       }
     }
     const counts: Record<string, number> = {};
@@ -223,6 +223,7 @@ export class Bridge {
 
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
+import { logInfo } from "../observability/structured-log.js";
 
 /** Load bridge config from ~/.ark/bridge.json */
 export function loadBridgeConfig(arkDir?: string): BridgeConfig | null {

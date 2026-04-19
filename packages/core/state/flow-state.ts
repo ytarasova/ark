@@ -6,6 +6,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
 import type { AppContext } from "../app.js";
+import { logDebug } from "../observability/structured-log.js";
 
 export interface FlowState {
   sessionId: string;
@@ -144,7 +145,7 @@ export function deleteFlowState(app: AppContext, sessionId: string): void {
     try {
       unlinkSync(path);
     } catch {
-      /* ignore */
+      logDebug("session", "ignore");
     }
   }
 }

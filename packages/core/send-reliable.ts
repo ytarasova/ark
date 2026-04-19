@@ -4,6 +4,7 @@
  */
 
 import * as tmux from "./infra/tmux.js";
+import { logDebug } from "./observability/structured-log.js";
 
 export interface SendOptions {
   maxRetries?: number;
@@ -61,7 +62,7 @@ export async function sendReliable(
         const content = await tmux.capturePaneAsync(sessionName, { lines: 10 });
         if (isReadyForInput(content)) break;
       } catch {
-        /* session may not exist yet */
+        logDebug("session", "session may not exist yet");
       }
       await new Promise((r) => setTimeout(r, 500));
     }

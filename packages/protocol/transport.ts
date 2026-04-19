@@ -1,4 +1,5 @@
 import type { JsonRpcMessage } from "./types.js";
+import { logInfo, logDebug } from "../core/observability/structured-log.js";
 
 export const JsonlCodec = {
   encode(msg: JsonRpcMessage): string {
@@ -72,7 +73,7 @@ export function createWebSocketTransport(
         const msg = JSON.parse(typeof event.data === "string" ? event.data : new TextDecoder().decode(event.data));
         for (const h of handlers) h(msg);
       } catch {
-        /* ignore malformed messages */
+        logDebug("general", "ignore malformed messages");
       }
     };
 
@@ -104,7 +105,7 @@ export function createWebSocketTransport(
             try {
               ws.send(JSON.stringify(msg));
             } catch {
-              /* drop if send fails */
+              logInfo("general", "drop if send fails");
             }
           }
         };

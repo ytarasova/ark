@@ -54,6 +54,7 @@ import {
   resolveComposeNetwork,
   writeInlineCompose,
 } from "../providers/docker/compose.js";
+import { logDebug } from "../../core/observability/structured-log.js";
 
 // ── Test seams ──────────────────────────────────────────────────────────────
 //
@@ -302,7 +303,7 @@ export class DockerComposeRuntime implements Runtime {
     try {
       rmSync(path, { force: true });
     } catch {
-      /* best-effort cleanup */
+      logDebug("compute", "best-effort cleanup");
     }
   }
 }

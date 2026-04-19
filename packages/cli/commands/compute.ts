@@ -10,6 +10,7 @@ import type { ProviderFlagOption } from "../../compute/index.js";
 import { getArkClient } from "./_shared.js";
 import { ComputePoolManager } from "../../core/compute/pool.js";
 import type { ComputeProviderName } from "../../types/index.js";
+import { logDebug } from "../../core/observability/structured-log.js";
 
 /**
  * Apply every registered provider's Commander options to `create`, de-duped
@@ -181,7 +182,7 @@ export function registerComputeCommands(program: Command) {
         try {
           await ark.computeUpdate(name, { status: "stopped" });
         } catch {
-          /* ignore */
+          logDebug("general", "ignore");
         }
         console.log(chalk.red(`Provision failed: ${e.message}`));
       }
@@ -400,7 +401,7 @@ export function registerComputeCommands(program: Command) {
       try {
         content = readFileSync(envPath, "utf-8");
       } catch {
-        /* new file */
+        logDebug("general", "new file");
       }
       if (content.includes("ARK_DEFAULT_COMPUTE=")) {
         content = content.replace(/ARK_DEFAULT_COMPUTE=.*/g, `ARK_DEFAULT_COMPUTE=${name}`);

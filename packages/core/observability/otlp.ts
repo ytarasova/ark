@@ -4,6 +4,7 @@
  */
 
 import { randomBytes } from "crypto";
+import { logInfo } from "./structured-log.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -153,7 +154,7 @@ export async function flushSpans(): Promise<void> {
       body: JSON.stringify(formatOtlpJson(spans)),
     });
   } catch {
-    // Fire-and-forget -- don't throw or re-buffer
+    logInfo("status", "Fire-and-forget -- don't throw or re-buffer");
   }
 }
 
