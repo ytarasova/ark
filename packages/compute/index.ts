@@ -151,3 +151,9 @@ export type { ComputeRuntimePair } from "./adapters/provider-map.js";
 export type { SnapshotStore, SnapshotRef, SnapshotBlob, SnapshotListFilter } from "./core/snapshot-store.js";
 export { SnapshotNotFoundError } from "./core/snapshot-store.js";
 export { FsSnapshotStore } from "./core/snapshot-store-fs.js";
+
+// ── Phase 4: Compute pool ──────────────────────────────────────────────────
+
+export type { ComputePool, PoolConfig, PoolStats } from "./core/pool/types.js";
+export { defaultPoolConfig } from "./core/pool/types.js";
+export { LocalFirecrackerPool } from "./core/pool/local-firecracker-pool.js";
