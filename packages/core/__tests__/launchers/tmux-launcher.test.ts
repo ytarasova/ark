@@ -39,7 +39,11 @@ describe("TmuxLauncher", () => {
     expect(typeof launcher.capture).toBe("function");
   });
 
-  it("is the default launcher on AppContext", () => {
+  it("is the class-level default launcher", () => {
+    // forTest* swaps in NoopLauncher to keep unit tests from spawning real
+    // tmux panes + claude CLIs. The *class* default is still TmuxLauncher:
+    // restore it explicitly to exercise the production wiring.
+    app.setLauncher(new TmuxLauncher());
     expect(app.launcher).toBeInstanceOf(TmuxLauncher);
   });
 
@@ -126,9 +130,9 @@ describe("AppContext launcher", () => {
     app.setLauncher(mockLauncher);
     expect(app.launcher).toBe(mockLauncher);
 
-    // Restore
+    // Restore (whichever launcher was active before this test)
     app.setLauncher(original);
-    expect(app.launcher).toBeInstanceOf(TmuxLauncher);
+    expect(app.launcher).toBe(original);
   });
 });
 

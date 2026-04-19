@@ -122,6 +122,120 @@ export class SessionService {
     }
   }
 
+  // ── Lifecycle-driven dispatch ─────────────────────────────────────────────
+  //
+  // The service owns every "a new session was created, launch it" moment.
+  // Callers -- handlers, CLI, fork/clone/spawn orchestration -- just notify
+  // the service that a session was created; dispatch happens automatically
+  // in the background. The service tracks in-flight promises so `stopAll()`
+  // / shutdown can drain them before teardown, otherwise tmux panes +
+  // agent CLIs leak when a test or server restart interrupts a dispatch.
+
+  private _pendingDispatches = new Set<Promise<unknown>>();
+  private _sessionCreatedListeners: Array<(sessionId: string) => void> = [];
+
+  /**
+   * Subscribe to the `session_created` lifecycle moment. The default
+   * subscriber kicks a background dispatch; external consumers (conductor,
+   * audit sinks, etc.) can register their own.
+   */
+  onSessionCreated(listener: (sessionId: string) => void): () => void {
+    this._sessionCreatedListeners.push(listener);
+    return () => {
+      const i = this._sessionCreatedListeners.indexOf(listener);
+      if (i >= 0) this._sessionCreatedListeners.splice(i, 1);
+    };
+  }
+
+  /**
+   * Emit the `session_created` lifecycle moment. Orchestration code
+   * (startSession, fork, clone, spawn) calls this after a session row has
+   * been committed. All registered listeners fire synchronously; the
+   * default listener kicks `dispatch` in the background.
+   */
+  emitSessionCreated(sessionId: string): void {
+    for (const l of this._sessionCreatedListeners) {
+      try {
+        l(sessionId);
+      } catch (err) {
+        this.events.log(sessionId, "session_created_listener_error", {
+          actor: "system",
+          data: { reason: err instanceof Error ? err.message : String(err) },
+        });
+      }
+    }
+  }
+
+  private _defaultDispatcherUnregister: (() => void) | null = null;
+
+  /**
+   * Register the default `session_created` -> background dispatch listener.
+   * Safe to call multiple times (e.g. per-test `beforeEach`): replaces any
+   * previous default registration, so listeners don't accumulate and fan out
+   * into duplicate dispatches.
+   */
+  registerDefaultDispatcher(onDispatched: (session: Session | null) => void): () => void {
+    if (this._defaultDispatcherUnregister) {
+      this._defaultDispatcherUnregister();
+      this._defaultDispatcherUnregister = null;
+    }
+    const unregister = this.onSessionCreated((sessionId) => this.kickDispatch(sessionId, onDispatched));
+    this._defaultDispatcherUnregister = () => {
+      unregister();
+      this._defaultDispatcherUnregister = null;
+    };
+    return this._defaultDispatcherUnregister;
+  }
+
+  private kickDispatch(sessionId: string, onDispatched: (session: Session | null) => void): void {
+    const promise = this.dispatch(sessionId)
+      .catch((err) => {
+        this.events.log(sessionId, "dispatch_failed", {
+          actor: "system",
+          data: { reason: err instanceof Error ? err.message : String(err) },
+        });
+      })
+      .then(() => {
+        onDispatched(this.sessions.get(sessionId));
+      });
+    this._pendingDispatches.add(promise);
+    promise.finally(() => this._pendingDispatches.delete(promise)).catch(() => {});
+  }
+
+  /** Await every in-flight background dispatch. Called by app.shutdown(). */
+  async drainPendingDispatches(): Promise<void> {
+    if (this._pendingDispatches.size === 0) return;
+    await Promise.allSettled([...this._pendingDispatches]);
+  }
+
+  /**
+   * Persist a session input file on disk under `<arkDir>/inputs/<id>/<name>`.
+   * Returns the absolute path callers should store in
+   * `session.config.inputs.files[<role>]`. The per-upload directory keeps
+   * same-name files for different roles from stomping each other.
+   */
+  async saveInput(opts: {
+    name: string;
+    role: string;
+    content: string;
+    contentEncoding?: "base64" | "utf-8";
+  }): Promise<{ path: string }> {
+    const { join, basename } = await import("path");
+    const { mkdirSync, writeFileSync } = await import("fs");
+    const safeName = basename(opts.name).replace(/[^\w.\-]/g, "_");
+    const safeRole = opts.role.replace(/[^\w.\-]/g, "_");
+    const dir = join(this.app.arkDir, "inputs", `${Date.now().toString(36)}-${safeRole}`);
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, safeName);
+    const encoding = opts.contentEncoding ?? "utf-8";
+    if (encoding === "base64") {
+      writeFileSync(path, Buffer.from(opts.content, "base64"));
+    } else {
+      writeFileSync(path, opts.content, "utf-8");
+    }
+    return { path };
+  }
+
   /**
    * Resume a stopped/failed session back to ready.
    * Port of session.ts resume() -- does NOT auto-dispatch (caller handles that).

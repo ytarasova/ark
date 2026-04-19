@@ -26,38 +26,6 @@ import type {
 
 const SESSION_NOT_FOUND = ErrorCodes.SESSION_NOT_FOUND;
 
-/**
- * Dispatch a freshly-created session.
- *
- * The dispatch itself can take multiple seconds (agent resolve + knowledge
- * context injection + launcher.launch + status poller registration), so
- * the RPC response does NOT block on it: we fire the promise, surface
- * progress + final state via `session/updated` notifications, and track
- * in-flight dispatches on the AppContext so `app.shutdown()` can await
- * them (tests + server restart) instead of leaking tmux panes + claude
- * CLIs into the user's shell.
- */
-function dispatchNewSession(
-  app: AppContext,
-  sessionId: string,
-  notify: (event: string, data: unknown) => void,
-): void {
-  const promise = app.sessionService
-    .dispatch(sessionId)
-    .catch((err) => {
-      app.events.log(sessionId, "dispatch_failed", {
-        actor: "system",
-        data: { reason: err instanceof Error ? err.message : String(err) },
-      });
-      return { ok: false, message: "" } as { ok: boolean; message: string };
-    })
-    .then(() => {
-      const after = app.sessions.get(sessionId);
-      if (after) notify("session/updated", { session: after });
-    });
-  app.trackDispatch(promise);
-}
-
 export function registerSessionHandlers(router: Router, app: AppContext): void {
   // ── Session lifecycle ──────────────────────────────────────────────────────
 
@@ -66,44 +34,23 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     // Atomic create + dispatch: splitting these across two RPCs used to force
     // every caller (CLI, web, tests) to remember the second call or live with
     // a session stuck at status=ready until the conductor's 60s poll tick.
-    // Removing the window closes a real UX cliff and deletes a class of bugs.
     //
-    // Dispatch runs fire-and-forget: callers get the session record back
-    // immediately (for UI placement), and status transitions arrive via the
-    // `session/updated` notification as the launcher progresses.
+    // `startSession` emits `session_created` before returning; the default
+    // dispatcher listener (registered above) kicks the background launcher.
     const { startSession } = await import("../../core/services/session-orchestration.js");
     const session = startSession(app, opts);
     notify("session/created", { session });
-    dispatchNewSession(app, session.id, notify);
     return { session };
   });
 
   router.handle("input/upload", async (params) => {
-    const { name, role, content, contentEncoding } = extract<{
+    const opts = extract<{
       name: string;
       role: string;
       content: string;
       contentEncoding?: "base64" | "utf-8";
     }>(params, ["name", "role", "content"]);
-
-    // Persist under arkDir/inputs/<timestamp-role>/<basename>. The folder
-    // per-upload keeps collisions (same `name` uploaded for different roles)
-    // from stomping on each other.
-    const { join, basename } = await import("path");
-    const { mkdirSync, writeFileSync } = await import("fs");
-    const safeName = basename(name).replace(/[^\w.\-]/g, "_");
-    const safeRole = role.replace(/[^\w.\-]/g, "_");
-    const dir = join(app.arkDir, "inputs", `${Date.now().toString(36)}-${safeRole}`);
-    mkdirSync(dir, { recursive: true });
-    const path = join(dir, safeName);
-
-    const encoding = contentEncoding ?? "utf-8";
-    if (encoding === "base64") {
-      writeFileSync(path, Buffer.from(content, "base64"));
-    } else {
-      writeFileSync(path, content, "utf-8");
-    }
-    return { path };
+    return app.sessionService.saveInput(opts);
   });
 
   router.handle("session/stop", async (params, notify) => {
@@ -166,9 +113,6 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     }
     const session = result.sessionId ? app.sessions.get(result.sessionId) : null;
     if (session) notify("session/created", { session });
-    if (result.sessionId) {
-      dispatchNewSession(app, result.sessionId, notify);
-    }
     return { session };
   });
 
@@ -180,9 +124,6 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     }
     const session = result.sessionId ? app.sessions.get(result.sessionId) : null;
     if (session) notify("session/created", { session });
-    if (result.sessionId) {
-      dispatchNewSession(app, result.sessionId, notify);
-    }
     return { session };
   });
 
@@ -290,7 +231,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     if (result.sessionId) {
       const session = app.sessions.get(result.sessionId);
       if (session) notify("session/created", { session });
-      dispatchNewSession(app, result.sessionId, notify);
+      // spawn() emits session_created internally; the default listener handles dispatch.
     }
     return result;
   });

@@ -522,19 +522,9 @@ describe("buildLauncher", () => {
     expect(content).not.toContain("--resume");
   });
 
-  it("includes --remote-control with sessionName", () => {
-    const { content } = buildLauncher({
-      ...baseOpts,
-      sessionName: "my-task-session",
-    });
-    expect(content).toContain("--remote-control");
-    expect(content).toContain("my-task-session");
-  });
-
-  it("defaults --remote-control to 'ark' without sessionName", () => {
-    const { content } = buildLauncher(baseOpts);
-    expect(content).toContain("--remote-control");
-    expect(content).toContain("'ark'");
+  it("does not include --remote-control (dropped -- polluted host workspace)", () => {
+    const { content } = buildLauncher({ ...baseOpts, sessionName: "my-task-session" });
+    expect(content).not.toContain("--remote-control");
   });
 
   it("includes --dangerously-load-development-channels server:ark-channel", () => {
@@ -606,8 +596,8 @@ describe("buildLauncher initialPrompt", () => {
       initialPrompt: "Fix the login bug",
     });
     expect(content).toContain("'Fix the login bug'");
-    // Should appear after the extra flags
-    const flagsIndex = content.indexOf("--remote-control");
+    // Should appear after the channel flag.
+    const flagsIndex = content.indexOf("--dangerously-load-development-channels");
     const promptIndex = content.indexOf("'Fix the login bug'");
     expect(promptIndex).toBeGreaterThan(flagsIndex);
   });
@@ -623,7 +613,7 @@ describe("buildLauncher initialPrompt", () => {
 
   it("does not include prompt arg when initialPrompt is undefined", () => {
     const { content } = buildLauncher(baseOpts);
-    // After the --remote-control line, script should just have exec bash
+    // After the channel flag, script should just have exec bash
     const lines = content.split("\n");
     const execLine = lines.findIndex((l) => l.trim() === "exec bash");
     // The line before exec bash should not contain a quoted prompt

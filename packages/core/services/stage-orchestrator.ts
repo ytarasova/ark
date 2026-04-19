@@ -1225,6 +1225,7 @@ export function spawnSubagent(
     data: { parent_id: parentId, task: opts.task, agent: agentName, model: opts.model },
   });
 
+  app.sessionService.emitSessionCreated(session.id);
   return { ok: true, sessionId: session.id, message: `Subagent ${session.id} spawned` };
 }
 

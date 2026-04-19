@@ -98,14 +98,6 @@ export class AppContext {
   private _runtimes = new Map<RuntimeKind, NewRuntime>();
 
   private _launcher: SessionLauncher = new TmuxLauncher();
-
-  /**
-   * In-flight dispatches kicked off by session/start (+ fork/clone/spawn).
-   * `app.shutdown()` awaits all of these so the process doesn't leak tmux
-   * panes or child CLIs when a server restart or test teardown happens
-   * while a dispatch is still resolving.
-   */
-  private _pendingDispatches = new Set<Promise<unknown>>();
   private _workerRegistry: WorkerRegistry | null = null;
   private _scheduler: SessionScheduler | null = null;
   private _tenantPolicyManager: TenantPolicyManager | null = null;
@@ -264,16 +256,6 @@ export class AppContext {
   }
 
   /** Replace the session launcher (e.g. for remote compute or testing). */
-  /**
-   * Register an in-flight dispatch promise so shutdown can drain it. Safe
-   * to pass any promise -- the tracker removes itself on settle. Does not
-   * surface rejections (callers are expected to handle them separately).
-   */
-  trackDispatch(promise: Promise<unknown>): void {
-    this._pendingDispatches.add(promise);
-    promise.finally(() => this._pendingDispatches.delete(promise)).catch(() => {});
-  }
-
   setLauncher(launcher: SessionLauncher): void {
     this._launcher = launcher;
   }
@@ -959,15 +941,9 @@ export class AppContext {
 
     // Reverse order of boot
 
-    // Step 0: drain in-flight dispatches queued by session/start + friends.
-    // Without this, tests that call session/start and immediately shutdown
-    // leak tmux sessions + agent CLIs because the fire-and-forget dispatch
-    // promise is still resolving inside launcher.launch().
-    if (this._pendingDispatches.size > 0) {
-      await Promise.allSettled([...this._pendingDispatches]);
-    }
-
-    // Step 0.5: stop running sessions (test mode only -- production sessions survive)
+    // Step 0: drain in-flight background dispatches + stop running sessions.
+    // SessionService owns both, so shutdown is one call instead of two.
+    await this.sessionService.drainPendingDispatches();
     if (this.options?.cleanupOnShutdown) {
       await this.sessionService.stopAll();
     }

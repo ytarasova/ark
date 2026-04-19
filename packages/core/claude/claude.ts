@@ -690,7 +690,9 @@ export interface LauncherOpts {
   mcpConfigPath: string;
   claudeSessionId?: string;
   prevClaudeSessionId?: string | null;
-  /** Session name for --remote-control flag */
+  /** @deprecated The `--remote-control` flag was removed (it spammed the host workspace
+   *  with session breadcrumbs without producing anything the dashboard uses). Kept on
+   *  the opts type only so existing callers compile; the value is now ignored. */
   sessionName?: string;
   /** Environment variables to export before launching Claude */
   env?: Record<string, string>;
@@ -702,12 +704,10 @@ export interface LauncherOpts {
 export function buildLauncher(opts: LauncherOpts): { content: string; claudeSessionId: string } {
   const claudeSessionId = opts.claudeSessionId ?? randomUUID();
   const claudeCmd = shellQuoteArgs(opts.claudeArgs);
-  // Channel + remote control flags
-  // Channel config is in .mcp.json (project level), Claude reads it automatically
-  const extraFlags = [
-    `--dangerously-load-development-channels server:ark-channel`,
-    `--remote-control ${shellQuote(opts.sessionName ?? "ark")}`,
-  ].join(" \\\n  ");
+  // Channel config is in .mcp.json (project level), Claude reads it automatically.
+  // --remote-control was dropped: it wrote session metadata into the host
+  // workspace and nothing on the Ark side consumed it.
+  const extraFlags = `--dangerously-load-development-channels server:ark-channel`;
 
   const envExports = Object.entries(opts.env ?? {})
     .map(([k, v]) => `export ${k}=${shellQuote(v)}`)

@@ -9,11 +9,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { AppContext, setApp, clearApp } from "../../app.js";
-import {
-  pauseWithSnapshot,
-  resumeFromSnapshot,
-  resolveSessionCompute,
-} from "../session-snapshot.js";
+import { pauseWithSnapshot, resumeFromSnapshot, resolveSessionCompute } from "../session-snapshot.js";
 import type {
   Compute,
   ComputeCapabilities,
@@ -319,11 +315,12 @@ describe("resumeFromSnapshot", () => {
     const id = seedSession(); // local compute (no snapshot support)
 
     // Manually save a snapshot referencing "local" compute kind
-    const blob = new ReadableStream<Uint8Array>({ start(c) { c.close(); } });
-    const saved = await app.snapshotStore.save(
-      { computeKind: "local", sessionId: id, metadata: {} },
-      blob,
-    );
+    const blob = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.close();
+      },
+    });
+    const saved = await app.snapshotStore.save({ computeKind: "local", sessionId: id, metadata: {} }, blob);
     app.sessions.update(id, {
       config: { last_snapshot_id: saved.id },
     });
