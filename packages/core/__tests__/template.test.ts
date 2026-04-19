@@ -35,6 +35,19 @@ describe("substituteVars", () => {
     const result = substituteVars("{x} and {x} again", { x: "val" });
     expect(result).toBe("val and val again");
   });
+
+  it("resolves dotted keys", () => {
+    const result = substituteVars("recipe={inputs.files.recipe} key={inputs.params.jira_key}", {
+      "inputs.files.recipe": "/tmp/r.yaml",
+      "inputs.params.jira_key": "IN-1234",
+    });
+    expect(result).toBe("recipe=/tmp/r.yaml key=IN-1234");
+  });
+
+  it("preserves unresolved dotted keys", () => {
+    const result = substituteVars("{inputs.files.missing}", {});
+    expect(result).toBe("{inputs.files.missing}");
+  });
 });
 
 // ── buildSessionVars ────────────────────────────────────────────────────────
@@ -85,5 +98,27 @@ describe("buildSessionVars", () => {
     expect(vars.flow).toBe("");
     expect(vars.agent).toBe("");
     expect(vars.compute).toBe("local");
+  });
+
+  it("flattens session.config.inputs into dotted keys", () => {
+    const vars = buildSessionVars({
+      id: "s-1",
+      config: {
+        inputs: {
+          files: { recipe: "/tmp/r.yaml", prd: "/tmp/prd.md" },
+          params: { jira_key: "IN-1", auto: "false" },
+        },
+      },
+    });
+
+    expect(vars["inputs.files.recipe"]).toBe("/tmp/r.yaml");
+    expect(vars["inputs.files.prd"]).toBe("/tmp/prd.md");
+    expect(vars["inputs.params.jira_key"]).toBe("IN-1");
+    expect(vars["inputs.params.auto"]).toBe("false");
+  });
+
+  it("tolerates inputs absent or empty", () => {
+    const vars = buildSessionVars({ config: {} });
+    expect(vars["inputs.files.recipe"]).toBeUndefined();
   });
 });

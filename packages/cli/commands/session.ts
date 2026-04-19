@@ -39,6 +39,32 @@ export function registerSessionCommands(program: Command) {
     .option("--claude-session <id>", "Create from an existing Claude Code session (use 'ark claude list' to find IDs)")
     .option("--recipe <name>", "Create session from a recipe template")
     .option("--runtime <name>", "Override agent runtime (e.g. codex, gemini, claude)")
+    .option(
+      "--file <role=path>",
+      "Attach a named file input (repeatable). Path is resolved absolute and exposed to agents + flows as {inputs.files.<role>}.",
+      (value, prev: Record<string, string> = {}) => {
+        const eq = value.indexOf("=");
+        if (eq < 0) throw new Error(`--file expects role=path, got: ${value}`);
+        const role = value.slice(0, eq).trim();
+        const path = value.slice(eq + 1).trim();
+        if (!role || !path) throw new Error(`--file expects role=path, got: ${value}`);
+        return { ...prev, [role]: resolve(path) };
+      },
+      {} as Record<string, string>,
+    )
+    .option(
+      "--param <k=v>",
+      "Add a named param (repeatable). Exposed as {inputs.params.<k>} and, for goose runtimes, passed through as --params k=v.",
+      (value, prev: Record<string, string> = {}) => {
+        const eq = value.indexOf("=");
+        if (eq < 0) throw new Error(`--param expects k=v, got: ${value}`);
+        const k = value.slice(0, eq).trim();
+        const v = value.slice(eq + 1);
+        if (!k) throw new Error(`--param expects k=v, got: ${value}`);
+        return { ...prev, [k]: v };
+      },
+      {} as Record<string, string>,
+    )
     .action(async (ticket, opts) => {
       const { checkPrereqs, hasRequiredPrereqs, formatPrereqCheck } = await import("../../core/prereqs.js");
       const prereqs = checkPrereqs();
@@ -129,6 +155,56 @@ export function registerSessionCommands(program: Command) {
       const summary = sanitizeSummary(rawName);
       if (summary !== rawName) console.log(`Note: session name sanitized to "${summary}"`);
 
+      // Collect generic session inputs (files + params) and validate against
+      // the flow's declared `inputs:` contract if present. Extra ad-hoc params
+      // are always allowed; only declared-required entries block dispatch.
+      const fileInputs: Record<string, string> = { ...(opts.file ?? {}) };
+      const paramInputs: Record<string, string> = { ...(opts.param ?? {}) };
+
+      try {
+        const flowDef = opts.flow ? await ark.flowRead(opts.flow) : null;
+        const declared = flowDef?.inputs;
+        if (declared) {
+          const missing: string[] = [];
+          for (const [role, def] of Object.entries(declared.files ?? {})) {
+            if (def?.required && !fileInputs[role]) missing.push(`--file ${role}=<path>`);
+          }
+          for (const [key, def] of Object.entries(declared.params ?? {})) {
+            if (def?.required && paramInputs[key] === undefined) {
+              if (def.default !== undefined) {
+                paramInputs[key] = def.default;
+              } else {
+                missing.push(`--param ${key}=<value>`);
+              }
+            } else if (paramInputs[key] === undefined && def?.default !== undefined) {
+              paramInputs[key] = def.default;
+            }
+            if (def?.pattern && paramInputs[key] !== undefined) {
+              const re = new RegExp(def.pattern);
+              if (!re.test(paramInputs[key])) {
+                console.error(chalk.red(`--param ${key}=${paramInputs[key]} does not match pattern ${def.pattern}`));
+                process.exit(1);
+              }
+            }
+          }
+          if (missing.length) {
+            console.error(chalk.red(`Flow '${opts.flow}' is missing required inputs:`));
+            for (const m of missing) console.error(`  ${m}`);
+            process.exit(1);
+          }
+        }
+      } catch {
+        // flow/read may 404 for ad-hoc flows; fall through without validation.
+      }
+
+      const inputs =
+        Object.keys(fileInputs).length || Object.keys(paramInputs).length
+          ? {
+              ...(Object.keys(fileInputs).length ? { files: fileInputs } : {}),
+              ...(Object.keys(paramInputs).length ? { params: paramInputs } : {}),
+            }
+          : undefined;
+
       const s = await ark.sessionStart({
         ticket,
         summary,
@@ -139,6 +215,7 @@ export function registerSessionCommands(program: Command) {
         workdir,
         group_name: opts.group,
         ...(sessionConfig ? { config: sessionConfig } : {}),
+        ...(inputs ? { inputs } : {}),
       });
 
       if (claudeSessionId) {

@@ -237,11 +237,7 @@ export function SessionsPage({
       {/* Center Panel */}
       {showNew ? (
         <div className="flex-1 overflow-y-auto bg-[var(--bg)]">
-          <NewSessionModal
-            onClose={() => setShowNew(false)}
-            onSubmit={handleNewSession}
-            daemonOnline={daemonStatus?.conductor?.online !== false}
-          />
+          <NewSessionModal onClose={() => setShowNew(false)} onSubmit={handleNewSession} />
         </div>
       ) : selectedId ? (
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">

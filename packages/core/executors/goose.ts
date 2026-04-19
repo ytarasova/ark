@@ -136,13 +136,19 @@ export const gooseExecutor: Executor = {
     const channelCfg = claude.channelMcpConfig(session.id, stage, channelPort, { conductorUrl });
 
     // Recipe params: pull session template vars so recipe authors can use
-    // `{{ticket}}`, `{{summary}}`, `{{workdir}}`, etc.
+    // `{{ticket}}`, `{{summary}}`, `{{workdir}}`, etc. User-supplied
+    // `session.config.inputs.params` overlays on top so dispatch-form values
+    // (e.g. `--param jira_key=IN-1234`) reach the recipe.
+    const sessionInputs = (session.config as Record<string, unknown> | undefined)?.inputs as
+      | { params?: Record<string, string> }
+      | undefined;
     const recipeParams: Record<string, string> = {
       ticket: session.ticket ?? "",
       summary: session.summary ?? "",
       workdir: effectiveWorkdir,
       repo: session.repo ?? "",
       branch: session.branch ?? "",
+      ...(sessionInputs?.params ?? {}),
     };
 
     // Build the goose command argv

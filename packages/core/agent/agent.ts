@@ -63,6 +63,12 @@ export function resolveAgent(
   if (agent.system_prompt) {
     agent.system_prompt = substituteVars(agent.system_prompt, vars);
   }
+  // Agents may reference session inputs in the recipe path, e.g.
+  // `recipe: "{inputs.files.recipe}"`. Resolve at agent-load time so the
+  // executor (e.g. goose) sees the concrete filesystem path.
+  if (agent.recipe) {
+    agent.recipe = substituteVars(agent.recipe, vars);
+  }
   return agent;
 }
 

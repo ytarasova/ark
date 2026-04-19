@@ -112,6 +112,32 @@ const computeSchema = z
 
 // ── session/start ───────────────────────────────────────────────────────────
 
+// Generic session inputs bag. Files are role-keyed absolute paths; params
+// are a dotted-key-safe k=v map. Both end up at `session.config.inputs` and
+// are reachable via `{inputs.files.<role>}` / `{inputs.params.<key>}`
+// through the shared template substitution pipeline.
+export const sessionInputsSchema = z.object({
+  files: z.record(z.string(), z.string()).optional(),
+  params: z.record(z.string(), z.string()).optional(),
+});
+export type SessionInputs = z.infer<typeof sessionInputsSchema>;
+
+// ── input/upload ────────────────────────────────────────────────────────────
+// Persists bytes to disk under arkDir/inputs/<id>/<name> and returns the
+// absolute path. Used by the web dispatch form to turn drag-dropped files
+// into filesystem paths that `{inputs.files.<role>}` can resolve.
+
+export const inputUploadRequest = z.object({
+  name: z.string(),
+  role: z.string(),
+  content: z.string(),
+  contentEncoding: z.enum(["base64", "utf-8"]).optional(),
+});
+export type InputUploadRequest = z.infer<typeof inputUploadRequest>;
+
+export const inputUploadResponse = z.object({ path: z.string() });
+export type InputUploadResponse = z.infer<typeof inputUploadResponse>;
+
 export const sessionStartRequest = z
   .object({
     ticket: z.string().optional(),
@@ -124,6 +150,7 @@ export const sessionStartRequest = z
     group_name: z.string().optional(),
     config: z.record(z.string(), z.unknown()).optional(),
     user_id: z.string().optional(),
+    inputs: sessionInputsSchema.optional(),
     attachments: z
       .array(
         z.object({
@@ -540,6 +567,7 @@ export interface RpcMethodSchemas {
 
 export const rpcMethodSchemas: Record<string, RpcMethodSchemas> = {
   "session/start": { request: sessionStartRequest, response: sessionStartResponse },
+  "input/upload": { request: inputUploadRequest, response: inputUploadResponse },
   "session/read": { request: sessionReadRequest, response: sessionReadResponse },
   "session/list": { request: sessionListRequest, response: sessionListResponse },
   "session/delete": { request: sessionDeleteRequest, response: sessionDeleteResponse },

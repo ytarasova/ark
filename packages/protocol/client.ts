@@ -397,6 +397,20 @@ export class ArkClient {
     return flows;
   }
 
+  /**
+   * Upload a session input file. Server persists under `<arkDir>/inputs/<id>/<name>`
+   * and returns the absolute path. Callers put the returned path into
+   * `sessionStart.inputs.files[role]` so templating can resolve it.
+   */
+  async inputUpload(opts: {
+    name: string;
+    role: string;
+    content: string;
+    contentEncoding?: "base64" | "utf-8";
+  }): Promise<{ path: string }> {
+    return this.rpc<{ path: string }>("input/upload", opts as unknown as Record<string, unknown>);
+  }
+
   async flowRead(name: string): Promise<FlowDefinition> {
     const { flow } = await this.rpc<FlowReadResult>("flow/read", { name });
     return flow;

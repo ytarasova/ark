@@ -74,6 +74,7 @@ export function startSession(
     workdir?: string;
     group_name?: string;
     config?: Record<string, unknown>;
+    inputs?: { files?: Record<string, string>; params?: Record<string, string> };
     attachments?: Array<{ name: string; content: string; type: string }>;
   },
 ): Session {
@@ -107,6 +108,19 @@ export function startSession(
         content: a.content,
         type: a.type,
       })),
+    };
+  }
+
+  // Persist generic inputs bag (files=role->path, params=k->v). Template
+  // substitution flattens these to `{inputs.files.<role>}` /
+  // `{inputs.params.<key>}` via `buildSessionVars`.
+  if (opts.inputs && (opts.inputs.files || opts.inputs.params)) {
+    mergedOpts.config = {
+      ...(mergedOpts.config ?? {}),
+      inputs: {
+        ...(opts.inputs.files ? { files: { ...opts.inputs.files } } : {}),
+        ...(opts.inputs.params ? { params: { ...opts.inputs.params } } : {}),
+      },
     };
   }
 
