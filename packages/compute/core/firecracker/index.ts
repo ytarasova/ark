@@ -1,10 +1,10 @@
 /**
  * Firecracker microVM manager -- low-level module.
  *
- * This module does NOT implement the `Compute` interface -- Phase 2's
- * `FirecrackerCompute` wraps it. Keep this module free of ark-specific
+ * This module does NOT implement the `Compute` interface -- the
+ * `FirecrackerCompute` class wraps it. Keep this module free of ark-specific
  * coupling (AppContext, session model, etc.) so it can also be reused from
- * the pool layer (Phase 4) and remote microVM backends (Phase 5).
+ * the pool layer and remote microVM backends.
  */
 
 export { createVm } from "./vm.js";

@@ -69,7 +69,7 @@ export function initPostgresSchema(db: IDatabase): void {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_group ON sessions(group_name)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_pr_url ON sessions(pr_url)`);
 
-  // Compute table. Wave 3 adds compute_kind + runtime_kind columns.
+  // Compute table. Includes compute_kind + runtime_kind columns.
   db.exec(`
     CREATE TABLE IF NOT EXISTS compute (
       name TEXT PRIMARY KEY,

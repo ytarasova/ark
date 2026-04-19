@@ -150,7 +150,7 @@ export function ComputeView({
       const config: any = { ...(form.templateConfig ?? {}) };
       if (form.size) config.size = form.size;
       if (form.region) config.region = form.region;
-      // Wave 3: send compute + runtime axes. Provider is omitted -- the server
+      // Send compute + runtime axes. Provider is omitted -- the server
       // derives it via pairToProvider for back-compat reads.
       await api.createCompute({
         name: form.name,
@@ -204,8 +204,8 @@ export function ComputeView({
                 <span className="text-foreground truncate">{c.name || c.id}</span>
               </div>
               <Badge variant="secondary" className="text-[10px] shrink-0 ml-2">
-                {/* Wave 3: prefer compute_kind + runtime_kind; fall back to
-                    the legacy provider / type string for older rows. */}
+                {/* Prefer compute_kind + runtime_kind; fall back to the
+                    legacy provider / type string for older rows. */}
                 {(c as any).compute_kind && (c as any).runtime_kind
                   ? `${(c as any).compute_kind}/${(c as any).runtime_kind}`
                   : c.provider || c.type || "local"}

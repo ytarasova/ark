@@ -1,5 +1,5 @@
 /**
- * Session snapshot orchestration -- Phase 3 foundation.
+ * Session snapshot orchestration.
  *
  * `pauseWithSnapshot` / `resumeFromSnapshot` are the higher-level counterparts
  * to the state-only `pause` / `resume` in `session-lifecycle.ts`. They talk
@@ -15,7 +15,7 @@
  *
  * NOTE: This file is intentionally minimal. The end-to-end wiring (look up
  * the session's compute target, save the snapshot bytes, update DB state,
- * restart arkd) will thicken as subsequent Phase 3 PRs land.
+ * restart arkd) thickens as subsequent snapshot work lands.
  */
 
 import type { AppContext } from "../app.js";
@@ -49,8 +49,8 @@ export interface ResumeFromSnapshotResult {
  * Resolve the `Compute` a session runs on, plus a stub handle derived from
  * the session row.
  *
- * Wave 3 replaces this with the DB `compute_kind` column and a proper
- * `ComputeTarget` lookup; for now we derive the kind from
+ * A future revision replaces this with the DB `compute_kind` column and a
+ * proper `ComputeTarget` lookup; for now we derive the kind from
  * `session.compute_name`'s suffix (local-*, ec2-*, firecracker-*, k8s-*)
  * which matches the seeded names in the repo. Unknown or missing computes
  * resolve to `local`.
@@ -216,8 +216,8 @@ export async function resumeFromSnapshot(
     return { ok: false, notSupported: true, message: err.message };
   }
 
-  // Hand the blob back to the compute impl. Phase 3 follow-ups will push
-  // the payload bytes across the wire; today the metadata (e.g. firecracker
+  // Hand the blob back to the compute impl. A follow-up will push the
+  // payload bytes across the wire; today the metadata (e.g. firecracker
   // memfile / statefile paths) is enough for the native implementations
   // that already exist.
   try {

@@ -249,7 +249,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   });
   router.handle("compute/list", async () => ({ targets: app.computes.list() }));
   router.handle("compute/create", async (p) => {
-    // Wave 3: accept either legacy `{provider}` or new `{compute, runtime}`.
+    // Accept either legacy `{provider}` or new `{compute, runtime}`.
     // When only `provider` is given the repo derives the pair via
     // providerToPair. When only the new axes are given we reverse-map to the
     // best-matching legacy provider name so back-compat reads keep working.
@@ -283,8 +283,8 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     });
     return { compute };
   });
-  // Wave 3: surface registered Compute / Runtime kinds so the web UI can
-  // populate dropdowns without duplicating our enum.
+  // Surface registered Compute / Runtime kinds so the web UI can populate
+  // dropdowns without duplicating our enum.
   router.handle("compute/kinds", async () => ({ kinds: app.listComputes() }));
   router.handle("runtime/kinds", async () => ({ kinds: app.listRuntimes() }));
   router.handle("compute/update", async (p) => {

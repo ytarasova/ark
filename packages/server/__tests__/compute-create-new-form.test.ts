@@ -1,6 +1,6 @@
 /**
- * Wave 3: compute/create RPC accepts both the legacy `{provider}` form and
- * the new `{compute, runtime}` form. Both paths must persist both the legacy
+ * compute/create RPC accepts both the legacy `{provider}` form and the new
+ * `{compute, runtime}` form. Both paths must persist both the legacy
  * `provider` column and the new `compute_kind` / `runtime_kind` columns so
  * back-compat reads keep working.
  */
@@ -39,7 +39,7 @@ async function call(method: string, params: Record<string, unknown>): Promise<an
   return (result as any).result;
 }
 
-describe("compute/create (Wave 3 two-axis form)", () => {
+describe("compute/create (two-axis form)", () => {
   it("accepts legacy {provider} and backfills compute_kind + runtime_kind", async () => {
     const { compute } = await call("compute/create", {
       name: "legacy-docker",

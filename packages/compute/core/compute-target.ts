@@ -1,25 +1,24 @@
 /**
  * ComputeTarget -- the composed (Compute, Runtime) pair used at dispatch.
  *
- * Wave 1 just exposes a straight delegation over the two interfaces. Wave 3
- * rewires the dispatch layer to construct a ComputeTarget from the
- * `{compute_kind, runtime_kind}` DB columns instead of looking up a single
- * `ComputeProvider`.
+ * Exposes a straight delegation over the two interfaces. The dispatch layer
+ * constructs a ComputeTarget from the `{compute_kind, runtime_kind}` DB
+ * columns instead of looking up a single `ComputeProvider`.
  *
- * Phase 4 adds the pool-consult: when the underlying Compute declares
- * `capabilities.pool === true` AND an AppContext is wired in AND that app has
- * a `ComputePool` registered for `compute.kind`, `provision()` acquires from
- * the pool instead of calling `compute.provision()` directly. `destroy()`
- * mirrors this by consulting a lightweight tag (`handle.meta.__pool_source`)
- * stamped at acquire time so we dispose via `pool.release()` iff the handle
- * actually came from the pool. Handles that pre-date pool wiring (or that
- * were provisioned directly even when a pool exists, eg. legacy code paths)
- * continue through `compute.destroy()` as before.
+ * When the underlying Compute declares `capabilities.pool === true` AND an
+ * AppContext is wired in AND that app has a `ComputePool` registered for
+ * `compute.kind`, `provision()` acquires from the pool instead of calling
+ * `compute.provision()` directly. `destroy()` mirrors this by consulting a
+ * lightweight tag (`handle.meta.__pool_source`) stamped at acquire time so we
+ * dispose via `pool.release()` iff the handle actually came from the pool.
+ * Handles that pre-date pool wiring (or that were provisioned directly even
+ * when a pool exists, eg. legacy code paths) continue through
+ * `compute.destroy()` as before.
  *
  * Methods follow the lifecycle order: `provision` (compute) -> `prepare`
  * (runtime) -> `launchAgent` (runtime) -> `shutdown` (runtime) -> `destroy`
  * (compute). The compose shape intentionally does not expose intermediate
- * start/stop yet -- those semantics get refined in Wave 2 once the remote
+ * start/stop yet -- those semantics may get refined later once more remote
  * computes land.
  */
 

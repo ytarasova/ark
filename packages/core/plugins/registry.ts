@@ -15,8 +15,8 @@
  *   3. Source-tracked: every entry carries provenance (builtin | user | project
  *      | tenant), so future policy gates ("tenants can't use project-level
  *      plugins") have somewhere to attach.
- *   4. Lifecycle-friendly: Phase 3 hot-reload needs `unregister(kind, name)`
- *      and an `onUnload` hook per entry, which Awilix doesn't cleanly model.
+ *   4. Lifecycle-friendly: hot-reload needs `unregister(kind, name)` and an
+ *      `onUnload` hook per entry, which Awilix doesn't cleanly model.
  *
  * The registry itself is registered into Awilix as `pluginRegistry`, so any
  * service that depends on plugins resolves it via DI like any other service.
@@ -26,13 +26,13 @@ import type { Executor } from "../executor.js";
 
 // ── Plugin kinds ────────────────────────────────────────────────────────────
 //
-// Phase 1 registers executors. Phase 2 adds: compute-provider, runtime,
-// transcript-parser, flow, skill, recipe, agent. The map below defines the
-// type for each kind; adding a new kind means adding one line here.
+// Today only executors are registered. Future extensions: compute-provider,
+// runtime, transcript-parser, flow, skill, recipe, agent. The map below
+// defines the type for each kind; adding a new kind means adding one line here.
 
 export interface PluginKindMap {
   executor: Executor;
-  // Phase 2 extensions land as new entries in this interface, e.g.:
+  // Future extensions land as new entries in this interface, e.g.:
   // "compute-provider": ComputeProvider;
   // "transcript-parser": TranscriptParser;
   // "runtime": RuntimeDefinition;
@@ -49,7 +49,7 @@ export interface PluginEntry<K extends PluginKind = PluginKind> {
   name: string;
   impl: PluginKindMap[K];
   source: PluginSource;
-  /** Optional free-text version. Phase 3 promotes this to a structured manifest. */
+  /** Optional free-text version. A future revision may promote this to a structured manifest. */
   version?: string;
   /** Where this plugin was loaded from, if known. Useful for error messages. */
   path?: string;

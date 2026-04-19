@@ -1,7 +1,8 @@
 /**
- * Legacy adapter tests -- Wave 1 only maps `LocalWorktreeProvider` onto a
- * `ComputeTarget` (LocalCompute + DirectRuntime). Every other provider
- * returns null so call sites continue using the legacy path.
+ * Legacy adapter tests -- verifies `computeProviderToTarget` maps every
+ * known legacy provider onto its matching `ComputeTarget`, and returns null
+ * for any provider not yet wired (so call sites continue using the legacy
+ * path).
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
@@ -71,7 +72,7 @@ describe("computeProviderToTarget", () => {
     expect(target!.runtime).toBeInstanceOf(DockerRuntime);
   });
 
-  it("maps LocalFirecrackerProvider onto FirecrackerCompute + DirectRuntime (Phase 2)", () => {
+  it("maps LocalFirecrackerProvider onto FirecrackerCompute + DirectRuntime", () => {
     const legacy = new LocalFirecrackerProvider();
     legacy.setApp?.(app);
     const target = computeProviderToTarget(legacy, app);
@@ -118,7 +119,7 @@ describe("computeProviderToTarget", () => {
     expect(h.name).toBe("local");
   });
 
-  // ── Wave 3: remote (EC2-backed) providers ────────────────────────────────
+  // ── Remote (EC2-backed) providers ────────────────────────────────────────
 
   it("maps RemoteWorktreeProvider onto EC2Compute + DirectRuntime", () => {
     const legacy = new RemoteWorktreeProvider();
@@ -147,7 +148,7 @@ describe("computeProviderToTarget", () => {
     expect(target!.runtime).toBeInstanceOf(DevcontainerRuntime);
   });
 
-  it("returns null for RemoteFirecrackerProvider (Phase 2 owns the microVM side)", () => {
+  it("returns null for RemoteFirecrackerProvider (microVM-on-EC2 not yet wired)", () => {
     const legacy = new RemoteFirecrackerProvider();
     legacy.setApp?.(app);
     const target = computeProviderToTarget(legacy, app);

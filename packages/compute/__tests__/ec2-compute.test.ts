@@ -408,12 +408,12 @@ describe("EC2Compute", () => {
   });
 
   describe("snapshot / restore", () => {
-    it("throws NotSupportedError on snapshot (Phase 3)", async () => {
+    it("throws NotSupportedError on snapshot (deferred)", async () => {
       const c = new EC2Compute();
       await expect(c.snapshot(makeProvisionedHandle())).rejects.toBeInstanceOf(NotSupportedError);
     });
 
-    it("throws NotSupportedError on restore (Phase 3)", async () => {
+    it("throws NotSupportedError on restore (deferred)", async () => {
       const c = new EC2Compute();
       const snap: Snapshot = {
         id: "noop",

@@ -1,7 +1,7 @@
 /**
- * Wave 3 dispatch: session-lifecycle.ts must resolve a ComputeTarget from
- * either the new `compute_kind` / `runtime_kind` columns or (for legacy
- * rows) the old `provider` column via providerToPair.
+ * Dispatch: session-lifecycle.ts must resolve a ComputeTarget from either
+ * the new `compute_kind` / `runtime_kind` columns or (for legacy rows) the
+ * old `provider` column via providerToPair.
  *
  * These tests exercise the resolveComputeTarget helper on AppContext and
  * confirm that the fall-back path keeps working for rows that predate the

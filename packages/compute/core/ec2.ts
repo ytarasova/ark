@@ -1,5 +1,5 @@
 /**
- * EC2Compute -- Wave 3 Compute impl that lives on an AWS EC2 instance.
+ * EC2Compute -- Compute impl that lives on an AWS EC2 instance.
  *
  * Lifecycle overview:
  *
@@ -22,8 +22,8 @@
  *   destroy: TerminateInstances (via `destroyStack`), close the tunnel,
  *            drop the security group / key pair the stack created.
  *
- * Snapshot / restore: deferred to Phase 3. Both throw NotSupportedError
- * with `capabilities.snapshot = true` still reported so dispatch can hint
+ * Snapshot / restore: deferred. Both throw NotSupportedError with
+ * `capabilities.snapshot = true` still reported so dispatch can hint
  * at the eventual shape -- tests assert both.
  *
  * Runtime composition: EC2Compute pairs with any Runtime (DirectRuntime,
@@ -496,8 +496,8 @@ export class EC2Compute implements Compute {
     }
 
     // Mutate the caller's handle in place so subsequent calls see the
-    // refreshed IP / tunnel PID. The DB-backed handle store in Wave 3
-    // dispatch will persist this via a separate path.
+    // refreshed IP / tunnel PID. The DB-backed handle store used by
+    // dispatch persists this via a separate path.
     meta.publicIp = publicIp;
     if (privateIp) meta.privateIp = privateIp;
     meta.sshPid = sshPid;
@@ -549,7 +549,7 @@ export class EC2Compute implements Compute {
     return `http://localhost:${meta.arkdLocalPort}`;
   }
 
-  // ── snapshot / restore (Phase 3) ─────────────────────────────────────────
+  // ── snapshot / restore (deferred) ────────────────────────────────────────
 
   async snapshot(_h: ComputeHandle): Promise<Snapshot> {
     throw new NotSupportedError(this.kind, "snapshot");

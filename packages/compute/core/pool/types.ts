@@ -1,10 +1,10 @@
 /**
- * ComputePool -- Phase 4 of the microVM compute vision.
+ * ComputePool -- warm-pool layer of the microVM compute vision.
  *
  * A pool wraps a single `Compute` implementation and amortises the
  * provision+boot latency across many short-lived sessions. Today's concrete
  * impl is `LocalFirecrackerPool` (see `./local-firecracker-pool.ts`); future
- * waves add pools for EC2 microVMs, Fly Machines, and Kata pods.
+ * work adds pools for EC2 microVMs, Fly Machines, and Kata pods.
  *
  * Lifecycle:
  *

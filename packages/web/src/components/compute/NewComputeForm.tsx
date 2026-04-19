@@ -4,8 +4,8 @@ import { Button } from "../ui/button.js";
 import { Input } from "../ui/input.js";
 import { selectClassName } from "../ui/styles.js";
 
-// Wave 3: surface both compute + runtime axes. Static defaults render while
-// the server reply is in flight; useEffect below overwrites with the live list.
+// Surface both compute + runtime axes. Static defaults render while the
+// server reply is in flight; useEffect below overwrites with the live list.
 const DEFAULT_COMPUTE_KINDS = ["local", "firecracker", "ec2", "k8s", "k8s-kata"] as const;
 const DEFAULT_RUNTIME_KINDS = ["direct", "docker", "compose", "devcontainer", "firecracker-in-container"] as const;
 

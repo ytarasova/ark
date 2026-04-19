@@ -1,5 +1,5 @@
 /**
- * DockerComposeRuntime -- Wave 2.
+ * DockerComposeRuntime -- runtime backed by docker compose.
  *
  * Provisions a session by:
  *   1. Bringing up the user's docker-compose stack (file, inline, or both).
@@ -13,8 +13,8 @@
  *   - `compose: { inline: {...} }`  -> spec written to a tempfile
  *   - `compose: { file, inline }`   -> both, merged via `docker compose -f A -f B`
  *
- * See `.workflow/plan/compute-runtime-vision.md` and the README section on
- * Wave 2 for the rationale behind the split.
+ * See `.workflow/plan/compute-runtime-vision.md` and the README for the
+ * rationale behind the split.
  */
 
 import { rmSync, existsSync } from "fs";

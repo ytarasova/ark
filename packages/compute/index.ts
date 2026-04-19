@@ -94,10 +94,11 @@ export { K8sProvider, KataProvider };
 // arc.json
 export { parseArcJson, resolvePortDecls, hasDevcontainer, hasComposeFile } from "./arc-json.js";
 
-// ── Wave 1: Compute + Runtime split ────────────────────────────────────────
+// ── Compute + Runtime split ────────────────────────────────────────────────
 //
-// New primary abstractions. Live alongside ComputeProvider; Wave 3 retires
-// the old interface. See `.workflow/plan/compute-runtime-vision.md`.
+// New primary abstractions. Live alongside ComputeProvider; the old interface
+// retires once every dispatch path reads from these. See
+// `.workflow/plan/compute-runtime-vision.md`.
 
 export type {
   Compute as NewCompute,
@@ -126,23 +127,23 @@ export { DockerComposeRuntime } from "./runtimes/docker-compose.js";
 export { ComputeTarget } from "./core/compute-target.js";
 export { computeProviderToTarget } from "./adapters/legacy.js";
 
-// Phase 2: FirecrackerCompute. Re-export from the firecracker barrel so
-// consumers don't have to reach into the core subtree. The sibling barrel
+// FirecrackerCompute. Re-export from the firecracker barrel so consumers
+// don't have to reach into the core subtree. The sibling barrel
 // (`./core/firecracker/index.ts`) also exports the low-level `createVm` and
-// network helpers for the pool layer (Phase 4).
+// network helpers for the pool layer.
 export { FirecrackerCompute, registerFirecrackerIfAvailable } from "./core/firecracker/compute.js";
 export type { FirecrackerComputeDeps, FirecrackerMeta } from "./core/firecracker/compute.js";
 
 export { providerToPair, pairToProvider, isKnownProvider, knownProviders } from "./adapters/provider-map.js";
 export type { ComputeRuntimePair } from "./adapters/provider-map.js";
 
-// ── Phase 3: Snapshot persistence ──────────────────────────────────────────
+// ── Snapshot persistence ───────────────────────────────────────────────────
 
 export type { SnapshotStore, SnapshotRef, SnapshotBlob, SnapshotListFilter } from "./core/snapshot-store.js";
 export { SnapshotNotFoundError } from "./core/snapshot-store.js";
 export { FsSnapshotStore } from "./core/snapshot-store-fs.js";
 
-// ── Phase 4: Compute pool ──────────────────────────────────────────────────
+// ── Compute pool ───────────────────────────────────────────────────────────
 
 export type { ComputePool, PoolConfig, PoolStats } from "./core/pool/types.js";
 export { defaultPoolConfig } from "./core/pool/types.js";

@@ -1,5 +1,5 @@
 /**
- * DevcontainerRuntime -- Wave 2.
+ * DevcontainerRuntime -- runtime backed by devcontainer.json.
  *
  * Turns a project's `.devcontainer/devcontainer.json` into a provisioned,
  * arkd-hosting container that the conductor can reach over HTTP.

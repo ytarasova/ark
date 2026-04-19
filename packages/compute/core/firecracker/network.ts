@@ -117,7 +117,7 @@ export interface GuestAddr {
  * Caveat -- hash collisions: two TAPs with different names can hash to the
  * same block and fight for addresses. We deliberately accept that here to
  * keep the manager stateless; an allocator that dispenses unique indices
- * belongs in the pool layer (Phase 4). Callers that need stability beyond
+ * belongs in the pool layer. Callers that need stability beyond
  * best-effort must coordinate externally.
  *
  * We only configure the HOST side of the /30. The caller is responsible for

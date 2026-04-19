@@ -10,8 +10,8 @@
  * `spec -> sequence of API calls` mapping plus the lifecycle state
  * transitions (start/stop/pause/resume/snapshot/restore).
  *
- * Real-VM behavior lands in Phase 2's integration PR, gated on a Linux
- * host with KVM. See `compute-runtime-vision.md` Phase 2 PR 2.4.
+ * Real-VM behavior lives in a separate integration suite gated on a Linux
+ * host with KVM. See `compute-runtime-vision.md`.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";

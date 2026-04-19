@@ -20,8 +20,8 @@
  * We content-address by caller-provided sha to make downloads / rebuilds
  * cacheable without forcing the manager to hash anything itself (hashing a
  * multi-GB rootfs on every boot would be unacceptable; the caller -- the
- * image-management PR in Phase 2 -- already computes a sha when it fetches
- * the blob).
+ * image-management pipeline -- already computes a sha when it fetches the
+ * blob).
  */
 
 import { mkdirSync } from "fs";
@@ -31,7 +31,7 @@ import { join } from "path";
 /** Root of all Firecracker state. Override via `ARK_DIR` (consumed indirectly via HOME). */
 export function firecrackerRoot(): string {
   // We deliberately do NOT read `config.dirs.ark` here: this module is a leaf
-  // utility with no AppContext coupling so it can be used from the Phase 2
+  // utility with no AppContext coupling so it can be used from
   // `FirecrackerCompute` before app boot is complete. If a future caller needs
   // a non-default root, add an optional arg rather than pulling in config.
   return join(homedir(), ".ark", "firecracker");
