@@ -139,3 +139,9 @@ export type { FirecrackerComputeDeps, FirecrackerMeta } from "./core/firecracker
 
 export { providerToPair, pairToProvider, isKnownProvider, knownProviders } from "./adapters/provider-map.js";
 export type { ComputeRuntimePair } from "./adapters/provider-map.js";
+
+// ── Phase 3: Snapshot persistence ──────────────────────────────────────────
+
+export type { SnapshotStore, SnapshotRef, SnapshotBlob, SnapshotListFilter } from "./core/snapshot-store.js";
+export { SnapshotNotFoundError } from "./core/snapshot-store.js";
+export { FsSnapshotStore } from "./core/snapshot-store-fs.js";

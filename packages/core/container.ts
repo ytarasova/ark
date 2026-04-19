@@ -31,6 +31,7 @@ import type { PricingRegistry } from "./observability/pricing.js";
 import type { UsageRecorder } from "./observability/usage.js";
 import type { TranscriptParserRegistry } from "./runtimes/transcript-parser.js";
 import type { PluginRegistry } from "./plugins/registry.js";
+import type { SnapshotStore } from "../compute/core/snapshot-store.js";
 
 /**
  * The cradle -- everything resolvable from the container.
@@ -76,6 +77,9 @@ export interface Cradle {
 
   // Plugin registry (executors, compute providers, etc.)
   pluginRegistry: PluginRegistry;
+
+  // Snapshot persistence (Phase 3)
+  snapshotStore: SnapshotStore;
 }
 
 export type AppContainer = AwilixContainer<Cradle>;

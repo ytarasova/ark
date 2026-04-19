@@ -104,6 +104,20 @@ export interface ReplayStep {
   data: Record<string, unknown> | null;
 }
 
+/**
+ * Shape of a `SnapshotRef` as returned to RPC clients. Keeps the structural
+ * contract independent of the `compute/` package so the protocol layer
+ * doesn't leak compute internals.
+ */
+export interface SessionSnapshotRef {
+  id: string;
+  computeKind: string;
+  sessionId: string;
+  createdAt: string;
+  sizeBytes: number;
+  metadata: Record<string, unknown>;
+}
+
 export class ArkClient {
   private transport: Transport;
   private idCounter = 0;
@@ -710,12 +724,18 @@ export class ArkClient {
     return this.rpc<{ ok: boolean; childIds?: string[]; message?: string }>("session/fan-out", { sessionId, tasks });
   }
 
-  async sessionResume(sessionId: string): Promise<SessionOpResult> {
-    return this.rpc<SessionOpResult>("session/resume", { sessionId });
+  async sessionResume(sessionId: string, snapshotId?: string): Promise<SessionOpResult & { snapshotId?: string }> {
+    return this.rpc<SessionOpResult & { snapshotId?: string }>("session/resume", { sessionId, snapshotId });
   }
 
-  async sessionPause(sessionId: string, reason?: string): Promise<SessionOpResult> {
-    return this.rpc<SessionOpResult>("session/pause", { sessionId, reason });
+  async sessionPause(
+    sessionId: string,
+    reason?: string,
+  ): Promise<SessionOpResult & { snapshot?: SessionSnapshotRef | null; notSupported?: boolean }> {
+    return this.rpc<SessionOpResult & { snapshot?: SessionSnapshotRef | null; notSupported?: boolean }>(
+      "session/pause",
+      { sessionId, reason },
+    );
   }
 
   async sessionInterrupt(sessionId: string): Promise<SessionOpResult> {

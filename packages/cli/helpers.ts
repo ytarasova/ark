@@ -19,6 +19,20 @@ export function splitEditorCommand(editor: string): { command: string; args: str
   return { command: parts[0], args: parts.slice(1) };
 }
 
+/** Format a byte count into a short human-readable string (e.g. "1.2 MB"). */
+export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return `${bytes}`;
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let i = 0;
+  let n = bytes;
+  while (n >= 1024 && i < units.length - 1) {
+    n /= 1024;
+    i++;
+  }
+  const formatted = i === 0 ? `${n}` : n.toFixed(n >= 10 || i === 0 ? 0 : 1);
+  return `${formatted} ${units[i]}`;
+}
+
 /** Format a session event for CLI display. */
 export function formatEvent(type: string, data?: Record<string, unknown>): string {
   switch (type) {

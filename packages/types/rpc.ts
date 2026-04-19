@@ -145,6 +145,8 @@ export interface SessionSearchConversationResult {
 
 export interface SessionResumeParams {
   sessionId: string;
+  /** Optional snapshot id to restore from. When omitted, the session's latest snapshot is used. */
+  snapshotId?: string;
 }
 
 // ── Messaging ───────────────────────────────────────────────────────────────

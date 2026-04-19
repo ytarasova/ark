@@ -249,19 +249,61 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   });
 
   router.handle("session/resume", async (params, notify) => {
-    const { sessionId } = extract<SessionResumeParams>(params, ["sessionId"]);
-    const result = await app.sessionService.resume(sessionId);
+    const { sessionId, snapshotId } = extract<SessionResumeParams>(params, ["sessionId"]);
+
+    // Phase 3: if the session has a persisted snapshot (or the caller supplied
+    // one explicitly), prefer the snapshot-based restore path. Otherwise fall
+    // back to the state-only resume for backends that don't snapshot.
     const session = app.sessions.get(sessionId);
-    if (session) notify("session/updated", { session });
+    const lastSnapshotId =
+      snapshotId ?? (session?.config as Record<string, unknown> | undefined)?.last_snapshot_id ?? undefined;
+
+    if (lastSnapshotId) {
+      const { resumeFromSnapshot } = await import("../../core/services/session-snapshot.js");
+      const snapResult = await resumeFromSnapshot(app, sessionId, { snapshotId: lastSnapshotId as string });
+      if (snapResult.ok) {
+        const updated = app.sessions.get(sessionId);
+        if (updated) notify("session/updated", { session: updated });
+        return { ok: true, message: snapResult.message, snapshotId: snapResult.snapshotId };
+      }
+      // Fall through to state-only resume only when the failure is because the
+      // compute doesn't support restore -- other errors (missing snapshot,
+      // restore failure) should surface so the caller sees them.
+      if (!snapResult.notSupported) {
+        throw new RpcError(snapResult.message, SESSION_NOT_FOUND);
+      }
+    }
+
+    const result = await app.sessionService.resume(sessionId);
+    const updated = app.sessions.get(sessionId);
+    if (updated) notify("session/updated", { session: updated });
     return result;
   });
 
   router.handle("session/pause", async (params, notify) => {
     const { sessionId, reason } = extract<SessionPauseParams>(params, ["sessionId"]);
-    const result = app.sessionService.pause(sessionId, reason);
+
+    // Phase 3: try the snapshot-backed pause first. If the underlying compute
+    // doesn't support snapshot we transparently fall back to a state-only
+    // pause so local sessions keep working the way they did pre-Phase-3.
+    const { pauseWithSnapshot } = await import("../../core/services/session-snapshot.js");
+    const snapResult = await pauseWithSnapshot(app, sessionId, { reason });
     const session = app.sessions.get(sessionId);
-    if (session) notify("session/updated", { session });
-    return result;
+
+    if (snapResult.ok) {
+      if (session) notify("session/updated", { session });
+      return { ok: true, message: snapResult.message, snapshot: snapResult.snapshot };
+    }
+    if (!snapResult.notSupported) {
+      // Snapshot path failed for reasons other than capability -- surface.
+      throw new RpcError(snapResult.message, SESSION_NOT_FOUND);
+    }
+
+    // Fallback: state-only pause (pre-Phase-3 behaviour).
+    const result = app.sessionService.pause(sessionId, reason);
+    const updated = app.sessions.get(sessionId);
+    if (updated) notify("session/updated", { session: updated });
+    return { ...result, snapshot: null, notSupported: true };
   });
 
   router.handle("session/interrupt", async (params, notify) => {

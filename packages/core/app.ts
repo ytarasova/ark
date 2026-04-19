@@ -22,6 +22,8 @@ import { safeAsync } from "./safe.js";
 import { eventBus } from "./hooks.js";
 import type { ComputeProvider } from "../compute/types.js";
 import type { Compute as NewCompute, Runtime as NewRuntime, ComputeKind, RuntimeKind } from "../compute/core/types.js";
+import type { SnapshotStore } from "../compute/core/snapshot-store.js";
+import { FsSnapshotStore } from "../compute/core/snapshot-store-fs.js";
 import { safeParseConfig } from "./util.js";
 import { initSchema as initRepoSchema, seedLocalCompute } from "./repositories/schema.js";
 import type { Compute, Session, ComputeProviderName } from "../types/index.js";
@@ -202,6 +204,13 @@ export class AppContext {
   }
   get knowledge(): KnowledgeStore {
     return this._resolve("knowledge");
+  }
+
+  // ── Snapshot persistence (Phase 3) ─────────────────────────────────────
+
+  /** Snapshot store used by `session/pause` + `session/resume`. */
+  get snapshotStore(): SnapshotStore {
+    return this._resolve("snapshotStore");
   }
 
   // ── Cost tracking ─────────────────────────────────────────────────────
@@ -604,6 +613,11 @@ export class AppContext {
 
       // Knowledge graph
       knowledge: asValue(new KnowledgeStore(db)),
+
+      // Snapshot persistence (Phase 3). Default to an FS-backed store under
+      // `<arkDir>/snapshots`. Hosted deployments can replace with an S3/GCS
+      // impl via `container.register({ snapshotStore: asValue(...) })`.
+      snapshotStore: asValue(new FsSnapshotStore(join(this.config.arkDir, "snapshots"))),
 
       // Cost tracking
       pricing: asValue(pricingRegistry),
