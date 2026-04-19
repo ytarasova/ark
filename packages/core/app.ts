@@ -21,6 +21,7 @@ import { configureOtlp } from "./observability/otlp.js";
 import { safeAsync } from "./safe.js";
 import { eventBus } from "./hooks.js";
 import type { ComputeProvider } from "../compute/types.js";
+import type { Compute as NewCompute, Runtime as NewRuntime, ComputeKind, RuntimeKind } from "../compute/core/types.js";
 import { safeParseConfig } from "./util.js";
 import { initSchema as initRepoSchema, seedLocalCompute } from "./repositories/schema.js";
 import type { Compute, Session, ComputeProviderName } from "../types/index.js";
@@ -87,6 +88,11 @@ export class AppContext {
   // Keep infrastructure fields that aren't in the container
   private _eventBus: typeof eventBus | null = null;
   private _providers = new Map<string, ComputeProvider>();
+
+  // Wave 1 Compute + Runtime registries. Live alongside `_providers`; Wave 3
+  // retires the old registry once every dispatch path reads from these.
+  private _computes = new Map<ComputeKind, NewCompute>();
+  private _runtimes = new Map<RuntimeKind, NewRuntime>();
 
   private _launcher: SessionLauncher = new TmuxLauncher();
   private _workerRegistry: WorkerRegistry | null = null;
@@ -392,6 +398,39 @@ export class AppContext {
     return [...this._providers.keys()];
   }
 
+  // ── Compute / Runtime registry (Wave 1) ───────────────────────────────
+  //
+  // Wave 1 lands the interfaces and a single `LocalCompute` + `DirectRuntime`
+  // pair. Wave 2 migrates the remaining providers. Wave 3 retires
+  // `registerProvider` / `getProvider` above and wires dispatch through
+  // these registries instead.
+
+  registerCompute(c: NewCompute): void {
+    c.setApp?.(this);
+    this._computes.set(c.kind, c);
+  }
+
+  registerRuntime(r: NewRuntime): void {
+    r.setApp?.(this);
+    this._runtimes.set(r.kind, r);
+  }
+
+  getCompute(kind: ComputeKind): NewCompute | null {
+    return this._computes.get(kind) ?? null;
+  }
+
+  getRuntime(kind: RuntimeKind): NewRuntime | null {
+    return this._runtimes.get(kind) ?? null;
+  }
+
+  listComputes(): ComputeKind[] {
+    return [...this._computes.keys()];
+  }
+
+  listRuntimes(): RuntimeKind[] {
+    return [...this._runtimes.keys()];
+  }
+
   /** Resolve the compute provider for a session. Defaults to local. */
   resolveProvider(session: Session): { provider: ComputeProvider | null; compute: Compute | null } {
     const computeName = session.compute_name || "local";
@@ -596,6 +635,14 @@ export class AppContext {
       } catch {
         /* @kubernetes/client-node not installed */
       }
+
+      // Wave 1 Compute + Runtime registry. Additive -- the legacy provider
+      // registry above still runs every dispatch path. Wave 3 flips dispatch
+      // to consume these.
+      const { LocalCompute } = await import("../compute/core/local.js");
+      const { DirectRuntime } = await import("../compute/runtimes/direct.js");
+      this.registerCompute(new LocalCompute());
+      this.registerRuntime(new DirectRuntime());
     });
   }
 

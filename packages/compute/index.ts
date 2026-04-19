@@ -95,3 +95,29 @@ export { K8sProvider, KataProvider };
 
 // arc.json
 export { parseArcJson, resolvePortDecls, hasDevcontainer, hasComposeFile } from "./arc-json.js";
+
+// ── Wave 1: Compute + Runtime split ────────────────────────────────────────
+//
+// New primary abstractions. Live alongside ComputeProvider; Wave 3 retires
+// the old interface. See `.workflow/plan/compute-runtime-vision.md`.
+
+export type {
+  Compute as NewCompute,
+  ComputeCapabilities,
+  ComputeHandle,
+  ComputeKind,
+  Runtime,
+  RuntimeKind,
+  AgentHandle,
+  ProvisionLatency,
+  PrepareCtx,
+  ProvisionOpts as NewProvisionOpts,
+  LaunchOpts as NewLaunchOpts,
+  Snapshot,
+} from "./core/types.js";
+export { NotSupportedError } from "./core/types.js";
+
+export { LocalCompute } from "./core/local.js";
+export { DirectRuntime } from "./runtimes/direct.js";
+export { ComputeTarget } from "./core/compute-target.js";
+export { computeProviderToTarget } from "./adapters/legacy.js";
