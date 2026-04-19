@@ -6,6 +6,7 @@ import { AppContext, setApp } from "../../core/app.js";
 import { loadConfig } from "../../core/config.js";
 import { getArkClient } from "./_shared.js";
 import { execSession } from "../exec.js";
+import { logDebug } from "../../core/observability/structured-log.js";
 
 /**
  * Headless + one-shot session commands. Extracted from misc.ts.
@@ -80,7 +81,7 @@ export function registerExecTryCommands(program: Command, app: AppContext | null
           const cmd = core.attachCommand(updated.session_id);
           execSync(cmd, { stdio: "inherit" });
         } catch {
-          /* session detached or user hit Ctrl-B-d */
+          logDebug("general", "session detached or user hit Ctrl-B-d");
         }
       }
 

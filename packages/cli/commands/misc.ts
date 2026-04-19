@@ -7,6 +7,7 @@ import * as core from "../../core/index.js";
 import { AppContext } from "../../core/app.js";
 import { getArkClient } from "./_shared.js";
 import { splitEditorCommand } from "../helpers.js";
+import { logDebug } from "../../core/observability/structured-log.js";
 
 export function registerMiscCommands(program: Command, _app: AppContext | null) {
   // ── PR commands ──────────────────────────────────────────────────────────────
@@ -340,7 +341,7 @@ export function registerMiscCommands(program: Command, _app: AppContext | null) 
             try {
               aux.stop();
             } catch {
-              /* ignore */
+              logDebug("general", "ignore");
             }
           }
           process.exit(0);

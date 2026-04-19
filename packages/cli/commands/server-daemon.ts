@@ -3,6 +3,7 @@ import chalk from "chalk";
 import { join } from "path";
 import { existsSync, writeFileSync, readFileSync, unlinkSync, mkdirSync } from "fs";
 import { homedir } from "os";
+import { logDebug } from "../../core/observability/structured-log.js";
 
 /** Path to the PID file for the server daemon. */
 function pidFilePath(arkDir?: string): string {
@@ -36,7 +37,7 @@ function removePidFile(arkDir?: string): void {
   try {
     unlinkSync(pidPath);
   } catch {
-    /* already gone */
+    logDebug("general", "already gone");
   }
 }
 

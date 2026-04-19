@@ -9,6 +9,7 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import { DEFAULT_ROUTER_URL } from "../../core/constants.js";
+import { logInfo } from "../../core/observability/structured-log.js";
 
 export function registerRouterCommands(program: Command) {
   const router = program.command("router").description("LLM routing proxy");
@@ -140,7 +141,7 @@ export function registerRouterCommands(program: Command) {
           const tzResp = await fetch(`${opts.tensorzeroUrl}/status`);
           tzHealthy = tzResp.ok;
         } catch {
-          /* not running */
+          logInfo("general", "not running");
         }
 
         console.log(
