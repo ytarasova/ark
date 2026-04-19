@@ -27,3 +27,5 @@ packages/web/DESIGN-BRIEF.md
 packages/desktop/out/
 packages/desktop/node_modules/
 packages/desktop/binaries/
+# Ark-managed (written at dispatch, cleaned on stop)
+.mcp.json
