@@ -8,7 +8,7 @@ let app: AppContext;
 let store: KnowledgeStore;
 
 beforeAll(async () => {
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   await app.boot();
   setApp(app);
   store = app.knowledge;

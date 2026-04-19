@@ -14,7 +14,7 @@ let app: AppContext;
 let router: Router;
 
 beforeAll(async () => {
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   await app.boot();
   setApp(app);
   router = new Router();

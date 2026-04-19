@@ -18,7 +18,7 @@ let app: AppContext;
 let tmuxSnapshot: Set<string>;
 beforeAll(async () => {
   tmuxSnapshot = snapshotArkTmuxSessions();
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   setApp(app);
   await app.boot();
 });

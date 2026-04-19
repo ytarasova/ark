@@ -37,7 +37,7 @@ let originalCwd: string;
 let repoDir: string;
 
 beforeEach(async () => {
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   setApp(app);
   await app.boot();
 

@@ -27,7 +27,7 @@ import { AppContext, setApp, clearApp } from "../../core/app.js";
 let app: AppContext;
 
 beforeAll(async () => {
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   setApp(app);
   await app.boot();
 });
@@ -332,25 +332,27 @@ describe("E2E Compute: sessionChannelPort", () => {
   });
 
   it("returns different ports for different session IDs", () => {
+    const { basePort, range } = getApp().config.channels;
     const port1 = getApp().sessions.channelPort("s-aaa111");
     const port2 = getApp().sessions.channelPort("s-bbb222");
-    // Different IDs should (almost certainly) produce different ports
-    // There's a small chance of collision in the mod 10000 space, but
-    // these specific hex values should differ
+    // Different IDs should (almost certainly) produce different ports.
+    // There's a small chance of collision in the mod-range space, but
+    // these specific hex values should differ.
     expect(typeof port1).toBe("number");
     expect(typeof port2).toBe("number");
-    expect(port1).toBeGreaterThanOrEqual(19200);
-    expect(port2).toBeGreaterThanOrEqual(19200);
-    expect(port1).toBeLessThan(29200);
-    expect(port2).toBeLessThan(29200);
+    expect(port1).toBeGreaterThanOrEqual(basePort);
+    expect(port2).toBeGreaterThanOrEqual(basePort);
+    expect(port1).toBeLessThan(basePort + range);
+    expect(port2).toBeLessThan(basePort + range);
   });
 
-  it("port is within expected range 19200-29199", () => {
+  it("port is within the configured channel range", () => {
+    const { basePort, range } = getApp().config.channels;
     const testIds = ["s-000000", "s-ffffff", "s-123abc", "s-deadbe"];
     for (const id of testIds) {
       const port = getApp().sessions.channelPort(id);
-      expect(port).toBeGreaterThanOrEqual(19200);
-      expect(port).toBeLessThan(29200);
+      expect(port).toBeGreaterThanOrEqual(basePort);
+      expect(port).toBeLessThan(basePort + range);
     }
   });
 });

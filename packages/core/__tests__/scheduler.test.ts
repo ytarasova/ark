@@ -7,7 +7,7 @@ import { mockSession } from "./test-helpers.js";
 let app: AppContext;
 
 beforeAll(async () => {
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   await app.boot();
   setApp(app);
 
@@ -143,7 +143,7 @@ describe("SessionScheduler", () => {
 
 describe("AppContext hosted mode guards", () => {
   it("throws when accessing workerRegistry without initialization", async () => {
-    const bareApp = AppContext.forTest();
+    const bareApp = await AppContext.forTestAsync();
     await bareApp.boot();
 
     expect(() => bareApp.workerRegistry).toThrow("hosted mode only");

@@ -71,7 +71,7 @@ let app: AppContext;
 let testDir: string;
 
 beforeAll(async () => {
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   await app.boot();
   setApp(app);
   testDir = join(tmpdir(), `ark-rebase-test-${Date.now()}`);

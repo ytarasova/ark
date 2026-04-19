@@ -22,7 +22,7 @@ import * as tmux from "../infra/tmux.js";
 let app: AppContext;
 
 beforeEach(async () => {
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   await app.boot();
   setApp(app);
 });

@@ -12,7 +12,7 @@ let app: AppContext;
 let snapRoot: string;
 
 beforeEach(async () => {
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   setApp(app);
   await app.boot();
   snapRoot = mkdtempSync(join(tmpdir(), "ark-pause-test-"));

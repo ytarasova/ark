@@ -21,7 +21,7 @@ let app: AppContext;
 let keyManager: ApiKeyManager;
 
 beforeAll(async () => {
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   await app.boot();
   setApp(app);
   keyManager = new ApiKeyManager(app.db);

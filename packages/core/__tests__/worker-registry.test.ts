@@ -5,7 +5,7 @@ import { WorkerRegistry, type WorkerNode } from "../hosted/worker-registry.js";
 let app: AppContext;
 
 beforeAll(async () => {
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   await app.boot();
   setApp(app);
 });

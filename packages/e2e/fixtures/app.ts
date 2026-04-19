@@ -2,7 +2,7 @@
  * Shared E2E test setup -- full isolation from production state.
  *
  * Provides:
- * - Isolated DB via AppContext.forTest() (temp dir, not ~/.ark)
+ * - Isolated DB via await AppContext.forTestAsync() (temp dir, not ~/.ark)
  * - Isolated workdir (temp dir, not cwd -- hooks config won't touch real repo)
  * - AppContext with providers (fixes "AppContext not initialized" errors)
  * - Tmux cleanup on teardown
@@ -39,7 +39,7 @@ export interface E2EEnv {
  */
 export async function setupE2E(): Promise<E2EEnv> {
   // 1. Create AppContext with isolated temp dir
-  const app = AppContext.forTest();
+  const app = await AppContext.forTestAsync();
   setApp(app);
   await app.boot();
 

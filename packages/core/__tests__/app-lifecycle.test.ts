@@ -18,7 +18,7 @@ describe("AppContext lifecycle", () => {
   });
 
   it("getApp() throws after shutdown() clears the singleton", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -32,15 +32,15 @@ describe("AppContext lifecycle", () => {
     app = null; // prevent afterEach double-shutdown
   });
 
-  it("todos accessor throws before boot()", () => {
-    app = AppContext.forTest();
+  it("todos accessor throws before boot()", async () => {
+    app = await AppContext.forTestAsync();
     setApp(app);
     // Not booted yet -- todos should throw
     expect(() => app!.todos).toThrow("AppContext not booted");
   });
 
   it("todos accessor works after boot()", async () => {
-    app = AppContext.forTest();
+    app = await AppContext.forTestAsync();
     setApp(app);
     await app.boot();
 
@@ -49,8 +49,8 @@ describe("AppContext lifecycle", () => {
     expect(app!.todos).toBeDefined();
   });
 
-  it("other accessors throw before boot()", () => {
-    app = AppContext.forTest();
+  it("other accessors throw before boot()", async () => {
+    app = await AppContext.forTestAsync();
     setApp(app);
     expect(() => app!.sessions).toThrow("AppContext not booted");
     expect(() => app!.events).toThrow("AppContext not booted");
@@ -61,12 +61,12 @@ describe("AppContext lifecycle", () => {
 
   it("shutdown only clears singleton when it matches the current app", async () => {
     // Boot app1
-    const app1 = AppContext.forTest();
+    const app1 = await AppContext.forTestAsync();
     setApp(app1);
     await app1.boot();
 
     // Boot app2 and make it the global singleton
-    const app2 = AppContext.forTest();
+    const app2 = await AppContext.forTestAsync();
     setApp(app2);
     await app2.boot();
 

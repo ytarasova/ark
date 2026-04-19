@@ -13,7 +13,7 @@ let ws: { stop(): void };
 let port: number;
 
 beforeAll(async () => {
-  app = AppContext.forTest();
+  app = await AppContext.forTestAsync();
   setApp(app);
   await app.boot();
 
