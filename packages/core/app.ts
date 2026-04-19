@@ -509,7 +509,7 @@ export class AppContext {
     if (!c || !r) return { target: null, compute };
 
     const { ComputeTarget } = await import("../compute/core/compute-target.js");
-    return { target: new ComputeTarget(c, r), compute };
+    return { target: new ComputeTarget(c, r, this), compute };
   }
 
   // ── Boot ───────────────────────────────────────────────────────────────

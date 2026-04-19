@@ -159,10 +159,10 @@ describe("FlyMachinesCompute kind + capabilities", () => {
     expect(compute.kind).toBe("fly-machines");
   });
 
-  it("capabilities declare snapshot + networkIsolation, provisionLatency=seconds", () => {
+  it("capabilities declare snapshot + pool + networkIsolation, provisionLatency=seconds", () => {
     expect(compute.capabilities).toEqual({
       snapshot: true,
-      pool: false,
+      pool: true,
       networkIsolation: true,
       provisionLatency: "seconds",
     });

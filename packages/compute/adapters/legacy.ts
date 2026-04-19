@@ -92,7 +92,7 @@ export function computeProviderToTarget(provider: ComputeProvider, app: AppConte
     compute.setApp(app);
     const runtime = new DirectRuntime();
     runtime.setApp(app);
-    return new ComputeTarget(compute, runtime);
+    return new ComputeTarget(compute, runtime, app);
   }
   if (provider instanceof LocalDockerProvider) {
     // Docker runtime: the host is still LocalCompute (always up). The
@@ -101,7 +101,7 @@ export function computeProviderToTarget(provider: ComputeProvider, app: AppConte
     compute.setApp(app);
     const runtime = new DockerRuntime();
     runtime.setApp(app);
-    return new ComputeTarget(compute, runtime);
+    return new ComputeTarget(compute, runtime, app);
   }
   if (provider instanceof LocalFirecrackerProvider) {
     // Phase 2 composition: the Firecracker microVM IS the compute; inside
@@ -110,7 +110,7 @@ export function computeProviderToTarget(provider: ComputeProvider, app: AppConte
     compute.setApp(app);
     const runtime = new DirectRuntime();
     runtime.setApp(app);
-    return new ComputeTarget(compute, runtime);
+    return new ComputeTarget(compute, runtime, app);
   }
   if (provider instanceof RemoteWorktreeProvider) {
     // Legacy "ec2" -- arkd runs on the instance; DirectRuntime forwards
@@ -119,7 +119,7 @@ export function computeProviderToTarget(provider: ComputeProvider, app: AppConte
     compute.setApp(app);
     const runtime = new DirectRuntime();
     runtime.setApp(app);
-    return new ComputeTarget(compute, runtime);
+    return new ComputeTarget(compute, runtime, app);
   }
   if (provider instanceof RemoteDockerProvider) {
     // Legacy "ec2-docker" -- docker-in-ec2. The runtime's per-session
@@ -129,7 +129,7 @@ export function computeProviderToTarget(provider: ComputeProvider, app: AppConte
     compute.setApp(app);
     const runtime = new DockerRuntime();
     runtime.setApp(app);
-    return new ComputeTarget(compute, runtime);
+    return new ComputeTarget(compute, runtime, app);
   }
   if (provider instanceof RemoteDevcontainerProvider) {
     // Legacy "ec2-devcontainer" -- devcontainer-in-ec2. The devcontainer CLI
@@ -138,7 +138,7 @@ export function computeProviderToTarget(provider: ComputeProvider, app: AppConte
     compute.setApp(app);
     const runtime = new DevcontainerRuntime();
     runtime.setApp(app);
-    return new ComputeTarget(compute, runtime);
+    return new ComputeTarget(compute, runtime, app);
   }
   if (provider instanceof RemoteFirecrackerProvider) {
     // Deferred: Phase 2 owns the microVM-on-EC2 composition. Until then the
@@ -152,14 +152,14 @@ export function computeProviderToTarget(provider: ComputeProvider, app: AppConte
     compute.setApp(app);
     const runtime = new DirectRuntime();
     runtime.setApp(app);
-    return new ComputeTarget(compute, runtime);
+    return new ComputeTarget(compute, runtime, app);
   }
   if (provider instanceof K8sProvider) {
     const compute = new K8sCompute();
     compute.setApp(app);
     const runtime = new DirectRuntime();
     runtime.setApp(app);
-    return new ComputeTarget(compute, runtime);
+    return new ComputeTarget(compute, runtime, app);
   }
   // Everything else: future waves.
   return null;
