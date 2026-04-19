@@ -5,6 +5,11 @@ import * as core from "../../core/index.js";
 import { startSession } from "../../core/services/session-orchestration.js";
 import type { HistoryListParams, HistoryImportParams, HistorySearchParams } from "../../types/index.js";
 
+/** True when Ark is running in hosted/multi-tenant mode. */
+function isHostedMode(app: AppContext): boolean {
+  return typeof app.config.databaseUrl === "string" && app.config.databaseUrl.length > 0;
+}
+
 export function registerHistoryHandlers(router: Router, app: AppContext): void {
   router.handle("history/list", async (p) => {
     const { limit } = extract<HistoryListParams>(p, []);
@@ -39,6 +44,14 @@ export function registerHistoryHandlers(router: Router, app: AppContext): void {
   });
 
   router.handle("history/rebuild-fts", async () => {
+    // claude_sessions_cache and transcript_index index the local user's
+    // `~/.claude` transcripts and are NOT tenant-scoped (single-user local
+    // mode only). In hosted mode there is no per-tenant transcript cache
+    // to rebuild and a global DELETE across the shared cache table from
+    // an untrusted tenant would be a DoS. Refuse the call instead.
+    if (isHostedMode(app)) {
+      throw new Error("history/rebuild-fts is disabled in hosted mode");
+    }
     const db = app.db;
     db.run("DELETE FROM claude_sessions_cache");
     db.run("DELETE FROM transcript_index");
