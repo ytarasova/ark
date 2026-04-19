@@ -362,4 +362,129 @@ describe("SessionService", () => {
       expect(typeof svc.approveReviewGate).toBe("function");
     });
   });
+
+  // ── setApp / AppContext guard ──────────────────────────────────────────
+
+  describe("setApp", () => {
+    it("setApp injects AppContext", () => {
+      const mockApp = {} as any;
+      svc.setApp(mockApp);
+      expect(typeof svc.setApp).toBe("function");
+    });
+  });
+
+  // ── list with filters ─────────────────────────────────────────────────
+
+  describe("list with filters", () => {
+    it("list passes filters through to repository", () => {
+      svc.start({ flow: "quick" });
+      svc.start({ flow: "default" });
+      const quickSessions = svc.list({ flow: "quick" });
+      expect(quickSessions.length).toBe(1);
+      expect(quickSessions[0].flow).toBe("quick");
+    });
+
+    it("list filters by status", () => {
+      const s = svc.start({});
+      sessions.update(s.id, { status: "running" as SessionStatus } as Partial<Session>);
+      svc.start({});
+      const running = svc.list({ status: "running" });
+      expect(running.length).toBe(1);
+      expect(running[0].id).toBe(s.id);
+    });
+  });
+
+  // ── stop edge cases ───────────────────────────────────────────────────
+
+  describe("stop edge cases", () => {
+    it("stops a pending session (no session_id)", async () => {
+      const s = svc.start({});
+      const result = await svc.stop(s.id);
+      expect(result.ok).toBe(true);
+      expect(sessions.get(s.id)!.status).toBe("stopped");
+    });
+
+    it("returns sessionId in result", async () => {
+      const s = svc.start({});
+      const result = await svc.stop(s.id);
+      expect(result.sessionId).toBe(s.id);
+    });
+  });
+
+  // ── resume edge cases ─────────────────────────────────────────────────
+
+  describe("resume edge cases", () => {
+    it("resumes a failed session", async () => {
+      const s = svc.start({});
+      sessions.update(s.id, { status: "failed" as SessionStatus } as Partial<Session>);
+      const result = await svc.resume(s.id);
+      expect(result.ok).toBe(true);
+      expect(sessions.get(s.id)!.status).toBe("ready");
+    });
+
+    it("resumes a blocked session", async () => {
+      const s = svc.start({});
+      sessions.update(s.id, { status: "blocked" as SessionStatus } as Partial<Session>);
+      const result = await svc.resume(s.id);
+      expect(result.ok).toBe(true);
+      expect(sessions.get(s.id)!.status).toBe("ready");
+    });
+
+    it("returns sessionId in result", async () => {
+      const s = svc.start({});
+      sessions.update(s.id, { status: "stopped" as SessionStatus } as Partial<Session>);
+      const result = await svc.resume(s.id);
+      expect(result.sessionId).toBe(s.id);
+    });
+  });
+
+  // ── complete edge cases ───────────────────────────────────────────────
+
+  describe("complete edge cases", () => {
+    it("returns sessionId in result", () => {
+      const s = svc.start({});
+      const result = svc.complete(s.id);
+      expect(result.sessionId).toBe(s.id);
+    });
+  });
+
+  // ── pause edge cases ──────────────────────────────────────────────────
+
+  describe("pause edge cases", () => {
+    it("returns sessionId in result", () => {
+      const s = svc.start({});
+      const result = svc.pause(s.id);
+      expect(result.sessionId).toBe(s.id);
+    });
+
+    it("logs the previous status in event data", () => {
+      const s = svc.start({});
+      sessions.update(s.id, { status: "running" as SessionStatus } as Partial<Session>);
+      svc.pause(s.id, "Need review");
+      const evts = events.list(s.id, { type: "session_paused" });
+      expect(evts.length).toBe(1);
+    });
+  });
+
+  // ── delete/undelete edge cases ────────────────────────────────────────
+
+  describe("delete/undelete edge cases", () => {
+    it("delete returns sessionId in result", async () => {
+      const s = svc.start({});
+      const result = await svc.delete(s.id);
+      expect(result.sessionId).toBe(s.id);
+    });
+
+    it("undelete returns sessionId in result", async () => {
+      const s = svc.start({});
+      await svc.delete(s.id);
+      const result = await svc.undelete(s.id);
+      expect(result.sessionId).toBe(s.id);
+    });
+
+    it("undelete of nonexistent returns error", async () => {
+      const result = await svc.undelete("s-000000");
+      expect(result.ok).toBe(false);
+    });
+  });
 });

@@ -383,4 +383,166 @@ describe("SessionRepository", () => {
     expect(repo.getGroups().length).toBe(0);
     expect(repo.get(s.id)!.group_name).toBeNull();
   });
+
+  // ── getGroupNames ────────────────────────────────────────────────────────
+
+  it("getGroupNames unions groups table and session group_names", () => {
+    repo.createGroup("explicit-group");
+    repo.create({ group_name: "session-only-group" });
+    const names = repo.getGroupNames();
+    expect(names).toContain("explicit-group");
+    expect(names).toContain("session-only-group");
+  });
+
+  it("getGroupNames deduplicates when group exists in both sources", () => {
+    repo.createGroup("shared");
+    repo.create({ group_name: "shared" });
+    const names = repo.getGroupNames();
+    expect(names.filter((n) => n === "shared").length).toBe(1);
+  });
+
+  it("getGroupNames returns sorted results", () => {
+    repo.createGroup("zebra");
+    repo.createGroup("alpha");
+    repo.create({ group_name: "middle" });
+    const names = repo.getGroupNames();
+    expect(names).toEqual([...names].sort());
+  });
+
+  // ── listDeleted ────────────────────────────────────────────────────────
+
+  it("listDeleted returns only soft-deleted sessions", () => {
+    const s1 = repo.create({ summary: "active" });
+    const s2 = repo.create({ summary: "deleted" });
+    repo.softDelete(s2.id);
+    const deleted = repo.listDeleted();
+    expect(deleted.length).toBe(1);
+    expect(deleted[0].id).toBe(s2.id);
+  });
+
+  it("listDeleted returns empty when no deleted sessions", () => {
+    repo.create({});
+    expect(repo.listDeleted().length).toBe(0);
+  });
+
+  // ── isChannelPortAvailable ─────────────────────────────────────────────
+
+  it("isChannelPortAvailable returns true when no running sessions", () => {
+    const s = repo.create({});
+    const port = repo.channelPort(s.id);
+    expect(repo.isChannelPortAvailable(port)).toBe(true);
+  });
+
+  it("isChannelPortAvailable returns false when port is in use by running session", () => {
+    const s = repo.create({});
+    repo.update(s.id, { status: "running" as SessionStatus });
+    const port = repo.channelPort(s.id);
+    expect(repo.isChannelPortAvailable(port)).toBe(false);
+  });
+
+  it("isChannelPortAvailable excludes specified session from conflict check", () => {
+    const s = repo.create({});
+    repo.update(s.id, { status: "running" as SessionStatus });
+    const port = repo.channelPort(s.id);
+    expect(repo.isChannelPortAvailable(port, s.id)).toBe(true);
+  });
+
+  // ── tenant isolation ───────────────────────────────────────────────────
+
+  it("setTenant/getTenant manages tenant context", () => {
+    expect(repo.getTenant()).toBe("default");
+    repo.setTenant("tenant-a");
+    expect(repo.getTenant()).toBe("tenant-a");
+  });
+
+  it("sessions are isolated by tenant", () => {
+    repo.setTenant("tenant-a");
+    const s1 = repo.create({ summary: "tenant-a session" });
+    repo.setTenant("tenant-b");
+    const s2 = repo.create({ summary: "tenant-b session" });
+    expect(repo.get(s1.id)).toBeNull();
+    expect(repo.get(s2.id)!.summary).toBe("tenant-b session");
+    repo.setTenant("tenant-a");
+    expect(repo.get(s1.id)!.summary).toBe("tenant-a session");
+    expect(repo.get(s2.id)).toBeNull();
+  });
+
+  // ── list filters (group_name, groupPrefix, parent_id) ──────────────────
+
+  it("list filters by group_name", () => {
+    repo.create({ group_name: "alpha" });
+    repo.create({ group_name: "beta" });
+    const result = repo.list({ group_name: "alpha" });
+    expect(result.length).toBe(1);
+    expect(result[0].group_name).toBe("alpha");
+  });
+
+  it("list filters by groupPrefix", () => {
+    repo.create({ group_name: "team-frontend" });
+    repo.create({ group_name: "team-backend" });
+    repo.create({ group_name: "other" });
+    const result = repo.list({ groupPrefix: "team-" });
+    expect(result.length).toBe(2);
+    expect(result.every((s) => s.group_name!.startsWith("team-"))).toBe(true);
+  });
+
+  it("list filters by parent_id", () => {
+    const parent = repo.create({});
+    const child = repo.create({});
+    repo.update(child.id, { parent_id: parent.id });
+    repo.create({});
+    const result = repo.list({ parent_id: parent.id });
+    expect(result.length).toBe(1);
+    expect(result[0].id).toBe(child.id);
+  });
+
+  // ── generateId ─────────────────────────────────────────────────────────
+
+  it("generateId returns properly formatted IDs", () => {
+    const id = repo.generateId();
+    expect(id).toMatch(/^s-[0-9a-z]{10}$/);
+  });
+
+  // ── channelPort with setChannelBounds ──────────────────────────────────
+
+  it("channelPort respects setChannelBounds", () => {
+    repo.setChannelBounds(30000, 100);
+    const port = repo.channelPort("s-abc123");
+    expect(port).toBeGreaterThanOrEqual(30000);
+    expect(port).toBeLessThan(30100);
+  });
+
+  // ── search ─────────────────────────────────────────────────────────────
+
+  it("search finds sessions by id", () => {
+    const s = repo.create({});
+    const results = repo.search(s.id);
+    expect(results.length).toBe(1);
+    expect(results[0].id).toBe(s.id);
+  });
+
+  it("search finds sessions by repo", () => {
+    repo.create({ repo: "/tmp/my-project" });
+    const results = repo.search("my-project");
+    expect(results.length).toBe(1);
+  });
+
+  it("search respects limit option", () => {
+    for (let i = 0; i < 5; i++) repo.create({ summary: `searchable-${i}` });
+    const results = repo.search("searchable", { limit: 3 });
+    expect(results.length).toBe(3);
+  });
+
+  // ── create edge cases ──────────────────────────────────────────────────
+
+  it("create stores workdir and compute_name", () => {
+    const s = repo.create({ workdir: "/tmp/work", compute_name: "docker-1" });
+    expect(s.workdir).toBe("/tmp/work");
+    expect(s.compute_name).toBe("docker-1");
+  });
+
+  it("create stores user_id", () => {
+    const s = repo.create({ user_id: "user-123" });
+    expect(s.user_id).toBe("user-123");
+  });
 });
