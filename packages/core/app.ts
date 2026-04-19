@@ -22,6 +22,7 @@ import { safeAsync } from "./safe.js";
 import { eventBus } from "./hooks.js";
 import type { ComputeProvider } from "../compute/types.js";
 import type { Compute as NewCompute, Runtime as NewRuntime, ComputeKind, RuntimeKind } from "../compute/core/types.js";
+import type { ComputePool } from "../compute/core/pool/types.js";
 import type { SnapshotStore } from "../compute/core/snapshot-store.js";
 import { FsSnapshotStore } from "../compute/core/snapshot-store-fs.js";
 import { safeParseConfig } from "./util.js";
@@ -96,6 +97,14 @@ export class AppContext {
   // retires the old registry once every dispatch path reads from these.
   private _computes = new Map<ComputeKind, NewCompute>();
   private _runtimes = new Map<RuntimeKind, NewRuntime>();
+  /**
+   * Phase 4: warm pools keyed by compute kind. At most one pool per kind;
+   * dispatch consults `getComputePool(kind)` before falling back to a direct
+   * `Compute.provision()` call. Pools are registered by the caller that
+   * instantiates them (eg. a boot hook or a test harness), not by the
+   * Compute itself, because pooling is an orthogonal concern.
+   */
+  private _computePools = new Map<ComputeKind, ComputePool>();
 
   private _launcher: SessionLauncher = new TmuxLauncher();
   private _workerRegistry: WorkerRegistry | null = null;
@@ -441,6 +450,25 @@ export class AppContext {
     return [...this._runtimes.keys()];
   }
 
+  // ── Compute pool registry (Phase 4) ───────────────────────────────────
+  //
+  // Pools are optional -- only registered when a caller explicitly wants to
+  // amortise provision latency (eg. local Firecracker). Dispatch should
+  // consult `getComputePool(kind)` first; if null, call `Compute.provision`
+  // directly. Pool lifecycle (`start` / `stop`) is the caller's responsibility.
+
+  registerComputePool(pool: ComputePool): void {
+    this._computePools.set(pool.compute.kind, pool);
+  }
+
+  getComputePool(kind: ComputeKind): ComputePool | null {
+    return this._computePools.get(kind) ?? null;
+  }
+
+  listComputePools(): ComputeKind[] {
+    return [...this._computePools.keys()];
+  }
+
   /** Resolve the compute provider for a session. Defaults to local. */
   resolveProvider(session: Session): { provider: ComputeProvider | null; compute: Compute | null } {
     const computeName = session.compute_name || "local";
@@ -716,6 +744,12 @@ export class AppContext {
       // logs at info level when the gating fires so the skip is observable.
       const { registerFirecrackerIfAvailable } = await import("../compute/core/firecracker/compute.js");
       registerFirecrackerIfAvailable(this);
+
+      // Phase 5: FlyMachinesCompute. Gated on FLY_API_TOKEN being present --
+      // without the token the provider is inert, and registering it would
+      // only surface unhelpful errors downstream.
+      const { registerFlyIfAvailable } = await import("../compute/core/fly/compute.js");
+      registerFlyIfAvailable(this);
     });
   }
 
