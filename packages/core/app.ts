@@ -716,6 +716,12 @@ export class AppContext {
       // logs at info level when the gating fires so the skip is observable.
       const { registerFirecrackerIfAvailable } = await import("../compute/core/firecracker/compute.js");
       registerFirecrackerIfAvailable(this);
+
+      // Phase 5: FlyMachinesCompute. Gated on FLY_API_TOKEN being present --
+      // without the token the provider is inert, and registering it would
+      // only surface unhelpful errors downstream.
+      const { registerFlyIfAvailable } = await import("../compute/core/fly/compute.js");
+      registerFlyIfAvailable(this);
     });
   }
 
