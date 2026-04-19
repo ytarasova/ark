@@ -20,7 +20,7 @@ import * as agentRegistry from "../agent/agent.js";
 import { saveCheckpoint } from "../session/checkpoint.js";
 import { parseGraphFlow, getSuccessors, resolveNextStages, computeSkippedStages } from "../state/graph-flow.js";
 import { markStageCompleted, setCurrentStage, markStagesSkipped, loadFlowState } from "../state/flow-state.js";
-import { logError } from "../observability/structured-log.js";
+import { logDebug, logError, logInfo } from "../observability/structured-log.js";
 import { recordEvent } from "../observability.js";
 import { track } from "../observability/telemetry.js";
 import { emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, flushSpans } from "../observability/otlp.js";
@@ -182,7 +182,7 @@ export async function dispatch(
       return { ok: false, message: schedErr.message ?? "Scheduling failed" };
     }
   } catch {
-    // Scheduler not available -- fall through to local dispatch
+    logDebug("session", "Scheduler not available -- fall through to local dispatch");
   }
 
   // Handle remote repo: clone to local temp directory if no workdir set
@@ -227,7 +227,7 @@ export async function dispatch(
       });
     }
   } catch {
-    /* skip guard on error */
+    logDebug("session", "skip guard on error");
   }
 
   // Check if fork stage
@@ -347,7 +347,7 @@ export async function dispatch(
         task = contextMd + task;
       }
     } catch {
-      /* knowledge not available -- continue without context */
+      logInfo("session", "knowledge not available -- continue without context");
     }
   }
 
@@ -360,7 +360,7 @@ export async function dispatch(
         task = task + `\n\n## Repository Structure\n\`\`\`\n${mapStr}\n\`\`\`\n`;
       }
     } catch {
-      /* skip repo map on error */
+      logDebug("session", "skip repo map on error");
     }
   }
 
@@ -435,7 +435,7 @@ export async function dispatch(
         timeout: 5000,
       }).trim();
     } catch {
-      /* no git -- skip */
+      logDebug("session", "no git -- skip");
     }
   }
 
@@ -449,7 +449,7 @@ export async function dispatch(
     try {
       await app.launcher.kill(tmuxName);
     } catch {
-      /* tmux may already be gone */
+      logDebug("session", "tmux may already be gone");
     }
     return { ok: false, message: `Session moved on during dispatch` };
   }
@@ -477,7 +477,7 @@ export async function dispatch(
   try {
     setCurrentStage(app, sessionId, session.stage!, session.flow);
   } catch {
-    /* skip flow-state on error */
+    logDebug("session", "skip flow-state on error");
   }
 
   // Checkpoint after successful dispatch
@@ -490,7 +490,7 @@ export async function dispatch(
     const { startStatusPoller } = await import("../executors/status-poller.js");
     startStatusPoller(app, sessionId, tmuxName, runtime);
   } catch {
-    /* status poller is best-effort -- agent runs fine without it */
+    logDebug("session", "status poller is best-effort -- agent runs fine without it");
   }
 
   // Observability + telemetry
@@ -541,7 +541,7 @@ export async function advance(
         try {
           markStageCompleted(app, sessionId, stage);
         } catch {
-          /* flow-state persistence is best-effort -- stage still advances */
+          logDebug("session", "flow-state persistence is best-effort -- stage still advances");
         }
 
         // Compute which stages should be skipped due to conditional branching
@@ -552,7 +552,7 @@ export async function advance(
             try {
               markStagesSkipped(app, sessionId, newSkipped);
             } catch {
-              /* flow-state persistence is best-effort -- stage still advances */
+              logDebug("session", "flow-state persistence is best-effort -- stage still advances");
             }
           }
         }
@@ -563,7 +563,7 @@ export async function advance(
         try {
           setCurrentStage(app, sessionId, graphNextStage, flowName);
         } catch {
-          /* flow-state persistence is best-effort -- stage still advances */
+          logDebug("session", "flow-state persistence is best-effort -- stage still advances");
         }
 
         // Stage isolation: clear runtime handles so next stage gets a fresh runtime.
@@ -615,7 +615,7 @@ export async function advance(
         try {
           markStageCompleted(app, sessionId, stage);
         } catch {
-          /* flow-state persistence is best-effort -- stage still advances */
+          logDebug("session", "flow-state persistence is best-effort -- stage still advances");
         }
         app.sessions.update(sessionId, { status: "waiting" });
         app.events.log(sessionId, "stage_waiting", {
@@ -630,7 +630,7 @@ export async function advance(
       try {
         markStageCompleted(app, sessionId, stage);
       } catch {
-        /* flow-state persistence is best-effort -- stage still advances */
+        logDebug("session", "flow-state persistence is best-effort -- stage still advances");
       }
       app.sessions.update(sessionId, { status: "completed" });
       app.events.log(sessionId, "session_completed", {
@@ -654,7 +654,7 @@ export async function advance(
       return { ok: true, message: "Flow completed (graph-flow)" };
     }
   } catch {
-    /* graph flow not applicable, fall through to linear */
+    logDebug("session", "graph flow not applicable, fall through to linear");
   }
 
   const nextStage = flow.resolveNextStage(app, flowName, stage, outcome);
@@ -663,7 +663,7 @@ export async function advance(
     try {
       markStageCompleted(app, sessionId, stage, outcome ? { outcome } : undefined);
     } catch {
-      /* flow-state persistence is best-effort -- stage still advances */
+      logDebug("session", "flow-state persistence is best-effort -- stage still advances");
     }
     app.sessions.update(sessionId, { status: "completed" });
     app.events.log(sessionId, "session_completed", {
@@ -697,7 +697,7 @@ export async function advance(
         extractAndSaveSkills(sessionId, turns, app);
       }
     } catch {
-      /* skill extraction is best-effort */
+      logDebug("session", "skill extraction is best-effort");
     }
 
     return { ok: true, message: "Flow completed" };
@@ -707,12 +707,12 @@ export async function advance(
   try {
     markStageCompleted(app, sessionId, stage, outcome ? { outcome } : undefined);
   } catch {
-    /* flow-state persistence is best-effort -- stage still advances */
+    logDebug("session", "flow-state persistence is best-effort -- stage still advances");
   }
   try {
     setCurrentStage(app, sessionId, nextStage, flowName);
   } catch {
-    /* flow-state persistence is best-effort -- stage still advances */
+    logDebug("session", "flow-state persistence is best-effort -- stage still advances");
   }
 
   const nextAction = flow.getStageAction(app, flowName, nextStage);
@@ -826,7 +826,7 @@ export async function executeAction(
             return { ok: true, message: `Action '${action}' executed (PR found on branch)` };
           }
         } catch {
-          /* no PR exists for this branch -- proceed to create */
+          logInfo("session", "no PR exists for this branch -- proceed to create");
         }
       }
       const result = await createWorktreePR(app, sessionId, { title: s.summary ?? undefined });

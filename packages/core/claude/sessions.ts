@@ -11,6 +11,7 @@ import { homedir } from "os";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import type { AppContext } from "../app.js";
+import { logDebug } from "../observability/structured-log.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -152,7 +153,7 @@ async function parseTranscriptMeta(
           }
         }
       } catch {
-        // Truncated or malformed JSON lines are expected in partial transcript reads
+        logDebug("session", "Truncated or malformed JSON lines are expected in partial transcript reads");
       }
     }
 
@@ -169,7 +170,7 @@ async function parseTranscriptMeta(
           break;
         }
       } catch {
-        // Truncated JSON in tail buffer is expected -- last line is often incomplete
+        logDebug("session", "Truncated JSON in tail buffer is expected -- last line is often incomplete");
       }
     }
 

@@ -21,7 +21,7 @@ import { loadRepoConfig } from "../repo-config.js";
 import { safeAsync } from "../safe.js";
 import { saveCheckpoint } from "../session/checkpoint.js";
 import { profileGroupPrefix } from "../state/profiles.js";
-import { logError, logWarn } from "../observability/structured-log.js";
+import { logDebug, logError, logInfo, logWarn } from "../observability/structured-log.js";
 import { recordEvent } from "../observability.js";
 import { track } from "../observability/telemetry.js";
 import { resolveProvider } from "../provider-registry.js";
@@ -269,7 +269,7 @@ export async function stop(
       if (entry.pid) await killProcessTree(entry.pid);
     }
   } catch {
-    /* fall through to tmux kill */
+    logDebug("session", "fall through to tmux kill");
   }
 
   // Kill agent + clean up provider resources FIRST (before any DB writes).
@@ -302,7 +302,7 @@ export async function stop(
     const { stopStatusPoller } = await import("../executors/status-poller.js");
     stopStatusPoller(sessionId);
   } catch {
-    /* poller may not be running -- safe to ignore */
+    logDebug("session", "poller may not be running -- safe to ignore");
   }
 
   // Checkpoint before state transition
@@ -604,7 +604,7 @@ export async function deleteSessionAsync(
     const { removeRecording } = await import("../recordings.js");
     removeRecording(app.config.arkDir, sessionId);
   } catch {
-    /* non-fatal */
+    logInfo("session", "non-fatal");
   }
 
   // 4. Soft-delete (keeps DB row for 90s undo window)

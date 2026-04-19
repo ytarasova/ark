@@ -1,3 +1,4 @@
+import { logInfo } from "./structured-log.js";
 /**
  * Optional telemetry -- tracks usage events for improving Ark.
  * Disabled by default. Enable via config or ARK_TELEMETRY=1.
@@ -61,6 +62,6 @@ export async function flush(): Promise<void> {
       body: JSON.stringify({ events }),
     });
   } catch {
-    /* fire-and-forget */
+    logInfo("status", "fire-and-forget");
   }
 }

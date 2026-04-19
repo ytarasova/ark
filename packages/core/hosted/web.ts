@@ -38,6 +38,7 @@ import {
 } from "./terminal-bridge.js";
 import { VERSION } from "../version.js";
 import { createHmac, timingSafeEqual } from "crypto";
+import { logInfo, logDebug } from "../observability/structured-log.js";
 
 const WEB_DIST: string = resolveWebDist();
 const SERVER_BOOT_TIME = Date.now();
@@ -166,7 +167,7 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
         execFileSync("bun", ["run", buildScript], { stdio: "pipe", timeout: 30_000 });
       }
     } catch {
-      /* build failed - will serve 404s */
+      logInfo("web", "build failed - will serve 404s");
     }
   }
 
@@ -221,7 +222,7 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
   try {
     apiKeyMgr = app.apiKeys;
   } catch {
-    /* not booted yet or unavailable */
+    logInfo("web", "not booted yet or unavailable");
   }
 
   // ── Server ───────────────────────────────────────────────────────────────
@@ -474,7 +475,7 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
         try {
           client.close();
         } catch {
-          /* ignore */
+          logDebug("web", "ignore");
         }
       }
       sseClients.clear();

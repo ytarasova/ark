@@ -19,6 +19,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "fs";
 import { join, resolve } from "path";
 import { homedir } from "os";
 import type { TranscriptParser, ParseResult, FindOpts } from "../transcript-parser.js";
+import { logDebug } from "../../observability/structured-log.js";
 
 /** Encode a workdir path as a Claude project slug: replace / and . with -. */
 function encodeProjectSlug(workdir: string): string {
@@ -62,7 +63,7 @@ export class ClaudeTranscriptParser implements TranscriptParser {
         usage.cache_read_tokens = (usage.cache_read_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
         usage.cache_write_tokens = (usage.cache_write_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0);
       } catch {
-        /* skip malformed lines */
+        logDebug("session", "skip malformed lines");
       }
     }
 

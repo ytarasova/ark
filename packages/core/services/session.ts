@@ -14,6 +14,7 @@ import type { SessionRepository } from "../repositories/session.js";
 import type { EventRepository } from "../repositories/event.js";
 import type { MessageRepository } from "../repositories/message.js";
 import type { AppContext } from "../app.js";
+import { logDebug } from "../observability/structured-log.js";
 
 // ── SessionService ───────────────────────────────────────────────────────────
 
@@ -93,7 +94,7 @@ export class SessionService {
         const { stop: orchStop } = await import("./session-orchestration.js");
         return orchStop(this.app, id, opts);
       } catch {
-        // AppContext not available (e.g. unit tests) -- fall through to local stop
+        logDebug("session", "AppContext not available (e.g. unit tests) -- fall through to local stop");
       }
     }
 

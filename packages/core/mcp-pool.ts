@@ -13,6 +13,7 @@
 import { spawn, type ChildProcess } from "child_process";
 import { createServer, createConnection, type Server, type Socket } from "net";
 import { existsSync, unlinkSync, readdirSync } from "fs";
+import { logInfo, logDebug } from "./observability/structured-log.js";
 
 // ── Types ───────────────────────────────────────────────────────────────
 
@@ -67,7 +68,7 @@ class SocketProxy {
       try {
         unlinkSync(this.socketPath);
       } catch {
-        /* stale socket may vanish between existsSync and unlinkSync */
+        logInfo("mcp", "stale socket may vanish between existsSync and unlinkSync");
       }
     }
 
@@ -195,7 +196,7 @@ class SocketProxy {
       try {
         client.destroy();
       } catch {
-        /* client already destroyed/errored; nothing to do */
+        logDebug("mcp", "client already destroyed/errored; nothing to do");
       }
     }
     this.clients.clear();
@@ -220,7 +221,7 @@ class SocketProxy {
       try {
         unlinkSync(this.socketPath);
       } catch {
-        /* shutdown cleanup; stale socket is harmless */
+        logInfo("mcp", "shutdown cleanup; stale socket is harmless");
       }
     }
   }
@@ -245,7 +246,7 @@ class SocketProxy {
     try {
       if (!socket.destroyed) socket.write(data);
     } catch {
-      /* socket may race-close between the destroyed check and write */
+      logDebug("mcp", "socket may race-close between the destroyed check and write");
     }
   }
 }

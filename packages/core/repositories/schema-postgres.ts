@@ -9,6 +9,7 @@
  */
 
 import type { IDatabase } from "../database/index.js";
+import { logDebug } from "../observability/structured-log.js";
 
 export function initPostgresSchema(db: IDatabase): void {
   // Sessions table
@@ -302,6 +303,6 @@ function safeDdl(db: IDatabase, sql: string): void {
   try {
     db.exec(sql);
   } catch {
-    // Already exists or other benign error
+    logDebug("general", "Already exists or other benign error");
   }
 }

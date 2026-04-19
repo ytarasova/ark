@@ -13,6 +13,7 @@ import { promisify } from "util";
 import { writeFileSync, mkdirSync, chmodSync, unlinkSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { tmpdir } from "os";
+import { logDebug } from "../observability/structured-log.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -219,7 +220,7 @@ export async function sendTextAsync(name: string, text: string): Promise<void> {
     try {
       unlinkSync(tmpFile);
     } catch {
-      /* OS tmpdir cleanup is acceptable fallback */
+      logDebug("general", "OS tmpdir cleanup is acceptable fallback");
     }
   }
 }
@@ -234,7 +235,7 @@ export async function pipePaneAsync(name: string, outputPath: string): Promise<v
   try {
     await execFileAsync(tmuxBin(), ["pipe-pane", "-t", name, `cat >> ${outputPath}`]);
   } catch {
-    /* pipe-pane may fail if session already gone -- non-fatal */
+    logDebug("general", "pipe-pane may fail if session already gone -- non-fatal");
   }
 }
 

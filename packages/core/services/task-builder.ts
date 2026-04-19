@@ -17,6 +17,7 @@ import * as agentRegistry from "../agent/agent.js";
 import { buildSessionVars } from "../template.js";
 import { resolveFlow } from "../state/flow.js";
 import { filterMessages, parseMessageFilter } from "../message-filter.js";
+import { logDebug } from "../observability/structured-log.js";
 
 /** Convert a typed Session to a plain Record for template variable resolution. */
 export function sessionAsVars(session: Session): Record<string, unknown> {
@@ -119,7 +120,7 @@ export async function appendPreviousStageContext(app: AppContext, session: Sessi
       });
       if (log.trim()) parts.push(`\n## Recent commits:\n${log.trim()}`);
     } catch {
-      // Expected: worktree dir may not be a git repo yet
+      logDebug("session", "Expected: worktree dir may not be a git repo yet");
     }
   }
 
@@ -157,7 +158,7 @@ export async function buildTaskWithHandoff(
       }
     }
   } catch {
-    /* skip message filtering on error */
+    logDebug("session", "skip message filtering on error");
   }
 
   return [...header, ...context].join("\n");

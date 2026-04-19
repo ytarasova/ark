@@ -13,6 +13,7 @@ import { spawn, execFileSync, type ChildProcess } from "child_process";
 import { writeFileSync, mkdirSync, existsSync } from "fs";
 import { join, dirname } from "path";
 import { generateTensorZeroConfig } from "./tensorzero-config.js";
+import { logInfo, logDebug } from "../observability/structured-log.js";
 
 export interface TensorZeroManagerOpts {
   port?: number;
@@ -82,7 +83,7 @@ export class TensorZeroManager {
       try {
         execFileSync("docker", ["rm", "-f", this.container], { stdio: "pipe" });
       } catch {
-        // already gone
+        logDebug("general", "already gone");
       }
       this.container = null;
     }
@@ -139,7 +140,7 @@ export class TensorZeroManager {
       const which = execFileSync("which", ["tensorzero-gateway"], { stdio: "pipe" }).toString().trim();
       if (which && existsSync(which)) return which;
     } catch {
-      // not in PATH
+      logDebug("general", "not in PATH");
     }
 
     return null;
@@ -188,7 +189,7 @@ export class TensorZeroManager {
     try {
       execFileSync("docker", ["rm", "-f", "ark-tensorzero"], { stdio: "pipe" });
     } catch {
-      // not running
+      logInfo("general", "not running");
     }
 
     const envArgs: string[] = [];

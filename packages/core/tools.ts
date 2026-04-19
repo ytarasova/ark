@@ -12,6 +12,7 @@ import { existsSync, readFileSync, writeFileSync, readdirSync, mkdirSync, unlink
 import { join, basename } from "path";
 import stripJsonComments from "strip-json-comments";
 import type { AppContext } from "./app.js";
+import { logInfo, logDebug } from "./observability/structured-log.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -67,7 +68,7 @@ function discoverCommands(projectDir: string): ToolEntry[] {
         source: join(cmdDir, file),
       });
     } catch {
-      /* skip unreadable files */
+      logDebug("session", "skip unreadable files");
     }
   }
   return entries;
@@ -89,7 +90,7 @@ function discoverClaudeSkills(projectDir: string): ToolEntry[] {
         source: join(skillDir, file),
       });
     } catch {
-      /* skip unreadable files */
+      logDebug("session", "skip unreadable files");
     }
   }
   return entries;
@@ -175,7 +176,7 @@ export function addMcpServer(projectDir: string, name: string, config: Record<st
     try {
       existing = readJsonc(mcpPath) as Record<string, any>;
     } catch {
-      /* start fresh if parse fails */
+      logInfo("session", "start fresh if parse fails");
     }
   }
   if (!existing.mcpServers) existing.mcpServers = {};

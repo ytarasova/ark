@@ -69,16 +69,18 @@ function rotate(): void {
         try {
           renameSync(from, to);
         } catch {
-          /* ignore */
+          // Rotating the logger from inside the logger would recurse forever --
+          // if rename fails (permissions, race with another process) we just
+          // skip this backup slot. The next rotate cycle will retry.
         }
     }
     try {
       renameSync(path, `${path}.1`);
     } catch {
-      /* ignore */
+      // See comment above: logger cannot log its own failures.
     }
   } catch {
-    /* ignore */
+    // stat()/rotate() failed entirely. Silent by design (logger internal).
   }
 }
 
@@ -101,7 +103,8 @@ export function log(level: LogLevel, component: LogComponent, message: string, d
     const path = logPath();
     if (path) appendFileSync(path, JSON.stringify(entry) + "\n");
   } catch {
-    /* don't crash on log failure */
+    // Logging must never throw (or we would crash the app on a disk-full
+    // condition). Recursing into log() here would also loop forever.
   }
 }
 

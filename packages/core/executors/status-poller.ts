@@ -8,7 +8,7 @@
 
 import type { AppContext } from "../app.js";
 import { getExecutor } from "../executor.js";
-import { logInfo } from "../observability/structured-log.js";
+import { logDebug, logInfo } from "../observability/structured-log.js";
 
 const activePollers = new Map<string, ReturnType<typeof setInterval>>();
 
@@ -37,7 +37,7 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
             app.sessions.mergeConfig(sessionId, { process_tree: tree });
           }
         } catch {
-          /* best-effort */
+          logDebug("status", "best-effort");
         }
       }
 
@@ -82,7 +82,7 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
               source: "status_poller",
             });
           } catch {
-            /* advance may fail if flow is done */
+            logInfo("status", "advance may fail if flow is done");
           }
         }
 
@@ -92,11 +92,11 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
           const title = newStatus === "completed" ? "Agent completed" : "Agent failed";
           await sendOSNotification(`Ark: ${title}`, session.summary ?? sessionId);
         } catch {
-          /* best-effort */
+          logDebug("status", "best-effort");
         }
       }
     } catch {
-      /* ignore polling errors */
+      logDebug("status", "ignore polling errors");
     }
   }, 3000); // Check every 3 seconds
 

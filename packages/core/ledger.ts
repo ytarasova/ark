@@ -7,6 +7,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 import { nanoid } from "nanoid";
 import type { AppContext } from "./app.js";
+import { logDebug } from "./observability/structured-log.js";
 
 export interface LedgerEntry {
   id: string;
@@ -35,7 +36,7 @@ export function loadLedger(app: AppContext, conductorId: string): Ledger {
     try {
       return JSON.parse(readFileSync(path, "utf-8"));
     } catch {
-      /* fall through */
+      logDebug("session", "fall through");
     }
   }
   return { conductorId, entries: [], lastActivity: new Date().toISOString(), stallCount: 0 };

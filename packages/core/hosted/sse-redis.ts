@@ -13,6 +13,7 @@
 
 import { createClient, type RedisClientType } from "redis";
 import type { SSEBus } from "./sse-bus.js";
+import { logInfo, logDebug } from "../observability/structured-log.js";
 
 type Listener = (event: string, data: unknown) => void;
 
@@ -45,11 +46,11 @@ export class RedisSSEBus implements SSEBus {
             try {
               cb(event, data);
             } catch {
-              // Don't let one bad listener break others
+              logInfo("web", "Don't let one bad listener break others");
             }
           }
         } catch {
-          // Ignore malformed messages
+          logDebug("web", "Ignore malformed messages");
         }
       });
     }

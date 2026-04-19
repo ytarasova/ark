@@ -4,6 +4,7 @@ import { join, dirname } from "path";
 import { Database } from "bun:sqlite";
 import type { KnowledgeStore } from "./store.js";
 import type { EdgeRelation } from "./types.js";
+import { logInfo } from "../observability/structured-log.js";
 
 export interface IndexResult {
   files: number;
@@ -315,7 +316,7 @@ export function indexCoChanges(
       }
     }
   } catch {
-    /* git log may fail in non-git repos */
+    logInfo("session", "git log may fail in non-git repos");
   }
 
   return edgeCount;

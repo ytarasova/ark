@@ -5,6 +5,7 @@
 import { readdirSync, statSync, readFileSync, writeFileSync, unlinkSync, existsSync } from "fs";
 import { join } from "path";
 import type { AppContext } from "../app.js";
+import { logDebug } from "./structured-log.js";
 
 export interface LogManagerOptions {
   maxSizeMb?: number; // Max log file size (default: 10)
@@ -71,7 +72,7 @@ export function cleanupLogs(app: AppContext, opts?: LogManagerOptions): { trunca
         }
       }
     } catch {
-      /* skip errors */
+      logDebug("status", "skip errors");
     }
   }
 

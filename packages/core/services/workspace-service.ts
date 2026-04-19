@@ -45,7 +45,7 @@ import type { Session, Compute } from "../../types/index.js";
 import type { ComputeProvider } from "../../compute/types.js";
 import * as claude from "../claude/claude.js";
 import { loadRepoConfig } from "../repo-config.js";
-import { logError, logWarn } from "../observability/structured-log.js";
+import { logDebug, logError, logInfo, logWarn } from "../observability/structured-log.js";
 import { safeAsync } from "../safe.js";
 
 const DEFAULT_BASE_BRANCH = "main";
@@ -332,7 +332,7 @@ export async function worktreeDiff(
       });
       branch = stdout.trim();
     } catch {
-      /* worktree dir may not be a git repo yet -- branch stays undefined */
+      logDebug("session", "worktree dir may not be a git repo yet -- branch stays undefined");
     }
   }
   if (!branch)
@@ -394,7 +394,7 @@ export async function worktreeDiff(
           });
           fileHashes[file] = hash.trim();
         } catch {
-          /* file may have been deleted */
+          logInfo("session", "file may have been deleted");
         }
       }
 
@@ -411,7 +411,7 @@ export async function worktreeDiff(
       // Save current hashes as reviewed
       app.sessions.mergeConfig(sessionId, { reviewed_files: fileHashes });
     } catch {
-      /* re-review tracking is best-effort */
+      logDebug("session", "re-review tracking is best-effort");
     }
 
     return {
@@ -493,7 +493,7 @@ export async function rebaseOntoBase(
         stdio: ["ignore", "pipe", "pipe"],
       });
     } catch {
-      /* already clean */
+      logDebug("session", "already clean");
     }
 
     logWarn("session", `rebaseOntoBase: rebase failed for ${sessionId}: ${e?.message ?? e}`);
@@ -533,7 +533,7 @@ export async function createWorktreePR(
       });
       branch = stdout.trim();
     } catch {
-      /* worktree dir may not be a git repo yet -- branch stays undefined */
+      logDebug("session", "worktree dir may not be a git repo yet -- branch stays undefined");
     }
   }
   if (!branch) return { ok: false, message: "Cannot determine worktree branch" };
@@ -691,7 +691,7 @@ export async function finishWorktree(
       });
       branch = stdout.trim();
     } catch {
-      /* worktree dir may not be a git repo yet -- branch stays undefined */
+      logDebug("session", "worktree dir may not be a git repo yet -- branch stays undefined");
     }
   }
 
@@ -751,7 +751,7 @@ export async function finishWorktree(
           stdio: ["ignore", "pipe", "pipe"],
         });
       } catch {
-        /* merge --abort may fail if no merge in progress -- safe to ignore */
+        logDebug("session", "merge --abort may fail if no merge in progress -- safe to ignore");
       }
       return {
         ok: false,
@@ -787,7 +787,7 @@ export async function finishWorktree(
           stdio: ["ignore", "pipe", "pipe"],
         });
       } catch {
-        /* force delete also failed -- branch may already be gone */
+        logDebug("session", "force delete also failed -- branch may already be gone");
       }
     }
   }
@@ -823,7 +823,7 @@ export async function removeSessionWorktree(app: AppContext, session: Session): 
       });
       return;
     } catch {
-      /* fall through to rmSync */
+      logDebug("session", "fall through to rmSync");
     }
   }
 
@@ -848,7 +848,7 @@ export function findOrphanedWorktrees(app: AppContext): string[] {
       }
     }
   } catch {
-    /* worktrees dir may not exist -- no orphans to report */
+    logDebug("session", "worktrees dir may not exist -- no orphans to report");
   }
 
   return orphans;

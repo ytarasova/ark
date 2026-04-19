@@ -7,6 +7,7 @@ import { existsSync, readdirSync, readFileSync, statSync, openSync, readSync, cl
 import { join } from "path";
 import { homedir } from "os";
 import type { AppContext } from "../app.js";
+import { logDebug } from "../observability/structured-log.js";
 
 /**
  * Max bytes to read from the tail of large transcript files for indexing.
@@ -241,7 +242,7 @@ function searchTranscriptsFiles(query: string, opts?: SearchOpts): SearchResult[
             break; // One match per file
           }
         } catch {
-          /* skip malformed JSONL entries */
+          logDebug("general", "skip malformed JSONL entries");
         }
       }
     }
@@ -370,7 +371,7 @@ export async function indexTranscripts(
           insert.run(sessionId, projectDir, entry.type, text, entry.timestamp ?? null);
           indexed++;
         } catch {
-          /* skip malformed entries */
+          logDebug("general", "skip malformed entries");
         }
       }
 
@@ -398,7 +399,7 @@ export function indexSession(app: AppContext, transcriptPath: string, sessionId:
       | undefined;
     maxTs = row?.ts ?? null;
   } catch {
-    /* index table may not exist yet */
+    logDebug("general", "index table may not exist yet");
   }
 
   const insert = db.prepare(
@@ -437,7 +438,7 @@ export function indexSession(app: AppContext, transcriptPath: string, sessionId:
       insert.run(sessionId, project ?? "", entry.type, text, ts);
       indexed++;
     } catch {
-      /* skip malformed entries */
+      logDebug("general", "skip malformed entries");
     }
   }
 

@@ -12,6 +12,7 @@ import { AppContext, setApp } from "../app.js";
 import { WorkerRegistry } from "./worker-registry.js";
 import { SessionScheduler } from "./scheduler.js";
 import { TenantPolicyManager } from "../auth/index.js";
+import { logDebug } from "../observability/structured-log.js";
 
 export async function startHostedServer(config: ArkConfig): Promise<{
   app: AppContext;
@@ -61,7 +62,7 @@ export async function startHostedServer(config: ArkConfig): Promise<{
       const { startRouter } = await import("../router/server.js");
       startRouter(config.router);
     } catch {
-      // Router module not available - skip
+      logDebug("web", "Router module not available - skip");
     }
   }
 

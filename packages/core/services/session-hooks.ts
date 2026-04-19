@@ -13,7 +13,7 @@ import type { Session, MessageRole, MessageType } from "../../types/index.js";
 import type { OutboundMessage } from "../conductor/channel-types.js";
 import * as flow from "../state/flow.js";
 import { detectHandoff } from "../handoff.js";
-import { logError, logWarn } from "../observability/structured-log.js";
+import { logDebug, logError, logInfo, logWarn } from "../observability/structured-log.js";
 import { evaluateTermination, parseTermination, type TerminationContext } from "../termination.js";
 import { loadRepoConfig } from "../repo-config.js";
 import { safeAsync } from "../safe.js";
@@ -266,7 +266,7 @@ export function applyHookStatus(
       }
     }
   } catch {
-    /* skip termination check on error */
+    logDebug("session", "skip termination check on error");
   }
 
   // Track token usage from transcript on Stop and SessionEnd
@@ -310,7 +310,7 @@ export function applyHookStatus(
             });
           }
         } catch {
-          /* skip handoff detection on error */
+          logDebug("session", "skip handoff detection on error");
         }
       })
       .catch(() => {
@@ -458,7 +458,7 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
             break;
           }
         } catch {
-          /* git check failed (e.g. no remote) -- continue to next check */
+          logInfo("session", "git check failed (e.g. no remote) -- continue to next check");
         }
 
         // Check for uncommitted changes -- agent must commit ALL work before completing.
@@ -498,7 +498,7 @@ export function applyReport(app: AppContext, sessionId: string, report: Outbound
             }
           }
         } catch {
-          /* git check failed -- allow completion to proceed */
+          logInfo("session", "git check failed -- allow completion to proceed");
         }
       }
 

@@ -7,6 +7,7 @@
  */
 
 import type { AppContext } from "../app.js";
+import { logDebug } from "../observability/structured-log.js";
 
 export interface ConversationTurn {
   role: string;
@@ -86,7 +87,7 @@ export function extractAndSaveSkills(sessionId: string, conversation: Conversati
       );
       saved++;
     } catch {
-      /* best-effort -- fs errors shouldn't block completion */
+      logDebug("session", "best-effort -- fs errors shouldn't block completion");
     }
   }
 

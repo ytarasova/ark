@@ -15,6 +15,7 @@
 
 import { spawn, type Subprocess, type ServerWebSocket } from "bun";
 import * as tmux from "../infra/tmux.js";
+import { logInfo, logDebug } from "../observability/structured-log.js";
 
 /** Validates that a session name contains only safe characters (alphanumeric, hyphens, underscores). */
 const SAFE_NAME_RE = /^[a-zA-Z0-9_-]+$/;
@@ -81,13 +82,13 @@ export function startTerminalBridge(ws: ServerWebSocket<unknown>, sessionName: s
         }
       }
     } catch {
-      // Process ended or read error
+      logInfo("web", "Process ended or read error");
     } finally {
       session.alive = false;
       try {
         ws.close();
       } catch {
-        /* already closed */
+        logDebug("web", "already closed");
       }
     }
   })();
@@ -101,7 +102,7 @@ export function startTerminalBridge(ws: ServerWebSocket<unknown>, sessionName: s
         if (done) break;
       }
     } catch {
-      /* ignore */
+      logDebug("web", "ignore");
     }
   })();
 
@@ -112,7 +113,7 @@ export function startTerminalBridge(ws: ServerWebSocket<unknown>, sessionName: s
       ws.send(JSON.stringify({ type: "disconnected" }));
       ws.close();
     } catch {
-      /* already closed */
+      logDebug("web", "already closed");
     }
   });
 
@@ -133,7 +134,7 @@ export function handleTerminalInput(ws: ServerWebSocket<unknown>, data: string |
         return;
       }
     } catch {
-      // Not JSON -- treat as raw input
+      logInfo("web", "Not JSON -- treat as raw input");
     }
     // Raw text input
     const sink = session.proc.stdin as import("bun").FileSink;
@@ -173,7 +174,7 @@ function handleResize(sessionName: string, cols: number, rows: number): void {
       /* best-effort */
     });
   } catch {
-    /* resize is best-effort */
+    logDebug("web", "resize is best-effort");
   }
 }
 
@@ -189,6 +190,6 @@ export function cleanupTerminalBridge(ws: ServerWebSocket<unknown>): void {
   try {
     session.proc.kill();
   } catch {
-    /* already dead */
+    logDebug("web", "already dead");
   }
 }

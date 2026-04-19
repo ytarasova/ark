@@ -17,6 +17,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import type { OutboundMessage } from "./channel-types.js";
 import { DEFAULT_ARKD_URL } from "../constants.js";
+import { logDebug } from "../observability/structured-log.js";
 
 const SESSION_ID = process.env.ARK_SESSION_ID ?? "unknown";
 const ARKD_URL = DEFAULT_ARKD_URL;
@@ -162,7 +163,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
         body: JSON.stringify(report),
       });
     } catch {
-      /* arkd not reachable */
+      logDebug("conductor", "arkd not reachable");
     }
 
     return { content: [{ type: "text", text: `Reported: ${reportType}` }] };
@@ -182,7 +183,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
         body: JSON.stringify(relayPayload),
       });
     } catch {
-      /* arkd not reachable */
+      logDebug("conductor", "arkd not reachable");
     }
     return { content: [{ type: "text", text: `Sent to ${args.target_session}` }] };
   }

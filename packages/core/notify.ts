@@ -7,6 +7,7 @@
  */
 
 import { execFile, execFileSync } from "child_process";
+import { logDebug } from "./observability/structured-log.js";
 
 let _notifierChecked = false;
 let _hasTerminalNotifier = false;
@@ -37,6 +38,6 @@ export async function sendOSNotification(title: string, body: string): Promise<v
       process.stderr.write("\x07");
     }
   } catch {
-    /* best-effort */
+    logDebug("session", "best-effort");
   }
 }
