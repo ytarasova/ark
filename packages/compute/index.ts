@@ -24,6 +24,8 @@ export type {
   PortDecl,
   PortStatus,
   ArcJson,
+  ArcComposeConfig,
+  ArcDevcontainerConfig,
 } from "./types.js";
 
 export function getIsolationModes(providerName: string): { value: string; label: string }[] {
@@ -119,5 +121,6 @@ export { NotSupportedError } from "./core/types.js";
 
 export { LocalCompute } from "./core/local.js";
 export { DirectRuntime } from "./runtimes/direct.js";
+export { DockerComposeRuntime } from "./runtimes/docker-compose.js";
 export { ComputeTarget } from "./core/compute-target.js";
 export { computeProviderToTarget } from "./adapters/legacy.js";
