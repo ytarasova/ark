@@ -137,6 +137,12 @@ export { computeProviderToTarget } from "./adapters/legacy.js";
 export { FirecrackerCompute, registerFirecrackerIfAvailable } from "./core/firecracker/compute.js";
 export type { FirecrackerComputeDeps, FirecrackerMeta } from "./core/firecracker/compute.js";
 
+// Phase 5: FlyMachinesCompute. Remote microVM backend via Fly.io Machines.
+// Registration is gated on `FLY_API_TOKEN`; `registerFlyIfAvailable` returns
+// null (and logs at debug) when the token is absent.
+export { FlyMachinesCompute, registerFlyIfAvailable, setFlyHooksForTesting } from "./core/fly/compute.js";
+export type { FlyMachinesComputeDeps, FlyMachinesProvisionConfig, FlyMeta } from "./core/fly/compute.js";
+
 export { providerToPair, pairToProvider, isKnownProvider, knownProviders } from "./adapters/provider-map.js";
 export type { ComputeRuntimePair } from "./adapters/provider-map.js";
 
