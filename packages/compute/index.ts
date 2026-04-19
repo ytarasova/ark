@@ -120,6 +120,8 @@ export type {
 export { NotSupportedError } from "./core/types.js";
 
 export { LocalCompute } from "./core/local.js";
+export { EC2Compute } from "./core/ec2.js";
+export type { EC2HandleMeta, EC2ProvisionConfig, EC2ComputeHelpers } from "./core/ec2.js";
 export { DirectRuntime } from "./runtimes/direct.js";
 export { DockerComposeRuntime } from "./runtimes/docker-compose.js";
 export { ComputeTarget } from "./core/compute-target.js";
