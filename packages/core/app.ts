@@ -642,9 +642,11 @@ export class AppContext {
       const { LocalCompute } = await import("../compute/core/local.js");
       const { DirectRuntime } = await import("../compute/runtimes/direct.js");
       const { DockerRuntime } = await import("../compute/runtimes/docker.js");
+      const { DevcontainerRuntime } = await import("../compute/runtimes/devcontainer.js");
       this.registerCompute(new LocalCompute());
       this.registerRuntime(new DirectRuntime());
       this.registerRuntime(new DockerRuntime());
+      this.registerRuntime(new DevcontainerRuntime());
     });
   }
 
