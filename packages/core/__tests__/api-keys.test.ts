@@ -133,6 +133,24 @@ describe("ApiKeyManager", () => {
       const ok = app.apiKeys.revoke("ak-nonexistent");
       expect(ok).toBe(false);
     });
+
+    it("refuses to revoke another tenant's key when tenantId is supplied", () => {
+      // Security: tenantId-scoped revoke must not touch other tenants'
+      // rows. This is the guard that prevents cross-tenant API key
+      // destruction via a guessed/enumerated id.
+      const victim = app.apiKeys.create("tenant-victim", "victim-key", "admin");
+      const ok = app.apiKeys.revoke(victim.id, "tenant-attacker");
+      expect(ok).toBe(false);
+      // Victim key still works.
+      expect(app.apiKeys.validate(victim.key)).not.toBeNull();
+    });
+
+    it("revokes within the supplied tenant scope", () => {
+      const own = app.apiKeys.create("tenant-owner", "own-key", "member");
+      const ok = app.apiKeys.revoke(own.id, "tenant-owner");
+      expect(ok).toBe(true);
+      expect(app.apiKeys.validate(own.key)).toBeNull();
+    });
   });
 
   describe("rotate", () => {
@@ -157,6 +175,18 @@ describe("ApiKeyManager", () => {
     it("returns null for nonexistent key", () => {
       const result = app.apiKeys.rotate("ak-nonexistent");
       expect(result).toBeNull();
+    });
+
+    it("refuses to rotate another tenant's key when tenantId is supplied", () => {
+      // Security: a caller scoped to one tenant cannot rotate another
+      // tenant's keys -- the rotate would both invalidate the victim's
+      // existing key and leak a brand-new key for the victim tenant to
+      // the attacker. Tenant scoping blocks this.
+      const victim = app.apiKeys.create("tenant-victim2", "victim-rot", "admin");
+      const result = app.apiKeys.rotate(victim.id, "tenant-attacker2");
+      expect(result).toBeNull();
+      // Victim key still works.
+      expect(app.apiKeys.validate(victim.key)).not.toBeNull();
     });
   });
 });
