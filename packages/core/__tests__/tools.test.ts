@@ -91,6 +91,61 @@ describe("discoverTools", () => {
     expect(mcpTools.length).toBe(0);
   });
 
+  it("handles malformed .mcp.json gracefully", () => {
+    const dir = makeProjectDir();
+    writeFileSync(join(dir, ".mcp.json"), "{ not valid json !!!");
+    const tools = discoverTools(dir);
+    const mcpTools = tools.filter((t) => t.kind === "mcp-server");
+    expect(mcpTools.length).toBe(0);
+  });
+
+  it("handles .mcp.json with no mcpServers key", () => {
+    const dir = makeProjectDir();
+    writeFileSync(join(dir, ".mcp.json"), JSON.stringify({ someOtherKey: true }));
+    const tools = discoverTools(dir);
+    const mcpTools = tools.filter((t) => t.kind === "mcp-server");
+    expect(mcpTools.length).toBe(0);
+  });
+
+  it("handles .mcp.json with empty mcpServers", () => {
+    const dir = makeProjectDir();
+    writeFileSync(join(dir, ".mcp.json"), JSON.stringify({ mcpServers: {} }));
+    const tools = discoverTools(dir);
+    const mcpTools = tools.filter((t) => t.kind === "mcp-server");
+    expect(mcpTools.length).toBe(0);
+  });
+
+  it("uses server description from config when present", () => {
+    const dir = makeProjectDir();
+    writeFileSync(
+      join(dir, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          "desc-server": { command: "node", args: ["srv.js"], description: "My custom description" },
+        },
+      }),
+    );
+    const tools = discoverTools(dir);
+    const mcpTools = tools.filter((t) => t.kind === "mcp-server");
+    expect(mcpTools.length).toBe(1);
+    expect(mcpTools[0].description).toBe("My custom description");
+  });
+
+  it("falls back to generic description when config has no description", () => {
+    const dir = makeProjectDir();
+    writeFileSync(
+      join(dir, ".mcp.json"),
+      JSON.stringify({
+        mcpServers: {
+          "no-desc": { command: "node" },
+        },
+      }),
+    );
+    const tools = discoverTools(dir);
+    const mcpTools = tools.filter((t) => t.kind === "mcp-server");
+    expect(mcpTools[0].description).toBe("MCP server: no-desc");
+  });
+
   it("handles JSONC (comments) in .mcp.json", () => {
     const dir = makeProjectDir();
     writeFileSync(
