@@ -640,11 +640,13 @@ export class AppContext {
       // registry above still runs every dispatch path. Wave 3 flips dispatch
       // to consume these.
       const { LocalCompute } = await import("../compute/core/local.js");
+      const { EC2Compute } = await import("../compute/core/ec2.js");
       const { DirectRuntime } = await import("../compute/runtimes/direct.js");
       const { DockerRuntime } = await import("../compute/runtimes/docker.js");
       const { DevcontainerRuntime } = await import("../compute/runtimes/devcontainer.js");
       const { DockerComposeRuntime } = await import("../compute/runtimes/docker-compose.js");
       this.registerCompute(new LocalCompute());
+      this.registerCompute(new EC2Compute());
       this.registerRuntime(new DirectRuntime());
       this.registerRuntime(new DockerRuntime());
       this.registerRuntime(new DevcontainerRuntime());
