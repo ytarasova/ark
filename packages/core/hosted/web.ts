@@ -249,10 +249,19 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
         });
       }
 
-      // Token auth (legacy simple token) -- checked first for backward compat
+      // Token auth (legacy simple token) -- checked first for backward compat.
+      // Compared in constant time so the response latency does not leak a
+      // per-byte oracle against the shared token.
       if (token) {
-        const provided = url.searchParams.get("token") ?? req.headers.get("authorization")?.replace("Bearer ", "");
-        if (provided !== token) {
+        const provided =
+          url.searchParams.get("token") ?? req.headers.get("authorization")?.replace("Bearer ", "") ?? "";
+        const expected = Buffer.from(token);
+        const providedBuf = Buffer.from(provided);
+        const lengthOk = providedBuf.length === expected.length;
+        // Pad to the expected length so timingSafeEqual never throws; the
+        // result is ignored on length mismatch but the compare still runs.
+        const cmpBuf = lengthOk ? providedBuf : expected;
+        if (!lengthOk || !timingSafeEqual(cmpBuf, expected)) {
           return new Response("Unauthorized", { status: 401 });
         }
       }

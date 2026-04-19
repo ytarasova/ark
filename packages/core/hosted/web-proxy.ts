@@ -8,6 +8,7 @@
 
 import { readFileSync, existsSync } from "fs";
 import { join, resolve } from "path";
+import { timingSafeEqual } from "crypto";
 import { resolveWebDist } from "../install-paths.js";
 
 // Shared install-aware resolver. In a compiled binary this points at
@@ -48,10 +49,17 @@ export function startWebProxy(opts: WebProxyOptions): { stop: () => void; url: s
         return new Response(null, { status: 204, headers: CORS });
       }
 
-      // Local token auth (protects the proxy endpoint itself)
+      // Local token auth (protects the proxy endpoint itself). Compared
+      // in constant time so response latency does not leak a per-byte
+      // oracle against the shared token.
       if (opts.localToken) {
-        const provided = url.searchParams.get("token") ?? req.headers.get("authorization")?.replace("Bearer ", "");
-        if (provided !== opts.localToken) {
+        const provided =
+          url.searchParams.get("token") ?? req.headers.get("authorization")?.replace("Bearer ", "") ?? "";
+        const expected = Buffer.from(opts.localToken);
+        const providedBuf = Buffer.from(provided);
+        const lengthOk = providedBuf.length === expected.length;
+        const cmpBuf = lengthOk ? providedBuf : expected;
+        if (!lengthOk || !timingSafeEqual(cmpBuf, expected)) {
           return new Response("Unauthorized", { status: 401 });
         }
       }
