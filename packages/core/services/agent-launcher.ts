@@ -149,8 +149,16 @@ export async function _launchAgentTmux(
     tenantId: session.tenant_id ?? "default",
   });
 
-  // Build launch env from agent config + provider-specific env (e.g. auth tokens for remote)
-  const launchEnv = { ...(agent.env ?? {}), ...(provider?.buildLaunchEnv(session) ?? {}) };
+  // Build launch env from agent config + provider-specific env (e.g. auth tokens for remote).
+  // ARK_SESSION_DIR lets the launcher drop an exit-code sentinel when claude
+  // exits non-zero; the status poller watches that path. See bug 3 in the
+  // session-dispatch cascade fix.
+  const sessionDirEnv = join(app.config.tracksDir, session.id);
+  const launchEnv: Record<string, string> = {
+    ...(agent.env ?? {}),
+    ...(provider?.buildLaunchEnv(session) ?? {}),
+    ARK_SESSION_DIR: sessionDirEnv,
+  };
 
   const { content: launchContent, claudeSessionId } = claude.buildLauncher({
     workdir: effectiveWorkdir,

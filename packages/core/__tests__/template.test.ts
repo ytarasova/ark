@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { substituteVars, buildSessionVars } from "../template.js";
+import { substituteVars, buildSessionVars, unresolvedVars } from "../template.js";
 
 // ── substituteVars ──────────────────────────────────────────────────────────
 
@@ -47,6 +47,80 @@ describe("substituteVars", () => {
   it("preserves unresolved dotted keys", () => {
     const result = substituteVars("{inputs.files.missing}", {});
     expect(result).toBe("{inputs.files.missing}");
+  });
+
+  // ── Double-brace + short-namespace (Web UI chip bar) ──────────────────────
+
+  it("resolves {{var}} when the key is present", () => {
+    const result = substituteVars("Hello {{name}}", { name: "Alice" });
+    expect(result).toBe("Hello Alice");
+  });
+
+  it("preserves {{unknown}} verbatim when the key is missing", () => {
+    const result = substituteVars("before {{unknown}} after", {});
+    expect(result).toBe("before {{unknown}} after");
+  });
+
+  it("resolves {{files.X}} via the short-namespace alias", () => {
+    const result = substituteVars("env={{files.env}}", {
+      "inputs.files.env": "/tmp/.env",
+    });
+    expect(result).toBe("env=/tmp/.env");
+  });
+
+  it("resolves {{params.X}} via the short-namespace alias", () => {
+    const result = substituteVars("ticket={{params.jira}}", {
+      "inputs.params.jira": "IN-42",
+    });
+    expect(result).toBe("ticket=IN-42");
+  });
+
+  it("tolerates whitespace inside double braces", () => {
+    const result = substituteVars("path={{ files.foo }}", {
+      "inputs.files.foo": "/tmp/foo",
+    });
+    expect(result).toBe("path=/tmp/foo");
+  });
+
+  it("mixes single- and double-brace forms in one template", () => {
+    const result = substituteVars("{greeting}, {{who}}!", {
+      greeting: "Hi",
+      who: "world",
+    });
+    expect(result).toBe("Hi, world!");
+  });
+
+  it("does not treat {{ / }} as a literal match when resolvable key is absent (preserves both braces)", () => {
+    // Regression: bug 1 -- the prior regex only matched single braces, so
+    // `{{files.env}}` rendered as `{{/tmp/env}}` (inner brace substituted,
+    // outer braces leaked). Now the whole double-brace token is preserved.
+    const result = substituteVars("{{files.bar}}", {});
+    expect(result).toBe("{{files.bar}}");
+  });
+});
+
+// ── unresolvedVars ──────────────────────────────────────────────────────────
+
+describe("unresolvedVars", () => {
+  it("returns the short-namespace key for an unset {{files.X}}", () => {
+    expect(unresolvedVars("{{files.bar}} text", {})).toEqual(["files.bar"]);
+  });
+
+  it("returns single-brace keys when unresolved", () => {
+    expect(unresolvedVars("{unknown}", {})).toEqual(["unknown"]);
+  });
+
+  it("returns an empty array when everything resolves (direct + aliased)", () => {
+    expect(
+      unresolvedVars("{{files.env}} {ticket}", {
+        "inputs.files.env": "/tmp/.env",
+        ticket: "PROJ-1",
+      }),
+    ).toEqual([]);
+  });
+
+  it("de-duplicates repeated keys", () => {
+    expect(unresolvedVars("{{x}} {{x}} {y}", {})).toEqual(["x", "y"]);
   });
 });
 
