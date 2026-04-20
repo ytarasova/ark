@@ -43,6 +43,7 @@ import type {
 } from "./repositories/index.js";
 import { ComputeTemplateRepository as ComputeTemplateRepositoryCtor } from "./repositories/index.js";
 import type { SessionService, ComputeService, HistoryService } from "./services/index.js";
+import { AgentRegistry } from "./services/agent-registry.js";
 import type { FlowStore, SkillStore, AgentStore, RecipeStore, RuntimeStore } from "./stores/index.js";
 import { buildTenantScope } from "./tenant-scope.js";
 import { ComputeRegistries } from "./compute-registries.js";
@@ -84,6 +85,7 @@ export class AppContext {
   private _registries = new ComputeRegistries(this);
 
   private _launcher: SessionLauncher = new TmuxLauncher();
+  private _agents: AgentRegistry = new AgentRegistry();
   private _eventBusReady = false;
   private _apiKeys: ApiKeyManager | null = null;
   private _hostedServices: {
@@ -433,6 +435,16 @@ export class AppContext {
   /** Replace the session launcher (e.g. for remote compute or testing). */
   setLauncher(launcher: SessionLauncher): void {
     this._launcher = launcher;
+  }
+
+  /**
+   * Registry of live AgentHandles, keyed by session id. Executors register
+   * a handle on launch; the registry removes it on exit. `shutdown()`
+   * iterates the registry and stops any handles still alive -- this is the
+   * production guarantee that tmux sessions never outlive the agent process.
+   */
+  get agentRegistry(): AgentRegistry {
+    return this._agents;
   }
 
   // ── Worker registry / scheduler / tenant policy (container-resolved) ─

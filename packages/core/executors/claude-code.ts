@@ -14,6 +14,7 @@ import * as claude from "../claude/claude.js";
 import * as tmux from "../infra/tmux.js";
 import { parseArcJson } from "../../compute/arc-json.js";
 import { getProvider } from "../../compute/index.js";
+import { TmuxAgentHandle } from "../services/tmux-agent-handle.js";
 
 export const claudeCodeExecutor: Executor = {
   name: "claude-code",
@@ -194,6 +195,20 @@ export const claudeCodeExecutor: Executor = {
       pty_cols: ptyCols,
       pty_rows: ptyRows,
     });
+
+    // Register an AgentHandle so the registry can reap tmux on shutdown.
+    // The handle watches the exit-code sentinel + tmux pane liveness; on
+    // either trigger it kills the tmux session (idempotent) and removes
+    // itself from the registry. This is the production guarantee that
+    // tmux sessions never outlive the agent process -- see CLAUDE.md +
+    // docs/agent-lifecycle.md.
+    const handle = new TmuxAgentHandle({
+      sessionId: session.id,
+      tmuxName,
+      workdir: effectiveWorkdir,
+      sessionDir,
+    });
+    app.agentRegistry.register(handle);
 
     return { ok: true, handle: tmuxName, pid: rootPid ?? undefined, claudeSessionId };
   },

@@ -16,6 +16,7 @@ import { join } from "path";
 import { writeFileSync, mkdirSync } from "fs";
 import { recordingPath } from "../recordings.js";
 import { logInfo } from "../observability/structured-log.js";
+import { TmuxAgentHandle } from "../services/tmux-agent-handle.js";
 
 /** Single-quote a string for safe bash interpolation (no expansion). */
 const shellQuote = (s: string) => `'${s.replace(/'/g, "'\\''")}'`;
@@ -127,6 +128,17 @@ export const cliAgentExecutor: Executor = {
       await Bun.sleep(200);
       await tmux.sendTextAsync(tmuxName, initialPrompt);
     }
+
+    // Register an AgentHandle so the registry can reap tmux on shutdown.
+    // cli-agent launchers don't write an exit-code sentinel (no claude
+    // wrapper script), so TmuxAgentHandle detects exit via pane-death only.
+    const handle = new TmuxAgentHandle({
+      sessionId,
+      tmuxName,
+      workdir: effectiveWorkdir,
+      sessionDir: trackDir,
+    });
+    app.agentRegistry.register(handle);
 
     return { ok: true, handle: tmuxName, pid: rootPid ?? undefined };
   },

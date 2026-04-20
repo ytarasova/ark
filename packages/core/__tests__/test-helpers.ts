@@ -16,68 +16,36 @@ import { AppContext } from "../app.js";
 import type { Session, SessionStatus, Compute, ComputeProviderName, ComputeStatus } from "../../types/index.js";
 
 /**
- * Snapshot current ark-* tmux sessions. Call before tests start, then pass
- * the result to killNewArkTmuxSessions() in afterAll to clean up only
- * sessions created during the test run (avoids destroying real sessions).
+ * Assert that no AgentHandle is still registered on `app`. Used by tests
+ * that want to verify the lifecycle machinery reaped everything. Replaces
+ * the retired `snapshotArkTmuxSessions`/`killNewArkTmuxSessions` helpers,
+ * which raced under `--concurrency 4` and mass-killed processes belonging
+ * to other workers.
+ *
+ * Prefer this over poking tmux directly: the registry is the authoritative
+ * source of truth, and matches what `AppContext.shutdown()` drains.
  */
-export function snapshotArkTmuxSessions(): Set<string> {
-  try {
-    const result = execFileSync("tmux", ["list-sessions", "-F", "#{session_name}"], {
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-    return new Set(result.split("\n").filter((s) => s.startsWith("ark-s-")));
-  } catch {
-    return new Set();
+export function expectNoLiveSessions(app: AppContext): void {
+  const live = app.agentRegistry.sessionIds();
+  if (live.length > 0) {
+    throw new Error(`Expected 0 live AgentHandles, found ${live.length}: ${live.join(", ")}`);
   }
 }
 
 /**
- * Kill ark-* tmux sessions that were NOT in the pre-test snapshot.
- * Also kills child processes (claude, bun) inside each session before
- * destroying it, preventing orphaned claude instances.
- * Safe to call in afterAll - won't destroy the user's real sessions.
+ * Count ark-* tmux sessions still alive process-wide. Used only by the
+ * anti-regression stress test -- regular tests should never need this.
+ * Lives here (not in infra/tmux.ts) because it's a test-only escape hatch.
  */
-export function killNewArkTmuxSessions(preExisting: Set<string>): void {
+export function countLiveArkTmuxSessions(): number {
   try {
     const result = execFileSync("tmux", ["list-sessions", "-F", "#{session_name}"], {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
     });
-    const current = result.split("\n").filter((s) => s.startsWith("ark-s-"));
-    for (const name of current) {
-      if (!preExisting.has(name)) {
-        // Kill child processes inside the tmux session first
-        try {
-          const panes = execFileSync("tmux", ["list-panes", "-t", name, "-F", "#{pane_pid}"], {
-            encoding: "utf-8",
-            stdio: ["pipe", "pipe", "pipe"],
-          });
-          for (const pid of panes.split("\n").filter(Boolean)) {
-            try {
-              execFileSync("pkill", ["-9", "-P", pid], { stdio: "pipe" });
-            } catch {
-              /* process may already be dead */
-            }
-            try {
-              process.kill(parseInt(pid), 9);
-            } catch {
-              /* process may already be dead */
-            }
-          }
-        } catch {
-          /* pane listing may fail */
-        }
-        // Then kill the tmux session
-        try {
-          execFileSync("tmux", ["kill-session", "-t", name], { stdio: "pipe" });
-        } catch {
-          /* session may already be dead */
-        }
-      }
-    }
+    return result.split("\n").filter((s) => s.startsWith("ark-s-")).length;
   } catch {
-    // No tmux server or no sessions - fine
+    return 0;
   }
 }
 
@@ -111,11 +79,13 @@ export function clearApp(): void {
 /**
  * Sets up beforeEach/afterAll hooks for test context isolation.
  * Each test gets a fresh AppContext.forTestAsync() with an isolated temp DB.
- * Automatically cleans up sessions and their processes on teardown.
+ * Automatically cleans up sessions and their processes on teardown via
+ * `AppContext.shutdown()`, which drains the AgentRegistry (every live
+ * tmux session is reaped by its AgentHandle -- no snapshot-and-kill
+ * races across parallel workers).
  */
 export function withTestContext(): { getCtx: () => AppContext } {
   let app: AppContext;
-  let tmuxSnapshot: Set<string>;
 
   beforeEach(async () => {
     if (app) {
@@ -123,7 +93,6 @@ export function withTestContext(): { getCtx: () => AppContext } {
       await app.shutdown();
       _currentTestApp = null;
     }
-    tmuxSnapshot = snapshotArkTmuxSessions();
     app = await AppContext.forTestAsync();
     await app.boot();
     _currentTestApp = app;
@@ -135,9 +104,6 @@ export function withTestContext(): { getCtx: () => AppContext } {
       await app.shutdown();
       _currentTestApp = null;
     }
-    // Safety net: also kill any tmux sessions created during this test
-    // that might not be tracked in the DB (e.g. if dispatch failed mid-way)
-    if (tmuxSnapshot) killNewArkTmuxSessions(tmuxSnapshot);
   });
 
   return { getCtx: () => app };
