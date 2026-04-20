@@ -129,4 +129,25 @@ describe("messaging handlers", () => {
     expect(result.ok).toBe(false);
     expect(result.message).toBeDefined();
   });
+
+  // ── gate/reject ──────────────────────────────────────────────────────────
+  //
+  // Exercises the RPC surface: the handler wires `gate/reject` through to
+  // SessionService.rejectReviewGate and returns its {ok, message, sessionId}
+  // shape. The deeper rework-prompt/max-rejections semantics are covered by
+  // packages/core/__tests__/reject-review-gate.test.ts.
+
+  it("gate/reject returns ok:false for a nonexistent session", async () => {
+    const res = await router.dispatch(createRequest(1, "gate/reject", { sessionId: "s-nonexistent", reason: "nope" }));
+    const result = (res as JsonRpcResponse).result as Record<string, any>;
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("not found");
+  });
+
+  it("gate/reject requires a sessionId parameter", async () => {
+    const res = await router.dispatch(createRequest(1, "gate/reject", { reason: "forgot id" }));
+    // The dispatcher turns thrown errors into JSON-RPC error responses.
+    const err = (res as { error?: { message: string } }).error;
+    expect(err?.message ?? "").toContain("sessionId");
+  });
 });

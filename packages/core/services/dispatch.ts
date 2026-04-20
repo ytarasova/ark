@@ -275,6 +275,15 @@ export async function dispatch(
   task = await injectKnowledgeContext(app, session, task);
   task = injectRepoMap(session, task);
 
+  // Append rework prompt (set by gate/reject). Single-shot: cleared after a
+  // successful launch so subsequent dispatches of the same stage don't replay
+  // stale rework instructions.
+  const reworkPrompt = session.rework_prompt;
+  if (reworkPrompt) {
+    task += `\n\n## Rework requested\n\n${reworkPrompt}`;
+    log(`Appended rework prompt (rejection #${session.rejection_count ?? 0})`);
+  }
+
   // Log the fully assembled prompt for audit trail
   app.events.log(sessionId, "prompt_sent", {
     stage,
@@ -365,7 +374,14 @@ export async function dispatch(
     return { ok: false, message: `Session moved on during dispatch` };
   }
 
-  app.sessions.update(sessionId, { status: "running", agent: agentName, session_id: tmuxName });
+  app.sessions.update(sessionId, {
+    status: "running",
+    agent: agentName,
+    session_id: tmuxName,
+    // Single-shot rework prompt: clear now that it has been delivered. The
+    // next dispatch (after approve or another reject) builds a fresh task.
+    ...(reworkPrompt ? { rework_prompt: null } : {}),
+  });
   if (stageStartSha) {
     app.sessions.mergeConfig(sessionId, { stage_start_sha: stageStartSha });
   }

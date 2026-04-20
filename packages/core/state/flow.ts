@@ -51,6 +51,14 @@ export interface StageDefinition {
    *   dispatch resumes the same conversation.
    */
   isolation?: "fresh" | "continue";
+  /**
+   * Rework-on-reject behaviour for `gate: "review"` / `"manual"` stages.
+   * See `packages/types/flow.ts` StageDefinition for details.
+   */
+  on_reject?: {
+    prompt?: string;
+    max_rejections?: number;
+  };
   // Fork/fan_out-specific
   strategy?: string;
   max_parallel?: number;

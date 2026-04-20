@@ -523,6 +523,19 @@ export class SessionService {
     return legacyApprove(this.app, id);
   }
 
+  /**
+   * Reject a review gate and dispatch a rework cycle. Renders `on_reject.prompt`
+   * (with `{{rejection_reason}}` substituted) and appends it to the next
+   * dispatch of the current stage. When `on_reject.max_rejections` is
+   * exceeded, the session is marked failed instead.
+   */
+  async rejectReviewGate(id: string, reason: string): Promise<SessionOpResult> {
+    const { rejectReviewGate: legacyReject } = await import("./session-orchestration.js");
+    const r = await legacyReject(this.app, id, reason ?? "");
+    // session-orchestration returns { ok, message } without sessionId; widen to SessionOpResult.
+    return { ...r, sessionId: id } as SessionOpResult;
+  }
+
   // ── Query helpers ─────────────────────────────────────────────────────────
 
   get(id: string): Session | null {

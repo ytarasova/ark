@@ -364,6 +364,16 @@ export class ArkClient {
     return this.rpc<SessionOpResult>("gate/approve", { sessionId });
   }
 
+  /** Reject a review gate with a reason; triggers a rework cycle. */
+  async gateReject(sessionId: string, reason: string): Promise<SessionOpResult> {
+    return this.rpc<SessionOpResult>("gate/reject", { sessionId, reason });
+  }
+
+  /** Alias used by CLI + web UI -- matches the `sessionReject` naming scheme. */
+  async sessionReject(sessionId: string, reason: string): Promise<SessionOpResult> {
+    return this.gateReject(sessionId, reason);
+  }
+
   // ── Resources ───────────────────────────────────────────────────────────────
 
   async agentList(): Promise<AgentDefinition[]> {

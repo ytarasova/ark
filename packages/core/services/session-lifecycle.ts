@@ -518,6 +518,107 @@ export async function approveReviewGate(
 }
 
 /**
+ * Render the rework prompt template. Supports both `{{rejection_reason}}`
+ * (Archon-style double-brace, the documented syntax for on_reject.prompt) and
+ * the standard single-brace session vars that the task prompt uses.
+ */
+export function renderReworkPrompt(template: string, reason: string, sessionVars: Record<string, string>): string {
+  // Substitute {{rejection_reason}} first (double braces bind tighter than the
+  // single-brace template engine; otherwise {rejection_reason} inside the
+  // double braces would leak through).
+  let out = template.replace(/\{\{\s*rejection_reason\s*\}\}/g, reason);
+  // Then substitute the standard {var} placeholders using the usual engine.
+  const merged: Record<string, string> = { ...sessionVars, rejection_reason: reason };
+  for (const [k, v] of Object.entries(merged)) {
+    out = out.replace(new RegExp(`\\{${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\}`, "g"), v);
+  }
+  return out;
+}
+
+/** Default rework prompt when the flow stage doesn't declare one. */
+const DEFAULT_REWORK_PROMPT = "Rework required. Reviewer said: {{rejection_reason}}";
+
+/**
+ * Reject a review gate: render the rework prompt, persist it, bump the rework
+ * counter, clear the runtime session id so the next dispatch starts fresh, log
+ * a `review_rejected` event, and re-dispatch the same stage. When
+ * `on_reject.max_rejections` is exceeded, the session is marked `failed`
+ * instead of re-dispatched.
+ */
+export async function rejectReviewGate(
+  app: AppContext,
+  sessionId: string,
+  reason: string,
+  dispatchFn: (app: AppContext, sessionId: string) => Promise<{ ok: boolean; message: string }>,
+): Promise<{ ok: boolean; message: string }> {
+  const session = app.sessions.get(sessionId);
+  if (!session) return { ok: false, message: "Session not found" };
+
+  const stageName = session.stage;
+  if (!stageName) return { ok: false, message: "Session has no current stage" };
+
+  const stageDef = flow.getStage(app, session.flow, stageName);
+  if (!stageDef) return { ok: false, message: `Stage '${stageName}' not found in flow '${session.flow}'` };
+
+  if (stageDef.gate !== "review" && stageDef.gate !== "manual") {
+    return {
+      ok: false,
+      message: `Stage '${stageName}' gate is '${stageDef.gate}', expected 'review' or 'manual'`,
+    };
+  }
+
+  const onReject = stageDef.on_reject;
+  const max = onReject?.max_rejections;
+  const currentCount = session.rejection_count ?? 0;
+
+  // Enforce the cap BEFORE mutating session state so a hit doesn't bump the counter.
+  if (typeof max === "number" && max >= 0 && currentCount >= max) {
+    app.sessions.update(sessionId, { status: "failed", error: "max_rejections exceeded" });
+    app.events.log(sessionId, "review_rejected", {
+      stage: stageName,
+      actor: "user",
+      data: { reason, rejection_count: currentCount, max_rejections: max, capped: true },
+    });
+    app.events.log(sessionId, "session_failed", {
+      stage: stageName,
+      actor: "system",
+      data: { reason: "max_rejections exceeded", rejection_count: currentCount, max_rejections: max },
+    });
+    return { ok: false, message: "max_rejections exceeded" };
+  }
+
+  // Render the rework prompt (declared or default).
+  const { buildSessionVars } = await import("../template.js");
+  const vars = buildSessionVars(session as unknown as Record<string, unknown>);
+  const template = onReject?.prompt && onReject.prompt.trim() ? onReject.prompt : DEFAULT_REWORK_PROMPT;
+  const rendered = renderReworkPrompt(template, reason, vars);
+
+  const nextCount = currentCount + 1;
+  app.sessions.update(sessionId, {
+    rework_prompt: rendered,
+    rejection_count: nextCount,
+    rejected_at: new Date().toISOString(),
+    rejected_reason: reason,
+    // Clear claude_session_id so the re-dispatch starts a fresh runtime --
+    // matches Archon's `fresh_context` intuition. Also clear the tmux/session
+    // handle so dispatch() will launch again instead of short-circuiting.
+    claude_session_id: null,
+    session_id: null,
+    // Re-open the gate: set status back to 'ready' so dispatch() accepts it.
+    status: "ready",
+    error: null,
+  });
+
+  app.events.log(sessionId, "review_rejected", {
+    stage: stageName,
+    actor: "user",
+    data: { reason, rejection_count: nextCount, max_rejections: max ?? null },
+  });
+
+  return await dispatchFn(app, sessionId);
+}
+
+/**
  * Fork: shallow copy - same compute, repo, flow, group. Fresh session, no resume.
  */
 export function forkSession(app: AppContext, sessionId: string, newName?: string): SessionOpResult {

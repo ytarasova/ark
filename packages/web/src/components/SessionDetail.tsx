@@ -154,6 +154,8 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
   const [activeDiffFile, setActiveDiffFile] = useState<string | undefined>(undefined);
   const [selectedEvent, setSelectedEvent] = useState<TimelineEvent | null>(null);
   const [selectedError, setSelectedError] = useState<ErrorInfo | null>(null);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const prevMsgCountRef = useRef<number | null>(null);
@@ -249,6 +251,47 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
       onToast(`Send to ${sessionId} failed: ${res.message || "session may not be running"}`, "error");
   }
 
+  async function handleGateApprove() {
+    setActionLoading("approve");
+    try {
+      const res = await api.gateApprove(sessionId);
+      if (res.ok !== false) {
+        onToast("Review gate approved", "success");
+        refetchDetail();
+      } else {
+        onToast(`Approve failed: ${res.message ?? "unknown error"}`, "error");
+      }
+    } catch (err: any) {
+      onToast(`Approve failed: ${err.message || "network error"}`, "error");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleGateReject() {
+    const reason = rejectReason.trim();
+    if (!reason) {
+      onToast("Reason is required", "error");
+      return;
+    }
+    setActionLoading("reject");
+    try {
+      const res = await api.sessionReject(sessionId, reason);
+      if (res.ok !== false) {
+        onToast("Rework dispatched", "success");
+        setRejectOpen(false);
+        setRejectReason("");
+        refetchDetail();
+      } else {
+        onToast(`Reject failed: ${res.message ?? "unknown error"}`, "error");
+      }
+    } catch (err: any) {
+      onToast(`Reject failed: ${err.message || "network error"}`, "error");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
   async function handleToggleTodo(id: number) {
     try {
       const res = await api.toggleTodo(id);
@@ -268,6 +311,14 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
   const completedStages = stages.filter((s) => s.state === "done").length;
   const totalStages = stages.length;
   const progressPct = totalStages > 0 ? Math.round((completedStages / totalStages) * 100) : 0;
+
+  // Detect whether the current stage is a review/manual gate so the header
+  // can show Approve/Reject controls (see handleGateApprove/handleGateReject).
+  const currentStageDef = flowStages.find((s: any) => s?.name === session.stage);
+  const currentGate = (currentStageDef?.gate ?? null) as string | null;
+  const isReviewGate = currentGate === "review" || currentGate === "manual";
+  // Reject dialog opens when the user clicks "Reject"; Esc/Cancel close it.
+  const canShowGate = isReviewGate && !readOnly;
 
   // Collect errors from events and session
   const errorEvents = events.filter(
@@ -308,6 +359,52 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
 
   const headerActions = (
     <div className="flex gap-1.5 shrink-0">
+      {canShowGate && (
+        <>
+          <button
+            type="button"
+            onClick={handleGateApprove}
+            disabled={actionLoading === "approve"}
+            aria-label="Approve review gate"
+            className={cn(
+              "h-7 px-2.5 rounded-[var(--radius-sm)] text-[11px] font-medium",
+              "border border-[var(--running)] bg-transparent text-[var(--running)]",
+              "hover:bg-[var(--diff-add-bg)] transition-colors cursor-pointer",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+              "flex items-center gap-1",
+            )}
+          >
+            {actionLoading === "approve" ? (
+              <>
+                <Loader2 className="animate-spin" size={12} /> Approving...
+              </>
+            ) : (
+              "Approve"
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setRejectOpen(true)}
+            disabled={actionLoading === "reject"}
+            aria-label="Reject review gate"
+            className={cn(
+              "h-7 px-2.5 rounded-[var(--radius-sm)] text-[11px] font-medium",
+              "border border-[var(--failed)] bg-transparent text-[var(--failed)]",
+              "hover:bg-[var(--diff-rm-bg)] transition-colors cursor-pointer",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+              "flex items-center gap-1",
+            )}
+          >
+            {actionLoading === "reject" ? (
+              <>
+                <Loader2 className="animate-spin" size={12} /> Rejecting...
+              </>
+            ) : (
+              "Reject"
+            )}
+          </button>
+        </>
+      )}
       {isActive && (
         <button
           type="button"
@@ -779,6 +876,103 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
           </div>
         )}
       </DetailDrawer>
+      {rejectOpen && (
+        <RejectGateModal
+          reason={rejectReason}
+          submitting={actionLoading === "reject"}
+          onReasonChange={setRejectReason}
+          onCancel={() => {
+            setRejectOpen(false);
+            setRejectReason("");
+          }}
+          onSubmit={handleGateReject}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Reject-gate modal
+// ---------------------------------------------------------------------------
+interface RejectGateModalProps {
+  reason: string;
+  submitting: boolean;
+  onReasonChange: (v: string) => void;
+  onCancel: () => void;
+  onSubmit: () => void;
+}
+
+export function RejectGateModal({ reason, submitting, onReasonChange, onCancel, onSubmit }: RejectGateModalProps) {
+  const canSubmit = reason.trim().length > 0 && !submitting;
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reject-gate-title"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onCancel();
+      }}
+    >
+      <div className="w-[480px] max-w-[90vw] rounded-[var(--radius-lg)] bg-[var(--bg)] border border-[var(--border)] shadow-xl p-5">
+        <h2 id="reject-gate-title" className="text-[14px] font-semibold text-[var(--fg)] mb-2">
+          Reject and request rework
+        </h2>
+        <p className="text-[12px] text-[var(--fg-muted)] mb-3">
+          Describe the issue. The reason is shown to the agent on the next dispatch.
+        </p>
+        <label className="block mb-3">
+          <span className="sr-only">Rejection reason</span>
+          <textarea
+            aria-label="Rejection reason"
+            className={cn(
+              "w-full min-h-[110px] text-[12px] p-2 rounded-[var(--radius-sm)]",
+              "border border-[var(--border)] bg-[var(--bg-hover)] text-[var(--fg)]",
+              "focus:outline-none focus:ring-2 focus:ring-[var(--running)]",
+            )}
+            value={reason}
+            onChange={(e) => onReasonChange(e.target.value)}
+            placeholder="Tests missing for the new service; please add coverage and rerun."
+            autoFocus
+          />
+        </label>
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={submitting}
+            className={cn(
+              "h-7 px-3 rounded-[var(--radius-sm)] text-[11px] font-medium",
+              "border border-[var(--border)] bg-transparent text-[var(--fg)]",
+              "hover:bg-[var(--bg-hover)] transition-colors cursor-pointer",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+            )}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={!canSubmit}
+            className={cn(
+              "h-7 px-3 rounded-[var(--radius-sm)] text-[11px] font-medium",
+              "border border-[var(--failed)] bg-[var(--failed)] text-white",
+              "hover:opacity-90 transition-opacity cursor-pointer",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+              "flex items-center gap-1",
+            )}
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="animate-spin" size={12} /> Submitting...
+              </>
+            ) : (
+              "Submit"
+            )}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

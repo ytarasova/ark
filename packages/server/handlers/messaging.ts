@@ -16,6 +16,12 @@ export function registerMessagingHandlers(router: Router, app: AppContext): void
     return result;
   });
 
+  router.handle("gate/reject", async (p) => {
+    const { sessionId, reason } = p as { sessionId?: string; reason?: string };
+    if (!sessionId) throw new Error("Missing required parameter: sessionId");
+    return await app.sessionService.rejectReviewGate(sessionId, reason ?? "");
+  });
+
   router.handle("message/markRead", async (p) => {
     const { sessionId } = extract<SessionIdParams>(p, ["sessionId"]);
     app.messages.markRead(sessionId);

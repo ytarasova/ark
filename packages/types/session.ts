@@ -82,6 +82,17 @@ export interface Session {
   group_name: string | null;
   breakpoint_reason: string | null;
   attached_by: string | null;
+  /** Count of review-gate rejections (rework cycles) against this session. */
+  rejection_count: number;
+  /**
+   * Rendered rework prompt, set by `gate/reject`. Appended to the next dispatch
+   * of the current stage, then cleared. Null when no rework is pending.
+   */
+  rework_prompt: string | null;
+  /** ISO8601 timestamp of the most recent rejection. Null when never rejected. */
+  rejected_at: string | null;
+  /** Last rejection reason supplied by the reviewer. Null when never rejected. */
+  rejected_reason: string | null;
   config: SessionConfig;
   /** User who created this session (multi-user mode). */
   user_id: string | null;
