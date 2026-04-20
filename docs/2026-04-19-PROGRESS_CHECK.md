@@ -89,12 +89,12 @@ From `docs/2026-04-18-COLLATED_ROADMAP.md` §4 Week 1:
 | # | Action | Status 2026-04-19 |
 |---|---|---|
 | 1 | Canonical 15-stage + 4-mode schema RFC | ❌ not done |
-| 2 | `--param k=v` + `--recipe-file <path>` CLI | 🟡 `--param` effectively done via recipe defaults; `--recipe-file` not landed |
+| 2 | `--param k=v` + ad-hoc recipe-file dispatch | ✅ **done via `--file role=path` + `--param k=v`** (CLI + Web UI); more general than the original `--recipe-file` spec |
 | 3 | Install 9 ISLC recipes + smoke IN-* ticket | ❌ not verifiable (need real-session evidence) |
 | 4 | Token-benchmark codebase-memory-mcp vs pure-Grep | ❌ not done |
 | 5 | UI polish (Send->Chat + info tooltips on Fork/Dispatch) | ❌ not done -- `ChatPanel.tsx:117` still `Send` |
 
-**Week-1 scorecard: 0/5 fully complete, 1/5 partial.** None of the canvas-adjacent product items landed.
+**Week-1 scorecard (corrected): 1/5 fully complete, 4/5 not done.** The dispatch-input mechanism (item 2) landed as the heaviest of the five and is already working end-to-end on both surfaces.
 
 ## 4. Deferred items from PR #202 (`b9356da`) -- still deferred
 
