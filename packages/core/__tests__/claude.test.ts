@@ -638,6 +638,56 @@ describe("buildLauncher initialPrompt", () => {
     const extraDashDashMatch = afterChannel.match(/^[^\n]*\n\s*--(?!dangerously)/);
     expect(extraDashDashMatch).toBeNull();
   });
+});
+
+// ── buildLauncher exit-code sentinel (bug 3) ─────────────────────────────────
+
+describe("buildLauncher exit-code sentinel", () => {
+  const baseOpts: LauncherOpts = {
+    workdir: "/tmp/project",
+    claudeArgs: ["claude", "--model", "opus", "--dangerously-skip-permissions"],
+    mcpConfigPath: "/tmp/.mcp.json",
+  };
+
+  it("wraps the claude invocation in an if/else that writes exit-code on failure", () => {
+    const { content } = buildLauncher(baseOpts);
+    // The claude command should be the `if` condition.
+    expect(content).toMatch(/if claude --/);
+    // The else branch captures $? and writes it to exit-code.
+    expect(content).toContain("code=$?");
+    expect(content).toContain('echo "$code" > "${ARK_SESSION_DIR:-/tmp/ark-session-unknown}"/exit-code');
+  });
+
+  it("references $ARK_SESSION_DIR so the sentinel lands where the poller looks", () => {
+    const { content } = buildLauncher(baseOpts);
+    expect(content).toContain("${ARK_SESSION_DIR:-/tmp/ark-session-unknown}");
+  });
+
+  it("keeps exec bash at the end so tmux stays alive for post-mortem", () => {
+    const { content } = buildLauncher(baseOpts);
+    expect(content.trimEnd().endsWith("exec bash")).toBe(true);
+  });
+
+  it("resume + fallback: only the final failure writes the sentinel", () => {
+    const { content } = buildLauncher({
+      ...baseOpts,
+      prevClaudeSessionId: "old-uuid",
+    });
+    // There should be exactly one exit-code write (after both primary and
+    // fallback fail), not two.
+    const sentinelWrites = content.match(/echo\s+"\$code"\s+>\s+/g);
+    expect(sentinelWrites).not.toBeNull();
+    expect(sentinelWrites!.length).toBe(1);
+    // Both the primary (--resume) and the fallback (--session-id) should appear.
+    expect(content).toContain("--resume");
+    expect(content).toContain("--session-id");
+  });
+
+  it("prints a human-readable failure message to stderr", () => {
+    const { content } = buildLauncher(baseOpts);
+    expect(content).toMatch(/Claude exited with code \$code\. Session marked failed\./);
+    expect(content).toContain(">&2");
+  });
 
   it("escapes single quotes in prompt", () => {
     const { content } = buildLauncher({

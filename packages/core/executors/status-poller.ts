@@ -6,9 +6,34 @@
  * session status when the process exits.
  */
 
+import { existsSync, readFileSync } from "fs";
+import { join } from "path";
 import type { AppContext } from "../app.js";
 import { getExecutor } from "../executor.js";
 import { logDebug, logInfo } from "../observability/structured-log.js";
+
+/**
+ * Read the exit-code sentinel for a session, if the launcher wrote one.
+ * Returns the parsed non-zero exit code, or `null` when no sentinel is
+ * present / the file is empty / the code is 0.
+ *
+ * The launcher (see claude.ts:buildLauncher) writes `$ARK_SESSION_DIR/exit-code`
+ * when the agent exits non-zero. We treat this as the authoritative signal
+ * that the session failed, even if tmux's `exec bash` keeps the pane alive.
+ */
+export function readExitCodeSentinel(tracksDir: string, sessionId: string): number | null {
+  const path = join(tracksDir, sessionId, "exit-code");
+  if (!existsSync(path)) return null;
+  try {
+    const raw = readFileSync(path, "utf-8").trim();
+    if (!raw) return null;
+    const code = Number.parseInt(raw, 10);
+    if (!Number.isFinite(code) || code === 0) return null;
+    return code;
+  } catch {
+    return null;
+  }
+}
 
 const activePollers = new Map<string, ReturnType<typeof setInterval>>();
 
@@ -23,6 +48,46 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
       const executor = app.pluginRegistry.executor(executorName) ?? getExecutor(executorName);
       if (!executor) {
         stopStatusPoller(sessionId);
+        return;
+      }
+
+      // Exit-code sentinel: the launcher writes $ARK_SESSION_DIR/exit-code
+      // when the agent process exits non-zero. `exec bash` keeps the tmux
+      // pane alive for post-mortem inspection, so executor.status() still
+      // reports "running" -- we need this side-channel to flip the Ark
+      // session to "failed". Bug 3 in the session-dispatch cascade.
+      const exitCode = readExitCodeSentinel(app.config.tracksDir, sessionId);
+      if (exitCode !== null) {
+        stopStatusPoller(sessionId);
+
+        const session = app.sessions.get(sessionId);
+        if (!session || session.status !== "running") return;
+
+        // Tail the stderr/log for a helpful reason, best-effort.
+        let tail = "";
+        try {
+          const stderrPath = join(app.config.tracksDir, sessionId, "stderr.log");
+          if (existsSync(stderrPath)) {
+            tail = readFileSync(stderrPath, "utf-8").split("\n").slice(-20).join("\n").trim();
+          }
+        } catch {
+          logDebug("status", "stderr tail best-effort");
+        }
+
+        const reason = tail ? `Claude exited with code ${exitCode}\n${tail}` : `Claude exited with code ${exitCode}`;
+        app.sessions.update(sessionId, {
+          status: "failed",
+          error: reason,
+          session_id: null,
+        });
+
+        app.events.log(sessionId, "session_failed", {
+          stage: session.stage,
+          actor: "system",
+          data: { reason: "agent exit-code sentinel", exitCode },
+        });
+
+        logInfo("session", `status-poller: ${sessionId} -> failed (exit code ${exitCode})`);
         return;
       }
 

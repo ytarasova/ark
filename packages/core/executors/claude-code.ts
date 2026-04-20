@@ -98,10 +98,17 @@ export const claudeCodeExecutor: Executor = {
 
     // Build launch env from agent config + provider-specific env + router URL (if enabled)
     const { buildRouterEnv } = await import("./router-env.js");
-    const launchEnv = {
+    // ARK_SESSION_DIR gives the launcher a place to drop the exit-code
+    // sentinel when claude exits non-zero (bug 3 fix). The status poller
+    // watches this same path. For remote compute the path refers to the
+    // compute target filesystem; provider-specific remapping is out of
+    // scope here and falls back to the launcher's /tmp default.
+    const localSessionDir = join(app.config.tracksDir, session.id);
+    const launchEnv: Record<string, string> = {
       ...(opts.agent.env ?? {}),
       ...(provider?.buildLaunchEnv(session) ?? {}),
       ...buildRouterEnv(app.config, { mode: "claude" }),
+      ARK_SESSION_DIR: localSessionDir,
     };
 
     const claudeArgs = opts.claudeArgs ?? [];
