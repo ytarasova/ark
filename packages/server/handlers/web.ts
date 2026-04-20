@@ -81,6 +81,7 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
     hotkeys: getHotkeys(),
     theme: getThemeMode(),
     profile: getActiveProfile(),
+    hosted: isHostedMode(app),
   }));
 
   // ── Cost export ──────────────────────────────────────────────────────────

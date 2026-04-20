@@ -5,6 +5,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../hooks/useApi.js";
+import { useHostedMode } from "../hooks/useServerConfig.js";
+import { usePasteImageUpload } from "../hooks/usePasteImageUpload.js";
+import { useFilePreviews } from "../hooks/useFilePreviews.js";
 import { Button } from "./ui/button.js";
 import { FolderPickerModal } from "./FolderPickerModal.js";
 import { InputsSection, type InputsValue } from "./session/InputsSection.js";
@@ -56,45 +59,6 @@ interface AttachmentInfo {
   size: number;
   type: string;
   content?: string;
-}
-
-const TEXT_EXTENSIONS = new Set([
-  ".md",
-  ".txt",
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".py",
-  ".yaml",
-  ".yml",
-  ".json",
-  ".csv",
-  ".xml",
-  ".html",
-  ".css",
-  ".sh",
-  ".sql",
-  ".toml",
-  ".cfg",
-  ".ini",
-  ".log",
-  ".env",
-  ".rs",
-  ".go",
-  ".java",
-  ".rb",
-  ".c",
-  ".h",
-  ".cpp",
-  ".hpp",
-]);
-
-const MAX_FILE_SIZE = 500 * 1024; // 500KB
-
-function isTextFile(name: string, mimeType: string): boolean {
-  const ext = "." + name.split(".").pop()?.toLowerCase();
-  return TEXT_EXTENSIONS.has(ext) || mimeType.startsWith("text/");
 }
 
 interface NewSessionModalProps {
@@ -208,6 +172,9 @@ function FlowDropdown({
 // ---------------------------------------------------------------------------
 // Repo Dropdown
 // ---------------------------------------------------------------------------
+/** Accept either `git@host:owner/repo(.git)?` or `https?://host/owner/repo(.git)?`. */
+const GIT_URL_RE = /^(git@[^:\s]+:[^\s]+|https?:\/\/[^\s]+)$/i;
+
 function RepoDropdown({
   value,
   onChange,
@@ -219,17 +186,34 @@ function RepoDropdown({
   recentRepos: RecentRepo[];
   onBrowse: () => void;
 }) {
+  const hosted = useHostedMode();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  function tryCommit(raw: string) {
+    const v = raw.trim();
+    if (!v) return;
+    if (hosted && !GIT_URL_RE.test(v)) {
+      setError("Remote mode requires a git URL (git@... or https://...)");
+      return;
+    }
+    setError(null);
+    onChange(v);
+    setOpen(false);
+    setSearch("");
+  }
+
+  const visibleRecent = hosted ? recentRepos.filter((r) => GIT_URL_RE.test(r.path)) : recentRepos;
+
   const filtered = search
-    ? recentRepos.filter(
+    ? visibleRecent.filter(
         (r) =>
           r.path.toLowerCase().includes(search.toLowerCase()) ||
           r.basename.toLowerCase().includes(search.toLowerCase()),
       )
-    : recentRepos;
+    : visibleRecent;
 
   return (
     <Popover.Root
@@ -265,15 +249,14 @@ function RepoDropdown({
                 ref={inputRef}
                 type="text"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && search.trim()) {
-                    onChange(search.trim());
-                    setOpen(false);
-                    setSearch("");
-                  }
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  if (error) setError(null);
                 }}
-                placeholder="Type path or search..."
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && search.trim()) tryCommit(search);
+                }}
+                placeholder={hosted ? "git@github.com:owner/repo or https://..." : "Type path or search..."}
                 aria-label="Repository path"
                 className="w-full bg-transparent text-[12px] text-[var(--fg)] outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] rounded-[4px] placeholder:text-[var(--fg-faint)]"
               />
@@ -318,25 +301,29 @@ function RepoDropdown({
             </div>
           )}
 
-          {/* Browse */}
-          <div className="border-t border-[var(--border)] mt-1 pt-1">
-            <button
-              type="button"
-              onClick={() => {
-                onBrowse();
-                setOpen(false);
-                setSearch("");
-              }}
-              className={cn(
-                "flex items-center gap-2 w-full text-left px-2.5 py-2 rounded-[var(--radius-sm,4px)]",
-                "hover:bg-[var(--bg-hover)] transition-colors duration-100 cursor-pointer",
-                "text-[12px] text-[var(--fg-muted)]",
-              )}
-            >
-              <FolderOpen size={13} />
-              Browse for folder...
-            </button>
-          </div>
+          {error && <div className="px-3 py-2 text-[11px] text-[var(--failed)]">{error}</div>}
+
+          {/* Browse -- local mode only; remote Ark servers have no client filesystem access. */}
+          {!hosted && (
+            <div className="border-t border-[var(--border)] mt-1 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  onBrowse();
+                  setOpen(false);
+                  setSearch("");
+                }}
+                className={cn(
+                  "flex items-center gap-2 w-full text-left px-2.5 py-2 rounded-[var(--radius-sm,4px)]",
+                  "hover:bg-[var(--bg-hover)] transition-colors duration-100 cursor-pointer",
+                  "text-[12px] text-[var(--fg-muted)]",
+                )}
+              >
+                <FolderOpen size={13} />
+                Browse for folder...
+              </button>
+            </div>
+          )}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
@@ -469,7 +456,6 @@ function detectReferences(text: string): DetectedReference[] {
 // ---------------------------------------------------------------------------
 // Markdown toolbar + rich textarea
 // ---------------------------------------------------------------------------
-const ACCEPTED_FILE_TYPES = ".png,.jpg,.jpeg,.gif,.txt,.pdf,.md,.json,.yaml,.yml,.ts,.tsx,.js,.jsx";
 
 function RichTaskInput({
   value,
@@ -478,6 +464,11 @@ function RichTaskInput({
   attachments,
   onAttachmentsChange,
   references,
+  inputs,
+  onInputsChange,
+  previews,
+  onPreview,
+  onClearPreview,
 }: {
   value: string;
   onChange: (val: string) => void;
@@ -485,9 +476,12 @@ function RichTaskInput({
   attachments: AttachmentInfo[];
   onAttachmentsChange: (a: AttachmentInfo[] | ((prev: AttachmentInfo[]) => AttachmentInfo[])) => void;
   references: DetectedReference[];
+  inputs: InputsValue;
+  onInputsChange: (next: InputsValue) => void;
+  previews: Record<string, string>;
+  onPreview: (role: string, blob: Blob) => void;
+  onClearPreview: (role: string) => void;
 }) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   const wrapSelection = useCallback(
     (prefix: string, suffix: string) => {
       const ta = textareaRef.current;
@@ -530,49 +524,47 @@ function RichTaskInput({
     [value, onChange, textareaRef],
   );
 
-  const handleFilePick = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = e.target.files;
-      if (!files) return;
-      const fileList = Array.from(files);
-      // Reset input so the same file can be re-selected
-      e.target.value = "";
-
-      for (const f of fileList) {
-        if (f.size > MAX_FILE_SIZE) {
-          alert(`File "${f.name}" exceeds the 500KB size limit and was skipped.`);
-          continue;
-        }
-        if (attachments.some((a) => a.name === f.name)) continue;
-
-        const reader = new FileReader();
-        const fileName = f.name;
-        const fileSize = f.size;
-        const fileType = f.type;
-
-        if (isTextFile(f.name, f.type)) {
-          reader.onload = () => {
-            const content = reader.result as string;
-            onAttachmentsChange((prev: AttachmentInfo[]) => [
-              ...prev.filter((a) => a.name !== fileName),
-              { name: fileName, size: fileSize, type: fileType, content },
-            ]);
-          };
-          reader.readAsText(f);
-        } else {
-          reader.onload = () => {
-            const content = reader.result as string;
-            onAttachmentsChange((prev: AttachmentInfo[]) => [
-              ...prev.filter((a) => a.name !== fileName),
-              { name: fileName, size: fileSize, type: fileType, content },
-            ]);
-          };
-          reader.readAsDataURL(f);
-        }
+  /** Insert a literal string at the cursor (or replace selection). */
+  const insertAtCursor = useCallback(
+    (text: string) => {
+      const ta = textareaRef.current;
+      if (!ta) {
+        onChange(value + text);
+        return;
       }
+      const start = ta.selectionStart;
+      const end = ta.selectionEnd;
+      const next = value.slice(0, start) + text + value.slice(end);
+      onChange(next);
+      requestAnimationFrame(() => {
+        ta.focus();
+        const pos = start + text.length;
+        ta.setSelectionRange(pos, pos);
+      });
     },
-    [attachments, onAttachmentsChange],
+    [value, onChange, textareaRef],
   );
+
+  const fileTokens = Object.entries(inputs.files ?? {}).filter(([, v]) => v);
+  const paramTokens = Object.entries(inputs.params ?? {}).filter(([, v]) => v !== undefined && v !== "");
+
+  /** Strip every occurrence of `token` from the task text (literal match). */
+  function stripToken(token: string) {
+    if (value.includes(token)) onChange(value.split(token).join(""));
+  }
+
+  function removeFileToken(role: string) {
+    const { [role]: _omit, ...rest } = inputs.files;
+    onInputsChange({ ...inputs, files: rest });
+    onClearPreview(role);
+    stripToken(`{{files.${role}}}`);
+  }
+
+  function removeParamToken(key: string) {
+    const { [key]: _omit, ...rest } = inputs.params;
+    onInputsChange({ ...inputs, params: rest });
+    stripToken(`{{params.${key}}}`);
+  }
 
   const removeAttachment = useCallback(
     (name: string) => {
@@ -581,35 +573,13 @@ function RichTaskInput({
     [attachments, onAttachmentsChange],
   );
 
-  const handlePaste = useCallback(
-    (e: React.ClipboardEvent) => {
-      const items = e.clipboardData?.items;
-      if (!items) return;
-      for (const item of Array.from(items)) {
-        if (!item.type.startsWith("image/")) continue;
-        e.preventDefault();
-        const blob = item.getAsFile();
-        if (!blob) continue;
-        if (blob.size > MAX_FILE_SIZE) {
-          alert("Pasted image exceeds the 500KB size limit.");
-          return;
-        }
-        const ext = item.type.split("/")[1] || "png";
-        const name = `clipboard-${Date.now()}.${ext}`;
-        const reader = new FileReader();
-        reader.onload = () => {
-          const content = reader.result as string;
-          onAttachmentsChange((prev: AttachmentInfo[]) => [
-            ...prev,
-            { name, size: blob.size, type: item.type, content },
-          ]);
-        };
-        reader.readAsDataURL(blob);
-        break; // only handle first image
-      }
-    },
-    [onAttachmentsChange],
-  );
+  const { onPaste: handlePaste } = usePasteImageUpload({
+    inputs,
+    onInputsChange,
+    onUploaded: (role) => insertAtCursor(`{{files.${role}}}`),
+    onPreview,
+    onError: (msg) => alert(msg),
+  });
 
   const toolbarBtnClass = cn(
     "p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--fg-muted)]",
@@ -654,28 +624,79 @@ function RichTaskInput({
           <button
             type="button"
             className={toolbarBtnClass}
-            title="Attach file"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Paperclip size={14} />
-          </button>
-          <button
-            type="button"
-            className={toolbarBtnClass}
             title="Insert link"
             onClick={() => wrapSelection("[", "](url)")}
           >
             <Link size={14} />
           </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={ACCEPTED_FILE_TYPES}
-            multiple
-            className="hidden"
-            onChange={handleFilePick}
-          />
         </div>
+
+        {/* Reusable input tokens -- click to insert `{{files.X}}` / `{{params.X}}` at cursor. */}
+        {(fileTokens.length > 0 || paramTokens.length > 0) && (
+          <div className="flex flex-wrap items-center gap-1.5 px-3 py-1.5 border-b border-[var(--border)] text-[11px]">
+            <span className="text-[var(--fg-muted)] uppercase tracking-[0.04em] mr-1">Insert</span>
+            {fileTokens.map(([role]) => (
+              <span
+                key={`file-${role}`}
+                className={cn(
+                  "group inline-flex items-center gap-1 rounded-md",
+                  "bg-[var(--primary)]/10 text-[var(--fg)] border border-[var(--border)]",
+                )}
+              >
+                <button
+                  type="button"
+                  onClick={() => insertAtCursor(`{{files.${role}}}`)}
+                  title={`Insert {{files.${role}}}`}
+                  className="inline-flex items-center gap-1 pl-1 pr-1 py-0.5 hover:bg-[var(--primary)]/20 rounded-l-md transition-colors"
+                >
+                  {previews[role] ? (
+                    <img src={previews[role]} alt="" className="h-4 w-4 rounded object-cover" />
+                  ) : (
+                    <Paperclip size={10} className="text-[var(--fg-muted)]" />
+                  )}
+                  {role}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeFileToken(role)}
+                  title={`Remove {{files.${role}}}`}
+                  aria-label={`Remove ${role}`}
+                  className="pr-1.5 py-0.5 text-[var(--fg-muted)] hover:text-[var(--failed)] transition-colors"
+                >
+                  <X size={10} />
+                </button>
+              </span>
+            ))}
+            {paramTokens.map(([key]) => (
+              <span
+                key={`param-${key}`}
+                className={cn(
+                  "group inline-flex items-center gap-1 rounded-md",
+                  "bg-[var(--primary)]/10 text-[var(--fg)] border border-[var(--border)]",
+                )}
+              >
+                <button
+                  type="button"
+                  onClick={() => insertAtCursor(`{{params.${key}}}`)}
+                  title={`Insert {{params.${key}}}`}
+                  className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 hover:bg-[var(--primary)]/20 rounded-l-md transition-colors"
+                >
+                  <span className="text-[var(--fg-muted)]">$</span>
+                  {key}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeParamToken(key)}
+                  title={`Remove {{params.${key}}}`}
+                  aria-label={`Remove ${key}`}
+                  className="pr-1.5 py-0.5 text-[var(--fg-muted)] hover:text-[var(--failed)] transition-colors"
+                >
+                  <X size={10} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Textarea */}
         <textarea
@@ -695,7 +716,6 @@ function RichTaskInput({
             "w-full bg-transparent text-[var(--fg)]",
             "text-[14px] leading-relaxed px-4 py-3 resize-none",
             "focus:outline-none focus-visible:outline-none",
-            "focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-inset rounded-lg",
             "placeholder:text-[var(--fg-muted)]",
           )}
         />
@@ -779,6 +799,7 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
   const [attachments, setAttachments] = useState<AttachmentInfo[]>([]);
   const [inputs, setInputs] = useState<InputsValue>({ files: {}, params: {} });
   const [inputsValid, setInputsValid] = useState(true);
+  const { previews, setPreview, clearPreview } = useFilePreviews();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   // Save trigger so we can restore focus on close.
@@ -999,7 +1020,15 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
 
         {/* Flow inputs (files + params) -- driven by the selected flow's
             declarative `inputs:` schema plus any ad-hoc extras the user adds. */}
-        <InputsSection flowName={selectedFlow} value={inputs} onChange={setInputs} onValidityChange={setInputsValid} />
+        <InputsSection
+          flowName={selectedFlow}
+          value={inputs}
+          onChange={setInputs}
+          onValidityChange={setInputsValid}
+          previews={previews}
+          onPreview={setPreview}
+          onClearPreview={clearPreview}
+        />
 
         {/* Ticket -- conditional */}
         {showTicket && (
@@ -1042,6 +1071,11 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
                 attachments={attachments}
                 onAttachmentsChange={setAttachments}
                 references={references}
+                inputs={inputs}
+                onInputsChange={setInputs}
+                previews={previews}
+                onPreview={setPreview}
+                onClearPreview={clearPreview}
               />
             )}
           />
