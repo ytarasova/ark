@@ -1,5 +1,64 @@
 # Changelog
 
+## v0.19.0 (2026-04-20)
+
+### Code Intelligence
+- **Unified schema + store + interfaces**: Wave 1 foundation for codebase analysis -- shared types, persistence layer, and provider contracts (#514c0a7)
+- **Full Deployment seam**: local vs control-plane parity for code-intel operations (#50e10cd)
+- **Wave 2a workspaces + from-sage-analysis flow**: workspace-scoped analysis with a new flow that feeds sage results into downstream stages (#3f733ca)
+
+### Compute
+- **ComputePool + LocalFirecrackerPool**: pooled compute with pre-warmed Firecracker micro-VMs (#232)
+- **FlyMachinesCompute**: Fly.io Machines as a first-class compute provider (#233)
+- **Wire ComputePool into ComputeTarget dispatch**: pools participate in standard dispatch path (#234)
+- **Fly arkd-bundled Docker image**: single image with arkd baked in for Fly deploys (#235)
+- **Optional 6PN tunnel via flyctl proxy**: private networking between Fly machines (#236)
+- **Drop Fly.io + E2B SaaS backends**: self-hosted only going forward (#237)
+- **Polymorphic ProviderFlagSpec registry**: CLI flags for compute providers generated from a registry (#238)
+
+### Architecture & DI
+- **Eliminate getApp/setApp/clearApp service locator**: replaced with explicit dependency injection (PR B of 2) (#251)
+- **Split DI registrations + migrate sessions/compute via awilix**: container-managed lifecycles (#248)
+- **Move app start/stop into awilix container lifecycle**: boot/shutdown driven by the DI container (#249)
+- **Split stage-orchestrator.ts into focused modules**: architecture audit + decomposition (#247)
+- **Replace blank try/catch swallows with safe helper + explicit log**: no more silent failures (#239)
+
+### Features
+- **BlobStore abstraction (local-disk + S3)**: unified file storage layer (#257)
+- **Unified trigger + connector framework**: integrations share a common dispatch model (#0e6127f)
+- **--input/--param on ark exec + autonomous goose-recipe flow**: CLI-driven parameterized execution (#9b40d1d)
+- **Runtime-declared MCP servers + per-session --with-mcp opt-in**: runtimes can declare tool servers (#4d9bf3f)
+- **Approval-with-rework for review gates**: reviewers can request changes before approval (#255)
+- **Generic inputs bag (files + params) + flow-driven dispatch form**: structured session inputs (#203)
+
+### Web UI
+- **TanStack Query + RHF/zod migrations, error boundaries, hooks lint**: modern data-fetching and form validation (#244)
+- **Rename Send button to Chat in ChatPanel**: clearer action labeling
+
+### Fixes
+- **PTY sentinel-gated geometry handshake**: replaces hardcoded 120x50 terminal size with dynamic negotiation
+- **Unbreak main CI after getApp/setApp/clearApp removal**: fix test imports (#254)
+- **Route 12 compute/core test imports to test-helpers singleton**: consistent test setup (#252)
+- **Import useRef in HistoryView**: fix missing React import (#250)
+- **Migrate event-store adapters from NOT_MIGRATED stubs**: complete adapter implementations
+
+### Security
+- **Defensive-security audit**: fix 11 findings from 2026-04-19 audit (#245)
+
+### Refactoring
+- **Remove session/dispatch as a user-facing op**: simplified session creation path (v2 with e2e fixes) (#231)
+- **Scrub Phase/Wave labels from code**: history lives in docs, code stays clean (#240)
+
+### Testing
+- **Migrate forTest -> forTestAsync; enable parallel suites**: all tests use async context (#241)
+- **Comprehensive server handler tests**: list, read, and resource handlers (#208, #210, #211)
+- **Session tests**: pauseWithSnapshot/resumeFromSnapshot, list filters, repository + service coverage (#205, #209, #213)
+- **Read-path tests for .mcp.json discovery + gitignore entry**: tool configuration tests (#206)
+- **Test coverage + TDD-hygiene audit**: top 3 handler-test gaps identified and filled (#243)
+
+### Chores
+- **Add .mcp.json to .gitignore** (#204)
+
 ## v0.18.0 (2026-04-17)
 
 ### Web UI Redesign
