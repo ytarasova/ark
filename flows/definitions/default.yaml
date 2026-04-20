@@ -6,8 +6,8 @@ stages:
     gate: auto
     optional: true
     task: |
-      Process ticket {ticket}. Run sanity gate and extract specification.
-      Write artifacts to {workdir}/.workflow/{ticket}/
+      Process ticket {{ticket}}. Run sanity gate and extract specification.
+      Write artifacts to {{workdir}}/.workflow/{{ticket}}/
       If no ticket provided, skip this stage.
 
   - name: plan
@@ -15,8 +15,8 @@ stages:
     gate: manual
     depends_on: [intake]
     task: |
-      Analyse {summary} and create PLAN.md with implementation strategy.
-      If spec exists at {workdir}/.workflow/{ticket}/spec.md, use it.
+      Analyse {{summary}} and create PLAN.md with implementation strategy.
+      If spec exists at {{workdir}}/.workflow/{{ticket}}/spec.md, use it.
       Decompose into independently-executable subtasks.
 
   - name: audit
@@ -34,7 +34,7 @@ stages:
     depends_on: [audit]
     on_failure: "retry(3)"
     task: |
-      Implement {summary}. Follow the plan from PLAN.md.
+      Implement {{summary}}. Follow the plan from PLAN.md.
       Write code, tests, and commit.
 
   - name: verify

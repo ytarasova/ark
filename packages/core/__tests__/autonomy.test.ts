@@ -160,8 +160,8 @@ describe("flow autonomy field", () => {
     writeUserFlow("resolve-autonomy", {
       name: "resolve-autonomy",
       stages: [
-        { name: "plan", agent: "planner", gate: "auto", autonomy: "edit", task: "Plan {ticket}" },
-        { name: "impl", agent: "worker", gate: "auto", autonomy: "execute", task: "Build {ticket}" },
+        { name: "plan", agent: "planner", gate: "auto", autonomy: "edit", task: "Plan {{ticket}}" },
+        { name: "impl", agent: "worker", gate: "auto", autonomy: "execute", task: "Build {{ticket}}" },
         { name: "review", agent: "reviewer", gate: "auto", autonomy: "read-only" },
       ],
     });

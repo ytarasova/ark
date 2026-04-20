@@ -57,8 +57,13 @@ describe("Flow templating E2E", () => {
     writeFlowYaml("templated", {
       name: "templated",
       stages: [
-        { name: "implement", agent: "implementer", gate: "auto", task: "Implement {ticket}: {summary} in {repo}" },
-        { name: "review", agent: "reviewer", gate: "auto", task: "Review {ticket} changes" },
+        {
+          name: "implement",
+          agent: "implementer",
+          gate: "auto",
+          task: "Implement {{ticket}}: {{summary}} in {{repo}}",
+        },
+        { name: "review", agent: "reviewer", gate: "auto", task: "Review {{ticket}} changes" },
       ],
     });
 
@@ -80,7 +85,7 @@ describe("Flow templating E2E", () => {
   it("resolveAgent still works with shared template helper", () => {
     writeAgentYaml("test-agent", {
       name: "test-agent",
-      system_prompt: "Working on {ticket} in {repo}",
+      system_prompt: "Working on {{ticket}} in {{repo}}",
     });
 
     const agent = resolveAgent(getApp(), "test-agent", {
@@ -105,7 +110,7 @@ describe("Flow templating E2E", () => {
   it("on_failure gets substituted too", () => {
     writeFlowYaml("failure-tmpl", {
       name: "failure-tmpl",
-      stages: [{ name: "deploy", agent: "deployer", gate: "auto", on_failure: "notify({ticket})" }],
+      stages: [{ name: "deploy", agent: "deployer", gate: "auto", on_failure: "notify({{ticket}})" }],
     });
 
     const vars = buildSessionVars({ id: "s-1", ticket: "DEPLOY-1" });
@@ -116,7 +121,7 @@ describe("Flow templating E2E", () => {
   it("description field gets substituted", () => {
     writeFlowYaml("desc-tmpl", {
       name: "desc-tmpl",
-      description: "Pipeline for {ticket} on {branch}",
+      description: "Pipeline for {{ticket}} on {{branch}}",
       stages: [{ name: "s1", agent: "a", gate: "auto" }],
     });
 
@@ -128,12 +133,12 @@ describe("Flow templating E2E", () => {
   it("unknown variables are preserved as-is", () => {
     writeFlowYaml("unknown-vars", {
       name: "unknown-vars",
-      stages: [{ name: "s1", agent: "a", gate: "auto", task: "Do {ticket} with {custom_var}" }],
+      stages: [{ name: "s1", agent: "a", gate: "auto", task: "Do {{ticket}} with {{custom_var}}" }],
     });
 
     const vars = buildSessionVars({ id: "s-1", ticket: "T-1" });
     const resolved = resolveFlow(getApp(), "unknown-vars", vars);
-    expect(resolved!.stages[0].task).toBe("Do T-1 with {custom_var}");
+    expect(resolved!.stages[0].task).toBe("Do T-1 with {{custom_var}}");
   });
 
   it("buildSessionVars + substituteVars round-trip with all fields", () => {
@@ -151,7 +156,7 @@ describe("Flow templating E2E", () => {
     });
 
     const result = substituteVars(
-      "{ticket} {summary} {repo} {branch} {workdir} {track_id} {stage} {flow} {agent} {compute}",
+      "{{ticket}} {{summary}} {{repo}} {{branch}} {{workdir}} {{track_id}} {{stage}} {{flow}} {{agent}} {{compute}}",
       vars,
     );
     expect(result).toBe("PROJ-99 Full test /repo dev /work s-full build ci builder cloud-1");

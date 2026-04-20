@@ -1,52 +1,168 @@
 /**
- * Tests for template.ts -- shared variable substitution.
+ * Tests for template.ts -- Nunjucks-backed variable substitution.
  */
 
 import { describe, it, expect } from "bun:test";
 import { substituteVars, buildSessionVars, unresolvedVars } from "../template.js";
 
-// ── substituteVars ──────────────────────────────────────────────────────────
+// ── substituteVars: basic ───────────────────────────────────────────────────
 
 describe("substituteVars", () => {
-  it("replaces known variables", () => {
-    const result = substituteVars("Hello {name}, welcome to {place}.", {
+  it("resolves {{var}} when set", () => {
+    const result = substituteVars("Hello {{name}}, welcome to {{place}}.", {
       name: "Alice",
       place: "Ark",
     });
     expect(result).toBe("Hello Alice, welcome to Ark.");
   });
 
-  it("preserves unknown variables as {name}", () => {
-    const result = substituteVars("Known: {a}, Unknown: {b}", { a: "yes" });
-    expect(result).toBe("Known: yes, Unknown: {b}");
+  it("preserves unknown {{var}} verbatim (double braces)", () => {
+    const result = substituteVars("Known: {{a}}, Unknown: {{b}}", { a: "yes" });
+    expect(result).toBe("Known: yes, Unknown: {{b}}");
   });
 
-  it("handles empty string values", () => {
-    const result = substituteVars("Value={key}", { key: "" });
+  it("preserves unresolved dotted path verbatim", () => {
+    const result = substituteVars("{{inputs.files.missing}}", {});
+    expect(result).toBe("{{inputs.files.missing}}");
+  });
+
+  it("renders empty string value", () => {
+    const result = substituteVars("Value={{key}}", { key: "" });
     expect(result).toBe("Value=");
   });
 
-  it("handles template with no variables (passthrough)", () => {
+  it("passes through templates with no variables", () => {
     const result = substituteVars("No variables here.", { key: "unused" });
     expect(result).toBe("No variables here.");
   });
 
   it("handles multiple occurrences of same variable", () => {
-    const result = substituteVars("{x} and {x} again", { x: "val" });
+    const result = substituteVars("{{x}} and {{x}} again", { x: "val" });
     expect(result).toBe("val and val again");
   });
 
-  it("resolves dotted keys", () => {
-    const result = substituteVars("recipe={inputs.files.recipe} key={inputs.params.jira_key}", {
+  it("resolves dotted keys via flat map", () => {
+    const result = substituteVars("recipe={{inputs.files.recipe}} key={{inputs.params.jira_key}}", {
       "inputs.files.recipe": "/tmp/r.yaml",
       "inputs.params.jira_key": "IN-1234",
     });
     expect(result).toBe("recipe=/tmp/r.yaml key=IN-1234");
   });
 
-  it("preserves unresolved dotted keys", () => {
-    const result = substituteVars("{inputs.files.missing}", {});
-    expect(result).toBe("{inputs.files.missing}");
+  it("tolerates whitespace inside braces", () => {
+    const result = substituteVars("{{ name }} and {{  name  }}", { name: "A" });
+    expect(result).toBe("A and A");
+  });
+});
+
+// ── substituteVars: short-namespace alias ───────────────────────────────────
+
+describe("substituteVars short-namespace alias", () => {
+  it("{{files.X}} resolves to inputs.files.X when top-level is unset", () => {
+    const result = substituteVars("{{files.recipe}}", {
+      "inputs.files.recipe": "/tmp/r.yaml",
+    });
+    expect(result).toBe("/tmp/r.yaml");
+  });
+
+  it("{{params.X}} resolves to inputs.params.X when top-level is unset", () => {
+    const result = substituteVars("{{params.jira_key}}", {
+      "inputs.params.jira_key": "IN-99",
+    });
+    expect(result).toBe("IN-99");
+  });
+
+  it("top-level {{files.X}} wins over alias", () => {
+    const result = substituteVars("{{files.recipe}}", {
+      "files.recipe": "/top.yaml",
+      "inputs.files.recipe": "/tmp/r.yaml",
+    });
+    expect(result).toBe("/top.yaml");
+  });
+
+  it("alias does not apply to already-namespaced paths", () => {
+    const result = substituteVars("{{inputs.files.foo}}", {});
+    expect(result).toBe("{{inputs.files.foo}}");
+  });
+});
+
+// ── substituteVars: Jinja features ──────────────────────────────────────────
+
+describe("substituteVars Jinja features", () => {
+  it("conditional renders body when condition is truthy", () => {
+    const result = substituteVars("{% if ticket %}JIRA: {{ ticket }}{% endif %}", { ticket: "X" });
+    expect(result).toBe("JIRA: X");
+  });
+
+  it("conditional skips body when condition is unset/empty", () => {
+    const setButEmpty = substituteVars("{% if ticket %}JIRA: {{ ticket }}{% endif %}", { ticket: "" });
+    expect(setButEmpty).toBe("");
+    const unset = substituteVars("{% if ticket %}JIRA: {{ ticket }}{% endif %}", {});
+    expect(unset).toBe("");
+  });
+
+  it("for loop iterates over a nested bag", () => {
+    const result = substituteVars("{% for k, v in inputs.params %}{{k}}={{v}}, {% endfor %}", {
+      "inputs.params.a": "1",
+      "inputs.params.b": "2",
+    });
+    expect(result).toBe("a=1, b=2, ");
+  });
+
+  it("filter: default applies when value is unset", () => {
+    const result = substituteVars('{{ branch | default("main") }}', {});
+    expect(result).toBe("main");
+  });
+
+  it("raw block escapes Jinja syntax", () => {
+    const result = substituteVars("{% raw %}{{literal}}{% endraw %}", { literal: "SHOULD_NOT_APPEAR" });
+    expect(result).toBe("{{literal}}");
+  });
+
+  it("for loop variable shadows outer scope", () => {
+    const result = substituteVars("{% for item in items %}{{item}}{% endfor %}", {
+      // Loop var 'item' has no top-level entry; comes from iteration.
+      "items.0": "a",
+      "items.1": "b",
+    });
+    // We don't build array-aware unflatten, so this case is not expected to
+    // iterate a proper array. Just verify the loop variable isn't prematurely
+    // substituted to a '{{item}}' preserved literal.
+    expect(result).not.toContain("{{item}}");
+  });
+});
+
+// ── unresolvedVars ──────────────────────────────────────────────────────────
+
+describe("unresolvedVars", () => {
+  it("returns paths that don't resolve", () => {
+    const missing = unresolvedVars("{{files.bar}} {{ticket}}", { ticket: "X" });
+    expect(missing).toEqual(["files.bar"]);
+  });
+
+  it("respects the short-namespace alias", () => {
+    const missing = unresolvedVars("{{files.foo}} {{files.bar}}", {
+      "inputs.files.foo": "/a",
+    });
+    expect(missing).toEqual(["files.bar"]);
+  });
+
+  it("is empty when all vars resolve", () => {
+    expect(unresolvedVars("{{a}} {{b}}", { a: "1", b: "2" })).toEqual([]);
+  });
+
+  it("deduplicates repeated references", () => {
+    expect(unresolvedVars("{{x}} {{x}} {{x}}", {})).toEqual(["x"]);
+  });
+
+  it("excludes locals bound by for loops", () => {
+    // Loop var 'item' is local to the body and must never appear in the
+    // unresolved list -- even when the outer iteree is missing from vars.
+    const missing = unresolvedVars("{% for item in items %}{{item.name}}{% endfor %}", {});
+    expect(missing).not.toContain("item");
+    expect(missing).not.toContain("item.name");
+    // 'items' (the iteree) is still referenced and missing.
+    expect(missing).toEqual(["items"]);
   });
 
   // ── Double-brace + short-namespace (Web UI chip bar) ──────────────────────
@@ -82,18 +198,17 @@ describe("substituteVars", () => {
     expect(result).toBe("path=/tmp/foo");
   });
 
-  it("mixes single- and double-brace forms in one template", () => {
+  it("preserves single-brace literals verbatim (single-brace is not a template syntax in Nunjucks)", () => {
+    // Single-brace `{var}` is not a Nunjucks delimiter. YAML was migrated to
+    // `{{var}}` in this PR; any surviving `{...}` is intended as literal text.
     const result = substituteVars("{greeting}, {{who}}!", {
       greeting: "Hi",
       who: "world",
     });
-    expect(result).toBe("Hi, world!");
+    expect(result).toBe("{greeting}, world!");
   });
 
   it("does not treat {{ / }} as a literal match when resolvable key is absent (preserves both braces)", () => {
-    // Regression: bug 1 -- the prior regex only matched single braces, so
-    // `{{files.env}}` rendered as `{{/tmp/env}}` (inner brace substituted,
-    // outer braces leaked). Now the whole double-brace token is preserved.
     const result = substituteVars("{{files.bar}}", {});
     expect(result).toBe("{{files.bar}}");
   });
@@ -106,13 +221,13 @@ describe("unresolvedVars", () => {
     expect(unresolvedVars("{{files.bar}} text", {})).toEqual(["files.bar"]);
   });
 
-  it("returns single-brace keys when unresolved", () => {
-    expect(unresolvedVars("{unknown}", {})).toEqual(["unknown"]);
+  it("ignores single-brace `{x}` literals (Nunjucks uses double-brace only)", () => {
+    expect(unresolvedVars("{unknown}", {})).toEqual([]);
   });
 
   it("returns an empty array when everything resolves (direct + aliased)", () => {
     expect(
-      unresolvedVars("{{files.env}} {ticket}", {
+      unresolvedVars("{{files.env}} {{ticket}}", {
         "inputs.files.env": "/tmp/.env",
         ticket: "PROJ-1",
       }),
@@ -120,7 +235,7 @@ describe("unresolvedVars", () => {
   });
 
   it("de-duplicates repeated keys", () => {
-    expect(unresolvedVars("{{x}} {{x}} {y}", {})).toEqual(["x", "y"]);
+    expect(unresolvedVars("{{x}} {{x}} {{y}}", {})).toEqual(["x", "y"]);
   });
 });
 
@@ -194,5 +309,24 @@ describe("buildSessionVars", () => {
   it("tolerates inputs absent or empty", () => {
     const vars = buildSessionVars({ config: {} });
     expect(vars["inputs.files.recipe"]).toBeUndefined();
+  });
+
+  it("round-trips with substituteVars", () => {
+    const vars = buildSessionVars({
+      id: "s-1",
+      ticket: "T-1",
+      summary: "Do X",
+      config: {
+        inputs: {
+          files: { recipe: "/tmp/r.yaml" },
+          params: { jira_key: "J-1" },
+        },
+      },
+    });
+    const rendered = substituteVars(
+      "session={{session_id}} ticket={{ticket}} summary={{summary}} recipe={{inputs.files.recipe}} jira={{inputs.params.jira_key}}",
+      vars,
+    );
+    expect(rendered).toBe("session=s-1 ticket=T-1 summary=Do X recipe=/tmp/r.yaml jira=J-1");
   });
 });

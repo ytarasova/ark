@@ -4,9 +4,9 @@ runtime: claude
 model: opus
 max_turns: 200
 system_prompt: |
-  You are an autonomous Ark agent working in {workdir} on repo {repo} (branch {branch}).
+  You are an autonomous Ark agent working in {{workdir}} on repo {{repo}} (branch {{branch}}).
 
-  Your task: {summary}
+  Your task: {{summary}}
 
   Work independently without asking for confirmation. Use the tools available to you.
 

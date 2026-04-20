@@ -162,6 +162,12 @@ profiles:
 
 New code should prefer nested accessors (`app.config.ports.conductor`). Legacy flat fields (`app.config.conductorPort`) are retained for back-compat and will eventually be removed.
 
+## Templating
+
+Agent / flow / recipe YAML and on-reject prompts use **Nunjucks** (Jinja-for-JS). Use `{{var}}` double braces -- single-brace `{var}` is no longer recognised. Conditionals (`{% if %}`), loops (`{% for %}`), filters (`| default("x")`), and `{% raw %}...{% endraw %}` escape blocks are all available. Unknown vars in Output positions are preserved verbatim; in conditional / filter contexts they resolve to undefined. Short-namespace aliases (`{{files.X}}` -> `{{inputs.files.X}}`) apply in Output positions only.
+
+See [docs/templating.md](docs/templating.md) for the full reference.
+
 ## Code Style
 
 - TypeScript, `strict: false`, ES modules with `.js` extensions

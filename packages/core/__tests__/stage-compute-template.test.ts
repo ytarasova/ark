@@ -241,7 +241,7 @@ describe("flow with per-stage compute templates", () => {
           compute_template: "sandbox",
           verify: ["npm test"],
           on_failure: "retry(2)",
-          task: "Implement {summary}",
+          task: "Implement {{summary}}",
         },
       ],
     });
@@ -252,6 +252,6 @@ describe("flow with per-stage compute templates", () => {
     expect(stage!.model).toBe("opus");
     expect(stage!.verify).toEqual(["npm test"]);
     expect(stage!.on_failure).toBe("retry(2)");
-    expect(stage!.task).toBe("Implement {summary}");
+    expect(stage!.task).toBe("Implement {{summary}}");
   });
 });
