@@ -464,7 +464,21 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
     websocket: {
       open(ws) {
         const { sessionId, tmuxName } = ws.data as { sessionId: string; tmuxName: string };
-        const bridge = startTerminalBridge(ws, tmuxName);
+        // The launcher uses `$ARK_SESSION_DIR/geometry` as the handshake
+        // sentinel. Keep this path in lockstep with the executor wiring
+        // (see executors/claude-code.ts + services/agent-launcher.ts).
+        const sessionDir = join(app.config.tracksDir, sessionId);
+        const bridge = startTerminalBridge(ws, tmuxName, {
+          sessionId,
+          sessionDir,
+          onGeometry: (id, cols, rows) => {
+            try {
+              app.sessions.update(id, { pty_cols: cols, pty_rows: rows });
+            } catch (e: any) {
+              logDebug("web", `pty_cols/rows persist failed for ${id}: ${e?.message ?? e}`);
+            }
+          },
+        });
         if (bridge) {
           ws.send(JSON.stringify({ type: "connected", sessionId }));
         } else {

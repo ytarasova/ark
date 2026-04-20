@@ -853,6 +853,46 @@ export function buildLauncher(opts: LauncherOpts): { content: string; claudeSess
   // Can't source .bashrc -- it exits early for non-interactive shells
   const pathSetup = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$HOME/.nvm/versions/node/*/bin:$PATH"\n`;
 
+  // ── PTY geometry handshake ────────────────────────────────────────────────
+  //
+  // Claude reads the PTY size at startup and lays out its TUI immediately.
+  // We used to pin the pane at 120x50 (both via `tmux new-session -x -y` and
+  // by exporting COLUMNS/LINES here), which meant the browser terminal
+  // always rendered against a 120-col agent regardless of the xterm.js
+  // viewport. Result: mismatched cursor-position codes, extra whitespace or
+  // unexpected wrapping when the viewport was wider/narrower than 120 cols.
+  //
+  // New contract: the terminal bridge writes the first client's real
+  // geometry to `$ARK_SESSION_DIR/geometry` (format `"<cols> <rows>\n"`)
+  // before it calls `tmux resize-window`. We gate the claude launch on that
+  // file so the agent reads a matching PTY size on first render. CLI-only
+  // dispatches (`ark session start` with no web terminal) fall through the
+  // GEOMETRY_WAIT_MS deadline and use the legacy 120x50 default so the
+  // non-interactive path keeps working.
+  const geometryWait = `GEOMETRY_SENTINEL="\${ARK_SESSION_DIR:-/tmp/ark-session-unknown}/geometry"
+GEOMETRY_WAIT_MS=500
+waited=0
+while [ ! -f "$GEOMETRY_SENTINEL" ] && [ "$waited" -lt "$GEOMETRY_WAIT_MS" ]; do
+  sleep 0.05
+  waited=$((waited + 50))
+done
+COLS=""
+ROWS=""
+if [ -f "$GEOMETRY_SENTINEL" ]; then
+  read -r COLS ROWS < "$GEOMETRY_SENTINEL" || true
+fi
+# Validate numeric -- protects against a partial write racing the read.
+# Empty, non-numeric, or "0" all fall through to the fallback so a malformed
+# sentinel can never set COLUMNS=0 (which would break every TUI).
+case "$COLS" in ''|*[!0-9]*|0) COLS="" ;; esac
+case "$ROWS" in ''|*[!0-9]*|0) ROWS="" ;; esac
+if [ -n "$COLS" ] && [ -n "$ROWS" ]; then
+  export COLUMNS="$COLS" LINES="$ROWS"
+else
+  export COLUMNS=120 LINES=50
+fi
+`;
+
   // When initialPrompt is provided, append it as the last positional arg
   // to trigger immediate processing. Separate it from option values with
   // `--`: `--dangerously-load-development-channels` is greedy and would
@@ -905,7 +945,7 @@ fi`;
 
   const content = `#!/bin/bash
 ${pathSetup}cd ${shellQuote(opts.workdir)}
-${envBlock}${body}
+${envBlock}${geometryWait}${body}
 exec bash
 `;
 
