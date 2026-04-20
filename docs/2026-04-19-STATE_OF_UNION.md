@@ -8,6 +8,7 @@
 ## 1. Headline
 
 - **Two-day alignment pass delivered.** Five dated review docs published on 2026-04-18 (reconciliation, Rohit/Abhimanyu flow support, code-intelligence design, unified summary, collated roadmap) plus a 2026-04-19 progress audit. These are the point-in-time record.
+- **Correction 2026-04-19 (later in day):** ad-hoc recipe-file dispatch is already shipped via the general `inputs.files` + `inputs.params` contract on both CLI (`--file role=path` + `--param k=v` at `packages/cli/commands/session.ts:42-67`) and Web UI (`InputsSection` component). This closes item 6 of the reconciliation §8 off-roadmap gap list -- 7 of 8 remain, not 8.
 - **codebase-memory-mcp integration SHIPPED** (PR #202, merged into main). v0.6.0 static C binary vendored; 14 code-intelligence tools auto-injected into every agent session; CLI + Web UI surfaces live. Paper: arXiv:2603.27277 claims 10x fewer tokens + 2.1x fewer tool calls vs pure-Grep baselines.
 - **Harinder's anchor:** *"We are 90% there."* Deep audit confirms. Remaining work is vocabulary alignment + integration + polish, not new subsystems.
 - **Compute platform advanced materially** since 2026-04-18: Awilix DI split, SnapshotStore + pause/resume, ComputePool with Firecracker warm pool, polymorphic ProviderFlagSpec, session/dispatch RPC retired, SOLID audits + 6 structural refactors.
@@ -84,7 +85,7 @@ All 8 off-roadmap gaps from reconciliation §8. These are **product/schema decis
 | Loop nodes (Archon `until_bash` / `max_iterations` / `fresh_context`) | ~200 LOC in `state/flow.ts` + orchestrator | Ralph-pattern iterative loops |
 | Approval with rework (Archon `on_reject.prompt`) | ~150 LOC; session metadata fields | Human-in-the-loop refinement cycles |
 | Centralized MCP Router (arkd hosts + conductor routes) | ~780 LOC per design doc §5 | Pooling MCPs across sessions (Camp 10 + Camp 11 converge here) |
-| Sage-KB / `--recipe-file <path>` for ad-hoc Sage dispatch | ~0.5 day; synthetic inline agent | Rohit's entire Sage integration path |
+| ~~Sage-KB / ad-hoc recipe file dispatch~~ | ✅ **SHIPPED** | Both CLI and Web UI support via general `inputs.files` + `inputs.params` contract (CLI `--file role=path` + `--param k=v`; Web UI flow-aware InputsSection). See `packages/cli/commands/session.ts:42-67` and `packages/web/src/components/session/InputsSection.tsx`. More general than the 2026-04-18 spec. |
 | In-App browser (UI element selector on live app) | ~200 LOC + Playwright embed | Canvas feature #13 |
 | Foundry 2.0 Track 2 (AI Monitor + Self-Healing) | Unscoped; Atul's deck promises 2026-04-20 | Separate track; outside Ark roadmap unless decision lands |
 
@@ -92,10 +93,10 @@ All 8 off-roadmap gaps from reconciliation §8. These are **product/schema decis
 
 Revised from `COLLATED_ROADMAP.md` Week 1 based on what actually landed vs slipped. Priority: close the cheap canvas items first, then pick one big gap per day.
 
-### Day 1 -- UI polish + `--recipe-file` (half a day)
+### Day 1 -- UI polish (quarter day)
 1. `ChatPanel.tsx:117` rename `"Send"` -> `"Chat"` (Abhimanyu 2026-04-13)
 2. `SessionDetail.tsx:51, 86-88` add Info tooltips on Fork + Dispatch buttons (Abhimanyu 2026-04-13)
-3. Wire `ark session start --recipe-file <path>` + synthetic inline agent (spec: `SUPPORTING_ROHIT_AND_ABHIMANYU_FLOWS.md` §6)
+3. ~~Ad-hoc recipe-file dispatch~~ **already shipped** via general inputs contract (`--file role=path` + `--param k=v`) on both CLI and Web UI. Confirm with a real dispatch against Rohit's `PAI-31080-goose-recipe.yaml` on Day 2.
 
 ### Day 2 -- Dogfood Path A (Abhimanyu ISLC)
 4. Copy the 9 ISLC recipes (`~/Downloads/islc-*.yaml`) to `~/.ark/recipes/goose/`

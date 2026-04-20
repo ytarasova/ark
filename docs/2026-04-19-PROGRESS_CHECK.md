@@ -22,7 +22,7 @@
 | 3 | Loop nodes (Archon `until`/`until_bash`/`max_iterations`/`fresh_context`) | ❌ GAP | ❌ **still GAP** | No matches in state/services |
 | 4 | Approval with rework (Archon `on_reject.prompt`) | ❌ GAP | ❌ **still GAP** | No `on_reject`, `rejection_count`, `rejection_reason` in schema |
 | 5 | Centralized MCP Router | ❌ GAP | 🟡 **PARTIAL** | `packages/core/mcp-pool.ts` = socket pool; conductor routing design exists (`CODE_INTELLIGENCE_DESIGN.md` §5) but no code yet |
-| 6 | Sage-KB / `--recipe-file <path>` | ❌ GAP | 🟡 **PARTIAL** | `--recipe <name>` works from registry (packages/cli/commands/session.ts); ad-hoc `--recipe-file <path>` not landed |
+| 6 | Sage-KB / ad-hoc recipe file dispatch | ❌ GAP | ✅ **SHIPPED (via general inputs)** | Both CLI and Web UI support it via a more general `inputs.files` + `inputs.params` contract, not via a dedicated `--recipe-file` flag. CLI: `--file <role=path>` (repeatable) + `--param <k=v>` (repeatable) at `packages/cli/commands/session.ts:42-67`. Web UI: `InputsSection` component with flow-aware schema (`packages/web/src/components/session/InputsSection.tsx`) + `NewSessionModal.tsx:931-933`. Flows declare `inputs:` contract; CLI validates required inputs; goose runtimes get `--params k=v` passed through automatically. Example: `ark session start --flow sage-dispatch --file recipe=~/Downloads/PAI-31080-goose-recipe.yaml --param jira_key=PAI-31080` |
 | 7 | In-App browser (UI element selector) | ❌ GAP | ❌ **still GAP** | No Playwright UI in `packages/web/src/` |
 | 8 | Foundry 2.0 Track 2 (AI Monitor + Self-Healing) | 🔮 FUTURE | 🔮 **still FUTURE** | No prometheus/grafana/alert_rule code; outside Ark scope |
 | 9 | Multi-tenant + Multi-user | 🟡 PARTIAL | 🟡 **PARTIAL** (no progress) | `tenant_id` on 32 tables; auth disabled by default; hosted.ts untested |
@@ -43,7 +43,7 @@
 | 24 | **session/dispatch RPC removed** (#231) | n/a | ✅ **SHIPPED** | RPC surface removed; auto-dispatch on session creation preserved. Commit `221df1e2`. |
 | 25 | **Awilix DI split** (#248) | n/a | ✅ **SHIPPED** | `packages/core/di/` new dir (`index.ts`, `persistence.ts`, `services.ts`, `runtime.ts`, `container.ts`); PROXY injection; sessions + compute migrated. Commit `8a6c29df`. |
 
-Counts: **4 shipped, 7 partial, 11 still-gap, 3 still-future** (total 25). **8 off-roadmap gaps from reconciliation §8 are ALL still open.**
+Counts (corrected after reviewing `packages/cli/commands/session.ts:42-67` and `packages/web/src/components/session/InputsSection.tsx`): **5 shipped, 6 partial, 11 still-gap, 3 still-future** (total 25). **7 of the 8 off-roadmap gaps from reconciliation §8 are still open**; item 6 (ad-hoc recipe file dispatch) is shipped via a general `inputs.files` + `inputs.params` contract on both CLI and Web UI.
 
 ## 2. What actually changed between 2026-04-18 and 2026-04-19 (by commit family)
 
