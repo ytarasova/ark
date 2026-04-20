@@ -614,7 +614,7 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         {activeTab === "terminal" && (
           <div className="flex-1 min-h-0">
             {output ? (
-              <StaticTerminal output={output} />
+              <StaticTerminal output={output} cols={session?.pty_cols} rows={session?.pty_rows} />
             ) : (
               <div className="text-center py-12 text-[var(--fg-faint)] font-[family-name:var(--font-mono)] text-[12px]">
                 No terminal output available{isActive ? " yet" : ""}

@@ -2,9 +2,17 @@
  * Static terminal renderer -- displays recorded terminal output using xterm.js
  * so ANSI escape codes (colors, formatting) render correctly.
  *
- * Uses manual column detection (not FitAddon) so horizontal scroll works:
- * we size the terminal to the widest line in the output, and the container
- * has overflow-x-auto so users can scroll to see long lines.
+ * Column detection strategy:
+ *   1. Use the explicit `cols` prop when provided. The server pins the tmux
+ *      PTY geometry at dispatch (see session.pty_cols) so the replay renders
+ *      at the same width the agent wrote against. Cursor-position ANSI codes
+ *      then land where the agent put them.
+ *   2. Otherwise fall back to auto-detection -- widest line after ANSI strip,
+ *      floored at 120. The floor is a safety net for wide output captured
+ *      before pty_cols was persisted.
+ *
+ * The container has overflow-x-auto so users can scroll to see long lines
+ * even when the measured geometry exceeds the browser viewport.
  */
 
 import { useEffect, useRef } from "react";
@@ -13,33 +21,40 @@ import "@xterm/xterm/css/xterm.css";
 
 interface StaticTerminalProps {
   output: string;
+  /** Explicit column count (session.pty_cols). Falls back to auto-detect. */
+  cols?: number | null;
+  /** Explicit row count (session.pty_rows). Only used as an initial hint;
+   *  fitRows() still adjusts to the container. */
+  rows?: number | null;
 }
 
 const ANSI_RE = /\x1b\[[0-9;?]*[A-Za-z]/g;
+const DEFAULT_COL_FLOOR = 120;
 
 function stripAnsi(s: string): string {
   return s.replace(ANSI_RE, "");
 }
 
 function detectCols(output: string): number {
-  let max = 80;
+  let max = DEFAULT_COL_FLOOR;
   for (const line of stripAnsi(output).split("\n")) {
     if (line.length > max) max = line.length;
   }
   return max;
 }
 
-export function StaticTerminal({ output }: StaticTerminalProps) {
+export function StaticTerminal({ output, cols: colsProp, rows: rowsProp }: StaticTerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!containerRef.current || !output) return;
 
-    const cols = detectCols(output);
+    const cols = colsProp && colsProp > 0 ? colsProp : detectCols(output);
     const cellHeight = 14;
 
     const term = new XTerm({
       cols,
+      rows: rowsProp && rowsProp > 0 ? rowsProp : undefined,
       cursorBlink: false,
       disableStdin: true,
       fontSize: 10,
@@ -88,7 +103,7 @@ export function StaticTerminal({ output }: StaticTerminalProps) {
       resizeObserver.disconnect();
       term.dispose();
     };
-  }, [output]);
+  }, [output, colsProp, rowsProp]);
 
   return <div ref={containerRef} className="w-full h-full min-h-0 overflow-x-auto overflow-y-hidden bg-[#0a0a0a]" />;
 }
