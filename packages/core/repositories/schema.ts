@@ -30,6 +30,8 @@ export function initSchema(db: IDatabase): void {
       rework_prompt TEXT,
       rejected_at TEXT,
       rejected_reason TEXT,
+      pty_cols INTEGER,
+      pty_rows INTEGER,
       config TEXT DEFAULT '{}',
       user_id TEXT,
       tenant_id TEXT NOT NULL DEFAULT 'default',
