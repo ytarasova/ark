@@ -609,11 +609,12 @@ describe("stop()", () => {
 
 describe("AppContext integration", () => {
   it("registerComputePool / getComputePool round-trips by compute kind", async () => {
-    const { AppContext, setApp, clearApp } = await import("../../core/app.js");
+    const { AppContext } = await import("../../core/app.js");
+    const helpers = await import("../../core/__tests__/test-helpers.js");
     const app = await AppContext.forTestAsync();
     try {
       await app.boot();
-      setApp(app);
+      helpers.setApp(app);
 
       const { compute } = makeHarness();
       pool = new LocalFirecrackerPool(compute, cfg({ target: 0, min: 0, max: 2 }));
@@ -625,7 +626,7 @@ describe("AppContext integration", () => {
       expect(app.listComputePools()).toContain("firecracker");
     } finally {
       await app.shutdown();
-      clearApp();
+      helpers.clearApp();
     }
   });
 });
