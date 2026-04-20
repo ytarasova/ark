@@ -28,6 +28,18 @@ export function registerExecTryCommands(program: Command, app: AppContext | null
     .option("-g, --group <name>", "Group name")
     .option("-a, --autonomy <level>", "Autonomy: full/execute/edit/read-only")
     .option("-o, --output <format>", "Output: text/json", "text")
+    .option(
+      "-i, --input <pair>",
+      "Session input file as role=path (repeatable). Accessible to flows/agents as {inputs.files.<role>}.",
+      (v: string, acc: string[]) => [...acc, v],
+      [] as string[],
+    )
+    .option(
+      "-p, --param <pair>",
+      "Session input param as key=value (repeatable). Accessible as {inputs.params.<key>}.",
+      (v: string, acc: string[]) => [...acc, v],
+      [] as string[],
+    )
     .option("--timeout <seconds>", "Timeout in seconds (0=unlimited)", "0")
     .action(async (opts) => {
       // `ark exec` needs the conductor running (for Claude Code hooks).
@@ -45,6 +57,8 @@ export function registerExecTryCommands(program: Command, app: AppContext | null
         autonomy: opts.autonomy,
         output: opts.output,
         timeout: parseInt(opts.timeout),
+        inputs: opts.input,
+        params: opts.param,
       });
 
       await execApp.shutdown();

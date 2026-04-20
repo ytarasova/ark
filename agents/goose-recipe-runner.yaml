@@ -1,0 +1,15 @@
+name: goose-recipe-runner
+description: "Goose agent that executes a recipe file passed via session inputs."
+runtime: goose
+max_turns: 200
+recipe: "{inputs.files.recipe}"
+system_prompt: |
+  Executes the goose recipe at {inputs.files.recipe}. The recipe file is the
+  source of truth for the task; this stanza is informational only.
+tools: []
+mcp_servers: []
+skills: []
+memories: []
+context: []
+permission_mode: bypassPermissions
+env: {}

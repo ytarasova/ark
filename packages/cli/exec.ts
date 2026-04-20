@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import { resolve } from "path";
-import { existsSync } from "fs";
+import { existsSync, statSync } from "fs";
 import { startSession, dispatch, waitForCompletion } from "../core/services/session-orchestration.js";
 import type { AppContext } from "../core/app.js";
 
@@ -14,6 +14,45 @@ export interface ExecOpts {
   autonomy?: string;
   output?: "text" | "json";
   timeout?: number;
+  /** role=path pairs. Paths are resolved relative to process.cwd(). */
+  inputs?: string[];
+  /** key=value pairs. */
+  params?: string[];
+}
+
+export function parsePair(pair: string, flag: string): [string, string] {
+  const eq = pair.indexOf("=");
+  if (eq <= 0) {
+    throw new Error(`${flag} expects <key>=<value>, got: ${pair}`);
+  }
+  const key = pair.slice(0, eq).trim();
+  const value = pair.slice(eq + 1);
+  if (!key) throw new Error(`${flag} has empty key: ${pair}`);
+  return [key, value];
+}
+
+export function parseInputs(raw: string[] | undefined): Record<string, string> | undefined {
+  if (!raw?.length) return undefined;
+  const files: Record<string, string> = {};
+  for (const pair of raw) {
+    const [role, relPath] = parsePair(pair, "--input");
+    const abs = resolve(relPath);
+    if (!existsSync(abs) || !statSync(abs).isFile()) {
+      throw new Error(`--input ${role}: file not found at ${abs}`);
+    }
+    files[role] = abs;
+  }
+  return files;
+}
+
+export function parseParams(raw: string[] | undefined): Record<string, string> | undefined {
+  if (!raw?.length) return undefined;
+  const params: Record<string, string> = {};
+  for (const pair of raw) {
+    const [key, value] = parsePair(pair, "--param");
+    params[key] = value;
+  }
+  return params;
 }
 
 export async function execSession(app: AppContext, opts: ExecOpts): Promise<number> {
@@ -38,6 +77,11 @@ export async function execSession(app: AppContext, opts: ExecOpts): Promise<numb
       .replace(/^-|-$/g, "")
       .slice(0, 60) || rawSummary;
 
+  // Parse --input / --param before session creation so errors surface early.
+  const files = parseInputs(opts.inputs);
+  const params = parseParams(opts.params);
+  const inputs = files || params ? { ...(files ? { files } : {}), ...(params ? { params } : {}) } : undefined;
+
   // Create session
   log(`Creating session: ${summary}`);
   const session = startSession(app, {
@@ -48,6 +92,7 @@ export async function execSession(app: AppContext, opts: ExecOpts): Promise<numb
     flow: opts.flow ?? "bare",
     compute_name: opts.compute,
     group_name: opts.group,
+    inputs,
   });
 
   // Dispatch
