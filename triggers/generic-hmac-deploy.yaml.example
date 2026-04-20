@@ -1,0 +1,14 @@
+# Generic HMAC fallback -- the `generic-hmac` source accepts any system that
+# can sign requests with HMAC-SHA256. Override the header name with
+# `ARK_TRIGGER_GENERIC_HMAC_HEADER=x-foo-signature` if your sender uses
+# something other than `X-Signature`.
+
+name: generic-deploy
+source: generic-hmac
+kind: webhook
+event: deploy.started
+flow: smoke-test
+summary: "deploy $.ref"
+inputs:
+  ref: $.ref
+  service: $.payload.service

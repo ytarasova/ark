@@ -96,6 +96,12 @@ export interface FlowDefinition {
   stages: StageDefinition[];
   edges?: FlowEdgeDefinition[];
   inputs?: FlowInputsSchema;
+  /**
+   * Named connectors (by registry key) that every stage in this flow
+   * inherits. See `packages/core/connectors/` for the registry. Resolved
+   * at dispatch time into MCP server entries + optional context prefills.
+   */
+  connectors?: string[];
 }
 
 // ── Stage navigation ────────────────────────────────────────────────────────

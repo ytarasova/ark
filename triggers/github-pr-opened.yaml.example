@@ -1,0 +1,23 @@
+# Example: kick the `review-pr` flow whenever a pull request opens against
+# paytmteam/foo. Rename the file to `github-pr-opened.yaml` (drop `.example`)
+# to enable.
+#
+# Set the GitHub webhook URL to:
+#   POST https://<ark-host>/api/webhooks/github
+# Header `X-Hub-Signature-256` is verified against the secret resolved from
+# `~/.ark/secrets.yaml` (`triggers.github.signing_key`) or the
+# `ARK_TRIGGER_GITHUB_SECRET` env var.
+
+name: github-pr-opened
+source: github
+kind: webhook
+event: pull_request.opened
+match:
+  repo: paytmteam/foo
+flow: review-pr
+summary: "PR $.payload.pull_request.number: $.payload.pull_request.title"
+inputs:
+  prUrl: $.payload.pull_request.html_url
+  branch: $.payload.pull_request.head.ref
+params:
+  ticket: $.payload.pull_request.title

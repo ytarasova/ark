@@ -1,0 +1,11 @@
+name: bitbucket-push-main
+source: bitbucket
+kind: webhook
+event: repo.push
+match:
+  repo: paytmteam/payments
+flow: ci
+summary: "push to $.ref by $.actor.name"
+inputs:
+  branch: $.ref
+  actor: $.actor.name

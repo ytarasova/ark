@@ -153,5 +153,13 @@ export interface FlowDefinition {
   stages: StageDefinition[];
   edges?: FlowEdgeDefinition[];
   inputs?: FlowInputsSchema;
+  /**
+   * Named connectors (by registry key) that every stage in this flow
+   * inherits. Each connector can contribute an MCP server or prefill
+   * context; resolution lives in `packages/core/connectors/`. Runtime
+   * and session-level opt-ins still apply on top -- connectors here
+   * merge additively with runtime mcp_servers + session --with-mcp.
+   */
+  connectors?: string[];
   source?: "builtin" | "user";
 }

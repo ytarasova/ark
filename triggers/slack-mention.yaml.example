@@ -1,0 +1,9 @@
+name: slack-mention
+source: slack
+kind: webhook
+event: app_mention
+flow: quick
+summary: "Slack mention from $.actor.id in $.ref"
+inputs:
+  text: $.payload.event.text
+  user: $.actor.id

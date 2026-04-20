@@ -26,6 +26,7 @@ import {
   type IssueWebhookConfig,
   type IssueWebhookPayload,
 } from "../integrations/github-webhook.js";
+import { handleWebhookRequest, matchWebhookPath } from "../../server/handlers/webhooks.js";
 import { type SSEBus, createSSEBus } from "./sse-bus.js";
 import { extractTenantContext, canWrite, type AuthConfig } from "../auth/index.js";
 import type { TenantContext } from "../../types/index.js";
@@ -373,7 +374,23 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
         }
       }
 
-      // GitHub webhook
+      // Unified trigger webhooks: POST /api/webhooks/:source (or /webhooks/:source).
+      // Handles every registered source (github, bitbucket, slack, linear, jira,
+      // generic-hmac, ...). Signature verification + 2xx-fast dispatch lives in
+      // packages/server/handlers/webhooks.ts.
+      if (req.method === "POST" && matchWebhookPath(url.pathname)) {
+        if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
+        try {
+          const response = await handleWebhookRequest(requestApp, req, {
+            tenant: tenantCtx?.tenantId ?? "default",
+          });
+          return response;
+        } catch (err) {
+          return errorResponse(err);
+        }
+      }
+
+      // GitHub issue webhook (legacy pre-unified path).
       if (url.pathname === "/api/webhooks/github/issues" && req.method === "POST") {
         if (readOnly) return jsonResponse({ ok: false, message: "Read-only mode" }, 403);
         try {

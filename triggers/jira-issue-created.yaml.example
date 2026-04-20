@@ -1,0 +1,9 @@
+name: jira-issue-created
+source: jira
+kind: webhook
+event: issue.created
+flow: quick
+summary: "Jira $.ref: $.payload.issue.fields.summary"
+inputs:
+  jiraKey: $.ref
+  summary: $.payload.issue.fields.summary

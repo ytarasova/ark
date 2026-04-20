@@ -1,0 +1,9 @@
+name: linear-issue-created
+source: linear
+kind: webhook
+event: issue.create
+flow: quick
+summary: "Linear $.ref: $.payload.data.title"
+inputs:
+  title: $.payload.data.title
+  url: $.payload.url

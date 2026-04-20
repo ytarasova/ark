@@ -135,9 +135,14 @@ export async function _launchAgentTmux(
   const channelPort = app.sessions.channelPort(session.id);
   const channelConfig = provider?.buildChannelConfig(session.id, stage, channelPort, { conductorUrl });
   const originalRepoDir = session.repo ? resolve(session.repo) : undefined;
-  // Runtime-declared MCP servers (see claude-code.ts for the rationale).
+  // Runtime-declared MCP servers + flow-level connectors. Runtime is the
+  // broad opt-in (every session on this runtime gets the toolbelt); flow
+  // connectors add per-flow MCP tools (e.g. a pi-sage-enabled review flow).
+  // See packages/core/connectors/resolve.ts for the merge rules.
   const runtimeName = agent.runtime;
-  const runtimeMcpServers = runtimeName ? (app.runtimes.get(runtimeName)?.mcp_servers ?? undefined) : undefined;
+  const { collectMcpEntries, flowConnectorsFor } = await import("../connectors/index.js");
+  const flowConnectors = flowConnectorsFor(app, session.flow);
+  const runtimeMcpServers = collectMcpEntries(app, session, { runtimeName, flowConnectors });
   const { resolveMcpConfigsDir } = await import("../install-paths.js");
   const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, {
     conductorUrl,

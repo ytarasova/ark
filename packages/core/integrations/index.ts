@@ -21,3 +21,14 @@ export {
   type CheckSuiteResult,
   type RevertPayload,
 } from "./rollback.js";
+
+// ── Unified registry ────────────────────────────────────────────────────────
+// `Integration` pairs a trigger source + connector under one name. Callers
+// asking "does Ark talk to github?" land here.
+export {
+  buildIntegrationCatalog,
+  getIntegration,
+  listIntegrations,
+  type Integration,
+  type IntegrationStatus,
+} from "./registry.js";

@@ -59,13 +59,14 @@ export const claudeCodeExecutor: Executor = {
     // Resolve the original repo path so MCP servers from the source repo's
     // .mcp.json can be merged into the worktree's .mcp.json.
     const originalRepoDir = session.repo ? resolve(session.repo) : undefined;
-    // Runtime-declared MCP servers (e.g. `mcp_servers: [pi-sage]` in
-    // runtimes/claude.yaml) get merged into .mcp.json alongside the
-    // ark-channel + codebase-memory injections. The runtime is the natural
-    // opt-in level: every session running on a given runtime inherits its
-    // toolbelt without each agent YAML having to re-declare it.
+    // Runtime-declared MCP servers + flow-level connectors. Runtime is the
+    // broad opt-in (every session on this runtime gets the toolbelt); flow
+    // connectors add per-flow MCP tools. See connectors/resolve.ts for the
+    // merge rules.
     const runtimeName = opts.agent.runtime;
-    const runtimeMcpServers = runtimeName ? (app.runtimes.get(runtimeName)?.mcp_servers ?? undefined) : undefined;
+    const { collectMcpEntries, flowConnectorsFor } = await import("../connectors/index.js");
+    const flowConnectors = flowConnectorsFor(app, session.flow);
+    const runtimeMcpServers = collectMcpEntries(app, session, { runtimeName, flowConnectors });
     const { resolveMcpConfigsDir } = await import("../install-paths.js");
     const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, {
       conductorUrl,

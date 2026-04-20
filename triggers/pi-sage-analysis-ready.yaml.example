@@ -1,0 +1,16 @@
+# Pi-sage posts an analysis-ready event when a deep KB analysis completes.
+# Wire this to the (in-flight) `from-sage-analysis` flow which fans out one
+# Ark stream per affected repo. If the flow does not exist yet, the
+# webhook handler still creates the session row -- no agent dispatch -- so
+# this is safe to enable before the flow lands.
+
+name: pi-sage-analysis-ready
+source: pi-sage
+kind: webhook
+event: analysis.ready
+flow: from-sage-analysis
+summary: "Pi-sage analysis $.ref ($.payload.ticket)"
+inputs:
+  analysisId: $.payload.analysis_id
+  baseUrl: $.payload.base_url
+  ticket: $.payload.ticket

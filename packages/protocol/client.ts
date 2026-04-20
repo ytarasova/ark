@@ -935,6 +935,44 @@ export class ArkClient {
     await this.rpc("schedule/disable", { id });
   }
 
+  // ── Triggers (unified webhook / schedule / poll / event) ───────────────────
+
+  async triggerList(tenant?: string): Promise<{ triggers: any[] }> {
+    return this.rpc("trigger/list", { tenant });
+  }
+
+  async triggerGet(name: string, tenant?: string): Promise<{ trigger: any }> {
+    return this.rpc("trigger/get", { name, tenant });
+  }
+
+  async triggerEnable(name: string, tenant?: string): Promise<void> {
+    await this.rpc("trigger/enable", { name, tenant });
+  }
+
+  async triggerDisable(name: string, tenant?: string): Promise<void> {
+    await this.rpc("trigger/disable", { name, tenant });
+  }
+
+  async triggerReload(): Promise<void> {
+    await this.rpc("trigger/reload");
+  }
+
+  async triggerSources(): Promise<{
+    sources: Array<{ name: string; label: string; status: string; secretEnvVar: string }>;
+  }> {
+    return this.rpc("trigger/sources");
+  }
+
+  async triggerTest(opts: {
+    name: string;
+    payload: unknown;
+    headers?: Record<string, string>;
+    tenant?: string;
+    dryRun?: boolean;
+  }): Promise<{ ok: boolean; fired: boolean; sessionId?: string; dryRun?: boolean; message?: string; event?: any }> {
+    return this.rpc("trigger/test", opts);
+  }
+
   // ── History extended ───────────────────────────────────────────────────────
 
   async indexStats(): Promise<IndexStatsResult> {
