@@ -1,28 +1,40 @@
 /**
- * ControlPlaneEventStore adapter -- stub.
+ * ControlPlaneEventStore adapter.
  *
- * Hosted Postgres-backed EventRepository. Slice 1 migration.
+ * Hosted Postgres-backed EventRepository. The repository itself is SQL-agnostic
+ * via `IDatabase`, so the implementation is identical to `LocalEventStore`;
+ * the distinction lives in which `IDatabase` is injected at the composition root.
  */
 
 import type { EventStore, EventLogOpts, EventListOpts } from "../../ports/event-store.js";
 import type { Event } from "../../../types/index.js";
-
-const NOT_MIGRATED = new Error("ControlPlaneEventStore: not migrated yet -- Slice 1");
+import { EventRepository } from "../../repositories/event.js";
+import type { IDatabase } from "../../database/index.js";
 
 export class ControlPlaneEventStore implements EventStore {
-  setTenant(_tenantId: string): void {
-    throw NOT_MIGRATED;
+  private repo: EventRepository;
+
+  constructor(db: IDatabase) {
+    this.repo = new EventRepository(db);
   }
+
+  setTenant(tenantId: string): void {
+    this.repo.setTenant(tenantId);
+  }
+
   getTenant(): string {
-    throw NOT_MIGRATED;
+    return this.repo.getTenant();
   }
-  log(_trackId: string, _type: string, _opts?: EventLogOpts): void {
-    throw NOT_MIGRATED;
+
+  log(trackId: string, type: string, opts?: EventLogOpts): void {
+    this.repo.log(trackId, type, opts);
   }
-  list(_trackId: string, _opts?: EventListOpts): Event[] {
-    throw NOT_MIGRATED;
+
+  list(trackId: string, opts?: EventListOpts): Event[] {
+    return this.repo.list(trackId, opts);
   }
-  deleteForTrack(_trackId: string): void {
-    throw NOT_MIGRATED;
+
+  deleteForTrack(trackId: string): void {
+    this.repo.deleteForTrack(trackId);
   }
 }

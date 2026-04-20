@@ -1,28 +1,60 @@
 /**
- * InMemoryEventStore adapter -- stub.
+ * InMemoryEventStore adapter.
  *
- * Slice 1: in-memory array for unit-test audit-log assertions.
+ * In-memory array implementation for unit-test audit-log assertions.
+ * Tenant scoping is enforced by filtering on the active tenant.
  */
 
 import type { EventStore, EventLogOpts, EventListOpts } from "../../ports/event-store.js";
 import type { Event } from "../../../types/index.js";
 
-const NOT_MIGRATED = new Error("InMemoryEventStore: not migrated yet -- Slice 1");
+interface StoredEvent extends Event {
+  tenant_id: string;
+}
 
 export class InMemoryEventStore implements EventStore {
-  setTenant(_tenantId: string): void {
-    throw NOT_MIGRATED;
+  private rows: StoredEvent[] = [];
+  private tenantId: string = "default";
+  private nextId = 1;
+
+  setTenant(tenantId: string): void {
+    this.tenantId = tenantId;
   }
+
   getTenant(): string {
-    throw NOT_MIGRATED;
+    return this.tenantId;
   }
-  log(_trackId: string, _type: string, _opts?: EventLogOpts): void {
-    throw NOT_MIGRATED;
+
+  log(trackId: string, type: string, opts?: EventLogOpts): void {
+    const row: StoredEvent = {
+      id: this.nextId++,
+      track_id: trackId,
+      type,
+      stage: opts?.stage ?? null,
+      actor: opts?.actor ?? null,
+      data: opts?.data ? { ...opts.data } : null,
+      created_at: new Date().toISOString(),
+      tenant_id: this.tenantId,
+    };
+    this.rows.push(row);
   }
-  list(_trackId: string, _opts?: EventListOpts): Event[] {
-    throw NOT_MIGRATED;
+
+  list(trackId: string, opts?: EventListOpts): Event[] {
+    const limit = opts?.limit ?? 200;
+    const filtered = this.rows.filter((r) => {
+      if (r.track_id !== trackId) return false;
+      if (r.tenant_id !== this.tenantId) return false;
+      if (opts?.type && r.type !== opts.type) return false;
+      return true;
+    });
+    filtered.sort((a, b) => a.id - b.id);
+    return filtered.slice(0, limit).map((r) => {
+      const { tenant_id: _tid, ...event } = r;
+      return event;
+    });
   }
-  deleteForTrack(_trackId: string): void {
-    throw NOT_MIGRATED;
+
+  deleteForTrack(trackId: string): void {
+    this.rows = this.rows.filter((r) => !(r.track_id === trackId && r.tenant_id === this.tenantId));
   }
 }
