@@ -8,6 +8,12 @@
 FROM oven/bun:1.3 AS deps
 WORKDIR /app
 
+# Build tools for transitive native modules (better-sqlite3 etc.). Only
+# present in the deps stage; stripped from the final production image.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --production
 
