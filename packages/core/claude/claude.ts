@@ -843,17 +843,27 @@ export function buildLauncher(opts: LauncherOpts): { content: string; claudeSess
   const promptArg = opts.initialPrompt ? ` \\\n  -- ${shellQuote(opts.initialPrompt)}` : "";
 
   // Wrap the claude invocation so a non-zero exit is surfaced back to Ark.
-  // `exec bash` below keeps the tmux pane alive (so the user can read the
-  // error + debug), but without this sentinel, Ark's status poller sees the
-  // tmux session as still "alive" and never flips the Ark session to
-  // `failed`. The poller watches $ARK_SESSION_DIR/exit-code to detect this
-  // case. See session-orchestration docs + status-poller.ts.
+  //
+  // The launcher deliberately does NOT keep the tmux pane alive after
+  // claude exits -- that was the old post-mortem behaviour via a trailing
+  // `exec bash`, and it's what caused 142 orphaned tmux sessions to
+  // accumulate across a single test run. When claude exits, the pane
+  // exits, tmux dies, and the AgentRegistry reaps the handle. Users who
+  // want to inspect a dead session's workdir should run `ark session
+  // attach <id>` (separate CLI, opens a one-shot shell in the workdir).
+  //
+  // The exit-code sentinel is kept for the status-poller's failed/completed
+  // distinction: on non-zero exit the launcher writes the code to
+  // `$ARK_SESSION_DIR/exit-code` *before* returning that same code from the
+  // script. status-poller reads the file on its next tick and flips the Ark
+  // session to `failed`. On exit 0 the script returns 0 with no sentinel and
+  // the TmuxAgentHandle's `pane-death` path fires `completed`.
   //
   // `ARK_SESSION_DIR` is exported into the launch env by the executor
   // (see executors/claude-code.ts). If it is not set (defensive default),
   // we fall back to writing under /tmp so the file write never breaks the
   // launcher -- the poller just won't find the sentinel and the session
-  // stays "running", which matches the pre-bug-3 behaviour.
+  // appears as `completed` on pane-death.
   const sentinelDir = `"\${ARK_SESSION_DIR:-/tmp/ark-session-unknown}"`;
   const primary = opts.prevClaudeSessionId
     ? `${claudeCmd} --resume ${shellQuote(opts.prevClaudeSessionId)} \\
@@ -865,30 +875,34 @@ export function buildLauncher(opts: LauncherOpts): { content: string; claudeSess
   ${extraFlags}${promptArg}`
     : null;
 
+  // Run claude. On non-zero exit: record the code, surface stderr, and
+  // exit with the same code. The tmux pane dies on exit, which is how
+  // the AgentRegistry reaps the handle (and via pane-death, tmux session).
   const body = fallback
     ? `if ${primary}; then
-  :
+  code=0
 elif ${fallback}; then
-  :
+  code=0
 else
   code=$?
   mkdir -p ${sentinelDir} 2>/dev/null || true
   echo "$code" > ${sentinelDir}/exit-code
   echo "Claude exited with code $code. Session marked failed." >&2
-fi`
+fi
+exit $code`
     : `if ${primary}; then
-  :
+  code=0
 else
   code=$?
   mkdir -p ${sentinelDir} 2>/dev/null || true
   echo "$code" > ${sentinelDir}/exit-code
   echo "Claude exited with code $code. Session marked failed." >&2
-fi`;
+fi
+exit $code`;
 
   const content = `#!/bin/bash
 ${pathSetup}cd ${shellQuote(opts.workdir)}
 ${envBlock}${body}
-exec bash
 `;
 
   return { content, claudeSessionId };

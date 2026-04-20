@@ -230,5 +230,15 @@ export async function _launchAgentTmux(
   claude.deliverTask(session.id, channelPort, task, stage);
   app.sessions.update(session.id, { claude_session_id: claudeSessionId });
 
+  // Register an AgentHandle so AppContext.shutdown reaps this tmux session.
+  const { TmuxAgentHandle } = await import("./tmux-agent-handle.js");
+  const handle = new TmuxAgentHandle({
+    sessionId: session.id,
+    tmuxName: launchResult.handle,
+    workdir: effectiveWorkdir,
+    sessionDir,
+  });
+  app.agentRegistry.register(handle);
+
   return launchResult.handle;
 }

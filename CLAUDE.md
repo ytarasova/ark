@@ -61,7 +61,7 @@ No workspaces -- packages coordinated via relative imports.
 
 **Bun-only.** Uses `bun:sqlite`, `Bun.serve()`, `Bun.sleep()`. Will not run under Node.
 
-**Tmux required.** Sessions launch agents in tmux (`ark-s-<id>`). No fallback.
+**Tmux required.** Sessions launch agents in tmux (`ark-s-<id>`). No fallback. The launcher script does NOT end with `exec bash` -- when the agent process exits, the tmux pane dies, and the `AgentRegistry` (`app.agentRegistry`) reaps the `AgentHandle`. See `docs/agent-lifecycle.md` for the full spawn/watch/reap contract. For post-mortem inspection of a dead session use `ark session attach <id>` (TODO; wire up in a follow-up).
 
 **ES module `.js` extensions required.** `import { foo } from "./bar.js"` -- omitting `.js` breaks at runtime.
 

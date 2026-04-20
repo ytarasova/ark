@@ -532,9 +532,13 @@ describe("buildLauncher", () => {
     expect(content).toContain("--dangerously-load-development-channels server:ark-channel");
   });
 
-  it("ends with exec bash", () => {
+  it("ends with `exit $code` (no exec bash -- tmux pane dies with claude)", () => {
     const { content } = buildLauncher(baseOpts);
-    expect(content.trimEnd().endsWith("exec bash")).toBe(true);
+    // The old `exec bash` trailer was the root cause of the 142 orphaned
+    // tmux sessions. Dropping it means pane-death fires as soon as claude
+    // exits, and the AgentRegistry reaps the tmux handle.
+    expect(content).not.toContain("exec bash");
+    expect(content.trimEnd().endsWith("exit $code")).toBe(true);
   });
 
   it("shell-quotes the claude args in the launcher", () => {
@@ -663,9 +667,14 @@ describe("buildLauncher exit-code sentinel", () => {
     expect(content).toContain("${ARK_SESSION_DIR:-/tmp/ark-session-unknown}");
   });
 
-  it("keeps exec bash at the end so tmux stays alive for post-mortem", () => {
+  it("exits with the captured code so the tmux pane dies with claude", () => {
     const { content } = buildLauncher(baseOpts);
-    expect(content.trimEnd().endsWith("exec bash")).toBe(true);
+    // No more `exec bash` post-mortem -- users who want to inspect the dir
+    // run `ark session attach <id>` instead. See docs/agent-lifecycle.md.
+    expect(content).not.toContain("exec bash");
+    // The script must end with `exit $code` so the tmux pane's exit status
+    // reflects what claude did, and the pane dies when claude exits.
+    expect(content.trimEnd().endsWith("exit $code")).toBe(true);
   });
 
   it("resume + fallback: only the final failure writes the sentinel", () => {
@@ -700,11 +709,15 @@ describe("buildLauncher exit-code sentinel", () => {
 
   it("does not include prompt arg when initialPrompt is undefined", () => {
     const { content } = buildLauncher(baseOpts);
-    // After the channel flag, script should just have exec bash
+    // When no initialPrompt is set, no positional arg should appear after
+    // the channel flag. The channel flag line is the last line of the
+    // claude invocation, and it must not be followed by a quoted-string
+    // positional (which would look like `  'prompt text'`).
     const lines = content.split("\n");
-    const execLine = lines.findIndex((l) => l.trim() === "exec bash");
-    // The line before exec bash should not contain a quoted prompt
-    expect(lines[execLine - 1]).not.toMatch(/^\s+'.*'$/);
+    const channelFlagIdx = lines.findIndex((l) => l.includes("server:ark-channel"));
+    expect(channelFlagIdx).toBeGreaterThanOrEqual(0);
+    const next = lines[channelFlagIdx + 1] ?? "";
+    expect(next).not.toMatch(/^\s+'.*'$/);
   });
 
   it("includes prompt in resume fallback branch too", () => {

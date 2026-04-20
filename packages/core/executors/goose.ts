@@ -204,6 +204,16 @@ export const gooseExecutor: Executor = {
     mkdirSync(join(app.config.arkDir, "recordings"), { recursive: true });
     await tmux.pipePaneAsync(tmuxName, recPath);
 
+    // Register an AgentHandle so the registry can reap tmux on shutdown.
+    const { TmuxAgentHandle } = await import("../services/tmux-agent-handle.js");
+    const handle = new TmuxAgentHandle({
+      sessionId: session.id,
+      tmuxName,
+      workdir: effectiveWorkdir,
+      sessionDir: trackDir,
+    });
+    app.agentRegistry.register(handle);
+
     return { ok: true, handle: tmuxName, pid: rootPid ?? undefined };
   },
 

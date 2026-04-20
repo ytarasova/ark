@@ -35,5 +35,15 @@ export class SessionDrain {
         logDebug("general", "sessionService.stopAll failed during shutdown");
       }
     }
+    // Belt-and-suspenders: reap any AgentHandle still registered (e.g. a
+    // dispatch that landed after stopAll finished, or a handle whose session
+    // row was already cleaned up). This is the anti-regression net against
+    // the 142 orphaned tmux sessions bug -- if the production code path
+    // forgot to register / deregister correctly, this catches it.
+    try {
+      await this.app.agentRegistry.stopAll();
+    } catch {
+      logDebug("general", "agentRegistry.stopAll failed during shutdown");
+    }
   }
 }

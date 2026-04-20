@@ -12,18 +12,15 @@ import { describe, it, expect, afterEach, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../app.js";
 import { startSession, dispatch, stop, resume, complete, getOutput } from "../services/session-orchestration.js";
 import { sessionExists, killSession } from "../infra/tmux.js";
-import { snapshotArkTmuxSessions, killNewArkTmuxSessions } from "./test-helpers.js";
 
 let app: AppContext;
-let tmuxSnapshot: Set<string>;
 beforeAll(async () => {
-  tmuxSnapshot = snapshotArkTmuxSessions();
   app = await AppContext.forTestAsync();
   await app.boot();
 });
 afterAll(async () => {
-  if (app?.sessionService) await app.sessionService.stopAll();
-  killNewArkTmuxSessions(tmuxSnapshot);
+  // AppContext.shutdown() goes through SessionDrain, which reaps every
+  // live AgentHandle via the registry. No manual tmux sweeping required.
   await app?.shutdown();
 });
 

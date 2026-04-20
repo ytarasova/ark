@@ -273,6 +273,17 @@ export async function stop(
     logDebug("session", "fall through to tmux kill");
   }
 
+  // Stop the AgentHandle first if one is registered. The handle owns tmux
+  // teardown + its own poller; stop() is idempotent so if the provider
+  // kill below races, nothing breaks. Without this, a stop() call leaves
+  // the handle's poller ticking until it observes pane-death.
+  try {
+    const handle = app.agentRegistry.get(sessionId);
+    if (handle) await handle.stop();
+  } catch {
+    logDebug("session", "agent handle stop best-effort");
+  }
+
   // Kill agent + clean up provider resources FIRST (before any DB writes).
   // This ensures processes are stopped even if subsequent DB ops fail.
   //
