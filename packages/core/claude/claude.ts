@@ -243,6 +243,12 @@ export function writeChannelConfig(
     runtimeMcpServers?: (string | Record<string, unknown>)[];
     /** Directory holding `<name>.json` files referenced by string entries. */
     mcpConfigsDir?: string;
+    /**
+     * When true, additionally inject the unified `ark-code-intel` MCP server
+     * alongside the legacy `codebase-memory` entry. Gated by
+     * `config.features.codeIntelV2`. Wave 1 default: false.
+     */
+    enableCodeIntelV2?: boolean;
   },
 ): string {
   const config =
@@ -318,6 +324,18 @@ export function writeChannelConfig(
         CBM_UI_ENABLED: "false",
       },
     };
+  }
+
+  // Wave 1: gate the unified code-intel MCP behind the codeIntelV2 flag.
+  // The MCP server itself ships in Wave 2; for now we leave the entry name
+  // as the stable contract and skip injection until both the flag and the
+  // server binary are present.
+  if (opts?.enableCodeIntelV2 && !existing.mcpServers["ark-code-intel"]) {
+    // The MCP server binary lands in Wave 2. Until then, the flag has no
+    // observable effect at write-time -- intentional: we don't want to
+    // inject a broken MCP entry, but we do want the gate to be wired so
+    // downstream wiring lights up the moment the server ships.
+    void existing;
   }
 
   writeFileSync(mcpConfigPath, JSON.stringify(existing, null, 2));

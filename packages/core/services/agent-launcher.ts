@@ -151,6 +151,7 @@ export async function _launchAgentTmux(
     originalRepoDir,
     runtimeMcpServers,
     mcpConfigsDir: resolveMcpConfigsDir(),
+    enableCodeIntelV2: app.config.features.codeIntelV2,
   });
 
   // Status hooks + permissions allow-list -- write .claude/settings.local.json

@@ -57,6 +57,10 @@ import type { WorkerRegistry } from "./hosted/worker-registry.js";
 import type { SessionScheduler } from "./hosted/scheduler.js";
 import type { TenantPolicyManager } from "./auth/index.js";
 import type { KnowledgeStore } from "./knowledge/store.js";
+import type { CodeIntelStore } from "./code-intel/store.js";
+import { CodeIntelStore as CodeIntelStoreCtor } from "./code-intel/store.js";
+import type { Deployment } from "./code-intel/interfaces/deployment.js";
+import { buildDeployment } from "./code-intel/deployment.js";
 import type { PricingRegistry } from "./observability/pricing.js";
 import type { UsageRecorder } from "./observability/usage.js";
 import type { TensorZeroManager } from "./router/tensorzero.js";
@@ -86,6 +90,8 @@ export class AppContext {
   private _launcher: SessionLauncher = new TmuxLauncher();
   private _eventBusReady = false;
   private _apiKeys: ApiKeyManager | null = null;
+  private _codeIntel: CodeIntelStore | null = null;
+  private _deployment: Deployment | null = null;
   private _hostedServices: {
     workerRegistry?: WorkerRegistry;
     scheduler?: SessionScheduler;
@@ -286,6 +292,28 @@ export class AppContext {
   }
   get knowledge(): KnowledgeStore {
     return this._resolve("knowledge");
+  }
+
+  /**
+   * Code-intel store -- lazy. Constructed on first access and migrated
+   * automatically. Backed by SQLite locally, Postgres in control-plane.
+   * The store is independent of the legacy KnowledgeStore (which keeps
+   * operating in parallel).
+   */
+  get codeIntel(): CodeIntelStore {
+    if (!this._codeIntel) {
+      this._codeIntel = CodeIntelStoreCtor.fromApp(this);
+      this._codeIntel.migrate();
+    }
+    return this._codeIntel;
+  }
+
+  /** Deployment facade -- mode + store backend + vendor resolver. Lazy. */
+  get deployment(): Deployment {
+    if (!this._deployment) {
+      this._deployment = buildDeployment(this);
+    }
+    return this._deployment;
   }
 
   // ── Snapshot persistence ───────────────────────────────────────────────

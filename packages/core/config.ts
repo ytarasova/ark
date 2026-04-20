@@ -227,7 +227,7 @@ export function loadConfig(overrides: LoadConfigOptions = {}): ArkConfig {
     ports: { conductor: 19100, arkd: 19300, server: 19400, web: 8420 },
     channels: { basePort: 19200, range: 10000 },
     auth: { requireToken: profile === "control-plane", defaultTenant: null },
-    features: { autoRebase: profile === "control-plane", codegraph: false },
+    features: { autoRebase: profile === "control-plane", codegraph: false, codeIntelV2: false },
     observability: { logLevel: profile === "test" ? "error" : "info" },
     storage: { blobBackend: profile === "control-plane" ? "s3" : "local" },
   };
@@ -280,6 +280,7 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
   const features: FeaturesConfig = {
     autoRebase: merged.features.autoRebase ?? defaults.features.autoRebase,
     codegraph: merged.features.codegraph ?? defaults.features.codegraph,
+    codeIntelV2: merged.features.codeIntelV2 ?? defaults.features.codeIntelV2 ?? false,
   };
   const databaseUrl = overrides.databaseUrl ?? merged.databaseUrl ?? process.env.DATABASE_URL;
   const database: DatabaseConfig = { url: databaseUrl };

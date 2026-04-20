@@ -172,6 +172,13 @@ export interface FeaturesConfig {
    * @envvar ARK_CODEGRAPH
    */
   codegraph: boolean;
+  /**
+   * Enable the unified code-intel v2 stack (CodeIntelStore + ark-code-intel MCP).
+   * When false, `ark code-intel *` commands still operate on the store, but the
+   * unified MCP server is NOT injected into agent dispatch. Wave 1 default: false.
+   * @envvar ARK_CODE_INTEL_V2
+   */
+  codeIntelV2: boolean;
 }
 
 /**

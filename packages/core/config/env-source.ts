@@ -106,6 +106,8 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): EnvOverrides {
   if (autoRebase !== undefined) out.features.autoRebase = autoRebase;
   const codegraph = parseBool(env.ARK_CODEGRAPH);
   if (codegraph !== undefined) out.features.codegraph = codegraph;
+  const codeIntelV2 = parseBool(env.ARK_CODE_INTEL_V2);
+  if (codeIntelV2 !== undefined) out.features.codeIntelV2 = codeIntelV2;
 
   // Storage
   const blobBackend = env.ARK_BLOB_BACKEND?.toLowerCase();
