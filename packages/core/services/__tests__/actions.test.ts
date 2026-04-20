@@ -9,20 +9,18 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
-import { AppContext, clearApp, setApp } from "../../app.js";
+import { AppContext } from "../../app.js";
 import { executeAction, getAction, listActions } from "../actions/index.js";
 
 let app: AppContext;
 
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
 });
 
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 describe("action registry", () => {

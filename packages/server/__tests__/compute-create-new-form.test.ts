@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
-import { AppContext, setApp, clearApp } from "../../core/app.js";
+import { AppContext } from "../../core/app.js";
 import { Router } from "../router.js";
 import { registerResourceHandlers } from "../handlers/resource.js";
 
@@ -16,14 +16,12 @@ let router: Router;
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
   router = new Router();
   registerResourceHandlers(router, app);
 });
 
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 beforeEach(() => {

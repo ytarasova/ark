@@ -20,7 +20,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { advance, mediateStageHandoff } from "../services/session-orchestration.js";
 
 let app: AppContext;
@@ -28,10 +28,8 @@ let app: AppContext;
 beforeEach(async () => {
   if (app) {
     await app.shutdown();
-    clearApp();
   }
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
 });
 

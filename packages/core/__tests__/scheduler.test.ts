@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { WorkerRegistry } from "../hosted/worker-registry.js";
 import { SessionScheduler } from "../hosted/scheduler.js";
 import { mockSession } from "./test-helpers.js";
@@ -9,7 +9,6 @@ let app: AppContext;
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
 
   // Initialize worker registry and scheduler (normally done by hosted.ts)
   const registry = new WorkerRegistry(app.db);
@@ -20,7 +19,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 describe("SessionScheduler", () => {

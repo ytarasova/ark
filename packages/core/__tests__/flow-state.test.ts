@@ -7,8 +7,8 @@ import {
   isStageCompleted,
   deleteFlowState,
 } from "../state/flow-state.js";
-import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 

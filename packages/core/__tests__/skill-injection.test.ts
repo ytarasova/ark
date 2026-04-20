@@ -5,8 +5,8 @@
 import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
 import { buildClaudeArgs } from "../agent/agent.js";
-import { getApp } from "../app.js";
 import type { AgentDefinition } from "../agent/agent.js";
+import { getApp } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
 

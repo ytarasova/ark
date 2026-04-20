@@ -10,11 +10,12 @@ import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import { writeFileSync, mkdirSync, readFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
-import { AppContext, getApp, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { buildArgs, writeSettings, removeSettings } from "../claude/claude.js";
 import { resolveFlow } from "../state/flow.js";
 import { buildClaudeArgs } from "../agent/agent.js";
 import { buildSessionVars } from "../template.js";
+import { clearApp, getApp, setApp } from "./test-helpers.js";
 
 let app: AppContext;
 
@@ -32,8 +33,8 @@ beforeEach(async () => {
     clearApp();
   }
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
+  setApp(app);
   rmSync(flowDir(), { recursive: true, force: true });
 });
 

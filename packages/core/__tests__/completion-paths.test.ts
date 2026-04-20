@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, afterAll } from "bun:test";
-import { AppContext, getApp, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { startConductor } from "../conductor/conductor.js";
 import { applyReport, applyHookStatus, advance } from "../services/session-orchestration.js";
 import type { OutboundMessage } from "../conductor/channel-types.js";
@@ -25,10 +25,8 @@ let server: { stop(): void } | null = null;
 beforeEach(async () => {
   if (app) {
     await app.shutdown();
-    clearApp();
   }
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
 });
 
@@ -54,7 +52,6 @@ afterAll(async () => {
   }
   if (app) {
     await app.shutdown();
-    clearApp();
   }
 });
 

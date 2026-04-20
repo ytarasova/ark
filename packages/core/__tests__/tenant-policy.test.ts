@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { TenantPolicyManager } from "../auth/index.js";
 
 let app: AppContext;
@@ -8,13 +8,11 @@ let pm: TenantPolicyManager;
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
   pm = new TenantPolicyManager(app.db);
 });
 
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 describe("TenantPolicyManager", () => {

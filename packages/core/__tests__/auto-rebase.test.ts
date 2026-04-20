@@ -13,7 +13,7 @@ import { execFileSync } from "child_process";
 import { mkdirSync, writeFileSync, existsSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { rebaseOntoBase } from "../services/session-orchestration.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -73,14 +73,12 @@ let testDir: string;
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
   testDir = join(tmpdir(), `ark-rebase-test-${Date.now()}`);
   mkdirSync(testDir, { recursive: true });
 });
 
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
   if (testDir && existsSync(testDir)) {
     rmSync(testDir, { recursive: true, force: true });
   }

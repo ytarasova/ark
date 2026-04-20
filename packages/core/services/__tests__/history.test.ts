@@ -12,7 +12,7 @@ import { asValue } from "awilix";
 import { Database } from "bun:sqlite";
 import { BunSqliteAdapter } from "../../database/sqlite.js";
 import type { IDatabase } from "../../database.js";
-import { AppContext, setApp, clearApp } from "../../app.js";
+import { AppContext } from "../../app.js";
 import { HistoryService } from "../history.js";
 import { SessionRepository } from "../../repositories/session.js";
 import { initSchema } from "../../repositories/schema.js";
@@ -24,14 +24,12 @@ let svc: HistoryService;
 beforeEach(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
   sessionRepo = app.sessions;
   svc = app.historyService;
 });
 
 afterEach(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 describe("HistoryService", () => {

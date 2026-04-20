@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { pauseWithSnapshot, resumeFromSnapshot, resolveSessionCompute } from "../services/session-snapshot.js";
 import type { Compute, ComputeHandle, Snapshot } from "../../compute/core/types.js";
 import { NotSupportedError } from "../../compute/core/types.js";
@@ -13,7 +13,6 @@ let snapRoot: string;
 
 beforeEach(async () => {
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
   snapRoot = mkdtempSync(join(tmpdir(), "ark-pause-test-"));
   (app as any)._container.register("snapshotStore", { resolve: () => new FsSnapshotStore(snapRoot) });
@@ -21,7 +20,6 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await app?.shutdown();
-  clearApp();
   rmSync(snapRoot, { recursive: true, force: true });
 });
 

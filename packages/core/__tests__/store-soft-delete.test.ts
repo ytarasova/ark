@@ -1,5 +1,4 @@
 import { describe, it, expect } from "bun:test";
-import { getApp } from "../app.js";
 
 function purgeExpiredDeletes(ttlSeconds: number = 90): string[] {
   const deleted = getApp().sessions.listDeleted();
@@ -15,6 +14,7 @@ function purgeExpiredDeletes(ttlSeconds: number = 90): string[] {
   return purged;
 }
 import { withTestContext } from "./test-helpers.js";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 

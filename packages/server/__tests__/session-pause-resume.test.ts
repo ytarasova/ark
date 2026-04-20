@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, beforeEach, beforeAll, afterAll } from "bun:test";
-import { AppContext, setApp, clearApp } from "../../core/app.js";
+import { AppContext } from "../../core/app.js";
 import { registerSessionHandlers } from "../handlers/session.js";
 import { Router } from "../router.js";
 import { createRequest, type JsonRpcResponse } from "../../protocol/types.js";
@@ -21,6 +21,7 @@ import type {
   Snapshot,
 } from "../../compute/core/types.js";
 import { NotSupportedError } from "../../compute/core/types.js";
+import { setApp } from "../../core/__tests__/test-helpers.js";
 
 let app: AppContext;
 let router: Router;
@@ -28,12 +29,10 @@ let router: Router;
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
 });
 
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 beforeEach(() => {

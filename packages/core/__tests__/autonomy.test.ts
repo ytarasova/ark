@@ -11,8 +11,8 @@ import { join } from "path";
 import YAML from "yaml";
 import { buildArgs, writeSettings } from "../claude/claude.js";
 import { resolveFlow } from "../state/flow.js";
-import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
+import { getApp } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
 

@@ -14,7 +14,7 @@ import {
   DEFAULT_TENANT_CONTEXT,
 } from "../auth/middleware.js";
 import { ApiKeyManager } from "../auth/api-keys.js";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import type { TenantContext } from "../types/index.js";
 
 let app: AppContext;
@@ -23,13 +23,11 @@ let keyManager: ApiKeyManager;
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
   keyManager = new ApiKeyManager(app.db);
 });
 
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 function mkReq(headers: Record<string, string> = {}, url = "http://localhost/api"): Request {

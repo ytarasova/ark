@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
 import { extractAndSaveSkills } from "../agent/skill-extractor.js";
-import { getApp } from "../app.js";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 

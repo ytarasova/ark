@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
-import { AppContext, setApp, clearApp } from "../../core/app.js";
+import { AppContext } from "../../core/app.js";
 import { ArkClient } from "../../protocol/client.js";
 import { ArkServer } from "../index.js";
 import { registerAllHandlers } from "../register.js";
@@ -9,12 +9,10 @@ import type { JsonRpcMessage } from "../../protocol/types.js";
 let app: AppContext;
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
 });
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 function createInMemoryPair(): { client: ArkClient; server: ArkServer } {

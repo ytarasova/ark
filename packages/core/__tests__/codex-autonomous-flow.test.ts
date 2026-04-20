@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { startStatusPoller, stopStatusPoller, stopAllPollers } from "../executors/status-poller.js";
 import { cliAgentExecutor } from "../executors/cli-agent.js";
 import * as tmux from "../infra/tmux.js";
@@ -20,13 +20,11 @@ let app: AppContext;
 beforeEach(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
 });
 
 afterEach(async () => {
   stopAllPollers();
   await app?.shutdown();
-  clearApp();
 });
 
 // ── Helper ────────────────────────────────────────────────────────────────────

@@ -11,7 +11,7 @@ import { mkdirSync, writeFileSync, rmSync, mkdtempSync } from "fs";
 import { join, parse } from "path";
 import { tmpdir, homedir } from "os";
 
-import { AppContext, setApp, clearApp } from "../../core/app.js";
+import { AppContext } from "../../core/app.js";
 import { Router } from "../router.js";
 import { registerFsHandlers } from "../handlers/fs.js";
 import { createRequest, type JsonRpcResponse, type JsonRpcError } from "../../protocol/types.js";
@@ -22,13 +22,11 @@ let tmpRoot: string;
 
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
 });
 
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 beforeEach(() => {

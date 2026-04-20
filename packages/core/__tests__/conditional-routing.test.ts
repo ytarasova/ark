@@ -15,7 +15,7 @@ import {
   loadFlowState,
   setCurrentStage,
 } from "../state/flow-state.js";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 
 // ── Pure graph-flow unit tests (no AppContext needed) ──────────────────────
 
@@ -279,12 +279,10 @@ describe("conditional routing - flow state integration", () => {
   beforeAll(async () => {
     app = await AppContext.forTestAsync();
     await app.boot();
-    setApp(app);
   });
 
   afterAll(async () => {
     await app?.shutdown();
-    clearApp();
   });
 
   it("tracks skipped stages in flow state", () => {

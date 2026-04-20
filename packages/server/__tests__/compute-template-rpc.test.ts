@@ -1,17 +1,15 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
-import { AppContext, setApp, clearApp } from "../../core/app.js";
+import { AppContext } from "../../core/app.js";
 
 let app: AppContext;
 
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
 });
 
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 beforeEach(() => {

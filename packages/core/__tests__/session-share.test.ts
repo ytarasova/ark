@@ -1,10 +1,10 @@
 import { describe, it, expect } from "bun:test";
 import { exportSession, exportSessionToFile, importSessionFromFile } from "../session/share.js";
-import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 import { writeFileSync, mkdtempSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 

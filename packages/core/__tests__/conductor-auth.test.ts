@@ -28,7 +28,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { startConductor } from "../conductor/conductor.js";
 
 const TEST_PORT = 19198;
@@ -45,13 +45,11 @@ async function boot(opts: { hostedMode: boolean }): Promise<void> {
       /* stop may throw if double-stopped */
     }
     await app.shutdown();
-    clearApp();
   }
   app = await AppContext.forTestAsync();
   if (opts.hostedMode) {
     (app.config as { databaseUrl?: string }).databaseUrl = "sqlite://test-hosted";
   }
-  setApp(app);
   await app.boot();
   server = startConductor(app, TEST_PORT, { quiet: true });
 }
@@ -75,7 +73,6 @@ afterEach(async () => {
     /* already stopped */
   }
   await app.shutdown();
-  clearApp();
 });
 
 describe("P1-1 -- conductor tenant identity must not be spoofable", () => {

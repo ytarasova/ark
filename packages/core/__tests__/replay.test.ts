@@ -1,8 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import { buildReplay } from "../session/replay.js";
-import { getApp } from "../app.js";
 import { startSession } from "../services/session-orchestration.js";
 import { withTestContext } from "./test-helpers.js";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 

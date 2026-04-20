@@ -17,12 +17,10 @@ describe("session-lifecycle compute/runtime dispatch", () => {
   beforeAll(async () => {
     app = await AppContext.forTestAsync();
     await app.boot();
-    setApp(app);
   });
 
   afterAll(async () => {
     await app?.shutdown();
-    clearApp();
   });
 
   it("resolves ComputeTarget for the seeded local compute row", async () => {

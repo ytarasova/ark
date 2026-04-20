@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { WorkerRegistry } from "../hosted/worker-registry.js";
 import { SessionScheduler } from "../hosted/scheduler.js";
 import { TenantPolicyManager } from "../auth/index.js";
@@ -12,7 +12,6 @@ let pm: TenantPolicyManager;
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
 
   // Initialize hosted-mode components
   registry = new WorkerRegistry(app.db);
@@ -28,7 +27,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 describe("SessionScheduler with tenant policies", () => {

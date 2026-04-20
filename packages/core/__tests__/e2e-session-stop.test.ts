@@ -9,14 +9,15 @@
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import { stop } from "../services/session-orchestration.js";
-import { AppContext, getApp, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
+import { clearApp, getApp, setApp } from "./test-helpers.js";
 
 let app: AppContext;
 
 beforeEach(async () => {
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
+  setApp(app);
 });
 
 afterAll(async () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { AppContext, getApp, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { subprocessExecutor } from "../executors/subprocess.js";
 import { waitFor } from "./test-helpers.js";
 
@@ -7,16 +7,13 @@ let app: AppContext;
 beforeEach(async () => {
   if (app) {
     await app.shutdown();
-    clearApp();
   }
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
 });
 afterEach(async () => {
   if (app) {
     await app.shutdown();
-    clearApp();
   }
 });
 

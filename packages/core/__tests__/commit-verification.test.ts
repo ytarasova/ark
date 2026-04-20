@@ -17,7 +17,7 @@ import { execFileSync } from "child_process";
 import { mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { applyReport, applyHookStatus } from "../services/session-orchestration.js";
 import type { OutboundMessage } from "../conductor/channel-types.js";
 
@@ -26,12 +26,10 @@ let app: AppContext;
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
 });
 
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 /** Create a temporary git repo with an initial commit. */

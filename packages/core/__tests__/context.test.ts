@@ -3,7 +3,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
-import { AppContext, getApp, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
+import { clearApp, getApp, setApp } from "./test-helpers.js";
 
 let app: AppContext;
 
@@ -13,8 +14,8 @@ beforeEach(async () => {
     clearApp();
   }
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
+  setApp(app);
 });
 
 afterAll(async () => {
@@ -37,16 +38,14 @@ describe("Store context isolation", () => {
     expect(sessions1.length).toBe(1);
     expect(sessions1[0].summary).toBe("ctx1-session");
 
-    // Switch to new context
+    // Each AppContext has its own DB -- sessions do not bleed across.
     const app2 = await AppContext.forTestAsync();
     await app2.boot();
-    setApp(app2);
 
-    const sessions2 = getApp().sessions.list();
+    const sessions2 = app2.sessions.list();
     expect(sessions2.length).toBe(0);
 
     await app2.shutdown();
-    setApp(app);
   });
 
   it("computes are isolated between contexts", () => {

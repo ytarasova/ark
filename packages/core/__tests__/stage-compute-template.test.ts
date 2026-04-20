@@ -14,7 +14,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test"
 import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
-import { AppContext, setApp, clearApp, getApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { getStage, getStages } from "../state/flow.js";
 import { resolveComputeForStage } from "../services/session-orchestration.js";
 
@@ -23,12 +23,10 @@ let app: AppContext;
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
 });
 
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 /** Directory where flow.ts looks for user flows. */

@@ -8,10 +8,10 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { getApp } from "../app.js";
 import { applyReport, applyHookStatus } from "../services/session-orchestration.js";
 import { startConductor } from "../conductor/conductor.js";
 import { withTestContext } from "./test-helpers.js";
+import { getApp } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
 

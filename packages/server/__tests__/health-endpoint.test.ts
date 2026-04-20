@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
-import { AppContext, setApp, clearApp } from "../../core/app.js";
+import { AppContext } from "../../core/app.js";
 import { ArkServer } from "../index.js";
 import { registerAllHandlers } from "../register.js";
 
@@ -14,7 +14,6 @@ let port: number;
 
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
 
   server = new ArkServer();
@@ -28,7 +27,6 @@ beforeAll(async () => {
 afterAll(async () => {
   ws?.stop();
   await app?.shutdown();
-  clearApp();
 });
 
 describe("ArkServer health endpoint", () => {

@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
-import { AppContext, setApp, clearApp } from "../../app.js";
+import { AppContext } from "../../app.js";
 import { TmuxLauncher } from "../../launchers/tmux.js";
 import { ContainerLauncher } from "../../launchers/container.js";
 import { ArkdLauncher } from "../../launchers/arkd.js";
@@ -17,12 +17,10 @@ let app: AppContext;
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
 });
 
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 // ── TmuxLauncher interface compliance ──────────────────────────────────────

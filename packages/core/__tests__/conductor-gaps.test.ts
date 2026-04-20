@@ -17,7 +17,7 @@ import {
 } from "../services/session-orchestration.js";
 import { getStageDefinition } from "../state/flow.js";
 import { loadRepoConfig } from "../repo-config.js";
-import { getApp } from "../app.js";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 

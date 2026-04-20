@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
-import { AppContext, setApp, clearApp } from "../../app.js";
+import { AppContext } from "../../app.js";
 import { pauseWithSnapshot, resumeFromSnapshot, resolveSessionCompute } from "../session-snapshot.js";
 import type {
   Compute,
@@ -19,18 +19,17 @@ import type {
   Snapshot,
 } from "../../../compute/core/types.js";
 import { NotSupportedError } from "../../../compute/core/types.js";
+import { setApp } from "../../__tests__/test-helpers.js";
 
 let app: AppContext;
 
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
 });
 
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 // ── Fake computes ─────────────────────────────────────────────────────────

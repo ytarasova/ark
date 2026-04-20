@@ -10,7 +10,7 @@ import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { AppContext, setApp, clearApp } from "../../core/app.js";
+import { AppContext } from "../../core/app.js";
 import { Router } from "../router.js";
 import { registerToolsHandlers } from "../handlers/tools.js";
 import { createRequest, type JsonRpcResponse, type JsonRpcError } from "../../protocol/types.js";
@@ -20,7 +20,6 @@ let router: Router;
 
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
   router = new Router();
   registerToolsHandlers(router, app);
@@ -28,7 +27,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 describe("tools/delete security", () => {

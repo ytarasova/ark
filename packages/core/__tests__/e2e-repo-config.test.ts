@@ -10,18 +10,16 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from "bun:test";
 import { mkdtempSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { startSession } from "../services/session-orchestration.js";
 
 let app: AppContext;
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
 });
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 const sessionIds: string[] = [];

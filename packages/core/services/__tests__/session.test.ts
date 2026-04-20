@@ -21,13 +21,14 @@ import { asValue } from "awilix";
 import { Database } from "bun:sqlite";
 import { BunSqliteAdapter } from "../../database/sqlite.js";
 import type { IDatabase } from "../../database.js";
-import { AppContext, setApp, clearApp } from "../../app.js";
+import { AppContext } from "../../app.js";
 import { SessionService } from "../session.js";
 import { SessionRepository } from "../../repositories/session.js";
 import { EventRepository } from "../../repositories/event.js";
 import { MessageRepository } from "../../repositories/message.js";
 import { initSchema } from "../../repositories/schema.js";
 import type { Session, SessionStatus } from "../../../types/index.js";
+import { setApp } from "../../__tests__/test-helpers.js";
 
 let app: AppContext;
 let sessions: SessionRepository;
@@ -38,7 +39,6 @@ let svc: SessionService;
 beforeEach(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
   // Pull the wired dependencies out of the container. These are the same
   // instances the SessionService was constructed with.
   sessions = app.sessions;
@@ -49,7 +49,6 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 describe("SessionService", () => {

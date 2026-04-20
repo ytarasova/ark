@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "bun:test";
-import { AppContext, getApp, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { existsSync } from "fs";
 
 let app: AppContext | null = null;
@@ -83,28 +83,7 @@ describe("AppContext", () => {
   });
 });
 
-describe("getApp / setApp / clearApp", () => {
-  afterEach(() => {
-    clearApp();
-  });
-
-  it("getApp throws when no app is set", () => {
-    clearApp();
-    expect(() => getApp()).toThrow("AppContext not initialized");
-  });
-
-  it("setApp + getApp returns the same instance", async () => {
-    const testApp = await AppContext.forTestAsync();
-    setApp(testApp);
-    expect(getApp()).toBe(testApp);
-    await testApp.shutdown();
-  });
-
-  it("clearApp resets the singleton", async () => {
-    const testApp = await AppContext.forTestAsync();
-    setApp(testApp);
-    clearApp();
-    expect(() => getApp()).toThrow();
-    await testApp.shutdown();
-  });
-});
+// The module-level getApp/setApp/clearApp service locator has been removed.
+// AppContext is now delivered via the DI container or as an explicit
+// parameter. Tests that need a test-local singleton reach for the helpers
+// in ./test-helpers.ts.

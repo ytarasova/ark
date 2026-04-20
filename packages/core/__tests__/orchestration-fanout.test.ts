@@ -6,7 +6,6 @@
  */
 
 import { describe, it, expect, setDefaultTimeout } from "bun:test";
-import { getApp } from "../app.js";
 
 setDefaultTimeout(15_000);
 import {
@@ -18,6 +17,7 @@ import {
   checkAutoJoin,
 } from "../services/session-orchestration.js";
 import { withTestContext, waitFor } from "./test-helpers.js";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 

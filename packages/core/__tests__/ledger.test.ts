@@ -3,9 +3,9 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 import { loadLedger, saveLedger, addEntry, updateEntry, detectStall, formatLedgerForPrompt } from "../ledger.js";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 
