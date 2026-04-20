@@ -33,6 +33,21 @@ import type { TranscriptParserRegistry } from "./runtimes/transcript-parser.js";
 import type { PluginRegistry } from "./plugins/registry.js";
 import type { SnapshotStore } from "../compute/core/snapshot-store.js";
 import type { AppContext } from "./app.js";
+import type { Lifecycle } from "./lifecycle.js";
+import type { ConductorLauncher } from "./infra/conductor-launcher.js";
+import type { ArkdLauncher } from "./infra/arkd-launcher.js";
+import type { RouterLauncher } from "./infra/router-launcher.js";
+import type { TensorZeroLauncher } from "./infra/tensorzero-launcher.js";
+import type { MetricsPoller } from "./infra/metrics-poller.js";
+import type { MaintenancePollers } from "./infra/maintenance-pollers.js";
+import type { SignalHandlers } from "./infra/signal-handlers.js";
+import type { StaleStateDetector } from "./infra/stale-state-detector.js";
+import type { ServiceWiring } from "./infra/service-wiring.js";
+import type { ComputeProvidersBoot } from "./infra/compute-providers-boot.js";
+import type { SessionDrain } from "./infra/session-drain.js";
+import type { WorkerRegistry } from "./hosted/worker-registry.js";
+import type { SessionScheduler } from "./hosted/scheduler.js";
+import type { TenantPolicyManager } from "./auth/index.js";
 
 /**
  * The cradle -- everything resolvable from the container.
@@ -42,9 +57,21 @@ import type { AppContext } from "./app.js";
  * minifies constructor parameter names, which breaks name-based matching.
  * See packages/core/di/ for the actual registrations.
  */
+/**
+ * Boot options that toggle optional background services. Registered in the
+ * cradle so launchers can read flags without reaching back into AppContext.
+ */
+export interface AppBootOptions {
+  skipConductor?: boolean;
+  skipMetrics?: boolean;
+  skipSignals?: boolean;
+  cleanupOnShutdown?: boolean;
+}
+
 export interface Cradle {
   // Config
   config: ArkConfig;
+  bootOptions: AppBootOptions;
 
   // AppContext itself -- registered as a scoped value so services can
   // resolve it without passing it through every constructor manually.
@@ -89,6 +116,25 @@ export interface Cradle {
 
   // Snapshot persistence
   snapshotStore: SnapshotStore;
+
+  // Lifecycle + infra launchers (container-managed start/stop)
+  lifecycle: Lifecycle;
+  serviceWiring: ServiceWiring;
+  computeProvidersBoot: ComputeProvidersBoot;
+  tensorZeroLauncher: TensorZeroLauncher;
+  routerLauncher: RouterLauncher;
+  conductorLauncher: ConductorLauncher;
+  arkdLauncher: ArkdLauncher;
+  metricsPoller: MetricsPoller;
+  maintenancePollers: MaintenancePollers;
+  staleStateDetector: StaleStateDetector;
+  signalHandlers: SignalHandlers;
+  sessionDrain: SessionDrain;
+
+  // Hosted-mode services (registered via setter; absent in local mode)
+  workerRegistry?: WorkerRegistry;
+  sessionScheduler?: SessionScheduler;
+  tenantPolicyManager?: TenantPolicyManager;
 }
 
 export type AppContainer = AwilixContainer<Cradle>;

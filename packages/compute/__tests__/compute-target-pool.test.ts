@@ -234,7 +234,7 @@ describe("ComputeTarget pool-consult", () => {
     // Drop the pool from the registry (simulating a process restart / pool
     // replacement / explicit deregistration) while holding a live handle.
     // The tag is still there but there's no pool to release to.
-    (app as unknown as { _computePools: Map<string, ComputePool> })._computePools.delete(compute.kind);
+    app.deregisterComputePool(compute.kind);
 
     await target.destroy(handle);
 
