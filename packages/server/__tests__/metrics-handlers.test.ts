@@ -69,7 +69,11 @@ describe("costs/read", () => {
 
 describe("costs/record + costs/summary + costs/trend + costs/session", () => {
   it("records a usage event that summary + trend + session then reflect", async () => {
-    const sessionId = "cost-record-session";
+    // The costs/record handler verifies the session belongs to the caller's
+    // tenant via app.sessions.get(sessionId); create one first so the
+    // handler doesn't reject with "Session not found".
+    const session = app.sessions.create({ summary: "cost-record-session" });
+    const sessionId = session.id;
 
     // Record a synthetic event via RPC
     const recordRes = ok(
