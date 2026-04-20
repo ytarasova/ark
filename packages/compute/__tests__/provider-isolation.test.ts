@@ -7,7 +7,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { AppContext, setApp, clearApp } from "../../core/app.js";
+import { AppContext } from "../../core/app.js";
+import { setApp, clearApp } from "../../core/__tests__/test-helpers.js";
 
 let app: AppContext;
 

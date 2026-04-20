@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { execFileSync } from "child_process";
 import { LocalProvider } from "../providers/local/index.js";
-import { AppContext, setApp, clearApp } from "../../core/app.js";
+import { AppContext } from "../../core/app.js";
+import { setApp, clearApp } from "../../core/__tests__/test-helpers.js";
 import type { Compute, Session } from "../../types/index.js";
 
 let app: AppContext;

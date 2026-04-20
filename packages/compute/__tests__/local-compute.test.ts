@@ -10,7 +10,8 @@ import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 
 import { LocalCompute } from "../core/local.js";
 import { NotSupportedError, type ComputeHandle, type Snapshot } from "../core/types.js";
-import { AppContext, setApp, clearApp } from "../../core/app.js";
+import { AppContext } from "../../core/app.js";
+import { setApp, clearApp } from "../../core/__tests__/test-helpers.js";
 
 let app: AppContext;
 
