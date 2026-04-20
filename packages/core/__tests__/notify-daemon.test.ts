@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "bun:test";
 import { NotifyDaemon } from "../infra/notify-daemon.js";
 import { Bridge } from "../integrations/bridge.js";
 import { withTestContext, waitFor } from "./test-helpers.js";
-import { getApp } from "../app.js";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 

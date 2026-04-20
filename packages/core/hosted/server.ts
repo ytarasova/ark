@@ -8,7 +8,7 @@
  */
 
 import type { ArkConfig } from "../config.js";
-import { AppContext, setApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { WorkerRegistry } from "./worker-registry.js";
 import { SessionScheduler } from "./scheduler.js";
 import { TenantPolicyManager } from "../auth/index.js";
@@ -24,7 +24,6 @@ export async function startHostedServer(config: ArkConfig): Promise<{
     skipSignals: false,
   });
   await app.boot();
-  setApp(app);
 
   // Initialize worker registry
   const registry = new WorkerRegistry(app.db);

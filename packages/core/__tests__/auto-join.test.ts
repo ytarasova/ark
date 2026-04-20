@@ -1,16 +1,14 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { fanOut, checkAutoJoin } from "../services/session-orchestration.js";
 
 let app: AppContext;
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
 });
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 describe("auto-join", () => {

@@ -1,8 +1,8 @@
 import { describe, it, expect } from "bun:test";
 import { calculateCost, formatCost, getSessionCost, getAllSessionCosts, checkBudget } from "../observability/costs.js";
 import type { TokenUsage } from "../observability/pricing.js";
-import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 

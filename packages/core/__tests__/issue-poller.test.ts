@@ -6,7 +6,6 @@
 
 import { describe, it, expect, beforeEach } from "bun:test";
 
-import { getApp } from "../app.js";
 import {
   fetchLabeledIssues,
   issueAlreadyTracked,
@@ -17,6 +16,7 @@ import {
   type GhIssue,
 } from "../integrations/issue-poller.js";
 import { withTestContext } from "./test-helpers.js";
+import { getApp } from "./test-helpers.js";
 
 // ── Test setup ───────────────────────────────────────────────────────────────
 

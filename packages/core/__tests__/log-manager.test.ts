@@ -1,9 +1,9 @@
 import { describe, it, expect } from "bun:test";
 import { truncateLog, logDir, cleanupLogs } from "../observability/log-manager.js";
-import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
 import { writeFileSync, readFileSync, mkdirSync, existsSync } from "fs";
 import { join } from "path";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 

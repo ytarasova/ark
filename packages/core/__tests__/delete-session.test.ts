@@ -9,16 +9,17 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
-import { AppContext, setApp, clearApp, getApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { startSession, deleteSessionAsync } from "../services/session-orchestration.js";
 import { writeSettings } from "../claude/claude.js";
+import { clearApp, getApp, setApp } from "./test-helpers.js";
 
 let app: AppContext;
 
 beforeEach(async () => {
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
+  setApp(app);
 });
 
 afterEach(async () => {

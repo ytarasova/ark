@@ -8,7 +8,7 @@
 
 import { describe, it, expect, afterEach } from "bun:test";
 import { asValue } from "awilix";
-import { AppContext, setApp, clearApp, getApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { SessionRepository } from "../repositories/session.js";
 import { ComputeRepository } from "../repositories/compute.js";
 import { EventRepository } from "../repositories/event.js";
@@ -17,6 +17,7 @@ import { TodoRepository } from "../repositories/todo.js";
 import { SessionService } from "../services/session.js";
 import { ComputeService } from "../services/compute.js";
 import { HistoryService } from "../services/history.js";
+import { clearApp, getApp, setApp } from "./test-helpers.js";
 
 let app: AppContext | null = null;
 
@@ -33,8 +34,8 @@ afterEach(async () => {
 describe("DI container registration", () => {
   it("boot() registers all cradle keys", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     const container = app.container;
     // All cradle keys should be resolvable
@@ -73,8 +74,8 @@ describe("DI container registration", () => {
 describe("AppContext accessors resolve from container", () => {
   it("accessors return the same instances as direct container resolve", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     expect(app.db).toBe(app.container.resolve("db"));
     expect(app.sessions).toBe(app.container.resolve("sessions"));
@@ -93,8 +94,8 @@ describe("AppContext accessors resolve from container", () => {
 
   it("singleton registrations return same instance on repeated resolve", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     // Repositories are registered as singletons
     const s1 = app.sessions;
@@ -112,8 +113,8 @@ describe("AppContext accessors resolve from container", () => {
 describe("resolved instances have correct types", () => {
   it("repositories are correct classes", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     expect(app.sessions).toBeInstanceOf(SessionRepository);
     expect(app.computes).toBeInstanceOf(ComputeRepository);
@@ -124,8 +125,8 @@ describe("resolved instances have correct types", () => {
 
   it("services are correct classes", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     expect(app.sessionService).toBeInstanceOf(SessionService);
     expect(app.computeService).toBeInstanceOf(ComputeService);
@@ -138,8 +139,8 @@ describe("resolved instances have correct types", () => {
 describe("service dependency injection", () => {
   it("SessionService can create and query sessions (repos wired)", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     const svc = app.sessionService;
     const session = svc.start({ summary: "DI test", ticket: "DI-1" });
@@ -158,8 +159,8 @@ describe("service dependency injection", () => {
 
   it("SessionService stop writes through to same DB", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     const svc = app.sessionService;
     const session = svc.start({});
@@ -172,8 +173,8 @@ describe("service dependency injection", () => {
 
   it("ComputeService delegates to ComputeRepository correctly", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     const svc = app.computeService;
     const c = svc.create({ name: "di-docker", provider: "docker" });
@@ -187,8 +188,8 @@ describe("service dependency injection", () => {
 
   it("HistoryService shares the same DB as repositories", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     // Create a session via service, then search via history
     app.sessionService.start({ summary: "Searchable DI session" });
@@ -203,7 +204,6 @@ describe("service dependency injection", () => {
 describe("forTest() isolation", () => {
   it("two forTest() instances have independent databases", async () => {
     const app1 = await AppContext.forTestAsync();
-    setApp(app1);
     await app1.boot();
 
     const app2 = await AppContext.forTestAsync();
@@ -219,7 +219,6 @@ describe("forTest() isolation", () => {
     // Cleanup
     await app2.shutdown();
     await app1.shutdown();
-    clearApp();
     app = null; // prevent afterEach double-shutdown
   });
 
@@ -230,8 +229,8 @@ describe("forTest() isolation", () => {
 
   it("forTest() sets skipConductor, skipMetrics, skipSignals", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     expect(app.conductor).toBeNull();
     expect(app.metricsPoller).toBeNull();
@@ -239,7 +238,6 @@ describe("forTest() isolation", () => {
 
   it("shutdown cleans up temp directory", async () => {
     const tempApp = await AppContext.forTestAsync();
-    setApp(tempApp);
     await tempApp.boot();
     const dir = tempApp.arkDir;
 
@@ -247,7 +245,6 @@ describe("forTest() isolation", () => {
     expect(existsSync(dir)).toBe(true);
 
     await tempApp.shutdown();
-    clearApp();
     expect(existsSync(dir)).toBe(false);
   });
 });
@@ -257,33 +254,39 @@ describe("forTest() isolation", () => {
 describe("container lifecycle phases", () => {
   it("phase transitions: created -> booting -> ready -> shutting_down -> stopped", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     expect(app.phase).toBe("created");
 
     await app.boot();
+
+    setApp(app);
     expect(app.phase).toBe("ready");
 
     await app.shutdown();
+
+    clearApp();
     expect(app.phase).toBe("stopped");
     app = null; // prevent afterEach double-shutdown
   });
 
   it("double boot throws", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     await expect(app.boot()).rejects.toThrow("Cannot boot");
   });
 
   it("double shutdown is idempotent", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     await app.shutdown();
+
+    clearApp();
     // Should not throw
     await app.shutdown();
+    clearApp();
     app = null; // prevent afterEach double-shutdown
   }, 15_000);
 
@@ -292,6 +295,8 @@ describe("container lifecycle phases", () => {
     expect(app.phase).toBe("created");
 
     await app.shutdown();
+
+    clearApp();
     expect(app.phase).toBe("stopped");
     app = null;
   });
@@ -311,16 +316,8 @@ describe("container lifecycle phases", () => {
     expect(tempApp.phase).toBe("stopped");
   });
 
-  it("shutdown without boot clears global singleton", async () => {
-    app = await AppContext.forTestAsync();
-    setApp(app);
-
-    expect(getApp()).toBe(app);
-
-    await app.shutdown();
-    expect(() => getApp()).toThrow("AppContext not initialized");
-    app = null;
-  });
+  // "shutdown without boot clears global singleton" was deleted -- the
+  // AppContext global singleton it exercised has been removed.
 });
 
 // ── Resource stores ─────────────────────────────────────────────────────────
@@ -328,8 +325,8 @@ describe("container lifecycle phases", () => {
 describe("resource stores via container", () => {
   it("flows store is accessible and has list()", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     const flows = app.flows;
     expect(typeof flows.list).toBe("function");
@@ -340,8 +337,8 @@ describe("resource stores via container", () => {
 
   it("skills store is accessible and has list()", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     const skills = app.skills;
     expect(typeof skills.list).toBe("function");
@@ -349,8 +346,8 @@ describe("resource stores via container", () => {
 
   it("agents store is accessible and has list()", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     const agents = app.agents;
     expect(typeof agents.list).toBe("function");
@@ -358,8 +355,8 @@ describe("resource stores via container", () => {
 
   it("recipes store is accessible and has list()", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     const recipes = app.recipes;
     expect(typeof recipes.list).toBe("function");
@@ -371,8 +368,8 @@ describe("resource stores via container", () => {
 describe("cross-service integration through container", () => {
   it("full session lifecycle through DI-wired services", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     const svc = app.sessionService;
 
@@ -418,8 +415,8 @@ describe("cross-service integration through container", () => {
 
   it("session + compute coexist in same container", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     // Create session and compute through services
     const session = app.sessionService.start({ summary: "With compute" });
@@ -436,8 +433,8 @@ describe("cross-service integration through container", () => {
 
   it("messages sent through repo are visible via service complete()", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     const session = app.sessionService.start({ summary: "Msg test" });
     app.messages.send(session.id, "agent", "Done!", "text");
@@ -454,8 +451,8 @@ describe("cross-service integration through container", () => {
 describe("transitive dependency sharing", () => {
   it("SessionService and SessionRepository share the same DB", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     const session = app.sessionService.start({ summary: "Shared DB test" });
 
@@ -467,8 +464,8 @@ describe("transitive dependency sharing", () => {
 
   it("HistoryService queries the same DB that repos write to", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     app.sessionService.start({ summary: "History transitive test" });
 
@@ -478,8 +475,8 @@ describe("transitive dependency sharing", () => {
 
   it("all repos resolve with the same DB instance", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     const db = app.container.resolve("db");
     expect(app.db).toBe(db);
@@ -493,8 +490,8 @@ describe("transitive dependency sharing", () => {
 
   it("todos repo shares DB with sessions repo", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     const session = app.sessions.create({});
     app.todos.add(session.id, "Test todo");
@@ -509,8 +506,8 @@ describe("transitive dependency sharing", () => {
 describe("container override", () => {
   it("can override a singleton registration with asValue", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     const session = app.sessionService.start({ summary: "Before override" });
     expect(app.sessions.get(session.id)).not.toBeNull();
@@ -526,8 +523,8 @@ describe("container override", () => {
 
   it("override does not affect previously resolved singletons held by reference", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     const originalRepo = app.sessions;
     const session = app.sessionService.start({ summary: "ref test" });
@@ -545,13 +542,11 @@ describe("container override", () => {
 describe("post-shutdown behavior", () => {
   it("phase is stopped after shutdown and DB is closed", async () => {
     const tempApp = await AppContext.forTestAsync();
-    setApp(tempApp);
     await tempApp.boot();
 
     expect(tempApp.sessions).toBeDefined();
 
     await tempApp.shutdown();
-    clearApp();
 
     expect(tempApp.phase).toBe("stopped");
 
@@ -561,17 +556,14 @@ describe("post-shutdown behavior", () => {
 
   it("boot after shutdown throws (no reuse)", async () => {
     const tempApp = await AppContext.forTestAsync();
-    setApp(tempApp);
     await tempApp.boot();
     await tempApp.shutdown();
-    clearApp();
 
     await expect(tempApp.boot()).rejects.toThrow();
   });
 
   it("temp directory is removed after shutdown with cleanupOnShutdown", async () => {
     const tempApp = await AppContext.forTestAsync();
-    setApp(tempApp);
     await tempApp.boot();
     const dir = tempApp.arkDir;
 
@@ -579,7 +571,6 @@ describe("post-shutdown behavior", () => {
     expect(existsSync(dir)).toBe(true);
 
     await tempApp.shutdown();
-    clearApp();
     expect(existsSync(dir)).toBe(false);
   });
 });
@@ -589,8 +580,8 @@ describe("post-shutdown behavior", () => {
 describe("getApp() global singleton integration", () => {
   it("getApp() resolves same instances as direct container access", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     const global = getApp();
     expect(global.sessions).toBe(app.sessions);
@@ -598,34 +589,14 @@ describe("getApp() global singleton integration", () => {
     expect(global.db).toBe(app.db);
   });
 
-  it("getApp() throws when no app is set", () => {
-    clearApp();
-    expect(() => getApp()).toThrow("AppContext not initialized");
-    app = null;
-  });
-
-  it("setApp replaces the global singleton", async () => {
-    const app1 = await AppContext.forTestAsync();
-    setApp(app1);
-    await app1.boot();
-
-    const app2 = await AppContext.forTestAsync();
-    setApp(app2);
-    await app2.boot();
-
-    expect(getApp()).toBe(app2);
-    expect(getApp()).not.toBe(app1);
-
-    await app1.shutdown();
-    await app2.shutdown();
-    clearApp();
-    app = null;
-  });
+  // "getApp() throws when no app is set" and "setApp replaces the global
+  // singleton" exercised the module-level AppContext singleton that has
+  // been removed.
 
   it("data written through getApp() is visible through direct app reference", async () => {
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    setApp(app);
 
     const session = getApp().sessionService.start({ summary: "Global write" });
 

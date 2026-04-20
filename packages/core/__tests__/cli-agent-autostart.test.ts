@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, spyOn } from "bun:test";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { cliAgentExecutor } from "../executors/cli-agent.js";
 import * as tmux from "../infra/tmux.js";
 import type { LaunchOpts } from "../executor.js";
@@ -47,14 +47,12 @@ let app: AppContext;
 beforeEach(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
   createdSessions.length = 0;
   sentTexts.length = 0;
 });
 
 afterEach(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

@@ -3,10 +3,10 @@ import chalk from "chalk";
 import { execFileSync } from "child_process";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
-import { getApp } from "../../core/app.js";
 import { getArkClient } from "../client.js";
+import type { AppContext } from "../../core/app.js";
 
-export function registerAuthCommands(program: Command) {
+export function registerAuthCommands(program: Command, app: AppContext) {
   const authCmd = program.command("auth").description("Manage authentication and API keys");
 
   // Claude CLI auth setup (moved from misc.ts)
@@ -78,7 +78,6 @@ export function registerAuthCommands(program: Command) {
     .option("--tenant <tenantId>", "Tenant ID", "default")
     .option("--expires <date>", "Expiration date (ISO 8601)")
     .action((opts: any) => {
-      const app = getApp();
       const role = opts.role as "admin" | "member" | "viewer";
       if (!["admin", "member", "viewer"].includes(role)) {
         console.error(chalk.red(`Invalid role: ${role}. Must be admin, member, or viewer.`));
@@ -100,7 +99,6 @@ export function registerAuthCommands(program: Command) {
     .description("List API keys")
     .option("--tenant <tenantId>", "Tenant ID", "default")
     .action((opts: any) => {
-      const app = getApp();
       const keys = app.apiKeys.list(opts.tenant);
       if (!keys.length) {
         console.log(chalk.dim("No API keys found."));
@@ -122,7 +120,6 @@ export function registerAuthCommands(program: Command) {
     .description("Revoke an API key")
     .argument("<id>", "API key ID (e.g. ak-abcd1234)")
     .action((id: string) => {
-      const app = getApp();
       const ok = app.apiKeys.revoke(id);
       if (ok) {
         console.log(chalk.green(`Revoked API key: ${id}`));
@@ -137,7 +134,6 @@ export function registerAuthCommands(program: Command) {
     .description("Rotate an API key (revoke old, create new with same metadata)")
     .argument("<id>", "API key ID to rotate")
     .action((id: string) => {
-      const app = getApp();
       const result = app.apiKeys.rotate(id);
       if (!result) {
         console.error(chalk.red(`API key not found: ${id}`));

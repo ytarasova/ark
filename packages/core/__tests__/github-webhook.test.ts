@@ -8,8 +8,8 @@ import {
   type IssueWebhookPayload,
   type IssueWebhookConfig,
 } from "../integrations/github-webhook.js";
-import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 

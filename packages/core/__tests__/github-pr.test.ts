@@ -5,7 +5,6 @@
 
 import { createHmac } from "crypto";
 import { describe, it, expect } from "bun:test";
-import { getApp } from "../app.js";
 import {
   validateSignature,
   extractComments,
@@ -14,6 +13,7 @@ import {
   handleGitHubWebhook,
 } from "../integrations/github-pr.js";
 import { withTestContext } from "./test-helpers.js";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 

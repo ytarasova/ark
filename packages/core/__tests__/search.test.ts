@@ -6,7 +6,6 @@
 import { describe, it, expect } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
-import { getApp } from "../app.js";
 import {
   searchSessions,
   searchTranscripts,
@@ -19,6 +18,7 @@ import {
 } from "../search/search.js";
 import type { MessageRole } from "../../types/index.js";
 import { withTestContext } from "./test-helpers.js";
+import { getApp } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
 

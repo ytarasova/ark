@@ -195,7 +195,7 @@ export function handleGitHubWebhook(app: AppContext, event: string, payload: Rec
       const steerPayload = { type: "steer", sessionId: session.id, message: prompt, from: "github-review" };
       safeAsync(`[github-pr] deliverToChannel for ${session.id}`, async () => {
         const { deliverToChannel } = await import("../conductor/conductor.js");
-        await deliverToChannel(session, channelPort, steerPayload);
+        await deliverToChannel(app, session, channelPort, steerPayload);
       })
         .then((delivered) => {
           if (!delivered) {

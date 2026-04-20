@@ -9,8 +9,9 @@
 import { describe, it, expect, afterEach, beforeAll, afterAll } from "bun:test";
 import { execFileSync } from "child_process";
 import { join } from "path";
-import { AppContext, getApp, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { startSession, waitForCompletion } from "../services/session-orchestration.js";
+import { clearApp, getApp, setApp } from "./test-helpers.js";
 
 const ROOT = join(import.meta.dir, "..", "..", "..");
 const CLI = join(ROOT, "packages", "cli", "index.ts");
@@ -19,8 +20,8 @@ let app: AppContext;
 
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
+  setApp(app);
 });
 
 afterAll(async () => {

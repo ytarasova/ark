@@ -9,8 +9,8 @@ import { describe, it, expect } from "bun:test";
 import { existsSync, readFileSync, statSync } from "fs";
 import { join } from "path";
 import { hasTmux, attachCommand, writeLauncher, sessionExists, listArkSessionsAsync } from "../infra/tmux.js";
-import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 

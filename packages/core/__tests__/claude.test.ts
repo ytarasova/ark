@@ -19,8 +19,8 @@ import {
   type ClaudeArgsOpts,
   type LauncherOpts,
 } from "../claude/claude.js";
-import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
+import { getApp } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
 

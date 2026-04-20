@@ -15,7 +15,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test"
 import { mkdtempSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { AppContext, setApp, clearApp } from "../../core/app.js";
+import { AppContext } from "../../core/app.js";
 import { registerKnowledgeHandlers } from "../handlers/knowledge.js";
 import { Router } from "../router.js";
 import { createRequest, type JsonRpcResponse, type JsonRpcError } from "../../protocol/types.js";
@@ -23,12 +23,10 @@ import { createRequest, type JsonRpcResponse, type JsonRpcError } from "../../pr
 let app: AppContext;
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
 });
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 let router: Router;

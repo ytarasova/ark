@@ -11,7 +11,7 @@ import { asValue } from "awilix";
 import { Database } from "bun:sqlite";
 import { BunSqliteAdapter } from "../../database/sqlite.js";
 import type { IDatabase } from "../../database.js";
-import { AppContext, setApp, clearApp } from "../../app.js";
+import { AppContext } from "../../app.js";
 import { ComputeService } from "../compute.js";
 import { ComputeRepository } from "../../repositories/compute.js";
 import { initSchema, seedLocalCompute } from "../../repositories/schema.js";
@@ -24,14 +24,12 @@ let svc: ComputeService;
 beforeEach(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
   repo = app.computes;
   svc = app.computeService;
 });
 
 afterEach(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 describe("ComputeService", () => {

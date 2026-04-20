@@ -28,7 +28,7 @@ function canonical(p: string): string {
     return resolve(p);
   }
 }
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { setupSessionWorktree } from "../services/session-orchestration.js";
 import { getProvider } from "../../compute/index.js";
 
@@ -38,7 +38,6 @@ let repoDir: string;
 
 beforeEach(async () => {
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
 
   // Set up a real git repo to serve as the "live" checkout.
@@ -57,7 +56,6 @@ beforeEach(async () => {
 afterEach(async () => {
   process.chdir(originalCwd);
   await app?.shutdown();
-  clearApp();
 });
 
 describe("setupSessionWorktree -- worktree isolation", () => {

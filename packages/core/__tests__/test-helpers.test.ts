@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import { withTestContext, waitFor } from "./test-helpers.js";
-import { getApp } from "../app.js";
+import { getApp } from "./test-helpers.js";
 
 // ── withTestContext ─────────────────────────────────────────────────────────
 

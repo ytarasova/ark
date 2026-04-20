@@ -6,9 +6,9 @@
  */
 
 import { describe, it, expect, beforeEach } from "bun:test";
-import { getApp } from "../app.js";
 import { fetchPRState, pollPRMerges, checkSessionMerge, setGhExec } from "../integrations/pr-merge-poller.js";
 import { withTestContext } from "./test-helpers.js";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 

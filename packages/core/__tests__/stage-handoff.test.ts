@@ -15,7 +15,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { AppContext, getApp, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { mediateStageHandoff, applyReport, applyHookStatus, advance } from "../services/session-orchestration.js";
 import { startConductor } from "../conductor/conductor.js";
 import type { OutboundMessage } from "../conductor/channel-types.js";
@@ -25,10 +25,8 @@ let app: AppContext;
 beforeEach(async () => {
   if (app) {
     await app.shutdown();
-    clearApp();
   }
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
 });
 

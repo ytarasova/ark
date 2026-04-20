@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
 import { watchMergedPR, type RollbackConfig, type CheckSuiteResult } from "../integrations/rollback.js";
-import { getApp } from "../app.js";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 

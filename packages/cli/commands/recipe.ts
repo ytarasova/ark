@@ -3,10 +3,10 @@ import chalk from "chalk";
 import { readFileSync } from "fs";
 import YAML from "yaml";
 import * as core from "../../core/index.js";
-import { getApp } from "../../core/app.js";
 import { getArkClient } from "./_shared.js";
+import type { AppContext } from "../../core/app.js";
 
-export function registerRecipeCommands(program: Command) {
+export function registerRecipeCommands(program: Command, app: AppContext) {
   const recipeCmd = program.command("recipe").description("Manage recipes");
 
   recipeCmd
@@ -76,7 +76,7 @@ export function registerRecipeCommands(program: Command) {
           process.exit(1);
         }
         const recipe = core.sessionToRecipe(session, opts.name);
-        getApp().recipes.save(recipe.name, recipe, scope, projectRoot);
+        app.recipes.save(recipe.name, recipe, scope, projectRoot);
         console.log(chalk.green(`Created recipe: ${opts.name} from session ${opts.fromSession} (${scope})`));
         return;
       }
@@ -94,7 +94,7 @@ export function registerRecipeCommands(program: Command) {
           console.error(chalk.red("YAML must have a 'name' field"));
           process.exit(1);
         }
-        getApp().recipes.save(recipe.name, recipe, scope, projectRoot);
+        app.recipes.save(recipe.name, recipe, scope, projectRoot);
         console.log(chalk.green(`Created recipe: ${recipe.name} (${scope})`));
         return;
       }
@@ -112,7 +112,7 @@ export function registerRecipeCommands(program: Command) {
       const scope = opts.scope as "global" | "project";
       const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
 
-      const recipe = getApp().recipes.get(name, projectRoot);
+      const recipe = app.recipes.get(name, projectRoot);
       if (recipe && recipe._source === "builtin") {
         console.error(chalk.red(`Cannot delete builtin recipe: ${name}`));
         process.exit(1);
@@ -122,7 +122,7 @@ export function registerRecipeCommands(program: Command) {
         process.exit(1);
       }
 
-      getApp().recipes.delete(name, scope, projectRoot);
+      app.recipes.delete(name, scope, projectRoot);
       console.log(chalk.green(`Deleted recipe: ${name}`));
     });
 }

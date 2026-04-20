@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect, afterEach, beforeAll, afterAll } from "bun:test";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { ConductorLauncher } from "../infra/conductor-launcher.js";
 import { ArkdLauncher } from "../infra/arkd-launcher.js";
 import { RouterLauncher } from "../infra/router-launcher.js";
@@ -29,7 +29,6 @@ let app: AppContext | null = null;
 afterEach(async () => {
   if (app) {
     await app.shutdown();
-    clearApp();
     app = null;
   }
 });
@@ -37,7 +36,6 @@ afterEach(async () => {
 describe("Lifecycle orchestrator", () => {
   it("boot() builds the container and resolves every launcher", async () => {
     app = AppContext.forTest();
-    setApp(app);
     await app.boot();
 
     const cradle = app.container.cradle;
@@ -57,7 +55,6 @@ describe("Lifecycle orchestrator", () => {
 
   it("skipConductor disables conductor + arkd launchers", async () => {
     app = AppContext.forTest();
-    setApp(app);
     await app.boot();
 
     // forTest() sets skipConductor: true
@@ -69,7 +66,6 @@ describe("Lifecycle orchestrator", () => {
 
   it("skipMetrics disables the metrics poller", async () => {
     app = AppContext.forTest();
-    setApp(app);
     await app.boot();
 
     expect(app.container.cradle.metricsPoller.running).toBe(false);
@@ -80,7 +76,6 @@ describe("Lifecycle orchestrator", () => {
 describe("Launcher disposers fire via container.dispose()", () => {
   it("ConductorLauncher.stop() is idempotent", async () => {
     app = AppContext.forTest();
-    setApp(app);
     await app.boot();
 
     const launcher = app.container.cradle.conductorLauncher;
@@ -91,7 +86,6 @@ describe("Launcher disposers fire via container.dispose()", () => {
 
   it("MetricsPoller stop clears its interval", async () => {
     app = AppContext.forTest();
-    setApp(app);
     await app.boot();
 
     const poller = app.container.cradle.metricsPoller;
@@ -101,7 +95,6 @@ describe("Launcher disposers fire via container.dispose()", () => {
 
   it("MaintenancePollers start + stop cycle clears intervals", async () => {
     app = AppContext.forTest();
-    setApp(app);
     await app.boot();
 
     const maintenance = app.container.cradle.maintenancePollers;
@@ -110,7 +103,6 @@ describe("Launcher disposers fire via container.dispose()", () => {
 
   it("SignalHandlers start is a no-op under skipSignals", async () => {
     app = AppContext.forTest();
-    setApp(app);
     await app.boot();
 
     const sh = app.container.cradle.signalHandlers;
@@ -119,7 +111,6 @@ describe("Launcher disposers fire via container.dispose()", () => {
 
   it("shutdown() calls container.dispose() exactly once", async () => {
     app = AppContext.forTest();
-    setApp(app);
     await app.boot();
 
     let disposeCount = 0;
@@ -142,7 +133,6 @@ describe("Launcher disposers fire via container.dispose()", () => {
 describe("container.dispose() runs each launcher's disposer", () => {
   it("calls stop() on every launcher with a disposer", async () => {
     app = AppContext.forTest();
-    setApp(app);
     await app.boot();
 
     const cradle = app.container.cradle;
@@ -224,13 +214,11 @@ describe("Infra launchers honor enablement", () => {
 
   beforeAll(async () => {
     app2 = AppContext.forTest();
-    setApp(app2);
     await app2.boot();
   });
 
   afterAll(async () => {
     await app2.shutdown();
-    clearApp();
   });
 
   it("RouterLauncher is inert when config.router is undefined", () => {

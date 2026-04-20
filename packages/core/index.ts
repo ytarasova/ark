@@ -7,7 +7,7 @@ export type { IDatabase, IStatement } from "./database/index.js";
 export { BunSqliteAdapter } from "./database/index.js";
 
 // Re-exports
-export { getApp, setApp, clearApp, AppContext } from "./app.js";
+export { AppContext } from "./app.js";
 export { safeParseConfig } from "./util.js";
 export {
   loadConfig,

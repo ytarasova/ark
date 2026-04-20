@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { startStatusPoller, stopStatusPoller, stopAllPollers } from "../executors/status-poller.js";
 import { gooseExecutor } from "../executors/goose.js";
 import { buildGooseCommand } from "../executors/goose.js";
@@ -26,13 +26,11 @@ let app: AppContext;
 beforeEach(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
 });
 
 afterEach(async () => {
   stopAllPollers();
   await app?.shutdown();
-  clearApp();
 });
 
 // ── Helper ───────────────────────────────────────────────────────────────────

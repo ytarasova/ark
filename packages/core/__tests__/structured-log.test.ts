@@ -3,6 +3,7 @@ import { setLogLevel, setLogComponents, logInfo, logError } from "../observabili
 import { withTestContext } from "./test-helpers.js";
 import { readFileSync, existsSync, writeFileSync } from "fs";
 import { join } from "path";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 
@@ -27,15 +28,11 @@ describe("structured logging", () => {
   beforeEach(() => {
     setLogLevel("debug");
     setLogComponents(null);
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { getApp } = require("../app.js");
     clearLog(getApp().config.arkDir);
   });
 
   it("writes JSONL entries", () => {
     logInfo("session", "test message", { key: "value" });
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { getApp } = require("../app.js");
     const entries = readLogEntries(getApp().config.arkDir);
     expect(entries.length).toBeGreaterThan(0);
     const last = entries[entries.length - 1];
@@ -49,8 +46,6 @@ describe("structured logging", () => {
     setLogLevel("error");
     logInfo("general", "should not appear");
     logError("general", "should appear");
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { getApp } = require("../app.js");
     const entries = readLogEntries(getApp().config.arkDir);
     // Only error-level entries should be written
     expect(entries.length).toBeGreaterThan(0);
@@ -61,8 +56,6 @@ describe("structured logging", () => {
     setLogComponents(["mcp"]);
     logInfo("session", "filtered out");
     logInfo("mcp", "allowed");
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { getApp } = require("../app.js");
     const entries = readLogEntries(getApp().config.arkDir);
     // Only mcp component entries should be written
     expect(entries.length).toBeGreaterThan(0);
@@ -71,8 +64,6 @@ describe("structured logging", () => {
 
   it("entries have timestamps", () => {
     logInfo("general", "timed");
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { getApp } = require("../app.js");
     const entries = readLogEntries(getApp().config.arkDir);
     expect(entries.length).toBeGreaterThan(0);
     const last = entries[entries.length - 1];

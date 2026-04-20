@@ -7,7 +7,6 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { getApp } from "../app.js";
 import { safeParseConfig } from "../util.js";
 import type { SessionStatus, MessageRole, MessageType } from "../../types/index.js";
 
@@ -42,6 +41,7 @@ function rowToSession(row: SessionRow) {
   return { ...row, status: row.status as SessionStatus, config: safeParseConfig(row.config) };
 }
 import { withTestContext } from "./test-helpers.js";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 

@@ -7,8 +7,8 @@ import { writeFileSync, mkdirSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
 import { resolveAgent, buildClaudeArgs, findProjectRoot, type AgentDefinition } from "../agent/agent.js";
-import { getApp } from "../app.js";
 import { withTestContext } from "./test-helpers.js";
+import { getApp } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
 

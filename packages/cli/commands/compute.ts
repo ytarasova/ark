@@ -4,13 +4,13 @@ import { join, dirname } from "path";
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { homedir } from "os";
 import { execFileSync } from "child_process";
-import * as core from "../../core/index.js";
 import { getProvider, allFlagSpecs, getFlagSpec } from "../../compute/index.js";
 import type { ProviderFlagOption } from "../../compute/index.js";
 import { getArkClient } from "./_shared.js";
 import { ComputePoolManager } from "../../core/compute/pool.js";
 import type { ComputeProviderName } from "../../types/index.js";
 import { logDebug } from "../../core/observability/structured-log.js";
+import type { AppContext } from "../../core/app.js";
 
 /**
  * Apply every registered provider's Commander options to `create`, de-duped
@@ -54,7 +54,7 @@ function isRepeatableListOption(opt: ProviderFlagOption): boolean {
   return /\(repeatable\)/i.test(opt.description);
 }
 
-export function registerComputeCommands(program: Command) {
+export function registerComputeCommands(program: Command, app: AppContext) {
   const computeCmd = program.command("compute").description("Manage compute resources");
 
   const createCmd = computeCmd
@@ -460,7 +460,6 @@ export function registerComputeCommands(program: Command) {
     .option("--image <image>", "Container image (provider-specific)")
     .action(async (name, opts) => {
       try {
-        const app = core.getApp();
         const manager = new ComputePoolManager(app);
         const config: Record<string, unknown> = {};
         if (opts.size) config.size = opts.size;
@@ -487,7 +486,6 @@ export function registerComputeCommands(program: Command) {
     .description("List compute pools")
     .action(async () => {
       try {
-        const app = core.getApp();
         const manager = new ComputePoolManager(app);
         const pools = manager.listPools();
         if (!pools.length) {
@@ -513,7 +511,6 @@ export function registerComputeCommands(program: Command) {
     .argument("<name>", "Pool name")
     .action(async (name) => {
       try {
-        const app = core.getApp();
         const manager = new ComputePoolManager(app);
         const deleted = manager.deletePool(name);
         if (deleted) {
@@ -535,7 +532,6 @@ export function registerComputeCommands(program: Command) {
     .description("List compute templates")
     .action(async () => {
       try {
-        const app = core.getApp();
         const templates = app.computeTemplates.list();
 
         // Also show config-defined templates
@@ -578,7 +574,6 @@ export function registerComputeCommands(program: Command) {
     .argument("<name>", "Template name")
     .action(async (name) => {
       try {
-        const app = core.getApp();
         let tmpl = app.computeTemplates.get(name);
 
         // Fall back to config
@@ -625,7 +620,6 @@ export function registerComputeCommands(program: Command) {
     .option("--namespace <ns>", "K8s namespace (k8s)")
     .action(async (name, opts) => {
       try {
-        const app = core.getApp();
         const config: Record<string, unknown> = {};
         if (opts.size) config.size = opts.size;
         if (opts.arch) config.arch = opts.arch;
@@ -657,7 +651,6 @@ export function registerComputeCommands(program: Command) {
     .argument("<name>", "Template name")
     .action(async (name) => {
       try {
-        const app = core.getApp();
         app.computeTemplates.delete(name);
         console.log(chalk.green(`Template '${name}' deleted`));
       } catch (e: any) {

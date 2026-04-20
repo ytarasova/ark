@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { AppContext, getApp, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { sessionToRecipe } from "../agent/recipe.js";
 import type { RecipeDefinition } from "../../types/index.js";
+import { clearApp, getApp, setApp } from "./test-helpers.js";
 
 let app: AppContext;
 beforeEach(async () => {
@@ -10,8 +11,8 @@ beforeEach(async () => {
     clearApp();
   }
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
+  setApp(app);
 });
 afterEach(async () => {
   if (app) {

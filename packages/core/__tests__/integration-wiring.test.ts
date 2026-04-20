@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { buildContext, formatContextAsMarkdown } from "../knowledge/context.js";
 import type { KnowledgeStore } from "../knowledge/store.js";
 import { TenantPolicyManager } from "../auth/tenant-policy.js";
@@ -10,13 +10,11 @@ let store: KnowledgeStore;
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
   store = app.knowledge;
 });
 
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 beforeEach(() => {

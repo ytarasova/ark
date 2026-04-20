@@ -13,7 +13,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { mediateStageHandoff, executeAction } from "../services/session-orchestration.js";
 import { waitFor } from "./test-helpers.js";
 
@@ -22,10 +22,8 @@ let app: AppContext;
 beforeEach(async () => {
   if (app) {
     await app.shutdown();
-    clearApp();
   }
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
 });
 

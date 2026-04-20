@@ -3,7 +3,6 @@
  */
 
 import { describe, it, expect, mock } from "bun:test";
-import { getApp } from "../app.js";
 import {
   saveCheckpoint,
   getCheckpoint,
@@ -12,6 +11,7 @@ import {
   recoverSession,
 } from "../session/checkpoint.js";
 import { withTestContext } from "./test-helpers.js";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 

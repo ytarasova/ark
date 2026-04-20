@@ -2,11 +2,11 @@ import type { Command } from "commander";
 import chalk from "chalk";
 import { join } from "path";
 import { existsSync } from "fs";
-import * as core from "../../core/index.js";
 import { findOrphanedWorktrees, cleanupWorktrees } from "../../core/services/session-orchestration.js";
 import { getArkClient } from "./_shared.js";
+import type { AppContext } from "../../core/app.js";
 
-export function registerWorktreeCommands(program: Command) {
+export function registerWorktreeCommands(program: Command, app: AppContext) {
   const worktree = program.command("worktree").description("Git worktree operations");
 
   worktree
@@ -81,7 +81,7 @@ export function registerWorktreeCommands(program: Command) {
       const ark = await getArkClient();
       const sessions = await ark.sessionList({ limit: 500 });
       const withWorktrees = sessions.filter((s) => {
-        const wtDir = join(core.getApp().config.worktreesDir, s.id);
+        const wtDir = join(app.config.worktreesDir, s.id);
         return existsSync(wtDir);
       });
 
@@ -102,7 +102,7 @@ export function registerWorktreeCommands(program: Command) {
     .description("Find and remove orphaned worktrees")
     .option("--dry-run", "Only show what would be removed")
     .action(async (opts) => {
-      const orphans = findOrphanedWorktrees(core.getApp());
+      const orphans = findOrphanedWorktrees(app);
       if (orphans.length === 0) {
         console.log(chalk.dim("No orphaned worktrees found"));
         return;
@@ -110,7 +110,7 @@ export function registerWorktreeCommands(program: Command) {
       console.log(chalk.yellow(`Found ${orphans.length} orphaned worktrees:`));
       for (const id of orphans) console.log(`  ${id}`);
       if (opts.dryRun) return;
-      const result = await cleanupWorktrees(core.getApp());
+      const result = await cleanupWorktrees(app);
       console.log(chalk.green(`Removed: ${result.removed}`));
       if (result.errors.length) {
         console.log(chalk.red(`Errors: ${result.errors.length}`));

@@ -12,7 +12,7 @@
 
 import { beforeEach, afterAll } from "bun:test";
 import { execFileSync } from "child_process";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import type { Session, SessionStatus, Compute, ComputeProviderName, ComputeStatus } from "../../types/index.js";
 
 /**
@@ -82,6 +82,33 @@ export function killNewArkTmuxSessions(preExisting: Set<string>): void {
 }
 
 /**
+ * Test-local AppContext handle. Kept in the test helpers module (NOT in
+ * production code) so tests that used the old `getApp()` service locator
+ * can migrate with a single import change. Production code must receive
+ * AppContext via constructor/parameter injection -- there is no
+ * `getApp()` exported from packages/core/app.ts anymore.
+ */
+let _currentTestApp: AppContext | null = null;
+
+/** Read the test-scoped AppContext. Throws if `withTestContext()` hasn't initialized one yet. */
+export function getApp(): AppContext {
+  if (!_currentTestApp) {
+    throw new Error("getApp() (test) called before the AppContext was initialized -- did you call withTestContext()?");
+  }
+  return _currentTestApp;
+}
+
+/** Install an AppContext as the current test context (used by ad-hoc beforeAll setups). */
+export function setApp(app: AppContext): void {
+  _currentTestApp = app;
+}
+
+/** Clear the test-scoped AppContext (teardown). */
+export function clearApp(): void {
+  _currentTestApp = null;
+}
+
+/**
  * Sets up beforeEach/afterAll hooks for test context isolation.
  * Each test gets a fresh AppContext.forTestAsync() with an isolated temp DB.
  * Automatically cleans up sessions and their processes on teardown.
@@ -94,19 +121,19 @@ export function withTestContext(): { getCtx: () => AppContext } {
     if (app) {
       await cleanupTestSessions(app);
       await app.shutdown();
-      clearApp();
+      _currentTestApp = null;
     }
     tmuxSnapshot = snapshotArkTmuxSessions();
     app = await AppContext.forTestAsync();
-    setApp(app);
     await app.boot();
+    _currentTestApp = app;
   });
 
   afterAll(async () => {
     if (app) {
       await cleanupTestSessions(app);
       await app.shutdown();
-      clearApp();
+      _currentTestApp = null;
     }
     // Safety net: also kill any tmux sessions created during this test
     // that might not be tracked in the DB (e.g. if dispatch failed mid-way)

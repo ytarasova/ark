@@ -30,6 +30,7 @@ beforeAll(async () => {
   app = await AppContext.forTestAsync();
   setApp(app);
   await app.boot();
+  setApp(app);
 });
 
 afterAll(async () => {

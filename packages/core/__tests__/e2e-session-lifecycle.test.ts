@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, afterEach, beforeAll, afterAll } from "bun:test";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { startSession, dispatch, stop, resume, complete, getOutput } from "../services/session-orchestration.js";
 import { sessionExists, killSession } from "../infra/tmux.js";
 import { snapshotArkTmuxSessions, killNewArkTmuxSessions } from "./test-helpers.js";
@@ -19,14 +19,12 @@ let tmuxSnapshot: Set<string>;
 beforeAll(async () => {
   tmuxSnapshot = snapshotArkTmuxSessions();
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
 });
 afterAll(async () => {
   if (app?.sessionService) await app.sessionService.stopAll();
   killNewArkTmuxSessions(tmuxSnapshot);
   await app?.shutdown();
-  clearApp();
 });
 
 // Track resources for cleanup

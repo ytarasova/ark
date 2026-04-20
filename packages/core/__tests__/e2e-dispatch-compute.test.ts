@@ -16,8 +16,9 @@ import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import { existsSync, mkdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { execFileSync } from "child_process";
-import { AppContext, getApp, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import * as claude from "../claude/claude.js";
+import { clearApp, getApp, setApp } from "./test-helpers.js";
 
 let app: AppContext;
 
@@ -27,8 +28,8 @@ beforeEach(async () => {
     clearApp();
   }
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
+  setApp(app);
 });
 
 afterAll(async () => {

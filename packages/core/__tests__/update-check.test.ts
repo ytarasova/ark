@@ -3,7 +3,7 @@ import { getCurrentVersion, checkForUpdate } from "../infra/update-check.js";
 import { withTestContext } from "./test-helpers.js";
 import { writeFileSync, existsSync, readFileSync } from "fs";
 import { join } from "path";
-import { getApp } from "../app.js";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 

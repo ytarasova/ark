@@ -15,7 +15,6 @@ import YAML from "yaml";
 let execFileResult: { stdout: string; stderr: string } = { stdout: "{}", stderr: "" };
 let execFileShouldThrow = false;
 
-import { getApp } from "../app.js";
 import {
   pollPRReviews,
   checkSessionPR,
@@ -24,6 +23,7 @@ import {
   setGhExec,
 } from "../integrations/pr-poller.js";
 import { withTestContext } from "./test-helpers.js";
+import { getApp } from "./test-helpers.js";
 
 // ── Test setup ───────────────────────────────────────────────────────────────
 

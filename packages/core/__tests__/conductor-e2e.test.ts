@@ -6,8 +6,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, afterAll } from "bun:test";
-import { AppContext, getApp, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { startConductor } from "../conductor/conductor.js";
+import { clearApp, getApp, setApp } from "./test-helpers.js";
 
 // Use a non-default port to avoid conflicts with a running conductor
 const TEST_PORT = 19199;
@@ -21,8 +22,8 @@ beforeEach(async () => {
     clearApp();
   }
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
+  setApp(app);
   server = startConductor(app, TEST_PORT, { quiet: true });
 });
 

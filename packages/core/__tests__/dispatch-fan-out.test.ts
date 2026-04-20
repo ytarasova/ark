@@ -1,18 +1,16 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { dispatch } from "../services/session-orchestration.js";
 
 let app: AppContext;
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
 });
 afterAll(async () => {
   // Stop all sessions (kills tmux + claude processes via provider)
   if (app?.sessionService) await app.sessionService.stopAll();
   await app?.shutdown();
-  clearApp();
 }, 30_000);
 
 describe("dispatch fan_out stage", () => {

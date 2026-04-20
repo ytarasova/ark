@@ -13,7 +13,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { mediateStageHandoff, runVerification, complete } from "../services/session-orchestration.js";
 import { startConductor } from "../conductor/conductor.js";
 
@@ -22,10 +22,8 @@ let app: AppContext;
 beforeEach(async () => {
   if (app) {
     await app.shutdown();
-    clearApp();
   }
   app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
 });
 

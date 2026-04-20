@@ -15,7 +15,7 @@ import { mkdirSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
 import { getStage, getNextStage, resolveNextStage, validateDAG, type StageDefinition } from "../state/flow.js";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { applyReport, advance } from "../services/session-orchestration.js";
 
 let app: AppContext;
@@ -23,12 +23,10 @@ let app: AppContext;
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
 });
 
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 /** Write a YAML flow definition to the user flows directory. */

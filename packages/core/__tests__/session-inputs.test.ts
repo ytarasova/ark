@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
-import { AppContext, setApp, clearApp } from "../app.js";
+import { AppContext } from "../app.js";
 import { startSession } from "../services/session-lifecycle.js";
 import { buildSessionVars, substituteVars } from "../template.js";
 
@@ -14,12 +14,10 @@ let app: AppContext;
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
 });
 
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 describe("session inputs plumbing", () => {

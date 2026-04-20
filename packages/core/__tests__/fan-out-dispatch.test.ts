@@ -1,11 +1,11 @@
 import { describe, it, expect, setDefaultTimeout } from "bun:test";
-import { getApp } from "../app.js";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 
 setDefaultTimeout(15_000);
 import { fanOut, checkAutoJoin, joinFork, dispatch, extractSubtasks } from "../services/session-orchestration.js";
 import { withTestContext } from "./test-helpers.js";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 

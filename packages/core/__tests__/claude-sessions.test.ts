@@ -2,12 +2,12 @@
  * Tests for Claude Code session discovery -- listClaudeSessions, getClaudeSession.
  */
 
-import { getApp } from "../app.js";
 import { describe, it, expect } from "bun:test";
 import { mkdirSync, writeFileSync, utimesSync } from "fs";
 import { join } from "path";
 import { listClaudeSessions, getClaudeSession, refreshClaudeSessionsCache } from "../claude/sessions.js";
 import { withTestContext } from "./test-helpers.js";
+import { getApp } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
 

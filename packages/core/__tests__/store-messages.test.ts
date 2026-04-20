@@ -3,7 +3,6 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { getApp } from "../app.js";
 import type { MessageRole, MessageType } from "../../types/index.js";
 
 function addMessage(opts: { session_id: string; role: MessageRole; content: string; type?: MessageType }) {
@@ -19,6 +18,7 @@ function markMessagesRead(sessionId: string) {
   return getApp().messages.markRead(sessionId);
 }
 import { withTestContext } from "./test-helpers.js";
+import { getApp } from "./test-helpers.js";
 
 withTestContext();
 

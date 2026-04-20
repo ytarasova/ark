@@ -5,7 +5,7 @@
 import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
 import { instantiateRecipe, sessionToRecipe } from "../agent/recipe.js";
-import { getApp } from "../app.js";
+import { getApp } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
 

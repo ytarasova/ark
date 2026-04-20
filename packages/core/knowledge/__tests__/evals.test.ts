@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
-import { AppContext, setApp, clearApp } from "../../app.js";
+import { AppContext } from "../../app.js";
 import { evaluateSession, getAgentStats, detectDrift, listEvals } from "../evals.js";
 import type { Session } from "../../../types/index.js";
 
@@ -8,12 +8,10 @@ let app: AppContext;
 beforeAll(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
-  setApp(app);
 });
 
 afterAll(async () => {
   await app?.shutdown();
-  clearApp();
 });
 
 function makeSession(overrides: Partial<Session> = {}): Session {
