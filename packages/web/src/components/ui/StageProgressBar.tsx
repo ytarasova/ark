@@ -3,8 +3,8 @@ import { cn } from "../../lib/utils.js";
 export interface StageProgress {
   /** Stage name */
   name: string;
-  /** "done" | "active" | "pending" | "failed" */
-  state: "done" | "active" | "pending" | "failed";
+  /** "done" | "active" | "pending" | "failed" | "stopped" */
+  state: "done" | "active" | "pending" | "failed" | "stopped";
 }
 
 export interface StageProgressBarProps extends React.ComponentProps<"div"> {
@@ -25,6 +25,7 @@ export function StageProgressBar({ stages, className, ...props }: StageProgressB
             "bg-[var(--completed)]": s.state === "done",
             "bg-[var(--running)]": s.state === "active",
             "bg-[var(--failed)]": s.state === "failed",
+            "bg-[var(--fg-muted)] opacity-60": s.state === "stopped",
             "bg-[var(--border)]": s.state === "pending",
           })}
           title={`${s.name}: ${s.state}`}

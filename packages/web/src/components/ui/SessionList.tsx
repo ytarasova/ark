@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { cn } from "../../lib/utils.js";
 import { StatusDot, type SessionStatus } from "./StatusDot.js";
 import { StageProgressBar, type StageProgress } from "./StageProgressBar.js";
-import { Search, X } from "lucide-react";
+import { Search, X, Archive, Trash2 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,6 +23,10 @@ export interface SessionListProps extends React.ComponentProps<"div"> {
   sessions: SessionListItem[];
   selectedId?: string | null;
   onSelect: (id: string) => void;
+  /** Per-row archive action (hover-shown icon). */
+  onArchive?: (id: string) => void;
+  /** Per-row delete action (hover-shown icon). */
+  onDelete?: (id: string) => void;
   /** Search input value */
   search?: string;
   onSearchChange?: (value: string) => void;
@@ -36,6 +40,8 @@ export function SessionList({
   sessions,
   selectedId,
   onSelect,
+  onArchive,
+  onDelete,
   search,
   onSearchChange,
   headerAction,
@@ -113,7 +119,14 @@ export function SessionList({
       {/* Session list */}
       <div className="flex-1 overflow-y-auto px-2 pb-2">
         {sessions.map((s) => (
-          <SessionCard key={s.id} session={s} selected={selectedId === s.id} onSelect={onSelect} />
+          <SessionCard
+            key={s.id}
+            session={s}
+            selected={selectedId === s.id}
+            onSelect={onSelect}
+            onArchive={onArchive}
+            onDelete={onDelete}
+          />
         ))}
       </div>
     </div>
@@ -128,23 +141,39 @@ function SessionCard({
   session,
   selected,
   onSelect,
+  onArchive,
+  onDelete,
 }: {
   session: SessionListItem;
   selected: boolean;
   onSelect: (id: string) => void;
+  onArchive?: (id: string) => void;
+  onDelete?: (id: string) => void;
 }) {
+  const iconBtnClass = cn(
+    "h-5 w-5 inline-flex items-center justify-center rounded shrink-0",
+    "text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-hover)]",
+    "opacity-0 group-hover:opacity-100 transition-opacity",
+  );
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onSelect(session.id)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect(session.id);
+        }
+      }}
       className={cn(
-        "flex flex-col gap-1 w-full text-left px-2 py-3 rounded-[var(--radius-sm)]",
+        "group flex flex-col gap-1 w-full text-left px-2 py-3 rounded-[var(--radius-sm)]",
         "cursor-pointer border-l-[3px] border-transparent min-h-[52px] justify-center",
         "hover:bg-[var(--bg-hover)] transition-colors duration-150",
         selected && "bg-[var(--primary-subtle)] border-l-[var(--primary)]",
       )}
     >
-      {/* Top row: dot + id + unread badge + time */}
+      {/* Top row: dot + id + unread badge + time + hover actions */}
       <div className="flex items-center gap-1.5">
         <StatusDot status={session.status} size="md" />
         <span className="font-[family-name:var(--font-mono-ui)] text-[12px] text-[var(--fg-muted)]">{session.id}</span>
@@ -161,6 +190,34 @@ function SessionCard({
           </span>
         )}
         <span className="text-[11px] text-[var(--fg-muted)] ml-auto">{session.relativeTime}</span>
+        {onArchive && (
+          <button
+            type="button"
+            title="Archive"
+            aria-label={`Archive ${session.id}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onArchive(session.id);
+            }}
+            className={iconBtnClass}
+          >
+            <Archive size={12} />
+          </button>
+        )}
+        {onDelete && (
+          <button
+            type="button"
+            title="Delete"
+            aria-label={`Delete ${session.id}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(session.id);
+            }}
+            className={cn(iconBtnClass, "hover:text-[var(--failed)]")}
+          >
+            <Trash2 size={12} />
+          </button>
+        )}
       </div>
 
       {/* Summary */}
@@ -176,6 +233,6 @@ function SessionCard({
           {session.cost}
         </span>
       </div>
-    </button>
+    </div>
   );
 }

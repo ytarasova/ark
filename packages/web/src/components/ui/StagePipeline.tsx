@@ -40,6 +40,9 @@ export function StagePipeline({ stages, selectedStage, onStageClick, className, 
               {
                 "text-[var(--completed)]": s.state === "done" && selectedStage !== s.name,
                 "text-[var(--primary)] bg-[var(--primary-subtle)]": s.state === "active" && selectedStage !== s.name,
+                "text-[var(--failed)]": s.state === "failed" && selectedStage !== s.name,
+                "text-[var(--fg-muted)] line-through decoration-dashed":
+                  s.state === "stopped" && selectedStage !== s.name,
                 "text-[var(--fg-muted)]": s.state === "pending" && selectedStage !== s.name,
                 "text-[var(--primary)] underline underline-offset-4 decoration-2 decoration-[var(--primary)]":
                   selectedStage === s.name,
