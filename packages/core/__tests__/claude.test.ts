@@ -720,6 +720,65 @@ describe("buildLauncher exit-code sentinel", () => {
   });
 });
 
+// ── buildLauncher PTY geometry sentinel ──────────────────────────────────────
+
+describe("buildLauncher geometry sentinel", () => {
+  const baseOpts: LauncherOpts = {
+    workdir: "/tmp/project",
+    claudeArgs: ["claude", "--model", "opus", "--dangerously-skip-permissions"],
+    mcpConfigPath: "/tmp/.mcp.json",
+  };
+
+  it("includes a busy-wait for $ARK_SESSION_DIR/geometry", () => {
+    const { content } = buildLauncher(baseOpts);
+    expect(content).toContain('GEOMETRY_SENTINEL="${ARK_SESSION_DIR:-/tmp/ark-session-unknown}/geometry"');
+    expect(content).toMatch(/while \[ ! -f "\$GEOMETRY_SENTINEL" \]/);
+  });
+
+  it("falls back to 120x50 when the sentinel never arrives (CLI dispatch)", () => {
+    const { content } = buildLauncher(baseOpts);
+    expect(content).toContain("export COLUMNS=120 LINES=50");
+  });
+
+  it("validates numeric COLS/ROWS before exporting (protects against a partial write)", () => {
+    const { content } = buildLauncher(baseOpts);
+    // Guards on both halves -- an empty, non-numeric, or zero read falls
+    // through to the 120x50 fallback branch. Zero is intentionally
+    // rejected so a malformed sentinel cannot set COLUMNS=0.
+    expect(content).toContain(`case "$COLS" in ''|*[!0-9]*|0) COLS="" ;; esac`);
+    expect(content).toContain(`case "$ROWS" in ''|*[!0-9]*|0) ROWS="" ;; esac`);
+  });
+
+  it("waits no longer than 500ms so CLI-only dispatches are never gated for long", () => {
+    const { content } = buildLauncher(baseOpts);
+    expect(content).toContain("GEOMETRY_WAIT_MS=500");
+  });
+
+  it("no longer hardcodes 120x50 at the top of the script (pre-fix regression guard)", () => {
+    // The old behaviour was an unconditional `export COLUMNS=120 LINES=50`.
+    // After the sentinel handshake there should be exactly one export --
+    // the fallback branch. The sentinel branch exports the real values.
+    const { content } = buildLauncher(baseOpts);
+    const unconditionalPin = content.match(/^\s*export COLUMNS=120 LINES=50\s*$/gm);
+    // The fallback export lives inside the `else` branch but will still
+    // match a loose regex. The regression we're guarding against is a
+    // *leading* pin with no prior `if [ -f` gate. Check the fallback is
+    // inside an else:
+    expect(content).toMatch(/else\s*\n\s*export COLUMNS=120 LINES=50/);
+    // And that there is no duplicate pin outside the else.
+    expect(unconditionalPin?.length ?? 0).toBeLessThanOrEqual(1);
+  });
+
+  it("geometry block runs before the claude invocation", () => {
+    const { content } = buildLauncher(baseOpts);
+    const geomIdx = content.indexOf("GEOMETRY_SENTINEL=");
+    const claudeIdx = content.indexOf("if claude");
+    expect(geomIdx).toBeGreaterThan(-1);
+    expect(claudeIdx).toBeGreaterThan(-1);
+    expect(geomIdx).toBeLessThan(claudeIdx);
+  });
+});
+
 // ── trustDirectory ────────────────────────────────────────────────────────────
 
 describe("trustDirectory", () => {

@@ -1,11 +1,15 @@
 /**
  * Tests for pty_cols / pty_rows round-trip on the sessions table.
  *
- * Bug 4 of the session-dispatch cascade: StaticTerminal's auto-detected
- * column count produced mangled replay when the captured stream's
- * cursor-position codes assumed a different width than the browser.
- * The server now pins the tmux PTY geometry at dispatch and persists it
- * on the session row so the frontend can render at the capture width.
+ * Originally these columns were written at dispatch (120x50 hardcoded). That
+ * pinned the live agent to 120 cols regardless of the real web viewport,
+ * which meant cursor-position escapes landed in the wrong cells when the
+ * browser was wider/narrower. Today pty_cols / pty_rows are *observed* (the
+ * terminal bridge writes them on the first client resize -- see
+ * packages/core/hosted/terminal-bridge.ts), not prescribed. They start NULL
+ * on freshly created sessions and get populated once a real client connects.
+ * These tests only cover the repo round-trip; the write path is covered in
+ * packages/core/__tests__/terminal-bridge-geometry.test.ts.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";

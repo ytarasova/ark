@@ -172,14 +172,15 @@ export const claudeCodeExecutor: Executor = {
 
     // Local launch
     log("Starting local tmux session...");
-    // Pin the tmux PTY geometry so terminal replay renders at the same
-    // width as the live capture. See bug 4 in session-dispatch cascade.
-    const ptyCols = 120;
-    const ptyRows = 50;
+    // tmux creates the pane at its default 120x50; the launcher blocks on
+    // `$ARK_SESSION_DIR/geometry` so claude doesn't pick up those dimensions.
+    // The terminal bridge writes the sentinel with the real client viewport
+    // on the first resize; CLI-only dispatches fall through the launcher's
+    // GEOMETRY_WAIT_MS deadline and use 120x50 as a last-resort default.
+    // pty_cols / pty_rows are left NULL at create-time and populated by the
+    // bridge when the first resize lands. See terminal-bridge.ts.
     await tmux.createSessionAsync(tmuxName, `bash ${launcher}`, {
       arkDir: app.config.arkDir,
-      width: ptyCols,
-      height: ptyRows,
     });
     const rootPid = await tmux.getPanePidAsync(tmuxName);
 
@@ -189,11 +190,7 @@ export const claudeCodeExecutor: Executor = {
     await tmux.pipePaneAsync(tmuxName, recPath);
 
     claude.autoAcceptChannelPrompt(tmuxName);
-    app.sessions.update(session.id, {
-      claude_session_id: claudeSessionId,
-      pty_cols: ptyCols,
-      pty_rows: ptyRows,
-    });
+    app.sessions.update(session.id, { claude_session_id: claudeSessionId });
 
     return { ok: true, handle: tmuxName, pid: rootPid ?? undefined, claudeSessionId };
   },
