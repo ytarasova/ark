@@ -109,10 +109,17 @@ export const claudeCodeExecutor: Executor = {
 
     // Build launch env from agent config + provider-specific env + router URL (if enabled)
     const { buildRouterEnv } = await import("./router-env.js");
-    const launchEnv = {
+    // ARK_SESSION_DIR gives the launcher a place to drop the exit-code
+    // sentinel when claude exits non-zero (bug 3 fix). The status poller
+    // watches this same path. For remote compute the path refers to the
+    // compute target filesystem; provider-specific remapping is out of
+    // scope here and falls back to the launcher's /tmp default.
+    const localSessionDir = join(app.config.tracksDir, session.id);
+    const launchEnv: Record<string, string> = {
       ...(opts.agent.env ?? {}),
       ...(provider?.buildLaunchEnv(session) ?? {}),
       ...buildRouterEnv(app.config, { mode: "claude" }),
+      ARK_SESSION_DIR: localSessionDir,
     };
 
     const claudeArgs = opts.claudeArgs ?? [];
@@ -165,7 +172,15 @@ export const claudeCodeExecutor: Executor = {
 
     // Local launch
     log("Starting local tmux session...");
-    await tmux.createSessionAsync(tmuxName, `bash ${launcher}`, { arkDir: app.config.arkDir });
+    // Pin the tmux PTY geometry so terminal replay renders at the same
+    // width as the live capture. See bug 4 in session-dispatch cascade.
+    const ptyCols = 120;
+    const ptyRows = 50;
+    await tmux.createSessionAsync(tmuxName, `bash ${launcher}`, {
+      arkDir: app.config.arkDir,
+      width: ptyCols,
+      height: ptyRows,
+    });
     const rootPid = await tmux.getPanePidAsync(tmuxName);
 
     // Start recording terminal output for post-session replay
@@ -174,7 +189,11 @@ export const claudeCodeExecutor: Executor = {
     await tmux.pipePaneAsync(tmuxName, recPath);
 
     claude.autoAcceptChannelPrompt(tmuxName);
-    app.sessions.update(session.id, { claude_session_id: claudeSessionId });
+    app.sessions.update(session.id, {
+      claude_session_id: claudeSessionId,
+      pty_cols: ptyCols,
+      pty_rows: ptyRows,
+    });
 
     return { ok: true, handle: tmuxName, pid: rootPid ?? undefined, claudeSessionId };
   },

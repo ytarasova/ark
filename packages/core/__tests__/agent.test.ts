@@ -281,7 +281,7 @@ describe("resolveAgent", () => {
   it("substitutes template vars in system_prompt", () => {
     writeAgentYaml("templated", {
       name: "templated",
-      system_prompt: "Working on {ticket}: {summary} in {repo} on branch {branch}.",
+      system_prompt: "Working on {{ticket}}: {{summary}} in {{repo}} on branch {{branch}}.",
     });
 
     const agent = resolveAgent(getApp(), "templated", {
@@ -298,7 +298,7 @@ describe("resolveAgent", () => {
   it("substitutes workdir, track_id, and stage vars", () => {
     writeAgentYaml("vars-agent", {
       name: "vars-agent",
-      system_prompt: "Dir: {workdir}, Track: {track_id}, Stage: {stage}",
+      system_prompt: "Dir: {{workdir}}, Track: {{track_id}}, Stage: {{stage}}",
     });
 
     const agent = resolveAgent(getApp(), "vars-agent", {
@@ -313,7 +313,7 @@ describe("resolveAgent", () => {
   it("substitutes backward-compat jira_key and jira_summary", () => {
     writeAgentYaml("compat-agent", {
       name: "compat-agent",
-      system_prompt: "Ticket: {jira_key}, Summary: {jira_summary}",
+      system_prompt: "Ticket: {{jira_key}}, Summary: {{jira_summary}}",
     });
 
     const agent = resolveAgent(getApp(), "compat-agent", {
@@ -327,17 +327,17 @@ describe("resolveAgent", () => {
   it("preserves unknown template vars", () => {
     writeAgentYaml("unknown-vars", {
       name: "unknown-vars",
-      system_prompt: "Known: {ticket}, Unknown: {custom_var}",
+      system_prompt: "Known: {{ticket}}, Unknown: {{custom_var}}",
     });
 
     const agent = resolveAgent(getApp(), "unknown-vars", { ticket: "T-1" });
-    expect(agent!.system_prompt).toBe("Known: T-1, Unknown: {custom_var}");
+    expect(agent!.system_prompt).toBe("Known: T-1, Unknown: {{custom_var}}");
   });
 
   it("handles empty session -- vars resolve to empty strings", () => {
     writeAgentYaml("empty-session", {
       name: "empty-session",
-      system_prompt: "Ticket={ticket}, Repo={repo}",
+      system_prompt: "Ticket={{ticket}}, Repo={{repo}}",
     });
 
     const agent = resolveAgent(getApp(), "empty-session", {});
@@ -355,7 +355,7 @@ describe("resolveAgent", () => {
   it("workdir defaults to '.' when not provided", () => {
     writeAgentYaml("workdir-default", {
       name: "workdir-default",
-      system_prompt: "Dir: {workdir}",
+      system_prompt: "Dir: {{workdir}}",
     });
 
     const agent = resolveAgent(getApp(), "workdir-default", {});
@@ -551,7 +551,7 @@ describe("resolveAgent with projectRoot", () => {
   it("resolves project agent with template substitution", () => {
     writeProjectAgentYaml("proj-tmpl", {
       name: "proj-tmpl",
-      system_prompt: "Working on {ticket} in {repo}",
+      system_prompt: "Working on {{ticket}} in {{repo}}",
     });
 
     const agent = resolveAgent(getApp(), "proj-tmpl", { ticket: "T-1", repo: "/code" }, projectDir());

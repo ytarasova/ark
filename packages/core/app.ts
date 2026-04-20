@@ -60,6 +60,9 @@ import type { KnowledgeStore } from "./knowledge/store.js";
 import type { PricingRegistry } from "./observability/pricing.js";
 import type { UsageRecorder } from "./observability/usage.js";
 import type { TensorZeroManager } from "./router/tensorzero.js";
+import type { BlobStore } from "./storage/blob-store.js";
+import type { AppMode } from "./modes/app-mode.js";
+import { buildAppMode } from "./modes/app-mode.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -290,6 +293,51 @@ export class AppContext {
   /** Snapshot store used by `session/pause` + `session/resume`. */
   get snapshotStore(): SnapshotStore {
     return this._resolve("snapshotStore");
+  }
+
+  // ── Blob storage (inputs, exports) ────────────────────────────────────
+
+  /** Blob store for session input uploads. Local-disk or S3 depending on profile. */
+  get blobStore(): BlobStore {
+    return this._resolve("blobStore");
+  }
+
+  // ── Deployment-mode descriptor ────────────────────────────────────────
+  //
+  // Picked ONCE at DI composition based on `config.database.url`; resolved
+  // polymorphically thereafter. Handlers/services/components never branch on
+  // a `hosted` boolean -- they look at `app.mode.<capability>` and act on its
+  // presence/absence.
+  //
+  // Available before boot: we build a pre-boot AppMode directly from config so
+  // call sites that inspect `app.mode.kind` during construction (e.g. handler
+  // registration, which happens before `lifecycle.start()` for the conductor
+  // path) keep working. Once the container is built, the DI-registered mode
+  // shadows the pre-boot one.
+  private _preBootMode: AppMode | null = null;
+
+  get mode(): AppMode {
+    if (this.phase === "ready" || this.phase === "shutting_down") {
+      try {
+        return this._container.resolve("mode");
+      } catch {
+        // fall through to the pre-boot mode below
+      }
+    }
+    if (!this._preBootMode) {
+      this._preBootMode = buildAppMode(this.config, this);
+    }
+    return this._preBootMode;
+  }
+
+  // ── Tenant scoping ───────────────────────────────────────────────────
+  //
+  // Base AppContext is not tenant-scoped. `forTenant(id)` returns a shallow
+  // copy that sets `tenantId` via Object.defineProperty, so this accessor
+  // returns null on the root context and the scoped id on per-tenant views.
+
+  get tenantId(): string | null {
+    return null;
   }
 
   // ── Cost tracking ─────────────────────────────────────────────────────

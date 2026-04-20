@@ -25,10 +25,14 @@ import type { AppContext } from "../app.js";
 import { registerDatabase, registerRepositories, registerResourceStores } from "./persistence.js";
 import { registerServices } from "./services.js";
 import { registerRuntime } from "./runtime.js";
+import { registerStorage } from "./storage.js";
+import { registerAppMode } from "./mode.js";
 
 export { registerDatabase, registerRepositories, registerResourceStores } from "./persistence.js";
 export { registerServices } from "./services.js";
 export { registerRuntime } from "./runtime.js";
+export { registerStorage } from "./storage.js";
+export { registerAppMode } from "./mode.js";
 
 /**
  * Build a fully wired container.
@@ -56,14 +60,24 @@ export function buildContainer(opts: {
   // 2. Database (with disposer).
   registerDatabase(container, opts.db);
 
-  // 3. Persistence layer.
+  // 3. AppMode -- picks Local vs Hosted based on `config.database.url`.
+  // Registered before anything else so handlers/services can resolve it
+  // via the cradle. This is the ONE remaining mode conditional in the
+  // codebase; everyone downstream does polymorphic dispatch.
+  registerAppMode(container);
+
+  // 4. Persistence layer.
   registerRepositories(container);
   registerResourceStores(container);
 
-  // 4. Runtime singletons + infra launchers.
+  // 4. Blob storage (inputs / exports). Must land before services so the
+  // SessionService factory can resolve `blobStore` from the cradle.
+  registerStorage(container);
+
+  // 5. Runtime singletons + infra launchers.
   registerRuntime(container);
 
-  // 5. Services.
+  // 6. Services.
   registerServices(container);
 
   return container;

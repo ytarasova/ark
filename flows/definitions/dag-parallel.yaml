@@ -5,7 +5,7 @@ stages:
     agent: planner
     gate: manual
     task: |
-      Analyze {summary} and create PLAN.md.
+      Analyze {{summary}} and create PLAN.md.
       Decompose into independent implementation tasks.
 
   - name: implement
@@ -13,14 +13,14 @@ stages:
     gate: auto
     depends_on: [plan]
     task: |
-      Implement the code changes from PLAN.md for: {summary}
+      Implement the code changes from PLAN.md for: {{summary}}
 
   - name: test
     agent: implementer
     gate: auto
     depends_on: [plan]
     task: |
-      Write tests for: {summary}
+      Write tests for: {{summary}}
       Focus on unit and integration tests.
 
   - name: integrate

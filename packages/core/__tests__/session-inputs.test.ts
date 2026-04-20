@@ -46,7 +46,7 @@ describe("session inputs plumbing", () => {
     expect(config.inputs).toBeUndefined();
   });
 
-  it("buildSessionVars + substituteVars resolve {inputs.files.X} / {inputs.params.X}", () => {
+  it("buildSessionVars + substituteVars resolve {{inputs.files.X}} / {{inputs.params.X}}", () => {
     const session = startSession(app, {
       summary: "template-test",
       repo: ".",
@@ -57,7 +57,7 @@ describe("session inputs plumbing", () => {
       },
     });
     const vars = buildSessionVars(session as unknown as Record<string, unknown>);
-    const rendered = substituteVars("recipe={inputs.files.recipe} key={inputs.params.jira_key}", vars);
+    const rendered = substituteVars("recipe={{inputs.files.recipe}} key={{inputs.params.jira_key}}", vars);
     expect(rendered).toBe("recipe=/tmp/goose.yaml key=IN-99");
   });
 });

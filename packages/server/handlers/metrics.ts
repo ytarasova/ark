@@ -1,13 +1,18 @@
-import { execFile } from "child_process";
-import { promisify } from "util";
+/**
+ * Shared metrics + cost-tracking handlers.
+ *
+ * The privileged host-command handlers (`compute/kill-process`,
+ * `compute/docker-logs`, `compute/docker-action`) are local-only and live in
+ * `metrics-local.ts`. They're registered conditionally when
+ * `app.mode.hostCommandCapability` is non-null.
+ */
+
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { getProvider } from "../../compute/index.js";
 import { getAllSessionCosts } from "../../core/observability/costs.js";
 import type { MetricsSnapshotParams } from "../../types/index.js";
-
-const execFileAsync = promisify(execFile);
 
 export function registerMetricsHandlers(router: Router, app: AppContext): void {
   router.handle("metrics/snapshot", async (p) => {
@@ -98,76 +103,5 @@ export function registerMetricsHandlers(router: Router, app: AppContext): void {
       source: params.source ?? "api",
     });
     return { ok: true };
-  });
-
-  // ── Process / container actions (local compute only) ─────────────────────
-  //
-  // Security: these RPCs execute privileged host commands (`kill`, `docker`).
-  // They are only safe on the local, single-user compute. In hosted /
-  // multi-tenant mode they are refused outright -- allowing a tenant to
-  // send signals to arbitrary pids on the control plane host, or to stop /
-  // introspect other tenants' containers, would be a cross-tenant breach.
-  // Registered in WRITE_METHODS so viewer roles and read-only web also
-  // cannot reach them.
-  const hostedMode = (): boolean => typeof app.config.databaseUrl === "string" && app.config.databaseUrl.length > 0;
-
-  router.handle("compute/kill-process", async (p) => {
-    if (hostedMode()) throw new Error("compute/kill-process is disabled in hosted mode");
-    const params = (p ?? {}) as Record<string, any>;
-    const pidRaw = params.pid;
-    // Coerce to a positive integer and reject anything else. Without this
-    // `String(pid)` would let a caller pass "-1" (kill every process in the
-    // caller's session) or other shell-ish tokens that execFile forwards
-    // verbatim as argv to `kill`.
-    const pid = Math.trunc(Number(pidRaw));
-    if (!Number.isFinite(pid) || pid <= 1) throw new Error("pid must be a positive integer greater than 1");
-    try {
-      await execFileAsync("kill", ["-15", String(pid)], { timeout: 5000 });
-      return { ok: true };
-    } catch (err: any) {
-      throw new Error(`Failed to kill process ${pid}: ${err.message}`);
-    }
-  });
-
-  // Docker container names follow a restricted charset. We match it here to
-  // keep command injection impossible even if `execFile` were ever swapped
-  // for a shell variant.
-  const DOCKER_NAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,254}$/;
-
-  router.handle("compute/docker-logs", async (p) => {
-    if (hostedMode()) throw new Error("compute/docker-logs is disabled in hosted mode");
-    const params = (p ?? {}) as Record<string, any>;
-    const container = params.container;
-    if (typeof container !== "string" || !DOCKER_NAME_RE.test(container)) {
-      throw new Error("container must be a valid docker name");
-    }
-    const tailNum = Math.trunc(Number(params.tail ?? 100));
-    const tail = String(Number.isFinite(tailNum) && tailNum > 0 && tailNum <= 10000 ? tailNum : 100);
-    try {
-      const { stdout } = await execFileAsync("docker", ["logs", container, "--tail", tail], {
-        timeout: 10_000,
-        encoding: "utf-8",
-      });
-      return { logs: stdout };
-    } catch (err: any) {
-      throw new Error(`Failed to get logs for ${container}: ${err.message}`);
-    }
-  });
-
-  router.handle("compute/docker-action", async (p) => {
-    if (hostedMode()) throw new Error("compute/docker-action is disabled in hosted mode");
-    const params = (p ?? {}) as Record<string, any>;
-    const container = params.container;
-    const action = params.action;
-    if (typeof container !== "string" || !DOCKER_NAME_RE.test(container)) {
-      throw new Error("container must be a valid docker name");
-    }
-    if (!action || !["stop", "restart"].includes(action)) throw new Error("action must be stop or restart");
-    try {
-      await execFileAsync("docker", [action, container], { timeout: 30_000 });
-      return { ok: true };
-    } catch (err: any) {
-      throw new Error(`Failed to ${action} container ${container}: ${err.message}`);
-    }
   });
 }

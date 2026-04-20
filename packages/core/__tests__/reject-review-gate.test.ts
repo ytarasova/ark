@@ -42,19 +42,14 @@ describe("renderReworkPrompt", () => {
     expect(out).toBe("Reviewer said: tests missing");
   });
 
-  it("also substitutes single-brace session vars", () => {
-    const out = renderReworkPrompt("Stage {stage}: {{rejection_reason}}", "no coverage", { stage: "review" });
+  it("substitutes session vars alongside rejection_reason", () => {
+    const out = renderReworkPrompt("Stage {{stage}}: {{rejection_reason}}", "no coverage", { stage: "review" });
     expect(out).toBe("Stage review: no coverage");
   });
 
-  it("handles the single-brace form of rejection_reason", () => {
-    const out = renderReworkPrompt("Reason: {rejection_reason}", "foo", {});
-    expect(out).toBe("Reason: foo");
-  });
-
-  it("leaves unknown variables intact", () => {
-    const out = renderReworkPrompt("Hi {unknown}", "x", {});
-    expect(out).toBe("Hi {unknown}");
+  it("leaves unknown variables intact as Jinja placeholders", () => {
+    const out = renderReworkPrompt("Hi {{unknown}}", "x", {});
+    expect(out).toBe("Hi {{unknown}}");
   });
 });
 

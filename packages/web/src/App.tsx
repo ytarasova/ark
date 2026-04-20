@@ -2,6 +2,7 @@ import "./styles.css";
 import { useState, useCallback, useMemo, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { queryClient, QueryClientProvider } from "./providers/QueryProvider.js";
+import { AppModeProvider } from "./providers/AppModeProvider.js";
 import { ThemeProvider, useTheme } from "./themes/ThemeProvider.js";
 import { TransportProvider } from "./transport/TransportContext.js";
 import { HttpTransport } from "./transport/HttpTransport.js";
@@ -210,9 +211,11 @@ const root = createRoot(document.getElementById("root")!);
 root.render(
   <TransportProvider transport={new HttpTransport()}>
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider defaultTheme="midnight-circuit">
-        <App />
-      </ThemeProvider>
+      <AppModeProvider>
+        <ThemeProvider defaultTheme="midnight-circuit">
+          <App />
+        </ThemeProvider>
+      </AppModeProvider>
     </QueryClientProvider>
   </TransportProvider>,
 );

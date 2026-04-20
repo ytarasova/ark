@@ -210,31 +210,34 @@ export class SessionService {
   }
 
   /**
-   * Persist a session input file on disk under `<arkDir>/inputs/<id>/<name>`.
-   * Returns the absolute path callers should store in
-   * `session.config.inputs.files[<role>]`. The per-upload directory keeps
-   * same-name files for different roles from stomping each other.
+   * Persist a session input blob and return an opaque locator callers should
+   * store in `session.config.inputs.files[<role>]`. The locator is then fed
+   * back through `input/read` (or decoded server-side) to retrieve the bytes.
+   *
+   * Backend selection is driven by config: local profile -> on-disk under
+   * `{arkDir}/blobs/<tenantId>/inputs/<id>/<filename>`, control-plane
+   * profile -> S3 under `{prefix}/<tenantId>/inputs/<id>/<filename>`.
+   *
+   * The return shape changed from `{ path }` to `{ locator }` on purpose --
+   * the old filesystem path leaked arkDir and broke past a single replica.
    */
   async saveInput(opts: {
     name: string;
     role: string;
     content: string;
     contentEncoding?: "base64" | "utf-8";
-  }): Promise<{ path: string }> {
-    const { join, basename } = await import("path");
-    const { mkdirSync, writeFileSync } = await import("fs");
+  }): Promise<{ locator: string }> {
+    const { basename } = await import("path");
+    const { LOCAL_TENANT_ID } = await import("../storage/blob-store.js");
     const safeName = basename(opts.name).replace(/[^\w.\-]/g, "_");
     const safeRole = opts.role.replace(/[^\w.\-]/g, "_");
-    const dir = join(this.app.arkDir, "inputs", `${Date.now().toString(36)}-${safeRole}`);
-    mkdirSync(dir, { recursive: true });
-    const path = join(dir, safeName);
     const encoding = opts.contentEncoding ?? "utf-8";
-    if (encoding === "base64") {
-      writeFileSync(path, Buffer.from(opts.content, "base64"));
-    } else {
-      writeFileSync(path, opts.content, "utf-8");
-    }
-    return { path };
+    const bytes = encoding === "base64" ? Buffer.from(opts.content, "base64") : Buffer.from(opts.content, "utf-8");
+
+    const tenantId = this.app.tenantId ?? LOCAL_TENANT_ID;
+    const id = `${Date.now().toString(36)}-${safeRole}`;
+    const meta = await this.app.blobStore.put({ tenantId, namespace: "inputs", id, filename: safeName }, bytes);
+    return { locator: meta.locator };
   }
 
   /**

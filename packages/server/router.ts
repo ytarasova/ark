@@ -29,6 +29,16 @@ export class Router {
     this.handlers.set(method, handler);
   }
 
+  /** Introspection: is a handler registered for this method? */
+  hasHandler(method: string): boolean {
+    return this.handlers.has(method);
+  }
+
+  /** Introspection: list every registered method name. */
+  methodNames(): string[] {
+    return [...this.handlers.keys()];
+  }
+
   requireInitialization(): void {
     this.requireInit = true;
   }

@@ -1,27 +1,23 @@
 /**
- * RPC handlers for routes previously served directly by web.ts REST endpoints.
- * These bridge the gap so the web server can use a single JSON-RPC endpoint.
+ * Shared web handlers (local + hosted) -- RPC routes that were previously
+ * REST endpoints on the web server.
+ *
+ * Local-mode-only web handlers (mcp/attach-by-dir, mcp/detach-by-dir,
+ * repo-map/get, knowledge/ingest) live in `web-local.ts` and are registered
+ * conditionally in `register.ts`. The bodies below never inspect a mode flag.
  */
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
-import { RpcError } from "../../protocol/types.js";
-
-/** True when Ark is running in hosted/multi-tenant mode. */
-function isHostedMode(app: AppContext): boolean {
-  return typeof app.config.databaseUrl === "string" && app.config.databaseUrl.length > 0;
-}
 import { searchSessions, searchTranscripts } from "../../core/search/search.js";
 import { searchAllConversations } from "../../core/search/global-search.js";
 import type { KnowledgeNode } from "../../core/knowledge/types.js";
-import { generateRepoMap } from "../../core/repo-map.js";
 import { getHotkeys } from "../../core/hotkeys.js";
 import { getThemeMode } from "../../core/theme.js";
 import { getAllSessionCosts, exportCostsCsv } from "../../core/observability/costs.js";
 import { getActiveProfile } from "../../core/state/profiles.js";
 import { cleanupWorktrees } from "../../core/services/session-orchestration.js";
 import { exportSession } from "../../core/session/share.js";
-import { addMcpServer, removeMcpServer } from "../../core/tools.js";
 import { generateOpenApiSpec } from "../../core/openapi.js";
 import { DEFAULT_CONDUCTOR_URL, DEFAULT_ARKD_URL } from "../../core/constants.js";
 
@@ -76,11 +72,17 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
     return searchAllConversations(query);
   });
 
-  // ── Config (combined hotkeys + theme + profile) ──────────────────────────
+  // ── Config (combined hotkeys + theme + profile + mode) ───────────────────
+  //
+  // `mode` is authoritative: the frontend's AppModeProvider picks the binding
+  // off this field. `hosted` is kept for back-compat with old clients until we
+  // ship a breaking release; new clients should key off `mode` only.
   router.handle("config/get", async () => ({
     hotkeys: getHotkeys(),
     theme: getThemeMode(),
     profile: getActiveProfile(),
+    mode: app.mode.kind,
+    hosted: app.mode.kind === "hosted",
   }));
 
   // ── Cost export ──────────────────────────────────────────────────────────
@@ -91,57 +93,6 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
       return { csv: exportCostsCsv(app, sessions) };
     }
     return getAllSessionCosts(app, sessions);
-  });
-
-  // ── MCP attach/detach by directory (web-specific contract) ───────────────
-  //
-  // These RPCs write to `<dir>/.claude.json` on the server's filesystem.
-  // In hosted / multi-tenant mode there is no per-tenant filesystem view,
-  // so refuse the call -- otherwise any tenant could clobber other tenants'
-  // or the control plane's `.claude.json` files.
-  router.handle("mcp/attach-by-dir", async (p) => {
-    if (isHostedMode(app)) {
-      throw new RpcError("mcp/attach-by-dir is disabled in hosted mode", -32601);
-    }
-    const { dir, name, config } = extract<{ dir: string; name: string; config: Record<string, unknown> }>(p, [
-      "dir",
-      "name",
-      "config",
-    ]);
-    addMcpServer(dir, name, config);
-    return { ok: true };
-  });
-
-  router.handle("mcp/detach-by-dir", async (p) => {
-    if (isHostedMode(app)) {
-      throw new RpcError("mcp/detach-by-dir is disabled in hosted mode", -32601);
-    }
-    const { dir, name } = extract<{ dir: string; name: string }>(p, ["dir", "name"]);
-    removeMcpServer(dir, name);
-    return { ok: true };
-  });
-
-  // ── Knowledge ingestion ──────────────────────────────────────────────────
-  router.handle("knowledge/ingest", async (p) => {
-    // Indexes arbitrary server-side paths -- disable in hosted mode.
-    if (isHostedMode(app)) {
-      throw new RpcError("knowledge/ingest is disabled in hosted mode", -32601);
-    }
-    const { path: inputPath, directory } = extract<{
-      path: string;
-      directory?: boolean;
-      scope?: string;
-      tags?: string[];
-      recursive?: boolean;
-    }>(p, ["path"]);
-    try {
-      const { indexCodebase } = await import("../../core/knowledge/indexer.js");
-      const target = directory ? inputPath : inputPath;
-      const result = await indexCodebase(target, app.knowledge, { incremental: true });
-      return { ok: true, files: result.files, chunks: result.symbols };
-    } catch (e: any) {
-      return { ok: false, error: e.message };
-    }
   });
 
   // ── Conductor learnings ──────────────────────────────────────────────────
@@ -190,17 +141,6 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
       learning: { title: node.label, description: node.content, recurrence: 1, lastSeen: node.updated_at },
       promoted: false,
     };
-  });
-
-  // ── Repo map ─────────────────────────────────────────────────────────────
-  router.handle("repo-map/get", async (p) => {
-    // generateRepoMap reads arbitrary server-side directories. Disable in
-    // hosted mode to prevent cross-tenant filesystem reads.
-    if (isHostedMode(app)) {
-      throw new RpcError("repo-map/get is disabled in hosted mode", -32601);
-    }
-    const { dir } = extract<{ dir?: string }>(p, []);
-    return generateRepoMap(dir ?? ".");
   });
 
   // ── Worktree list & cleanup ──────────────────────────────────────────────

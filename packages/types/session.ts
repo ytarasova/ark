@@ -93,6 +93,14 @@ export interface Session {
   rejected_at: string | null;
   /** Last rejection reason supplied by the reviewer. Null when never rejected. */
   rejected_reason: string | null;
+  /**
+   * Initial PTY column count (tmux geometry at dispatch). Persisted so the
+   * terminal replay renders at the original width even if the browser is
+   * narrower. Null for legacy rows. See bug 4 in session-dispatch cascade.
+   */
+  pty_cols: number | null;
+  /** Initial PTY row count (tmux geometry at dispatch). Null for legacy rows. */
+  pty_rows: number | null;
   config: SessionConfig;
   /** User who created this session (multi-user mode). */
   user_id: string | null;

@@ -47,6 +47,8 @@ interface SessionRow {
   rework_prompt: string | null;
   rejected_at: string | null;
   rejected_reason: string | null;
+  pty_cols: number | null;
+  pty_rows: number | null;
   config: string;
   user_id: string | null;
   tenant_id: string;
@@ -75,6 +77,8 @@ function rowToSession(row: SessionRow): Session {
     rework_prompt: row.rework_prompt ?? null,
     rejected_at: row.rejected_at ?? null,
     rejected_reason: row.rejected_reason ?? null,
+    pty_cols: typeof row.pty_cols === "number" ? row.pty_cols : null,
+    pty_rows: typeof row.pty_rows === "number" ? row.pty_rows : null,
     config: safeParseConfig(row.config),
   };
 }
@@ -105,6 +109,8 @@ const SESSION_COLUMNS = new Set([
   "rework_prompt",
   "rejected_at",
   "rejected_reason",
+  "pty_cols",
+  "pty_rows",
   "config",
   "user_id",
   "updated_at",

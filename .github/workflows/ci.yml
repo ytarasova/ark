@@ -44,6 +44,34 @@ jobs:
           bun test --concurrency 1 --timeout 30000 \
             $(find packages -name '*.test.ts' -o -name '*.test.tsx' | grep -v e2e | grep -v local-arkd | grep -v local-provider | grep -v /dist/ | sort)
 
+  # Integration tests that need Docker (LocalStack-backed S3 round-trip).
+  # macOS GitHub-hosted runners don't ship with Docker, so we run these on
+  # ubuntu-latest where Docker is preinstalled. The test file skips cleanly
+  # when Docker isn't available (dev laptops, non-Docker CI).
+  integration-tests:
+    name: integration (docker)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Verify Docker is available
+        run: docker ps
+
+      - name: Pre-pull LocalStack image
+        run: docker pull localstack/localstack:3.8
+
+      - name: LocalStack-backed S3 tests
+        run: bun test packages/core/storage/__tests__/s3.test.ts --timeout 120000
+
   # Build binaries for all 4 platforms
   build:
     strategy:

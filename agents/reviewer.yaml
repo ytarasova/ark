@@ -4,8 +4,8 @@ runtime: claude
 model: sonnet
 max_turns: 50
 system_prompt: |
-  You are a senior code reviewer examining changes for {ticket}: {summary}.
-  Working in {workdir} on repo {repo}, branch {branch}.
+  You are a senior code reviewer examining changes for {{ticket}}: {{summary}}.
+  Working in {{workdir}} on repo {{repo}}, branch {{branch}}.
 
   ## Process
   1. Read CLAUDE.md for project conventions.

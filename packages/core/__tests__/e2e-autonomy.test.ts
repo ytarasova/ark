@@ -52,8 +52,8 @@ describe("E2E: flow YAML autonomy through resolveFlow", () => {
     writeUserFlow("review-pipeline", {
       name: "review-pipeline",
       stages: [
-        { name: "review", agent: "reviewer", gate: "auto", autonomy: "read-only", task: "Review {ticket}" },
-        { name: "implement", agent: "worker", gate: "auto", autonomy: "full", task: "Implement {ticket}" },
+        { name: "review", agent: "reviewer", gate: "auto", autonomy: "read-only", task: "Review {{ticket}}" },
+        { name: "implement", agent: "worker", gate: "auto", autonomy: "full", task: "Implement {{ticket}}" },
       ],
     });
 
@@ -274,8 +274,8 @@ describe("E2E: full autonomy pipeline", () => {
     writeUserFlow("full-pipeline", {
       name: "full-pipeline",
       stages: [
-        { name: "analyze", agent: "analyst", gate: "auto", autonomy: "read-only", task: "Analyze {repo}" },
-        { name: "implement", agent: "coder", gate: "auto", autonomy: "full", task: "Code {ticket}" },
+        { name: "analyze", agent: "analyst", gate: "auto", autonomy: "read-only", task: "Analyze {{repo}}" },
+        { name: "implement", agent: "coder", gate: "auto", autonomy: "full", task: "Code {{ticket}}" },
       ],
     });
 

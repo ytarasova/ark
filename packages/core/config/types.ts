@@ -128,6 +128,38 @@ export interface AuthSectionConfig {
   defaultTenant: string | null;
 }
 
+/** Blob storage -- uploads, exports, anything that can't live on one replica's disk. */
+export interface StorageConfig {
+  /**
+   * Active backend. `local` writes under `{dirs.ark}/blobs`, `s3` writes to
+   * the bucket configured below.
+   * @envvar ARK_BLOB_BACKEND
+   * @default "local" (local/test profile) / "s3" (control-plane profile)
+   */
+  blobBackend: "local" | "s3";
+  /**
+   * S3 backend settings. Required when `blobBackend === "s3"`; ignored otherwise.
+   * Credentials use the AWS SDK default provider chain (env / shared config / IMDS).
+   */
+  s3?: {
+    /** @envvar ARK_S3_BUCKET */
+    bucket: string;
+    /** @envvar ARK_S3_REGION */
+    region: string;
+    /**
+     * Key prefix under the bucket root.
+     * @envvar ARK_S3_PREFIX
+     * @default "ark"
+     */
+    prefix?: string;
+    /**
+     * Override endpoint for LocalStack / MinIO. Unset in production.
+     * @envvar ARK_S3_ENDPOINT
+     */
+    endpoint?: string;
+  };
+}
+
 /** Feature flags. Grep the codebase for new `config.features.*` usage. */
 export interface FeaturesConfig {
   /**
@@ -155,4 +187,5 @@ export interface ProfileDefaults {
   auth: AuthSectionConfig;
   features: FeaturesConfig;
   observability: { logLevel: ObservabilityConfig["logLevel"] };
+  storage: StorageConfig;
 }

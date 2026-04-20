@@ -369,8 +369,8 @@ describe("resolveFlow", () => {
     writeUserFlow("task-flow", {
       name: "task-flow",
       stages: [
-        { name: "plan", agent: "planner", gate: "auto", task: "Plan work for {ticket}: {summary}" },
-        { name: "impl", agent: "worker", gate: "auto", task: "Implement {ticket} in {repo}" },
+        { name: "plan", agent: "planner", gate: "auto", task: "Plan work for {{ticket}}: {{summary}}" },
+        { name: "impl", agent: "worker", gate: "auto", task: "Implement {{ticket}} in {{repo}}" },
       ],
     });
 
@@ -383,7 +383,7 @@ describe("resolveFlow", () => {
   it("substitutes variables in description", () => {
     writeUserFlow("desc-flow", {
       name: "desc-flow",
-      description: "Flow for {ticket} on {branch}",
+      description: "Flow for {{ticket}} on {{branch}}",
       stages: [{ name: "s1", agent: "a", gate: "auto" }],
     });
 
@@ -394,7 +394,7 @@ describe("resolveFlow", () => {
   it("substitutes variables in on_failure", () => {
     writeUserFlow("fail-flow", {
       name: "fail-flow",
-      stages: [{ name: "s1", agent: "a", gate: "auto", on_failure: "notify({ticket})" }],
+      stages: [{ name: "s1", agent: "a", gate: "auto", on_failure: "notify({{ticket}})" }],
     });
 
     const flow = resolveFlow(getApp(), "fail-flow", { ticket: "BUG-99" });

@@ -325,7 +325,15 @@ export const api = {
       };
     }),
   uploadInput: (opts: { name: string; role: string; content: string; contentEncoding?: "base64" | "utf-8" }) =>
-    rpc<{ path: string }>("input/upload", opts as any),
+    rpc<{ locator: string }>("input/upload", opts as any),
+  readInput: (locator: string) =>
+    rpc<{
+      filename: string;
+      contentType: string;
+      content: string;
+      contentEncoding: "base64";
+      size: number;
+    }>("input/read", { locator }),
   // TODO: add Zod schema for flow/create
   createFlow: (data: any) => rpc<any>("flow/create", data).then((r) => ({ ok: true, name: r.name })),
   // TODO: add Zod schema for flow/delete

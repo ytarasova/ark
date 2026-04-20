@@ -602,6 +602,93 @@ describe("buildLauncher initialPrompt", () => {
     expect(promptIndex).toBeGreaterThan(flagsIndex);
   });
 
+  it("inserts `--` between the channel flag and the prompt positional (bug 2)", () => {
+    // `--dangerously-load-development-channels` is greedy and would eat
+    // the prompt as another channel entry. The `--` separator stops that.
+    const { content } = buildLauncher({
+      ...baseOpts,
+      initialPrompt: "Fix the login bug",
+    });
+    const channelFlagIdx = content.indexOf("--dangerously-load-development-channels");
+    const separatorIdx = content.indexOf("--", channelFlagIdx + "--dangerously-load-development-channels".length);
+    const promptIdx = content.indexOf("'Fix the login bug'");
+    expect(separatorIdx).toBeGreaterThan(channelFlagIdx);
+    expect(promptIdx).toBeGreaterThan(separatorIdx);
+  });
+
+  it("includes the `--` separator in both resume and fallback branches", () => {
+    const { content } = buildLauncher({
+      ...baseOpts,
+      prevClaudeSessionId: "old-uuid",
+      initialPrompt: "Continue the task",
+    });
+    // Two prompt positionals (resume + fallback) should each be preceded by `--`.
+    const matches = content.match(/--\s+'Continue the task'/g);
+    expect(matches).not.toBeNull();
+    expect(matches!.length).toBe(2);
+  });
+
+  it("does not add a `--` separator when there is no prompt", () => {
+    const { content } = buildLauncher(baseOpts);
+    // With no initialPrompt there is no positional to separate, so the
+    // launcher should not contain a dangling `--` on the claude line.
+    const channelLineIdx = content.indexOf("--dangerously-load-development-channels");
+    const afterChannel = content.slice(channelLineIdx);
+    // The only `--` on this line should be the channel flag itself.
+    const extraDashDashMatch = afterChannel.match(/^[^\n]*\n\s*--(?!dangerously)/);
+    expect(extraDashDashMatch).toBeNull();
+  });
+});
+
+// ── buildLauncher exit-code sentinel (bug 3) ─────────────────────────────────
+
+describe("buildLauncher exit-code sentinel", () => {
+  const baseOpts: LauncherOpts = {
+    workdir: "/tmp/project",
+    claudeArgs: ["claude", "--model", "opus", "--dangerously-skip-permissions"],
+    mcpConfigPath: "/tmp/.mcp.json",
+  };
+
+  it("wraps the claude invocation in an if/else that writes exit-code on failure", () => {
+    const { content } = buildLauncher(baseOpts);
+    // The claude command should be the `if` condition.
+    expect(content).toMatch(/if claude --/);
+    // The else branch captures $? and writes it to exit-code.
+    expect(content).toContain("code=$?");
+    expect(content).toContain('echo "$code" > "${ARK_SESSION_DIR:-/tmp/ark-session-unknown}"/exit-code');
+  });
+
+  it("references $ARK_SESSION_DIR so the sentinel lands where the poller looks", () => {
+    const { content } = buildLauncher(baseOpts);
+    expect(content).toContain("${ARK_SESSION_DIR:-/tmp/ark-session-unknown}");
+  });
+
+  it("keeps exec bash at the end so tmux stays alive for post-mortem", () => {
+    const { content } = buildLauncher(baseOpts);
+    expect(content.trimEnd().endsWith("exec bash")).toBe(true);
+  });
+
+  it("resume + fallback: only the final failure writes the sentinel", () => {
+    const { content } = buildLauncher({
+      ...baseOpts,
+      prevClaudeSessionId: "old-uuid",
+    });
+    // There should be exactly one exit-code write (after both primary and
+    // fallback fail), not two.
+    const sentinelWrites = content.match(/echo\s+"\$code"\s+>\s+/g);
+    expect(sentinelWrites).not.toBeNull();
+    expect(sentinelWrites!.length).toBe(1);
+    // Both the primary (--resume) and the fallback (--session-id) should appear.
+    expect(content).toContain("--resume");
+    expect(content).toContain("--session-id");
+  });
+
+  it("prints a human-readable failure message to stderr", () => {
+    const { content } = buildLauncher(baseOpts);
+    expect(content).toMatch(/Claude exited with code \$code\. Session marked failed\./);
+    expect(content).toContain(">&2");
+  });
+
   it("escapes single quotes in prompt", () => {
     const { content } = buildLauncher({
       ...baseOpts,

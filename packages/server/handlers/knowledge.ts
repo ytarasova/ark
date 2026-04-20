@@ -1,14 +1,17 @@
+/**
+ * Shared knowledge-graph handlers (available in both local + hosted modes).
+ *
+ * Local-only handlers (index/export/import) live in `knowledge-local.ts` and
+ * are registered conditionally in `register.ts`. The split keeps the
+ * filesystem-touching code in one place and makes the mode contract explicit:
+ * `app.mode.knowledgeCapability` must be non-null to register the local set.
+ */
+
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
-import { RpcError } from "../../protocol/types.js";
 import type { NodeType } from "../../core/knowledge/types.js";
 import { logInfo } from "../../core/observability/structured-log.js";
-
-/** True when Ark is running in hosted/multi-tenant mode. */
-function isHostedMode(app: AppContext): boolean {
-  return typeof app.config.databaseUrl === "string" && app.config.databaseUrl.length > 0;
-}
 
 export function registerKnowledgeHandlers(router: Router, app: AppContext): void {
   router.handle("knowledge/search", async (p) => {
@@ -52,49 +55,6 @@ export function registerKnowledgeHandlers(router: Router, app: AppContext): void
       by_node_type: byNodeType,
       by_edge_type: byEdgeType,
     };
-  });
-
-  router.handle("knowledge/index", async (p) => {
-    // knowledge/index reads arbitrary directories on the server's
-    // filesystem. In hosted multi-tenant mode there is no well-defined
-    // per-tenant filesystem view, so refuse the call outright rather
-    // than let one tenant read another's (or the control plane's) files.
-    if (isHostedMode(app)) {
-      throw new RpcError("knowledge/index is disabled in hosted mode", -32601);
-    }
-    const { repo } = extract<{ repo?: string }>(p, []);
-    const repoPath = repo ?? process.cwd();
-    try {
-      const { indexCodebase } = await import("../../core/knowledge/indexer.js");
-      const result = await indexCodebase(repoPath, app.knowledge, { incremental: true });
-      return { ok: true, ...result };
-    } catch (e: any) {
-      return { ok: false, error: e.message };
-    }
-  });
-
-  router.handle("knowledge/export", async (p) => {
-    // Export writes markdown files to an arbitrary directory -- refuse in
-    // hosted mode to prevent cross-tenant filesystem writes.
-    if (isHostedMode(app)) {
-      throw new RpcError("knowledge/export is disabled in hosted mode", -32601);
-    }
-    const { dir } = extract<{ dir?: string }>(p, []);
-    const { exportToMarkdown } = await import("../../core/knowledge/export.js");
-    const result = exportToMarkdown(app.knowledge, dir ?? "./knowledge-export");
-    return { ok: true, ...result };
-  });
-
-  router.handle("knowledge/import", async (p) => {
-    // Import reads markdown files from an arbitrary directory -- refuse in
-    // hosted mode to prevent cross-tenant filesystem reads.
-    if (isHostedMode(app)) {
-      throw new RpcError("knowledge/import is disabled in hosted mode", -32601);
-    }
-    const { dir } = extract<{ dir?: string }>(p, []);
-    const { importFromMarkdown } = await import("../../core/knowledge/export.js");
-    const result = importFromMarkdown(app.knowledge, dir ?? "./knowledge-export");
-    return { ok: true, ...result };
   });
 
   // codebase-memory-mcp introspection: is it vendored, what version, what tools

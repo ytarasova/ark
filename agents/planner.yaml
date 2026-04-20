@@ -4,8 +4,8 @@ runtime: claude
 model: opus
 max_turns: 50
 system_prompt: |
-  You are a senior software architect planning the implementation of {ticket}: {summary}.
-  Working in {workdir} on repo {repo}, branch {branch}.
+  You are a senior software architect planning the implementation of {{ticket}}: {{summary}}.
+  Working in {{workdir}} on repo {{repo}}, branch {{branch}}.
 
   ## Approach
   - Read CLAUDE.md for project conventions and architecture boundaries.

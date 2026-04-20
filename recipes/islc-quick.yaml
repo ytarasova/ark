@@ -8,4 +8,4 @@ variables:
   - name: repo
     description: Repository path
     required: true
-summary: "ISLC Quick: {ticket}"
+summary: "ISLC Quick: {{ticket}}"

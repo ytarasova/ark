@@ -38,6 +38,7 @@ import type {
   AuthSectionConfig,
   FeaturesConfig,
   DatabaseConfig,
+  StorageConfig,
   ProfileDefaults,
 } from "./config/types.js";
 import { detectProfile, loadProfileDefaults } from "./config/profiles.js";
@@ -53,6 +54,7 @@ export type {
   AuthSectionConfig,
   FeaturesConfig,
   DatabaseConfig,
+  StorageConfig,
 } from "./config/types.js";
 
 export interface OtlpSettings {
@@ -128,6 +130,7 @@ export interface ArkConfig {
   authSection: AuthSectionConfig;
   features: FeaturesConfig;
   database: DatabaseConfig;
+  storage: StorageConfig;
 
   // ── Legacy flat fields (derived from nested sections) ──────────────────
 
@@ -226,6 +229,7 @@ export function loadConfig(overrides: LoadConfigOptions = {}): ArkConfig {
     auth: { requireToken: profile === "control-plane", defaultTenant: null },
     features: { autoRebase: profile === "control-plane", codegraph: false },
     observability: { logLevel: profile === "test" ? "error" : "info" },
+    storage: { blobBackend: profile === "control-plane" ? "s3" : "local" },
   };
   return assemble(defaults, overrides, profile);
 }
@@ -280,6 +284,21 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
   const databaseUrl = overrides.databaseUrl ?? merged.databaseUrl ?? process.env.DATABASE_URL;
   const database: DatabaseConfig = { url: databaseUrl };
 
+  const storage: StorageConfig = {
+    blobBackend: merged.storage?.blobBackend ?? defaults.storage.blobBackend,
+    s3:
+      merged.storage?.s3 ??
+      defaults.storage.s3 ??
+      // Leave undefined when backend != s3 so callers can gate on presence.
+      (defaults.storage.blobBackend === "s3" ? { bucket: "", region: "", prefix: "ark" } : undefined),
+  };
+  // Programmatic override wins outright so tests + embedding hosts can
+  // inject a fully-shaped storage config without replaying env plumbing.
+  if (overrides.storage) {
+    storage.blobBackend = overrides.storage.blobBackend ?? storage.blobBackend;
+    storage.s3 = overrides.storage.s3 ?? storage.s3;
+  }
+
   const dirs: DirsConfig = {
     ark: arkDir,
     worktrees: overrides.worktreesDir ?? join(arkDir, "worktrees"),
@@ -311,6 +330,7 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
     authSection,
     features,
     database,
+    storage,
 
     // Legacy flat fields
     arkDir,
@@ -390,7 +410,7 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
 }
 
 function emptyEnvOverrides(): EnvOverrides {
-  return { ports: {}, channels: {}, observability: {}, auth: {}, features: {} };
+  return { ports: {}, channels: {}, observability: {}, auth: {}, features: {}, storage: {} };
 }
 
 /** Extract partial Spring-style overrides from a legacy-flat overrides arg. */
@@ -403,6 +423,10 @@ function flatOverridesFromLegacy(o: LoadConfigOptions): EnvOverrides {
   if (o.observability) Object.assign(out.observability, o.observability);
   if (o.authSection) Object.assign(out.auth, o.authSection);
   if (o.features) Object.assign(out.features, o.features);
+  if (o.storage) {
+    if (o.storage.blobBackend) out.storage.blobBackend = o.storage.blobBackend;
+    if (o.storage.s3) out.storage.s3 = o.storage.s3;
+  }
   if (o.database?.url) out.databaseUrl = o.database.url;
   return out;
 }
