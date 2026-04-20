@@ -8,6 +8,7 @@
 > - `docs/2026-04-18-CODE_INTELLIGENCE_DESIGN.md` -- hybrid delivery + pooling + codebase-memory-mcp
 > - `docs/2026-04-18-UNIFIED_SUMMARY.md` -- exec summary + 12 open decisions
 > - `docs/ROADMAP.md` -- the product-of-record (updated 2026-04-18)
+> - **`docs/2026-04-19-PROGRESS_CHECK.md`** -- day-2 audit against this roadmap. Week-1 scorecard: 0/5 fully complete, 1/5 partial. All 8 off-roadmap gaps from reconciliation §8 remain open. Infrastructure (DI split, pause/resume, ComputePool) advanced; canvas-vocabulary items did not.
 
 ## 0. Position after 2026-04-18
 

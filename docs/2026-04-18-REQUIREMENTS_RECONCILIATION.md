@@ -1,5 +1,7 @@
 # Requirements Reconciliation -- 2026-04-18
 
+> **Day-2 update (2026-04-19):** see `docs/2026-04-19-PROGRESS_CHECK.md` for the 24-hour audit against this gap list. Summary: all 8 off-roadmap gaps in §8 remain open; 4 infrastructure items shipped (SnapshotStore/#201, ComputePool/#232-234, session-dispatch RPC removal/#231, DI split/#248); 1/5 Week-1 canvas items partial.
+>
 > **Status:** point-in-time reconciliation of stated Paytm requirements against Ark's current code + docs.
 > **Scope:** past 10 days of discussion in `#ark-init` (C0AKLLFN9GC), `#foundry-ark-sync` DM (C0ATUNM8CPK), `#ark-ppsl-experiments` DM (C0AQLGKQ601), plus the Foundary-Ark Requirements canvas (F0AUHKDHXME), Atul's Foundry 2.0 deck, and Rohit's Sage integration drop.
 > **No code changes produced.** This document exists to align on *what we're building* before anything else moves.
