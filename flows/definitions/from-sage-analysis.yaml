@@ -1,0 +1,33 @@
+name: from-sage-analysis
+description: >-
+  Runtime-neutral pi-sage driver. Fetches a pi-sage analysis JSON (by ID +
+  base URL, or by file path) and fans out one sub-stream per affected repo.
+  Each child session receives the stream's ordered TDD task list and a
+  rendered prompt that includes the ticket summary, resolved gaps, and the
+  per-task description / files / validation block. Runtime + compute are
+  chosen at the session level so Claude / Codex / Gemini / Goose all work.
+inputs:
+  params:
+    analysis_id:
+      description: "Pi-sage analysis id (usually a Jira key). Required unless inputs.files.analysis_json is pre-supplied."
+      required: false
+    sage_base_url:
+      description: "Pi-sage base URL. Accepts http(s):// or file:// for offline fixtures."
+      default: "https://pi-team.mypaytm.com/sage"
+      required: false
+  files:
+    analysis_json:
+      description: "Optional pre-fetched analysis JSON. When set, stage 1 short-circuits."
+      required: false
+      accept: "application/json"
+stages:
+  - name: fetch-analysis
+    action: fetch_sage_analysis
+    gate: auto
+
+  - name: fan-out
+    type: fan_out
+    gate: auto
+    depends_on: [fetch-analysis]
+    agent: worker
+    max_parallel: 8

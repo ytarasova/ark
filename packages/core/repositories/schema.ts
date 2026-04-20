@@ -35,6 +35,7 @@ export function initSchema(db: IDatabase): void {
       config TEXT DEFAULT '{}',
       user_id TEXT,
       tenant_id TEXT NOT NULL DEFAULT 'default',
+      workspace_id TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -60,6 +61,7 @@ export function initSchema(db: IDatabase): void {
     CREATE INDEX IF NOT EXISTS idx_sessions_pr_url ON sessions(pr_url);
     CREATE INDEX IF NOT EXISTS idx_sessions_tenant ON sessions(tenant_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_sessions_workspace ON sessions(workspace_id);
 
     CREATE TABLE IF NOT EXISTS compute (
       name TEXT PRIMARY KEY,

@@ -9,11 +9,18 @@ import { createPrAction } from "./create-pr.js";
 import { mergePrAction } from "./merge-pr.js";
 import { autoMergeAction } from "./auto-merge.js";
 import { closeAction } from "./close.js";
+import { fetchSageAnalysisAction } from "./fetch-sage-analysis.js";
 import type { AppContext } from "../../app.js";
 
 export type { ActionHandler, ActionResult } from "./types.js";
 
-const ACTIONS: readonly ActionHandler[] = [createPrAction, mergePrAction, autoMergeAction, closeAction];
+const ACTIONS: readonly ActionHandler[] = [
+  createPrAction,
+  mergePrAction,
+  autoMergeAction,
+  closeAction,
+  fetchSageAnalysisAction,
+];
 
 const ACTION_INDEX: Map<string, ActionHandler> = (() => {
   const m = new Map<string, ActionHandler>();

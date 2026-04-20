@@ -106,6 +106,12 @@ export interface Session {
   user_id: string | null;
   /** Tenant scope (multi-tenant mode). Defaults to "default" in single-tenant deployments. */
   tenant_id: string;
+  /**
+   * Workspace this session runs against. Nullable for back-compat; Wave 2b
+   * will start treating this as the primary dispatch unit (multi-repo
+   * worktree). Wave 2a only threads the column through repo + CLI.
+   */
+  workspace_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -128,6 +134,8 @@ export interface CreateSessionOpts {
   group_name?: string;
   config?: Partial<SessionConfig>;
   user_id?: string;
+  /** Workspace id for workspace-scoped dispatch. Null/undefined = legacy repo-only. */
+  workspace_id?: string | null;
   inputs?: SessionInputs;
   attachments?: Array<{ name: string; content: string; type: string }>;
 }

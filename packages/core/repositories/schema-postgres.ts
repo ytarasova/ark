@@ -43,12 +43,14 @@ export function initPostgresSchema(db: IDatabase): void {
       config TEXT DEFAULT '{}',
       user_id TEXT,
       tenant_id TEXT NOT NULL DEFAULT 'default',
+      workspace_id TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     )
   `);
 
   db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_workspace ON sessions(workspace_id)`);
 
   // Events table
   db.exec(`

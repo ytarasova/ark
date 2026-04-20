@@ -8,24 +8,25 @@ function newDb() {
 }
 
 describe("MigrationRunner", () => {
-  it("starts at version 0 with one pending migration", () => {
+  it("starts at version 0 with two pending migrations", () => {
     const db = newDb();
     const runner = new MigrationRunner(db, "sqlite");
     const status = runner.status();
     expect(status.currentVersion).toBe(0);
-    expect(status.pending.length).toBe(1);
+    expect(status.pending.length).toBe(2);
     expect(status.pending[0].version).toBe(1);
+    expect(status.pending[1].version).toBe(2);
     db.close();
   });
 
-  it("applies the initial migration and bumps the version", () => {
+  it("applies all migrations and bumps the version", () => {
     const db = newDb();
     const runner = new MigrationRunner(db, "sqlite");
     runner.migrate();
     const status = runner.status();
-    expect(status.currentVersion).toBe(1);
+    expect(status.currentVersion).toBe(2);
     expect(status.pending.length).toBe(0);
-    expect(status.applied.length).toBe(1);
+    expect(status.applied.length).toBe(2);
     db.close();
   });
 
@@ -36,8 +37,8 @@ describe("MigrationRunner", () => {
     runner.migrate();
     runner.migrate();
     const status = runner.status();
-    expect(status.currentVersion).toBe(1);
-    expect(status.applied.length).toBe(1);
+    expect(status.currentVersion).toBe(2);
+    expect(status.applied.length).toBe(2);
     db.close();
   });
 

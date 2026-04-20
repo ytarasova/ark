@@ -1,0 +1,97 @@
+{
+  "jira_id": "IN-18342",
+  "summary": "Onboard the new 'payouts-v2' ledger service into the reconciliation pipeline: wire the outbound event, update the reconciler query set, and publish the SDK client so internal callers can stop reading the legacy v1 tables directly.",
+  "affected_repos": [
+    {
+      "name": "pi-payouts-service",
+      "branch": "develop",
+      "reason": "Emits the new PayoutFinalized event + exposes the v2 read API."
+    },
+    {
+      "name": "pi-reconciler",
+      "branch": "main",
+      "reason": "Consumes the event; v1 query path needs to be replaced with v2."
+    },
+    {
+      "name": "pi-internal-sdk",
+      "branch": "main",
+      "reason": "Publishes the typed client so internal services can migrate off v1."
+    }
+  ],
+  "gaps": [
+    {
+      "id": "g1",
+      "question": "Should v1 reads continue during the migration window or be hard-cut over?",
+      "audience": "tech",
+      "status": "resolved: soft-cutover, keep v1 read for 30 days behind a feature flag"
+    },
+    {
+      "id": "g2",
+      "question": "Who owns dashboard updates for the new event pipeline?",
+      "audience": "product",
+      "status": "resolved: payouts team owns until GA, reconciler team takes over after"
+    }
+  ],
+  "plan_streams": [
+    {
+      "repo": "pi-payouts-service",
+      "branch": "develop",
+      "tasks": [
+        {
+          "title": "Define PayoutFinalized v2 event schema",
+          "files": ["src/events/payout_finalized_v2.py", "schemas/events/payout_finalized.v2.avsc"],
+          "description": "Introduce the v2 event DTO with explicit currency, settlement_ref, and ledger_id. Backwards-compatible field ordering; do not rename v1 fields inline.",
+          "validation": "pytest tests/events/test_payout_finalized_v2.py -q"
+        },
+        {
+          "title": "Emit the event from the finalization path",
+          "files": ["src/payouts/finalize.py"],
+          "description": "Publish PayoutFinalized v2 alongside the existing v1 event behind the dual_emit feature flag. v1 remains the default until reconciler flips over.",
+          "validation": "pytest tests/payouts/test_finalize_dual_emit.py -q"
+        },
+        {
+          "title": "Expose v2 read endpoint",
+          "files": ["src/api/payouts_v2.py", "src/api/router.py"],
+          "description": "Add GET /v2/payouts/{id} returning the ledger-linked shape. Reuse the existing auth middleware. Paginate where applicable.",
+          "validation": "pytest tests/api/test_payouts_v2.py -q && curl -sf localhost:8000/v2/payouts/ping"
+        }
+      ]
+    },
+    {
+      "repo": "pi-reconciler",
+      "branch": "main",
+      "tasks": [
+        {
+          "title": "Consume PayoutFinalized v2 event",
+          "files": ["reconciler/consumers/payout_finalized.py"],
+          "description": "Add a v2 consumer path alongside v1. Behind flag reconciler.v2_read, read ledger_id instead of joining through the legacy table.",
+          "validation": "go test ./reconciler/consumers/..."
+        },
+        {
+          "title": "Replace v1 query with v2 ledger lookup",
+          "files": ["reconciler/query/payouts.go"],
+          "description": "Implement the v2 lookup using the ledger_id carried on the event. Keep v1 join as fallback until the feature flag flips after a 30-day bake.",
+          "validation": "go test ./reconciler/query/..."
+        }
+      ]
+    },
+    {
+      "repo": "pi-internal-sdk",
+      "branch": "main",
+      "tasks": [
+        {
+          "title": "Generate typed v2 client from v2 OpenAPI spec",
+          "files": ["sdk/payouts/v2.ts", "openapi/payouts.v2.yaml"],
+          "description": "Run the spec-to-client generator; wire the module export. Keep the v1 client exported side-by-side.",
+          "validation": "bun test packages/sdk/__tests__/payouts-v2.test.ts"
+        },
+        {
+          "title": "Publish pre-release on the internal npm registry",
+          "files": ["package.json", "CHANGELOG.md"],
+          "description": "Bump the pre-release tag, update CHANGELOG, and publish behind the 'next' dist-tag so early adopters can pin without breaking consumers.",
+          "validation": "bun run build && bun run publish:dry"
+        }
+      ]
+    }
+  ]
+}

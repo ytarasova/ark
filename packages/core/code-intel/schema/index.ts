@@ -16,6 +16,7 @@
 
 import * as tenants from "./tenants.js";
 import * as schemaMigrations from "./schema-migrations.js";
+import * as workspaces from "./workspaces.js";
 import * as repos from "./repos.js";
 import * as indexingRuns from "./indexing-runs.js";
 import * as files from "./files.js";
@@ -44,6 +45,7 @@ export interface TableModule {
 export const TABLE_MODULES: ReadonlyArray<TableModule> = [
   tenants,
   schemaMigrations,
+  workspaces,
   repos,
   indexingRuns,
   files,
@@ -71,6 +73,7 @@ export function postgresSchema(): string {
 export {
   tenants,
   schemaMigrations,
+  workspaces,
   repos,
   indexingRuns,
   files,

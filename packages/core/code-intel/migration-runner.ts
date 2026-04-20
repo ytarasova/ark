@@ -12,6 +12,7 @@
 
 import type { IDatabase } from "../database/index.js";
 import * as migration001 from "./migrations/001_initial_schema.js";
+import * as migration002 from "./migrations/002_workspaces.js";
 import { TABLE as MIGRATIONS_TABLE } from "./schema/schema-migrations.js";
 
 export interface Migration {
@@ -22,6 +23,7 @@ export interface Migration {
 
 const MIGRATIONS: ReadonlyArray<Migration> = [
   { version: migration001.VERSION, name: migration001.NAME, up: migration001.up },
+  { version: migration002.VERSION, name: migration002.NAME, up: migration002.up },
 ];
 
 export interface MigrationRunnerOptions {
@@ -113,6 +115,7 @@ export class MigrationRunner {
       "code_intel_files",
       "code_intel_indexing_runs",
       "code_intel_repos",
+      "code_intel_workspaces",
       "code_intel_tenants",
       "code_intel_schema_migrations",
     ];

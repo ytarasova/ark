@@ -21,6 +21,15 @@ export {
   type CheckSuiteResult,
   type RevertPayload,
 } from "./rollback.js";
+export {
+  fetchAnalysis,
+  buildStreamSubtasks,
+  type SageAnalysis,
+  type SagePlanStream,
+  type SageTask,
+  type SageAffectedRepo,
+  type SageStreamSubtask,
+} from "./sage-analysis.js";
 
 // ── Unified registry ────────────────────────────────────────────────────────
 // `Integration` pairs a trigger source + connector under one name. Callers

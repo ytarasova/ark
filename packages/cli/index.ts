@@ -39,6 +39,7 @@ import { registerAuthCommands } from "./commands/auth.js";
 import { registerTenantCommands } from "./commands/tenant.js";
 import { registerKnowledgeCommands } from "./commands/knowledge.js";
 import { registerCodeIntelCommands } from "./commands/code-intel.js";
+import { registerWorkspaceCommands } from "./commands/workspace.js";
 import { registerEvalCommands } from "./commands/eval.js";
 import { registerDashboardCommands } from "./commands/dashboard.js";
 import { registerCostsCommands } from "./commands/costs.js";
@@ -46,6 +47,7 @@ import { registerServerCommands } from "./commands/server.js";
 import { registerExecTryCommands } from "./commands/exec-try.js";
 import { registerDaemonCommands } from "./commands/daemon.js";
 import { registerMiscCommands } from "./commands/misc.js";
+import { registerSageCommands } from "./commands/sage.js";
 
 // ── Resolve remote mode early (before AppContext boot) ──────────────────────
 // Commander hasn't parsed yet, so peek at argv + env for --server / --token.
@@ -139,6 +141,7 @@ registerAuthCommands(program, localApp);
 registerTenantCommands(program, localApp);
 registerKnowledgeCommands(program, localApp);
 registerCodeIntelCommands(program, localApp);
+registerWorkspaceCommands(program, localApp);
 registerEvalCommands(program);
 registerDashboardCommands(program, app);
 registerCostsCommands(program, localApp);
@@ -146,6 +149,7 @@ registerServerCommands(program);
 registerDaemonCommands(program);
 registerExecTryCommands(program, app);
 registerMiscCommands(program, app);
+registerSageCommands(program, app);
 
 // ── Run ─────────────────────────────────────────────────────────────────────
 

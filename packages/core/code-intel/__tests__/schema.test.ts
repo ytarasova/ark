@@ -4,8 +4,8 @@ import { BunSqliteAdapter } from "../../database/sqlite.js";
 import { TABLE_MODULES, sqliteSchema, postgresSchema } from "../schema/index.js";
 
 describe("schema DDL emitters", () => {
-  it("emits 14 Wave 1 tables", () => {
-    expect(TABLE_MODULES.length).toBe(14);
+  it("emits 15 Wave 1 + Wave 2a tables", () => {
+    expect(TABLE_MODULES.length).toBe(15);
   });
 
   it("each table module exports a non-empty SQLite DDL", () => {

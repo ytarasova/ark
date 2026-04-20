@@ -52,6 +52,7 @@ interface SessionRow {
   config: string;
   user_id: string | null;
   tenant_id: string;
+  workspace_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -113,6 +114,7 @@ const SESSION_COLUMNS = new Set([
   "pty_rows",
   "config",
   "user_id",
+  "workspace_id",
   "updated_at",
 ]);
 
@@ -174,8 +176,8 @@ export class SessionRepository {
       .prepare(
         `
       INSERT INTO sessions (id, ticket, summary, repo, branch, compute_name,
-        workdir, stage, status, flow, agent, group_name, config, user_id, tenant_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 'pending', ?, ?, ?, ?, ?, ?, ?, ?)
+        workdir, stage, status, flow, agent, group_name, config, user_id, tenant_id, workspace_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 'pending', ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       )
       .run(
@@ -192,6 +194,7 @@ export class SessionRepository {
         JSON.stringify(opts.config ?? {}),
         opts.user_id ?? null,
         this.tenantId,
+        opts.workspace_id ?? null,
         ts,
         ts,
       );

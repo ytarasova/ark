@@ -17,7 +17,8 @@ import * as agentRegistry from "../agent/agent.js";
 import { buildSessionVars } from "../template.js";
 import { resolveFlow } from "../state/flow.js";
 import { filterMessages, parseMessageFilter } from "../message-filter.js";
-import { logDebug } from "../observability/structured-log.js";
+import { logDebug, logWarn } from "../observability/structured-log.js";
+import { buildStreamSubtasks, type SageAnalysis } from "../integrations/sage-analysis.js";
 
 /** Convert a typed Session to a plain Record for template variable resolution. */
 export function sessionAsVars(session: Session): Record<string, unknown> {
@@ -165,6 +166,23 @@ export async function buildTaskWithHandoff(
 }
 
 export function extractSubtasks(app: AppContext, session: Session): { name: string; task: string }[] {
+  // Sage-analysis path: when the session was seeded with a pi-sage analysis
+  // JSON (via --input analysis_json=<path> or the `fetch_sage_analysis`
+  // action), fan out one subtask per plan_stream. This is the happy path for
+  // the `from-sage-analysis` flow.
+  const inputs = (session.config as any)?.inputs as { files?: Record<string, string> } | undefined;
+  const analysisPath = inputs?.files?.analysis_json;
+  if (analysisPath && existsSync(analysisPath)) {
+    try {
+      const analysis = JSON.parse(readFileSync(analysisPath, "utf-8")) as SageAnalysis;
+      if (Array.isArray(analysis.plan_streams) && analysis.plan_streams.length > 0) {
+        return buildStreamSubtasks(analysis).map((s) => ({ name: s.name, task: s.task }));
+      }
+    } catch (e: any) {
+      logWarn("session", `extractSubtasks: failed to load analysis from ${analysisPath}: ${e?.message ?? e}`);
+    }
+  }
+
   const wtDir = join(app.config.worktreesDir, session.id);
   const planPath = join(wtDir, "PLAN.md");
 
