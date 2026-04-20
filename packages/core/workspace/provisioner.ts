@@ -34,6 +34,7 @@ import { randomBytes } from "crypto";
 import type { AppContext } from "../app.js";
 import type { Session } from "../../types/index.js";
 import type { Repo, Workspace } from "../code-intel/store.js";
+import { DEFAULT_TENANT_ID } from "../code-intel/constants.js";
 import { logDebug, logInfo, logWarn } from "../observability/structured-log.js";
 import {
   MANIFEST_FILENAME,
@@ -248,7 +249,7 @@ export async function ensureRepoCloned(
 
   const session = app.sessions.get(sessionId);
   if (!session) throw new Error(`session ${sessionId} not found`);
-  const tenantId = session.tenant_id ?? "default";
+  const tenantId = session.tenant_id ?? DEFAULT_TENANT_ID;
 
   const repoRow = app.codeIntel.getRepo(tenantId, entry.repo_id);
   if (!repoRow) {
