@@ -1,7 +1,80 @@
 # Ark Platform Roadmap
 
-> Last updated: **2026-04-18** (requirements reconciliation + code intelligence design)
->
+> Last updated: **2026-04-20** (pi-sage integration + unified code intelligence + integration framework)
+
+## 2026-04-20 Update -- where we are this week
+
+This entry consolidates everything that landed, was designed, or is in flight since the 2026-04-18 review. Detailed specs are referenced inline; the older 2026-04-18 / 2026-04-19 sections below remain as the historical state-of-union snapshots.
+
+### Detailed specs produced today
+
+- **`docs/2026-04-20-pi-sage-integration-roadmap.md`** -- pi-sage integration master plan: Ark as `SAGE_EXECUTOR=ark` target, MCP connector for sage KB, `from-sage-analysis` flow, KB migration, surface-parity rule (CLI + control-plane + Web UI for every item).
+- **`docs/2026-04-20-code-intelligence-unification-plan.md`** -- the big one. Critical review of pi-sage's schema (24 flaws to avoid), unified Ark schema with multi-tenant + UUIDs + soft-deletes + indexing_runs + external_refs, external-tools tiering (wrap, don't rewrite), deployment modes (vendored local / provisioned control-plane), workspaces as dispatch unit, platform-knowledge derived docs (~60 doc types in 3 flavors), parity-sprint sequencing, 14 differentiators (D1-D14) including session-as-oracle ranking and LLM intent layer.
+
+### Shipped to main since 2026-04-18
+
+| Commit | Capability |
+|---|---|
+| `d2f36923` `feat(runtime)` | Runtime-level MCP server mounting via `RuntimeDefinition.mcp_servers` + per-session `--with-mcp` opt-in + shipped `mcp-configs/{atlassian,github,linear,figma,pi-sage}.json` stubs + env-var expansion in MCP configs |
+| `9b40d1de` `feat(cli)` | `--input role=path` and `--param key=value` on `ark exec` (repeatable) feeding existing `inputs.files` / `inputs.params` plumbing; `agents/goose-recipe-runner.yaml` + `flows/definitions/goose-recipe.yaml` autonomous one-shot goose flow consuming `{inputs.files.recipe}` |
+| `0e6127fa` `feat(integrations)` | Unified trigger + connector framework. Trigger pipeline `Source -> Receiver -> NormalizedEvent -> Matcher -> Dispatcher -> Flow`. 12 trigger sources (github / bitbucket / linear / slack / jira / generic-hmac full + tested; pi-sage / alertmanager / cloudwatch / pagerduty / prometheus scaffolded; email stub). 6 connectors (pi-sage / jira / github / linear full; bitbucket / slack scaffolded). Unified integration registry pairing trigger + connector by name. `ark trigger` CLI. `POST /webhooks/:source` route. 99/99 new tests pass. Docs at `docs/integrations.md`. |
+
+### In flight
+
+- **Parity Sprint Wave 1 agent** -- code-intel foundation: 14-table schema (multi-tenant, UUIDs, soft-delete, indexing_runs, external_refs), `CodeIntelStore`, migration runner, 7 modular interfaces (Extractor / QueryMethod / Ranker / Policy / Pipeline / VendorResolver / Deployment), FilesystemVendorResolver, 3 representative extractors (files / git-contributors / syft-deps stub), 2 representative queries (FTS / get_context), minimal CLI, feature flag, ~50 tests. Tight scope to avoid further API overloads.
+
+### Queued (waiting on Wave 1)
+
+- **Parity Sprint Wave 2** -- workspaces table + multi-repo dispatch (workspace = unit of dispatch, not just query scope), `workspace_id` migration, remaining ~10 pi-sage-equivalent extractors (endpoints / configs / infra / openapi / test-mappings / class-hierarchy / contributors / hotspots / ast / docs), remaining ~10 query methods, 25 mechanical platform-doc extractors (ADR Index / API Endpoint Registry / Env Var Registry / Service Dependency Graph / etc.), Web UI "Code Intelligence" page with Platform Knowledge tab.
+- **Parity Sprint Wave 3** -- control-plane Postgres + pgvector backend, MCP pool per `(tenant, repo, tool)` in arkd, remote compute workspace dispatch (EC2 / firecracker / k8s), trigger-framework `dispatch.scope: workspace` wiring, `make vendor-all` script for syft / kubeconform / ONNX embedding model.
+- **Parity Sprint Wave 4 (differentiators start)** -- D1 LLM-extracted intent annotations (Haiku / MiniMax via SambaNova, ~$8 per Paytm reindex), 15 LLM-synthesized platform docs (Architecture Critique / Tech Debt / Maturity Scorecard / Risk Register / Security Audit), D4 contract extraction, D5 test intent graph.
+- **Parity Sprint Wave 5+** -- D2 intent embeddings, D3 session-as-oracle ranking, D6 query-time federation, D7 temporal queries, D8 agent-as-extractor, D9 explainable + cost-aware ranking, D11 speculative pre-warm, D12 policy-aware queries, D13 cross-language interop edges, D14 drift monitor.
+- **`from-sage-analysis` flow** -- runtime-neutral replacement for pi-sage's Goose recipe generator. Takes a sage analysis ID, fans out one Ark stream per affected repo, expands TDD task lists into per-task agent steps. Owed since the original pi-sage integration ask. Dispatches alongside Wave 2.
+- **Web UI for triggers + connectors** -- Agent D explicitly punted this. Folds into the Wave 2 web UI agent.
+
+### Design decisions locked since 2026-04-18
+
+- **Autonomy is a flow property**, not a per-call CLI flag. Drop `--autonomy` plumbing. Pick an autonomous flow instead.
+- **No bridge command in Ark.** Pi-sage calls `ark exec` directly with `--input recipe=...`. Pi-sage maintainers add `SAGE_EXECUTOR=ark` natively (spec handed off at `/tmp/pi-sage-ark-executor-spec.md`).
+- **Recipe is an opaque prompt.** Pi-sage's multi-step plan structure stays in pi-sage's stream orchestrator. Per-task recipe is a single instruction. Multi-step orchestration in Ark is a flow DAG (`from-sage-analysis`), not recipe parsing.
+- **Integration = trigger source + connector**, both opt-in capabilities of one named integration. Covers pi-sage, jira, github, bitbucket, linear, slack, confluence, alertmanager, cloudwatch, pagerduty, prometheus, email uniformly.
+- **Goose is one runtime among many.** Ark flows own the orchestration; goose-recipe YAML is not the serialization layer.
+- **CLI entry and webhook entry hit the same flow path.** Anything via `ark exec` is reachable via webhook + vice versa.
+- **Surface parity is non-negotiable.** Every feature ships on CLI + control-plane / local + Web UI in the same release.
+- **YAML for everything Ark authors.** JSON only at protocol boundaries (JSON-RPC, MCP) and external tool stdout we don't own.
+- **Workspace is the unit of dispatch**, not just a query scope. Sessions can run against an entire workspace (multi-repo parallel worktrees with sparse cloning) or stay anchored to one repo with workspace context attached. New built-in `workspace-*` flows for cross-repo work.
+- **Code intelligence is one unified store with many extractors feeding it**, not a router over three disjoint backends. Pi-sage shape (one DB, many extractors, one query class) -- but with the 24 flaws fixed.
+- **Wrap, don't rewrite.** Tier 1 backbone tools (tree-sitter via codebase-memory-mcp, syft, git, ONNX, pgvector) cover the foundation. Tier 2 (SCIP) adds rich symbol resolution for top-6 languages. Tier 3 (kubeconform / terraform-config-inspect / OpenAPI parsers) covers domain extraction. Tier 4 (per-framework endpoint detection) is unavoidable Ark code, shipped as declarative `tree-sitter` `.scm` queries not imperative parsers.
+- **Local mode is fully vendored** (every binary + grammar + ONNX model bundled in install). **Control-plane mode is provisioned** (Postgres + arkd worker pool with binaries baked in image + per-tenant Helm provisioning).
+
+### Reference index (where to find the detail)
+
+| Topic | Spec |
+|---|---|
+| Pi-sage integration end-to-end | `docs/2026-04-20-pi-sage-integration-roadmap.md` |
+| Code intelligence overhaul (everything) | `docs/2026-04-20-code-intelligence-unification-plan.md` |
+| Trigger + connector framework + sources matrix | `docs/integrations.md` |
+| 2026-04-18 hybrid code-intel design (still valid) | `docs/2026-04-18-CODE_INTELLIGENCE_DESIGN.md` |
+| Latest state-of-union snapshot | `docs/2026-04-19-STATE_OF_UNION.md` |
+| Apr-18 requirements reconciliation | `docs/2026-04-18-REQUIREMENTS_RECONCILIATION.md` |
+| Sage / ISLC dispatch mechanics | `docs/2026-04-18-SUPPORTING_ROHIT_AND_ABHIMANYU_FLOWS.md` |
+| Unified Apr-18 summary tying it together | `docs/2026-04-18-UNIFIED_SUMMARY.md` |
+| Apr-19 progress check vs Apr-18 gaps | `docs/2026-04-19-PROGRESS_CHECK.md` |
+
+### Where the 2026-04-18 / 2026-04-19 plan stands now
+
+The 2026-04-18 review findings + 2026-04-19 state-of-union below remain factually correct as snapshots. The big items they flagged that have moved since:
+
+- **Centralized MCP Router design** (off-roadmap item 5 in Apr-18): subsumed by the integration framework's connector + the code-intel unification plan. Connector framework lands MCP per-tenant with shared auth registry; code-intel Wave 3 lands the arkd MCP pool per `(tenant, repo, tool)`.
+- **Sage-KB MCP integration contract** (off-roadmap item 6 in Apr-18): `pi-sage` connector (in `0e6127fa`) + `triggers/pi-sage-analysis-ready.yaml.example` already point at `from-sage-analysis` flow scaffolding.
+- **Knowledge graph auto-index** (Apr-18 ⚠️ O8): being redesigned as part of the code-intel overhaul (Wave 3 control-plane work + Wave 1 indexing-run lifecycle replaces the ad-hoc auto-index).
+- **codebase-memory-mcp alongside ops-codegraph** (Apr-19 dual-stack debt): code-intel overhaul absorbs both as extractors feeding one unified store. Wave 2 deprecates the standalone read paths once parity is verified.
+- **Foundry 2.0 Track 2 -- AI Monitor** (off-roadmap item 8 in Apr-18, deadline 2026-04-20): not addressed this week; remains open.
+
+The historical 2026-04-18 review section follows for posterity.
+
+---
+
 > ## 2026-04-18 Review Findings (deep reconciliation against Paytm requirements)
 >
 > **Authoritative source:** Foundary-Ark Requirements canvas (F0AUHKDHXME, Abhimanyu 2026-04-17) + Harinder's thread feedback + Abhimanyu's reply. Harinder: *"we are 90% there."*
