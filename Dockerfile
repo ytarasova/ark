@@ -22,8 +22,14 @@ RUN bun install --frozen-lockfile --production
 FROM oven/bun:1.3 AS build
 WORKDIR /app
 
+# Build needs the full dep set (tsc, vite are devDeps). Native build
+# tools again because we're re-running install with the full set.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY package.json bun.lock tsconfig.json ./
-COPY --from=deps /app/node_modules ./node_modules
+RUN bun install --frozen-lockfile
 
 # Copy source
 COPY packages/ packages/
@@ -54,9 +60,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
-# Copy built artifacts
+# Copy built artifacts. Production node_modules come from the deps
+# stage (no devDeps) -- keeps the final image slim.
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/node_modules ./node_modules
+COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./
 COPY --from=build /app/ark ./ark
 
