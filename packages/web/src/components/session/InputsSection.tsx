@@ -13,14 +13,18 @@
  *   { files: Record<role, locator | path>, params: Record<k, v> }
  *
  * Empty maps are fine -- callers should treat `undefined` as "no inputs".
+ *
+ * Mode variance -- file rows and the "Add file" inline editor come from the
+ * active AppMode binding (see `packages/web/src/providers/AppModeProvider.tsx`).
+ * This component does NOT branch on `hosted` -- it just renders the binding.
  */
 
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../hooks/useApi.js";
-import { useHostedMode } from "../../hooks/useServerConfig.js";
+import { useAppMode } from "../../providers/AppModeProvider.js";
 import { Button } from "../ui/button.js";
 import { cn } from "../../lib/utils.js";
-import { Paperclip, Plus, X, Upload } from "lucide-react";
+import { Plus, X } from "lucide-react";
 
 interface FlowFileInput {
   description?: string;
@@ -72,7 +76,8 @@ export function InputsSection({
   onPreview,
   onClearPreview,
 }: Props) {
-  const hosted = useHostedMode();
+  const { binding } = useAppMode();
+  const { FileInputRow, FileInputAddEditor } = binding;
   const [schema, setSchema] = useState<FlowInputsSchema | null>(null);
 
   // Ad-hoc extras: roles/keys the user added that are not in the flow schema.
@@ -262,69 +267,6 @@ export function InputsSection({
     cancelParamEdit();
   }
 
-  const fileRoleEditor =
-    pendingFileRole !== null ? (
-      <div className="flex items-center gap-2">
-        <input
-          autoFocus
-          type="text"
-          value={pendingFileRole}
-          onChange={(e) => setPendingFileRole(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              commitFileRole();
-            }
-            if (e.key === "Escape") cancelFileEdit();
-          }}
-          placeholder="File role (e.g. recipe, prd)"
-          className={cn(fieldClass, "w-28 flex-none")}
-        />
-        {!hosted && (
-          <input
-            type="text"
-            value={pendingFilePath}
-            onChange={(e) => setPendingFilePath(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                commitFileRole();
-              }
-              if (e.key === "Escape") cancelFileEdit();
-            }}
-            placeholder="/absolute/path or click upload"
-            className={fieldClass}
-          />
-        )}
-        <label
-          className={cn(
-            "shrink-0 inline-flex items-center gap-1.5 justify-center h-9 px-3 rounded-md cursor-pointer",
-            "bg-[var(--primary)] text-[var(--primary-fg,white)] text-[12px] font-medium",
-            "hover:opacity-90 transition-opacity",
-          )}
-          title="Upload file (auto-adds entry)"
-        >
-          <Upload size={12} />
-          Upload
-          <input
-            type="file"
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) commitFileUpload(f);
-            }}
-          />
-        </label>
-        <Button type="button" size="sm" variant="outline" onClick={cancelFileEdit}>
-          Cancel
-        </Button>
-      </div>
-    ) : (
-      <Button type="button" size="sm" variant="outline" onClick={() => setPendingFileRole("")}>
-        <Paperclip size={12} className="mr-1" /> Add file
-      </Button>
-    );
-
   const paramKeyEditor =
     pendingParamKey !== null ? (
       <div className="flex items-center gap-2">
@@ -383,79 +325,34 @@ export function InputsSection({
             const def = schema?.files?.[role];
             const isExtra = !declaredFileRoles.includes(role);
             const currentLocator = value.files[role] ?? "";
-            const hasFile = currentLocator.length > 0;
             return (
-              <div key={role} className="flex items-center gap-2">
-                <div className="w-28 flex items-center gap-1.5 text-[12px] text-[var(--fg)] truncate" title={role}>
-                  {previews?.[role] && (
-                    <img
-                      src={previews[role]}
-                      alt=""
-                      className="h-6 w-6 rounded object-cover shrink-0 border border-[var(--border)]"
-                    />
-                  )}
-                  <span className="truncate">
-                    {role}
-                    {def?.required ? <span className="text-[var(--failed)] ml-0.5">*</span> : null}
-                  </span>
-                </div>
-                {hasFile || hosted ? (
-                  <div className={cn(fieldClass, "flex items-center text-[var(--fg-muted)] truncate")}>
-                    {hasFile ? (
-                      <span className="truncate" title={currentLocator}>
-                        {/* Local: show whatever the user has (typed path or locator). Hosted: basename-ish. */}
-                        {hosted ? currentLocator.split("/").pop() || currentLocator : currentLocator}
-                      </span>
-                    ) : (
-                      <span className="text-[var(--fg-faint)]">click Upload</span>
-                    )}
-                  </div>
-                ) : (
-                  <input
-                    type="text"
-                    value={currentLocator}
-                    onChange={(e) => setFilePath(role, e.target.value)}
-                    placeholder={def?.description ?? "/absolute/path or click upload"}
-                    className={fieldClass}
-                  />
-                )}
-                {!hasFile && (
-                  <label
-                    className={cn(
-                      "shrink-0 inline-flex items-center justify-center h-9 px-3 rounded-md cursor-pointer",
-                      "border border-[var(--border)] text-[12px] hover:border-[var(--fg-muted)] transition-colors",
-                    )}
-                    title="Upload file"
-                  >
-                    <Upload size={12} />
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept={def?.accept}
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) handleUpload(role, f);
-                      }}
-                    />
-                  </label>
-                )}
-                {isExtra ? (
-                  <button
-                    type="button"
-                    aria-label={`Remove ${role}`}
-                    onClick={() => removeFile(role)}
-                    className="shrink-0 h-9 w-9 inline-flex items-center justify-center rounded-md text-[var(--fg-muted)] hover:text-[var(--fg)]"
-                  >
-                    <X size={14} />
-                  </button>
-                ) : (
-                  <div className="w-9" />
-                )}
-              </div>
+              <FileInputRow
+                key={role}
+                role={role}
+                required={!!def?.required}
+                description={def?.description}
+                accept={def?.accept}
+                value={currentLocator}
+                isExtra={isExtra}
+                previewUrl={previews?.[role]}
+                onTypeValue={(v) => setFilePath(role, v)}
+                onUpload={(f) => handleUpload(role, f)}
+                onRemove={() => removeFile(role)}
+              />
             );
           })}
         </div>
-        <div className="mt-2">{fileRoleEditor}</div>
+        <div className="mt-2">
+          <FileInputAddEditor
+            pendingRole={pendingFileRole}
+            onPendingRoleChange={setPendingFileRole}
+            pendingPath={pendingFilePath}
+            onPendingPathChange={setPendingFilePath}
+            onCommitRole={commitFileRole}
+            onCommitUpload={commitFileUpload}
+            onCancel={cancelFileEdit}
+          />
+        </div>
       </div>
 
       <div>

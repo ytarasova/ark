@@ -1,14 +1,17 @@
+/**
+ * Shared history handlers (local + hosted).
+ *
+ * `history/rebuild-fts` is local-only (it wipes the shared
+ * `claude_sessions_cache` + `transcript_index` tables) and lives in
+ * `history-local.ts`, registered conditionally in `register.ts`.
+ */
+
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import * as core from "../../core/index.js";
 import { startSession } from "../../core/services/session-orchestration.js";
 import type { HistoryListParams, HistoryImportParams, HistorySearchParams } from "../../types/index.js";
-
-/** True when Ark is running in hosted/multi-tenant mode. */
-function isHostedMode(app: AppContext): boolean {
-  return typeof app.config.databaseUrl === "string" && app.config.databaseUrl.length > 0;
-}
 
 export function registerHistoryHandlers(router: Router, app: AppContext): void {
   router.handle("history/list", async (p) => {
@@ -41,24 +44,6 @@ export function registerHistoryHandlers(router: Router, app: AppContext): void {
   router.handle("history/index", async () => {
     const count = await core.indexTranscripts(app, { onProgress: () => {} });
     return { ok: true, count };
-  });
-
-  router.handle("history/rebuild-fts", async () => {
-    // claude_sessions_cache and transcript_index index the local user's
-    // `~/.claude` transcripts and are NOT tenant-scoped (single-user local
-    // mode only). In hosted mode there is no per-tenant transcript cache
-    // to rebuild and a global DELETE across the shared cache table from
-    // an untrusted tenant would be a DoS. Refuse the call instead.
-    if (isHostedMode(app)) {
-      throw new Error("history/rebuild-fts is disabled in hosted mode");
-    }
-    const db = app.db;
-    db.run("DELETE FROM claude_sessions_cache");
-    db.run("DELETE FROM transcript_index");
-    const sessionCount = await core.refreshClaudeSessionsCache(app, {});
-    const indexCount = await core.indexTranscripts(app, {});
-    const items = core.listClaudeSessions(app);
-    return { ok: true, sessionCount, indexCount, items };
   });
 
   router.handle("history/refresh-and-index", async () => {

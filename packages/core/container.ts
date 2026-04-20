@@ -34,6 +34,7 @@ import type { PluginRegistry } from "./plugins/registry.js";
 import type { SnapshotStore } from "../compute/core/snapshot-store.js";
 import type { BlobStore } from "./storage/blob-store.js";
 import type { AppContext } from "./app.js";
+import type { AppMode } from "./modes/app-mode.js";
 import type { Lifecycle } from "./lifecycle.js";
 import type { ConductorLauncher } from "./infra/conductor-launcher.js";
 import type { ArkdLauncher } from "./infra/arkd-launcher.js";
@@ -77,6 +78,12 @@ export interface Cradle {
   // AppContext itself -- registered as a scoped value so services can
   // resolve it without passing it through every constructor manually.
   app: AppContext;
+
+  // Deployment-mode descriptor. Picked once at DI composition based on
+  // `config.database.url`; resolved polymorphically thereafter. Handlers,
+  // services, and components never branch on a `hosted` boolean -- they
+  // read `app.mode.<capability>` and act on its presence/absence.
+  mode: AppMode;
 
   // Database
   db: IDatabase;

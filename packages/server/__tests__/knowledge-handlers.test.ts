@@ -17,6 +17,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { AppContext } from "../../core/app.js";
 import { registerKnowledgeHandlers } from "../handlers/knowledge.js";
+import { registerKnowledgeLocalHandlers } from "../handlers/knowledge-local.js";
 import { Router } from "../router.js";
 import { createRequest, type JsonRpcResponse, type JsonRpcError } from "../../protocol/types.js";
 
@@ -34,6 +35,11 @@ let router: Router;
 beforeEach(() => {
   router = new Router();
   registerKnowledgeHandlers(router, app);
+  // knowledge/index + knowledge/export + knowledge/import live in the
+  // local-only handler module (they touch the server filesystem and are
+  // disabled in hosted mode). Tests boot in local mode so registration
+  // always succeeds.
+  registerKnowledgeLocalHandlers(router, app);
   // Clear any carry-over knowledge nodes between tests to keep expectations
   // stable across the full suite
   for (const t of ["memory", "learning", "skill", "recipe", "agent", "session", "symbol", "file"] as const) {

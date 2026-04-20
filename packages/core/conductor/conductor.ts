@@ -267,12 +267,12 @@ export class Conductor {
    *     match the tenant resolved from a valid Bearer token.
    *   - The `"default"` fallback is only permitted when BOTH no Authorization
    *     header AND no `X-Ark-Tenant-Id` header are present AND the conductor
-   *     is in local single-tenant mode (no `databaseUrl` configured).
+   *     is in local single-tenant mode (`app.mode.kind === "local"`).
    */
   private resolveTenant(req: Request): TenantResolution {
     const auth = req.headers.get("authorization") ?? req.headers.get("Authorization");
     const hdrTenant = req.headers.get("x-ark-tenant-id") ?? req.headers.get("X-Ark-Tenant-Id");
-    const isHostedMode = !!this.app.config.databaseUrl;
+    const isHosted = this.app.mode.kind === "hosted";
 
     if (auth) {
       const match = auth.match(BEARER_PATTERN);
@@ -298,7 +298,7 @@ export class Conductor {
       };
     }
 
-    if (isHostedMode) {
+    if (isHosted) {
       return { ok: false, status: 401, error: "authentication required" };
     }
     return { ok: true, tenantId: "default" };
