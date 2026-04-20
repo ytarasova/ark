@@ -18,12 +18,18 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --production
 
 # ── Stage 2: Build ───────────────────────────────────────────────────────────
+#
+# Bun runs TypeScript directly at runtime; no `tsc` compile required for
+# the server itself. The build stage exists to:
+#   1. produce the web UI bundle (packages/web/dist) via Vite
+#   2. snapshot the source tree we copy into the runtime image
+# Skipping `bun run build` (tsc) avoids fighting accumulated type drift
+# in code paths we are not running.
 
 FROM oven/bun:1.3 AS build
 WORKDIR /app
 
-# Build needs the full dep set (tsc, vite are devDeps). Native build
-# tools again because we're re-running install with the full set.
+# Native build tools for transitive deps (better-sqlite3 etc.) and Vite.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends python3 make g++ \
     && rm -rf /var/lib/apt/lists/*
@@ -39,10 +45,7 @@ COPY skills/ skills/
 COPY recipes/ recipes/
 COPY ark ./ark
 
-# Build TypeScript
-RUN bun run build
-
-# Build web UI (if vite config exists)
+# Build web UI (Vite). Server code stays as .ts -- Bun runs it directly.
 RUN if [ -f packages/web/vite.config.ts ]; then \
       cd packages/web && bunx vite build --logLevel error; \
     fi
@@ -60,11 +63,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
-# Copy built artifacts. Production node_modules come from the deps
-# stage (no devDeps) -- keeps the final image slim.
-COPY --from=build /app/dist ./dist
+# Production node_modules come from the deps stage (no devDeps) --
+# keeps the final image slim. Source comes from the build stage.
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./
+COPY --from=build /app/bun.lock ./
+COPY --from=build /app/tsconfig.json ./
+COPY --from=build /app/packages ./packages
 COPY --from=build /app/ark ./ark
 
 # Copy resource definitions (agents, flows, skills, recipes)
@@ -89,5 +94,6 @@ EXPOSE 8420 19100 8430
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD curl -f http://localhost:19100/health || exit 1
 
-# Default: start Ark web server with conductor
-CMD ["bun", "run", "dist/cli/index.js", "web", "--port", "8420"]
+# Default: start Ark control plane (server --hosted). Bun runs the .ts
+# entry point directly, no compile step required.
+CMD ["bun", "packages/cli/index.ts", "server", "start", "--hosted", "--port", "8420"]

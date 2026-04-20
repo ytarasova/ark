@@ -14,7 +14,11 @@ export type LogComponent =
   | "bridge"
   | "pool"
   | "compute"
-  | "general";
+  | "general"
+  | "triggers"
+  | "connectors"
+  | "code-intel"
+  | "workspace";
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
 interface LogEntry {

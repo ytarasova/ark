@@ -159,7 +159,6 @@ async function branchExists(repoDir: string, branch: string): Promise<boolean> {
     await execFileAsync("git", ["-C", repoDir, "show-ref", "--verify", `refs/heads/${branch}`], {
       encoding: "utf-8",
       timeout: 5_000,
-      stdio: ["ignore", "pipe", "pipe"],
     });
     return true;
   } catch {
@@ -206,7 +205,6 @@ async function readHeadCommit(repoDir: string): Promise<string | null> {
     const { stdout } = await execFileAsync("git", ["-C", repoDir, "rev-parse", "HEAD"], {
       encoding: "utf-8",
       timeout: 5_000,
-      stdio: ["ignore", "pipe", "pipe"],
     });
     return stdout.trim() || null;
   } catch {
@@ -290,7 +288,6 @@ export async function ensureRepoCloned(
     await execFileAsync("git", ["clone", source, destination], {
       encoding: "utf-8",
       timeout: 300_000,
-      stdio: ["ignore", "pipe", "pipe"],
     });
   } catch (e: any) {
     throw new Error(`failed to clone workspace repo ${repoSlug} from ${source}: ${e?.message ?? e}`);
@@ -301,7 +298,6 @@ export async function ensureRepoCloned(
     await execFileAsync("git", ["-C", destination, "checkout", "-b", resolvedBranch], {
       encoding: "utf-8",
       timeout: 30_000,
-      stdio: ["ignore", "pipe", "pipe"],
     });
   } catch (e: any) {
     // Branch creation shouldn't fail because `resolveBranchForRepo` picked

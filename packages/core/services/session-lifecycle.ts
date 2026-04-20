@@ -45,7 +45,6 @@ function resolveGitHubUrl(dir?: string | null): string | null {
     const remote = execFileSync("git", ["-C", dir, "remote", "get-url", "origin"], {
       encoding: "utf-8",
       timeout: 5_000,
-      stdio: ["ignore", "pipe", "pipe"],
     }).trim();
     // git@github.com:owner/repo.git -> https://github.com/owner/repo
     const sshMatch = remote.match(/git@github\.com:([^/]+\/[^.]+)/);

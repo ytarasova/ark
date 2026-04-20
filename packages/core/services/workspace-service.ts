@@ -175,13 +175,11 @@ async function setupWorktree(
   try {
     await execFileAsync("git", ["-C", repoPath, "worktree", "prune"], {
       encoding: "utf-8",
-      stdio: ["ignore", "pipe", "pipe"],
     });
     // Try with new branch
     try {
       await execFileAsync("git", ["-C", repoPath, "worktree", "add", "-b", branchName, wtPath], {
         encoding: "utf-8",
-        stdio: ["ignore", "pipe", "pipe"],
       });
       return wtPath;
     } catch (e: any) {
@@ -193,7 +191,6 @@ async function setupWorktree(
     try {
       await execFileAsync("git", ["-C", repoPath, "worktree", "add", wtPath, branchName], {
         encoding: "utf-8",
-        stdio: ["ignore", "pipe", "pipe"],
       });
       return wtPath;
     } catch (e: any) {
@@ -205,7 +202,6 @@ async function setupWorktree(
     try {
       await execFileAsync("git", ["-C", repoPath, "worktree", "add", "-b", `ark-${sessionId}`, wtPath], {
         encoding: "utf-8",
-        stdio: ["ignore", "pipe", "pipe"],
       });
       return wtPath;
     } catch (e: any) {
@@ -328,7 +324,6 @@ export async function worktreeDiff(
     try {
       const { stdout } = await execFileAsync("git", ["-C", wtDir, "rev-parse", "--abbrev-ref", "HEAD"], {
         encoding: "utf-8",
-        stdio: ["ignore", "pipe", "pipe"],
       });
       branch = stdout.trim();
     } catch {
@@ -355,7 +350,6 @@ export async function worktreeDiff(
     // Get diff stat
     const { stdout: stat } = await execFileAsync("git", ["-C", repo, "diff", "--stat", `${baseBranch}...${branch}`], {
       encoding: "utf-8",
-      stdio: ["ignore", "pipe", "pipe"],
     });
 
     // Get full diff (truncated to 50KB)
@@ -369,7 +363,7 @@ export async function worktreeDiff(
     const { stdout: shortstat } = await execFileAsync(
       "git",
       ["-C", repo, "diff", "--shortstat", `${baseBranch}...${branch}`],
-      { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] },
+      { encoding: "utf-8" },
     );
     // "3 files changed, 42 insertions(+), 7 deletions(-)"
     const filesMatch = shortstat.match(/(\d+) files? changed/);
@@ -382,7 +376,7 @@ export async function worktreeDiff(
       const { stdout: diffNames } = await execFileAsync(
         "git",
         ["-C", repo, "diff", "--name-only", `${baseBranch}...${branch}`],
-        { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] },
+        { encoding: "utf-8" },
       );
       const files = diffNames.trim().split("\n").filter(Boolean);
       const fileHashes: Record<string, string> = {};
@@ -390,7 +384,6 @@ export async function worktreeDiff(
         try {
           const { stdout: hash } = await execFileAsync("git", ["-C", repo, "rev-parse", `${branch}:${file}`], {
             encoding: "utf-8",
-            stdio: ["ignore", "pipe", "pipe"],
           });
           fileHashes[file] = hash.trim();
         } catch {
@@ -468,14 +461,12 @@ export async function rebaseOntoBase(
     await execFileAsync("git", ["-C", gitDir, "fetch", "origin", base], {
       encoding: "utf-8",
       timeout: 30_000,
-      stdio: ["ignore", "pipe", "pipe"],
     });
 
     // Rebase onto origin/<base>
     await execFileAsync("git", ["-C", gitDir, "rebase", `origin/${base}`], {
       encoding: "utf-8",
       timeout: 60_000,
-      stdio: ["ignore", "pipe", "pipe"],
     });
 
     app.events.log(sessionId, "rebase_completed", {
@@ -490,7 +481,6 @@ export async function rebaseOntoBase(
     try {
       await execFileAsync("git", ["-C", gitDir, "rebase", "--abort"], {
         encoding: "utf-8",
-        stdio: ["ignore", "pipe", "pipe"],
       });
     } catch {
       logDebug("session", "already clean");
@@ -529,7 +519,6 @@ export async function createWorktreePR(
     try {
       const { stdout } = await execFileAsync("git", ["-C", wtDir, "rev-parse", "--abbrev-ref", "HEAD"], {
         encoding: "utf-8",
-        stdio: ["ignore", "pipe", "pipe"],
       });
       branch = stdout.trim();
     } catch {
@@ -687,7 +676,6 @@ export async function finishWorktree(
     try {
       const { stdout } = await execFileAsync("git", ["-C", wtDir, "rev-parse", "--abbrev-ref", "HEAD"], {
         encoding: "utf-8",
-        stdio: ["ignore", "pipe", "pipe"],
       });
       branch = stdout.trim();
     } catch {
@@ -716,7 +704,6 @@ export async function finishWorktree(
       try {
         await execFileAsync("git", ["-C", repo, "worktree", "remove", wtDir, "--force"], {
           encoding: "utf-8",
-          stdio: ["ignore", "pipe", "pipe"],
         });
       } catch (e: any) {
         logError("session", `finishWorktree: remove worktree failed: ${e?.message ?? e}`);
@@ -736,19 +723,16 @@ export async function finishWorktree(
       // Checkout target branch in the main repo
       await execFileAsync("git", ["-C", repo, "checkout", targetBranch], {
         encoding: "utf-8",
-        stdio: ["ignore", "pipe", "pipe"],
       });
       // Merge the worktree branch
       await execFileAsync("git", ["-C", repo, "merge", branch, "--no-edit"], {
         encoding: "utf-8",
-        stdio: ["ignore", "pipe", "pipe"],
       });
     } catch {
       // Abort merge on conflict to preserve state
       try {
         await execFileAsync("git", ["-C", repo, "merge", "--abort"], {
           encoding: "utf-8",
-          stdio: ["ignore", "pipe", "pipe"],
         });
       } catch {
         logDebug("session", "merge --abort may fail if no merge in progress -- safe to ignore");
@@ -765,7 +749,6 @@ export async function finishWorktree(
     try {
       await execFileAsync("git", ["-C", repo, "worktree", "remove", wtDir, "--force"], {
         encoding: "utf-8",
-        stdio: ["ignore", "pipe", "pipe"],
       });
     } catch (e: any) {
       logError("session", `finishWorktree: remove worktree failed: ${e?.message ?? e}`);
@@ -777,14 +760,12 @@ export async function finishWorktree(
     try {
       await execFileAsync("git", ["-C", repo, "branch", "-d", branch], {
         encoding: "utf-8",
-        stdio: ["ignore", "pipe", "pipe"],
       });
     } catch {
       // Branch may not exist or not be fully merged -- try force delete
       try {
         await execFileAsync("git", ["-C", repo, "branch", "-D", branch], {
           encoding: "utf-8",
-          stdio: ["ignore", "pipe", "pipe"],
         });
       } catch {
         logDebug("session", "force delete also failed -- branch may already be gone");
@@ -819,7 +800,6 @@ export async function removeSessionWorktree(app: AppContext, session: Session): 
     try {
       await execFileAsync("git", ["-C", repo, "worktree", "remove", "--force", wtPath], {
         encoding: "utf-8",
-        stdio: ["ignore", "pipe", "pipe"],
       });
       return;
     } catch {
@@ -866,7 +846,6 @@ export async function cleanupWorktrees(app: AppContext): Promise<{ removed: numb
       // Try git worktree remove first
       await execFileAsync("git", ["worktree", "remove", wtPath, "--force"], {
         encoding: "utf-8",
-        stdio: ["ignore", "pipe", "pipe"],
       });
       removed++;
     } catch {
