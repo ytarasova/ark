@@ -13,6 +13,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { AppContext } from "../../core/app.js";
 import { registerMetricsHandlers } from "../handlers/metrics.js";
+import { registerMetricsLocalHandlers } from "../handlers/metrics-local.js";
 import { Router } from "../router.js";
 import { createRequest, type JsonRpcResponse, type JsonRpcError } from "../../protocol/types.js";
 
@@ -30,6 +31,11 @@ let router: Router;
 beforeEach(() => {
   router = new Router();
   registerMetricsHandlers(router, app);
+  // compute/kill-process + docker-{logs,action} live in the local-only
+  // handler module (only available when `app.mode.hostCommandCapability`
+  // is non-null). Tests boot in local mode so the registration always
+  // succeeds.
+  registerMetricsLocalHandlers(router, app);
 });
 
 function ok(res: unknown): Record<string, any> {

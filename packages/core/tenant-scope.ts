@@ -56,8 +56,10 @@ export function buildTenantScope(parent: AppContext, tenantId: string): AppConte
   Object.defineProperty(scoped, "knowledge", { get: () => scopedKnowledge, configurable: true });
   Object.defineProperty(scoped, "usageRecorder", { get: () => scopedUsage, configurable: true });
 
-  // DB-backed resource stores are only live in hosted mode.
-  if (parent.config.databaseUrl) {
+  // DB-backed resource stores are only live in hosted mode. This is a DI-
+  // composition-time check (creating the tenant scope's store wiring), not a
+  // runtime branch, so it's allowed under the AppMode invariant.
+  if (parent.mode.kind === "hosted") {
     const scopedAgents = new DbResourceStore(db, "agent", {
       description: "",
       model: "sonnet",
