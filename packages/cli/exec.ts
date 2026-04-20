@@ -1,8 +1,8 @@
 import chalk from "chalk";
 import { resolve } from "path";
 import { existsSync } from "fs";
-import { getApp } from "../core/app.js";
 import { startSession, dispatch, waitForCompletion } from "../core/services/session-orchestration.js";
+import type { AppContext } from "../core/app.js";
 
 export interface ExecOpts {
   repo?: string;
@@ -16,7 +16,7 @@ export interface ExecOpts {
   timeout?: number;
 }
 
-export async function execSession(opts: ExecOpts): Promise<number> {
+export async function execSession(app: AppContext, opts: ExecOpts): Promise<number> {
   const output = opts.output ?? "text";
   const log = output === "text" ? (msg: string) => process.stderr.write(chalk.dim(msg) + "\n") : () => {};
 
@@ -40,7 +40,7 @@ export async function execSession(opts: ExecOpts): Promise<number> {
 
   // Create session
   log(`Creating session: ${summary}`);
-  const session = startSession(getApp(), {
+  const session = startSession(app, {
     ticket: opts.ticket,
     summary,
     repo,
@@ -52,7 +52,7 @@ export async function execSession(opts: ExecOpts): Promise<number> {
 
   // Dispatch
   log(`Dispatching ${session.id}...`);
-  const result = await dispatch(getApp(), session.id);
+  const result = await dispatch(app, session.id);
   if (!result.ok) {
     if (output === "json") {
       console.log(JSON.stringify({ status: "error", message: result.message, sessionId: session.id }));
@@ -65,7 +65,7 @@ export async function execSession(opts: ExecOpts): Promise<number> {
 
   // Wait
   const timeoutMs = (opts.timeout ?? 0) * 1000;
-  const { session: final, timedOut } = await waitForCompletion(getApp(), session.id, {
+  const { session: final, timedOut } = await waitForCompletion(app, session.id, {
     timeoutMs,
     pollMs: 5000,
     onStatus: (status) => log(`  Status: ${status}`),

@@ -2,9 +2,9 @@ import type { Command } from "commander";
 import chalk from "chalk";
 import { resolve } from "path";
 import { existsSync } from "fs";
-import * as core from "../../core/index.js";
+import type { AppContext } from "../../core/app.js";
 
-export function registerKnowledgeCommands(program: Command) {
+export function registerKnowledgeCommands(program: Command, app: AppContext) {
   const cmd = program.command("knowledge").description("Knowledge graph - search, index, remember, export");
 
   cmd
@@ -14,7 +14,6 @@ export function registerKnowledgeCommands(program: Command) {
     .option("-t, --types <types>", "Comma-separated node types to filter (file,symbol,session,memory,learning,skill)")
     .option("-n, --limit <n>", "Max results", "20")
     .action((query: string, opts) => {
-      const app = core.getApp();
       const types = opts.types ? opts.types.split(",").map((t: string) => t.trim()) : undefined;
       const results = app.knowledge.search(query, { types, limit: Number(opts.limit) });
       if (!results.length) {
@@ -36,7 +35,6 @@ export function registerKnowledgeCommands(program: Command) {
     .option("-r, --repo <path>", "Repository path (default: cwd)")
     .option("--incremental", "Only re-index changed files")
     .action(async (opts) => {
-      const app = core.getApp();
       const repoPath = resolve(opts.repo ?? process.cwd());
       if (!existsSync(repoPath)) {
         console.log(chalk.red(`Path not found: ${repoPath}`));
@@ -62,7 +60,6 @@ export function registerKnowledgeCommands(program: Command) {
     .command("stats")
     .description("Show node/edge counts by type")
     .action(() => {
-      const app = core.getApp();
       const store = app.knowledge;
       const nodeTypes = ["file", "symbol", "session", "memory", "learning", "skill", "recipe", "agent"] as const;
       console.log(chalk.bold("Nodes:"));
@@ -105,7 +102,6 @@ export function registerKnowledgeCommands(program: Command) {
     .option("-t, --tags <tags>", "Comma-separated tags")
     .option("-i, --importance <n>", "Importance 0-1 (default: 0.5)")
     .action((content: string, opts) => {
-      const app = core.getApp();
       const tags = opts.tags ? opts.tags.split(",").map((t: string) => t.trim()) : [];
       const importance = opts.importance ? parseFloat(opts.importance) : 0.5;
       const id = app.knowledge.addNode({
@@ -123,7 +119,6 @@ export function registerKnowledgeCommands(program: Command) {
     .argument("<query>", "Search query")
     .option("-n, --limit <n>", "Max results", "10")
     .action((query: string, opts) => {
-      const app = core.getApp();
       const results = app.knowledge.search(query, {
         types: ["memory", "learning"],
         limit: Number(opts.limit),
@@ -147,7 +142,6 @@ export function registerKnowledgeCommands(program: Command) {
     .option("-d, --dir <path>", "Output directory", "./knowledge-export")
     .option("-t, --types <types>", "Comma-separated types to export (default: memory,learning)")
     .action(async (opts) => {
-      const app = core.getApp();
       const { exportToMarkdown } = await import("../../core/knowledge/export.js");
       const outputDir = resolve(opts.dir);
       const types = opts.types ? opts.types.split(",").map((t: string) => t.trim()) : undefined;
@@ -160,7 +154,6 @@ export function registerKnowledgeCommands(program: Command) {
     .description("Import knowledge from markdown files")
     .option("-d, --dir <path>", "Input directory", "./knowledge-export")
     .action(async (opts) => {
-      const app = core.getApp();
       const { importFromMarkdown } = await import("../../core/knowledge/export.js");
       const inputDir = resolve(opts.dir);
       if (!existsSync(inputDir)) {
@@ -183,7 +176,6 @@ export function registerKnowledgeCommands(program: Command) {
         console.log(chalk.red(`Path not found: ${resolved}`));
         return;
       }
-      const app = core.getApp();
       console.log(`Ingesting ${resolved}...`);
       try {
         const { indexCodebase } = await import("../../core/knowledge/indexer.js");

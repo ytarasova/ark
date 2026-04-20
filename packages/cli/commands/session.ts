@@ -9,6 +9,7 @@ import { runVerification } from "../../core/services/session-orchestration.js";
 import { getArkClient } from "./_shared.js";
 import { sanitizeSummary, formatBytes } from "../helpers.js";
 import { logDebug } from "../../core/observability/structured-log.js";
+import type { AppContext } from "../../core/app.js";
 
 async function forkCloneHandler(id: string, opts: { task?: string; group?: string }) {
   const ark = await getArkClient();
@@ -22,7 +23,7 @@ async function forkCloneHandler(id: string, opts: { task?: string; group?: strin
   }
 }
 
-export function registerSessionCommands(program: Command) {
+export function registerSessionCommands(program: Command, app: AppContext) {
   const session = program.command("session").description("Manage SDLC flow sessions");
 
   session
@@ -88,7 +89,7 @@ export function registerSessionCommands(program: Command) {
       // Import from Claude session if specified
       let claudeSessionId: string | undefined;
       if (opts.claudeSession) {
-        const cs = await core.getClaudeSession(core.getApp(), opts.claudeSession);
+        const cs = await core.getClaudeSession(app, opts.claudeSession);
         if (!cs) {
           console.log(
             chalk.red(
@@ -373,7 +374,7 @@ export function registerSessionCommands(program: Command) {
     .action(async (id, opts) => {
       if (!opts.force) {
         // Run verification first
-        const result = await runVerification(core.getApp(), id);
+        const result = await runVerification(app, id);
         if (!result.ok) {
           console.log(chalk.red("Verification failed:"));
           console.log(chalk.red(result.message));
@@ -531,7 +532,7 @@ export function registerSessionCommands(program: Command) {
     .action(async (action, id, text) => {
       switch (action) {
         case "list": {
-          const todos = core.getApp().todos.list(id);
+          const todos = app.todos.list(id);
           if (todos.length === 0) {
             console.log(chalk.dim("No todos"));
           } else {
@@ -547,7 +548,7 @@ export function registerSessionCommands(program: Command) {
             console.log(chalk.red("Usage: ark session todo add <session-id> <content>"));
             return;
           }
-          const todo = core.getApp().todos.add(id, text);
+          const todo = app.todos.add(id, text);
           console.log(chalk.green(`Added todo #${todo.id}: ${todo.content}`));
           break;
         }
@@ -556,7 +557,7 @@ export function registerSessionCommands(program: Command) {
             console.log(chalk.red("Usage: ark session todo done <session-id> <todo-id>"));
             return;
           }
-          const todo = core.getApp().todos.toggle(parseInt(text, 10));
+          const todo = app.todos.toggle(parseInt(text, 10));
           if (todo) {
             console.log(chalk.green(`Todo #${todo.id} ${todo.done ? "done" : "undone"}`));
           } else {
@@ -569,7 +570,7 @@ export function registerSessionCommands(program: Command) {
             console.log(chalk.red("Usage: ark session todo delete <session-id> <todo-id>"));
             return;
           }
-          const ok = core.getApp().todos.delete(parseInt(text, 10));
+          const ok = app.todos.delete(parseInt(text, 10));
           console.log(ok ? chalk.green("Deleted") : chalk.red("Not found"));
           break;
         }
@@ -584,7 +585,7 @@ export function registerSessionCommands(program: Command) {
     .argument("<id>", "Session ID")
     .action(async (id) => {
       console.log(chalk.dim("Running verification..."));
-      const result = await runVerification(core.getApp(), id);
+      const result = await runVerification(app, id);
       if (result.ok) {
         console.log(chalk.green("Verification passed"));
       } else {
@@ -722,7 +723,7 @@ export function registerSessionCommands(program: Command) {
     .argument("[file]")
     .action((id, file) => {
       const outPath = file ?? `session-${id}.json`;
-      if (core.exportSessionToFile(core.getApp(), id, outPath)) {
+      if (core.exportSessionToFile(app, id, outPath)) {
         console.log(chalk.green(`Exported to ${outPath}`));
       } else {
         console.log(chalk.red("Session not found"));
@@ -734,7 +735,7 @@ export function registerSessionCommands(program: Command) {
     .description("Import session from file")
     .argument("<file>")
     .action((file) => {
-      const result = core.importSessionFromFile(core.getApp(), file);
+      const result = core.importSessionFromFile(app, file);
       console.log(result.ok ? chalk.green(result.message) : chalk.red(result.message));
     });
 }

@@ -9,10 +9,10 @@
 
 import type { Command } from "commander";
 import chalk from "chalk";
-import * as core from "../../core/index.js";
 import { TenantPolicyManager } from "../../core/auth/index.js";
+import type { AppContext } from "../../core/app.js";
 
-export function registerTenantCommands(program: Command) {
+export function registerTenantCommands(program: Command, app: AppContext) {
   const tenant = program.command("tenant").description("Manage tenant settings");
   const policy = tenant.command("policy").description("Manage tenant compute policies");
 
@@ -26,7 +26,6 @@ export function registerTenantCommands(program: Command) {
     .option("--max-cost <usd>", "Maximum daily cost in USD")
     .action((tenantId, opts) => {
       try {
-        const app = core.getApp();
         const pm = new TenantPolicyManager(app.db);
 
         const allowedProviders = opts.providers
@@ -63,7 +62,6 @@ export function registerTenantCommands(program: Command) {
     .argument("<tenant-id>", "Tenant ID")
     .action((tenantId) => {
       try {
-        const app = core.getApp();
         const pm = new TenantPolicyManager(app.db);
         const p = pm.getPolicy(tenantId);
 
@@ -100,7 +98,6 @@ export function registerTenantCommands(program: Command) {
     .description("List all tenant compute policies")
     .action(() => {
       try {
-        const app = core.getApp();
         const pm = new TenantPolicyManager(app.db);
         const policies = pm.listPolicies();
 
@@ -130,7 +127,6 @@ export function registerTenantCommands(program: Command) {
     .argument("<tenant-id>", "Tenant ID")
     .action((tenantId) => {
       try {
-        const app = core.getApp();
         const pm = new TenantPolicyManager(app.db);
         const deleted = pm.deletePolicy(tenantId);
 

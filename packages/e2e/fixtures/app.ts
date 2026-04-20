@@ -18,7 +18,7 @@ import { mkdtempSync, writeFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { execFileSync } from "child_process";
-import { AppContext, setApp, clearApp } from "../../core/app.js";
+import { AppContext } from "../../core/app.js";
 import * as tmux from "../../core/infra/tmux.js";
 
 export interface E2EEnv {
@@ -40,7 +40,6 @@ export interface E2EEnv {
 export async function setupE2E(): Promise<E2EEnv> {
   // 1. Create AppContext with isolated temp dir
   const app = await AppContext.forTestAsync();
-  setApp(app);
   await app.boot();
 
   // 2. Create isolated workdir with a git repo (some tests need .git)
@@ -76,7 +75,6 @@ export async function setupE2E(): Promise<E2EEnv> {
       // race it against a hard ceiling so a stuck DB checkpoint or
       // unresponsive provider teardown can't freeze the whole afterAll.
       await Promise.race([app.shutdown(), new Promise<void>((r) => setTimeout(r, 10_000))]);
-      clearApp();
 
       // Clean up workdir
       try {

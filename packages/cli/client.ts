@@ -8,10 +8,10 @@
 import { ArkClient } from "../protocol/client.js";
 import { ArkServer } from "../server/index.js";
 import { registerAllHandlers } from "../server/register.js";
-import { getApp } from "../core/app.js";
 import { createWebSocketTransport } from "../protocol/transport.js";
 import type { Transport } from "../protocol/transport.js";
 import type { JsonRpcMessage } from "../protocol/types.js";
+import type { AppContext } from "../core/app.js";
 
 let _client: ArkClient | null = null;
 let _server: ArkServer | null = null;
@@ -20,6 +20,18 @@ let _server: ArkServer | null = null;
 let _remoteServerUrl: string | undefined;
 /** Auth token set via --token or ARK_TOKEN env var. */
 let _remoteToken: string | undefined;
+
+/**
+ * AppContext for local-mode ArkClient init. The CLI entry passes the booted
+ * app once at startup; `getArkClient()` reads it when constructing the
+ * in-process server. In remote mode this stays null.
+ */
+let _localApp: AppContext | null = null;
+
+/** Called from index.ts before any commands run. */
+export function setLocalApp(app: AppContext | null): void {
+  _localApp = app;
+}
 
 /** Called from index.ts to configure remote mode before any commands run. */
 export function setRemoteServer(url: string | undefined, token: string | undefined): void {
@@ -78,9 +90,12 @@ export async function getArkClient(): Promise<ArkClient> {
   }
 
   // Local mode: start server in-process
+  if (!_localApp) {
+    throw new Error("ArkClient local mode requires a booted AppContext -- call setLocalApp(app) first");
+  }
   _server = new ArkServer();
-  registerAllHandlers(_server.router, getApp());
-  _server.attachLifecycle(getApp());
+  registerAllHandlers(_server.router, _localApp);
+  _server.attachLifecycle(_localApp);
 
   const { clientTransport, serverTransport } = createInMemoryPair();
   _server.addConnection(serverTransport);

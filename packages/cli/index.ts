@@ -15,10 +15,10 @@
 import { Command } from "commander";
 import chalk from "chalk";
 import * as core from "../core/index.js";
-import { AppContext, setApp } from "../core/app.js";
+import { AppContext } from "../core/app.js";
 import { loadConfig } from "../core/config.js";
 import { VERSION } from "../core/version.js";
-import { closeArkClient, setRemoteServer, isRemoteMode } from "./client.js";
+import { closeArkClient, setLocalApp, setRemoteServer, isRemoteMode } from "./client.js";
 
 import { registerSessionCommands } from "./commands/session.js";
 import { registerComputeCommands } from "./commands/compute.js";
@@ -65,8 +65,24 @@ setRemoteServer(remoteServer, remoteToken);
 let app: AppContext | null = null;
 if (!isRemoteMode()) {
   app = new AppContext(loadConfig(), { skipConductor: true, skipMetrics: true });
-  setApp(app);
   await app.boot();
+}
+setLocalApp(app);
+
+/**
+ * Most CLI commands require a local AppContext. In remote mode (when `app`
+ * is null) they are unusable -- Commander still registers them so --help
+ * works, but their actions fail early via this guard. Commands that work
+ * purely over JSON-RPC (e.g. `session list`) take a different code path
+ * and consult `getArkClient()` instead.
+ */
+function requireLocalApp(): AppContext {
+  if (!app) {
+    throw new Error(
+      "This command is not supported in remote mode. Run locally or use an equivalent remote-aware command.",
+    );
+  }
+  return app;
 }
 
 const program = new Command()
@@ -88,27 +104,40 @@ program.hook("preAction", (thisCommand) => {
   }
 });
 
-// Register all command groups
-registerSessionCommands(program);
-registerComputeCommands(program);
-registerAgentCommands(program);
+// Register all command groups. Commands that need the local AppContext
+// take it as a parameter; `requireLocalApp()` short-circuits on remote
+// mode so commander doesn't need to know the difference.
+const localApp =
+  app ??
+  (new Proxy({} as AppContext, {
+    get: () => {
+      throw new Error(
+        "This command is not supported in remote mode. Run locally or use an equivalent remote-aware command.",
+      );
+    },
+  }) as unknown as AppContext);
+void requireLocalApp;
+
+registerSessionCommands(program, localApp);
+registerComputeCommands(program, localApp);
+registerAgentCommands(program, localApp);
 registerFlowCommands(program);
-registerSkillCommands(program);
-registerRecipeCommands(program);
+registerSkillCommands(program, localApp);
+registerRecipeCommands(program, localApp);
 registerScheduleCommands(program);
-registerWorktreeCommands(program);
-registerSearchCommands(program);
+registerWorktreeCommands(program, localApp);
+registerSearchCommands(program, localApp);
 registerMemoryCommands(program);
 registerProfileCommands(program);
-registerConductorCommands(program);
+registerConductorCommands(program, localApp);
 registerRouterCommands(program);
-registerRuntimeCommands(program);
-registerAuthCommands(program);
-registerTenantCommands(program);
-registerKnowledgeCommands(program);
+registerRuntimeCommands(program, localApp);
+registerAuthCommands(program, localApp);
+registerTenantCommands(program, localApp);
+registerKnowledgeCommands(program, localApp);
 registerEvalCommands(program);
 registerDashboardCommands(program, app);
-registerCostsCommands(program);
+registerCostsCommands(program, localApp);
 registerServerCommands(program);
 registerDaemonCommands(program);
 registerExecTryCommands(program, app);

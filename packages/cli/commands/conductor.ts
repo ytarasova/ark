@@ -1,9 +1,9 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import * as core from "../../core/index.js";
-import { getApp } from "../../core/app.js";
+import type { AppContext } from "../../core/app.js";
 
-export function registerConductorCommands(program: Command) {
+export function registerConductorCommands(program: Command, app: AppContext) {
   const conductorCmd = program.command("conductor").description("Conductor operations");
 
   conductorCmd
@@ -12,8 +12,7 @@ export function registerConductorCommands(program: Command) {
     .option("-p, --port <port>", "Port", "19100")
     .action(async (opts) => {
       const { startConductor } = await import("../../core/conductor/conductor.js");
-      const { getApp } = await import("../../core/app.js");
-      startConductor(getApp(), parseInt(opts.port));
+      startConductor(app, parseInt(opts.port));
       // Keep alive
       setInterval(() => {}, 60_000);
     });
@@ -22,7 +21,6 @@ export function registerConductorCommands(program: Command) {
     .command("learnings")
     .description("Show conductor learnings")
     .action(async () => {
-      const app = getApp();
       const learnings = app.knowledge.listNodes({ type: "learning" });
 
       if (learnings.length > 0) {
@@ -58,7 +56,6 @@ export function registerConductorCommands(program: Command) {
     .argument("<title>")
     .argument("[description]")
     .action(async (title, description) => {
-      const app = getApp();
       // Check for existing learning with same label and increment recurrence
       const existing = app.knowledge.search(title, { types: ["learning"], limit: 5 });
       const match = existing.find((n) => n.label === title);
@@ -88,7 +85,7 @@ export function registerConductorCommands(program: Command) {
     .command("bridge")
     .description("Start the messaging bridge (Telegram/Slack)")
     .action(async () => {
-      const bridge = core.createBridge(getApp().config.arkDir);
+      const bridge = core.createBridge(app.config.arkDir);
       if (!bridge) {
         console.log(chalk.red("No bridge config found. Create ~/.ark/bridge.json with telegram/slack settings."));
         console.log(chalk.dim("\nExample ~/.ark/bridge.json:"));
@@ -111,9 +108,9 @@ export function registerConductorCommands(program: Command) {
       bridge.onMessage(async (msg) => {
         const text = msg.text.trim().toLowerCase();
         if (text === "/status" || text === "status") {
-          await bridge.notifyStatusSummary(getApp());
+          await bridge.notifyStatusSummary(app);
         } else if (text === "/sessions" || text === "sessions") {
-          const sessions = getApp().sessions.list({ limit: 20 });
+          const sessions = app.sessions.list({ limit: 20 });
           const lines = sessions.map((s) => `\u2022 ${s.summary ?? s.id} (${s.status})`);
           await bridge.notify(lines.join("\n") || "No sessions");
         } else {
@@ -132,7 +129,7 @@ export function registerConductorCommands(program: Command) {
     .description("Send a test notification via bridge")
     .argument("<message>")
     .action(async (message) => {
-      const bridge = core.createBridge(getApp().config.arkDir);
+      const bridge = core.createBridge(app.config.arkDir);
       if (!bridge) {
         console.log(chalk.red("No bridge config. Create ~/.ark/bridge.json"));
         return;

@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import chalk from "chalk";
 import { execSync } from "child_process";
 import * as core from "../../core/index.js";
-import { AppContext, setApp } from "../../core/app.js";
+import { AppContext } from "../../core/app.js";
 import { loadConfig } from "../../core/config.js";
 import { getArkClient } from "./_shared.js";
 import { execSession } from "../exec.js";
@@ -34,9 +34,8 @@ export function registerExecTryCommands(program: Command, app: AppContext | null
       if (app) await app.shutdown();
       const execApp = new AppContext(loadConfig());
       await execApp.boot();
-      setApp(execApp);
 
-      const code = await execSession({
+      const code = await execSession(execApp, {
         repo: opts.repo,
         summary: opts.summary,
         ticket: opts.ticket,

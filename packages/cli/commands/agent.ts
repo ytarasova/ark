@@ -5,10 +5,10 @@ import { existsSync, writeFileSync, mkdirSync } from "fs";
 import { execFileSync } from "child_process";
 import YAML from "yaml";
 import * as core from "../../core/index.js";
-import { getApp } from "../../core/app.js";
 import { getArkClient } from "./_shared.js";
+import type { AppContext } from "../../core/app.js";
 
-export function registerAgentCommands(program: Command) {
+export function registerAgentCommands(program: Command, app: AppContext) {
   const agent = program.command("agent").description("Manage agent definitions");
 
   agent
@@ -54,7 +54,7 @@ export function registerAgentCommands(program: Command) {
     .action(async (name, opts) => {
       const projectRoot = core.findProjectRoot(process.cwd());
       const scope: "project" | "global" = opts.global || !projectRoot ? "global" : "project";
-      const dir = scope === "project" ? join(projectRoot!, ".ark", "agents") : join(getApp().config.arkDir, "agents");
+      const dir = scope === "project" ? join(projectRoot!, ".ark", "agents") : join(app.config.arkDir, "agents");
       const filePath = join(dir, `${name}.yaml`);
 
       if (existsSync(filePath)) {
@@ -90,7 +90,7 @@ export function registerAgentCommands(program: Command) {
     .argument("<name>")
     .action(async (name) => {
       const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
-      const a = getApp().agents.get(name, projectRoot);
+      const a = app.agents.get(name, projectRoot);
       if (!a) {
         console.log(chalk.red(`Agent '${name}' not found`));
         return;
@@ -105,12 +105,12 @@ export function registerAgentCommands(program: Command) {
         rl.close();
         const choice = answer.trim().toLowerCase();
         if (choice === "p" && projectRoot) {
-          getApp().agents.save(a.name, a, "project", projectRoot);
+          app.agents.save(a.name, a, "project", projectRoot);
           const path = join(projectRoot, ".ark", "agents", `${name}.yaml`);
           execFileSync(process.env.EDITOR || "vi", [path], { stdio: "inherit" });
         } else if (choice === "g") {
-          getApp().agents.save(a.name, a, "global");
-          const path = join(getApp().config.arkDir, "agents", `${name}.yaml`);
+          app.agents.save(a.name, a, "global");
+          const path = join(app.config.arkDir, "agents", `${name}.yaml`);
           execFileSync(process.env.EDITOR || "vi", [path], { stdio: "inherit" });
         } else {
           console.log("Cancelled.");
@@ -127,7 +127,7 @@ export function registerAgentCommands(program: Command) {
     .argument("<name>")
     .action(async (name) => {
       const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
-      const a = getApp().agents.get(name, projectRoot);
+      const a = app.agents.get(name, projectRoot);
       if (!a) {
         console.log(chalk.red(`Agent '${name}' not found`));
         return;
@@ -147,7 +147,7 @@ export function registerAgentCommands(program: Command) {
 
       if (answer.trim().toLowerCase() === "y") {
         const scope = a._source as "project" | "global";
-        getApp().agents.delete(name, scope, scope === "project" ? projectRoot : undefined);
+        app.agents.delete(name, scope, scope === "project" ? projectRoot : undefined);
         console.log(chalk.green(`Deleted '${name}'.`));
       } else {
         console.log("Cancelled.");
@@ -162,7 +162,7 @@ export function registerAgentCommands(program: Command) {
     .option("--global", "Save to ~/.ark/agents/ instead of project")
     .action((name, newName, opts) => {
       const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
-      const a = getApp().agents.get(name, projectRoot);
+      const a = app.agents.get(name, projectRoot);
       if (!a) {
         console.log(chalk.red(`Agent '${name}' not found`));
         return;
@@ -171,9 +171,9 @@ export function registerAgentCommands(program: Command) {
       const targetName = newName || name;
       const scope: "project" | "global" = opts.global || !projectRoot ? "global" : "project";
       const copy = { ...a, name: targetName };
-      getApp().agents.save(copy.name, copy, scope, scope === "project" ? projectRoot : undefined);
+      app.agents.save(copy.name, copy, scope, scope === "project" ? projectRoot : undefined);
 
-      const dir = scope === "project" ? join(projectRoot!, ".ark", "agents") : join(getApp().config.arkDir, "agents");
+      const dir = scope === "project" ? join(projectRoot!, ".ark", "agents") : join(app.config.arkDir, "agents");
       console.log(chalk.green(`Copied '${name}' → ${scope} '${targetName}' at ${join(dir, `${targetName}.yaml`)}`));
     });
 }
