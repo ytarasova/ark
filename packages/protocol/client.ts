@@ -404,17 +404,29 @@ export class ArkClient {
   }
 
   /**
-   * Upload a session input file. Server persists under `<arkDir>/inputs/<id>/<name>`
-   * and returns the absolute path. Callers put the returned path into
-   * `sessionStart.inputs.files[role]` so templating can resolve it.
+   * Upload a session input file. Server persists through the configured
+   * BlobStore (local disk or S3) and returns an opaque locator. Callers
+   * put the returned locator into `sessionStart.inputs.files[role]`; the
+   * server resolves it back to bytes on dispatch.
    */
   async inputUpload(opts: {
     name: string;
     role: string;
     content: string;
     contentEncoding?: "base64" | "utf-8";
-  }): Promise<{ path: string }> {
-    return this.rpc<{ path: string }>("input/upload", opts as unknown as Record<string, unknown>);
+  }): Promise<{ locator: string }> {
+    return this.rpc<{ locator: string }>("input/upload", opts as unknown as Record<string, unknown>);
+  }
+
+  /** Read back a previously-uploaded input by locator. Tenant-enforced. */
+  async inputRead(locator: string): Promise<{
+    filename: string;
+    contentType: string;
+    content: string;
+    contentEncoding: "base64";
+    size: number;
+  }> {
+    return this.rpc("input/read", { locator });
   }
 
   async flowRead(name: string): Promise<FlowDefinition> {

@@ -123,9 +123,10 @@ export const sessionInputsSchema = z.object({
 export type SessionInputs = z.infer<typeof sessionInputsSchema>;
 
 // ── input/upload ────────────────────────────────────────────────────────────
-// Persists bytes to disk under arkDir/inputs/<id>/<name> and returns the
-// absolute path. Used by the web dispatch form to turn drag-dropped files
-// into filesystem paths that `{inputs.files.<role>}` can resolve.
+// Persists bytes through the configured BlobStore (local disk or S3) and
+// returns an opaque locator. Callers stash the locator in
+// `sessionStart.inputs.files[role]`; templating resolves it through the
+// blob store on dispatch. Breaking change vs the old `{ path }` response.
 
 export const inputUploadRequest = z.object({
   name: z.string(),
@@ -135,8 +136,25 @@ export const inputUploadRequest = z.object({
 });
 export type InputUploadRequest = z.infer<typeof inputUploadRequest>;
 
-export const inputUploadResponse = z.object({ path: z.string() });
+export const inputUploadResponse = z.object({ locator: z.string() });
 export type InputUploadResponse = z.infer<typeof inputUploadResponse>;
+
+// ── input/read ──────────────────────────────────────────────────────────────
+// Fetch uploaded bytes by locator. Tenant is enforced by the BlobStore:
+// the locator carries the owning tenant id and the handler passes the
+// caller's tenant through, so a mismatch throws rather than leaks bytes.
+
+export const inputReadRequest = z.object({ locator: z.string() });
+export type InputReadRequest = z.infer<typeof inputReadRequest>;
+
+export const inputReadResponse = z.object({
+  filename: z.string(),
+  contentType: z.string(),
+  content: z.string(),
+  contentEncoding: z.literal("base64"),
+  size: z.number(),
+});
+export type InputReadResponse = z.infer<typeof inputReadResponse>;
 
 export const sessionStartRequest = z
   .object({
@@ -568,6 +586,7 @@ export interface RpcMethodSchemas {
 export const rpcMethodSchemas: Record<string, RpcMethodSchemas> = {
   "session/start": { request: sessionStartRequest, response: sessionStartResponse },
   "input/upload": { request: inputUploadRequest, response: inputUploadResponse },
+  "input/read": { request: inputReadRequest, response: inputReadResponse },
   "session/read": { request: sessionReadRequest, response: sessionReadResponse },
   "session/list": { request: sessionListRequest, response: sessionListResponse },
   "session/delete": { request: sessionDeleteRequest, response: sessionDeleteResponse },

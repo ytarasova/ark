@@ -45,6 +45,7 @@ export function buildTenantScope(parent: AppContext, tenantId: string): AppConte
   const scopedUsage = new UsageRecorder(db, parent.pricing);
   scopedUsage.setTenant(tenantId);
 
+  Object.defineProperty(scoped, "tenantId", { get: () => tenantId, configurable: true });
   Object.defineProperty(scoped, "sessions", { get: () => scopedSessions, configurable: true });
   Object.defineProperty(scoped, "computes", { get: () => scopedComputes, configurable: true });
   Object.defineProperty(scoped, "computeTemplates", { get: () => scopedComputeTemplates, configurable: true });

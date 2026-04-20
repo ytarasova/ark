@@ -50,6 +50,7 @@ function chunkToOverrides(chunk: Record<string, unknown>): EnvOverrides {
     observability: {},
     auth: {},
     features: {},
+    storage: {},
   };
 
   const ports = chunk.ports;
@@ -98,6 +99,29 @@ function chunkToOverrides(chunk: Record<string, unknown>): EnvOverrides {
     if (cg !== undefined) out.features.codegraph = cg;
   }
 
+  const storage = chunk.storage;
+  if (isObj(storage)) {
+    const backend = pickStr(storage.blobBackend ?? storage.blob_backend);
+    if (backend === "local" || backend === "s3") {
+      out.storage.blobBackend = backend;
+    }
+    const s3 = storage.s3;
+    if (isObj(s3)) {
+      const bucket = pickStr(s3.bucket);
+      const region = pickStr(s3.region);
+      const prefix = pickStr(s3.prefix);
+      const endpoint = pickStr(s3.endpoint);
+      if (bucket || region || prefix || endpoint) {
+        out.storage.s3 = {
+          bucket: bucket ?? "",
+          region: region ?? "",
+          prefix,
+          endpoint,
+        };
+      }
+    }
+  }
+
   const ark = pickStr(chunk.arkDir ?? chunk.ark_dir);
   if (ark) out.arkDir = ark;
 
@@ -141,7 +165,7 @@ export function loadYamlOverrides(arkDir: string, profile: ArkProfile): EnvOverr
 }
 
 function emptyOverrides(): EnvOverrides {
-  return { ports: {}, channels: {}, observability: {}, auth: {}, features: {} };
+  return { ports: {}, channels: {}, observability: {}, auth: {}, features: {}, storage: {} };
 }
 
 /** Shallow-merge with `b` winning per section. */
@@ -155,5 +179,9 @@ export function mergeOverrides(a: EnvOverrides, b: EnvOverrides): EnvOverrides {
     observability: { ...a.observability, ...b.observability },
     auth: { ...a.auth, ...b.auth },
     features: { ...a.features, ...b.features },
+    storage: {
+      blobBackend: b.storage?.blobBackend ?? a.storage?.blobBackend,
+      s3: b.storage?.s3 ?? a.storage?.s3,
+    },
   };
 }

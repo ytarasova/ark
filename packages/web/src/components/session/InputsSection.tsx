@@ -138,8 +138,12 @@ export function InputsSection({ flowName, value, onChange, onValidityChange }: P
       bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + 0x8000)));
     }
     const content = btoa(bin);
-    const { path } = await api.uploadInput({ name: file.name, role, content, contentEncoding: "base64" });
-    onChange({ ...value, files: { ...value.files, [role]: path } });
+    // `input/upload` now returns an opaque `{ locator }` (base64url of
+    // `{tenant}/{ns}/{id}/{filename}`) rather than a filesystem path --
+    // the BlobStore owns the bytes, and the locator is what callers feed
+    // back to `input/read` / flow templating.
+    const { locator } = await api.uploadInput({ name: file.name, role, content, contentEncoding: "base64" });
+    onChange({ ...value, files: { ...value.files, [role]: locator } });
   }
 
   function setFilePath(role: string, path: string) {
