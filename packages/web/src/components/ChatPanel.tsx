@@ -114,7 +114,7 @@ export function ChatPanel({ sessionId, session, onClose, onToast }: ChatPanelPro
             autoFocus
           />
           <Button size="xs" disabled={!msg.trim() || sending} onClick={handleSend}>
-            {sending ? "..." : "Send"}
+            {sending ? "..." : "Chat"}
           </Button>
         </div>
       )}
