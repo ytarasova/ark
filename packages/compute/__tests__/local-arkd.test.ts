@@ -30,6 +30,28 @@ let server: { stop(): void };
 let tempDir: string;
 let client: ArkdClient;
 
+/**
+ * Poll arkd `/health` until it responds 200 or the deadline passes.
+ * Cheap (no shell-outs), so we can call it right after startArkd() without
+ * burning seconds. When we reuse an existing arkd owned by `make dev`,
+ * this also confirms it's alive before the tests start asserting.
+ */
+async function waitForArkdReady(url: string, timeoutMs = 10_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  let lastErr: unknown = null;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`${url}/health`, { method: "GET" });
+      if (res.ok) return;
+      lastErr = new Error(`HTTP ${res.status}`);
+    } catch (err) {
+      lastErr = err;
+    }
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  throw new Error(`arkd not ready at ${url} within ${timeoutMs}ms: ${String(lastErr)}`);
+}
+
 const compute = {
   id: "test-local",
   name: "test-local",
@@ -51,7 +73,7 @@ function makeSession(sessionId?: string): Session {
 
 let ownServer = false;
 
-beforeAll(() => {
+beforeAll(async () => {
   tempDir = join(tmpdir(), `local-arkd-test-${Date.now()}`);
   mkdirSync(tempDir, { recursive: true });
   try {
@@ -62,6 +84,10 @@ beforeAll(() => {
     console.log(`Port ${ARKD_PORT} in use, reusing existing arkd`);
   }
   client = new ArkdClient(`http://localhost:${ARKD_PORT}`);
+  // Whether we own the server or we're reusing an existing one, the first
+  // test can race the HTTP server coming up. Poll /health briefly so the
+  // first /snapshot / /agent call doesn't hit ECONNREFUSED.
+  await waitForArkdReady(`http://localhost:${ARKD_PORT}`);
 });
 
 afterAll(() => {
@@ -219,6 +245,12 @@ describe("LocalWorktreeProvider", () => {
   // ── Metrics via arkd ────────────────────────────────────────────────────
 
   describe("getMetrics via arkd", () => {
+    // 30s timeout (not the bun-test default 5s): /snapshot shells out to
+    // top / vm_stat / df / uptime / ps aux / tmux list-sessions / docker
+    // stats --no-stream, and on a loaded host that routinely exceeds 5s
+    // (direct curl against a live arkd measured ~7s on the maintainer's
+    // laptop). The assertions themselves are cheap; the budget is for
+    // the HTTP round-trip against a real metrics collector.
     it("returns full ComputeSnapshot", async () => {
       const snap = await provider.getMetrics(compute);
       expect(typeof snap.metrics.cpu).toBe("number");
@@ -228,7 +260,7 @@ describe("LocalWorktreeProvider", () => {
       expect(Array.isArray(snap.sessions)).toBe(true);
       expect(Array.isArray(snap.processes)).toBe(true);
       expect(Array.isArray(snap.docker)).toBe(true);
-    });
+    }, 30_000);
   });
 
   // ── Port probing via arkd ───────────────────────────────────────────────
