@@ -126,10 +126,108 @@ export function channelMcpConfig(
 }
 
 /**
+ * Expand `${ENV_NAME}` and `${ENV_NAME:-default}` placeholders inside an
+ * MCP server config against `process.env`. Used by runtime-level MCP
+ * entries so a single YAML / JSON stub can be parameterised per
+ * deployment (e.g. URLs, API tokens, sockets) with a shipped default.
+ *
+ * Walks objects/arrays recursively. Non-string leaves are left untouched.
+ * Missing env vars without a default are left as the literal `${VAR}` so
+ * the underlying MCP server can decide whether to error -- we don't want
+ * to swallow misconfig silently here.
+ */
+export function expandEnvPlaceholders<T>(value: T, env: Record<string, string | undefined> = process.env): T {
+  if (value == null) return value;
+  if (typeof value === "string") {
+    return value.replace(/\$\{([A-Z0-9_]+)(?::-([^}]*))?\}/g, (full, name, fallback) => {
+      const resolved = env[name];
+      if (resolved !== undefined && resolved !== "") return resolved;
+      if (fallback !== undefined) return fallback;
+      return full;
+    }) as unknown as T;
+  }
+  if (Array.isArray(value)) {
+    return value.map((v) => expandEnvPlaceholders(v, env)) as unknown as T;
+  }
+  if (typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = expandEnvPlaceholders(v, env);
+    }
+    return out as unknown as T;
+  }
+  return value;
+}
+
+/**
+ * Resolve an MCP server entry into a `{ name, config }` pair suitable for
+ * writing into `.mcp.json["mcpServers"]`. Supports the same input shapes
+ * as `RuntimeDefinition.mcp_servers` and `AgentDefinition.mcp_servers`:
+ *   - string path to `<somewhere>/<name>.json` (loaded from disk; the file
+ *     must contain `{"mcpServers": { "<name>": { ... } }}`)
+ *   - bare server name like `"pi-sage"` -- looked up in `mcpConfigsDir` if
+ *     supplied, otherwise treated as just a name with no config to add
+ *   - inline object `{ "<name>": { command, args, env } | { type, url } }`
+ * Returns `null` when the entry can't be resolved (file missing, etc.).
+ */
+function resolveMcpServerEntry(
+  entry: string | Record<string, unknown>,
+  opts?: { mcpConfigsDir?: string },
+): { name: string; config: Record<string, unknown> } | null {
+  if (typeof entry === "object" && entry !== null) {
+    const keys = Object.keys(entry);
+    if (keys.length !== 1) return null;
+    const name = keys[0];
+    const raw = entry[name];
+    if (typeof raw !== "object" || raw === null) return null;
+    return { name, config: expandEnvPlaceholders(raw as Record<string, unknown>) };
+  }
+
+  if (typeof entry !== "string") return null;
+
+  // Determine candidate file path -- either explicit, or look up in mcpConfigsDir
+  let filePath: string | null = null;
+  let derivedName: string;
+  if (entry.endsWith(".json") || entry.includes("/")) {
+    filePath = resolve(entry);
+    derivedName = (entry.split("/").pop() ?? entry).replace(/\.json$/, "");
+  } else {
+    derivedName = entry;
+    if (opts?.mcpConfigsDir) {
+      filePath = join(opts.mcpConfigsDir, `${entry}.json`);
+    }
+  }
+
+  if (!filePath || !existsSync(filePath)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(filePath, "utf-8")) as Record<string, unknown>;
+    const servers = parsed.mcpServers as Record<string, Record<string, unknown>> | undefined;
+    if (!servers) return null;
+    // Prefer the entry whose key matches `derivedName`; fall back to the only entry.
+    const match = servers[derivedName] ?? (Object.keys(servers).length === 1 ? servers[Object.keys(servers)[0]] : null);
+    if (!match) return null;
+    return { name: derivedName, config: expandEnvPlaceholders(match) };
+  } catch (e: any) {
+    console.error(`resolveMcpServerEntry: failed to load ${filePath}:`, e?.message ?? e);
+    return null;
+  }
+}
+
+/**
  * Write channel MCP config to the worktree's .mcp.json.
  * Claude Code reads .mcp.json from the project directory at startup.
  * --dangerously-load-development-channels server:NAME looks up NAME
  * in the loaded MCP config, so the server must be in .mcp.json.
+ *
+ * Merge order (later wins for the same name only via opt-in entries; the
+ * channel + codebase-memory are always written last so they cannot be
+ * shadowed by repo / runtime config):
+ *   1. existing `.mcp.json` in the worktree
+ *   2. servers copied from `originalRepoDir/.mcp.json` (skips `ark-channel`,
+ *      never overwrites existing names)
+ *   3. servers declared in the runtime YAML (`runtimeMcpServers`)
+ *   4. `ark-channel` (always overwritten)
+ *   5. `codebase-memory` (only if the binary is on disk and not already set)
  */
 export function writeChannelConfig(
   sessionId: string,
@@ -141,6 +239,10 @@ export function writeChannelConfig(
     channelConfig?: Record<string, unknown>;
     tracksDir?: string;
     originalRepoDir?: string;
+    /** MCP servers declared on the active runtime YAML. */
+    runtimeMcpServers?: (string | Record<string, unknown>)[];
+    /** Directory holding `<name>.json` files referenced by string entries. */
+    mcpConfigsDir?: string;
   },
 ): string {
   const config =
@@ -180,6 +282,20 @@ export function writeChannelConfig(
           e?.message ?? e,
         );
       }
+    }
+  }
+
+  // Merge runtime-declared MCP servers (e.g. from runtimes/claude.yaml). Same
+  // precedence as the original-repo merge: do not override entries already
+  // present in the worktree's .mcp.json or in the source repo's .mcp.json.
+  if (opts?.runtimeMcpServers?.length) {
+    if (!existing.mcpServers) existing.mcpServers = {};
+    for (const entry of opts.runtimeMcpServers) {
+      const resolved = resolveMcpServerEntry(entry, { mcpConfigsDir: opts.mcpConfigsDir });
+      if (!resolved) continue;
+      if (resolved.name === "ark-channel") continue;
+      if (existing.mcpServers[resolved.name]) continue;
+      existing.mcpServers[resolved.name] = resolved.config;
     }
   }
 

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "pi-sage": {
+      "type": "url",
+      "url": "${ARK_PI_SAGE_MCP_URL:-https://pi-team.mypaytm.com/sage/mcp}"
+    }
+  }
+}

@@ -213,3 +213,19 @@ export function channelLaunchSpecWith(env: ResolveEnv): { command: string; args:
 export function channelLaunchSpec(): { command: string; args: string[] } {
   return channelLaunchSpecWith(defaultEnv());
 }
+
+/**
+ * Resolve the directory containing shipped MCP config stubs
+ * (`mcp-configs/<name>.json`). Used to look up runtime-declared MCP entries
+ * by short name (e.g. `mcp_servers: [pi-sage]`).
+ *
+ * Installed tarball layout:   `<prefix>/mcp-configs/`
+ * Source-tree layout:         `<repo>/mcp-configs/`
+ */
+export function resolveMcpConfigsDirWith(env: ResolveEnv): string {
+  return join(resolveStoreBaseDirWith(env), "mcp-configs");
+}
+
+export function resolveMcpConfigsDir(): string {
+  return resolveMcpConfigsDirWith(defaultEnv());
+}

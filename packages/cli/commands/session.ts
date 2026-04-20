@@ -41,6 +41,12 @@ export function registerSessionCommands(program: Command, app: AppContext) {
     .option("--recipe <name>", "Create session from a recipe template")
     .option("--runtime <name>", "Override agent runtime (e.g. codex, gemini, claude)")
     .option(
+      "--with-mcp <name>",
+      "Mount an additional MCP server into the session (repeatable). Resolves against shipped mcp-configs/<name>.json or an inline path.",
+      (value, prev: string[] = []) => [...prev, value],
+      [] as string[],
+    )
+    .option(
       "--file <role=path>",
       "Attach a named file input (repeatable). Path is resolved absolute and exposed to agents + flows as {inputs.files.<role>}.",
       (value, prev: Record<string, string> = {}) => {

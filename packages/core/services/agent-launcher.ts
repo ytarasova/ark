@@ -135,11 +135,17 @@ export async function _launchAgentTmux(
   const channelPort = app.sessions.channelPort(session.id);
   const channelConfig = provider?.buildChannelConfig(session.id, stage, channelPort, { conductorUrl });
   const originalRepoDir = session.repo ? resolve(session.repo) : undefined;
+  // Runtime-declared MCP servers (see claude-code.ts for the rationale).
+  const runtimeName = agent.runtime;
+  const runtimeMcpServers = runtimeName ? (app.runtimes.get(runtimeName)?.mcp_servers ?? undefined) : undefined;
+  const { resolveMcpConfigsDir } = await import("../install-paths.js");
   const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, {
     conductorUrl,
     channelConfig,
     tracksDir: app.config.tracksDir,
     originalRepoDir,
+    runtimeMcpServers,
+    mcpConfigsDir: resolveMcpConfigsDir(),
   });
 
   // Status hooks + permissions allow-list -- write .claude/settings.local.json

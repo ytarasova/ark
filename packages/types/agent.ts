@@ -27,6 +27,16 @@ export interface RuntimeDefinition {
   default_model?: string;
   permission_mode?: string;
   env?: Record<string, string>;
+  /**
+   * MCP servers that should be merged into every session run on this runtime.
+   * Each entry can be:
+   *   - a string referencing an `mcp-configs/<name>.json` file (loaded at dispatch)
+   *   - an inline `{ "<name>": { command, args, env } }` object
+   *   - an inline `{ "<name>": { type: "url", url: "..." } }` object for HTTP MCP servers
+   * Server-level `${ENV}` placeholders inside the config get expanded against
+   * `process.env` so deployments can swap URLs / tokens without editing YAML.
+   */
+  mcp_servers?: (string | Record<string, unknown>)[];
   /** Billing and cost tracking config. When omitted, defaults to { mode: 'api' }. */
   billing?: RuntimeBilling;
   _source?: "builtin" | "global" | "project";
