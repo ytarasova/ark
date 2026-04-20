@@ -7,7 +7,7 @@ on:
     paths:
       - "Dockerfile"
       - "package.json"
-      - "bun.lockb"
+      - "bun.lock"
       - "packages/**"
       - "agents/**"
       - "flows/**"
