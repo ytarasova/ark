@@ -14,7 +14,7 @@
 // Bun global type declaration (avoids requiring @types/bun as a dependency)
 declare const Bun: {
   serve(options: { port: number; hostname: string; fetch(req: Request): Promise<Response> | Response }): {
-    stop(): void;
+    stop(closeActiveConnections?: boolean): void;
   };
 };
 
@@ -48,16 +48,6 @@ const DEFAULT_PORT = DEFAULT_CONDUCTOR_PORT;
 /** Interval between schedule and PR review poll ticks */
 const POLL_INTERVAL_MS = 60_000;
 
-/**
- * Module-level AppContext set by startConductor(). Used by handler functions
- * that are called outside the startConductor() closure (e.g. deliverToChannel,
- * which is exported and called from other modules).
- *
- * Internal handlers defined inside startConductor() close over the `app`
- * parameter directly and do not use this variable.
- */
-let _app: AppContext;
-
 /** Extract a path segment by index, returning null if missing. */
 function extractPathSegment(path: string, index: number): string | null {
   return path.split("/")[index] ?? null;
@@ -70,558 +60,744 @@ type TenantResolution = { ok: true; tenantId: string } | { ok: false; status: nu
 
 const BEARER_PATTERN = /^Bearer\s+(.+)$/i;
 
-/**
- * Resolve the tenant id for an inbound HTTP request.
- *
- * Security model (P1-1):
- *   - A Bearer token MUST be validated against `api_keys`. The tenant id
- *     is read from the matched row, NOT parsed from the token body -- this
- *     closes the bug where any caller could submit a token like
- *     `ark_victim_whatever` and be scoped to `victim`.
- *   - The `X-Ark-Tenant-Id` header is NEVER trusted on its own. It must
- *     match the tenant resolved from a valid Bearer token, else it is
- *     rejected. Legacy clients that send the header without a token are
- *     rejected too.
- *   - The `"default"` fallback is only permitted when BOTH no Authorization
- *     header AND no `X-Ark-Tenant-Id` header are present AND the conductor
- *     is in local single-tenant mode (no `databaseUrl` configured).
- */
-function resolveTenant(req: Request): TenantResolution {
-  const auth = req.headers.get("authorization") ?? req.headers.get("Authorization");
-  const hdrTenant = req.headers.get("x-ark-tenant-id") ?? req.headers.get("X-Ark-Tenant-Id");
-  const isHostedMode = !!_app.config.databaseUrl;
+export interface ConductorOptions {
+  quiet?: boolean;
+  issueLabel?: string;
+  issueAutoDispatch?: boolean;
+}
 
-  if (auth) {
-    const match = auth.match(BEARER_PATTERN);
-    const token = match?.[1]?.trim();
-    if (!token) {
-      return { ok: false, status: 401, error: "malformed Authorization header" };
-    }
-    const ctx = _app.apiKeys.validate(token);
-    if (!ctx) {
-      return { ok: false, status: 401, error: "invalid or expired API key" };
-    }
-    // If caller also set X-Ark-Tenant-Id, it must match the validated tenant
-    // -- we refuse to honor an override that could cross tenants.
-    if (hdrTenant && hdrTenant !== ctx.tenantId) {
-      return { ok: false, status: 403, error: "tenant header does not match API key" };
-    }
-    return { ok: true, tenantId: ctx.tenantId };
+export interface ConductorHandle {
+  stop(): void;
+}
+
+/**
+ * Conductor -- all routes, pollers, and handlers as instance methods.
+ *
+ * The conductor used to keep its own module-level `_app` so that free
+ * helpers like `deliverToChannel` could reach the AppContext. That is
+ * gone: the conductor is now a class with an injected `AppContext`, and
+ * `deliverToChannel` is a free function that takes `app` explicitly.
+ */
+export class Conductor {
+  private readonly app: AppContext;
+  private readonly port: number;
+  private readonly opts: ConductorOptions;
+  private server: { stop(): void } | null = null;
+  private timers: Array<ReturnType<typeof setInterval>> = [];
+
+  constructor(app: AppContext, port: number = DEFAULT_PORT, opts: ConductorOptions = {}) {
+    this.app = app;
+    this.port = port;
+    this.opts = opts;
   }
 
-  if (hdrTenant) {
-    // Header without a validated token -- spoofable. Reject.
+  // ── Lifecycle ────────────────────────────────────────────────────────────
+
+  start(): ConductorHandle {
+    this.server = Bun.serve({
+      port: this.port,
+      hostname: DEFAULT_CONDUCTOR_HOST,
+      fetch: (req) => this.fetch(req),
+    });
+
+    if (!this.opts.quiet) logInfo("conductor", `Ark conductor listening on localhost:${this.port}`);
+
+    // Schedule poller -- check every 60 seconds
+    this.timers.push(
+      setInterval(
+        () =>
+          safeAsync("schedule polling", async () => {
+            const schedules = listSchedules(this.app).filter((s) => s.enabled);
+            const now = new Date();
+            for (const sched of schedules) {
+              if (!cronMatches(sched.cron, now)) continue;
+              if (sched.last_run) {
+                const lastRun = new Date(sched.last_run);
+                if (
+                  lastRun.getMinutes() === now.getMinutes() &&
+                  lastRun.getHours() === now.getHours() &&
+                  lastRun.getDate() === now.getDate()
+                )
+                  continue;
+              }
+              await safeAsync(`scheduled dispatch for ${sched.id}`, async () => {
+                const s = session.startSession(this.app, {
+                  summary: sched.summary ?? `Scheduled: ${sched.id}`,
+                  repo: sched.repo ?? undefined,
+                  workdir: sched.workdir ?? undefined,
+                  flow: sched.flow,
+                  compute_name: sched.compute_name ?? undefined,
+                  group_name: sched.group_name ?? undefined,
+                });
+                await session.dispatch(this.app, s.id);
+                updateScheduleLastRun(this.app, sched.id);
+                this.app.events.log(s.id, "scheduled_dispatch", {
+                  actor: "scheduler",
+                  data: { schedule_id: sched.id, cron: sched.cron },
+                });
+              });
+            }
+          }),
+        POLL_INTERVAL_MS,
+      ),
+    );
+
+    // PR review poller - check every 60 seconds
+    this.timers.push(
+      setInterval(() => safeAsync("PR review polling", () => pollPRReviews(this.app)), POLL_INTERVAL_MS),
+    );
+
+    // PR merge poller - check every 30 seconds (blocks flow completion, needs faster checks)
+    const MERGE_POLL_INTERVAL_MS = 30_000;
+    this.timers.push(
+      setInterval(() => safeAsync("PR merge polling", () => pollPRMerges(this.app)), MERGE_POLL_INTERVAL_MS),
+    );
+
+    // Issue poller - only start if a label is configured
+    if (this.opts.issueLabel) {
+      const issueOpts = { label: this.opts.issueLabel, autoDispatch: this.opts.issueAutoDispatch };
+      safeAsync("issue polling: initial", () => pollIssues(this.app, issueOpts));
+      this.timers.push(
+        setInterval(() => safeAsync("issue polling", () => pollIssues(this.app, issueOpts)), POLL_INTERVAL_MS),
+      );
+    }
+
+    // Stuck session recovery -- check every 60 seconds for sessions stuck in
+    // "running" status whose agent process has exited.
+    const STUCK_POLL_INTERVAL_MS = 60_000;
+    this.timers.push(
+      setInterval(() => safeAsync("stuck session recovery", () => this.recoverStuckSessions()), STUCK_POLL_INTERVAL_MS),
+    );
+    safeAsync("stuck session recovery: initial", () => this.recoverStuckSessions());
+
     return {
-      ok: false,
-      status: 401,
-      error: "X-Ark-Tenant-Id requires a validated Authorization: Bearer token",
+      stop: () => this.stop(),
     };
   }
 
-  // Neither header present. "default" is only safe in local single-tenant mode.
-  if (isHostedMode) {
-    return { ok: false, status: 401, error: "authentication required" };
+  stop(): void {
+    for (const t of this.timers) clearInterval(t);
+    this.timers = [];
+    // Force-close active connections so the port releases immediately and
+    // a fresh Conductor can bind to the same port (test scenarios).
+    this.server?.stop(true);
+    this.server = null;
   }
-  return { ok: true, tenantId: "default" };
+
+  // ── Top-level router ─────────────────────────────────────────────────────
+
+  private async fetch(req: Request): Promise<Response> {
+    const url = new URL(req.url);
+    const path = url.pathname;
+
+    try {
+      if (req.method === "POST" && path.startsWith("/api/channel/")) {
+        const sessionId = extractPathSegment(path, 3);
+        if (!sessionId) return Response.json({ error: "missing session id" }, { status: 400 });
+        return this.handleChannelReport(req, sessionId);
+      }
+
+      if (req.method === "POST" && path === "/api/relay") {
+        return this.handleAgentRelay(req);
+      }
+
+      if (req.method === "POST" && path === "/hooks/status") {
+        return this.handleHookStatus(req, url);
+      }
+
+      if (req.method === "POST" && path === "/hooks/github/merge") {
+        return this.handlePRMergeWebhook(req);
+      }
+
+      // ── Worker management (hosted control plane) ──────────────────
+      if (req.method === "POST" && path === "/api/workers/register") {
+        return this.handleWorkerRegister(req);
+      }
+      if (req.method === "POST" && path === "/api/workers/heartbeat") {
+        return this.handleWorkerHeartbeat(req);
+      }
+      if (req.method === "POST" && path === "/api/workers/deregister") {
+        return this.handleWorkerDeregister(req);
+      }
+      if (req.method === "GET" && path === "/api/workers") {
+        return this.handleWorkerList();
+      }
+
+      // ── Tenant policy management (hosted control plane) ────────────
+      if (path.startsWith("/api/tenant/polic")) {
+        if (req.method === "GET" && path === "/api/tenant/policies") {
+          return this.handleTenantPolicyList();
+        }
+        if (path.startsWith("/api/tenant/policy/")) {
+          const tenantId = extractPathSegment(path, 4);
+          if (!tenantId) return Response.json({ error: "missing tenant id" }, { status: 400 });
+          if (req.method === "GET") return this.handleTenantPolicyGet(tenantId);
+          if (req.method === "PUT") return this.handleTenantPolicySet(req, tenantId);
+          if (req.method === "DELETE") return this.handleTenantPolicyDelete(tenantId);
+        }
+      }
+
+      // ── LLM proxy: forward to router ──────────────────────────
+      if (req.method === "POST" && path === "/v1/chat/completions") {
+        return this.proxyToRouter(req, "/v1/chat/completions");
+      }
+      if (req.method === "GET" && path === "/v1/models") {
+        return this.proxyToRouter(req, "/v1/models");
+      }
+
+      if (req.method === "GET") {
+        return this.handleRestApi(req, path);
+      }
+
+      return new Response("Not found", { status: 404 });
+    } catch (e) {
+      return Response.json({ error: String(e) }, { status: 500 });
+    }
+  }
+
+  // ── Tenant resolution ────────────────────────────────────────────────────
+
+  /**
+   * Resolve the tenant id for an inbound HTTP request.
+   *
+   * Security model (P1-1):
+   *   - A Bearer token MUST be validated against `api_keys`. The tenant id
+   *     is read from the matched row, NOT parsed from the token body.
+   *   - The `X-Ark-Tenant-Id` header is NEVER trusted on its own. It must
+   *     match the tenant resolved from a valid Bearer token.
+   *   - The `"default"` fallback is only permitted when BOTH no Authorization
+   *     header AND no `X-Ark-Tenant-Id` header are present AND the conductor
+   *     is in local single-tenant mode (no `databaseUrl` configured).
+   */
+  private resolveTenant(req: Request): TenantResolution {
+    const auth = req.headers.get("authorization") ?? req.headers.get("Authorization");
+    const hdrTenant = req.headers.get("x-ark-tenant-id") ?? req.headers.get("X-Ark-Tenant-Id");
+    const isHostedMode = !!this.app.config.databaseUrl;
+
+    if (auth) {
+      const match = auth.match(BEARER_PATTERN);
+      const token = match?.[1]?.trim();
+      if (!token) {
+        return { ok: false, status: 401, error: "malformed Authorization header" };
+      }
+      const ctx = this.app.apiKeys.validate(token);
+      if (!ctx) {
+        return { ok: false, status: 401, error: "invalid or expired API key" };
+      }
+      if (hdrTenant && hdrTenant !== ctx.tenantId) {
+        return { ok: false, status: 403, error: "tenant header does not match API key" };
+      }
+      return { ok: true, tenantId: ctx.tenantId };
+    }
+
+    if (hdrTenant) {
+      return {
+        ok: false,
+        status: 401,
+        error: "X-Ark-Tenant-Id requires a validated Authorization: Bearer token",
+      };
+    }
+
+    if (isHostedMode) {
+      return { ok: false, status: 401, error: "authentication required" };
+    }
+    return { ok: true, tenantId: "default" };
+  }
+
+  private appForRequest(req: Request): { ok: true; app: AppContext } | { ok: false; response: Response } {
+    const r = this.resolveTenant(req);
+    if (r.ok === false) {
+      return { ok: false, response: Response.json({ error: r.error }, { status: r.status }) };
+    }
+    return { ok: true, app: this.app.forTenant(r.tenantId) };
+  }
+
+  // ── Route handlers ───────────────────────────────────────────────────────
+
+  private async handleChannelReport(req: Request, sessionId: string): Promise<Response> {
+    const resolved = this.appForRequest(req);
+    if (resolved.ok === false) return resolved.response;
+    const report = (await req.json()) as OutboundMessage;
+    await handleReport(resolved.app, sessionId, report);
+    return Response.json({ status: "ok" });
+  }
+
+  private async handleAgentRelay(req: Request): Promise<Response> {
+    const resolved = this.appForRequest(req);
+    if (resolved.ok === false) return resolved.response;
+    const { from, target, message } = (await req.json()) as {
+      from: string;
+      target: string;
+      message: string;
+    };
+    const scoped = resolved.app;
+    const targetSession = scoped.sessions.get(target);
+    if (targetSession) {
+      const channelPort = scoped.sessions.channelPort(target);
+      const payload = { type: "steer", message, from, sessionId: target };
+      await deliverToChannel(this.app, targetSession as Session, channelPort, payload);
+    }
+    return Response.json({ status: "relayed" });
+  }
+
+  private async handleHookStatus(req: Request, url: URL): Promise<Response> {
+    const sessionId = url.searchParams.get("session");
+    if (!sessionId) return Response.json({ error: "missing session param" }, { status: 400 });
+
+    const resolved = this.appForRequest(req);
+    if (resolved.ok === false) return resolved.response;
+    const app = resolved.app;
+    const s = app.sessions.get(sessionId);
+    if (!s) return Response.json({ error: "session not found" }, { status: 404 });
+
+    const payload = (await req.json()) as Record<string, unknown>;
+    const event = String(payload.hook_event_name ?? "");
+
+    // Guard: ignore stale hook events from a previous stage's agent session.
+    const hookAgentId = payload.session_id as string | undefined;
+    if (hookAgentId && s.claude_session_id && hookAgentId !== s.claude_session_id) {
+      return Response.json({ status: "ok", mapped: "ignored_stale" });
+    }
+
+    // Guardrail evaluation for PreToolUse events
+    if (event === "PreToolUse") {
+      const toolName = String(payload.tool_name ?? "");
+      const toolInput = (payload.tool_input ?? {}) as Record<string, any>;
+      const { evaluateToolCall } = await import("../session/guardrails.js");
+      const evalResult = evaluateToolCall(toolName, toolInput);
+
+      if (evalResult.action === "block") {
+        app.events.log(sessionId, "guardrail_blocked", {
+          actor: "system",
+          data: { tool: toolName, pattern: evalResult.rule?.pattern, input: toolInput },
+        });
+      } else if (evalResult.action === "warn") {
+        app.events.log(sessionId, "guardrail_warning", {
+          actor: "system",
+          data: { tool: toolName, pattern: evalResult.rule?.pattern },
+        });
+      }
+
+      return Response.json({ status: "ok", guardrail: evalResult.action });
+    }
+
+    // Delegate business logic to session.ts
+    const result = session.applyHookStatus(app, s, event, payload);
+
+    // Apply events
+    for (const evt of result.events ?? []) {
+      app.events.log(sessionId, evt.type, evt.opts);
+    }
+
+    // Apply store updates
+    if (result.updates) {
+      app.sessions.update(sessionId, result.updates);
+    }
+
+    // Mark messages read on terminal states
+    if (result.markRead) {
+      app.messages.markRead(sessionId);
+    }
+
+    // On-failure retry loop
+    if (result.shouldRetry && result.newStatus === "failed") {
+      const retryResult = session.retryWithContext(app, sessionId, {
+        maxRetries: result.retryMaxRetries,
+      });
+      if (retryResult.ok) {
+        logInfo("conductor", `on_failure retry (hook) triggered for ${sessionId}: ${retryResult.message}`);
+        eventBus.emit("hook_status", sessionId, {
+          data: { event, status: "ready", retry: true, ...payload } as Record<string, unknown>,
+        });
+        session.dispatch(app, sessionId).catch((err) => {
+          logError("conductor", `on_failure retry dispatch (hook) failed for ${sessionId}: ${err?.message ?? err}`);
+        });
+        return Response.json({ status: "ok", mapped: "retry" });
+      }
+      logWarn("conductor", `on_failure retry (hook) exhausted for ${sessionId}: ${retryResult.message}`);
+    }
+
+    // Emit to event bus
+    if (result.newStatus) {
+      eventBus.emit("hook_status", sessionId, {
+        data: { event, status: result.newStatus, ...payload } as Record<string, unknown>,
+      });
+
+      if (result.newStatus === "completed" || result.newStatus === "failed") {
+        session.cleanupOnTerminal(app, sessionId);
+        emitStageSpanEnd(sessionId, { status: result.newStatus });
+        emitSessionSpanEnd(sessionId, { status: result.newStatus });
+        flushSpans();
+
+        try {
+          const { evaluateSession } = await import("../knowledge/evals.js");
+          const freshSession = app.sessions.get(sessionId);
+          if (freshSession) evaluateSession(app, freshSession);
+        } catch {
+          logDebug("conductor", "skip eval on error");
+        }
+      }
+    }
+
+    if (result.shouldAdvance) {
+      await session.mediateStageHandoff(app, sessionId, {
+        autoDispatch: result.shouldAutoDispatch,
+        source: "hook_status",
+      });
+    }
+
+    if (result.shouldIndex && result.indexTranscript) {
+      await safeAsync("transcript indexing", async () => {
+        indexSession(app, result.indexTranscript!.transcriptPath, result.indexTranscript!.sessionId);
+      });
+    }
+
+    if (result.newStatus) {
+      try {
+        addEntry(app, "default", "progress", `Session ${sessionId} status: ${result.newStatus}`, sessionId);
+      } catch {
+        logDebug("conductor", "skip ledger on error");
+      }
+    }
+
+    return Response.json({ status: "ok", mapped: result.newStatus ?? "no-op" });
+  }
+
+  private handleRestApi(req: Request, path: string): Response {
+    if (path === "/health") {
+      return Response.json({
+        status: "ok",
+        arkDir: this.app.config.arkDir,
+      });
+    }
+
+    const resolved = this.appForRequest(req);
+    if (resolved.ok === false) return resolved.response;
+    const app = resolved.app;
+
+    if (path === "/api/sessions") return Response.json(app.sessions.list());
+    if (path.startsWith("/api/sessions/")) {
+      const id = extractPathSegment(path, 3);
+      if (!id) return Response.json({ error: "missing session id" }, { status: 400 });
+      const s = app.sessions.get(id);
+      return s ? Response.json(s) : Response.json({ error: "not found" }, { status: 404 });
+    }
+    if (path.startsWith("/api/events/")) {
+      const id = extractPathSegment(path, 3);
+      if (!id) return Response.json({ error: "missing session id" }, { status: 400 });
+      if (!app.sessions.get(id)) return Response.json({ error: "not found" }, { status: 404 });
+      return Response.json(app.events.list(id));
+    }
+    return new Response("Not found", { status: 404 });
+  }
+
+  private async handlePRMergeWebhook(req: Request): Promise<Response> {
+    const payload = (await req.json()) as GitHubPRWebhookPayload;
+    if (payload.action !== "closed" || !payload.pull_request?.merged) {
+      return Response.json({ status: "ignored" });
+    }
+
+    const pr = payload.pull_request;
+    const repo = payload.repository;
+
+    if (!repo?.owner?.login || !repo?.name || !pr?.head?.ref || !pr?.base?.ref || !pr?.merge_commit_sha) {
+      return Response.json({ status: "incomplete_payload" }, { status: 400 });
+    }
+
+    const sessions = this.app.sessions.list();
+    const matchedSession = sessions.find((s) => {
+      return s.config?.github_url === pr.html_url || s.branch === pr.head?.ref;
+    });
+
+    if (!matchedSession) return Response.json({ status: "no_session" });
+
+    const config: RollbackConfig = this.app.rollbackConfig ?? {
+      enabled: false,
+      timeout: 600,
+      on_timeout: "ignore",
+      auto_merge: false,
+      health_url: null,
+    };
+
+    if (!config.enabled) return Response.json({ status: "rollback_disabled" });
+
+    const ghToken = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
+    const fetcher = async (sha: string) => {
+      const res = await fetch(`https://api.github.com/repos/${repo.full_name}/commits/${sha}/check-suites`, {
+        headers: { Authorization: `Bearer ${ghToken}`, Accept: "application/vnd.github+json" },
+      });
+      return res.json() as Promise<{ check_suites: import("../integrations/rollback.js").CheckSuiteResult[] }>;
+    };
+
+    const healthFetcher = config.health_url
+      ? async () => {
+          try {
+            const res = await fetch(config.health_url!);
+            return res.ok;
+          } catch {
+            return false;
+          }
+        }
+      : undefined;
+
+    const onRevert = async (revertPayload: import("../integrations/rollback.js").RevertPayload) => {
+      await fetch(`https://api.github.com/repos/${repo?.full_name}/pulls`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${ghToken}`,
+          Accept: "application/vnd.github+json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(revertPayload),
+      });
+    };
+
+    watchMergedPR(this.app, {
+      sessionId: matchedSession.id,
+      sha: pr.merge_commit_sha,
+      owner: repo.owner.login,
+      repo: repo.name,
+      prNumber: pr.number,
+      prTitle: pr.title,
+      branch: pr.head.ref,
+      baseBranch: pr.base.ref,
+      config,
+      fetcher,
+      healthFetcher,
+      onRevert,
+      onStop: async (id) => {
+        await session.stop(this.app, id);
+      },
+    }).catch((e) => logError("conductor", `rollback watcher error: ${e}`));
+
+    return Response.json({ status: "watching" });
+  }
+
+  // ── Worker management handlers ───────────────────────────────────────────
+
+  private async handleWorkerRegister(req: Request): Promise<Response> {
+    try {
+      const registry = this.app.workerRegistry;
+      const body = (await req.json()) as {
+        id: string;
+        url: string;
+        capacity?: number;
+        compute_name?: string;
+        tenant_id?: string;
+        metadata?: Record<string, unknown>;
+      };
+      if (!body.id || !body.url) {
+        return Response.json({ error: "id and url are required" }, { status: 400 });
+      }
+      registry.register({
+        id: body.id,
+        url: body.url,
+        capacity: body.capacity ?? 5,
+        compute_name: body.compute_name ?? null,
+        tenant_id: body.tenant_id ?? null,
+        metadata: body.metadata ?? {},
+      });
+      logInfo("conductor", `Worker registered: ${body.id} (${body.url})`);
+      return Response.json({ status: "registered", id: body.id });
+    } catch (e: any) {
+      if (e.message?.includes("hosted mode only")) {
+        return Response.json({ error: "Worker registry not available (not running in hosted mode)" }, { status: 503 });
+      }
+      throw e;
+    }
+  }
+
+  private async handleWorkerHeartbeat(req: Request): Promise<Response> {
+    try {
+      const body = (await req.json()) as { id: string };
+      if (!body.id) {
+        return Response.json({ error: "id is required" }, { status: 400 });
+      }
+      this.app.workerRegistry.heartbeat(body.id);
+      return Response.json({ status: "ok" });
+    } catch (e: any) {
+      if (e.message?.includes("hosted mode only")) {
+        return Response.json({ error: "Worker registry not available" }, { status: 503 });
+      }
+      throw e;
+    }
+  }
+
+  private async handleWorkerDeregister(req: Request): Promise<Response> {
+    try {
+      const body = (await req.json()) as { id: string };
+      if (!body.id) {
+        return Response.json({ error: "id is required" }, { status: 400 });
+      }
+      this.app.workerRegistry.deregister(body.id);
+      logInfo("conductor", `Worker deregistered: ${body.id}`);
+      return Response.json({ status: "deregistered" });
+    } catch (e: any) {
+      if (e.message?.includes("hosted mode only")) {
+        return Response.json({ error: "Worker registry not available" }, { status: 503 });
+      }
+      throw e;
+    }
+  }
+
+  private handleWorkerList(): Response {
+    try {
+      const workers = this.app.workerRegistry.list();
+      return Response.json(workers);
+    } catch (e: any) {
+      if (e.message?.includes("hosted mode only")) {
+        return Response.json({ error: "Worker registry not available" }, { status: 503 });
+      }
+      throw e;
+    }
+  }
+
+  // ── Tenant policy handlers ───────────────────────────────────────────────
+
+  private handleTenantPolicyGet(tenantId: string): Response {
+    try {
+      const pm = this.app.tenantPolicyManager;
+      if (!pm)
+        return Response.json(
+          { error: "Tenant policy manager not available (not running in hosted mode)" },
+          { status: 503 },
+        );
+      const policy = pm.getPolicy(tenantId);
+      if (!policy) return Response.json({ error: "policy not found" }, { status: 404 });
+      return Response.json(policy);
+    } catch (e: any) {
+      return Response.json({ error: String(e) }, { status: 500 });
+    }
+  }
+
+  private async handleTenantPolicySet(req: Request, tenantId: string): Promise<Response> {
+    try {
+      const pm = this.app.tenantPolicyManager;
+      if (!pm)
+        return Response.json(
+          { error: "Tenant policy manager not available (not running in hosted mode)" },
+          { status: 503 },
+        );
+      const body = (await req.json()) as Record<string, unknown>;
+      pm.setPolicy({
+        tenant_id: tenantId,
+        allowed_providers: (body.allowed_providers as string[]) ?? [],
+        default_provider: (body.default_provider as string) ?? "k8s",
+        max_concurrent_sessions: (body.max_concurrent_sessions as number) ?? 10,
+        max_cost_per_day_usd: (body.max_cost_per_day_usd as number | null) ?? null,
+        compute_pools: (body.compute_pools as Array<{ pool_id: string; weight?: number }>) ?? [],
+      });
+      logInfo("conductor", `Tenant policy set for: ${tenantId}`);
+      return Response.json({ status: "ok", tenant_id: tenantId });
+    } catch (e: any) {
+      return Response.json({ error: String(e) }, { status: 500 });
+    }
+  }
+
+  private handleTenantPolicyDelete(tenantId: string): Response {
+    try {
+      const pm = this.app.tenantPolicyManager;
+      if (!pm)
+        return Response.json(
+          { error: "Tenant policy manager not available (not running in hosted mode)" },
+          { status: 503 },
+        );
+      const deleted = pm.deletePolicy(tenantId);
+      if (!deleted) return Response.json({ error: "policy not found" }, { status: 404 });
+      logInfo("conductor", `Tenant policy deleted for: ${tenantId}`);
+      return Response.json({ status: "deleted", tenant_id: tenantId });
+    } catch (e: any) {
+      return Response.json({ error: String(e) }, { status: 500 });
+    }
+  }
+
+  private handleTenantPolicyList(): Response {
+    try {
+      const pm = this.app.tenantPolicyManager;
+      if (!pm)
+        return Response.json(
+          { error: "Tenant policy manager not available (not running in hosted mode)" },
+          { status: 503 },
+        );
+      return Response.json(pm.listPolicies());
+    } catch (e: any) {
+      return Response.json({ error: String(e) }, { status: 500 });
+    }
+  }
+
+  // ── LLM proxy ────────────────────────────────────────────────────────────
+
+  /**
+   * Proxy an HTTP request to the LLM router, streaming the response back.
+   * Used for the arkd -> conductor -> router proxy chain.
+   */
+  private async proxyToRouter(req: Request, path: string): Promise<Response> {
+    const routerUrl = this.app.config.router?.url ?? DEFAULT_ROUTER_URL;
+    try {
+      const headers: Record<string, string> = {};
+      for (const key of ["content-type", "authorization", "accept"]) {
+        const val = req.headers.get(key);
+        if (val) headers[key] = val;
+      }
+      const init: RequestInit = { method: req.method, headers };
+      if (req.method === "POST") init.body = req.body;
+      const upstream = await fetch(`${routerUrl}${path}`, init);
+      return new Response(upstream.body, {
+        status: upstream.status,
+        headers: {
+          "Content-Type": upstream.headers.get("content-type") ?? "application/json",
+        },
+      });
+    } catch (e: any) {
+      return Response.json({ error: `router proxy failed: ${e?.message ?? e}` }, { status: 502 });
+    }
+  }
+
+  // ── Stuck session recovery ───────────────────────────────────────────────
+
+  /**
+   * Recover sessions stuck in "running" status whose agent process has exited.
+   *
+   * This handles the case where:
+   * 1. Agent called report(completed) but arkd/conductor was down -- report lost
+   * 2. Status poller missed the exit (e.g. poller was stopped or conductor restarted)
+   * 3. Hook status (SessionEnd) was never delivered
+   */
+  private async recoverStuckSessions(): Promise<void> {
+    await recoverStuckSessions(this.app);
+  }
 }
+
+// ── Public entry points (thin wrappers over the Conductor class) ───────────
 
 /**
- * Return a tenant-scoped AppContext view for this request, or a Response
- * the caller should return directly on rejection.
+ * Start the conductor HTTP server. Returns a handle with a `stop()` method.
+ *
+ * Prefer instantiating `Conductor` directly when you need access to the
+ * running instance; this thin wrapper exists for the launcher + tests that
+ * only need the stop handle.
  */
-function appForRequest(req: Request): { ok: true; app: AppContext } | { ok: false; response: Response } {
-  const r = resolveTenant(req);
-  if (!r.ok) {
-    return { ok: false, response: Response.json({ error: r.error }, { status: r.status }) };
-  }
-  return { ok: true, app: _app.forTenant(r.tenantId) };
-}
-
-// ── Route handlers ──────────────────────────────────────────────────────────
-
-async function handleChannelReport(req: Request, sessionId: string): Promise<Response> {
-  const resolved = appForRequest(req);
-  if (!resolved.ok) return resolved.response;
-  const report = (await req.json()) as OutboundMessage;
-  await handleReport(resolved.app, sessionId, report);
-  return Response.json({ status: "ok" });
-}
-
-async function handleAgentRelay(req: Request): Promise<Response> {
-  const resolved = appForRequest(req);
-  if (!resolved.ok) return resolved.response;
-  const { from, target, message } = (await req.json()) as {
-    from: string;
-    target: string;
-    message: string;
-  };
-  const scoped = resolved.app;
-  const targetSession = scoped.sessions.get(target);
-  if (targetSession) {
-    const channelPort = scoped.sessions.channelPort(target);
-    const payload = { type: "steer", message, from, sessionId: target };
-    await deliverToChannel(targetSession as Session, channelPort, payload);
-  }
-  return Response.json({ status: "relayed" });
-}
-
-async function handleHookStatus(req: Request, url: URL): Promise<Response> {
-  const sessionId = url.searchParams.get("session");
-  if (!sessionId) return Response.json({ error: "missing session param" }, { status: 400 });
-
-  const resolved = appForRequest(req);
-  if (!resolved.ok) return resolved.response;
-  const app = resolved.app;
-  const s = app.sessions.get(sessionId);
-  if (!s) return Response.json({ error: "session not found" }, { status: 404 });
-
-  const payload = (await req.json()) as Record<string, unknown>;
-  const event = String(payload.hook_event_name ?? "");
-
-  // Guard: ignore stale hook events from a previous stage's agent session.
-  // After stage handoff, the old agent process sends SessionEnd/Stop, but
-  // the Ark session is already running a new agent. Match the agent session
-  // ID in the payload against the session's current session_id to filter stale events.
-  const hookAgentId = payload.session_id as string | undefined;
-  if (hookAgentId && s.claude_session_id && hookAgentId !== s.claude_session_id) {
-    return Response.json({ status: "ok", mapped: "ignored_stale" });
-  }
-
-  // Guardrail evaluation for PreToolUse events
-  if (event === "PreToolUse") {
-    const toolName = String(payload.tool_name ?? "");
-    const toolInput = (payload.tool_input ?? {}) as Record<string, any>;
-    const { evaluateToolCall } = await import("../session/guardrails.js");
-    const evalResult = evaluateToolCall(toolName, toolInput);
-
-    if (evalResult.action === "block") {
-      app.events.log(sessionId, "guardrail_blocked", {
-        actor: "system",
-        data: { tool: toolName, pattern: evalResult.rule?.pattern, input: toolInput },
-      });
-    } else if (evalResult.action === "warn") {
-      app.events.log(sessionId, "guardrail_warning", {
-        actor: "system",
-        data: { tool: toolName, pattern: evalResult.rule?.pattern },
-      });
-    }
-
-    return Response.json({ status: "ok", guardrail: evalResult.action });
-  }
-
-  // Delegate business logic to session.ts
-  const result = session.applyHookStatus(app, s, event, payload);
-
-  // Apply events
-  for (const evt of result.events ?? []) {
-    app.events.log(sessionId, evt.type, evt.opts);
-  }
-
-  // Apply store updates
-  if (result.updates) {
-    app.sessions.update(sessionId, result.updates);
-  }
-
-  // Mark messages read on terminal states
-  if (result.markRead) {
-    app.messages.markRead(sessionId);
-  }
-
-  // On-failure retry loop: if the stage has on_failure: "retry(N)", attempt retry + re-dispatch
-  if (result.shouldRetry && result.newStatus === "failed") {
-    const retryResult = session.retryWithContext(app, sessionId, {
-      maxRetries: result.retryMaxRetries,
-    });
-    if (retryResult.ok) {
-      logInfo("conductor", `on_failure retry (hook) triggered for ${sessionId}: ${retryResult.message}`);
-      eventBus.emit("hook_status", sessionId, {
-        data: { event, status: "ready", retry: true, ...payload } as Record<string, unknown>,
-      });
-      // fire-and-forget: HTTP response confirms retry was initiated, not completed
-      session.dispatch(app, sessionId).catch((err) => {
-        logError("conductor", `on_failure retry dispatch (hook) failed for ${sessionId}: ${err?.message ?? err}`);
-      });
-      return Response.json({ status: "ok", mapped: "retry" });
-    }
-    // Max retries exhausted -- fall through to normal failure handling
-    logWarn("conductor", `on_failure retry (hook) exhausted for ${sessionId}: ${retryResult.message}`);
-  }
-
-  // Emit to event bus
-  if (result.newStatus) {
-    eventBus.emit("hook_status", sessionId, {
-      data: { event, status: result.newStatus, ...payload } as Record<string, unknown>,
-    });
-
-    // Clean up provider resources on terminal states (stop container, remove worktree, etc.)
-    if (result.newStatus === "completed" || result.newStatus === "failed") {
-      session.cleanupOnTerminal(app, sessionId);
-      // Close OTLP spans for terminal states
-      emitStageSpanEnd(sessionId, { status: result.newStatus });
-      emitSessionSpanEnd(sessionId, { status: result.newStatus });
-      flushSpans();
-      // OS notification is handled by handleReport to avoid duplicates
-
-      // Record eval in knowledge graph
-      try {
-        const { evaluateSession } = await import("../knowledge/evals.js");
-        const freshSession = app.sessions.get(sessionId);
-        if (freshSession) evaluateSession(app, freshSession);
-      } catch {
-        logDebug("conductor", "skip eval on error");
-      }
-    }
-  }
-
-  // Auto-advance for SessionEnd fallback on auto-gate sessions
-  if (result.shouldAdvance) {
-    await session.mediateStageHandoff(app, sessionId, {
-      autoDispatch: result.shouldAutoDispatch,
-      source: "hook_status",
-    });
-  }
-
-  // Index transcript
-  if (result.shouldIndex && result.indexTranscript) {
-    await safeAsync("transcript indexing", async () => {
-      indexSession(app, result.indexTranscript!.transcriptPath, result.indexTranscript!.sessionId);
-    });
-  }
-
-  // Track progress in conductor ledger
-  if (result.newStatus) {
-    try {
-      addEntry(app, "default", "progress", `Session ${sessionId} status: ${result.newStatus}`, sessionId);
-    } catch {
-      logDebug("conductor", "skip ledger on error");
-    }
-  }
-
-  return Response.json({ status: "ok", mapped: result.newStatus ?? "no-op" });
-}
-
-function handleRestApi(req: Request, path: string): Response {
-  // `/health` does not require authentication (used by load balancers /
-  // process supervisors). It also does not expose tenant data -- return
-  // only a minimal status payload.
-  if (path === "/health") {
-    return Response.json({
-      status: "ok",
-      arkDir: _app.config.arkDir,
-    });
-  }
-
-  // All data-returning endpoints must run through the same tenant
-  // resolution as JSON-RPC. P1-2 fix: previously `_app.sessions.list()`
-  // returned ALL sessions regardless of who asked.
-  const resolved = appForRequest(req);
-  if (!resolved.ok) return resolved.response;
-  const app = resolved.app;
-
-  if (path === "/api/sessions") return Response.json(app.sessions.list());
-  if (path.startsWith("/api/sessions/")) {
-    const id = extractPathSegment(path, 3);
-    if (!id) return Response.json({ error: "missing session id" }, { status: 400 });
-    const s = app.sessions.get(id);
-    return s ? Response.json(s) : Response.json({ error: "not found" }, { status: 404 });
-  }
-  if (path.startsWith("/api/events/")) {
-    const id = extractPathSegment(path, 3);
-    if (!id) return Response.json({ error: "missing session id" }, { status: 400 });
-    // Scope events by ensuring the session is visible to this tenant.
-    if (!app.sessions.get(id)) return Response.json({ error: "not found" }, { status: 404 });
-    return Response.json(app.events.list(id));
-  }
-  return new Response("Not found", { status: 404 });
-}
-
-/** GitHub PR merge webhook payload (subset of fields we use). */
-interface GitHubPRWebhookPayload {
-  action?: string;
-  pull_request?: {
-    merged?: boolean;
-    html_url?: string;
-    merge_commit_sha?: string;
-    number?: number;
-    title?: string;
-    head?: { ref?: string };
-    base?: { ref?: string };
-  };
-  repository?: {
-    full_name?: string;
-    name?: string;
-    owner?: { login?: string };
-  };
-}
-
-async function handlePRMergeWebhook(req: Request): Promise<Response> {
-  const payload = (await req.json()) as GitHubPRWebhookPayload;
-  if (payload.action !== "closed" || !payload.pull_request?.merged) {
-    return Response.json({ status: "ignored" });
-  }
-
-  const pr = payload.pull_request;
-  const repo = payload.repository;
-
-  // Guard against incomplete webhook payloads
-  if (!repo?.owner?.login || !repo?.name || !pr?.head?.ref || !pr?.base?.ref || !pr?.merge_commit_sha) {
-    return Response.json({ status: "incomplete_payload" }, { status: 400 });
-  }
-
-  // Find Ark session by branch or PR URL
-  const sessions = _app.sessions.list();
-  const matchedSession = sessions.find((s) => {
-    return s.config?.github_url === pr.html_url || s.branch === pr.head?.ref;
-  });
-
-  if (!matchedSession) return Response.json({ status: "no_session" });
-
-  const config: RollbackConfig = _app.rollbackConfig ?? {
-    enabled: false,
-    timeout: 600,
-    on_timeout: "ignore",
-    auto_merge: false,
-    health_url: null,
-  };
-
-  if (!config.enabled) return Response.json({ status: "rollback_disabled" });
-
-  const ghToken = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
-  const fetcher = async (sha: string) => {
-    const res = await fetch(`https://api.github.com/repos/${repo.full_name}/commits/${sha}/check-suites`, {
-      headers: { Authorization: `Bearer ${ghToken}`, Accept: "application/vnd.github+json" },
-    });
-    return res.json() as Promise<{ check_suites: import("./rollback.js").CheckSuiteResult[] }>;
-  };
-
-  const healthFetcher = config.health_url
-    ? async () => {
-        try {
-          const res = await fetch(config.health_url!);
-          return res.ok;
-        } catch {
-          return false;
-        }
-      }
-    : undefined;
-
-  const onRevert = async (revertPayload: import("./rollback.js").RevertPayload) => {
-    await fetch(`https://api.github.com/repos/${repo?.full_name}/pulls`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${ghToken}`,
-        Accept: "application/vnd.github+json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(revertPayload),
-    });
-  };
-
-  // fire-and-forget: long-running rollback watcher, errors logged via .catch()
-  watchMergedPR(_app, {
-    sessionId: matchedSession.id,
-    sha: pr.merge_commit_sha,
-    owner: repo.owner.login,
-    repo: repo.name,
-    prNumber: pr.number,
-    prTitle: pr.title,
-    branch: pr.head.ref,
-    baseBranch: pr.base.ref,
-    config,
-    fetcher,
-    healthFetcher,
-    onRevert,
-    onStop: async (id) => {
-      await session.stop(_app, id);
-    },
-  }).catch((e) => logError("conductor", `rollback watcher error: ${e}`));
-
-  return Response.json({ status: "watching" });
-}
-
-// ── Server ──────────────────────────────────────────────────────────────────
-
-export function startConductor(
-  app: AppContext,
-  port = DEFAULT_PORT,
-  opts?: {
-    quiet?: boolean;
-    issueLabel?: string;
-    issueAutoDispatch?: boolean;
-  },
-): { stop(): void } {
-  _app = app;
-  const server = Bun.serve({
-    port,
-    hostname: DEFAULT_CONDUCTOR_HOST,
-    async fetch(req) {
-      const url = new URL(req.url);
-      const path = url.pathname;
-
-      try {
-        if (req.method === "POST" && path.startsWith("/api/channel/")) {
-          const sessionId = extractPathSegment(path, 3);
-          if (!sessionId) return Response.json({ error: "missing session id" }, { status: 400 });
-          return handleChannelReport(req, sessionId);
-        }
-
-        if (req.method === "POST" && path === "/api/relay") {
-          return handleAgentRelay(req);
-        }
-
-        if (req.method === "POST" && path === "/hooks/status") {
-          return handleHookStatus(req, url);
-        }
-
-        if (req.method === "POST" && path === "/hooks/github/merge") {
-          return handlePRMergeWebhook(req);
-        }
-
-        // ── Worker management (hosted control plane) ──────────────────
-        if (req.method === "POST" && path === "/api/workers/register") {
-          return handleWorkerRegister(req);
-        }
-        if (req.method === "POST" && path === "/api/workers/heartbeat") {
-          return handleWorkerHeartbeat(req);
-        }
-        if (req.method === "POST" && path === "/api/workers/deregister") {
-          return handleWorkerDeregister(req);
-        }
-        if (req.method === "GET" && path === "/api/workers") {
-          return handleWorkerList(req);
-        }
-
-        // ── Tenant policy management (hosted control plane) ────────────
-        if (path.startsWith("/api/tenant/polic")) {
-          if (req.method === "GET" && path === "/api/tenant/policies") {
-            return handleTenantPolicyList();
-          }
-          if (path.startsWith("/api/tenant/policy/")) {
-            const tenantId = extractPathSegment(path, 4);
-            if (!tenantId) return Response.json({ error: "missing tenant id" }, { status: 400 });
-            if (req.method === "GET") return handleTenantPolicyGet(tenantId);
-            if (req.method === "PUT") return handleTenantPolicySet(req, tenantId);
-            if (req.method === "DELETE") return handleTenantPolicyDelete(tenantId);
-          }
-        }
-
-        // ── LLM proxy: forward to router ──────────────────────────
-        if (req.method === "POST" && path === "/v1/chat/completions") {
-          return proxyToRouter(req, "/v1/chat/completions");
-        }
-        if (req.method === "GET" && path === "/v1/models") {
-          return proxyToRouter(req, "/v1/models");
-        }
-
-        if (req.method === "GET") {
-          return handleRestApi(req, path);
-        }
-
-        return new Response("Not found", { status: 404 });
-      } catch (e) {
-        return Response.json({ error: String(e) }, { status: 500 });
-      }
-    },
-  });
-
-  if (!opts?.quiet) logInfo("conductor", `Ark conductor listening on localhost:${port}`);
-
-  // Schedule poller -- check every 60 seconds
-  const scheduleTimer = setInterval(
-    () =>
-      safeAsync("schedule polling", async () => {
-        const schedules = listSchedules(app).filter((s) => s.enabled);
-        const now = new Date();
-        for (const sched of schedules) {
-          if (!cronMatches(sched.cron, now)) continue;
-          // Skip if already ran this minute
-          if (sched.last_run) {
-            const lastRun = new Date(sched.last_run);
-            if (
-              lastRun.getMinutes() === now.getMinutes() &&
-              lastRun.getHours() === now.getHours() &&
-              lastRun.getDate() === now.getDate()
-            )
-              continue;
-          }
-          await safeAsync(`scheduled dispatch for ${sched.id}`, async () => {
-            const s = session.startSession(_app, {
-              summary: sched.summary ?? `Scheduled: ${sched.id}`,
-              repo: sched.repo ?? undefined,
-              workdir: sched.workdir ?? undefined,
-              flow: sched.flow,
-              compute_name: sched.compute_name ?? undefined,
-              group_name: sched.group_name ?? undefined,
-            });
-            await session.dispatch(_app, s.id);
-            updateScheduleLastRun(app, sched.id);
-            _app.events.log(s.id, "scheduled_dispatch", {
-              actor: "scheduler",
-              data: { schedule_id: sched.id, cron: sched.cron },
-            });
-          });
-        }
-      }),
-    POLL_INTERVAL_MS,
-  );
-
-  // PR review poller - check every 60 seconds
-  const prTimer = setInterval(() => safeAsync("PR review polling", () => pollPRReviews(app)), POLL_INTERVAL_MS);
-
-  // PR merge poller - check every 30 seconds (blocks flow completion, needs faster checks)
-  const MERGE_POLL_INTERVAL_MS = 30_000;
-  const mergeTimer = setInterval(() => safeAsync("PR merge polling", () => pollPRMerges(app)), MERGE_POLL_INTERVAL_MS);
-
-  // Issue poller - only start if a label is configured
-  let issueTimer: ReturnType<typeof setInterval> | null = null;
-  if (opts?.issueLabel) {
-    const issueOpts = { label: opts.issueLabel, autoDispatch: opts.issueAutoDispatch };
-    // Run immediately on start
-    safeAsync("issue polling: initial", () => pollIssues(app, issueOpts));
-    issueTimer = setInterval(() => safeAsync("issue polling", () => pollIssues(app, issueOpts)), POLL_INTERVAL_MS);
-  }
-
-  // Stuck session recovery -- check every 60 seconds for sessions stuck in
-  // "running" status whose agent process has exited. This handles the case
-  // where the channel report was lost (arkd/conductor was down when agent reported).
-  const STUCK_POLL_INTERVAL_MS = 60_000;
-  const stuckTimer = setInterval(
-    () => safeAsync("stuck session recovery", () => recoverStuckSessions(app)),
-    STUCK_POLL_INTERVAL_MS,
-  );
-  // Run immediately on start to catch sessions stuck before conductor (re)start
-  safeAsync("stuck session recovery: initial", () => recoverStuckSessions(app));
-
-  return {
-    stop() {
-      clearInterval(scheduleTimer);
-      clearInterval(prTimer);
-      clearInterval(mergeTimer);
-      clearInterval(stuckTimer);
-      if (issueTimer) clearInterval(issueTimer);
-      server.stop();
-    },
-  };
+export function startConductor(app: AppContext, port = DEFAULT_PORT, opts?: ConductorOptions): ConductorHandle {
+  const c = new Conductor(app, port, opts);
+  return c.start();
 }
 
 /**
  * Deliver a message to a session's channel, using arkd if available.
  * Falls back to direct HTTP to the channel port for local sessions.
  *
- * Uses the module-level `_app` for compute lookup. In multi-tenant mode,
- * compute records are tenant-scoped and the caller is responsible for
- * passing sessions from a correctly scoped AppContext; compute lookup here
- * intentionally uses the root `_app` since compute names are typically
- * scoped identically.
+ * The caller passes the AppContext explicitly -- there is no module-level
+ * singleton. For tenant-scoped sessions the caller can pre-scope the app.
  */
 export async function deliverToChannel(
+  app: AppContext,
   targetSession: Session,
   channelPort: number,
   payload: Record<string, unknown>,
 ): Promise<void> {
   // Try arkd delivery first (works for both local and remote)
   const computeName = targetSession.compute_name || "local";
-  const tenantApp = targetSession.tenant_id ? _app.forTenant(targetSession.tenant_id) : _app;
+  const tenantApp = targetSession.tenant_id ? app.forTenant(targetSession.tenant_id) : app;
   const compute = tenantApp.computes.get(computeName);
   const provider = compute ? getProvider(compute.provider) : null;
   if (provider?.getArkdUrl) {
@@ -647,218 +823,48 @@ export async function deliverToChannel(
   }
 }
 
-// ── Worker management handlers ──────────────────────────────────────────────
+// ── GitHub PR webhook payload type ──────────────────────────────────────────
 
-async function handleWorkerRegister(req: Request): Promise<Response> {
-  try {
-    const registry = _app.workerRegistry;
-    const body = (await req.json()) as {
-      id: string;
-      url: string;
-      capacity?: number;
-      compute_name?: string;
-      tenant_id?: string;
-      metadata?: Record<string, unknown>;
-    };
-    if (!body.id || !body.url) {
-      return Response.json({ error: "id and url are required" }, { status: 400 });
-    }
-    registry.register({
-      id: body.id,
-      url: body.url,
-      capacity: body.capacity ?? 5,
-      compute_name: body.compute_name ?? null,
-      tenant_id: body.tenant_id ?? null,
-      metadata: body.metadata ?? {},
-    });
-    logInfo("conductor", `Worker registered: ${body.id} (${body.url})`);
-    return Response.json({ status: "registered", id: body.id });
-  } catch (e: any) {
-    if (e.message?.includes("hosted mode only")) {
-      return Response.json({ error: "Worker registry not available (not running in hosted mode)" }, { status: 503 });
-    }
-    throw e;
-  }
+/** GitHub PR merge webhook payload (subset of fields we use). */
+interface GitHubPRWebhookPayload {
+  action?: string;
+  pull_request?: {
+    merged?: boolean;
+    html_url?: string;
+    merge_commit_sha?: string;
+    number?: number;
+    title?: string;
+    head?: { ref?: string };
+    base?: { ref?: string };
+  };
+  repository?: {
+    full_name?: string;
+    name?: string;
+    owner?: { login?: string };
+  };
 }
 
-async function handleWorkerHeartbeat(req: Request): Promise<Response> {
-  try {
-    const body = (await req.json()) as { id: string };
-    if (!body.id) {
-      return Response.json({ error: "id is required" }, { status: 400 });
-    }
-    _app.workerRegistry.heartbeat(body.id);
-    return Response.json({ status: "ok" });
-  } catch (e: any) {
-    if (e.message?.includes("hosted mode only")) {
-      return Response.json({ error: "Worker registry not available" }, { status: 503 });
-    }
-    throw e;
-  }
-}
-
-async function handleWorkerDeregister(req: Request): Promise<Response> {
-  try {
-    const body = (await req.json()) as { id: string };
-    if (!body.id) {
-      return Response.json({ error: "id is required" }, { status: 400 });
-    }
-    _app.workerRegistry.deregister(body.id);
-    logInfo("conductor", `Worker deregistered: ${body.id}`);
-    return Response.json({ status: "deregistered" });
-  } catch (e: any) {
-    if (e.message?.includes("hosted mode only")) {
-      return Response.json({ error: "Worker registry not available" }, { status: 503 });
-    }
-    throw e;
-  }
-}
-
-function handleWorkerList(_req: Request): Response {
-  try {
-    const workers = _app.workerRegistry.list();
-    return Response.json(workers);
-  } catch (e: any) {
-    if (e.message?.includes("hosted mode only")) {
-      return Response.json({ error: "Worker registry not available" }, { status: 503 });
-    }
-    throw e;
-  }
-}
-
-// ── Tenant policy handlers ─────────────────────────────────────────────────
-
-function handleTenantPolicyGet(tenantId: string): Response {
-  try {
-    const pm = _app.tenantPolicyManager;
-    if (!pm)
-      return Response.json(
-        { error: "Tenant policy manager not available (not running in hosted mode)" },
-        { status: 503 },
-      );
-    const policy = pm.getPolicy(tenantId);
-    if (!policy) return Response.json({ error: "policy not found" }, { status: 404 });
-    return Response.json(policy);
-  } catch (e: any) {
-    return Response.json({ error: String(e) }, { status: 500 });
-  }
-}
-
-async function handleTenantPolicySet(req: Request, tenantId: string): Promise<Response> {
-  try {
-    const pm = _app.tenantPolicyManager;
-    if (!pm)
-      return Response.json(
-        { error: "Tenant policy manager not available (not running in hosted mode)" },
-        { status: 503 },
-      );
-    const body = (await req.json()) as Record<string, unknown>;
-    pm.setPolicy({
-      tenant_id: tenantId,
-      allowed_providers: (body.allowed_providers as string[]) ?? [],
-      default_provider: (body.default_provider as string) ?? "k8s",
-      max_concurrent_sessions: (body.max_concurrent_sessions as number) ?? 10,
-      max_cost_per_day_usd: (body.max_cost_per_day_usd as number | null) ?? null,
-      compute_pools: (body.compute_pools as Array<{ pool_id: string; weight?: number }>) ?? [],
-    });
-    logInfo("conductor", `Tenant policy set for: ${tenantId}`);
-    return Response.json({ status: "ok", tenant_id: tenantId });
-  } catch (e: any) {
-    return Response.json({ error: String(e) }, { status: 500 });
-  }
-}
-
-function handleTenantPolicyDelete(tenantId: string): Response {
-  try {
-    const pm = _app.tenantPolicyManager;
-    if (!pm)
-      return Response.json(
-        { error: "Tenant policy manager not available (not running in hosted mode)" },
-        { status: 503 },
-      );
-    const deleted = pm.deletePolicy(tenantId);
-    if (!deleted) return Response.json({ error: "policy not found" }, { status: 404 });
-    logInfo("conductor", `Tenant policy deleted for: ${tenantId}`);
-    return Response.json({ status: "deleted", tenant_id: tenantId });
-  } catch (e: any) {
-    return Response.json({ error: String(e) }, { status: 500 });
-  }
-}
-
-function handleTenantPolicyList(): Response {
-  try {
-    const pm = _app.tenantPolicyManager;
-    if (!pm)
-      return Response.json(
-        { error: "Tenant policy manager not available (not running in hosted mode)" },
-        { status: 503 },
-      );
-    return Response.json(pm.listPolicies());
-  } catch (e: any) {
-    return Response.json({ error: String(e) }, { status: 500 });
-  }
-}
-
-// ── LLM proxy ───────────────────────────────────────────────────────────────
-
-/**
- * Proxy an HTTP request to the LLM router, streaming the response back.
- * Used for the arkd -> conductor -> router proxy chain.
- */
-async function proxyToRouter(req: Request, path: string): Promise<Response> {
-  const routerUrl = _app.config.router?.url ?? DEFAULT_ROUTER_URL;
-  try {
-    const headers: Record<string, string> = {};
-    for (const key of ["content-type", "authorization", "accept"]) {
-      const val = req.headers.get(key);
-      if (val) headers[key] = val;
-    }
-    const init: RequestInit = { method: req.method, headers };
-    if (req.method === "POST") init.body = req.body;
-    const upstream = await fetch(`${routerUrl}${path}`, init);
-    return new Response(upstream.body, {
-      status: upstream.status,
-      headers: {
-        "Content-Type": upstream.headers.get("content-type") ?? "application/json",
-      },
-    });
-  } catch (e: any) {
-    return Response.json({ error: `router proxy failed: ${e?.message ?? e}` }, { status: 502 });
-  }
-}
-
-// ── Stuck session recovery ─────────────────────────────────────────────────
+// ── Stuck session recovery (module-level helper) ───────────────────────────
 
 /**
  * Recover sessions stuck in "running" status whose agent process has exited.
- *
- * This handles the case where:
- * 1. Agent called report(completed) but arkd/conductor was down -- report lost
- * 2. Status poller missed the exit (e.g. poller was stopped or conductor restarted)
- * 3. Hook status (SessionEnd) was never delivered
- *
- * For each stuck session, checks if the tmux session is still alive. If not,
- * checks for new commits and triggers advancement or marks as failed.
+ * Exported so `Conductor.recoverStuckSessions` can stay a thin wrapper.
  */
 async function recoverStuckSessions(app: AppContext): Promise<void> {
   const sessions = app.sessions.list({ status: "running" });
   for (const s of sessions) {
     if (!s.session_id) continue; // No tmux handle -- skip
 
-    // Check if the tmux session is still alive
     try {
       const client = new ArkdClient("http://localhost:19300");
       const status = await client.agentStatus({ sessionName: s.session_id });
-      if (status.running) continue; // Agent is still alive -- not stuck
+      if (status.running) continue;
     } catch {
-      // Arkd not reachable -- skip this session (can't determine status)
       continue;
     }
 
-    // Agent process has exited but session is still "running" -- recover
     logInfo("conductor", `recovering stuck session ${s.id} (agent ${s.session_id} exited)`);
 
-    // Check for new commits to determine if agent completed work
     let hasNewCommits = false;
     if (s.workdir) {
       try {
@@ -880,14 +886,13 @@ async function recoverStuckSessions(app: AppContext): Promise<void> {
           hasNewCommits = !!log;
         }
       } catch {
-        hasNewCommits = true; // Allow on git error
+        hasNewCommits = true;
       }
     } else {
-      hasNewCommits = true; // No workdir -- skip check
+      hasNewCommits = true;
     }
 
     if (hasNewCommits) {
-      // Agent completed work -- advance the flow
       app.sessions.update(s.id, { status: "ready", error: null, session_id: null });
       app.events.log(s.id, "stuck_session_recovered", {
         actor: "system",
@@ -903,7 +908,6 @@ async function recoverStuckSessions(app: AppContext): Promise<void> {
         logError("conductor", `stuck recovery advance failed for ${s.id}: ${e?.message ?? e}`);
       }
     } else {
-      // Agent exited without commits -- mark as failed
       app.sessions.update(s.id, {
         status: "failed",
         error: "Agent exited without committing any changes (recovered by conductor)",
@@ -921,30 +925,24 @@ async function recoverStuckSessions(app: AppContext): Promise<void> {
 // ── Report handling ─────────────────────────────────────────────────────────
 
 async function handleReport(app: AppContext, sessionId: string, report: OutboundMessage): Promise<void> {
-  // Delegate business logic to session.ts
   const result = session.applyReport(app, sessionId, report);
 
-  // Log events
   for (const evt of result.logEvents ?? []) {
     app.events.log(sessionId, evt.type, evt.opts);
   }
 
-  // Store message for chat view
   if (result.message) {
     app.messages.send(sessionId, result.message.role, result.message.content, result.message.type);
   }
 
-  // Emit bus events
   for (const evt of result.busEvents ?? []) {
     eventBus.emit(evt.type, evt.sessionId, evt.data);
   }
 
-  // Apply store updates
   if (Object.keys(result.updates).length > 0) {
     app.sessions.update(sessionId, result.updates);
   }
 
-  // Handle advance + auto-dispatch for completed reports via orchestrator-mediated handoff
   if (result.shouldAdvance) {
     try {
       const handoff = await session.mediateStageHandoff(app, sessionId, {
@@ -968,24 +966,20 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
     }
   }
 
-  // On-failure retry loop: if the stage has on_failure: "retry(N)", attempt retry + re-dispatch
   if (result.shouldRetry) {
     const retryResult = session.retryWithContext(app, sessionId, {
       maxRetries: result.retryMaxRetries,
     });
     if (retryResult.ok) {
       logInfo("conductor", `on_failure retry triggered for ${sessionId}: ${retryResult.message}`);
-      // fire-and-forget: HTTP response confirms retry was initiated, not completed
       session.dispatch(app, sessionId).catch((err) => {
         logError("conductor", `on_failure retry dispatch failed for ${sessionId}: ${err?.message ?? err}`);
       });
-      return; // Retry in progress -- skip failure notification
+      return;
     }
-    // Max retries exhausted -- fall through to normal failure handling
     logWarn("conductor", `on_failure retry exhausted for ${sessionId}: ${retryResult.message}`);
   }
 
-  // OS notification on stage completion or failure
   const finalSession = app.sessions.get(sessionId);
   if (finalSession && (report.type === "completed" || report.type === "error")) {
     const notifyTitle = report.type === "completed" ? "Stage completed" : "Session failed";
@@ -993,9 +987,6 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
     await sendOSNotification(`Ark: ${notifyTitle}`, notifyBody);
   }
 
-  // PR URL detection (agent-provided) -- pr_url is already persisted via
-  // result.updates (applied above) so the action stage sees it in time.
-  // Only log the pr_detected event here for observability.
   if (result.prUrl) {
     app.events.log(sessionId, "pr_detected", {
       actor: "agent",
@@ -1003,7 +994,6 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
     });
   }
 
-  // Persist structured artifacts for queryable tracking
   try {
     const r = report as unknown as Record<string, unknown>;
     if (result.prUrl) {
@@ -1023,7 +1013,6 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
     logDebug("conductor", "best-effort artifact tracking");
   }
 
-  // Index session completion in knowledge graph (best-effort)
   if (report.type === "completed" && app.knowledge) {
     try {
       const { indexSessionCompletion } = await import("../knowledge/indexer.js");
@@ -1035,11 +1024,9 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
     }
   }
 
-  // Auto-create PR on completion (when session has a git remote and no PR yet)
   if (report.type === "completed" && !result.prUrl) {
     const s = app.sessions.get(sessionId);
     if (s && !s.pr_url && s.config?.github_url && s.branch) {
-      // Check repo config for auto_pr override (defaults to true)
       const { loadRepoConfig } = await import("../repo-config.js");
       const repoConfig = s.workdir ? loadRepoConfig(s.workdir) : {};
       const autoPR = repoConfig.auto_pr !== false;
