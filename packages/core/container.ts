@@ -32,14 +32,23 @@ import type { UsageRecorder } from "./observability/usage.js";
 import type { TranscriptParserRegistry } from "./runtimes/transcript-parser.js";
 import type { PluginRegistry } from "./plugins/registry.js";
 import type { SnapshotStore } from "../compute/core/snapshot-store.js";
+import type { AppContext } from "./app.js";
 
 /**
  * The cradle -- everything resolvable from the container.
- * Constructor parameter names MUST match these keys (CLASSIC injection mode).
+ *
+ * Factories registered via `asFunction` read dependencies from this cradle.
+ * We avoid `asClass` + CLASSIC injection because `bun build --compile`
+ * minifies constructor parameter names, which breaks name-based matching.
+ * See packages/core/di/ for the actual registrations.
  */
 export interface Cradle {
   // Config
   config: ArkConfig;
+
+  // AppContext itself -- registered as a scoped value so services can
+  // resolve it without passing it through every constructor manually.
+  app: AppContext;
 
   // Database
   db: IDatabase;
@@ -86,10 +95,16 @@ export type AppContainer = AwilixContainer<Cradle>;
 
 /**
  * Create an empty container. Registrations happen during boot().
+ *
+ * Uses PROXY injection mode: factories registered via `asFunction` receive
+ * a single cradle-proxy argument and access deps via property lookup
+ * (`c.db`, `c.sessions`). Property access is string-based, so the pattern
+ * survives `bun build --compile` minification -- unlike CLASSIC mode which
+ * relies on introspecting constructor parameter names.
  */
 export function createAppContainer(): AppContainer {
   return createContainer<Cradle>({
-    injectionMode: InjectionMode.CLASSIC,
+    injectionMode: InjectionMode.PROXY,
     strict: true,
   });
 }

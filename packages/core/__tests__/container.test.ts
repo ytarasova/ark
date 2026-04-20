@@ -17,10 +17,11 @@ describe("createAppContainer()", () => {
     expect(container).not.toBeNull();
   });
 
-  it("container has CLASSIC injection mode", () => {
+  it("container has PROXY injection mode", () => {
     const container = createAppContainer();
-    // Verify injection mode by checking the container's options
-    expect(container.options.injectionMode).toBe(InjectionMode.CLASSIC);
+    // PROXY mode: factories receive a cradle-proxy arg and access deps via
+    // property lookup (survives bun build --compile minification).
+    expect(container.options.injectionMode).toBe(InjectionMode.PROXY);
   });
 
   it("container is in strict mode", () => {
