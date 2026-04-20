@@ -34,6 +34,7 @@ import {
 } from "../observability/otlp.js";
 import { removeSessionWorktree } from "./workspace-service.js";
 import { substituteVars, buildSessionVars } from "../template.js";
+import { provisionWorkspaceWorkdir } from "../workspace/provisioner.js";
 
 export type SessionOpResult = { ok: true; sessionId: string } | { ok: false; message: string };
 
@@ -75,6 +76,14 @@ export function startSession(
     workdir?: string;
     group_name?: string;
     config?: Record<string, unknown>;
+    /**
+     * Workspace id for workspace-scoped dispatch (Wave 2b). When set, the
+     * session workdir becomes a parallel multi-repo tree under
+     * `~/.ark/workspaces/<session_id>/` with an `.ark-workspace.yaml`
+     * manifest. LOCAL compute only -- remote compute targets are Wave 2b-2.
+     * When only `repo` is set, legacy single-worktree behaviour is preserved.
+     */
+    workspace_id?: string | null;
     inputs?: { files?: Record<string, string>; params?: Record<string, string> };
     attachments?: Array<{ name: string; content: string; type: string }>;
   },
@@ -92,6 +101,7 @@ export function startSession(
     flow: opts.flow ?? repoConfig.flow,
     compute_name: opts.compute_name ?? repoConfig.compute,
     group_name: groupName,
+    workspace_id: opts.workspace_id ?? null,
   };
 
   // Resolve GitHub repo URL from git remote
@@ -126,6 +136,29 @@ export function startSession(
   }
 
   const session = app.sessions.create(mergedOpts);
+
+  // Workspace-scoped dispatch (Wave 2b-1 -- LOCAL compute only). When a
+  // workspace_id is set, lay out `~/.ark/workspaces/<session_id>/` with a
+  // YAML manifest listing every repo in the workspace (`cloned: false`).
+  // First-touch `ensureRepoCloned` materialises a repo later. Legacy
+  // single-repo sessions are untouched. Errors here fail session startup
+  // loudly rather than silently falling back to a repo-only workdir.
+  if (mergedOpts.workspace_id) {
+    const ws = app.codeIntel.getWorkspace(mergedOpts.workspace_id);
+    if (!ws) {
+      throw new Error(`workspace ${mergedOpts.workspace_id} not found; cannot dispatch session ${session.id}`);
+    }
+    const primaryRepoId =
+      opts.repo && ws
+        ? (app.codeIntel
+            .listReposInWorkspace(ws.tenant_id, ws.id)
+            .find((r) => r.name === opts.repo || r.local_path === opts.repo || r.repo_url === opts.repo)?.id ?? null)
+        : null;
+    const wsWorkdir = provisionWorkspaceWorkdir(app, session, ws, { primaryRepoId });
+    app.sessions.update(session.id, { workdir: wsWorkdir });
+    (session as { workdir: string | null }).workdir = wsWorkdir;
+  }
+
   // Broadcast lifecycle hook so the service layer can react (the default
   // listener kicks a background dispatch).
   app.sessionService.emitSessionCreated(session.id);

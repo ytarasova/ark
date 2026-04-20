@@ -13,6 +13,7 @@
 import type { IDatabase } from "../database/index.js";
 import * as migration001 from "./migrations/001_initial_schema.js";
 import * as migration002 from "./migrations/002_workspaces.js";
+import * as migration003 from "./migrations/003_platform_docs.js";
 import { TABLE as MIGRATIONS_TABLE } from "./schema/schema-migrations.js";
 
 export interface Migration {
@@ -24,6 +25,7 @@ export interface Migration {
 const MIGRATIONS: ReadonlyArray<Migration> = [
   { version: migration001.VERSION, name: migration001.NAME, up: migration001.up },
   { version: migration002.VERSION, name: migration002.NAME, up: migration002.up },
+  { version: migration003.VERSION, name: migration003.NAME, up: migration003.up },
 ];
 
 export interface MigrationRunnerOptions {
@@ -102,6 +104,8 @@ export class MigrationRunner {
   /** Drop every code-intel table. Dev-only; exposed by `ark code-intel db reset`. */
   reset(): void {
     const tables = [
+      "code_intel_platform_doc_versions",
+      "code_intel_platform_docs",
       "code_intel_file_hotspots",
       "code_intel_contributions",
       "code_intel_people",

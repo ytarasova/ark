@@ -2,6 +2,7 @@ import chalk from "chalk";
 import { resolve } from "path";
 import { existsSync, statSync } from "fs";
 import { startSession, dispatch, waitForCompletion } from "../core/services/session-orchestration.js";
+import { DEFAULT_TENANT_ID } from "../core/code-intel/constants.js";
 import type { AppContext } from "../core/app.js";
 
 export interface ExecOpts {
@@ -18,6 +19,13 @@ export interface ExecOpts {
   inputs?: string[];
   /** key=value pairs. */
   params?: string[];
+  /**
+   * Workspace slug for workspace-scoped dispatch. Resolves via
+   * `CodeIntelStore.getWorkspaceBySlug`. When set with `--repo`, the repo
+   * becomes the primary entry-point and the session still gets a
+   * multi-repo workdir. Wave 2b-1 supports LOCAL compute only.
+   */
+  workspace?: string;
 }
 
 export function parsePair(pair: string, flag: string): [string, string] {
@@ -59,13 +67,38 @@ export async function execSession(app: AppContext, opts: ExecOpts): Promise<numb
   const output = opts.output ?? "text";
   const log = output === "text" ? (msg: string) => process.stderr.write(chalk.dim(msg) + "\n") : () => {};
 
-  // Resolve repo
+  // Resolve workspace (Wave 2b-1). Tenant defaults to the caller's default
+  // when not otherwise scoped. Resolution fails loudly so the operator
+  // knows the slug was wrong before a session row is created.
+  let workspace_id: string | null = null;
+  if (opts.workspace) {
+    const tenantSlug = app.config.authSection.defaultTenant;
+    let tenantId = DEFAULT_TENANT_ID;
+    if (tenantSlug) {
+      const t = app.codeIntel.getTenantBySlug(tenantSlug);
+      if (t) tenantId = t.id;
+    }
+    const ws = app.codeIntel.getWorkspaceBySlug(tenantId, opts.workspace);
+    if (!ws) {
+      console.error(chalk.red(`Workspace '${opts.workspace}' not found in tenant '${tenantSlug ?? "default"}'.`));
+      return 1;
+    }
+    workspace_id = ws.id;
+  }
+
+  // Resolve repo. When `--workspace` is passed alone (no --repo), we skip
+  // the repo-dir resolution entirely -- the session's workdir will be the
+  // multi-repo workspace tree. Otherwise preserve legacy semantics:
+  // absolute repo path becomes the workdir.
   let workdir: string | undefined;
-  let repo = opts.repo ?? ".";
-  const rp = resolve(repo);
-  if (existsSync(rp)) {
-    workdir = rp;
-    if (repo === "." || repo === "./") repo = rp;
+  let repo: string | undefined = opts.repo;
+  if (!workspace_id || opts.repo) {
+    repo = opts.repo ?? ".";
+    const rp = resolve(repo);
+    if (existsSync(rp)) {
+      workdir = rp;
+      if (repo === "." || repo === "./") repo = rp;
+    }
   }
 
   // Sanitize summary
@@ -93,6 +126,7 @@ export async function execSession(app: AppContext, opts: ExecOpts): Promise<numb
     compute_name: opts.compute,
     group_name: opts.group,
     inputs,
+    workspace_id,
   });
 
   // Dispatch

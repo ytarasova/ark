@@ -13,9 +13,10 @@ describe("MigrationRunner", () => {
     const runner = new MigrationRunner(db, "sqlite");
     const status = runner.status();
     expect(status.currentVersion).toBe(0);
-    expect(status.pending.length).toBe(2);
+    expect(status.pending.length).toBe(3);
     expect(status.pending[0].version).toBe(1);
     expect(status.pending[1].version).toBe(2);
+    expect(status.pending[2].version).toBe(3);
     db.close();
   });
 
@@ -24,9 +25,9 @@ describe("MigrationRunner", () => {
     const runner = new MigrationRunner(db, "sqlite");
     runner.migrate();
     const status = runner.status();
-    expect(status.currentVersion).toBe(2);
+    expect(status.currentVersion).toBe(3);
     expect(status.pending.length).toBe(0);
-    expect(status.applied.length).toBe(2);
+    expect(status.applied.length).toBe(3);
     db.close();
   });
 
@@ -37,8 +38,8 @@ describe("MigrationRunner", () => {
     runner.migrate();
     runner.migrate();
     const status = runner.status();
-    expect(status.currentVersion).toBe(2);
-    expect(status.applied.length).toBe(2);
+    expect(status.currentVersion).toBe(3);
+    expect(status.applied.length).toBe(3);
     db.close();
   });
 

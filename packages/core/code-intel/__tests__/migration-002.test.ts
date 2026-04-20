@@ -98,8 +98,8 @@ describe("Migration 002 (workspaces)", () => {
     runner.migrate();
     runner.migrate();
     const status = runner.status();
-    expect(status.currentVersion).toBe(2);
-    expect(status.applied.length).toBe(2);
+    expect(status.currentVersion).toBe(3);
+    expect(status.applied.length).toBe(3);
     const count = db.prepare(`SELECT COUNT(*) AS n FROM ${WORKSPACES_TABLE}`).get() as { n: number };
     expect(count.n).toBe(1);
     db.close();

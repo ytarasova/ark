@@ -20,7 +20,7 @@ export function registerExecTryCommands(program: Command, app: AppContext | null
   program
     .command("exec")
     .description("Run a session non-interactively (for CI/CD)")
-    .option("-r, --repo <path>", "Repository path", ".")
+    .option("-r, --repo <path>", "Repository path")
     .option("-s, --summary <text>", "Task summary")
     .option("-t, --ticket <key>", "Ticket reference")
     .option("-f, --flow <name>", "Flow name", "bare")
@@ -28,6 +28,10 @@ export function registerExecTryCommands(program: Command, app: AppContext | null
     .option("-g, --group <name>", "Group name")
     .option("-a, --autonomy <level>", "Autonomy: full/execute/edit/read-only")
     .option("-o, --output <format>", "Output: text/json", "text")
+    .option(
+      "-w, --workspace <slug>",
+      "Workspace slug for multi-repo dispatch (Wave 2b-1: LOCAL compute only). Combine with --repo to set a primary.",
+    )
     .option(
       "-i, --input <pair>",
       "Session input file as role=path (repeatable). Accessible to flows/agents as {inputs.files.<role>}.",
@@ -59,6 +63,7 @@ export function registerExecTryCommands(program: Command, app: AppContext | null
         timeout: parseInt(opts.timeout),
         inputs: opts.input,
         params: opts.param,
+        workspace: opts.workspace,
       });
 
       await execApp.shutdown();

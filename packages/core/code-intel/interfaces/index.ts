@@ -9,3 +9,4 @@ export * from "./executor.js";
 export * from "./storage.js";
 export * from "./observability.js";
 export * from "./deployment.js";
+export * from "./platform-doc-extractor.js";

@@ -38,6 +38,8 @@ import { registerEvalHandlers } from "./handlers/eval.js";
 import { registerDashboardHandlers } from "./handlers/dashboard.js";
 import { registerFsHandlers } from "./handlers/fs.js";
 import { registerTriggerHandlers } from "./handlers/triggers.js";
+import { registerConnectorHandlers } from "./handlers/connectors.js";
+import { registerIntegrationsHandlers } from "./handlers/integrations.js";
 
 /**
  * Register every shared handler, then conditionally mount local-only handlers
@@ -74,6 +76,8 @@ export function registerSharedHandlers(router: Router, app: AppContext): void {
   registerEvalHandlers(router, app);
   registerDashboardHandlers(router, app);
   registerTriggerHandlers(router, app);
+  registerConnectorHandlers(router, app);
+  registerIntegrationsHandlers(router, app);
 }
 
 /**

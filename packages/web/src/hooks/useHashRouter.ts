@@ -10,6 +10,7 @@ const VALID_VIEWS = new Set([
   "tools",
   "schedules",
   "costs",
+  "integrations",
   "settings",
   "_design",
 ]);

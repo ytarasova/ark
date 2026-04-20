@@ -29,6 +29,8 @@ import * as dependencies from "./dependencies.js";
 import * as people from "./people.js";
 import * as contributions from "./contributions.js";
 import * as fileHotspots from "./file-hotspots.js";
+import * as platformDocs from "./platform-docs.js";
+import * as platformDocVersions from "./platform-doc-versions.js";
 
 export interface TableModule {
   TABLE: string;
@@ -60,6 +62,14 @@ export const TABLE_MODULES: ReadonlyArray<TableModule> = [
   fileHotspots,
 ];
 
+/**
+ * Wave 2c -- platform-docs tables. Intentionally kept OUT of the initial
+ * schema aggregate (migration 001 applies `TABLE_MODULES` wholesale; these
+ * tables belong to migration 003). Both modules are still exported for
+ * direct use from migration 003 + the store.
+ */
+export const WAVE_2C_TABLE_MODULES: ReadonlyArray<TableModule> = [platformDocs, platformDocVersions];
+
 /** Concatenate all SQLite DDL into one script (for migration runner). */
 export function sqliteSchema(): string {
   return TABLE_MODULES.map((m) => m.sqliteDDL()).join("\n");
@@ -86,4 +96,6 @@ export {
   people,
   contributions,
   fileHotspots,
+  platformDocs,
+  platformDocVersions,
 };

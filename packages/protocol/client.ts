@@ -985,6 +985,48 @@ export class ArkClient {
     return this.rpc("trigger/test", opts);
   }
 
+  // ── Connectors (outbound half of the integration framework) ────────────────
+
+  async connectorsList(): Promise<{
+    connectors: Array<{
+      name: string;
+      label: string;
+      kind: "mcp" | "rest" | "context";
+      status: "full" | "scaffolded" | "stub";
+      auth: { kind: string; envVar?: string; secretsKey?: string } | null;
+      mcp: { configName?: string; configPath?: string | null; hasInline: boolean } | null;
+      rest: { baseUrl?: string; endpoints?: string[] } | null;
+      hasContext: boolean;
+    }>;
+  }> {
+    return this.rpc("connectors/list");
+  }
+
+  async connectorsGet(name: string): Promise<{ connector: any }> {
+    return this.rpc("connectors/get", { name });
+  }
+
+  async connectorsTest(name: string): Promise<{ name: string; reachable: boolean; details: string }> {
+    return this.rpc("connectors/test", { name });
+  }
+
+  // ── Integrations (unified trigger + connector catalog) ─────────────────────
+
+  async integrationsList(): Promise<{
+    integrations: Array<{
+      name: string;
+      label: string;
+      status: "full" | "scaffolded" | "stub";
+      has_trigger: boolean;
+      has_connector: boolean;
+      trigger_kind: string | null;
+      connector_kind: string | null;
+      auth: { envVar?: string; triggerSecretEnvVar?: string } | null;
+    }>;
+  }> {
+    return this.rpc("integrations/list");
+  }
+
   // ── History extended ───────────────────────────────────────────────────────
 
   async indexStats(): Promise<IndexStatsResult> {

@@ -448,4 +448,27 @@ export const api = {
       home: string;
       entries: { name: string; path: string; isGitRepo?: boolean }[];
     }>("fs/list-dir", path === undefined ? {} : { path }),
+
+  // ── Triggers / Connectors / Integrations (integration framework) ─────────
+  getTriggers: (tenant?: string) => rpc<{ triggers: any[] }>("trigger/list", { tenant }).then((r) => r.triggers ?? []),
+  getTriggerSources: () =>
+    rpc<{ sources: Array<{ name: string; label: string; status: string; secretEnvVar: string }> }>(
+      "trigger/sources",
+    ).then((r) => r.sources ?? []),
+  enableTrigger: (name: string, tenant?: string) => rpc<any>("trigger/enable", { name, tenant }),
+  disableTrigger: (name: string, tenant?: string) => rpc<any>("trigger/disable", { name, tenant }),
+  reloadTriggers: () => rpc<any>("trigger/reload"),
+  testTrigger: (opts: { name: string; payload: unknown; tenant?: string; dryRun?: boolean }) =>
+    rpc<{
+      ok: boolean;
+      fired: boolean;
+      sessionId?: string;
+      dryRun?: boolean;
+      message?: string;
+      event?: any;
+    }>("trigger/test", opts as Record<string, unknown>),
+  getConnectors: () => rpc<{ connectors: any[] }>("connectors/list").then((r) => r.connectors ?? []),
+  testConnector: (name: string) =>
+    rpc<{ name: string; reachable: boolean; details: string }>("connectors/test", { name }),
+  getIntegrations: () => rpc<{ integrations: any[] }>("integrations/list").then((r) => r.integrations ?? []),
 };
