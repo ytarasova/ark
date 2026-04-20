@@ -5,8 +5,8 @@ stages:
     agent: worker
     gate: manual
     task: |
-      Brainstorm approaches for: {summary}
-      Working in {workdir} on repo {repo}.
+      Brainstorm approaches for: {{summary}}
+      Working in {{workdir}} on repo {{repo}}.
 
       Your job is to explore the problem space and generate ideas:
       1. Read the codebase to understand relevant architecture and constraints
@@ -23,7 +23,7 @@ stages:
     gate: manual
     depends_on: [explore]
     task: |
-      Synthesize the brainstorm output for: {summary}
+      Synthesize the brainstorm output for: {{summary}}
 
       Read BRAINSTORM.md and consolidate:
       1. Rank approaches by feasibility, effort, and alignment with goals

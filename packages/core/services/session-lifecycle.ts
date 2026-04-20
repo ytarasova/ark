@@ -33,6 +33,7 @@ import {
   flushSpans,
 } from "../observability/otlp.js";
 import { removeSessionWorktree } from "./workspace-service.js";
+import { substituteVars, buildSessionVars } from "../template.js";
 
 export type SessionOpResult = { ok: true; sessionId: string } | { ok: false; message: string };
 
@@ -112,8 +113,8 @@ export function startSession(
   }
 
   // Persist generic inputs bag (files=role->path, params=k->v). Template
-  // substitution flattens these to `{inputs.files.<role>}` /
-  // `{inputs.params.<key>}` via `buildSessionVars`.
+  // substitution flattens these to `{{inputs.files.<role>}}` /
+  // `{{inputs.params.<key>}}` via `buildSessionVars`.
   if (opts.inputs && (opts.inputs.files || opts.inputs.params)) {
     mergedOpts.config = {
       ...(mergedOpts.config ?? {}),
@@ -518,21 +519,12 @@ export async function approveReviewGate(
 }
 
 /**
- * Render the rework prompt template. Supports both `{{rejection_reason}}`
- * (Archon-style double-brace, the documented syntax for on_reject.prompt) and
- * the standard single-brace session vars that the task prompt uses.
+ * Render the rework prompt template. Uses the standard Nunjucks template
+ * engine; `{{rejection_reason}}` is injected alongside the session vars.
  */
 export function renderReworkPrompt(template: string, reason: string, sessionVars: Record<string, string>): string {
-  // Substitute {{rejection_reason}} first (double braces bind tighter than the
-  // single-brace template engine; otherwise {rejection_reason} inside the
-  // double braces would leak through).
-  let out = template.replace(/\{\{\s*rejection_reason\s*\}\}/g, reason);
-  // Then substitute the standard {var} placeholders using the usual engine.
   const merged: Record<string, string> = { ...sessionVars, rejection_reason: reason };
-  for (const [k, v] of Object.entries(merged)) {
-    out = out.replace(new RegExp(`\\{${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\}`, "g"), v);
-  }
-  return out;
+  return substituteVars(template, merged);
 }
 
 /** Default rework prompt when the flow stage doesn't declare one. */
@@ -588,7 +580,6 @@ export async function rejectReviewGate(
   }
 
   // Render the rework prompt (declared or default).
-  const { buildSessionVars } = await import("../template.js");
   const vars = buildSessionVars(session as unknown as Record<string, unknown>);
   const template = onReject?.prompt && onReject.prompt.trim() ? onReject.prompt : DEFAULT_REWORK_PROMPT;
   const rendered = renderReworkPrompt(template, reason, vars);

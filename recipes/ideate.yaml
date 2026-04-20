@@ -18,7 +18,7 @@ variables:
     description: "Jira epic key to link as parent (optional)"
   - name: assignee
     description: "Jira username to assign (optional)"
-summary: "Ideate: {idea}"
+summary: "Ideate: {{idea}}"
 system_prompt_override: |
   You are an expert Product Manager assistant. Your goal is to turn a raw idea
   into a Jira ticket that passes the ISLC Stage 0 sanity gate (11-field check)

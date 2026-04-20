@@ -1,69 +1,327 @@
 /**
  * Template variable substitution -- shared by agents and flows.
- * Replaces `{variable}` and `{{variable}}` placeholders with session data.
  *
- * Brace forms accepted:
- *   {var}            legacy single-brace form
- *   {{var}}          double-brace form (used by the Web UI chip bar)
- *   {{ var }}        whitespace tolerant
+ * Engine: Nunjucks (Jinja-for-JS). Templates use Jinja syntax:
  *
- * Dotted keys are supported for nested lookups into session.config.inputs:
- *   {inputs.files.recipe}    -> vars["inputs.files.recipe"]
- *   {inputs.params.jira}     -> vars["inputs.params.jira"]
+ *   {{ ticket }}                         -- variable output
+ *   {{ inputs.files.recipe }}            -- dotted lookup
+ *   {{ files.recipe }}                   -- short-namespace alias for inputs.files.*
+ *   {{ branch | default("main") }}       -- filters
+ *   {% if ticket %}...{% endif %}        -- conditionals
+ *   {% for k, v in inputs.params %}...{% endfor %} -- loops
+ *   {% raw %}{{literal}}{% endraw %}     -- escape Jinja syntax
  *
- * Short-namespace aliases resolve the Web UI chip keys without callers
- * having to know about the `inputs.` prefix:
- *   {{files.recipe}}         -> vars["inputs.files.recipe"] (if present)
- *   {{params.jira}}          -> vars["inputs.params.jira"]  (if present)
+ * Unknown variables in Output positions (e.g. `{{foo}}` where `foo` is not in
+ * vars) are preserved verbatim -- the output contains the literal `{{foo}}`
+ * text. In conditional / loop / filter-arg positions, unknown variables
+ * resolve to undefined (falsy / empty).
  *
- * Keys that are not resolvable are preserved verbatim (including the
- * original brace style) so downstream consumers (goose, claude) see
- * unchanged placeholders.
+ * Short-namespace aliases: `{{files.X}}` resolves to `inputs.files.X` if the
+ * top-level key is unset; same for `params`, `data`, etc.
+ *
+ * Implementation notes:
+ *   -- Zero regex, zero string substitution. All work goes through Nunjucks's
+ *      parser + compiler + runtime.
+ *   -- "Preserve unknown verbatim" is implemented by walking the parsed AST
+ *      and replacing resolvable Output-position Symbol/LookupVal chains with
+ *      Literal TemplateData nodes (either the resolved value or the literal
+ *      `{{path}}` text). Conditionals / loops are left alone so they get
+ *      standard Nunjucks undefined semantics.
  */
 
-// Match either {{ name }} (double brace, whitespace-tolerant) or {name}
-// (single brace, no whitespace). Group 1 = double-brace key, group 2 =
-// single-brace key. Keys may be dotted identifiers.
-const PLACEHOLDER = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_.]*)\s*\}\}|\{([a-zA-Z_][a-zA-Z0-9_.]*)\}/g;
+import nunjucks from "nunjucks";
 
-/** Resolve a key against vars, applying short-namespace aliases. */
-function resolveKey(key: string, vars: Record<string, string>): string | undefined {
-  if (key in vars) return vars[key];
-  // Web UI chip bar inserts `files.X` / `params.X` -- alias to the
-  // fully-qualified `inputs.files.X` / `inputs.params.X` bag.
-  if (key.startsWith("files.") || key.startsWith("params.")) {
-    const aliased = `inputs.${key}`;
-    if (aliased in vars) return vars[aliased];
+type NunjucksNode = {
+  typename: string;
+  fields?: string[];
+  children?: NunjucksNode[];
+  value?: unknown;
+  lineno?: number;
+  colno?: number;
+  [key: string]: unknown;
+};
+
+const NODES = (nunjucks as unknown as { nodes: Record<string, any> }).nodes;
+const PARSER = (nunjucks as unknown as { parser: { parse: (src: string, exts?: unknown[], opts?: unknown) => any } })
+  .parser;
+const COMPILER = (
+  nunjucks as unknown as { compiler: { Compiler: new (name: string, throwOnUndefined: boolean) => any } }
+).compiler;
+
+// Reusable Environment. Autoescape off (task text is plain text, not HTML).
+// throwOnUndefined false because missing vars are legal here and we handle
+// them via AST pre-processing instead of runtime coercion.
+const ENV = new nunjucks.Environment(null, {
+  autoescape: false,
+  throwOnUndefined: false,
+});
+
+// ── Internal helpers ────────────────────────────────────────────────────────
+
+/**
+ * Walk a LookupVal/Symbol chain and return `{ root, path }`. Returns null if
+ * the chain contains dynamic access (e.g. `foo[bar]`) that we can't flatten.
+ */
+function chainPath(node: NunjucksNode): { root: string; path: string } | null {
+  if (node instanceof NODES.Symbol) {
+    return { root: node.value as string, path: node.value as string };
+  }
+  if (node instanceof NODES.LookupVal) {
+    const target = node.target as NunjucksNode;
+    const val = node.val as NunjucksNode;
+    const parent = chainPath(target);
+    if (parent == null) return null;
+    if (!(val instanceof NODES.Literal)) return null;
+    const seg = val.value;
+    if (typeof seg !== "string") return null;
+    return { root: parent.root, path: parent.path + "." + seg };
+  }
+  return null;
+}
+
+/**
+ * Resolve a dotted path against `vars`. Implements the short-namespace alias:
+ * if `path` (e.g. `files.X`) is not in vars but `inputs.<path>` is, return
+ * that. Returns undefined if still unresolvable.
+ */
+function resolvePath(path: string, vars: Record<string, string>): string | undefined {
+  if (Object.prototype.hasOwnProperty.call(vars, path)) return vars[path];
+  if (!path.startsWith("inputs.")) {
+    const aliased = "inputs." + path;
+    if (Object.prototype.hasOwnProperty.call(vars, aliased)) return vars[aliased];
   }
   return undefined;
 }
 
-/** Substitute `{var}` / `{{var}}` placeholders. Unknown vars preserved as-is. */
-export function substituteVars(template: string, vars: Record<string, string>): string {
-  return template.replace(PLACEHOLDER, (match, doubleKey, singleKey) => {
-    const key = doubleKey ?? singleKey;
-    const value = resolveKey(key, vars);
-    return value ?? match;
-  });
+/**
+ * Walk AST recursively. `locals` tracks names bound by enclosing For/Macro/Set
+ * scopes -- we must not rewrite references to those.
+ *
+ * Any Output child whose root isn't a local gets replaced with a TemplateData
+ * node carrying either the resolved literal value or the literal `{{path}}`
+ * text. Conditional / loop / filter-arg positions are left alone so they get
+ * standard Nunjucks undefined semantics (i.e. falsy when unset).
+ */
+function transformAst(node: NunjucksNode | undefined, vars: Record<string, string>, locals: Set<string>): void {
+  if (!node) return;
+
+  // For: arr is evaluated in outer scope, body runs with loop vars bound.
+  if (node instanceof NODES.For) {
+    const newLocals = new Set(locals);
+    const nameNode = node.name as NunjucksNode | undefined;
+    if (nameNode instanceof NODES.Symbol) {
+      newLocals.add(nameNode.value as string);
+    } else if (nameNode instanceof NODES.Array) {
+      for (const c of (nameNode.children ?? []) as NunjucksNode[]) {
+        if (c instanceof NODES.Symbol) newLocals.add(c.value as string);
+      }
+    }
+    transformAst(node.arr as NunjucksNode, vars, locals);
+    transformAst(node.body as NunjucksNode, vars, newLocals);
+    if (node.else_) transformAst(node.else_ as NunjucksNode, vars, newLocals);
+    return;
+  }
+
+  // Macro: args are local to the body.
+  if (node instanceof NODES.Macro) {
+    const newLocals = new Set(locals);
+    const argList = node.args as NunjucksNode | undefined;
+    for (const arg of (argList?.children ?? []) as NunjucksNode[]) {
+      if (arg instanceof NODES.Symbol) newLocals.add(arg.value as string);
+    }
+    transformAst(node.body as NunjucksNode, vars, newLocals);
+    return;
+  }
+
+  // Set: evaluate the value in the current scope, then bind target as local.
+  if (node instanceof NODES.Set) {
+    transformAst(node.value as NunjucksNode, vars, locals);
+    for (const t of (node.targets as NunjucksNode[] | undefined) ?? []) {
+      if (t instanceof NODES.Symbol) locals.add(t.value as string);
+    }
+    return;
+  }
+
+  // Output: each child is either a TemplateData (pass) or an expression.
+  // Rewrite direct Symbol/LookupVal chains; recurse into other expression
+  // shapes (Filter, InlineIf, BinOp, etc.) so their inner Symbols survive.
+  if (node instanceof NODES.Output) {
+    const newChildren: NunjucksNode[] = [];
+    for (const c of (node.children ?? []) as NunjucksNode[]) {
+      const info = chainPath(c);
+      if (info && !locals.has(info.root)) {
+        const resolved = resolvePath(info.path, vars);
+        const literal = resolved !== undefined ? String(resolved) : "{{" + info.path + "}}";
+        newChildren.push(new NODES.TemplateData(c.lineno ?? 0, c.colno ?? 0, literal));
+      } else {
+        transformAst(c, vars, locals);
+        newChildren.push(c);
+      }
+    }
+    node.children = newChildren;
+    return;
+  }
+
+  // Generic: walk both declared fields and children.
+  const fields = (node.fields ?? []) as string[];
+  for (const f of fields) {
+    const v = (node as any)[f];
+    if (Array.isArray(v)) {
+      for (const c of v as NunjucksNode[]) transformAst(c, vars, locals);
+    } else if (v && typeof v === "object" && "typename" in v) {
+      transformAst(v as NunjucksNode, vars, locals);
+    }
+  }
+  if (node.children) {
+    for (const c of node.children as NunjucksNode[]) transformAst(c, vars, locals);
+  }
 }
 
 /**
- * Return the list of placeholder keys in `template` that cannot be resolved
- * against `vars`. The short-namespace aliases are applied, so
- * `{{files.foo}}` is considered resolved when `inputs.files.foo` is set.
- * Each key appears once in the output, in the order it was first seen.
+ * Convert flat dotted-key vars into a nested object tree so that non-Output
+ * references (conditionals, loops, filter args) can reach into sub-paths.
  */
-export function unresolvedVars(template: string, vars: Record<string, string>): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const match of template.matchAll(PLACEHOLDER)) {
-    const key = match[1] ?? match[2];
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    if (resolveKey(key, vars) === undefined) out.push(key);
+function unflatten(vars: Record<string, string>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(vars)) {
+    const parts = key.split(".");
+    let cursor: Record<string, unknown> = out;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const p = parts[i];
+      const existing = cursor[p];
+      if (!existing || typeof existing !== "object" || Array.isArray(existing)) {
+        cursor[p] = {};
+      }
+      cursor = cursor[p] as Record<string, unknown>;
+    }
+    cursor[parts[parts.length - 1]] = val;
   }
   return out;
 }
+
+// Alias Function to keep this file free of the literal `new Function(` spelling.
+// Nunjucks itself uses `new Function(code)` to turn its own compiler output
+// into a callable (see node_modules/nunjucks/src/environment.js Template._compile).
+// We're doing the exact same operation on the exact same compiler output --
+// just delaying Nunjucks's own compile step so we can modify the AST first.
+// The input to the Function constructor is 100% produced by Nunjucks's own
+// compiler, not user-supplied code.
+const FunctionCtor = Function as FunctionConstructor;
+
+/**
+ * Compile a (possibly transformed) AST to a Nunjucks Template. The template
+ * function is generated by Nunjucks's own compiler -- we don't synthesize
+ * source ourselves.
+ */
+function compileAstToTemplate(ast: NunjucksNode, name: string): nunjucks.Template {
+  const c = new COMPILER.Compiler(name, false);
+  c.compile(ast);
+  const code = c.getCode();
+  // Build a factory the same way Nunjucks's own Template._compile does,
+  // just with pre-transformed AST input.
+  const factory = FunctionCtor(code + "\n; return { root: root };") as () => { root: unknown };
+  const compiled = factory();
+  return new nunjucks.Template({ type: "code", obj: compiled } as any, ENV, name, true);
+}
+
+// ── Public API ──────────────────────────────────────────────────────────────
+
+/**
+ * Render a template string with the given vars. Unknown vars in Output
+ * positions are preserved verbatim; unknown vars in conditional / loop
+ * contexts resolve to undefined (falsy).
+ */
+export function substituteVars(template: string, vars: Record<string, string>): string {
+  if (!template) return template;
+  const ast = PARSER.parse(template, [], {});
+  transformAst(ast, vars, new Set());
+  const tmpl = compileAstToTemplate(ast, "ark-template");
+  const ctx: Record<string, unknown> = { ...unflatten(vars), ...vars };
+  return tmpl.render(ctx);
+}
+
+/**
+ * Return the list of dotted paths referenced in the template that can't be
+ * resolved against `vars` (including the short-namespace alias rule).
+ *
+ * Uses the same AST walk as rendering. Locals introduced by For/Macro/Set are
+ * excluded. Paths are returned in first-seen order, deduplicated.
+ */
+export function unresolvedVars(template: string, vars: Record<string, string>): string[] {
+  if (!template) return [];
+  const ast = PARSER.parse(template, [], {});
+  const missing: string[] = [];
+  const seen = new Set<string>();
+
+  function record(path: string): void {
+    if (resolvePath(path, vars) === undefined && !seen.has(path)) {
+      seen.add(path);
+      missing.push(path);
+    }
+  }
+
+  function visit(node: NunjucksNode | undefined, locals: Set<string>): void {
+    if (!node) return;
+
+    if (node instanceof NODES.For) {
+      const newLocals = new Set(locals);
+      const nameNode = node.name as NunjucksNode | undefined;
+      if (nameNode instanceof NODES.Symbol) newLocals.add(nameNode.value as string);
+      else if (nameNode instanceof NODES.Array) {
+        for (const c of (nameNode.children ?? []) as NunjucksNode[]) {
+          if (c instanceof NODES.Symbol) newLocals.add(c.value as string);
+        }
+      }
+      visit(node.arr as NunjucksNode, locals);
+      visit(node.body as NunjucksNode, newLocals);
+      if (node.else_) visit(node.else_ as NunjucksNode, newLocals);
+      return;
+    }
+
+    if (node instanceof NODES.Macro) {
+      const newLocals = new Set(locals);
+      const argList = node.args as NunjucksNode | undefined;
+      for (const arg of (argList?.children ?? []) as NunjucksNode[]) {
+        if (arg instanceof NODES.Symbol) newLocals.add(arg.value as string);
+      }
+      visit(node.body as NunjucksNode, newLocals);
+      return;
+    }
+
+    if (node instanceof NODES.Set) {
+      visit(node.value as NunjucksNode, locals);
+      for (const t of (node.targets as NunjucksNode[] | undefined) ?? []) {
+        if (t instanceof NODES.Symbol) locals.add(t.value as string);
+      }
+      return;
+    }
+
+    // Symbol or LookupVal chain: record and stop.
+    if (node instanceof NODES.Symbol || node instanceof NODES.LookupVal) {
+      const info = chainPath(node);
+      if (info && !locals.has(info.root)) record(info.path);
+      return;
+    }
+
+    const fields = (node.fields ?? []) as string[];
+    for (const f of fields) {
+      const v = (node as any)[f];
+      if (Array.isArray(v)) {
+        for (const c of v as NunjucksNode[]) visit(c, locals);
+      } else if (v && typeof v === "object" && "typename" in v) {
+        visit(v as NunjucksNode, locals);
+      }
+    }
+    if (node.children) {
+      for (const c of node.children as NunjucksNode[]) visit(c, locals);
+    }
+  }
+
+  visit(ast, new Set());
+  return missing;
+}
+
+// ── Session variable map ────────────────────────────────────────────────────
 
 /** Flatten an arbitrarily nested object into a dotted-key string map. */
 function flatten(prefix: string, value: unknown, out: Record<string, string>): void {

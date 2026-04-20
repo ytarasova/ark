@@ -5,15 +5,15 @@ stages:
     agent: ticket-intake
     gate: auto
     task: |
-      Process Jira ticket {ticket}. Run sanity gate and extract 27-section spec.
-      Write artifacts to {workdir}/.workflow/{ticket}/
+      Process Jira ticket {{ticket}}. Run sanity gate and extract 27-section spec.
+      Write artifacts to {{workdir}}/.workflow/{{ticket}}/
 
   - name: plan
     agent: spec-planner
     gate: manual
     depends_on: [ticket-intake]
     task: |
-      Read spec from {workdir}/.workflow/{ticket}/spec.md.
+      Read spec from {{workdir}}/.workflow/{{ticket}}/spec.md.
       Decompose into subtasks, create Jira sub-tasks.
 
   - name: audit

@@ -6,13 +6,13 @@ stages:
     agent: planner
     gate: manual
     task: |
-      Analyze {summary} and create PLAN.md.
+      Analyze {{summary}} and create PLAN.md.
 
   - name: implement
     agent: implementer
     gate: auto
     task: |
-      Implement the changes from PLAN.md for: {summary}
+      Implement the changes from PLAN.md for: {{summary}}
 
   - name: review
     agent: reviewer

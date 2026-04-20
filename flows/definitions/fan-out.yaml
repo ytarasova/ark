@@ -5,7 +5,7 @@ stages:
     agent: planner
     gate: manual
     task: |
-      Analyze {summary} and decompose into independent sub-tasks.
+      Analyze {{summary}} and decompose into independent sub-tasks.
       Output a JSON array of tasks: [{"summary": "...", "agent": "implementer"}, ...]
   - name: execute
     type: fan_out

@@ -20,7 +20,7 @@ export interface StageDefinition {
   type?: "agent" | "action" | "fork" | "fan_out";
   agent?: string;
   action?: string;
-  task?: string; // Template for agent task prompt - supports {variable} substitution
+  task?: string; // Template for agent task prompt -- Nunjucks syntax ({{var}}, {% if %}, ...)
   gate: "auto" | "manual" | "condition" | "review";
   autonomy?: "full" | "execute" | "edit" | "read-only";
   on_failure?: string;
@@ -313,7 +313,7 @@ export function getReadyStages(stages: StageDefinition[], completedStages: strin
 
 // ── Template substitution ────────────────────────────────────────────────────
 
-/** Resolve a flow by substituting {variables} in stage fields. */
+/** Resolve a flow by rendering {{ var }} placeholders in stage fields. */
 export function resolveFlow(app: AppContext, flowName: string, vars: Record<string, string>): FlowDefinition | null {
   const flow = loadFlow(app, flowName);
   if (!flow) return null;

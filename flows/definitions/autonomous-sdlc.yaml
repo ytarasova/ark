@@ -5,7 +5,7 @@ stages:
     agent: planner
     gate: auto
     task: |
-      Analyse {summary} and create PLAN.md with implementation strategy.
+      Analyse {{summary}} and create PLAN.md with implementation strategy.
       Read the codebase, identify files to change, design the approach.
       Commit PLAN.md to the branch.
       When done, call report(completed) with a summary of the plan.
@@ -16,7 +16,7 @@ stages:
     depends_on: [plan]
     on_failure: "retry(2)"
     task: |
-      Implement {summary}. Follow the plan from PLAN.md.
+      Implement {{summary}}. Follow the plan from PLAN.md.
       Write production-quality code with tests. Create atomic commits.
       Run the test suite and ensure all tests pass.
       When done, call report(completed) listing files changed and test results.
