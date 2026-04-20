@@ -2,8 +2,10 @@
  * Unit tests for the fs/list-dir RPC handler.
  *
  * Covers: default to $HOME, directory listing, sorting, isGitRepo flag,
- * parent navigation, filesystem-root edge, non-existent path error, and
- * the hosted-mode refusal.
+ * parent navigation, filesystem-root edge, non-existent path error. The
+ * hosted-mode refusal contract lives in the register-mode test --
+ * `registerLocalOnlyHandlers` skips this handler entirely in hosted mode
+ * rather than refusing at runtime.
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "bun:test";
@@ -53,8 +55,6 @@ afterEach(() => {
   } catch {
     // ignore
   }
-  // Reset databaseUrl in case a test set it for the hosted-mode check.
-  (app.config as any).databaseUrl = undefined;
 });
 
 async function call(path?: string) {
@@ -145,13 +145,5 @@ describe("fs/list-dir handler", () => {
     expect(res.error).toBeDefined();
     expect(res.error.code).toBe(-32602);
     expect(res.error.message).toContain("absolute");
-  });
-
-  it("refuses the call when running in hosted mode", async () => {
-    (app.config as any).databaseUrl = "postgres://fake/ark";
-    const res = (await call(tmpRoot)) as JsonRpcError;
-    expect(res.error).toBeDefined();
-    expect(res.error.code).toBe(-32601);
-    expect(res.error.message.toLowerCase()).toContain("hosted");
   });
 });

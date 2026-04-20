@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../hooks/useApi.js";
-import { useHostedMode } from "../hooks/useServerConfig.js";
+import { useAppMode } from "../providers/AppModeProvider.js";
 import { usePasteImageUpload } from "../hooks/usePasteImageUpload.js";
 import { useFilePreviews } from "../hooks/useFilePreviews.js";
 import { Button } from "./ui/button.js";
@@ -13,22 +13,7 @@ import { FolderPickerModal } from "./FolderPickerModal.js";
 import { InputsSection, type InputsValue } from "./session/InputsSection.js";
 import { cn } from "../lib/utils.js";
 import { relTime, formatRepoName } from "../util.js";
-import {
-  Zap,
-  Monitor,
-  FolderOpen,
-  Check,
-  ChevronDown,
-  Search,
-  Folder,
-  Bold,
-  Italic,
-  Code,
-  List,
-  Paperclip,
-  Link,
-  X,
-} from "lucide-react";
+import { Zap, Monitor, Check, ChevronDown, Bold, Italic, Code, List, Paperclip, Link, X } from "lucide-react";
 
 interface FlowInfo {
   name: string;
@@ -162,167 +147,6 @@ function FlowDropdown({
           ))}
           {flows.length === 0 && (
             <div className="px-3 py-4 text-[12px] text-[var(--fg-muted)] text-center">No flows available</div>
-          )}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Repo Dropdown
-// ---------------------------------------------------------------------------
-/** Accept either `git@host:owner/repo(.git)?` or `https?://host/owner/repo(.git)?`. */
-const GIT_URL_RE = /^(git@[^:\s]+:[^\s]+|https?:\/\/[^\s]+)$/i;
-
-function RepoDropdown({
-  value,
-  onChange,
-  recentRepos,
-  onBrowse,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  recentRepos: RecentRepo[];
-  onBrowse: () => void;
-}) {
-  const hosted = useHostedMode();
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  function tryCommit(raw: string) {
-    const v = raw.trim();
-    if (!v) return;
-    if (hosted && !GIT_URL_RE.test(v)) {
-      setError("Remote mode requires a git URL (git@... or https://...)");
-      return;
-    }
-    setError(null);
-    onChange(v);
-    setOpen(false);
-    setSearch("");
-  }
-
-  const visibleRecent = hosted ? recentRepos.filter((r) => GIT_URL_RE.test(r.path)) : recentRepos;
-
-  const filtered = search
-    ? visibleRecent.filter(
-        (r) =>
-          r.path.toLowerCase().includes(search.toLowerCase()) ||
-          r.basename.toLowerCase().includes(search.toLowerCase()),
-      )
-    : visibleRecent;
-
-  return (
-    <Popover.Root
-      open={open}
-      onOpenChange={(v) => {
-        setOpen(v);
-        if (v) setTimeout(() => inputRef.current?.focus(), 50);
-      }}
-    >
-      <Popover.Trigger asChild>
-        <button type="button" className={triggerClass}>
-          <FolderOpen size={14} className="text-[var(--fg-muted)] shrink-0 mr-2" />
-          <span className="truncate text-left flex-1">
-            {value && value !== "." ? (
-              <>
-                <span className="font-medium">{formatRepoName(value)}</span>
-                <span className="text-[var(--fg-muted)] ml-1.5 text-[12px]">{value}</span>
-              </>
-            ) : (
-              <span className="text-[var(--fg-muted)]">Select repository...</span>
-            )}
-          </span>
-          <ChevronDown size={14} className="text-[var(--fg-muted)] shrink-0 ml-2" />
-        </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content sideOffset={4} align="start" className={popoverContentClass}>
-          {/* Search / manual input */}
-          <div className="px-2 py-1.5 border-b border-[var(--border)]">
-            <div className="flex items-center gap-1.5">
-              <Search size={12} className="text-[var(--fg-muted)] shrink-0" />
-              <input
-                ref={inputRef}
-                type="text"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  if (error) setError(null);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && search.trim()) tryCommit(search);
-                }}
-                placeholder={hosted ? "git@github.com:owner/repo or https://..." : "Type path or search..."}
-                aria-label="Repository path"
-                className="w-full bg-transparent text-[12px] text-[var(--fg)] outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] rounded-[4px] placeholder:text-[var(--fg-faint)]"
-              />
-            </div>
-          </div>
-
-          {/* Recent repos */}
-          {filtered.length > 0 && (
-            <>
-              <div className="px-2.5 pt-2 pb-1 text-[10px] font-semibold text-[var(--fg-muted)] uppercase tracking-wider">
-                Recent repositories
-              </div>
-              {filtered.map((r) => (
-                <button
-                  key={r.path}
-                  type="button"
-                  onClick={() => {
-                    onChange(r.path);
-                    setOpen(false);
-                    setSearch("");
-                  }}
-                  className={cn(
-                    "flex items-center gap-2 w-full text-left px-2.5 py-1.5 rounded-[var(--radius-sm,4px)]",
-                    "hover:bg-[var(--bg-hover)] transition-colors duration-100 cursor-pointer",
-                    value === r.path && "bg-[var(--primary)]/5",
-                  )}
-                >
-                  <Folder size={13} className="text-[var(--fg-muted)] shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-medium text-[var(--fg)] truncate">{r.basename}</div>
-                    <div className="text-[11px] text-[var(--fg-muted)] truncate">{r.path}</div>
-                  </div>
-                  <span className="text-[10px] text-[var(--fg-muted)] shrink-0 ml-1">{r.lastUsed}</span>
-                </button>
-              ))}
-            </>
-          )}
-
-          {filtered.length === 0 && search && (
-            <div className="px-3 py-3 text-[12px] text-[var(--fg-muted)] text-center">
-              No matches. Press Enter to use "{search}"
-            </div>
-          )}
-
-          {error && <div className="px-3 py-2 text-[11px] text-[var(--failed)]">{error}</div>}
-
-          {/* Browse -- local mode only; remote Ark servers have no client filesystem access. */}
-          {!hosted && (
-            <div className="border-t border-[var(--border)] mt-1 pt-1">
-              <button
-                type="button"
-                onClick={() => {
-                  onBrowse();
-                  setOpen(false);
-                  setSearch("");
-                }}
-                className={cn(
-                  "flex items-center gap-2 w-full text-left px-2.5 py-2 rounded-[var(--radius-sm,4px)]",
-                  "hover:bg-[var(--bg-hover)] transition-colors duration-100 cursor-pointer",
-                  "text-[12px] text-[var(--fg-muted)]",
-                )}
-              >
-                <FolderOpen size={13} />
-                Browse for folder...
-              </button>
-            </div>
           )}
         </Popover.Content>
       </Popover.Portal>
@@ -787,6 +611,8 @@ export type NewSessionFormValues = z.infer<typeof NewSessionSchema>;
 // Main component
 // ---------------------------------------------------------------------------
 export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
+  const { binding } = useAppMode();
+  const { RepoPicker } = binding;
   const { control, handleSubmit, watch, setValue, formState } = useForm<NewSessionFormValues>({
     resolver: zodResolver(NewSessionSchema),
     defaultValues: { summary: "", repo: ".", ticket: "", flow: "", compute: "" },
@@ -994,7 +820,7 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
             name="repo"
             control={control}
             render={({ field }) => (
-              <RepoDropdown
+              <RepoPicker
                 value={field.value}
                 onChange={field.onChange}
                 recentRepos={recentRepos}
