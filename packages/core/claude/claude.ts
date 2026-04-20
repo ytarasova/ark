@@ -720,8 +720,11 @@ export function buildLauncher(opts: LauncherOpts): { content: string; claudeSess
   const pathSetup = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$HOME/.nvm/versions/node/*/bin:$PATH"\n`;
 
   // When initialPrompt is provided, append it as the last positional arg
-  // to trigger immediate processing (claude "prompt" --session-id X).
-  const promptArg = opts.initialPrompt ? ` \\\n  ${shellQuote(opts.initialPrompt)}` : "";
+  // to trigger immediate processing. Separate it from option values with
+  // `--`: `--dangerously-load-development-channels` is greedy and would
+  // otherwise consume the prompt as another channel entry. The `--` tells
+  // Claude's arg parser "everything after this is a positional".
+  const promptArg = opts.initialPrompt ? ` \\\n  -- ${shellQuote(opts.initialPrompt)}` : "";
 
   let content: string;
   if (opts.prevClaudeSessionId) {
