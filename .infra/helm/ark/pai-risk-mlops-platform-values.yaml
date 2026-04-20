@@ -1,0 +1,118 @@
+# Environment overlay for the pai-risk-mlops platform cluster.
+#
+# Reuses foundry's Postgres RDS (one shared instance, separate `ark`
+# database) and the foundry S3 bucket (separate `ark/` prefix). IRSA
+# binds the pod's service account to an IAM role for S3 access. App
+# secrets live in AWS Secrets Manager at
+# `pai-risk-mlops/platform/ark`; RDS credentials come from the
+# RDS-managed rotating secret.
+#
+# Loaded by ArgoCD Application via:
+#   helm:
+#     releaseName: ark
+#     valueFiles: ['pai-risk-mlops-platform-values.yaml']
+
+namespace: ark
+
+controlPlane:
+  image:
+    repository: 880170353725.dkr.ecr.ap-south-1.amazonaws.com/pai-mlops-platform/ark
+    tag: latest
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+workers:
+  enabled: true
+  replicaCount: 3
+  image:
+    repository: 880170353725.dkr.ecr.ap-south-1.amazonaws.com/pai-mlops-platform/ark
+    tag: latest
+    pullPolicy: Always
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+  capacity: 5
+  kata:
+    enabled: false
+
+# Foundry RDS, separate database `ark`. The DBA needs to run
+#   CREATE DATABASE ark; CREATE SCHEMA code_intel;
+# under the foundry RDS master credentials before first deploy.
+postgresql:
+  enabled: false
+  external:
+    host: foundry.chy2qgkm0yi2.ap-south-1.rds.amazonaws.com
+    port: 5432
+    database: ark
+    existingSecret: ark-secrets
+
+# Foundry-shared bucket, ark/ prefix.
+s3:
+  bucket: pai-mlops-artifacts-platform
+  prefix: ark/
+  region: ap-south-1
+
+# Bundled Redis for now (workspaces / sessions only). When fleet load
+# justifies it, switch to ElastiCache via redis.enabled=false +
+# redis.external.host.
+redis:
+  enabled: true
+
+ingress:
+  enabled: true
+  className: nginx
+  host: ark.internal.ap-south-1.platform.mlops.pai.mypaytm.com
+  tls:
+    enabled: true
+    secretName: ark-tls
+
+# IRSA -- IAM role for the ark service account. Must be created out-of-
+# band (see docs/DEPLOY-PAI-RISK-MLOPS.md) with S3 access to
+# pai-mlops-artifacts-platform/ark/* and Secrets Manager read on
+# pai-risk-mlops/platform/ark*.
+serviceAccount:
+  create: true
+  name: ark
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::880170353725:role/platform-ark-service
+
+# external-secrets pulls app + RDS secrets at runtime.
+externalSecret:
+  enabled: true
+  storeName: aws-secretstore
+  storeKind: ClusterSecretStore
+  refreshInterval: 1h
+  appSecretPath: pai-risk-mlops/platform/ark
+  appSecrets:
+    - ANTHROPIC_API_KEY
+    - OPENAI_API_KEY
+    - GOOGLE_API_KEY
+    - SAGE_BEARER_TOKEN
+    - GITHUB_WEBHOOK_SECRET
+    - BITBUCKET_WEBHOOK_SECRET
+    - SLACK_SIGNING_SECRET
+    - LINEAR_WEBHOOK_SECRET
+    - JIRA_WEBHOOK_SECRET
+    - PI_SAGE_WEBHOOK_SECRET
+
+# RDS-managed credentials (rotated by AWS).
+database:
+  secretArn: arn:aws:secretsmanager:ap-south-1:880170353725:secret:rds!db-9b1f1b3f-dace-455f-81c7-7223f4aecdb1-DbwodS
+
+# LLM router defaults; per-tenant overrides via tenant config.
+llm:
+  existingSecret: ark-secrets
+
+# Profile is control-plane in production.
+config:
+  profile: control-plane
