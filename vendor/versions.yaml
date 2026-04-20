@@ -15,7 +15,7 @@
 
 goose:
   repo: block/goose
-  version: v1.30.0
+  version: v1.31.0
   env: GOOSE_VERSION
   platforms: [darwin-arm64, darwin-x64, linux-arm64, linux-x64]
   notes: "Block / Linux Foundation AAIF. Rust binary, pre-built per platform."
@@ -39,7 +39,7 @@ tensorzero:
   notes: "Built from HEAD of main via cargo. Pin a specific tag when stability becomes a concern."
 codegraph:
   repo: optave/codegraph
-  version: v3.9.3
+  version: v3.9.4
   env: ""
   platforms: [darwin-arm64, darwin-x64, linux-arm64, linux-x64]
   notes: |
@@ -47,7 +47,6 @@ codegraph:
     Extracted from @optave/codegraph-<arch> npm packages. Version
     tracked by package.json's bun lockfile, not this file. Keep entry
     until the deprecation migration lands + is verified in CI.
-
 codebase-memory-mcp:
   repo: DeusData/codebase-memory-mcp
   version: v0.6.0
