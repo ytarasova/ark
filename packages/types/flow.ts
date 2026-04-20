@@ -80,6 +80,32 @@ export interface StageDefinition {
    *   the same agent's output (e.g. review -> fixup).
    */
   isolation?: "fresh" | "continue";
+  /**
+   * Rework-on-reject behaviour for `gate: "review"` / `"manual"` stages.
+   *
+   * When a reviewer rejects the gate via `gate/reject`, the rendered `prompt`
+   * is appended to the next dispatch of the same stage so the agent knows
+   * what to fix. Supports `{{rejection_reason}}` plus every variable the
+   * normal task template supports (see `template.ts`).
+   *
+   * Example:
+   *   on_reject:
+   *     prompt: |
+   *       The reviewer rejected this change. Feedback:
+   *       {{rejection_reason}}
+   *       Please address the feedback and rework the stage.
+   *     max_rejections: 3
+   */
+  on_reject?: {
+    /** Template appended to the next dispatch. Supports `{{rejection_reason}}`. */
+    prompt?: string;
+    /**
+     * Cap rework cycles. Default: unlimited. When the session's
+     * `rejection_count` hits this value, the session is marked `failed` with
+     * reason "max_rejections exceeded" instead of being re-dispatched.
+     */
+    max_rejections?: number;
+  };
   // Fork-specific
   strategy?: string;
   max_parallel?: number;

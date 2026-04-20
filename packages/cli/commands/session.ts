@@ -367,6 +367,33 @@ export function registerSessionCommands(program: Command, app: AppContext) {
     });
 
   session
+    .command("approve")
+    .description("Approve a review gate and advance to the next stage")
+    .argument("<id>")
+    .action(async (id) => {
+      const ark = await getArkClient();
+      const r = await ark.gateApprove(id);
+      console.log(r.ok ? chalk.green(r.message) : chalk.red(r.message));
+    });
+
+  session
+    .command("reject")
+    .description("Reject a review gate and dispatch a rework cycle with the given reason")
+    .argument("<id>")
+    .requiredOption("-r, --reason <text>", "Why the change needs rework (shown to the agent)")
+    .action(async (id, opts) => {
+      const ark = await getArkClient();
+      const reason = String(opts.reason ?? "").trim();
+      if (!reason) {
+        console.log(chalk.red("--reason is required"));
+        process.exitCode = 1;
+        return;
+      }
+      const r = await ark.sessionReject(id, reason);
+      console.log(r.ok ? chalk.green(r.message ?? "Rework dispatched") : chalk.red(r.message ?? "Reject failed"));
+    });
+
+  session
     .command("complete")
     .description("Mark current stage done and advance")
     .argument("<id>")

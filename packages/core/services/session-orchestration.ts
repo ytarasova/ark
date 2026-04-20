@@ -72,15 +72,24 @@ export { prepareRemoteEnvironment } from "./agent-launcher.js";
 // ── Output & messaging ──────────────────────────────────────────────────────
 export { getOutput, send } from "./session-output.js";
 
-// ── Review gate (wraps advance from stage-orchestrator) ─────────────────────
+// ── Review gate (wraps advance + dispatch) ─────────────────────────────────
 import { advance as _advance } from "./stage-orchestrator.js";
-import { approveReviewGate as _approveReviewGate } from "./session-lifecycle.js";
+import { dispatch as _dispatch } from "./dispatch.js";
+import { approveReviewGate as _approveReviewGate, rejectReviewGate as _rejectReviewGate } from "./session-lifecycle.js";
 
 export async function approveReviewGate(
   app: import("../app.js").AppContext,
   sessionId: string,
 ): Promise<{ ok: boolean; message: string }> {
   return _approveReviewGate(app, sessionId, _advance);
+}
+
+export async function rejectReviewGate(
+  app: import("../app.js").AppContext,
+  sessionId: string,
+  reason: string,
+): Promise<{ ok: boolean; message: string }> {
+  return _rejectReviewGate(app, sessionId, reason, _dispatch);
 }
 
 // ── Re-exports from session-hooks.ts (hook status, reports, stage handoff) ──

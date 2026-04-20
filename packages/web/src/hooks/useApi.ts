@@ -183,6 +183,11 @@ export const api = {
   complete: (id: string) => rpc<any>("session/complete", { sessionId: id }),
   // TODO: add Zod schema for session/spawn
   spawnSubagent: (id: string, data: any) => rpc<any>("session/spawn", { sessionId: id, ...data }),
+  // TODO: add Zod schema for gate/approve
+  gateApprove: (id: string) => rpc<{ ok: boolean; message?: string }>("gate/approve", { sessionId: id }),
+  // TODO: add Zod schema for gate/reject
+  sessionReject: (id: string, reason: string) =>
+    rpc<{ ok: boolean; message?: string }>("gate/reject", { sessionId: id, reason }),
 
   // ── Todos & Verification ─────────────────────────────────────────────────
   // TODO: add Zod schema for todo/list

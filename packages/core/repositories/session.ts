@@ -43,6 +43,10 @@ interface SessionRow {
   group_name: string | null;
   breakpoint_reason: string | null;
   attached_by: string | null;
+  rejection_count: number | null;
+  rework_prompt: string | null;
+  rejected_at: string | null;
+  rejected_reason: string | null;
   config: string;
   user_id: string | null;
   tenant_id: string;
@@ -65,6 +69,12 @@ function rowToSession(row: SessionRow): Session {
   return {
     ...row,
     status: row.status as SessionStatus,
+    // Rejection columns default to 0 / null when the row is from before the
+    // columns were added, or when Postgres/SQLite surfaces them as NULL.
+    rejection_count: typeof row.rejection_count === "number" ? row.rejection_count : 0,
+    rework_prompt: row.rework_prompt ?? null,
+    rejected_at: row.rejected_at ?? null,
+    rejected_reason: row.rejected_reason ?? null,
     config: safeParseConfig(row.config),
   };
 }
@@ -91,6 +101,10 @@ const SESSION_COLUMNS = new Set([
   "group_name",
   "breakpoint_reason",
   "attached_by",
+  "rejection_count",
+  "rework_prompt",
+  "rejected_at",
+  "rejected_reason",
   "config",
   "user_id",
   "updated_at",
