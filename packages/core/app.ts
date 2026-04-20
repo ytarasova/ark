@@ -60,6 +60,7 @@ import type { KnowledgeStore } from "./knowledge/store.js";
 import type { PricingRegistry } from "./observability/pricing.js";
 import type { UsageRecorder } from "./observability/usage.js";
 import type { TensorZeroManager } from "./router/tensorzero.js";
+import type { BlobStore } from "./storage/blob-store.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -290,6 +291,23 @@ export class AppContext {
   /** Snapshot store used by `session/pause` + `session/resume`. */
   get snapshotStore(): SnapshotStore {
     return this._resolve("snapshotStore");
+  }
+
+  // ── Blob storage (inputs, exports) ────────────────────────────────────
+
+  /** Blob store for session input uploads. Local-disk or S3 depending on profile. */
+  get blobStore(): BlobStore {
+    return this._resolve("blobStore");
+  }
+
+  // ── Tenant scoping ───────────────────────────────────────────────────
+  //
+  // Base AppContext is not tenant-scoped. `forTenant(id)` returns a shallow
+  // copy that sets `tenantId` via Object.defineProperty, so this accessor
+  // returns null on the root context and the scoped id on per-tenant views.
+
+  get tenantId(): string | null {
+    return null;
   }
 
   // ── Cost tracking ─────────────────────────────────────────────────────

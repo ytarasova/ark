@@ -25,10 +25,12 @@ import type { AppContext } from "../app.js";
 import { registerDatabase, registerRepositories, registerResourceStores } from "./persistence.js";
 import { registerServices } from "./services.js";
 import { registerRuntime } from "./runtime.js";
+import { registerStorage } from "./storage.js";
 
 export { registerDatabase, registerRepositories, registerResourceStores } from "./persistence.js";
 export { registerServices } from "./services.js";
 export { registerRuntime } from "./runtime.js";
+export { registerStorage } from "./storage.js";
 
 /**
  * Build a fully wired container.
@@ -60,10 +62,14 @@ export function buildContainer(opts: {
   registerRepositories(container);
   registerResourceStores(container);
 
-  // 4. Runtime singletons + infra launchers.
+  // 4. Blob storage (inputs / exports). Must land before services so the
+  // SessionService factory can resolve `blobStore` from the cradle.
+  registerStorage(container);
+
+  // 5. Runtime singletons + infra launchers.
   registerRuntime(container);
 
-  // 5. Services.
+  // 6. Services.
   registerServices(container);
 
   return container;

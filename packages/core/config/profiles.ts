@@ -74,6 +74,7 @@ export async function localDefaults(): Promise<ProfileDefaults> {
     auth: { requireToken: false, defaultTenant: null },
     features: { autoRebase: false, codegraph: false },
     observability: { logLevel: "info" },
+    storage: { blobBackend: "local" },
   };
 }
 
@@ -91,6 +92,7 @@ export async function controlPlaneDefaults(): Promise<ProfileDefaults> {
     auth: { requireToken: true, defaultTenant: null },
     features: { autoRebase: true, codegraph: false },
     observability: { logLevel: "info" },
+    storage: { blobBackend: "s3" },
   };
 }
 
@@ -118,6 +120,7 @@ export async function testDefaults(): Promise<ProfileDefaults> {
     auth: { requireToken: false, defaultTenant: null },
     features: { autoRebase: false, codegraph: false },
     observability: { logLevel: "error" }, // quiet tests
+    storage: { blobBackend: "local" },
   };
 }
 

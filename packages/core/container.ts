@@ -32,6 +32,7 @@ import type { UsageRecorder } from "./observability/usage.js";
 import type { TranscriptParserRegistry } from "./runtimes/transcript-parser.js";
 import type { PluginRegistry } from "./plugins/registry.js";
 import type { SnapshotStore } from "../compute/core/snapshot-store.js";
+import type { BlobStore } from "./storage/blob-store.js";
 import type { AppContext } from "./app.js";
 import type { Lifecycle } from "./lifecycle.js";
 import type { ConductorLauncher } from "./infra/conductor-launcher.js";
@@ -116,6 +117,9 @@ export interface Cradle {
 
   // Snapshot persistence
   snapshotStore: SnapshotStore;
+
+  // Blob storage (session input uploads, exports)
+  blobStore: BlobStore;
 
   // Lifecycle + infra launchers (container-managed start/stop)
   lifecycle: Lifecycle;

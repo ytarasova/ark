@@ -53,6 +53,19 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     return app.sessionService.saveInput(opts);
   });
 
+  router.handle("input/read", async (params) => {
+    const { locator } = extract<{ locator: string }>(params, ["locator"]);
+    const { LOCAL_TENANT_ID } = await import("../../core/storage/blob-store.js");
+    const { bytes, meta } = await app.blobStore.get(locator, app.tenantId ?? LOCAL_TENANT_ID);
+    return {
+      filename: meta.filename,
+      contentType: meta.contentType ?? "application/octet-stream",
+      content: bytes.toString("base64"),
+      contentEncoding: "base64",
+      size: meta.size,
+    };
+  });
+
   router.handle("session/stop", async (params, notify) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
     const result = await app.sessionService.stop(sessionId);

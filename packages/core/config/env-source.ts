@@ -11,7 +11,14 @@
  * object. The resolver composes it with YAML / profile defaults.
  */
 
-import type { PortsConfig, ChannelsConfig, ObservabilityConfig, AuthSectionConfig, FeaturesConfig } from "./types.js";
+import type {
+  PortsConfig,
+  ChannelsConfig,
+  ObservabilityConfig,
+  AuthSectionConfig,
+  FeaturesConfig,
+  StorageConfig,
+} from "./types.js";
 
 export interface EnvOverrides {
   arkDir?: string;
@@ -20,6 +27,7 @@ export interface EnvOverrides {
   observability: Partial<ObservabilityConfig>;
   auth: Partial<AuthSectionConfig>;
   features: Partial<FeaturesConfig>;
+  storage: Partial<StorageConfig>;
   databaseUrl?: string;
   redisUrl?: string;
 }
@@ -60,6 +68,7 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): EnvOverrides {
     observability: {},
     auth: {},
     features: {},
+    storage: {},
   };
 
   // Dirs
@@ -97,6 +106,20 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): EnvOverrides {
   if (autoRebase !== undefined) out.features.autoRebase = autoRebase;
   const codegraph = parseBool(env.ARK_CODEGRAPH);
   if (codegraph !== undefined) out.features.codegraph = codegraph;
+
+  // Storage
+  const blobBackend = env.ARK_BLOB_BACKEND?.toLowerCase();
+  if (blobBackend === "local" || blobBackend === "s3") {
+    out.storage.blobBackend = blobBackend;
+  }
+  if (env.ARK_S3_BUCKET || env.ARK_S3_REGION || env.ARK_S3_PREFIX || env.ARK_S3_ENDPOINT) {
+    out.storage.s3 = {
+      bucket: env.ARK_S3_BUCKET ?? "",
+      region: env.ARK_S3_REGION ?? "",
+      prefix: env.ARK_S3_PREFIX,
+      endpoint: env.ARK_S3_ENDPOINT,
+    };
+  }
 
   // Database
   if (env.DATABASE_URL) out.databaseUrl = env.DATABASE_URL;

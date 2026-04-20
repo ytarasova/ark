@@ -119,7 +119,18 @@ const fixtures: Record<string, MethodFixture> = {
   "input/upload": {
     validRequest: { name: "goose.yaml", role: "recipe", content: "aGVsbG8=", contentEncoding: "base64" },
     invalidRequest: { name: "x.yaml", role: "r" },
-    sampleResponse: { path: "/tmp/ark/inputs/abc-recipe/goose.yaml" },
+    sampleResponse: { locator: "X2xvY2FsL2lucHV0cy9hYmMtcmVjaXBlL2dvb3NlLnlhbWw" },
+  },
+  "input/read": {
+    validRequest: { locator: "X2xvY2FsL2lucHV0cy9hYmMtcmVjaXBlL2dvb3NlLnlhbWw" },
+    invalidRequest: { locator: 42 },
+    sampleResponse: {
+      filename: "goose.yaml",
+      contentType: "application/x-yaml",
+      content: "aGVsbG8=",
+      contentEncoding: "base64",
+      size: 5,
+    },
   },
   "session/read": {
     validRequest: { sessionId: "s-1", include: ["events"] },
