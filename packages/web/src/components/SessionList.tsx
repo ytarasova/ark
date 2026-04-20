@@ -11,6 +11,8 @@ interface SessionListProps {
   sessions: any[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onArchive?: (id: string) => void;
+  onDelete?: (id: string) => void;
   filter: string;
   onFilterChange: (f: string) => void;
   search: string;
@@ -59,6 +61,8 @@ export function SessionListPanel({
   sessions,
   selectedId,
   onSelect,
+  onArchive,
+  onDelete,
   filter,
   onFilterChange,
   search,
@@ -133,6 +137,8 @@ export function SessionListPanel({
       sessions={items}
       selectedId={selectedId}
       onSelect={onSelect}
+      onArchive={!readOnly ? onArchive : undefined}
+      onDelete={!readOnly ? onDelete : undefined}
       search={search}
       onSearchChange={onSearchChange}
       filterChips={filterChips}

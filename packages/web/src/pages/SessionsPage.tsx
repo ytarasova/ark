@@ -5,6 +5,7 @@ import { SessionDetail } from "../components/SessionDetail.js";
 import { NewSessionModal } from "../components/NewSessionModal.js";
 import { DashboardView } from "../components/DashboardView.js";
 import { SessionStreamErrorBoundary } from "../components/ui/ErrorBoundary.js";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog.js";
 import { useSessions } from "../hooks/useSessions.js";
 import { api } from "../hooks/useApi.js";
 import { ArrowLeft, Maximize2, Minimize2 } from "lucide-react";
@@ -35,6 +36,8 @@ export function SessionsPage({
 }: SessionsPageProps) {
   const [selectedId, setSelectedIdInternal] = useState<string | null>(initialSelectedId ?? null);
   const [maximized, setMaximized] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deletingBusy, setDeletingBusy] = useState(false);
   const setSelectedId = useCallback(
     (id: string | null) => {
       setSelectedIdInternal(id);
@@ -214,6 +217,21 @@ export function SessionsPage({
               });
             }
           }}
+          onArchive={async (id) => {
+            try {
+              const res = await api.archive(id);
+              if (res.ok === false) {
+                onToast?.(`Archive failed: ${res.message ?? "unknown error"}`, "error");
+                return;
+              }
+              onToast?.(`Session ${id} archived`, "success");
+              if (selectedId === id) setSelectedId(null);
+              refresh();
+            } catch (err: any) {
+              onToast?.(`Archive failed: ${err?.message ?? err}`, "error");
+            }
+          }}
+          onDelete={(id) => setPendingDeleteId(id)}
           filter={filter}
           onFilterChange={setFilter}
           search={search}
@@ -275,6 +293,39 @@ export function SessionsPage({
           daemonStatus={daemonStatus}
         />
       )}
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onClose={() => !deletingBusy && setPendingDeleteId(null)}
+        onConfirm={async () => {
+          if (!pendingDeleteId) return;
+          const id = pendingDeleteId;
+          setDeletingBusy(true);
+          try {
+            const res = await api.deleteSession(id);
+            if (res.ok === false) {
+              onToast?.(`Delete failed: ${res.message ?? "unknown error"}`, "error");
+              return;
+            }
+            onToast?.(`Session ${id} deleted`, "success");
+            if (selectedId === id) setSelectedId(null);
+            refresh();
+          } catch (err: any) {
+            onToast?.(`Delete failed: ${err?.message ?? err}`, "error");
+          } finally {
+            setDeletingBusy(false);
+            setPendingDeleteId(null);
+          }
+        }}
+        title="Delete session?"
+        message={
+          pendingDeleteId
+            ? `This removes events, worktree, and tmux state for ${pendingDeleteId}. This cannot be undone.`
+            : undefined
+        }
+        confirmLabel="Delete"
+        danger
+        loading={deletingBusy}
+      />
     </Layout>
   );
 }

@@ -25,6 +25,7 @@ import { DetailDrawer } from "./ui/DetailDrawer.js";
 import { TodoList, type TodoItem } from "./ui/TodoList.js";
 import { DiffViewer, type DiffFile } from "./ui/DiffViewer.js";
 import { StaticTerminal } from "./StaticTerminal.js";
+import { ConfirmDialog } from "./ui/ConfirmDialog.js";
 
 // Extracted helpers
 import {
@@ -156,6 +157,7 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
   const [selectedError, setSelectedError] = useState<ErrorInfo | null>(null);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const prevMsgCountRef = useRef<number | null>(null);
@@ -219,6 +221,14 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
           // and "restart terminal session" (status=stopped/failed/completed).
           // `session/resume` is the single re-dispatch surface.
           res = await api.restart(sessionId);
+          break;
+        case "archive":
+          res = await api.archive(sessionId);
+          break;
+        case "delete":
+          // Confirmation happens via the in-app modal; by the time we're here,
+          // the user has already confirmed.
+          res = await api.deleteSession(sessionId);
           break;
         default:
           return;
@@ -456,6 +466,48 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
           )}
         </button>
       )}
+      <button
+        type="button"
+        onClick={() => handleAction("archive")}
+        disabled={actionLoading === "archive"}
+        aria-label="Archive session"
+        className={cn(
+          "h-7 px-2.5 rounded-[var(--radius-sm)] text-[11px] font-medium",
+          "border border-[var(--border)] bg-transparent text-[var(--fg-muted)]",
+          "hover:text-[var(--fg)] hover:border-[var(--fg-muted)] transition-colors cursor-pointer",
+          "disabled:opacity-50 disabled:cursor-not-allowed",
+          "flex items-center gap-1",
+        )}
+      >
+        {actionLoading === "archive" ? (
+          <>
+            <Loader2 className="animate-spin" size={12} /> Archiving...
+          </>
+        ) : (
+          "Archive"
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={() => setDeleteConfirmOpen(true)}
+        disabled={actionLoading === "delete"}
+        aria-label="Delete session"
+        className={cn(
+          "h-7 px-2.5 rounded-[var(--radius-sm)] text-[11px] font-medium",
+          "border border-[var(--failed)] bg-transparent text-[var(--failed)]",
+          "hover:bg-[var(--diff-rm-bg)] transition-colors cursor-pointer",
+          "disabled:opacity-50 disabled:cursor-not-allowed",
+          "flex items-center gap-1",
+        )}
+      >
+        {actionLoading === "delete" ? (
+          <>
+            <Loader2 className="animate-spin" size={12} /> Deleting...
+          </>
+        ) : (
+          "Delete"
+        )}
+      </button>
     </div>
   );
 
@@ -888,6 +940,19 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
           onSubmit={handleGateReject}
         />
       )}
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={async () => {
+          setDeleteConfirmOpen(false);
+          await handleAction("delete");
+        }}
+        title="Delete session?"
+        message={`This removes events, worktree, and tmux state for ${sessionId}. This cannot be undone.`}
+        confirmLabel="Delete"
+        danger
+        loading={actionLoading === "delete"}
+      />
     </div>
   );
 }

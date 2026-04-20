@@ -14,15 +14,19 @@ export function buildStageProgress(session: any, flowStages: any[]): StageProgre
   const currentStage = session.stage;
   const currentIdx = flowStages.findIndex((s: any) => s.name === currentStage);
   const isFailed = session.status === "failed";
+  const isStopped = session.status === "stopped";
   const isCompleted = session.status === "completed";
   const isRunning = session.status === "running" || session.status === "waiting";
 
   return flowStages.map((s: any, i: number) => {
     if (isCompleted) return { name: s.name, state: "done" as const };
     if (currentIdx < 0) return { name: s.name, state: "pending" as const };
+    // Earlier stages genuinely advanced, mark them done regardless of
+    // whether the session was later stopped / failed mid-flow.
     if (i < currentIdx) return { name: s.name, state: "done" as const };
     if (i === currentIdx) {
       if (isFailed) return { name: s.name, state: "failed" as const };
+      if (isStopped) return { name: s.name, state: "stopped" as const };
       if (isRunning) return { name: s.name, state: "active" as const };
       return { name: s.name, state: "pending" as const };
     }
