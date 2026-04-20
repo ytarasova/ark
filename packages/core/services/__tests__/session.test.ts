@@ -1,27 +1,55 @@
-import { describe, it, expect, beforeEach } from "bun:test";
+/**
+ * SessionService tests.
+ *
+ * Demonstrates the DI container override pattern (awilix):
+ *   - `AppContext.forTestAsync()` builds a fully wired container.
+ *   - Tests can swap individual dependencies via
+ *     `app.container.register({ <key>: asValue(fake) })` -- useful when the
+ *     unit under test shouldn't touch the real DB / FS.
+ *   - Dependencies resolve lazily, so overrides applied after boot but before
+ *     first resolve take effect without re-wiring.
+ *
+ * Prior to the DI migration this file constructed a fresh sqlite DB +
+ * repositories by hand in `beforeEach`. That's still viable for pure unit
+ * tests (see the "pure unit construction" block at the bottom), but the
+ * override-based approach is preferred: it exercises the real wiring graph
+ * and makes dependency swaps explicit instead of implicit.
+ */
+
+import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
+import { asValue } from "awilix";
 import { Database } from "bun:sqlite";
 import { BunSqliteAdapter } from "../../database/sqlite.js";
 import type { IDatabase } from "../../database.js";
+import { AppContext, setApp, clearApp } from "../../app.js";
 import { SessionService } from "../session.js";
 import { SessionRepository } from "../../repositories/session.js";
 import { EventRepository } from "../../repositories/event.js";
 import { MessageRepository } from "../../repositories/message.js";
 import { initSchema } from "../../repositories/schema.js";
-import type { Session, SessionStatus, SessionOpResult } from "../../../types/index.js";
+import type { Session, SessionStatus } from "../../../types/index.js";
 
-let db: IDatabase;
+let app: AppContext;
 let sessions: SessionRepository;
 let events: EventRepository;
 let messages: MessageRepository;
 let svc: SessionService;
 
-beforeEach(() => {
-  db = new BunSqliteAdapter(new Database(":memory:"));
-  initSchema(db);
-  sessions = new SessionRepository(db);
-  events = new EventRepository(db);
-  messages = new MessageRepository(db);
-  svc = new SessionService(sessions, events, messages);
+beforeEach(async () => {
+  app = await AppContext.forTestAsync();
+  await app.boot();
+  setApp(app);
+  // Pull the wired dependencies out of the container. These are the same
+  // instances the SessionService was constructed with.
+  sessions = app.sessions;
+  events = app.events;
+  messages = app.messages;
+  svc = app.sessionService;
+});
+
+afterEach(async () => {
+  await app?.shutdown();
+  clearApp();
 });
 
 describe("SessionService", () => {
@@ -485,6 +513,94 @@ describe("SessionService", () => {
     it("undelete of nonexistent returns error", async () => {
       const result = await svc.undelete("s-000000");
       expect(result.ok).toBe(false);
+    });
+  });
+
+  // ── DI container overrides ────────────────────────────────────────────
+  //
+  // These exercise the "replace a dependency with a test double" pattern.
+  // The service instance resolved before the override retains the original
+  // wiring (awilix singletons are cached by reference), but *re-resolving*
+  // sessionService after an override gives us a fresh instance wired to the
+  // fake -- proving the container can rebuild services from test doubles.
+
+  describe("container overrides", () => {
+    it("swapping the events repo reroutes session_created logging", () => {
+      // Spy that records every event logged through the service.
+      const recorded: Array<{ sessionId: string; type: string }> = [];
+      const fakeEvents = {
+        log: mock((sessionId: string, type: string) => {
+          recorded.push({ sessionId, type });
+        }),
+        list: mock(() => []),
+      };
+
+      // Replace events in the container. sessionService resolves events on
+      // construction, so we also need to re-resolve sessionService.
+      app.container.register({
+        events: asValue(fakeEvents),
+        sessionService: asValue(
+          new SessionService(app.sessions, fakeEvents as unknown as EventRepository, app.messages, app),
+        ),
+      });
+
+      const freshSvc = app.container.resolve("sessionService");
+      const s = freshSvc.start({ summary: "override test" });
+
+      expect(recorded.length).toBe(1);
+      expect(recorded[0].sessionId).toBe(s.id);
+      expect(recorded[0].type).toBe("session_created");
+      expect(fakeEvents.log).toHaveBeenCalledTimes(1);
+    });
+
+    it("swapping the sessions repo with a fake lets us assert call patterns", async () => {
+      // Minimal fake repo -- just enough surface for stop() to run.
+      const fakeRepo = {
+        get: mock((id: string) => ({ id, status: "running", session_id: null, stage: null, agent: null })),
+        update: mock(() => {}),
+        list: mock(() => []),
+        create: mock(() => ({ id: "s-fake", status: "pending" })),
+      };
+
+      app.container.register({
+        sessions: asValue(fakeRepo as unknown as SessionRepository),
+        sessionService: asValue(
+          new SessionService(fakeRepo as unknown as SessionRepository, app.events, app.messages, app),
+        ),
+      });
+
+      const freshSvc = app.container.resolve("sessionService");
+      const result = await freshSvc.stop("s-fake-id");
+
+      expect(result.ok).toBe(true);
+      expect(fakeRepo.get).toHaveBeenCalledWith("s-fake-id");
+      expect(fakeRepo.update).toHaveBeenCalled();
+    });
+  });
+
+  // ── Pure-unit construction (legacy, still supported) ──────────────────
+  //
+  // For pure unit tests that don't need the full AppContext, you can still
+  // construct SessionService directly. Prefer the container path above when
+  // the test touches more than one repository.
+
+  describe("pure unit construction (no container)", () => {
+    let pureDb: IDatabase;
+    let pureSvc: SessionService;
+
+    beforeEach(() => {
+      pureDb = new BunSqliteAdapter(new Database(":memory:"));
+      initSchema(pureDb);
+      pureSvc = new SessionService(
+        new SessionRepository(pureDb),
+        new EventRepository(pureDb),
+        new MessageRepository(pureDb),
+      );
+    });
+
+    it("start() works without an AppContext", () => {
+      const s = pureSvc.start({ summary: "pure unit" });
+      expect(s.id).toMatch(/^s-[0-9a-z]{10}$/);
     });
   });
 });

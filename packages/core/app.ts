@@ -12,10 +12,10 @@ import type { IDatabase } from "./database/index.js";
 import { BunSqliteAdapter } from "./database/index.js";
 import { join } from "path";
 import { tmpdir } from "os";
-import { resolveStoreBaseDir } from "./install-paths.js";
 
 import { asValue } from "awilix";
 import { createAppContainer, type AppContainer } from "./container.js";
+import { buildContainer } from "./di/index.js";
 import { loadConfig, loadAppConfig, type ArkConfig } from "./config.js";
 import { configureOtlp } from "./observability/otlp.js";
 import { safeAsync } from "./safe.js";
@@ -24,7 +24,6 @@ import type { ComputeProvider } from "../compute/types.js";
 import type { Compute as NewCompute, Runtime as NewRuntime, ComputeKind, RuntimeKind } from "../compute/core/types.js";
 import type { ComputePool } from "../compute/core/pool/types.js";
 import type { SnapshotStore } from "../compute/core/snapshot-store.js";
-import { FsSnapshotStore } from "../compute/core/snapshot-store-fs.js";
 import { safeParseConfig } from "./util.js";
 import { initSchema as initRepoSchema, seedLocalCompute } from "./repositories/schema.js";
 import type { Compute, Session, ComputeProviderName } from "../types/index.js";
@@ -45,15 +44,11 @@ import {
   TodoRepository,
   ArtifactRepository,
 } from "./repositories/index.js";
-import { SessionService, ComputeService, HistoryService } from "./services/index.js";
-import { FileFlowStore, FileSkillStore, FileAgentStore, FileRecipeStore, FileRuntimeStore } from "./stores/index.js";
-import { TranscriptParserRegistry } from "./runtimes/transcript-parser.js";
-import { createPluginRegistry, type PluginRegistry } from "./plugins/registry.js";
-import { ClaudeTranscriptParser } from "./runtimes/claude/parser.js";
-import { CodexTranscriptParser } from "./runtimes/codex/parser.js";
-import { GeminiTranscriptParser } from "./runtimes/gemini/parser.js";
-import { DbResourceStore, initResourceDefinitionsTable } from "./stores/db-resource-store.js";
+import type { SessionService, ComputeService, HistoryService } from "./services/index.js";
+import { DbResourceStore } from "./stores/db-resource-store.js";
 import type { FlowStore, SkillStore, AgentStore, RecipeStore, RuntimeStore } from "./stores/index.js";
+import type { TranscriptParserRegistry } from "./runtimes/transcript-parser.js";
+import type { PluginRegistry } from "./plugins/registry.js";
 import type { SessionLauncher } from "./session-launcher.js";
 import { TmuxLauncher } from "./launchers/tmux.js";
 import { NoopLauncher } from "./launchers/noop.js";
@@ -135,8 +130,14 @@ export class AppContext {
   constructor(config: ArkConfig, options: AppOptions = {}) {
     this.config = config;
     this.options = options;
+    // Placeholder container -- the real one is built in boot() once the DB
+    // is open. We still register `config` + `app` here so call sites that
+    // read config before boot (rare, but a few tests do) keep working.
     this._container = createAppContainer();
-    this._container.register({ config: asValue(config) });
+    this._container.register({
+      config: asValue(config),
+      app: asValue(this),
+    });
   }
 
   // ── Accessors (resolved from the DI container) ────────────────────────
@@ -311,8 +312,9 @@ export class AppContext {
   private _resolve<K extends keyof import("./container.js").Cradle>(key: K): import("./container.js").Cradle[K] {
     try {
       return this._container.resolve(key);
-    } catch {
-      throw new Error(`AppContext not booted -- ${key} not available`);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      throw new Error(`AppContext not booted -- ${key} not available (${reason})`);
     }
   }
 
@@ -592,75 +594,22 @@ export class AppContext {
     }
   }
 
-  /** Step 3b: register all repositories, services, stores, and registries in the DI container. */
+  /**
+   * Step 3b: register all repositories, services, stores, and registries in
+   * the DI container.
+   *
+   * Delegates to `buildContainer()` in packages/core/di/ which owns the
+   * concern split (persistence / services / runtime). The container returned
+   * from `buildContainer` replaces the placeholder built in the constructor.
+   *
+   * TODO(di-migration): remaining services + subsystems still wired directly
+   * on AppContext (router, conductor, arkd, worker registry, scheduler,
+   * tenant policy manager, compute pools). Migrate in follow-up PRs using
+   * the same pattern -- add a cradle entry, register in the appropriate
+   * di/* module, resolve via `app.container.resolve(...)`.
+   */
   private _registerContainer(db: IDatabase): void {
-    const storeBaseDir = resolveStoreBaseDir();
-    const pricingRegistry = new PricingRegistry();
-
-    // Construct repositories eagerly so we can register them as values.
-    // asClass(...) used to work here, but `bun build --compile` minifies
-    // constructor parameter names which breaks awilix's name-based DI
-    // resolution -- the compiled binary fails with
-    // "AppContext not booted -- sessionService not available" because
-    // SessionService(constructor(a, b, c)) can't be matched against the
-    // cradle. Constructing eagerly side-steps that entirely.
-    const sessions = new SessionRepository(db);
-    // Push channel port bounds from config into the repo so its
-    // channelPort(id) respects the active profile (test profile
-    // randomizes the base port to avoid cross-worker collisions).
-    sessions.setChannelBounds(this.config.channels.basePort, this.config.channels.range);
-    const computes = new ComputeRepository(db);
-    const computeTemplates = new ComputeTemplateRepository(db);
-    const events = new EventRepository(db);
-    const messages = new MessageRepository(db);
-    const todos = new TodoRepository(db);
-    const artifacts = new ArtifactRepository(db);
-    const sessionService = new SessionService(sessions, events, messages, this);
-    const computeService = new ComputeService(computes);
-    const historyService = new HistoryService(db);
-
-    this._container.register({
-      db: asValue(db),
-
-      // Repositories
-      sessions: asValue(sessions),
-      computes: asValue(computes),
-      computeTemplates: asValue(computeTemplates),
-      events: asValue(events),
-      messages: asValue(messages),
-      todos: asValue(todos),
-      artifacts: asValue(artifacts),
-
-      // Services
-      sessionService: asValue(sessionService),
-      computeService: asValue(computeService),
-      historyService: asValue(historyService),
-
-      // Resource stores: file-backed for local mode, DB-backed for hosted/control plane
-      ...this.createResourceStores(db, storeBaseDir),
-
-      // Knowledge graph
-      knowledge: asValue(new KnowledgeStore(db)),
-
-      // Snapshot persistence. Default to an FS-backed store under
-      // `<arkDir>/snapshots`. Hosted deployments can replace with an S3/GCS
-      // impl via `container.register({ snapshotStore: asValue(...) })`.
-      snapshotStore: asValue(new FsSnapshotStore(join(this.config.arkDir, "snapshots"))),
-
-      // Cost tracking
-      pricing: asValue(pricingRegistry),
-      usageRecorder: asValue(new UsageRecorder(db, pricingRegistry)),
-
-      // Runtime transcript parsers (polymorphic, one per agent tool)
-      transcriptParsers: asValue(this.createTranscriptParserRegistry()),
-
-      // Plugin registry -- canonical source for extensible collections
-      // (executors today; compute providers, runtimes, transcript parsers next)
-      pluginRegistry: asValue(createPluginRegistry()),
-    });
-
-    // Non-blocking remote price refresh
-    pricingRegistry.refreshFromRemote().catch(() => {});
+    this._container = buildContainer({ app: this, config: this.config, db });
   }
 
   /** Step 4: register every compute provider available in the current install. */
@@ -739,7 +688,8 @@ export class AppContext {
 
   /** Step 5: wire services and the global event bus. */
   private _wireServices(): void {
-    this.sessionService.setApp(this);
+    // SessionService receives `app` via constructor injection (see
+    // packages/core/di/services.ts), so no setApp call is needed here.
     setProviderResolver((session: Session) => this.resolveProvider(session));
 
     // Built-in executors -- register into the PluginRegistry (authoritative)
@@ -1046,96 +996,10 @@ export class AppContext {
   }
 
   // ── Resource Store Factory ─────────────────────────────────────────────
-
-  /**
-   * Build the TranscriptParserRegistry with all known runtime parsers.
-   * To add a new runtime, create a parser class under packages/core/runtimes/<name>/parser.ts
-   * and register it here.
-   */
-  private createTranscriptParserRegistry(): TranscriptParserRegistry {
-    const registry = new TranscriptParserRegistry();
-    // Claude parser uses session.claude_session_id (set at launch via --session-id)
-    // to construct the exact transcript path. The sessionIdLookup bridges workdir
-    // back to that stored ID by querying the session repo.
-    registry.register(
-      new ClaudeTranscriptParser(undefined, (workdir) => {
-        try {
-          const sessions = this.sessions.list({ limit: 50 });
-          const match = sessions.find((s) => s.workdir === workdir && s.claude_session_id);
-          return match?.claude_session_id ?? null;
-        } catch {
-          return null;
-        }
-      }),
-    );
-    registry.register(new CodexTranscriptParser());
-    registry.register(new GeminiTranscriptParser());
-    return registry;
-  }
-
-  private createResourceStores(db: IDatabase, storeBaseDir: string): Record<string, any> {
-    const isHosted = !!this.config.databaseUrl;
-
-    if (isHosted) {
-      // Control plane: DB-backed stores with tenant scoping
-      initResourceDefinitionsTable(db);
-      return {
-        flows: asValue(new DbResourceStore(db, "flow", { stages: [] })),
-        skills: asValue(new DbResourceStore(db, "skill", { description: "", content: "" })),
-        agents: asValue(
-          new DbResourceStore(db, "agent", {
-            description: "",
-            model: "sonnet",
-            max_turns: 200,
-            system_prompt: "",
-            tools: [],
-            mcp_servers: [],
-            skills: [],
-            memories: [],
-            context: [],
-            permission_mode: "bypassPermissions",
-            env: {},
-          }),
-        ),
-        recipes: asValue(new DbResourceStore(db, "recipe", { description: "", flow: "default" })),
-        runtimes: asValue(new DbResourceStore(db, "runtime", { description: "", type: "cli-agent", command: [] })),
-      };
-    }
-
-    // Local mode: file-backed stores with three-tier resolution
-    return {
-      flows: asValue(
-        new FileFlowStore({
-          builtinDir: join(storeBaseDir, "flows", "definitions"),
-          userDir: join(this.config.arkDir, "flows"),
-        }),
-      ),
-      skills: asValue(
-        new FileSkillStore({
-          builtinDir: join(storeBaseDir, "skills"),
-          userDir: join(this.config.arkDir, "skills"),
-        }),
-      ),
-      agents: asValue(
-        new FileAgentStore({
-          builtinDir: join(storeBaseDir, "agents"),
-          userDir: join(this.config.arkDir, "agents"),
-        }),
-      ),
-      recipes: asValue(
-        new FileRecipeStore({
-          builtinDir: join(storeBaseDir, "recipes"),
-          userDir: join(this.config.arkDir, "recipes"),
-        }),
-      ),
-      runtimes: asValue(
-        new FileRuntimeStore({
-          builtinDir: join(storeBaseDir, "runtimes"),
-          userDir: join(this.config.arkDir, "runtimes"),
-        }),
-      ),
-    };
-  }
+  //
+  // Resource store + transcript parser construction moved to
+  // packages/core/di/persistence.ts and packages/core/di/runtime.ts
+  // respectively. See buildContainer() in di/index.ts for wiring.
 
   // ── Metrics Poller ─────────────────────────────────────────────────────
 
