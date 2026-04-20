@@ -8,12 +8,18 @@
 ## 1. Headline
 
 - **Two-day alignment pass delivered.** Five dated review docs published on 2026-04-18 (reconciliation, Rohit/Abhimanyu flow support, code-intelligence design, unified summary, collated roadmap) plus a 2026-04-19 progress audit. These are the point-in-time record.
-- **Correction 2026-04-19 (later in day):** re-audit against *generalizations* rather than literal 2026-04-18 spec names surfaces two more shipped items + one hidden regression:
+- **Evening 2026-04-19 update** (third-pass re-audit + action pass):
+  - ✅ **Audit-log adapters migrated** -- all 3 stubs (`local`, `test`, `control-plane`) now delegate to real `EventRepository`. Port doc clarifies `log` is the only append path and `deleteForTrack` is session-cascade, not audit-tamper. 12/12 EventRepository tests pass.
+  - ✅ **Send -> Chat** rename in `ChatPanel.tsx:117` (Abhimanyu 2026-04-13 feedback).
+  - 🟡 **Canonical 15-stage vocabulary** upgraded from GAP to PARTIAL: 12 ISLC agents in `agents/` cover the stage semantic; flow schema + canonical `paytm-sdlc.yaml` still pending.
+  - 🟡 **In-app browser** upgraded from GAP to PARTIAL: `@anthropics/playwright-mcp` in `extension-catalog.ts`; no custom UI picker yet.
+  - N/A: Fork/Dispatch tooltips -- TUI-retired concept. Web UI uses `Resume` as the single re-dispatch surface.
+  - Full updated matrix: 7 shipped / 8 partial / 7 gap / 3 future; 5 of 8 reconciliation §8 off-roadmap gaps remain fully open.
+- **Correction 2026-04-19 (earlier):** re-audit against *generalizations* rather than literal 2026-04-18 spec names surfaces two more shipped items + one hidden regression:
   - ✅ **Ad-hoc recipe-file dispatch** shipped via `--file role=path` + `--param k=v` (CLI + Web UI). Closes reconciliation §8 item 6.
   - ✅ **Per-stage model routing** shipped at `packages/core/services/dispatch.ts:260-263` via `stageDef.model` override. The Apr 14 "plan with Opus, implement with MiniMax" strategy is wire-ready today.
   - 🟡 **Workflow UI file upload** partially shipped (ChatInput + SessionDetail; not ChatPanel).
-  - ⚠️ **Audit log is WORSE than reported**: all three event-store adapters are NOT_MIGRATED stubs that throw; port has `deleteForTrack()` violating immutability. Compliance risk if audit is assumed for pilot.
-  - **6 of 8** reconciliation §8 off-roadmap gaps remain open (not 7, not 8).
+  - ⚠️ **Audit log was WORSE than reported**: all three event-store adapters were NOT_MIGRATED stubs that throw. **Now fixed in the evening pass** (see above).
 - **codebase-memory-mcp integration SHIPPED** (PR #202, merged into main). v0.6.0 static C binary vendored; 14 code-intelligence tools auto-injected into every agent session; CLI + Web UI surfaces live. Paper: arXiv:2603.27277 claims 10x fewer tokens + 2.1x fewer tool calls vs pure-Grep baselines.
 - **Harinder's anchor:** *"We are 90% there."* Deep audit confirms. Remaining work is vocabulary alignment + integration + polish, not new subsystems.
 - **Compute platform advanced materially** since 2026-04-18: Awilix DI split, SnapshotStore + pause/resume, ComputePool with Firecracker warm pool, polymorphic ProviderFlagSpec, session/dispatch RPC retired, SOLID audits + 6 structural refactors.
