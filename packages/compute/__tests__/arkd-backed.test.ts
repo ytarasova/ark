@@ -9,12 +9,34 @@ import { join } from "path";
 import { tmpdir } from "os";
 import { startArkd } from "../../arkd/server.js";
 import { ArkdBackedProvider } from "../providers/arkd-backed.js";
+import { allocatePort } from "../../core/config/port-allocator.js";
 import type { Compute, Session, ProvisionOpts, SyncOpts, IsolationMode } from "../types.js";
 import { waitFor } from "../../core/__tests__/test-helpers.js";
 
-const TEST_PORT = 19360;
+let TEST_PORT: number;
 let server: { stop(): void };
 let tempDir: string;
+
+/**
+ * Poll arkd `/health` until it responds 200 or the deadline passes.
+ * Much cheaper than `/snapshot` (no shell-outs), so safe to call right
+ * after `startArkd()` without burning seconds. Throws on timeout.
+ */
+async function waitForArkdReady(url: string, timeoutMs = 10_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  let lastErr: unknown = null;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`${url}/health`, { method: "GET" });
+      if (res.ok) return;
+      lastErr = new Error(`HTTP ${res.status}`);
+    } catch (err) {
+      lastErr = err;
+    }
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  throw new Error(`arkd not ready at ${url} within ${timeoutMs}ms: ${String(lastErr)}`);
+}
 
 // Concrete test subclass - implements the abstract methods minimally
 class TestArkdProvider extends ArkdBackedProvider {
@@ -70,10 +92,16 @@ function makeSession(sessionId?: string): Session {
   } as Session;
 }
 
-beforeAll(() => {
+beforeAll(async () => {
   tempDir = join(tmpdir(), `arkd-backed-test-${Date.now()}`);
   mkdirSync(tempDir, { recursive: true });
+  // Allocate an ephemeral port so two copies of this file (in different
+  // workers or alongside local-arkd.test.ts) don't collide on 19360.
+  TEST_PORT = await allocatePort();
   server = startArkd(TEST_PORT, { quiet: true });
+  // Wait until the HTTP server is actually accepting requests. Without
+  // this, the first test can race `Bun.serve()`'s async listen and fail.
+  await waitForArkdReady(`http://localhost:${TEST_PORT}`);
 });
 
 afterAll(() => {
@@ -159,6 +187,13 @@ describe("ArkdBackedProvider agent lifecycle", () => {
 // ── Metrics ─────────────────────────────────────────────────────────────────
 
 describe("ArkdBackedProvider getMetrics", () => {
+  // Timeout is 30s (not the bun-test default 5s) because /snapshot on arkd
+  // shells out to `top -l 1`, `vm_stat`, `df`, `uptime`, `ps aux`, `tmux
+  // list-sessions` (with per-session introspection), and `docker stats
+  // --no-stream`. On a loaded macOS host these routinely stack past 5s -- a
+  // direct `curl /snapshot` measured ~7s on the maintainer's laptop with no
+  // test harness overhead. The assertions themselves are cheap; the time
+  // budget is for the HTTP round-trip against a real collector.
   it("returns ComputeSnapshot from arkd", async () => {
     const snap = await provider.getMetrics(compute);
 
@@ -171,7 +206,7 @@ describe("ArkdBackedProvider getMetrics", () => {
     expect(Array.isArray(snap.sessions)).toBe(true);
     expect(Array.isArray(snap.processes)).toBe(true);
     expect(Array.isArray(snap.docker)).toBe(true);
-  });
+  }, 30_000);
 });
 
 // ── Port probing ────────────────────────────────────────────────────────────
