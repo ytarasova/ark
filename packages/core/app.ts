@@ -114,9 +114,6 @@ export class AppContext {
     }
     this.phase = "booting";
 
-    // Auto-register as global singleton (used by flow.ts loadFlow fallback)
-    if (!_app) _app = this;
-
     // Preconditions that must happen before the container can be built:
     // filesystem, DB open, schema migration, compute-template seeding, and
     // ApiKeyManager init (the API key manager currently creates its own
@@ -159,9 +156,6 @@ export class AppContext {
     if (this.options.cleanupOnShutdown && existsSync(this.config.arkDir)) {
       rmSync(this.config.arkDir, { recursive: true, force: true });
     }
-
-    // Clear global singleton if this instance is the current one
-    if (_app === this) _app = null;
 
     this.phase = "stopped";
   }
@@ -555,22 +549,8 @@ const TEST_OPTIONS: AppOptions = {
   cleanupOnShutdown: true,
 };
 
-// ── Global Singleton ───────────────────────────────────────────────────────
-
-let _app: AppContext | null = null;
-
-/** Get the global AppContext. Throws if not set. */
-export function getApp(): AppContext {
-  if (!_app) throw new Error("AppContext not initialized -- call setApp() first");
-  return _app;
-}
-
-/** Set the global AppContext singleton. */
-export function setApp(app: AppContext): void {
-  _app = app;
-}
-
-/** Clear the global AppContext (for tests). */
-export function clearApp(): void {
-  _app = null;
-}
+// The module-level `getApp/setApp/clearApp` service locator has been
+// removed. All callers must now receive AppContext through constructor
+// injection or an explicit parameter (preferred). The CLI entry point
+// holds the lone process-wide AppContext and threads it through its
+// command handlers.
