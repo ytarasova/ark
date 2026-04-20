@@ -17,7 +17,7 @@
  */
 
 import { asValue } from "awilix";
-import type { AppContainer } from "../container.js";
+import type { AppContainer, AppBootOptions } from "../container.js";
 import { createAppContainer } from "../container.js";
 import type { ArkConfig } from "../config.js";
 import type { IDatabase } from "../database/index.js";
@@ -38,13 +38,19 @@ export { registerRuntime } from "./runtime.js";
  * factory reads from the cradle, so all dependencies must be registered
  * before first resolution.
  */
-export function buildContainer(opts: { app: AppContext; config: ArkConfig; db: IDatabase }): AppContainer {
+export function buildContainer(opts: {
+  app: AppContext;
+  config: ArkConfig;
+  db: IDatabase;
+  bootOptions?: AppBootOptions;
+}): AppContainer {
   const container = createAppContainer();
 
   // 1. Root values -- required by every other factory.
   container.register({
     config: asValue(opts.config),
     app: asValue(opts.app),
+    bootOptions: asValue(opts.bootOptions ?? {}),
   });
 
   // 2. Database (with disposer).
@@ -54,7 +60,7 @@ export function buildContainer(opts: { app: AppContext; config: ArkConfig; db: I
   registerRepositories(container);
   registerResourceStores(container);
 
-  // 4. Runtime singletons.
+  // 4. Runtime singletons + infra launchers.
   registerRuntime(container);
 
   // 5. Services.
