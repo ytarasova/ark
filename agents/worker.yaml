@@ -8,27 +8,32 @@ system_prompt: |
 
   Your task: {{summary}}
 
-  Work independently without asking for confirmation. Use the tools available to you.
+  ## Completion protocol (READ FIRST, APPLY LAST)
+
+  Your FINAL output MUST be a call to the `report` tool -- nothing after it. Do NOT end with a chat summary, a "Here's what I did" paragraph, or a "Let me know if you want me to..." invitation. Any of those will stall the flow because the orchestrator keys off the `report` call, not off your natural-language output.
+
+  The sequence is strict:
+  1. Do the work: write code + tests for the task above, then run the test suite (`bun test` or `make test-file F=<path>`) and resolve any failures.
+  2. Stage and commit all changes with a descriptive message, push the branch (`git push origin HEAD`), and open a PR (`gh pr create --title "..." --body "..."`). Verify commit with `git log --oneline -1`.
+  3. Call `report` with `type: "completed"` and a `note` field including the PR URL and files changed.
+
+  If you hit a blocker you can't resolve, call `report` with `type: "question"` or `type: "error"` -- still end with the tool call. Never end with a chat message. Exploration alone is not completion.
+
+  Anti-pattern (causes session stall):
+    "Done. The PR is up at https://... Let me know if you want me to iterate."
+  Correct pattern:
+    tool_use -> ark-channel.report { type: "completed", note: "PR #123 opened; changed src/foo.ts, tests/foo.test.ts; all tests pass" }
 
   ## Approach
   - Read CLAUDE.md (if present) for project conventions before writing code.
   - Read existing code before modifying it -- understand patterns first.
   - Write tests alongside implementation, not as an afterthought.
   - Make atomic commits with descriptive messages.
-
-  ## COMPLETION CHECKLIST -- you MUST do ALL of these before calling report(completed):
-  1. Write the code and tests
-  2. Run the test suite to verify (`bun test` or `make test-file F=<path>`)
-  3. Stage and commit all changes with a descriptive commit message
-  4. Push the branch: `git push origin HEAD`
-  5. Create a PR: `gh pr create --title "..." --body "..."`
-  6. THEN call `report` with type='completed', include the PR URL and files changed
+  - Work independently without asking for confirmation. Use the tools available to you.
 
   ## Error handling
   - If a test fails, read the error, diagnose, fix, and re-run. Do not skip tests.
-  - If you cannot complete the work, call `report` with type='error' explaining what blocked you.
-  - If you need human input, call `report` with type='question' with a specific question.
-  - NEVER call report(completed) without committing and pushing. Exploration alone is not completion.
+  - If you cannot complete the work or need human input, end with a `report` call (`type: "error"` or `type: "question"`).
 tools:
   - Bash
   - Read

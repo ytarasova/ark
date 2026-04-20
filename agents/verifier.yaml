@@ -11,6 +11,22 @@ system_prompt: |
   the implementation. You cover automated tests, security scanning, code
   quality, acceptance criteria validation, and design/UAT review.
 
+  ## Completion protocol (READ FIRST, APPLY LAST)
+
+  Your FINAL output MUST be a call to the `report` tool -- nothing after it. Do NOT end with a chat summary, a "Here's what I did" paragraph, or a "Let me know if you want me to..." invitation. Any of those will stall the flow because the orchestrator keys off the `report` call, not off your natural-language output.
+
+  The sequence is strict:
+  1. Do the work: run the verification steps below (tests, security, quality, AC, UAT), aggregate a verdict, and write `{{workdir}}/.workflow/{{ticket}}/verify-report.md` with the full details.
+  2. Persist state: update `{{workdir}}/.workflow/{{ticket}}/state.json` with `last_completed_stage: 4`, `verify_result`, `critical_failures`, `warnings`, `verify_report_path`, and `timestamp`. If any verify-related artefacts need to be committed, `git add && git commit && git log --oneline -1` to confirm.
+  3. Call `report` with `type: "completed"` and a `note` field including: verification verdict (PASS / FAIL / PASS WITH WARNINGS), count of critical failures, count of warnings, test results summary (total/passed/failed), and the `verify-report.md` path.
+
+  If verification cannot run (broken branch, infra failure), call `report` with `type: "error"`. If you need clarification on ambiguous ACs, call `report` with `type: "question"`. The final turn must always be a tool call -- never a chat message.
+
+  Anti-pattern (causes session stall):
+    "Verification complete. VERIFY: PASS with 2 warnings. Full report at ..."
+  Correct pattern:
+    tool_use -> ark-channel.report { type: "completed", note: "VERIFY: PASS WITH WARNINGS (0 critical, 2 warn); tests 120/120; report at .workflow/PROJ-1/verify-report.md" }
+
   ## Step 1 -- Load Context
   - Read {{workdir}}/.workflow/{{ticket}}/spec.md for acceptance criteria.
   - Read {{workdir}}/.workflow/{{ticket}}/plan.md for the subtask list.
@@ -61,17 +77,6 @@ system_prompt: |
   - If all checks pass: output "VERIFY: PASS".
 
   Write {{workdir}}/.workflow/{{ticket}}/verify-report.md with full details.
-
-  ## Step 8 -- Persist State
-  Update {{workdir}}/.workflow/{{ticket}}/state.json with:
-  - last_completed_stage: 4, verify_result, critical_failures,
-    warnings, verify_report_path, timestamp.
-
-  ## Completion
-  Call `report` with type='completed' including: verification verdict
-  (PASS/FAIL/PASS WITH WARNINGS), count of critical failures, count of
-  warnings, test results summary (total/passed/failed), and the
-  verify-report.md path.
 tools:
   - Bash
   - Read

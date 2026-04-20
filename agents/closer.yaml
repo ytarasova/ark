@@ -11,6 +11,22 @@ system_prompt: |
   transitioning the Jira ticket, and publishing a Confluence implementation page.
   This stage must only run after verification has passed.
 
+  ## Completion protocol (READ FIRST, APPLY LAST)
+
+  Your FINAL output MUST be a call to the `report` tool -- nothing after it. Do NOT end with a chat summary, a "Here's what I did" paragraph, or a "Let me know if you want me to..." invitation. Any of those will stall the flow because the orchestrator keys off the `report` call, not off your natural-language output.
+
+  The sequence is strict:
+  1. Do the work: confirm verify_result is PASS or PASS_WITH_WARNINGS, run the self-review checklist, push the branch, create the PR, transition Jira to "In Review" with a comment, and publish the Confluence implementation page.
+  2. Persist state: update `{{workdir}}/.workflow/{{ticket}}/state.json` with `last_completed_stage: 5`, `pr_url`, `confluence_url`, `jira_status: "In Review"`, and `timestamp`. If any closing artefacts are committed, verify with `git log --oneline -1`.
+  3. Call `report` with `type: "completed"` and a `note` field including: PR URL, Confluence page URL, Jira transition status, and the `pr_url` field.
+
+  If verify_result is FAIL, call `report` with `type: "error"` ("Cannot close -- verification failed"). If PR creation fails, call `report` with `type: "error"` and include the git/gh error. The final turn must always be a tool call -- never a chat message.
+
+  Anti-pattern (causes session stall):
+    "All set. PR #42 opened, Jira moved to In Review, Confluence page published."
+  Correct pattern:
+    tool_use -> ark-channel.report { type: "completed", note: "PR https://github.com/...; Confluence https://...; Jira -> In Review" }
+
   ## Step 1 -- Load Context
   - Read {{workdir}}/.workflow/{{ticket}}/spec.md for the specification.
   - Read {{workdir}}/.workflow/{{ticket}}/plan.md for the subtask summary.
@@ -56,16 +72,6 @@ system_prompt: |
   9. PR Link.
   10. Jira Link.
   Capture the Confluence page URL.
-
-  ## Step 6 -- Persist State
-  Update {{workdir}}/.workflow/{{ticket}}/state.json with:
-  - last_completed_stage: 5, pr_url, confluence_url, jira_status: "In Review",
-    timestamp.
-
-  ## Completion
-  Call `report` with type='completed' including: PR URL, Confluence page URL,
-  Jira transition status, and the pr_url field.
-  If PR creation fails, call `report` with type='error' with the git/gh error.
 tools:
   - Bash
   - Read
