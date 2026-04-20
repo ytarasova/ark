@@ -28,12 +28,12 @@
 | 9 | Multi-tenant + Multi-user | 🟡 PARTIAL | 🟡 **PARTIAL** (no progress) | `tenant_id` on 32 tables; auth disabled by default; hosted.ts untested |
 | 10 | Multi-repo (Camp 11) | 🔮 FUTURE | 🔮 **still FUTURE** | No `session.repos[]` schema; still single-repo |
 | 11 | LLM Router MiniMax/SambaNova/TFY adapters | 🟡 PARTIAL | ❌ **GAP** (downgraded for clarity) | No provider definitions in `packages/router/config.ts`. |
-| 12 | Per-stage model routing | ❌ GAP | 🟡 **PARTIAL** | `StageDefinition.model?: string` field exists (`flow.ts:42`); orchestration does not yet enforce per-stage routing |
+| 12 | Per-stage model routing | ❌ GAP | ✅ **SHIPPED** | `packages/core/services/dispatch.ts:260-263` reads `stageDef?.model ?? session.config?.model_override` and applies it to `agent.model` before dispatch. Schema field at `flow.ts:42`. Wired end-to-end; no unit tests for it yet. (Revised 2026-04-19 re-audit.) |
 | 13 | Dashboards Team/BU/Org rollups | 🟡 PARTIAL | 🟡 **PARTIAL** (no progress) | Session-level dashboard only |
-| 14 | Auditing (immutable audit log) | ❌ GAP | 🟡 **PARTIAL** | `packages/core/ports/event-store.ts` documents "persistent audit log"; `MapSecretStore`/`MapEventStore` test adapters in place; no immutable schema yet |
+| 14 | Auditing (immutable audit log) | ❌ GAP | ❌ **MORE BROKEN than reported** | `packages/core/ports/event-store.ts` interface exists but `local/event-store.ts`, `test/event-store.ts`, `control-plane/event-store.ts` are ALL `NOT_MIGRATED` stubs that throw. Port has `deleteForTrack()` method which violates immutability. Not a partial impl -- the adapters don't work at all. (Revised 2026-04-19 re-audit.) |
 | 15 | Credentials vault (Camp 10) | 📍 PLANNED | 📍 **still PLANNED** | `packages/core/adapters/test/secret-store.ts` + `MapSecretStore` for tests only; no encrypted storage |
 | 16 | Workflow Observability OTLP | 🟡 PARTIAL | 🟡 **PARTIAL** (no progress) | `packages/core/otlp.ts` stub; no real Jaeger/Tempo wiring |
-| 17 | Workflow UI file upload | ❌ GAP | ❌ **still GAP** | `ChatPanel.tsx` unchanged; no file picker; no `files` in `MessageSendParams` |
+| 17 | Workflow UI file upload | ❌ GAP | 🟡 **PARTIAL** | `packages/web/src/components/ui/ChatInput.tsx:55-73` supports Cmd+V image paste. `SessionDetail.tsx:613` uses `ChatInput` with attachment support (`:238-244`). BUT `ChatPanel.tsx` (the inline slide-out chat in the session list) still uses basic `Input` without file affordance. Partial surface coverage. (Revised 2026-04-19 re-audit.) |
 | 18 | Workflow UI diff-review syntax highlight | 🟡 PARTIAL | 🟡 **PARTIAL** (no progress) | Still raw `<pre>` render in `SessionDetail.tsx` |
 | 19 | Remove `codegraph` from versions.yaml | ⏳ deferred | ⏳ **still deferred** | Still present in `vendor/versions.yaml` (dual-stack with codebase-memory-mcp) |
 | 20 | Retire native `knowledge/search` + `context` + `impact` | ⏳ deferred | ⏳ **still deferred** | All 3 cases still present in `packages/core/knowledge/mcp.ts` |
@@ -43,7 +43,7 @@
 | 24 | **session/dispatch RPC removed** (#231) | n/a | ✅ **SHIPPED** | RPC surface removed; auto-dispatch on session creation preserved. Commit `221df1e2`. |
 | 25 | **Awilix DI split** (#248) | n/a | ✅ **SHIPPED** | `packages/core/di/` new dir (`index.ts`, `persistence.ts`, `services.ts`, `runtime.ts`, `container.ts`); PROXY injection; sessions + compute migrated. Commit `8a6c29df`. |
 
-Counts (corrected after reviewing `packages/cli/commands/session.ts:42-67` and `packages/web/src/components/session/InputsSection.tsx`): **5 shipped, 6 partial, 11 still-gap, 3 still-future** (total 25). **7 of the 8 off-roadmap gaps from reconciliation §8 are still open**; item 6 (ad-hoc recipe file dispatch) is shipped via a general `inputs.files` + `inputs.params` contract on both CLI and Web UI.
+Counts (after 2026-04-19 re-audit pass): **6 shipped, 7 partial, 9 still-gap, 3 still-future** (total 25). **6 of the 8 off-roadmap gaps from reconciliation §8 remain open** -- item 6 (ad-hoc recipe file dispatch) shipped via `inputs.files` + `inputs.params`; item on per-stage model routing in the canvas decision list (Apr 14 "plan with Opus, implement with MiniMax") also shipped via `StageDefinition.model` override at dispatch. Item 14 (audit log) is worse than originally tracked -- adapters are all non-functional stubs.
 
 ## 2. What actually changed between 2026-04-18 and 2026-04-19 (by commit family)
 
@@ -105,6 +105,15 @@ All three items called out in `2026-04-18-CODE_INTELLIGENCE_DESIGN.md` for "post
 3. Pool via arkd/conductor -- still per-session `.mcp.json` injection
 
 This is consistent with the "benchmark first, retire after" plan. No urgency unless the pilot starts.
+
+## 4a. Re-audit corrections (added 2026-04-19 later in day)
+
+Two meaningful upgrades + one hidden regression surfaced by a second-pass audit focused on generalizations rather than literal spec names:
+
+- **Item 6 (ad-hoc recipe-file dispatch):** ❌ GAP -> ✅ SHIPPED. Implemented as the general `--file role=path` + `--param k=v` inputs contract on both CLI and Web UI. More general than the original spec.
+- **Item 12 (per-stage model routing):** ❌ GAP -> ✅ SHIPPED. `packages/core/services/dispatch.ts:260-263` applies `stageDef.model` override to the agent before dispatch. The plan-with-Opus-implement-with-MiniMax strategy is wire-ready today.
+- **Item 17 (workflow UI file upload):** ❌ GAP -> 🟡 PARTIAL. ChatInput + SessionDetail support attachments; ChatPanel's inline slide-out chat still uses basic Input.
+- **Item 14 (audit log):** 🟡 PARTIAL -> ❌ MORE BROKEN than reported. All three adapters (`local`, `test`, `control-plane`) are NOT_MIGRATED stubs. Port has `deleteForTrack()` which violates immutability. This is worse than tracking indicated and is a **compliance risk** if audit features are assumed to work for the pilot.
 
 ## 5. Observations
 

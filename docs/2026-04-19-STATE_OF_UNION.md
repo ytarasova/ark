@@ -8,7 +8,12 @@
 ## 1. Headline
 
 - **Two-day alignment pass delivered.** Five dated review docs published on 2026-04-18 (reconciliation, Rohit/Abhimanyu flow support, code-intelligence design, unified summary, collated roadmap) plus a 2026-04-19 progress audit. These are the point-in-time record.
-- **Correction 2026-04-19 (later in day):** ad-hoc recipe-file dispatch is already shipped via the general `inputs.files` + `inputs.params` contract on both CLI (`--file role=path` + `--param k=v` at `packages/cli/commands/session.ts:42-67`) and Web UI (`InputsSection` component). This closes item 6 of the reconciliation §8 off-roadmap gap list -- 7 of 8 remain, not 8.
+- **Correction 2026-04-19 (later in day):** re-audit against *generalizations* rather than literal 2026-04-18 spec names surfaces two more shipped items + one hidden regression:
+  - ✅ **Ad-hoc recipe-file dispatch** shipped via `--file role=path` + `--param k=v` (CLI + Web UI). Closes reconciliation §8 item 6.
+  - ✅ **Per-stage model routing** shipped at `packages/core/services/dispatch.ts:260-263` via `stageDef.model` override. The Apr 14 "plan with Opus, implement with MiniMax" strategy is wire-ready today.
+  - 🟡 **Workflow UI file upload** partially shipped (ChatInput + SessionDetail; not ChatPanel).
+  - ⚠️ **Audit log is WORSE than reported**: all three event-store adapters are NOT_MIGRATED stubs that throw; port has `deleteForTrack()` violating immutability. Compliance risk if audit is assumed for pilot.
+  - **6 of 8** reconciliation §8 off-roadmap gaps remain open (not 7, not 8).
 - **codebase-memory-mcp integration SHIPPED** (PR #202, merged into main). v0.6.0 static C binary vendored; 14 code-intelligence tools auto-injected into every agent session; CLI + Web UI surfaces live. Paper: arXiv:2603.27277 claims 10x fewer tokens + 2.1x fewer tool calls vs pure-Grep baselines.
 - **Harinder's anchor:** *"We are 90% there."* Deep audit confirms. Remaining work is vocabulary alignment + integration + polish, not new subsystems.
 - **Compute platform advanced materially** since 2026-04-18: Awilix DI split, SnapshotStore + pause/resume, ComputePool with Firecracker warm pool, polymorphic ProviderFlagSpec, session/dispatch RPC retired, SOLID audits + 6 structural refactors.
@@ -163,6 +168,15 @@ From `COLLATED_ROADMAP.md` §6 -- unchanged:
 - At least one Abhimanyu ISLC recipe (e.g. `islc-orchestrate` against an IN-* ticket) dispatched and run end-to-end
 - Twice-weekly adoption review meetings running with leadership
 - Token spend per session on code intelligence drops below 10K tokens (vs >50K on pure-Grep baseline) -- measured on the codebase-memory-mcp pilot
+
+## 10a. Audit-log compliance risk (new 2026-04-19)
+
+The second-pass re-audit found that `packages/core/ports/event-store.ts` documents "persistent audit log" but all three adapters (`local/event-store.ts`, `test/event-store.ts`, `control-plane/event-store.ts`) are `NOT_MIGRATED` stubs that throw on every call. Additionally, the port exposes `deleteForTrack()` which violates the immutability requirement of an audit log.
+
+**Implication for pilot:** Any tenant compliance requirement (PML, PPSL, Paytm finops) assuming audit-log coverage will fail silently when the event-store is called. This should be explicitly scoped before pilot hand-out:
+
+- Decide whether audit log is P1 for pilot (if yes: migrate at least the `local` adapter + make port append-only)
+- If not P1: document explicitly that audit log is "not yet operational" in any pilot onboarding doc
 
 ## 11. Risks worth naming
 
