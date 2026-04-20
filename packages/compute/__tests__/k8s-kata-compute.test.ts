@@ -17,7 +17,8 @@ import type { ChildProcess } from "node:child_process";
 import { KataCompute, DEFAULT_KATA_RUNTIME_CLASS } from "../core/k8s-kata.js";
 import type { K8sComputeDeps } from "../core/k8s.js";
 import { NotSupportedError, type Snapshot } from "../core/types.js";
-import { AppContext, setApp, clearApp } from "../../core/app.js";
+import { AppContext } from "../../core/app.js";
+import { setApp, clearApp } from "../../core/__tests__/test-helpers.js";
 
 let app: AppContext;
 

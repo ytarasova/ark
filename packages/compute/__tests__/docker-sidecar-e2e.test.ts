@@ -24,7 +24,8 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { AppContext, setApp, clearApp } from "../../core/app.js";
+import { AppContext } from "../../core/app.js";
+import { setApp, clearApp } from "../../core/__tests__/test-helpers.js";
 import { LocalDockerProvider } from "../providers/local-arkd.js";
 
 const execFileAsync = promisify(execFile);

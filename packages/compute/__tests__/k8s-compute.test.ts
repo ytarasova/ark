@@ -22,7 +22,8 @@ import type { ChildProcess } from "node:child_process";
 
 import { K8sCompute, type K8sComputeDeps } from "../core/k8s.js";
 import { NotSupportedError, type ComputeHandle, type Snapshot } from "../core/types.js";
-import { AppContext, setApp, clearApp } from "../../core/app.js";
+import { AppContext } from "../../core/app.js";
+import { setApp, clearApp } from "../../core/__tests__/test-helpers.js";
 
 let app: AppContext;
 

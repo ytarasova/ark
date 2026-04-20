@@ -15,7 +15,8 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
-import { AppContext, clearApp, setApp } from "../../core/app.js";
+import { AppContext } from "../../core/app.js";
+import { clearApp, setApp } from "../../core/__tests__/test-helpers.js";
 import { ComputeTarget, POOL_SOURCE_META_KEY } from "../core/compute-target.js";
 import type { ComputePool, PoolStats } from "../core/pool/types.js";
 import type {

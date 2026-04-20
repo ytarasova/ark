@@ -29,7 +29,8 @@ import { KataCompute } from "../core/k8s-kata.js";
 import { DirectRuntime } from "../runtimes/direct.js";
 import { DockerRuntime } from "../runtimes/docker.js";
 import { DevcontainerRuntime } from "../runtimes/devcontainer.js";
-import { AppContext, setApp, clearApp } from "../../core/app.js";
+import { AppContext } from "../../core/app.js";
+import { setApp, clearApp } from "../../core/__tests__/test-helpers.js";
 
 let app: AppContext;
 

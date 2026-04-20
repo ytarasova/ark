@@ -9,7 +9,8 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
-import { AppContext, setApp, clearApp } from "../index.js";
+import { AppContext } from "../index.js";
+import { setApp, clearApp } from "./test-helpers.js";
 
 describe("session-lifecycle compute/runtime dispatch", () => {
   let app: AppContext;

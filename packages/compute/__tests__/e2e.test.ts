@@ -11,11 +11,10 @@ import { mkdirSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
-import { getApp } from "../../core/app.js";
-
 import { getProvider, listProviders, resolvePortDecls } from "../index.js";
 
-import { AppContext, setApp, clearApp } from "../../core/app.js";
+import { AppContext } from "../../core/app.js";
+import { getApp, setApp, clearApp } from "../../core/__tests__/test-helpers.js";
 
 let app: AppContext;
 beforeAll(async () => {
