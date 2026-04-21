@@ -177,7 +177,7 @@ describe("service dependency injection", async () => {
     setApp(app);
 
     const svc = app.computeService;
-    const c = svc.create({ name: "di-docker", provider: "docker" });
+    const c = await svc.create({ name: "di-docker", provider: "docker" });
     expect(c.name).toBe("di-docker");
 
     // Verify it's in the DB via the repository
@@ -193,7 +193,7 @@ describe("service dependency injection", async () => {
 
     // Create a session via service, then search via history
     await app.sessionService.start({ summary: "Searchable DI session" });
-    const results = app.historyService.search("Searchable DI");
+    const results = await app.historyService.search("Searchable DI");
     expect(results.length).toBe(1);
     expect(results[0].match).toBe("Searchable DI session");
   });
@@ -420,7 +420,7 @@ describe("cross-service integration through container", async () => {
 
     // Create session and compute through services
     const session = await app.sessionService.start({ summary: "With compute" });
-    const compute = app.computeService.create({ name: "test-ec2", provider: "ec2" });
+    const compute = await app.computeService.create({ name: "test-ec2", provider: "ec2" });
 
     // Both write to the same underlying database
     expect(await app.sessions.get(session.id)).not.toBeNull();
@@ -457,7 +457,9 @@ describe("transitive dependency sharing", async () => {
     const session = await app.sessionService.start({ summary: "Shared DB test" });
 
     // Write directly to the DB via the db accessor
-    const row = app.db.prepare("SELECT id FROM sessions WHERE id = ?").get(session.id) as { id: string } | undefined;
+    const row = (await app.db.prepare("SELECT id FROM sessions WHERE id = ?").get(session.id)) as
+      | { id: string }
+      | undefined;
     expect(row).toBeDefined();
     expect(row!.id).toBe(session.id);
   });
@@ -469,7 +471,7 @@ describe("transitive dependency sharing", async () => {
 
     await app.sessionService.start({ summary: "History transitive test" });
 
-    const results = app.historyService.search("History transitive");
+    const results = await app.historyService.search("History transitive");
     expect(results.length).toBe(1);
   });
 
@@ -532,8 +534,8 @@ describe("container override", async () => {
     app.container.register({ sessions: asValue({ get: () => null }) });
 
     // The original reference still works
-    expect(originalRepo.get(session.id)).not.toBeNull();
-    expect(originalRepo.get(session.id)!.summary).toBe("ref test");
+    expect(await originalRepo.get(session.id)).not.toBeNull();
+    expect((await originalRepo.get(session.id))!.summary).toBe("ref test");
   });
 });
 
@@ -551,7 +553,7 @@ describe("post-shutdown behavior", async () => {
     expect(tempApp.phase).toBe("stopped");
 
     // DB was closed during shutdown
-    expect(() => tempApp.container.resolve("db").prepare("SELECT 1").get()).toThrow();
+    expect(() => tempApp.container.resolve("db").prepare("SELECT 1")).toThrow();
   });
 
   it("boot after shutdown throws (no reuse)", async () => {
@@ -598,7 +600,7 @@ describe("getApp() global singleton integration", async () => {
     await app.boot();
     setApp(app);
 
-    const session = getApp().sessionService.start({ summary: "Global write" });
+    const session = await getApp().sessionService.start({ summary: "Global write" });
 
     const found = await app.sessions.get(session.id);
     expect(found).not.toBeNull();

@@ -163,7 +163,7 @@ describe("ApiKeyManager", async () => {
       expect(await app.apiKeys.validate(original.key)).toBeNull();
 
       // New key should be valid
-      const ctx = app.apiKeys.validate(rotated!.key);
+      const ctx = await app.apiKeys.validate(rotated!.key);
       expect(ctx).not.toBeNull();
       expect(ctx!.tenantId).toBe("acme");
       expect(ctx!.role).toBe("admin");

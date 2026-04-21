@@ -11,8 +11,9 @@ describe("session compute dispatch", async () => {
     expect(typeof dispatch).toBe("function");
 
     // Calling dispatch with a nonexistent session should return a Promise
-    const result = await dispatch(getApp(), "nonexistent-id");
-    expect(result).toBeInstanceOf(Promise);
+    const resultPromise = dispatch(getApp(), "nonexistent-id");
+    expect(resultPromise).toBeInstanceOf(Promise);
+    await resultPromise;
   });
 
   it("dispatch resolves with ok: false for nonexistent session", async () => {
@@ -23,7 +24,7 @@ describe("session compute dispatch", async () => {
 
   it("dispatch resolves with ok: false when session has no stage", async () => {
     // Create a session with no flow stage set up
-    const session = getApp().sessions.create({ summary: "test-no-stage" });
+    const session = await getApp().sessions.create({ summary: "test-no-stage" });
     // Session starts with status 'pending' and no stage
     const result = await dispatch(getApp(), session.id);
     expect(result.ok).toBe(false);

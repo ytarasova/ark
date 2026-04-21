@@ -14,4 +14,12 @@ export {
   type MembershipWithUser,
 } from "./memberships.js";
 export { UserRepository, type UserRow } from "./users.js";
+export { FlowStateRepository, type FlowState, type StageResult } from "./flow-state.js";
+export {
+  LedgerRepository,
+  type Ledger,
+  type LedgerEntry,
+  type LedgerEntryType,
+  type LedgerEntryStatus,
+} from "./ledger.js";
 export { initSchema, seedLocalCompute } from "./schema.js";

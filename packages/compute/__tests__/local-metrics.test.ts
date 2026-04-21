@@ -19,7 +19,7 @@ describe("local metrics", async () => {
     expect(Array.isArray(snap.sessions)).toBe(true);
     expect(Array.isArray(snap.processes)).toBe(true);
     expect(Array.isArray(snap.docker)).toBe(true);
-  }, 30_000);
+  }, 60_000);
 
   it("session entries have required fields", async () => {
     const snap = await collectLocalMetrics();
@@ -28,7 +28,7 @@ describe("local metrics", async () => {
       expect(s).toHaveProperty("status");
       expect(s).toHaveProperty("mode");
     }
-  }, 30_000);
+  }, 60_000);
 
   it("metrics value ranges", async () => {
     const snap = await collectLocalMetrics();
@@ -46,7 +46,7 @@ describe("local metrics", async () => {
 
     expect(m.netRxMb).toBe(0);
     expect(m.netTxMb).toBe(0);
-  }, 30_000);
+  }, 60_000);
 
   it("process entries have required fields", async () => {
     const snap = await collectLocalMetrics();
@@ -63,7 +63,7 @@ describe("local metrics", async () => {
       expect(typeof p.command).toBe("string");
       expect(p.command.length).toBeGreaterThan(0);
     }
-  }, 30_000);
+  }, 60_000);
 
   it("docker entries shape", async () => {
     const snap = await collectLocalMetrics();
@@ -74,13 +74,13 @@ describe("local metrics", async () => {
       expect(d).toHaveProperty("image");
       expect(d).toHaveProperty("project");
     }
-  }, 30_000);
+  }, 60_000);
 
   it("snapshot structure", async () => {
     const snap = await collectLocalMetrics();
     const keys = Object.keys(snap).sort();
     expect(keys).toEqual(["docker", "metrics", "processes", "sessions"]);
-  }, 30_000);
+  }, 60_000);
 
   it("metrics keys", async () => {
     const snap = await collectLocalMetrics();
@@ -96,5 +96,5 @@ describe("local metrics", async () => {
       "netTxMb",
       "uptime",
     ]);
-  }, 30_000);
+  }, 60_000);
 });

@@ -23,8 +23,8 @@ describe("multi-instance coordination", () => {
     cleanups.push(inst1.stop);
     const inst2 = await registerInstance(getApp(), "inst-b");
     cleanups.push(inst2.stop);
-    expect(inst1.isPrimary()).toBe(true);
-    expect(inst2.isPrimary()).toBe(false);
+    expect(await inst1.isPrimary()).toBe(true);
+    expect(await inst2.isPrimary()).toBe(false);
   });
 
   it("stop removes the instance", async () => {

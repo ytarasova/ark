@@ -92,14 +92,14 @@ describe("v0.5 gaps integration", async () => {
     expect(payload.body).toContain("#99");
   });
 
-  it("knowledge store search returns results without errors", () => {
-    getApp().knowledge.addNode({
+  it("knowledge store search returns results without errors", async () => {
+    await getApp().knowledge.addNode({
       type: "memory",
       label: "Integration test memory for knowledge search",
       content: "Integration test memory for knowledge search",
       metadata: { tags: ["integration"], scope: "global", importance: 0.8 },
     });
-    const results = getApp().knowledge.search("integration test", {
+    const results = await getApp().knowledge.search("integration test", {
       types: ["memory"],
       limit: 5,
     });

@@ -235,7 +235,7 @@ describe("Conductor /hooks/status endpoint", async () => {
       transcript_path: transcriptPath,
     });
 
-    const agg = getApp().usageRecorder.getSessionCost(session.id);
+    const agg = await getApp().usageRecorder.getSessionCost(session.id);
     expect(agg.input_tokens).toBe(3000);
     expect(agg.output_tokens).toBe(1300);
     expect(agg.cache_read_tokens).toBe(8000);
@@ -262,7 +262,7 @@ describe("Conductor /hooks/status endpoint", async () => {
       reason: "prompt_input_exit",
     });
 
-    const agg = getApp().usageRecorder.getSessionCost(session.id);
+    const agg = await getApp().usageRecorder.getSessionCost(session.id);
     expect(agg.input_tokens).toBe(500);
     expect(agg.output_tokens).toBe(200);
   });
@@ -273,7 +273,7 @@ describe("Conductor /hooks/status endpoint", async () => {
 
     await postHook(session.id, { hook_event_name: "Stop" });
 
-    const agg = getApp().usageRecorder.getSessionCost(session.id);
+    const agg = await getApp().usageRecorder.getSessionCost(session.id);
     expect(agg.records.length).toBe(0);
   });
 
@@ -346,9 +346,9 @@ describe("Conductor /hooks/status endpoint", async () => {
     const db = getApp().db;
     let count = 0;
     try {
-      const row = db.prepare("SELECT COUNT(*) as c FROM transcript_index WHERE session_id = ?").get(session.id) as
-        | { c: number }
-        | undefined;
+      const row = (await db
+        .prepare("SELECT COUNT(*) as c FROM transcript_index WHERE session_id = ?")
+        .get(session.id)) as { c: number } | undefined;
       count = row?.c ?? 0;
     } catch {
       /* FTS5 table may not exist */

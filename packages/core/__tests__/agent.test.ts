@@ -647,6 +647,29 @@ describe("buildClaudeArgs", () => {
     const args = buildClaudeArgs(baseAgent, { task: "ignored" });
     expect(args).not.toContain("-p");
   });
+
+  it("appends a completion contract that forces a final `report` tool call", () => {
+    // The agent's turn is not considered complete until it calls
+    // ark-channel's `report` tool. The dashboard and flow routing both
+    // rely on that call -- without it the session looks hung.
+    const args = buildClaudeArgs(baseAgent);
+    const prompt = args[args.indexOf("--append-system-prompt") + 1];
+    expect(prompt).toContain("## Completion contract");
+    expect(prompt).toContain("MUST call the `report` tool");
+    expect(prompt).toContain("type='completed'");
+    expect(prompt).toContain("type='question'");
+    expect(prompt).toContain("type='error'");
+  });
+
+  it("keeps the completion contract even in fully autonomous mode", () => {
+    // Autonomous mode removes `type='question'` reports but still needs
+    // `completed` / `error` terminal reports so flow routing advances.
+    const args = buildClaudeArgs(baseAgent, { autonomy: "full" });
+    const prompt = args[args.indexOf("--append-system-prompt") + 1];
+    expect(prompt).toContain("## Autonomous Mode");
+    expect(prompt).toContain("## Completion contract");
+    expect(prompt).toContain("MUST call the `report` tool");
+  });
 });
 
 // ── Integration: full agent lifecycle ───────────────────────────────────────

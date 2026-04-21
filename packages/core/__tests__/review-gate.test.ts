@@ -46,7 +46,7 @@ describe("approveReviewGate", async () => {
     expect(adv.ok).toBe(true);
     expect(adv.message).toContain("wait-review");
 
-    const atReview = getApp().sessions.get(session.id)!;
+    const atReview = (await getApp().sessions.get(session.id))!;
     expect(atReview.stage).toBe("wait-review");
 
     // Normal advance should be blocked by review gate
@@ -59,7 +59,7 @@ describe("approveReviewGate", async () => {
     expect(result.ok).toBe(true);
     expect(result.message).toContain("deploy");
 
-    const after = getApp().sessions.get(session.id)!;
+    const after = (await getApp().sessions.get(session.id))!;
     expect(after.stage).toBe("deploy");
   });
 
@@ -81,7 +81,7 @@ describe("approveReviewGate", async () => {
     const session = await startSession(getApp(), { flow: "rev-evt", summary: "event test" });
     await approveReviewGate(getApp(), session.id);
 
-    const events = getApp().events.list(session.id, { type: "review_approved" });
+    const events = await getApp().events.list(session.id, { type: "review_approved" });
     expect(events.length).toBe(1);
     expect(events[0].actor).toBe("github");
     expect(events[0].stage).toBe("wait");
@@ -115,7 +115,7 @@ describe("review gate blocking", async () => {
     const approved = await approveReviewGate(getApp(), session.id);
     expect(approved.ok).toBe(true);
 
-    const final = getApp().sessions.get(session.id)!;
+    const final = (await getApp().sessions.get(session.id))!;
     expect(final.stage).toBe("final");
   });
 });

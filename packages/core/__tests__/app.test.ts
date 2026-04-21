@@ -32,16 +32,18 @@ describe("AppContext", async () => {
   it("initializes database with schema on boot", async () => {
     app = await AppContext.forTestAsync();
     await app.boot();
-    const row = app.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'").get() as
-      | { name: string }
-      | undefined;
+    const row = (await app.db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'")
+      .get()) as { name: string } | undefined;
     expect(row?.name).toBe("sessions");
   });
 
   it("seeds local compute row on boot", async () => {
     app = await AppContext.forTestAsync();
     await app.boot();
-    const row = app.db.prepare("SELECT name FROM compute WHERE name='local'").get() as { name: string } | undefined;
+    const row = (await app.db.prepare("SELECT name FROM compute WHERE name='local'").get()) as
+      | { name: string }
+      | undefined;
     expect(row?.name).toBe("local");
   });
 

@@ -187,6 +187,41 @@ export async function initPostgresSchema(db: IDatabase): Promise<void> {
 
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_todos_session ON todos(session_id)`);
 
+  // Flow state: DAG orchestration state (completed/skipped/current stage, per-stage
+  // results). One row per session. Mirrors the SQLite definition in schema.ts.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS flow_state (
+      session_id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      flow_name TEXT NOT NULL DEFAULT '',
+      completed_stages TEXT NOT NULL DEFAULT '[]',
+      skipped_stages TEXT NOT NULL DEFAULT '[]',
+      current_stage TEXT,
+      stage_results TEXT NOT NULL DEFAULT '{}',
+      started_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+  await db.exec(`CREATE INDEX IF NOT EXISTS idx_flow_state_tenant ON flow_state(tenant_id)`);
+
+  // Ledger entries: append-only conductor progress ledger. Mirrors the SQLite
+  // definition in schema.ts.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS ledger_entries (
+      id TEXT PRIMARY KEY,
+      conductor_id TEXT NOT NULL DEFAULT 'default',
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      type TEXT NOT NULL,
+      content TEXT NOT NULL,
+      status TEXT,
+      session_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+  await db.exec(`CREATE INDEX IF NOT EXISTS idx_ledger_entries_conductor ON ledger_entries(conductor_id)`);
+  await db.exec(`CREATE INDEX IF NOT EXISTS idx_ledger_entries_created ON ledger_entries(created_at)`);
+
   // Schedules table
   await db.exec(`
     CREATE TABLE IF NOT EXISTS schedules (
@@ -249,6 +284,8 @@ export async function initPostgresSchema(db: IDatabase): Promise<void> {
   await safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_messages_tenant ON messages(tenant_id)`);
   await safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_todos_tenant ON todos(tenant_id)`);
   await safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_groups_tenant ON groups(tenant_id)`);
+  await safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_flow_state_tenant ON flow_state(tenant_id)`);
+  await safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_ledger_entries_tenant ON ledger_entries(tenant_id)`);
   await safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_schedules_tenant ON schedules(tenant_id)`);
   await safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_compute_pools_tenant ON compute_pools(tenant_id)`);
 

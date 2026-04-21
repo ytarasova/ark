@@ -45,13 +45,29 @@ describe("buildAppMode", () => {
   });
 
   it("reads the legacy flat databaseUrl field as a fallback", () => {
-    const mode = buildAppMode({ databaseUrl: "sqlite://legacy" } as any);
+    // Only `postgres://` / `postgresql://` URLs trigger hosted mode now --
+    // the old "any non-empty URL == hosted" behaviour was a bug that hid
+    // sqlite URLs as "hosted + SQLite adapter".
+    const mode = buildAppMode({ databaseUrl: "postgres://legacy/db" } as any);
     expect(mode.kind).toBe("hosted");
+    expect(mode.database.dialect).toBe("postgres");
+    expect(mode.database.url).toBe("postgres://legacy/db");
   });
 
   it("treats empty string databaseUrl as local", () => {
     const mode = buildAppMode({ databaseUrl: "" } as any);
     expect(mode.kind).toBe("local");
+    expect(mode.database.dialect).toBe("sqlite");
+    expect(mode.database.url).toBeNull();
+  });
+
+  it("treats a sqlite URL as local (not hosted)", () => {
+    // Regression guard: pre-Phase-4, buildAppMode used `!!url && length > 0`
+    // so `sqlite://anything` was classified as hosted even though the DB
+    // adapter then opened SQLite. Dialect + mode are now consistent.
+    const mode = buildAppMode({ databaseUrl: "sqlite:///tmp/x.db" } as any);
+    expect(mode.kind).toBe("local");
+    expect(mode.database.dialect).toBe("sqlite");
   });
 });
 
@@ -64,8 +80,8 @@ describe("buildLocalAppMode(app)", () => {
 });
 
 describe("buildHostedAppMode", () => {
-  it("nulls every capability", () => {
-    const mode = buildHostedAppMode();
+  it("nulls every filesystem/local-mode capability + stamps the database descriptor", () => {
+    const mode = buildHostedAppMode({ dialect: "postgres", url: "postgres://test" });
     expect(mode.kind).toBe("hosted");
     expect(mode.fsCapability).toBeNull();
     expect(mode.knowledgeCapability).toBeNull();
@@ -73,6 +89,8 @@ describe("buildHostedAppMode", () => {
     expect(mode.repoMapCapability).toBeNull();
     expect(mode.ftsRebuildCapability).toBeNull();
     expect(mode.hostCommandCapability).toBeNull();
+    expect(mode.database.dialect).toBe("postgres");
+    expect(mode.database.url).toBe("postgres://test");
   });
 });
 

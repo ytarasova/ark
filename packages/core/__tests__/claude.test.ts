@@ -720,6 +720,28 @@ describe("buildLauncher exit-code sentinel", () => {
   });
 });
 
+// ── buildLauncher PTY geometry ──────────────────────────────────────────────
+
+describe("buildLauncher PTY geometry", () => {
+  const baseOpts: LauncherOpts = {
+    workdir: "/tmp/project",
+    claudeArgs: ["claude", "--model", "opus", "--dangerously-skip-permissions"],
+    mcpConfigPath: "/tmp/.mcp.json",
+  };
+
+  it("does not export COLUMNS / LINES or wait on a geometry sentinel", () => {
+    // Geometry is deferred to the first WebSocket resize, which calls
+    // `tmux resize-window` and SIGWINCHes the running claude. The launcher
+    // must not set COLUMNS / LINES (that would pin the PTY before reflow)
+    // and must not gate the launch on a sentinel file.
+    const { content } = buildLauncher(baseOpts);
+    expect(content).not.toContain("export COLUMNS");
+    expect(content).not.toContain("export LINES");
+    expect(content).not.toMatch(/GEOMETRY_SENTINEL/);
+    expect(content).not.toMatch(/GEOMETRY_WAIT_MS/);
+  });
+});
+
 // ── trustDirectory ────────────────────────────────────────────────────────────
 
 describe("trustDirectory", () => {

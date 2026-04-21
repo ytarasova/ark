@@ -132,8 +132,8 @@ describe("formatReviewPrompt", () => {
 
 describe("findSessionByPR", async () => {
   it("returns session matching pr_url", async () => {
-    const session = getApp().sessions.create({ summary: "test session" });
-    getApp().sessions.update(session.id, { pr_url: "https://github.com/org/repo/pull/42" });
+    const session = await getApp().sessions.create({ summary: "test session" });
+    await getApp().sessions.update(session.id, { pr_url: "https://github.com/org/repo/pull/42" });
 
     const found = await findSessionByPR(getApp(), "https://github.com/org/repo/pull/42");
     expect(found).not.toBeNull();
@@ -149,12 +149,12 @@ describe("findSessionByPR", async () => {
   it("returns most recent session for same PR", async () => {
     const prUrl = "https://github.com/org/repo/pull/77";
 
-    const older = getApp().sessions.create({ summary: "older" });
-    getApp().sessions.update(older.id, { pr_url: prUrl });
+    const older = await getApp().sessions.create({ summary: "older" });
+    await getApp().sessions.update(older.id, { pr_url: prUrl });
 
     // Small delay to ensure different created_at
-    const newer = getApp().sessions.create({ summary: "newer" });
-    getApp().sessions.update(newer.id, { pr_url: prUrl });
+    const newer = await getApp().sessions.create({ summary: "newer" });
+    await getApp().sessions.update(newer.id, { pr_url: prUrl });
 
     const found = await findSessionByPR(getApp(), prUrl);
     expect(found).not.toBeNull();
@@ -177,12 +177,12 @@ describe("handleGitHubWebhook", () => {
     };
   }
 
-  it("returns approve for approved reviews with matching session", () => {
+  it("returns approve for approved reviews with matching session", async () => {
     const prUrl = "https://github.com/org/repo/pull/10";
-    const session = getApp().sessions.create({ summary: "webhook test" });
-    getApp().sessions.update(session.id, { pr_url: prUrl, status: "running" });
+    const session = await getApp().sessions.create({ summary: "webhook test" });
+    await getApp().sessions.update(session.id, { pr_url: prUrl, status: "running" });
 
-    const result = handleGitHubWebhook(
+    const result = await handleGitHubWebhook(
       getApp(),
       "pull_request_review",
       makePRPayload(prUrl, {
@@ -198,12 +198,12 @@ describe("handleGitHubWebhook", () => {
     expect(result.sessionId).toBe(session.id);
   });
 
-  it("returns steer for changes_requested with comments", () => {
+  it("returns steer for changes_requested with comments", async () => {
     const prUrl = "https://github.com/org/repo/pull/20";
-    const session = getApp().sessions.create({ summary: "steer test" });
-    getApp().sessions.update(session.id, { pr_url: prUrl, status: "stopped" });
+    const session = await getApp().sessions.create({ summary: "steer test" });
+    await getApp().sessions.update(session.id, { pr_url: prUrl, status: "stopped" });
 
-    const result = handleGitHubWebhook(
+    const result = await handleGitHubWebhook(
       getApp(),
       "pull_request_review",
       makePRPayload(prUrl, {
@@ -220,12 +220,12 @@ describe("handleGitHubWebhook", () => {
     expect(result.message).toContain("Fix the error handling");
   });
 
-  it("returns steer for pull_request_review_comment", () => {
+  it("returns steer for pull_request_review_comment", async () => {
     const prUrl = "https://github.com/org/repo/pull/30";
-    const session = getApp().sessions.create({ summary: "comment test" });
-    getApp().sessions.update(session.id, { pr_url: prUrl, status: "running" });
+    const session = await getApp().sessions.create({ summary: "comment test" });
+    await getApp().sessions.update(session.id, { pr_url: prUrl, status: "running" });
 
-    const result = handleGitHubWebhook(
+    const result = await handleGitHubWebhook(
       getApp(),
       "pull_request_review_comment",
       makePRPayload(prUrl, {
@@ -244,21 +244,21 @@ describe("handleGitHubWebhook", () => {
     expect(result.message).toContain("src/utils.ts:55");
   });
 
-  it("ignores unknown event types", () => {
-    const result = handleGitHubWebhook(getApp(), "push", { ref: "refs/heads/main" });
+  it("ignores unknown event types", async () => {
+    const result = await handleGitHubWebhook(getApp(), "push", { ref: "refs/heads/main" });
     expect(result.action).toBe("ignore");
   });
 
-  it("ignores events without PR URL", () => {
-    const result = handleGitHubWebhook(getApp(), "pull_request_review", {
+  it("ignores events without PR URL", async () => {
+    const result = await handleGitHubWebhook(getApp(), "pull_request_review", {
       review: { state: "approved", body: "ok", user: { login: "x" } },
     });
     expect(result.action).toBe("ignore");
     expect(result.message).toContain("No PR URL");
   });
 
-  it("ignores events with no matching session", () => {
-    const result = handleGitHubWebhook(
+  it("ignores events with no matching session", async () => {
+    const result = await handleGitHubWebhook(
       getApp(),
       "pull_request_review",
       makePRPayload("https://github.com/org/repo/pull/9999", {

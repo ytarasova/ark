@@ -63,10 +63,10 @@ const fakeSession: Session = {
 const computeNames: string[] = [];
 const tmuxSessions: string[] = [];
 
-function cleanupComputes() {
+async function cleanupComputes() {
   for (const name of computeNames) {
     try {
-      getApp().computes.delete(name);
+      await getApp().computes.delete(name);
     } catch {
       /* already gone */
     }
@@ -90,14 +90,14 @@ function cleanupTmux() {
 // ── Test 1: Full compute lifecycle ──────────────────────────────────────────────
 
 describe("E2E: Full compute lifecycle", async () => {
-  afterEach(() => {
-    cleanupComputes();
+  afterEach(async () => {
+    await cleanupComputes();
     cleanupTmux();
   });
 
   it("uses the auto-created local compute, provisions, updates, and collects metrics", async () => {
     // The "local" compute is auto-created by ensureLocalCompute() in getDb()
-    const compute = getApp().computes.get("local");
+    const compute = await getApp().computes.get("local");
     expect(compute).not.toBeNull();
     expect(compute!.name).toBe("local");
     expect(compute!.provider).toBe("local");
@@ -135,14 +135,14 @@ describe("E2E: Full compute lifecycle", async () => {
 // ── Test 2: Launch and probe a session ───────────────────────────────────────
 
 describe("E2E: Launch and probe a session", async () => {
-  afterEach(() => {
+  afterEach(async () => {
     cleanupTmux();
-    cleanupComputes();
+    await cleanupComputes();
   });
 
   it("launches a tmux session, probes ports with a live server", async () => {
     // Use the auto-created "local" compute
-    const compute = getApp().computes.get("local")!;
+    const compute = (await getApp().computes.get("local"))!;
     expect(compute).not.toBeNull();
 
     const provider = getProvider("local")!;
@@ -218,8 +218,8 @@ describe("E2E: arc.json port resolution and probing", async () => {
     mkdirSync(tempDir, { recursive: true });
   });
 
-  afterEach(() => {
-    cleanupComputes();
+  afterEach(async () => {
+    await cleanupComputes();
     try {
       rmSync(tempDir, { recursive: true, force: true });
     } catch {
@@ -258,7 +258,7 @@ describe("E2E: arc.json port resolution and probing", async () => {
     expect(devDecl!.source).toBe("devcontainer.json");
 
     // Probe those ports via provider -- both should be not listening
-    const compute = getApp().computes.get("local")!;
+    const compute = (await getApp().computes.get("local"))!;
     expect(compute).not.toBeNull();
 
     const provider = getProvider("local")!;
@@ -273,15 +273,15 @@ describe("E2E: arc.json port resolution and probing", async () => {
 // ── Test 4: Compute -> provider resolution flow ─────────────────────────────────
 
 describe("E2E: Compute to provider resolution flow", () => {
-  afterEach(() => {
-    cleanupComputes();
+  afterEach(async () => {
+    await cleanupComputes();
   });
 
-  it("resolves providers for computes with different provider types", () => {
+  it("resolves providers for computes with different provider types", async () => {
     // Use the auto-created "local" compute and create an ec2 compute
-    const localCompute = getApp().computes.get("local")!;
+    const localCompute = (await getApp().computes.get("local"))!;
     expect(localCompute).not.toBeNull();
-    const ec2Compute = getApp().computes.create({ name: "my-ec2", provider: "ec2" });
+    const ec2Compute = await getApp().computes.create({ name: "my-ec2", provider: "ec2" });
     computeNames.push("my-ec2");
 
     expect(localCompute.provider).toBe("local");
@@ -302,14 +302,14 @@ describe("E2E: Compute to provider resolution flow", () => {
     expect(providerNames).toContain("docker");
 
     // Verify computes can be listed
-    const computes = getApp().computes.list();
+    const computes = await getApp().computes.list();
     const testComputes = computes.filter((h) => h.name === "local" || h.name === "my-ec2");
     expect(testComputes.length).toBe(2);
 
     // Clean up ec2 compute only (local is a singleton)
-    getApp().computes.delete("my-ec2");
+    await getApp().computes.delete("my-ec2");
     computeNames.length = 0;
 
-    expect(getApp().computes.get("my-ec2")).toBeNull();
+    expect(await getApp().computes.get("my-ec2")).toBeNull();
   });
 });

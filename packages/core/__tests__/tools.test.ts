@@ -18,7 +18,7 @@ function makeProjectDir(): string {
 }
 
 describe("discoverTools", () => {
-  it("finds MCP servers from .mcp.json", () => {
+  it("finds MCP servers from .mcp.json", async () => {
     const dir = makeProjectDir();
     writeFileSync(
       join(dir, ".mcp.json"),
@@ -30,7 +30,7 @@ describe("discoverTools", () => {
       }),
     );
 
-    const tools = discoverTools(dir);
+    const tools = await discoverTools(dir);
     const mcpTools = tools.filter((t) => t.kind === "mcp-server");
     expect(mcpTools.length).toBe(2);
     expect(mcpTools[0].name).toBe("my-server");
@@ -38,45 +38,45 @@ describe("discoverTools", () => {
     expect(mcpTools[0].config).toEqual({ command: "node", args: ["server.js"] });
   });
 
-  it("finds commands from .claude/commands/", () => {
+  it("finds commands from .claude/commands/", async () => {
     const dir = makeProjectDir();
     const cmdDir = join(dir, ".claude", "commands");
     mkdirSync(cmdDir, { recursive: true });
     writeFileSync(join(cmdDir, "deploy.md"), "# Deploy to production\nRun the deploy script...");
     writeFileSync(join(cmdDir, "lint.md"), "# Lint the code\nRun eslint...");
 
-    const tools = discoverTools(dir);
+    const tools = await discoverTools(dir);
     const cmds = tools.filter((t) => t.kind === "command");
     expect(cmds.length).toBe(2);
     expect(cmds.find((c) => c.name === "deploy")?.description).toBe("Deploy to production");
     expect(cmds.find((c) => c.name === "lint")?.description).toBe("Lint the code");
   });
 
-  it("finds claude skills from .claude/skills/", () => {
+  it("finds claude skills from .claude/skills/", async () => {
     const dir = makeProjectDir();
     const skillDir = join(dir, ".claude", "skills");
     mkdirSync(skillDir, { recursive: true });
     writeFileSync(join(skillDir, "review.md"), "# Code review skill\nReview code for...");
 
-    const tools = discoverTools(dir);
+    const tools = await discoverTools(dir);
     const skills = tools.filter((t) => t.kind === "claude-skill");
     expect(skills.length).toBe(1);
     expect(skills[0].name).toBe("review");
     expect(skills[0].description).toBe("Code review skill");
   });
 
-  it("finds CLAUDE.md as context entry", () => {
+  it("finds CLAUDE.md as context entry", async () => {
     const dir = makeProjectDir();
     writeFileSync(join(dir, "CLAUDE.md"), "# Project\nThis is a project.");
 
-    const tools = discoverTools(dir);
+    const tools = await discoverTools(dir);
     const ctx = tools.filter((t) => t.kind === "context");
     expect(ctx.length).toBe(1);
     expect(ctx[0].name).toBe("CLAUDE.md");
   });
 
-  it("finds ark skills and recipes", () => {
-    const tools = discoverTools();
+  it("finds ark skills and recipes", async () => {
+    const tools = await discoverTools();
     const arkSkills = tools.filter((t) => t.kind === "ark-skill");
     const arkRecipes = tools.filter((t) => t.kind === "ark-recipe");
     // Builtin skills and recipes should exist
@@ -84,38 +84,38 @@ describe("discoverTools", () => {
     expect(arkRecipes.length).toBeGreaterThanOrEqual(0);
   });
 
-  it("handles missing .mcp.json gracefully", () => {
+  it("handles missing .mcp.json gracefully", async () => {
     const dir = makeProjectDir();
-    const tools = discoverTools(dir);
+    const tools = await discoverTools(dir);
     const mcpTools = tools.filter((t) => t.kind === "mcp-server");
     expect(mcpTools.length).toBe(0);
   });
 
-  it("handles malformed .mcp.json gracefully", () => {
+  it("handles malformed .mcp.json gracefully", async () => {
     const dir = makeProjectDir();
     writeFileSync(join(dir, ".mcp.json"), "{ not valid json !!!");
-    const tools = discoverTools(dir);
+    const tools = await discoverTools(dir);
     const mcpTools = tools.filter((t) => t.kind === "mcp-server");
     expect(mcpTools.length).toBe(0);
   });
 
-  it("handles .mcp.json with no mcpServers key", () => {
+  it("handles .mcp.json with no mcpServers key", async () => {
     const dir = makeProjectDir();
     writeFileSync(join(dir, ".mcp.json"), JSON.stringify({ someOtherKey: true }));
-    const tools = discoverTools(dir);
+    const tools = await discoverTools(dir);
     const mcpTools = tools.filter((t) => t.kind === "mcp-server");
     expect(mcpTools.length).toBe(0);
   });
 
-  it("handles .mcp.json with empty mcpServers", () => {
+  it("handles .mcp.json with empty mcpServers", async () => {
     const dir = makeProjectDir();
     writeFileSync(join(dir, ".mcp.json"), JSON.stringify({ mcpServers: {} }));
-    const tools = discoverTools(dir);
+    const tools = await discoverTools(dir);
     const mcpTools = tools.filter((t) => t.kind === "mcp-server");
     expect(mcpTools.length).toBe(0);
   });
 
-  it("uses server description from config when present", () => {
+  it("uses server description from config when present", async () => {
     const dir = makeProjectDir();
     writeFileSync(
       join(dir, ".mcp.json"),
@@ -125,13 +125,13 @@ describe("discoverTools", () => {
         },
       }),
     );
-    const tools = discoverTools(dir);
+    const tools = await discoverTools(dir);
     const mcpTools = tools.filter((t) => t.kind === "mcp-server");
     expect(mcpTools.length).toBe(1);
     expect(mcpTools[0].description).toBe("My custom description");
   });
 
-  it("falls back to generic description when config has no description", () => {
+  it("falls back to generic description when config has no description", async () => {
     const dir = makeProjectDir();
     writeFileSync(
       join(dir, ".mcp.json"),
@@ -141,12 +141,12 @@ describe("discoverTools", () => {
         },
       }),
     );
-    const tools = discoverTools(dir);
+    const tools = await discoverTools(dir);
     const mcpTools = tools.filter((t) => t.kind === "mcp-server");
     expect(mcpTools[0].description).toBe("MCP server: no-desc");
   });
 
-  it("handles JSONC (comments) in .mcp.json", () => {
+  it("handles JSONC (comments) in .mcp.json", async () => {
     const dir = makeProjectDir();
     writeFileSync(
       join(dir, ".mcp.json"),
@@ -162,13 +162,13 @@ describe("discoverTools", () => {
 }`,
     );
 
-    const tools = discoverTools(dir);
+    const tools = await discoverTools(dir);
     const mcpTools = tools.filter((t) => t.kind === "mcp-server");
     expect(mcpTools.length).toBe(1);
     expect(mcpTools[0].name).toBe("test-server");
   });
 
-  it("sorts by kind then name", () => {
+  it("sorts by kind then name", async () => {
     const dir = makeProjectDir();
     writeFileSync(
       join(dir, ".mcp.json"),
@@ -181,7 +181,7 @@ describe("discoverTools", () => {
     writeFileSync(join(cmdDir, "beta.md"), "# Beta");
     writeFileSync(join(cmdDir, "alpha.md"), "# Alpha");
 
-    const tools = discoverTools(dir);
+    const tools = await discoverTools(dir);
     const mcpIdx = tools.findIndex((t) => t.kind === "mcp-server");
     const cmdIdx = tools.findIndex((t) => t.kind === "command");
     // MCP servers come before commands
@@ -194,23 +194,23 @@ describe("discoverTools", () => {
 });
 
 describe("MCP server CRUD", () => {
-  it("addMcpServer / removeMcpServer round-trip", () => {
+  it("addMcpServer / removeMcpServer round-trip", async () => {
     const dir = makeProjectDir();
 
     addMcpServer(dir, "test-server", { command: "node", args: ["srv.js"] });
-    let tools = discoverTools(dir);
+    let tools = await discoverTools(dir);
     let mcp = tools.filter((t) => t.kind === "mcp-server");
     expect(mcp.length).toBe(1);
     expect(mcp[0].name).toBe("test-server");
     expect(mcp[0].config).toEqual({ command: "node", args: ["srv.js"] });
 
     removeMcpServer(dir, "test-server");
-    tools = discoverTools(dir);
+    tools = await discoverTools(dir);
     mcp = tools.filter((t) => t.kind === "mcp-server");
     expect(mcp.length).toBe(0);
   });
 
-  it("addMcpServer preserves existing servers", () => {
+  it("addMcpServer preserves existing servers", async () => {
     const dir = makeProjectDir();
     addMcpServer(dir, "first", { command: "a" });
     addMcpServer(dir, "second", { command: "b" });
@@ -221,7 +221,7 @@ describe("MCP server CRUD", () => {
     expect(parsed.mcpServers.second.command).toBe("b");
   });
 
-  it("addMcpServer handles JSONC in existing file", () => {
+  it("addMcpServer handles JSONC in existing file", async () => {
     const dir = makeProjectDir();
     writeFileSync(
       join(dir, ".mcp.json"),
@@ -234,12 +234,12 @@ describe("MCP server CRUD", () => {
     );
 
     addMcpServer(dir, "new-server", { command: "new" });
-    const tools = discoverTools(dir);
+    const tools = await discoverTools(dir);
     const mcp = tools.filter((t) => t.kind === "mcp-server");
     expect(mcp.length).toBe(2);
   });
 
-  it("removeMcpServer is a no-op when .mcp.json is missing", () => {
+  it("removeMcpServer is a no-op when .mcp.json is missing", async () => {
     const dir = makeProjectDir();
     // Should not throw
     removeMcpServer(dir, "nonexistent");
@@ -247,13 +247,13 @@ describe("MCP server CRUD", () => {
 });
 
 describe("command CRUD", () => {
-  it("addCommand / removeCommand round-trip", () => {
+  it("addCommand / removeCommand round-trip", async () => {
     const dir = makeProjectDir();
 
     addCommand(dir, "deploy", "# Deploy\nDeploy to production.");
     expect(getCommand(dir, "deploy")).toBe("# Deploy\nDeploy to production.");
 
-    const tools = discoverTools(dir);
+    const tools = await discoverTools(dir);
     const cmds = tools.filter((t) => t.kind === "command");
     expect(cmds.length).toBe(1);
     expect(cmds[0].name).toBe("deploy");
@@ -262,18 +262,18 @@ describe("command CRUD", () => {
     expect(getCommand(dir, "deploy")).toBeNull();
   });
 
-  it("getCommand returns null for missing command", () => {
+  it("getCommand returns null for missing command", async () => {
     const dir = makeProjectDir();
     expect(getCommand(dir, "nonexistent")).toBeNull();
   });
 
-  it("addCommand creates .claude/commands/ directory", () => {
+  it("addCommand creates .claude/commands/ directory", async () => {
     const dir = makeProjectDir();
     addCommand(dir, "test-cmd", "# Test\nContent");
     expect(getCommand(dir, "test-cmd")).toBe("# Test\nContent");
   });
 
-  it("removeCommand is a no-op for missing command", () => {
+  it("removeCommand is a no-op for missing command", async () => {
     const dir = makeProjectDir();
     // Should not throw
     removeCommand(dir, "nonexistent");

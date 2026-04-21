@@ -35,11 +35,49 @@ export function readExitCodeSentinel(tracksDir: string, sessionId: string): numb
   }
 }
 
-const activePollers = new Map<string, ReturnType<typeof setInterval>>();
+/**
+ * Registry of active status-poll intervals, keyed by sessionId. One instance
+ * per AppContext -- disposed on `shutdown()` so per-test / per-replica
+ * cleanup doesn't leave intervals leaking against a stale executor registry.
+ *
+ * The previous module-level `activePollers` Map survived AppContext teardown,
+ * which in parallel test execution meant one test's pollers could tick against
+ * another's AppContext (usually harmless, but a latent cross-test leak).
+ */
+export class StatusPollerRegistry {
+  private readonly intervals = new Map<string, ReturnType<typeof setInterval>>();
+
+  has(sessionId: string): boolean {
+    return this.intervals.has(sessionId);
+  }
+
+  set(sessionId: string, interval: ReturnType<typeof setInterval>): void {
+    this.intervals.set(sessionId, interval);
+  }
+
+  stop(sessionId: string): void {
+    const interval = this.intervals.get(sessionId);
+    if (interval) {
+      clearInterval(interval);
+      this.intervals.delete(sessionId);
+    }
+  }
+
+  stopAll(): void {
+    this.intervals.forEach((interval) => clearInterval(interval));
+    this.intervals.clear();
+  }
+
+  /** Awilix disposer -- called on container.dispose(). */
+  dispose(): void {
+    this.stopAll();
+  }
+}
 
 export function startStatusPoller(app: AppContext, sessionId: string, handle: string, executorName: string): void {
+  const pollers = app.statusPollers;
   // Don't double-poll
-  if (activePollers.has(sessionId)) return;
+  if (pollers.has(sessionId)) return;
 
   let tick = 0;
   const interval = setInterval(async () => {
@@ -47,7 +85,7 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
     try {
       const executor = app.pluginRegistry.executor(executorName) ?? getExecutor(executorName);
       if (!executor) {
-        stopStatusPoller(sessionId);
+        stopStatusPoller(app, sessionId);
         return;
       }
 
@@ -58,7 +96,7 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
       // session to "failed". Bug 3 in the session-dispatch cascade.
       const exitCode = readExitCodeSentinel(app.config.tracksDir, sessionId);
       if (exitCode !== null) {
-        stopStatusPoller(sessionId);
+        stopStatusPoller(app, sessionId);
 
         const session = await app.sessions.get(sessionId);
         if (!session || session.status !== "running") return;
@@ -107,7 +145,7 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
       }
 
       if (status.state === "completed" || status.state === "failed" || status.state === "not_found") {
-        stopStatusPoller(sessionId);
+        stopStatusPoller(app, sessionId);
 
         const session = await app.sessions.get(sessionId);
         if (!session || session.status !== "running") return;
@@ -165,20 +203,13 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
     }
   }, 3000); // Check every 3 seconds
 
-  activePollers.set(sessionId, interval);
+  pollers.set(sessionId, interval);
 }
 
-export function stopStatusPoller(sessionId: string): void {
-  const interval = activePollers.get(sessionId);
-  if (interval) {
-    clearInterval(interval);
-    activePollers.delete(sessionId);
-  }
+export function stopStatusPoller(app: AppContext, sessionId: string): void {
+  app.statusPollers.stop(sessionId);
 }
 
-export function stopAllPollers(): void {
-  activePollers.forEach((interval) => {
-    clearInterval(interval);
-  });
-  activePollers.clear();
+export function stopAllPollers(app: AppContext): void {
+  app.statusPollers.stopAll();
 }

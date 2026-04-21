@@ -118,16 +118,26 @@ describe("from-sage-analysis flow", async () => {
   });
 
   test("extractSubtasks expands to one subtask per plan_stream when analysis_json is present", async () => {
+    // Upload the sample analysis to the blob store under the session's
+    // tenant (SessionRepository defaults to "default"). extractSubtasks
+    // reads it back via the locator -- matches how `ark sage` seeds the
+    // session in production.
+    const bytes = readFileSync(SAMPLE_PATH);
+    const meta = await app.blobStore.put(
+      { tenantId: "default", namespace: "sage-analysis", id: "test-IN-18342", filename: "sample.json" },
+      bytes,
+    );
+
     const session = await startSession(app, {
       summary: "sage:IN-18342",
       flow: "from-sage-analysis",
       inputs: {
-        files: { analysis_json: SAMPLE_PATH },
+        files: { analysis_json: meta.locator },
         params: { analysis_id: "IN-18342" },
       },
     });
-    const sessionRecord = await app.sessions.get(session.id)!;
-    const subtasks = extractSubtasks(app, sessionRecord);
+    const sessionRecord = (await app.sessions.get(session.id))!;
+    const subtasks = await extractSubtasks(app, sessionRecord);
     expect(subtasks).toHaveLength(3);
     // The first subtask prompt must contain the repo name + at least one task title.
     expect(subtasks[0].task).toContain("pi-payouts-service");
@@ -139,8 +149,8 @@ describe("from-sage-analysis flow", async () => {
       summary: "no-analysis",
       flow: "from-sage-analysis",
     });
-    const sessionRecord = await app.sessions.get(session.id)!;
-    const subtasks = extractSubtasks(app, sessionRecord);
+    const sessionRecord = (await app.sessions.get(session.id))!;
+    const subtasks = await extractSubtasks(app, sessionRecord);
     // Default fallback returns implementation + tests
     expect(subtasks.length).toBeGreaterThan(0);
     expect(subtasks.some((s) => s.name === "implementation")).toBe(true);

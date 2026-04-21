@@ -84,14 +84,14 @@ describe("rejectReviewGate", async () => {
     expect(result.ok).toBe(true);
     expect(dispatched).toBe(1);
 
-    const after = getApp().sessions.get(session.id)!;
+    const after = (await getApp().sessions.get(session.id))!;
     expect(after.stage).toBe("qa"); // still on the same stage
     expect(after.rejection_count).toBe(1);
     expect(after.rejected_reason).toBe("tests are missing");
     expect(after.rejected_at).toBeTruthy();
     expect(after.rework_prompt).toBe("Fix this: tests are missing");
 
-    const events = getApp().events.list(session.id, { type: "review_rejected" });
+    const events = await getApp().events.list(session.id, { type: "review_rejected" });
     expect(events.length).toBe(1);
     expect(events[0].data?.reason).toBe("tests are missing");
     expect(events[0].data?.rejection_count).toBe(1);
@@ -113,7 +113,7 @@ describe("rejectReviewGate", async () => {
     }));
     expect(result.ok).toBe(true);
 
-    const after = getApp().sessions.get(session.id)!;
+    const after = (await getApp().sessions.get(session.id))!;
     expect(after.rework_prompt).toBe("Rework required. Reviewer said: needs more tests");
     expect(after.rejection_count).toBe(1);
   });
@@ -127,7 +127,7 @@ describe("rejectReviewGate", async () => {
     const session = await startSession(getApp(), { flow: "reject-manual", summary: "manual gate" });
     const res = await rejectReviewGate(getApp(), session.id, "nope", async () => ({ ok: true, message: "ok" }));
     expect(res.ok).toBe(true);
-    expect(getApp().sessions.get(session.id)!.rejection_count).toBe(1);
+    expect((await getApp().sessions.get(session.id))!.rejection_count).toBe(1);
   });
 
   it("rejects when stage gate is not review/manual", async () => {
@@ -154,14 +154,14 @@ describe("rejectReviewGate", async () => {
     });
     const session = await startSession(getApp(), { flow: "reject-clear", summary: "clear" });
     // Pre-populate runtime ids to verify they're nulled out.
-    getApp().sessions.update(session.id, {
+    await getApp().sessions.update(session.id, {
       claude_session_id: "prev-claude",
       session_id: "ark-s-prev",
     });
 
     await rejectReviewGate(getApp(), session.id, "rework", async () => ({ ok: true, message: "ok" }));
 
-    const after = getApp().sessions.get(session.id)!;
+    const after = (await getApp().sessions.get(session.id))!;
     expect(after.claude_session_id).toBeNull();
     expect(after.session_id).toBeNull();
     expect(after.status).toBe("ready");
@@ -195,13 +195,13 @@ describe("rejectReviewGate max_rejections", async () => {
     // First reject -> rework_count becomes 1
     let res = await rejectReviewGate(getApp(), session.id, "r1", stubDispatch);
     expect(res.ok).toBe(true);
-    expect(getApp().sessions.get(session.id)!.rejection_count).toBe(1);
+    expect((await getApp().sessions.get(session.id))!.rejection_count).toBe(1);
     expect(dispatchCount).toBe(1);
 
     // Second reject -> rework_count becomes 2 (still within cap since 1 < 2)
     res = await rejectReviewGate(getApp(), session.id, "r2", stubDispatch);
     expect(res.ok).toBe(true);
-    expect(getApp().sessions.get(session.id)!.rejection_count).toBe(2);
+    expect((await getApp().sessions.get(session.id))!.rejection_count).toBe(2);
     expect(dispatchCount).toBe(2);
 
     // Third reject -> cap hit (2 >= 2), session fails, no dispatch.
@@ -210,17 +210,17 @@ describe("rejectReviewGate max_rejections", async () => {
     expect(res.message).toBe("max_rejections exceeded");
     expect(dispatchCount).toBe(2);
 
-    const after = getApp().sessions.get(session.id)!;
+    const after = (await getApp().sessions.get(session.id))!;
     expect(after.status).toBe("failed");
     expect(after.error).toBe("max_rejections exceeded");
 
     // Confirm both the review_rejected (capped) and session_failed events were logged.
-    const rejectedEvents = getApp().events.list(session.id, { type: "review_rejected" });
+    const rejectedEvents = await getApp().events.list(session.id, { type: "review_rejected" });
     const capped = rejectedEvents.find((e) => e.data?.capped);
     expect(capped).toBeTruthy();
     expect(capped!.data?.rejection_count).toBe(2);
 
-    const failedEvents = getApp().events.list(session.id, { type: "session_failed" });
+    const failedEvents = await getApp().events.list(session.id, { type: "session_failed" });
     expect(failedEvents.length).toBe(1);
     expect(failedEvents[0].data?.reason).toBe("max_rejections exceeded");
   });
@@ -246,7 +246,7 @@ describe("rejectReviewGate max_rejections", async () => {
     expect(res.ok).toBe(false);
     expect(res.message).toBe("max_rejections exceeded");
     expect(dispatched).toBe(0);
-    expect(getApp().sessions.get(session.id)!.status).toBe("failed");
+    expect((await getApp().sessions.get(session.id))!.status).toBe("failed");
   });
 });
 
@@ -278,7 +278,7 @@ describe("review gate integration", async () => {
     // Reject with a stub dispatch to simulate rework.
     const res = await rejectReviewGate(getApp(), session.id, "add tests", async () => ({ ok: true, message: "ok" }));
     expect(res.ok).toBe(true);
-    const afterReject = getApp().sessions.get(session.id)!;
+    const afterReject = (await getApp().sessions.get(session.id))!;
     expect(afterReject.stage).toBe("review"); // still here
     expect(afterReject.rework_prompt).toBe("redo: add tests");
 
@@ -286,7 +286,7 @@ describe("review gate integration", async () => {
     const { approveReviewGate } = await import("../services/session-orchestration.js");
     const approve = await approveReviewGate(getApp(), session.id);
     expect(approve.ok).toBe(true);
-    expect(getApp().sessions.get(session.id)!.stage).toBe("ship");
+    expect((await getApp().sessions.get(session.id))!.stage).toBe("ship");
 
     // Safety: advance past the final auto gate to confirm the flow finished cleanly.
     await advance(getApp(), session.id, true);

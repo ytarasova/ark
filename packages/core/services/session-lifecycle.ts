@@ -349,8 +349,7 @@ export async function stop(
 
   // Stop status poller if active (non-Claude executors)
   try {
-    const { stopStatusPoller } = await import("../executors/status-poller.js");
-    stopStatusPoller(sessionId);
+    app.statusPollers.stop(sessionId);
   } catch {
     logDebug("session", "poller may not be running -- safe to ignore");
   }

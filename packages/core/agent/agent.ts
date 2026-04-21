@@ -168,6 +168,19 @@ export function buildClaudeArgs(
       "\n\n## Autonomous Mode\nYou are running in FULLY AUTONOMOUS mode. Do NOT call report with type='question'. Do NOT wait for human input. Make your own decisions on any ambiguities and proceed directly to completion. Document your decisions in your output for later review.";
   }
 
+  // Completion contract: the agent MUST signal it is done via the channel
+  // `report` tool or its exit is silent -- the dashboard stays on "running",
+  // flow routing never advances, and Stop-hook status reports don't carry a
+  // summary. Make this the last thing before stopping so it cannot be
+  // forgotten or deferred.
+  systemPrompt +=
+    "\n\n## Completion contract\n" +
+    "Before you stop for any reason, you MUST call the `report` tool (from the `ark-channel` MCP server). This is non-negotiable -- your turn is not complete until that call has been made.\n\n" +
+    "- Finished the task: call `report` with `type='completed'` and a summary of what changed (include `filesChanged`, `commits`, and `pr_url` when applicable).\n" +
+    "- Blocked and need a human: call `report` with `type='question'` and the question.\n" +
+    "- Hit an unrecoverable error: call `report` with `type='error'` and the failure reason.\n\n" +
+    "Do NOT end your turn by only writing a chat message -- write the chat message, then call `report`. If you already reported progress earlier, you still must send the terminal report (`completed` / `question` / `error`) as your final tool call.";
+
   // Tool hints: tell the agent what's available so it doesn't probe around.
   // Runs regardless of autonomy -- the permissions.allow list is defense-in-depth
   // but hints are how the agent actually knows what to call.

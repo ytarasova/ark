@@ -81,6 +81,13 @@ export function registerSageCommands(program: Command): void {
         console.error(chalk.red(`Failed: ${e?.message ?? e}`));
         process.exit(1);
       }
+      // NOTE: origin/main had a BlobStore-backed direct-dispatch variant here
+      // (uploaded the analysis JSON into tenant-scoped blob storage then called
+      // `startSession` + `dispatch` directly). We moved to CLI-daemon-first
+      // ("CLI only talks to the control plane"), so the BlobStore upload needs
+      // to move server-side into the `sage/analyze` handler. Tracked for
+      // follow-up: re-apply the BlobStore persistence inside the handler so
+      // downstream stages on other replicas can read the analysis JSON.
     });
 }
 

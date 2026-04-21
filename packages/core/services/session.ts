@@ -219,6 +219,19 @@ export class SessionService {
 
   private kickDispatch(sessionId: string, onDispatched: (session: Session | null) => void): void {
     const promise = this.dispatch(sessionId)
+      .then(async (result) => {
+        // dispatch returns `{ ok: false, message }` for non-throw failures
+        // (e.g. "Stage 'pr' is create_pr, not agent" on an action stage).
+        // Without this log, kickDispatch silently swallows the failure and
+        // the session sits idle -- which is what broke the Restart button
+        // on completed sessions whose terminal stage is an action.
+        if (result && result.ok === false) {
+          await this.events.log(sessionId, "dispatch_failed", {
+            actor: "system",
+            data: { reason: result.message ?? "dispatch returned ok: false" },
+          });
+        }
+      })
       .catch(async (err) => {
         await this.events.log(sessionId, "dispatch_failed", {
           actor: "system",
@@ -277,34 +290,160 @@ export class SessionService {
   }
 
   /**
-   * Resume a stopped/failed session back to ready.
-   * Port of session.ts resume() -- does NOT auto-dispatch (caller handles that).
+   * Resume a stopped/failed session: clear runtime state, mark ready, and
+   * kick a *background* dispatch so the current stage starts running again.
+   * The earlier "does NOT auto-dispatch" port left the RPC caller to kick
+   * dispatch manually, but nobody did -- the Restart button in the UI just
+   * flipped status back to "ready" and the session sat idle forever.
+   *
+   * Kicking in the background (rather than awaiting dispatch) matches the
+   * `session_created` -> default-dispatcher contract: the RPC returns
+   * immediately with status="ready", and the session flips to "running"
+   * once the launcher lands. Tests that assert `status === "ready"`
+   * straight after the RPC still pass.
+   *
+   * Killing any lingering executor handle first keeps a zombie tmux session
+   * from holding the claude session-id across a resume.
    */
-  async resume(id: string): Promise<SessionOpResult> {
+  async resume(id: string, opts?: { rewindToStage?: string }): Promise<SessionOpResult> {
     const session = await this.sessions.get(id);
     if (!session) return { ok: false, message: `Session ${id} not found` };
 
-    // Guard: can't resume completed sessions
-    if (session.status === "completed") {
-      return { ok: false, message: "Cannot resume a completed session" };
+    // Rewind allows re-running a completed session from any stage. Without a
+    // rewind, completed sessions stay blocked -- there's nothing meaningful to
+    // "resume" since the flow already terminated.
+    if (session.status === "completed" && !opts?.rewindToStage) {
+      return {
+        ok: false,
+        message: "Session is already completed. Pick a stage to restart from.",
+      };
+    }
+    if (session.status === "running" && session.session_id) {
+      return { ok: false, message: "Already running" };
     }
 
-    // Clear runtime state, set to ready
-    await this.sessions.update(id, {
+    if (session.session_id) {
+      try {
+        await this.app.launcher.kill(session.session_id);
+      } catch {
+        // best-effort cleanup; a missing/dead tmux session is expected on resume
+      }
+    }
+
+    // Apply rewind updates: reset stage, wipe the claude conversation id so the
+    // agent starts fresh, drop pr_url (so `create_pr` doesn't skip on a rerun),
+    // and clear any cached flow-graph state (completed-stage tracking) so the
+    // DAG orchestrator doesn't auto-skip already-completed successors.
+    const targetStage = opts?.rewindToStage ?? session.stage ?? null;
+    const rewinding = !!opts?.rewindToStage && opts.rewindToStage !== session.stage;
+
+    const updates: Partial<Session> = {
       status: "ready" as SessionStatus,
       error: null,
       breakpoint_reason: null,
       attached_by: null,
       session_id: null,
-    } as Partial<Session>);
+    };
+    if (rewinding) {
+      updates.stage = targetStage;
+      updates.claude_session_id = null;
+      updates.pr_url = null;
+      const cfg = { ...(session.config ?? {}) } as Record<string, unknown>;
+      delete cfg.last_snapshot_id;
+      updates.config = cfg;
+
+      // The DAG orchestrator persists completed-stage tracking in the
+      // flow_state table. If that row survives the rewind, `getReadyStages`
+      // sees every stage as already-completed and the flow stalls at a
+      // phantom join-barrier -- the agent runs, finishes, and the DAG
+      // refuses to advance because it thinks all successors have already
+      // run. Delete the row so the rewind truly starts over.
+      try {
+        await this.app.flowStates.delete(id);
+      } catch {
+        logDebug("session", "flow-state delete is best-effort");
+      }
+    }
+    await this.sessions.update(id, updates);
 
     await this.events.log(id, "session_resumed", {
-      stage: session.stage ?? undefined,
+      stage: targetStage ?? undefined,
       actor: "user",
-      data: { from_status: session.status },
+      data: {
+        from_status: session.status,
+        ...(rewinding ? { rewound_to: targetStage, from_stage: session.stage } : {}),
+      },
     });
 
+    // Route based on the (post-rewind) stage's action type: agent stages go
+    // through the usual dispatcher (tmux + claude launch). Action stages
+    // (`create_pr`, `merge`, ...) are not dispatchable -- `dispatch()` returns
+    // `ok:false` with "Stage 'X' is action, not agent". For those, re-run the
+    // action via `executeAction`, matching the auto-handoff path at
+    // `session-hooks.ts:737`. Without this branch, Restart on any session
+    // whose current stage is an action is silently a no-op.
+    const route = await this.resolveResumeRoute(id, session.flow, targetStage);
+    if (route === "agent") {
+      this.kickDispatch(id, () => {});
+    } else if (route === "action") {
+      this.kickActionStage(id);
+    }
+
     return { ok: true, message: "OK", sessionId: id };
+  }
+
+  /** Pick the re-run path for the session's current stage. */
+  private async resolveResumeRoute(
+    sessionId: string,
+    flowName: string,
+    stage: string | null,
+  ): Promise<"agent" | "action" | "noop"> {
+    if (!stage) return "noop";
+    try {
+      const flow = await import("../state/flow.js");
+      const action = flow.getStageAction(this.app, flowName, stage);
+      if (action.type === "agent" || action.type === "fork" || action.type === "fan_out") return "agent";
+      if (action.type === "action") return "action";
+    } catch (err) {
+      await this.events.log(sessionId, "dispatch_failed", {
+        actor: "system",
+        data: { reason: `resolveResumeRoute failed: ${err instanceof Error ? err.message : String(err)}` },
+      });
+    }
+    return "noop";
+  }
+
+  /**
+   * Re-run a non-agent action stage in the background. Mirrors the handoff
+   * path in `session-hooks.ts` but without the auto-advance chaining -- the
+   * user explicitly asked to re-run THIS stage; if the action succeeds the
+   * normal post-action handoff takes over from there.
+   */
+  private kickActionStage(sessionId: string): void {
+    const promise = (async () => {
+      try {
+        const session = await this.sessions.get(sessionId);
+        if (!session?.stage) return;
+        const flow = await import("../state/flow.js");
+        const action = flow.getStageAction(this.app, session.flow, session.stage);
+        if (action.type !== "action" || !action.action) return;
+        const { executeAction } = await import("./actions/index.js");
+        const result = await executeAction(this.app, sessionId, action.action);
+        if (!result.ok) {
+          await this.events.log(sessionId, "dispatch_failed", {
+            actor: "system",
+            data: { reason: `action '${action.action}' failed: ${result.message}` },
+          });
+        }
+      } catch (err) {
+        await this.events.log(sessionId, "dispatch_failed", {
+          actor: "system",
+          data: { reason: err instanceof Error ? err.message : String(err) },
+        });
+      }
+    })();
+    this._pendingDispatches.add(promise);
+    promise.finally(() => this._pendingDispatches.delete(promise)).catch(() => {});
   }
 
   /**

@@ -763,7 +763,7 @@ describe("stage validation edge cases", async () => {
     expect((await runVerification(app, session.id)).ok).toBe(false);
 
     // Clear all
-    app.todos.deleteForSession(session.id);
+    await app.todos.deleteForSession(session.id);
 
     // After clearing: passes
     expect((await runVerification(app, session.id)).ok).toBe(true);

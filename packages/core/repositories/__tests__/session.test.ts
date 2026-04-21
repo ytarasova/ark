@@ -279,7 +279,7 @@ describe("SessionRepository", async () => {
       .prepare("INSERT INTO events (track_id, type, created_at) VALUES (?, 'test', ?)")
       .run(s.id, new Date().toISOString());
     await repo.delete(s.id);
-    const events = (await db.prepare("SELECT * FROM events WHERE track_id = ?")).all(s.id);
+    const events = await db.prepare("SELECT * FROM events WHERE track_id = ?").all(s.id);
     expect(events.length).toBe(0);
   });
 

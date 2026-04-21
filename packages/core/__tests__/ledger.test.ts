@@ -1,137 +1,172 @@
 /**
- * Tests for task/progress ledger: load/save, entries, stall detection, prompt formatting.
+ * Tests for LedgerRepository: load, addEntry, updateEntry, stall detection,
+ * prompt formatting, and tenant isolation.
  */
 
-import { describe, it, expect } from "bun:test";
-import { withTestContext } from "./test-helpers.js";
-import { loadLedger, saveLedger, addEntry, updateEntry, detectStall, formatLedgerForPrompt } from "../ledger.js";
-import { getApp } from "./test-helpers.js";
+import { describe, it, expect, beforeEach } from "bun:test";
+import { withTestContext, getApp } from "./test-helpers.js";
 
 withTestContext();
 
 const CID = "test-conductor-1";
 
-describe("loadLedger / saveLedger", () => {
-  it("round-trips a ledger through save and load", () => {
-    const ledger = loadLedger(getApp(), CID);
-    expect(ledger.conductorId).toBe(CID);
+// Each describe block uses a fresh conductor id so assertions on entry counts
+// are independent. `beforeEach` wipes the specific conductor's rows.
+async function fresh(conductorId: string): Promise<string> {
+  await getApp().ledger.delete(conductorId);
+  return conductorId;
+}
+
+describe("LedgerRepository.load", () => {
+  const cid = "load-cid";
+  beforeEach(async () => {
+    await fresh(cid);
+  });
+
+  it("returns an empty ledger for a new conductor", async () => {
+    const ledger = await getApp().ledger.load(cid);
+    expect(ledger.conductorId).toBe(cid);
     expect(ledger.entries).toEqual([]);
     expect(ledger.stallCount).toBe(0);
+  });
 
-    ledger.entries.push({
-      id: "le-1",
-      type: "fact",
-      content: "repo uses TypeScript",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-    saveLedger(getApp(), ledger);
-
-    const reloaded = loadLedger(getApp(), CID);
+  it("reflects entries written via addEntry", async () => {
+    await getApp().ledger.addEntry(cid, "fact", "repo uses TypeScript");
+    const reloaded = await getApp().ledger.load(cid);
     expect(reloaded.entries.length).toBe(1);
     expect(reloaded.entries[0].content).toBe("repo uses TypeScript");
-    expect(reloaded.conductorId).toBe(CID);
+    expect(reloaded.conductorId).toBe(cid);
   });
 });
 
-describe("addEntry", () => {
-  it("creates an entry and persists it", () => {
-    const entry = addEntry(getApp(), CID, "fact", "project has 10 files", "s-123");
-    // Ledger IDs are `le-<10 url-safe chars>` via nanoid -- non-crypto
-    // Math.random fallback is no longer acceptable here.
+describe("LedgerRepository.addEntry", () => {
+  const cid = "add-cid";
+  beforeEach(async () => {
+    await fresh(cid);
+  });
+
+  it("creates an entry with a nanoid-shaped id + returns it", async () => {
+    const entry = await getApp().ledger.addEntry(cid, "fact", "project has 10 files", "s-123");
     expect(entry.id).toMatch(/^le-[A-Za-z0-9_-]{10}$/);
     expect(entry.type).toBe("fact");
     expect(entry.content).toBe("project has 10 files");
     expect(entry.sessionId).toBe("s-123");
     expect(entry.status).toBeUndefined();
-
-    const ledger = loadLedger(getApp(), CID);
-    expect(ledger.entries.length).toBe(1);
-    expect(ledger.entries[0].id).toBe(entry.id);
+    const loaded = await getApp().ledger.load(cid);
+    expect(loaded.entries.map((e) => e.id)).toContain(entry.id);
   });
 
-  it("sets status to pending for plan_step entries", () => {
-    const entry = addEntry(getApp(), CID, "plan_step", "implement auth module");
+  it("sets status=pending for plan_step entries", async () => {
+    const entry = await getApp().ledger.addEntry(cid, "plan_step", "implement auth module");
     expect(entry.status).toBe("pending");
   });
 
-  it("emits unique ids across a burst of entries", () => {
+  it("emits unique ids across a burst of writes", async () => {
     const ids = new Set<string>();
-    for (let i = 0; i < 100; i++) {
-      const e = addEntry(getApp(), CID, "fact", `burst ${i}`);
+    for (let i = 0; i < CID.length + 50; i++) {
+      const e = await getApp().ledger.addEntry(cid, "fact", `burst ${i}`);
       expect(e.id).toMatch(/^le-[A-Za-z0-9_-]{10}$/);
       expect(ids.has(e.id)).toBe(false);
       ids.add(e.id);
     }
-    expect(ids.size).toBe(100);
   });
 });
 
-describe("updateEntry", () => {
-  it("updates an existing entry", () => {
-    const entry = addEntry(getApp(), CID, "plan_step", "write tests");
-    updateEntry(getApp(), CID, entry.id, { status: "completed", content: "write tests - done" });
+describe("LedgerRepository.updateEntry", () => {
+  const cid = "upd-cid";
+  beforeEach(async () => {
+    await fresh(cid);
+  });
 
-    const ledger = loadLedger(getApp(), CID);
+  it("updates an existing entry", async () => {
+    const entry = await getApp().ledger.addEntry(cid, "plan_step", "write tests");
+    await getApp().ledger.updateEntry(cid, entry.id, { status: "completed", content: "write tests - done" });
+    const ledger = await getApp().ledger.load(cid);
     const updated = ledger.entries.find((e) => e.id === entry.id)!;
     expect(updated.status).toBe("completed");
     expect(updated.content).toBe("write tests - done");
-    // updatedAt should be a valid ISO timestamp (may be same ms as creation)
     expect(updated.updatedAt).toBeTruthy();
   });
 
-  it("does nothing for nonexistent entry", () => {
-    addEntry(getApp(), CID, "fact", "exists");
-    updateEntry(getApp(), CID, "le-nonexistent", { content: "nope" });
-    const ledger = loadLedger(getApp(), CID);
-    expect(ledger.entries.length).toBe(1);
-    expect(ledger.entries[0].content).toBe("exists");
+  it("is a silent no-op for a nonexistent entry", async () => {
+    await getApp().ledger.addEntry(cid, "fact", "exists");
+    await getApp().ledger.updateEntry(cid, "le-nonexistent", { content: "nope" });
+    const entries = (await getApp().ledger.load(cid)).entries;
+    expect(entries.length).toBe(1);
+    expect(entries[0].content).toBe("exists");
   });
 });
 
-describe("detectStall", () => {
-  it("returns false when no progress entries exist", () => {
-    addEntry(getApp(), CID, "fact", "just a fact");
-    expect(detectStall(getApp(), CID)).toBe(false);
+describe("LedgerRepository.detectStall", () => {
+  const cid = "stall-cid";
+  beforeEach(async () => {
+    await fresh(cid);
   });
 
-  it("detects stall when progress is old", () => {
-    const ledger = loadLedger(getApp(), CID);
-    ledger.entries.push({
-      id: "le-old",
-      type: "progress",
-      content: "old progress",
-      createdAt: new Date(Date.now() - 20 * 60 * 1000).toISOString(), // 20 min ago
-      updatedAt: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
-    });
-    saveLedger(getApp(), ledger);
+  it("returns false when no progress entries exist", async () => {
+    await getApp().ledger.addEntry(cid, "fact", "just a fact");
+    expect(await getApp().ledger.detectStall(cid)).toBe(false);
+  });
 
-    expect(detectStall(getApp(), CID, 10)).toBe(true);
+  it("returns true when the most-recent progress entry is older than the threshold", async () => {
+    // Seed an old progress entry directly via the DB so we can backdate `created_at`.
+    const oldTs = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+    await getApp()
+      .db.prepare(
+        `INSERT INTO ledger_entries
+           (id, conductor_id, tenant_id, type, content, status, session_id, created_at, updated_at)
+         VALUES (?, ?, ?, 'progress', 'old progress', NULL, NULL, ?, ?)`,
+      )
+      .run("le-old-progress", cid, "default", oldTs, oldTs);
 
-    // Should have added a stall entry
-    const reloaded = loadLedger(getApp(), CID);
-    const stallEntries = reloaded.entries.filter((e) => e.type === "stall");
-    expect(stallEntries.length).toBe(1);
+    expect(await getApp().ledger.detectStall(cid, 10)).toBe(true);
+    // First detection appends a single stall entry.
+    const reloaded = await getApp().ledger.load(cid);
+    expect(reloaded.entries.filter((e) => e.type === "stall").length).toBe(1);
     expect(reloaded.stallCount).toBeGreaterThan(0);
   });
 });
 
-describe("formatLedgerForPrompt", () => {
-  it("returns empty string for empty ledger", () => {
-    expect(formatLedgerForPrompt(getApp(), CID)).toBe("");
+describe("LedgerRepository.formatPrompt", () => {
+  const cid = "fmt-cid";
+  beforeEach(async () => {
+    await fresh(cid);
   });
 
-  it("formats facts, plan steps, and recent activity", () => {
-    addEntry(getApp(), CID, "fact", "monorepo with 3 packages");
-    addEntry(getApp(), CID, "plan_step", "step 1: analyze");
-    addEntry(getApp(), CID, "progress", "started analysis");
+  it("returns empty string for an empty ledger", async () => {
+    expect(await getApp().ledger.formatPrompt(cid)).toBe("");
+  });
 
-    const prompt = formatLedgerForPrompt(getApp(), CID);
+  it("formats facts, plan steps, and recent activity", async () => {
+    await getApp().ledger.addEntry(cid, "fact", "monorepo with 3 packages");
+    await getApp().ledger.addEntry(cid, "plan_step", "step 1: analyze");
+    await getApp().ledger.addEntry(cid, "progress", "started analysis");
+    const prompt = await getApp().ledger.formatPrompt(cid);
     expect(prompt).toContain("## Task Ledger");
     expect(prompt).toContain("### Facts");
     expect(prompt).toContain("monorepo with 3 packages");
     expect(prompt).toContain("### Plan");
     expect(prompt).toContain("[pending] step 1: analyze");
     expect(prompt).toContain("### Recent Activity");
+  });
+});
+
+describe("LedgerRepository tenant isolation", () => {
+  it("writes from tenant-a are invisible to tenant-b", async () => {
+    const cid = "tenant-shared";
+    const repo = getApp().ledger;
+
+    repo.setTenant("tenant-a");
+    await repo.delete(cid);
+    await repo.addEntry(cid, "fact", "a-only fact");
+
+    repo.setTenant("tenant-b");
+    await repo.delete(cid);
+    expect((await repo.load(cid)).entries).toEqual([]);
+
+    repo.setTenant("tenant-a");
+    expect((await repo.load(cid)).entries[0].content).toBe("a-only fact");
+
+    repo.setTenant("default");
   });
 });

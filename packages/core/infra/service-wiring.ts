@@ -74,12 +74,10 @@ export class ServiceWiring {
     eventBus.clear();
     this.app._markEventBusStopped();
 
-    try {
-      const { stopAllPollers } = await import("../executors/status-poller.js");
-      stopAllPollers();
-    } catch {
-      // poller module may not be loaded
-    }
+    // The statusPollers cradle entry has its own awilix disposer that clears
+    // every interval on container.dispose(); no need to kick it manually here
+    // (and calling into the DI container during shutdown risks re-resolving
+    // disposed dependencies). Left as a comment for the explicit contract.
 
     const { clearProviderResolver } = await import("../provider-registry.js");
     clearProviderResolver();

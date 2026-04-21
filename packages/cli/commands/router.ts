@@ -45,9 +45,17 @@ export function registerRouterCommands(program: Command) {
 
       if (opts.tensorzero && !tensorZeroUrl) {
         const { TensorZeroManager } = await import("../../core/router/index.js");
+        const { loadAppConfig } = await import("../../core/config.js");
         const tzPort = parseInt(opts.tensorzeroPort, 10);
+        // Resolve the ark data dir so `tensorzero.toml` (with API keys)
+        // lands under `arkDir/tensorzero/` -- not `$HOME/.ark/tensorzero`
+        // or `/tmp/.ark/tensorzero`, either of which can be world-readable
+        // on a shared host.
+        const arkConfig = loadAppConfig();
+        const { join } = await import("path");
         tzManager = new TensorZeroManager({
           port: tzPort,
+          configDir: arkConfig.tensorZero?.configDir ?? join(arkConfig.arkDir, "tensorzero"),
           anthropicKey: process.env.ANTHROPIC_API_KEY,
           openaiKey: process.env.OPENAI_API_KEY,
           geminiKey: process.env.GEMINI_API_KEY,

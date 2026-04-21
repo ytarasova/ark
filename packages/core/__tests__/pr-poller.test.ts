@@ -47,20 +47,20 @@ function makeGhOutput(overrides: Record<string, any> = {}): string {
   });
 }
 
-function createReviewSession(
+async function createReviewSession(
   opts: { pr_url?: string; status?: string; flow?: string; stage?: string; config?: Record<string, any> } = {},
-): store.Session {
-  const session = getApp().sessions.create({
+): Promise<any> {
+  const session = await getApp().sessions.create({
     summary: "test pr poller",
     flow: opts.flow ?? "review-flow",
   });
-  getApp().sessions.update(session.id, {
+  await getApp().sessions.update(session.id, {
     pr_url: opts.pr_url ?? "https://github.com/org/repo/pull/42",
     status: opts.status ?? "running",
     stage: opts.stage ?? "review",
     config: opts.config ?? {},
   });
-  return getApp().sessions.get(session.id)!;
+  return (await getApp().sessions.get(session.id))!;
 }
 
 beforeEach(() => {
@@ -91,8 +91,8 @@ beforeEach(() => {
 
 describe("pollPRReviews", async () => {
   it("skips sessions without pr_url", async () => {
-    const session = getApp().sessions.create({ summary: "no pr", flow: "review-flow" });
-    getApp().sessions.update(session.id, { status: "running", stage: "review" });
+    const session = await getApp().sessions.create({ summary: "no pr", flow: "review-flow" });
+    await getApp().sessions.update(session.id, { status: "running", stage: "review" });
     // No pr_url set
 
     await pollPRReviews(getApp());
@@ -104,8 +104,8 @@ describe("pollPRReviews", async () => {
   });
 
   it("skips sessions not in review-gated stage", async () => {
-    const session = getApp().sessions.create({ summary: "wrong stage", flow: "review-flow" });
-    getApp().sessions.update(session.id, {
+    const session = await getApp().sessions.create({ summary: "wrong stage", flow: "review-flow" });
+    await getApp().sessions.update(session.id, {
       pr_url: "https://github.com/org/repo/pull/99",
       status: "running",
       stage: "implement", // auto gate, not review
@@ -119,7 +119,7 @@ describe("pollPRReviews", async () => {
   });
 
   it("respects 60-second cooldown", async () => {
-    const session = createReviewSession({
+    const session = await createReviewSession({
       config: {
         last_review_check: new Date().toISOString(), // just checked
       },
@@ -145,7 +145,7 @@ describe("pollPRReviews", async () => {
 
 describe("checkSessionPR", async () => {
   it("detects new approval and logs pr_approved event", async () => {
-    const session = createReviewSession();
+    const session = await createReviewSession();
 
     execFileResult = {
       stdout: makeGhOutput({
@@ -165,7 +165,7 @@ describe("checkSessionPR", async () => {
   });
 
   it("detects changes_requested and stores feedback message", async () => {
-    const session = createReviewSession();
+    const session = await createReviewSession();
 
     execFileResult = {
       stdout: makeGhOutput({
@@ -196,7 +196,7 @@ describe("checkSessionPR", async () => {
   });
 
   it("handles gh CLI errors gracefully", async () => {
-    const session = createReviewSession();
+    const session = await createReviewSession();
     execFileShouldThrow = true;
 
     // Should not throw
@@ -209,7 +209,7 @@ describe("checkSessionPR", async () => {
   });
 
   it("handles empty reviews array", async () => {
-    const session = createReviewSession();
+    const session = await createReviewSession();
     execFileResult = { stdout: makeGhOutput({ reviews: [] }), stderr: "" };
 
     await checkSessionPR(getApp(), session);
@@ -221,7 +221,7 @@ describe("checkSessionPR", async () => {
   });
 
   it("logs pr_status event when PR is merged", async () => {
-    const session = createReviewSession();
+    const session = await createReviewSession();
     execFileResult = { stdout: makeGhOutput({ state: "MERGED", reviews: [] }), stderr: "" };
 
     await checkSessionPR(getApp(), session);
@@ -235,7 +235,7 @@ describe("checkSessionPR", async () => {
   });
 
   it("skips already-seen reviews based on review_count", async () => {
-    const session = createReviewSession({
+    const session = await createReviewSession({
       config: {
         review_count: 1,
         last_review_time: "2026-03-27T11:00:00Z",
@@ -299,7 +299,7 @@ describe("fetchPRReviews", async () => {
 
 describe("processReviewFeedback", async () => {
   it("skips when no new reviews detected", async () => {
-    const session = createReviewSession();
+    const session = await createReviewSession();
     const config = { review_count: 1, last_review_time: "2026-03-27T12:00:00Z" };
     const data = {
       title: "PR",
@@ -316,7 +316,7 @@ describe("processReviewFeedback", async () => {
   });
 
   it("logs pr_approved event for new approval", async () => {
-    const session = createReviewSession();
+    const session = await createReviewSession();
     const config = { review_count: 0, last_review_time: "" };
     const data = {
       title: "PR",
@@ -333,7 +333,7 @@ describe("processReviewFeedback", async () => {
   });
 
   it("stores feedback message for changes_requested", async () => {
-    const session = createReviewSession({ status: "blocked" });
+    const session = await createReviewSession({ status: "blocked" });
     const config = { review_count: 0, last_review_time: "" };
     const data = {
       title: "Fix bug",
@@ -362,7 +362,7 @@ describe("processReviewFeedback", async () => {
   });
 
   it("updates session config with review count", async () => {
-    const session = createReviewSession();
+    const session = await createReviewSession();
     const config = { review_count: 0, last_review_time: "" };
     const data = {
       title: "PR",

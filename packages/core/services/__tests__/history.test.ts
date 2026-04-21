@@ -102,7 +102,7 @@ describe("HistoryService", async () => {
 
       // Build an isolated in-memory DB with its own data.
       const fakeDb = new BunSqliteAdapter(new Database(":memory:"));
-      initSchema(fakeDb);
+      await initSchema(fakeDb);
       const fakeSessions = new SessionRepository(fakeDb);
       await fakeSessions.create({ summary: "isolated-via-container-override" });
 
@@ -129,9 +129,9 @@ describe("HistoryService", async () => {
     let pureDb: IDatabase;
     let pureSvc: HistoryService;
 
-    beforeEach(() => {
+    beforeEach(async () => {
       pureDb = new BunSqliteAdapter(new Database(":memory:"));
-      initSchema(pureDb);
+      await initSchema(pureDb);
       pureSvc = new HistoryService(pureDb);
     });
 

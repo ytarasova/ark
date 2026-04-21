@@ -12,7 +12,8 @@
 
 import { spawn, type ChildProcess } from "child_process";
 import { createServer, createConnection, type Server, type Socket } from "net";
-import { existsSync, unlinkSync, readdirSync } from "fs";
+import { existsSync, unlinkSync, readdirSync, mkdirSync } from "fs";
+import { join } from "path";
 import { logInfo, logDebug } from "./observability/structured-log.js";
 
 // ── Types ───────────────────────────────────────────────────────────────
@@ -47,9 +48,12 @@ class SocketProxy {
   private restartCount = 0;
   private lastRestartTime = 0;
 
-  constructor(private def: McpServerDef) {
+  constructor(
+    private def: McpServerDef,
+    socketDir: string,
+  ) {
     this.name = def.name;
-    this.socketPath = `/tmp/ark-mcp-${def.name}.sock`;
+    this.socketPath = join(socketDir, `ark-mcp-${def.name}.sock`);
   }
 
   getStatus(): ProxyStatus {
@@ -257,10 +261,21 @@ export class McpPool {
   private proxies = new Map<string, SocketProxy>();
   private healthInterval: ReturnType<typeof setInterval> | null = null;
 
+  /**
+   * @param socketDir directory for the per-server Unix sockets. Callers must
+   * pass a tenant-safe / instance-safe path (typically `app.config.arkDir +
+   * "/mcp-sockets"`). Hardcoding `/tmp` previously let concurrent ark
+   * instances collide on the same socket filename and let other processes
+   * on the host enumerate every pool socket.
+   */
+  constructor(private readonly socketDir: string) {
+    mkdirSync(socketDir, { recursive: true });
+  }
+
   /** Add an MCP server to the pool. Does not start it. */
   register(def: McpServerDef): void {
     if (!this.proxies.has(def.name)) {
-      this.proxies.set(def.name, new SocketProxy(def));
+      this.proxies.set(def.name, new SocketProxy(def, this.socketDir));
     }
   }
 
@@ -361,12 +376,18 @@ export function runMcpProxy(socketPath: string): void {
 }
 
 // ── Singleton pool ──────────────────────────────────────────────────────
+//
+// One pool per process, keyed by its socket directory. Callers pass an
+// explicit dir so a hosted control-plane can isolate per-instance socket
+// filesystems. Dropping the arg-less `getMcpPool()` surface rules out the
+// /tmp hardcode that previously let concurrent ark processes on the same
+// host collide on socket filenames.
 
 let _pool: McpPool | null = null;
 
-/** Get or create the global MCP pool. */
-export function getMcpPool(): McpPool {
-  if (!_pool) _pool = new McpPool();
+/** Get or create the pool bound to `socketDir`. */
+export function getMcpPool(socketDir: string): McpPool {
+  if (!_pool) _pool = new McpPool(socketDir);
   return _pool;
 }
 
@@ -376,12 +397,12 @@ export function destroyMcpPool(): void {
   _pool = null;
 }
 
-/** Discover existing pool sockets on disk. */
-export function discoverPoolSockets(): string[] {
+/** Discover existing pool sockets on disk in the given directory. */
+export function discoverPoolSockets(socketDir: string): string[] {
   try {
-    return readdirSync("/tmp")
+    return readdirSync(socketDir)
       .filter((f: string) => f.startsWith("ark-mcp-") && f.endsWith(".sock"))
-      .map((f: string) => `/tmp/${f}`);
+      .map((f: string) => join(socketDir, f));
   } catch {
     return [];
   }

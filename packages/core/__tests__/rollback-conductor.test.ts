@@ -15,7 +15,7 @@ const config: RollbackConfig = {
 
 describe("watchMergedPR integration", async () => {
   it("returns none when all checks pass", async () => {
-    const session = getApp().sessions.create({ summary: "test" });
+    const session = await getApp().sessions.create({ summary: "test" });
     let callCount = 0;
     const fetcher = async () => {
       callCount++;
@@ -41,7 +41,7 @@ describe("watchMergedPR integration", async () => {
   });
 
   it("triggers rollback on CI failure", async () => {
-    const session = getApp().sessions.create({ summary: "test" });
+    const session = await getApp().sessions.create({ summary: "test" });
     let reverted = false;
     const fetcher = async () => ({
       check_suites: [{ id: 1, conclusion: "failure", status: "completed" }] as CheckSuiteResult[],
@@ -66,7 +66,7 @@ describe("watchMergedPR integration", async () => {
   });
 
   it("on_timeout=ignore returns none after timeout", async () => {
-    const session = getApp().sessions.create({ summary: "test" });
+    const session = await getApp().sessions.create({ summary: "test" });
     const fetcher = async () => ({
       check_suites: [{ id: 1, conclusion: null, status: "in_progress" }] as CheckSuiteResult[],
     });
@@ -87,7 +87,7 @@ describe("watchMergedPR integration", async () => {
   });
 
   it("triggers rollback on timeout when on_timeout=rollback", async () => {
-    const session = getApp().sessions.create({ summary: "test" });
+    const session = await getApp().sessions.create({ summary: "test" });
     let reverted = false;
     const fetcher = async () => ({
       check_suites: [{ id: 1, conclusion: null, status: "in_progress" }] as CheckSuiteResult[],
@@ -112,7 +112,7 @@ describe("watchMergedPR integration", async () => {
   });
 
   it("triggers rollback when health check fails", async () => {
-    const session = getApp().sessions.create({ summary: "test" });
+    const session = await getApp().sessions.create({ summary: "test" });
     let reverted = false;
     const fetcher = async () => ({
       check_suites: [{ id: 1, conclusion: "success", status: "completed" }] as CheckSuiteResult[],

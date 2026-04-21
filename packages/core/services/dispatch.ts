@@ -20,7 +20,6 @@ import type { Session } from "../../types/index.js";
 import * as flow from "../state/flow.js";
 import * as agentRegistry from "../agent/agent.js";
 import { saveCheckpoint } from "../session/checkpoint.js";
-import { setCurrentStage } from "../state/flow-state.js";
 import { logDebug } from "../observability/structured-log.js";
 import { recordEvent } from "../observability.js";
 import { track } from "../observability/telemetry.js";
@@ -548,7 +547,7 @@ export async function dispatch(
 
   // Persist flow state: mark current stage
   try {
-    setCurrentStage(app, sessionId, session.stage!, session.flow);
+    await app.flowStates.setCurrentStage(sessionId, session.stage!, session.flow);
   } catch {
     logDebug("session", "skip flow-state on error");
   }
@@ -612,7 +611,7 @@ async function dispatchFork(
 ): Promise<{ ok: boolean; message: string }> {
   // Read PLAN.md or use default subtasks
   const session = (await app.sessions.get(sessionId))!;
-  const subtasks = extractSubtasks(app, session);
+  const subtasks = await extractSubtasks(app, session);
 
   const { fork } = await import("./fork-join.js");
 
@@ -638,7 +637,7 @@ async function dispatchFanOut(
   stageDef: flow.StageDefinition,
 ): Promise<{ ok: boolean; message: string }> {
   const session = (await app.sessions.get(sessionId))!;
-  const subtasks = extractSubtasks(app, session);
+  const subtasks = await extractSubtasks(app, session);
 
   const { fanOut } = await import("./fork-join.js");
 

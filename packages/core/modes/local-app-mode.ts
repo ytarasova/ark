@@ -21,6 +21,8 @@ import { listClaudeSessions, refreshClaudeSessionsCache } from "../claude/sessio
 import { indexTranscripts } from "../search/search.js";
 import type {
   AppMode,
+  ComputeBootstrapCapability,
+  DatabaseMode,
   FsCapability,
   FsListDirResult,
   FsDirEntry,
@@ -29,8 +31,9 @@ import type {
   RepoMapCapability,
   FtsRebuildCapability,
   HostCommandCapability,
-  ComputeBootstrapCapability,
+  TenantResolverCapability,
 } from "./app-mode.js";
+import { resolveBearerAuth, resolveDatabaseMode } from "./app-mode.js";
 import { seedLocalCompute } from "../repositories/schema.js";
 import { seedLocalComputePostgres } from "../repositories/schema-postgres.js";
 import { buildMigrationsCapability } from "./migrations-capability.js";
@@ -178,9 +181,6 @@ function makeFtsRebuildCapability(app: AppContext): FtsRebuildCapability {
       // claude_sessions_cache + transcript_index index the local user's
       // `~/.claude` transcripts and are NOT tenant-scoped. Wiping them is
       // only safe in single-user local mode.
-      // Note: pre-PR-1 this used the (non-existent) `db.run` shortcut; the
-      // async IDatabase contract has no such helper, so we go through the
-      // statement API.
       await db.prepare("DELETE FROM claude_sessions_cache").run();
       await db.prepare("DELETE FROM transcript_index").run();
       const sessionCount = await refreshClaudeSessionsCache(app, {});
@@ -211,15 +211,33 @@ function makeHostCommandCapability(): HostCommandCapability {
   };
 }
 
-// ── Factory ────────────────────────────────────────────────────────────────
+// ── Tenant resolver ────────────────────────────────────────────────────────
 
 /**
- * Build a `LocalAppMode` instance bound to the given app context. Uses a
- * deferred-resolution strategy for capabilities that reach into `app.knowledge`
- * or `app.db`: the capability closure is constructed lazily on first use so it
- * can run before `AppContext.boot()` wires the knowledge/db cradle entries
- * (tests + container-building callers).
+ * Local single-tenant resolver.
+ *
+ *   - Authorization: Bearer <token>  -> validate + use its tenant (shared path)
+ *   - Only X-Ark-Tenant-Id            -> accept it verbatim. Local mode serves
+ *                                        a single user/tenant; the header is
+ *                                        informational and can't widen access.
+ *                                        The channel MCP subprocess always
+ *                                        sets this at dispatch, so rejecting
+ *                                        would break `report`, relay, and
+ *                                        /hooks/status on every local session.
+ *   - No headers                      -> fall back to "default".
  */
+function makeLocalTenantResolver(): TenantResolverCapability {
+  return {
+    async resolve({ authHeader, tenantHeader, validateToken }) {
+      if (authHeader) return resolveBearerAuth(authHeader, tenantHeader, validateToken);
+      if (tenantHeader) return { ok: true, tenantId: tenantHeader };
+      return { ok: true, tenantId: "default" };
+    },
+  };
+}
+
+// ── Compute bootstrap ──────────────────────────────────────────────────────
+
 function makeLocalComputeBootstrap(dialect: "sqlite" | "postgres"): ComputeBootstrapCapability {
   return {
     async seed(db) {
@@ -232,7 +250,16 @@ function makeLocalComputeBootstrap(dialect: "sqlite" | "postgres"): ComputeBoots
   };
 }
 
-export function buildLocalAppMode(app?: AppContext, dialect: "sqlite" | "postgres" = "sqlite"): AppMode {
+// ── Factory ────────────────────────────────────────────────────────────────
+
+/**
+ * Build a `LocalAppMode` instance bound to the given app context. Uses a
+ * deferred-resolution strategy for capabilities that reach into `app.knowledge`
+ * or `app.db`: the capability closure is constructed lazily on first use so it
+ * can run before `AppContext.boot()` wires the knowledge/db cradle entries
+ * (tests + container-building callers).
+ */
+export function buildLocalAppMode(app?: AppContext, database?: DatabaseMode): AppMode {
   const fsCapability = makeFsCapability();
   const mcpDirCapability = makeMcpDirCapability();
   const repoMapCapability = makeRepoMapCapability();
@@ -248,6 +275,10 @@ export function buildLocalAppMode(app?: AppContext, dialect: "sqlite" | "postgre
     secretsCfg?.backend === "aws"
       ? new AwsSecretsProvider({ region: secretsCfg.awsRegion, kmsKeyId: secretsCfg.awsKmsKeyId })
       : new FileSecretsProvider(arkDir);
+  const tenantResolver = makeLocalTenantResolver();
+  // Default to SQLite/null when no config was passed (tests that build a
+  // bare local mode without going through `buildAppMode`).
+  const db: DatabaseMode = database ?? resolveDatabaseMode(app?.config ?? {});
   return {
     kind: "local",
     fsCapability,
@@ -256,8 +287,10 @@ export function buildLocalAppMode(app?: AppContext, dialect: "sqlite" | "postgre
     repoMapCapability,
     ftsRebuildCapability,
     hostCommandCapability,
-    computeBootstrap: makeLocalComputeBootstrap(dialect),
-    migrations: buildMigrationsCapability(dialect),
+    computeBootstrap: makeLocalComputeBootstrap(db.dialect),
+    migrations: buildMigrationsCapability(db.dialect),
     secrets,
+    tenantResolver,
+    database: db,
   };
 }

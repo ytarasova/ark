@@ -123,7 +123,7 @@ describe("createSessionFromIssue", async () => {
     const issue = makeIssue();
     const session = await createSessionFromIssue(getApp(), issue);
 
-    const events = getApp().events.list(session!.id);
+    const events = await getApp().events.list(session!.id);
     const imported = events.filter((e) => e.type === "issue_imported");
     expect(imported).toHaveLength(1);
 
@@ -133,7 +133,7 @@ describe("createSessionFromIssue", async () => {
   });
 
   it("skips duplicate issues (session with same ticket exists)", async () => {
-    getApp().sessions.create({ ticket: "#42", summary: "already tracked" });
+    await getApp().sessions.create({ ticket: "#42", summary: "already tracked" });
 
     const issue = makeIssue();
     const session = await createSessionFromIssue(getApp(), issue);
@@ -149,20 +149,20 @@ describe("pollIssues", async () => {
 
     await pollIssues(getApp(), { label: "ark" });
 
-    const sessions = getApp().sessions.list();
+    const sessions = await getApp().sessions.list();
     const tickets = sessions.map((s) => s.ticket);
     expect(tickets).toContain("#10");
     expect(tickets).toContain("#11");
   });
 
   it("skips issues that already have sessions", async () => {
-    getApp().sessions.create({ ticket: "#10", summary: "existing" });
+    await getApp().sessions.create({ ticket: "#10", summary: "existing" });
 
     ghOutput = makeGhOutput([makeIssue({ number: 10, title: "Bug A" }), makeIssue({ number: 11, title: "Bug B" })]);
 
     await pollIssues(getApp(), { label: "ark" });
 
-    const sessions = getApp().sessions.list();
+    const sessions = await getApp().sessions.list();
     const ticket11 = sessions.filter((s) => s.ticket === "#11");
     const ticket10 = sessions.filter((s) => s.ticket === "#10");
     expect(ticket11).toHaveLength(1);

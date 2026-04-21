@@ -447,16 +447,9 @@ export {
   type TerminationContext,
 } from "./termination.js";
 
-// Flow state persistence
-export {
-  saveFlowState,
-  loadFlowState,
-  markStageCompleted,
-  setCurrentStage,
-  isStageCompleted,
-  deleteFlowState,
-  type FlowState,
-} from "./state/flow-state.js";
+// Flow state persistence -- moved to FlowStateRepository (see repositories/flow-state.ts).
+// Callers: `app.flowStates.*` instead of the old free functions.
+export { FlowStateRepository, type FlowState, type StageResult } from "./repositories/flow-state.js";
 
 // Cross-session memory (migrated to KnowledgeStore -- old file-based memory removed)
 // remember, recall, forget, listMemories, clearMemories, formatMemoriesForPrompt removed -- use app.knowledge directly
@@ -482,17 +475,15 @@ export { detectHandoff, hasHandoff, type HandoffSignal } from "./handoff.js";
 // Per-agent message filtering
 export { filterMessages, parseMessageFilter, type MessageFilter, type FilteredMessage } from "./message-filter.js";
 
-// Task/progress ledger
+// Task/progress ledger -- moved to LedgerRepository (see repositories/ledger.ts).
+// Callers: `app.ledger.*` instead of the old free functions.
 export {
-  loadLedger,
-  saveLedger,
-  addEntry,
-  updateEntry,
-  detectStall,
-  formatLedgerForPrompt,
+  LedgerRepository,
   type Ledger,
   type LedgerEntry,
-} from "./ledger.js";
+  type LedgerEntryType,
+  type LedgerEntryStatus,
+} from "./repositories/ledger.js";
 
 // Agent Client Protocol (headless JSON-RPC)
 export { handleAcpRequest, runAcpServer, type AcpRequest, type AcpResponse } from "./acp.js";

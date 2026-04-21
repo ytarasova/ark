@@ -149,6 +149,40 @@ export async function initSchema(db: IDatabase): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_todos_tenant ON todos(tenant_id);
     CREATE INDEX IF NOT EXISTS idx_groups_tenant ON groups(tenant_id);
 
+    -- flow_state: DAG orchestration state (completed/skipped/current stage,
+    -- per-stage results). One row per session. Replaces the pre-DB JSON files
+    -- under {arkDir}/flow-state/<sessionId>.json; see repositories/flow-state.ts.
+    CREATE TABLE IF NOT EXISTS flow_state (
+      session_id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      flow_name TEXT NOT NULL DEFAULT '',
+      completed_stages TEXT NOT NULL DEFAULT '[]',
+      skipped_stages TEXT NOT NULL DEFAULT '[]',
+      current_stage TEXT,
+      stage_results TEXT NOT NULL DEFAULT '{}',
+      started_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_flow_state_tenant ON flow_state(tenant_id);
+
+    -- ledger_entries: append-only conductor progress ledger (facts, hypotheses,
+    -- plan steps, progress reports, stall markers). Replaces the pre-DB
+    -- {arkDir}/conductor/<conductorId>/ledger.json; see repositories/ledger.ts.
+    CREATE TABLE IF NOT EXISTS ledger_entries (
+      id TEXT PRIMARY KEY,
+      conductor_id TEXT NOT NULL DEFAULT 'default',
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      type TEXT NOT NULL,
+      content TEXT NOT NULL,
+      status TEXT,
+      session_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_ledger_entries_conductor ON ledger_entries(conductor_id);
+    CREATE INDEX IF NOT EXISTS idx_ledger_entries_tenant ON ledger_entries(tenant_id);
+    CREATE INDEX IF NOT EXISTS idx_ledger_entries_created ON ledger_entries(created_at);
+
     CREATE TABLE IF NOT EXISTS schedules (
       id TEXT PRIMARY KEY,
       cron TEXT NOT NULL,

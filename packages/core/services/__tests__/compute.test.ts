@@ -35,16 +35,16 @@ afterEach(async () => {
 describe("ComputeService", async () => {
   // ── create ─────────────────────────────────────────────────────────────────
 
-  it("create delegates to repository", () => {
-    const c = svc.create({ name: "test-docker", provider: "docker" });
+  it("create delegates to repository", async () => {
+    const c = await svc.create({ name: "test-docker", provider: "docker" });
     expect(c.name).toBe("test-docker");
     expect(c.provider).toBe("docker");
     expect(c.status).toBe("stopped");
   });
 
-  it("create rejects second local provider (singleton)", () => {
+  it("create rejects second local provider (singleton)", async () => {
     // "local" already seeded -- creating another must throw
-    expect(() => svc.create({ name: "local2", provider: "local" })).toThrow(/singleton/);
+    expect(svc.create({ name: "local2", provider: "local" })).rejects.toThrow(/singleton/);
   });
 
   // ── get ────────────────────────────────────────────────────────────────────
@@ -62,14 +62,14 @@ describe("ComputeService", async () => {
   // ── list ───────────────────────────────────────────────────────────────────
 
   it("list returns all compute entries", async () => {
-    svc.create({ name: "d1", provider: "docker" });
+    await svc.create({ name: "d1", provider: "docker" });
     const all = await svc.list();
     expect(all.length).toBeGreaterThanOrEqual(2);
   });
 
   it("list filters by provider", async () => {
-    svc.create({ name: "d1", provider: "docker" });
-    svc.create({ name: "e1", provider: "ec2" });
+    await svc.create({ name: "d1", provider: "docker" });
+    await svc.create({ name: "e1", provider: "ec2" });
     const dockers = await svc.list({ provider: "docker" });
     expect(dockers.every((c) => c.provider === "docker")).toBe(true);
   });
@@ -77,7 +77,7 @@ describe("ComputeService", async () => {
   // ── update ─────────────────────────────────────────────────────────────────
 
   it("update changes fields", async () => {
-    svc.create({ name: "upd", provider: "docker" });
+    await svc.create({ name: "upd", provider: "docker" });
     const updated = await svc.update("upd", { status: "running" as ComputeStatus });
     expect(updated!.status).toBe("running");
   });
@@ -85,7 +85,7 @@ describe("ComputeService", async () => {
   // ── delete ─────────────────────────────────────────────────────────────────
 
   it("delete removes compute", async () => {
-    svc.create({ name: "del-me", provider: "docker" });
+    await svc.create({ name: "del-me", provider: "docker" });
     expect(await svc.delete("del-me")).toBe(true);
     expect(await svc.get("del-me")).toBeNull();
   });
@@ -101,9 +101,9 @@ describe("ComputeService", async () => {
 
   // ── mergeConfig ────────────────────────────────────────────────────────────
 
-  it("mergeConfig delegates to repository", () => {
-    svc.create({ name: "merge", provider: "docker", config: { ip: "1.2.3.4" } });
-    const updated = svc.mergeConfig("merge", { region: "us-east-1" });
+  it("mergeConfig delegates to repository", async () => {
+    await svc.create({ name: "merge", provider: "docker", config: { ip: "1.2.3.4" } });
+    const updated = await svc.mergeConfig("merge", { region: "us-east-1" });
     expect(updated!.config).toEqual({ ip: "1.2.3.4", region: "us-east-1" });
   });
 
@@ -113,10 +113,10 @@ describe("ComputeService", async () => {
   // ComputeService.create() can be exercised without touching SQLite.
 
   describe("container overrides", () => {
-    it("swapping computes repo with a fake intercepts create()", () => {
+    it("swapping computes repo with a fake intercepts create()", async () => {
       const stored: Compute[] = [];
       const fakeRepo = {
-        create: mock((opts: { name: string; provider: string }) => {
+        create: mock(async (opts: { name: string; provider: string }) => {
           const c = {
             name: opts.name,
             provider: opts.provider,
@@ -128,11 +128,11 @@ describe("ComputeService", async () => {
           stored.push(c);
           return c;
         }),
-        get: mock((name: string) => stored.find((c) => c.name === name) ?? null),
-        list: mock(() => stored),
-        update: mock(() => null),
-        delete: mock(() => true),
-        mergeConfig: mock(() => null),
+        get: mock(async (name: string) => stored.find((c) => c.name === name) ?? null),
+        list: mock(async () => stored),
+        update: mock(async () => null),
+        delete: mock(async () => true),
+        mergeConfig: mock(async () => null),
       };
 
       app.container.register({
@@ -141,14 +141,14 @@ describe("ComputeService", async () => {
       });
 
       const freshSvc = app.container.resolve("computeService");
-      const c = freshSvc.create({ name: "fake-ec2", provider: "ec2" });
+      const c = await freshSvc.create({ name: "fake-ec2", provider: "ec2" });
 
       expect(c.name).toBe("fake-ec2");
       expect(fakeRepo.create).toHaveBeenCalledTimes(1);
       expect(stored.length).toBe(1);
 
       // Real repo is untouched (override only affects the container copy).
-      expect(repo.get("fake-ec2")).toBeNull();
+      expect(await repo.get("fake-ec2")).toBeNull();
     });
   });
 
@@ -158,15 +158,15 @@ describe("ComputeService", async () => {
     let pureDb: IDatabase;
     let pureSvc: ComputeService;
 
-    beforeEach(() => {
+    beforeEach(async () => {
       pureDb = new BunSqliteAdapter(new Database(":memory:"));
-      initSchema(pureDb);
-      seedLocalCompute(pureDb);
+      await initSchema(pureDb);
+      await seedLocalCompute(pureDb);
       pureSvc = new ComputeService(new ComputeRepository(pureDb));
     });
 
-    it("create() works without an AppContext", () => {
-      const c = pureSvc.create({ name: "pure-docker", provider: "docker" });
+    it("create() works without an AppContext", async () => {
+      const c = await pureSvc.create({ name: "pure-docker", provider: "docker" });
       expect(c.name).toBe("pure-docker");
     });
   });
