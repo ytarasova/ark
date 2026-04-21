@@ -169,6 +169,24 @@ export interface ArkConfig {
   tensorZero?: TensorZeroSettings;
   /** Predefined compute templates (local mode). */
   computeTemplates?: ComputeTemplateConfig[];
+  /**
+   * Secrets backend configuration. The concrete provider is picked by
+   * `AppMode`: local mode uses the file provider, hosted mode uses the
+   * AWS SSM Parameter Store provider. The fields here are advisory.
+   *
+   * - `backend`: explicit override ("file" | "aws"). When unset the mode
+   *   decides. Mostly useful for forcing the AWS provider in local dev
+   *   against a real account, or the file provider inside a pod test.
+   * - `awsRegion`: AWS region for SSM. Defaults to `AWS_REGION` or
+   *   `us-east-1`.
+   * - `awsKmsKeyId`: optional KMS key (alias/ARN/id) to encrypt the
+   *   SecureString parameters. Unset uses the account default alias.
+   */
+  secrets?: {
+    backend?: "file" | "aws";
+    awsRegion?: string;
+    awsKmsKeyId?: string;
+  };
   /** @deprecated prefer `config.database.url` */
   databaseUrl?: string;
   /** Redis URL for hosted SSE bus and cross-instance pub/sub. redis://... */
@@ -436,6 +454,7 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
         (legacyYaml.tensor_zero as Record<string, unknown>)?.auto_start === true,
     },
     computeTemplates: parseComputeTemplates(legacyYaml.compute_templates),
+    secrets: parseSecretsConfig(legacyYaml.secrets, merged),
     databaseUrl: database.url,
     redisUrl: process.env.REDIS_URL ?? (legacyYaml.redis_url as string) ?? merged.redisUrl,
   };
@@ -450,7 +469,7 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
 }
 
 function emptyEnvOverrides(): EnvOverrides {
-  return { ports: {}, channels: {}, observability: {}, auth: {}, features: {}, storage: {} };
+  return { ports: {}, channels: {}, observability: {}, auth: {}, features: {}, storage: {}, secrets: {} };
 }
 
 /** Extract partial Spring-style overrides from a legacy-flat overrides arg. */
@@ -468,6 +487,40 @@ function flatOverridesFromLegacy(o: LoadConfigOptions): EnvOverrides {
     if (o.storage.s3) out.storage.s3 = o.storage.s3;
   }
   if (o.database?.url) out.databaseUrl = o.database.url;
+  if (o.secrets) {
+    if (o.secrets.backend === "file" || o.secrets.backend === "aws") out.secrets.backend = o.secrets.backend;
+    if (o.secrets.awsRegion) out.secrets.awsRegion = o.secrets.awsRegion;
+    if (o.secrets.awsKmsKeyId) out.secrets.awsKmsKeyId = o.secrets.awsKmsKeyId;
+  }
+  return out;
+}
+
+/**
+ * Collapse YAML + env-derived secrets overrides into the ArkConfig.secrets block.
+ * Returns undefined when nothing was specified -- callers then treat the mode
+ * default as authoritative (file in local, aws in hosted).
+ */
+function parseSecretsConfig(rawYaml: unknown, merged: EnvOverrides): ArkConfig["secrets"] | undefined {
+  const fromEnv = merged.secrets ?? {};
+  const fromYaml = (rawYaml && typeof rawYaml === "object" ? (rawYaml as Record<string, unknown>) : {}) as Record<
+    string,
+    unknown
+  >;
+  const backend =
+    fromEnv.backend ?? (fromYaml.backend === "file" || fromYaml.backend === "aws" ? fromYaml.backend : undefined);
+  const awsRegion =
+    fromEnv.awsRegion ??
+    (typeof fromYaml.aws_region === "string" ? (fromYaml.aws_region as string) : undefined) ??
+    (typeof fromYaml.awsRegion === "string" ? (fromYaml.awsRegion as string) : undefined);
+  const awsKmsKeyId =
+    fromEnv.awsKmsKeyId ??
+    (typeof fromYaml.aws_kms_key_id === "string" ? (fromYaml.aws_kms_key_id as string) : undefined) ??
+    (typeof fromYaml.awsKmsKeyId === "string" ? (fromYaml.awsKmsKeyId as string) : undefined);
+  if (!backend && !awsRegion && !awsKmsKeyId) return undefined;
+  const out: NonNullable<ArkConfig["secrets"]> = {};
+  if (backend) out.backend = backend as "file" | "aws";
+  if (awsRegion) out.awsRegion = awsRegion;
+  if (awsKmsKeyId) out.awsKmsKeyId = awsKmsKeyId;
   return out;
 }
 

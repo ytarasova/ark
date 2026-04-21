@@ -25,6 +25,7 @@
 
 import type { ArkConfig } from "../config.js";
 import type { AppContext } from "../app.js";
+import type { SecretsCapability } from "../secrets/types.js";
 import { buildLocalAppMode } from "./local-app-mode.js";
 import { buildHostedAppMode } from "./hosted-app-mode.js";
 
@@ -126,6 +127,13 @@ export interface AppMode {
   readonly hostCommandCapability: HostCommandCapability | null;
   readonly computeBootstrap: ComputeBootstrapCapability;
   readonly migrations: MigrationsCapability;
+  /**
+   * Tenant-scoped secrets backend. Always present. Local mode gets the
+   * file-backed provider rooted at `${arkDir}/secrets.json`; hosted mode
+   * gets the AWS SSM Parameter Store provider. See
+   * `packages/core/secrets/` for the implementations.
+   */
+  readonly secrets: SecretsCapability;
 }
 
 // ── Factory (the ONE remaining mode conditional) ───────────────────────────
@@ -147,7 +155,7 @@ export function buildAppMode(config: ArkConfig, app?: AppContext): AppMode {
     (config.database as { url?: string } | undefined)?.url ?? (config as { databaseUrl?: string }).databaseUrl;
   const isHosted = typeof url === "string" && url.length > 0;
   if (isHosted) {
-    return buildHostedAppMode();
+    return buildHostedAppMode(config);
   }
   const dialect: "sqlite" | "postgres" =
     typeof url === "string" && (url.startsWith("postgres://") || url.startsWith("postgresql://"))

@@ -139,6 +139,15 @@ export class AppContext {
     this._container = buildContainer({ app: this, config: this.config, db, bootOptions: this.options });
     await this._container.cradle.lifecycle.start();
 
+    // Hosted-mode only: on a fresh DB the `resource_definitions` table is empty,
+    // so `agent/list` + friends return []. Seed the builtin YAMLs shipped with
+    // the source tree (or install prefix) on every boot; the seeder is idempotent
+    // and leaves any user-authored override rows untouched.
+    if (this.config.databaseUrl) {
+      const { seedBuiltinResources } = await import("./di/seed-builtins.js");
+      await seedBuiltinResources(this);
+    }
+
     // Eagerly construct + migrate the code-intel store. The store's migrate()
     // is async and we want it to land before any handler reads `app.codeIntel`.
     // The accessor below remains synchronous so handlers stay simple; if a
@@ -352,6 +361,15 @@ export class AppContext {
   // path) keep working. Once the container is built, the DI-registered mode
   // shadows the pre-boot one.
   private _preBootMode: AppMode | null = null;
+
+  /**
+   * Tenant-scoped secrets backend. Delegates to `app.mode.secrets` so callers
+   * never need to know whether they're talking to the file-backed or AWS SSM
+   * implementation. See `packages/core/secrets/types.ts`.
+   */
+  get secrets(): import("./secrets/types.js").SecretsCapability {
+    return this.mode.secrets;
+  }
 
   get mode(): AppMode {
     if (this.phase === "ready" || this.phase === "shutting_down") {

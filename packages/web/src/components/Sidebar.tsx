@@ -16,6 +16,8 @@ import {
   Zap,
   Monitor,
   Plug,
+  KeyRound,
+  Shield,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
@@ -71,6 +73,8 @@ const NAV: NavItem[] = [
   { id: "tools", icon: Wrench, label: "Tools", shortcut: "T" },
   { id: "schedules", icon: Calendar, label: "Schedules" },
   { id: "integrations", icon: Plug, label: "Integrations", shortcut: "I" },
+  { id: "secrets", icon: KeyRound, label: "Secrets" },
+  { id: "admin", icon: Shield, label: "Admin" },
   { id: "costs", icon: DollarSign, label: "Costs", shortcut: "$" },
 ];
 

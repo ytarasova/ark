@@ -119,6 +119,10 @@ export const claudeCodeExecutor: Executor = {
       ...(opts.agent.env ?? {}),
       ...(provider?.buildLaunchEnv(session) ?? {}),
       ...buildRouterEnv(app.config, { mode: "claude" }),
+      // `opts.env` carries secrets resolved by dispatch; they override
+      // every other env source so operator-rotated values take effect
+      // on the next run without editing any YAML.
+      ...(opts.env ?? {}),
       ARK_SESSION_DIR: localSessionDir,
     };
 

@@ -197,6 +197,39 @@ describe("action stage chaining", async () => {
     expect(actionEvents.length).toBe(1);
   });
 
+  it("dispatch auto-executes first-stage action and drives flow to completed", async () => {
+    // Regression: prior to this fix, dispatch() returned `{ok: false,
+    // "Stage 'X' is action, not agent"}` when the first stage of a flow
+    // was an action. That left the session stuck at status=ready forever
+    // because the default session_created listener only kicks dispatch
+    // once. The fix routes action stages through executeAction +
+    // mediateStageHandoff so a single-action flow can auto-complete.
+    const { dispatch } = await import("../services/session-orchestration.js");
+
+    app.flows.save("test-action-first", {
+      name: "test-action-first",
+      stages: [{ name: "only", action: "close", gate: "auto" }],
+    } as any);
+
+    const session = await app.sessions.create({ summary: "action-first test", flow: "test-action-first" });
+    await app.sessions.update(session.id, { status: "ready", stage: "only" });
+
+    const result = await dispatch(app, session.id);
+    expect(result.ok).toBe(true);
+
+    await waitFor(
+      async () => {
+        const s = await app.sessions.get(session.id);
+        return s?.status === "completed";
+      },
+      { timeout: 5000, message: "Expected single-action-stage session to reach completed" },
+    );
+
+    const events = await app.events.list(session.id);
+    const actionEvents = events.filter((e) => e.type === "action_executed" && e.data?.action === "close");
+    expect(actionEvents.length).toBe(1);
+  });
+
   it("executeAction no longer calls advance internally", async () => {
     // Set up session at an action stage
     app.flows.save("test-no-advance", {

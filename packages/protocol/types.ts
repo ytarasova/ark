@@ -49,6 +49,7 @@ export const ErrorCodes = {
   EXECUTOR_ERROR: -32003,
   GATE_NOT_PENDING: -32004,
   OVERLOADED: -32005,
+  FORBIDDEN: -32006,
 } as const;
 
 // ── Constructors ────────────────────────────────────────────────────────────

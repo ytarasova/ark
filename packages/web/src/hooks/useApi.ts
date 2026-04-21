@@ -471,4 +471,13 @@ export const api = {
   testConnector: (name: string) =>
     rpc<{ name: string; reachable: boolean; details: string }>("connectors/test", { name }),
   getIntegrations: () => rpc<{ integrations: any[] }>("integrations/list").then((r) => r.integrations ?? []),
+
+  // ── Secrets (tenant-scoped) ───────────────────────────────────────────────
+  listSecrets: () =>
+    rpc<{
+      secrets: Array<{ tenant_id: string; name: string; description?: string; created_at: string; updated_at: string }>;
+    }>("secret/list").then((r) => r.secrets ?? []),
+  setSecret: (name: string, value: string, description?: string) =>
+    rpc<{ ok: true }>("secret/set", { name, value, description }),
+  deleteSecret: (name: string) => rpc<{ ok: boolean }>("secret/delete", { name }),
 };

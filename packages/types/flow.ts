@@ -129,6 +129,21 @@ export interface StageDefinition {
   strategy?: string;
   max_parallel?: number;
   subtasks?: { name: string; task: string }[];
+  /**
+   * Names of secrets to resolve (via `app.secrets`) and inject as env vars
+   * into the session at dispatch time. Names must match the secrets-name
+   * regex `[A-Z0-9_]+` because they land verbatim in the executor env.
+   *
+   * Resolution order if the same key is also set in the agent's static
+   * `env` block or the runtime's `env` block: `secrets` > runtime env >
+   * agent env > session env. Secrets always win so an operator that
+   * rotates a value in the secrets backend takes effect on the next
+   * dispatch without re-editing any YAML.
+   *
+   * A missing secret fails the dispatch immediately with a clear error
+   * instead of silently dropping the env var.
+   */
+  secrets?: string[];
 }
 
 /** Declarative description of a file input slot a flow requires. */

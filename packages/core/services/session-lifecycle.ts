@@ -158,10 +158,6 @@ export async function startSession(
     (session as { workdir: string | null }).workdir = wsWorkdir;
   }
 
-  // Broadcast lifecycle hook so the service layer can react (the default
-  // listener kicks a background dispatch).
-  app.sessionService.emitSessionCreated(session.id);
-
   // Audit: log session creation with full context
   await app.events.log(session.id, "session_created", {
     actor: "user",
@@ -181,6 +177,17 @@ export async function startSession(
   // Apply agent override if specified
   if (opts.agent) {
     await app.sessions.update(session.id, { agent: opts.agent });
+  }
+
+  // Prefetch flow via the async path so the hosted DB-backed store warms
+  // its sync cache. Without this, the hosted `DbResourceStore.get` returns
+  // a Promise on first hit, `loadFlow` treats it as unresolved, and
+  // `getFirstStage` returns null -- which leaves the session wedged at
+  // `status: pending` forever because no first stage is ever set.
+  try {
+    await app.flows.get(mergedOpts.flow ?? "default");
+  } catch {
+    logDebug("session", "flow prefetch failed -- continue and rely on legacy sync path");
   }
 
   // Set first stage
@@ -204,6 +211,15 @@ export async function startSession(
       emitStageSpanStart(session.id, { stage: firstStage, agent: stageAction.agent, gate: "auto" });
     }
   }
+
+  // Broadcast lifecycle hook so the service layer can react (the default
+  // listener kicks a background dispatch). Emitted AFTER the first stage is
+  // persisted -- if we emit earlier (as we used to) the listener's dispatch
+  // call sees `stage: null` and bails with "No current stage", which left
+  // action-only flows wedged at `status: ready` until an RPC
+  // `session/advance` came in manually.
+  app.sessionService.emitSessionCreated(session.id);
+
   return (await app.sessions.get(session.id))!;
 }
 

@@ -168,7 +168,13 @@ export class K8sProvider implements ComputeProvider {
           {
             name: "agent",
             image: cfg.image,
-            command: ["/bin/bash", "-c", opts.launcherContent],
+            // `/bin/sh` is present in every reasonable container image (alpine
+            // has no bash, ubuntu/debian both have /bin/sh via dash). The
+            // launcher content is `buildLauncher()` output which begins with
+            // a `#!/bin/bash` shebang, so bashisms inside the script still
+            // require bash in the image -- but that's the script's problem,
+            // not ours: `/bin/sh -c` just needs to execute the first line.
+            command: ["/bin/sh", "-c", opts.launcherContent],
             resources: cfg.resources
               ? {
                   requests: { cpu: cfg.resources.cpu, memory: cfg.resources.memory },

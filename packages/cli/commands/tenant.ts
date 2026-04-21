@@ -1,20 +1,145 @@
 /**
- * CLI commands for tenant compute policy management.
- *
- * ark tenant policy set <tenant-id> --providers k8s,k8s-kata --max-sessions 20
- * ark tenant policy get <tenant-id>
- * ark tenant policy list
- * ark tenant policy delete <tenant-id>
+ * CLI commands for tenant management:
+ *   ark tenant list / create / update / delete / suspend / resume
+ *   ark tenant policy *   (existing sub-namespace, preserved below)
  */
 
 import type { Command } from "commander";
 import chalk from "chalk";
-import { TenantPolicyManager } from "../../core/auth/index.js";
+import { TenantPolicyManager, TenantManager } from "../../core/auth/index.js";
 import type { AppContext } from "../../core/app.js";
 
 export function registerTenantCommands(program: Command, app: AppContext) {
   const tenant = program.command("tenant").description("Manage tenant settings");
   const policy = tenant.command("policy").description("Manage tenant compute policies");
+
+  // ── Tenant lifecycle ─────────────────────────────────────────────────
+
+  tenant
+    .command("list")
+    .description("List all tenants")
+    .option("--json", "Output raw JSON")
+    .action(async (opts) => {
+      try {
+        const tm = new TenantManager(app.db);
+        const rows = await tm.list();
+        if (opts.json) {
+          console.log(JSON.stringify(rows, null, 2));
+          return;
+        }
+        if (!rows.length) {
+          console.log(chalk.dim("No tenants yet."));
+          return;
+        }
+        console.log(`  ${"ID".padEnd(22)} ${"SLUG".padEnd(20)} ${"NAME".padEnd(24)} STATUS`);
+        for (const t of rows) {
+          console.log(`  ${t.id.padEnd(22)} ${t.slug.padEnd(20)} ${t.name.padEnd(24)} ${t.status}`);
+        }
+      } catch (e: any) {
+        console.log(chalk.red(`Failed: ${e.message}`));
+      }
+    });
+
+  tenant
+    .command("create")
+    .description("Create a new tenant")
+    .argument("<slug>", "Kebab-case slug (unique)")
+    .option("--name <name>", "Human-readable name (defaults to slug)")
+    .option("--id <id>", "Explicit tenant id (default: auto)")
+    .option("--json", "Output raw JSON")
+    .action(async (slug, opts) => {
+      try {
+        const tm = new TenantManager(app.db);
+        const t = await tm.create({ slug, name: opts.name ?? slug, id: opts.id });
+        if (opts.json) console.log(JSON.stringify(t, null, 2));
+        else console.log(chalk.green(`Tenant created: ${t.id} (slug=${t.slug})`));
+      } catch (e: any) {
+        console.log(chalk.red(`Failed: ${e.message}`));
+      }
+    });
+
+  tenant
+    .command("update")
+    .description("Update a tenant's slug / name / status")
+    .argument("<id>", "Tenant id or slug")
+    .option("--slug <slug>", "New slug")
+    .option("--name <name>", "New name")
+    .option("--status <status>", "active | suspended | archived")
+    .action(async (id, opts) => {
+      try {
+        const tm = new TenantManager(app.db);
+        const current = await tm.get(id);
+        if (!current) {
+          console.log(chalk.red(`Tenant '${id}' not found`));
+          return;
+        }
+        const patch: Record<string, any> = {};
+        if (opts.slug) patch.slug = opts.slug;
+        if (opts.name) patch.name = opts.name;
+        if (opts.status) patch.status = opts.status;
+        const t = await tm.update(current.id, patch);
+        console.log(chalk.green(`Tenant updated: ${t?.id}`));
+      } catch (e: any) {
+        console.log(chalk.red(`Failed: ${e.message}`));
+      }
+    });
+
+  tenant
+    .command("delete")
+    .description("Delete a tenant (cascades teams + memberships, leaves sessions/computes behind)")
+    .argument("<id>", "Tenant id or slug")
+    .action(async (id) => {
+      try {
+        const tm = new TenantManager(app.db);
+        const current = await tm.get(id);
+        if (!current) {
+          console.log(chalk.red(`Tenant '${id}' not found`));
+          return;
+        }
+        const ok = await tm.delete(current.id);
+        console.log(ok ? chalk.green(`Tenant deleted: ${current.id}`) : chalk.red("Delete failed"));
+      } catch (e: any) {
+        console.log(chalk.red(`Failed: ${e.message}`));
+      }
+    });
+
+  tenant
+    .command("suspend")
+    .description("Set tenant status to 'suspended'")
+    .argument("<id>", "Tenant id or slug")
+    .action(async (id) => {
+      try {
+        const tm = new TenantManager(app.db);
+        const current = await tm.get(id);
+        if (!current) {
+          console.log(chalk.red(`Tenant '${id}' not found`));
+          return;
+        }
+        await tm.setStatus(current.id, "suspended");
+        console.log(chalk.yellow(`Tenant '${current.id}' suspended`));
+      } catch (e: any) {
+        console.log(chalk.red(`Failed: ${e.message}`));
+      }
+    });
+
+  tenant
+    .command("resume")
+    .description("Set tenant status to 'active'")
+    .argument("<id>", "Tenant id or slug")
+    .action(async (id) => {
+      try {
+        const tm = new TenantManager(app.db);
+        const current = await tm.get(id);
+        if (!current) {
+          console.log(chalk.red(`Tenant '${id}' not found`));
+          return;
+        }
+        await tm.setStatus(current.id, "active");
+        console.log(chalk.green(`Tenant '${current.id}' active`));
+      } catch (e: any) {
+        console.log(chalk.red(`Failed: ${e.message}`));
+      }
+    });
 
   policy
     .command("set")

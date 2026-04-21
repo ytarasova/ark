@@ -30,6 +30,8 @@ const IntegrationsPage = lazy(() =>
   import("./pages/IntegrationsPage.js").then((m) => ({ default: m.IntegrationsPage })),
 );
 const SettingsPage = lazy(() => import("./pages/SettingsPage.js").then((m) => ({ default: m.SettingsPage })));
+const SecretsPage = lazy(() => import("./pages/SecretsPage.js").then((m) => ({ default: m.SecretsPage })));
+const AdminPage = lazy(() => import("./pages/AdminPage.js").then((m) => ({ default: m.AdminPage })));
 const LoginPage = lazy(() => import("./pages/LoginPage.js").then((m) => ({ default: m.LoginPage })));
 const DesignPreviewPage = lazy(() =>
   import("./pages/DesignPreviewPage.js").then((m) => ({ default: m.DesignPreviewPage })),
@@ -83,6 +85,7 @@ function App() {
       { id: "nav-schedules", label: "Go to Schedules", section: "Navigation", onSelect: () => onNavigate("schedules") },
       { id: "nav-memory", label: "Go to Memory", section: "Navigation", onSelect: () => onNavigate("memory") },
       { id: "nav-costs", label: "Go to Costs", section: "Navigation", onSelect: () => onNavigate("costs") },
+      { id: "nav-admin", label: "Go to Admin", section: "Navigation", onSelect: () => onNavigate("admin") },
       { id: "nav-settings", label: "Go to Settings", section: "Navigation", onSelect: () => onNavigate("settings") },
       {
         id: "theme-toggle-mode",
@@ -198,6 +201,18 @@ function App() {
               daemonStatus={daemonStatus}
               initialTab={subId}
               onTabChange={setSubId}
+            />
+          )}
+          {view === "secrets" && (
+            <SecretsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
+          )}
+          {view === "admin" && (
+            <AdminPage
+              view={view}
+              onNavigate={onNavigate}
+              readOnly={readOnly}
+              daemonStatus={daemonStatus}
+              onToast={showToast}
             />
           )}
           {view === "settings" && (

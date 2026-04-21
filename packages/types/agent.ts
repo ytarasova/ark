@@ -39,6 +39,14 @@ export interface RuntimeDefinition {
   mcp_servers?: (string | Record<string, unknown>)[];
   /** Billing and cost tracking config. When omitted, defaults to { mode: 'api' }. */
   billing?: RuntimeBilling;
+  /**
+   * Names of secrets to resolve (via `app.secrets`) and inject as env vars
+   * into every session that uses this runtime. Secret names follow the
+   * `[A-Z0-9_]+` regex and land verbatim as env vars inside the executor.
+   * Missing secrets fail the dispatch. Merged with stage-level secrets;
+   * stage wins on conflict.
+   */
+  secrets?: string[];
   _source?: "builtin" | "global" | "project";
   _path?: string;
 }

@@ -51,6 +51,7 @@ function chunkToOverrides(chunk: Record<string, unknown>): EnvOverrides {
     auth: {},
     features: {},
     storage: {},
+    secrets: {},
   };
 
   const ports = chunk.ports;
@@ -124,6 +125,16 @@ function chunkToOverrides(chunk: Record<string, unknown>): EnvOverrides {
     }
   }
 
+  const secrets = chunk.secrets;
+  if (isObj(secrets)) {
+    const backend = pickStr(secrets.backend);
+    if (backend === "file" || backend === "aws") out.secrets.backend = backend;
+    const region = pickStr(secrets.awsRegion ?? secrets.aws_region);
+    if (region) out.secrets.awsRegion = region;
+    const kms = pickStr(secrets.awsKmsKeyId ?? secrets.aws_kms_key_id);
+    if (kms) out.secrets.awsKmsKeyId = kms;
+  }
+
   const ark = pickStr(chunk.arkDir ?? chunk.ark_dir);
   if (ark) out.arkDir = ark;
 
@@ -167,7 +178,7 @@ export function loadYamlOverrides(arkDir: string, profile: ArkProfile): EnvOverr
 }
 
 function emptyOverrides(): EnvOverrides {
-  return { ports: {}, channels: {}, observability: {}, auth: {}, features: {}, storage: {} };
+  return { ports: {}, channels: {}, observability: {}, auth: {}, features: {}, storage: {}, secrets: {} };
 }
 
 /** Shallow-merge with `b` winning per section. */
@@ -185,5 +196,6 @@ export function mergeOverrides(a: EnvOverrides, b: EnvOverrides): EnvOverrides {
       blobBackend: b.storage?.blobBackend ?? a.storage?.blobBackend,
       s3: b.storage?.s3 ?? a.storage?.s3,
     },
+    secrets: { ...(a.secrets ?? {}), ...(b.secrets ?? {}) },
   };
 }

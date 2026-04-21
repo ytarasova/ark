@@ -34,6 +34,9 @@ import type {
 import { seedLocalCompute } from "../repositories/schema.js";
 import { seedLocalComputePostgres } from "../repositories/schema-postgres.js";
 import { buildMigrationsCapability } from "./migrations-capability.js";
+import { FileSecretsProvider } from "../secrets/file-provider.js";
+import { AwsSecretsProvider } from "../secrets/aws-provider.js";
+import type { SecretsCapability } from "../secrets/types.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -236,6 +239,15 @@ export function buildLocalAppMode(app?: AppContext, dialect: "sqlite" | "postgre
   const knowledgeCapability = app ? makeKnowledgeCapability(app) : null;
   const ftsRebuildCapability = app ? makeFtsRebuildCapability(app) : null;
   const hostCommandCapability = makeHostCommandCapability();
+  // Default to the user's home when no AppContext is available (bare
+  // AppMode construction used by a few tests). The first real mutation
+  // creates the directory, so this is safe to derive up front.
+  const arkDir = app?.config?.arkDir ?? `${process.env.HOME ?? "."}/.ark`;
+  const secretsCfg = app?.config?.secrets;
+  const secrets: SecretsCapability =
+    secretsCfg?.backend === "aws"
+      ? new AwsSecretsProvider({ region: secretsCfg.awsRegion, kmsKeyId: secretsCfg.awsKmsKeyId })
+      : new FileSecretsProvider(arkDir);
   return {
     kind: "local",
     fsCapability,
@@ -246,5 +258,6 @@ export function buildLocalAppMode(app?: AppContext, dialect: "sqlite" | "postgre
     hostCommandCapability,
     computeBootstrap: makeLocalComputeBootstrap(dialect),
     migrations: buildMigrationsCapability(dialect),
+    secrets,
   };
 }

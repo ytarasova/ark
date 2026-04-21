@@ -10,6 +10,10 @@
 
 import type { AppMode, ComputeBootstrapCapability } from "./app-mode.js";
 import { buildMigrationsCapability } from "./migrations-capability.js";
+import { AwsSecretsProvider } from "../secrets/aws-provider.js";
+import { FileSecretsProvider } from "../secrets/file-provider.js";
+import type { SecretsCapability } from "../secrets/types.js";
+import type { ArkConfig } from "../config.js";
 
 /**
  * Hosted compute bootstrap is intentionally a no-op. The operator
@@ -23,7 +27,12 @@ function makeNoopComputeBootstrap(): ComputeBootstrapCapability {
   return { seed: () => undefined };
 }
 
-export function buildHostedAppMode(): AppMode {
+export function buildHostedAppMode(config?: ArkConfig): AppMode {
+  const secretsCfg = config?.secrets;
+  const secrets: SecretsCapability =
+    secretsCfg?.backend === "file"
+      ? new FileSecretsProvider(config?.arkDir ?? `${process.env.HOME ?? "."}/.ark`)
+      : new AwsSecretsProvider({ region: secretsCfg?.awsRegion, kmsKeyId: secretsCfg?.awsKmsKeyId });
   return {
     kind: "hosted",
     fsCapability: null,
@@ -34,5 +43,6 @@ export function buildHostedAppMode(): AppMode {
     hostCommandCapability: null,
     computeBootstrap: makeNoopComputeBootstrap(),
     migrations: buildMigrationsCapability("postgres"),
+    secrets,
   };
 }

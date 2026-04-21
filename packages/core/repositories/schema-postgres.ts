@@ -295,6 +295,56 @@ export async function initPostgresSchema(db: IDatabase): Promise<void> {
       last_heartbeat TEXT NOT NULL
     )
   `);
+
+  // Tenants + users + teams + memberships (see migration 003).
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS tenants (
+      id TEXT PRIMARY KEY,
+      slug TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'active',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+  await safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_tenants_status ON tenants(status)`);
+
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      name TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS teams (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      slug TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE (tenant_id, slug)
+    )
+  `);
+  await safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_teams_tenant ON teams(tenant_id)`);
+
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS memberships (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+      role TEXT NOT NULL DEFAULT 'member',
+      created_at TEXT NOT NULL,
+      UNIQUE (user_id, team_id)
+    )
+  `);
+  await safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_memberships_user ON memberships(user_id)`);
+  await safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_memberships_team ON memberships(team_id)`);
 }
 
 export async function seedLocalComputePostgres(db: IDatabase): Promise<void> {

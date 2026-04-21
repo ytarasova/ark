@@ -40,6 +40,8 @@ import { registerFsHandlers } from "./handlers/fs.js";
 import { registerTriggerHandlers } from "./handlers/triggers.js";
 import { registerConnectorHandlers } from "./handlers/connectors.js";
 import { registerIntegrationsHandlers } from "./handlers/integrations.js";
+import { registerSecretsHandlers } from "./handlers/secrets.js";
+import { registerAdminHandlers } from "./handlers/admin.js";
 
 /**
  * Register every shared handler, then conditionally mount local-only handlers
@@ -78,6 +80,8 @@ export function registerSharedHandlers(router: Router, app: AppContext): void {
   registerTriggerHandlers(router, app);
   registerConnectorHandlers(router, app);
   registerIntegrationsHandlers(router, app);
+  registerSecretsHandlers(router, app);
+  registerAdminHandlers(router, app);
 }
 
 /**

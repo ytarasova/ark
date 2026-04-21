@@ -44,6 +44,15 @@ interface ResourceRow {
 
 export class DbResourceStore<T extends { name: string }> {
   private tenantId: string = "default";
+  // Sync-access cache keyed by `<tenantId>::<name>`. Populated lazily on
+  // every `list()` call + every `save()`/`delete()`, and used by the sync
+  // `get()` path below. Without this cache, hosted-mode callers that use
+  // the sync FlowStore/AgentStore contract (see
+  // `state/flow.ts::getFirstStage`) receive a pending Promise which they
+  // treat as a FlowDefinition, deref `.stages`, and silently get
+  // `undefined` -- which is exactly how single-stage `e2e-noop` flows used
+  // to hang forever at `status: pending`.
+  private syncCache: Map<string, T | null> = new Map();
 
   constructor(
     private db: IDatabase,
@@ -58,18 +67,55 @@ export class DbResourceStore<T extends { name: string }> {
     return this.tenantId;
   }
 
+  private cacheKey(name: string): string {
+    return `${this.tenantId}::${name}`;
+  }
+
   async list(): Promise<T[]> {
     const rows = (await this.db
       .prepare("SELECT * FROM resource_definitions WHERE kind = ? AND tenant_id = ? ORDER BY name")
       .all(this.kind, this.tenantId)) as ResourceRow[];
-    return rows.map((r) => this.rowToResource(r));
+    const resources = rows.map((r) => this.rowToResource(r));
+    // Re-seed sync cache on every list so subsequent sync `get()` calls
+    // see the latest server-side view.
+    for (const r of resources) {
+      this.syncCache.set(this.cacheKey(r.name), r);
+    }
+    return resources;
   }
 
-  async get(name: string): Promise<T | null> {
+  /**
+   * Return a resource by name. The method signature is
+   * `T | null | Promise<T | null>` so both async and sync callers work --
+   * async paths `await` as before, sync paths (`state/flow.ts`) consult
+   * the in-memory cache populated by `list()` / `save()`.
+   *
+   * Sync callers that miss the cache get `null` and should trigger an
+   * async rehydrate out-of-band. In practice this is fine because every
+   * hot sync caller runs after a `list()` or a recent `save()`.
+   */
+  get(name: string): T | null | Promise<T | null> {
+    // Fast path: cache hit. Use `has` so we distinguish "not loaded" from
+    // "loaded and confirmed absent" (the second gets cached as null to
+    // avoid thrashing the DB on repeated lookups of a missing name).
+    const key = this.cacheKey(name);
+    if (this.syncCache.has(key)) {
+      return this.syncCache.get(key) ?? null;
+    }
+    // Slow path: async query, populates the cache for next time. Sync
+    // callers see `Promise<null>` this round and null on the next
+    // re-entry once the cache is populated; this matches how `flow/read`
+    // warms the cache on the first RPC call.
+    return this.getAsync(name);
+  }
+
+  private async getAsync(name: string): Promise<T | null> {
     const row = (await this.db
       .prepare("SELECT * FROM resource_definitions WHERE name = ? AND kind = ? AND tenant_id = ?")
       .get(name, this.kind, this.tenantId)) as ResourceRow | undefined;
-    return row ? this.rowToResource(row) : null;
+    const resource = row ? this.rowToResource(row) : null;
+    this.syncCache.set(this.cacheKey(name), resource);
+    return resource;
   }
 
   async save(name: string, resource: T): Promise<void> {
@@ -91,12 +137,18 @@ export class DbResourceStore<T extends { name: string }> {
     `,
       )
       .run(name, this.kind, content, this.tenantId, ts, ts, content, ts);
+
+    // Keep the sync cache coherent with the row we just persisted.
+    this.syncCache.set(this.cacheKey(name), { ...this.defaults, ...(resource as object), name, _source: "db" } as T);
   }
 
   async delete(name: string): Promise<boolean> {
     const result = await this.db
       .prepare("DELETE FROM resource_definitions WHERE name = ? AND kind = ? AND tenant_id = ?")
       .run(name, this.kind, this.tenantId);
+    // Cache the known-absent state so a follow-up sync `get` doesn't
+    // resurrect the row via a stale Map entry.
+    this.syncCache.set(this.cacheKey(name), null);
     return result.changes > 0;
   }
 

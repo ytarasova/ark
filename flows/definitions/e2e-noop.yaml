@@ -1,0 +1,6 @@
+name: e2e-noop
+description: "E2E harness flow -- single auto-gate action stage, no LLM required"
+stages:
+  - name: noop
+    action: close_ticket
+    gate: auto

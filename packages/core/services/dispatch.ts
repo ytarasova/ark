@@ -31,6 +31,49 @@ import { sessionAsVars, buildTaskWithHandoff, extractSubtasks } from "./task-bui
 import { indexRepoForDispatch, injectKnowledgeContext, injectRepoMap } from "./dispatch-context.js";
 
 /**
+ * Resolve secret names declared on the stage + runtime into a merged env.
+ *
+ * Precedence (first wins):
+ *   1. Stage `secrets: [NAMES]` -- highest, operator is most specific here.
+ *   2. Runtime `secrets: [NAMES]` -- default for every session on that runtime.
+ *
+ * The resolver calls `app.secrets.resolveMany(tenant, names)` which throws
+ * listing every missing name; we surface that as a dispatch failure.
+ * Agents with static `env` entries that collide with a secret name are
+ * left alone in this pass -- the launch merge handles precedence there
+ * (secrets > runtime env > agent env).
+ */
+async function resolveStageSecrets(
+  app: AppContext,
+  session: Session,
+  stageDef: flow.StageDefinition | null,
+  runtimeKind: string,
+  log: (msg: string) => void,
+): Promise<{ env: Record<string, string>; error?: string }> {
+  const names = new Set<string>();
+  const stageList = Array.isArray(stageDef?.secrets) ? stageDef.secrets : [];
+  for (const n of stageList) names.add(n);
+  // Runtime-declared secrets. Pull from the RuntimeStore; avoid
+  // hard-failing if the runtime isn't known (legacy executor paths).
+  try {
+    const rt = app.runtimes?.get?.(runtimeKind) ?? null;
+    const rtSecrets = Array.isArray(rt?.secrets) ? (rt as { secrets?: string[] }).secrets! : [];
+    for (const n of rtSecrets) names.add(n);
+  } catch {
+    logDebug("session", "runtime secrets list unavailable -- skipping");
+  }
+  if (names.size === 0) return { env: {} };
+  const tenantId = session.tenant_id ?? app.config.authSection?.defaultTenant ?? "default";
+  try {
+    const env = await app.secrets.resolveMany(tenantId, Array.from(names));
+    log(`Resolved ${Object.keys(env).length} secret env var(s) for tenant ${tenantId}`);
+    return { env };
+  } catch (err: any) {
+    return { env: {}, error: `Secret resolution failed: ${err?.message ?? String(err)}` };
+  }
+}
+
+/**
  * Resolve compute for a stage that references a named compute target.
  *
  * After the unification of compute targets and templates into a single
@@ -228,6 +271,30 @@ export async function dispatch(
     return { ok: false, message: `Compute '${session.compute_name}' not found. Delete and recreate the session.` };
   }
 
+  // Action stages execute in-process regardless of hosted/local mode -- they
+  // don't launch an agent, don't need an arkd worker, and must not be
+  // scheduled like one. Handle them here before the hosted scheduler path
+  // so single-action flows can auto-complete on the control plane without
+  // waiting on a worker that will never have anything to do.
+  const earlyAction = flow.getStageAction(app, session.flow, stage);
+  if (earlyAction.type === "action") {
+    const { executeAction } = await import("./actions/index.js");
+    const { mediateStageHandoff } = await import("./session-hooks.js");
+    const result = await executeAction(app, sessionId, earlyAction.action ?? "");
+    if (!result.ok) {
+      await app.sessions.update(sessionId, {
+        status: "failed",
+        error: `Action '${earlyAction.action}' failed: ${result.message.slice(0, 200)}`,
+      });
+      return { ok: false, message: result.message };
+    }
+    const postAction = await app.sessions.get(sessionId);
+    if (postAction?.status === "ready") {
+      await mediateStageHandoff(app, sessionId, { autoDispatch: true, source: "dispatch_action" });
+    }
+    return { ok: true, message: `Executed action '${earlyAction.action}'` };
+  }
+
   // Hosted mode takes precedence; local dispatch runs only if no scheduler is wired.
   const hosted = await dispatchHosted(app, sessionId, session, log);
   if (hosted) return hosted;
@@ -355,6 +422,13 @@ export async function dispatch(
   const claudeArgs =
     runtime === "claude-code" ? agentRegistry.buildClaudeArgs(agent, { autonomy, projectRoot, app }) : [];
 
+  // Resolve secrets declared on the stage + the runtime and merge them
+  // into the launch env. Stage secrets win over runtime secrets on name
+  // conflict. A missing secret fails dispatch with a clear message --
+  // we never silently drop an env var the agent depends on.
+  const secretEnv = await resolveStageSecrets(app, session, stageDef, runtime, log);
+  if (secretEnv.error) return { ok: false, message: secretEnv.error };
+
   // Launch via executor
   log(`Launching via ${runtime}...`);
   const launchResult = await executor.launch({
@@ -363,6 +437,7 @@ export async function dispatch(
     agent,
     task,
     claudeArgs,
+    env: secretEnv.env,
     stage,
     autonomy,
     onLog: log,

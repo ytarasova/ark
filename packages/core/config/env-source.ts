@@ -20,6 +20,12 @@ import type {
   StorageConfig,
 } from "./types.js";
 
+export interface EnvSecretsOverrides {
+  backend?: "file" | "aws";
+  awsRegion?: string;
+  awsKmsKeyId?: string;
+}
+
 export interface EnvOverrides {
   arkDir?: string;
   ports: Partial<PortsConfig>;
@@ -28,6 +34,7 @@ export interface EnvOverrides {
   auth: Partial<AuthSectionConfig>;
   features: Partial<FeaturesConfig>;
   storage: Partial<StorageConfig>;
+  secrets: EnvSecretsOverrides;
   databaseUrl?: string;
   redisUrl?: string;
 }
@@ -69,6 +76,7 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): EnvOverrides {
     auth: {},
     features: {},
     storage: {},
+    secrets: {},
   };
 
   // Dirs
@@ -122,6 +130,14 @@ export function readEnv(env: NodeJS.ProcessEnv = process.env): EnvOverrides {
       endpoint: env.ARK_S3_ENDPOINT,
     };
   }
+
+  // Secrets backend
+  const secretsBackend = env.ARK_SECRETS_BACKEND?.toLowerCase();
+  if (secretsBackend === "file" || secretsBackend === "aws") {
+    out.secrets.backend = secretsBackend;
+  }
+  if (env.ARK_SECRETS_AWS_REGION) out.secrets.awsRegion = env.ARK_SECRETS_AWS_REGION;
+  if (env.ARK_SECRETS_AWS_KMS_KEY_ID) out.secrets.awsKmsKeyId = env.ARK_SECRETS_AWS_KMS_KEY_ID;
 
   // Database
   if (env.DATABASE_URL) out.databaseUrl = env.DATABASE_URL;

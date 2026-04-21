@@ -64,6 +64,11 @@ export interface StageDefinition {
   strategy?: string;
   max_parallel?: number;
   subtasks?: { name: string; task: string }[];
+  /**
+   * Secrets to resolve via `app.secrets` and inject as env vars at dispatch.
+   * See `packages/types/flow.ts` StageDefinition for semantics.
+   */
+  secrets?: string[];
 }
 
 export interface FlowEdgeDefinition {
@@ -107,10 +112,30 @@ export interface FlowDefinition {
 
 // ── Stage navigation ────────────────────────────────────────────────────────
 
-/** Load a flow by name via the AppContext store. */
+/** Load a flow by name via the AppContext store.
+ *
+ * `FlowStore.get` is nominally synchronous (the file-backed store reads from
+ * disk synchronously), but the hosted DB-backed store exposes `get` as
+ * `T | null | Promise<T | null>` to serve sync callers out of an in-memory
+ * cache and fall back to a Promise-returning query on a cache miss. Callers
+ * here only need the sync resolution -- a cache miss on the hot startSession
+ * path means the RPC dispatch path hasn't warmed the cache yet, which should
+ * not happen after the `session/start` handler has run (startSession is
+ * synchronous wrt. the flow lookup but lives inside an async RPC). To keep
+ * the contract tight, we explicitly swallow Promise returns and treat them
+ * as "not loaded yet" -- the caller's next tick will see the cached value.
+ */
 function loadFlow(app: AppContext, name: string): FlowDefinition | null {
   try {
-    return app.flows.get(name);
+    const result = app.flows.get(name);
+    if (result && typeof (result as { then?: unknown }).then === "function") {
+      // Hosted DB store cache miss -- Promise return. Fire-and-forget so
+      // the cache warms for the next call; for this call there's nothing
+      // to return synchronously.
+      void (result as Promise<FlowDefinition | null>).catch(() => null);
+      return null;
+    }
+    return result as FlowDefinition | null;
   } catch {
     return null;
   }
