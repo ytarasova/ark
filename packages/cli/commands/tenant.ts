@@ -48,6 +48,7 @@ export function registerTenantCommands(program: Command, app: AppContext) {
           auto_index: null,
           auto_index_required: false,
           tensorzero_enabled: null,
+          allowed_k8s_contexts: [],
         });
 
         console.log(chalk.green(`Policy set for tenant '${tenantId}'`));

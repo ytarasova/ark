@@ -26,6 +26,7 @@ export interface TenantComputePolicy {
   auto_index: boolean | null; // null = inherit from global config
   auto_index_required: boolean; // tenant MUST auto-index
   tensorzero_enabled: boolean | null; // null = inherit from global config
+  allowed_k8s_contexts: string[]; // empty = all contexts allowed
 }
 
 export interface ComputePoolRef {
@@ -49,6 +50,7 @@ const DEFAULT_POLICY: Omit<TenantComputePolicy, "tenant_id"> = {
   auto_index: null,
   auto_index_required: false,
   tensorzero_enabled: null,
+  allowed_k8s_contexts: [],
 };
 
 // ── Manager ────────────────────────────────────────────────────────────────
@@ -99,6 +101,7 @@ export class TenantPolicyManager {
       ["auto_index", "INTEGER"],
       ["auto_index_required", "INTEGER NOT NULL DEFAULT 0"],
       ["tensorzero_enabled", "INTEGER"],
+      ["allowed_k8s_contexts", "TEXT NOT NULL DEFAULT '[]'"],
     ];
     for (const [col, def] of cols) {
       try {
@@ -132,6 +135,7 @@ export class TenantPolicyManager {
     const now = new Date().toISOString();
     const providers = JSON.stringify(policy.allowed_providers);
     const pools = JSON.stringify(policy.compute_pools);
+    const k8sContexts = JSON.stringify(policy.allowed_k8s_contexts ?? []);
     const routerEnabled = policy.router_enabled == null ? null : policy.router_enabled ? 1 : 0;
     const routerRequired = policy.router_required ? 1 : 0;
     const autoIndex = policy.auto_index == null ? null : policy.auto_index ? 1 : 0;
@@ -152,6 +156,7 @@ export class TenantPolicyManager {
             compute_pools = ?,
             router_enabled = ?, router_required = ?, router_policy = ?,
             auto_index = ?, auto_index_required = ?, tensorzero_enabled = ?,
+            allowed_k8s_contexts = ?,
             updated_at = ?
         WHERE tenant_id = ?
       `,
@@ -168,6 +173,7 @@ export class TenantPolicyManager {
           autoIndex,
           autoIndexRequired,
           tensorzeroEnabled,
+          k8sContexts,
           now,
           policy.tenant_id,
         );
@@ -180,8 +186,9 @@ export class TenantPolicyManager {
            max_concurrent_sessions, max_cost_per_day_usd, compute_pools,
            router_enabled, router_required, router_policy,
            auto_index, auto_index_required, tensorzero_enabled,
+           allowed_k8s_contexts,
            created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
         )
         .run(
@@ -197,6 +204,7 @@ export class TenantPolicyManager {
           autoIndex,
           autoIndexRequired,
           tensorzeroEnabled,
+          k8sContexts,
           now,
           now,
         );
@@ -227,6 +235,17 @@ export class TenantPolicyManager {
     const policy = await this.getEffectivePolicy(tenantId);
     if (policy.allowed_providers.length === 0) return true;
     return policy.allowed_providers.includes(provider);
+  }
+
+  /**
+   * Check if a k8s kubeconfig context is allowed for a tenant.
+   * An empty allowed_k8s_contexts list means all contexts are allowed --
+   * use this to lock a tenant to specific clusters.
+   */
+  async isK8sContextAllowed(tenantId: string, context: string): Promise<boolean> {
+    const policy = await this.getEffectivePolicy(tenantId);
+    if (!policy.allowed_k8s_contexts || policy.allowed_k8s_contexts.length === 0) return true;
+    return policy.allowed_k8s_contexts.includes(context);
   }
 
   /**
@@ -295,6 +314,7 @@ export class TenantPolicyManager {
   private _hydrateRow(row: TenantPolicyRow): TenantComputePolicy {
     let allowedProviders: string[] = [];
     let computePools: ComputePoolRef[] = [];
+    let k8sContexts: string[] = [];
     try {
       allowedProviders = JSON.parse(row.allowed_providers);
     } catch {
@@ -302,6 +322,11 @@ export class TenantPolicyManager {
     }
     try {
       computePools = JSON.parse(row.compute_pools);
+    } catch {
+      logDebug("general", "default");
+    }
+    try {
+      if (row.allowed_k8s_contexts) k8sContexts = JSON.parse(row.allowed_k8s_contexts);
     } catch {
       logDebug("general", "default");
     }
@@ -319,6 +344,7 @@ export class TenantPolicyManager {
       auto_index: row.auto_index == null ? null : !!row.auto_index,
       auto_index_required: !!row.auto_index_required,
       tensorzero_enabled: row.tensorzero_enabled == null ? null : !!row.tensorzero_enabled,
+      allowed_k8s_contexts: k8sContexts,
     };
   }
 }
@@ -336,4 +362,5 @@ interface TenantPolicyRow {
   auto_index: number | null;
   auto_index_required: number | null;
   tensorzero_enabled: number | null;
+  allowed_k8s_contexts: string | null;
 }

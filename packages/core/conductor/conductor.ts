@@ -694,6 +694,7 @@ export class Conductor {
         auto_index: (body.auto_index as boolean | null) ?? null,
         auto_index_required: (body.auto_index_required as boolean) ?? false,
         tensorzero_enabled: (body.tensorzero_enabled as boolean | null) ?? null,
+        allowed_k8s_contexts: (body.allowed_k8s_contexts as string[]) ?? [],
       });
       logInfo("conductor", `Tenant policy set for: ${tenantId}`);
       return Response.json({ status: "ok", tenant_id: tenantId });

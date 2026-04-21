@@ -263,6 +263,34 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
         "local") as import("../../types/index.js").ComputeProviderName;
     }
 
+    // K8s targets must specify context, namespace, image up-front -- fail
+    // at create time rather than letting a misconfigured target provision
+    // pods into the wrong cluster/namespace later. Match on the new compute
+    // kind (preferred) and the legacy provider string (back-compat callers).
+    const providerStr = String(effectiveProvider ?? "");
+    const isK8s = computeKind === "k8s" || providerStr === "k8s" || providerStr === "k8s-kata";
+    if (isK8s) {
+      const cfg = (config ?? {}) as Record<string, unknown>;
+      const missing = ["context", "namespace", "image"].filter((k) => !cfg[k]);
+      if (missing.length) {
+        throw new RpcError(
+          `k8s compute requires ${missing.join(", ")} in config -- missing values would silently default to the kubeconfig current-context / "ark" namespace / ubuntu image`,
+          ErrorCodes.INVALID_PARAMS,
+        );
+      }
+      // Tenant policy gate: lock down which clusters this tenant can target.
+      // Empty allowed_k8s_contexts means "no restriction".
+      if (app.tenantPolicyManager && app.tenantId) {
+        const allowed = await app.tenantPolicyManager.isK8sContextAllowed(app.tenantId, cfg.context as string);
+        if (!allowed) {
+          throw new RpcError(
+            `Tenant "${app.tenantId}" is not permitted to target k8s context "${cfg.context}"`,
+            ErrorCodes.INVALID_PARAMS,
+          );
+        }
+      }
+    }
+
     const compute = await app.computes.create({
       name,
       provider: effectiveProvider,
@@ -271,6 +299,44 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
       config,
     });
     return { compute };
+  });
+
+  // Discover available k8s contexts + namespaces from the local kubeconfig
+  // (or in-cluster service-account). Powers the compute-create UI / CLI
+  // pickers so users don't have to type cluster names from memory.
+  router.handle("k8s/discover", async (p) => {
+    const { kubeconfig, includeNamespaces } = extract<{ kubeconfig?: string; includeNamespaces?: boolean }>(p, []);
+    const k8s = await import("@kubernetes/client-node");
+    const kc = new k8s.KubeConfig();
+    if (kubeconfig) kc.loadFromFile(kubeconfig);
+    else kc.loadFromDefault();
+    const contexts = kc.getContexts().map((c) => ({ name: c.name, cluster: c.cluster, user: c.user }));
+    const current = kc.getCurrentContext();
+    const result: { contexts: typeof contexts; current: string; namespacesByContext?: Record<string, string[]> } = {
+      contexts,
+      current,
+    };
+    if (includeNamespaces) {
+      const namespacesByContext: Record<string, string[]> = {};
+      for (const ctx of contexts) {
+        try {
+          const scoped = new k8s.KubeConfig();
+          if (kubeconfig) scoped.loadFromFile(kubeconfig);
+          else scoped.loadFromDefault();
+          scoped.setCurrentContext(ctx.name);
+          const api = scoped.makeApiClient(k8s.CoreV1Api);
+          const { items } = await api.listNamespace();
+          namespacesByContext[ctx.name] = (items || []).map((n: any) => n.metadata?.name).filter(Boolean) as string[];
+        } catch {
+          // Context may be unreachable from this machine (no VPN / wrong
+          // creds / cluster down). Skip silently -- the picker just won't
+          // show namespaces for it.
+          namespacesByContext[ctx.name] = [];
+        }
+      }
+      result.namespacesByContext = namespacesByContext;
+    }
+    return result;
   });
   // Surface registered Compute / Runtime kinds so the web UI can populate
   // dropdowns without duplicating our enum.
