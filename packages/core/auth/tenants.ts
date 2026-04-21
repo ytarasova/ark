@@ -9,15 +9,19 @@
  * Mirrors `TenantPolicyManager`: lazy `ensureSchema()` guarded by a cached
  * promise, every public method async, no sync ctor work.
  *
- * NOTE on `delete`: it hard-cascades teams + memberships (via FK in
- * migration 003) but leaves sessions + computes owned by the tenant
- * behind. Deleting those is too destructive to do implicitly -- callers
- * who really want a full wipe should delete the downstream rows first.
+ * Soft-delete: `delete(id)` is now a soft-delete (see migration 004).
+ * Hard DELETE is gone -- we set `deleted_at` so downstream rows keep their
+ * referential integrity and the audit trail is preserved. The old cascade
+ * via FK `ON DELETE CASCADE` is replaced by an explicit manager-layer
+ * cascade that soft-deletes child teams + memberships inside one txn.
  */
 
 import type { IDatabase } from "../database/index.js";
 import { randomBytes } from "crypto";
-import { TenantRepository, type TenantRow, type TenantStatus } from "../repositories/tenants.js";
+import { TenantRepository, type ListOptions, type TenantRow, type TenantStatus } from "../repositories/tenants.js";
+export type { ListOptions } from "../repositories/tenants.js";
+import { TeamRepository } from "../repositories/teams.js";
+import { MembershipRepository } from "../repositories/memberships.js";
 import { logDebug } from "../observability/structured-log.js";
 
 export type Tenant = TenantRow;
@@ -34,25 +38,29 @@ function assertSlug(slug: string): void {
 export class TenantManager {
   private _initialized: Promise<void> | null = null;
   private _repo: TenantRepository;
+  private _teams: TeamRepository;
+  private _memberships: MembershipRepository;
 
   constructor(private db: IDatabase) {
     this._repo = new TenantRepository(db);
+    this._teams = new TeamRepository(db);
+    this._memberships = new MembershipRepository(db);
   }
 
   private async ensureSchema(): Promise<void> {
     if (this._initialized) return this._initialized;
     this._initialized = (async () => {
       try {
-        await this.db.exec(
-          `CREATE TABLE IF NOT EXISTS tenants (
-            id TEXT PRIMARY KEY,
-            slug TEXT NOT NULL UNIQUE,
-            name TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'active',
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-          )`,
-        );
+        const ddl =
+          "CREATE TABLE IF NOT EXISTS tenants (" +
+          "id TEXT PRIMARY KEY, " +
+          "slug TEXT NOT NULL, " +
+          "name TEXT NOT NULL, " +
+          "status TEXT NOT NULL DEFAULT 'active', " +
+          "deleted_at TEXT, " +
+          "created_at TEXT NOT NULL, " +
+          "updated_at TEXT NOT NULL)";
+        await this.db.exec(ddl);
       } catch {
         logDebug("general", "tenants table exists");
       }
@@ -60,16 +68,16 @@ export class TenantManager {
     return this._initialized;
   }
 
-  async list(): Promise<Tenant[]> {
+  async list(opts: ListOptions = {}): Promise<Tenant[]> {
     await this.ensureSchema();
-    return this._repo.list();
+    return this._repo.list(opts);
   }
 
-  async get(idOrSlug: string): Promise<Tenant | null> {
+  async get(idOrSlug: string, opts: ListOptions = {}): Promise<Tenant | null> {
     await this.ensureSchema();
-    const byId = await this._repo.get(idOrSlug);
+    const byId = await this._repo.get(idOrSlug, opts);
     if (byId) return byId;
-    return this._repo.getBySlug(idOrSlug);
+    return this._repo.getBySlug(idOrSlug, opts);
   }
 
   async create(opts: { slug: string; name: string; id?: string; status?: TenantStatus }): Promise<Tenant> {
@@ -87,9 +95,40 @@ export class TenantManager {
     return this._repo.update(id, fields);
   }
 
+  /**
+   * Soft-delete a tenant and cascade to its teams + memberships inside a
+   * single transaction. Idempotent -- calling on an already-soft-deleted
+   * tenant is a no-op and returns `true`.
+   *
+   * TODO(agent-1-ctx): admin handler should pass ctx.userId to record who
+   * deleted the entity (audit trail). Once ctx wiring lands we add a
+   * `deleted_by` column and populate it here.
+   */
   async delete(id: string): Promise<boolean> {
     await this.ensureSchema();
-    return this._repo.delete(id);
+    return this.db.transaction(async () => {
+      const ok = await this._repo.softDelete(id);
+      if (!ok) return false;
+      // Cascade: soft-delete every team in the tenant and every membership
+      // of every team. We drive this from the manager because the FK
+      // `ON DELETE CASCADE` only fires on hard DELETE.
+      const teams = await this._teams.listByTenant(id);
+      for (const team of teams) {
+        await this._memberships.softRemoveByTeam(team.id);
+      }
+      await this._teams.softDeleteByTenant(id);
+      return true;
+    });
+  }
+
+  /**
+   * Restore a soft-deleted tenant. Does NOT auto-restore child teams or
+   * memberships -- an admin restores those explicitly if they want the
+   * old shape back.
+   */
+  async restore(id: string): Promise<boolean> {
+    await this.ensureSchema();
+    return this._repo.restore(id);
   }
 
   async setStatus(id: string, status: TenantStatus): Promise<Tenant | null> {

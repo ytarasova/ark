@@ -3,10 +3,9 @@ import chalk from "chalk";
 import { join } from "path";
 import { existsSync } from "fs";
 import { findOrphanedWorktrees, cleanupWorktrees } from "../../core/services/session-orchestration.js";
-import { getArkClient } from "./_shared.js";
-import type { AppContext } from "../../core/app.js";
+import { getArkClient, getInProcessApp } from "../app-client.js";
 
-export function registerWorktreeCommands(program: Command, app: AppContext) {
+export function registerWorktreeCommands(program: Command) {
   const worktree = program.command("worktree").description("Git worktree operations");
 
   worktree
@@ -79,6 +78,7 @@ export function registerWorktreeCommands(program: Command, app: AppContext) {
     .description("List sessions with active worktrees")
     .action(async () => {
       const ark = await getArkClient();
+      const app = await getInProcessApp();
       const sessions = await ark.sessionList({ limit: 500 });
       const withWorktrees = sessions.filter((s) => {
         const wtDir = join(app.config.worktreesDir, s.id);
@@ -102,6 +102,7 @@ export function registerWorktreeCommands(program: Command, app: AppContext) {
     .description("Find and remove orphaned worktrees")
     .option("--dry-run", "Only show what would be removed")
     .action(async (opts) => {
+      const app = await getInProcessApp();
       const orphans = await findOrphanedWorktrees(app);
       if (orphans.length === 0) {
         console.log(chalk.dim("No orphaned worktrees found"));

@@ -2,17 +2,45 @@ import { Router, type Handler } from "./router.js";
 import { createNotification, isRequest, isNotification, parseMessage, type JsonRpcMessage } from "../protocol/types.js";
 import { createStdioTransport, type Transport } from "../protocol/transport.js";
 import { logDebug } from "../core/observability/structured-log.js";
+import {
+  localAdminContext,
+  materializeContext,
+  type TenantContext,
+  type MaterializeOptions,
+} from "../core/auth/context.js";
 
 export interface ServerConnection {
   id: string;
   transport: Transport;
   subscriptions: string[];
+  /**
+   * Per-connection credential material captured at transport open time.
+   * WebSocket clients may send the Bearer token as `Authorization` on the
+   * upgrade request or as a `?token=` query param; stdio callers inherit
+   * the host process's identity so we treat them as local-admin.
+   */
+  credentials?: {
+    authorizationHeader?: string | null;
+    queryToken?: string | null;
+  };
+}
+
+/**
+ * Auth settings wired onto the server by `attachAuth(app)`. When absent, the
+ * server dispatches every request with a local-admin context (the legacy
+ * behavior, used by unit tests and the single-user CLI daemon).
+ */
+export interface ServerAuthConfig {
+  requireToken: boolean;
+  defaultTenant: string | null;
+  apiKeys: MaterializeOptions["apiKeys"];
 }
 
 export class ArkServer {
   router = new Router();
   private connections = new Map<string, ServerConnection>();
   private connCounter = 0;
+  private auth: ServerAuthConfig | null = null;
 
   constructor() {
     this.router.requireInitialization();
@@ -32,6 +60,19 @@ export class ArkServer {
     });
   }
 
+  /**
+   * Wire auth materialization. Call once after `AppContext.boot()` so the
+   * router can resolve `TenantContext` from the caller's bearer token on
+   * every request. Without this, the server falls back to local-admin.
+   */
+  attachAuth(app: import("../core/app.js").AppContext): void {
+    this.auth = {
+      requireToken: app.config.authSection?.requireToken ?? false,
+      defaultTenant: app.config.authSection?.defaultTenant ?? null,
+      apiKeys: app.apiKeys,
+    };
+  }
+
   /** Register a method handler. */
   handle(method: string, handler: Handler): void {
     this.router.handle(method, handler);
@@ -49,7 +90,8 @@ export class ArkServer {
         if (msg.method === "initialize" && msg.params?.subscribe) {
           conn.subscriptions = msg.params.subscribe as string[];
         }
-        const response = await this.router.dispatch(msg, this.notify.bind(this));
+        const ctx = await this.resolveContext(conn);
+        const response = await this.router.dispatch(msg, this.notify.bind(this), ctx);
         transport.send(response);
 
         // After initialize response, mark as initialized
@@ -100,6 +142,24 @@ export class ArkServer {
     return false;
   }
 
+  /**
+   * Resolve the TenantContext for a message on `conn`. In unauthenticated
+   * mode (no `attachAuth` call, or `requireToken = false`) this returns a
+   * local-admin context with the configured default tenant.
+   */
+  private async resolveContext(conn: ServerConnection): Promise<TenantContext> {
+    if (!this.auth || !this.auth.requireToken) {
+      return localAdminContext(this.auth?.defaultTenant ?? null);
+    }
+    return materializeContext({
+      requireToken: true,
+      defaultTenant: this.auth.defaultTenant,
+      authorizationHeader: conn.credentials?.authorizationHeader ?? null,
+      queryToken: conn.credentials?.queryToken ?? null,
+      apiKeys: this.auth.apiKeys,
+    });
+  }
+
   /** Start server on stdio (JSONL over stdin/stdout). */
   startStdio(): string {
     const transport = createStdioTransport(Bun.stdin.stream(), { write: (data) => process.stdout.write(data) });
@@ -109,13 +169,26 @@ export class ArkServer {
   /** Start WebSocket server on a port. Returns stop function. */
   startWebSocket(port: number): { stop(): void } {
     const self = this;
-    const wsMetadata = new WeakMap<object, { connId: string; handlers: ((msg: JsonRpcMessage) => void)[] }>();
-    const server = Bun.serve({
+    const wsMetadata = new WeakMap<
+      object,
+      {
+        connId: string;
+        handlers: ((msg: JsonRpcMessage) => void)[];
+        authorizationHeader: string | null;
+        queryToken: string | null;
+      }
+    >();
+    // Capture upgrade-time credentials via Bun's `data` channel on upgrade().
+    type WsData = { authorizationHeader: string | null; queryToken: string | null };
+    const server = Bun.serve<WsData, never>({
       port,
       hostname: "127.0.0.1",
       fetch(req, server) {
-        if (server.upgrade(req)) return;
         const url = new URL(req.url, `http://localhost`);
+        const authorizationHeader = req.headers.get("authorization");
+        const queryToken = url.searchParams.get("token");
+        const data: WsData = { authorizationHeader, queryToken };
+        if (server.upgrade(req, { data })) return;
         if (url.pathname === "/health") {
           return Response.json({ status: "ok", pid: process.pid, uptime: process.uptime() });
         }
@@ -125,6 +198,12 @@ export class ArkServer {
         open(ws) {
           const connId = `ws-${++self.connCounter}`;
           const handlers: ((msg: JsonRpcMessage) => void)[] = [];
+          const upgradeData = (ws.data ?? {}) as {
+            authorizationHeader?: string | null;
+            queryToken?: string | null;
+          };
+          const authorizationHeader = upgradeData.authorizationHeader ?? null;
+          const queryToken = upgradeData.queryToken ?? null;
 
           const conn: ServerConnection = {
             id: connId,
@@ -140,10 +219,11 @@ export class ArkServer {
               },
             },
             subscriptions: [],
+            credentials: { authorizationHeader, queryToken },
           };
 
           self.connections.set(connId, conn);
-          wsMetadata.set(ws, { connId, handlers });
+          wsMetadata.set(ws, { connId, handlers, authorizationHeader, queryToken });
 
           // Wire message routing (same as addConnection)
           conn.transport.onMessage(async (msg) => {
@@ -151,7 +231,8 @@ export class ArkServer {
               if (msg.method === "initialize" && msg.params?.subscribe) {
                 conn.subscriptions = msg.params.subscribe as string[];
               }
-              const response = await self.router.dispatch(msg, self.notify.bind(self));
+              const ctx = await self.resolveContext(conn);
+              const response = await self.router.dispatch(msg, self.notify.bind(self), ctx);
               conn.transport.send(response);
               if (msg.method === "initialize" && "result" in response) {
                 self.router.markInitialized();

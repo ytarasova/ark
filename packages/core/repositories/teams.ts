@@ -1,10 +1,12 @@
 /**
  * TeamRepository -- SQL adapter for the `teams` table.
  *
- * Teams live inside a tenant -- `(tenant_id, slug)` is unique. The table
- * is created by migration 003 with an FK to `tenants(id) ON DELETE
- * CASCADE`, so deleting a tenant wipes its teams (and the memberships
- * table cascades off teams in turn).
+ * Teams live inside a tenant -- `(tenant_id, slug)` is unique among live
+ * rows (partial unique index, see migration 004). The table is created by
+ * migration 003 with an FK to `tenants(id) ON DELETE CASCADE`.
+ *
+ * Soft-delete: every read filters `deleted_at IS NULL` unless the caller
+ * explicitly opts in with `{ includeDeleted: true }`.
  */
 
 import type { IDatabase } from "../database/index.js";
@@ -16,8 +18,13 @@ export interface TeamRow {
   slug: string;
   name: string;
   description: string | null;
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ListOptions {
+  includeDeleted?: boolean;
 }
 
 const COLUMNS = new Set(["slug", "name", "description", "updated_at"]);
@@ -25,15 +32,19 @@ const COLUMNS = new Set(["slug", "name", "description", "updated_at"]);
 export class TeamRepository {
   constructor(private db: IDatabase) {}
 
-  async listByTenant(tenantId: string): Promise<TeamRow[]> {
-    const rows = (await this.db
-      .prepare("SELECT * FROM teams WHERE tenant_id = ? ORDER BY slug ASC")
-      .all(tenantId)) as TeamRow[];
+  async listByTenant(tenantId: string, opts: ListOptions = {}): Promise<TeamRow[]> {
+    const sql = opts.includeDeleted
+      ? "SELECT * FROM teams WHERE tenant_id = ? ORDER BY slug ASC"
+      : "SELECT * FROM teams WHERE tenant_id = ? AND deleted_at IS NULL ORDER BY slug ASC";
+    const rows = (await this.db.prepare(sql).all(tenantId)) as TeamRow[];
     return rows;
   }
 
-  async get(id: string): Promise<TeamRow | null> {
-    const row = (await this.db.prepare("SELECT * FROM teams WHERE id = ?").get(id)) as TeamRow | undefined;
+  async get(id: string, opts: ListOptions = {}): Promise<TeamRow | null> {
+    const sql = opts.includeDeleted
+      ? "SELECT * FROM teams WHERE id = ?"
+      : "SELECT * FROM teams WHERE id = ? AND deleted_at IS NULL";
+    const row = (await this.db.prepare(sql).get(id)) as TeamRow | undefined;
     return row ?? null;
   }
 
@@ -66,8 +77,35 @@ export class TeamRepository {
     return this.get(id);
   }
 
-  async delete(id: string): Promise<boolean> {
-    const res = await this.db.prepare("DELETE FROM teams WHERE id = ?").run(id);
+  async softDelete(id: string): Promise<boolean> {
+    const existing = (await this.db.prepare("SELECT deleted_at FROM teams WHERE id = ?").get(id)) as
+      | { deleted_at: string | null }
+      | undefined;
+    if (!existing) return false;
+    if (existing.deleted_at) return true;
+    const ts = now();
+    const res = await this.db
+      .prepare("UPDATE teams SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL")
+      .run(ts, ts, id);
     return res.changes > 0;
+  }
+
+  async restore(id: string): Promise<boolean> {
+    const res = await this.db
+      .prepare("UPDATE teams SET deleted_at = NULL, updated_at = ? WHERE id = ? AND deleted_at IS NOT NULL")
+      .run(now(), id);
+    return res.changes > 0;
+  }
+
+  /**
+   * Cascade helper -- soft-delete every team in a tenant. Used when a
+   * tenant is itself soft-deleted so downstream rows don't remain
+   * visible to `list()` callers. Idempotent.
+   */
+  async softDeleteByTenant(tenantId: string): Promise<void> {
+    const ts = now();
+    await this.db
+      .prepare("UPDATE teams SET deleted_at = ?, updated_at = ? WHERE tenant_id = ? AND deleted_at IS NULL")
+      .run(ts, ts, tenantId);
   }
 }

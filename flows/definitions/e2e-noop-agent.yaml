@@ -1,0 +1,6 @@
+name: e2e-noop-agent
+description: "E2E harness flow -- single auto-gate agent stage, exercises the session-pod + agent-launch path"
+stages:
+  - name: work
+    agent: e2e-noop-agent
+    gate: auto

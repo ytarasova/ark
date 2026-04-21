@@ -6,10 +6,9 @@ import { execSync } from "child_process";
 import * as core from "../../core/index.js";
 import { SESSION_STATUSES } from "../../types/index.js";
 import { runVerification } from "../../core/services/session-orchestration.js";
-import { getArkClient } from "./_shared.js";
+import { getArkClient, getInProcessApp } from "../app-client.js";
 import { sanitizeSummary, formatBytes } from "../helpers.js";
 import { logDebug } from "../../core/observability/structured-log.js";
-import type { AppContext } from "../../core/app.js";
 
 async function forkCloneHandler(id: string, opts: { task?: string; group?: string }) {
   const ark = await getArkClient();
@@ -23,7 +22,7 @@ async function forkCloneHandler(id: string, opts: { task?: string; group?: strin
   }
 }
 
-export function registerSessionCommands(program: Command, app: AppContext) {
+export function registerSessionCommands(program: Command) {
   const session = program.command("session").description("Manage SDLC flow sessions");
 
   session
@@ -95,6 +94,7 @@ export function registerSessionCommands(program: Command, app: AppContext) {
       // Import from Claude session if specified
       let claudeSessionId: string | undefined;
       if (opts.claudeSession) {
+        const app = await getInProcessApp();
         const cs = await core.getClaudeSession(app, opts.claudeSession);
         if (!cs) {
           console.log(
@@ -407,6 +407,7 @@ export function registerSessionCommands(program: Command, app: AppContext) {
     .action(async (id, opts) => {
       if (!opts.force) {
         // Run verification first
+        const app = await getInProcessApp();
         const result = await runVerification(app, id);
         if (!result.ok) {
           console.log(chalk.red("Verification failed:"));
@@ -563,9 +564,10 @@ export function registerSessionCommands(program: Command, app: AppContext) {
     .argument("<session-id>", "Session ID")
     .argument("[text]", "Todo content (for add) or todo ID (for done/delete)")
     .action(async (action, id, text) => {
+      const ark = await getArkClient();
       switch (action) {
         case "list": {
-          const todos = await app.todos.list(id);
+          const { todos } = await ark.todoList(id);
           if (todos.length === 0) {
             console.log(chalk.dim("No todos"));
           } else {
@@ -581,7 +583,7 @@ export function registerSessionCommands(program: Command, app: AppContext) {
             console.log(chalk.red("Usage: ark session todo add <session-id> <content>"));
             return;
           }
-          const todo = await app.todos.add(id, text);
+          const { todo } = await ark.todoAdd(id, text);
           console.log(chalk.green(`Added todo #${todo.id}: ${todo.content}`));
           break;
         }
@@ -590,7 +592,7 @@ export function registerSessionCommands(program: Command, app: AppContext) {
             console.log(chalk.red("Usage: ark session todo done <session-id> <todo-id>"));
             return;
           }
-          const todo = await app.todos.toggle(parseInt(text, 10));
+          const { todo } = await ark.todoToggle(parseInt(text, 10));
           if (todo) {
             console.log(chalk.green(`Todo #${todo.id} ${todo.done ? "done" : "undone"}`));
           } else {
@@ -603,7 +605,7 @@ export function registerSessionCommands(program: Command, app: AppContext) {
             console.log(chalk.red("Usage: ark session todo delete <session-id> <todo-id>"));
             return;
           }
-          const ok = app.todos.delete(parseInt(text, 10));
+          const { ok } = await ark.todoDelete(parseInt(text, 10));
           console.log(ok ? chalk.green("Deleted") : chalk.red("Not found"));
           break;
         }
@@ -618,6 +620,7 @@ export function registerSessionCommands(program: Command, app: AppContext) {
     .argument("<id>", "Session ID")
     .action(async (id) => {
       console.log(chalk.dim("Running verification..."));
+      const app = await getInProcessApp();
       const result = await runVerification(app, id);
       if (result.ok) {
         console.log(chalk.green("Verification passed"));
@@ -754,12 +757,18 @@ export function registerSessionCommands(program: Command, app: AppContext) {
     .description("Export session to file")
     .argument("<id>")
     .argument("[file]")
-    .action((id, file) => {
+    .action(async (id, file) => {
       const outPath = file ?? `session-${id}.json`;
-      if (core.exportSessionToFile(app, id, outPath)) {
-        console.log(chalk.green(`Exported to ${outPath}`));
-      } else {
-        console.log(chalk.red("Session not found"));
+      const ark = await getArkClient();
+      try {
+        const result = await ark.sessionExport(id, outPath);
+        if (result.ok) {
+          console.log(chalk.green(`Exported to ${result.filePath ?? outPath}`));
+        } else {
+          console.log(chalk.red("Session not found"));
+        }
+      } catch (e: any) {
+        console.log(chalk.red(e.message ?? "Export failed"));
       }
     });
 
@@ -768,6 +777,10 @@ export function registerSessionCommands(program: Command, app: AppContext) {
     .description("Import session from file")
     .argument("<file>")
     .action(async (file) => {
+      // Import remains local-only: it reads from the caller's filesystem and
+      // writes rows into the DB. There is no import RPC yet; fall through to
+      // the in-process app so the UX still works on a clean checkout.
+      const app = await getInProcessApp();
       const result = await core.importSessionFromFile(app, file);
       console.log(result.ok ? chalk.green(result.message) : chalk.red(result.message));
     });

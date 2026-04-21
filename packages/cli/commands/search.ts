@@ -1,10 +1,9 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import * as core from "../../core/index.js";
-import { getArkClient } from "./_shared.js";
-import type { AppContext } from "../../core/app.js";
+import { getArkClient, getInProcessApp } from "../app-client.js";
 
-export function registerSearchCommands(program: Command, app: AppContext) {
+export function registerSearchCommands(program: Command) {
   program
     .command("search")
     .description("Search across sessions, events, messages, and transcripts")
@@ -31,6 +30,7 @@ export function registerSearchCommands(program: Command, app: AppContext) {
       }
 
       if (opts.hybrid) {
+        const app = await getInProcessApp();
         const knowledgeResults = await app.knowledge.search(query, { limit });
         if (knowledgeResults.length === 0) {
           console.log(chalk.yellow("No knowledge search results found."));

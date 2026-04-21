@@ -3,10 +3,16 @@ import chalk from "chalk";
 import { execFileSync } from "child_process";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
-import { getArkClient } from "../client.js";
-import type { AppContext } from "../../core/app.js";
+import { getArkClient, getInProcessApp } from "../app-client.js";
 
-export function registerAuthCommands(program: Command, app: AppContext) {
+/**
+ * Auth commands. API-key CRUD currently has no RPC surface (there is no
+ * `admin/api-key/*` namespace yet), so the create/list/revoke/rotate
+ * commands fall through to `getInProcessApp()` and talk to the local
+ * DB. `ark auth setup` remains a local-only flow -- it writes an OAuth
+ * token into ~/.ark regardless of mode.
+ */
+export function registerAuthCommands(program: Command) {
   const authCmd = program.command("auth").description("Manage authentication and API keys");
 
   // Claude CLI auth setup (moved from misc.ts)
@@ -83,6 +89,7 @@ export function registerAuthCommands(program: Command, app: AppContext) {
         console.error(chalk.red(`Invalid role: ${role}. Must be admin, member, or viewer.`));
         process.exit(1);
       }
+      const app = await getInProcessApp();
       const result = await app.apiKeys.create(opts.tenant, opts.name, role, opts.expires);
       console.log(chalk.green("API key created successfully."));
       console.log();
@@ -99,6 +106,7 @@ export function registerAuthCommands(program: Command, app: AppContext) {
     .description("List API keys")
     .option("--tenant <tenantId>", "Tenant ID", "default")
     .action(async (opts: any) => {
+      const app = await getInProcessApp();
       const keys = await app.apiKeys.list(opts.tenant);
       if (!keys.length) {
         console.log(chalk.dim("No API keys found."));
@@ -120,6 +128,7 @@ export function registerAuthCommands(program: Command, app: AppContext) {
     .description("Revoke an API key")
     .argument("<id>", "API key ID (e.g. ak-abcd1234)")
     .action(async (id: string) => {
+      const app = await getInProcessApp();
       const ok = await app.apiKeys.revoke(id);
       if (ok) {
         console.log(chalk.green(`Revoked API key: ${id}`));
@@ -134,6 +143,7 @@ export function registerAuthCommands(program: Command, app: AppContext) {
     .description("Rotate an API key (revoke old, create new with same metadata)")
     .argument("<id>", "API key ID to rotate")
     .action(async (id: string) => {
+      const app = await getInProcessApp();
       const result = await app.apiKeys.rotate(id);
       if (!result) {
         console.error(chalk.red(`API key not found: ${id}`));

@@ -3,10 +3,9 @@ import chalk from "chalk";
 import { readFileSync } from "fs";
 import YAML from "yaml";
 import * as core from "../../core/index.js";
-import { getArkClient } from "./_shared.js";
-import type { AppContext } from "../../core/app.js";
+import { getArkClient, getInProcessApp } from "../app-client.js";
 
-export function registerSkillCommands(program: Command, app: AppContext) {
+export function registerSkillCommands(program: Command) {
   const skillCmd = program.command("skill").description("Manage skills");
 
   skillCmd
@@ -53,7 +52,8 @@ export function registerSkillCommands(program: Command, app: AppContext) {
     .option("-p, --prompt <prompt>", "Skill prompt")
     .option("-s, --scope <scope>", "Scope: global or project", "global")
     .option("--tags <tags>", "Comma-separated tags")
-    .action((name: string | undefined, opts: any) => {
+    .action(async (name: string | undefined, opts: any) => {
+      const app = await getInProcessApp();
       const scope = opts.scope as "global" | "project";
       const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
 
@@ -103,7 +103,8 @@ export function registerSkillCommands(program: Command, app: AppContext) {
     .description("Delete a skill (global or project only)")
     .argument("<name>", "Skill name")
     .option("-s, --scope <scope>", "Scope: global or project", "global")
-    .action((name: string, opts: any) => {
+    .action(async (name: string, opts: any) => {
+      const app = await getInProcessApp();
       const scope = opts.scope as "global" | "project";
       const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
 

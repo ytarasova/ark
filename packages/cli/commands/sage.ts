@@ -3,7 +3,7 @@ import chalk from "chalk";
 import { existsSync, statSync, mkdirSync, writeFileSync } from "fs";
 import { resolve, isAbsolute, join } from "path";
 
-import type { AppContext } from "../../core/app.js";
+import { getInProcessApp } from "../app-client.js";
 import { fetchAnalysis, type SageAnalysis } from "../../core/integrations/sage-analysis.js";
 import { startSession, dispatch } from "../../core/services/session-orchestration.js";
 
@@ -16,12 +16,7 @@ import { startSession, dispatch } from "../../core/services/session-orchestratio
  * `--dry-run` prints the dispatch plan (one sub-stream per plan_stream, task
  * counts) without touching the DB or starting agents.
  */
-export function registerSageCommands(program: Command, app: AppContext | null): void {
-  const requireApp = (): AppContext => {
-    if (!app) throw new Error("ark sage requires a local AppContext (not supported in remote mode)");
-    return app;
-  };
-
+export function registerSageCommands(program: Command): void {
   program
     .command("sage")
     .description("Dispatch the from-sage-analysis flow for a pi-sage analysis")
@@ -32,7 +27,7 @@ export function registerSageCommands(program: Command, app: AppContext | null): 
     .option("--repo <path>", "Repo / workdir for the parent session", ".")
     .option("--dry-run", "Print the dispatch plan without creating a session")
     .action(async (ref: string, opts: SageOpts) => {
-      const resolvedApp = requireApp();
+      const resolvedApp = await getInProcessApp();
       const { baseUrl, analysisId, localPath } = resolveAnalysisRef(ref, opts.sageUrl);
 
       // Fetch analysis first so dry-run can render task counts AND so we fail

@@ -300,24 +300,31 @@ export async function initPostgresSchema(db: IDatabase): Promise<void> {
   await db.exec(`
     CREATE TABLE IF NOT EXISTS tenants (
       id TEXT PRIMARY KEY,
-      slug TEXT NOT NULL UNIQUE,
+      slug TEXT NOT NULL,
       name TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'active',
+      deleted_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     )
   `);
   await safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_tenants_status ON tenants(status)`);
+  await safeDdl(
+    db,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_slug_live ON tenants(slug) WHERE deleted_at IS NULL`,
+  );
 
   await db.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
-      email TEXT NOT NULL UNIQUE,
+      email TEXT NOT NULL,
       name TEXT,
+      deleted_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     )
   `);
+  await safeDdl(db, `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_live ON users(email) WHERE deleted_at IS NULL`);
 
   await db.exec(`
     CREATE TABLE IF NOT EXISTS teams (
@@ -326,12 +333,16 @@ export async function initPostgresSchema(db: IDatabase): Promise<void> {
       slug TEXT NOT NULL,
       name TEXT NOT NULL,
       description TEXT,
+      deleted_at TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      UNIQUE (tenant_id, slug)
+      updated_at TEXT NOT NULL
     )
   `);
   await safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_teams_tenant ON teams(tenant_id)`);
+  await safeDdl(
+    db,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_teams_tenant_slug_live ON teams(tenant_id, slug) WHERE deleted_at IS NULL`,
+  );
 
   await db.exec(`
     CREATE TABLE IF NOT EXISTS memberships (
@@ -339,12 +350,16 @@ export async function initPostgresSchema(db: IDatabase): Promise<void> {
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
       role TEXT NOT NULL DEFAULT 'member',
-      created_at TEXT NOT NULL,
-      UNIQUE (user_id, team_id)
+      deleted_at TEXT,
+      created_at TEXT NOT NULL
     )
   `);
   await safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_memberships_user ON memberships(user_id)`);
   await safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_memberships_team ON memberships(team_id)`);
+  await safeDdl(
+    db,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_memberships_user_team_live ON memberships(user_id, team_id) WHERE deleted_at IS NULL`,
+  );
 }
 
 export async function seedLocalComputePostgres(db: IDatabase): Promise<void> {

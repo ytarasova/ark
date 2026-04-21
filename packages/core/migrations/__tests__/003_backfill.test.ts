@@ -1,11 +1,38 @@
 import { describe, it, expect } from "bun:test";
 import { Database } from "bun:sqlite";
 import { BunSqliteAdapter } from "../../database/sqlite.js";
-import type { IDatabase } from "../../database/index.js";
+import type { IDatabase, IStatement } from "../../database/types.js";
 import { MigrationRunner } from "../runner.js";
+import { up as up003, VERSION as V003 } from "../003_tenants_teams.js";
 
 async function freshDb(): Promise<IDatabase> {
   return new BunSqliteAdapter(new Database(":memory:"));
+}
+
+/**
+ * Wrap an IDatabase so every prepare() + run-ddl call is logged. Used to
+ * assert that the 003 no-op guard really prevents backfill SELECTs on a
+ * DB that already sits at version 3.
+ */
+function withSqlSpy(inner: IDatabase): { db: IDatabase; seen: string[] } {
+  const seen: string[] = [];
+  const db: IDatabase = {
+    prepare(sql: string): IStatement {
+      seen.push(sql);
+      return inner.prepare(sql);
+    },
+    exec(sql: string): Promise<void> {
+      seen.push(sql);
+      return inner.exec(sql);
+    },
+    transaction<T>(fn: () => Promise<T>): Promise<T> {
+      return inner.transaction(fn);
+    },
+    close(): Promise<void> {
+      return inner.close();
+    },
+  };
+  return { db, seen };
 }
 
 describe("Migration 003 -- tenants backfill", () => {
@@ -89,6 +116,58 @@ describe("Migration 003 -- tenants backfill", () => {
     expect(row?.id).toBe("default");
     expect(row?.slug).toBe("default");
     expect(row?.status).toBe("active");
+    await db.close();
+  });
+
+  it("is a no-op when ark_schema_migrations already records version >= 3", async () => {
+    // Boot the DB once so migrations run and the apply-log records v3.
+    const db = await freshDb();
+    await new MigrationRunner(db, "sqlite").apply();
+
+    // Wrap with a spy, then call 003's up() directly. The guard should see
+    // the apply-log row for v3 and short-circuit before any backfill SELECT
+    // or CREATE TABLE runs against sessions / compute / tenant_policies.
+    const { db: spied, seen } = withSqlSpy(db);
+    await up003({ db: spied, dialect: "sqlite" });
+
+    const touchesHotTable = (sql: string): boolean =>
+      /\b(sessions|compute|tenant_policies|events|messages|todos|schedules)\b/i.test(sql);
+    const offenders = seen.filter(touchesHotTable);
+    expect(offenders).toEqual([]);
+
+    // Only the guard's own SELECT against the apply-log should have fired.
+    expect(seen.length).toBe(1);
+    expect(seen[0]).toMatch(/ark_schema_migrations/);
+
+    await db.close();
+  });
+
+  it("runs backfill when the apply-log has not yet recorded v3", async () => {
+    // Simulate partial state: migrations table exists and has v1, v2 but not
+    // v3. 003's body MUST run in this case -- this is the fresh-upgrade path.
+    const db = await freshDb();
+    await new MigrationRunner(db, "sqlite").apply({ targetVersion: 2 });
+
+    const ts = new Date().toISOString();
+    await db
+      .prepare(
+        "INSERT INTO sessions (id, status, flow, tenant_id, created_at, updated_at) VALUES (?, 'pending', 'default', ?, ?, ?)",
+      )
+      .run("s-9", "sprocket", ts, ts);
+
+    // Sanity: guard must see version 2, not >= 3.
+    const apex = (await db.prepare("SELECT COALESCE(MAX(version), 0) AS v FROM ark_schema_migrations").get()) as {
+      v: number;
+    };
+    expect(apex.v).toBe(2);
+
+    await up003({ db, dialect: "sqlite" });
+
+    const tenants = (await db.prepare("SELECT id FROM tenants ORDER BY id").all()) as Array<{ id: string }>;
+    expect(tenants.map((t) => t.id)).toContain("sprocket");
+
+    // Confirm we still tripped the target version.
+    expect(V003).toBe(3);
     await db.close();
   });
 });

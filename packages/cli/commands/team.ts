@@ -8,27 +8,25 @@
  * ark team members add <team> <userEmail> --role member
  * ark team members remove <team> <userEmail>
  * ark team members set-role <team> <userEmail> <role>
+ *
+ * Every subcommand dispatches via ArkClient against admin/team/*.
  */
 
 import type { Command } from "commander";
 import chalk from "chalk";
-import { TeamManager, TenantManager, UserManager, type MembershipRole } from "../../core/auth/index.js";
-import type { AppContext } from "../../core/app.js";
+import { getArkClient } from "../app-client.js";
+import type { ArkClient } from "../../protocol/client.js";
 
-async function resolveTenantId(app: AppContext, idOrSlug: string): Promise<string> {
-  const tm = new TenantManager(app.db);
-  const t = await tm.get(idOrSlug);
-  if (!t) throw new Error(`Tenant '${idOrSlug}' not found`);
-  return t.id;
+type MembershipRole = "owner" | "admin" | "member" | "viewer";
+
+async function resolveTenantId(ark: ArkClient, idOrSlug: string): Promise<string> {
+  const list = await ark.adminTenantList();
+  const match = list.find((t) => t.id === idOrSlug || t.slug === idOrSlug);
+  if (!match) throw new Error(`Tenant '${idOrSlug}' not found`);
+  return match.id;
 }
 
-async function resolveUserByEmail(app: AppContext, email: string): Promise<string> {
-  const um = new UserManager(app.db);
-  const u = await um.upsertByEmail({ email });
-  return u.id;
-}
-
-export function registerTeamCommands(program: Command, app: AppContext) {
+export function registerTeamCommands(program: Command) {
   const team = program.command("team").description("Manage teams + memberships");
 
   team
@@ -38,8 +36,9 @@ export function registerTeamCommands(program: Command, app: AppContext) {
     .option("--json", "Output raw JSON")
     .action(async (opts) => {
       try {
-        const tenantId = await resolveTenantId(app, opts.tenant);
-        const teams = await new TeamManager(app.db).listByTenant(tenantId);
+        const ark = await getArkClient();
+        const tenantId = await resolveTenantId(ark, opts.tenant);
+        const teams = await ark.adminTeamList(tenantId);
         if (opts.json) {
           console.log(JSON.stringify(teams, null, 2));
           return;
@@ -67,9 +66,9 @@ export function registerTeamCommands(program: Command, app: AppContext) {
     .option("--json", "Output raw JSON")
     .action(async (slug, opts) => {
       try {
-        const tenantId = await resolveTenantId(app, opts.tenant);
-        const tm = new TeamManager(app.db);
-        const t = await tm.create({
+        const ark = await getArkClient();
+        const tenantId = await resolveTenantId(ark, opts.tenant);
+        const t = await ark.adminTeamCreate({
           tenant_id: tenantId,
           slug,
           name: opts.name ?? slug,
@@ -91,12 +90,13 @@ export function registerTeamCommands(program: Command, app: AppContext) {
     .option("--description <text>", "New description")
     .action(async (id, opts) => {
       try {
-        const tm = new TeamManager(app.db);
-        const patch: Record<string, any> = {};
-        if (opts.slug) patch.slug = opts.slug;
-        if (opts.name) patch.name = opts.name;
-        if (opts.description !== undefined) patch.description = opts.description;
-        const t = await tm.update(id, patch);
+        const ark = await getArkClient();
+        const t = await ark.adminTeamUpdate({
+          id,
+          ...(opts.slug ? { slug: opts.slug } : {}),
+          ...(opts.name ? { name: opts.name } : {}),
+          ...(opts.description !== undefined ? { description: opts.description } : {}),
+        });
         if (!t) console.log(chalk.red(`Team '${id}' not found`));
         else console.log(chalk.green(`Team updated: ${t.id}`));
       } catch (e: any) {
@@ -110,7 +110,8 @@ export function registerTeamCommands(program: Command, app: AppContext) {
     .argument("<id>", "Team id")
     .action(async (id) => {
       try {
-        const ok = await new TeamManager(app.db).delete(id);
+        const ark = await getArkClient();
+        const ok = await ark.adminTeamDelete(id);
         console.log(ok ? chalk.green(`Team deleted: ${id}`) : chalk.red("Delete failed"));
       } catch (e: any) {
         console.log(chalk.red(`Failed: ${e.message}`));
@@ -128,7 +129,8 @@ export function registerTeamCommands(program: Command, app: AppContext) {
     .option("--json", "Output raw JSON")
     .action(async (teamId, opts) => {
       try {
-        const rows = await new TeamManager(app.db).listMembers(teamId);
+        const ark = await getArkClient();
+        const rows = await ark.adminTeamMembersList(teamId);
         if (opts.json) {
           console.log(JSON.stringify(rows, null, 2));
           return;
@@ -154,8 +156,12 @@ export function registerTeamCommands(program: Command, app: AppContext) {
     .option("--role <role>", "owner | admin | member | viewer", "member")
     .action(async (teamId, userEmail, opts) => {
       try {
-        const userId = await resolveUserByEmail(app, userEmail);
-        const m = await new TeamManager(app.db).addMember(teamId, userId, opts.role as MembershipRole);
+        const ark = await getArkClient();
+        const m = await ark.adminTeamMembersAdd({
+          team_id: teamId,
+          email: userEmail,
+          role: opts.role as MembershipRole,
+        });
         console.log(chalk.green(`Added '${userEmail}' as ${m.role} to team '${teamId}'`));
       } catch (e: any) {
         console.log(chalk.red(`Failed: ${e.message}`));
@@ -169,13 +175,8 @@ export function registerTeamCommands(program: Command, app: AppContext) {
     .argument("<userEmail>", "User email")
     .action(async (teamId, userEmail) => {
       try {
-        const um = new UserManager(app.db);
-        const user = await um.get(userEmail);
-        if (!user) {
-          console.log(chalk.red(`User '${userEmail}' not found`));
-          return;
-        }
-        const ok = await new TeamManager(app.db).removeMember(teamId, user.id);
+        const ark = await getArkClient();
+        const ok = await ark.adminTeamMembersRemove({ team_id: teamId, email: userEmail });
         console.log(ok ? chalk.green(`Removed '${userEmail}' from team '${teamId}'`) : chalk.red("Not a member"));
       } catch (e: any) {
         console.log(chalk.red(`Failed: ${e.message}`));
@@ -190,13 +191,12 @@ export function registerTeamCommands(program: Command, app: AppContext) {
     .argument("<role>", "owner | admin | member | viewer")
     .action(async (teamId, userEmail, role) => {
       try {
-        const um = new UserManager(app.db);
-        const user = await um.get(userEmail);
-        if (!user) {
-          console.log(chalk.red(`User '${userEmail}' not found`));
-          return;
-        }
-        const m = await new TeamManager(app.db).setRole(teamId, user.id, role as MembershipRole);
+        const ark = await getArkClient();
+        const m = await ark.adminTeamMembersSetRole({
+          team_id: teamId,
+          email: userEmail,
+          role: role as MembershipRole,
+        });
         if (!m) console.log(chalk.red("Membership not found"));
         else console.log(chalk.green(`Updated '${userEmail}' to ${m.role} in team '${teamId}'`));
       } catch (e: any) {

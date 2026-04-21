@@ -5,16 +5,15 @@
  *   ark user create --email a@b --name "..."
  *   ark user delete <idOrEmail>
  *
- * Users are durable identities keyed by email. Authentication (password,
- * OIDC, JWT) is out of scope for this CLI surface.
+ * Users are durable identities keyed by email. Every subcommand dispatches
+ * via ArkClient against admin/user/*.
  */
 
 import type { Command } from "commander";
 import chalk from "chalk";
-import { UserManager } from "../../core/auth/index.js";
-import type { AppContext } from "../../core/app.js";
+import { getArkClient } from "../app-client.js";
 
-export function registerUserCommands(program: Command, app: AppContext) {
+export function registerUserCommands(program: Command) {
   const user = program.command("user").description("Manage user identities");
 
   user
@@ -23,7 +22,8 @@ export function registerUserCommands(program: Command, app: AppContext) {
     .option("--json", "Output raw JSON")
     .action(async (opts) => {
       try {
-        const rows = await new UserManager(app.db).list();
+        const ark = await getArkClient();
+        const rows = await ark.adminUserList();
         if (opts.json) {
           console.log(JSON.stringify(rows, null, 2));
           return;
@@ -48,7 +48,8 @@ export function registerUserCommands(program: Command, app: AppContext) {
     .option("--json", "Output raw JSON")
     .action(async (idOrEmail, opts) => {
       try {
-        const u = await new UserManager(app.db).get(idOrEmail);
+        const ark = await getArkClient();
+        const u = await ark.adminUserGet(idOrEmail);
         if (!u) {
           console.log(chalk.red(`User '${idOrEmail}' not found`));
           return;
@@ -74,7 +75,8 @@ export function registerUserCommands(program: Command, app: AppContext) {
     .option("--json", "Output raw JSON")
     .action(async (opts) => {
       try {
-        const u = await new UserManager(app.db).create({ email: opts.email, name: opts.name ?? null });
+        const ark = await getArkClient();
+        const u = await ark.adminUserCreate({ email: opts.email, name: opts.name ?? null });
         if (opts.json) console.log(JSON.stringify(u, null, 2));
         else console.log(chalk.green(`User created: ${u.id} (${u.email})`));
       } catch (e: any) {
@@ -88,13 +90,13 @@ export function registerUserCommands(program: Command, app: AppContext) {
     .argument("<idOrEmail>", "User id or email")
     .action(async (idOrEmail) => {
       try {
-        const um = new UserManager(app.db);
-        const u = await um.get(idOrEmail);
+        const ark = await getArkClient();
+        const u = await ark.adminUserGet(idOrEmail);
         if (!u) {
           console.log(chalk.red(`User '${idOrEmail}' not found`));
           return;
         }
-        const ok = await um.delete(u.id);
+        const ok = await ark.adminUserDelete(u.id);
         console.log(ok ? chalk.green(`User deleted: ${u.id}`) : chalk.red("Delete failed"));
       } catch (e: any) {
         console.log(chalk.red(`Failed: ${e.message}`));

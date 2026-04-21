@@ -19,10 +19,19 @@ import chalk from "chalk";
 import YAML from "yaml";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join, resolve } from "path";
-import type { AppContext } from "../../core/app.js";
+import { getInProcessApp } from "../app-client.js";
 import { DEFAULT_TENANT_ID } from "../../core/code-intel/constants.js";
 
-async function resolveTenantId(app: AppContext, explicitSlug?: string | null): Promise<string> {
+/**
+ * Workspace commands are local-only today -- they reach into
+ * `app.codeIntel` which has no RPC surface. `getInProcessApp()` boots a
+ * local AppContext on demand and throws against `--server`. The helper
+ * signatures below use the structural shape we need from AppContext so
+ * we don't have to import the type directly from `core/app`.
+ */
+type AppLike = Awaited<ReturnType<typeof getInProcessApp>>;
+
+async function resolveTenantId(app: AppLike, explicitSlug?: string | null): Promise<string> {
   if (explicitSlug) {
     const t = await app.codeIntel.getTenantBySlug(explicitSlug);
     if (!t) throw new Error(`tenant "${explicitSlug}" not found -- run \`ark tenant create\` first`);
@@ -37,7 +46,7 @@ async function resolveTenantId(app: AppContext, explicitSlug?: string | null): P
 }
 
 async function findRepoForWorkspace(
-  app: AppContext,
+  app: AppLike,
   tenant_id: string,
   query: string,
 ): Promise<{ id: string; name: string; repo_url: string } | null> {
@@ -72,7 +81,7 @@ function setActiveWorkspaceInConfig(arkDir: string, slug: string): string {
   return path;
 }
 
-export function registerWorkspaceCommands(program: Command, app: AppContext) {
+export function registerWorkspaceCommands(program: Command) {
   const cmd = program.command("workspace").description("Manage workspaces (tenant -> workspace -> repo)");
 
   // ── create ──────────────────────────────────────────────────────────────
@@ -85,6 +94,7 @@ export function registerWorkspaceCommands(program: Command, app: AppContext) {
     .option("--description <text>", "Free-form description")
     .action(async (slug: string, opts) => {
       try {
+        const app = await getInProcessApp();
         const tenant_id = await resolveTenantId(app, opts.tenant);
         const existing = await app.codeIntel.getWorkspaceBySlug(tenant_id, slug);
         if (existing) {
@@ -113,6 +123,7 @@ export function registerWorkspaceCommands(program: Command, app: AppContext) {
     .option("--format <fmt>", "Output format: yaml | text", "text")
     .action(async (opts) => {
       try {
+        const app = await getInProcessApp();
         const tenant_id = await resolveTenantId(app, opts.tenant);
         const workspaces = await app.codeIntel.listWorkspaces(tenant_id);
         if (opts.format === "yaml") {
@@ -154,6 +165,7 @@ export function registerWorkspaceCommands(program: Command, app: AppContext) {
     .option("--format <fmt>", "Output format: yaml | text", "text")
     .action(async (slug: string, opts) => {
       try {
+        const app = await getInProcessApp();
         const tenant_id = await resolveTenantId(app, opts.tenant);
         const ws = await app.codeIntel.getWorkspaceBySlug(tenant_id, slug);
         if (!ws) {
@@ -204,6 +216,7 @@ export function registerWorkspaceCommands(program: Command, app: AppContext) {
     .option("--tenant <slug>", "Tenant slug (default: local default)")
     .action(async (slug: string, opts) => {
       try {
+        const app = await getInProcessApp();
         const tenant_id = await resolveTenantId(app, opts.tenant);
         const ws = await app.codeIntel.getWorkspaceBySlug(tenant_id, slug);
         if (!ws) {
@@ -228,6 +241,7 @@ export function registerWorkspaceCommands(program: Command, app: AppContext) {
     .option("--tenant <slug>", "Tenant slug (default: local default)")
     .action(async (workspaceSlug: string, repoArg: string, opts) => {
       try {
+        const app = await getInProcessApp();
         const tenant_id = await resolveTenantId(app, opts.tenant);
         const ws = await app.codeIntel.getWorkspaceBySlug(tenant_id, workspaceSlug);
         if (!ws) {
@@ -281,6 +295,7 @@ export function registerWorkspaceCommands(program: Command, app: AppContext) {
     .option("--tenant <slug>", "Tenant slug (default: local default)")
     .action(async (workspaceSlug: string, repoArg: string, opts) => {
       try {
+        const app = await getInProcessApp();
         const tenant_id = await resolveTenantId(app, opts.tenant);
         const ws = await app.codeIntel.getWorkspaceBySlug(tenant_id, workspaceSlug);
         if (!ws) {

@@ -1,9 +1,18 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import * as core from "../../core/index.js";
-import type { AppContext } from "../../core/app.js";
+import { getInProcessApp } from "../app-client.js";
 
-export function registerConductorCommands(program: Command, app: AppContext) {
+/**
+ * `ark conductor` -- conductor-specific local operations.
+ *
+ * These reach into the local knowledge graph / bridge config that a daemon
+ * would own, so every action boots an in-process AppContext on demand
+ * (through `getInProcessApp`). When `--server` is set, the commands fail
+ * fast with a friendly message -- conductor operations are not yet
+ * exposed over JSON-RPC.
+ */
+export function registerConductorCommands(program: Command) {
   const conductorCmd = program.command("conductor").description("Conductor operations");
 
   conductorCmd
@@ -11,9 +20,9 @@ export function registerConductorCommands(program: Command, app: AppContext) {
     .description("Start the conductor server")
     .option("-p, --port <port>", "Port", "19100")
     .action(async (opts) => {
+      const app = await getInProcessApp();
       const { startConductor } = await import("../../core/conductor/conductor.js");
       startConductor(app, parseInt(opts.port));
-      // Keep alive
       setInterval(() => {}, 60_000);
     });
 
@@ -21,17 +30,17 @@ export function registerConductorCommands(program: Command, app: AppContext) {
     .command("learnings")
     .description("Show conductor learnings")
     .action(async () => {
+      const app = await getInProcessApp();
       const learnings = await app.knowledge.listNodes({ type: "learning" });
 
       if (learnings.length > 0) {
-        // Split into "promoted" (recurrence >= 3) and active
         const promoted = learnings.filter((l) => ((l.metadata.recurrence as number) ?? 1) >= 3);
         const active = learnings.filter((l) => ((l.metadata.recurrence as number) ?? 1) < 3);
 
         if (promoted.length > 0) {
           console.log(chalk.bold("\nPolicies (promoted from learnings):\n"));
           for (const p of promoted) {
-            console.log(`  ${chalk.green("\u2713")} ${chalk.bold(p.label)}`);
+            console.log(`  ${chalk.green("✓")} ${chalk.bold(p.label)}`);
             if (p.content) console.log(`    ${chalk.dim(p.content.split("\n")[0])}`);
           }
         }
@@ -40,7 +49,7 @@ export function registerConductorCommands(program: Command, app: AppContext) {
           console.log(chalk.bold("\nActive learnings:\n"));
           for (const l of active) {
             const rec = (l.metadata.recurrence as number) ?? 1;
-            const bar = "\u2588".repeat(rec) + "\u2591".repeat(3 - rec);
+            const bar = "█".repeat(rec) + "░".repeat(3 - rec);
             console.log(`  ${bar} ${chalk.bold(l.label)} (seen ${rec}x)`);
             if (l.content) console.log(`    ${chalk.dim(l.content.split("\n")[0])}`);
           }
@@ -56,7 +65,7 @@ export function registerConductorCommands(program: Command, app: AppContext) {
     .argument("<title>")
     .argument("[description]")
     .action(async (title, description) => {
-      // Check for existing learning with same label and increment recurrence
+      const app = await getInProcessApp();
       const existing = await app.knowledge.search(title, { types: ["learning"], limit: 5 });
       const match = existing.find((n) => n.label === title);
       if (match) {
@@ -85,6 +94,7 @@ export function registerConductorCommands(program: Command, app: AppContext) {
     .command("bridge")
     .description("Start the messaging bridge (Telegram/Slack)")
     .action(async () => {
+      const app = await getInProcessApp();
       const bridge = core.createBridge(app.config.arkDir);
       if (!bridge) {
         console.log(chalk.red("No bridge config found. Create ~/.ark/bridge.json with telegram/slack settings."));
@@ -104,14 +114,13 @@ export function registerConductorCommands(program: Command, app: AppContext) {
         return;
       }
 
-      // Handle common commands
       bridge.onMessage(async (msg) => {
         const text = msg.text.trim().toLowerCase();
         if (text === "/status" || text === "status") {
           await bridge.notifyStatusSummary(app);
         } else if (text === "/sessions" || text === "sessions") {
           const sessions = await app.sessions.list({ limit: 20 });
-          const lines = sessions.map((s) => `\u2022 ${s.summary ?? s.id} (${s.status})`);
+          const lines = sessions.map((s) => `• ${s.summary ?? s.id} (${s.status})`);
           await bridge.notify(lines.join("\n") || "No sessions");
         } else {
           await bridge.notify(`Unknown command: ${text}`);
@@ -119,8 +128,6 @@ export function registerConductorCommands(program: Command, app: AppContext) {
       });
 
       console.log(chalk.green("Bridge started. Ctrl+C to stop."));
-
-      // Keep alive
       await new Promise(() => {});
     });
 
@@ -129,6 +136,7 @@ export function registerConductorCommands(program: Command, app: AppContext) {
     .description("Send a test notification via bridge")
     .argument("<message>")
     .action(async (message) => {
+      const app = await getInProcessApp();
       const bridge = core.createBridge(app.config.arkDir);
       if (!bridge) {
         console.log(chalk.red("No bridge config. Create ~/.ark/bridge.json"));

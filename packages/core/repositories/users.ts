@@ -1,10 +1,10 @@
 /**
  * UserRepository -- SQL adapter for the `users` table.
  *
- * The table is created by migration 003. Authentication details (password,
- * OIDC provider, etc.) are intentionally NOT on this table -- users here
- * are just durable identities keyed by email. `upsertByEmail` is the
- * primitive an auth layer calls when it sees a new JWT.
+ * The table is created by migration 003. `deleted_at` is added in 004
+ * so users are soft-deletable; email uniqueness is enforced by a partial
+ * unique index scoped to live rows. Authentication details (password,
+ * OIDC provider) still live elsewhere -- users here are durable identities.
  */
 
 import type { IDatabase } from "../database/index.js";
@@ -15,25 +15,37 @@ export interface UserRow {
   id: string;
   email: string;
   name: string | null;
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ListOptions {
+  includeDeleted?: boolean;
 }
 
 export class UserRepository {
   constructor(private db: IDatabase) {}
 
-  async list(): Promise<UserRow[]> {
-    const rows = (await this.db.prepare("SELECT * FROM users ORDER BY email ASC").all()) as UserRow[];
+  async list(opts: ListOptions = {}): Promise<UserRow[]> {
+    const where = opts.includeDeleted ? "" : "WHERE deleted_at IS NULL";
+    const rows = (await this.db.prepare(`SELECT * FROM users ${where} ORDER BY email ASC`).all()) as UserRow[];
     return rows;
   }
 
-  async get(id: string): Promise<UserRow | null> {
-    const row = (await this.db.prepare("SELECT * FROM users WHERE id = ?").get(id)) as UserRow | undefined;
+  async get(id: string, opts: ListOptions = {}): Promise<UserRow | null> {
+    const sql = opts.includeDeleted
+      ? "SELECT * FROM users WHERE id = ?"
+      : "SELECT * FROM users WHERE id = ? AND deleted_at IS NULL";
+    const row = (await this.db.prepare(sql).get(id)) as UserRow | undefined;
     return row ?? null;
   }
 
-  async getByEmail(email: string): Promise<UserRow | null> {
-    const row = (await this.db.prepare("SELECT * FROM users WHERE email = ?").get(email)) as UserRow | undefined;
+  async getByEmail(email: string, opts: ListOptions = {}): Promise<UserRow | null> {
+    const sql = opts.includeDeleted
+      ? "SELECT * FROM users WHERE email = ?"
+      : "SELECT * FROM users WHERE email = ? AND deleted_at IS NULL";
+    const row = (await this.db.prepare(sql).get(email)) as UserRow | undefined;
     return row ?? null;
   }
 
@@ -47,9 +59,10 @@ export class UserRepository {
   }
 
   /**
-   * Idempotent: if a row with this email exists, return it (name is
+   * Idempotent: if a live row with this email exists, return it (name is
    * updated if provided + different). Otherwise insert a new row. Safe to
-   * call from an auth layer that has just verified a JWT.
+   * call from an auth layer that has just verified a JWT. Does NOT
+   * resurrect soft-deleted users -- call `restore(id)` explicitly for that.
    */
   async upsertByEmail(u: { email: string; name?: string | null }): Promise<UserRow> {
     const existing = await this.getByEmail(u.email);
@@ -65,8 +78,23 @@ export class UserRepository {
     return this.create(u);
   }
 
-  async delete(id: string): Promise<boolean> {
-    const res = await this.db.prepare("DELETE FROM users WHERE id = ?").run(id);
+  async softDelete(id: string): Promise<boolean> {
+    const existing = (await this.db.prepare("SELECT deleted_at FROM users WHERE id = ?").get(id)) as
+      | { deleted_at: string | null }
+      | undefined;
+    if (!existing) return false;
+    if (existing.deleted_at) return true;
+    const ts = now();
+    const res = await this.db
+      .prepare("UPDATE users SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL")
+      .run(ts, ts, id);
+    return res.changes > 0;
+  }
+
+  async restore(id: string): Promise<boolean> {
+    const res = await this.db
+      .prepare("UPDATE users SET deleted_at = NULL, updated_at = ? WHERE id = ? AND deleted_at IS NOT NULL")
+      .run(now(), id);
     return res.changes > 0;
   }
 }

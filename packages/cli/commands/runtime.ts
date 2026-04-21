@@ -1,15 +1,16 @@
 import type { Command } from "commander";
 import chalk from "chalk";
-import type { AppContext } from "../../core/app.js";
+import { getArkClient } from "../app-client.js";
 
-export function registerRuntimeCommands(program: Command, app: AppContext) {
+export function registerRuntimeCommands(program: Command) {
   const runtime = program.command("runtime").description("Manage runtime definitions");
 
   runtime
     .command("list")
     .description("List available runtimes")
     .action(async () => {
-      const runtimes = app.runtimes.list();
+      const ark = await getArkClient();
+      const runtimes = await ark.runtimeList();
       if (!runtimes.length) {
         console.log(chalk.dim("No runtimes found."));
         return;
@@ -28,8 +29,11 @@ export function registerRuntimeCommands(program: Command, app: AppContext) {
     .description("Show runtime details")
     .argument("<name>")
     .action(async (name) => {
-      const r = app.runtimes.get(name);
-      if (!r) {
+      const ark = await getArkClient();
+      let r;
+      try {
+        r = await ark.runtimeRead(name);
+      } catch {
         console.log(chalk.red(`Runtime '${name}' not found`));
         return;
       }

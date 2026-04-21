@@ -1086,6 +1086,199 @@ export class ArkClient {
     return this.rpc("dashboard/summary");
   }
 
+  // ── Admin: tenants ─────────────────────────────────────────────────────────
+
+  async adminTenantList(): Promise<
+    Array<{ id: string; slug: string; name: string; status: string; created_at: string; updated_at: string }>
+  > {
+    const { tenants } = await this.rpc<{ tenants: any[] }>("admin/tenant/list");
+    return tenants;
+  }
+
+  async adminTenantGet(id: string): Promise<{
+    id: string;
+    slug: string;
+    name: string;
+    status: string;
+    created_at: string;
+    updated_at: string;
+  } | null> {
+    try {
+      const { tenant } = await this.rpc<{ tenant: any }>("admin/tenant/get", { id });
+      return tenant;
+    } catch (e) {
+      if (e instanceof RpcError && e.code === -32002) return null;
+      throw e;
+    }
+  }
+
+  async adminTenantCreate(opts: { slug: string; name: string; status?: string }): Promise<any> {
+    const { tenant } = await this.rpc<{ tenant: any }>("admin/tenant/create", opts as Record<string, unknown>);
+    return tenant;
+  }
+
+  async adminTenantUpdate(opts: { id: string; slug?: string; name?: string; status?: string }): Promise<any> {
+    const { tenant } = await this.rpc<{ tenant: any }>("admin/tenant/update", opts as Record<string, unknown>);
+    return tenant;
+  }
+
+  async adminTenantSetStatus(id: string, status: string): Promise<any> {
+    const { tenant } = await this.rpc<{ tenant: any }>("admin/tenant/set-status", { id, status });
+    return tenant;
+  }
+
+  async adminTenantDelete(id: string): Promise<boolean> {
+    const { ok } = await this.rpc<{ ok: boolean }>("admin/tenant/delete", { id });
+    return ok;
+  }
+
+  // ── Admin: teams ───────────────────────────────────────────────────────────
+
+  async adminTeamList(tenant_id: string): Promise<any[]> {
+    const { teams } = await this.rpc<{ teams: any[] }>("admin/team/list", { tenant_id });
+    return teams;
+  }
+
+  async adminTeamGet(id: string): Promise<any | null> {
+    try {
+      const { team } = await this.rpc<{ team: any }>("admin/team/get", { id });
+      return team;
+    } catch (e) {
+      if (e instanceof RpcError && e.code === -32002) return null;
+      throw e;
+    }
+  }
+
+  async adminTeamCreate(opts: {
+    tenant_id: string;
+    slug: string;
+    name: string;
+    description?: string | null;
+  }): Promise<any> {
+    const { team } = await this.rpc<{ team: any }>("admin/team/create", opts as Record<string, unknown>);
+    return team;
+  }
+
+  async adminTeamUpdate(opts: { id: string; slug?: string; name?: string; description?: string | null }): Promise<any> {
+    const { team } = await this.rpc<{ team: any }>("admin/team/update", opts as Record<string, unknown>);
+    return team;
+  }
+
+  async adminTeamDelete(id: string): Promise<boolean> {
+    const { ok } = await this.rpc<{ ok: boolean }>("admin/team/delete", { id });
+    return ok;
+  }
+
+  async adminTeamMembersList(team_id: string): Promise<
+    Array<{
+      id: string;
+      user_id: string;
+      team_id: string;
+      role: "owner" | "admin" | "member" | "viewer";
+      created_at: string;
+      email: string;
+      name?: string | null;
+    }>
+  > {
+    const { members } = await this.rpc<{ members: any[] }>("admin/team/members/list", { team_id });
+    return members;
+  }
+
+  async adminTeamMembersAdd(opts: {
+    team_id: string;
+    user_id?: string;
+    email?: string;
+    role?: "owner" | "admin" | "member" | "viewer";
+  }): Promise<any> {
+    const { membership } = await this.rpc<{ membership: any }>(
+      "admin/team/members/add",
+      opts as Record<string, unknown>,
+    );
+    return membership;
+  }
+
+  async adminTeamMembersRemove(opts: { team_id: string; user_id?: string; email?: string }): Promise<boolean> {
+    const { ok } = await this.rpc<{ ok: boolean }>("admin/team/members/remove", opts as Record<string, unknown>);
+    return ok;
+  }
+
+  async adminTeamMembersSetRole(opts: {
+    team_id: string;
+    user_id?: string;
+    email?: string;
+    role: "owner" | "admin" | "member" | "viewer";
+  }): Promise<any> {
+    const { membership } = await this.rpc<{ membership: any }>(
+      "admin/team/members/set-role",
+      opts as Record<string, unknown>,
+    );
+    return membership;
+  }
+
+  // ── Admin: users ───────────────────────────────────────────────────────────
+
+  async adminUserList(): Promise<
+    Array<{ id: string; email: string; name: string | null; created_at: string; updated_at: string }>
+  > {
+    const { users } = await this.rpc<{ users: any[] }>("admin/user/list");
+    return users;
+  }
+
+  async adminUserGet(id: string): Promise<any | null> {
+    try {
+      const { user } = await this.rpc<{ user: any }>("admin/user/get", { id });
+      return user;
+    } catch (e) {
+      if (e instanceof RpcError && e.code === -32002) return null;
+      throw e;
+    }
+  }
+
+  async adminUserCreate(opts: { email: string; name?: string | null }): Promise<any> {
+    const { user } = await this.rpc<{ user: any }>("admin/user/create", opts as Record<string, unknown>);
+    return user;
+  }
+
+  async adminUserUpsert(opts: { email: string; name?: string | null }): Promise<any> {
+    const { user } = await this.rpc<{ user: any }>("admin/user/upsert", opts as Record<string, unknown>);
+    return user;
+  }
+
+  async adminUserDelete(id: string): Promise<boolean> {
+    const { ok } = await this.rpc<{ ok: boolean }>("admin/user/delete", { id });
+    return ok;
+  }
+
+  // ── Secrets ────────────────────────────────────────────────────────────────
+
+  async secretList(): Promise<
+    Array<{
+      tenant_id: string;
+      name: string;
+      description?: string | null;
+      created_at?: string | null;
+      updated_at?: string | null;
+    }>
+  > {
+    const { secrets } = await this.rpc<{ secrets: any[] }>("secret/list");
+    return secrets;
+  }
+
+  async secretGet(name: string): Promise<string | null> {
+    const { value } = await this.rpc<{ value: string | null }>("secret/get", { name });
+    return value;
+  }
+
+  async secretSet(name: string, value: string, description?: string): Promise<boolean> {
+    const { ok } = await this.rpc<{ ok: boolean }>("secret/set", { name, value, description });
+    return ok;
+  }
+
+  async secretDelete(name: string): Promise<boolean> {
+    const { ok } = await this.rpc<{ ok: boolean }>("secret/delete", { name });
+    return ok;
+  }
+
   // ── Teardown ────────────────────────────────────────────────────────────────
 
   close(): void {

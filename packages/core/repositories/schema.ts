@@ -191,21 +191,25 @@ export async function initSchema(db: IDatabase): Promise<void> {
 
     CREATE TABLE IF NOT EXISTS tenants (
       id TEXT PRIMARY KEY,
-      slug TEXT NOT NULL UNIQUE,
+      slug TEXT NOT NULL,
       name TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'active',
+      deleted_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_tenants_status ON tenants(status);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_slug_live ON tenants(slug) WHERE deleted_at IS NULL;
 
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
-      email TEXT NOT NULL UNIQUE,
+      email TEXT NOT NULL,
       name TEXT,
+      deleted_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_live ON users(email) WHERE deleted_at IS NULL;
 
     CREATE TABLE IF NOT EXISTS teams (
       id TEXT PRIMARY KEY,
@@ -213,22 +217,25 @@ export async function initSchema(db: IDatabase): Promise<void> {
       slug TEXT NOT NULL,
       name TEXT NOT NULL,
       description TEXT,
+      deleted_at TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      UNIQUE (tenant_id, slug)
+      updated_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_teams_tenant ON teams(tenant_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_teams_tenant_slug_live ON teams(tenant_id, slug) WHERE deleted_at IS NULL;
 
     CREATE TABLE IF NOT EXISTS memberships (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
       role TEXT NOT NULL DEFAULT 'member',
-      created_at TEXT NOT NULL,
-      UNIQUE (user_id, team_id)
+      deleted_at TEXT,
+      created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_memberships_user ON memberships(user_id);
     CREATE INDEX IF NOT EXISTS idx_memberships_team ON memberships(team_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_memberships_user_team_live
+      ON memberships(user_id, team_id) WHERE deleted_at IS NULL;
   `);
 
   // Compute pools table (defined in its own module so the pool manager can

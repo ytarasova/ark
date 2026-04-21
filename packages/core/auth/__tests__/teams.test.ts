@@ -31,7 +31,42 @@ describe("TeamManager", () => {
     const ok = await tm.delete(ops.id);
     expect(ok).toBe(true);
     expect(await tm.get(ops.id)).toBeNull();
+    // Soft-deleted team is still there with includeDeleted
+    const ghost = await tm.get(ops.id, { includeDeleted: true });
+    expect(ghost?.id).toBe(ops.id);
+    expect(ghost?.deleted_at).not.toBeNull();
 
+    await db.close();
+  });
+
+  it("soft-delete cascades to memberships + restore brings back the team", async () => {
+    const db = await freshDb();
+    const tenant = await new TenantManager(db).create({ slug: "sd", name: "SD" });
+    const tm = new TeamManager(db);
+    const users = new UserManager(db);
+    const team = await tm.create({ tenant_id: tenant.id, slug: "eng", name: "Eng" });
+    const u = await users.create({ email: "sd@example.com" });
+    await tm.addMember(team.id, u.id, "member");
+
+    await tm.delete(team.id);
+    expect(await tm.listMembers(team.id)).toHaveLength(0);
+    expect(await tm.listMembers(team.id, { includeDeleted: true })).toHaveLength(1);
+
+    expect(await tm.restore(team.id)).toBe(true);
+    const restored = await tm.get(team.id);
+    expect(restored?.deleted_at).toBeNull();
+
+    await db.close();
+  });
+
+  it("recreating a team slug after soft-delete succeeds", async () => {
+    const db = await freshDb();
+    const tenant = await new TenantManager(db).create({ slug: "rr", name: "RR" });
+    const tm = new TeamManager(db);
+    const first = await tm.create({ tenant_id: tenant.id, slug: "squad", name: "First" });
+    await tm.delete(first.id);
+    const second = await tm.create({ tenant_id: tenant.id, slug: "squad", name: "Second" });
+    expect(second.id).not.toBe(first.id);
     await db.close();
   });
 
@@ -79,6 +114,18 @@ describe("TeamManager", () => {
     expect(ok).toBe(true);
     const final = await tm.listMembers(team.id);
     expect(final.map((m) => m.email)).toEqual(["alice@example.com"]);
+
+    // removeMember is soft -- ghost is visible with includeDeleted
+    const ghostList = await tm.listMembers(team.id, { includeDeleted: true });
+    expect(ghostList.map((m) => m.email).sort()).toEqual(["alice@example.com", "bob@example.com"]);
+
+    // removeMember is idempotent
+    expect(await tm.removeMember(team.id, bob.id)).toBe(true);
+
+    // restoreMember un-soft-deletes
+    expect(await tm.restoreMember(team.id, bob.id)).toBe(true);
+    const reinstated = await tm.listMembers(team.id);
+    expect(reinstated.map((m) => m.email).sort()).toEqual(["alice@example.com", "bob@example.com"]);
 
     await db.close();
   });

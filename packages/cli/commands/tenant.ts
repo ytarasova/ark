@@ -1,15 +1,19 @@
 /**
  * CLI commands for tenant management:
  *   ark tenant list / create / update / delete / suspend / resume
- *   ark tenant policy *   (existing sub-namespace, preserved below)
+ *   ark tenant policy *   (policy sub-namespace stays local-only for now --
+ *                          there is no RPC surface for tenant policies yet)
+ *
+ * Every tenant-lifecycle command dispatches via ArkClient against the
+ * admin/tenant/* handlers. Policy commands still reach into a local
+ * AppContext until the server handlers exist; see the PUNT note below.
  */
 
 import type { Command } from "commander";
 import chalk from "chalk";
-import { TenantPolicyManager, TenantManager } from "../../core/auth/index.js";
-import type { AppContext } from "../../core/app.js";
+import { getArkClient, getInProcessApp } from "../app-client.js";
 
-export function registerTenantCommands(program: Command, app: AppContext) {
+export function registerTenantCommands(program: Command) {
   const tenant = program.command("tenant").description("Manage tenant settings");
   const policy = tenant.command("policy").description("Manage tenant compute policies");
 
@@ -21,8 +25,8 @@ export function registerTenantCommands(program: Command, app: AppContext) {
     .option("--json", "Output raw JSON")
     .action(async (opts) => {
       try {
-        const tm = new TenantManager(app.db);
-        const rows = await tm.list();
+        const ark = await getArkClient();
+        const rows = await ark.adminTenantList();
         if (opts.json) {
           console.log(JSON.stringify(rows, null, 2));
           return;
@@ -45,12 +49,11 @@ export function registerTenantCommands(program: Command, app: AppContext) {
     .description("Create a new tenant")
     .argument("<slug>", "Kebab-case slug (unique)")
     .option("--name <name>", "Human-readable name (defaults to slug)")
-    .option("--id <id>", "Explicit tenant id (default: auto)")
     .option("--json", "Output raw JSON")
     .action(async (slug, opts) => {
       try {
-        const tm = new TenantManager(app.db);
-        const t = await tm.create({ slug, name: opts.name ?? slug, id: opts.id });
+        const ark = await getArkClient();
+        const t = await ark.adminTenantCreate({ slug, name: opts.name ?? slug });
         if (opts.json) console.log(JSON.stringify(t, null, 2));
         else console.log(chalk.green(`Tenant created: ${t.id} (slug=${t.slug})`));
       } catch (e: any) {
@@ -67,17 +70,18 @@ export function registerTenantCommands(program: Command, app: AppContext) {
     .option("--status <status>", "active | suspended | archived")
     .action(async (id, opts) => {
       try {
-        const tm = new TenantManager(app.db);
-        const current = await tm.get(id);
+        const ark = await getArkClient();
+        const current = await ark.adminTenantGet(id);
         if (!current) {
           console.log(chalk.red(`Tenant '${id}' not found`));
           return;
         }
-        const patch: Record<string, any> = {};
-        if (opts.slug) patch.slug = opts.slug;
-        if (opts.name) patch.name = opts.name;
-        if (opts.status) patch.status = opts.status;
-        const t = await tm.update(current.id, patch);
+        const t = await ark.adminTenantUpdate({
+          id: current.id,
+          ...(opts.slug ? { slug: opts.slug } : {}),
+          ...(opts.name ? { name: opts.name } : {}),
+          ...(opts.status ? { status: opts.status } : {}),
+        });
         console.log(chalk.green(`Tenant updated: ${t?.id}`));
       } catch (e: any) {
         console.log(chalk.red(`Failed: ${e.message}`));
@@ -90,13 +94,13 @@ export function registerTenantCommands(program: Command, app: AppContext) {
     .argument("<id>", "Tenant id or slug")
     .action(async (id) => {
       try {
-        const tm = new TenantManager(app.db);
-        const current = await tm.get(id);
+        const ark = await getArkClient();
+        const current = await ark.adminTenantGet(id);
         if (!current) {
           console.log(chalk.red(`Tenant '${id}' not found`));
           return;
         }
-        const ok = await tm.delete(current.id);
+        const ok = await ark.adminTenantDelete(current.id);
         console.log(ok ? chalk.green(`Tenant deleted: ${current.id}`) : chalk.red("Delete failed"));
       } catch (e: any) {
         console.log(chalk.red(`Failed: ${e.message}`));
@@ -109,13 +113,13 @@ export function registerTenantCommands(program: Command, app: AppContext) {
     .argument("<id>", "Tenant id or slug")
     .action(async (id) => {
       try {
-        const tm = new TenantManager(app.db);
-        const current = await tm.get(id);
+        const ark = await getArkClient();
+        const current = await ark.adminTenantGet(id);
         if (!current) {
           console.log(chalk.red(`Tenant '${id}' not found`));
           return;
         }
-        await tm.setStatus(current.id, "suspended");
+        await ark.adminTenantSetStatus(current.id, "suspended");
         console.log(chalk.yellow(`Tenant '${current.id}' suspended`));
       } catch (e: any) {
         console.log(chalk.red(`Failed: ${e.message}`));
@@ -128,22 +132,26 @@ export function registerTenantCommands(program: Command, app: AppContext) {
     .argument("<id>", "Tenant id or slug")
     .action(async (id) => {
       try {
-        const tm = new TenantManager(app.db);
-        const current = await tm.get(id);
+        const ark = await getArkClient();
+        const current = await ark.adminTenantGet(id);
         if (!current) {
           console.log(chalk.red(`Tenant '${id}' not found`));
           return;
         }
-        await tm.setStatus(current.id, "active");
+        await ark.adminTenantSetStatus(current.id, "active");
         console.log(chalk.green(`Tenant '${current.id}' active`));
       } catch (e: any) {
         console.log(chalk.red(`Failed: ${e.message}`));
       }
     });
 
+  // ── Policy subcommands (PUNT: no RPC surface yet; local-only) ──────────
+  // Agent #1 / agents owning the server handlers can add `admin/tenant/policy/*`
+  // later. For now we keep parity by reaching into a local AppContext.
+
   policy
     .command("set")
-    .description("Set compute policy for a tenant")
+    .description("Set compute policy for a tenant (local-only until admin/tenant/policy RPC lands)")
     .argument("<tenant-id>", "Tenant ID")
     .option("--providers <list>", "Comma-separated allowed providers (e.g. k8s,ec2)")
     .option("--default-provider <provider>", "Default provider", "k8s")
@@ -151,6 +159,8 @@ export function registerTenantCommands(program: Command, app: AppContext) {
     .option("--max-cost <usd>", "Maximum daily cost in USD")
     .action(async (tenantId, opts) => {
       try {
+        const app = await getInProcessApp();
+        const { TenantPolicyManager } = await import("../../core/auth/index.js");
         const pm = new TenantPolicyManager(app.db);
 
         const allowedProviders = opts.providers
@@ -190,10 +200,12 @@ export function registerTenantCommands(program: Command, app: AppContext) {
 
   policy
     .command("get")
-    .description("Get compute policy for a tenant")
+    .description("Get compute policy for a tenant (local-only)")
     .argument("<tenant-id>", "Tenant ID")
     .action(async (tenantId) => {
       try {
+        const app = await getInProcessApp();
+        const { TenantPolicyManager } = await import("../../core/auth/index.js");
         const pm = new TenantPolicyManager(app.db);
         const p = await pm.getPolicy(tenantId);
 
@@ -227,9 +239,11 @@ export function registerTenantCommands(program: Command, app: AppContext) {
 
   policy
     .command("list")
-    .description("List all tenant compute policies")
+    .description("List all tenant compute policies (local-only)")
     .action(async () => {
       try {
+        const app = await getInProcessApp();
+        const { TenantPolicyManager } = await import("../../core/auth/index.js");
         const pm = new TenantPolicyManager(app.db);
         const policies = await pm.listPolicies();
 
@@ -255,10 +269,12 @@ export function registerTenantCommands(program: Command, app: AppContext) {
 
   policy
     .command("delete")
-    .description("Delete compute policy for a tenant")
+    .description("Delete compute policy for a tenant (local-only)")
     .argument("<tenant-id>", "Tenant ID")
     .action(async (tenantId) => {
       try {
+        const app = await getInProcessApp();
+        const { TenantPolicyManager } = await import("../../core/auth/index.js");
         const pm = new TenantPolicyManager(app.db);
         const deleted = await pm.deletePolicy(tenantId);
 

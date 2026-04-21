@@ -1,10 +1,13 @@
 /**
  * TenantRepository -- thin SQL adapter for the `tenants` table.
  *
- * The table is created by migration 003 (`003_tenants_teams.ts`). Callers
- * typically reach it through `TenantManager` (packages/core/auth/tenants.ts)
- * which wraps CRUD with the lazy `ensureSchema()` guard. This repository is
- * the direct SQL layer used by that manager.
+ * The table is created by migration 003 (`003_tenants_teams.ts`) and
+ * gains the `deleted_at` column in migration 004. Callers typically
+ * reach it through `TenantManager` (packages/core/auth/tenants.ts).
+ *
+ * Soft-delete semantics: every read (`list`, `get`, `getBySlug`) filters
+ * `deleted_at IS NULL` by default so soft-deleted rows are invisible.
+ * Admin surfaces that need the tombstones can pass `{ includeDeleted: true }`.
  */
 
 import type { IDatabase } from "../database/index.js";
@@ -17,8 +20,13 @@ export interface TenantRow {
   slug: string;
   name: string;
   status: TenantStatus;
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ListOptions {
+  includeDeleted?: boolean;
 }
 
 const COLUMNS = new Set(["slug", "name", "status", "updated_at"]);
@@ -26,18 +34,25 @@ const COLUMNS = new Set(["slug", "name", "status", "updated_at"]);
 export class TenantRepository {
   constructor(private db: IDatabase) {}
 
-  async list(): Promise<TenantRow[]> {
-    const rows = (await this.db.prepare("SELECT * FROM tenants ORDER BY slug ASC").all()) as TenantRow[];
+  async list(opts: ListOptions = {}): Promise<TenantRow[]> {
+    const where = opts.includeDeleted ? "" : "WHERE deleted_at IS NULL";
+    const rows = (await this.db.prepare(`SELECT * FROM tenants ${where} ORDER BY slug ASC`).all()) as TenantRow[];
     return rows;
   }
 
-  async get(id: string): Promise<TenantRow | null> {
-    const row = (await this.db.prepare("SELECT * FROM tenants WHERE id = ?").get(id)) as TenantRow | undefined;
+  async get(id: string, opts: ListOptions = {}): Promise<TenantRow | null> {
+    const sql = opts.includeDeleted
+      ? "SELECT * FROM tenants WHERE id = ?"
+      : "SELECT * FROM tenants WHERE id = ? AND deleted_at IS NULL";
+    const row = (await this.db.prepare(sql).get(id)) as TenantRow | undefined;
     return row ?? null;
   }
 
-  async getBySlug(slug: string): Promise<TenantRow | null> {
-    const row = (await this.db.prepare("SELECT * FROM tenants WHERE slug = ?").get(slug)) as TenantRow | undefined;
+  async getBySlug(slug: string, opts: ListOptions = {}): Promise<TenantRow | null> {
+    const sql = opts.includeDeleted
+      ? "SELECT * FROM tenants WHERE slug = ?"
+      : "SELECT * FROM tenants WHERE slug = ? AND deleted_at IS NULL";
+    const row = (await this.db.prepare(sql).get(slug)) as TenantRow | undefined;
     return row ?? null;
   }
 
@@ -63,12 +78,27 @@ export class TenantRepository {
   }
 
   /**
-   * Hard-delete a tenant. FKs on `teams` + `memberships` cascade. Session
-   * and compute rows for this tenant are NOT touched -- removing them here
-   * would be too destructive; see migration 003 for the rationale.
+   * Soft-delete: sets `deleted_at` to now() if not already set. Idempotent --
+   * calling on an already-soft-deleted row is a no-op and returns `true` so
+   * the caller sees the same result as the first call.
    */
-  async delete(id: string): Promise<boolean> {
-    const res = await this.db.prepare("DELETE FROM tenants WHERE id = ?").run(id);
+  async softDelete(id: string): Promise<boolean> {
+    const existing = (await this.db.prepare("SELECT deleted_at FROM tenants WHERE id = ?").get(id)) as
+      | { deleted_at: string | null }
+      | undefined;
+    if (!existing) return false;
+    if (existing.deleted_at) return true;
+    const ts = now();
+    const res = await this.db
+      .prepare("UPDATE tenants SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL")
+      .run(ts, ts, id);
+    return res.changes > 0;
+  }
+
+  async restore(id: string): Promise<boolean> {
+    const res = await this.db
+      .prepare("UPDATE tenants SET deleted_at = NULL, updated_at = ? WHERE id = ? AND deleted_at IS NOT NULL")
+      .run(now(), id);
     return res.changes > 0;
   }
 }

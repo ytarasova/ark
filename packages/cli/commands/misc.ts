@@ -4,17 +4,11 @@ import { resolve, join, dirname } from "path";
 import { existsSync, writeFileSync, mkdirSync } from "fs";
 import { execFileSync } from "child_process";
 import * as core from "../../core/index.js";
-import { AppContext } from "../../core/app.js";
-import { getArkClient } from "./_shared.js";
+import { getArkClient, getInProcessApp } from "../app-client.js";
 import { splitEditorCommand } from "../helpers.js";
 import { logDebug } from "../../core/observability/structured-log.js";
 
-export function registerMiscCommands(program: Command, app: AppContext | null) {
-  // In remote mode `app` is null. Guard commands that need a local AppContext.
-  const requireApp = (): AppContext => {
-    if (!app) throw new Error("This command requires a local AppContext (not supported in remote mode)");
-    return app;
-  };
+export function registerMiscCommands(program: Command) {
   // ── PR commands ──────────────────────────────────────────────────────────────
 
   const pr = program.command("pr").description("Manage PR-bound sessions");
@@ -39,8 +33,9 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
     .description("Show session bound to a PR URL")
     .argument("<pr-url>", "GitHub PR URL")
     .action(async (prUrl) => {
+      const app = await getInProcessApp();
       const { findSessionByPR } = await import("../../core/integrations/github-pr.js");
-      const session = await findSessionByPR(requireApp(), prUrl);
+      const session = await findSessionByPR(app, prUrl);
       if (!session) {
         console.log(chalk.yellow(`No session for ${prUrl}`));
         return;
@@ -71,7 +66,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
         ),
       );
       console.log(chalk.dim("Press Ctrl+C to stop.\n"));
-      const poller = startIssuePoller(requireApp(), {
+      const app = await getInProcessApp();
+      const poller = startIssuePoller(app, {
         label,
         intervalMs,
         autoDispatch: opts.dispatch,
@@ -172,8 +168,9 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
     .command("config")
     .description("Open Ark config in your editor")
     .option("--path", "Just print the config path")
-    .action((opts) => {
-      const configPath = join(requireApp().config.arkDir, "config.yaml");
+    .action(async (opts) => {
+      const app = await getInProcessApp();
+      const configPath = join(app.config.arkDir, "config.yaml");
 
       // Create default config if missing
       if (!existsSync(configPath)) {
@@ -288,7 +285,7 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
         // the dashboard probes localhost:19100 / 19300 and finds them online.
         const auxiliary: { stop: () => void }[] = [];
         if (opts.withDaemon) {
-          const arkApp = requireApp();
+          const arkApp = await getInProcessApp();
           const { startConductor } = await import("../../core/conductor/conductor.js");
           const { startArkd } = await import("../../arkd/index.js");
           const { DEFAULT_CONDUCTOR_PORT, DEFAULT_ARKD_PORT } = await import("../../core/constants.js");
@@ -329,7 +326,8 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
           }
         }
 
-        const server = core.startWebServer(requireApp(), {
+        const serverApp = await getInProcessApp();
+        const server = core.startWebServer(serverApp, {
           port: Number(opts.port),
           readOnly: opts.readOnly,
           token: opts.token,
@@ -378,8 +376,9 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
   program
     .command("acp")
     .description("Start headless ACP server on stdin/stdout (JSON-RPC)")
-    .action(() => {
-      core.runAcpServer(requireApp());
+    .action(async () => {
+      const app = await getInProcessApp();
+      core.runAcpServer(app);
     });
 
   // ── Repo map ──────────────────────────────────────────────────────────────

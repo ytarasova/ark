@@ -2,9 +2,7 @@ import type { Command } from "commander";
 import chalk from "chalk";
 import { execSync } from "child_process";
 import * as core from "../../core/index.js";
-import { AppContext } from "../../core/app.js";
-import { loadConfig } from "../../core/config.js";
-import { getArkClient } from "./_shared.js";
+import { getArkClient, bootStandaloneApp, shutdownInProcessApp } from "../app-client.js";
 import { execSession } from "../exec.js";
 import { logDebug } from "../../core/observability/structured-log.js";
 
@@ -15,8 +13,12 @@ import { logDebug } from "../../core/observability/structured-log.js";
  *                to completion, exits with the session's result code.
  *   ark try    - interactive one-shot sandboxed session that deletes
  *                itself after the user attaches once.
+ *
+ * `ark exec` deliberately boots its OWN AppContext (with the conductor
+ * running) rather than reusing the CLI's in-process shared one -- the
+ * conductor lifecycle matters for hook delivery during dispatch.
  */
-export function registerExecTryCommands(program: Command, app: AppContext | null) {
+export function registerExecTryCommands(program: Command) {
   program
     .command("exec")
     .description("Run a session non-interactively (for CI/CD)")
@@ -47,9 +49,10 @@ export function registerExecTryCommands(program: Command, app: AppContext | null
     .option("--timeout <seconds>", "Timeout in seconds (0=unlimited)", "0")
     .action(async (opts) => {
       // `ark exec` needs the conductor running (for Claude Code hooks).
-      if (app) await app.shutdown();
-      const execApp = new AppContext(loadConfig());
-      await execApp.boot();
+      // Shut down any shared in-process AppContext first so the conductor
+      // port is free, then boot a fresh AppContext with full lifecycle.
+      await shutdownInProcessApp();
+      const execApp = await bootStandaloneApp();
 
       const code = await execSession(execApp, {
         repo: opts.repo,

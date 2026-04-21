@@ -9,7 +9,7 @@
 
 import type { IDatabase } from "../database/index.js";
 import { randomBytes } from "crypto";
-import { TeamRepository, type TeamRow } from "../repositories/teams.js";
+import { TeamRepository, type ListOptions, type TeamRow } from "../repositories/teams.js";
 import {
   MembershipRepository,
   type MembershipRole,
@@ -57,9 +57,9 @@ export class TeamManager {
             slug TEXT NOT NULL,
             name TEXT NOT NULL,
             description TEXT,
+            deleted_at TEXT,
             created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL,
-            UNIQUE (tenant_id, slug)
+            updated_at TEXT NOT NULL
           )`,
         );
         await this.db.exec(
@@ -68,8 +68,8 @@ export class TeamManager {
             user_id TEXT NOT NULL,
             team_id TEXT NOT NULL,
             role TEXT NOT NULL DEFAULT 'member',
-            created_at TEXT NOT NULL,
-            UNIQUE (user_id, team_id)
+            deleted_at TEXT,
+            created_at TEXT NOT NULL
           )`,
         );
       } catch {
@@ -79,14 +79,14 @@ export class TeamManager {
     return this._initialized;
   }
 
-  async listByTenant(tenantId: string): Promise<Team[]> {
+  async listByTenant(tenantId: string, opts: ListOptions = {}): Promise<Team[]> {
     await this.ensureSchema();
-    return this._teams.listByTenant(tenantId);
+    return this._teams.listByTenant(tenantId, opts);
   }
 
-  async get(teamId: string): Promise<Team | null> {
+  async get(teamId: string, opts: ListOptions = {}): Promise<Team | null> {
     await this.ensureSchema();
-    return this._teams.get(teamId);
+    return this._teams.get(teamId, opts);
   }
 
   async create(opts: {
@@ -100,6 +100,9 @@ export class TeamManager {
     assertSlug(opts.slug);
     const existing = (await this._teams.listByTenant(opts.tenant_id)).find((t) => t.slug === opts.slug);
     if (existing) throw new Error(`Team '${opts.slug}' already exists in tenant '${opts.tenant_id}'`);
+    // Live-row check only -- a soft-deleted team with the same slug does
+    // NOT block creation (partial unique index on teams(tenant_id, slug)
+    // WHERE deleted_at IS NULL).
     const id = opts.id ?? `tm-${randomBytes(6).toString("hex")}`;
     return this._teams.create({
       id,
@@ -116,14 +119,35 @@ export class TeamManager {
     return this._teams.update(teamId, fields);
   }
 
+  /**
+   * Soft-delete a team and cascade to its memberships inside a
+   * transaction. Idempotent.
+   *
+   * TODO(agent-1-ctx): admin handler should pass ctx.userId to record who
+   * deleted the entity (audit trail).
+   */
   async delete(teamId: string): Promise<boolean> {
     await this.ensureSchema();
-    return this._teams.delete(teamId);
+    return this.db.transaction(async () => {
+      const ok = await this._teams.softDelete(teamId);
+      if (!ok) return false;
+      await this._memberships.softRemoveByTeam(teamId);
+      return true;
+    });
   }
 
-  async listMembers(teamId: string): Promise<MembershipWithUser[]> {
+  /**
+   * Restore a soft-deleted team. Does NOT auto-restore its memberships --
+   * an admin restores those individually.
+   */
+  async restore(teamId: string): Promise<boolean> {
     await this.ensureSchema();
-    return this._memberships.listByTeam(teamId);
+    return this._teams.restore(teamId);
+  }
+
+  async listMembers(teamId: string, opts: { includeDeleted?: boolean } = {}): Promise<MembershipWithUser[]> {
+    await this.ensureSchema();
+    return this._memberships.listByTeam(teamId, opts);
   }
 
   async addMember(teamId: string, userId: string, role: MembershipRole = "member"): Promise<MembershipRow> {
@@ -132,9 +156,20 @@ export class TeamManager {
     return this._memberships.add(userId, teamId, role);
   }
 
+  /**
+   * Soft-remove a member from a team. Idempotent.
+   *
+   * TODO(agent-1-ctx): admin handler should pass ctx.userId to record who
+   * removed the membership.
+   */
   async removeMember(teamId: string, userId: string): Promise<boolean> {
     await this.ensureSchema();
-    return this._memberships.remove(userId, teamId);
+    return this._memberships.softRemove(userId, teamId);
+  }
+
+  async restoreMember(teamId: string, userId: string): Promise<boolean> {
+    await this.ensureSchema();
+    return this._memberships.restore(userId, teamId);
   }
 
   async setRole(teamId: string, userId: string, role: MembershipRole): Promise<MembershipRow | null> {

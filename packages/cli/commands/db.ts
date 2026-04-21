@@ -5,14 +5,17 @@
  *   db status             print current schema version + applied/pending
  *   db down --to N        rollback to version N (Phase 1 stub: throws)
  *
- * Polymorphic via `app.mode.migrations` -- the CLI never branches on dialect.
+ * DB commands are local-only: they reach directly into the schema to run
+ * migrations, so `--server` remote mode isn't meaningful here. When a
+ * caller is in remote mode, `getInProcessApp()` throws with a friendly
+ * message.
  */
 
 import type { Command } from "commander";
 import chalk from "chalk";
-import type { AppContext } from "../../core/app.js";
+import { getInProcessApp } from "../app-client.js";
 
-export function registerDbCommands(program: Command, app: AppContext) {
+export function registerDbCommands(program: Command) {
   const cmd = program.command("db").description("Schema migrations + status");
 
   cmd
@@ -20,6 +23,7 @@ export function registerDbCommands(program: Command, app: AppContext) {
     .description("Apply any pending Ark migrations")
     .option("--to <version>", "Target version (default: latest)")
     .action(async (opts) => {
+      const app = await getInProcessApp();
       const targetVersion = opts.to ? Number(opts.to) : undefined;
       await app.mode.migrations.apply(app.db, { targetVersion });
       const status = await app.mode.migrations.status(app.db);
@@ -32,6 +36,7 @@ export function registerDbCommands(program: Command, app: AppContext) {
     .command("status")
     .description("Print current schema version + pending migrations")
     .action(async () => {
+      const app = await getInProcessApp();
       const status = await app.mode.migrations.status(app.db);
       console.log(`Dialect:         ${chalk.cyan(app.mode.migrations.dialect)}`);
       console.log(`Current version: ${chalk.cyan(status.currentVersion)}`);
@@ -55,6 +60,7 @@ export function registerDbCommands(program: Command, app: AppContext) {
     .requiredOption("--to <version>", "Target version")
     .action(async (opts) => {
       try {
+        const app = await getInProcessApp();
         await app.mode.migrations.down(app.db, { targetVersion: Number(opts.to) });
       } catch (err: any) {
         console.error(chalk.red(err.message ?? String(err)));

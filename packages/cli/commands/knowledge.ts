@@ -2,9 +2,9 @@ import type { Command } from "commander";
 import chalk from "chalk";
 import { resolve } from "path";
 import { existsSync } from "fs";
-import type { AppContext } from "../../core/app.js";
+import { getInProcessApp } from "../app-client.js";
 
-export function registerKnowledgeCommands(program: Command, app: AppContext) {
+export function registerKnowledgeCommands(program: Command) {
   const cmd = program.command("knowledge").description("Knowledge graph - search, index, remember, export");
 
   cmd
@@ -14,6 +14,7 @@ export function registerKnowledgeCommands(program: Command, app: AppContext) {
     .option("-t, --types <types>", "Comma-separated node types to filter (file,symbol,session,memory,learning,skill)")
     .option("-n, --limit <n>", "Max results", "20")
     .action(async (query: string, opts) => {
+      const app = await getInProcessApp();
       const types = opts.types ? opts.types.split(",").map((t: string) => t.trim()) : undefined;
       const results = await app.knowledge.search(query, { types, limit: Number(opts.limit) });
       if (!results.length) {
@@ -35,6 +36,7 @@ export function registerKnowledgeCommands(program: Command, app: AppContext) {
     .option("-r, --repo <path>", "Repository path (default: cwd)")
     .option("--incremental", "Only re-index changed files")
     .action(async (opts) => {
+      const app = await getInProcessApp();
       const repoPath = resolve(opts.repo ?? process.cwd());
       if (!existsSync(repoPath)) {
         console.log(chalk.red(`Path not found: ${repoPath}`));
@@ -60,6 +62,7 @@ export function registerKnowledgeCommands(program: Command, app: AppContext) {
     .command("stats")
     .description("Show node/edge counts by type")
     .action(async () => {
+      const app = await getInProcessApp();
       const store = app.knowledge;
       const nodeTypes = ["file", "symbol", "session", "memory", "learning", "skill", "recipe", "agent"] as const;
       console.log(chalk.bold("Nodes:"));
@@ -102,6 +105,7 @@ export function registerKnowledgeCommands(program: Command, app: AppContext) {
     .option("-t, --tags <tags>", "Comma-separated tags")
     .option("-i, --importance <n>", "Importance 0-1 (default: 0.5)")
     .action(async (content: string, opts) => {
+      const app = await getInProcessApp();
       const tags = opts.tags ? opts.tags.split(",").map((t: string) => t.trim()) : [];
       const importance = opts.importance ? parseFloat(opts.importance) : 0.5;
       const id = await app.knowledge.addNode({
@@ -119,6 +123,7 @@ export function registerKnowledgeCommands(program: Command, app: AppContext) {
     .argument("<query>", "Search query")
     .option("-n, --limit <n>", "Max results", "10")
     .action(async (query: string, opts) => {
+      const app = await getInProcessApp();
       const results = await app.knowledge.search(query, {
         types: ["memory", "learning"],
         limit: Number(opts.limit),
@@ -142,6 +147,7 @@ export function registerKnowledgeCommands(program: Command, app: AppContext) {
     .option("-d, --dir <path>", "Output directory", "./knowledge-export")
     .option("-t, --types <types>", "Comma-separated types to export (default: memory,learning)")
     .action(async (opts) => {
+      const app = await getInProcessApp();
       const { exportToMarkdown } = await import("../../core/knowledge/export.js");
       const outputDir = resolve(opts.dir);
       const types = opts.types ? opts.types.split(",").map((t: string) => t.trim()) : undefined;
@@ -154,6 +160,7 @@ export function registerKnowledgeCommands(program: Command, app: AppContext) {
     .description("Import knowledge from markdown files")
     .option("-d, --dir <path>", "Input directory", "./knowledge-export")
     .action(async (opts) => {
+      const app = await getInProcessApp();
       const { importFromMarkdown } = await import("../../core/knowledge/export.js");
       const inputDir = resolve(opts.dir);
       if (!existsSync(inputDir)) {
@@ -178,6 +185,7 @@ export function registerKnowledgeCommands(program: Command, app: AppContext) {
       }
       console.log(`Ingesting ${resolved}...`);
       try {
+        const app = await getInProcessApp();
         const { indexCodebase } = await import("../../core/knowledge/indexer.js");
         const result = await indexCodebase(resolved, app.knowledge, {
           incremental: opts.incremental,

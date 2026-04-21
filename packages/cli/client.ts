@@ -1,115 +1,22 @@
 /**
- * CLI singleton ArkClient -- in-process server with in-memory transport,
- * or remote WebSocket client when --server / ARK_SERVER is set.
+ * CLI ArkClient facade.
  *
- * Singleton pattern adapted for non-React CLI use.
+ * Legacy call sites imported `getArkClient` / `setLocalApp` / `setRemoteServer`
+ * directly from this module; the transport and auto-spawn logic now live in
+ * `./app-client.ts`. This file remains as a thin re-export so existing
+ * imports keep working.
  */
 
-import { ArkClient } from "../protocol/client.js";
-import { ArkServer } from "../server/index.js";
-import { registerAllHandlers } from "../server/register.js";
-import { createWebSocketTransport } from "../protocol/transport.js";
-import type { Transport } from "../protocol/transport.js";
-import type { JsonRpcMessage } from "../protocol/types.js";
-import type { AppContext } from "../core/app.js";
-
-let _client: ArkClient | null = null;
-let _server: ArkServer | null = null;
-
-/** Remote server URL set via --server or ARK_SERVER env var. */
-let _remoteServerUrl: string | undefined;
-/** Auth token set via --token or ARK_TOKEN env var. */
-let _remoteToken: string | undefined;
+export { getArkClient, setRemoteServer, isRemoteMode, setServerPort, closeArkClient } from "./app-client.js";
 
 /**
- * AppContext for local-mode ArkClient init. The CLI entry passes the booted
- * app once at startup; `getArkClient()` reads it when constructing the
- * in-process server. In remote mode this stays null.
+ * Back-compat shim: the old `setLocalApp(app)` entry point is retired.
+ * Local mode now connects to a daemon (auto-spawned when needed) instead
+ * of running the server in-process. Commands that still need direct
+ * `AppContext` access use `getInProcessApp()` from `app-client.ts`.
+ *
+ * Kept as a no-op so callers that still wire it up don't crash.
  */
-let _localApp: AppContext | null = null;
-
-/** Called from index.ts before any commands run. */
-export function setLocalApp(app: AppContext | null): void {
-  _localApp = app;
-}
-
-/** Called from index.ts to configure remote mode before any commands run. */
-export function setRemoteServer(url: string | undefined, token: string | undefined): void {
-  _remoteServerUrl = url;
-  _remoteToken = token;
-}
-
-/** Returns true when operating in remote mode. */
-export function isRemoteMode(): boolean {
-  return !!(_remoteServerUrl || process.env.ARK_SERVER);
-}
-
-function createInMemoryPair(): { clientTransport: Transport; serverTransport: Transport } {
-  let clientHandler: (msg: JsonRpcMessage) => void = () => {};
-  let serverHandler: (msg: JsonRpcMessage) => void = () => {};
-
-  const clientTransport: Transport = {
-    send(msg) {
-      queueMicrotask(() => serverHandler(msg));
-    },
-    onMessage(h) {
-      clientHandler = h;
-    },
-    close() {},
-  };
-
-  const serverTransport: Transport = {
-    send(msg) {
-      queueMicrotask(() => clientHandler(msg));
-    },
-    onMessage(h) {
-      serverHandler = h;
-    },
-    close() {},
-  };
-
-  return { clientTransport, serverTransport };
-}
-
-export async function getArkClient(): Promise<ArkClient> {
-  if (_client) return _client;
-
-  const serverUrl = _remoteServerUrl || process.env.ARK_SERVER;
-  const token = _remoteToken || process.env.ARK_TOKEN;
-
-  if (serverUrl) {
-    // Remote mode: connect to existing control plane via WebSocket
-    const wsUrl = serverUrl.replace(/^http/, "ws").replace(/\/$/, "") + "/ws";
-    const { transport, ready } = createWebSocketTransport(wsUrl, { token });
-    await ready;
-
-    const client = new ArkClient(transport);
-    await client.initialize({ subscribe: ["**"] });
-    _client = client;
-    return _client;
-  }
-
-  // Local mode: start server in-process
-  if (!_localApp) {
-    throw new Error("ArkClient local mode requires a booted AppContext -- call setLocalApp(app) first");
-  }
-  _server = new ArkServer();
-  registerAllHandlers(_server.router, _localApp);
-  _server.attachLifecycle(_localApp);
-
-  const { clientTransport, serverTransport } = createInMemoryPair();
-  _server.addConnection(serverTransport);
-
-  const client = new ArkClient(clientTransport);
-  await client.initialize({ subscribe: ["**"] });
-  _client = client;
-  return _client;
-}
-
-export function closeArkClient(): void {
-  if (_client) {
-    _client.close();
-    _client = null;
-  }
-  _server = null;
+export function setLocalApp(_app: unknown): void {
+  // no-op -- retained for source compatibility
 }

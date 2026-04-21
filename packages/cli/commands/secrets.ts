@@ -7,19 +7,15 @@
  *   ark secrets delete <NAME> [--yes]   # --yes skips the confirm prompt
  *   ark secrets get <NAME> [--print]    # refuses to print to a TTY without --print
  *
- * Tenant resolution matches the rest of Ark: `--tenant` if set, else
- * `ARK_DEFAULT_TENANT`, else "default".
+ * All subcommands dispatch via ArkClient against secret/*. Tenant resolution
+ * lives server-side: the `--tenant` flag is still accepted for explicit
+ * override, but defaulting falls back to the server's auth context.
  */
 
 import type { Command } from "commander";
 import chalk from "chalk";
 import { createInterface } from "readline";
-import type { AppContext } from "../../core/app.js";
-import { assertValidSecretName } from "../../core/secrets/types.js";
-
-function resolveTenant(app: AppContext, opts: { tenant?: string }): string {
-  return opts.tenant ?? process.env.ARK_DEFAULT_TENANT ?? app.config.authSection?.defaultTenant ?? "default";
-}
+import { getArkClient } from "../app-client.js";
 
 /** Read the entire stdin to a string. Used when the caller pipes a value in. */
 async function readStdin(): Promise<string> {
@@ -67,14 +63,14 @@ async function promptMasked(prompt: string): Promise<string> {
           resolve(buf);
           return;
         }
-        if (ch === "") {
+        if (ch === "") {
           // Ctrl-C -- bail with a non-zero exit so shell scripts notice.
           stdin.setRawMode(false);
           stdin.pause();
           stdout.write("\n");
           process.exit(130);
         }
-        if (ch === "" || ch === "\b") {
+        if (ch === "" || ch === "\b") {
           if (buf.length > 0) {
             buf = buf.slice(0, -1);
             stdout.write("\b \b");
@@ -89,19 +85,18 @@ async function promptMasked(prompt: string): Promise<string> {
   });
 }
 
-export function registerSecretsCommands(program: Command, app: AppContext): void {
+export function registerSecretsCommands(program: Command): void {
   const group = program.command("secrets").description("Manage tenant-scoped secrets (env vars for sessions)");
 
   group
     .command("list")
     .description("List secret names (values are never returned)")
-    .option("--tenant <id>", "Override the tenant id (default: ARK_DEFAULT_TENANT or 'default')")
-    .action(async (opts) => {
+    .action(async () => {
       try {
-        const tenantId = resolveTenant(app, opts);
-        const refs = await app.secrets.list(tenantId);
+        const ark = await getArkClient();
+        const refs = await ark.secretList();
         if (refs.length === 0) {
-          console.log(chalk.dim(`No secrets configured for tenant '${tenantId}'.`));
+          console.log(chalk.dim("No secrets configured."));
           return;
         }
         console.log(`  ${"NAME".padEnd(32)} ${"UPDATED".padEnd(22)} DESCRIPTION`);
@@ -120,11 +115,9 @@ export function registerSecretsCommands(program: Command, app: AppContext): void
     .description("Create or replace a secret. Reads value from stdin if piped, otherwise prompts.")
     .argument("<name>", "Secret name (ASCII [A-Z0-9_]+)")
     .option("-d, --description <text>", "Human-readable description")
-    .option("--tenant <id>", "Override the tenant id")
     .action(async (name: string, opts) => {
       try {
-        assertValidSecretName(name);
-        const tenantId = resolveTenant(app, opts);
+        const ark = await getArkClient();
         let value: string;
         if (!process.stdin.isTTY) {
           value = (await readStdin()).replace(/\r?\n$/, "");
@@ -136,8 +129,8 @@ export function registerSecretsCommands(program: Command, app: AppContext): void
           process.exitCode = 2;
           return;
         }
-        await app.secrets.set(tenantId, name, value, { description: opts.description });
-        console.log(chalk.green(`Secret '${name}' stored for tenant '${tenantId}'.`));
+        await ark.secretSet(name, value, opts.description);
+        console.log(chalk.green(`Secret '${name}' stored.`));
       } catch (e: any) {
         console.log(chalk.red(`Failed: ${e.message ?? e}`));
         process.exitCode = 1;
@@ -149,15 +142,12 @@ export function registerSecretsCommands(program: Command, app: AppContext): void
     .description("Delete a secret.")
     .argument("<name>", "Secret name")
     .option("-y, --yes", "Skip the confirm prompt")
-    .option("--tenant <id>", "Override the tenant id")
     .action(async (name: string, opts) => {
       try {
-        assertValidSecretName(name);
-        const tenantId = resolveTenant(app, opts);
         if (!opts.yes) {
           const answer = await new Promise<string>((resolve) => {
             const rl = createInterface({ input: process.stdin, output: process.stdout });
-            rl.question(`Delete secret '${name}' for tenant '${tenantId}'? [y/N] `, (a) => {
+            rl.question(`Delete secret '${name}'? [y/N] `, (a) => {
               rl.close();
               resolve(a.trim().toLowerCase());
             });
@@ -167,11 +157,12 @@ export function registerSecretsCommands(program: Command, app: AppContext): void
             return;
           }
         }
-        const removed = await app.secrets.delete(tenantId, name);
+        const ark = await getArkClient();
+        const removed = await ark.secretDelete(name);
         if (removed) {
           console.log(chalk.green(`Deleted secret '${name}'.`));
         } else {
-          console.log(chalk.yellow(`No secret '${name}' for tenant '${tenantId}' (idempotent).`));
+          console.log(chalk.yellow(`No secret '${name}' (idempotent).`));
         }
       } catch (e: any) {
         console.log(chalk.red(`Failed: ${e.message ?? e}`));
@@ -184,10 +175,8 @@ export function registerSecretsCommands(program: Command, app: AppContext): void
     .description("Print a secret value to stdout. Refuses TTY stdout without --print.")
     .argument("<name>", "Secret name")
     .option("--print", "Allow printing to a TTY (default: refuse to prevent shoulder surfing)")
-    .option("--tenant <id>", "Override the tenant id")
     .action(async (name: string, opts) => {
       try {
-        assertValidSecretName(name);
         if (process.stdout.isTTY && !opts.print) {
           console.log(
             chalk.red(
@@ -197,10 +186,10 @@ export function registerSecretsCommands(program: Command, app: AppContext): void
           process.exitCode = 2;
           return;
         }
-        const tenantId = resolveTenant(app, opts);
-        const value = await app.secrets.get(tenantId, name);
+        const ark = await getArkClient();
+        const value = await ark.secretGet(name);
         if (value === null) {
-          console.log(chalk.red(`Secret '${name}' not found for tenant '${tenantId}'.`));
+          console.log(chalk.red(`Secret '${name}' not found.`));
           process.exitCode = 1;
           return;
         }

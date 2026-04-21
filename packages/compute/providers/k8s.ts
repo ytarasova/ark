@@ -34,6 +34,22 @@ export interface K8sConfig {
     cpu?: string; // e.g. "2"
     memory?: string; // e.g. "4Gi"
   };
+  /**
+   * Optional: mount a pre-existing Kubernetes Secret into each session pod so
+   * the agent runtime (currently Claude Code) can reuse a host subscription
+   * without baking creds into the image. The Secret is expected to already
+   * exist in `namespace` -- this provider never creates or mutates it. Test
+   * harnesses and higher-level operator flows own that step.
+   *
+   * Contract: the Secret is mounted read-only at `credsMountPath` (default
+   * `/root/.claude`). Claude Code auto-discovers `~/.claude` as its creds
+   * directory, so this matches the docker-compute convention
+   * (`~/.claude -> /root/.claude:ro`). The Secret's keys become files inside
+   * that directory; typically the operator stores the `.credentials.json`
+   * + `.claude.json` from the host `~/.claude/` as keys on the Secret.
+   */
+  credsSecretName?: string;
+  credsMountPath?: string; // default: "/root/.claude"
   [key: string]: unknown;
 }
 
@@ -151,6 +167,38 @@ export class K8sProvider implements ComputeProvider {
     const ns = cfg.namespace;
     const name = this.podName(session);
 
+    // Optional creds mount. We deliberately do NOT default a mount on every
+    // pod -- only when the operator has pre-seeded a Secret and wired it on
+    // the compute row. This keeps vanilla pods creds-free (and keeps the
+    // action-only e2e path unchanged).
+    const credsMountPath = cfg.credsMountPath ?? "/root/.claude";
+    const credsVolumes = cfg.credsSecretName
+      ? [
+          {
+            name: "ark-creds",
+            secret: {
+              secretName: cfg.credsSecretName,
+              // defaultMode 0400 -- read-only for the runtime user, matches
+              // the local `~/.claude` permissions convention.
+              defaultMode: 0o400,
+            },
+          },
+        ]
+      : [];
+    const credsVolumeMounts = cfg.credsSecretName
+      ? [
+          {
+            name: "ark-creds",
+            mountPath: credsMountPath,
+            readOnly: true,
+          },
+        ]
+      : [];
+    // Claude Code auto-discovers `$HOME/.claude` for credentials, so when the
+    // mount lands at `/root/.claude` (the default) no env vars are needed.
+    // Operators who mount elsewhere can layer their own env on the runtime
+    // definition; we deliberately don't invent a non-standard override here.
+
     const pod = {
       metadata: {
         name,
@@ -164,6 +212,7 @@ export class K8sProvider implements ComputeProvider {
         restartPolicy: "Never",
         ...(cfg.runtimeClassName ? { runtimeClassName: cfg.runtimeClassName } : {}),
         ...(cfg.serviceAccount ? { serviceAccountName: cfg.serviceAccount } : {}),
+        ...(credsVolumes.length ? { volumes: credsVolumes } : {}),
         containers: [
           {
             name: "agent",
@@ -175,6 +224,7 @@ export class K8sProvider implements ComputeProvider {
             // require bash in the image -- but that's the script's problem,
             // not ours: `/bin/sh -c` just needs to execute the first line.
             command: ["/bin/sh", "-c", opts.launcherContent],
+            ...(credsVolumeMounts.length ? { volumeMounts: credsVolumeMounts } : {}),
             resources: cfg.resources
               ? {
                   requests: { cpu: cfg.resources.cpu, memory: cfg.resources.memory },

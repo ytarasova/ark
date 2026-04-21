@@ -32,7 +32,34 @@ describe("UserManager", () => {
     const ok = await um.delete(a.id);
     expect(ok).toBe(true);
     expect(await um.get(a.id)).toBeNull();
+    // Soft-deleted: still findable with includeDeleted
+    const ghost = await um.get(a.id, { includeDeleted: true });
+    expect(ghost?.id).toBe(a.id);
+    expect(ghost?.deleted_at).not.toBeNull();
 
+    await db.close();
+  });
+
+  it("soft-delete is idempotent + restore brings the user back", async () => {
+    const db = await freshDb();
+    const um = new UserManager(db);
+    const u = await um.create({ email: "sd@example.com" });
+    expect(await um.delete(u.id)).toBe(true);
+    expect(await um.delete(u.id)).toBe(true);
+    expect(await um.get(u.id)).toBeNull();
+    expect(await um.restore(u.id)).toBe(true);
+    const back = await um.get(u.id);
+    expect(back?.id).toBe(u.id);
+    await db.close();
+  });
+
+  it("recreating an email after soft-delete succeeds", async () => {
+    const db = await freshDb();
+    const um = new UserManager(db);
+    const first = await um.create({ email: "rr@example.com", name: "First" });
+    await um.delete(first.id);
+    const second = await um.create({ email: "rr@example.com", name: "Second" });
+    expect(second.id).not.toBe(first.id);
     await db.close();
   });
 

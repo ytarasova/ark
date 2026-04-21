@@ -1,9 +1,8 @@
 import type { Command } from "commander";
 import chalk from "chalk";
-import type { AppContext } from "../../core/app.js";
-import { getArkClient } from "./_shared.js";
+import { getArkClient } from "../app-client.js";
 
-export function registerDashboardCommands(program: Command, _app: AppContext | null) {
+export function registerDashboardCommands(program: Command) {
   program
     .command("dashboard")
     .description("Show fleet status, costs, and recent activity")

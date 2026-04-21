@@ -157,6 +157,85 @@ describe("K8sProvider.launch", async () => {
   });
 });
 
+describe("K8sProvider.launch creds mount", async () => {
+  let rec: Recorded;
+  let provider: K8sProvider;
+
+  beforeEach(() => {
+    rec = { lastPod: null, calls: [] };
+    provider = makeProvider(rec);
+  });
+
+  it("does not add a volumes / volumeMounts field when credsSecretName is absent", async () => {
+    // Regression guard: the default (no creds) path must keep the pod body
+    // minimal so vanilla action-only flows don't break on clusters that lack
+    // the Secret. The existing `k8s e2e flow` action-only case depends on
+    // this exact shape.
+    await provider.launch(baseCompute as any, baseSession, {
+      tmuxName: "ark-abc12345",
+      workdir: "/tmp/wd",
+      launcherContent: "#!/bin/sh\n:",
+      ports: [],
+    });
+    const spec = rec.lastPod!.spec;
+    expect(spec.volumes).toBeUndefined();
+    expect(spec.containers[0].volumeMounts).toBeUndefined();
+    // And no surprise env var either.
+    expect(spec.containers[0].env).toBeUndefined();
+  });
+
+  it("mounts the Secret read-only at /root/.claude when credsSecretName is set", async () => {
+    const withCreds = {
+      ...baseCompute,
+      config: { ...baseCompute.config, credsSecretName: "ark-claude-creds" },
+    };
+    await provider.launch(withCreds as any, baseSession, {
+      tmuxName: "ark-abc12345",
+      workdir: "/tmp/wd",
+      launcherContent: "#!/bin/sh\n:",
+      ports: [],
+    });
+
+    const spec = rec.lastPod!.spec;
+    expect(spec.volumes).toEqual([
+      {
+        name: "ark-creds",
+        secret: {
+          secretName: "ark-claude-creds",
+          defaultMode: 0o400,
+        },
+      },
+    ]);
+    expect(spec.containers[0].volumeMounts).toEqual([
+      {
+        name: "ark-creds",
+        mountPath: "/root/.claude",
+        readOnly: true,
+      },
+    ]);
+  });
+
+  it("honours a custom credsMountPath", async () => {
+    const withCreds = {
+      ...baseCompute,
+      config: {
+        ...baseCompute.config,
+        credsSecretName: "ark-claude-creds",
+        credsMountPath: "/home/agent/.claude",
+      },
+    };
+    await provider.launch(withCreds as any, baseSession, {
+      tmuxName: "ark-abc12345",
+      workdir: "/tmp/wd",
+      launcherContent: "#!/bin/sh\n:",
+      ports: [],
+    });
+    const mount = rec.lastPod!.spec.containers[0].volumeMounts[0];
+    expect(mount.mountPath).toBe("/home/agent/.claude");
+    expect(mount.readOnly).toBe(true);
+  });
+});
+
 describe("K8sProvider.start (instance pod)", async () => {
   it("uses /bin/sh for the keep-alive command so alpine images work", async () => {
     const rec: Recorded = { lastPod: null, calls: [] };

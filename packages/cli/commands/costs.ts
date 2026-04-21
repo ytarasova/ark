@@ -2,8 +2,7 @@ import type { Command } from "commander";
 import chalk from "chalk";
 import { writeFileSync } from "fs";
 import * as core from "../../core/index.js";
-import { getArkClient } from "./_shared.js";
-import type { AppContext } from "../../core/app.js";
+import { getArkClient, getInProcessApp } from "../app-client.js";
 
 /**
  * Cost-related CLI commands: `ark costs`, `ark costs-sync`, `ark costs-export`.
@@ -14,7 +13,7 @@ import type { AppContext } from "../../core/app.js";
  *   - the `costs-sync` backfill from on-disk transcripts
  *   - the `costs-export` CSV/JSON dump
  */
-export function registerCostsCommands(program: Command, app: AppContext) {
+export function registerCostsCommands(program: Command) {
   program
     .command("costs")
     .description("Show cost summary across sessions")
@@ -118,6 +117,7 @@ export function registerCostsCommands(program: Command, app: AppContext) {
     .command("costs-sync")
     .description("Backfill cost data from Claude transcripts")
     .action(async () => {
+      const app = await getInProcessApp();
       const result = await core.syncCosts(app);
       console.log(chalk.green(`Synced: ${result.synced} sessions, Skipped: ${result.skipped}`));
     });
@@ -129,6 +129,7 @@ export function registerCostsCommands(program: Command, app: AppContext) {
     .option("-o, --output <file>", "Output file")
     .action(async (opts) => {
       const ark = await getArkClient();
+      const app = await getInProcessApp();
       const sessions = await ark.sessionList({ limit: 500 });
       const data =
         opts.format === "csv"

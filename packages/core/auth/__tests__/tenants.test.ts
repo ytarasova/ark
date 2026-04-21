@@ -47,7 +47,48 @@ describe("TenantManager", () => {
 
     const ok = await tm.delete(a.id);
     expect(ok).toBe(true);
+    // Soft-delete: list() and get() hide the row by default.
     expect(await tm.get(a.id)).toBeNull();
+    const listAfter = await tm.list();
+    expect(listAfter.some((t) => t.id === a.id)).toBe(false);
+    // But it's still there -- findable with includeDeleted.
+    const ghost = await tm.get(a.id, { includeDeleted: true });
+    expect(ghost?.id).toBe(a.id);
+    expect(ghost?.deleted_at).not.toBeNull();
+
+    await db.close();
+  });
+
+  it("soft-delete is idempotent + restore un-soft-deletes", async () => {
+    const db = await freshDb();
+    const tm = new TenantManager(db);
+    const t = await tm.create({ slug: "idem", name: "Idem" });
+
+    expect(await tm.delete(t.id)).toBe(true);
+    expect(await tm.delete(t.id)).toBe(true); // already deleted -> still ok
+    expect(await tm.get(t.id)).toBeNull();
+
+    expect(await tm.restore(t.id)).toBe(true);
+    const restored = await tm.get(t.id);
+    expect(restored?.id).toBe(t.id);
+    expect(restored?.deleted_at).toBeNull();
+
+    await db.close();
+  });
+
+  it("soft-deleted slug can be recreated (partial unique index)", async () => {
+    const db = await freshDb();
+    const tm = new TenantManager(db);
+
+    const first = await tm.create({ slug: "reuse", name: "First" });
+    await tm.delete(first.id);
+
+    const second = await tm.create({ slug: "reuse", name: "Second" });
+    expect(second.id).not.toBe(first.id);
+
+    const list = await tm.list({ includeDeleted: true });
+    const reuseRows = list.filter((t) => t.slug === "reuse");
+    expect(reuseRows.length).toBe(2);
 
     await db.close();
   });
@@ -70,7 +111,7 @@ describe("TenantManager", () => {
 });
 
 describe("TenantManager cascade delete", () => {
-  it("cascades to teams and memberships on delete", async () => {
+  it("soft-cascades to teams and memberships on delete in one txn", async () => {
     const db = await freshDb();
     const tm = new TenantManager(db);
     const teams = new TeamManager(db);
@@ -83,10 +124,19 @@ describe("TenantManager cascade delete", () => {
 
     await tm.delete(tenant.id);
 
+    // Default list() calls hide the soft-deleted child rows.
     const remaining = await teams.listByTenant(tenant.id);
     expect(remaining.length).toBe(0);
     const members = await teams.listMembers(team.id);
     expect(members.length).toBe(0);
+
+    // But with includeDeleted they come back with deleted_at populated.
+    const ghostTeams = await teams.listByTenant(tenant.id, { includeDeleted: true });
+    expect(ghostTeams.length).toBe(1);
+    expect(ghostTeams[0].deleted_at).not.toBeNull();
+    const ghostMembers = await teams.listMembers(team.id, { includeDeleted: true });
+    expect(ghostMembers.length).toBe(1);
+    expect(ghostMembers[0].deleted_at).not.toBeNull();
 
     await db.close();
   });

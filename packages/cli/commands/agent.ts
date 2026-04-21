@@ -5,10 +5,9 @@ import { existsSync, writeFileSync, mkdirSync } from "fs";
 import { execFileSync } from "child_process";
 import YAML from "yaml";
 import * as core from "../../core/index.js";
-import { getArkClient } from "./_shared.js";
-import type { AppContext } from "../../core/app.js";
+import { getArkClient, getInProcessApp } from "../app-client.js";
 
-export function registerAgentCommands(program: Command, app: AppContext) {
+export function registerAgentCommands(program: Command) {
   const agent = program.command("agent").description("Manage agent definitions");
 
   agent
@@ -52,6 +51,7 @@ export function registerAgentCommands(program: Command, app: AppContext) {
     .argument("<name>")
     .option("--global", "Save to ~/.ark/agents/ instead of project")
     .action(async (name, opts) => {
+      const app = await getInProcessApp();
       const projectRoot = core.findProjectRoot(process.cwd());
       const scope: "project" | "global" = opts.global || !projectRoot ? "global" : "project";
       const dir = scope === "project" ? join(projectRoot!, ".ark", "agents") : join(app.config.arkDir, "agents");
@@ -89,6 +89,7 @@ export function registerAgentCommands(program: Command, app: AppContext) {
     .description("Edit an agent definition")
     .argument("<name>")
     .action(async (name) => {
+      const app = await getInProcessApp();
       const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
       const a = app.agents.get(name, projectRoot);
       if (!a) {
@@ -126,6 +127,7 @@ export function registerAgentCommands(program: Command, app: AppContext) {
     .description("Delete a custom agent")
     .argument("<name>")
     .action(async (name) => {
+      const app = await getInProcessApp();
       const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
       const a = app.agents.get(name, projectRoot);
       if (!a) {
@@ -160,7 +162,8 @@ export function registerAgentCommands(program: Command, app: AppContext) {
     .argument("<name>")
     .argument("[new-name]")
     .option("--global", "Save to ~/.ark/agents/ instead of project")
-    .action((name, newName, opts) => {
+    .action(async (name, newName, opts) => {
+      const app = await getInProcessApp();
       const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
       const a = app.agents.get(name, projectRoot);
       if (!a) {

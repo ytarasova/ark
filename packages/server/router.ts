@@ -8,9 +8,24 @@ import {
   type JsonRpcError,
 } from "../protocol/types.js";
 import { validateRequest } from "./validate.js";
+import { localAdminContext, type TenantContext } from "../core/auth/context.js";
 
 export type NotifyFn = (method: string, params?: Record<string, unknown>) => void;
-export type Handler = (params: Record<string, unknown>, notify: NotifyFn) => Promise<unknown>;
+/**
+ * Handler signature -- every handler receives:
+ *   - `params`: validated JSON-RPC params (via Zod when registered)
+ *   - `notify`: per-request notify for push events
+ *   - `ctx`: caller's TenantContext (tenant id, user id, isAdmin)
+ *
+ * `ctx` is always present; in local / single-user mode the router
+ * materializes a local-admin context. Hosted mode materializes from the
+ * Authorization header / query token via `ApiKeyManager`.
+ *
+ * Thin handlers that don't use ctx may still declare it for documentation
+ * (`async (params, _notify, _ctx) => ...`). Omitting it is safe at runtime
+ * too, since JS ignores unused trailing function parameters.
+ */
+export type Handler = (params: Record<string, unknown>, notify: NotifyFn, ctx: TenantContext) => Promise<unknown>;
 
 export class Router {
   private handlers = new Map<string, Handler>();
@@ -47,7 +62,7 @@ export class Router {
     this.initialized = true;
   }
 
-  async dispatch(req: JsonRpcRequest, notify?: NotifyFn): Promise<JsonRpcResponse | JsonRpcError> {
+  async dispatch(req: JsonRpcRequest, notify?: NotifyFn, ctx?: TenantContext): Promise<JsonRpcResponse | JsonRpcError> {
     if (this.requireInit && !this.initialized && req.method !== "initialize") {
       return createErrorResponse(req.id, ErrorCodes.NOT_INITIALIZED, "Not initialized -- call initialize first");
     }
@@ -63,7 +78,11 @@ export class Router {
       // handlers using the legacy `extract<T>` helper keep working.
       const params = validateRequest(req.method, req.params);
       const noop: NotifyFn = () => {};
-      const result = await handler(params, notify ?? noop);
+      // Unit tests and single-user callers can dispatch without a ctx;
+      // default to a local-admin view in that case. Hosted transports
+      // always pass an explicit ctx.
+      const effectiveCtx: TenantContext = ctx ?? localAdminContext(null);
+      const result = await handler(params, notify ?? noop, effectiveCtx);
       return createResponse(req.id, result);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

@@ -3,10 +3,9 @@ import chalk from "chalk";
 import { readFileSync } from "fs";
 import YAML from "yaml";
 import * as core from "../../core/index.js";
-import { getArkClient } from "./_shared.js";
-import type { AppContext } from "../../core/app.js";
+import { getArkClient, getInProcessApp } from "../app-client.js";
 
-export function registerRecipeCommands(program: Command, app: AppContext) {
+export function registerRecipeCommands(program: Command) {
   const recipeCmd = program.command("recipe").description("Manage recipes");
 
   recipeCmd
@@ -76,6 +75,7 @@ export function registerRecipeCommands(program: Command, app: AppContext) {
           process.exit(1);
         }
         const recipe = core.sessionToRecipe(session, opts.name);
+        const app = await getInProcessApp();
         app.recipes.save(recipe.name, recipe, scope, projectRoot);
         console.log(chalk.green(`Created recipe: ${opts.name} from session ${opts.fromSession} (${scope})`));
         return;
@@ -94,6 +94,7 @@ export function registerRecipeCommands(program: Command, app: AppContext) {
           console.error(chalk.red("YAML must have a 'name' field"));
           process.exit(1);
         }
+        const app = await getInProcessApp();
         app.recipes.save(recipe.name, recipe, scope, projectRoot);
         console.log(chalk.green(`Created recipe: ${recipe.name} (${scope})`));
         return;
@@ -108,7 +109,8 @@ export function registerRecipeCommands(program: Command, app: AppContext) {
     .description("Delete a recipe (global or project only)")
     .argument("<name>", "Recipe name")
     .option("-s, --scope <scope>", "Scope: global or project", "global")
-    .action((name: string, opts: any) => {
+    .action(async (name: string, opts: any) => {
+      const app = await getInProcessApp();
       const scope = opts.scope as "global" | "project";
       const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
 

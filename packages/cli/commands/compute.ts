@@ -7,11 +7,10 @@ import { execFileSync } from "child_process";
 import { createInterface } from "readline";
 import { getProvider, allFlagSpecs, getFlagSpec } from "../../compute/index.js";
 import type { ProviderFlagOption } from "../../compute/index.js";
-import { getArkClient } from "./_shared.js";
+import { getArkClient, getInProcessApp } from "../app-client.js";
 import { ComputePoolManager } from "../../core/compute/pool.js";
 import type { ComputeProviderName } from "../../types/index.js";
 import { logDebug } from "../../core/observability/structured-log.js";
-import type { AppContext } from "../../core/app.js";
 
 /**
  * Minimal raw-readline prompt. Returns the trimmed user input or the
@@ -122,7 +121,7 @@ function isRepeatableListOption(opt: ProviderFlagOption): boolean {
   return /\(repeatable\)/i.test(opt.description);
 }
 
-export function registerComputeCommands(program: Command, app: AppContext) {
+export function registerComputeCommands(program: Command) {
   const computeCmd = program.command("compute").description("Manage compute resources");
 
   const createCmd = computeCmd
@@ -552,6 +551,7 @@ export function registerComputeCommands(program: Command, app: AppContext) {
     .option("--image <image>", "Container image (provider-specific)")
     .action(async (name, opts) => {
       try {
+        const app = await getInProcessApp();
         const manager = new ComputePoolManager(app);
         const config: Record<string, unknown> = {};
         if (opts.size) config.size = opts.size;
@@ -578,6 +578,7 @@ export function registerComputeCommands(program: Command, app: AppContext) {
     .description("List compute pools")
     .action(async () => {
       try {
+        const app = await getInProcessApp();
         const manager = new ComputePoolManager(app);
         const pools = await manager.listPools();
         if (!pools.length) {
@@ -603,6 +604,7 @@ export function registerComputeCommands(program: Command, app: AppContext) {
     .argument("<name>", "Pool name")
     .action(async (name) => {
       try {
+        const app = await getInProcessApp();
         const manager = new ComputePoolManager(app);
         const deleted = await manager.deletePool(name);
         if (deleted) {
@@ -624,6 +626,7 @@ export function registerComputeCommands(program: Command, app: AppContext) {
     .description("List compute templates")
     .action(async () => {
       try {
+        const app = await getInProcessApp();
         const templates = await app.computeTemplates.list();
 
         // Also show config-defined templates
@@ -666,6 +669,7 @@ export function registerComputeCommands(program: Command, app: AppContext) {
     .argument("<name>", "Template name")
     .action(async (name) => {
       try {
+        const app = await getInProcessApp();
         let tmpl: any = await app.computeTemplates.get(name);
 
         // Fall back to config
@@ -748,6 +752,7 @@ export function registerComputeCommands(program: Command, app: AppContext) {
     .argument("<name>", "Template name")
     .action(async (name) => {
       try {
+        const app = await getInProcessApp();
         app.computeTemplates.delete(name);
         console.log(chalk.green(`Template '${name}' deleted`));
       } catch (e: any) {
