@@ -41,6 +41,7 @@ import type {
   TodoRepository,
   ArtifactRepository,
   FlowStateRepository,
+  LedgerRepository,
 } from "./repositories/index.js";
 import { ComputeTemplateRepository as ComputeTemplateRepositoryCtor } from "./repositories/index.js";
 import type { SessionService, ComputeService, HistoryService } from "./services/index.js";
@@ -259,6 +260,9 @@ export class AppContext {
   }
   get flowStates(): FlowStateRepository {
     return this._resolve("flowStates");
+  }
+  get ledger(): LedgerRepository {
+    return this._resolve("ledger");
   }
 
   /** API key manager for multi-tenant auth. Available after boot. */

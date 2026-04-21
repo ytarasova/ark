@@ -31,7 +31,6 @@ import { pollPRMerges } from "../integrations/pr-merge-poller.js";
 import { pollIssues } from "../integrations/issue-poller.js";
 import { ArkdClient } from "../../arkd/client.js";
 import { safeAsync } from "../safe.js";
-import { addEntry } from "../ledger.js";
 import { logDebug, logError, logInfo, logWarn } from "../observability/structured-log.js";
 import { sendOSNotification } from "../notify.js";
 import { watchMergedPR, type RollbackConfig } from "../integrations/rollback.js";
@@ -417,7 +416,7 @@ export class Conductor {
 
     if (result.newStatus) {
       try {
-        addEntry(app, "default", "progress", `Session ${sessionId} status: ${result.newStatus}`, sessionId);
+        app.ledger.addEntry("default", "progress", `Session ${sessionId} status: ${result.newStatus}`, sessionId);
       } catch {
         logDebug("conductor", "skip ledger on error");
       }

@@ -200,6 +200,24 @@ export function initPostgresSchema(db: IDatabase): void {
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_flow_state_tenant ON flow_state(tenant_id)`);
 
+  // Ledger entries: append-only conductor progress ledger. Mirrors the SQLite
+  // definition in schema.ts.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS ledger_entries (
+      id TEXT PRIMARY KEY,
+      conductor_id TEXT NOT NULL DEFAULT 'default',
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      type TEXT NOT NULL,
+      content TEXT NOT NULL,
+      status TEXT,
+      session_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_ledger_entries_conductor ON ledger_entries(conductor_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_ledger_entries_created ON ledger_entries(created_at)`);
+
   // Schedules table
   db.exec(`
     CREATE TABLE IF NOT EXISTS schedules (
@@ -257,6 +275,7 @@ export function initPostgresSchema(db: IDatabase): void {
   safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_todos_tenant ON todos(tenant_id)`);
   safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_groups_tenant ON groups(tenant_id)`);
   safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_flow_state_tenant ON flow_state(tenant_id)`);
+  safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_ledger_entries_tenant ON ledger_entries(tenant_id)`);
   safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_schedules_tenant ON schedules(tenant_id)`);
   safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_compute_pools_tenant ON compute_pools(tenant_id)`);
 

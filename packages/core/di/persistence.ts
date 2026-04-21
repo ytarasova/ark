@@ -21,6 +21,7 @@ import {
   TodoRepository,
   ArtifactRepository,
   FlowStateRepository,
+  LedgerRepository,
 } from "../repositories/index.js";
 import { FileFlowStore, FileSkillStore, FileAgentStore, FileRecipeStore, FileRuntimeStore } from "../stores/index.js";
 import { DbResourceStore, initResourceDefinitionsTable } from "../stores/db-resource-store.js";
@@ -77,6 +78,7 @@ export function registerRepositories(container: AppContainer): void {
     todos: asFunction((c: { db: IDatabase }) => new TodoRepository(c.db), { lifetime: Lifetime.SINGLETON }),
     artifacts: asFunction((c: { db: IDatabase }) => new ArtifactRepository(c.db), { lifetime: Lifetime.SINGLETON }),
     flowStates: asFunction((c: { db: IDatabase }) => new FlowStateRepository(c.db), { lifetime: Lifetime.SINGLETON }),
+    ledger: asFunction((c: { db: IDatabase }) => new LedgerRepository(c.db), { lifetime: Lifetime.SINGLETON }),
 
     // Knowledge graph is persistence-adjacent -- keep it here with the repos.
     knowledge: asFunction((c: { db: IDatabase }) => new KnowledgeStore(c.db), { lifetime: Lifetime.SINGLETON }),

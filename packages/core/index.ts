@@ -475,17 +475,15 @@ export { detectHandoff, hasHandoff, type HandoffSignal } from "./handoff.js";
 // Per-agent message filtering
 export { filterMessages, parseMessageFilter, type MessageFilter, type FilteredMessage } from "./message-filter.js";
 
-// Task/progress ledger
+// Task/progress ledger -- moved to LedgerRepository (see repositories/ledger.ts).
+// Callers: `app.ledger.*` instead of the old free functions.
 export {
-  loadLedger,
-  saveLedger,
-  addEntry,
-  updateEntry,
-  detectStall,
-  formatLedgerForPrompt,
+  LedgerRepository,
   type Ledger,
   type LedgerEntry,
-} from "./ledger.js";
+  type LedgerEntryType,
+  type LedgerEntryStatus,
+} from "./repositories/ledger.js";
 
 // Agent Client Protocol (headless JSON-RPC)
 export { handleAcpRequest, runAcpServer, type AcpRequest, type AcpResponse } from "./acp.js";

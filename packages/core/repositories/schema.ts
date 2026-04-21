@@ -163,6 +163,24 @@ export function initSchema(db: IDatabase): void {
     );
     CREATE INDEX IF NOT EXISTS idx_flow_state_tenant ON flow_state(tenant_id);
 
+    -- ledger_entries: append-only conductor progress ledger (facts, hypotheses,
+    -- plan steps, progress reports, stall markers). Replaces the pre-DB
+    -- {arkDir}/conductor/<conductorId>/ledger.json; see repositories/ledger.ts.
+    CREATE TABLE IF NOT EXISTS ledger_entries (
+      id TEXT PRIMARY KEY,
+      conductor_id TEXT NOT NULL DEFAULT 'default',
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      type TEXT NOT NULL,
+      content TEXT NOT NULL,
+      status TEXT,
+      session_id TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_ledger_entries_conductor ON ledger_entries(conductor_id);
+    CREATE INDEX IF NOT EXISTS idx_ledger_entries_tenant ON ledger_entries(tenant_id);
+    CREATE INDEX IF NOT EXISTS idx_ledger_entries_created ON ledger_entries(created_at);
+
     CREATE TABLE IF NOT EXISTS schedules (
       id TEXT PRIMARY KEY,
       cron TEXT NOT NULL,
