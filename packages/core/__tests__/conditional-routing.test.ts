@@ -8,13 +8,6 @@ import {
   isFanOutNode,
   validateGraphFlow,
 } from "../state/graph-flow.js";
-import {
-  markStageCompleted,
-  markStagesSkipped,
-  getSkippedStages,
-  loadFlowState,
-  setCurrentStage,
-} from "../state/flow-state.js";
 import { AppContext } from "../app.js";
 
 // ── Pure graph-flow unit tests (no AppContext needed) ──────────────────────
@@ -285,33 +278,33 @@ describe("conditional routing - flow state integration", async () => {
     await app?.shutdown();
   });
 
-  it("tracks skipped stages in flow state", () => {
+  it("tracks skipped stages in flow state", async () => {
     const sid = "s-cond-test-1";
-    setCurrentStage(app, sid, "plan", "conditional");
-    markStageCompleted(app, sid, "plan");
-    markStagesSkipped(app, sid, ["path-b", "path-b-next"]);
+    await app.flowStates.setCurrentStage(sid, "plan", "conditional");
+    await app.flowStates.markStageCompleted(sid, "plan");
+    await app.flowStates.markStagesSkipped(sid, ["path-b", "path-b-next"]);
 
-    const state = loadFlowState(app, sid);
+    const state = await app.flowStates.load(sid);
     expect(state?.completedStages).toEqual(["plan"]);
     expect(state?.skippedStages).toEqual(["path-b", "path-b-next"]);
     expect(state?.stageResults["path-b"]?.status).toBe("skipped");
     expect(state?.stageResults["path-b-next"]?.status).toBe("skipped");
   });
 
-  it("getSkippedStages returns skipped stages", () => {
+  it("getSkippedStages returns skipped stages", async () => {
     const sid = "s-cond-test-2";
-    markStagesSkipped(app, sid, ["x", "y"]);
-    expect(getSkippedStages(app, sid)).toEqual(["x", "y"]);
+    await app.flowStates.markStagesSkipped(sid, ["x", "y"]);
+    expect(await app.flowStates.getSkippedStages(sid)).toEqual(["x", "y"]);
   });
 
-  it("getSkippedStages returns empty for unknown session", () => {
-    expect(getSkippedStages(app, "s-nonexistent")).toEqual([]);
+  it("getSkippedStages returns empty for unknown session", async () => {
+    expect(await app.flowStates.getSkippedStages("s-nonexistent")).toEqual([]);
   });
 
-  it("skipped stages are not duplicated on repeated calls", () => {
+  it("skipped stages are not duplicated on repeated calls", async () => {
     const sid = "s-cond-test-3";
-    markStagesSkipped(app, sid, ["a", "b"]);
-    markStagesSkipped(app, sid, ["b", "c"]);
-    expect(getSkippedStages(app, sid)).toEqual(["a", "b", "c"]);
+    await app.flowStates.markStagesSkipped(sid, ["a", "b"]);
+    await app.flowStates.markStagesSkipped(sid, ["b", "c"]);
+    expect(await app.flowStates.getSkippedStages(sid)).toEqual(["a", "b", "c"]);
   });
 });

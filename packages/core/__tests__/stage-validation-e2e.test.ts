@@ -456,7 +456,7 @@ describe("full verification lifecycle", async () => {
 
     // Step 2: Resolve the todo
     await app.todos.toggle(todo.id);
-    expect(app.todos.allDone(session.id)).toBe(true);
+    expect(await app.todos.allDone(session.id)).toBe(true);
 
     // Step 3: Reset status to ready (as the agent would after fixing)
     await app.sessions.update(session.id, { status: "ready", breakpoint_reason: null });
@@ -763,7 +763,7 @@ describe("stage validation edge cases", async () => {
     expect((await runVerification(app, session.id)).ok).toBe(false);
 
     // Clear all
-    app.todos.deleteForSession(session.id);
+    await app.todos.deleteForSession(session.id);
 
     // After clearing: passes
     expect((await runVerification(app, session.id)).ok).toBe(true);

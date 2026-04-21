@@ -62,6 +62,11 @@ describe("indexing_runs lifecycle", async () => {
 
   it("listIndexingRuns returns most-recent first", async () => {
     const before = (await store.listIndexingRuns(DEFAULT_TENANT_ID, repoId)).length;
+    // Nudge the clock forward so `started_at` is strictly greater than any
+    // previously-inserted run in this test file. `listIndexingRuns` orders by
+    // `started_at DESC, id DESC`; without the gap, two runs can land in the
+    // same millisecond and the UUID tiebreaker becomes order-sensitive.
+    await new Promise((r) => setTimeout(r, 5));
     const fresh = await store.beginIndexingRun({ tenant_id: DEFAULT_TENANT_ID, repo_id: repoId, branch: "main" });
     await store.finalizeIndexingRun({ run_id: fresh.id, status: "ok" });
     const after = await store.listIndexingRuns(DEFAULT_TENANT_ID, repoId);

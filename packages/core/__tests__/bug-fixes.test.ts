@@ -17,19 +17,19 @@ withTestContext();
 // ── Bug 1: applyReport null guard ────────────────────────────────────────────
 
 describe("applyReport", () => {
-  test("returns empty result for nonexistent sessionId (no crash)", () => {
+  test("returns empty result for nonexistent sessionId (no crash)", async () => {
     const report = { type: "completed", stage: "plan", summary: "done" } as unknown as OutboundMessage;
-    const result = applyReport(getApp(), "s-nonexistent", report);
+    const result = await applyReport(getApp(), "s-nonexistent", report);
     expect(result.updates).toEqual({});
     expect(result.logEvents).toEqual([]);
     expect(result.busEvents).toEqual([]);
   });
 
-  test("still works correctly for existing session", () => {
-    const session = getApp().sessions.create({ summary: "test session" });
-    getApp().sessions.update(session.id, { status: "running", stage: "plan" });
+  test("still works correctly for existing session", async () => {
+    const session = await getApp().sessions.create({ summary: "test session" });
+    await getApp().sessions.update(session.id, { status: "running", stage: "plan" });
     const report = { type: "progress", stage: "plan", message: "working..." } as unknown as OutboundMessage;
-    const result = applyReport(getApp(), session.id, report);
+    const result = await applyReport(getApp(), session.id, report);
     // Should have log events and bus events
     expect(result.logEvents!.length).toBeGreaterThan(0);
     expect(result.busEvents!.length).toBeGreaterThan(0);
@@ -39,33 +39,33 @@ describe("applyReport", () => {
 // ── Bug 2: mergeSessionConfig atomic ─────────────────────────────────────────
 
 describe("mergeSessionConfig", () => {
-  test("merges without clobbering existing keys", () => {
-    const session = getApp().sessions.create({
+  test("merges without clobbering existing keys", async () => {
+    const session = await getApp().sessions.create({
       summary: "test",
       config: { existing: "value", count: 1 },
     });
 
-    getApp().sessions.mergeConfig(session.id, { newKey: "added" });
-    const updated = getApp().sessions.get(session.id)!;
+    await getApp().sessions.mergeConfig(session.id, { newKey: "added" });
+    const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.config.existing).toBe("value");
     expect(updated.config.count).toBe(1);
     expect(updated.config.newKey).toBe("added");
   });
 
-  test("two sequential patches both survive", () => {
-    const session = getApp().sessions.create({ summary: "test", config: {} });
+  test("two sequential patches both survive", async () => {
+    const session = await getApp().sessions.create({ summary: "test", config: {} });
 
-    getApp().sessions.mergeConfig(session.id, { a: 1 });
-    getApp().sessions.mergeConfig(session.id, { b: 2 });
+    await getApp().sessions.mergeConfig(session.id, { a: 1 });
+    await getApp().sessions.mergeConfig(session.id, { b: 2 });
 
-    const updated = getApp().sessions.get(session.id)!;
+    const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.config.a).toBe(1);
     expect(updated.config.b).toBe(2);
   });
 
-  test("no-ops for nonexistent session", () => {
+  test("no-ops for nonexistent session", async () => {
     // Should not throw
-    getApp().sessions.mergeConfig("s-nonexistent", { key: "val" });
+    await getApp().sessions.mergeConfig("s-nonexistent", { key: "val" });
   });
 });
 

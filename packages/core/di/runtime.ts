@@ -42,6 +42,7 @@ import { MaintenancePollers } from "../infra/maintenance-pollers.js";
 import { SignalHandlers } from "../infra/signal-handlers.js";
 import { StaleStateDetector } from "../infra/stale-state-detector.js";
 import { SessionDrain } from "../infra/session-drain.js";
+import { StatusPollerRegistry } from "../executors/status-poller.js";
 
 /**
  * Register runtime singletons: pricing, usage recorder, transcript parsers,
@@ -108,6 +109,11 @@ export function registerRuntime(container: AppContainer): void {
     ),
 
     pluginRegistry: asFunction(() => createPluginRegistry(), { lifetime: Lifetime.SINGLETON }),
+
+    statusPollers: asFunction(() => new StatusPollerRegistry(), {
+      lifetime: Lifetime.SINGLETON,
+      dispose: (r: StatusPollerRegistry) => r.dispose(),
+    }),
 
     snapshotStore: asFunction((c: { config: ArkConfig }) => new FsSnapshotStore(join(c.config.arkDir, "snapshots")), {
       lifetime: Lifetime.SINGLETON,

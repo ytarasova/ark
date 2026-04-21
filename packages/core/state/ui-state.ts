@@ -1,6 +1,17 @@
 /**
- * Persists UI state (cursor, tab, scroll) across restarts.
- * Saved to ~/.ark/ui-state.json.
+ * Persists single-user UI state (cursor, tab, scroll) across restarts.
+ * Saved to `{arkDir}/ui-state.json`.
+ *
+ * LOCAL-ONLY. These helpers assume a stable per-user filesystem and a
+ * single UI consumer -- neither is true in hosted/control-plane mode,
+ * where every tenant would clobber a shared file. If hosted support is
+ * needed in future, add a `UserPreferencesCapability` on `AppMode` with
+ * a DB-backed implementation keyed by `(tenant_id, user_id)`.
+ *
+ * Today no production code path calls these functions (only the
+ * `ui-state.test.ts` test suite exercises the contract). The `arkDir`
+ * argument is REQUIRED at call time so there's no accidental default
+ * that would write to `$HOME/.ark/ui-state.json` from a hosted replica.
  */
 
 import { readFileSync, writeFileSync, existsSync } from "fs";

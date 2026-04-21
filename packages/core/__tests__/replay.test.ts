@@ -15,8 +15,8 @@ describe("buildReplay", async () => {
 
   it("returns steps in chronological order", async () => {
     const session = await startSession(getApp(), { summary: "test replay", flow: "default" });
-    getApp().events.log(session.id, "stage_ready", { stage: "plan", data: { stage: "plan" } });
-    getApp().events.log(session.id, "stage_started", {
+    await getApp().events.log(session.id, "stage_ready", { stage: "plan", data: { stage: "plan" } });
+    await getApp().events.log(session.id, "stage_started", {
       stage: "plan",
       actor: "planner",
       data: { stage: "plan", agent: "planner" },
@@ -32,9 +32,9 @@ describe("buildReplay", async () => {
   });
 
   it("steps have correct index values", async () => {
-    const session = getApp().sessions.create({ summary: "test indexing" });
-    getApp().events.log(session.id, "stage_ready", { data: { stage: "plan" } });
-    getApp().events.log(session.id, "stage_started", { data: { stage: "plan", agent: "planner" } });
+    const session = await getApp().sessions.create({ summary: "test indexing" });
+    await getApp().events.log(session.id, "stage_ready", { data: { stage: "plan" } });
+    await getApp().events.log(session.id, "stage_started", { data: { stage: "plan", agent: "planner" } });
 
     const steps = await buildReplay(getApp(), session.id);
     steps.forEach((step, i) => {
@@ -51,8 +51,8 @@ describe("buildReplay", async () => {
   });
 
   it("session_created event has meaningful summary", async () => {
-    const session = getApp().sessions.create({ summary: "My important task", flow: "quick" });
-    getApp().events.log(session.id, "session_created", {
+    const session = await getApp().sessions.create({ summary: "My important task", flow: "quick" });
+    await getApp().events.log(session.id, "session_created", {
       data: { flow: "quick", summary: "My important task" },
     });
     const steps = await buildReplay(getApp(), session.id);
@@ -63,8 +63,8 @@ describe("buildReplay", async () => {
   });
 
   it("stage_started event includes agent name", async () => {
-    const session = getApp().sessions.create({ summary: "agent test" });
-    getApp().events.log(session.id, "stage_started", {
+    const session = await getApp().sessions.create({ summary: "agent test" });
+    await getApp().events.log(session.id, "stage_started", {
       stage: "implement",
       actor: "implementer",
       data: { stage: "implement", agent: "implementer" },
@@ -78,8 +78,8 @@ describe("buildReplay", async () => {
   });
 
   it("agent_error event shows error preview", async () => {
-    const session = getApp().sessions.create({ summary: "error test" });
-    getApp().events.log(session.id, "agent_error", {
+    const session = await getApp().sessions.create({ summary: "error test" });
+    await getApp().events.log(session.id, "agent_error", {
       data: { error: "TypeError: Cannot read properties of null" },
     });
 
@@ -90,8 +90,8 @@ describe("buildReplay", async () => {
   });
 
   it("hook_status event formats correctly", async () => {
-    const session = getApp().sessions.create({ summary: "hook test" });
-    getApp().events.log(session.id, "hook_status", {
+    const session = await getApp().sessions.create({ summary: "hook test" });
+    await getApp().events.log(session.id, "hook_status", {
       data: { status: "busy", hook_event: "tool_use" },
     });
 
@@ -103,8 +103,8 @@ describe("buildReplay", async () => {
   });
 
   it("retry_with_context event shows attempt number", async () => {
-    const session = getApp().sessions.create({ summary: "retry test" });
-    getApp().events.log(session.id, "retry_with_context", {
+    const session = await getApp().sessions.create({ summary: "retry test" });
+    await getApp().events.log(session.id, "retry_with_context", {
       data: { attempt: 2, error: "tests failed" },
     });
 
@@ -116,8 +116,8 @@ describe("buildReplay", async () => {
   });
 
   it("steps include detail when data is present", async () => {
-    const session = getApp().sessions.create({ summary: "detail test" });
-    getApp().events.log(session.id, "agent_completed", {
+    const session = await getApp().sessions.create({ summary: "detail test" });
+    await getApp().events.log(session.id, "agent_completed", {
       data: { summary: "Done", files_changed: 5, commits: 2 },
     });
 
@@ -129,8 +129,8 @@ describe("buildReplay", async () => {
   });
 
   it("falls back to title-cased type for unknown event types", async () => {
-    const session = getApp().sessions.create({ summary: "unknown type test" });
-    getApp().events.log(session.id, "some_new_thing", { data: {} });
+    const session = await getApp().sessions.create({ summary: "unknown type test" });
+    await getApp().events.log(session.id, "some_new_thing", { data: {} });
 
     const steps = await buildReplay(getApp(), session.id);
     const unknown = steps.find((s) => s.type === "some_new_thing");
@@ -140,8 +140,8 @@ describe("buildReplay", async () => {
   });
 
   it("preserves stage and actor from events", async () => {
-    const session = getApp().sessions.create({ summary: "stage test" });
-    getApp().events.log(session.id, "stage_started", {
+    const session = await getApp().sessions.create({ summary: "stage test" });
+    await getApp().events.log(session.id, "stage_started", {
       stage: "review",
       actor: "reviewer",
       data: { stage: "review", agent: "reviewer" },

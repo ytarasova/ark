@@ -27,9 +27,23 @@ export function sanitizeSessionName(name: string): string {
   return name;
 }
 
+/**
+ * Callback used by the bridge to persist first-resize geometry back onto the
+ * session row. The web server wires this to `app.sessions.update(...)` so the
+ * recorded terminal replay (StaticTerminal) uses the same column count the
+ * live agent saw.
+ */
+export type GeometryPersistFn = (sessionId: string, cols: number, rows: number) => void;
+
 export interface TerminalSession {
   proc: Subprocess;
   sessionName: string;
+  /** The ark session id -- `sessionName` is always `ark-<sessionId>`. */
+  sessionId: string;
+  /** Set once the first resize has been observed for this session. */
+  geometryPersisted: boolean;
+  /** Optional hook to update the DB row with the observed geometry. */
+  onGeometry?: GeometryPersistFn;
   alive: boolean;
 }
 
@@ -48,8 +62,19 @@ function buildAttachCommand(sessionName: string): string[] {
   return ["script", "-q", "-c", `${tmuxBin} attach-session -t ${sessionName}`, "/dev/null"];
 }
 
+export interface StartBridgeOpts {
+  /** Ark session id (maps to `<sessionName>` minus `ark-` prefix). */
+  sessionId: string;
+  /** Optional hook to persist observed geometry onto the DB row. */
+  onGeometry?: GeometryPersistFn;
+}
+
 /** Start a terminal bridge for a WebSocket connection. */
-export function startTerminalBridge(ws: ServerWebSocket<unknown>, sessionName: string): TerminalSession | null {
+export function startTerminalBridge(
+  ws: ServerWebSocket<unknown>,
+  sessionName: string,
+  opts: StartBridgeOpts,
+): TerminalSession | null {
   // Validate session name to prevent command injection
   sanitizeSessionName(sessionName);
 
@@ -63,7 +88,14 @@ export function startTerminalBridge(ws: ServerWebSocket<unknown>, sessionName: s
     stderr: "pipe",
   });
 
-  const session: TerminalSession = { proc, sessionName, alive: true };
+  const session: TerminalSession = {
+    proc,
+    sessionName,
+    sessionId: opts.sessionId,
+    geometryPersisted: false,
+    onGeometry: opts.onGeometry,
+    alive: true,
+  };
   activeSessions.set(ws, session);
 
   // Stream stdout to WebSocket
@@ -130,7 +162,7 @@ export function handleTerminalInput(ws: ServerWebSocket<unknown>, data: string |
     try {
       const msg = JSON.parse(data);
       if (msg.type === "resize" && msg.cols && msg.rows) {
-        handleResize(session.sessionName, msg.cols, msg.rows);
+        handleResize(session, msg.cols, msg.rows);
         return;
       }
     } catch {
@@ -150,22 +182,30 @@ export function handleTerminalInput(ws: ServerWebSocket<unknown>, data: string |
   sink.flush();
 }
 
-/** Resize the tmux window. */
-function handleResize(sessionName: string, cols: number, rows: number): void {
+/**
+ * Resize the tmux window. `tmux resize-window` sends SIGWINCH to the running
+ * claude process, which reflows its TUI. The first resize also persists the
+ * observed geometry onto the session row so the recorded replay renders at
+ * the same width.
+ */
+function handleResize(session: TerminalSession, cols: number, rows: number): void {
+  const safeCols = Math.max(1, cols | 0);
+  const safeRows = Math.max(1, rows | 0);
+
+  if (!session.geometryPersisted) {
+    session.geometryPersisted = true;
+    try {
+      session.onGeometry?.(session.sessionId, safeCols, safeRows);
+    } catch (e: any) {
+      logDebug("web", `geometry persist failed: ${e?.message ?? e}`);
+    }
+  }
+
   try {
     const tmuxBin = tmux.tmuxBin();
     // sessionName was validated at bridge creation; cols/rows are coerced to string digits
     const proc = spawn({
-      cmd: [
-        tmuxBin,
-        "resize-window",
-        "-t",
-        sessionName,
-        "-x",
-        String(Math.max(1, cols | 0)),
-        "-y",
-        String(Math.max(1, rows | 0)),
-      ],
+      cmd: [tmuxBin, "resize-window", "-t", session.sessionName, "-x", String(safeCols), "-y", String(safeRows)],
       stdout: "pipe",
       stderr: "pipe",
     });

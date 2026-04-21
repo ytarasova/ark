@@ -267,16 +267,16 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   });
 
   router.handle("session/resume", async (params, notify) => {
-    const { sessionId, snapshotId } = extract<SessionResumeParams>(params, ["sessionId"]);
+    const { sessionId, snapshotId, rewindToStage } = extract<SessionResumeParams>(params, ["sessionId"]);
 
-    // If the session has a persisted snapshot (or the caller supplied one
-    // explicitly), prefer the snapshot-based restore path. Otherwise fall
-    // back to the state-only resume for backends that don't snapshot.
+    // Snapshot-backed restore bypasses rewind: restoring a pinned snapshot is
+    // a different operation from "re-run from stage X". If the caller wants
+    // a rewind, they must not also ask for a snapshot.
     const session = await app.sessions.get(sessionId);
     const lastSnapshotId =
       snapshotId ?? (session?.config as Record<string, unknown> | undefined)?.last_snapshot_id ?? undefined;
 
-    if (lastSnapshotId) {
+    if (lastSnapshotId && !rewindToStage) {
       const { resumeFromSnapshot } = await import("../../core/services/session-snapshot.js");
       const snapResult = await resumeFromSnapshot(app, sessionId, { snapshotId: lastSnapshotId as string });
       if (snapResult.ok) {
@@ -292,10 +292,24 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
       }
     }
 
-    const result = await app.sessionService.resume(sessionId);
+    const result = await app.sessionService.resume(sessionId, { rewindToStage });
     const updated = await app.sessions.get(sessionId);
     if (updated) notify("session/updated", { session: updated });
     return result;
+  });
+
+  router.handle("session/flowStages", async (params) => {
+    const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
+    const session = await app.sessions.get(sessionId);
+    if (!session) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
+    const { getStages } = await import("../../core/state/flow.js");
+    const stages = getStages(app, session.flow).map((s) => ({
+      name: s.name,
+      type: s.action ? "action" : s.agent ? "agent" : (s.type ?? "agent"),
+      agent: s.agent ?? null,
+      action: s.action ?? null,
+    }));
+    return { flow: session.flow, currentStage: session.stage, stages };
   });
 
   router.handle("session/pause", async (params, notify) => {

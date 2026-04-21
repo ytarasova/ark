@@ -33,8 +33,8 @@ describe("Store context isolation", async () => {
   });
 
   it("sessions are isolated between contexts", async () => {
-    getApp().sessions.create({ summary: "ctx1-session" });
-    const sessions1 = getApp().sessions.list();
+    await getApp().sessions.create({ summary: "ctx1-session" });
+    const sessions1 = await getApp().sessions.list();
     expect(sessions1.length).toBe(1);
     expect(sessions1[0].summary).toBe("ctx1-session");
 
@@ -42,49 +42,49 @@ describe("Store context isolation", async () => {
     const app2 = await AppContext.forTestAsync();
     await app2.boot();
 
-    const sessions2 = app2.sessions.list();
+    const sessions2 = await app2.sessions.list();
     expect(sessions2.length).toBe(0);
 
     await app2.shutdown();
   });
 
-  it("computes are isolated between contexts", () => {
+  it("computes are isolated between contexts", async () => {
     // Default local compute is auto-created
-    const computes = getApp().computes.list();
+    const computes = await getApp().computes.list();
     const localCompute = computes.find((h) => h.name === "local");
     expect(localCompute).toBeDefined();
     expect(localCompute!.provider).toBe("local");
   });
 
-  it("CRUD works in isolated context", () => {
+  it("CRUD works in isolated context", async () => {
     // Create
-    const session = getApp().sessions.create({ summary: "test-crud", repo: "/tmp/test" });
+    const session = await getApp().sessions.create({ summary: "test-crud", repo: "/tmp/test" });
     expect(session.id).toBeTruthy();
 
     // Read
-    const fetched = getApp().sessions.get(session.id);
+    const fetched = await getApp().sessions.get(session.id);
     expect(fetched).not.toBeNull();
     expect(fetched!.summary).toBe("test-crud");
 
     // List
-    expect(getApp().sessions.list().length).toBe(1);
+    expect((await getApp().sessions.list()).length).toBe(1);
 
     // Delete
-    getApp().sessions.delete(session.id);
-    expect(getApp().sessions.list().length).toBe(0);
+    await getApp().sessions.delete(session.id);
+    expect((await getApp().sessions.list()).length).toBe(0);
   });
 
-  it("compute CRUD works in isolated context", () => {
-    getApp().computes.create({ name: "test-ec2", provider: "ec2", config: { size: "m" } });
-    const compute = getApp().computes.get("test-ec2");
+  it("compute CRUD works in isolated context", async () => {
+    await getApp().computes.create({ name: "test-ec2", provider: "ec2", config: { size: "m" } });
+    const compute = await getApp().computes.get("test-ec2");
     expect(compute).not.toBeNull();
     expect(compute!.provider).toBe("ec2");
 
     // local + test-ec2
-    expect(getApp().computes.list().length).toBe(2);
+    expect((await getApp().computes.list()).length).toBe(2);
 
-    getApp().computes.delete("test-ec2");
-    expect(getApp().computes.list().length).toBe(1);
+    await getApp().computes.delete("test-ec2");
+    expect((await getApp().computes.list()).length).toBe(1);
   });
 
   it("cleanup removes temp directory", async () => {

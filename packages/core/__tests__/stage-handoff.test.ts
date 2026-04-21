@@ -259,7 +259,7 @@ describe("applyReport + mediateStageHandoff integration", async () => {
       filesChanged: ["src/feature.ts"],
       commits: ["abc123"],
     };
-    const result = applyReport(app, session.id, report);
+    const result = await applyReport(app, session.id, report);
     expect(result.shouldAdvance).toBe(true);
     expect(result.shouldAutoDispatch).toBe(true);
 
@@ -292,7 +292,7 @@ describe("applyReport + mediateStageHandoff integration", async () => {
       filesChanged: [],
       commits: [],
     };
-    const result = applyReport(app, session.id, report);
+    const result = await applyReport(app, session.id, report);
 
     // Manual gate: shouldAdvance is falsy -- conductor should NOT call mediateStageHandoff
     expect(result.shouldAdvance).toBeFalsy();
@@ -316,7 +316,7 @@ describe("applyReport + mediateStageHandoff integration", async () => {
       filesChanged: ["src/feature.ts"],
       commits: ["abc123"],
     };
-    const result = applyReport(app, session.id, report);
+    const result = await applyReport(app, session.id, report);
     expect(result.shouldAdvance).toBe(true);
     expect(result.updates.error).toBeNull();
 
@@ -346,7 +346,7 @@ describe("applyHookStatus + mediateStageHandoff integration", async () => {
     const fresh = await app.sessions.get(session.id)!;
 
     // Step 1: applyHookStatus determines shouldAdvance
-    const result = applyHookStatus(app, fresh, "SessionEnd", {});
+    const result = await applyHookStatus(app, fresh, "SessionEnd", {});
     expect(result.shouldAdvance).toBe(true);
 
     // Apply updates

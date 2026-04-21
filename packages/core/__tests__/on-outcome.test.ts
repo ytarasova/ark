@@ -183,7 +183,7 @@ describe("applyReport outcome extraction", async () => {
     const session = await app.sessions.create({ summary: "Test outcome", flow: "outcome-report-flow" });
     await app.sessions.update(session.id, { status: "running", stage: "review", agent: "reviewer" });
 
-    const result = applyReport(app, session.id, {
+    const result = await applyReport(app, session.id, {
       type: "completed",
       stage: "review",
       summary: "Review done",
@@ -205,7 +205,7 @@ describe("applyReport outcome extraction", async () => {
     const session = await app.sessions.create({ summary: "Test no outcome", flow: "outcome-no-report" });
     await app.sessions.update(session.id, { status: "running", stage: "build", agent: "builder" });
 
-    const result = applyReport(app, session.id, {
+    const result = await applyReport(app, session.id, {
       type: "completed",
       stage: "build",
       summary: "Build done",

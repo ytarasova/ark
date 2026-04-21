@@ -4,7 +4,7 @@
  * Extracted from session-orchestration.ts. All functions take app: AppContext as first arg.
  */
 
-import { existsSync, readFileSync } from "fs";
+import { existsSync } from "fs";
 import { join } from "path";
 import { promisify } from "util";
 import { execFile } from "child_process";
@@ -19,6 +19,7 @@ import { resolveFlow } from "../state/flow.js";
 import { filterMessages, parseMessageFilter } from "../message-filter.js";
 import { logDebug, logWarn } from "../observability/structured-log.js";
 import { buildStreamSubtasks, type SageAnalysis } from "../integrations/sage-analysis.js";
+import { readPlanMd } from "./plan-artifact.js";
 
 /** Convert a typed Session to a plain Record for template variable resolution. */
 export function sessionAsVars(session: Session): Record<string, unknown> {
@@ -62,23 +63,57 @@ export function formatTaskHeader(app: AppContext, session: Session, stage: strin
     `When you finish your work, call \`report\` with type='completed' and a concise summary of what you accomplished (files changed, tests added, key decisions). This summary is shown to the user in the dashboard.`,
   );
 
-  // Append file attachments if present
+  return parts;
+}
+
+/**
+ * Render the session's attachments as a markdown block, fetching blob-backed
+ * content on demand. Called from `appendPreviousStageContext` so it stays in
+ * the async side of task construction -- `formatTaskHeader` remains sync.
+ *
+ * Supports both shapes during the migration window: pre-upload entries carry
+ * inline `content`, post-upload entries carry `locator`. After the first
+ * dispatch every session row ends up with locators (see
+ * `materializeAttachments` in workspace-service.ts).
+ */
+async function renderAttachmentsBlock(app: AppContext, session: Session): Promise<string[]> {
   const attachments = (session.config as any)?.attachments as
-    | Array<{ name: string; content: string; type: string }>
+    | Array<{ name: string; content?: string; locator?: string; type?: string }>
     | undefined;
-  if (attachments?.length) {
-    parts.push("\n## Attached Files\n");
-    parts.push("Files are saved to `.ark/attachments/` in the working directory.\n");
-    for (const att of attachments) {
-      if (att.content?.startsWith("data:")) {
-        parts.push(`### ${att.name}\nBinary file (${att.type}) at \`.ark/attachments/${att.name}\`\n`);
-      } else {
-        parts.push(`### ${att.name}\n\`\`\`\n${att.content}\n\`\`\`\n`);
+  if (!attachments?.length) return [];
+
+  const out: string[] = ["\n## Attached Files\n", "Files are saved to `.ark/attachments/` in the working directory.\n"];
+  for (const att of attachments) {
+    const type = att.type ?? "";
+    const isBinary = type.startsWith("application/") || type.startsWith("image/") || type.startsWith("video/");
+    // Fetch text content from blob (or use inline if still present) so the
+    // prompt shows a preview for small text files. Binary files get a
+    // pointer only; the agent can `cat` them from the workdir if needed.
+    if (isBinary) {
+      out.push(`### ${att.name}\nBinary file (${type}) at \`.ark/attachments/${att.name}\`\n`);
+      continue;
+    }
+
+    let content: string | null = null;
+    if (att.locator) {
+      try {
+        const got = await app.blobStore.get(att.locator, session.tenant_id);
+        content = got.bytes.toString("utf-8");
+      } catch (e: any) {
+        logWarn("session", `attachment preview fetch failed for ${att.name}: ${e?.message ?? e}`);
       }
+    } else if (att.content) {
+      content = att.content.startsWith("data:") ? null : att.content;
+    }
+
+    if (content === null) {
+      out.push(`### ${att.name}\nFile available at \`.ark/attachments/${att.name}\`\n`);
+    } else {
+      const preview = content.length > 3000 ? content.slice(0, 3000) + "\n... (truncated)" : content;
+      out.push(`### ${att.name}\n\`\`\`\n${preview}\n\`\`\`\n`);
     }
   }
-
-  return parts;
+  return out;
 }
 
 /** Append previous stage context: completed stages, PLAN.md, and recent git log. */
@@ -96,13 +131,15 @@ export async function appendPreviousStageContext(app: AppContext, session: Sessi
     }
   }
 
-  // Check for PLAN.md
+  // Attachment preview (fetches from BlobStore for uploaded attachments)
+  parts.push(...(await renderAttachmentsBlock(app, session)));
+
+  // Check for PLAN.md (BlobStore locator preferred, worktree FS fallback)
   const wtDir = join(app.config.worktreesDir, session.id);
-  const planPath = join(wtDir, "PLAN.md");
-  if (existsSync(planPath)) {
-    let plan = readFileSync(planPath, "utf-8");
-    if (plan.length > 3000) plan = plan.slice(0, 3000) + "\n... (truncated)";
-    parts.push(`\n## PLAN.md:\n${plan}`);
+  const plan = await readPlanMd(app, session);
+  if (plan !== null) {
+    const trimmed = plan.length > 3000 ? plan.slice(0, 3000) + "\n... (truncated)" : plan;
+    parts.push(`\n## PLAN.md:\n${trimmed}`);
   } else {
     // Fallback: inject completion summary from previous stage as plan context.
     // Covers cases where the planner reported its analysis in the completion
@@ -165,29 +202,28 @@ export async function buildTaskWithHandoff(
   return [...header, ...context].join("\n");
 }
 
-export function extractSubtasks(app: AppContext, session: Session): { name: string; task: string }[] {
+export async function extractSubtasks(app: AppContext, session: Session): Promise<{ name: string; task: string }[]> {
   // Sage-analysis path: when the session was seeded with a pi-sage analysis
-  // JSON (via --input analysis_json=<path> or the `fetch_sage_analysis`
-  // action), fan out one subtask per plan_stream. This is the happy path for
-  // the `from-sage-analysis` flow.
+  // JSON (via `ark sage` or the `fetch_sage_analysis` action), the locator
+  // lives on `inputs.files.analysis_json`. Fan out one subtask per
+  // plan_stream. Happy path for the `from-sage-analysis` flow.
   const inputs = (session.config as any)?.inputs as { files?: Record<string, string> } | undefined;
-  const analysisPath = inputs?.files?.analysis_json;
-  if (analysisPath && existsSync(analysisPath)) {
+  const analysisLocator = inputs?.files?.analysis_json;
+  if (analysisLocator) {
     try {
-      const analysis = JSON.parse(readFileSync(analysisPath, "utf-8")) as SageAnalysis;
+      const { bytes } = await app.blobStore.get(analysisLocator, session.tenant_id);
+      const analysis = JSON.parse(bytes.toString("utf-8")) as SageAnalysis;
       if (Array.isArray(analysis.plan_streams) && analysis.plan_streams.length > 0) {
         return buildStreamSubtasks(analysis).map((s) => ({ name: s.name, task: s.task }));
       }
     } catch (e: any) {
-      logWarn("session", `extractSubtasks: failed to load analysis from ${analysisPath}: ${e?.message ?? e}`);
+      logWarn("session", `extractSubtasks: failed to load analysis ${analysisLocator}: ${e?.message ?? e}`);
     }
   }
 
-  const wtDir = join(app.config.worktreesDir, session.id);
-  const planPath = join(wtDir, "PLAN.md");
-
-  if (existsSync(planPath)) {
-    const plan = readFileSync(planPath, "utf-8");
+  // PLAN.md fallback: BlobStore locator first, then worktree FS
+  const plan = await readPlanMd(app, session);
+  if (plan) {
     const steps = [...plan.matchAll(/^##\s+(?:Step\s+)?(\d+)[.:]\s*(.+)/gm)];
     if (steps.length >= 2) {
       return steps.map(([, num, title]) => ({

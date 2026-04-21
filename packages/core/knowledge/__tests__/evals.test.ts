@@ -52,7 +52,7 @@ describe("evaluateSession", async () => {
     await app.sessions.update(created.id, { status: "completed", agent: "implementer" } as Partial<Session>);
     const freshSession = await app.sessions.get(created.id)!;
 
-    const result = evaluateSession(app, freshSession);
+    const result = await evaluateSession(app, freshSession);
 
     expect(result.agentRole).toBe("implementer");
     expect(result.metrics.completed).toBe(true);
@@ -73,7 +73,7 @@ describe("evaluateSession", async () => {
     await app.sessions.update(created.id, { status: "failed", agent: "worker" } as Partial<Session>);
     const freshSession = await app.sessions.get(created.id)!;
 
-    const result = evaluateSession(app, freshSession);
+    const result = await evaluateSession(app, freshSession);
     expect(result.metrics.completed).toBe(false);
     expect(result.agentRole).toBe("worker");
   });
@@ -88,7 +88,7 @@ describe("evaluateSession", async () => {
     } as Partial<Session>);
     const freshSession = await app.sessions.get(created.id)!;
 
-    const result = evaluateSession(app, freshSession);
+    const result = await evaluateSession(app, freshSession);
     expect(result.metrics.prCreated).toBe(true);
   });
 });
@@ -120,7 +120,7 @@ describe("getAgentStats", async () => {
       });
     }
 
-    const stats = getAgentStats(app, "planner");
+    const stats = await getAgentStats(app, "planner");
     expect(stats.totalSessions).toBe(3);
     expect(stats.completionRate).toBeCloseTo(2 / 3, 2);
     expect(stats.testPassRate).toBe(0.5); // 1 passed out of 2 with tests
@@ -129,16 +129,16 @@ describe("getAgentStats", async () => {
     expect(stats.avgCost).toBeCloseTo(1.0, 1);
   });
 
-  it("returns zeros for unknown agent", () => {
-    const stats = getAgentStats(app, "nonexistent-agent-xyz");
+  it("returns zeros for unknown agent", async () => {
+    const stats = await getAgentStats(app, "nonexistent-agent-xyz");
     expect(stats.totalSessions).toBe(0);
     expect(stats.completionRate).toBe(0);
   });
 });
 
 describe("detectDrift", async () => {
-  it("returns no alert with insufficient data", () => {
-    const drift = detectDrift(app, "some-agent-with-no-data");
+  it("returns no alert with insufficient data", async () => {
+    const drift = await detectDrift(app, "some-agent-with-no-data");
     expect(drift.alert).toBe(false);
     expect(drift.completionRateDelta).toBe(0);
     expect(drift.avgCostDelta).toBe(0);
@@ -182,7 +182,7 @@ describe("detectDrift", async () => {
 
     // Since we can't easily backdate created_at through the store API,
     // just verify the function handles the insufficient-data case correctly
-    const drift = detectDrift(app, "drifter", 7, 28);
+    const drift = await detectDrift(app, "drifter", 7, 28);
     // With all nodes created "now", they all fall in "recent" -- not enough baseline
     expect(drift.alert).toBe(false);
   });
@@ -213,7 +213,7 @@ describe("listEvals", async () => {
       },
     });
 
-    const evals = listEvals(app);
+    const evals = await listEvals(app);
     expect(evals.length).toBe(1);
     expect(evals[0].agentRole).toBe("implementer");
     expect(evals[0].sessionId).toBe("s-list-1");
@@ -239,11 +239,11 @@ describe("listEvals", async () => {
       metadata: { eval: true, agentRole: "implementer" },
     });
 
-    const plannerEvals = listEvals(app, "planner");
+    const plannerEvals = await listEvals(app, "planner");
     expect(plannerEvals.length).toBe(1);
     expect(plannerEvals[0].agentRole).toBe("planner");
 
-    const implEvals = listEvals(app, "implementer");
+    const implEvals = await listEvals(app, "implementer");
     expect(implEvals.length).toBe(1);
   });
 
@@ -260,7 +260,7 @@ describe("listEvals", async () => {
       });
     }
 
-    const limited = listEvals(app, undefined, 3);
+    const limited = await listEvals(app, undefined, 3);
     expect(limited.length).toBe(3);
   });
 });

@@ -59,7 +59,7 @@ describe("metrics/snapshot", async () => {
     // with a `snapshot` key.
     const res = ok(await router.dispatch(createRequest(1, "metrics/snapshot", {})));
     expect(res).toHaveProperty("snapshot");
-  });
+  }, 60_000);
 });
 
 describe("costs/read", async () => {

@@ -11,6 +11,7 @@ import { join } from "path";
 import type { AppContainer } from "../container.js";
 import type { IDatabase } from "../database/index.js";
 import type { ArkConfig } from "../config.js";
+import type { AppMode } from "../modes/app-mode.js";
 import { resolveStoreBaseDir } from "../install-paths.js";
 import {
   SessionRepository,
@@ -20,6 +21,8 @@ import {
   MessageRepository,
   TodoRepository,
   ArtifactRepository,
+  FlowStateRepository,
+  LedgerRepository,
 } from "../repositories/index.js";
 import { FileFlowStore, FileSkillStore, FileAgentStore, FileRecipeStore, FileRuntimeStore } from "../stores/index.js";
 import { DbResourceStore, initResourceDefinitionsTable } from "../stores/db-resource-store.js";
@@ -75,6 +78,8 @@ export function registerRepositories(container: AppContainer): void {
     messages: asFunction((c: { db: IDatabase }) => new MessageRepository(c.db), { lifetime: Lifetime.SINGLETON }),
     todos: asFunction((c: { db: IDatabase }) => new TodoRepository(c.db), { lifetime: Lifetime.SINGLETON }),
     artifacts: asFunction((c: { db: IDatabase }) => new ArtifactRepository(c.db), { lifetime: Lifetime.SINGLETON }),
+    flowStates: asFunction((c: { db: IDatabase }) => new FlowStateRepository(c.db), { lifetime: Lifetime.SINGLETON }),
+    ledger: asFunction((c: { db: IDatabase }) => new LedgerRepository(c.db), { lifetime: Lifetime.SINGLETON }),
 
     // Knowledge graph is persistence-adjacent -- keep it here with the repos.
     knowledge: asFunction((c: { db: IDatabase }) => new KnowledgeStore(c.db), { lifetime: Lifetime.SINGLETON }),
@@ -85,38 +90,45 @@ export function registerRepositories(container: AppContainer): void {
  * Register resource stores (flows, skills, agents, recipes, runtimes).
  *
  * Two modes:
- *   - Local (no databaseUrl): file-backed stores with three-tier resolution
- *     (builtin + user dirs).
- *   - Hosted (databaseUrl set): DB-backed stores with tenant scoping.
+ *   - Local (SQLite / no Postgres URL): file-backed stores with three-tier
+ *     resolution (builtin + user dirs).
+ *   - Hosted (Postgres URL): DB-backed stores with tenant scoping.
+ *
+ * The factories receive `AppMode` from the cradle rather than re-sniffing
+ * `config.databaseUrl` themselves -- that decision is made exactly once
+ * in `buildAppMode` and everyone downstream reads `mode.kind`.
  */
 export function registerResourceStores(container: AppContainer): void {
   container.register({
-    flows: asFunction((c: { db: IDatabase; config: ArkConfig }) => makeFlowStore(c.db, c.config), {
-      lifetime: Lifetime.SINGLETON,
-    }),
-    skills: asFunction((c: { db: IDatabase; config: ArkConfig }) => makeSkillStore(c.db, c.config), {
-      lifetime: Lifetime.SINGLETON,
-    }),
-    agents: asFunction((c: { db: IDatabase; config: ArkConfig }) => makeAgentStore(c.db, c.config), {
-      lifetime: Lifetime.SINGLETON,
-    }),
-    recipes: asFunction((c: { db: IDatabase; config: ArkConfig }) => makeRecipeStore(c.db, c.config), {
-      lifetime: Lifetime.SINGLETON,
-    }),
-    runtimes: asFunction((c: { db: IDatabase; config: ArkConfig }) => makeRuntimeStore(c.db, c.config), {
-      lifetime: Lifetime.SINGLETON,
-    }),
+    flows: asFunction(
+      (c: { db: IDatabase; config: ArkConfig; mode: AppMode }) => makeFlowStore(c.db, c.config, c.mode),
+      {
+        lifetime: Lifetime.SINGLETON,
+      },
+    ),
+    skills: asFunction(
+      (c: { db: IDatabase; config: ArkConfig; mode: AppMode }) => makeSkillStore(c.db, c.config, c.mode),
+      { lifetime: Lifetime.SINGLETON },
+    ),
+    agents: asFunction(
+      (c: { db: IDatabase; config: ArkConfig; mode: AppMode }) => makeAgentStore(c.db, c.config, c.mode),
+      { lifetime: Lifetime.SINGLETON },
+    ),
+    recipes: asFunction(
+      (c: { db: IDatabase; config: ArkConfig; mode: AppMode }) => makeRecipeStore(c.db, c.config, c.mode),
+      { lifetime: Lifetime.SINGLETON },
+    ),
+    runtimes: asFunction(
+      (c: { db: IDatabase; config: ArkConfig; mode: AppMode }) => makeRuntimeStore(c.db, c.config, c.mode),
+      { lifetime: Lifetime.SINGLETON },
+    ),
   });
 }
 
 // ── Factory helpers ─────────────────────────────────────────────────────────
 
-function isHosted(config: ArkConfig): boolean {
-  return !!config.databaseUrl;
-}
-
-function makeFlowStore(db: IDatabase, config: ArkConfig) {
-  if (isHosted(config)) {
+function makeFlowStore(db: IDatabase, config: ArkConfig, mode: AppMode) {
+  if (mode.kind === "hosted") {
     initResourceDefinitionsTable(db);
     return new DbResourceStore(db, "flow", { stages: [] });
   }
@@ -126,8 +138,8 @@ function makeFlowStore(db: IDatabase, config: ArkConfig) {
   });
 }
 
-function makeSkillStore(db: IDatabase, config: ArkConfig) {
-  if (isHosted(config)) {
+function makeSkillStore(db: IDatabase, config: ArkConfig, mode: AppMode) {
+  if (mode.kind === "hosted") {
     initResourceDefinitionsTable(db);
     return new DbResourceStore(db, "skill", { description: "", content: "" });
   }
@@ -137,8 +149,8 @@ function makeSkillStore(db: IDatabase, config: ArkConfig) {
   });
 }
 
-function makeAgentStore(db: IDatabase, config: ArkConfig) {
-  if (isHosted(config)) {
+function makeAgentStore(db: IDatabase, config: ArkConfig, mode: AppMode) {
+  if (mode.kind === "hosted") {
     initResourceDefinitionsTable(db);
     return new DbResourceStore(db, "agent", {
       description: "",
@@ -160,8 +172,8 @@ function makeAgentStore(db: IDatabase, config: ArkConfig) {
   });
 }
 
-function makeRecipeStore(db: IDatabase, config: ArkConfig) {
-  if (isHosted(config)) {
+function makeRecipeStore(db: IDatabase, config: ArkConfig, mode: AppMode) {
+  if (mode.kind === "hosted") {
     initResourceDefinitionsTable(db);
     return new DbResourceStore(db, "recipe", { description: "", flow: "default" });
   }
@@ -171,8 +183,8 @@ function makeRecipeStore(db: IDatabase, config: ArkConfig) {
   });
 }
 
-function makeRuntimeStore(db: IDatabase, config: ArkConfig) {
-  if (isHosted(config)) {
+function makeRuntimeStore(db: IDatabase, config: ArkConfig, mode: AppMode) {
+  if (mode.kind === "hosted") {
     initResourceDefinitionsTable(db);
     return new DbResourceStore(db, "runtime", { description: "", type: "cli-agent", command: [] });
   }

@@ -8,7 +8,8 @@
  * with a consistent `RpcError` via the shared wrapper.
  */
 
-import type { AppMode, ComputeBootstrapCapability } from "./app-mode.js";
+import type { AppMode, ComputeBootstrapCapability, DatabaseMode, TenantResolverCapability } from "./app-mode.js";
+import { resolveBearerAuth } from "./app-mode.js";
 import { buildMigrationsCapability } from "./migrations-capability.js";
 
 /**
@@ -20,10 +21,38 @@ import { buildMigrationsCapability } from "./migrations-capability.js";
  * control plane for resources.
  */
 function makeNoopComputeBootstrap(): ComputeBootstrapCapability {
-  return { seed: () => undefined };
+  return { seed: async () => undefined };
 }
 
-export function buildHostedAppMode(): AppMode {
+/**
+ * Hosted multi-tenant resolver.
+ *
+ *   - Authorization: Bearer <token>  -> validate + use its tenant (shared path)
+ *   - Only X-Ark-Tenant-Id            -> 401. In a multi-tenant server the
+ *                                        tenant header cannot be self-declared;
+ *                                        it must match a validated Bearer
+ *                                        token. Closes the cross-tenant
+ *                                        exposure vector flagged in the P1
+ *                                        security audit.
+ *   - No headers                      -> 401 (authentication required).
+ */
+function makeHostedTenantResolver(): TenantResolverCapability {
+  return {
+    async resolve({ authHeader, tenantHeader, validateToken }) {
+      if (authHeader) return resolveBearerAuth(authHeader, tenantHeader, validateToken);
+      if (tenantHeader) {
+        return {
+          ok: false,
+          status: 401,
+          error: "X-Ark-Tenant-Id requires a validated Authorization: Bearer token",
+        };
+      }
+      return { ok: false, status: 401, error: "authentication required" };
+    },
+  };
+}
+
+export function buildHostedAppMode(database: DatabaseMode): AppMode {
   return {
     kind: "hosted",
     fsCapability: null,
@@ -34,5 +63,7 @@ export function buildHostedAppMode(): AppMode {
     hostCommandCapability: null,
     computeBootstrap: makeNoopComputeBootstrap(),
     migrations: buildMigrationsCapability("postgres"),
+    tenantResolver: makeHostedTenantResolver(),
+    database,
   };
 }

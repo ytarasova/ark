@@ -162,8 +162,8 @@ describe("UsageRecorder", async () => {
       // "team-alpha" and verify that the caller on the default app sees
       // zero rows for that tenant regardless of the opts.tenantId value.
       const scoped = app.forTenant("team-alpha");
-      const session = scoped.sessions.create({ summary: "tenant-test" });
-      scoped.usageRecorder.record({
+      const session = await scoped.sessions.create({ summary: "tenant-test" });
+      await scoped.usageRecorder.record({
         sessionId: session.id,
         model: "claude-sonnet-4-6",
         provider: "anthropic",
@@ -171,7 +171,7 @@ describe("UsageRecorder", async () => {
       });
 
       // Caller scoped to "team-alpha" sees their row.
-      const scopedSummary = scoped.usageRecorder.getSummary({ groupBy: "model" });
+      const scopedSummary = await scoped.usageRecorder.getSummary({ groupBy: "model" });
       const scopedTotal = scopedSummary.reduce((s, r) => s + r.count, 0);
       expect(scopedTotal).toBeGreaterThanOrEqual(1);
 
@@ -204,10 +204,10 @@ describe("UsageRecorder", async () => {
       expect(trend[0].cost).toBeGreaterThan(0);
     });
 
-    it("is scoped to the recorder's tenant regardless of opts.tenantId", () => {
+    it("is scoped to the recorder's tenant regardless of opts.tenantId", async () => {
       // Caller cannot probe another tenant's data via opts.tenantId;
       // the scoped-tenant rows are what count.
-      const scopedEmpty = app.forTenant("nonexistent-tenant").usageRecorder.getDailyTrend({ days: 1 });
+      const scopedEmpty = await app.forTenant("nonexistent-tenant").usageRecorder.getDailyTrend({ days: 1 });
       expect(scopedEmpty).toHaveLength(0);
     });
   });
@@ -218,11 +218,11 @@ describe("UsageRecorder", async () => {
       expect(total).toBeGreaterThan(0);
     });
 
-    it("is scoped to the recorder's tenant regardless of opts.tenantId", () => {
+    it("is scoped to the recorder's tenant regardless of opts.tenantId", async () => {
       // Security: opts.tenantId is ignored in favor of the scoped tenant,
       // so scoping to a tenant with no rows returns 0 even if the caller
       // attempts to pass a populated tenant's id.
-      const total = app.forTenant("nonexistent-tenant").usageRecorder.getTotalCost({ tenantId: "default" });
+      const total = await app.forTenant("nonexistent-tenant").usageRecorder.getTotalCost({ tenantId: "default" });
       expect(total).toBe(0);
     });
   });

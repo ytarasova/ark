@@ -33,14 +33,14 @@ describe("handleAcpRequest", async () => {
     expect(result.status).toBe("ready");
 
     // Verify it actually exists in the store
-    const session = getApp().sessions.get(result.sessionId);
+    const session = await getApp().sessions.get(result.sessionId);
     expect(session).toBeTruthy();
     expect(session!.summary).toBe("ACP test session");
   });
 
   it("session/list returns sessions", async () => {
-    getApp().sessions.create({ summary: "list test 1", repo: "." });
-    getApp().sessions.create({ summary: "list test 2", repo: "." });
+    await getApp().sessions.create({ summary: "list test 1", repo: "." });
+    await getApp().sessions.create({ summary: "list test 2", repo: "." });
 
     const resp = await handleAcpRequest(getApp(), req("session/list", { limit: 10 }));
 
@@ -50,7 +50,7 @@ describe("handleAcpRequest", async () => {
   });
 
   it("session/get returns a specific session", async () => {
-    const session = getApp().sessions.create({ summary: "get test", repo: "." });
+    const session = await getApp().sessions.create({ summary: "get test", repo: "." });
 
     const resp = await handleAcpRequest(getApp(), req("session/get", { sessionId: session.id }));
 
@@ -77,7 +77,7 @@ describe("handleAcpRequest", async () => {
   });
 
   it("session/delete removes a session", async () => {
-    const session = getApp().sessions.create({ summary: "delete test", repo: "." });
+    const session = await getApp().sessions.create({ summary: "delete test", repo: "." });
 
     const resp = await handleAcpRequest(getApp(), req("session/delete", { sessionId: session.id }));
 

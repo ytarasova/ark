@@ -41,40 +41,40 @@ afterAll(async () => {
 // -- Full lifecycle -----------------------------------------------------------
 
 describe("schedule E2E lifecycle", () => {
-  it("create -> get -> disable -> verify disabled -> delete -> verify gone", () => {
+  it("create -> get -> disable -> verify disabled -> delete -> verify gone", async () => {
     // Create
-    const sched = createSchedule(getApp(), { cron: "* * * * *", summary: "every minute" });
+    const sched = await createSchedule(getApp(), { cron: "* * * * *", summary: "every minute" });
     expect(sched.id).toMatch(/^sched-/);
     expect(sched.cron).toBe("* * * * *");
     expect(sched.enabled).toBe(true);
     expect(sched.summary).toBe("every minute");
 
     // Get it back
-    const fetched = getSchedule(getApp(), sched.id);
+    const fetched = await getSchedule(getApp(), sched.id);
     expect(fetched).not.toBeNull();
     expect(fetched!.id).toBe(sched.id);
     expect(fetched!.cron).toBe("* * * * *");
 
     // Disable
-    enableSchedule(getApp(), sched.id, false);
-    const disabled = getSchedule(getApp(), sched.id);
+    await enableSchedule(getApp(), sched.id, false);
+    const disabled = await getSchedule(getApp(), sched.id);
     expect(disabled!.enabled).toBe(false);
 
     // Delete
-    const deleted = deleteSchedule(getApp(), sched.id);
+    const deleted = await deleteSchedule(getApp(), sched.id);
     expect(deleted).toBe(true);
 
     // Verify gone
-    expect(getSchedule(getApp(), sched.id)).toBeNull();
+    expect(await getSchedule(getApp(), sched.id)).toBeNull();
   });
 
-  it("re-enable a disabled schedule", () => {
-    const sched = createSchedule(getApp(), { cron: "0 9 * * 1-5" });
-    enableSchedule(getApp(), sched.id, false);
-    expect(getSchedule(getApp(), sched.id)!.enabled).toBe(false);
+  it("re-enable a disabled schedule", async () => {
+    const sched = await createSchedule(getApp(), { cron: "0 9 * * 1-5" });
+    await enableSchedule(getApp(), sched.id, false);
+    expect((await getSchedule(getApp(), sched.id))!.enabled).toBe(false);
 
-    enableSchedule(getApp(), sched.id, true);
-    expect(getSchedule(getApp(), sched.id)!.enabled).toBe(true);
+    await enableSchedule(getApp(), sched.id, true);
+    expect((await getSchedule(getApp(), sched.id))!.enabled).toBe(true);
   });
 });
 
@@ -125,24 +125,24 @@ describe("cronMatches E2E with specific dates", () => {
 // -- updateScheduleLastRun double-fire guard ----------------------------------
 
 describe("updateScheduleLastRun prevents double-fire", () => {
-  it("last_run is null initially, set after updateScheduleLastRun", () => {
-    const sched = createSchedule(getApp(), { cron: "* * * * *" });
+  it("last_run is null initially, set after updateScheduleLastRun", async () => {
+    const sched = await createSchedule(getApp(), { cron: "* * * * *" });
     expect(sched.last_run).toBeNull();
 
-    updateScheduleLastRun(getApp(), sched.id);
-    const updated = getSchedule(getApp(), sched.id)!;
+    await updateScheduleLastRun(getApp(), sched.id);
+    const updated = (await getSchedule(getApp(), sched.id))!;
     expect(updated.last_run).toBeTruthy();
     expect(updated.last_run).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
-  it("two rapid updateScheduleLastRun calls produce same-minute timestamps", () => {
-    const sched = createSchedule(getApp(), { cron: "* * * * *" });
+  it("two rapid updateScheduleLastRun calls produce same-minute timestamps", async () => {
+    const sched = await createSchedule(getApp(), { cron: "* * * * *" });
 
-    updateScheduleLastRun(getApp(), sched.id);
-    const first = getSchedule(getApp(), sched.id)!.last_run!;
+    await updateScheduleLastRun(getApp(), sched.id);
+    const first = (await getSchedule(getApp(), sched.id))!.last_run!;
 
-    updateScheduleLastRun(getApp(), sched.id);
-    const second = getSchedule(getApp(), sched.id)!.last_run!;
+    await updateScheduleLastRun(getApp(), sched.id);
+    const second = (await getSchedule(getApp(), sched.id))!.last_run!;
 
     // Both timestamps are in the same minute (within a second or two of each other)
     const firstMinute = first.slice(0, 16); // "2026-03-25T10:42"
@@ -150,16 +150,16 @@ describe("updateScheduleLastRun prevents double-fire", () => {
     expect(firstMinute).toBe(secondMinute);
   });
 
-  it("last_run allows checking if schedule already fired this minute", () => {
-    const sched = createSchedule(getApp(), { cron: "* * * * *" });
+  it("last_run allows checking if schedule already fired this minute", async () => {
+    const sched = await createSchedule(getApp(), { cron: "* * * * *" });
 
     // Simulate the conductor's double-fire guard logic:
     // Before firing, check if last_run is in the current minute
-    const before = getSchedule(getApp(), sched.id)!;
+    const before = (await getSchedule(getApp(), sched.id))!;
     expect(before.last_run).toBeNull(); // never fired => should fire
 
-    updateScheduleLastRun(getApp(), sched.id);
-    const after = getSchedule(getApp(), sched.id)!;
+    await updateScheduleLastRun(getApp(), sched.id);
+    const after = (await getSchedule(getApp(), sched.id))!;
     const lastRunMinute = after.last_run!.slice(0, 16);
     const nowMinute = new Date().toISOString().slice(0, 16);
     expect(lastRunMinute).toBe(nowMinute); // same minute => do not fire again
@@ -169,12 +169,12 @@ describe("updateScheduleLastRun prevents double-fire", () => {
 // -- Multiple schedules -------------------------------------------------------
 
 describe("multiple schedules", () => {
-  it("listSchedules returns all created schedules", () => {
-    createSchedule(getApp(), { cron: "0 2 * * *", summary: "nightly-backup" });
-    createSchedule(getApp(), { cron: "0 9 * * 1", summary: "weekly-report" });
-    createSchedule(getApp(), { cron: "*/5 * * * *", summary: "health-check" });
+  it("listSchedules returns all created schedules", async () => {
+    await createSchedule(getApp(), { cron: "0 2 * * *", summary: "nightly-backup" });
+    await createSchedule(getApp(), { cron: "0 9 * * 1", summary: "weekly-report" });
+    await createSchedule(getApp(), { cron: "*/5 * * * *", summary: "health-check" });
 
-    const list = listSchedules(getApp());
+    const list = await listSchedules(getApp());
     expect(list.length).toBe(3);
 
     const summaries = list.map((s) => s.summary);
@@ -183,40 +183,40 @@ describe("multiple schedules", () => {
     expect(summaries).toContain("health-check");
   });
 
-  it("deleting one schedule does not affect others", () => {
-    const a = createSchedule(getApp(), { cron: "0 1 * * *", summary: "a" });
-    const b = createSchedule(getApp(), { cron: "0 2 * * *", summary: "b" });
-    const c = createSchedule(getApp(), { cron: "0 3 * * *", summary: "c" });
+  it("deleting one schedule does not affect others", async () => {
+    const a = await createSchedule(getApp(), { cron: "0 1 * * *", summary: "a" });
+    const b = await createSchedule(getApp(), { cron: "0 2 * * *", summary: "b" });
+    const c = await createSchedule(getApp(), { cron: "0 3 * * *", summary: "c" });
 
-    deleteSchedule(getApp(), b.id);
+    await deleteSchedule(getApp(), b.id);
 
-    const list = listSchedules(getApp());
+    const list = await listSchedules(getApp());
     expect(list.length).toBe(2);
     expect(list.map((s) => s.summary)).toContain("a");
     expect(list.map((s) => s.summary)).toContain("c");
-    expect(getSchedule(getApp(), b.id)).toBeNull();
-    expect(getSchedule(getApp(), a.id)).not.toBeNull();
-    expect(getSchedule(getApp(), c.id)).not.toBeNull();
+    expect(await getSchedule(getApp(), b.id)).toBeNull();
+    expect(await getSchedule(getApp(), a.id)).not.toBeNull();
+    expect(await getSchedule(getApp(), c.id)).not.toBeNull();
   });
 
-  it("each schedule has a unique id", () => {
+  it("each schedule has a unique id", async () => {
     const ids = new Set<string>();
     for (let i = 0; i < 10; i++) {
-      const s = createSchedule(getApp(), { cron: "* * * * *", summary: `s-${i}` });
+      const s = await createSchedule(getApp(), { cron: "* * * * *", summary: `s-${i}` });
       ids.add(s.id);
     }
     expect(ids.size).toBe(10);
   });
 
-  it("schedules with different flows and optional fields", () => {
-    const s1 = createSchedule(getApp(), {
+  it("schedules with different flows and optional fields", async () => {
+    const s1 = await createSchedule(getApp(), {
       cron: "0 8 * * *",
       flow: "deploy",
       repo: "org/api",
       compute_name: "prod",
       group_name: "deployments",
     });
-    const s2 = createSchedule(getApp(), {
+    const s2 = await createSchedule(getApp(), {
       cron: "0 22 * * *",
       flow: "backup",
       workdir: "/mnt/backups",

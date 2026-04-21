@@ -31,8 +31,8 @@ describe("interrupt(getApp())", async () => {
   });
 
   it("returns error when session is not running", async () => {
-    const session = getApp().sessions.create({ summary: "interrupt-not-running" });
-    getApp().sessions.update(session.id, { status: "pending" });
+    const session = await getApp().sessions.create({ summary: "interrupt-not-running" });
+    await getApp().sessions.update(session.id, { status: "pending" });
 
     const result = await interrupt(getApp(), session.id);
     expect(result.ok).toBe(false);
@@ -40,8 +40,8 @@ describe("interrupt(getApp())", async () => {
   });
 
   it("returns error when session has no tmux session_id", async () => {
-    const session = getApp().sessions.create({ summary: "interrupt-no-tmux" });
-    getApp().sessions.update(session.id, { status: "running", session_id: null });
+    const session = await getApp().sessions.create({ summary: "interrupt-no-tmux" });
+    await getApp().sessions.update(session.id, { status: "running", session_id: null });
 
     const result = await interrupt(getApp(), session.id);
     expect(result.ok).toBe(false);
@@ -63,7 +63,7 @@ describe("worktreeDiff(getApp())", async () => {
   });
 
   it("returns error when session has no workdir", async () => {
-    const session = getApp().sessions.create({ summary: "diff-no-workdir" });
+    const session = await getApp().sessions.create({ summary: "diff-no-workdir" });
     // No workdir or repo set
 
     const result = await worktreeDiff(getApp(), session.id);
@@ -72,8 +72,8 @@ describe("worktreeDiff(getApp())", async () => {
   });
 
   it("returns error when branch cannot be determined", async () => {
-    const session = getApp().sessions.create({ summary: "diff-no-branch" });
-    getApp().sessions.update(session.id, {
+    const session = await getApp().sessions.create({ summary: "diff-no-branch" });
+    await getApp().sessions.update(session.id, {
       workdir: "/tmp/nonexistent-workdir",
       repo: "/tmp/nonexistent-repo",
     });
@@ -93,7 +93,7 @@ describe("worktreeDiff re-review flagging", async () => {
   });
 
   it("returns modifiedSinceReview in the result shape", async () => {
-    const session = getApp().sessions.create({ summary: "re-review-test" });
+    const session = await getApp().sessions.create({ summary: "re-review-test" });
     const result = await worktreeDiff(getApp(), session.id);
     expect(Array.isArray(result.modifiedSinceReview)).toBe(true);
   });
@@ -109,7 +109,7 @@ describe("createWorktreePR(getApp())", async () => {
   });
 
   it("returns error when session has no repo", async () => {
-    const session = getApp().sessions.create({ summary: "pr-no-repo" });
+    const session = await getApp().sessions.create({ summary: "pr-no-repo" });
     // No repo set
 
     const result = await createWorktreePR(getApp(), session.id);
@@ -118,8 +118,8 @@ describe("createWorktreePR(getApp())", async () => {
   });
 
   it("returns error when branch cannot be determined", async () => {
-    const session = getApp().sessions.create({ summary: "pr-no-branch" });
-    getApp().sessions.update(session.id, { repo: "/tmp/nonexistent-repo" });
+    const session = await getApp().sessions.create({ summary: "pr-no-branch" });
+    await getApp().sessions.update(session.id, { repo: "/tmp/nonexistent-repo" });
 
     const result = await createWorktreePR(getApp(), session.id);
     expect(result.ok).toBe(false);
@@ -141,15 +141,15 @@ describe("mergeWorktreePR(getApp())", async () => {
   });
 
   it("returns error when session has no PR URL", async () => {
-    const session = getApp().sessions.create({ summary: "merge-no-pr" });
+    const session = await getApp().sessions.create({ summary: "merge-no-pr" });
     const result = await mergeWorktreePR(getApp(), session.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("no PR URL");
   });
 
   it("returns error when session has no repo", async () => {
-    const session = getApp().sessions.create({ summary: "merge-no-repo" });
-    getApp().sessions.update(session.id, { pr_url: "https://github.com/org/repo/pull/1" });
+    const session = await getApp().sessions.create({ summary: "merge-no-repo" });
+    await getApp().sessions.update(session.id, { pr_url: "https://github.com/org/repo/pull/1" });
     const result = await mergeWorktreePR(getApp(), session.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("no repo");
@@ -167,8 +167,8 @@ describe("mergeWorktreePR(getApp())", async () => {
 
 describe("executeAction auto_merge", async () => {
   it("returns error when session has no PR URL", async () => {
-    const session = getApp().sessions.create({ summary: "auto-merge-no-pr", flow: "autonomous-sdlc" });
-    getApp().sessions.update(session.id, { stage: "merge" });
+    const session = await getApp().sessions.create({ summary: "auto-merge-no-pr", flow: "autonomous-sdlc" });
+    await getApp().sessions.update(session.id, { stage: "merge" });
     const result = await executeAction(getApp(), session.id, "auto_merge");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("no PR URL");
@@ -181,8 +181,8 @@ describe("executeAction auto_merge", async () => {
   });
 
   it("returns error when session has no repo", async () => {
-    const session = getApp().sessions.create({ summary: "auto-merge-no-repo", flow: "autonomous-sdlc" });
-    getApp().sessions.update(session.id, {
+    const session = await getApp().sessions.create({ summary: "auto-merge-no-repo", flow: "autonomous-sdlc" });
+    await getApp().sessions.update(session.id, {
       stage: "merge",
       pr_url: "https://github.com/org/repo/pull/1",
     });
@@ -192,8 +192,8 @@ describe("executeAction auto_merge", async () => {
   });
 
   it("does not advance session on merge failure (stays in current state)", async () => {
-    const session = getApp().sessions.create({ summary: "auto-merge-fail-no-advance", flow: "autonomous-sdlc" });
-    getApp().sessions.update(session.id, {
+    const session = await getApp().sessions.create({ summary: "auto-merge-fail-no-advance", flow: "autonomous-sdlc" });
+    await getApp().sessions.update(session.id, {
       stage: "merge",
       status: "running",
       pr_url: "https://github.com/org/repo/pull/1",
@@ -201,7 +201,7 @@ describe("executeAction auto_merge", async () => {
     const result = await executeAction(getApp(), session.id, "auto_merge");
     expect(result.ok).toBe(false);
     // Session should NOT have been advanced or set to waiting
-    const updated = getApp().sessions.get(session.id)!;
+    const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.status).toBe("running");
     expect(updated.stage).toBe("merge");
   });
@@ -210,8 +210,8 @@ describe("executeAction auto_merge", async () => {
 // ── Test 4: TodoRepository ────────────────────────────────────────────────────
 
 describe("TodoRepository", () => {
-  it("add() creates a todo", () => {
-    const todo = getApp().todos.add("s-todo-1", "Write tests");
+  it("add() creates a todo", async () => {
+    const todo = await getApp().todos.add("s-todo-1", "Write tests");
     expect(todo.id).toBeDefined();
     expect(todo.session_id).toBe("s-todo-1");
     expect(todo.content).toBe("Write tests");
@@ -219,22 +219,22 @@ describe("TodoRepository", () => {
     expect(todo.created_at).toBeDefined();
   });
 
-  it("list() returns todos for a session", () => {
-    getApp().todos.add("s-list-1", "First item");
-    getApp().todos.add("s-list-1", "Second item");
+  it("list() returns todos for a session", async () => {
+    await getApp().todos.add("s-list-1", "First item");
+    await getApp().todos.add("s-list-1", "Second item");
 
-    const todos = getApp().todos.list("s-list-1");
+    const todos = await getApp().todos.list("s-list-1");
     expect(todos).toHaveLength(2);
     expect(todos[0].content).toBe("First item");
     expect(todos[1].content).toBe("Second item");
   });
 
-  it("list() does not return todos from other sessions", () => {
-    getApp().todos.add("s-iso-a", "Session A todo");
-    getApp().todos.add("s-iso-b", "Session B todo");
+  it("list() does not return todos from other sessions", async () => {
+    await getApp().todos.add("s-iso-a", "Session A todo");
+    await getApp().todos.add("s-iso-b", "Session B todo");
 
-    const todosA = getApp().todos.list("s-iso-a");
-    const todosB = getApp().todos.list("s-iso-b");
+    const todosA = await getApp().todos.list("s-iso-a");
+    const todosB = await getApp().todos.list("s-iso-b");
 
     expect(todosA).toHaveLength(1);
     expect(todosA[0].content).toBe("Session A todo");
@@ -242,63 +242,63 @@ describe("TodoRepository", () => {
     expect(todosB[0].content).toBe("Session B todo");
   });
 
-  it("toggle() flips done state", () => {
-    const todo = getApp().todos.add("s-toggle-1", "Toggle me");
+  it("toggle() flips done state", async () => {
+    const todo = await getApp().todos.add("s-toggle-1", "Toggle me");
     expect(todo.done).toBe(false);
 
-    const toggled = getApp().todos.toggle(todo.id);
+    const toggled = await getApp().todos.toggle(todo.id);
     expect(toggled).not.toBeNull();
     expect(toggled!.done).toBe(true);
 
-    const toggledBack = getApp().todos.toggle(todo.id);
+    const toggledBack = await getApp().todos.toggle(todo.id);
     expect(toggledBack).not.toBeNull();
     expect(toggledBack!.done).toBe(false);
   });
 
-  it("toggle() returns null for non-existent id", () => {
-    const result = getApp().todos.toggle(999999);
+  it("toggle() returns null for non-existent id", async () => {
+    const result = await getApp().todos.toggle(999999);
     expect(result).toBeNull();
   });
 
-  it("delete() removes a todo", () => {
-    const todo = getApp().todos.add("s-del-1", "Delete me");
-    expect(getApp().todos.list("s-del-1")).toHaveLength(1);
+  it("delete() removes a todo", async () => {
+    const todo = await getApp().todos.add("s-del-1", "Delete me");
+    expect(await getApp().todos.list("s-del-1")).toHaveLength(1);
 
-    const deleted = getApp().todos.delete(todo.id);
+    const deleted = await getApp().todos.delete(todo.id);
     expect(deleted).toBe(true);
-    expect(getApp().todos.list("s-del-1")).toHaveLength(0);
+    expect(await getApp().todos.list("s-del-1")).toHaveLength(0);
   });
 
-  it("allDone() returns true when no todos exist", () => {
-    expect(getApp().todos.allDone("s-empty-session")).toBe(true);
+  it("allDone() returns true when no todos exist", async () => {
+    expect(await getApp().todos.allDone("s-empty-session")).toBe(true);
   });
 
-  it("allDone() returns true when all todos are done", () => {
-    const t1 = getApp().todos.add("s-alldone-1", "Item 1");
-    const t2 = getApp().todos.add("s-alldone-1", "Item 2");
-    getApp().todos.toggle(t1.id);
-    getApp().todos.toggle(t2.id);
+  it("allDone() returns true when all todos are done", async () => {
+    const t1 = await getApp().todos.add("s-alldone-1", "Item 1");
+    const t2 = await getApp().todos.add("s-alldone-1", "Item 2");
+    await getApp().todos.toggle(t1.id);
+    await getApp().todos.toggle(t2.id);
 
-    expect(getApp().todos.allDone("s-alldone-1")).toBe(true);
+    expect(await getApp().todos.allDone("s-alldone-1")).toBe(true);
   });
 
-  it("allDone() returns false when undone todos exist", () => {
-    const t1 = getApp().todos.add("s-notdone-1", "Item 1");
-    getApp().todos.add("s-notdone-1", "Item 2");
-    getApp().todos.toggle(t1.id); // only one done
+  it("allDone() returns false when undone todos exist", async () => {
+    const t1 = await getApp().todos.add("s-notdone-1", "Item 1");
+    await getApp().todos.add("s-notdone-1", "Item 2");
+    await getApp().todos.toggle(t1.id); // only one done
 
-    expect(getApp().todos.allDone("s-notdone-1")).toBe(false);
+    expect(await getApp().todos.allDone("s-notdone-1")).toBe(false);
   });
 
-  it("deleteForSession() removes all todos for a session", () => {
-    getApp().todos.add("s-purge-1", "Todo A");
-    getApp().todos.add("s-purge-1", "Todo B");
-    getApp().todos.add("s-purge-2", "Todo C"); // different session
+  it("deleteForSession() removes all todos for a session", async () => {
+    await getApp().todos.add("s-purge-1", "Todo A");
+    await getApp().todos.add("s-purge-1", "Todo B");
+    await getApp().todos.add("s-purge-2", "Todo C"); // different session
 
-    getApp().todos.deleteForSession("s-purge-1");
+    await getApp().todos.deleteForSession("s-purge-1");
 
-    expect(getApp().todos.list("s-purge-1")).toHaveLength(0);
-    expect(getApp().todos.list("s-purge-2")).toHaveLength(1);
+    expect(await getApp().todos.list("s-purge-1")).toHaveLength(0);
+    expect(await getApp().todos.list("s-purge-2")).toHaveLength(1);
   });
 });
 
@@ -306,7 +306,7 @@ describe("TodoRepository", () => {
 
 describe("runVerification(getApp())", async () => {
   it("returns ok when no todos and no verify scripts", async () => {
-    const session = getApp().sessions.create({ summary: "verify-clean" });
+    const session = await getApp().sessions.create({ summary: "verify-clean" });
 
     const result = await runVerification(getApp(), session.id);
     expect(result.ok).toBe(true);
@@ -317,8 +317,8 @@ describe("runVerification(getApp())", async () => {
   });
 
   it("fails when undone todos exist", async () => {
-    const session = getApp().sessions.create({ summary: "verify-todos" });
-    getApp().todos.add(session.id, "Must do this");
+    const session = await getApp().sessions.create({ summary: "verify-todos" });
+    await getApp().todos.add(session.id, "Must do this");
 
     const result = await runVerification(getApp(), session.id);
     expect(result.ok).toBe(false);
@@ -327,9 +327,9 @@ describe("runVerification(getApp())", async () => {
   });
 
   it("returns pending todo content in message", async () => {
-    const session = getApp().sessions.create({ summary: "verify-msg" });
-    getApp().todos.add(session.id, "Fix the bug");
-    getApp().todos.add(session.id, "Add tests");
+    const session = await getApp().sessions.create({ summary: "verify-msg" });
+    await getApp().todos.add(session.id, "Fix the bug");
+    await getApp().todos.add(session.id, "Add tests");
 
     const result = await runVerification(getApp(), session.id);
     expect(result.ok).toBe(false);
@@ -345,9 +345,9 @@ describe("runVerification(getApp())", async () => {
   });
 
   it("passes when all todos are done", async () => {
-    const session = getApp().sessions.create({ summary: "verify-done-todos" });
-    const t1 = getApp().todos.add(session.id, "Already done");
-    getApp().todos.toggle(t1.id);
+    const session = await getApp().sessions.create({ summary: "verify-done-todos" });
+    const t1 = await getApp().todos.add(session.id, "Already done");
+    await getApp().todos.toggle(t1.id);
 
     const result = await runVerification(getApp(), session.id);
     expect(result.ok).toBe(true);
@@ -362,17 +362,17 @@ describe("runVerification(getApp())", async () => {
     const tmp = join(process.env.TMPDIR ?? "/tmp", `ark-verify-seam-${Date.now()}`);
     mkdirSync(tmp, { recursive: true });
 
-    getApp().flows.save("verify-flow", {
+    await getApp().flows.save("verify-flow", {
       name: "verify-flow",
       stages: [{ name: "only", agent: "worker", verify: ["good", "bad"] }],
     } as any);
 
-    const session = getApp().sessions.create({
+    const session = await getApp().sessions.create({
       summary: "verify-stub",
       flow: "verify-flow",
       workdir: tmp,
     });
-    getApp().sessions.update(session.id, { stage: "only" });
+    await getApp().sessions.update(session.id, { stage: "only" });
 
     const calls: Array<{ script: string; cwd: string | undefined }> = [];
     const result = await runVerification(getApp(), session.id, {
@@ -400,17 +400,17 @@ describe("runVerification(getApp())", async () => {
     const tmp = join(process.env.TMPDIR ?? "/tmp", `ark-verify-pass-${Date.now()}`);
     mkdirSync(tmp, { recursive: true });
 
-    getApp().flows.save("verify-flow-pass", {
+    await getApp().flows.save("verify-flow-pass", {
       name: "verify-flow-pass",
       stages: [{ name: "only", agent: "worker", verify: ["lint", "test"] }],
     } as any);
 
-    const session = getApp().sessions.create({
+    const session = await getApp().sessions.create({
       summary: "verify-stub-pass",
       flow: "verify-flow-pass",
       workdir: tmp,
     });
-    getApp().sessions.update(session.id, { stage: "only" });
+    await getApp().sessions.update(session.id, { stage: "only" });
 
     const result = await runVerification(getApp(), session.id, {
       runScript: async () => ({ stdout: "", stderr: "" }),
@@ -484,14 +484,14 @@ describe("archive(getApp()) and restore(getApp())", async () => {
   it("archive sets status to archived", async () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { archive } = require("../services/session-orchestration.js");
-    const session = getApp().sessions.create({ summary: "archive-test" });
-    getApp().sessions.update(session.id, { status: "completed" });
+    const session = await getApp().sessions.create({ summary: "archive-test" });
+    await getApp().sessions.update(session.id, { status: "completed" });
 
     const result = await archive(getApp(), session.id);
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Session archived");
 
-    const updated = getApp().sessions.get(session.id);
+    const updated = await getApp().sessions.get(session.id);
     expect(updated!.status).toBe("archived");
   });
 
@@ -506,25 +506,25 @@ describe("archive(getApp()) and restore(getApp())", async () => {
   it("restore sets status to stopped", async () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { archive, restore } = require("../services/session-orchestration.js");
-    const session = getApp().sessions.create({ summary: "restore-test" });
-    getApp().sessions.update(session.id, { status: "completed" });
+    const session = await getApp().sessions.create({ summary: "restore-test" });
+    await getApp().sessions.update(session.id, { status: "completed" });
     await archive(getApp(), session.id);
 
-    const result = restore(getApp(), session.id);
+    const result = await restore(getApp(), session.id);
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Session restored");
 
-    const updated = getApp().sessions.get(session.id);
+    const updated = await getApp().sessions.get(session.id);
     expect(updated!.status).toBe("stopped");
   });
 
-  it("restore returns error when not archived", () => {
+  it("restore returns error when not archived", async () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { restore } = require("../services/session-orchestration.js");
-    const session = getApp().sessions.create({ summary: "restore-not-archived" });
-    getApp().sessions.update(session.id, { status: "completed" });
+    const session = await getApp().sessions.create({ summary: "restore-not-archived" });
+    await getApp().sessions.update(session.id, { status: "completed" });
 
-    const result = restore(getApp(), session.id);
+    const result = await restore(getApp(), session.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not archived");
   });
@@ -532,17 +532,17 @@ describe("archive(getApp()) and restore(getApp())", async () => {
   it("archived sessions excluded from default list", async () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { archive } = require("../services/session-orchestration.js");
-    const session = getApp().sessions.create({ summary: "archive-list-test" });
-    getApp().sessions.update(session.id, { status: "completed" });
+    const session = await getApp().sessions.create({ summary: "archive-list-test" });
+    await getApp().sessions.update(session.id, { status: "completed" });
     await archive(getApp(), session.id);
 
     // Default list should not include archived
-    const defaultList = getApp().sessions.list();
+    const defaultList = await getApp().sessions.list();
     const found = defaultList.find((s: any) => s.id === session.id);
     expect(found).toBeUndefined();
 
     // Filtering for archived should include it
-    const archivedList = getApp().sessions.list({ status: "archived" });
+    const archivedList = await getApp().sessions.list({ status: "archived" });
     const foundArchived = archivedList.find((s: any) => s.id === session.id);
     expect(foundArchived).toBeDefined();
     expect(foundArchived!.status).toBe("archived");

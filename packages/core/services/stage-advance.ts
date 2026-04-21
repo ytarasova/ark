@@ -10,13 +10,13 @@ import type { Session } from "../../types/index.js";
 import * as flow from "../state/flow.js";
 import { saveCheckpoint } from "../session/checkpoint.js";
 import { parseGraphFlow, getSuccessors, resolveNextStages, computeSkippedStages } from "../state/graph-flow.js";
-import { markStageCompleted, setCurrentStage, markStagesSkipped, loadFlowState } from "../state/flow-state.js";
 import { logDebug, logError } from "../observability/structured-log.js";
 import { recordEvent } from "../observability.js";
 import { emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, flushSpans } from "../observability/otlp.js";
 import { loadRepoConfig } from "../repo-config.js";
 
 import { recordSessionUsage, runVerification, cloneSession } from "./session-lifecycle.js";
+import { capturePlanMdIfPresent } from "./plan-artifact.js";
 
 export async function advance(
   app: AppContext,
@@ -35,6 +35,12 @@ export async function advance(
     if (!canProceed) return { ok: false, message: reason };
   }
 
+  // Snapshot PLAN.md from the worktree into BlobStore before we advance off
+  // this stage. Downstream stages (including ones on a different replica)
+  // read the locator from `session.config.plan_md_locator` instead of
+  // expecting the file to still be on whatever local disk wrote it.
+  await capturePlanMdIfPresent(app, session);
+
   // Checkpoint before advancing to next stage
   saveCheckpoint(app, sessionId);
 
@@ -47,7 +53,7 @@ export async function advance(
     const hasDependsOn = flowDef?.stages?.some((s) => s.depends_on?.length > 0);
     if (flowDef && (flowDef.edges?.length > 0 || hasDependsOn)) {
       const graphFlow = parseGraphFlow(flowDef);
-      const flowState = loadFlowState(app, sessionId);
+      const flowState = await app.flowStates.load(sessionId);
       const completedStages = flowState?.completedStages ?? [];
       const skippedStages = flowState?.skippedStages ?? [];
 
@@ -57,7 +63,7 @@ export async function advance(
       if (readyStages.length > 0) {
         // Mark current stage completed
         try {
-          markStageCompleted(app, sessionId, stage);
+          await app.flowStates.markStageCompleted(sessionId, stage);
         } catch {
           logDebug("session", "flow-state persistence is best-effort -- stage still advances");
         }
@@ -68,7 +74,7 @@ export async function advance(
           const newSkipped = computeSkippedStages(graphFlow, stage, readyStages, skippedStages);
           if (newSkipped.length > skippedStages.length) {
             try {
-              markStagesSkipped(app, sessionId, newSkipped);
+              await app.flowStates.markStagesSkipped(sessionId, newSkipped);
             } catch {
               logDebug("session", "flow-state persistence is best-effort -- stage still advances");
             }
@@ -79,7 +85,7 @@ export async function advance(
         // picked up on subsequent advance() calls if the flow has parallel branches)
         const graphNextStage = readyStages[0];
         try {
-          setCurrentStage(app, sessionId, graphNextStage, flowName);
+          await app.flowStates.setCurrentStage(sessionId, graphNextStage, flowName);
         } catch {
           logDebug("session", "flow-state persistence is best-effort -- stage still advances");
         }
@@ -131,7 +137,7 @@ export async function advance(
       if (allSuccessors.length > 0) {
         // Successors exist but aren't ready (join barriers) -- mark completed and wait
         try {
-          markStageCompleted(app, sessionId, stage);
+          await app.flowStates.markStageCompleted(sessionId, stage);
         } catch {
           logDebug("session", "flow-state persistence is best-effort -- stage still advances");
         }
@@ -146,7 +152,7 @@ export async function advance(
 
       // Terminal node -- flow complete
       try {
-        markStageCompleted(app, sessionId, stage);
+        await app.flowStates.markStageCompleted(sessionId, stage);
       } catch {
         logDebug("session", "flow-state persistence is best-effort -- stage still advances");
       }
@@ -186,7 +192,7 @@ export async function advance(
   if (!nextStage) {
     // Flow complete -- persist final stage completion
     try {
-      markStageCompleted(app, sessionId, stage, outcome ? { outcome } : undefined);
+      await app.flowStates.markStageCompleted(sessionId, stage, outcome ? { outcome } : undefined);
     } catch {
       logDebug("session", "flow-state persistence is best-effort -- stage still advances");
     }
@@ -237,12 +243,12 @@ export async function advance(
 
   // Persist flow state: mark completed + set next
   try {
-    markStageCompleted(app, sessionId, stage, outcome ? { outcome } : undefined);
+    await app.flowStates.markStageCompleted(sessionId, stage, outcome ? { outcome } : undefined);
   } catch {
     logDebug("session", "flow-state persistence is best-effort -- stage still advances");
   }
   try {
-    setCurrentStage(app, sessionId, nextStage, flowName);
+    await app.flowStates.setCurrentStage(sessionId, nextStage, flowName);
   } catch {
     logDebug("session", "flow-state persistence is best-effort -- stage still advances");
   }

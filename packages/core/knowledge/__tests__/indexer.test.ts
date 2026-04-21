@@ -194,9 +194,7 @@ describe("indexCodebase", async () => {
       return "";
     };
 
-    (await expect(await indexCodebase("/fake/repo", store, { exec: fakeExec }))).rejects.toThrow(
-      "codegraph is required",
-    );
+    await expect(indexCodebase("/fake/repo", store, { exec: fakeExec })).rejects.toThrow("codegraph is required");
   });
 });
 
@@ -273,7 +271,7 @@ describe("indexSessionCompletion", async () => {
     await store.addNode({ id: "file:src/main.ts", type: "file", label: "src/main.ts" });
     await store.addNode({ id: "file:src/utils.ts", type: "file", label: "src/utils.ts" });
 
-    indexSessionCompletion(store, "s-123", "Fix login bug", "success", ["src/main.ts", "src/utils.ts"]);
+    await indexSessionCompletion(store, "s-123", "Fix login bug", "success", ["src/main.ts", "src/utils.ts"]);
 
     const sessionNode = await store.getNode("session:s-123");
     expect(sessionNode).not.toBeNull();
@@ -296,7 +294,7 @@ describe("indexSessionCompletion", async () => {
       metadata: { outcome: "running" },
     });
 
-    indexSessionCompletion(store, "s-456", "Updated summary", "success", ["src/app.ts"]);
+    await indexSessionCompletion(store, "s-456", "Updated summary", "success", ["src/app.ts"]);
 
     const node = await store.getNode("session:s-456");
     expect(node).not.toBeNull();
@@ -306,7 +304,7 @@ describe("indexSessionCompletion", async () => {
   });
 
   it("handles empty changed files list", async () => {
-    indexSessionCompletion(store, "s-789", "No file changes", "success", []);
+    await indexSessionCompletion(store, "s-789", "No file changes", "success", []);
 
     const node = await store.getNode("session:s-789");
     expect(node).not.toBeNull();

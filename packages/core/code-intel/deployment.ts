@@ -1,9 +1,10 @@
 /**
  * Deployment factory -- builds a Deployment bag from an AppContext.
  *
- * This is the ONE place where the local-vs-control-plane split is
- * decided. Every other module (extractors, queries, pipeline, store)
- * takes a `Deployment` and is mode-agnostic.
+ * Reads deployment shape from `app.mode` rather than re-sniffing the raw
+ * config URL. The `buildAppMode` factory is the single place that converts
+ * `databaseUrl` into `mode.database.dialect` + `mode.kind`; every other
+ * module (including this one) takes the result.
  *
  * Local profile (Wave 1 default):
  *   SQLite + filesystem vendor + local subprocess + ~/.ark/code-intel
@@ -12,10 +13,6 @@
  * Control-plane profile (Wave 3+ swap-ins):
  *   Postgres + in-image vendor + arkd-RPC executor + PVC/S3 storage
  *   + RLS policy + OTLP observability.
- *
- * The factory detects mode from `app.config.profile` and from
- * `app.config.database.url` (presence of postgres:// implies hosted,
- * even if profile was left as `local` for some reason).
  */
 
 import type { AppContext } from "../app.js";
@@ -27,16 +24,14 @@ import { AllowAllPolicy } from "./policy/allow-all.js";
 import { StderrObservability } from "./observability/stderr.js";
 
 export function buildDeployment(app: AppContext): Deployment {
-  const url = app.config.database?.url ?? app.config.databaseUrl;
-  const isPostgres = !!url && (url.startsWith("postgres://") || url.startsWith("postgresql://"));
-  const profile = app.config.profile;
-  const mode: Deployment["mode"] = profile === "control-plane" || isPostgres ? "control-plane" : "local";
+  const mode: Deployment["mode"] = app.mode.kind === "hosted" ? "control-plane" : "local";
+  const storeBackend = app.mode.database.dialect;
 
   const vendorResolver = new FilesystemVendorResolver();
   const arkDir = app.config.arkDir ?? app.config.dirs?.ark ?? process.cwd();
   return {
     mode,
-    storeBackend: isPostgres ? "postgres" : "sqlite",
+    storeBackend,
     vendorResolver,
     executor: new LocalBinaryExecutor(vendorResolver),
     storage: new LocalRepoStorage(arkDir),

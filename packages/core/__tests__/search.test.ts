@@ -26,7 +26,7 @@ const { getCtx } = withTestContext();
 
 describe("searchSessions", async () => {
   it("finds session by summary", async () => {
-    getApp().sessions.create({ summary: "Fix login redirect bug" });
+    await getApp().sessions.create({ summary: "Fix login redirect bug" });
     const results = await searchSessions(getApp(), "login redirect");
     expect(results.length).toBeGreaterThanOrEqual(1);
     expect(results.some((r) => r.source === "metadata")).toBe(true);
@@ -34,7 +34,7 @@ describe("searchSessions", async () => {
   });
 
   it("finds session by ticket (jira_key)", async () => {
-    getApp().sessions.create({ ticket: "PROJ-1234", summary: "some task" });
+    await getApp().sessions.create({ ticket: "PROJ-1234", summary: "some task" });
     const results = await searchSessions(getApp(), "PROJ-1234");
     expect(results.length).toBeGreaterThanOrEqual(1);
     const meta = results.find((r) => r.source === "metadata");
@@ -42,7 +42,7 @@ describe("searchSessions", async () => {
   });
 
   it("finds session by repo", async () => {
-    getApp().sessions.create({ repo: "acme/widget-service", summary: "work" });
+    await getApp().sessions.create({ repo: "acme/widget-service", summary: "work" });
     const results = await searchSessions(getApp(), "widget-service");
     expect(results.length).toBeGreaterThanOrEqual(1);
     const meta = results.find((r) => r.source === "metadata");
@@ -50,8 +50,8 @@ describe("searchSessions", async () => {
   });
 
   it("finds matches in event data", async () => {
-    const session = getApp().sessions.create({ summary: "unrelated" });
-    getApp().events.log(session.id, "deploy", { data: { message: "deployed to staging-east" } });
+    const session = await getApp().sessions.create({ summary: "unrelated" });
+    await getApp().events.log(session.id, "deploy", { data: { message: "deployed to staging-east" } });
     const results = await searchSessions(getApp(), "staging-east");
     const ev = results.find((r) => r.source === "event");
     expect(ev).toBeDefined();
@@ -59,8 +59,8 @@ describe("searchSessions", async () => {
   });
 
   it("finds matches in messages", async () => {
-    const session = getApp().sessions.create({ summary: "unrelated" });
-    getApp().messages.send(session.id, "agent" as MessageRole, "Refactored the payment module");
+    const session = await getApp().sessions.create({ summary: "unrelated" });
+    await getApp().messages.send(session.id, "agent" as MessageRole, "Refactored the payment module");
     const results = await searchSessions(getApp(), "payment module");
     const msg = results.find((r) => r.source === "message");
     expect(msg).toBeDefined();
@@ -68,7 +68,7 @@ describe("searchSessions", async () => {
   });
 
   it("is case insensitive", async () => {
-    getApp().sessions.create({ summary: "Upgrade PostgreSQL driver" });
+    await getApp().sessions.create({ summary: "Upgrade PostgreSQL driver" });
     const upper = await searchSessions(getApp(), "POSTGRESQL");
     const lower = await searchSessions(getApp(), "postgresql");
     expect(upper.length).toBeGreaterThanOrEqual(1);
@@ -77,7 +77,7 @@ describe("searchSessions", async () => {
 
   it("limits results", async () => {
     for (let i = 0; i < 10; i++) {
-      getApp().sessions.create({ summary: `batch task ${i}` });
+      await getApp().sessions.create({ summary: `batch task ${i}` });
     }
     const results = await searchSessions(getApp(), "batch task", { limit: 3 });
     expect(results.length).toBeLessThanOrEqual(3);
@@ -85,7 +85,7 @@ describe("searchSessions", async () => {
 
   it("deduplicates by sessionId + source", async () => {
     // A session whose summary AND ticket both match
-    getApp().sessions.create({ ticket: "DUP-99", summary: "DUP-99 duplicate test" });
+    await getApp().sessions.create({ ticket: "DUP-99", summary: "DUP-99 duplicate test" });
     const results = await searchSessions(getApp(), "DUP-99");
     const metaResults = results.filter((r) => r.source === "metadata");
     // Should appear at most once for metadata even though both jira_key and jira_summary match
@@ -93,13 +93,13 @@ describe("searchSessions", async () => {
   });
 
   it("returns empty array when nothing matches", async () => {
-    getApp().sessions.create({ summary: "something else" });
+    await getApp().sessions.create({ summary: "something else" });
     const results = await searchSessions(getApp(), "zzz_nonexistent_zzz");
     expect(results).toEqual([]);
   });
 
   it("returns results with timestamps", async () => {
-    getApp().sessions.create({ summary: "timestamped session" });
+    await getApp().sessions.create({ summary: "timestamped session" });
     const results = await searchSessions(getApp(), "timestamped");
     expect(results.length).toBeGreaterThanOrEqual(1);
     for (const r of results) {
@@ -108,9 +108,9 @@ describe("searchSessions", async () => {
   });
 
   it("returns results from multiple sources", async () => {
-    const session = getApp().sessions.create({ summary: "multi-source alpha" });
-    getApp().messages.send(session.id, "agent" as MessageRole, "working on alpha feature");
-    getApp().events.log(session.id, "note", { data: { note: "alpha checkpoint" } });
+    const session = await getApp().sessions.create({ summary: "multi-source alpha" });
+    await getApp().messages.send(session.id, "agent" as MessageRole, "working on alpha feature");
+    await getApp().events.log(session.id, "note", { data: { note: "alpha checkpoint" } });
 
     const results = await searchSessions(getApp(), "alpha");
     const sources = new Set(results.map((r) => r.source));
@@ -463,18 +463,18 @@ describe("indexTranscripts filtering", async () => {
 // ── indexSession ─────────────────────────────────────────────────────────────
 
 describe("indexSession", () => {
-  it("indexes a single transcript file", () => {
+  it("indexes a single transcript file", async () => {
     const transcriptPath = join(getCtx().arkDir, "single.jsonl");
     writeFileSync(
       transcriptPath,
       JSON.stringify({ type: "assistant", message: { role: "assistant", content: "hello world" } }),
     );
 
-    const count = indexSession(getApp(), transcriptPath, "s-single", "test-project");
+    const count = await indexSession(getApp(), transcriptPath, "s-single", "test-project");
     expect(count).toBe(1);
   });
 
-  it("incremental -- does not duplicate on second call", () => {
+  it("incremental -- does not duplicate on second call", async () => {
     const transcriptPath = join(getCtx().arkDir, "replace.jsonl");
     writeFileSync(
       transcriptPath,
@@ -484,7 +484,7 @@ describe("indexSession", () => {
         timestamp: "2026-01-01T00:01:00Z",
       }),
     );
-    indexSession(getApp(), transcriptPath, "s-replace");
+    await indexSession(getApp(), transcriptPath, "s-replace");
 
     writeFileSync(
       transcriptPath,
@@ -501,9 +501,9 @@ describe("indexSession", () => {
         }),
       ].join("\n"),
     );
-    indexSession(getApp(), transcriptPath, "s-replace");
+    await indexSession(getApp(), transcriptPath, "s-replace");
 
-    const turns = getSessionConversation(getApp(), "s-replace");
+    const turns = await getSessionConversation(getApp(), "s-replace");
     expect(turns.length).toBe(2); // Not 3 (no duplicate of first)
   });
 });
@@ -541,15 +541,15 @@ describe("getSessionConversation", async () => {
     );
     await indexTranscripts(getApp(), { transcriptsDir: join(getCtx().arkDir, "claude-projects") });
 
-    const turns = getSessionConversation(getApp(), "conv-sess");
+    const turns = await getSessionConversation(getApp(), "conv-sess");
     expect(turns.length).toBe(4);
     expect(turns[0].role).toBe("user");
     expect(turns[0].content).toBe("hello there friend");
     expect(turns[3].content).toContain("authentication");
   });
 
-  it("returns empty for unknown session", () => {
-    expect(getSessionConversation(getApp(), "nonexistent")).toEqual([]);
+  it("returns empty for unknown session", async () => {
+    expect(await getSessionConversation(getApp(), "nonexistent")).toEqual([]);
   });
 
   it("respects limit", async () => {
@@ -582,7 +582,7 @@ describe("getSessionConversation", async () => {
     );
     await indexTranscripts(getApp(), { transcriptsDir: join(getCtx().arkDir, "claude-projects") });
 
-    const turns = getSessionConversation(getApp(), "conv-sess2", { limit: 2 });
+    const turns = await getSessionConversation(getApp(), "conv-sess2", { limit: 2 });
     expect(turns.length).toBe(2);
   });
 });
@@ -610,7 +610,7 @@ describe("searchSessionConversation", async () => {
     );
     await indexTranscripts(getApp(), { transcriptsDir: join(getCtx().arkDir, "claude-projects") });
 
-    const results = searchSessionConversation(getApp(), "search-conv-sess", "authentication");
+    const results = await searchSessionConversation(getApp(), "search-conv-sess", "authentication");
     expect(results.length).toBeGreaterThan(0);
     expect(results[0].sessionId).toBe("search-conv-sess");
   });
@@ -644,21 +644,21 @@ describe("searchSessionConversation", async () => {
 
     await indexTranscripts(getApp(), { transcriptsDir: join(getCtx().arkDir, "claude-projects") });
 
-    const results = searchSessionConversation(getApp(), "iso-sess1", "authentication");
+    const results = await searchSessionConversation(getApp(), "iso-sess1", "authentication");
     for (const r of results) {
       expect(r.sessionId).toBe("iso-sess1");
     }
   });
 
-  it("returns empty for no matches", () => {
-    expect(searchSessionConversation(getApp(), "iso-sess1", "zzz_impossible_zzz")).toEqual([]);
+  it("returns empty for no matches", async () => {
+    expect(await searchSessionConversation(getApp(), "iso-sess1", "zzz_impossible_zzz")).toEqual([]);
   });
 });
 
 // ── indexSession improvements ────────────────────────────────────────────────
 
 describe("indexSession improvements", () => {
-  it("skips tool_result entries", () => {
+  it("skips tool_result entries", async () => {
     const path = join(getCtx().arkDir, "tool-test.jsonl");
     writeFileSync(
       path,
@@ -675,11 +675,11 @@ describe("indexSession improvements", () => {
         }),
       ].join("\n"),
     );
-    const count = indexSession(getApp(), path, "tool-test");
+    const count = await indexSession(getApp(), path, "tool-test");
     expect(count).toBe(1); // only the assistant message
   });
 
-  it("skips tool_use-only entries", () => {
+  it("skips tool_use-only entries", async () => {
     const path = join(getCtx().arkDir, "tooluse-test.jsonl");
     writeFileSync(
       path,
@@ -696,11 +696,11 @@ describe("indexSession improvements", () => {
         }),
       ].join("\n"),
     );
-    const count = indexSession(getApp(), path, "tooluse-test");
+    const count = await indexSession(getApp(), path, "tooluse-test");
     expect(count).toBe(1); // only the user message
   });
 
-  it("incremental -- second call adds only new entries", () => {
+  it("incremental -- second call adds only new entries", async () => {
     const path = join(getCtx().arkDir, "incr-test.jsonl");
     writeFileSync(
       path,
@@ -710,7 +710,7 @@ describe("indexSession improvements", () => {
         timestamp: "2026-01-01T00:01:00Z",
       }),
     );
-    indexSession(getApp(), path, "incr-test");
+    await indexSession(getApp(), path, "incr-test");
 
     // Add more content
     writeFileSync(
@@ -728,9 +728,9 @@ describe("indexSession improvements", () => {
         }),
       ].join("\n"),
     );
-    indexSession(getApp(), path, "incr-test");
+    await indexSession(getApp(), path, "incr-test");
 
-    const turns = getSessionConversation(getApp(), "incr-test");
+    const turns = await getSessionConversation(getApp(), "incr-test");
     expect(turns.length).toBe(2); // not 3 (no duplicate)
   });
 });
@@ -770,8 +770,8 @@ describe("readTranscriptTail", () => {
 // ── getIndexStats ────────────────────────────────────────────────────────────
 
 describe("getIndexStats", () => {
-  it("returns zeros when index is empty", () => {
-    const stats = getIndexStats(getApp());
+  it("returns zeros when index is empty", async () => {
+    const stats = await getIndexStats(getApp());
     expect(stats.entries).toBe(0);
     expect(stats.sessions).toBe(0);
   });

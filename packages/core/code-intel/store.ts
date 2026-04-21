@@ -289,10 +289,7 @@ export class CodeIntelStore {
 
   /** Build a store bound to an AppContext, picking up dialect + db. */
   static fromApp(app: AppContext): CodeIntelStore {
-    const url = app.config.database?.url ?? app.config.databaseUrl;
-    const dialect: "sqlite" | "postgres" =
-      url && (url.startsWith("postgres://") || url.startsWith("postgresql://")) ? "postgres" : "sqlite";
-    return new CodeIntelStore(app.db, { dialect });
+    return new CodeIntelStore(app.db, { dialect: app.mode.database.dialect });
   }
 
   /** Idempotent: applies any pending migrations. Safe to call on boot. */

@@ -109,7 +109,7 @@ function toolResultTurn(ts: string) {
 
 describe("E2E: Hook -> Index -> Query flow", async () => {
   it("Stop hook with transcript_path indexes and getSessionConversation returns turns", async () => {
-    const session = getApp().sessions.create({ summary: "e2e-conv-basic" });
+    const session = await getApp().sessions.create({ summary: "e2e-conv-basic" });
     await app.sessions.update(session.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
 
     const transcriptPath = writeTranscript(app.config.arkDir, "conv-basic.jsonl", [
@@ -125,7 +125,7 @@ describe("E2E: Hook -> Index -> Query flow", async () => {
     });
     expect(resp.status).toBe(200);
 
-    const turns = getSessionConversation(getApp(), session.id);
+    const turns = await getSessionConversation(getApp(), session.id);
     expect(turns.length).toBe(4);
     expect(turns[0].role).toBe("user");
     expect(turns[0].content).toContain("auth bug");
@@ -138,7 +138,7 @@ describe("E2E: Hook -> Index -> Query flow", async () => {
 
 describe("E2E: Incremental indexing", async () => {
   it("second Stop hook adds new messages without duplicates", async () => {
-    const session = getApp().sessions.create({ summary: "e2e-incremental" });
+    const session = await getApp().sessions.create({ summary: "e2e-incremental" });
     await app.sessions.update(session.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
 
     const transcriptPath = writeTranscript(app.config.arkDir, "conv-incr.jsonl", [
@@ -152,7 +152,7 @@ describe("E2E: Incremental indexing", async () => {
       transcript_path: transcriptPath,
     });
 
-    let turns = getSessionConversation(getApp(), session.id);
+    let turns = await getSessionConversation(getApp(), session.id);
     expect(turns.length).toBe(2);
 
     // Append more conversation to the transcript
@@ -168,7 +168,7 @@ describe("E2E: Incremental indexing", async () => {
       transcript_path: transcriptPath,
     });
 
-    turns = getSessionConversation(getApp(), session.id);
+    turns = await getSessionConversation(getApp(), session.id);
     expect(turns.length).toBe(4); // not 6 (no duplicates)
     expect(turns[0].content).toContain("caching layer");
     expect(turns[2].content).toContain("cache invalidation");
@@ -179,7 +179,7 @@ describe("E2E: Incremental indexing", async () => {
 describe("E2E: Per-session search", async () => {
   it("searchSessionConversation is scoped to one session", async () => {
     // Session A -- talks about authentication
-    const sessionA = getApp().sessions.create({ summary: "e2e-search-A" });
+    const sessionA = await getApp().sessions.create({ summary: "e2e-search-A" });
     await app.sessions.update(sessionA.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
     const pathA = writeTranscript(app.config.arkDir, "conv-a.jsonl", [
       userTurn("fix the authentication middleware vulnerability", "2026-01-01T00:01:00Z"),
@@ -188,7 +188,7 @@ describe("E2E: Per-session search", async () => {
     await postHookStatus(sessionA.id, { hook_event_name: "Stop", transcript_path: pathA });
 
     // Session B -- talks about database
-    const sessionB = getApp().sessions.create({ summary: "e2e-search-B" });
+    const sessionB = await getApp().sessions.create({ summary: "e2e-search-B" });
     await app.sessions.update(sessionB.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
     const pathB = writeTranscript(app.config.arkDir, "conv-b.jsonl", [
       userTurn("optimize the database connection pooling", "2026-01-01T00:01:00Z"),
@@ -197,18 +197,18 @@ describe("E2E: Per-session search", async () => {
     await postHookStatus(sessionB.id, { hook_event_name: "Stop", transcript_path: pathB });
 
     // Search A for "authentication" -- should find results
-    const resultsA = searchSessionConversation(getApp(), sessionA.id, "authentication");
+    const resultsA = await searchSessionConversation(getApp(), sessionA.id, "authentication");
     expect(resultsA.length).toBeGreaterThan(0);
     for (const r of resultsA) {
       expect(r.sessionId).toBe(sessionA.id);
     }
 
     // Search B for "authentication" -- should find nothing (it's about database)
-    const resultsB = searchSessionConversation(getApp(), sessionB.id, "authentication");
+    const resultsB = await searchSessionConversation(getApp(), sessionB.id, "authentication");
     expect(resultsB.length).toBe(0);
 
     // Search B for "database" -- should find results
-    const resultsBdb = searchSessionConversation(getApp(), sessionB.id, "database");
+    const resultsBdb = await searchSessionConversation(getApp(), sessionB.id, "database");
     expect(resultsBdb.length).toBeGreaterThan(0);
     for (const r of resultsBdb) {
       expect(r.sessionId).toBe(sessionB.id);
@@ -219,7 +219,7 @@ describe("E2E: Per-session search", async () => {
 describe("E2E: Cross-session search", async () => {
   it("searchTranscripts finds matches across both sessions via FTS5", async () => {
     // Session C -- mentions "deployment pipeline"
-    const sessionC = getApp().sessions.create({ summary: "e2e-cross-C" });
+    const sessionC = await getApp().sessions.create({ summary: "e2e-cross-C" });
     await app.sessions.update(sessionC.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
     const pathC = writeTranscript(app.config.arkDir, "conv-c.jsonl", [
       assistantTurn("I have configured the deployment pipeline for staging", "2026-01-01T00:01:00Z"),
@@ -227,7 +227,7 @@ describe("E2E: Cross-session search", async () => {
     await postHookStatus(sessionC.id, { hook_event_name: "Stop", transcript_path: pathC });
 
     // Session D -- also mentions "deployment"
-    const sessionD = getApp().sessions.create({ summary: "e2e-cross-D" });
+    const sessionD = await getApp().sessions.create({ summary: "e2e-cross-D" });
     await app.sessions.update(sessionD.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
     const pathD = writeTranscript(app.config.arkDir, "conv-d.jsonl", [
       assistantTurn("Fixed the deployment rollback mechanism for production", "2026-01-01T00:01:00Z"),
@@ -250,7 +250,7 @@ describe("E2E: Cross-session search", async () => {
 
 describe("E2E: Token usage stored on hook", async () => {
   it("Stop hook with transcript_path stores aggregated token usage", async () => {
-    const session = getApp().sessions.create({ summary: "e2e-usage" });
+    const session = await getApp().sessions.create({ summary: "e2e-usage" });
     await app.sessions.update(session.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
 
     const transcriptPath = writeTranscript(app.config.arkDir, "conv-usage.jsonl", [
@@ -288,7 +288,7 @@ describe("E2E: Token usage stored on hook", async () => {
 
 describe("E2E: Noise filtering", async () => {
   it("tool_use and tool_result entries are not in getSessionConversation", async () => {
-    const session = getApp().sessions.create({ summary: "e2e-noise" });
+    const session = await getApp().sessions.create({ summary: "e2e-noise" });
     await app.sessions.update(session.id, { status: "running", claude_session_id: CLAUDE_SESSION_ID });
 
     const transcriptPath = writeTranscript(app.config.arkDir, "conv-noise.jsonl", [
@@ -307,7 +307,7 @@ describe("E2E: Noise filtering", async () => {
       transcript_path: transcriptPath,
     });
 
-    const turns = getSessionConversation(getApp(), session.id);
+    const turns = await getSessionConversation(getApp(), session.id);
     // Should only have the 4 real messages, not the tool_use/tool_result noise
     expect(turns.length).toBe(4);
     for (const turn of turns) {

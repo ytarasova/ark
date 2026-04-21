@@ -19,7 +19,7 @@ describe("fan-out E2E", async () => {
     await app.sessions.update(parent.id, { stage: "implement", status: "running" });
 
     // 2. Fan out into 3 children
-    const result = fanOut(app, parent.id, {
+    const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "Task A" }, { summary: "Task B" }, { summary: "Task C" }],
     });
     expect(result.ok).toBe(true);
@@ -106,7 +106,7 @@ describe("fan-out E2E", async () => {
     const parent = await app.sessions.create({ summary: "Partial fail", flow: "bare" });
     await app.sessions.update(parent.id, { stage: "implement", status: "running" });
 
-    const result = fanOut(app, parent.id, {
+    const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "Will pass" }, { summary: "Will fail" }],
     });
 

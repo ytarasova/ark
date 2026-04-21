@@ -72,14 +72,14 @@ describe("getSessionCost", async () => {
     const app = getApp();
     const s = await app.sessions.create({ summary: "test" });
     recordUsage(s.id, "sonnet", { input_tokens: 1_000_000, output_tokens: 0 });
-    const sc = getSessionCost(app, await app.sessions.get(s.id)!);
+    const sc = await getSessionCost(app, (await app.sessions.get(s.id))!);
     expect(sc.cost).toBeCloseTo(3.0, 2);
   });
 
   it("returns 0 cost for session without records", async () => {
     const app = getApp();
     const s = await app.sessions.create({ summary: "no-usage" });
-    const sc = getSessionCost(app, s);
+    const sc = await getSessionCost(app, s);
     expect(sc.cost).toBe(0);
   });
 });
@@ -91,7 +91,7 @@ describe("getAllSessionCosts", async () => {
     const s2 = await app.sessions.create({ summary: "expensive" });
     recordUsage(s1.id, "haiku", { input_tokens: 100_000, output_tokens: 0 });
     recordUsage(s2.id, "opus", { input_tokens: 100_000, output_tokens: 0 });
-    const sessions = [await app.sessions.get(s1.id)!, await app.sessions.get(s2.id)!];
+    const sessions = [(await app.sessions.get(s1.id))!, (await app.sessions.get(s2.id))!];
     const result = await getAllSessionCosts(app, sessions);
     expect(result.sessions.length).toBe(2);
     expect(result.sessions[0].sessionId).toBe(s2.id); // opus is more expensive
@@ -103,7 +103,7 @@ describe("getAllSessionCosts", async () => {
     const s1 = await app.sessions.create({ summary: "has-cost" });
     const s2 = await app.sessions.create({ summary: "no-cost" });
     recordUsage(s1.id, "sonnet", { input_tokens: 100_000, output_tokens: 0 });
-    const sessions = [await app.sessions.get(s1.id)!, s2];
+    const sessions = [(await app.sessions.get(s1.id))!, s2];
     const result = await getAllSessionCosts(app, sessions);
     expect(result.sessions.length).toBe(1);
     expect(result.sessions[0].sessionId).toBe(s1.id);
@@ -151,7 +151,7 @@ describe("getAllSessionCosts edge cases", async () => {
   it("skips sessions with zero cost", async () => {
     const app = getApp();
     const s = await app.sessions.create({ summary: "no-tokens" });
-    const result = await getAllSessionCosts(app, [await app.sessions.get(s.id)!]);
+    const result = await getAllSessionCosts(app, [(await app.sessions.get(s.id))!]);
     expect(result.sessions).toHaveLength(0);
   });
 
@@ -162,7 +162,7 @@ describe("getAllSessionCosts edge cases", async () => {
     recordUsage(s1.id, "opus", { input_tokens: 100_000, output_tokens: 0 });
     recordUsage(s2.id, "haiku", { input_tokens: 100_000, output_tokens: 0 });
 
-    const result = await getAllSessionCosts(app, [await app.sessions.get(s1.id)!, await app.sessions.get(s2.id)!]);
+    const result = await getAllSessionCosts(app, [(await app.sessions.get(s1.id))!, (await app.sessions.get(s2.id))!]);
     expect(result.sessions).toHaveLength(2);
     expect(result.sessions[0].cost).toBeGreaterThan(result.sessions[1].cost); // opus > haiku
     expect(result.total).toBeGreaterThan(0);
@@ -175,7 +175,7 @@ describe("checkBudget", async () => {
     const s = await app.sessions.create({ summary: "budget-test" });
     recordUsage(s.id, "opus", { input_tokens: 10_000_000, output_tokens: 1_000_000 });
 
-    const sessions = [await app.sessions.get(s.id)!];
+    const sessions = [(await app.sessions.get(s.id))!];
     const status = await checkBudget(app, sessions, { dailyLimit: 10 });
     expect(status.daily.exceeded).toBe(true);
     expect(status.daily.warning).toBe(true);
@@ -186,7 +186,7 @@ describe("checkBudget", async () => {
     const s = await app.sessions.create({ summary: "cheap" });
     recordUsage(s.id, "haiku", { input_tokens: 1000, output_tokens: 100 });
 
-    const sessions = [await app.sessions.get(s.id)!];
+    const sessions = [(await app.sessions.get(s.id))!];
     const status = await checkBudget(app, sessions, { dailyLimit: 100 });
     expect(status.daily.exceeded).toBe(false);
     expect(status.daily.warning).toBe(false);

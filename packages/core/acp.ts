@@ -57,12 +57,12 @@ export async function handleAcpRequest(app: AppContext, req: AcpRequest): Promis
 
       case "session/get": {
         const sessionId = req.params?.sessionId as string;
-        const session = app.sessions.get(sessionId);
+        const session = await app.sessions.get(sessionId);
         return { jsonrpc: "2.0", result: session, id };
       }
 
       case "session/list": {
-        const sessions = app.sessions.list({ limit: (req.params?.limit as number) ?? 100 });
+        const sessions = await app.sessions.list({ limit: (req.params?.limit as number) ?? 100 });
         return { jsonrpc: "2.0", result: sessions, id };
       }
 

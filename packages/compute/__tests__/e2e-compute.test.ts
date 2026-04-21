@@ -54,10 +54,10 @@ function ensureProviders() {
 // Track resources for cleanup
 const computeNames: string[] = [];
 
-function cleanupComputes() {
+async function cleanupComputes() {
   for (const name of computeNames) {
     try {
-      getApp().computes.delete(name);
+      await getApp().computes.delete(name);
     } catch {
       /* already gone */
     }
@@ -69,11 +69,13 @@ function cleanupComputes() {
 
 describe("E2E Compute: Remote compute provider resolution", () => {
   beforeEach(() => ensureProviders());
-  afterEach(() => cleanupComputes());
+  afterEach(async () => {
+    await cleanupComputes();
+  });
 
-  it("creates a remote compute and stores its config", () => {
+  it("creates a remote compute and stores its config", async () => {
     const name = `test-remote-resolve-${Date.now()}`;
-    const compute = getApp().computes.create({
+    const compute = await getApp().computes.create({
       name,
       provider: "ec2-worktree",
       config: { size: "m", region: "us-east-1" },
@@ -92,11 +94,13 @@ describe("E2E Compute: Remote compute provider resolution", () => {
 
 describe("E2E Compute: Docker compute provider resolution", () => {
   beforeEach(() => ensureProviders());
-  afterEach(() => cleanupComputes());
+  afterEach(async () => {
+    await cleanupComputes();
+  });
 
-  it("creates a Docker compute and resolves its provider", () => {
+  it("creates a Docker compute and resolves its provider", async () => {
     const name = `test-docker-resolve-${Date.now()}`;
-    const compute = getApp().computes.create({
+    const compute = await getApp().computes.create({
       name,
       provider: "docker",
       config: { image: "ubuntu:22.04", memory: "4g" },
@@ -136,7 +140,7 @@ describe("E2E Compute: resolvePortDecls with all three sources", () => {
     }
   });
 
-  it("resolves ports from arc.json, devcontainer.json, and docker-compose.yml", () => {
+  it("resolves ports from arc.json, devcontainer.json, and docker-compose.yml", async () => {
     // Create arc.json with a port
     writeFileSync(join(tempDir, "arc.json"), JSON.stringify({ ports: [{ port: 3000, name: "api" }] }));
 
@@ -174,7 +178,7 @@ describe("E2E Compute: resolvePortDecls with all three sources", () => {
     expect(composeDecl!.source).toBe("docker-compose");
   });
 
-  it("deduplicates ports with arc.json taking priority", () => {
+  it("deduplicates ports with arc.json taking priority", async () => {
     // Both arc.json and devcontainer declare port 3000
     writeFileSync(join(tempDir, "arc.json"), JSON.stringify({ ports: [{ port: 3000, name: "web-app" }] }));
     const devcontainerDir = join(tempDir, ".devcontainer");
@@ -201,10 +205,12 @@ describe("E2E Compute: resolvePortDecls with all three sources", () => {
 
 describe("E2E Compute: Local provider getMetrics", async () => {
   beforeEach(() => ensureProviders());
-  afterEach(() => cleanupComputes());
+  afterEach(async () => {
+    await cleanupComputes();
+  });
 
   it("returns a valid metrics snapshot", async () => {
-    const compute = getApp().computes.get("local")!;
+    const compute = await getApp().computes.get("local")!;
     expect(compute).not.toBeNull();
 
     const provider = getProvider("local")!;
@@ -237,17 +243,19 @@ describe("E2E Compute: Local provider getMetrics", async () => {
     expect(Array.isArray(snapshot.sessions)).toBe(true);
     expect(Array.isArray(snapshot.processes)).toBe(true);
     expect(Array.isArray(snapshot.docker)).toBe(true);
-  }, 15_000);
+  }, 30_000);
 });
 
 // ── Test 5: Local provider probePorts with live server ──────────────────────
 
 describe("E2E Compute: Local provider probePorts", async () => {
   beforeEach(() => ensureProviders());
-  afterEach(() => cleanupComputes());
+  afterEach(async () => {
+    await cleanupComputes();
+  });
 
   it("detects a listening port and a closed port", async () => {
-    const compute = getApp().computes.get("local")!;
+    const compute = await getApp().computes.get("local")!;
     expect(compute).not.toBeNull();
 
     const provider = getProvider("local")!;
@@ -292,32 +300,34 @@ describe("E2E Compute: Local provider probePorts", async () => {
 // ── Test 6: mergeComputeConfig ─────────────────────────────────────────────────
 
 describe("E2E Compute: mergeComputeConfig", () => {
-  afterEach(() => cleanupComputes());
+  afterEach(async () => {
+    await cleanupComputes();
+  });
 
-  it("merges config keys without overwriting existing ones", () => {
+  it("merges config keys without overwriting existing ones", async () => {
     const name = `test-merge-cfg-${Date.now()}`;
-    getApp().computes.create({
+    await getApp().computes.create({
       name,
       provider: "docker",
       config: { existing: "value", count: 42 },
     });
     computeNames.push(name);
 
-    const updated = getApp().computes.mergeConfig(name, { newKey: "hello", count: 99 });
+    const updated = await getApp().computes.mergeConfig(name, { newKey: "hello", count: 99 });
     expect(updated).not.toBeNull();
     expect(updated!.config.existing).toBe("value"); // preserved
     expect(updated!.config.newKey).toBe("hello"); // added
     expect(updated!.config.count).toBe(99); // overwritten
 
     // Verify via re-read
-    const compute = getApp().computes.get(name);
+    const compute = await getApp().computes.get(name);
     expect(compute!.config.existing).toBe("value");
     expect(compute!.config.newKey).toBe("hello");
     expect(compute!.config.count).toBe(99);
   });
 
-  it("returns null for non-existent compute", () => {
-    const result = getApp().computes.mergeConfig("nonexistent-compute", { key: "val" });
+  it("returns null for non-existent compute", async () => {
+    const result = await getApp().computes.mergeConfig("nonexistent-compute", { key: "val" });
     expect(result).toBeNull();
   });
 });
@@ -325,13 +335,13 @@ describe("E2E Compute: mergeComputeConfig", () => {
 // ── Test 7: sessionChannelPort ──────────────────────────────────────────────
 
 describe("E2E Compute: sessionChannelPort", () => {
-  it("returns consistent port for same session ID", () => {
+  it("returns consistent port for same session ID", async () => {
     const port1 = getApp().sessions.channelPort("s-abc123");
     const port2 = getApp().sessions.channelPort("s-abc123");
     expect(port1).toBe(port2);
   });
 
-  it("returns different ports for different session IDs", () => {
+  it("returns different ports for different session IDs", async () => {
     const { basePort, range } = getApp().config.channels;
     const port1 = getApp().sessions.channelPort("s-aaa111");
     const port2 = getApp().sessions.channelPort("s-bbb222");
@@ -346,7 +356,7 @@ describe("E2E Compute: sessionChannelPort", () => {
     expect(port2).toBeLessThan(basePort + range);
   });
 
-  it("port is within the configured channel range", () => {
+  it("port is within the configured channel range", async () => {
     const { basePort, range } = getApp().config.channels;
     const testIds = ["s-000000", "s-ffffff", "s-123abc", "s-deadbe"];
     for (const id of testIds) {

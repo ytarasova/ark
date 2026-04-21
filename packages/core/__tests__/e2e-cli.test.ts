@@ -156,7 +156,7 @@ describe("CLI: session lifecycle", async () => {
   it("deletes a session (soft-delete)", async () => {
     const app = getApp();
     const session = await startSession(app, { repo: ".", summary: "delete-test", flow: "bare" });
-    app.sessions.softDelete(session.id);
+    await app.sessions.softDelete(session.id);
     const after = await app.sessions.get(session.id);
     expect(after).not.toBeNull();
     expect(after!.status).toBe("deleting");
@@ -165,7 +165,7 @@ describe("CLI: session lifecycle", async () => {
   it("undeletes a soft-deleted session", async () => {
     const app = getApp();
     const session = await startSession(app, { repo: ".", summary: "undelete-test", flow: "bare" });
-    app.sessions.softDelete(session.id);
+    await app.sessions.softDelete(session.id);
     const restored = await app.sessions.undelete(session.id);
     expect(restored).not.toBeNull();
     // startSession sets initial status, which gets restored after undelete

@@ -13,7 +13,7 @@ describe("extractSubtasks", async () => {
   it("returns default implementation + tests when no PLAN.md exists", async () => {
     const app = getApp();
     const session = await app.sessions.create({ summary: "Build auth system", flow: "bare" });
-    const subtasks = extractSubtasks(app, session);
+    const subtasks = await extractSubtasks(app, session);
 
     expect(subtasks).toHaveLength(2);
     expect(subtasks[0].name).toBe("implementation");
@@ -45,7 +45,7 @@ describe("extractSubtasks", async () => {
       ].join("\n"),
     );
 
-    const subtasks = extractSubtasks(app, session);
+    const subtasks = await extractSubtasks(app, session);
     expect(subtasks).toHaveLength(3);
     expect(subtasks[0].name).toBe("step-1");
     expect(subtasks[0].task).toContain("Set up database schema");
@@ -63,7 +63,7 @@ describe("extractSubtasks", async () => {
     mkdirSync(wtDir, { recursive: true });
     writeFileSync(join(wtDir, "PLAN.md"), "# Plan\n\n## Step 1: Fix the bug\nJust do it.\n");
 
-    const subtasks = extractSubtasks(app, session);
+    const subtasks = await extractSubtasks(app, session);
     expect(subtasks).toHaveLength(2);
     expect(subtasks[0].name).toBe("implementation");
   });
@@ -71,7 +71,7 @@ describe("extractSubtasks", async () => {
   it("uses 'the task' when session has no summary", async () => {
     const app = getApp();
     const session = await app.sessions.create({ flow: "bare" });
-    const subtasks = extractSubtasks(app, session);
+    const subtasks = await extractSubtasks(app, session);
 
     expect(subtasks[0].task).toContain("the task");
   });
@@ -87,7 +87,7 @@ describe("extractSubtasks", async () => {
       ["# Plan", "", "## 1. First thing", "Details.", "", "## 2. Second thing", "More details."].join("\n"),
     );
 
-    const subtasks = extractSubtasks(app, session);
+    const subtasks = await extractSubtasks(app, session);
     expect(subtasks).toHaveLength(2);
     expect(subtasks[0].task).toContain("First thing");
     expect(subtasks[1].task).toContain("Second thing");
@@ -106,7 +106,7 @@ describe("dispatch with fan_out stage", async () => {
     const updated = await app.sessions.get(parent.id);
     expect(updated!.status).toBe("waiting");
 
-    const children = app.sessions.getChildren(parent.id);
+    const children = await app.sessions.getChildren(parent.id);
     expect(children.length).toBeGreaterThan(0);
 
     for (const child of children) {
@@ -124,8 +124,8 @@ describe("dispatch with fan_out stage", async () => {
 
     await dispatch(app, parent.id);
 
-    const updated = await app.sessions.get(parent.id)!;
-    const children = app.sessions.getChildren(parent.id);
+    const updated = (await app.sessions.get(parent.id))!;
+    const children = await app.sessions.getChildren(parent.id);
     expect(children.length).toBeGreaterThan(0);
 
     for (const child of children) {
@@ -141,11 +141,11 @@ describe("fan-out lifecycle integration", async () => {
     const app = getApp();
     const parent = await app.sessions.create({ summary: "Multi fan-out", flow: "bare" });
 
-    const r1 = fanOut(app, parent.id, { tasks: [{ summary: "A" }] });
+    const r1 = await fanOut(app, parent.id, { tasks: [{ summary: "A" }] });
     const fg1 = (await app.sessions.get(parent.id))!.fork_group;
 
     await app.sessions.update(parent.id, { status: "running", fork_group: null });
-    const r2 = fanOut(app, parent.id, { tasks: [{ summary: "B" }] });
+    const r2 = await fanOut(app, parent.id, { tasks: [{ summary: "B" }] });
     const fg2 = (await app.sessions.get(parent.id))!.fork_group;
 
     expect(r1.ok).toBe(true);
@@ -158,7 +158,7 @@ describe("fan-out lifecycle integration", async () => {
     const parent = await app.sessions.create({ summary: "Auto-advance", flow: "bare" });
     await app.sessions.update(parent.id, { stage: "implement", status: "running" });
 
-    const result = fanOut(app, parent.id, {
+    const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "Only child" }],
     });
 
@@ -166,7 +166,7 @@ describe("fan-out lifecycle integration", async () => {
     const joined = await checkAutoJoin(app, result.childIds![0]);
     expect(joined).toBe(true);
 
-    const parentState = await app.sessions.get(parent.id)!;
+    const parentState = (await app.sessions.get(parent.id))!;
     expect(parentState.fork_group).toBeNull();
     expect(parentState.status).not.toBe("waiting");
   });
@@ -176,7 +176,7 @@ describe("fan-out lifecycle integration", async () => {
     const parent = await app.sessions.create({ summary: "Mixed results", flow: "bare" });
     await app.sessions.update(parent.id, { stage: "implement", status: "running" });
 
-    const result = fanOut(app, parent.id, {
+    const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "Good" }, { summary: "Bad" }, { summary: "Also good" }],
     });
 
@@ -204,7 +204,7 @@ describe("fan-out lifecycle integration", async () => {
     const parent = await app.sessions.create({ summary: "Join test", flow: "bare" });
     await app.sessions.update(parent.id, { stage: "implement", status: "running" });
 
-    const result = fanOut(app, parent.id, {
+    const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "A" }, { summary: "B" }],
     });
 
@@ -214,7 +214,7 @@ describe("fan-out lifecycle integration", async () => {
     const joinResult = await joinFork(app, parent.id);
     expect(joinResult.ok).toBe(true);
 
-    const parentState = await app.sessions.get(parent.id)!;
+    const parentState = (await app.sessions.get(parent.id))!;
     expect(parentState.fork_group).toBeNull();
 
     const events = await app.events.list(parent.id);
@@ -230,12 +230,12 @@ describe("fan-out lifecycle integration", async () => {
       repo: "org/repo",
     });
 
-    const result = fanOut(app, parent.id, {
+    const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "Child 1" }, { summary: "Child 2" }],
     });
 
     for (const childId of result.childIds!) {
-      const child = await app.sessions.get(childId)!;
+      const child = (await app.sessions.get(childId))!;
       expect(child.compute_name).toBe("my-docker");
       expect(child.workdir).toBe("/workspace/project");
       expect(child.repo).toBe("org/repo");
@@ -246,7 +246,7 @@ describe("fan-out lifecycle integration", async () => {
     const app = getApp();
     const parent = await app.sessions.create({ summary: "Mixed flows", flow: "bare" });
 
-    const result = fanOut(app, parent.id, {
+    const result = await fanOut(app, parent.id, {
       tasks: [
         { summary: "Quick task", flow: "quick" },
         { summary: "Bare task", flow: "bare" },
@@ -255,7 +255,7 @@ describe("fan-out lifecycle integration", async () => {
     });
 
     expect(result.ok).toBe(true);
-    const children = result.childIds!.map(async (id) => await app.sessions.get(id)!);
+    const children = await Promise.all(result.childIds!.map(async (id) => (await app.sessions.get(id))!));
     expect(children[0].flow).toBe("quick");
     expect(children[1].flow).toBe("bare");
     expect(children[2].flow).toBe("bare");
@@ -265,7 +265,7 @@ describe("fan-out lifecycle integration", async () => {
     const app = getApp();
     const parent = await app.sessions.create({ summary: "Mixed agents", flow: "bare" });
 
-    const result = fanOut(app, parent.id, {
+    const result = await fanOut(app, parent.id, {
       tasks: [
         { summary: "Review this", agent: "reviewer" },
         { summary: "Implement that", agent: "implementer" },
@@ -274,7 +274,7 @@ describe("fan-out lifecycle integration", async () => {
     });
 
     expect(result.ok).toBe(true);
-    const children = result.childIds!.map(async (id) => await app.sessions.get(id)!);
+    const children = await Promise.all(result.childIds!.map(async (id) => (await app.sessions.get(id))!));
     expect(children[0].agent).toBe("reviewer");
     expect(children[1].agent).toBe("implementer");
     expect(children[2].agent).toBeNull();
@@ -283,22 +283,22 @@ describe("fan-out lifecycle integration", async () => {
   it("getChildren returns only direct children, not grandchildren", async () => {
     const app = getApp();
     const grandparent = await app.sessions.create({ summary: "Grandparent", flow: "bare" });
-    const parentResult = fanOut(app, grandparent.id, {
+    const parentResult = await fanOut(app, grandparent.id, {
       tasks: [{ summary: "Parent child" }],
     });
 
     const parentChildId = parentResult.childIds![0];
     await app.sessions.update(parentChildId, { status: "running" });
 
-    fanOut(app, parentChildId, {
+    await fanOut(app, parentChildId, {
       tasks: [{ summary: "Grandchild" }],
     });
 
-    const grandparentChildren = app.sessions.getChildren(grandparent.id);
+    const grandparentChildren = await app.sessions.getChildren(grandparent.id);
     expect(grandparentChildren).toHaveLength(1);
     expect(grandparentChildren[0].id).toBe(parentChildId);
 
-    const parentChildren = app.sessions.getChildren(parentChildId);
+    const parentChildren = await app.sessions.getChildren(parentChildId);
     expect(parentChildren).toHaveLength(1);
     expect(parentChildren[0].summary).toBe("Grandchild");
   });

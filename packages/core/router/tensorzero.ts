@@ -10,14 +10,22 @@
  */
 
 import { spawn, execFileSync, type ChildProcess } from "child_process";
-import { writeFileSync, mkdirSync, existsSync } from "fs";
+import { writeFileSync, mkdirSync, existsSync, chmodSync } from "fs";
 import { join, dirname } from "path";
 import { generateTensorZeroConfig } from "./tensorzero-config.js";
 import { logInfo, logDebug } from "../observability/structured-log.js";
 
 export interface TensorZeroManagerOpts {
   port?: number;
-  configDir?: string;
+  /**
+   * Directory for `tensorzero.toml`. Required -- callers must supply an
+   * ark-controlled path (typically `app.config.arkDir`). The previous
+   * fallback to `$HOME/.ark/tensorzero` or `/tmp/.ark/tensorzero` leaked
+   * provider API keys into arbitrary host locations; in shared-host /
+   * container deployments `/tmp` is world-readable and the container user
+   * often has no real `$HOME`.
+   */
+  configDir: string;
   /** Path to vendored binary. Auto-detected from ark binary location if omitted. */
   binaryPath?: string;
   anthropicKey?: string;
@@ -34,9 +42,12 @@ export class TensorZeroManager {
   private opts: TensorZeroManagerOpts;
 
   constructor(opts: TensorZeroManagerOpts) {
+    if (!opts.configDir) {
+      throw new Error("TensorZeroManager requires an explicit configDir (no `$HOME` / `/tmp` fallback)");
+    }
     this.opts = opts;
     this.port = opts.port ?? 3000;
-    this.configDir = opts.configDir ?? join(process.env.HOME ?? "/tmp", ".ark", "tensorzero");
+    this.configDir = opts.configDir;
   }
 
   /** Base URL for the TensorZero gateway. */
@@ -111,7 +122,17 @@ export class TensorZeroManager {
       postgresUrl: this.opts.postgresUrl,
       port: this.port,
     });
-    writeFileSync(configPath, config);
+    // chmod 600 on the config: it embeds the Anthropic / OpenAI / Gemini
+    // API keys + the Postgres URL. Any other user on the same host MUST
+    // NOT read it. `writeFileSync` honours the mode flag on first create,
+    // and `chmodSync` re-applies on existing files (defense in depth for
+    // container restarts that reuse the volume).
+    writeFileSync(configPath, config, { mode: 0o600 });
+    try {
+      chmodSync(configPath, 0o600);
+    } catch (e: any) {
+      logDebug("router", `tensorzero.toml chmod 600 failed: ${e?.message ?? e}`);
+    }
     return configPath;
   }
 

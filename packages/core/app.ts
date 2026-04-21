@@ -39,6 +39,8 @@ import type {
   MessageRepository,
   TodoRepository,
   ArtifactRepository,
+  FlowStateRepository,
+  LedgerRepository,
 } from "./repositories/index.js";
 import { ComputeTemplateRepository as ComputeTemplateRepositoryCtor } from "./repositories/index.js";
 import type { SessionService, ComputeService, HistoryService } from "./services/index.js";
@@ -187,10 +189,14 @@ export class AppContext {
   }
 
   private async _openDatabase(): Promise<IDatabase> {
-    const dbUrl = this.config.databaseUrl;
-    if (dbUrl && (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://"))) {
+    // `this.mode` lazily builds a `preBootMode` when the container isn't up
+    // yet -- safe at boot-time because `buildAppMode` is a pure function of
+    // config. All downstream dialect decisions read `mode.database.dialect`
+    // instead of re-sniffing `databaseUrl`, so this is the ONE place in the
+    // codebase that converts a URL into a dialect + constructs the adapter.
+    if (this.mode.database.dialect === "postgres") {
       const { PostgresAdapter } = await import("./database/postgres.js");
-      return new PostgresAdapter(dbUrl);
+      return new PostgresAdapter(this.mode.database.url!);
     }
     const rawDb = new Database(this.config.dbPath);
     rawDb.run("PRAGMA journal_mode = WAL");
@@ -206,10 +212,8 @@ export class AppContext {
     // Postgres) is handled inside the runner: if the apply log is empty but
     // the canonical legacy `compute` table exists, 001_initial is recorded
     // as already-applied so its body doesn't re-run.
-    const { buildAppMode } = await import("./modes/app-mode.js");
-    const mode = buildAppMode(this.config);
-    await mode.migrations.apply(db);
-    await mode.computeBootstrap.seed(db);
+    await this.mode.migrations.apply(db);
+    await this.mode.computeBootstrap.seed(db);
   }
 
   private async _seedComputeTemplates(db: IDatabase): Promise<void> {
@@ -263,6 +267,12 @@ export class AppContext {
   }
   get artifacts(): ArtifactRepository {
     return this._resolve("artifacts");
+  }
+  get flowStates(): FlowStateRepository {
+    return this._resolve("flowStates");
+  }
+  get ledger(): LedgerRepository {
+    return this._resolve("ledger");
   }
 
   /** API key manager for multi-tenant auth. Available after boot. */
@@ -396,6 +406,11 @@ export class AppContext {
 
   get pluginRegistry(): PluginRegistry {
     return this._resolve("pluginRegistry");
+  }
+
+  /** Per-app status-poller interval registry (replaces the old module-level Map). */
+  get statusPollers(): import("./executors/status-poller.js").StatusPollerRegistry {
+    return this._resolve("statusPollers");
   }
 
   // ── Infra launcher accessors (container-managed internal state) ──────

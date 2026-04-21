@@ -83,14 +83,14 @@ describe("recipe CRUD", () => {
     expect(result.repo).toBe("/projects/ark");
   });
 
-  it("sessionToRecipe captures session config", () => {
-    const s = getApp().sessions.create({
+  it("sessionToRecipe captures session config", async () => {
+    const s = await getApp().sessions.create({
       summary: "Fix auth bug",
       repo: "/projects/myapp",
       flow: "default",
     });
-    getApp().sessions.update(s.id, { agent: "implementer", compute_name: "local", group_name: "bugs" });
-    const updated = getApp().sessions.get(s.id)!;
+    await getApp().sessions.update(s.id, { agent: "implementer", compute_name: "local", group_name: "bugs" });
+    const updated = (await getApp().sessions.get(s.id))!;
 
     const recipe = sessionToRecipe(updated, "fix-auth");
     expect(recipe.name).toBe("fix-auth");

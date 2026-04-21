@@ -23,20 +23,20 @@ afterEach(async () => {
 
 describe("session stop", async () => {
   it("sets status to 'stopped' (not 'failed')", async () => {
-    const session = getApp().sessions.create({ summary: "stop-test" });
-    getApp().sessions.update(session.id, { status: "running", stage: "work" });
+    const session = await getApp().sessions.create({ summary: "stop-test" });
+    await getApp().sessions.update(session.id, { status: "running", stage: "work" });
 
     const result = await stop(app, session.id);
     expect(result.ok).toBe(true);
 
-    const updated = getApp().sessions.get(session.id)!;
+    const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.status).toBe("stopped");
     expect(updated.status).not.toBe("failed");
   });
 
   it("preserves claude_session_id for resume", async () => {
-    const session = getApp().sessions.create({ summary: "stop-claude" });
-    getApp().sessions.update(session.id, {
+    const session = await getApp().sessions.create({ summary: "stop-claude" });
+    await getApp().sessions.update(session.id, {
       status: "running",
       stage: "work",
       claude_session_id: "uuid-to-preserve",
@@ -44,13 +44,13 @@ describe("session stop", async () => {
 
     await stop(app, session.id);
 
-    const updated = getApp().sessions.get(session.id)!;
+    const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.claude_session_id).toBe("uuid-to-preserve");
   });
 
   it("clears session_id (tmux name)", async () => {
-    const session = getApp().sessions.create({ summary: "stop-session-id" });
-    getApp().sessions.update(session.id, {
+    const session = await getApp().sessions.create({ summary: "stop-session-id" });
+    await getApp().sessions.update(session.id, {
       status: "running",
       stage: "work",
       session_id: "ark-s-abc123",
@@ -58,13 +58,13 @@ describe("session stop", async () => {
 
     await stop(app, session.id);
 
-    const updated = getApp().sessions.get(session.id)!;
+    const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.session_id).toBeNull();
   });
 
   it("sets error to null", async () => {
-    const session = getApp().sessions.create({ summary: "stop-error-clear" });
-    getApp().sessions.update(session.id, {
+    const session = await getApp().sessions.create({ summary: "stop-error-clear" });
+    await getApp().sessions.update(session.id, {
       status: "running",
       stage: "work",
       error: "some previous error",
@@ -72,13 +72,13 @@ describe("session stop", async () => {
 
     await stop(app, session.id);
 
-    const updated = getApp().sessions.get(session.id)!;
+    const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.error).toBeNull();
   });
 
   it("returns ok: true with message", async () => {
-    const session = getApp().sessions.create({ summary: "stop-msg" });
-    getApp().sessions.update(session.id, { status: "running", stage: "work" });
+    const session = await getApp().sessions.create({ summary: "stop-msg" });
+    await getApp().sessions.update(session.id, { status: "running", stage: "work" });
 
     const result = await stop(app, session.id);
     expect(result.ok).toBe(true);
@@ -92,30 +92,30 @@ describe("session stop", async () => {
   });
 
   it("can stop a session in 'ready' status", async () => {
-    const session = getApp().sessions.create({ summary: "stop-ready" });
-    getApp().sessions.update(session.id, { status: "ready", stage: "work" });
+    const session = await getApp().sessions.create({ summary: "stop-ready" });
+    await getApp().sessions.update(session.id, { status: "ready", stage: "work" });
 
     const result = await stop(app, session.id);
     expect(result.ok).toBe(true);
 
-    const updated = getApp().sessions.get(session.id)!;
+    const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.status).toBe("stopped");
   });
 
   it("can stop a session in 'blocked' status", async () => {
-    const session = getApp().sessions.create({ summary: "stop-blocked" });
-    getApp().sessions.update(session.id, { status: "blocked", stage: "work" });
+    const session = await getApp().sessions.create({ summary: "stop-blocked" });
+    await getApp().sessions.update(session.id, { status: "blocked", stage: "work" });
 
     const result = await stop(app, session.id);
     expect(result.ok).toBe(true);
 
-    const updated = getApp().sessions.get(session.id)!;
+    const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.status).toBe("stopped");
   });
 
   it("preserves other session fields after stop", async () => {
-    const session = getApp().sessions.create({ summary: "preserve-fields", repo: "/my/repo" });
-    getApp().sessions.update(session.id, {
+    const session = await getApp().sessions.create({ summary: "preserve-fields", repo: "/my/repo" });
+    await getApp().sessions.update(session.id, {
       status: "running",
       stage: "work",
       agent: "coder",
@@ -124,7 +124,7 @@ describe("session stop", async () => {
 
     await stop(app, session.id);
 
-    const updated = getApp().sessions.get(session.id)!;
+    const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.summary).toBe("preserve-fields");
     expect(updated.repo).toBe("/my/repo");
     expect(updated.agent).toBe("coder");
@@ -133,8 +133,8 @@ describe("session stop", async () => {
   });
 
   it("clears runtime fields but preserves claude_session_id", async () => {
-    const session = getApp().sessions.create({ summary: "clear-all" });
-    getApp().sessions.update(session.id, {
+    const session = await getApp().sessions.create({ summary: "clear-all" });
+    await getApp().sessions.update(session.id, {
       status: "running",
       stage: "work",
       session_id: "ark-tmux",
@@ -144,7 +144,7 @@ describe("session stop", async () => {
 
     await stop(app, session.id);
 
-    const updated = getApp().sessions.get(session.id)!;
+    const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.status).toBe("stopped");
     expect(updated.session_id).toBeNull();
     expect(updated.claude_session_id).toBe("claude-uuid");
@@ -170,8 +170,8 @@ describe("session resume", async () => {
 
   it("resume allows completed sessions to restart", async () => {
     const { resume } = await import("../services/session-orchestration.js");
-    const session = getApp().sessions.create({ summary: "completed-test" });
-    getApp().sessions.update(session.id, { status: "completed", stage: "work" });
+    const session = await getApp().sessions.create({ summary: "completed-test" });
+    await getApp().sessions.update(session.id, { status: "completed", stage: "work" });
 
     const result = await resume(app, session.id);
     // Completed sessions can now be resumed (dispatches again)
@@ -180,12 +180,12 @@ describe("session resume", async () => {
   });
 
   it("stopped session can transition to ready via updateSession", async () => {
-    const session = getApp().sessions.create({ summary: "resume-ready" });
-    getApp().sessions.update(session.id, { status: "running", stage: "work" });
+    const session = await getApp().sessions.create({ summary: "resume-ready" });
+    await getApp().sessions.update(session.id, { status: "running", stage: "work" });
     await stop(app, session.id);
 
     // Simulate what resume does (without dispatch)
-    getApp().sessions.update(session.id, {
+    await getApp().sessions.update(session.id, {
       status: "ready",
       error: null,
       breakpoint_reason: null,
@@ -193,20 +193,20 @@ describe("session resume", async () => {
       session_id: null,
     });
 
-    const updated = getApp().sessions.get(session.id)!;
+    const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.status).toBe("ready");
     expect(updated.error).toBeNull();
     expect(updated.breakpoint_reason).toBeNull();
   });
 
   it("stop then ready transition preserves stage", async () => {
-    const session = getApp().sessions.create({ summary: "stage-preserve" });
-    getApp().sessions.update(session.id, { status: "running", stage: "deploy" });
+    const session = await getApp().sessions.create({ summary: "stage-preserve" });
+    await getApp().sessions.update(session.id, { status: "running", stage: "deploy" });
     await stop(app, session.id);
 
-    getApp().sessions.update(session.id, { status: "ready" });
+    await getApp().sessions.update(session.id, { status: "ready" });
 
-    const updated = getApp().sessions.get(session.id)!;
+    const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.stage).toBe("deploy");
   });
 });

@@ -62,8 +62,8 @@ describe("TenantPolicyManager", async () => {
   });
 
   describe("getEffectivePolicy", async () => {
-    it("returns default policy for unknown tenant", () => {
-      const policy = pm.getEffectivePolicy("unknown-tenant");
+    it("returns default policy for unknown tenant", async () => {
+      const policy = await pm.getEffectivePolicy("unknown-tenant");
       expect(policy.tenant_id).toBe("unknown-tenant");
       expect(policy.allowed_providers).toEqual([]);
       expect(policy.default_provider).toBe("k8s");
@@ -81,7 +81,7 @@ describe("TenantPolicyManager", async () => {
         compute_pools: [],
       });
 
-      const policy = pm.getEffectivePolicy("tenant-b");
+      const policy = await pm.getEffectivePolicy("tenant-b");
       expect(policy.allowed_providers).toEqual(["ec2"]);
       expect(policy.default_provider).toBe("ec2");
       expect(policy.max_concurrent_sessions).toBe(3);
@@ -142,11 +142,11 @@ describe("TenantPolicyManager", async () => {
   });
 
   describe("isProviderAllowed", async () => {
-    it("allows all providers when allowed_providers is empty", () => {
+    it("allows all providers when allowed_providers is empty", async () => {
       // Default policy has empty allowed_providers
-      expect(pm.isProviderAllowed("no-policy-tenant", "k8s")).toBe(true);
-      expect(pm.isProviderAllowed("no-policy-tenant", "ec2")).toBe(true);
-      expect(pm.isProviderAllowed("no-policy-tenant", "docker")).toBe(true);
+      expect(await pm.isProviderAllowed("no-policy-tenant", "k8s")).toBe(true);
+      expect(await pm.isProviderAllowed("no-policy-tenant", "ec2")).toBe(true);
+      expect(await pm.isProviderAllowed("no-policy-tenant", "docker")).toBe(true);
     });
 
     it("allows only listed providers", async () => {
@@ -159,10 +159,10 @@ describe("TenantPolicyManager", async () => {
         compute_pools: [],
       });
 
-      expect(pm.isProviderAllowed("restricted-tenant", "k8s")).toBe(true);
-      expect(pm.isProviderAllowed("restricted-tenant", "k8s-kata")).toBe(true);
-      expect(pm.isProviderAllowed("restricted-tenant", "ec2")).toBe(false);
-      expect(pm.isProviderAllowed("restricted-tenant", "docker")).toBe(false);
+      expect(await pm.isProviderAllowed("restricted-tenant", "k8s")).toBe(true);
+      expect(await pm.isProviderAllowed("restricted-tenant", "k8s-kata")).toBe(true);
+      expect(await pm.isProviderAllowed("restricted-tenant", "ec2")).toBe(false);
+      expect(await pm.isProviderAllowed("restricted-tenant", "docker")).toBe(false);
     });
   });
 
@@ -177,13 +177,13 @@ describe("TenantPolicyManager", async () => {
         compute_pools: [],
       });
 
-      const result = pm.canDispatch("can-dispatch-tenant");
+      const result = await pm.canDispatch("can-dispatch-tenant");
       expect(result.allowed).toBe(true);
       expect(result.reason).toBeUndefined();
     });
 
-    it("allows dispatch for unknown tenant using default policy", () => {
-      const result = pm.canDispatch("brand-new-tenant");
+    it("allows dispatch for unknown tenant using default policy", async () => {
+      const result = await pm.canDispatch("brand-new-tenant");
       expect(result.allowed).toBe(true);
     });
   });

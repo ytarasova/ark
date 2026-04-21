@@ -28,9 +28,9 @@ describe("generateRepoMap", () => {
     const tsFiles = map.entries.filter((e) => e.path.endsWith(".ts"));
     expect(tsFiles.length).toBeGreaterThan(0);
 
-    // Entries should be sorted by path
+    // Entries should be sorted by path (locale-aware, matches generateRepoMap's sort).
     for (let i = 1; i < map.entries.length; i++) {
-      expect(map.entries[i].path >= map.entries[i - 1].path).toBe(true);
+      expect(map.entries[i].path.localeCompare(map.entries[i - 1].path)).toBeGreaterThanOrEqual(0);
     }
   });
 

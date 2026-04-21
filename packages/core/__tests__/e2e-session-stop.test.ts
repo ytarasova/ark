@@ -27,19 +27,19 @@ afterAll(async () => {
 
 describe("session stop preserves claude_session_id", async () => {
   it("stop(app) sets status to stopped", async () => {
-    const session = getApp().sessions.create({ summary: "stop-status-test" });
-    getApp().sessions.update(session.id, { status: "running", stage: "work" });
+    const session = await getApp().sessions.create({ summary: "stop-status-test" });
+    await getApp().sessions.update(session.id, { status: "running", stage: "work" });
 
     const result = await stop(app, session.id);
     expect(result.ok).toBe(true);
 
-    const updated = getApp().sessions.get(session.id)!;
+    const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.status).toBe("stopped");
   });
 
   it("stop(app) preserves claude_session_id (does NOT null it out)", async () => {
-    const session = getApp().sessions.create({ summary: "stop-preserve-id" });
-    getApp().sessions.update(session.id, {
+    const session = await getApp().sessions.create({ summary: "stop-preserve-id" });
+    await getApp().sessions.update(session.id, {
       status: "running",
       stage: "work",
       claude_session_id: "claude-uuid-12345",
@@ -48,7 +48,7 @@ describe("session stop preserves claude_session_id", async () => {
 
     await stop(app, session.id);
 
-    const updated = getApp().sessions.get(session.id)!;
+    const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.status).toBe("stopped");
     expect(updated.claude_session_id).toBe("claude-uuid-12345");
     // session_id (tmux name) should be cleared
@@ -57,8 +57,8 @@ describe("session stop preserves claude_session_id", async () => {
 
   it("after stop + updateSession to ready, claude_session_id is still intact", async () => {
     const claudeId = "uuid-for-resume-test";
-    const session = getApp().sessions.create({ summary: "stop-resume-cycle" });
-    getApp().sessions.update(session.id, {
+    const session = await getApp().sessions.create({ summary: "stop-resume-cycle" });
+    await getApp().sessions.update(session.id, {
       status: "running",
       stage: "work",
       claude_session_id: claudeId,
@@ -67,12 +67,12 @@ describe("session stop preserves claude_session_id", async () => {
 
     // Stop the session
     await stop(app, session.id);
-    const stopped = getApp().sessions.get(session.id)!;
+    const stopped = (await getApp().sessions.get(session.id))!;
     expect(stopped.status).toBe("stopped");
     expect(stopped.claude_session_id).toBe(claudeId);
 
     // Simulate resume preparation (what resume(app) does before dispatch)
-    getApp().sessions.update(session.id, {
+    await getApp().sessions.update(session.id, {
       status: "ready",
       error: null,
       breakpoint_reason: null,
@@ -81,15 +81,15 @@ describe("session stop preserves claude_session_id", async () => {
     });
 
     // claude_session_id should still be preserved after the ready transition
-    const ready = getApp().sessions.get(session.id)!;
+    const ready = (await getApp().sessions.get(session.id))!;
     expect(ready.status).toBe("ready");
     expect(ready.claude_session_id).toBe(claudeId);
   });
 
   it("multiple stop cycles preserve the same claude_session_id", async () => {
     const claudeId = "persistent-uuid";
-    const session = getApp().sessions.create({ summary: "multi-stop-test" });
-    getApp().sessions.update(session.id, {
+    const session = await getApp().sessions.create({ summary: "multi-stop-test" });
+    await getApp().sessions.update(session.id, {
       status: "running",
       stage: "work",
       claude_session_id: claudeId,
@@ -97,24 +97,24 @@ describe("session stop preserves claude_session_id", async () => {
 
     // First stop
     await stop(app, session.id);
-    expect(getApp().sessions.get(session.id)!.claude_session_id).toBe(claudeId);
+    expect((await getApp().sessions.get(session.id))!.claude_session_id).toBe(claudeId);
 
     // Simulate restart
-    getApp().sessions.update(session.id, { status: "running", session_id: "ark-tmux-2" });
+    await getApp().sessions.update(session.id, { status: "running", session_id: "ark-tmux-2" });
 
     // Second stop
     await stop(app, session.id);
-    expect(getApp().sessions.get(session.id)!.claude_session_id).toBe(claudeId);
+    expect((await getApp().sessions.get(session.id))!.claude_session_id).toBe(claudeId);
 
     // Third cycle
-    getApp().sessions.update(session.id, { status: "running", session_id: "ark-tmux-3" });
+    await getApp().sessions.update(session.id, { status: "running", session_id: "ark-tmux-3" });
     await stop(app, session.id);
-    expect(getApp().sessions.get(session.id)!.claude_session_id).toBe(claudeId);
+    expect((await getApp().sessions.get(session.id))!.claude_session_id).toBe(claudeId);
   });
 
   it("stop(app) nulls error field", async () => {
-    const session = getApp().sessions.create({ summary: "stop-clears-error" });
-    getApp().sessions.update(session.id, {
+    const session = await getApp().sessions.create({ summary: "stop-clears-error" });
+    await getApp().sessions.update(session.id, {
       status: "running",
       stage: "work",
       error: "some transient error",
@@ -122,13 +122,13 @@ describe("session stop preserves claude_session_id", async () => {
 
     await stop(app, session.id);
 
-    const updated = getApp().sessions.get(session.id)!;
+    const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.error).toBeNull();
   });
 
   it("stop(app) preserves stage and agent fields", async () => {
-    const session = getApp().sessions.create({ summary: "stop-preserves-agent" });
-    getApp().sessions.update(session.id, {
+    const session = await getApp().sessions.create({ summary: "stop-preserves-agent" });
+    await getApp().sessions.update(session.id, {
       status: "running",
       stage: "review",
       agent: "reviewer",
@@ -137,7 +137,7 @@ describe("session stop preserves claude_session_id", async () => {
 
     await stop(app, session.id);
 
-    const updated = getApp().sessions.get(session.id)!;
+    const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.stage).toBe("review");
     expect(updated.agent).toBe("reviewer");
     expect(updated.workdir).toBe("/tmp/work");

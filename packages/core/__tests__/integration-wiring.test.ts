@@ -36,7 +36,7 @@ describe("buildContext token budget", async () => {
       });
     }
 
-    const ctx = buildContext(store, "topic budget test", { maxTokens: 500 });
+    const ctx = await buildContext(store, "topic budget test", { maxTokens: 500 });
     // With a small budget, should get fewer items
     expect(ctx.memories.length).toBeLessThanOrEqual(3);
   });
@@ -78,7 +78,7 @@ describe("buildContext token budget", async () => {
       });
     }
 
-    const ctx = buildContext(store, "test content");
+    const ctx = await buildContext(store, "test content");
     expect(ctx.files.length).toBeLessThanOrEqual(5);
     expect(ctx.memories.length).toBeLessThanOrEqual(3);
     expect(ctx.sessions.length).toBeLessThanOrEqual(3);
@@ -154,11 +154,11 @@ describe("router config", () => {
 // ── Tenant integration policies ──────────────────────────────────────────
 
 describe("tenant integration policies", () => {
-  it("getEffectiveIntegrationSettings merges tenant + global", () => {
+  it("getEffectiveIntegrationSettings merges tenant + global", async () => {
     const mgr = new TenantPolicyManager(app.db);
 
     // Set a tenant policy with router required
-    mgr.setPolicy({
+    await mgr.setPolicy({
       tenant_id: "test-integration",
       allowed_providers: [],
       default_provider: "k8s",
@@ -173,7 +173,7 @@ describe("tenant integration policies", () => {
       tensorzero_enabled: null,
     });
 
-    const settings = mgr.getEffectiveIntegrationSettings("test-integration", {
+    const settings = await mgr.getEffectiveIntegrationSettings("test-integration", {
       routerEnabled: false,
       autoIndex: false,
       tensorZeroEnabled: false,
@@ -189,13 +189,13 @@ describe("tenant integration policies", () => {
     // tensorzero inherits from global (null in tenant)
     expect(settings.tensorZeroEnabled).toBe(false);
 
-    mgr.deletePolicy("test-integration");
+    await mgr.deletePolicy("test-integration");
   });
 
-  it("defaults to global config when no tenant policy", () => {
+  it("defaults to global config when no tenant policy", async () => {
     const mgr = new TenantPolicyManager(app.db);
 
-    const settings = mgr.getEffectiveIntegrationSettings("no-policy-tenant", {
+    const settings = await mgr.getEffectiveIntegrationSettings("no-policy-tenant", {
       routerEnabled: true,
       autoIndex: true,
       tensorZeroEnabled: true,

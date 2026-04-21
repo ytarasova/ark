@@ -31,7 +31,7 @@ describe("Migration 002 (workspaces)", async () => {
       .all()) as Array<{ name: string }>;
     const names = tables.map((t) => t.name);
     expect(names).toContain(WORKSPACES_TABLE);
-    const reposCols = (await db.prepare(`PRAGMA table_info(${REPOS_TABLE})`)).all() as Array<{ name: string }>;
+    const reposCols = (await db.prepare(`PRAGMA table_info(${REPOS_TABLE})`).all()) as Array<{ name: string }>;
     expect(reposCols.map((c) => c.name)).toContain("workspace_id");
     await db.close();
   });
@@ -101,7 +101,7 @@ describe("Migration 002 (workspaces)", async () => {
     const status = await runner.status();
     expect(status.currentVersion).toBe(3);
     expect(status.applied.length).toBe(3);
-    const count = (await db.prepare(`SELECT COUNT(*) AS n FROM ${WORKSPACES_TABLE}`)).get() as { n: number };
+    const count = (await db.prepare(`SELECT COUNT(*) AS n FROM ${WORKSPACES_TABLE}`).get()) as { n: number };
     expect(count.n).toBe(1);
     await db.close();
   });

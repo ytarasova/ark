@@ -88,7 +88,7 @@ describe("WorkerRegistry", async () => {
     const hbTime = new Date(Date.now() + 1000).toISOString();
     await registry.heartbeat("w-hb");
 
-    const after = await registry.get("w-hb")!;
+    const after = (await registry.get("w-hb"))!;
     expect(after.status).toBe("online");
     expect(after.last_heartbeat >= before).toBe(true);
   });
@@ -105,7 +105,7 @@ describe("WorkerRegistry", async () => {
     });
 
     expect(await registry.get("w-del")).not.toBeNull();
-    registry.deregister("w-del");
+    await registry.deregister("w-del");
     expect(await registry.get("w-del")).toBeNull();
   });
 
@@ -121,7 +121,7 @@ describe("WorkerRegistry", async () => {
     });
 
     // Mark it offline manually for testing
-    app.db.prepare("UPDATE workers SET status = 'offline' WHERE id = 'w-online'").run();
+    await app.db.prepare("UPDATE workers SET status = 'offline' WHERE id = 'w-online'").run();
 
     const online = await registry.list({ status: "online" });
     const offline = await registry.list({ status: "offline" });
@@ -175,10 +175,10 @@ describe("WorkerRegistry", async () => {
     });
 
     // Fill to capacity
-    registry.incrementSessions("w-avail-1");
-    registry.incrementSessions("w-avail-1");
+    await registry.incrementSessions("w-avail-1");
+    await registry.incrementSessions("w-avail-1");
 
-    const available = registry.getAvailable();
+    const available = await registry.getAvailable();
     expect(available.some((w) => w.id === "w-avail-1")).toBe(false);
   });
 
@@ -201,7 +201,7 @@ describe("WorkerRegistry", async () => {
       metadata: {},
     });
 
-    const gpuWorkers = registry.getAvailable({ computeName: "gpu-cluster" });
+    const gpuWorkers = await registry.getAvailable({ computeName: "gpu-cluster" });
     expect(gpuWorkers.some((w) => w.id === "w-gpu-1")).toBe(true);
     expect(gpuWorkers.some((w) => w.id === "w-cpu-1")).toBe(false);
   });
@@ -210,7 +210,7 @@ describe("WorkerRegistry", async () => {
     const registry = new WorkerRegistry(app.db);
 
     // Clean all workers from previous tests to get deterministic results
-    app.db.prepare("DELETE FROM workers").run();
+    await app.db.prepare("DELETE FROM workers").run();
 
     await registry.register({
       id: "w-ll-heavy",
@@ -230,15 +230,15 @@ describe("WorkerRegistry", async () => {
     });
 
     // Add load to heavy worker
-    registry.incrementSessions("w-ll-heavy");
-    registry.incrementSessions("w-ll-heavy");
-    registry.incrementSessions("w-ll-heavy");
-    registry.incrementSessions("w-ll-heavy"); // 4/5 = 80%
+    await registry.incrementSessions("w-ll-heavy");
+    await registry.incrementSessions("w-ll-heavy");
+    await registry.incrementSessions("w-ll-heavy");
+    await registry.incrementSessions("w-ll-heavy"); // 4/5 = 80%
 
     // Add minimal load to light worker
-    registry.incrementSessions("w-ll-light"); // 1/10 = 10%
+    await registry.incrementSessions("w-ll-light"); // 1/10 = 10%
 
-    const best = registry.getLeastLoaded();
+    const best = await registry.getLeastLoaded();
     expect(best).not.toBeNull();
     expect(best!.id).toBe("w-ll-light");
   });
@@ -256,16 +256,16 @@ describe("WorkerRegistry", async () => {
 
     expect((await registry.get("w-count"))!.active_sessions).toBe(0);
 
-    registry.incrementSessions("w-count");
-    registry.incrementSessions("w-count");
+    await registry.incrementSessions("w-count");
+    await registry.incrementSessions("w-count");
     expect((await registry.get("w-count"))!.active_sessions).toBe(2);
 
-    registry.decrementSessions("w-count");
+    await registry.decrementSessions("w-count");
     expect((await registry.get("w-count"))!.active_sessions).toBe(1);
 
     // Decrement below zero should clamp to 0
-    registry.decrementSessions("w-count");
-    registry.decrementSessions("w-count");
+    await registry.decrementSessions("w-count");
+    await registry.decrementSessions("w-count");
     expect((await registry.get("w-count"))!.active_sessions).toBe(0);
   });
 
@@ -282,12 +282,12 @@ describe("WorkerRegistry", async () => {
 
     // Set heartbeat to 2 minutes ago
     const old = new Date(Date.now() - 120_000).toISOString();
-    app.db.prepare("UPDATE workers SET last_heartbeat = ? WHERE id = 'w-stale'").run(old);
+    await app.db.prepare("UPDATE workers SET last_heartbeat = ? WHERE id = 'w-stale'").run(old);
 
     const pruned = await registry.pruneStale(90_000); // 90s timeout
     expect(pruned).toBeGreaterThanOrEqual(1);
 
-    const worker = await registry.get("w-stale")!;
+    const worker = (await registry.get("w-stale"))!;
     expect(worker.status).toBe("offline");
   });
 

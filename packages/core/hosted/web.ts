@@ -291,7 +291,7 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
           return new Response("Invalid session ID", { status: 400 });
         }
         // Validate session exists
-        const session = requestApp.sessions.get(sessionId);
+        const session = await requestApp.sessions.get(sessionId);
         if (!session) return new Response("Session not found", { status: 404 });
         const tmuxName = `ark-${sessionId}`;
         const upgraded = server.upgrade(req, { data: { sessionId, tmuxName } } as any);
@@ -464,7 +464,16 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
     websocket: {
       open(ws) {
         const { sessionId, tmuxName } = ws.data as { sessionId: string; tmuxName: string };
-        const bridge = startTerminalBridge(ws, tmuxName);
+        const bridge = startTerminalBridge(ws, tmuxName, {
+          sessionId,
+          onGeometry: (id, cols, rows) => {
+            try {
+              app.sessions.update(id, { pty_cols: cols, pty_rows: rows });
+            } catch (e: any) {
+              logDebug("web", `pty_cols/rows persist failed for ${id}: ${e?.message ?? e}`);
+            }
+          },
+        });
         if (bridge) {
           ws.send(JSON.stringify({ type: "connected", sessionId }));
         } else {

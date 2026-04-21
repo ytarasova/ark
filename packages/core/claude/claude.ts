@@ -853,6 +853,11 @@ export function buildLauncher(opts: LauncherOpts): { content: string; claudeSess
   // Can't source .bashrc -- it exits early for non-interactive shells
   const pathSetup = `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$HOME/.nvm/versions/node/*/bin:$PATH"\n`;
 
+  // PTY geometry is deferred: claude launches at tmux's default pane size.
+  // When the web terminal attaches, the first client resize triggers
+  // `tmux resize-window` which sends SIGWINCH to the running claude process,
+  // prompting it to reflow. CLI-only dispatches stay at the tmux default.
+  //
   // When initialPrompt is provided, append it as the last positional arg
   // to trigger immediate processing. Separate it from option values with
   // `--`: `--dangerously-load-development-channels` is greedy and would

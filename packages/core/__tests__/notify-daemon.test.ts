@@ -65,10 +65,10 @@ describe("NotifyDaemon", async () => {
       },
     });
 
-    const s1 = getApp().sessions.create({ summary: "running-test" });
-    getApp().sessions.update(s1.id, { status: "running" });
-    const s2 = getApp().sessions.create({ summary: "waiting-test" });
-    getApp().sessions.update(s2.id, { status: "waiting" });
+    const s1 = await getApp().sessions.create({ summary: "running-test" });
+    await getApp().sessions.update(s1.id, { status: "running" });
+    const s2 = await getApp().sessions.create({ summary: "waiting-test" });
+    await getApp().sessions.update(s2.id, { status: "waiting" });
 
     daemon.start();
     await waitFor(() => polls >= 1, { timeout: 2000, message: "expected at least one poll" });
@@ -92,15 +92,15 @@ describe("NotifyDaemon", async () => {
       },
     });
 
-    const s = getApp().sessions.create({ summary: "transition-test" });
-    getApp().sessions.update(s.id, { status: "running" });
+    const s = await getApp().sessions.create({ summary: "transition-test" });
+    await getApp().sessions.update(s.id, { status: "running" });
 
     daemon.start();
     // Wait for the baseline poll to land
     await waitFor(() => polls >= 1, { timeout: 2000 });
 
     // Transition -> wait until at least one more poll observes it
-    getApp().sessions.update(s.id, { status: "waiting" });
+    await getApp().sessions.update(s.id, { status: "waiting" });
     await waitFor(() => notifications.some((n) => n.includes("transition-test")), {
       timeout: 2000,
       message: "expected a transition notification",
@@ -127,7 +127,7 @@ describe("NotifyDaemon", async () => {
       },
     });
 
-    getApp().sessions.create({ summary: "no-initial-notify" });
+    await getApp().sessions.create({ summary: "no-initial-notify" });
 
     daemon.start();
     await waitFor(() => polls >= 1, { timeout: 2000 });

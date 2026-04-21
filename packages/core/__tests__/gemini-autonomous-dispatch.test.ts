@@ -27,17 +27,21 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  stopAllPollers();
+  if (app) stopAllPollers(app);
   await app?.shutdown();
 });
 
 // ── Helper ───────────────────────────────────────────────────────────────────
 
-function waitFor(fn: () => boolean, timeoutMs = 10000): Promise<void> {
+function waitFor(fn: () => boolean | Promise<boolean>, timeoutMs = 10000): Promise<void> {
   return new Promise((resolve, reject) => {
     const start = Date.now();
-    const check = () => {
-      if (fn()) return resolve();
+    const check = async () => {
+      try {
+        if (await fn()) return resolve();
+      } catch (e) {
+        return reject(e as Error);
+      }
       if (Date.now() - start > timeoutMs) return reject(new Error("waitFor timed out"));
       setTimeout(check, 100);
     };

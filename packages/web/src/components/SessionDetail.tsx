@@ -11,6 +11,8 @@ import { Loader2 } from "lucide-react";
 import { SessionHeader } from "./ui/SessionHeader.js";
 import { ContentTabs, tabButtonId, tabPanelId, type TabDef } from "./ui/ContentTabs.js";
 import { ChatInput } from "./ui/ChatInput.js";
+import { Modal } from "./ui/modal.js";
+import { Button } from "./ui/button.js";
 import { ScrollProgress } from "./ui/ScrollProgress.js";
 import { AgentMessage } from "./ui/AgentMessage.js";
 import { MarkdownContent } from "./ui/MarkdownContent.js";
@@ -40,8 +42,51 @@ import { renderAgentContent, buildRichTimelineEvent } from "./session/event-buil
 // ---------------------------------------------------------------------------
 // Attached files display
 // ---------------------------------------------------------------------------
-function AttachedFiles({ attachments }: { attachments: Array<{ name: string; content: string; type: string }> }) {
+
+/**
+ * Sessions carry attachments in one of two shapes during the BlobStore
+ * migration: legacy `{ name, content, type }` (inline base64 / utf-8) or
+ * post-upload `{ name, locator, type }` (pointer into BlobStore). We render
+ * both; locator-shaped entries fetch content on expand via the `input/read`
+ * RPC so we don't pull every attachment's bytes into the session list.
+ */
+interface AttachmentRef {
+  name: string;
+  type?: string;
+  content?: string;
+  locator?: string;
+}
+
+function AttachedFiles({ attachments }: { attachments: AttachmentRef[] }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [fetched, setFetched] = useState<Record<string, { content: string; binary: boolean } | "loading" | "error">>(
+    {},
+  );
+
+  async function toggle(att: AttachmentRef) {
+    const key = att.name;
+    const willOpen = !expanded[key];
+    setExpanded((prev) => ({ ...prev, [key]: willOpen }));
+    if (!willOpen || fetched[key] || !att.locator) return;
+
+    setFetched((prev) => ({ ...prev, [key]: "loading" }));
+    try {
+      const res = await api.readInput(att.locator);
+      const contentType = res.contentType ?? att.type ?? "";
+      const isBinary =
+        contentType.startsWith("image/") || contentType.startsWith("application/") || contentType.startsWith("video/");
+      setFetched((prev) => ({
+        ...prev,
+        [key]: {
+          content: isBinary ? "" : Buffer.from(res.content, "base64").toString("utf-8"),
+          binary: isBinary,
+        },
+      }));
+    } catch {
+      setFetched((prev) => ({ ...prev, [key]: "error" }));
+    }
+  }
+
   return (
     <div className="mb-4 border border-[var(--border)] rounded-lg overflow-hidden">
       <div className="px-3 py-2 bg-[var(--bg-hover)] border-b border-[var(--border)]">
@@ -50,14 +95,17 @@ function AttachedFiles({ attachments }: { attachments: Array<{ name: string; con
         </span>
       </div>
       {attachments.map((att) => {
-        const isBinary = att.content?.startsWith("data:");
         const isOpen = expanded[att.name] ?? false;
+        // Legacy inline content still renders inline; locator-shaped entries
+        // use the `fetched` cache keyed by name.
+        const inlineBinary = att.content?.startsWith("data:");
+        const remote = fetched[att.name];
         return (
           <div key={att.name} className="border-b border-[var(--border)] last:border-b-0">
             <button
               type="button"
               className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
-              onClick={() => setExpanded((prev) => ({ ...prev, [att.name]: !prev[att.name] }))}
+              onClick={() => toggle(att)}
             >
               <span className="text-[12px] font-medium text-[var(--fg)]">{att.name}</span>
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--fg-muted)] font-[family-name:var(--font-mono-ui)]">
@@ -67,13 +115,27 @@ function AttachedFiles({ attachments }: { attachments: Array<{ name: string; con
             </button>
             {isOpen && (
               <div className="px-3 pb-2">
-                {isBinary ? (
+                {att.content !== undefined ? (
+                  inlineBinary ? (
+                    <span className="text-[11px] text-[var(--fg-muted)] italic">
+                      Binary file -- preview not available
+                    </span>
+                  ) : (
+                    <pre className="text-[11px] leading-relaxed text-[var(--fg)] bg-[var(--bg)] rounded p-2 overflow-x-auto max-h-[300px] overflow-y-auto whitespace-pre-wrap font-[family-name:var(--font-mono-ui)]">
+                      {att.content}
+                    </pre>
+                  )
+                ) : remote === "loading" || remote === undefined ? (
+                  <span className="text-[11px] text-[var(--fg-muted)] italic">Loading…</span>
+                ) : remote === "error" ? (
+                  <span className="text-[11px] text-[var(--failed)] italic">Failed to load attachment</span>
+                ) : remote.binary ? (
                   <span className="text-[11px] text-[var(--fg-muted)] italic">
                     Binary file -- preview not available
                   </span>
                 ) : (
                   <pre className="text-[11px] leading-relaxed text-[var(--fg)] bg-[var(--bg)] rounded p-2 overflow-x-auto max-h-[300px] overflow-y-auto whitespace-pre-wrap font-[family-name:var(--font-mono-ui)]">
-                    {att.content}
+                    {remote.content}
                   </pre>
                 )}
               </div>
@@ -82,6 +144,142 @@ function AttachedFiles({ attachments }: { attachments: Array<{ name: string; con
         );
       })}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Restart-from-stage dialog
+// ---------------------------------------------------------------------------
+
+interface RestartDialogProps {
+  sessionId: string;
+  open: boolean;
+  onClose: () => void;
+  onRestart: (rewindToStage: string | undefined) => Promise<void>;
+}
+
+/**
+ * Prompts the user to pick which stage to restart the flow from. Populated
+ * via `session/flowStages`. "Continue here" (undefined rewind) re-runs the
+ * current stage; picking any stage rewinds the pointer, drops cached
+ * claude_session_id + pr_url, and re-dispatches.
+ */
+function RestartDialog({ sessionId, open, onClose, onRestart }: RestartDialogProps) {
+  const flowQuery = useQuery({
+    queryKey: ["session", sessionId, "flowStages"],
+    queryFn: () => api.getFlowStages(sessionId),
+    enabled: open,
+    staleTime: 30_000,
+  });
+  const [selected, setSelected] = useState<string | "__continue__" | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (open) setSelected(null);
+  }, [open]);
+
+  const stages = flowQuery.data?.stages ?? [];
+  const currentStage = flowQuery.data?.currentStage ?? null;
+
+  async function handleConfirm() {
+    if (!selected) return;
+    setSubmitting(true);
+    try {
+      await onRestart(selected === "__continue__" ? undefined : selected);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Restart session">
+      <div className="flex flex-col gap-3 px-5 py-4 text-[12px]">
+        <p className="text-[var(--fg-muted)]">
+          Pick the stage to restart from. Rewinding clears the agent conversation id and PR link so the run starts fresh
+          from that stage.
+        </p>
+
+        {flowQuery.isLoading && <div className="py-4 text-center text-[var(--fg-muted)]">Loading stages…</div>}
+        {flowQuery.isError && (
+          <div className="py-4 text-center text-[var(--failed)]">
+            Failed to load stages: {(flowQuery.error as { message?: string })?.message ?? "unknown error"}
+          </div>
+        )}
+
+        {!flowQuery.isLoading && !flowQuery.isError && (
+          <div className="flex flex-col gap-1.5 max-h-[40vh] overflow-y-auto pr-1">
+            <label
+              className={cn(
+                "flex items-start gap-2 px-3 py-2 rounded-md border cursor-pointer",
+                selected === "__continue__"
+                  ? "border-[var(--running)] bg-[var(--bg-hover)]"
+                  : "border-[var(--border)] hover:bg-[var(--bg-hover)]",
+              )}
+            >
+              <input
+                type="radio"
+                name="restart-stage"
+                className="mt-1"
+                checked={selected === "__continue__"}
+                onChange={() => setSelected("__continue__")}
+              />
+              <div className="flex flex-col gap-0.5">
+                <span className="font-medium">Continue at current stage{currentStage ? ` (${currentStage})` : ""}</span>
+                <span className="text-[11px] text-[var(--fg-muted)]">
+                  Re-run the current stage without resetting prior work.
+                </span>
+              </div>
+            </label>
+
+            {stages.map((s) => (
+              <label
+                key={s.name}
+                className={cn(
+                  "flex items-start gap-2 px-3 py-2 rounded-md border cursor-pointer",
+                  selected === s.name
+                    ? "border-[var(--running)] bg-[var(--bg-hover)]"
+                    : "border-[var(--border)] hover:bg-[var(--bg-hover)]",
+                )}
+              >
+                <input
+                  type="radio"
+                  name="restart-stage"
+                  className="mt-1"
+                  checked={selected === s.name}
+                  onChange={() => setSelected(s.name)}
+                />
+                <div className="flex flex-col gap-0.5 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{s.name}</span>
+                    {s.name === currentStage && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--fg-muted)]">
+                        current
+                      </span>
+                    )}
+                    <span className="text-[10px] text-[var(--fg-muted)]">
+                      {s.type === "action"
+                        ? `action: ${s.action ?? ""}`
+                        : s.type === "agent"
+                          ? `agent: ${s.agent ?? ""}`
+                          : s.type}
+                    </span>
+                  </div>
+                </div>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-end gap-2 border-t border-border px-5 py-3">
+        <Button variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
+          Cancel
+        </Button>
+        <Button size="sm" onClick={handleConfirm} disabled={!selected || submitting}>
+          {submitting ? "Restarting…" : "Restart"}
+        </Button>
+      </div>
+    </Modal>
   );
 }
 
@@ -158,6 +356,7 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [restartDialogOpen, setRestartDialogOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const prevMsgCountRef = useRef<number | null>(null);
@@ -217,9 +416,9 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
           res = await api.stop(sessionId);
           break;
         case "restart":
-          // Covers both "retry after failed dispatch" (status=ready/pending/blocked)
-          // and "restart terminal session" (status=stopped/failed/completed).
-          // `session/resume` is the single re-dispatch surface.
+          // Restart always opens the stage-picker dialog -- the dialog's
+          // Confirm button calls `performRestart(rewindToStage)`. This
+          // case is only hit by callers that want to skip the dialog.
           res = await api.restart(sessionId);
           break;
         case "archive":
@@ -242,6 +441,29 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
       }
     } catch (err: any) {
       onToast(`Failed to ${action} session ${sessionId}: ${err.message || "network error"}`, "error");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function performRestart(rewindToStage: string | undefined) {
+    setActionLoading("restart");
+    try {
+      const res = await api.restart(sessionId, rewindToStage ? { rewindToStage } : undefined);
+      if (res.ok !== false) {
+        onToast(
+          rewindToStage
+            ? `Session ${sessionId} restarted from ${rewindToStage}`
+            : `Session ${sessionId} restart successful`,
+          "success",
+        );
+        setRestartDialogOpen(false);
+        refetchDetail();
+      } else {
+        onToast(`Failed to restart ${sessionId}: ${res.message || "unknown error"}`, "error");
+      }
+    } catch (err: any) {
+      onToast(`Failed to restart ${sessionId}: ${err.message || "network error"}`, "error");
     } finally {
       setActionLoading(null);
     }
@@ -446,7 +668,7 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         session.status === "completed") && (
         <button
           type="button"
-          onClick={() => handleAction("restart")}
+          onClick={() => setRestartDialogOpen(true)}
           disabled={actionLoading === "restart"}
           aria-label="Restart session"
           className={cn(
@@ -580,12 +802,9 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         {activeTab === "conversation" && (
           <div className="max-w-[720px] mx-auto">
             {/* Attached files */}
-            {session?.config?.attachments &&
-              (session.config.attachments as Array<{ name: string; content: string; type: string }>).length > 0 && (
-                <AttachedFiles
-                  attachments={session.config.attachments as Array<{ name: string; content: string; type: string }>}
-                />
-              )}
+            {session?.config?.attachments && (session.config.attachments as AttachmentRef[]).length > 0 && (
+              <AttachedFiles attachments={session.config.attachments as AttachmentRef[]} />
+            )}
             {timeline.length === 0 && conversationMessages.length === 0 && (
               <div className="text-center text-sm text-[var(--fg-muted)] py-12">
                 No conversation yet.{" "}
@@ -952,6 +1171,12 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         confirmLabel="Delete"
         danger
         loading={actionLoading === "delete"}
+      />
+      <RestartDialog
+        sessionId={sessionId}
+        open={restartDialogOpen}
+        onClose={() => setRestartDialogOpen(false)}
+        onRestart={performRestart}
       />
     </div>
   );

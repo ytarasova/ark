@@ -77,7 +77,7 @@ const TEST_MODELS: ModelConfig[] = [
   },
 ];
 
-function makeRegistry(): ProviderRegistry {
+async function makeRegistry(): Promise<ProviderRegistry> {
   const registry = new ProviderRegistry();
   await registry.register({
     name: "test-a",
@@ -111,8 +111,8 @@ describe("RoutingEngine", () => {
   let engine: RoutingEngine;
   let registry: ProviderRegistry;
 
-  beforeEach(() => {
-    registry = makeRegistry();
+  beforeEach(async () => {
+    registry = await makeRegistry();
   });
 
   afterEach(() => {

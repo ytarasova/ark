@@ -24,7 +24,7 @@ describe("dispatch fan_out stage", async () => {
     const updated = await app.sessions.get(parent.id);
     expect(updated!.status).toBe("waiting");
 
-    const children = app.sessions.getChildren(parent.id);
+    const children = await app.sessions.getChildren(parent.id);
     expect(children.length).toBeGreaterThan(0);
 
     // Clean up dispatched agents before test exits
