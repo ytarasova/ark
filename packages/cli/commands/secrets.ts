@@ -15,6 +15,8 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import { createInterface } from "readline";
+import { readdirSync, readFileSync, writeFileSync, statSync, existsSync, mkdirSync } from "fs";
+import { join } from "path";
 import { getArkClient } from "../app-client.js";
 
 /** Read the entire stdin to a string. Used when the caller pipes a value in. */
@@ -164,6 +166,123 @@ export function registerSecretsCommands(program: Command): void {
         } else {
           console.log(chalk.yellow(`No secret '${name}' (idempotent).`));
         }
+      } catch (e: any) {
+        console.log(chalk.red(`Failed: ${e.message ?? e}`));
+        process.exitCode = 1;
+      }
+    });
+
+  // ── Blob (multi-file) subcommands ────────────────────────────────────
+  //
+  // A blob is a named bag of files, uploaded from a directory on disk.
+  // Used today for claude subscription credentials (`~/.claude/`) where
+  // the "secret" is really a small directory, not a single string.
+
+  const blob = group.command("blob").description("Manage multi-file secret blobs (directory-shaped secrets)");
+
+  blob
+    .command("list")
+    .description("List blob names (contents are never returned)")
+    .action(async () => {
+      try {
+        const ark = await getArkClient();
+        const names = await ark.secretBlobList();
+        if (names.length === 0) {
+          console.log(chalk.dim("No blob secrets configured."));
+          return;
+        }
+        for (const n of names) console.log(`  ${n}`);
+      } catch (e: any) {
+        console.log(chalk.red(`Failed: ${e.message ?? e}`));
+        process.exitCode = 1;
+      }
+    });
+
+  blob
+    .command("upload")
+    .description("Upload a directory as a named blob. Reads every file in <dir> (non-recursive).")
+    .argument("<name>", "Blob name (lowercase kebab-case, <=63 chars)")
+    .argument("<dir>", "Directory to upload")
+    .action(async (name: string, dir: string) => {
+      try {
+        if (!existsSync(dir) || !statSync(dir).isDirectory()) {
+          console.log(chalk.red(`'${dir}' is not a directory`));
+          process.exitCode = 2;
+          return;
+        }
+        const entries = readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile());
+        if (entries.length === 0) {
+          console.log(chalk.red(`Directory '${dir}' has no files`));
+          process.exitCode = 2;
+          return;
+        }
+        const files: Record<string, string> = {};
+        for (const entry of entries) {
+          const buf = readFileSync(join(dir, entry.name));
+          files[entry.name] = buf.toString("base64");
+        }
+        const ark = await getArkClient();
+        await ark.secretBlobSet(name, files, { encoding: "base64" });
+        console.log(chalk.green(`Blob '${name}' uploaded (${entries.length} file${entries.length === 1 ? "" : "s"}).`));
+      } catch (e: any) {
+        console.log(chalk.red(`Failed: ${e.message ?? e}`));
+        process.exitCode = 1;
+      }
+    });
+
+  blob
+    .command("download")
+    .description("Download a blob into a directory. Creates the directory if missing.")
+    .argument("<name>", "Blob name")
+    .argument("<dir>", "Target directory")
+    .action(async (name: string, dir: string) => {
+      try {
+        const ark = await getArkClient();
+        const blobData = await ark.secretBlobGet(name);
+        if (!blobData) {
+          console.log(chalk.red(`Blob '${name}' not found`));
+          process.exitCode = 1;
+          return;
+        }
+        mkdirSync(dir, { recursive: true });
+        const files = Object.keys(blobData.files);
+        for (const filename of files) {
+          const bytes = Buffer.from(blobData.files[filename], "base64");
+          writeFileSync(join(dir, filename), bytes, { mode: 0o600 });
+        }
+        console.log(
+          chalk.green(`Blob '${name}' written to ${dir} (${files.length} file${files.length === 1 ? "" : "s"}).`),
+        );
+      } catch (e: any) {
+        console.log(chalk.red(`Failed: ${e.message ?? e}`));
+        process.exitCode = 1;
+      }
+    });
+
+  blob
+    .command("delete")
+    .description("Delete a blob.")
+    .argument("<name>", "Blob name")
+    .option("-y, --yes", "Skip the confirm prompt")
+    .action(async (name: string, opts) => {
+      try {
+        if (!opts.yes) {
+          const answer = await new Promise<string>((resolve) => {
+            const rl = createInterface({ input: process.stdin, output: process.stdout });
+            rl.question(`Delete blob '${name}'? [y/N] `, (a) => {
+              rl.close();
+              resolve(a.trim().toLowerCase());
+            });
+          });
+          if (answer !== "y" && answer !== "yes") {
+            console.log("Aborted.");
+            return;
+          }
+        }
+        const ark = await getArkClient();
+        const removed = await ark.secretBlobDelete(name);
+        if (removed) console.log(chalk.green(`Deleted blob '${name}'.`));
+        else console.log(chalk.yellow(`No blob '${name}' (idempotent).`));
       } catch (e: any) {
         console.log(chalk.red(`Failed: ${e.message ?? e}`));
         process.exitCode = 1;

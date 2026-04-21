@@ -1,11 +1,64 @@
 import type { Command } from "commander";
 import chalk from "chalk";
+import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdtempSync } from "fs";
 import { join } from "path";
-import { existsSync, writeFileSync, mkdirSync } from "fs";
+import { tmpdir } from "os";
 import { execFileSync } from "child_process";
 import YAML from "yaml";
-import * as core from "../../core/index.js";
-import { getArkClient, getInProcessApp } from "../app-client.js";
+import { getArkClient } from "../app-client.js";
+
+/**
+ * Scaffold a fresh agent YAML string. Kept client-side so the CLI can preview
+ * and edit it in `$EDITOR` before sending it to the daemon. The daemon fills
+ * missing fields with the same defaults when it receives a partial YAML, so
+ * this scaffold is just a UX convenience.
+ */
+function agentScaffold(name: string): string {
+  return YAML.stringify({
+    name,
+    description: "",
+    model: "sonnet",
+    max_turns: 200,
+    system_prompt: "",
+    tools: ["Bash", "Read", "Write", "Edit", "Glob", "Grep"],
+    mcp_servers: [],
+    skills: [],
+    memories: [],
+    context: [],
+    permission_mode: "bypassPermissions",
+    env: {},
+  });
+}
+
+/**
+ * Open `$EDITOR` on a scratch file pre-populated with `initial`, return the
+ * post-edit contents. The file lives in an ephemeral tmp directory so
+ * exits-without-save don't clutter the user's cwd.
+ */
+function editInEditor(filename: string, initial: string): string | null {
+  const dir = mkdtempSync(join(tmpdir(), "ark-agent-"));
+  const path = join(dir, filename);
+  writeFileSync(path, initial);
+  try {
+    execFileSync(process.env.EDITOR || "vi", [path], { stdio: "inherit" });
+    if (!existsSync(path)) return null;
+    return readFileSync(path, "utf-8");
+  } finally {
+    try {
+      if (existsSync(path)) unlinkSync(path);
+    } catch {
+      // best effort
+    }
+  }
+}
+
+async function confirm(question: string): Promise<boolean> {
+  const readline = await import("readline");
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await new Promise<string>((resolve) => rl.question(question, resolve));
+  rl.close();
+  return answer.trim().toLowerCase() === "y";
+}
 
 export function registerAgentCommands(program: Command) {
   const agent = program.command("agent").description("Manage agent definitions");
@@ -49,110 +102,136 @@ export function registerAgentCommands(program: Command) {
     .command("create")
     .description("Create a new agent")
     .argument("<name>")
-    .option("--global", "Save to ~/.ark/agents/ instead of project")
-    .action(async (name, opts) => {
-      const app = await getInProcessApp();
-      const projectRoot = core.findProjectRoot(process.cwd());
-      const scope: "project" | "global" = opts.global || !projectRoot ? "global" : "project";
-      const dir = scope === "project" ? join(projectRoot!, ".ark", "agents") : join(app.config.arkDir, "agents");
-      const filePath = join(dir, `${name}.yaml`);
+    .option("--global", "Save at global scope instead of project scope")
+    .option("--from <file>", "Seed YAML from a file instead of scaffolding fresh")
+    .option("--no-editor", "Skip the $EDITOR step (use the scaffold / --from content as-is)")
+    .action(async (name: string, opts: { global?: boolean; from?: string; editor?: boolean }) => {
+      const scope: "global" | "project" = opts.global ? "global" : "project";
 
-      if (existsSync(filePath)) {
-        console.log(chalk.red(`Agent '${name}' already exists at ${filePath}`));
-        return;
+      let seed: string;
+      if (opts.from) {
+        try {
+          seed = readFileSync(opts.from, "utf-8");
+        } catch {
+          console.error(chalk.red(`Cannot read file: ${opts.from}`));
+          process.exit(1);
+        }
+      } else {
+        seed = agentScaffold(name);
       }
 
-      mkdirSync(dir, { recursive: true });
-      const scaffold = YAML.stringify({
-        name,
-        description: "",
-        model: "sonnet",
-        max_turns: 200,
-        system_prompt: "",
-        tools: ["Bash", "Read", "Write", "Edit", "Glob", "Grep"],
-        mcp_servers: [],
-        skills: [],
-        memories: [],
-        context: [],
-        permission_mode: "bypassPermissions",
-        env: {},
-      });
-      writeFileSync(filePath, scaffold);
-      console.log(chalk.green(`Created ${scope} agent: ${filePath}`));
+      let yaml: string | null = seed;
+      if (opts.editor !== false) {
+        yaml = editInEditor(`${name}.yaml`, seed);
+        if (yaml === null) {
+          console.log(chalk.red("Editor discarded file; aborting."));
+          return;
+        }
+      }
 
-      const editor = process.env.EDITOR || "vi";
-      execFileSync(editor, [filePath], { stdio: "inherit" });
+      const ark = await getArkClient();
+      try {
+        const res = await ark.agentCreate({ name, yaml, scope });
+        console.log(chalk.green(`Created ${res.scope} agent '${res.name}'.`));
+      } catch (e: any) {
+        console.error(chalk.red(`agent/create failed: ${e?.message ?? e}`));
+        process.exit(1);
+      }
     });
 
   agent
     .command("edit")
     .description("Edit an agent definition")
     .argument("<name>")
-    .action(async (name) => {
-      const app = await getInProcessApp();
-      const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
-      const a = app.agents.get(name, projectRoot);
-      if (!a) {
+    .option("--global", "Write back at global scope (default follows the existing agent's scope)")
+    .action(async (name: string, opts: { global?: boolean }) => {
+      const ark = await getArkClient();
+      let current;
+      try {
+        current = await ark.agentRead(name);
+      } catch {
         console.log(chalk.red(`Agent '${name}' not found`));
         return;
       }
 
-      if (a._source === "builtin") {
-        const readline = await import("readline");
-        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-        const answer = await new Promise<string>((resolve) =>
-          rl.question(`'${name}' is a builtin agent. Copy to [p]roject/[g]lobal first? [p/g/N] `, resolve),
-        );
-        rl.close();
-        const choice = answer.trim().toLowerCase();
-        if (choice === "p" && projectRoot) {
-          app.agents.save(a.name, a, "project", projectRoot);
-          const path = join(projectRoot, ".ark", "agents", `${name}.yaml`);
-          execFileSync(process.env.EDITOR || "vi", [path], { stdio: "inherit" });
-        } else if (choice === "g") {
-          app.agents.save(a.name, a, "global");
-          const path = join(app.config.arkDir, "agents", `${name}.yaml`);
-          execFileSync(process.env.EDITOR || "vi", [path], { stdio: "inherit" });
-        } else {
+      if (current._source === "builtin") {
+        const yes = await confirm(`'${name}' is a builtin agent. Copy it to global scope first? [y/N] `);
+        if (!yes) {
           console.log("Cancelled.");
+          return;
         }
+        // Copy, then edit the copy at the requested scope.
+        try {
+          await ark.agentCopy({ from: name, to: name, scope: "global" });
+        } catch (e: any) {
+          console.error(chalk.red(`agent/copy failed: ${e?.message ?? e}`));
+          process.exit(1);
+        }
+        current = await ark.agentRead(name);
+      }
+
+      // Strip metadata fields before handing YAML back to the user -- the
+      // daemon will re-derive `_source` / `_path` on the next read.
+      const { _source, _path, ...visible } = current;
+      const seed = YAML.stringify(visible);
+      const edited = editInEditor(`${name}.yaml`, seed);
+      if (edited === null) {
+        console.log(chalk.red("Editor discarded file; aborting."));
+        return;
+      }
+      if (edited.trim() === seed.trim()) {
+        console.log(chalk.dim("No changes."));
         return;
       }
 
-      execFileSync(process.env.EDITOR || "vi", [a._path!], { stdio: "inherit" });
+      const scope: "global" | "project" | undefined = opts.global
+        ? "global"
+        : current._source === "project"
+          ? "project"
+          : "global";
+      try {
+        const res = await ark.agentEdit({ name, yaml: edited, scope });
+        console.log(chalk.green(`Updated ${res.scope} agent '${res.name}'.`));
+      } catch (e: any) {
+        console.error(chalk.red(`agent/edit failed: ${e?.message ?? e}`));
+        process.exit(1);
+      }
     });
 
   agent
     .command("delete")
     .description("Delete a custom agent")
     .argument("<name>")
-    .action(async (name) => {
-      const app = await getInProcessApp();
-      const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
-      const a = app.agents.get(name, projectRoot);
-      if (!a) {
+    .option("-y, --yes", "Skip confirmation")
+    .action(async (name: string, opts: { yes?: boolean }) => {
+      const ark = await getArkClient();
+      let current;
+      try {
+        current = await ark.agentRead(name);
+      } catch {
         console.log(chalk.red(`Agent '${name}' not found`));
         return;
       }
 
-      if (a._source === "builtin") {
+      if (current._source === "builtin") {
         console.log(chalk.red("Cannot delete builtin agents."));
         return;
       }
 
-      const readline = await import("readline");
-      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-      const answer = await new Promise<string>((resolve) =>
-        rl.question(`Delete ${a._source} agent '${name}' at ${a._path}? [y/N] `, resolve),
-      );
-      rl.close();
+      if (!opts.yes) {
+        const yes = await confirm(`Delete ${current._source} agent '${name}'? [y/N] `);
+        if (!yes) {
+          console.log("Cancelled.");
+          return;
+        }
+      }
 
-      if (answer.trim().toLowerCase() === "y") {
-        const scope = a._source as "project" | "global";
-        app.agents.delete(name, scope, scope === "project" ? projectRoot : undefined);
+      try {
+        await ark.agentDelete(name, current._source as "global" | "project");
         console.log(chalk.green(`Deleted '${name}'.`));
-      } else {
-        console.log("Cancelled.");
+      } catch (e: any) {
+        console.error(chalk.red(`agent/delete failed: ${e?.message ?? e}`));
+        process.exit(1);
       }
     });
 
@@ -161,22 +240,18 @@ export function registerAgentCommands(program: Command) {
     .description("Copy an agent for customization")
     .argument("<name>")
     .argument("[new-name]")
-    .option("--global", "Save to ~/.ark/agents/ instead of project")
-    .action(async (name, newName, opts) => {
-      const app = await getInProcessApp();
-      const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
-      const a = app.agents.get(name, projectRoot);
-      if (!a) {
-        console.log(chalk.red(`Agent '${name}' not found`));
-        return;
+    .option("--global", "Save at global scope instead of project scope")
+    .action(async (name: string, newName: string | undefined, opts: { global?: boolean }) => {
+      const target = newName || name;
+      const scope: "global" | "project" = opts.global ? "global" : "project";
+
+      const ark = await getArkClient();
+      try {
+        const res = await ark.agentCopy({ from: name, to: target, scope });
+        console.log(chalk.green(`Copied '${name}' -> ${res.scope} '${res.name}'.`));
+      } catch (e: any) {
+        console.error(chalk.red(`agent/copy failed: ${e?.message ?? e}`));
+        process.exit(1);
       }
-
-      const targetName = newName || name;
-      const scope: "project" | "global" = opts.global || !projectRoot ? "global" : "project";
-      const copy = { ...a, name: targetName };
-      app.agents.save(copy.name, copy, scope, scope === "project" ? projectRoot : undefined);
-
-      const dir = scope === "project" ? join(projectRoot!, ".ark", "agents") : join(app.config.arkDir, "agents");
-      console.log(chalk.green(`Copied '${name}' → ${scope} '${targetName}' at ${join(dir, `${targetName}.yaml`)}`));
     });
 }

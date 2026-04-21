@@ -2,16 +2,20 @@ import type { Command } from "commander";
 import chalk from "chalk";
 import { writeFileSync } from "fs";
 import * as core from "../../core/index.js";
-import { getArkClient, getInProcessApp } from "../app-client.js";
+import { getArkClient } from "../app-client.js";
 
 /**
  * Cost-related CLI commands: `ark costs`, `ark costs-sync`, `ark costs-export`.
  *
- * Extracted from misc.ts to keep that file from being a 600-line catch-all.
- * The three commands together handle:
- *   - the live `costs` UX (per-session list, --by grouped summary, --trend daily chart)
- *   - the `costs-sync` backfill from on-disk transcripts
- *   - the `costs-export` CSV/JSON dump
+ * Every command is a thin client over the daemon's `costs/*` RPC surface.
+ *
+ * Local-by-nature carve-outs (documented + kept on the CLI side):
+ *   - CSV formatting (`costs-export --format csv`): the daemon returns the
+ *     structured rows; the CLI turns them into CSV. Same data either way,
+ *     but the CSV assembly is display concern, not a daemon responsibility.
+ *   - `writeFileSync(--output)`: writing the result to a path on the CLI
+ *     user's host is a client-side filesystem op. The daemon doesn't know
+ *     where the user's `./out.csv` should land.
  */
 export function registerCostsCommands(program: Command) {
   program
@@ -36,12 +40,12 @@ export function registerCostsCommands(program: Command) {
         }
         console.log(chalk.bold("\nDaily Cost Trend\n"));
         console.log(chalk.dim("Date".padEnd(14) + "Cost"));
-        console.log(chalk.dim("\u2500".repeat(30)));
+        console.log(chalk.dim("─".repeat(30)));
         for (const row of trend) {
           console.log(`${row.date.padEnd(14)}${core.formatCost(row.cost)}`);
         }
         const total = trend.reduce((s, r) => s + r.cost, 0);
-        console.log(chalk.dim("\u2500".repeat(30)));
+        console.log(chalk.dim("─".repeat(30)));
         console.log(chalk.bold(`Total: ${core.formatCost(total)}\n`));
         return;
       }
@@ -72,7 +76,7 @@ export function registerCostsCommands(program: Command) {
             opts.by.padEnd(30) + "Cost".padEnd(12) + "In Tokens".padEnd(14) + "Out Tokens".padEnd(14) + "Records",
           ),
         );
-        console.log(chalk.dim("\u2500".repeat(80)));
+        console.log(chalk.dim("─".repeat(80)));
         const limit = Number(opts.limit);
         for (const row of summary.slice(0, limit)) {
           const key = (row.key ?? "unknown").slice(0, 28).padEnd(30);
@@ -97,7 +101,7 @@ export function registerCostsCommands(program: Command) {
 
       console.log(chalk.bold(`\nTotal cost: ${core.formatCost(total)}\n`));
       console.log(chalk.dim("Session".padEnd(40) + "Model".padEnd(10) + "Cost".padEnd(10) + "Tokens"));
-      console.log(chalk.dim("\u2500".repeat(75)));
+      console.log(chalk.dim("─".repeat(75)));
 
       const limit = Number(opts.limit);
       for (const c of costs.slice(0, limit)) {
@@ -115,10 +119,10 @@ export function registerCostsCommands(program: Command) {
 
   program
     .command("costs-sync")
-    .description("Backfill cost data from Claude transcripts")
+    .description("Backfill cost data from transcripts (on the daemon host)")
     .action(async () => {
-      const app = await getInProcessApp();
-      const result = await core.syncCosts(app);
+      const ark = await getArkClient();
+      const result = await ark.costsSync();
       console.log(chalk.green(`Synced: ${result.synced} sessions, Skipped: ${result.skipped}`));
     });
 
@@ -129,12 +133,33 @@ export function registerCostsCommands(program: Command) {
     .option("-o, --output <file>", "Output file")
     .action(async (opts) => {
       const ark = await getArkClient();
-      const app = await getInProcessApp();
-      const sessions = await ark.sessionList({ limit: 500 });
-      const data =
-        opts.format === "csv"
-          ? await core.exportCostsCsv(app, sessions)
-          : JSON.stringify(await core.getAllSessionCosts(app, sessions), null, 2);
+      const { rows } = await ark.costsExport({ limit: 500 });
+
+      let data: string;
+      if (opts.format === "csv") {
+        const header =
+          "session_id,summary,model,cost_usd,input_tokens,output_tokens,cache_read,cache_write,total_tokens";
+        const lines = [header];
+        for (const r of rows) {
+          const total = r.input_tokens + r.output_tokens + r.cache_read_tokens + r.cache_write_tokens;
+          lines.push(
+            [
+              r.sessionId,
+              `"${(r.summary ?? "").replace(/"/g, '""')}"`,
+              r.model ?? "",
+              r.cost.toFixed(4),
+              r.input_tokens,
+              r.output_tokens,
+              r.cache_read_tokens,
+              r.cache_write_tokens,
+              total,
+            ].join(","),
+          );
+        }
+        data = lines.join("\n");
+      } else {
+        data = JSON.stringify(rows, null, 2);
+      }
       if (opts.output) {
         writeFileSync(opts.output, data);
         console.log(chalk.green(`Exported to ${opts.output}`));

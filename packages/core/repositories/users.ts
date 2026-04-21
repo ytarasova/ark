@@ -16,6 +16,7 @@ export interface UserRow {
   email: string;
   name: string | null;
   deleted_at: string | null;
+  deleted_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -78,7 +79,7 @@ export class UserRepository {
     return this.create(u);
   }
 
-  async softDelete(id: string): Promise<boolean> {
+  async softDelete(id: string, userId: string | null = null): Promise<boolean> {
     const existing = (await this.db.prepare("SELECT deleted_at FROM users WHERE id = ?").get(id)) as
       | { deleted_at: string | null }
       | undefined;
@@ -86,14 +87,16 @@ export class UserRepository {
     if (existing.deleted_at) return true;
     const ts = now();
     const res = await this.db
-      .prepare("UPDATE users SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL")
-      .run(ts, ts, id);
+      .prepare("UPDATE users SET deleted_at = ?, deleted_by = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL")
+      .run(ts, userId, ts, id);
     return res.changes > 0;
   }
 
   async restore(id: string): Promise<boolean> {
     const res = await this.db
-      .prepare("UPDATE users SET deleted_at = NULL, updated_at = ? WHERE id = ? AND deleted_at IS NOT NULL")
+      .prepare(
+        "UPDATE users SET deleted_at = NULL, deleted_by = NULL, updated_at = ? WHERE id = ? AND deleted_at IS NOT NULL",
+      )
       .run(now(), id);
     return res.changes > 0;
   }

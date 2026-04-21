@@ -22,7 +22,7 @@ import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { logInfo } from "../../core/observability/structured-log.js";
-import { assertValidSecretName } from "../../core/secrets/types.js";
+import { assertValidSecretName, assertValidBlobName, assertValidBlobFilename } from "../../core/secrets/types.js";
 import type { TenantContext } from "../../core/auth/context.js";
 
 function resolveTenantId(app: AppContext, ctx: TenantContext): string {
@@ -97,6 +97,86 @@ export function registerSecretsHandlers(router: Router, app: AppContext): void {
     }
     const tenantId = resolveTenantId(app, ctx);
     const removed = await app.secrets.delete(tenantId, name);
+    return { ok: removed };
+  });
+
+  // ── Blob (multi-file) secrets ─────────────────────────────────────────
+  //
+  // Wire format for blob file contents on the RPC surface is base64. We
+  // accept a `{ files: { "<filename>": "<base64>" } }` payload on set and
+  // return the same shape on get. The server only decodes at dispatch time
+  // (when materializing a k8s Secret), not here; keeping the wire binary
+  // means the handler can round-trip non-UTF-8 bytes unchanged.
+
+  router.handle("secret/blob/list", async (_p, _notify, ctx) => {
+    const tenantId = resolveTenantId(app, ctx);
+    const names = await app.secrets.listBlobs(tenantId);
+    return { blobs: names };
+  });
+
+  router.handle("secret/blob/get", async (p, _notify, ctx) => {
+    const { name } = extract<{ name: string }>(p, ["name"]);
+    try {
+      assertValidBlobName(name);
+    } catch (err) {
+      throw wrapNameError(err);
+    }
+    const tenantId = resolveTenantId(app, ctx);
+    logInfo("general", `secret/blob/get tenant=${tenantId} name=${name}`);
+    const blob = await app.secrets.getBlob(tenantId, name);
+    if (!blob) return { blob: null };
+    const files: Record<string, string> = {};
+    for (const filename of Object.keys(blob)) {
+      files[filename] = Buffer.from(blob[filename]).toString("base64");
+    }
+    return { blob: { files, encoding: "base64" as const } };
+  });
+
+  router.handle("secret/blob/set", async (p, _notify, ctx) => {
+    const { name, files, encoding } = extract<{
+      name: string;
+      files: Record<string, string>;
+      encoding?: "base64" | "utf-8";
+    }>(p, ["name", "files"]);
+    try {
+      assertValidBlobName(name);
+    } catch (err) {
+      throw wrapNameError(err);
+    }
+    if (!files || typeof files !== "object" || Array.isArray(files)) {
+      throw new RpcError("files must be an object of filename -> string", ErrorCodes.INVALID_PARAMS);
+    }
+    const enc = encoding ?? "base64";
+    if (enc !== "base64" && enc !== "utf-8") {
+      throw new RpcError(`Unsupported encoding '${enc}' (expected 'base64' or 'utf-8')`, ErrorCodes.INVALID_PARAMS);
+    }
+    const decoded: Record<string, Uint8Array> = {};
+    for (const filename of Object.keys(files)) {
+      try {
+        assertValidBlobFilename(filename);
+      } catch (err) {
+        throw wrapNameError(err);
+      }
+      const v = files[filename];
+      if (typeof v !== "string") {
+        throw new RpcError(`files['${filename}']: value must be a string`, ErrorCodes.INVALID_PARAMS);
+      }
+      decoded[filename] = enc === "base64" ? new Uint8Array(Buffer.from(v, "base64")) : new TextEncoder().encode(v);
+    }
+    const tenantId = resolveTenantId(app, ctx);
+    await app.secrets.setBlob(tenantId, name, decoded);
+    return { ok: true };
+  });
+
+  router.handle("secret/blob/delete", async (p, _notify, ctx) => {
+    const { name } = extract<{ name: string }>(p, ["name"]);
+    try {
+      assertValidBlobName(name);
+    } catch (err) {
+      throw wrapNameError(err);
+    }
+    const tenantId = resolveTenantId(app, ctx);
+    const removed = await app.secrets.deleteBlob(tenantId, name);
     return { ok: removed };
   });
 }

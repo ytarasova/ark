@@ -70,6 +70,33 @@ describe("UserManager", () => {
     await db.close();
   });
 
+  it("records deleted_by when delete() is called with an acting userId", async () => {
+    const db = await freshDb();
+    const um = new UserManager(db);
+    const u = await um.create({ email: "audit@example.com" });
+    await um.delete(u.id, "u-admin-1");
+    const ghost = await um.get(u.id, { includeDeleted: true });
+    expect(ghost?.deleted_by).toBe("u-admin-1");
+    expect(ghost?.deleted_at).not.toBeNull();
+
+    // Restore clears both fields.
+    await um.restore(u.id);
+    const back = await um.get(u.id);
+    expect(back?.deleted_at).toBeNull();
+    expect(back?.deleted_by).toBeNull();
+    await db.close();
+  });
+
+  it("soft-deletes with NULL deleted_by when no actor is supplied", async () => {
+    const db = await freshDb();
+    const um = new UserManager(db);
+    const u = await um.create({ email: "sys@example.com" });
+    await um.delete(u.id);
+    const ghost = await um.get(u.id, { includeDeleted: true });
+    expect(ghost?.deleted_by).toBeNull();
+    await db.close();
+  });
+
   it("rejects duplicate emails on create", async () => {
     const db = await freshDb();
     const um = new UserManager(db);

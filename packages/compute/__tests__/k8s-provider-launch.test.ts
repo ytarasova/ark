@@ -250,3 +250,278 @@ describe("K8sProvider.start (instance pod)", async () => {
     expect(cmd[0]).not.toBe("/bin/bash");
   });
 });
+
+describe("K8sProvider.launch securityContext", async () => {
+  // The pod-level securityContext block gates admission on clusters
+  // enforcing Pod Security Standards "restricted". These tests pin both
+  // the omit-when-absent default AND the populated shape so regressions
+  // show up in CI before they reach an EKS / GKE / OKE cluster.
+
+  let rec: Recorded;
+  let provider: K8sProvider;
+
+  beforeEach(() => {
+    rec = { lastPod: null, calls: [] };
+    provider = makeProvider(rec);
+  });
+
+  it("omits spec.securityContext entirely when none of the hardening fields are set", async () => {
+    // Baseline: an unconfigured compute must not emit `securityContext: {}`
+    // -- that would still pass admission today but signals "we decided to
+    // leave this open" rather than "field absent by default".
+    await provider.launch(baseCompute as any, baseSession, {
+      tmuxName: "ark-abc12345",
+      workdir: "/tmp/wd",
+      launcherContent: "#!/bin/sh\n:",
+      ports: [],
+    });
+    expect(rec.lastPod!.spec.securityContext).toBeUndefined();
+  });
+
+  it("emits pod-level securityContext when runAsNonRoot is set", async () => {
+    const hardened = {
+      ...baseCompute,
+      config: { ...baseCompute.config, runAsNonRoot: true },
+    };
+    await provider.launch(hardened as any, baseSession, {
+      tmuxName: "ark-abc12345",
+      workdir: "/tmp/wd",
+      launcherContent: "#!/bin/sh\n:",
+      ports: [],
+    });
+    expect(rec.lastPod!.spec.securityContext).toEqual({ runAsNonRoot: true });
+  });
+
+  it("emits all four fields when every knob is configured", async () => {
+    // fsGroup in particular matters when credsSecretName is set -- the
+    // secret mount needs to be readable by the non-root user.
+    const hardened = {
+      ...baseCompute,
+      config: {
+        ...baseCompute.config,
+        runAsNonRoot: true,
+        runAsUser: 1000,
+        runAsGroup: 1000,
+        fsGroup: 1000,
+      },
+    };
+    await provider.launch(hardened as any, baseSession, {
+      tmuxName: "ark-abc12345",
+      workdir: "/tmp/wd",
+      launcherContent: "#!/bin/sh\n:",
+      ports: [],
+    });
+    expect(rec.lastPod!.spec.securityContext).toEqual({
+      runAsNonRoot: true,
+      runAsUser: 1000,
+      runAsGroup: 1000,
+      fsGroup: 1000,
+    });
+  });
+
+  it("preserves falsy values (runAsNonRoot: false) instead of dropping them", async () => {
+    // A compute that explicitly opts out of non-root enforcement should
+    // round-trip the `false` into the pod body -- otherwise an operator
+    // who wrote `runAsNonRoot: false` to unblock a legacy image would
+    // silently end up with the admission-blocking default. Our builder
+    // uses `=== undefined` checks rather than truthiness, so this holds.
+    const legacy = {
+      ...baseCompute,
+      config: { ...baseCompute.config, runAsNonRoot: false, runAsUser: 0 },
+    };
+    await provider.launch(legacy as any, baseSession, {
+      tmuxName: "ark-abc12345",
+      workdir: "/tmp/wd",
+      launcherContent: "#!/bin/sh\n:",
+      ports: [],
+    });
+    expect(rec.lastPod!.spec.securityContext).toEqual({ runAsNonRoot: false, runAsUser: 0 });
+  });
+});
+
+describe("K8sProvider.launch clusterName resolution (agent G)", async () => {
+  // Exercises the new programmatic-KubeConfig path introduced for Phase 1
+  // cluster-access. We stub the @kubernetes/client-node import via the
+  // existing `makeProvider` pattern by pre-populating `kubeApi`, but here we
+  // also need to drive the KubeConfig construction itself -- that happens
+  // inside the provider on the `clusterName` branch. To keep the test narrow
+  // and dependency-free we replace `this.app.secrets.get` + set a system-layer
+  // cluster, then invoke a private helper via a thin spy.
+
+  it("builds KubeConfig programmatically from resolved cluster + secrets", async () => {
+    // Stub the secrets capability on the mode to return a known token.
+    const originalMode = app.mode;
+    const fakeSecrets = {
+      async get(_tid: string, name: string) {
+        if (name === "PROD_K8S_TOKEN") return "s3cr3t-token";
+        if (name === "PROD_K8S_CA") return "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----";
+        return null;
+      },
+    } as any;
+    Object.defineProperty(app, "mode", {
+      configurable: true,
+      get: () => ({ ...originalMode, secrets: fakeSecrets }),
+    });
+    // Inject a system-layer cluster via config surgery. Cast because config
+    // is readonly in the type but the runtime object is mutable.
+    (app.config as any).compute = {
+      clusters: [
+        {
+          name: "prod-us-east",
+          kind: "k8s",
+          apiEndpoint: "https://prod.k8s.example.com:6443",
+          auth: { kind: "token", tokenSecret: "PROD_K8S_TOKEN", caSecret: "PROD_K8S_CA" },
+        },
+      ],
+    };
+
+    // Record what the k8s client loadFromOptions is called with by swapping
+    // in a stub KubeConfig via a module-level mock. Simpler: call the private
+    // method directly via cast.
+    const provider = new K8sProvider();
+    provider.setApp(app);
+    const recorded: any = { loaded: null, api: null };
+    const fakeKc = {
+      loadFromOptions(opts: unknown) {
+        recorded.loaded = opts;
+      },
+      loadFromCluster() {
+        recorded.loaded = { inCluster: true };
+      },
+      makeApiClient() {
+        recorded.api = { tag: "fake" };
+        return recorded.api;
+      },
+    };
+    const fakeModule = { KubeConfig: class {}, CoreV1Api: class {} } as any;
+    await (provider as any).buildKubeConfigFromCluster(fakeKc, "prod-us-east", "default", fakeModule);
+
+    // Assert: API endpoint + user token wired up without ever reading disk.
+    expect(recorded.loaded).toBeTruthy();
+    expect(recorded.loaded.clusters[0].server).toBe("https://prod.k8s.example.com:6443");
+    expect(recorded.loaded.currentContext).toBe("prod-us-east-ctx");
+    expect(recorded.loaded.users[0].token).toBe("s3cr3t-token");
+    // CA was provided via caSecret, encoded base64 for kc.loadFromOptions.
+    expect(recorded.loaded.clusters[0].caData).toBeTruthy();
+    expect(recorded.loaded.clusters[0].skipTLSVerify).toBeUndefined();
+
+    Object.defineProperty(app, "mode", { configurable: true, get: () => originalMode });
+  });
+
+  it("fails fast when a referenced secret is missing for the tenant", async () => {
+    const originalMode = app.mode;
+    const fakeSecrets = {
+      async get(_tid: string, _name: string) {
+        return null;
+      },
+    } as any;
+    Object.defineProperty(app, "mode", {
+      configurable: true,
+      get: () => ({ ...originalMode, secrets: fakeSecrets }),
+    });
+    (app.config as any).compute = {
+      clusters: [
+        {
+          name: "staging",
+          kind: "k8s",
+          apiEndpoint: "https://staging.example.com",
+          auth: { kind: "token", tokenSecret: "MISSING_TOKEN" },
+        },
+      ],
+    };
+
+    const provider = new K8sProvider();
+    provider.setApp(app);
+    const fakeKc = {
+      loadFromOptions() {},
+      loadFromCluster() {},
+      makeApiClient() {
+        return {};
+      },
+    };
+    await expect((provider as any).buildKubeConfigFromCluster(fakeKc, "staging", "acme", {} as any)).rejects.toThrow(
+      /requires secret "MISSING_TOKEN"/,
+    );
+
+    Object.defineProperty(app, "mode", { configurable: true, get: () => originalMode });
+  });
+
+  it("rejects unknown cluster name with the available list", async () => {
+    (app.config as any).compute = {
+      clusters: [
+        {
+          name: "only-one",
+          kind: "k8s",
+          apiEndpoint: "https://a.example.com",
+          auth: { kind: "in_cluster" },
+        },
+      ],
+    };
+    const provider = new K8sProvider();
+    provider.setApp(app);
+    const fakeKc = {
+      loadFromOptions() {},
+      loadFromCluster() {},
+      makeApiClient() {
+        return {};
+      },
+    };
+    await expect((provider as any).buildKubeConfigFromCluster(fakeKc, "nope", "default", {} as any)).rejects.toThrow(
+      /not in effective list.*Available: only-one/,
+    );
+  });
+
+  it("uses loadFromCluster() for in_cluster auth and skips the secret fetch", async () => {
+    (app.config as any).compute = {
+      clusters: [
+        {
+          name: "pod-local",
+          kind: "k8s",
+          apiEndpoint: "https://kubernetes.default.svc",
+          auth: { kind: "in_cluster" },
+        },
+      ],
+    };
+    const provider = new K8sProvider();
+    provider.setApp(app);
+    const recorded: any = { loaded: null };
+    const fakeKc = {
+      loadFromOptions(opts: unknown) {
+        recorded.loaded = opts;
+      },
+      loadFromCluster() {
+        recorded.loaded = { inCluster: true };
+      },
+      makeApiClient() {
+        return {};
+      },
+    };
+    await (provider as any).buildKubeConfigFromCluster(fakeKc, "pod-local", "default", {} as any);
+    expect(recorded.loaded).toEqual({ inCluster: true });
+  });
+});
+
+describe("K8sProvider.start (instance pod) securityContext", async () => {
+  it("applies the same pod-level securityContext as launch()", async () => {
+    // Parity: the instance pod (keep-alive `sleep infinity`) must honour
+    // the hardening knobs too, otherwise `Start` on a restricted-PSS
+    // cluster silently fails admission while `launch()` succeeds.
+    const rec: Recorded = { lastPod: null, calls: [] };
+    const provider = makeProvider(rec);
+
+    const hardened = {
+      ...baseCompute,
+      config: { ...baseCompute.config, runAsNonRoot: true, runAsUser: 1000 },
+    };
+    await provider.start(hardened as any);
+
+    expect(rec.lastPod!.spec.securityContext).toEqual({ runAsNonRoot: true, runAsUser: 1000 });
+  });
+
+  it("omits securityContext from the instance pod when none of the knobs are set", async () => {
+    const rec: Recorded = { lastPod: null, calls: [] };
+    const provider = makeProvider(rec);
+    await provider.start(baseCompute as any);
+    expect(rec.lastPod!.spec.securityContext).toBeUndefined();
+  });
+});

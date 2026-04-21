@@ -31,12 +31,23 @@
  * writes must never surface.
  */
 
-import { existsSync, readFileSync, writeFileSync, renameSync, chmodSync, mkdirSync } from "fs";
+import {
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  renameSync,
+  chmodSync,
+  mkdirSync,
+  readdirSync,
+  rmSync,
+  statSync,
+} from "fs";
 import { randomBytes, createCipheriv, createDecipheriv, scryptSync } from "crypto";
 import os from "os";
 import { dirname, join } from "path";
 import type { SecretRef, SecretsCapability } from "./types.js";
-import { assertValidSecretName } from "./types.js";
+import { assertValidSecretName, assertValidBlobName, assertValidBlobFilename } from "./types.js";
+import { normalizeBlob, type BlobInput, type BlobBytes } from "./blob.js";
 
 const VERSION = 1;
 /** Pseudo-application-constant salt mixed into the scrypt KDF. */
@@ -244,5 +255,110 @@ export class FileSecretsProvider implements SecretsCapability {
       throw new Error(`Missing secrets for tenant '${tenantId}': ${missing.join(", ")}`);
     }
     return out;
+  }
+
+  // ── Blob surface (multi-file secrets) ──────────────────────────────────
+  //
+  // Blobs live under `${arkDir}/secrets/<tenantId>/<blobName>/<file>` with
+  // every file 0600. We deliberately do NOT encrypt the blob payloads --
+  // blobs are used for things like claude subscription credentials that are
+  // already secrets on disk in the user's `~/.claude/`, so layering the
+  // file-provider's machine-scoped AES on top of them is security theatre.
+  // Operators who want real at-rest encryption should run the AWS provider.
+  //
+  // We DO refuse to traverse outside `${arkDir}/secrets/<tenant>/` when
+  // deleting or enumerating, and every filename is validated at the types
+  // layer so the on-disk path is always a safe join.
+
+  private blobRoot(): string {
+    return join(dirname(this.path), "secrets");
+  }
+
+  private tenantBlobDir(tenantId: string): string {
+    return join(this.blobRoot(), tenantId);
+  }
+
+  private blobDir(tenantId: string, name: string): string {
+    return join(this.tenantBlobDir(tenantId), name);
+  }
+
+  async listBlobs(tenantId: string): Promise<string[]> {
+    const dir = this.tenantBlobDir(tenantId);
+    if (!existsSync(dir)) return [];
+    const entries = readdirSync(dir, { withFileTypes: true });
+    return entries
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name)
+      .sort();
+  }
+
+  async getBlob(tenantId: string, name: string): Promise<Record<string, Uint8Array> | null> {
+    assertValidBlobName(name);
+    const dir = this.blobDir(tenantId, name);
+    if (!existsSync(dir)) return null;
+    const files = readdirSync(dir, { withFileTypes: true });
+    const out: BlobBytes = {};
+    for (const f of files) {
+      if (!f.isFile()) continue;
+      // Defensive: even though setBlob validates, a manually-added file
+      // with a weird name should be ignored rather than crash reads.
+      try {
+        assertValidBlobFilename(f.name);
+      } catch {
+        continue;
+      }
+      const raw = readFileSync(join(dir, f.name));
+      // readFileSync returns a Buffer; normalize to Uint8Array so the
+      // return value matches the capability contract.
+      out[f.name] = new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
+    }
+    return out;
+  }
+
+  async setBlob(tenantId: string, name: string, files: BlobInput): Promise<void> {
+    assertValidBlobName(name);
+    const normalized = normalizeBlob(files);
+    const dir = this.blobDir(tenantId, name);
+    // Wipe first so a shrinking blob doesn't leave stale files behind.
+    if (existsSync(dir)) {
+      rmSync(dir, { recursive: true, force: true });
+    }
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    // Best-effort chmod on the tenant dir too -- mkdirSync respects umask,
+    // so an explicit chmod guarantees 0700 even in a 022 umask session.
+    try {
+      chmodSync(dir, 0o700);
+      chmodSync(this.tenantBlobDir(tenantId), 0o700);
+    } catch {
+      // best-effort
+    }
+    for (const filename of Object.keys(normalized)) {
+      const dest = join(dir, filename);
+      const tmp = `${dest}.tmp`;
+      writeFileSync(tmp, normalized[filename], { mode: 0o600 });
+      try {
+        chmodSync(tmp, 0o600);
+      } catch {
+        // best-effort
+      }
+      renameSync(tmp, dest);
+    }
+  }
+
+  async deleteBlob(tenantId: string, name: string): Promise<boolean> {
+    assertValidBlobName(name);
+    const dir = this.blobDir(tenantId, name);
+    if (!existsSync(dir)) return false;
+    // Guard: only delete if the target is a directory under the blob root.
+    // Prevents a symlink pointed outside of ~/.ark/secrets/ from erasing
+    // arbitrary disk contents.
+    try {
+      const st = statSync(dir);
+      if (!st.isDirectory()) return false;
+    } catch {
+      return false;
+    }
+    rmSync(dir, { recursive: true, force: true });
+    return true;
   }
 }

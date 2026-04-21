@@ -135,6 +135,14 @@ function chunkToOverrides(chunk: Record<string, unknown>): EnvOverrides {
     if (kms) out.secrets.awsKmsKeyId = kms;
   }
 
+  // Note: the `compute.clusters` section is structured (nested objects with
+  // auth-mode variants) and is parsed in `config.ts` via the legacy YAML
+  // loader rather than coerced into EnvOverrides here. Profile overlays for
+  // clusters still work -- the legacy loader reads the resolved file with
+  // top-level keys; a profile overlay can swap the compute block if the
+  // overlay is at the top level, but nested-merge of per-profile clusters is
+  // intentionally NOT supported in Phase 1 (full replace only).
+
   const ark = pickStr(chunk.arkDir ?? chunk.ark_dir);
   if (ark) out.arkDir = ark;
 

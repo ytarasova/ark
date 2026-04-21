@@ -2,8 +2,7 @@ import type { Command } from "commander";
 import chalk from "chalk";
 import { readFileSync } from "fs";
 import YAML from "yaml";
-import * as core from "../../core/index.js";
-import { getArkClient, getInProcessApp } from "../app-client.js";
+import { getArkClient } from "../app-client.js";
 
 export function registerSkillCommands(program: Command) {
   const skillCmd = program.command("skill").description("Manage skills");
@@ -53,10 +52,14 @@ export function registerSkillCommands(program: Command) {
     .option("-s, --scope <scope>", "Scope: global or project", "global")
     .option("--tags <tags>", "Comma-separated tags")
     .action(async (name: string | undefined, opts: any) => {
-      const app = await getInProcessApp();
       const scope = opts.scope as "global" | "project";
-      const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
+      const ark = await getArkClient();
 
+      // Two input paths: --from <file> OR inline flags. Both get serialized
+      // to YAML client-side and posted as a single `yaml` blob so the daemon
+      // can persist identical content against local or remote control planes.
+      let yaml: string;
+      let resolvedName: string;
       if (opts.from) {
         let content: string;
         try {
@@ -65,37 +68,44 @@ export function registerSkillCommands(program: Command) {
           console.error(chalk.red(`Cannot read file: ${opts.from}`));
           process.exit(1);
         }
-        const skill = YAML.parse(content);
-        if (!skill.name) {
-          console.error(chalk.red("YAML must have a 'name' field"));
+        let parsed: any;
+        try {
+          parsed = YAML.parse(content);
+        } catch (e: any) {
+          console.error(chalk.red(`Malformed YAML: ${e?.message ?? e}`));
           process.exit(1);
         }
-        app.skills.save(skill.name, skill, scope, projectRoot);
-        console.log(chalk.green(`Created skill: ${skill.name} (${scope})`));
-        return;
-      }
-
-      if (!name) {
-        console.error(chalk.red("Name required (or use --from)"));
-        process.exit(1);
-      }
-      if (!opts.prompt) {
-        console.error(chalk.red("--prompt required"));
-        process.exit(1);
-      }
-
-      app.skills.save(
-        name,
-        {
+        if (!parsed || typeof parsed !== "object" || !parsed.name) {
+          console.error(chalk.red("YAML must be an object with a 'name' field"));
+          process.exit(1);
+        }
+        resolvedName = String(parsed.name);
+        yaml = content;
+      } else {
+        if (!name) {
+          console.error(chalk.red("Name required (or use --from)"));
+          process.exit(1);
+        }
+        if (!opts.prompt) {
+          console.error(chalk.red("--prompt required"));
+          process.exit(1);
+        }
+        resolvedName = name;
+        yaml = YAML.stringify({
           name,
           description: opts.description ?? "",
           prompt: opts.prompt,
           tags: opts.tags?.split(",").map((t: string) => t.trim()) ?? [],
-        },
-        scope,
-        projectRoot,
-      );
-      console.log(chalk.green(`Created skill: ${name} (${scope})`));
+        });
+      }
+
+      try {
+        const res = await ark.skillCreate({ name: resolvedName, yaml, scope });
+        console.log(chalk.green(`Created skill: ${res.name} (${res.scope})`));
+      } catch (e: any) {
+        console.error(chalk.red(`skill/create failed: ${e?.message ?? e}`));
+        process.exit(1);
+      }
     });
 
   skillCmd
@@ -104,21 +114,14 @@ export function registerSkillCommands(program: Command) {
     .argument("<name>", "Skill name")
     .option("-s, --scope <scope>", "Scope: global or project", "global")
     .action(async (name: string, opts: any) => {
-      const app = await getInProcessApp();
       const scope = opts.scope as "global" | "project";
-      const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
-
-      const skill = app.skills.get(name, projectRoot);
-      if (skill && skill._source === "builtin") {
-        console.error(chalk.red(`Cannot delete builtin skill: ${name}`));
+      const ark = await getArkClient();
+      try {
+        await ark.skillDelete(name, scope);
+        console.log(chalk.green(`Deleted skill: ${name}`));
+      } catch (e: any) {
+        console.error(chalk.red(`skill/delete failed: ${e?.message ?? e}`));
         process.exit(1);
       }
-      if (!skill) {
-        console.error(chalk.red(`Skill not found: ${name}`));
-        process.exit(1);
-      }
-
-      app.skills.delete(name, scope, projectRoot);
-      console.log(chalk.green(`Deleted skill: ${name}`));
     });
 }

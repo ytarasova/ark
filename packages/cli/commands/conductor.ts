@@ -1,61 +1,71 @@
 import type { Command } from "commander";
 import chalk from "chalk";
-import * as core from "../../core/index.js";
-import { getInProcessApp } from "../app-client.js";
+import { getArkClient } from "../app-client.js";
 
 /**
- * `ark conductor` -- conductor-specific local operations.
+ * `ark conductor` -- thin client over the daemon's conductor/* RPC surface.
  *
- * These reach into the local knowledge graph / bridge config that a daemon
- * would own, so every action boots an in-process AppContext on demand
- * (through `getInProcessApp`). When `--server` is set, the commands fail
- * fast with a friendly message -- conductor operations are not yet
- * exposed over JSON-RPC.
+ * Every subcommand rides `getArkClient()` so `--server <url>` works the same
+ * as talking to a local auto-spawned daemon. The daemon owns the conductor
+ * loop, the knowledge graph, and the bridge config.
+ *
+ * Local-by-nature carve-outs (documented + retained as CLI-side behavior):
+ *   - `conductor start` is gone: starting the conductor is a daemon-boot
+ *     concern, not a CLI command. Use `ark server daemon start` to bring
+ *     one up. Use `conductor status` to check liveness.
+ *   - The `bridge` subcommand previously blocked on a never-resolving
+ *     promise to keep the inbound poller alive. It now calls the RPC
+ *     (which arms the poller on the daemon) and returns immediately; the
+ *     poller outlives this CLI invocation on the daemon side.
  */
 export function registerConductorCommands(program: Command) {
   const conductorCmd = program.command("conductor").description("Conductor operations");
 
   conductorCmd
-    .command("start")
-    .description("Start the conductor server")
-    .option("-p, --port <port>", "Port", "19100")
-    .action(async (opts) => {
-      const app = await getInProcessApp();
-      const { startConductor } = await import("../../core/conductor/conductor.js");
-      startConductor(app, parseInt(opts.port));
-      setInterval(() => {}, 60_000);
+    .command("status")
+    .description("Show whether a conductor is running on the daemon")
+    .action(async () => {
+      const ark = await getArkClient();
+      const { running, port, pid } = await ark.conductorStatus();
+      if (running) {
+        console.log(chalk.green(`Conductor is running on port ${port}${pid ? ` (pid ${pid})` : ""}`));
+      } else {
+        console.log(chalk.yellow(`No conductor running. Expected port: ${port}`));
+        console.log(chalk.dim("Start one with: ark server daemon start"));
+      }
     });
 
   conductorCmd
     .command("learnings")
     .description("Show conductor learnings")
     .action(async () => {
-      const app = await getInProcessApp();
-      const learnings = await app.knowledge.listNodes({ type: "learning" });
+      const ark = await getArkClient();
+      const { learnings } = await ark.conductorLearnings();
 
-      if (learnings.length > 0) {
-        const promoted = learnings.filter((l) => ((l.metadata.recurrence as number) ?? 1) >= 3);
-        const active = learnings.filter((l) => ((l.metadata.recurrence as number) ?? 1) < 3);
-
-        if (promoted.length > 0) {
-          console.log(chalk.bold("\nPolicies (promoted from learnings):\n"));
-          for (const p of promoted) {
-            console.log(`  ${chalk.green("✓")} ${chalk.bold(p.label)}`);
-            if (p.content) console.log(`    ${chalk.dim(p.content.split("\n")[0])}`);
-          }
-        }
-
-        if (active.length > 0) {
-          console.log(chalk.bold("\nActive learnings:\n"));
-          for (const l of active) {
-            const rec = (l.metadata.recurrence as number) ?? 1;
-            const bar = "█".repeat(rec) + "░".repeat(3 - rec);
-            console.log(`  ${bar} ${chalk.bold(l.label)} (seen ${rec}x)`);
-            if (l.content) console.log(`    ${chalk.dim(l.content.split("\n")[0])}`);
-          }
-        }
-      } else {
+      if (learnings.length === 0) {
         console.log(chalk.dim("No learnings yet. The conductor records patterns during orchestration."));
+        return;
+      }
+
+      const promoted = learnings.filter((l) => l.promoted);
+      const active = learnings.filter((l) => !l.promoted);
+
+      if (promoted.length > 0) {
+        console.log(chalk.bold("\nPolicies (promoted from learnings):\n"));
+        for (const p of promoted) {
+          console.log(`  ${chalk.green("✓")} ${chalk.bold(p.title)}`);
+          if (p.description) console.log(`    ${chalk.dim(p.description.split("\n")[0])}`);
+        }
+      }
+
+      if (active.length > 0) {
+        console.log(chalk.bold("\nActive learnings:\n"));
+        for (const l of active) {
+          const rec = Math.max(1, Math.min(3, l.recurrence));
+          const bar = "█".repeat(rec) + "░".repeat(3 - rec);
+          console.log(`  ${bar} ${chalk.bold(l.title)} (seen ${l.recurrence}x)`);
+          if (l.description) console.log(`    ${chalk.dim(l.description.split("\n")[0])}`);
+        }
       }
     });
 
@@ -64,40 +74,24 @@ export function registerConductorCommands(program: Command) {
     .description("Record a conductor learning")
     .argument("<title>")
     .argument("[description]")
-    .action(async (title, description) => {
-      const app = await getInProcessApp();
-      const existing = await app.knowledge.search(title, { types: ["learning"], limit: 5 });
-      const match = existing.find((n) => n.label === title);
-      if (match) {
-        const recurrence = ((match.metadata.recurrence as number) ?? 1) + 1;
-        await app.knowledge.updateNode(match.id, {
-          content: description || match.content,
-          metadata: { ...match.metadata, recurrence },
-        });
-        if (recurrence >= 3) {
-          console.log(chalk.green(`Promoted to policy: ${title} (recurrence: ${recurrence})`));
-        } else {
-          console.log(chalk.blue(`Recorded: ${title} (recurrence: ${recurrence}/3)`));
-        }
+    .action(async (title: string, description?: string) => {
+      const ark = await getArkClient();
+      const { learning } = await ark.conductorLearn({ title, description });
+      if (learning.promoted) {
+        console.log(chalk.green(`Promoted to policy: ${title} (recurrence: ${learning.recurrence})`));
       } else {
-        await app.knowledge.addNode({
-          type: "learning",
-          label: title,
-          content: description ?? "",
-          metadata: { recurrence: 1 },
-        });
-        console.log(chalk.blue(`Recorded: ${title} (recurrence: 1/3)`));
+        console.log(chalk.blue(`Recorded: ${title} (recurrence: ${learning.recurrence}/3)`));
       }
     });
 
   conductorCmd
     .command("bridge")
-    .description("Start the messaging bridge (Telegram/Slack)")
+    .description("Start the messaging bridge (Telegram/Slack) on the daemon")
     .action(async () => {
-      const app = await getInProcessApp();
-      const bridge = core.createBridge(app.config.arkDir);
-      if (!bridge) {
-        console.log(chalk.red("No bridge config found. Create ~/.ark/bridge.json with telegram/slack settings."));
+      const ark = await getArkClient();
+      const result = await ark.conductorBridge();
+      if (!result.ok) {
+        console.log(chalk.red(result.message ?? "Bridge failed to start"));
         console.log(chalk.dim("\nExample ~/.ark/bridge.json:"));
         console.log(
           chalk.dim(
@@ -113,37 +107,20 @@ export function registerConductorCommands(program: Command) {
         );
         return;
       }
-
-      bridge.onMessage(async (msg) => {
-        const text = msg.text.trim().toLowerCase();
-        if (text === "/status" || text === "status") {
-          await bridge.notifyStatusSummary(app);
-        } else if (text === "/sessions" || text === "sessions") {
-          const sessions = await app.sessions.list({ limit: 20 });
-          const lines = sessions.map((s) => `• ${s.summary ?? s.id} (${s.status})`);
-          await bridge.notify(lines.join("\n") || "No sessions");
-        } else {
-          await bridge.notify(`Unknown command: ${text}`);
-        }
-      });
-
-      console.log(chalk.green("Bridge started. Ctrl+C to stop."));
-      await new Promise(() => {});
+      console.log(chalk.green("Bridge started on the daemon. It will continue to run in the background."));
     });
 
   conductorCmd
     .command("notify")
     .description("Send a test notification via bridge")
     .argument("<message>")
-    .action(async (message) => {
-      const app = await getInProcessApp();
-      const bridge = core.createBridge(app.config.arkDir);
-      if (!bridge) {
-        console.log(chalk.red("No bridge config. Create ~/.ark/bridge.json"));
+    .action(async (message: string) => {
+      const ark = await getArkClient();
+      const result = await ark.conductorNotify(message);
+      if (!result.ok) {
+        console.log(chalk.red(result.message ?? "No bridge config. Create ~/.ark/bridge.json"));
         return;
       }
-      await bridge.notify(message);
-      bridge.stop();
       console.log(chalk.green("Notification sent"));
     });
 }

@@ -58,6 +58,7 @@ export class TeamManager {
             name TEXT NOT NULL,
             description TEXT,
             deleted_at TEXT,
+            deleted_by TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
           )`,
@@ -69,6 +70,7 @@ export class TeamManager {
             team_id TEXT NOT NULL,
             role TEXT NOT NULL DEFAULT 'member',
             deleted_at TEXT,
+            deleted_by TEXT,
             created_at TEXT NOT NULL
           )`,
         );
@@ -123,15 +125,16 @@ export class TeamManager {
    * Soft-delete a team and cascade to its memberships inside a
    * transaction. Idempotent.
    *
-   * TODO(agent-1-ctx): admin handler should pass ctx.userId to record who
-   * deleted the entity (audit trail).
+   * `userId` is the acting user's id (from `ctx.userId`); it's recorded
+   * in `deleted_by` on the team row AND propagated to the membership
+   * cascade so the audit trail identifies the actor end-to-end.
    */
-  async delete(teamId: string): Promise<boolean> {
+  async delete(teamId: string, userId: string | null = null): Promise<boolean> {
     await this.ensureSchema();
     return this.db.transaction(async () => {
-      const ok = await this._teams.softDelete(teamId);
+      const ok = await this._teams.softDelete(teamId, userId);
       if (!ok) return false;
-      await this._memberships.softRemoveByTeam(teamId);
+      await this._memberships.softRemoveByTeam(teamId, userId);
       return true;
     });
   }
@@ -159,12 +162,13 @@ export class TeamManager {
   /**
    * Soft-remove a member from a team. Idempotent.
    *
-   * TODO(agent-1-ctx): admin handler should pass ctx.userId to record who
-   * removed the membership.
+   * `deletedBy` is the acting user's id (from `ctx.userId`); it's recorded
+   * in `deleted_by` on the membership row. Passing `null` (or omitting it)
+   * means "system" deleter.
    */
-  async removeMember(teamId: string, userId: string): Promise<boolean> {
+  async removeMember(teamId: string, userId: string, deletedBy: string | null = null): Promise<boolean> {
     await this.ensureSchema();
-    return this._memberships.softRemove(userId, teamId);
+    return this._memberships.softRemove(userId, teamId, deletedBy);
   }
 
   async restoreMember(teamId: string, userId: string): Promise<boolean> {

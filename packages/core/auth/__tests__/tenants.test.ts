@@ -110,6 +110,75 @@ describe("TenantManager", () => {
   });
 });
 
+describe("TenantManager deleted_by audit", () => {
+  it("records ctx.userId in deleted_by when delete() is passed a userId", async () => {
+    const db = await freshDb();
+    const tm = new TenantManager(db);
+    const t = await tm.create({ slug: "audit", name: "Audit" });
+
+    const ok = await tm.delete(t.id, "u-admin-42");
+    expect(ok).toBe(true);
+
+    const ghost = await tm.get(t.id, { includeDeleted: true });
+    expect(ghost?.deleted_by).toBe("u-admin-42");
+    expect(ghost?.deleted_at).not.toBeNull();
+
+    // Second delete is idempotent AND must NOT overwrite the original
+    // audit fields -- if a later call comes from a different actor we
+    // still want the first-mover's id on record.
+    expect(await tm.delete(t.id, "u-someone-else")).toBe(true);
+    const again = await tm.get(t.id, { includeDeleted: true });
+    expect(again?.deleted_by).toBe("u-admin-42");
+
+    await db.close();
+  });
+
+  it("records NULL deleted_by when delete() is called without a userId", async () => {
+    const db = await freshDb();
+    const tm = new TenantManager(db);
+    const t = await tm.create({ slug: "noactor", name: "NA" });
+    await tm.delete(t.id);
+    const ghost = await tm.get(t.id, { includeDeleted: true });
+    expect(ghost?.deleted_at).not.toBeNull();
+    expect(ghost?.deleted_by).toBeNull();
+    await db.close();
+  });
+
+  it("restore clears both deleted_at and deleted_by", async () => {
+    const db = await freshDb();
+    const tm = new TenantManager(db);
+    const t = await tm.create({ slug: "restore", name: "R" });
+    await tm.delete(t.id, "u-admin-9");
+    await tm.restore(t.id);
+    const back = await tm.get(t.id);
+    expect(back?.deleted_at).toBeNull();
+    expect(back?.deleted_by).toBeNull();
+    await db.close();
+  });
+
+  it("cascade attributes the same userId to child teams and memberships", async () => {
+    const db = await freshDb();
+    const tm = new TenantManager(db);
+    const teams = new TeamManager(db);
+    const users = new UserManager(db);
+
+    const tenant = await tm.create({ slug: "casc-audit", name: "CA" });
+    const team = await teams.create({ tenant_id: tenant.id, slug: "eng", name: "Eng" });
+    const user = await users.create({ email: "ca@b.com" });
+    await teams.addMember(team.id, user.id, "member");
+
+    await tm.delete(tenant.id, "u-admin-boss");
+
+    const ghostTeam = await teams.get(team.id, { includeDeleted: true });
+    expect(ghostTeam?.deleted_by).toBe("u-admin-boss");
+
+    const ghostMembers = await teams.listMembers(team.id, { includeDeleted: true });
+    expect(ghostMembers[0].deleted_by).toBe("u-admin-boss");
+
+    await db.close();
+  });
+});
+
 describe("TenantManager cascade delete", () => {
   it("soft-cascades to teams and memberships on delete in one txn", async () => {
     const db = await freshDb();

@@ -1,17 +1,27 @@
 /**
- * `ark workspace` -- Wave 2a CLI surface for the new workspace layer.
+ * `ark workspace` -- thin CLI wrapper over the workspace/* RPCs.
  *
- * A workspace groups N repos for cross-repo queries, platform docs, and
- * (Wave 2b) multi-repo session dispatch. Wave 2a ships CRUD + repo
- * attachment only. YAML is the only authored output format; there is no
- * `--json` flag (use `--format yaml` explicitly, or stick with text).
+ * RPC methods (see packages/server/handlers/workspace.ts):
+ *   workspace/list
+ *   workspace/get
+ *   workspace/create
+ *   workspace/delete
+ *   workspace/status
+ *   workspace/add-repo
+ *   workspace/remove-repo
  *
- *   ark workspace create <slug> [--tenant <t>] [--name <n>] [--description <d>]
- *   ark workspace list [--tenant <t>] [--format yaml|text]
- *   ark workspace show <slug> [--format yaml|text]
- *   ark workspace use <slug>
- *   ark workspace add-repo <workspace-slug> <repo-path-or-url>
- *   ark workspace remove-repo <workspace-slug> <repo>
+ * Local-by-nature punts (documented):
+ *
+ *   `ark workspace use <slug>` writes `active_workspace: <slug>` into the
+ *   caller's ~/.ark/config.yaml. The target is a file on the CLI host, not
+ *   the daemon. We therefore keep it on `getInProcessApp()` and refuse to
+ *   run it in remote mode.
+ *
+ *   `ark workspace add-repo <slug> <path>` for a *new* local path: the
+ *   previous implementation auto-registered the repo on the fly. The new
+ *   RPC surface makes that a two-step operation (`code-intel repo add`
+ *   followed by `workspace add-repo`). The CLI performs the two RPCs in
+ *   sequence so the UX stays identical.
  */
 
 import type { Command } from "commander";
@@ -19,43 +29,7 @@ import chalk from "chalk";
 import YAML from "yaml";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join, resolve } from "path";
-import { getInProcessApp } from "../app-client.js";
-import { DEFAULT_TENANT_ID } from "../../core/code-intel/constants.js";
-
-/**
- * Workspace commands are local-only today -- they reach into
- * `app.codeIntel` which has no RPC surface. `getInProcessApp()` boots a
- * local AppContext on demand and throws against `--server`. The helper
- * signatures below use the structural shape we need from AppContext so
- * we don't have to import the type directly from `core/app`.
- */
-type AppLike = Awaited<ReturnType<typeof getInProcessApp>>;
-
-async function resolveTenantId(app: AppLike, explicitSlug?: string | null): Promise<string> {
-  if (explicitSlug) {
-    const t = await app.codeIntel.getTenantBySlug(explicitSlug);
-    if (!t) throw new Error(`tenant "${explicitSlug}" not found -- run \`ark tenant create\` first`);
-    return t.id;
-  }
-  const fallbackSlug = app.config.authSection.defaultTenant;
-  if (fallbackSlug) {
-    const t = await app.codeIntel.getTenantBySlug(fallbackSlug);
-    if (t) return t.id;
-  }
-  return DEFAULT_TENANT_ID;
-}
-
-async function findRepoForWorkspace(
-  app: AppLike,
-  tenant_id: string,
-  query: string,
-): Promise<{ id: string; name: string; repo_url: string } | null> {
-  const repos = await app.codeIntel.listRepos(tenant_id);
-  // Match: repo id (full or prefix), name, or URL.
-  return (
-    repos.find((r) => r.id === query || r.id.startsWith(query) || r.name === query || r.repo_url === query) ?? null
-  );
-}
+import { getArkClient, getInProcessApp, isRemoteMode } from "../app-client.js";
 
 /**
  * Persist `active_workspace: <slug>` to `{arkDir}/config.yaml`, preserving
@@ -89,25 +63,26 @@ export function registerWorkspaceCommands(program: Command) {
     .command("create")
     .description("Create a new workspace")
     .argument("<slug>", "Workspace slug (unique per tenant)")
-    .option("--tenant <slug>", "Tenant slug (default: local default)")
+    .option("--tenant <slug>", "Tenant slug (default: caller's tenant)")
     .option("--name <name>", "Display name (default: derived from slug)")
     .option("--description <text>", "Free-form description")
     .action(async (slug: string, opts) => {
+      if (opts.tenant) {
+        console.log(
+          chalk.yellow("--tenant is no longer honored at the CLI; the daemon uses the caller's authenticated tenant."),
+        );
+      }
       try {
-        const app = await getInProcessApp();
-        const tenant_id = await resolveTenantId(app, opts.tenant);
-        const existing = await app.codeIntel.getWorkspaceBySlug(tenant_id, slug);
-        if (existing) {
-          console.log(chalk.yellow(`Workspace '${slug}' already exists (${existing.id.slice(0, 8)})`));
-          return;
-        }
-        const name = opts.name ?? slug.replace(/[-_]+/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase());
-        const created = await app.codeIntel.createWorkspace({
-          tenant_id,
+        const client = await getArkClient();
+        const { workspace: created, created: wasCreated } = await client.workspaceCreate({
           slug,
-          name,
+          name: opts.name,
           description: opts.description ?? null,
         });
+        if (!wasCreated) {
+          console.log(chalk.yellow(`Workspace '${slug}' already exists (${created.id.slice(0, 8)})`));
+          return;
+        }
         console.log(chalk.green(`Created workspace '${created.slug}' (${created.id.slice(0, 8)})`));
       } catch (e: any) {
         console.error(chalk.red(`Failed: ${e.message}`));
@@ -119,25 +94,19 @@ export function registerWorkspaceCommands(program: Command) {
   cmd
     .command("list")
     .description("List workspaces for a tenant")
-    .option("--tenant <slug>", "Tenant slug (default: local default)")
+    .option("--tenant <slug>", "Tenant slug (default: caller's tenant)")
     .option("--format <fmt>", "Output format: yaml | text", "text")
     .action(async (opts) => {
+      if (opts.tenant) {
+        console.log(
+          chalk.yellow("--tenant is no longer honored at the CLI; the daemon uses the caller's authenticated tenant."),
+        );
+      }
       try {
-        const app = await getInProcessApp();
-        const tenant_id = await resolveTenantId(app, opts.tenant);
-        const workspaces = await app.codeIntel.listWorkspaces(tenant_id);
+        const client = await getArkClient();
+        const { workspaces } = await client.workspaceList();
         if (opts.format === "yaml") {
-          const rows = await Promise.all(
-            workspaces.map(async (w) => ({
-              slug: w.slug,
-              id: w.id,
-              name: w.name,
-              description: w.description,
-              repo_count: (await app.codeIntel.listReposInWorkspace(tenant_id, w.id)).length,
-              created_at: w.created_at,
-            })),
-          );
-          console.log(YAML.stringify(rows));
+          console.log(YAML.stringify(workspaces));
           return;
         }
         if (workspaces.length === 0) {
@@ -145,9 +114,10 @@ export function registerWorkspaceCommands(program: Command) {
           return;
         }
         for (const w of workspaces) {
-          const repos = await app.codeIntel.listReposInWorkspace(tenant_id, w.id);
           console.log(
-            `  ${chalk.cyan(w.slug.padEnd(20))} ${chalk.bold(w.name.padEnd(24))} ${chalk.dim(`${repos.length} repo${repos.length === 1 ? "" : "s"}`)}`,
+            `  ${chalk.cyan(w.slug.padEnd(20))} ${chalk.bold(w.name.padEnd(24))} ${chalk.dim(
+              `${w.repo_count} repo${w.repo_count === 1 ? "" : "s"}`,
+            )}`,
           );
         }
       } catch (e: any) {
@@ -161,36 +131,19 @@ export function registerWorkspaceCommands(program: Command) {
     .command("show")
     .description("Show a workspace + attached repos")
     .argument("<slug>", "Workspace slug")
-    .option("--tenant <slug>", "Tenant slug (default: local default)")
+    .option("--tenant <slug>", "Tenant slug (default: caller's tenant)")
     .option("--format <fmt>", "Output format: yaml | text", "text")
     .action(async (slug: string, opts) => {
+      if (opts.tenant) {
+        console.log(
+          chalk.yellow("--tenant is no longer honored at the CLI; the daemon uses the caller's authenticated tenant."),
+        );
+      }
       try {
-        const app = await getInProcessApp();
-        const tenant_id = await resolveTenantId(app, opts.tenant);
-        const ws = await app.codeIntel.getWorkspaceBySlug(tenant_id, slug);
-        if (!ws) {
-          console.error(chalk.red(`Workspace '${slug}' not found`));
-          process.exitCode = 1;
-          return;
-        }
-        const repos = await app.codeIntel.listReposInWorkspace(tenant_id, ws.id);
+        const client = await getArkClient();
+        const { workspace: ws } = await client.workspaceGet(slug);
         if (opts.format === "yaml") {
-          console.log(
-            YAML.stringify({
-              slug: ws.slug,
-              id: ws.id,
-              name: ws.name,
-              description: ws.description,
-              tenant_id: ws.tenant_id,
-              created_at: ws.created_at,
-              repos: repos.map((r) => ({
-                id: r.id,
-                name: r.name,
-                repo_url: r.repo_url,
-                default_branch: r.default_branch,
-              })),
-            }),
-          );
+          console.log(YAML.stringify(ws));
           return;
         }
         console.log(chalk.bold(ws.name));
@@ -198,8 +151,8 @@ export function registerWorkspaceCommands(program: Command) {
         console.log(`  ${chalk.dim("id")}          ${ws.id}`);
         if (ws.description) console.log(`  ${chalk.dim("description")} ${ws.description}`);
         console.log(`  ${chalk.dim("created")}     ${ws.created_at}`);
-        console.log(`  ${chalk.dim("repos")}       ${repos.length}`);
-        for (const r of repos) {
+        console.log(`  ${chalk.dim("repos")}       ${ws.repos.length}`);
+        for (const r of ws.repos) {
           console.log(`    ${chalk.cyan(r.id.slice(0, 8))} ${chalk.bold(r.name)} ${chalk.dim(r.repo_url)}`);
         }
       } catch (e: any) {
@@ -208,23 +161,37 @@ export function registerWorkspaceCommands(program: Command) {
       }
     });
 
-  // ── use ─────────────────────────────────────────────────────────────────
+  // ── use (local-by-nature) ───────────────────────────────────────────────
   cmd
     .command("use")
-    .description("Set the active workspace (persisted to ~/.ark/config.yaml)")
+    .description("Set the active workspace (persisted to the caller's ~/.ark/config.yaml)")
     .argument("<slug>", "Workspace slug")
-    .option("--tenant <slug>", "Tenant slug (default: local default)")
+    .option("--tenant <slug>", "Tenant slug (default: caller's tenant)")
     .action(async (slug: string, opts) => {
+      if (opts.tenant) {
+        console.log(
+          chalk.yellow("--tenant is no longer honored at the CLI; the daemon uses the caller's authenticated tenant."),
+        );
+      }
       try {
-        const app = await getInProcessApp();
-        const tenant_id = await resolveTenantId(app, opts.tenant);
-        const ws = await app.codeIntel.getWorkspaceBySlug(tenant_id, slug);
-        if (!ws) {
-          console.error(chalk.red(`Workspace '${slug}' not found`));
-          process.exitCode = 1;
-          return;
+        // Verify the workspace exists via the daemon first -- this way we
+        // don't write a stale slug into the local config when the caller
+        // typo'd the name.
+        const client = await getArkClient();
+        const { workspace: ws } = await client.workspaceGet(slug);
+
+        // We need the caller's arkDir for the config.yaml write. In remote
+        // mode we still persist to the caller's local config, so grab it
+        // from loadConfig() directly (no AppContext boot needed).
+        let arkDir: string;
+        if (isRemoteMode()) {
+          const { loadConfig } = await import("../../core/config.js");
+          arkDir = loadConfig().arkDir;
+        } else {
+          const app = await getInProcessApp();
+          arkDir = app.config.arkDir;
         }
-        const written = setActiveWorkspaceInConfig(app.config.arkDir, ws.slug);
+        const written = setActiveWorkspaceInConfig(arkDir, ws.slug);
         console.log(chalk.green(`Active workspace set to '${ws.slug}' (${written})`));
       } catch (e: any) {
         console.error(chalk.red(`Failed: ${e.message}`));
@@ -238,48 +205,44 @@ export function registerWorkspaceCommands(program: Command) {
     .description("Attach a repo to a workspace (creates the repo if it's a new path/URL)")
     .argument("<workspace-slug>", "Workspace slug")
     .argument("<repo-path-or-url>", "Repo path, URL, or existing repo id / name")
-    .option("--tenant <slug>", "Tenant slug (default: local default)")
+    .option("--tenant <slug>", "Tenant slug (default: caller's tenant)")
     .action(async (workspaceSlug: string, repoArg: string, opts) => {
+      if (opts.tenant) {
+        console.log(
+          chalk.yellow("--tenant is no longer honored at the CLI; the daemon uses the caller's authenticated tenant."),
+        );
+      }
       try {
-        const app = await getInProcessApp();
-        const tenant_id = await resolveTenantId(app, opts.tenant);
-        const ws = await app.codeIntel.getWorkspaceBySlug(tenant_id, workspaceSlug);
-        if (!ws) {
-          console.error(chalk.red(`Workspace '${workspaceSlug}' not found`));
-          process.exitCode = 1;
-          return;
-        }
+        const client = await getArkClient();
 
-        // Resolve to an existing repo first, then fall back to auto-registering
-        // a new one (mirrors `ark code-intel repo add` behavior).
-        let repoId: string;
-        let repoName: string;
-        const existingByIdOrName = await findRepoForWorkspace(app, tenant_id, repoArg);
-        if (existingByIdOrName) {
-          repoId = existingByIdOrName.id;
-          repoName = existingByIdOrName.name;
-        } else {
-          const isLocal = existsSync(repoArg);
-          const repo_url = isLocal ? `file://${resolve(repoArg)}` : repoArg;
-          const existingByUrl = await app.codeIntel.findRepoByUrl(tenant_id, repo_url);
-          if (existingByUrl) {
-            repoId = existingByUrl.id;
-            repoName = existingByUrl.name;
-          } else {
-            const derivedName = (isLocal ? resolve(repoArg).split("/").pop() : repoArg.split("/").pop()) ?? "repo";
-            const created = await app.codeIntel.createRepo({
-              tenant_id,
-              repo_url,
-              name: derivedName,
-              local_path: isLocal ? resolve(repoArg) : null,
-            });
-            repoId = created.id;
-            repoName = created.name;
+        // Try direct attach first -- if the repo already exists in the
+        // tenant (by id / name / url) the daemon will resolve it.
+        try {
+          await client.workspaceAddRepo({ slug: workspaceSlug, repo: repoArg });
+          console.log(chalk.green(`Attached '${repoArg}' to workspace '${workspaceSlug}'`));
+          return;
+        } catch (e: any) {
+          // Fall through only if the daemon said the repo was not found --
+          // other errors (e.g. workspace missing) should bubble up.
+          if (!String(e?.message ?? "").includes("not found in this tenant")) {
+            throw e;
           }
         }
 
-        await app.codeIntel.addRepoToWorkspace(repoId, ws.id);
-        console.log(chalk.green(`Attached '${repoName}' (${repoId.slice(0, 8)}) to workspace '${ws.slug}'`));
+        // Fall back: auto-register the repo, then attach. Mirrors the old
+        // behavior of `ark workspace add-repo <new-path>`.
+        const isLocal = existsSync(repoArg);
+        const repoUrl = isLocal ? `file://${resolve(repoArg)}` : repoArg;
+        const derivedName = (isLocal ? resolve(repoArg).split("/").pop() : repoArg.split("/").pop()) ?? "repo";
+        const { repo: created } = await client.codeIntelRepoAdd({
+          repoUrl,
+          name: derivedName,
+          localPath: isLocal ? resolve(repoArg) : null,
+        });
+        await client.workspaceAddRepo({ slug: workspaceSlug, repo: created.id });
+        console.log(
+          chalk.green(`Attached '${created.name}' (${created.id.slice(0, 8)}) to workspace '${workspaceSlug}'`),
+        );
       } catch (e: any) {
         console.error(chalk.red(`Failed: ${e.message}`));
         process.exitCode = 1;
@@ -292,30 +255,23 @@ export function registerWorkspaceCommands(program: Command) {
     .description("Detach a repo from a workspace (repo itself is not deleted)")
     .argument("<workspace-slug>", "Workspace slug")
     .argument("<repo>", "Repo id, name, or URL")
-    .option("--tenant <slug>", "Tenant slug (default: local default)")
+    .option("--tenant <slug>", "Tenant slug (default: caller's tenant)")
     .action(async (workspaceSlug: string, repoArg: string, opts) => {
+      if (opts.tenant) {
+        console.log(
+          chalk.yellow("--tenant is no longer honored at the CLI; the daemon uses the caller's authenticated tenant."),
+        );
+      }
       try {
-        const app = await getInProcessApp();
-        const tenant_id = await resolveTenantId(app, opts.tenant);
-        const ws = await app.codeIntel.getWorkspaceBySlug(tenant_id, workspaceSlug);
-        if (!ws) {
-          console.error(chalk.red(`Workspace '${workspaceSlug}' not found`));
-          process.exitCode = 1;
+        const client = await getArkClient();
+        const result = await client.workspaceRemoveRepo({ slug: workspaceSlug, repo: repoArg });
+        if (!result.detached) {
+          console.log(
+            chalk.yellow(`Repo '${repoArg}' is not attached to workspace '${workspaceSlug}'; nothing to do.`),
+          );
           return;
         }
-        const repo = await findRepoForWorkspace(app, tenant_id, repoArg);
-        if (!repo) {
-          console.error(chalk.red(`Repo '${repoArg}' not found in tenant`));
-          process.exitCode = 1;
-          return;
-        }
-        const current = await app.codeIntel.getRepoWorkspaceId(repo.id);
-        if (current !== ws.id) {
-          console.log(chalk.yellow(`Repo '${repo.name}' is not attached to workspace '${ws.slug}'; nothing to do.`));
-          return;
-        }
-        await app.codeIntel.removeRepoFromWorkspace(repo.id);
-        console.log(chalk.green(`Detached '${repo.name}' from workspace '${ws.slug}'`));
+        console.log(chalk.green(`Detached '${repoArg}' from workspace '${workspaceSlug}'`));
       } catch (e: any) {
         console.error(chalk.red(`Failed: ${e.message}`));
         process.exitCode = 1;

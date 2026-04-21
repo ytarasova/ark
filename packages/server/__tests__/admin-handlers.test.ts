@@ -58,6 +58,9 @@ describe("admin/* handler gate", () => {
       ["admin/user/create", { email: "a@b.c" }],
       ["admin/user/upsert", { email: "a@b.c" }],
       ["admin/user/delete", { id: "u-x" }],
+      ["admin/apikey/list", { tenant_id: "t-x" }],
+      ["admin/apikey/delete", { id: "ak-x" }],
+      ["admin/apikey/restore", { id: "ak-x" }],
     ];
 
     for (const [method, params] of methods) {
@@ -80,6 +83,78 @@ describe("admin/* handler gate", () => {
     const res = (await router.dispatch(createRequest(1, "admin/tenant/list", {}))) as JsonRpcResponse;
     expect(res.result).toBeDefined();
     expect((res.result as Record<string, unknown>).tenants).toBeDefined();
+  });
+
+  it("admin/tenant/delete threads ctx.userId into the deleted_by audit column", async () => {
+    // Acceptance test for the ctx-plumbing wave: every admin delete path
+    // must capture the caller's user id. We dispatch as an admin context
+    // with a specific userId and then peek into the DB to confirm the
+    // tombstone carries that id. Restoring the tenant clears both fields.
+    const adminAsUser: TenantContext = {
+      tenantId: "default",
+      userId: "u-auditor-007",
+      role: "admin",
+      isAdmin: true,
+    };
+
+    const create = (await dispatchAs(
+      "admin/tenant/create",
+      { slug: "audit-plumb-" + Math.random().toString(36).slice(2, 8), name: "Plumb" },
+      adminAsUser,
+    )) as JsonRpcResponse;
+    const tenant = (create.result as any).tenant;
+
+    const del = (await dispatchAs("admin/tenant/delete", { id: tenant.id }, adminAsUser)) as JsonRpcResponse;
+    expect((del.result as any).ok).toBe(true);
+
+    const row = (await app.db.prepare("SELECT deleted_at, deleted_by FROM tenants WHERE id = ?").get(tenant.id)) as
+      | { deleted_at: string | null; deleted_by: string | null }
+      | undefined;
+    expect(row?.deleted_at).not.toBeNull();
+    expect(row?.deleted_by).toBe("u-auditor-007");
+  });
+
+  it("admin/apikey/delete soft-deletes the key and records ctx.userId", async () => {
+    // The key row should survive (soft-delete), validate() should no
+    // longer match it, and the deleted_by column should hold the admin's
+    // user id. Restore should reverse both.
+    const adminAsUser: TenantContext = {
+      tenantId: "tenant-ak",
+      userId: "u-admin-ak",
+      role: "admin",
+      isAdmin: true,
+    };
+
+    const { key, id } = await app.apiKeys.create("tenant-ak", "to-soft-delete", "member");
+    expect(await app.apiKeys.validate(key)).not.toBeNull();
+
+    const res = (await dispatchAs(
+      "admin/apikey/delete",
+      { id, tenant_id: "tenant-ak" },
+      adminAsUser,
+    )) as JsonRpcResponse;
+    expect((res.result as any).ok).toBe(true);
+
+    expect(await app.apiKeys.validate(key)).toBeNull();
+
+    const row = (await app.db.prepare("SELECT deleted_at, deleted_by FROM api_keys WHERE id = ?").get(id)) as
+      | { deleted_at: string | null; deleted_by: string | null }
+      | undefined;
+    expect(row?.deleted_at).not.toBeNull();
+    expect(row?.deleted_by).toBe("u-admin-ak");
+
+    // Restore un-soft-deletes and clears both fields.
+    const restored = (await dispatchAs(
+      "admin/apikey/restore",
+      { id, tenant_id: "tenant-ak" },
+      adminAsUser,
+    )) as JsonRpcResponse;
+    expect((restored.result as any).ok).toBe(true);
+    const after = (await app.db.prepare("SELECT deleted_at, deleted_by FROM api_keys WHERE id = ?").get(id)) as
+      | { deleted_at: string | null; deleted_by: string | null }
+      | undefined;
+    expect(after?.deleted_at).toBeNull();
+    expect(after?.deleted_by).toBeNull();
   });
 
   it("admin/tenant/create with a member-role ctx returns FORBIDDEN", async () => {

@@ -44,6 +44,7 @@ import type {
 import { detectProfile, loadProfileDefaults } from "./config/profiles.js";
 import { readEnv, type EnvOverrides } from "./config/env-source.js";
 import { loadYamlOverrides, mergeOverrides } from "./config/yaml-source.js";
+import { validateClusterConfig, type ClusterConfig } from "./config/clusters.js";
 
 export type {
   ArkProfile,
@@ -56,6 +57,21 @@ export type {
   DatabaseConfig,
   StorageConfig,
 } from "./config/types.js";
+export type { ClusterConfig, ClusterAuth } from "./config/clusters.js";
+
+/**
+ * Compute-section config. Currently only carries the system-layer cluster
+ * list; more compute-wide knobs (default provider, pool caps) may join in
+ * future waves. Kept optional on `AppConfig` so existing call sites that
+ * destructure config don't break when the section is absent.
+ */
+export interface ComputeConfig {
+  /**
+   * System-layer k8s clusters. Each entry is a fully-validated `ClusterConfig`.
+   * Tenant overlays come from `tenant_policies.compute_config_yaml` at dispatch.
+   */
+  clusters: ClusterConfig[];
+}
 
 export interface OtlpSettings {
   enabled: boolean;
@@ -131,6 +147,8 @@ export interface ArkConfig {
   features: FeaturesConfig;
   database: DatabaseConfig;
   storage: StorageConfig;
+  /** Compute-wide configuration. Includes the system-layer cluster list. */
+  compute: ComputeConfig;
 
   // ── Legacy flat fields (derived from nested sections) ──────────────────
 
@@ -378,6 +396,13 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
   // The new profile system captures test-mode more broadly via `profile`.
   const isTestEnv = process.env.ARK_TEST_DIR !== undefined;
 
+  // Compute section: parse clusters out of the legacy YAML (compute.clusters)
+  // layered with programmatic overrides. Env vars are skipped in Phase 1 --
+  // cluster arrays are too structured for single-string env encoding.
+  const yamlClusters = parseSystemClusters((legacyYaml as Record<string, unknown>).compute);
+  const overrideClusters = overrides.compute?.clusters;
+  const clusters: ClusterConfig[] = overrideClusters !== undefined ? overrideClusters : yamlClusters;
+
   const base: ArkConfig = {
     // Nested Spring-style sections (preferred)
     profile,
@@ -389,6 +414,7 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
     features,
     database,
     storage,
+    compute: { clusters },
 
     // Legacy flat fields
     arkDir,
@@ -521,6 +547,28 @@ function parseSecretsConfig(rawYaml: unknown, merged: EnvOverrides): ArkConfig["
   if (backend) out.backend = backend as "file" | "aws";
   if (awsRegion) out.awsRegion = awsRegion;
   if (awsKmsKeyId) out.awsKmsKeyId = awsKmsKeyId;
+  return out;
+}
+
+/**
+ * Parse the `compute:` block from config.yaml into a system-layer cluster
+ * list. Invalid entries are DROPPED with a console warning rather than
+ * crashing the daemon at boot -- the operator can still override via the
+ * tenant YAML blob, and the misconfigured entry will show up in the
+ * `cluster/list` RPC response as absent.
+ */
+function parseSystemClusters(raw: unknown): ClusterConfig[] {
+  if (!raw || typeof raw !== "object") return [];
+  const entries = (raw as Record<string, unknown>).clusters;
+  if (!Array.isArray(entries)) return [];
+  const out: ClusterConfig[] = [];
+  for (let i = 0; i < entries.length; i++) {
+    try {
+      out.push(validateClusterConfig(entries[i], `config.yaml compute.clusters[${i}]`));
+    } catch (e: any) {
+      console.warn(`[config] ${e?.message ?? e} -- entry dropped`);
+    }
+  }
   return out;
 }
 

@@ -35,6 +35,7 @@ import {
 import { removeSessionWorktree } from "./workspace-service.js";
 import { substituteVars, buildSessionVars } from "../template.js";
 import { provisionWorkspaceWorkdir } from "../workspace/provisioner.js";
+import { deletePerSessionCredsSecret } from "./dispatch-claude-auth.js";
 
 export type SessionOpResult = { ok: true; sessionId: string } | { ok: false; message: string };
 
@@ -356,6 +357,17 @@ export async function stop(
 
   // Checkpoint before state transition
   saveCheckpoint(app, sessionId);
+
+  // Tenant-level claude auth teardown: if dispatch materialized a
+  // per-session k8s Secret (subscription-blob mode), delete it now.
+  // Idempotent -- a missing Secret (crashed daemon, double-stop,
+  // concurrent GC) never fails teardown.
+  try {
+    const compute = session.compute_name ? await app.computes.get(session.compute_name) : null;
+    await deletePerSessionCredsSecret(app, session, compute);
+  } catch (e: any) {
+    logError("session", `stop ${sessionId}: creds secret cleanup: ${e?.message ?? e}`);
+  }
 
   // Clean up hook config and channel MCP config from working directory
   if (session.workdir) {
@@ -772,6 +784,14 @@ export async function deleteSessionAsync(
     }
   }
 
+  // 2b. Tenant-level claude auth teardown -- idempotent, mirrors stop().
+  try {
+    const compute = session.compute_name ? await app.computes.get(session.compute_name) : null;
+    await deletePerSessionCredsSecret(app, session, compute);
+  } catch (e: any) {
+    logError("session", `delete ${sessionId}: creds secret cleanup: ${e?.message ?? e}`);
+  }
+
   // 3. Clean up worktree directory (provider-independent fallback --
   // ensures cleanup even when no compute is assigned or provider doesn't handle local worktrees)
   await removeSessionWorktree(app, session);
@@ -809,6 +829,13 @@ export async function cleanupOnTerminal(app: AppContext, sessionId: string): Pro
   const session = await app.sessions.get(sessionId);
   if (!session) return;
   await withProvider(session, `cleanup ${sessionId}`, (p, c) => p.cleanupSession(c, session));
+  // Tenant-level claude creds Secret cleanup -- idempotent.
+  try {
+    const compute = session.compute_name ? await app.computes.get(session.compute_name) : null;
+    await deletePerSessionCredsSecret(app, session, compute);
+  } catch (e: any) {
+    logError("session", `cleanupOnTerminal ${sessionId}: creds secret cleanup: ${e?.message ?? e}`);
+  }
 }
 
 /** Wait for a session to reach a terminal state. Returns the final session. */

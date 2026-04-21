@@ -3,7 +3,7 @@ import chalk from "chalk";
 import { readFileSync } from "fs";
 import YAML from "yaml";
 import * as core from "../../core/index.js";
-import { getArkClient, getInProcessApp } from "../app-client.js";
+import { getArkClient } from "../app-client.js";
 
 export function registerRecipeCommands(program: Command) {
   const recipeCmd = program.command("recipe").description("Manage recipes");
@@ -61,23 +61,28 @@ export function registerRecipeCommands(program: Command) {
     .option("-s, --scope <scope>", "Scope: global or project", "global")
     .action(async (opts: any) => {
       const scope = opts.scope as "global" | "project";
-      const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
+      const ark = await getArkClient();
 
       if (opts.fromSession) {
         if (!opts.name) {
           console.error(chalk.red("--name required with --from-session"));
           process.exit(1);
         }
-        const ark = await getArkClient();
         const { session } = await ark.sessionRead(opts.fromSession);
         if (!session) {
           console.error(chalk.red(`Session not found: ${opts.fromSession}`));
           process.exit(1);
         }
+        // sessionToRecipe is a pure function -- safe to run client-side.
         const recipe = core.sessionToRecipe(session, opts.name);
-        const app = await getInProcessApp();
-        app.recipes.save(recipe.name, recipe, scope, projectRoot);
-        console.log(chalk.green(`Created recipe: ${opts.name} from session ${opts.fromSession} (${scope})`));
+        const yaml = YAML.stringify(recipe);
+        try {
+          const res = await ark.recipeCreate({ name: recipe.name, yaml, scope });
+          console.log(chalk.green(`Created recipe: ${res.name} from session ${opts.fromSession} (${res.scope})`));
+        } catch (e: any) {
+          console.error(chalk.red(`recipe/create failed: ${e?.message ?? e}`));
+          process.exit(1);
+        }
         return;
       }
 
@@ -89,14 +94,24 @@ export function registerRecipeCommands(program: Command) {
           console.error(chalk.red(`Cannot read file: ${opts.from}`));
           process.exit(1);
         }
-        const recipe = YAML.parse(content);
-        if (!recipe.name) {
-          console.error(chalk.red("YAML must have a 'name' field"));
+        let parsed: any;
+        try {
+          parsed = YAML.parse(content);
+        } catch (e: any) {
+          console.error(chalk.red(`Malformed YAML: ${e?.message ?? e}`));
           process.exit(1);
         }
-        const app = await getInProcessApp();
-        app.recipes.save(recipe.name, recipe, scope, projectRoot);
-        console.log(chalk.green(`Created recipe: ${recipe.name} (${scope})`));
+        if (!parsed || typeof parsed !== "object" || !parsed.name) {
+          console.error(chalk.red("YAML must be an object with a 'name' field"));
+          process.exit(1);
+        }
+        try {
+          const res = await ark.recipeCreate({ name: String(parsed.name), yaml: content, scope });
+          console.log(chalk.green(`Created recipe: ${res.name} (${res.scope})`));
+        } catch (e: any) {
+          console.error(chalk.red(`recipe/create failed: ${e?.message ?? e}`));
+          process.exit(1);
+        }
         return;
       }
 
@@ -110,21 +125,14 @@ export function registerRecipeCommands(program: Command) {
     .argument("<name>", "Recipe name")
     .option("-s, --scope <scope>", "Scope: global or project", "global")
     .action(async (name: string, opts: any) => {
-      const app = await getInProcessApp();
       const scope = opts.scope as "global" | "project";
-      const projectRoot = core.findProjectRoot(process.cwd()) ?? undefined;
-
-      const recipe = app.recipes.get(name, projectRoot);
-      if (recipe && recipe._source === "builtin") {
-        console.error(chalk.red(`Cannot delete builtin recipe: ${name}`));
+      const ark = await getArkClient();
+      try {
+        await ark.recipeDelete(name, scope);
+        console.log(chalk.green(`Deleted recipe: ${name}`));
+      } catch (e: any) {
+        console.error(chalk.red(`recipe/delete failed: ${e?.message ?? e}`));
         process.exit(1);
       }
-      if (!recipe) {
-        console.error(chalk.red(`Recipe not found: ${name}`));
-        process.exit(1);
-      }
-
-      app.recipes.delete(name, scope, projectRoot);
-      console.log(chalk.green(`Deleted recipe: ${name}`));
     });
 }

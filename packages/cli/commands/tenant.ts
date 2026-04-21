@@ -1,17 +1,16 @@
 /**
  * CLI commands for tenant management:
  *   ark tenant list / create / update / delete / suspend / resume
- *   ark tenant policy *   (policy sub-namespace stays local-only for now --
- *                          there is no RPC surface for tenant policies yet)
+ *   ark tenant policy *   (admin/tenant/policy/* over RPC)
  *
  * Every tenant-lifecycle command dispatches via ArkClient against the
- * admin/tenant/* handlers. Policy commands still reach into a local
- * AppContext until the server handlers exist; see the PUNT note below.
+ * admin/tenant/* handlers. Policy commands also go through ArkClient now
+ * that admin/tenant/policy/* is wired on the server.
  */
 
 import type { Command } from "commander";
 import chalk from "chalk";
-import { getArkClient, getInProcessApp } from "../app-client.js";
+import { getArkClient } from "../app-client.js";
 
 export function registerTenantCommands(program: Command) {
   const tenant = program.command("tenant").description("Manage tenant settings");
@@ -145,13 +144,11 @@ export function registerTenantCommands(program: Command) {
       }
     });
 
-  // ── Policy subcommands (PUNT: no RPC surface yet; local-only) ──────────
-  // Agent #1 / agents owning the server handlers can add `admin/tenant/policy/*`
-  // later. For now we keep parity by reaching into a local AppContext.
+  // ── Policy subcommands (RPC: admin/tenant/policy/*) ──────────────────
 
   policy
     .command("set")
-    .description("Set compute policy for a tenant (local-only until admin/tenant/policy RPC lands)")
+    .description("Set compute policy for a tenant")
     .argument("<tenant-id>", "Tenant ID")
     .option("--providers <list>", "Comma-separated allowed providers (e.g. k8s,ec2)")
     .option("--default-provider <provider>", "Default provider", "k8s")
@@ -159,10 +156,7 @@ export function registerTenantCommands(program: Command) {
     .option("--max-cost <usd>", "Maximum daily cost in USD")
     .action(async (tenantId, opts) => {
       try {
-        const app = await getInProcessApp();
-        const { TenantPolicyManager } = await import("../../core/auth/index.js");
-        const pm = new TenantPolicyManager(app.db);
-
+        const ark = await getArkClient();
         const allowedProviders = opts.providers
           ? opts.providers
               .split(",")
@@ -170,20 +164,12 @@ export function registerTenantCommands(program: Command) {
               .filter(Boolean)
           : [];
 
-        await pm.setPolicy({
+        await ark.tenantPolicySet({
           tenant_id: tenantId,
           allowed_providers: allowedProviders,
           default_provider: opts.defaultProvider,
           max_concurrent_sessions: parseInt(opts.maxSessions, 10),
           max_cost_per_day_usd: opts.maxCost ? parseFloat(opts.maxCost) : null,
-          compute_pools: [],
-          router_enabled: null,
-          router_required: false,
-          router_policy: null,
-          auto_index: null,
-          auto_index_required: false,
-          tensorzero_enabled: null,
-          allowed_k8s_contexts: [],
         });
 
         console.log(chalk.green(`Policy set for tenant '${tenantId}'`));
@@ -200,14 +186,12 @@ export function registerTenantCommands(program: Command) {
 
   policy
     .command("get")
-    .description("Get compute policy for a tenant (local-only)")
+    .description("Get compute policy for a tenant")
     .argument("<tenant-id>", "Tenant ID")
     .action(async (tenantId) => {
       try {
-        const app = await getInProcessApp();
-        const { TenantPolicyManager } = await import("../../core/auth/index.js");
-        const pm = new TenantPolicyManager(app.db);
-        const p = await pm.getPolicy(tenantId);
+        const ark = await getArkClient();
+        const p = await ark.tenantPolicyGet(tenantId);
 
         if (!p) {
           console.log(chalk.dim(`No explicit policy for tenant '${tenantId}'. Default policy applies.`));
@@ -239,13 +223,11 @@ export function registerTenantCommands(program: Command) {
 
   policy
     .command("list")
-    .description("List all tenant compute policies (local-only)")
+    .description("List all tenant compute policies")
     .action(async () => {
       try {
-        const app = await getInProcessApp();
-        const { TenantPolicyManager } = await import("../../core/auth/index.js");
-        const pm = new TenantPolicyManager(app.db);
-        const policies = await pm.listPolicies();
+        const ark = await getArkClient();
+        const policies = await ark.tenantPolicyList();
 
         if (!policies.length) {
           console.log(chalk.dim("No tenant policies configured. Default policy applies to all tenants."));
@@ -269,14 +251,12 @@ export function registerTenantCommands(program: Command) {
 
   policy
     .command("delete")
-    .description("Delete compute policy for a tenant (local-only)")
+    .description("Delete compute policy for a tenant")
     .argument("<tenant-id>", "Tenant ID")
     .action(async (tenantId) => {
       try {
-        const app = await getInProcessApp();
-        const { TenantPolicyManager } = await import("../../core/auth/index.js");
-        const pm = new TenantPolicyManager(app.db);
-        const deleted = await pm.deletePolicy(tenantId);
+        const ark = await getArkClient();
+        const deleted = await ark.tenantPolicyDelete(tenantId);
 
         if (deleted) {
           console.log(chalk.green(`Policy deleted for tenant '${tenantId}'`));
@@ -285,6 +265,82 @@ export function registerTenantCommands(program: Command) {
         }
       } catch (e: any) {
         console.log(chalk.red(`Failed: ${e.message}`));
+      }
+    });
+
+  // ── Claude auth subcommands (RPC: admin/tenant/auth/*) ──────────────
+  //
+  // Per-tenant binding between the tenant and the credential material used
+  // at dispatch. Two modes:
+  //   - api_key         -> `secret_ref` is a string secret name
+  //                        (becomes `ANTHROPIC_API_KEY` at dispatch).
+  //   - subscription_blob -> `secret_ref` is a blob name
+  //                        (materialized as a per-session k8s Secret at
+  //                         `/root/.claude`).
+
+  const auth = tenant.command("auth").description("Manage per-tenant Claude credential bindings");
+
+  auth
+    .command("set")
+    .description("Bind a tenant to a Claude credential (api-key secret OR subscription-blob).")
+    .argument("<tenant-id>", "Tenant ID (or slug)")
+    .option("--api-key <name>", "Bind to a string secret storing ANTHROPIC_API_KEY")
+    .option("--subscription-blob <name>", "Bind to a blob secret (the ~/.claude directory)")
+    .action(async (tenantId, opts) => {
+      try {
+        const hasKey = typeof opts.apiKey === "string" && opts.apiKey.length > 0;
+        const hasBlob = typeof opts.subscriptionBlob === "string" && opts.subscriptionBlob.length > 0;
+        if (hasKey === hasBlob) {
+          console.log(chalk.red("Specify exactly one of --api-key or --subscription-blob."));
+          process.exitCode = 2;
+          return;
+        }
+        const ark = await getArkClient();
+        const kind = hasKey ? "api_key" : "subscription_blob";
+        const ref = hasKey ? opts.apiKey : opts.subscriptionBlob;
+        const row = await ark.tenantAuthSet(tenantId, kind, ref);
+        console.log(chalk.green(`Tenant '${tenantId}' bound to ${row.kind} '${row.secret_ref}'.`));
+      } catch (e: any) {
+        console.log(chalk.red(`Failed: ${e.message ?? e}`));
+        process.exitCode = 1;
+      }
+    });
+
+  auth
+    .command("show")
+    .description("Show the current Claude credential binding for a tenant.")
+    .argument("<tenant-id>", "Tenant ID (or slug)")
+    .action(async (tenantId) => {
+      try {
+        const ark = await getArkClient();
+        const row = await ark.tenantAuthGet(tenantId);
+        if (!row) {
+          console.log(chalk.dim(`No Claude auth binding for tenant '${tenantId}'.`));
+          return;
+        }
+        console.log(chalk.bold(`Claude auth for tenant '${row.tenant_id}'`));
+        console.log(`  Kind:       ${row.kind}`);
+        console.log(`  Secret ref: ${row.secret_ref}`);
+        console.log(`  Updated:    ${row.updated_at}`);
+      } catch (e: any) {
+        console.log(chalk.red(`Failed: ${e.message ?? e}`));
+        process.exitCode = 1;
+      }
+    });
+
+  auth
+    .command("clear")
+    .description("Remove the Claude credential binding for a tenant.")
+    .argument("<tenant-id>", "Tenant ID (or slug)")
+    .action(async (tenantId) => {
+      try {
+        const ark = await getArkClient();
+        const ok = await ark.tenantAuthClear(tenantId);
+        if (ok) console.log(chalk.green(`Cleared Claude auth for tenant '${tenantId}'.`));
+        else console.log(chalk.yellow(`No binding to clear for tenant '${tenantId}'.`));
+      } catch (e: any) {
+        console.log(chalk.red(`Failed: ${e.message ?? e}`));
+        process.exitCode = 1;
       }
     });
 }

@@ -92,6 +92,32 @@ describe("MembershipRepository soft-delete", () => {
     await db.close();
   });
 
+  it("softRemove records deleted_by and restore clears it", async () => {
+    const db = await freshDb();
+    const tenant = await new TenantManager(db).create({ slug: "dby", name: "D" });
+    const team = await new TeamManager(db).create({ tenant_id: tenant.id, slug: "eng", name: "Eng" });
+    const user = await new UserManager(db).create({ email: "dby@m.com" });
+    const repo = new MembershipRepository(db);
+
+    await repo.add(user.id, team.id, "member");
+    await repo.softRemove(user.id, team.id, "u-admin-33");
+    const ghost = await repo.get(user.id, team.id, { includeDeleted: true });
+    expect(ghost?.deleted_by).toBe("u-admin-33");
+    expect(ghost?.deleted_at).not.toBeNull();
+
+    // Idempotent softRemove does NOT overwrite the original actor.
+    await repo.softRemove(user.id, team.id, "u-admin-other");
+    const still = await repo.get(user.id, team.id, { includeDeleted: true });
+    expect(still?.deleted_by).toBe("u-admin-33");
+
+    await repo.restore(user.id, team.id);
+    const back = await repo.get(user.id, team.id);
+    expect(back?.deleted_at).toBeNull();
+    expect(back?.deleted_by).toBeNull();
+
+    await db.close();
+  });
+
   it("removing and re-adding a member creates a fresh live row", async () => {
     const db = await freshDb();
     const tenant = await new TenantManager(db).create({ slug: "re", name: "Re" });

@@ -21,6 +21,7 @@ export interface TenantRow {
   name: string;
   status: TenantStatus;
   deleted_at: string | null;
+  deleted_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -78,11 +79,15 @@ export class TenantRepository {
   }
 
   /**
-   * Soft-delete: sets `deleted_at` to now() if not already set. Idempotent --
-   * calling on an already-soft-deleted row is a no-op and returns `true` so
-   * the caller sees the same result as the first call.
+   * Soft-delete: sets `deleted_at` to now() and (optionally) `deleted_by` to
+   * the caller's user id. Idempotent -- calling on an already-soft-deleted
+   * row is a no-op and returns `true`. The second call does NOT overwrite
+   * `deleted_at` or `deleted_by`, so the original audit record sticks.
+   *
+   * `userId` may be null (local / unauthenticated path) to indicate "system
+   * deleter"; the column stays NULL in that case.
    */
-  async softDelete(id: string): Promise<boolean> {
+  async softDelete(id: string, userId: string | null = null): Promise<boolean> {
     const existing = (await this.db.prepare("SELECT deleted_at FROM tenants WHERE id = ?").get(id)) as
       | { deleted_at: string | null }
       | undefined;
@@ -90,14 +95,16 @@ export class TenantRepository {
     if (existing.deleted_at) return true;
     const ts = now();
     const res = await this.db
-      .prepare("UPDATE tenants SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL")
-      .run(ts, ts, id);
+      .prepare("UPDATE tenants SET deleted_at = ?, deleted_by = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL")
+      .run(ts, userId, ts, id);
     return res.changes > 0;
   }
 
   async restore(id: string): Promise<boolean> {
     const res = await this.db
-      .prepare("UPDATE tenants SET deleted_at = NULL, updated_at = ? WHERE id = ? AND deleted_at IS NOT NULL")
+      .prepare(
+        "UPDATE tenants SET deleted_at = NULL, deleted_by = NULL, updated_at = ? WHERE id = ? AND deleted_at IS NOT NULL",
+      )
       .run(now(), id);
     return res.changes > 0;
   }

@@ -13,4 +13,9 @@ export interface ApiKey {
   createdAt: string;
   lastUsedAt: string | null;
   expiresAt: string | null;
+  /** Soft-delete timestamp (migration 006). Null for live keys. */
+  deletedAt?: string | null;
+  /** Acting user id recorded at revoke time (migration 006). Null if the
+   *  key was revoked by the system / an unauthenticated caller. */
+  deletedBy?: string | null;
 }

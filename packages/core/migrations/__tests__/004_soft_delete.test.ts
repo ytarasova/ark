@@ -41,8 +41,11 @@ describe("Migration 004 -- soft-delete", () => {
       .all()) as Array<{ name: string; sql: string }>;
 
     const names = indexes.map((r) => r.name).sort();
+    // Migration 006 adds idx_api_keys_hash_live -- the `%_live` pattern
+    // picks it up too, so the full expected set grows by one.
     expect(names).toEqual(
       [
+        "idx_api_keys_hash_live",
         "idx_memberships_user_team_live",
         "idx_tenants_slug_live",
         "idx_teams_tenant_slug_live",

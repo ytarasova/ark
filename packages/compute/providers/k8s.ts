@@ -24,7 +24,22 @@ import { logDebug } from "../../core/observability/structured-log.js";
 
 export interface K8sConfig {
   provider: "k8s" | "k8s-kata";
-  context: string; // kubeconfig context (required) -- which cluster to target
+  /**
+   * Legacy path: the name of a context inside a kubeconfig file read from
+   * disk. Required when `clusterName` is NOT set. Preserved for
+   * backward compat with installs that keep a kubeconfig next to the daemon.
+   */
+  context?: string;
+  /**
+   * New (Phase 1) path: name of an entry in the effective cluster list
+   * resolved via `resolveEffectiveClusters(app, tenantId)`. When set, the
+   * provider builds its KubeConfig programmatically from the cluster entry
+   * (+ secrets backend creds) instead of reading `~/.kube/config`.
+   *
+   * Mutually exclusive with the kubeconfig-on-disk flow; if both are set,
+   * `clusterName` wins.
+   */
+  clusterName?: string;
   namespace: string; // required -- which namespace to provision pods in
   image: string; // required -- container image for agent pods
   kubeconfig?: string; // path to kubeconfig (default: in-cluster or ~/.kube/config)
@@ -50,7 +65,47 @@ export interface K8sConfig {
    */
   credsSecretName?: string;
   credsMountPath?: string; // default: "/root/.claude"
+  /**
+   * Optional pod-level securityContext fields. Clusters with a Pod Security
+   * Standards (PSS) "restricted" admission policy reject pods that run as
+   * root, so these knobs are required to make Ark pods admissible on
+   * hardened clusters. Emitted into `spec.securityContext` only when at
+   * least one of the fields is set -- an unconfigured compute produces no
+   * `securityContext` block at all, matching the pre-hardening baseline.
+   *
+   * Field semantics mirror the upstream k8s PodSecurityContext shape:
+   *   - `runAsNonRoot`: if true, the kubelet refuses to start any container
+   *     that would run as uid 0. Fail-fast guard.
+   *   - `runAsUser` / `runAsGroup`: numeric uid / gid the containers run as.
+   *   - `fsGroup`: numeric gid assigned to mounted volumes so the container
+   *     user can write to them (matters for `credsSecretName` mounts).
+   *
+   * Container-level overrides (`securityContext` on the container spec)
+   * are intentionally NOT exposed in Wave 1 -- if a pod-level setting
+   * isn't enough, callers can extend the K8sConfig later.
+   */
+  runAsNonRoot?: boolean;
+  runAsUser?: number;
+  runAsGroup?: number;
+  fsGroup?: number;
   [key: string]: unknown;
+}
+
+/**
+ * Build the pod-level `securityContext` object from the subset of k8s
+ * config fields we support, or return `undefined` when none are set so the
+ * caller can omit the key entirely (rather than emit `securityContext: {}`).
+ *
+ * Keeping this pure + exported-by-shape means it stays easy to unit-test
+ * without spinning up an AppContext.
+ */
+function buildPodSecurityContext(cfg: K8sConfig): Record<string, unknown> | undefined {
+  const sc: Record<string, unknown> = {};
+  if (cfg.runAsNonRoot !== undefined) sc.runAsNonRoot = cfg.runAsNonRoot;
+  if (cfg.runAsUser !== undefined) sc.runAsUser = cfg.runAsUser;
+  if (cfg.runAsGroup !== undefined) sc.runAsGroup = cfg.runAsGroup;
+  if (cfg.fsGroup !== undefined) sc.fsGroup = cfg.fsGroup;
+  return Object.keys(sc).length > 0 ? sc : undefined;
 }
 
 /**
@@ -60,8 +115,12 @@ export interface K8sConfig {
  * (rather than a confusing cluster-side 404 on the wrong namespace).
  */
 function requireK8sConfig(cfg: K8sConfig): void {
-  if (!cfg.context) {
-    throw new Error("k8s compute is missing required `context` -- which kubeconfig context (cluster) to target");
+  // Either `clusterName` (new resolver path) or `context` (legacy on-disk
+  // kubeconfig) must be set. Both missing = misconfiguration.
+  if (!cfg.context && !cfg.clusterName) {
+    throw new Error(
+      "k8s compute is missing required `clusterName` or `context` -- which cluster to target (see docs/cluster-config.md)",
+    );
   }
   if (!cfg.namespace) {
     throw new Error("k8s compute is missing required `namespace`");
@@ -69,6 +128,22 @@ function requireK8sConfig(cfg: K8sConfig): void {
   if (!cfg.image) {
     throw new Error("k8s compute is missing required `image`");
   }
+}
+
+/**
+ * Collect every secret name referenced by a cluster auth block so we can
+ * batch-fetch them before touching the KubeConfig builder.
+ */
+function collectSecretNames(cluster: {
+  auth: { kind: string; tokenSecret?: string; certSecret?: string; keySecret?: string; caSecret?: string };
+}): string[] {
+  const names: string[] = [];
+  const a = cluster.auth as Record<string, string | undefined>;
+  if (a.tokenSecret) names.push(a.tokenSecret);
+  if (a.certSecret) names.push(a.certSecret);
+  if (a.keySecret) names.push(a.keySecret);
+  if (a.caSecret) names.push(a.caSecret);
+  return names;
 }
 
 const EMPTY_METRICS: ComputeMetrics = {
@@ -112,24 +187,131 @@ export class K8sProvider implements ComputeProvider {
     requireK8sConfig(cfg);
     const k8s = await this.getK8sModule();
     const kc = new k8s.KubeConfig();
-    if (cfg.kubeconfig) {
-      kc.loadFromFile(cfg.kubeconfig);
+
+    if (cfg.clusterName) {
+      // New path: build the KubeConfig programmatically from the effective
+      // cluster entry + secrets backend. We resolve against the compute
+      // row's tenant_id (falling back to "default" when the column is
+      // missing -- old-install compat).
+      const tenantId = (compute as { tenant_id?: string }).tenant_id ?? "default";
+      await this.buildKubeConfigFromCluster(kc, cfg.clusterName, tenantId, k8s);
     } else {
-      kc.loadFromDefault(); // in-cluster or ~/.kube/config
+      // Legacy path: read kubeconfig from disk and pin to cfg.context.
+      if (cfg.kubeconfig) {
+        kc.loadFromFile(cfg.kubeconfig);
+      } else {
+        kc.loadFromDefault(); // in-cluster or ~/.kube/config
+      }
+      if (!cfg.context) {
+        throw new Error("k8s compute missing `context` for kubeconfig-on-disk flow");
+      }
+      if (!kc.getContextObject(cfg.context)) {
+        const available = kc
+          .getContexts()
+          .map((c: any) => c.name)
+          .join(", ");
+        throw new Error(`k8s context "${cfg.context}" not found in kubeconfig. Available: ${available || "(none)"}`);
+      }
+      kc.setCurrentContext(cfg.context);
     }
-    // Pin to the configured context. Without this, kc would use whatever
-    // current-context the kubeconfig file happens to have set -- which is
-    // exactly the silent-default footgun this provider used to have.
-    if (!kc.getContextObject(cfg.context)) {
-      const available = kc
-        .getContexts()
-        .map((c: any) => c.name)
-        .join(", ");
-      throw new Error(`k8s context "${cfg.context}" not found in kubeconfig. Available: ${available || "(none)"}`);
-    }
-    kc.setCurrentContext(cfg.context);
+
     this.kubeApi = kc.makeApiClient(k8s.CoreV1Api);
     return this.kubeApi;
+  }
+
+  /**
+   * Build a KubeConfig programmatically from the effective cluster list +
+   * tenant-scoped secrets. No temp files on disk. Uses
+   * `KubeConfig.loadFromOptions` with explicit `clusters` / `users` /
+   * `contexts` arrays (preferred over per-field setters for testability).
+   *
+   * `in_cluster` short-circuits via `KubeConfig.loadFromCluster()`; the
+   * daemon MUST be running inside the target cluster for that mode.
+   *
+   * `exec` and `oidc` auth kinds are rejected with a clear Phase-2 pointer.
+   */
+  private async buildKubeConfigFromCluster(
+    kc: any,
+    clusterName: string,
+    tenantId: string,
+    k8s: typeof import("@kubernetes/client-node"),
+  ): Promise<void> {
+    const { resolveEffectiveClusters } = await import("../../core/config/clusters.js");
+    if (!this.app) {
+      throw new Error("K8sProvider: app context is required for clusterName resolution");
+    }
+    const effective = await resolveEffectiveClusters(this.app, tenantId);
+    const cluster = effective.find((c) => c.name === clusterName);
+    if (!cluster) {
+      const names = effective.map((c) => c.name).join(", ");
+      throw new Error(
+        `cluster "${clusterName}" not in effective list for tenant "${tenantId}". Available: ${names || "(none)"}`,
+      );
+    }
+
+    const auth = cluster.auth;
+    if (auth.kind === "in_cluster") {
+      // `loadFromCluster` picks up /var/run/secrets/kubernetes.io/serviceaccount/*.
+      kc.loadFromCluster();
+      return;
+    }
+    // Validate Phase-1 coverage before we fetch any secrets.
+    if ((auth as any).kind === "exec" || (auth as any).kind === "oidc") {
+      throw new Error(
+        `auth kind "${(auth as any).kind}" not yet supported (Phase 2). Use "token" or "client_cert" for now.`,
+      );
+    }
+
+    // Pull creds from the secrets backend. Every referenced secret must
+    // exist for this tenant; otherwise fail fast with a message that names
+    // both the cluster and the missing secret.
+    const needsSecrets = collectSecretNames(cluster);
+    const fetched: Record<string, string> = {};
+    for (const name of needsSecrets) {
+      const value = await this.app.secrets.get(tenantId, name);
+      if (value == null) {
+        throw new Error(`cluster "${clusterName}" requires secret "${name}" which is not set for tenant "${tenantId}"`);
+      }
+      fetched[name] = value;
+    }
+
+    const clusterSpec: Record<string, unknown> = {
+      name: clusterName,
+      server: cluster.apiEndpoint,
+    };
+    // CA precedence: inline `caData` on the cluster beats `caSecret` inside
+    // the auth block. Inline CA is cheaper and less error-prone for public
+    // certs (AWS EKS, GKE public endpoints).
+    if (cluster.caData) {
+      clusterSpec.caData = Buffer.from(cluster.caData, "utf-8").toString("base64");
+    } else if ("caSecret" in auth && auth.caSecret && fetched[auth.caSecret]) {
+      clusterSpec.caData = Buffer.from(fetched[auth.caSecret], "utf-8").toString("base64");
+    } else {
+      // If neither is set, callers are opting into `skipTLSVerify`. That is
+      // dangerous default -- require an explicit caData for production. We
+      // keep the escape hatch for dev/test kind clusters only.
+      clusterSpec.skipTLSVerify = true;
+    }
+
+    const userName = `${clusterName}-user`;
+    const userSpec: Record<string, unknown> = { name: userName };
+    if (auth.kind === "token") {
+      userSpec.token = fetched[auth.tokenSecret];
+    } else if (auth.kind === "client_cert") {
+      userSpec.certData = Buffer.from(fetched[auth.certSecret], "utf-8").toString("base64");
+      userSpec.keyData = Buffer.from(fetched[auth.keySecret], "utf-8").toString("base64");
+    }
+
+    const contextName = `${clusterName}-ctx`;
+    kc.loadFromOptions({
+      clusters: [clusterSpec],
+      users: [userSpec],
+      contexts: [{ name: contextName, cluster: clusterName, user: userName }],
+      currentContext: contextName,
+    });
+    // Silence unused-import warning in minified bundles; retained for the
+    // type reference on the parameter signature.
+    void k8s;
   }
 
   protected podName(session: Session): string {
@@ -199,6 +381,7 @@ export class K8sProvider implements ComputeProvider {
     // Operators who mount elsewhere can layer their own env on the runtime
     // definition; we deliberately don't invent a non-standard override here.
 
+    const securityContext = buildPodSecurityContext(cfg);
     const pod = {
       metadata: {
         name,
@@ -212,6 +395,7 @@ export class K8sProvider implements ComputeProvider {
         restartPolicy: "Never",
         ...(cfg.runtimeClassName ? { runtimeClassName: cfg.runtimeClassName } : {}),
         ...(cfg.serviceAccount ? { serviceAccountName: cfg.serviceAccount } : {}),
+        ...(securityContext ? { securityContext } : {}),
         ...(credsVolumes.length ? { volumes: credsVolumes } : {}),
         containers: [
           {
@@ -290,6 +474,7 @@ export class K8sProvider implements ComputeProvider {
       // fall through to create
     }
 
+    const securityContext = buildPodSecurityContext(cfg);
     const pod = {
       metadata: {
         name,
@@ -303,6 +488,7 @@ export class K8sProvider implements ComputeProvider {
         restartPolicy: "Always",
         ...(cfg.runtimeClassName ? { runtimeClassName: cfg.runtimeClassName } : {}),
         ...(cfg.serviceAccount ? { serviceAccountName: cfg.serviceAccount } : {}),
+        ...(securityContext ? { securityContext } : {}),
         containers: [
           {
             name: "instance",

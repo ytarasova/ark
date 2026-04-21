@@ -22,6 +22,7 @@ export interface MembershipRow {
   team_id: string;
   role: MembershipRole;
   deleted_at: string | null;
+  deleted_by: string | null;
   created_at: string;
 }
 
@@ -41,7 +42,7 @@ export class MembershipRepository {
     const deletedFilter = opts.includeDeleted ? "" : "AND m.deleted_at IS NULL AND u.deleted_at IS NULL";
     const rows = (await this.db
       .prepare(
-        `SELECT m.id, m.user_id, m.team_id, m.role, m.deleted_at, m.created_at, u.email, u.name
+        `SELECT m.id, m.user_id, m.team_id, m.role, m.deleted_at, m.deleted_by, m.created_at, u.email, u.name
          FROM memberships m
          INNER JOIN users u ON u.id = m.user_id
          WHERE m.team_id = ? ${deletedFilter}
@@ -86,26 +87,32 @@ export class MembershipRepository {
   }
 
   /**
-   * Soft-remove: sets `deleted_at` on the live membership row (if any).
-   * Returns `true` if a row was affected OR if the membership was already
-   * soft-deleted (idempotent). Returns `false` if no such membership ever
-   * existed.
+   * Soft-remove: sets `deleted_at` on the live membership row (if any) and
+   * records `deleted_by` with the caller's user id (null for system /
+   * unauthenticated paths). Returns `true` if a row was affected OR if the
+   * membership was already soft-deleted (idempotent -- the second call does
+   * NOT overwrite the audit fields). Returns `false` if no such membership
+   * ever existed.
    */
-  async softRemove(userId: string, teamId: string): Promise<boolean> {
+  async softRemove(userId: string, teamId: string, deletedBy: string | null = null): Promise<boolean> {
     const row = (await this.db
       .prepare("SELECT deleted_at FROM memberships WHERE user_id = ? AND team_id = ?")
       .get(userId, teamId)) as { deleted_at: string | null } | undefined;
     if (!row) return false;
     if (row.deleted_at) return true;
     const res = await this.db
-      .prepare("UPDATE memberships SET deleted_at = ? WHERE user_id = ? AND team_id = ? AND deleted_at IS NULL")
-      .run(now(), userId, teamId);
+      .prepare(
+        "UPDATE memberships SET deleted_at = ?, deleted_by = ? WHERE user_id = ? AND team_id = ? AND deleted_at IS NULL",
+      )
+      .run(now(), deletedBy, userId, teamId);
     return res.changes > 0;
   }
 
   async restore(userId: string, teamId: string): Promise<boolean> {
     const res = await this.db
-      .prepare("UPDATE memberships SET deleted_at = NULL WHERE user_id = ? AND team_id = ? AND deleted_at IS NOT NULL")
+      .prepare(
+        "UPDATE memberships SET deleted_at = NULL, deleted_by = NULL WHERE user_id = ? AND team_id = ? AND deleted_at IS NOT NULL",
+      )
       .run(userId, teamId);
     return res.changes > 0;
   }
@@ -120,21 +127,22 @@ export class MembershipRepository {
   /**
    * Cascade helper -- soft-delete every membership for a given team.
    * Used when a team is itself soft-deleted (which in turn cascades from
-   * a tenant soft-delete).
+   * a tenant soft-delete). `deletedBy` is propagated so the cascade carries
+   * the upstream actor's identity.
    */
-  async softRemoveByTeam(teamId: string): Promise<void> {
+  async softRemoveByTeam(teamId: string, deletedBy: string | null = null): Promise<void> {
     await this.db
-      .prepare("UPDATE memberships SET deleted_at = ? WHERE team_id = ? AND deleted_at IS NULL")
-      .run(now(), teamId);
+      .prepare("UPDATE memberships SET deleted_at = ?, deleted_by = ? WHERE team_id = ? AND deleted_at IS NULL")
+      .run(now(), deletedBy, teamId);
   }
 
   /**
    * Cascade helper -- soft-delete every membership for a given user.
    * Used when a user is soft-deleted.
    */
-  async softRemoveByUser(userId: string): Promise<void> {
+  async softRemoveByUser(userId: string, deletedBy: string | null = null): Promise<void> {
     await this.db
-      .prepare("UPDATE memberships SET deleted_at = ? WHERE user_id = ? AND deleted_at IS NULL")
-      .run(now(), userId);
+      .prepare("UPDATE memberships SET deleted_at = ?, deleted_by = ? WHERE user_id = ? AND deleted_at IS NULL")
+      .run(now(), deletedBy, userId);
   }
 }

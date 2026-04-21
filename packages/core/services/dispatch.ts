@@ -29,6 +29,7 @@ import { getExecutor } from "../executor.js";
 
 import { sessionAsVars, buildTaskWithHandoff, extractSubtasks } from "./task-builder.js";
 import { indexRepoForDispatch, injectKnowledgeContext, injectRepoMap } from "./dispatch-context.js";
+import { materializeClaudeAuthForDispatch } from "./dispatch-claude-auth.js";
 
 /**
  * Resolve secret names declared on the stage + runtime into a merged env.
@@ -429,6 +430,27 @@ export async function dispatch(
   const secretEnv = await resolveStageSecrets(app, session, stageDef, runtime, log);
   if (secretEnv.error) return { ok: false, message: secretEnv.error };
 
+  // Tenant-level claude auth materialization. Runs BEFORE we read the
+  // compute row for launch so any `credsSecretName` mutation lands before
+  // the provider sees it. A tenant bound to `api_key` contributes
+  // ANTHROPIC_API_KEY to the launch env; a tenant bound to
+  // `subscription_blob` on k8s-family compute triggers per-session k8s
+  // Secret creation + `credsSecretName` mergeConfig.
+  const computeForAuth = session.compute_name ? await app.computes.get(session.compute_name) : null;
+  const claudeAuth = await materializeClaudeAuthForDispatch(app, session, computeForAuth);
+  if (Object.keys(claudeAuth.env).length > 0) {
+    log(`Injected tenant-level claude auth env: ${Object.keys(claudeAuth.env).join(", ")}`);
+  }
+  if (claudeAuth.credsSecretName) {
+    log(`Materialized subscription blob as k8s Secret '${claudeAuth.credsSecretName}'`);
+  }
+
+  // Merge launch env. Order: stage/runtime secrets first, tenant auth
+  // second -- we WANT the tenant's ANTHROPIC_API_KEY to win when an
+  // operator configured it, so sessions that don't declare their own
+  // secret still get auth.
+  const launchEnv: Record<string, string> = { ...secretEnv.env, ...claudeAuth.env };
+
   // Launch via executor
   log(`Launching via ${runtime}...`);
   const launchResult = await executor.launch({
@@ -437,7 +459,7 @@ export async function dispatch(
     agent,
     task,
     claudeArgs,
-    env: secretEnv.env,
+    env: launchEnv,
     stage,
     autonomy,
     onLog: log,

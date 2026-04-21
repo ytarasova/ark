@@ -14,6 +14,10 @@
  * referential integrity and the audit trail is preserved. The old cascade
  * via FK `ON DELETE CASCADE` is replaced by an explicit manager-layer
  * cascade that soft-deletes child teams + memberships inside one txn.
+ *
+ * Audit: `delete(id, userId)` records the acting user's id in `deleted_by`
+ * (migration 005). Cascade helpers carry the same `userId` so every child
+ * row attributes the upstream actor rather than NULL.
  */
 
 import type { IDatabase } from "../database/index.js";
@@ -58,6 +62,7 @@ export class TenantManager {
           "name TEXT NOT NULL, " +
           "status TEXT NOT NULL DEFAULT 'active', " +
           "deleted_at TEXT, " +
+          "deleted_by TEXT, " +
           "created_at TEXT NOT NULL, " +
           "updated_at TEXT NOT NULL)";
         await this.db.exec(ddl);
@@ -100,23 +105,24 @@ export class TenantManager {
    * single transaction. Idempotent -- calling on an already-soft-deleted
    * tenant is a no-op and returns `true`.
    *
-   * TODO(agent-1-ctx): admin handler should pass ctx.userId to record who
-   * deleted the entity (audit trail). Once ctx wiring lands we add a
-   * `deleted_by` column and populate it here.
+   * `userId` is the acting user's id (from `ctx.userId`); it's recorded in
+   * `deleted_by` on the tenant row AND propagated through the cascade so
+   * every child row attributes the same actor. Passing `null` (or omitting
+   * it) means "system" deleter.
    */
-  async delete(id: string): Promise<boolean> {
+  async delete(id: string, userId: string | null = null): Promise<boolean> {
     await this.ensureSchema();
     return this.db.transaction(async () => {
-      const ok = await this._repo.softDelete(id);
+      const ok = await this._repo.softDelete(id, userId);
       if (!ok) return false;
       // Cascade: soft-delete every team in the tenant and every membership
       // of every team. We drive this from the manager because the FK
       // `ON DELETE CASCADE` only fires on hard DELETE.
       const teams = await this._teams.listByTenant(id);
       for (const team of teams) {
-        await this._memberships.softRemoveByTeam(team.id);
+        await this._memberships.softRemoveByTeam(team.id, userId);
       }
-      await this._teams.softDeleteByTenant(id);
+      await this._teams.softDeleteByTenant(id, userId);
       return true;
     });
   }

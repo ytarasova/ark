@@ -1,20 +1,25 @@
 import type { Command } from "commander";
 import chalk from "chalk";
-import { existsSync, statSync, mkdirSync, writeFileSync } from "fs";
-import { resolve, isAbsolute, join } from "path";
+import { existsSync, statSync } from "fs";
+import { resolve, isAbsolute } from "path";
 
-import { getInProcessApp } from "../app-client.js";
-import { fetchAnalysis, type SageAnalysis } from "../../core/integrations/sage-analysis.js";
-import { startSession, dispatch } from "../../core/services/session-orchestration.js";
+import { getArkClient } from "../app-client.js";
 
 /**
- * `ark sage <analysis-id-or-path>` -- thin wrapper over the
- * `from-sage-analysis` flow. Resolves the analysis reference (HTTP via
- * pi-sage base URL, or a local file path), hands the fetched JSON into the
- * session under `inputs.files.analysis_json`, and dispatches the flow.
+ * `ark sage <analysis-id-or-path>` -- thin client over the daemon's
+ * `sage/analyze` and `sage/context` RPCs.
  *
- * `--dry-run` prints the dispatch plan (one sub-stream per plan_stream, task
- * counts) without touching the DB or starting agents.
+ * The daemon owns the session + flow dispatch for `from-sage-analysis`.
+ * When the caller passes a Jira key, we forward it straight through. When
+ * they pass a file path, we forward it as a `file://` URL so the daemon
+ * can read it directly.
+ *
+ * Local-by-nature carve-outs:
+ *   - Relative paths (`./foo.json`): the CLI resolves them against its own
+ *     cwd before handing the daemon an absolute `file://` URL. The daemon
+ *     has no cwd relative to the user, so this path handling is CLI-side.
+ *   - Existence checks on the local file happen CLI-side so the error
+ *     message names the correct path from the user's perspective.
  */
 export function registerSageCommands(program: Command): void {
   program
@@ -27,63 +32,55 @@ export function registerSageCommands(program: Command): void {
     .option("--repo <path>", "Repo / workdir for the parent session", ".")
     .option("--dry-run", "Print the dispatch plan without creating a session")
     .action(async (ref: string, opts: SageOpts) => {
-      const resolvedApp = await getInProcessApp();
-      const { baseUrl, analysisId, localPath } = resolveAnalysisRef(ref, opts.sageUrl);
-
-      // Fetch analysis first so dry-run can render task counts AND so we fail
-      // fast with a clear error before touching the DB.
-      let analysis: SageAnalysis;
-      try {
-        analysis = await fetchAnalysis(baseUrl, analysisId);
-      } catch (e: any) {
-        console.error(chalk.red(`Failed to fetch analysis: ${e?.message ?? e}`));
-        process.exit(1);
-      }
+      const ark = await getArkClient();
+      const { sageUrl, analysisId } = resolveAnalysisRef(ref, opts.sageUrl);
 
       if (opts.dryRun) {
-        printDryRun(analysis, { baseUrl, analysisId, localPath });
+        try {
+          const ctx = await ark.sageContext({ analysisId, sageUrl });
+          console.log(chalk.bold(`\nfrom-sage-analysis dry-run`));
+          console.log(chalk.dim(`  Ticket:    ${ctx.analysisId}`));
+          console.log(chalk.dim(`  Base URL:  ${ctx.baseUrl}`));
+          if (ctx.summary) console.log(chalk.dim(`  Summary:   ${ctx.summary.slice(0, 120)}`));
+          console.log(chalk.bold(`\n  Sub-streams (one child session per plan_stream):`));
+          for (const [i, stream] of ctx.streams.entries()) {
+            console.log(
+              `    ${i + 1}. ${stream.repo}${stream.branch ? chalk.dim(`@${stream.branch}`) : ""}  ${chalk.yellow(`${stream.tasks.length} tasks`)}`,
+            );
+            for (const [j, task] of stream.tasks.entries()) {
+              console.log(chalk.dim(`       ${j + 1}. ${task.title}`));
+            }
+          }
+          console.log("");
+        } catch (e: any) {
+          console.error(chalk.red(`Failed to fetch analysis: ${e?.message ?? e}`));
+          process.exit(1);
+        }
         return;
       }
 
-      // Materialise the analysis so the session can consume it via
-      // inputs.files.analysis_json. If the caller already pointed us at a
-      // local file, reuse that path directly.
-      let analysisPath: string;
-      if (localPath) {
-        analysisPath = localPath;
-      } else {
-        const sageDir = join(resolvedApp.config.arkDir, "sage");
-        mkdirSync(sageDir, { recursive: true });
-        analysisPath = join(sageDir, `${analysisId}.analysis.json`);
-        writeFileSync(analysisPath, JSON.stringify(analysis, null, 2), "utf-8");
-      }
-
-      const summary = `sage:${analysis.jira_id}`;
-      const session = await startSession(resolvedApp, {
-        ticket: analysis.jira_id,
-        summary,
-        repo: opts.repo ?? ".",
-        workdir: opts.repo ? resolve(opts.repo) : undefined,
-        flow: "from-sage-analysis",
-        compute_name: opts.compute,
-        inputs: {
-          files: { analysis_json: analysisPath },
-          params: { analysis_id: analysis.jira_id, sage_base_url: baseUrl },
-        },
-        config: opts.runtime ? { runtime_override: opts.runtime } : undefined,
-      });
-
-      console.log(chalk.green(`Created session ${session.id} (flow=from-sage-analysis)`));
-      console.log(chalk.dim(`  Analysis: ${analysis.jira_id}`));
-      console.log(chalk.dim(`  Streams:  ${analysis.plan_streams.length}`));
-      console.log(chalk.dim(`  Tasks:    ${countTasks(analysis)}`));
-
-      const result = await dispatch(resolvedApp, session.id);
-      if (!result.ok) {
-        console.error(chalk.red(`Dispatch failed: ${result.message}`));
+      try {
+        const result = await ark.sageAnalyze({
+          analysisId,
+          sageUrl,
+          compute: opts.compute,
+          runtime: opts.runtime,
+          repo: opts.repo,
+        });
+        if (!result.ok) {
+          console.error(chalk.red(`Dispatch failed: ${result.message ?? "unknown error"}`));
+          if (result.sessionId) console.error(chalk.dim(`  Session id: ${result.sessionId}`));
+          process.exit(1);
+        }
+        console.log(chalk.green(`Created session ${result.sessionId} (flow=from-sage-analysis)`));
+        console.log(chalk.dim(`  Analysis: ${result.analysisId}`));
+        console.log(chalk.dim(`  Streams:  ${result.streamCount}`));
+        console.log(chalk.dim(`  Tasks:    ${result.taskCount}`));
+        console.log(chalk.green(`Dispatched. Session id: ${result.sessionId}`));
+      } catch (e: any) {
+        console.error(chalk.red(`Failed: ${e?.message ?? e}`));
         process.exit(1);
       }
-      console.log(chalk.green(`Dispatched. Session id: ${session.id}`));
     });
 }
 
@@ -95,22 +92,12 @@ interface SageOpts {
   dryRun?: boolean;
 }
 
-interface ResolvedRef {
-  baseUrl: string;
-  analysisId: string;
-  /** When the caller passed a file path, we round-trip that path into the session directly. */
-  localPath?: string;
-}
-
 /**
  * A sage ref is either:
- *   - a Jira key (IN-12345 etc.) -> fetched from --sage-url
- *   - an absolute path to a JSON file -> read directly
- *   - a relative path starting with ./ or containing /examples/ -> resolved
- *     against cwd
+ *   - a Jira key (IN-12345 etc.) -> fetched over HTTP from --sage-url
+ *   - a file path -> converted into a `file://` URL the daemon can read
  */
-function resolveAnalysisRef(ref: string, sageUrl: string | undefined): ResolvedRef {
-  // Path handling first: explicit .json extension or an existing file.
+function resolveAnalysisRef(ref: string, sageUrl: string | undefined): { sageUrl: string; analysisId: string } {
   const looksLikePath = ref.endsWith(".json") || ref.startsWith("./") || ref.startsWith("/") || ref.startsWith("file:");
   if (looksLikePath) {
     const abs = ref.startsWith("file://") ? ref : isAbsolute(ref) ? ref : resolve(ref);
@@ -123,35 +110,9 @@ function resolveAnalysisRef(ref: string, sageUrl: string | undefined): ResolvedR
         .split("/")
         .pop()
         ?.replace(/\.analysis\.json$|\.json$/, "") ?? "sage-analysis";
-    return {
-      baseUrl: `file://${fsPath}`,
-      analysisId,
-      localPath: fsPath,
-    };
+    return { sageUrl: `file://${fsPath}`, analysisId };
   }
 
-  // Jira-key style: fetch from the URL.
   if (!sageUrl) throw new Error("--sage-url is required when passing a Jira key");
-  return { baseUrl: sageUrl, analysisId: ref };
-}
-
-function countTasks(analysis: SageAnalysis): number {
-  return analysis.plan_streams.reduce((n, s) => n + s.tasks.length, 0);
-}
-
-function printDryRun(analysis: SageAnalysis, ref: ResolvedRef): void {
-  console.log(chalk.bold(`\nfrom-sage-analysis dry-run`));
-  console.log(chalk.dim(`  Ticket:    ${analysis.jira_id}`));
-  console.log(chalk.dim(`  Base URL:  ${ref.baseUrl}`));
-  if (analysis.summary) console.log(chalk.dim(`  Summary:   ${analysis.summary.slice(0, 120)}`));
-  console.log(chalk.bold(`\n  Sub-streams (one child session per plan_stream):`));
-  for (const [i, stream] of analysis.plan_streams.entries()) {
-    console.log(
-      `    ${i + 1}. ${stream.repo}${stream.branch ? chalk.dim(`@${stream.branch}`) : ""}  ${chalk.yellow(`${stream.tasks.length} tasks`)}`,
-    );
-    for (const [j, task] of stream.tasks.entries()) {
-      console.log(chalk.dim(`       ${j + 1}. ${task.title}`));
-    }
-  }
-  console.log("");
+  return { sageUrl, analysisId: ref };
 }

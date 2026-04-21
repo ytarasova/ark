@@ -44,6 +44,7 @@ export class UserManager {
             email TEXT NOT NULL,
             name TEXT,
             deleted_at TEXT,
+            deleted_by TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
           )`,
@@ -85,15 +86,20 @@ export class UserManager {
    * Soft-delete a user and cascade to their memberships inside a
    * transaction. Idempotent.
    *
-   * TODO(agent-1-ctx): admin handler should pass ctx.userId to record who
-   * deleted the entity.
+   * `actingUserId` is the id of the caller performing the delete (from
+   * `ctx.userId`); it's recorded in `deleted_by` on both the user row AND
+   * every cascaded membership. `null` (the default) means "system" deleter.
+   *
+   * Note: `actingUserId` is distinct from the `id` being deleted -- a user
+   * can't be both the target and the actor unless an admin is revoking
+   * their own account.
    */
-  async delete(id: string): Promise<boolean> {
+  async delete(id: string, actingUserId: string | null = null): Promise<boolean> {
     await this.ensureSchema();
     return this.db.transaction(async () => {
-      const ok = await this._repo.softDelete(id);
+      const ok = await this._repo.softDelete(id, actingUserId);
       if (!ok) return false;
-      await this._memberships.softRemoveByUser(id);
+      await this._memberships.softRemoveByUser(id, actingUserId);
       return true;
     });
   }

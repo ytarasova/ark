@@ -130,6 +130,28 @@ describe("TeamManager", () => {
     await db.close();
   });
 
+  it("records deleted_by on team delete and on removeMember", async () => {
+    const db = await freshDb();
+    const tenant = await new TenantManager(db).create({ slug: "au", name: "Au" });
+    const tm = new TeamManager(db);
+    const users = new UserManager(db);
+    const team = await tm.create({ tenant_id: tenant.id, slug: "eng", name: "Eng" });
+    const user = await users.create({ email: "aud@m.com" });
+    await tm.addMember(team.id, user.id, "member");
+
+    // removeMember writes deleted_by on the membership row.
+    await tm.removeMember(team.id, user.id, "u-admin-7");
+    const ghostMembers = await tm.listMembers(team.id, { includeDeleted: true });
+    expect(ghostMembers[0].deleted_by).toBe("u-admin-7");
+
+    // delete() writes deleted_by on the team row AND propagates to the cascade.
+    await tm.delete(team.id, "u-admin-99");
+    const ghostTeam = await tm.get(team.id, { includeDeleted: true });
+    expect(ghostTeam?.deleted_by).toBe("u-admin-99");
+
+    await db.close();
+  });
+
   it("rejects invalid roles", async () => {
     const db = await freshDb();
     const tenant = await new TenantManager(db).create({ slug: "r", name: "R" });

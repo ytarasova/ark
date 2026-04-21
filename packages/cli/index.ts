@@ -56,6 +56,10 @@ import { registerMiscCommands } from "./commands/misc.js";
 import { registerSageCommands } from "./commands/sage.js";
 import { registerDbCommands } from "./commands/db.js";
 import { registerSecretsCommands } from "./commands/secrets.js";
+// --- BEGIN agent-G ---
+import { registerClusterCommands } from "./commands/cluster.js";
+import { registerTenantConfigCommands } from "./commands/tenant-config.js";
+// --- END agent-G ---
 
 // ── Resolve remote mode early (before Commander parses) ─────────────────────
 // The client helper looks at _remoteServerUrl; stash the values we'll see
@@ -129,6 +133,11 @@ registerMiscCommands(program);
 registerSageCommands(program);
 registerDbCommands(program);
 registerSecretsCommands(program);
+
+// --- BEGIN agent-G ---
+registerClusterCommands(program);
+registerTenantConfigCommands(program);
+// --- END agent-G ---
 
 // ── Run ─────────────────────────────────────────────────────────────────────
 

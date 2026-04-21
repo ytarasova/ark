@@ -19,6 +19,7 @@ export interface TeamRow {
   name: string;
   description: string | null;
   deleted_at: string | null;
+  deleted_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -77,7 +78,7 @@ export class TeamRepository {
     return this.get(id);
   }
 
-  async softDelete(id: string): Promise<boolean> {
+  async softDelete(id: string, userId: string | null = null): Promise<boolean> {
     const existing = (await this.db.prepare("SELECT deleted_at FROM teams WHERE id = ?").get(id)) as
       | { deleted_at: string | null }
       | undefined;
@@ -85,14 +86,16 @@ export class TeamRepository {
     if (existing.deleted_at) return true;
     const ts = now();
     const res = await this.db
-      .prepare("UPDATE teams SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL")
-      .run(ts, ts, id);
+      .prepare("UPDATE teams SET deleted_at = ?, deleted_by = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL")
+      .run(ts, userId, ts, id);
     return res.changes > 0;
   }
 
   async restore(id: string): Promise<boolean> {
     const res = await this.db
-      .prepare("UPDATE teams SET deleted_at = NULL, updated_at = ? WHERE id = ? AND deleted_at IS NOT NULL")
+      .prepare(
+        "UPDATE teams SET deleted_at = NULL, deleted_by = NULL, updated_at = ? WHERE id = ? AND deleted_at IS NOT NULL",
+      )
       .run(now(), id);
     return res.changes > 0;
   }
@@ -100,12 +103,15 @@ export class TeamRepository {
   /**
    * Cascade helper -- soft-delete every team in a tenant. Used when a
    * tenant is itself soft-deleted so downstream rows don't remain
-   * visible to `list()` callers. Idempotent.
+   * visible to `list()` callers. Idempotent. `userId` is attributed to
+   * every cascaded row so the audit trail identifies the upstream actor.
    */
-  async softDeleteByTenant(tenantId: string): Promise<void> {
+  async softDeleteByTenant(tenantId: string, userId: string | null = null): Promise<void> {
     const ts = now();
     await this.db
-      .prepare("UPDATE teams SET deleted_at = ?, updated_at = ? WHERE tenant_id = ? AND deleted_at IS NULL")
-      .run(ts, ts, tenantId);
+      .prepare(
+        "UPDATE teams SET deleted_at = ?, deleted_by = ?, updated_at = ? WHERE tenant_id = ? AND deleted_at IS NULL",
+      )
+      .run(ts, userId, ts, tenantId);
   }
 }

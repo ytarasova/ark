@@ -1279,6 +1279,609 @@ export class ArkClient {
     return ok;
   }
 
+  // --- BEGIN agent-B: tenant policy + api key methods ---
+
+  async tenantPolicyList(): Promise<
+    Array<{
+      tenant_id: string;
+      allowed_providers: string[];
+      default_provider: string;
+      max_concurrent_sessions: number;
+      max_cost_per_day_usd: number | null;
+      compute_pools: Array<{
+        pool_name: string;
+        provider: string;
+        min: number;
+        max: number;
+        config: Record<string, unknown>;
+      }>;
+      router_enabled: boolean | null;
+      router_required: boolean;
+      router_policy: string | null;
+      auto_index: boolean | null;
+      auto_index_required: boolean;
+      tensorzero_enabled: boolean | null;
+      allowed_k8s_contexts: string[];
+    }>
+  > {
+    const { policies } = await this.rpc<{ policies: any[] }>("admin/tenant/policy/list");
+    return policies;
+  }
+
+  async tenantPolicyGet(tenantId: string): Promise<any | null> {
+    const { policy } = await this.rpc<{ policy: any | null }>("admin/tenant/policy/get", { tenant_id: tenantId });
+    return policy;
+  }
+
+  async tenantPolicySet(opts: {
+    tenant_id: string;
+    allowed_providers?: string[];
+    default_provider?: string;
+    max_concurrent_sessions?: number;
+    max_cost_per_day_usd?: number | null;
+    compute_pools?: Array<{
+      pool_name: string;
+      provider: string;
+      min: number;
+      max: number;
+      config: Record<string, unknown>;
+    }>;
+    router_enabled?: boolean | null;
+    router_required?: boolean;
+    router_policy?: string | null;
+    auto_index?: boolean | null;
+    auto_index_required?: boolean;
+    tensorzero_enabled?: boolean | null;
+    allowed_k8s_contexts?: string[];
+  }): Promise<any> {
+    const { policy } = await this.rpc<{ policy: any }>(
+      "admin/tenant/policy/set",
+      opts as unknown as Record<string, unknown>,
+    );
+    return policy;
+  }
+
+  async tenantPolicyDelete(tenantId: string): Promise<boolean> {
+    const { ok } = await this.rpc<{ ok: boolean }>("admin/tenant/policy/delete", { tenant_id: tenantId });
+    return ok;
+  }
+
+  async apiKeyList(tenantId: string): Promise<
+    Array<{
+      id: string;
+      tenant_id: string;
+      name: string;
+      role: "admin" | "member" | "viewer";
+      created_at: string;
+      last_used_at: string | null;
+      expires_at: string | null;
+    }>
+  > {
+    const { keys } = await this.rpc<{ keys: any[] }>("admin/apikey/list", { tenant_id: tenantId });
+    return keys;
+  }
+
+  async apiKeyCreate(opts: {
+    tenant_id: string;
+    name: string;
+    role?: "admin" | "member" | "viewer";
+    expires_at?: string;
+  }): Promise<{
+    id: string;
+    key: string;
+    tenant_id: string;
+    name: string;
+    role: "admin" | "member" | "viewer";
+    expires_at: string | null;
+  }> {
+    return this.rpc("admin/apikey/create", opts as unknown as Record<string, unknown>);
+  }
+
+  async apiKeyRevoke(id: string, tenantId?: string): Promise<boolean> {
+    const { ok } = await this.rpc<{ ok: boolean }>("admin/apikey/revoke", {
+      id,
+      ...(tenantId ? { tenant_id: tenantId } : {}),
+    });
+    return ok;
+  }
+
+  async apiKeyRotate(id: string, tenantId?: string): Promise<{ ok: boolean; key: string }> {
+    return this.rpc<{ ok: boolean; key: string }>("admin/apikey/rotate", {
+      id,
+      ...(tenantId ? { tenant_id: tenantId } : {}),
+    });
+  }
+
+  // --- END agent-B ---
+
+  // --- BEGIN agent-C: resource CRUD methods ---
+
+  /**
+   * Create a new agent from a full YAML string. The daemon parses the YAML,
+   * validates it, and writes it to the resource store. Scope defaults to
+   * `global` unless `project` is requested (and a project root resolves).
+   */
+  async agentCreate(opts: {
+    name: string;
+    yaml: string;
+    scope?: "global" | "project";
+  }): Promise<{ ok: boolean; name: string; scope: string }> {
+    return this.rpc("agent/create", opts as unknown as Record<string, unknown>);
+  }
+
+  /**
+   * Overwrite an existing agent's YAML. Returns a 404-equivalent error if
+   * the agent doesn't exist; refuses to edit builtin agents (copy first).
+   */
+  async agentEdit(opts: {
+    name: string;
+    yaml: string;
+    scope?: "global" | "project";
+  }): Promise<{ ok: boolean; name: string; scope: string }> {
+    return this.rpc("agent/edit", opts as unknown as Record<string, unknown>);
+  }
+
+  /**
+   * Duplicate an agent under a new name. Source may be any scope (including
+   * builtin); destination is written at the requested scope.
+   */
+  async agentCopy(opts: {
+    from: string;
+    to: string;
+    scope?: "global" | "project";
+  }): Promise<{ ok: boolean; name: string; scope: string }> {
+    return this.rpc("agent/copy", opts as unknown as Record<string, unknown>);
+  }
+
+  // `agentDelete` already exists on this class (legacy shape) and hits the
+  // same `agent/delete` RPC method our new handler responds to. Re-adding
+  // it would collide as a duplicate class member, so we reuse it.
+
+  /**
+   * Create a new skill from a full YAML string. Same shape as `agentCreate`.
+   */
+  async skillCreate(opts: {
+    name: string;
+    yaml: string;
+    scope?: "global" | "project";
+  }): Promise<{ ok: boolean; name: string; scope: string }> {
+    return this.rpc("skill/create", opts as unknown as Record<string, unknown>);
+  }
+
+  // `skillDelete` already exists on this class and hits the same `skill/delete`
+  // RPC method our new handler responds to.
+
+  /**
+   * Create a new recipe from a full YAML string. Requires a non-empty
+   * `flow` field in the YAML.
+   */
+  async recipeCreate(opts: {
+    name: string;
+    yaml: string;
+    scope?: "global" | "project";
+  }): Promise<{ ok: boolean; name: string; scope: string }> {
+    return this.rpc("recipe/create", opts as unknown as Record<string, unknown>);
+  }
+
+  // `recipeDelete` already exists on this class and hits the same
+  // `recipe/delete` RPC method our new handler responds to.
+
+  // --- END agent-C ---
+
+  // --- BEGIN agent-E: conductor + sage + costs methods ---
+
+  async conductorStatus(): Promise<{ running: boolean; port: number; pid?: number }> {
+    return this.rpc("conductor/status");
+  }
+
+  async conductorLearnings(): Promise<{
+    learnings: Array<{
+      id: string;
+      title: string;
+      description: string;
+      recurrence: number;
+      promoted: boolean;
+      lastSeen: string;
+    }>;
+  }> {
+    return this.rpc("conductor/learnings");
+  }
+
+  async conductorLearn(opts: { title: string; description?: string }): Promise<{
+    ok: boolean;
+    learning: {
+      id: string;
+      title: string;
+      description: string;
+      recurrence: number;
+      promoted: boolean;
+      lastSeen: string;
+    };
+  }> {
+    return this.rpc("conductor/learn", opts as Record<string, unknown>);
+  }
+
+  async conductorBridge(): Promise<{ ok: boolean; running: boolean; message?: string }> {
+    return this.rpc("conductor/bridge");
+  }
+
+  async conductorNotify(message: string): Promise<{ ok: boolean; message?: string }> {
+    return this.rpc("conductor/notify", { message });
+  }
+
+  async sageContext(opts: { analysisId: string; sageUrl?: string }): Promise<{
+    analysisId: string;
+    baseUrl: string;
+    summary: string | null;
+    streamCount: number;
+    taskCount: number;
+    streams: Array<{ repo: string; branch: string | null; tasks: Array<{ title: string }> }>;
+  }> {
+    return this.rpc("sage/context", opts as Record<string, unknown>);
+  }
+
+  async sageAnalyze(opts: {
+    analysisId: string;
+    sageUrl?: string;
+    compute?: string;
+    runtime?: string;
+    repo?: string;
+  }): Promise<{
+    ok: boolean;
+    sessionId: string;
+    analysisId: string;
+    streamCount: number;
+    taskCount: number;
+    message?: string;
+  }> {
+    return this.rpc("sage/analyze", opts as Record<string, unknown>);
+  }
+
+  async costsSync(): Promise<{ ok: boolean; synced: number; skipped: number }> {
+    return this.rpc("costs/sync");
+  }
+
+  async costsExport(opts?: { limit?: number }): Promise<{
+    total: number;
+    rows: Array<{
+      sessionId: string;
+      summary: string | null;
+      model: string | null;
+      cost: number;
+      input_tokens: number;
+      output_tokens: number;
+      cache_read_tokens: number;
+      cache_write_tokens: number;
+    }>;
+  }> {
+    return this.rpc("costs/export", (opts ?? {}) as Record<string, unknown>);
+  }
+
+  // --- END agent-E ---
+
+  // --- BEGIN agent-D: knowledge + code-intel + workspace methods ---
+
+  /** Store a new memory node in the knowledge graph. Tenant-scoped. */
+  async knowledgeRemember(opts: {
+    content: string;
+    tags?: string[];
+    importance?: number;
+    scope?: string;
+  }): Promise<{ ok: boolean; id: string }> {
+    return this.rpc("knowledge/remember", opts as Record<string, unknown>);
+  }
+
+  /** Search memory + learning nodes. Tenant-scoped. */
+  async knowledgeRecall(
+    query: string,
+    opts?: { limit?: number },
+  ): Promise<{
+    results: Array<{
+      id: string;
+      type: string;
+      label: string;
+      content: string | null;
+      score: number;
+      metadata: Record<string, unknown>;
+    }>;
+  }> {
+    return this.rpc("knowledge/recall", { query, ...(opts ?? {}) });
+  }
+
+  // ── code-intel ─────────────────────────────────────────────────────────
+
+  async codeIntelHealth(): Promise<{
+    schemaVersion: number;
+    pending: number;
+    deploymentMode: string;
+    storeBackend: string;
+    tenantCount: number;
+    defaultTenantRepoCount: number;
+    featureCodeIntelV2: boolean;
+  }> {
+    return this.rpc("code-intel/health");
+  }
+
+  async codeIntelMigrationStatus(): Promise<{
+    currentVersion: number;
+    pending: Array<{ version: number; name: string }>;
+  }> {
+    return this.rpc("code-intel/migration-status");
+  }
+
+  async codeIntelMigrate(opts?: { to?: number }): Promise<{ ok: boolean; currentVersion: number }> {
+    return this.rpc("code-intel/migrate", (opts ?? {}) as Record<string, unknown>);
+  }
+
+  async codeIntelReset(opts: { confirm: true }): Promise<{ ok: boolean }> {
+    return this.rpc("code-intel/reset", opts as Record<string, unknown>);
+  }
+
+  async codeIntelTenantList(): Promise<{
+    tenants: Array<{ id: string; slug: string; name: string; created_at: string }>;
+  }> {
+    return this.rpc("code-intel/tenant/list");
+  }
+
+  async codeIntelRepoAdd(opts: {
+    repoUrl: string;
+    name?: string;
+    defaultBranch?: string;
+    localPath?: string | null;
+  }): Promise<{ repo: any; created: boolean }> {
+    return this.rpc("code-intel/repo/add", opts as Record<string, unknown>);
+  }
+
+  async codeIntelRepoList(): Promise<{
+    repos: Array<{
+      id: string;
+      tenant_id: string;
+      repo_url: string;
+      name: string;
+      default_branch: string;
+      primary_language: string | null;
+      local_path: string | null;
+      config: Record<string, unknown>;
+      created_at: string;
+    }>;
+  }> {
+    return this.rpc("code-intel/repo/list");
+  }
+
+  async codeIntelReindex(opts?: { repoId?: string; extractors?: string[] }): Promise<{
+    run: {
+      id: string;
+      status: string;
+      tenant_id: string;
+      repo_id: string;
+      branch: string;
+      started_at: string;
+      finished_at: string | null;
+      extractor_counts: Record<string, number>;
+    };
+  }> {
+    return this.rpc("code-intel/reindex", (opts ?? {}) as Record<string, unknown>);
+  }
+
+  async codeIntelSearch(
+    query: string,
+    opts?: { limit?: number },
+  ): Promise<{
+    hits: Array<{
+      chunk_id: string;
+      chunk_kind: string;
+      content_preview: string;
+      [key: string]: unknown;
+    }>;
+  }> {
+    return this.rpc("code-intel/search", { query, ...(opts ?? {}) });
+  }
+
+  async codeIntelGetContext(opts: { subject: string; repoId?: string }): Promise<{ context: any }> {
+    return this.rpc("code-intel/get-context", opts as Record<string, unknown>);
+  }
+
+  // ── workspace ──────────────────────────────────────────────────────────
+
+  async workspaceList(): Promise<{
+    workspaces: Array<{
+      id: string;
+      slug: string;
+      name: string;
+      description: string | null;
+      tenant_id: string;
+      created_at: string;
+      repo_count: number;
+    }>;
+  }> {
+    return this.rpc("workspace/list");
+  }
+
+  async workspaceGet(slug: string): Promise<{
+    workspace: {
+      id: string;
+      slug: string;
+      name: string;
+      description: string | null;
+      tenant_id: string;
+      created_at: string;
+      repos: any[];
+    };
+  }> {
+    return this.rpc("workspace/get", { slug });
+  }
+
+  async workspaceCreate(opts: {
+    slug: string;
+    name?: string;
+    description?: string | null;
+  }): Promise<{ workspace: any; created: boolean }> {
+    return this.rpc("workspace/create", opts as Record<string, unknown>);
+  }
+
+  async workspaceDelete(opts: { slug: string; force?: boolean }): Promise<{ ok: boolean }> {
+    return this.rpc("workspace/delete", opts as Record<string, unknown>);
+  }
+
+  async workspaceStatus(slug: string): Promise<{
+    status: {
+      id: string;
+      slug: string;
+      name: string;
+      repo_count: number;
+      repos: Array<{ id: string; name: string; repo_url: string }>;
+    };
+  }> {
+    return this.rpc("workspace/status", { slug });
+  }
+
+  async workspaceAddRepo(opts: {
+    slug: string;
+    repo: string;
+  }): Promise<{ ok: boolean; repo_id: string; workspace_id: string }> {
+    return this.rpc("workspace/add-repo", opts as Record<string, unknown>);
+  }
+
+  async workspaceRemoveRepo(opts: { slug: string; repo: string }): Promise<{ ok: boolean; detached: boolean }> {
+    return this.rpc("workspace/remove-repo", opts as Record<string, unknown>);
+  }
+
+  // --- END agent-D ---
+
+  // --- BEGIN agent-F: blob secrets + tenant auth methods ---
+
+  /** List blob-secret names for the current tenant. Never returns contents. */
+  async secretBlobList(): Promise<string[]> {
+    const { blobs } = await this.rpc<{ blobs: string[] }>("secret/blob/list");
+    return blobs;
+  }
+
+  /**
+   * Fetch every file in a blob. Files are returned base64-encoded so the
+   * wire format is binary-safe; callers decode locally when writing to disk.
+   */
+  async secretBlobGet(name: string): Promise<{ files: Record<string, string>; encoding: "base64" } | null> {
+    const { blob } = await this.rpc<{
+      blob: { files: Record<string, string>; encoding: "base64" } | null;
+    }>("secret/blob/get", { name });
+    return blob;
+  }
+
+  /**
+   * Create-or-replace a blob. Files default to base64-encoded values; pass
+   * `encoding: "utf-8"` to let the server TextEncoder them server-side
+   * (convenient for tests dealing with plaintext payloads).
+   */
+  async secretBlobSet(
+    name: string,
+    files: Record<string, string>,
+    opts?: { encoding?: "base64" | "utf-8" },
+  ): Promise<boolean> {
+    const { ok } = await this.rpc<{ ok: boolean }>("secret/blob/set", {
+      name,
+      files,
+      encoding: opts?.encoding ?? "base64",
+    });
+    return ok;
+  }
+
+  /** Delete a blob. Returns true when a blob was actually removed. */
+  async secretBlobDelete(name: string): Promise<boolean> {
+    const { ok } = await this.rpc<{ ok: boolean }>("secret/blob/delete", { name });
+    return ok;
+  }
+
+  /** Get the current Claude auth binding for a tenant (or null if none). */
+  async tenantAuthGet(tenantId: string): Promise<{
+    tenant_id: string;
+    kind: "api_key" | "subscription_blob";
+    secret_ref: string;
+    created_at: string;
+    updated_at: string;
+  } | null> {
+    const { auth } = await this.rpc<{ auth: any | null }>("admin/tenant/auth/get", { tenant_id: tenantId });
+    return auth;
+  }
+
+  /**
+   * Set the Claude auth binding. `kind: "api_key"` points at a string
+   * secret (the value becomes `ANTHROPIC_API_KEY` at dispatch).
+   * `kind: "subscription_blob"` points at a blob (materialized into a
+   * per-session k8s Secret at `/root/.claude`).
+   */
+  async tenantAuthSet(tenantId: string, kind: "api_key" | "subscription_blob", secretRef: string): Promise<any> {
+    const { auth } = await this.rpc<{ auth: any }>("admin/tenant/auth/set", {
+      tenant_id: tenantId,
+      kind,
+      secret_ref: secretRef,
+    });
+    return auth;
+  }
+
+  /** Clear the Claude auth binding. Idempotent; returns true when a row was removed. */
+  async tenantAuthClear(tenantId: string): Promise<boolean> {
+    const { ok } = await this.rpc<{ ok: boolean }>("admin/tenant/auth/clear", { tenant_id: tenantId });
+    return ok;
+  }
+
+  // --- END agent-F ---
+
+  // --- BEGIN agent-G: cluster + tenant compute config methods ---
+
+  /**
+   * List the effective cluster list for the current tenant. Returns each
+   * cluster's name / kind / apiEndpoint / defaultNamespace (auth blocks are
+   * never surfaced over the wire).
+   */
+  async clusterList(): Promise<
+    Array<{
+      name: string;
+      kind: "k8s" | "k8s-kata";
+      apiEndpoint: string;
+      defaultNamespace?: string;
+    }>
+  > {
+    const { clusters } = await this.rpc<{
+      clusters: Array<{
+        name: string;
+        kind: "k8s" | "k8s-kata";
+        apiEndpoint: string;
+        defaultNamespace?: string;
+      }>;
+    }>("cluster/list");
+    return clusters;
+  }
+
+  /** Fetch a tenant's compute-config YAML blob (admin only). */
+  async tenantComputeConfigGet(tenantId: string): Promise<string | null> {
+    const { yaml } = await this.rpc<{ yaml: string | null }>("admin/tenant/config/get-compute", {
+      tenant_id: tenantId,
+    });
+    return yaml;
+  }
+
+  /**
+   * Write a tenant's compute-config YAML blob (admin only). The server
+   * validates the YAML shape before persisting.
+   */
+  async tenantComputeConfigSet(tenantId: string, yaml: string): Promise<boolean> {
+    const { ok } = await this.rpc<{ ok: boolean }>("admin/tenant/config/set-compute", {
+      tenant_id: tenantId,
+      yaml,
+    });
+    return ok;
+  }
+
+  /** Clear a tenant's compute-config YAML blob (admin only). */
+  async tenantComputeConfigClear(tenantId: string): Promise<boolean> {
+    const { ok } = await this.rpc<{ ok: boolean }>("admin/tenant/config/clear-compute", {
+      tenant_id: tenantId,
+    });
+    return ok;
+  }
+
+  // --- END agent-G ---
+
   // ── Teardown ────────────────────────────────────────────────────────────────
 
   close(): void {

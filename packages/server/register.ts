@@ -42,6 +42,29 @@ import { registerConnectorHandlers } from "./handlers/connectors.js";
 import { registerIntegrationsHandlers } from "./handlers/integrations.js";
 import { registerSecretsHandlers } from "./handlers/secrets.js";
 import { registerAdminHandlers } from "./handlers/admin.js";
+// --- BEGIN agent-B: admin-policy + admin-apikey ---
+import { registerAdminPolicyHandlers } from "./handlers/admin-policy.js";
+import { registerAdminApiKeyHandlers } from "./handlers/admin-apikey.js";
+// --- END agent-B ---
+// --- BEGIN agent-C: resource-crud ---
+import { registerResourceCrudHandlers } from "./handlers/resource-crud.js";
+// --- END agent-C ---
+// --- BEGIN agent-E: conductor + sage + costs ---
+import { registerConductorHandlers } from "./handlers/conductor.js";
+import { registerSageHandlers } from "./handlers/sage.js";
+import { registerCostsAdminHandlers } from "./handlers/costs.js";
+// --- END agent-E ---
+// --- BEGIN agent-D: knowledge + code-intel + workspace ---
+import { registerKnowledgeRpcHandlers } from "./handlers/knowledge-rpc.js";
+import { registerCodeIntelHandlers } from "./handlers/code-intel.js";
+import { registerWorkspaceHandlers } from "./handlers/workspace.js";
+// --- END agent-D ---
+// --- BEGIN agent-F: tenant-auth ---
+import { registerTenantAuthHandlers } from "./handlers/tenant-auth.js";
+// --- END agent-F ---
+// --- BEGIN agent-G: clusters + tenant compute config ---
+import { registerClusterHandlers } from "./handlers/clusters.js";
+// --- END agent-G ---
 
 /**
  * Register every shared handler, then conditionally mount local-only handlers
@@ -82,6 +105,42 @@ export function registerSharedHandlers(router: Router, app: AppContext): void {
   registerIntegrationsHandlers(router, app);
   registerSecretsHandlers(router, app);
   registerAdminHandlers(router, app);
+
+  // --- BEGIN agent-B: admin-policy + admin-apikey ---
+  registerAdminPolicyHandlers(router, app);
+  registerAdminApiKeyHandlers(router, app);
+  // --- END agent-B ---
+
+  // --- BEGIN agent-C: resource-crud ---
+  // Must run AFTER registerResourceHandlers so the YAML-aware variants win
+  // for agent/create, agent/delete, skill/delete, recipe/delete. The new
+  // handlers still accept the legacy structured shape for back-compat.
+  registerResourceCrudHandlers(router, app);
+  // --- END agent-C ---
+
+  // --- BEGIN agent-E: conductor + sage + costs ---
+  registerConductorHandlers(router, app);
+  registerSageHandlers(router, app);
+  registerCostsAdminHandlers(router, app);
+  // --- END agent-E ---
+
+  // --- BEGIN agent-D: knowledge + code-intel + workspace ---
+  // knowledge-rpc adds knowledge/remember + knowledge/recall on top of the
+  // existing shared knowledge handlers. code-intel + workspace put their
+  // namespaces on the wire for the first time -- the CLI was previously
+  // reaching into app.codeIntel via getInProcessApp().
+  registerKnowledgeRpcHandlers(router, app);
+  registerCodeIntelHandlers(router, app);
+  registerWorkspaceHandlers(router, app);
+  // --- END agent-D ---
+
+  // --- BEGIN agent-F: tenant-auth ---
+  registerTenantAuthHandlers(router, app);
+  // --- END agent-F ---
+
+  // --- BEGIN agent-G: clusters + tenant compute config ---
+  registerClusterHandlers(router, app);
+  // --- END agent-G ---
 }
 
 /**

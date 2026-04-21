@@ -172,12 +172,15 @@ export async function initSchema(db: IDatabase): Promise<void> {
       key_hash TEXT NOT NULL,
       name TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'member',
+      deleted_at TEXT,
+      deleted_by TEXT,
       created_at TEXT NOT NULL,
       last_used_at TEXT,
       expires_at TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_api_keys_tenant ON api_keys(tenant_id);
     CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_api_keys_hash_live ON api_keys(key_hash) WHERE deleted_at IS NULL;
 
     CREATE TABLE IF NOT EXISTS resource_definitions (
       name TEXT NOT NULL,
@@ -195,6 +198,7 @@ export async function initSchema(db: IDatabase): Promise<void> {
       name TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'active',
       deleted_at TEXT,
+      deleted_by TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -206,6 +210,7 @@ export async function initSchema(db: IDatabase): Promise<void> {
       email TEXT NOT NULL,
       name TEXT,
       deleted_at TEXT,
+      deleted_by TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -218,6 +223,7 @@ export async function initSchema(db: IDatabase): Promise<void> {
       name TEXT NOT NULL,
       description TEXT,
       deleted_at TEXT,
+      deleted_by TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -230,6 +236,7 @@ export async function initSchema(db: IDatabase): Promise<void> {
       team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
       role TEXT NOT NULL DEFAULT 'member',
       deleted_at TEXT,
+      deleted_by TEXT,
       created_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_memberships_user ON memberships(user_id);
@@ -251,6 +258,47 @@ export async function initSchema(db: IDatabase): Promise<void> {
 
   // Session artifacts table (queryable artifact tracking)
   await initArtifactSchema(db);
+
+  // --- BEGIN agent-F: tenant_claude_auth ---
+  // Tenant-level claude auth binding: exactly one of api_key / subscription_blob
+  // per tenant. `secret_ref` is the name of the secret (or blob) in the
+  // SecretsCapability backend; this table only stores the binding.
+  await safeExec(
+    db,
+    `CREATE TABLE IF NOT EXISTS tenant_claude_auth (
+      tenant_id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL CHECK (kind IN ('api_key','subscription_blob')),
+      secret_ref TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`,
+  );
+  // --- END agent-F ---
+
+  // --- BEGIN agent-G: tenant_policies.compute_config_yaml ---
+  // Per-tenant YAML blob of cluster overrides. Parsed into ClusterConfig[]
+  // at dispatch via `resolveEffectiveClusters`. The parent table is created
+  // lazily by TenantPolicyManager; on a fresh install we ensure it here too
+  // so the column is always present out of the box.
+  await safeExec(
+    db,
+    `CREATE TABLE IF NOT EXISTS tenant_policies (
+      tenant_id TEXT PRIMARY KEY,
+      allowed_providers TEXT NOT NULL DEFAULT '[]',
+      default_provider TEXT NOT NULL DEFAULT 'k8s',
+      max_concurrent_sessions INTEGER NOT NULL DEFAULT 10,
+      max_cost_per_day_usd REAL,
+      compute_pools TEXT NOT NULL DEFAULT '[]',
+      compute_config_yaml TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
+  );
+  // If the table already existed, add the column (migration 008 also covers
+  // this path; this is defense in depth for installs that never go through
+  // the runner).
+  await safeExec(db, "ALTER TABLE tenant_policies ADD COLUMN compute_config_yaml TEXT");
+  // --- END agent-G ---
 }
 
 export async function initKnowledgeSchema(db: IDatabase): Promise<void> {

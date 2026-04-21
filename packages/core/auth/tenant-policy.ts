@@ -102,6 +102,8 @@ export class TenantPolicyManager {
       ["auto_index_required", "INTEGER NOT NULL DEFAULT 0"],
       ["tensorzero_enabled", "INTEGER"],
       ["allowed_k8s_contexts", "TEXT NOT NULL DEFAULT '[]'"],
+      // Agent G -- cluster config YAML blob (see migration 008).
+      ["compute_config_yaml", "TEXT"],
     ];
     for (const [col, def] of cols) {
       try {
@@ -110,6 +112,65 @@ export class TenantPolicyManager {
         logInfo("general", "exists");
       }
     }
+  }
+
+  // ── Cluster / compute config blob (agent G) ───────────────────────────────
+  //
+  // A tenant admin can stash a YAML blob of cluster overrides on their
+  // tenant_policies row. `resolveEffectiveClusters` merges that blob on top
+  // of the system-layer `app.config.compute.clusters`. The blob is stored
+  // verbatim; validation happens at set-time (via `parseClustersYaml`) to
+  // surface malformed YAML before it hits dispatch.
+
+  /** Fetch the tenant's compute-config YAML blob, or null if none. */
+  async getComputeConfig(tenantId: string): Promise<string | null> {
+    await this.ensureSchema();
+    try {
+      const row = (await this.db
+        .prepare("SELECT compute_config_yaml FROM tenant_policies WHERE tenant_id = ?")
+        .get(tenantId)) as { compute_config_yaml: string | null } | undefined;
+      return row?.compute_config_yaml ?? null;
+    } catch {
+      // Column may not exist on a down-level DB. Return null so dispatch
+      // falls back to system-layer clusters.
+      return null;
+    }
+  }
+
+  /**
+   * Write the tenant's compute-config YAML blob. Creates a minimal
+   * `tenant_policies` row when no explicit policy exists yet.
+   *
+   * Caller MUST have pre-validated the YAML via `parseClustersYaml` -- this
+   * method stores the blob verbatim.
+   */
+  async setComputeConfig(tenantId: string, yaml: string): Promise<void> {
+    await this.ensureSchema();
+    const now = new Date().toISOString();
+    const existing = await this.db.prepare("SELECT tenant_id FROM tenant_policies WHERE tenant_id = ?").get(tenantId);
+    if (existing) {
+      await this.db
+        .prepare("UPDATE tenant_policies SET compute_config_yaml = ?, updated_at = ? WHERE tenant_id = ?")
+        .run(yaml, now, tenantId);
+    } else {
+      await this.db
+        .prepare(
+          `INSERT INTO tenant_policies
+             (tenant_id, allowed_providers, default_provider, max_concurrent_sessions, compute_pools,
+              compute_config_yaml, created_at, updated_at)
+           VALUES (?, '[]', 'k8s', 10, '[]', ?, ?, ?)`,
+        )
+        .run(tenantId, yaml, now, now);
+    }
+  }
+
+  /** Clear the tenant's compute-config YAML blob. Returns true when a row was updated. */
+  async clearComputeConfig(tenantId: string): Promise<boolean> {
+    await this.ensureSchema();
+    const result = await this.db
+      .prepare("UPDATE tenant_policies SET compute_config_yaml = NULL, updated_at = ? WHERE tenant_id = ?")
+      .run(new Date().toISOString(), tenantId);
+    return result.changes > 0;
   }
 
   /** Get the policy for a tenant, or null if no explicit policy exists. */
