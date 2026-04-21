@@ -43,8 +43,8 @@ export function registerMetricsHandlers(router: Router, app: AppContext): void {
     // tenantId is intentionally NOT forwarded from the client -- the
     // UsageRecorder enforces its own tenant scope. A remote caller cannot
     // query another tenant's costs by passing that tenant's id here.
-    const summary = app.usageRecorder.getSummary({ groupBy, since, until });
-    const total = app.usageRecorder.getTotalCost({ since, until });
+    const summary = await app.usageRecorder.getSummary({ groupBy, since, until });
+    const total = await app.usageRecorder.getTotalCost({ since, until });
     return { summary, total };
   });
 
@@ -53,7 +53,7 @@ export function registerMetricsHandlers(router: Router, app: AppContext): void {
     const days = params.days ?? 30;
 
     // tenantId is intentionally NOT forwarded from the client.
-    const trend = app.usageRecorder.getDailyTrend({ days });
+    const trend = await app.usageRecorder.getDailyTrend({ days });
     return { trend };
   });
 
@@ -70,7 +70,7 @@ export function registerMetricsHandlers(router: Router, app: AppContext): void {
     const session = await app.sessions.get(sessionId);
     if (!session) throw new Error("Session not found");
 
-    const result = app.usageRecorder.getSessionCost(sessionId);
+    const result = await app.usageRecorder.getSessionCost(sessionId);
     return result;
   });
 
@@ -88,7 +88,7 @@ export function registerMetricsHandlers(router: Router, app: AppContext): void {
     // tenantId is intentionally NOT forwarded from the client -- the
     // UsageRecorder is tenant-scoped and will attribute the record to the
     // caller's tenant regardless.
-    app.usageRecorder.record({
+    await app.usageRecorder.record({
       sessionId: params.sessionId,
       model: params.model,
       provider: params.provider,

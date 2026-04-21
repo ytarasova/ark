@@ -222,7 +222,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const recipe = app.recipes.get(name);
     if (!recipe) throw new Error(`Recipe '${name}' not found`);
     const instance = instantiateRecipe(recipe, (variables ?? {}) as Record<string, string>);
-    const session = app.sessionService.start(instance);
+    const session = await app.sessionService.start(instance);
     return { session };
   });
 
@@ -455,15 +455,15 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     return { ok: true };
   });
 
-  router.handle("group/list", async () => ({ groups: app.sessions.getGroups() }));
+  router.handle("group/list", async () => ({ groups: await app.sessions.getGroups() }));
   router.handle("group/create", async (p) => {
     const { name } = extract<GroupCreateParams>(p, ["name"]);
-    app.sessions.createGroup(name);
+    await app.sessions.createGroup(name);
     return { group: { name } };
   });
   router.handle("group/delete", async (p) => {
     const { name } = extract<GroupDeleteParams>(p, ["name"]);
-    app.sessions.deleteGroup(name);
+    await app.sessions.deleteGroup(name);
     return { ok: true };
   });
 }
