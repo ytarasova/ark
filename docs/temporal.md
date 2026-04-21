@@ -261,15 +261,17 @@ Tracking: Phase 4 issue "Helm sub-chart + RDS co-tenancy" documents the deployme
 
 ## Migration sequence
 
-| Phase | Scope | Exit criteria |
-|---|---|---|
-| **0 (this doc)** | Design + Bun spike + local cluster + tracker issues. No code changes. | Issues filed; `make dev-temporal` works; spike result documented. |
-| **1: BlobStore audit** | Find every inline-bytes site in the legacy orchestrator; convert to BlobStore. ESLint rule that gates new violators. | `rg -n 'writeFileSync|readFileSync|Buffer\.from' packages/core/services` has no unexplained hits; every service I/O site is either `<= 4 KiB` or `BlobRef`. |
-| **2: Client wrapper + shadow projector** | Add `packages/core/temporal/` with a client wrapper, a minimal `sessionWorkflow`, the first two activities (`startSessionActivity`, `awaitStageCompletionActivity`). New sessions in `test` profile can opt into shadow mode. | Shadow projector diff is 0 over a 24-hour run on staging. |
-| **3: Activity catalog buildout** | Port every stage kind to activities. Unit + integration tests per activity. Compensation activities for cancellation paths. | All stage kinds covered; flow tests pass on both legacy and temporal paths. |
-| **4: Helm sub-chart + RDS coordination** | Ship the worker as a sub-chart. Ops provisions the shared RDS logical DB, pgbouncer, IAM roles. Load-test at 2x expected throughput. | Staging runs Temporal-backed sessions for 1 tenant for 7 days, zero orchestration-related incidents. |
-| **5: Projector to real tables + flag flip for new sessions** | Flip `features.temporalOrchestration=on` per-tenant. Legacy drains naturally. Per-tenant override in `tenant_features` table. Reads unified behind `SessionService`. | Two early-access tenants on Temporal for 30 days; parity with legacy on all SLOs. |
-| **6: Retire legacy** | Delete `packages/core/services/stage-orchestrator.ts` (and its siblings) and `packages/core/state/flow.ts`. `sessions.orchestrator` column fixed to `'temporal'`. Migration script archives anything `orchestrator='legacy'`. | No references to legacy orchestrator in tree; docs updated; `features.temporalOrchestration` removed. |
+Tracked in GH meta-issue **#374** (Temporal orchestration rollout).
+
+| Phase | Issue | Scope | Exit criteria |
+|---|---|---|---|
+| **0 (this doc)** | #374 | Design + Bun spike + local cluster + tracker issues. No code changes. | Issues filed; `make dev-temporal` works; spike result documented. |
+| **1: BlobStore audit** | #368 | Find every inline-bytes site in the legacy orchestrator; convert to BlobStore. ESLint rule that gates new violators. | `rg -n 'writeFileSync|readFileSync|Buffer\.from' packages/core/services` has no unexplained hits; every service I/O site is either `<= 4 KiB` or `BlobRef`. |
+| **2: Client wrapper + shadow projector** | #369 | Add `packages/core/temporal/` with a client wrapper, a minimal `sessionWorkflow`, the first two activities (`startSessionActivity`, `awaitStageCompletionActivity`). New sessions in `test` profile can opt into shadow mode. | Shadow projector diff is 0 over a 24-hour run on staging. |
+| **3: Activity catalog buildout** | #370 | Port every stage kind to activities. Unit + integration tests per activity. Compensation activities for cancellation paths. | All stage kinds covered; flow tests pass on both legacy and temporal paths. |
+| **4: Helm sub-chart + RDS coordination** | #371 | Ship the worker as a sub-chart. Ops provisions the shared RDS logical DB, pgbouncer, IAM roles. Load-test at 2x expected throughput. | Staging runs Temporal-backed sessions for 1 tenant for 7 days, zero orchestration-related incidents. |
+| **5: Projector to real tables + flag flip for new sessions** | #372 | Flip `features.temporalOrchestration=on` per-tenant. Legacy drains naturally. Per-tenant override in `tenant_features` table. Reads unified behind `SessionService`. | Two early-access tenants on Temporal for 30 days; parity with legacy on all SLOs. |
+| **6: Retire legacy** | #373 | Delete `packages/core/services/stage-orchestrator.ts` (and its siblings) and `packages/core/state/flow.ts`. `sessions.orchestrator` column fixed to `'temporal'`. Migration script archives anything `orchestrator='legacy'`. | No references to legacy orchestrator in tree; docs updated; `features.temporalOrchestration` removed. |
 
 ## Appendix: worked example (linear flow)
 
