@@ -231,7 +231,11 @@ export function assembleDatabaseUrlFromParts(
   const port = env.DB_PORT ?? "5432";
   const u = encodeURIComponent(user);
   const p = encodeURIComponent(pass);
-  return `postgresql://${u}:${p}@${host}:${port}/${name}`;
+  // RDS / managed Postgres typically reject unencrypted connections.
+  // Default to sslmode=require; operator overrides via DB_SSLMODE for
+  // self-hosted Postgres without TLS (rare).
+  const sslmode = env.DB_SSLMODE ?? "require";
+  return `postgresql://${u}:${p}@${host}:${port}/${name}?sslmode=${encodeURIComponent(sslmode)}`;
 }
 
 /**
