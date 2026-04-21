@@ -8,10 +8,12 @@ interface HeaderActionsProps {
   isActive: boolean;
   canShowGate: boolean;
   actionLoading: string | null;
-  onAction: (action: "stop" | "restart" | "archive") => void;
+  onAction: (action: "stop" | "archive") => void;
   onDelete: () => void;
   onApprove: () => void;
   onOpenReject: () => void;
+  /** Opens the Restart-from-stage dialog; caller drives the actual restart. */
+  onOpenRestart: () => void;
 }
 
 /**
@@ -29,6 +31,7 @@ export function HeaderActions({
   onDelete,
   onApprove,
   onOpenReject,
+  onOpenRestart,
 }: HeaderActionsProps) {
   const showRestart =
     status === "ready" ||
@@ -112,7 +115,7 @@ export function HeaderActions({
       {showRestart && (
         <button
           type="button"
-          onClick={() => onAction("restart")}
+          onClick={onOpenRestart}
           disabled={actionLoading === "restart"}
           aria-label="Restart session"
           className={cn(

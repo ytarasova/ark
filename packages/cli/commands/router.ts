@@ -51,7 +51,7 @@ export function registerRouterCommands(program: Command) {
         // lands under `arkDir/tensorzero/` -- not `$HOME/.ark/tensorzero`
         // or `/tmp/.ark/tensorzero`, either of which can be world-readable
         // on a shared host.
-        const arkConfig = loadAppConfig();
+        const arkConfig = await loadAppConfig();
         const { join } = await import("path");
         tzManager = new TensorZeroManager({
           port: tzPort,

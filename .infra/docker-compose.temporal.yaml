@@ -1,0 +1,114 @@
+# Local Temporal cluster for Ark Phase 0/1 development.
+#
+# Brings up:
+#   - temporal-postgres  : isolated Postgres 16 for Temporal state.
+#     Intentionally NOT the same instance as Ark's dev Postgres --
+#     isolation in local dev is cheap and keeps blast radius obvious.
+#     Production uses a shared RDS cluster with schema-level isolation;
+#     that trade-off is captured in docs/temporal.md.
+#   - temporal           : temporalio/auto-setup image (creates schema on boot).
+#   - temporal-ui        : web UI at :8088.
+#   - temporal-admin     : tctl / temporal CLI on demand (run-once).
+#
+# Usage:
+#   make dev-temporal         # bring up + wait for health
+#   make dev-temporal-down    # stop + remove volumes
+#
+# Namespace `ark-dev` is created by the auto-setup image. The worker-facing
+# gRPC endpoint is `localhost:7233`. Ark components connect via
+# `ARK_TEMPORAL_ADDRESS` (default `localhost:7233`) when the feature flag
+# `features.temporalOrchestration` is enabled.
+
+name: ark-temporal
+
+services:
+  temporal-postgres:
+    # Pinned to Postgres 16 to match what Temporal's auto-setup image
+    # expects; bumping this unilaterally risks schema-init failures.
+    image: postgres:16
+    container_name: ark-temporal-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    ports:
+      # Exposed on a non-default host port so it cannot clash with Ark's
+      # normal dev Postgres (:5432 if the dev compose is also running).
+      - "15432:5432"
+    volumes:
+      - temporal-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal -d temporal"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  temporal:
+    # auto-setup runs the Temporal schema migrations on boot, then hands
+    # off to a regular temporal-server process. Fine for local dev; real
+    # deployments run migrations explicitly.
+    image: temporalio/auto-setup:1.27
+    container_name: ark-temporal
+    restart: unless-stopped
+    depends_on:
+      temporal-postgres:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: temporal-postgres
+      # Dynamic config file left at the image's built-in default --
+      # the 1.27 image used to ship `config/dynamicconfig/development-sql.yaml`
+      # but that path drifts between minor versions. Using the default
+      # avoids hard-coding a path that breaks on upgrade.
+      # Creates the `ark-dev` namespace on first boot.
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CLI_ADDRESS: temporal:7233
+    ports:
+      - "7233:7233"  # gRPC -- workers + clients
+    healthcheck:
+      # `tctl cluster health` exits 0 once frontend is serving.
+      test: ["CMD-SHELL", "temporal operator cluster health --address temporal:7233 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  temporal-admin:
+    # Run-once helper container to create the `ark-dev` namespace and
+    # any additional namespaces we need for multi-tenant experiments.
+    # Separate service so `make dev-temporal` can wait on it to finish.
+    image: temporalio/admin-tools:1.27
+    container_name: ark-temporal-admin
+    depends_on:
+      temporal:
+        condition: service_healthy
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CLI_ADDRESS: temporal:7233
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "temporal operator namespace describe ark-dev >/dev/null 2>&1 ||
+       temporal operator namespace create --retention 72h ark-dev;
+       echo 'ark-dev namespace ready';"
+    restart: "no"
+
+  temporal-ui:
+    image: temporalio/ui:2.34.0
+    container_name: ark-temporal-ui
+    restart: unless-stopped
+    depends_on:
+      temporal:
+        condition: service_healthy
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:8088,http://localhost:5173,http://localhost:8420
+    ports:
+      - "8088:8080"
+
+volumes:
+  temporal-postgres-data:
+    name: ark-temporal-postgres-data

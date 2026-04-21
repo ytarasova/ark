@@ -19,6 +19,7 @@ import { ErrorDetailDrawer } from "./session/ErrorDetailDrawer.js";
 import { EventsFooter, DiffFooter, TodosFooter } from "./session/TabFooter.js";
 import { TabPanels } from "./session/TabPanels.js";
 import { RejectGateModal } from "./session/RejectGateModal.js";
+import { RestartDialog } from "./session/RestartDialog.js";
 import type { ErrorInfo } from "./session/types.js";
 
 // Re-exported for back-compat: `__tests__/RejectGateModal.test.ts` imports
@@ -35,7 +36,7 @@ interface SessionDetailProps {
 
 export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabChange }: SessionDetailProps) {
   const d = useSessionDetail({ sessionId, initialTab, onTabChange });
-  const { actionLoading, handleAction, handleGateApprove, handleGateReject } = useSessionActions({
+  const { actionLoading, handleAction, handleGateApprove, handleGateReject, handleRestart } = useSessionActions({
     sessionId,
     onToast,
     refetchDetail: d.refetchDetail,
@@ -48,6 +49,7 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [restartDialogOpen, setRestartDialogOpen] = useState(false);
 
   if (!d.session) {
     return (
@@ -97,6 +99,7 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
       onDelete={() => setDeleteConfirmOpen(true)}
       onApprove={handleGateApprove}
       onOpenReject={() => setRejectOpen(true)}
+      onOpenRestart={() => setRestartDialogOpen(true)}
     />
   );
 
@@ -203,6 +206,15 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         confirmLabel="Delete"
         danger
         loading={actionLoading === "delete"}
+      />
+      <RestartDialog
+        sessionId={sessionId}
+        open={restartDialogOpen}
+        onClose={() => setRestartDialogOpen(false)}
+        onRestart={async (rewindToStage) => {
+          await handleRestart(rewindToStage);
+          setRestartDialogOpen(false);
+        }}
       />
     </div>
   );

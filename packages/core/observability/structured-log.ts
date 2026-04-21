@@ -20,7 +20,8 @@ export type LogComponent =
   | "code-intel"
   | "workspace"
   | "handoff"
-  | "compute-pool";
+  | "compute-pool"
+  | "router";
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
 interface LogEntry {

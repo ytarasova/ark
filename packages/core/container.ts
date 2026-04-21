@@ -18,6 +18,9 @@ import type { EventRepository } from "./repositories/event.js";
 import type { MessageRepository } from "./repositories/message.js";
 import type { TodoRepository } from "./repositories/todo.js";
 import type { ArtifactRepository } from "./repositories/artifact.js";
+import type { FlowStateRepository } from "./repositories/flow-state.js";
+import type { LedgerRepository } from "./repositories/ledger.js";
+import type { StatusPollerRegistry } from "./executors/status-poller.js";
 import type { SessionService } from "./services/session.js";
 import type { ComputeService } from "./services/compute.js";
 import type { HistoryService } from "./services/history.js";
@@ -96,6 +99,8 @@ export interface Cradle {
   messages: MessageRepository;
   todos: TodoRepository;
   artifacts: ArtifactRepository;
+  flowStates: FlowStateRepository;
+  ledger: LedgerRepository;
 
   // Services
   sessionService: SessionService;
@@ -141,6 +146,9 @@ export interface Cradle {
   staleStateDetector: StaleStateDetector;
   signalHandlers: SignalHandlers;
   sessionDrain: SessionDrain;
+
+  // Status polling registry (per-AppContext; disposed on shutdown)
+  statusPollers: StatusPollerRegistry;
 
   // Hosted-mode services (registered via setter; absent in local mode)
   workerRegistry?: WorkerRegistry;

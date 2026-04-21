@@ -11,12 +11,13 @@
 #   make build         Build native macOS binary + Electron app
 #   make package       Package everything for distribution
 
-.PHONY: help install dev dev-daemon dev-arkd dev-web claude-tfy web desktop \
+.PHONY: help install dev dev-daemon dev-arkd dev-web dev-temporal dev-temporal-down claude-tfy web desktop \
         test test-file test-e2e test-e2e-fast test-e2e-web test-e2e-web-dev test-install test-watch lint lint-fix \
         format format-check \
         audit audit-check \
         build build-cli build-web build-desktop \
         package package-cli package-desktop \
+        spike-temporal-bun \
         vendor-tmux vendor-tensorzero vendor-codegraph \
         clean uninstall
 
@@ -95,6 +96,25 @@ dev-web: ## Hot-reload: API server (:8420) + Vite frontend (:5173)
 	  $(BUN) --watch packages/cli/index.ts web --port 8420 --api-only 2>&1 | sed 's/^/[api] /' & \
 	  sleep 1 && cd packages/web && npx vite --port 5173 2>&1 | sed 's/^/[web] /' & \
 	  wait
+
+dev-temporal: ## Start local Temporal cluster (server :7233 + UI :8088) for Phase 0/1
+	@command -v docker >/dev/null 2>&1 || { echo "Docker required. Install Docker Desktop."; exit 1; }
+	@echo "\033[1mStarting Ark local Temporal cluster...\033[0m"
+	docker compose -f .infra/docker-compose.temporal.yaml -p ark-temporal up -d --wait
+	@echo ""
+	@echo "  Temporal gRPC:   localhost:7233     (ARK_TEMPORAL_ADDRESS=localhost:7233)"
+	@echo "  Temporal UI:     http://localhost:8088"
+	@echo "  Namespace:       ark-dev"
+	@echo "  Postgres:        localhost:15432   (isolated from ark dev db)"
+	@echo ""
+	@echo "  See docs/temporal-local-dev.md for next steps."
+
+dev-temporal-down: ## Stop and remove the local Temporal cluster + its data volume
+	docker compose -f .infra/docker-compose.temporal.yaml -p ark-temporal down -v
+	@echo "Ark local Temporal cluster stopped."
+
+spike-temporal-bun: ## Run the Phase 0 Bun / Temporal worker compat spike
+	@./scripts/spike-temporal-bun.sh
 
 # TrueFoundry: https://truefoundry.com/docs/ai-gateway/claude-code (ANTHROPIC_BASE_URL + Bearer in ANTHROPIC_CUSTOM_HEADERS).
 # Claude Code gateway requirements: https://code.claude.com/docs/en/llm-gateway (Messages /v1/messages, forward anthropic-* headers).

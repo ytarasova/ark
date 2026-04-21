@@ -109,5 +109,36 @@ export function useSessionActions({
     [sessionId, onToast, refetchDetail],
   );
 
-  return { actionLoading, handleAction, handleGateApprove, handleGateReject };
+  /**
+   * Explicit restart entrypoint used by the Restart-from-stage dialog.
+   * Accepts an optional `rewindToStage`; when undefined, re-runs the current
+   * stage. Separate from `handleAction("restart")` because the dialog drives
+   * the param, and the old "Restart" button no longer fires directly.
+   */
+  const handleRestart = useCallback(
+    async (rewindToStage: string | undefined): Promise<void> => {
+      setActionLoading("restart");
+      try {
+        const res = await api.restart(sessionId, rewindToStage ? { rewindToStage } : undefined);
+        if (res.ok !== false) {
+          onToast(
+            rewindToStage
+              ? `Session ${sessionId} restarted from ${rewindToStage}`
+              : `Session ${sessionId} restart successful`,
+            "success",
+          );
+          refetchDetail();
+        } else {
+          onToast(`Restart failed: ${res.message ?? "unknown error"}`, "error");
+        }
+      } catch (err: any) {
+        onToast(`Restart failed: ${err.message || "network error"}`, "error");
+      } finally {
+        setActionLoading(null);
+      }
+    },
+    [sessionId, onToast, refetchDetail],
+  );
+
+  return { actionLoading, handleAction, handleGateApprove, handleGateReject, handleRestart };
 }

@@ -309,8 +309,21 @@ export const api = {
   exportSession: (id: string) =>
     rpc<SessionExportDataResponse>("session/export-data", { sessionId: id } satisfies SessionExportDataRequest),
   importSession: (data: SessionImportRequest) => rpc<SessionImportResponse>("session/import", data),
-  restart: (id: string) =>
-    rpc<SessionResumeResponse>("session/resume", { sessionId: id } satisfies SessionResumeRequest),
+  restart: (id: string, opts?: { rewindToStage?: string }) =>
+    rpc<SessionResumeResponse>("session/resume", {
+      sessionId: id,
+      ...(opts?.rewindToStage ? { rewindToStage: opts.rewindToStage } : {}),
+    } satisfies SessionResumeRequest),
+  // Flow stage list used by the Restart-from-stage dialog. `currentStage` is
+  // the session's current pointer; `stages` is the full flow definition in
+  // order. Typed inline because the handler's return shape isn't in
+  // rpc-schemas.ts yet.
+  getFlowStages: (id: string) =>
+    rpc<{
+      flow: string;
+      currentStage: string | null;
+      stages: Array<{ name: string; type: string; action?: string; agent?: string }>;
+    }>("session/flowStages", { sessionId: id }),
   fork: (id: string, name?: string) =>
     rpc<SessionCloneResponse>("session/clone", { sessionId: id, name } satisfies SessionCloneRequest).then((r) => ({
       ok: true as const,
