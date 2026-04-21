@@ -131,35 +131,96 @@ export async function setupSessionWorktree(
     (session as { workdir: string | null }).workdir = persisted;
   }
 
-  // Write file attachments to the worktree so the agent can access them on disk
-  const attachments = (session.config as any)?.attachments as
-    | Array<{ name: string; content: string; type: string }>
-    | undefined;
-  if (attachments?.length) {
-    const attachDir = join(effectiveWorkdir, ".ark", "attachments");
-    mkdirSync(attachDir, { recursive: true });
-    for (const att of attachments) {
-      // Guard against path traversal -- attacker-controlled `att.name` must
-      // stay inside `attachDir`. `safeAttachmentName` throws on any `..`,
-      // separator, absolute path, or control-char payload.
-      let safeName: string;
-      try {
-        safeName = safeAttachmentName(att.name);
-      } catch (e: any) {
-        logWarn("workspace", `skipping unsafe attachment for session ${session.id}: ${e?.message ?? e}`);
-        continue;
-      }
-      if (att.content?.startsWith("data:")) {
-        // Binary file: strip data URL prefix and write as buffer
-        const base64 = att.content.replace(/^data:[^;]+;base64,/, "");
-        writeFileSync(join(attachDir, safeName), Buffer.from(base64, "base64"));
-      } else if (att.content) {
-        writeFileSync(join(attachDir, safeName), att.content, "utf-8");
-      }
-    }
-  }
+  // Materialise attachments onto the worktree. The first time through, any
+  // `{ name, content, type }` entry is uploaded to tenant-scoped BlobStore
+  // and replaced on the session row with `{ name, locator, type }` -- this
+  // keeps subsequent dispatches + replicas reading bytes from durable
+  // storage instead of trying to find ephemeral worktree files on the right
+  // container. Whichever shape we see, we end with a file at
+  // `<workdir>/.ark/attachments/<name>` for the agent to open.
+  await materializeAttachments(app, session, effectiveWorkdir);
 
   return effectiveWorkdir;
+}
+
+interface AttachmentEntry {
+  name: string;
+  type?: string;
+  /** Raw base64 / utf-8 content (legacy / pre-upload sessions). */
+  content?: string;
+  /** Blob locator (post-upload). */
+  locator?: string;
+}
+
+/**
+ * Upload any not-yet-uploaded attachments to BlobStore and materialise every
+ * attachment into `<workdir>/.ark/attachments/`. On first call the session
+ * row is rewritten to carry locators instead of inline base64; subsequent
+ * calls are pure reads.
+ */
+async function materializeAttachments(app: AppContext, session: Session, workdir: string): Promise<void> {
+  const raw = (session.config as any)?.attachments as AttachmentEntry[] | undefined;
+  if (!raw?.length) return;
+
+  const attachDir = join(workdir, ".ark", "attachments");
+  mkdirSync(attachDir, { recursive: true });
+
+  // Accumulate the post-upload shape so we can rewrite `config.attachments`
+  // atomically at the end. If nothing needed uploading, `changed` stays false
+  // and we skip the update.
+  const rewritten: AttachmentEntry[] = [];
+  let changed = false;
+
+  for (const att of raw) {
+    // Path-traversal guard: attacker-controlled `att.name` must not escape
+    // `attachDir`. Throws on `..`, separators, absolute paths, or control
+    // chars -- we log + skip rather than failing the whole dispatch.
+    let safeName: string;
+    try {
+      safeName = safeAttachmentName(att.name);
+    } catch (e: any) {
+      logWarn("workspace", `skipping unsafe attachment for session ${session.id}: ${e?.message ?? e}`);
+      continue;
+    }
+
+    let bytes: Buffer | null = null;
+    let locator = att.locator;
+
+    if (locator) {
+      // Already uploaded: pull from BlobStore.
+      try {
+        const got = await app.blobStore.get(locator, session.tenant_id);
+        bytes = got.bytes;
+      } catch (e: any) {
+        logWarn("workspace", `failed to fetch attachment ${safeName} for ${session.id}: ${e?.message ?? e}`);
+        continue;
+      }
+    } else if (att.content) {
+      // Not yet uploaded: decode, push to BlobStore, rewrite in place.
+      bytes = att.content.startsWith("data:")
+        ? Buffer.from(att.content.replace(/^data:[^;]+;base64,/, ""), "base64")
+        : Buffer.from(att.content, "utf-8");
+      const meta = await app.blobStore.put(
+        { tenantId: session.tenant_id, namespace: "attachments", id: session.id, filename: safeName },
+        bytes,
+        { contentType: att.type },
+      );
+      locator = meta.locator;
+      changed = true;
+    } else {
+      logWarn("workspace", `attachment ${safeName} has neither content nor locator; skipping`);
+      continue;
+    }
+
+    writeFileSync(join(attachDir, safeName), bytes);
+    rewritten.push({ name: safeName, type: att.type, locator });
+  }
+
+  if (changed) {
+    // Replace the inline-content entries with locator-only entries so the
+    // next dispatch + the web UI both see the same durable reference.
+    app.sessions.mergeConfig(session.id, { attachments: rewritten });
+  }
 }
 
 async function setupWorktree(

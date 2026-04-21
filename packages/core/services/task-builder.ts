@@ -62,23 +62,57 @@ export function formatTaskHeader(app: AppContext, session: Session, stage: strin
     `When you finish your work, call \`report\` with type='completed' and a concise summary of what you accomplished (files changed, tests added, key decisions). This summary is shown to the user in the dashboard.`,
   );
 
-  // Append file attachments if present
+  return parts;
+}
+
+/**
+ * Render the session's attachments as a markdown block, fetching blob-backed
+ * content on demand. Called from `appendPreviousStageContext` so it stays in
+ * the async side of task construction -- `formatTaskHeader` remains sync.
+ *
+ * Supports both shapes during the migration window: pre-upload entries carry
+ * inline `content`, post-upload entries carry `locator`. After the first
+ * dispatch every session row ends up with locators (see
+ * `materializeAttachments` in workspace-service.ts).
+ */
+async function renderAttachmentsBlock(app: AppContext, session: Session): Promise<string[]> {
   const attachments = (session.config as any)?.attachments as
-    | Array<{ name: string; content: string; type: string }>
+    | Array<{ name: string; content?: string; locator?: string; type?: string }>
     | undefined;
-  if (attachments?.length) {
-    parts.push("\n## Attached Files\n");
-    parts.push("Files are saved to `.ark/attachments/` in the working directory.\n");
-    for (const att of attachments) {
-      if (att.content?.startsWith("data:")) {
-        parts.push(`### ${att.name}\nBinary file (${att.type}) at \`.ark/attachments/${att.name}\`\n`);
-      } else {
-        parts.push(`### ${att.name}\n\`\`\`\n${att.content}\n\`\`\`\n`);
+  if (!attachments?.length) return [];
+
+  const out: string[] = ["\n## Attached Files\n", "Files are saved to `.ark/attachments/` in the working directory.\n"];
+  for (const att of attachments) {
+    const type = att.type ?? "";
+    const isBinary = type.startsWith("application/") || type.startsWith("image/") || type.startsWith("video/");
+    // Fetch text content from blob (or use inline if still present) so the
+    // prompt shows a preview for small text files. Binary files get a
+    // pointer only; the agent can `cat` them from the workdir if needed.
+    if (isBinary) {
+      out.push(`### ${att.name}\nBinary file (${type}) at \`.ark/attachments/${att.name}\`\n`);
+      continue;
+    }
+
+    let content: string | null = null;
+    if (att.locator) {
+      try {
+        const got = await app.blobStore.get(att.locator, session.tenant_id);
+        content = got.bytes.toString("utf-8");
+      } catch (e: any) {
+        logWarn("session", `attachment preview fetch failed for ${att.name}: ${e?.message ?? e}`);
       }
+    } else if (att.content) {
+      content = att.content.startsWith("data:") ? null : att.content;
+    }
+
+    if (content === null) {
+      out.push(`### ${att.name}\nFile available at \`.ark/attachments/${att.name}\`\n`);
+    } else {
+      const preview = content.length > 3000 ? content.slice(0, 3000) + "\n... (truncated)" : content;
+      out.push(`### ${att.name}\n\`\`\`\n${preview}\n\`\`\`\n`);
     }
   }
-
-  return parts;
+  return out;
 }
 
 /** Append previous stage context: completed stages, PLAN.md, and recent git log. */
@@ -95,6 +129,9 @@ export async function appendPreviousStageContext(app: AppContext, session: Sessi
       parts.push(`- ${c.stage} (agent=${d.agent ?? "?"}, turns=${d.num_turns ?? "?"}, cost=$${d.cost_usd ?? 0})`);
     }
   }
+
+  // Attachment preview (fetches from BlobStore for uploaded attachments)
+  parts.push(...(await renderAttachmentsBlock(app, session)));
 
   // Check for PLAN.md
   const wtDir = join(app.config.worktreesDir, session.id);

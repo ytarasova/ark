@@ -42,8 +42,51 @@ import { renderAgentContent, buildRichTimelineEvent } from "./session/event-buil
 // ---------------------------------------------------------------------------
 // Attached files display
 // ---------------------------------------------------------------------------
-function AttachedFiles({ attachments }: { attachments: Array<{ name: string; content: string; type: string }> }) {
+
+/**
+ * Sessions carry attachments in one of two shapes during the BlobStore
+ * migration: legacy `{ name, content, type }` (inline base64 / utf-8) or
+ * post-upload `{ name, locator, type }` (pointer into BlobStore). We render
+ * both; locator-shaped entries fetch content on expand via the `input/read`
+ * RPC so we don't pull every attachment's bytes into the session list.
+ */
+interface AttachmentRef {
+  name: string;
+  type?: string;
+  content?: string;
+  locator?: string;
+}
+
+function AttachedFiles({ attachments }: { attachments: AttachmentRef[] }) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [fetched, setFetched] = useState<Record<string, { content: string; binary: boolean } | "loading" | "error">>(
+    {},
+  );
+
+  async function toggle(att: AttachmentRef) {
+    const key = att.name;
+    const willOpen = !expanded[key];
+    setExpanded((prev) => ({ ...prev, [key]: willOpen }));
+    if (!willOpen || fetched[key] || !att.locator) return;
+
+    setFetched((prev) => ({ ...prev, [key]: "loading" }));
+    try {
+      const res = await api.readInput(att.locator);
+      const contentType = res.contentType ?? att.type ?? "";
+      const isBinary =
+        contentType.startsWith("image/") || contentType.startsWith("application/") || contentType.startsWith("video/");
+      setFetched((prev) => ({
+        ...prev,
+        [key]: {
+          content: isBinary ? "" : Buffer.from(res.content, "base64").toString("utf-8"),
+          binary: isBinary,
+        },
+      }));
+    } catch {
+      setFetched((prev) => ({ ...prev, [key]: "error" }));
+    }
+  }
+
   return (
     <div className="mb-4 border border-[var(--border)] rounded-lg overflow-hidden">
       <div className="px-3 py-2 bg-[var(--bg-hover)] border-b border-[var(--border)]">
@@ -52,14 +95,17 @@ function AttachedFiles({ attachments }: { attachments: Array<{ name: string; con
         </span>
       </div>
       {attachments.map((att) => {
-        const isBinary = att.content?.startsWith("data:");
         const isOpen = expanded[att.name] ?? false;
+        // Legacy inline content still renders inline; locator-shaped entries
+        // use the `fetched` cache keyed by name.
+        const inlineBinary = att.content?.startsWith("data:");
+        const remote = fetched[att.name];
         return (
           <div key={att.name} className="border-b border-[var(--border)] last:border-b-0">
             <button
               type="button"
               className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
-              onClick={() => setExpanded((prev) => ({ ...prev, [att.name]: !prev[att.name] }))}
+              onClick={() => toggle(att)}
             >
               <span className="text-[12px] font-medium text-[var(--fg)]">{att.name}</span>
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--fg-muted)] font-[family-name:var(--font-mono-ui)]">
@@ -69,13 +115,27 @@ function AttachedFiles({ attachments }: { attachments: Array<{ name: string; con
             </button>
             {isOpen && (
               <div className="px-3 pb-2">
-                {isBinary ? (
+                {att.content !== undefined ? (
+                  inlineBinary ? (
+                    <span className="text-[11px] text-[var(--fg-muted)] italic">
+                      Binary file -- preview not available
+                    </span>
+                  ) : (
+                    <pre className="text-[11px] leading-relaxed text-[var(--fg)] bg-[var(--bg)] rounded p-2 overflow-x-auto max-h-[300px] overflow-y-auto whitespace-pre-wrap font-[family-name:var(--font-mono-ui)]">
+                      {att.content}
+                    </pre>
+                  )
+                ) : remote === "loading" || remote === undefined ? (
+                  <span className="text-[11px] text-[var(--fg-muted)] italic">Loading…</span>
+                ) : remote === "error" ? (
+                  <span className="text-[11px] text-[var(--failed)] italic">Failed to load attachment</span>
+                ) : remote.binary ? (
                   <span className="text-[11px] text-[var(--fg-muted)] italic">
                     Binary file -- preview not available
                   </span>
                 ) : (
                   <pre className="text-[11px] leading-relaxed text-[var(--fg)] bg-[var(--bg)] rounded p-2 overflow-x-auto max-h-[300px] overflow-y-auto whitespace-pre-wrap font-[family-name:var(--font-mono-ui)]">
-                    {att.content}
+                    {remote.content}
                   </pre>
                 )}
               </div>
@@ -742,12 +802,9 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         {activeTab === "conversation" && (
           <div className="max-w-[720px] mx-auto">
             {/* Attached files */}
-            {session?.config?.attachments &&
-              (session.config.attachments as Array<{ name: string; content: string; type: string }>).length > 0 && (
-                <AttachedFiles
-                  attachments={session.config.attachments as Array<{ name: string; content: string; type: string }>}
-                />
-              )}
+            {session?.config?.attachments && (session.config.attachments as AttachmentRef[]).length > 0 && (
+              <AttachedFiles attachments={session.config.attachments as AttachmentRef[]} />
+            )}
             {timeline.length === 0 && conversationMessages.length === 0 && (
               <div className="text-center text-sm text-[var(--fg-muted)] py-12">
                 No conversation yet.{" "}

@@ -64,7 +64,12 @@ export const fetchSageAnalysisAction: ActionHandler = {
     // default-subtasks path.
     const bytes = Buffer.from(JSON.stringify(analysis, null, 2), "utf-8");
     const meta = await app.blobStore.put(
-      { tenantId: session.tenant_id, namespace: "sage-analysis", id: sessionId, filename: `${analysisId}.analysis.json` },
+      {
+        tenantId: session.tenant_id,
+        namespace: "sage-analysis",
+        id: sessionId,
+        filename: `${analysisId}.analysis.json`,
+      },
       bytes,
       { contentType: "application/json" },
     );
