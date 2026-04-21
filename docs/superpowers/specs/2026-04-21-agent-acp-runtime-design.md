@@ -132,29 +132,57 @@ interface RuntimeDefinition {
     inactivity_timeout_seconds?: number;
     /** Watchdog -- silence before first update after session/prompt. Default 60s. */
     pre_first_update_timeout_seconds?: number;
+    /**
+     * How the selected model id is delivered to the ACP subprocess. See §7.1.
+     * Defaults to "cli_flag" with model_cli_flag = ["--model", "{model}"].
+     */
+    model_delivery?: "cli_flag" | "env" | "meta";
+    /** Used when model_delivery = "cli_flag". {model} is substituted at launch. */
+    model_cli_flag?: string[];
+    /** Used when model_delivery = "env". Env var name set to the model id. */
+    model_env?: string;
+    /** Used when model_delivery = "meta". Key placed in session/new _meta object. */
+    model_meta_key?: string;
   };
 }
 ```
 
-Two reference runtime YAMLs ship with the change:
+### 7.1. Model selection and delivery
+
+ACP's stable spec has no standard field for "which model" -- it's agent-specific. Model selection is therefore launch-time only in P1 (consistent with every other Ark runtime today): the user picks from the runtime's `models` list at session creation, and the selected id gets injected into the ACP subprocess via one of three configured channels. The channel is declared on the runtime YAML so the executor stays generic.
+
+| `model_delivery` | How it flows | Example |
+|---|---|---|
+| `cli_flag` (default) | Model id is spliced into `agent_acp.command` before launch via the `model_cli_flag` template. `{model}` is replaced with the selected id. | Gemini: `["-m", "{model}"]`; Claude Code ACP: `["--model", "{model}"]` |
+| `env` | `model_env` names an env var that arkd sets to the model id in the subprocess environment. | `model_env: GEMINI_MODEL` |
+| `meta` | Model id is passed in the `_meta` object of `session/new` params under `model_meta_key`. | `model_meta_key: "model"` -> `session/new { _meta: { model: "claude-sonnet-4-6" } }` |
+
+Gemini runtime example (updated):
 
 ```yaml
 # runtimes/gemini-acp.yaml
 name: gemini-acp
-description: "Gemini CLI via Agent Client Protocol"
 type: agent-acp
 agent_acp:
   command: ["gemini"]
   acp_flags: ["--experimental-acp"]
+  model_delivery: cli_flag
+  model_cli_flag: ["-m", "{model}"]
   grant_all_permissions: true
-  host_capabilities:
-    fs: { read_text_file: true, write_text_file: true }
-    terminal: true
 models:
   - { id: gemini-2.5-pro, label: "Gemini 2.5 Pro" }
+  - { id: gemini-2.5-flash, label: "Gemini 2.5 Flash" }
 default_model: gemini-2.5-pro
 billing: { mode: api, transcript_parser: gemini }
 ```
+
+**Mid-session switching is not supported in P1.** If a user wants to switch models on an existing session, the executor treats it as a restart: `POST /agent-acp/close`, then `POST /agent-acp/launch` with the new model and the stored `agent_acp_session_id` for `session/load`. When the agent does not advertise `loadSession`, the standard resume-fallback path (§8.2 and the `agent_acp_resume_fallback` event in §5) applies -- user sees a "resumed, prior context not preserved" system divider.
+
+For multi-stage flows that need different models per stage: each stage already runs in its own session with its own agent YAML in Ark today; that story is unchanged by ACP, so "different model per step" works out of the box at the flow level.
+
+Routing through Ark's LLM Router (`packages/router/`) as a mid-turn alternative is documented as an open question in §17 and deferred to a separate spec.
+
+A generic non-trusted template also ships:
 
 ```yaml
 # runtimes/zed-acp.yaml  -- generic template
@@ -163,10 +191,15 @@ description: "Any Zed-compatible ACP agent (user-configurable)"
 type: agent-acp
 agent_acp:
   command: ["${ACP_AGENT_CMD}"]
+  model_delivery: meta
+  model_meta_key: "model"
   grant_all_permissions: false   # surfaces permission prompts in chat
   host_capabilities:
     fs: { read_text_file: true, write_text_file: true }
     terminal: true
+models:
+  - { id: "${ACP_DEFAULT_MODEL_ID}", label: "Configured model" }
+default_model: "${ACP_DEFAULT_MODEL_ID}"
 billing: { mode: api }
 ```
 
@@ -501,7 +534,7 @@ All tests use `AppContext.forTestAsync()` per CLAUDE.md. `make test --concurrenc
 ### 16.1. P1 (this spec)
 
 1. Naming discipline: `agent-acp` everywhere for the real protocol; existing `packages/core/acp.ts` unchanged.
-2. New `agent-acp` runtime type in YAML schema (existing runtimes untouched).
+2. New `agent-acp` runtime type in YAML schema (existing runtimes untouched), including `model_delivery` channel (cli_flag / env / meta) per §7.1. Launch-time model selection only; mid-session switch = close + launch with `session/load` resume.
 3. `packages/core/agent-acp/` -- types, codec, updates, mcp-adapter.
 4. `packages/core/executors/agent-acp.ts` -- launch, send, cancel, resume, close, event forwarding.
 5. `packages/arkd/agent-acp/` -- client, host, transport, pty-manager.
@@ -529,3 +562,4 @@ All tests use `AppContext.forTestAsync()` per CLAUDE.md. `make test --concurrenc
 - PTY library choice under Bun: `node-pty` may not compile cleanly; `@homebridge/node-pty-prebuilt-multiarch` is the usual fallback. Verify at implementation time. If neither works, `terminal/*` capability advertises false in P1 and the feature moves to P2 -- the rest of the design still ships.
 - Whether `session/set_session_mcps` is stable enough to include in P1. Current read: no. Re-check before starting work.
 - Cost/token accounting for ACP sessions: ACP does not currently carry structured token usage in notifications. For P1 we rely on the runtime's existing `billing.transcript_parser` when the ACP agent also happens to write a transcript file on disk (Claude Code ACP mode does; Gemini may not). If no transcript exists, session cost is `0` until P2 introduces a richer cost path.
+- Routing ACP agents through Ark's LLM Router (`packages/router/`) for mid-turn, policy-driven model selection. Deferred to a separate spec. P1 sticks to launch-time model selection per §7.1.
