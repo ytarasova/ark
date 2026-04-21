@@ -53,13 +53,6 @@ function extractPathSegment(path: string, index: number): string | null {
   return path.split("/")[index] ?? null;
 }
 
-/**
- * Resolution result for inbound request tenant identity.
- */
-type TenantResolution = { ok: true; tenantId: string } | { ok: false; status: number; error: string };
-
-const BEARER_PATTERN = /^Bearer\s+(.+)$/i;
-
 export interface ConductorOptions {
   quiet?: boolean;
   issueLabel?: string;
@@ -258,50 +251,20 @@ export class Conductor {
   // ── Tenant resolution ────────────────────────────────────────────────────
 
   /**
-   * Resolve the tenant id for an inbound HTTP request.
-   *
-   * Security model (P1-1):
-   *   - A Bearer token MUST be validated against `api_keys`. The tenant id
-   *     is read from the matched row, NOT parsed from the token body.
-   *   - The `X-Ark-Tenant-Id` header is NEVER trusted on its own. It must
-   *     match the tenant resolved from a valid Bearer token.
-   *   - The `"default"` fallback is only permitted when BOTH no Authorization
-   *     header AND no `X-Ark-Tenant-Id` header are present AND the conductor
-   *     is in local single-tenant mode (`app.mode.kind === "local"`).
+   * Resolve the tenant id for an inbound HTTP request by delegating to the
+   * mode-specific resolver composed at DI startup. Local and hosted modes
+   * have different trust rules (see `app-mode.ts` + the two implementations);
+   * this method stays a thin adapter from `Request` headers to the resolver
+   * input shape.
    */
-  private resolveTenant(req: Request): TenantResolution {
-    const auth = req.headers.get("authorization") ?? req.headers.get("Authorization");
-    const hdrTenant = req.headers.get("x-ark-tenant-id") ?? req.headers.get("X-Ark-Tenant-Id");
-    const isHosted = this.app.mode.kind === "hosted";
-
-    if (auth) {
-      const match = auth.match(BEARER_PATTERN);
-      const token = match?.[1]?.trim();
-      if (!token) {
-        return { ok: false, status: 401, error: "malformed Authorization header" };
-      }
-      const ctx = this.app.apiKeys.validate(token);
-      if (!ctx) {
-        return { ok: false, status: 401, error: "invalid or expired API key" };
-      }
-      if (hdrTenant && hdrTenant !== ctx.tenantId) {
-        return { ok: false, status: 403, error: "tenant header does not match API key" };
-      }
-      return { ok: true, tenantId: ctx.tenantId };
-    }
-
-    if (hdrTenant) {
-      return {
-        ok: false,
-        status: 401,
-        error: "X-Ark-Tenant-Id requires a validated Authorization: Bearer token",
-      };
-    }
-
-    if (isHosted) {
-      return { ok: false, status: 401, error: "authentication required" };
-    }
-    return { ok: true, tenantId: "default" };
+  private resolveTenant(req: Request) {
+    const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization");
+    const tenantHeader = req.headers.get("x-ark-tenant-id") ?? req.headers.get("X-Ark-Tenant-Id");
+    return this.app.mode.tenantResolver.resolve({
+      authHeader,
+      tenantHeader,
+      validateToken: (token) => this.app.apiKeys.validate(token),
+    });
   }
 
   private appForRequest(req: Request): { ok: true; app: AppContext } | { ok: false; response: Response } {

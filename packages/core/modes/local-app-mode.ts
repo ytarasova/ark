@@ -29,7 +29,9 @@ import type {
   RepoMapCapability,
   FtsRebuildCapability,
   HostCommandCapability,
+  TenantResolverCapability,
 } from "./app-mode.js";
+import { resolveBearerAuth } from "./app-mode.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -201,6 +203,31 @@ function makeHostCommandCapability(): HostCommandCapability {
   };
 }
 
+// ── Tenant resolver ────────────────────────────────────────────────────────
+
+/**
+ * Local single-tenant resolver.
+ *
+ *   - Authorization: Bearer <token>  -> validate + use its tenant (shared path)
+ *   - Only X-Ark-Tenant-Id            -> accept it verbatim. Local mode serves
+ *                                        a single user/tenant; the header is
+ *                                        informational and can't widen access.
+ *                                        The channel MCP subprocess always
+ *                                        sets this at dispatch, so rejecting
+ *                                        would break `report`, relay, and
+ *                                        /hooks/status on every local session.
+ *   - No headers                      -> fall back to "default".
+ */
+function makeLocalTenantResolver(): TenantResolverCapability {
+  return {
+    resolve({ authHeader, tenantHeader, validateToken }) {
+      if (authHeader) return resolveBearerAuth(authHeader, tenantHeader, validateToken);
+      if (tenantHeader) return { ok: true, tenantId: tenantHeader };
+      return { ok: true, tenantId: "default" };
+    },
+  };
+}
+
 // ── Factory ────────────────────────────────────────────────────────────────
 
 /**
@@ -217,6 +244,7 @@ export function buildLocalAppMode(app?: AppContext): AppMode {
   const knowledgeCapability = app ? makeKnowledgeCapability(app) : null;
   const ftsRebuildCapability = app ? makeFtsRebuildCapability(app) : null;
   const hostCommandCapability = makeHostCommandCapability();
+  const tenantResolver = makeLocalTenantResolver();
   return {
     kind: "local",
     fsCapability,
@@ -225,5 +253,6 @@ export function buildLocalAppMode(app?: AppContext): AppMode {
     repoMapCapability,
     ftsRebuildCapability,
     hostCommandCapability,
+    tenantResolver,
   };
 }

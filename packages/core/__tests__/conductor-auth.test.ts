@@ -3,13 +3,16 @@
  * (cross-tenant REST leak).
  *
  * Preconditions the tests pin down:
- *   P1-1:
- *     - `X-Ark-Tenant-Id` alone is never trusted. A request with only the
- *       header (no Bearer token) is rejected.
+ *   P1-1 (hosted mode):
+ *     - `X-Ark-Tenant-Id` alone is never trusted. A hosted-mode request
+ *       with only the header (no Bearer token) is rejected with 401.
  *     - A Bearer token that does not resolve to an api_keys row is rejected.
  *     - A validated Bearer + mismatched X-Ark-Tenant-Id returns 403.
- *     - `"default"` is still permitted when neither header is present AND
- *       the conductor is in local single-tenant mode (no databaseUrl).
+ *   P1-1 (local mode):
+ *     - No headers -> fall through to tenant "default".
+ *     - Only `X-Ark-Tenant-Id` (no Bearer) is accepted verbatim. Local mode
+ *       is single-user; the header is informational and can't widen access,
+ *       and the channel MCP subprocess always sets it at dispatch.
  *
  *   P1-2:
  *     - `GET /api/sessions` with a tenant-A token returns only tenant-A
@@ -116,17 +119,22 @@ describe("P1-1 -- conductor tenant identity must not be spoofable", () => {
   });
 });
 
-describe("P1-1 -- local single-tenant mode is preserved when no credentials are present", () => {
+describe("P1-1 -- local single-tenant mode accepts the channel MCP's informational tenant header", () => {
   it("allows unauthenticated requests in local mode (no databaseUrl)", async () => {
     await boot({ hostedMode: false });
     const resp = await postChannel("s-local");
     expect(resp.status).toBe(200);
   });
 
-  it("still rejects a header-only request in local mode (spoofable)", async () => {
+  it("accepts `X-Ark-Tenant-Id: default` without a Bearer in local mode", async () => {
+    // The channel MCP subprocess always injects ARK_TENANT_ID and the
+    // channel server forwards it as X-Ark-Tenant-Id. Local mode must
+    // accept this -- rejecting would 401 every `report` + relay + hooks
+    // call, which is the regression we fixed (commit SHA lives in the
+    // conductor-auth test replacement for this one).
     await boot({ hostedMode: false });
-    const resp = await postChannel("s-local", { "X-Ark-Tenant-Id": "attacker" });
-    expect(resp.status).toBe(401);
+    const resp = await postChannel("s-local", { "X-Ark-Tenant-Id": "default" });
+    expect(resp.status).toBe(200);
   });
 });
 

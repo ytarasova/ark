@@ -79,6 +79,34 @@ export interface HostCommandCapability {
   dockerAction(container: string, action: "stop" | "restart"): Promise<void>;
 }
 
+/**
+ * Inbound HTTP tenant resolution (Authorization + X-Ark-Tenant-Id headers).
+ *
+ * The conductor's HTTP surface is the same endpoints in both modes, but the
+ * trust rules for the two headers differ:
+ *   - Local single-tenant: no token required; a bare `X-Ark-Tenant-Id`
+ *     header is informational (the channel MCP subprocess always sets it
+ *     to `"default"` at dispatch).
+ *   - Hosted multi-tenant: a Bearer token is mandatory for any request that
+ *     carries (or needs) a tenant scope; an unaccompanied tenant header is
+ *     a cross-tenant exposure vector and MUST be rejected with 401.
+ *
+ * The resolver is the single place the trust rule is expressed. Handlers go
+ * through `app.mode.tenantResolver.resolve(...)` and never branch on
+ * `app.mode.kind`.
+ */
+export interface TenantResolverCapability {
+  resolve(args: TenantResolverInput): TenantResolverResult;
+}
+
+export interface TenantResolverInput {
+  authHeader: string | null;
+  tenantHeader: string | null;
+  validateToken: (token: string) => { tenantId: string } | null;
+}
+
+export type TenantResolverResult = { ok: true; tenantId: string } | { ok: false; status: number; error: string };
+
 // ── AppMode contract ───────────────────────────────────────────────────────
 
 /**
@@ -95,6 +123,40 @@ export interface AppMode {
   readonly repoMapCapability: RepoMapCapability | null;
   readonly ftsRebuildCapability: FtsRebuildCapability | null;
   readonly hostCommandCapability: HostCommandCapability | null;
+  /**
+   * Always present (both modes use HTTP auth). The implementation encodes
+   * the mode-specific trust rules for tenant + Bearer headers.
+   */
+  readonly tenantResolver: TenantResolverCapability;
+}
+
+// ── Shared helper: Bearer-token path is identical in both modes ────────────
+
+const BEARER_PATTERN = /^Bearer\s+(.+)$/i;
+
+/**
+ * Given an Authorization header that claims Bearer auth, validate the token
+ * and resolve its tenant. Used by both LocalTenantResolver and HostedTenantResolver
+ * -- the only difference between the two is what they do when the header is ABSENT.
+ */
+export function resolveBearerAuth(
+  authHeader: string,
+  tenantHeader: string | null,
+  validateToken: (token: string) => { tenantId: string } | null,
+): TenantResolverResult {
+  const match = authHeader.match(BEARER_PATTERN);
+  const token = match?.[1]?.trim();
+  if (!token) {
+    return { ok: false, status: 401, error: "malformed Authorization header" };
+  }
+  const ctx = validateToken(token);
+  if (!ctx) {
+    return { ok: false, status: 401, error: "invalid or expired API key" };
+  }
+  if (tenantHeader && tenantHeader !== ctx.tenantId) {
+    return { ok: false, status: 403, error: "tenant header does not match API key" };
+  }
+  return { ok: true, tenantId: ctx.tenantId };
 }
 
 // ── Factory (the ONE remaining mode conditional) ───────────────────────────
