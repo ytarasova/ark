@@ -136,7 +136,7 @@ describe("Parallel DAG advance via depends_on", async () => {
     expect(updated!.status).toBe("ready");
 
     // Flow state should show plan as completed
-    const flowState = app.flowStates.load(s.id);
+    const flowState = await app.flowStates.load(s.id);
     expect(flowState).not.toBeNull();
     expect(flowState!.completedStages).toContain("plan");
   });
@@ -146,7 +146,7 @@ describe("Parallel DAG advance via depends_on", async () => {
     await app.sessions.update(s.id, { stage: "implement", status: "ready" });
 
     // Mark plan as completed in flow state (it ran before implement)
-    app.flowStates.markStageCompleted(s.id, "plan");
+    await app.flowStates.markStageCompleted(s.id, "plan");
 
     const result = await advance(app, s.id, true);
     expect(result.ok).toBe(true);
@@ -165,8 +165,8 @@ describe("Parallel DAG advance via depends_on", async () => {
     await app.sessions.update(s.id, { stage: "test", status: "ready" });
 
     // Mark plan and implement as completed in flow state
-    app.flowStates.markStageCompleted(s.id, "plan");
-    app.flowStates.markStageCompleted(s.id, "implement");
+    await app.flowStates.markStageCompleted(s.id, "plan");
+    await app.flowStates.markStageCompleted(s.id, "implement");
 
     const result = await advance(app, s.id, true);
     expect(result.ok).toBe(true);
@@ -181,9 +181,9 @@ describe("Parallel DAG advance via depends_on", async () => {
     await app.sessions.update(s.id, { stage: "integrate", status: "ready" });
 
     // Mark all preceding stages as completed
-    app.flowStates.markStageCompleted(s.id, "plan");
-    app.flowStates.markStageCompleted(s.id, "implement");
-    app.flowStates.markStageCompleted(s.id, "test");
+    await app.flowStates.markStageCompleted(s.id, "plan");
+    await app.flowStates.markStageCompleted(s.id, "implement");
+    await app.flowStates.markStageCompleted(s.id, "test");
 
     const result = await advance(app, s.id, true);
     expect(result.ok).toBe(true);
