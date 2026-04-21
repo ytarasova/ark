@@ -399,6 +399,11 @@ export class AppContext {
     return this._resolve("pluginRegistry");
   }
 
+  /** Per-app status-poller interval registry (replaces the old module-level Map). */
+  get statusPollers(): import("./executors/status-poller.js").StatusPollerRegistry {
+    return this._resolve("statusPollers");
+  }
+
   // ── Infra launcher accessors (container-managed internal state) ──────
 
   /** Orphaned sessions detected during boot (running but tmux dead). */
