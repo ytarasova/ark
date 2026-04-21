@@ -20,6 +20,8 @@ interface ComputeRow {
   runtime_kind?: string | null;
   status: string;
   config: string;
+  is_template?: number | boolean | null;
+  cloned_from?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -48,11 +50,22 @@ function rowToCompute(row: ComputeRow): Compute {
     runtime_kind: runtime_kind as RuntimeKindName,
     status: row.status as ComputeStatus,
     config: safeParseConfig(row.config),
+    is_template: !!row.is_template,
+    cloned_from: row.cloned_from ?? null,
   };
 }
 
 // Valid compute columns (from schema).
-const COMPUTE_COLUMNS = new Set(["provider", "compute_kind", "runtime_kind", "status", "config", "updated_at"]);
+const COMPUTE_COLUMNS = new Set([
+  "provider",
+  "compute_kind",
+  "runtime_kind",
+  "status",
+  "config",
+  "is_template",
+  "cloned_from",
+  "updated_at",
+]);
 
 // Providers that allow only one compute instance per tenant.
 const SINGLETON_PROVIDERS = new Set(["local"]);
@@ -84,10 +97,13 @@ export class ComputeRepository {
     }
     provider = provider ?? "local";
 
-    // Singleton providers allow only one compute instance per tenant.
-    if (SINGLETON_PROVIDERS.has(provider)) {
+    // Singleton providers allow only one *concrete* instance per tenant.
+    // Templates are blueprints and never run on real infra, so they're
+    // exempt; likewise clones are per-session ephemeral rows. The
+    // constraint only matters for concrete rows that model real hardware.
+    if (SINGLETON_PROVIDERS.has(provider) && !opts.is_template && !opts.cloned_from) {
       const existing = (await this.db
-        .prepare("SELECT name FROM compute WHERE provider = ? AND tenant_id = ?")
+        .prepare("SELECT name FROM compute WHERE provider = ? AND tenant_id = ? AND NOT is_template")
         .get(provider, this.tenantId)) as { name: string } | undefined;
       if (existing) {
         throw new Error(`Provider '${provider}' is a singleton -- compute '${existing.name}' already exists`);
@@ -102,11 +118,17 @@ export class ComputeRepository {
     const computeKind = (opts.compute ?? fallback.compute) as ComputeKindName;
     const runtimeKind = (opts.runtime ?? fallback.runtime) as RuntimeKindName;
 
+    // SQLite stores booleans as 0/1; Postgres uses BOOLEAN. Pass a JS
+    // boolean and let each driver encode appropriately. rowToCompute
+    // normalizes back to a TS boolean on read.
+    const isTemplate = !!opts.is_template;
+    const clonedFrom = opts.cloned_from ?? null;
+
     await this.db
       .prepare(
         `
-      INSERT INTO compute (name, provider, compute_kind, runtime_kind, status, config, tenant_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO compute (name, provider, compute_kind, runtime_kind, status, config, is_template, cloned_from, tenant_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       )
       .run(
@@ -116,6 +138,8 @@ export class ComputeRepository {
         runtimeKind,
         initialStatus,
         JSON.stringify(opts.config ?? {}),
+        isTemplate,
+        clonedFrom,
         this.tenantId,
         ts,
         ts,
@@ -149,6 +173,22 @@ export class ComputeRepository {
     params.push(filters?.limit ?? 100);
 
     return ((await this.db.prepare(sql).all(...params)) as ComputeRow[]).map(rowToCompute);
+  }
+
+  /** Filter view: rows that are reusable config blueprints. */
+  async listTemplates(): Promise<Compute[]> {
+    const rows = (await this.db
+      .prepare("SELECT * FROM compute WHERE tenant_id = ? AND is_template ORDER BY created_at DESC")
+      .all(this.tenantId)) as ComputeRow[];
+    return rows.map(rowToCompute);
+  }
+
+  /** Filter view: rows that are concrete (non-template) compute targets. */
+  async listConcrete(): Promise<Compute[]> {
+    const rows = (await this.db
+      .prepare("SELECT * FROM compute WHERE tenant_id = ? AND NOT is_template ORDER BY created_at DESC")
+      .all(this.tenantId)) as ComputeRow[];
+    return rows.map(rowToCompute);
   }
 
   async update(name: string, fields: Partial<Compute>): Promise<Compute | null> {

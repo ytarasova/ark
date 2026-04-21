@@ -102,4 +102,35 @@ describe("garbageCollectComputeIfTemplate", () => {
     expect(gc).toBe(true);
     expect(await app.computes.get("local-docker")).toBeNull();
   });
+
+  it("cloned_from rows are GC'd even when the kind is persistent", async () => {
+    // EC2 + direct is persistent -- would normally be skipped. But the
+    // `cloned_from` flag marks this row as an ephemeral clone produced by
+    // the dispatcher, so GC should remove it regardless of lifecycle.
+    await app.computes.create({
+      name: "ec2-clone",
+      compute: "ec2",
+      runtime: "direct",
+      config: {},
+      cloned_from: "ec2-template",
+    });
+    const gc = await garbageCollectComputeIfTemplate(app, "ec2-clone");
+    expect(gc).toBe(true);
+    expect(await app.computes.get("ec2-clone")).toBeNull();
+  });
+
+  it("persistent row WITHOUT cloned_from is NOT GC'd", async () => {
+    // A user-provisioned EC2 box (no clone marker) should stick around
+    // across session boundaries -- that's the whole point of persistent
+    // infra. GC must leave it alone.
+    await app.computes.create({
+      name: "ec2-persistent",
+      compute: "ec2",
+      runtime: "direct",
+      config: {},
+    });
+    const gc = await garbageCollectComputeIfTemplate(app, "ec2-persistent");
+    expect(gc).toBe(false);
+    expect(await app.computes.get("ec2-persistent")).not.toBeNull();
+  });
 });

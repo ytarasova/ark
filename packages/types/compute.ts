@@ -1,4 +1,4 @@
-export type ComputeStatus = "stopped" | "running" | "provisioning" | "destroyed";
+export type ComputeStatus = "stopped" | "running" | "provisioning" | "destroyed" | "failed";
 export type ComputeProviderName = "local" | "docker" | "ec2" | "remote-arkd";
 
 /**
@@ -108,6 +108,18 @@ export interface Compute {
   runtime_kind: RuntimeKindName;
   status: ComputeStatus;
   config: ComputeConfig;
+  /**
+   * When true, this row is a reusable config blueprint -- the dispatcher
+   * clones it into a concrete per-session row rather than launching it
+   * directly. Template and concrete rows live in the same table,
+   * distinguished only by this flag.
+   */
+  is_template?: boolean;
+  /**
+   * When set, this row was cloned from the named template at dispatch time.
+   * GC treats rows with `cloned_from` as ephemeral regardless of lifecycle.
+   */
+  cloned_from?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -123,11 +135,19 @@ export interface CreateComputeOpts {
   config?: Partial<ComputeConfig>;
   /** Apply a named template's defaults before user config overrides. */
   template?: string;
+  /** Mark this row as a reusable config blueprint instead of a concrete target. */
+  is_template?: boolean;
+  /** Mark this row as cloned from the named template (set by the dispatcher). */
+  cloned_from?: string;
 }
 
 /**
  * A reusable compute configuration preset.
  * Stored in config.yaml (local) or DB (control plane).
+ *
+ * @deprecated Prefer `Compute` with `is_template: true`. The two types now
+ * back onto the same `compute` table; this interface is retained so callers
+ * that haven't migrated still compile.
  */
 export interface ComputeTemplate {
   /** Unique template name (e.g. "gpu-large", "sandbox", "quick"). */

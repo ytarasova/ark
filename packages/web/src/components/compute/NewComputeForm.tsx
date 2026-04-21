@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -6,7 +6,8 @@ import { useQuery } from "@tanstack/react-query";
 import { api } from "../../hooks/useApi.js";
 import { Button } from "../ui/button.js";
 import { Input } from "../ui/input.js";
-import { selectClassName } from "../ui/styles.js";
+import { cn } from "../../lib/utils.js";
+import { RichSelect } from "../ui/RichSelect.js";
 
 // Surface both compute + runtime axes. Static defaults render while the
 // server reply is in flight; the queries below overwrite with the live list.
@@ -53,6 +54,7 @@ type NewComputeFormValues = z.infer<typeof NewComputeFormSchema>;
 
 export interface NewComputePayload extends NewComputeFormValues {
   templateConfig: Record<string, unknown>;
+  is_template: boolean;
 }
 
 export function NewComputeForm({
@@ -108,7 +110,16 @@ export function NewComputeForm({
   });
 
   const compute = watch("compute");
+  const runtime = watch("runtime");
+  const size = watch("size");
   const selectedTemplate = watch("selectedTemplate");
+
+  // Lifecycle classification (mirror of packages/types/compute.ts).
+  // Template-lifecycle pairs can only exist as templates -- they have no
+  // persistent infrastructure, so a "concrete" row would be nonsense.
+  const TEMPLATE_COMPUTE_KINDS = new Set(["k8s", "k8s-kata", "firecracker"]);
+  const TEMPLATE_RUNTIME_KINDS = new Set(["docker", "compose", "devcontainer", "firecracker-in-container"]);
+  const isTemplateLifecycle = TEMPLATE_COMPUTE_KINDS.has(compute) || TEMPLATE_RUNTIME_KINDS.has(runtime);
 
   // Keep templateConfig in a ref-style state via watch / setValue -- we
   // stash the chosen template's config object and hand it over on submit.
@@ -122,30 +133,94 @@ export function NewComputeForm({
     setValue("runtime", pair.runtime, { shouldDirty: true });
   }, [selectedTemplate, templates, setValue]);
 
+  // Segmented control: the only real difference between a template and a
+  // concrete target is this flag. The rest of the form is identical.
+  const [kind, setKind] = useState<"compute" | "template">("compute");
+
+  // Auto-switch to template when the user picks a template-lifecycle pair.
+  // A concrete k8s / docker / firecracker row is meaningless -- those kinds
+  // have no infrastructure to provision in advance, so the DB row would
+  // never map to anything runnable.
+  useEffect(() => {
+    if (isTemplateLifecycle && kind === "compute") {
+      setKind("template");
+    }
+  }, [isTemplateLifecycle, kind]);
+
   const submit = handleSubmit((values) => {
     const tmpl = (templates as any[]).find((t) => t.name === values.selectedTemplate);
     const templateConfig: Record<string, unknown> = tmpl?.config ?? {};
-    onSubmit({ ...values, templateConfig });
+    onSubmit({ ...values, templateConfig, is_template: kind === "template" });
   });
 
   return (
     <div className="flex flex-col h-full p-5 overflow-y-auto">
-      <h2 className="text-base font-semibold text-foreground mb-5">New Compute Target</h2>
+      <h2 className="text-base font-semibold text-foreground mb-5">
+        {kind === "template" ? "New Compute Template" : "New Compute Target"}
+      </h2>
       <form onSubmit={submit} className="flex flex-col flex-1 min-h-0" noValidate>
-        {templates.length > 0 && (
+        <div className="mb-3.5">
+          <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
+            Kind
+          </label>
+          <div
+            role="tablist"
+            aria-label="Choose compute kind"
+            className="inline-flex rounded-md border border-border overflow-hidden"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={kind === "compute"}
+              onClick={() => setKind("compute")}
+              className={cn(
+                "px-3 py-1.5 text-[12px] transition-colors",
+                kind === "compute" ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/40",
+              )}
+            >
+              Compute target
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={kind === "template"}
+              onClick={() => setKind("template")}
+              className={cn(
+                "px-3 py-1.5 text-[12px] transition-colors border-l border-border",
+                kind === "template" ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/40",
+              )}
+            >
+              Template
+            </button>
+          </div>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            {kind === "compute"
+              ? "This compute is provisioned now and reused by sessions referencing it directly."
+              : "A reusable config blueprint. Sessions that reference this template get an isolated clone that's torn down when the session ends."}
+          </p>
+        </div>
+        {kind === "compute" && templates.length > 0 && (
           <div className="mb-3.5">
             <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
-              Template
+              Base template
             </label>
-            <select className={selectClassName} aria-label="Select compute template" {...register("selectedTemplate")}>
-              <option value="">(None)</option>
-              {(templates as any[]).map((t) => (
-                <option key={t.name} value={t.name}>
-                  {t.name}
-                  {t.description ? ` - ${t.description}` : ""} [{t.provider}]
-                </option>
-              ))}
-            </select>
+            <p className="mb-1.5 text-[11px] text-muted-foreground">
+              Optional. Pre-fill compute, runtime, and config from an existing template.
+            </p>
+            <RichSelect
+              value={selectedTemplate ?? ""}
+              onChange={(v) => setValue("selectedTemplate", v, { shouldDirty: true })}
+              placeholder="(None)"
+              options={[
+                { value: "", label: "(None)" },
+                ...(templates as any[]).map((t) => ({
+                  value: t.name,
+                  label: t.name,
+                  description: t.description,
+                  badge: t.provider,
+                })),
+              ]}
+            />
           </div>
         )}
         <div className="mb-3.5">
@@ -167,25 +242,21 @@ export function NewComputeForm({
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
             Compute
           </label>
-          <select className={selectClassName} aria-label="Select compute kind" {...register("compute")}>
-            {computeKinds.map((k) => (
-              <option key={k} value={k}>
-                {k}
-              </option>
-            ))}
-          </select>
+          <RichSelect
+            value={compute}
+            onChange={(v) => setValue("compute", v, { shouldDirty: true })}
+            options={computeKinds.map((k) => ({ value: k, label: k }))}
+          />
         </div>
         <div className="mb-3.5">
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
             Runtime
           </label>
-          <select className={selectClassName} aria-label="Select runtime kind" {...register("runtime")}>
-            {runtimeKinds.map((k) => (
-              <option key={k} value={k}>
-                {k}
-              </option>
-            ))}
-          </select>
+          <RichSelect
+            value={runtime}
+            onChange={(v) => setValue("runtime", v, { shouldDirty: true })}
+            options={runtimeKinds.map((k) => ({ value: k, label: k }))}
+          />
         </div>
         {compute === "ec2" && (
           <>
@@ -193,14 +264,19 @@ export function NewComputeForm({
               <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
                 Size
               </label>
-              <select className={selectClassName} aria-label="Select instance size" {...register("size")}>
-                <option value="">Default</option>
-                <option value="xs">XS (2 vCPU, 8 GB)</option>
-                <option value="s">S (4 vCPU, 16 GB)</option>
-                <option value="m">M (8 vCPU, 32 GB)</option>
-                <option value="l">L (16 vCPU, 64 GB)</option>
-                <option value="xl">XL (32 vCPU, 128 GB)</option>
-              </select>
+              <RichSelect
+                value={size ?? ""}
+                onChange={(v) => setValue("size", v, { shouldDirty: true })}
+                placeholder="Default"
+                options={[
+                  { value: "", label: "Default" },
+                  { value: "xs", label: "XS", description: "2 vCPU, 8 GB" },
+                  { value: "s", label: "S", description: "4 vCPU, 16 GB" },
+                  { value: "m", label: "M", description: "8 vCPU, 32 GB" },
+                  { value: "l", label: "L", description: "16 vCPU, 64 GB" },
+                  { value: "xl", label: "XL", description: "32 vCPU, 128 GB" },
+                ]}
+              />
             </div>
             <div className="mb-3.5">
               <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
@@ -232,8 +308,13 @@ export function NewComputeForm({
           <Button type="button" variant="outline" size="sm" onClick={onClose} aria-label="Cancel creating compute">
             Cancel
           </Button>
-          <Button type="submit" size="sm" aria-label="Create compute target" disabled={formState.isSubmitting}>
-            Create Compute
+          <Button
+            type="submit"
+            size="sm"
+            aria-label={kind === "template" ? "Create compute template" : "Create compute target"}
+            disabled={formState.isSubmitting}
+          >
+            {kind === "template" ? "Create Template" : "Create Compute"}
           </Button>
         </div>
       </form>

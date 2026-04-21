@@ -30,8 +30,19 @@ export async function garbageCollectComputeIfTemplate(
   const compute = await app.computes.get(computeName);
   if (!compute) return false;
 
+  // Unified-model extension: rows cloned from a template at dispatch time
+  // are ephemeral by construction. Collect regardless of the computed
+  // lifecycle -- every session gets its own clone and no other session
+  // should ever reference it by name.
+  const isClone = !!compute.cloned_from;
   const lifecycle = effectiveLifecycle(compute.compute_kind, compute.runtime_kind);
-  if (lifecycle !== "template") return false;
+  if (!isClone && lifecycle !== "template") return false;
+
+  // A template row (`is_template: true`) is a config blueprint, never a
+  // runtime target, so nothing live can legitimately reference it by
+  // compute_name. Don't GC templates via this path -- removal is an
+  // explicit user action.
+  if (compute.is_template) return false;
 
   // Bail if any live session still references this compute. We deliberately
   // count *all* non-terminal sessions, not just running ones, so a session
@@ -49,12 +60,26 @@ export async function garbageCollectComputeIfTemplate(
     return false;
   }
 
+  // Tear down real infrastructure before deleting the DB row. For clones
+  // (sessions-created or manual Provision-from-template) this is the only
+  // thing that actually releases the pod / container / microVM -- without
+  // it we'd leak infra in the cluster even though the row is gone. Missing
+  // providers (older local-only installs) are tolerated: the row deletion
+  // still proceeds.
+  try {
+    const { getProvider } = await import("../../compute/index.js");
+    const provider = getProvider(compute.provider);
+    if (provider) {
+      await provider.destroy(compute);
+    }
+  } catch (e: any) {
+    logDebug("compute-pool", `provider.destroy during gc for ${computeName} failed: ${e?.message ?? e}`);
+  }
+
   try {
     await app.computes.delete(computeName);
-    logInfo(
-      "compute-pool",
-      `gc'd template compute '${computeName}' (${compute.compute_kind}/${compute.runtime_kind}) -- no live sessions reference it`,
-    );
+    const reason = isClone ? `cloned from '${compute.cloned_from}'` : `${compute.compute_kind}/${compute.runtime_kind}`;
+    logInfo("compute-pool", `gc'd compute '${computeName}' (${reason}) -- no live sessions reference it`);
     return true;
   } catch (e: any) {
     logDebug("compute-pool", `gc failed for ${computeName}: ${e?.message ?? e}`);

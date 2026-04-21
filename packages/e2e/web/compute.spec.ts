@@ -108,12 +108,23 @@ test("create compute via New Compute inline form", async () => {
   await expect(nameInput).toBeVisible();
   await nameInput.fill("e2e-ui-compute");
 
-  // Select "docker" provider (local is a singleton and already exists)
-  const providerSelect = page.locator("select", { has: page.locator('option[value="docker"]') }).first();
-  await providerSelect.selectOption("docker");
+  // The form now uses RichSelect (Radix Popover) instead of native <select>.
+  // Open the Compute picker, pick "local". Leave runtime as the default
+  // "direct" -- local+direct is a persistent concrete target, which is the
+  // simplest path that won't hit the template-lifecycle guard.
+  await page
+    .locator('button[aria-label="Select compute kind"]')
+    .click()
+    .catch(async () => {
+      // Fallback: the RichSelect trigger may not have the aria-label in this
+      // theme -- click the button inside the labeled Compute section instead.
+      const computeSection = page.locator("text=Compute").first().locator("..");
+      await computeSection.locator("button").first().click();
+    });
+  await page.locator('div[role="option"], button:has-text("local")').first().click();
 
   // Submit
-  await page.click('button:has-text("Create Compute")');
+  await page.click('button:has-text("Create Compute"), button:has-text("Create Template")');
 
   // Wait for the compute target to appear (may need reload)
   await page.waitForTimeout(1_000);
@@ -124,4 +135,76 @@ test("create compute via New Compute inline form", async () => {
 
   // Cleanup: destroy via RPC
   await ws.rpc("compute/destroy", { name: "e2e-ui-compute" });
+});
+
+// -- Unified template + concrete model --------------------------------------
+
+test("compute/list returns is_template + cloned_from on every row", async () => {
+  const data = await ws.rpc("compute/list");
+  for (const t of data.targets) {
+    expect(t).toHaveProperty("is_template");
+    expect(t).toHaveProperty("cloned_from");
+  }
+});
+
+test("compute/list filters: include=template returns only templates", async () => {
+  // Create one template + one concrete and ensure the filter separates them.
+  await ws.rpc("compute/create", {
+    name: "e2e-filter-template",
+    provider: "docker",
+    is_template: true,
+    config: { image: "alpine" },
+  });
+  await ws.rpc("compute/create", {
+    name: "e2e-filter-concrete",
+    provider: "docker",
+    config: { image: "alpine" },
+  });
+
+  const templatesOnly = await ws.rpc("compute/list", { include: "template" });
+  const concreteOnly = await ws.rpc("compute/list", { include: "concrete" });
+
+  expect(templatesOnly.targets.some((t: any) => t.name === "e2e-filter-template")).toBe(true);
+  expect(templatesOnly.targets.some((t: any) => t.name === "e2e-filter-concrete")).toBe(false);
+  expect(concreteOnly.targets.some((t: any) => t.name === "e2e-filter-concrete")).toBe(true);
+  expect(concreteOnly.targets.some((t: any) => t.name === "e2e-filter-template")).toBe(false);
+
+  // Every row returned by include=template has is_template=true
+  for (const t of templatesOnly.targets) expect(t.is_template).toBe(true);
+  for (const t of concreteOnly.targets) expect(!!t.is_template).toBe(false);
+
+  // Cleanup
+  await ws.rpc("compute/destroy", { name: "e2e-filter-template" });
+  await ws.rpc("compute/destroy", { name: "e2e-filter-concrete" });
+});
+
+test("provision on a template clones into a concrete row", async () => {
+  // Create a docker template (docker doesn't need a live k8s cluster, so
+  // this can run in isolation without cluster access).
+  await ws.rpc("compute/create", {
+    name: "e2e-prov-template",
+    provider: "docker",
+    is_template: true,
+    config: { image: "alpine" },
+  });
+
+  // Provision it -- server should clone + mark the clone running (or at
+  // least return the clone's name).
+  const res = await ws.rpc("compute/provision", { name: "e2e-prov-template" });
+  expect(res.ok).toBe(true);
+  expect(res.name).toBeTruthy();
+  expect(res.name).not.toBe("e2e-prov-template");
+  expect(res.cloned_from).toBe("e2e-prov-template");
+
+  // The clone should be visible in the concrete list with cloned_from set.
+  const concrete = await ws.rpc("compute/list", { include: "concrete" });
+  const clone = concrete.targets.find((t: any) => t.name === res.name);
+  expect(clone).toBeTruthy();
+  expect(clone.is_template).toBeFalsy();
+  expect(clone.cloned_from).toBe("e2e-prov-template");
+
+  // Cleanup clone + template. `compute/destroy` on a running concrete row
+  // cascades infra teardown + DB row removal.
+  await ws.rpc("compute/destroy", { name: res.name }).catch(() => {});
+  await ws.rpc("compute/destroy", { name: "e2e-prov-template" });
 });

@@ -17,7 +17,7 @@ export function ComputeDetailPanel({
   metricHistory,
   sessions,
   onAction,
-  actionMsg,
+  pendingAction,
   metricsState,
   onRetryMetrics,
   onNavigateToSession,
@@ -27,7 +27,7 @@ export function ComputeDetailPanel({
   metricHistory: MetricHistoryPoint[];
   sessions: any[];
   onAction: (action: string) => void;
-  actionMsg: { text: string; type: string } | null;
+  pendingAction?: string | null;
   metricsState: "loading" | "loaded" | "error";
   onRetryMetrics: () => void;
   onNavigateToSession?: (sessionId: string) => void;
@@ -44,6 +44,8 @@ export function ComputeDetailPanel({
       (!s.compute_name && (compute.provider === "local" || compute.type === "local")),
   );
 
+  const isTemplate = !!compute.is_template;
+
   return (
     <div className="p-5 overflow-y-auto h-full">
       {/* Header */}
@@ -52,32 +54,35 @@ export function ComputeDetailPanel({
         <Badge variant="secondary" className="text-[10px]">
           {compute.provider || compute.type || "local"}
         </Badge>
-        <span className="flex items-center gap-1.5 text-[12px]">
-          <span className={cn("inline-block w-2 h-2 rounded-full", statusDotColor(compute.status || "unknown"))} />
-          <span className="text-muted-foreground">{compute.status || "unknown"}</span>
-        </span>
+        {isTemplate ? (
+          <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
+            Template
+          </Badge>
+        ) : (
+          <span className="flex items-center gap-1.5 text-[12px]">
+            <span className={cn("inline-block w-2 h-2 rounded-full", statusDotColor(compute.status || "unknown"))} />
+            <span className="text-muted-foreground">{compute.status || "unknown"}</span>
+          </span>
+        )}
       </div>
 
       {/* Actions - hide for local provider */}
       {compute.provider !== "local" && (
         <div className="mb-5">
-          <ComputeActions compute={compute} onAction={onAction} />
-          {actionMsg && (
-            <div
-              className={cn(
-                "mt-1.5 text-xs",
-                actionMsg.type === "error" ? "text-[var(--failed)]" : "text-[var(--running)]",
-              )}
-            >
-              {actionMsg.text}
-            </div>
+          <ComputeActions compute={compute} onAction={onAction} pendingAction={pendingAction} />
+          {isTemplate && (
+            <p className="mt-3 text-[12px] text-muted-foreground leading-relaxed">
+              A reusable config blueprint. Sessions referencing this template auto-provision an isolated clone that's
+              torn down on cleanup. You can also Provision a clone manually -- it will bring up a real instance you can
+              attach to.
+            </p>
           )}
         </div>
       )}
 
-      {/* System Metrics Cards */}
-      {metricsState === "loading" && !m && <MetricsSkeleton />}
-      {metricsState === "error" && !m && (
+      {/* System Metrics Cards -- skip for templates (they have no runtime). */}
+      {!isTemplate && metricsState === "loading" && !m && <MetricsSkeleton />}
+      {!isTemplate && metricsState === "error" && !m && (
         <div className="rounded-lg border border-border bg-secondary/30 p-4 mb-5 text-[13px] text-muted-foreground flex items-center gap-2">
           <Activity size={14} className="opacity-50" />
           <span>Could not reach arkd</span>
@@ -91,7 +96,7 @@ export function ComputeDetailPanel({
           </button>
         </div>
       )}
-      {m && (
+      {!isTemplate && m && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
           <Card>
             <CardHeader className="pb-1 pt-3 px-3">

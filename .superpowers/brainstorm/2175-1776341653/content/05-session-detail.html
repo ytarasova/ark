@@ -1,0 +1,183 @@
+<h2>Session Detail Layout</h2>
+<p class="subtitle">This is the primary workspace -- where you monitor and interact with a running agent. How should it be organized?</p>
+
+<div class="cards" style="display:flex; flex-direction:column; gap:24px;">
+
+  <!-- Option A: Tabbed Panels -->
+  <div class="card" data-choice="tabbed-panels" onclick="toggleSelect(this)" style="border-radius:12px; overflow:hidden; border:1px solid rgba(124,106,239,0.2);">
+    <div class="card-image" style="background:#0C0C14; padding:16px;">
+      <div style="display:flex; gap:0; height:280px; border-radius:8px; overflow:hidden; border:1px solid #252540;">
+        <!-- Left: Session list (from master-detail) -->
+        <div style="width:180px; background:#0F0F18; border-right:1px solid #252540; padding:8px; flex-shrink:0;">
+          <div style="padding:4px 8px; margin-bottom:6px;">
+            <div style="background:#14141E; border:1px solid #252540; border-radius:5px; padding:4px 8px; font-size:9px; color:#7878A0;">Search...</div>
+          </div>
+          <div style="padding:5px 8px; background:#1E1E30; border-radius:5px; margin-bottom:2px; display:flex; align-items:center; gap:5px; border-left:2px solid #7C6AEF;">
+            <div style="width:5px; height:5px; border-radius:50%; background:#34D399; box-shadow:0 0 3px rgba(52,211,153,0.4);"></div>
+            <span style="font-size:10px; color:#E4E4ED; font-family:monospace;">s-a1b2</span>
+          </div>
+          <div style="padding:5px 8px; border-radius:5px; margin-bottom:2px; display:flex; align-items:center; gap:5px;">
+            <div style="width:5px; height:5px; border-radius:50%; background:#FBBF24;"></div>
+            <span style="font-size:10px; color:#7878A0; font-family:monospace;">s-c3d4</span>
+          </div>
+          <div style="padding:5px 8px; border-radius:5px; margin-bottom:2px; display:flex; align-items:center; gap:5px;">
+            <div style="width:5px; height:5px; border-radius:50%; background:#60A5FA;"></div>
+            <span style="font-size:10px; color:#7878A0; font-family:monospace;">s-e5f6</span>
+          </div>
+        </div>
+
+        <!-- Right: Detail area -->
+        <div style="flex:1; background:#0C0C14; display:flex; flex-direction:column;">
+          <!-- Session header bar -->
+          <div style="padding:8px 12px; border-bottom:1px solid #252540; display:flex; align-items:center; gap:8px; flex-shrink:0;">
+            <div style="width:7px; height:7px; border-radius:50%; background:#34D399; box-shadow:0 0 5px rgba(52,211,153,0.4);"></div>
+            <span style="font-size:12px; color:#E4E4ED; font-weight:600; font-family:monospace;">s-a1b2</span>
+            <span style="font-size:10px; color:#7878A0;">Add auth middleware</span>
+            <!-- Mini pipeline inline -->
+            <div style="display:flex; gap:3px; margin-left:8px;">
+              <div style="padding:2px 5px; background:#34D399; color:#0C0C14; border-radius:3px; font-size:8px; font-weight:600;">plan</div>
+              <div style="width:8px; height:1px; background:#252540; align-self:center;"></div>
+              <div style="padding:2px 5px; background:#7C6AEF; color:white; border-radius:3px; font-size:8px; font-weight:600;">implement</div>
+              <div style="width:8px; height:1px; background:#252540; align-self:center;"></div>
+              <div style="padding:2px 5px; background:#1E1E30; color:#7878A0; border-radius:3px; font-size:8px;">verify</div>
+              <div style="width:8px; height:1px; background:#252540; align-self:center;"></div>
+              <div style="padding:2px 5px; background:#1E1E30; color:#7878A0; border-radius:3px; font-size:8px;">review</div>
+            </div>
+            <div style="margin-left:auto; display:flex; gap:4px; align-items:center;">
+              <span style="font-size:10px; color:#7C6AEF;">$0.82</span>
+              <div style="padding:2px 6px; background:rgba(251,191,36,0.1); border:1px solid rgba(251,191,36,0.2); border-radius:3px; font-size:9px; color:#FBBF24;">Stop</div>
+            </div>
+          </div>
+
+          <!-- Tabs -->
+          <div style="display:flex; gap:0; border-bottom:1px solid #252540; flex-shrink:0;">
+            <div style="padding:6px 14px; font-size:11px; color:#7C6AEF; border-bottom:2px solid #7C6AEF; font-weight:500;">Conversation</div>
+            <div style="padding:6px 14px; font-size:11px; color:#7878A0;">Terminal</div>
+            <div style="padding:6px 14px; font-size:11px; color:#7878A0;">Events <span style="font-size:9px; opacity:0.5;">24</span></div>
+            <div style="padding:6px 14px; font-size:11px; color:#7878A0;">Diff</div>
+            <div style="padding:6px 14px; font-size:11px; color:#7878A0;">Todos</div>
+          </div>
+
+          <!-- Tab content: Conversation -->
+          <div style="flex:1; padding:10px 12px; overflow:hidden; display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; gap:8px;">
+              <div style="width:20px; height:20px; border-radius:50%; background:linear-gradient(135deg,#7C6AEF,#06B6D4); flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:8px; color:white; font-weight:600;">A</div>
+              <div style="background:#14141E; border:1px solid #252540; border-radius:8px; padding:8px 10px; font-size:10px; color:#E4E4ED; line-height:1.5; flex:1;">
+                Analyzing the codebase structure. Found 3 files that need auth middleware:<br>
+                <span style="color:#06B6D4; font-family:monospace; font-size:9px;">packages/server/routes/api.ts</span><br>
+                <span style="color:#06B6D4; font-family:monospace; font-size:9px;">packages/server/routes/sessions.ts</span>
+              </div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <div style="width:20px; height:20px; border-radius:4px; background:#1E1E30; flex-shrink:0; display:flex; align-items:center; justify-content:center;">
+                <div style="width:10px; height:10px; border:1.5px solid #06B6D4; border-radius:2px;"></div>
+              </div>
+              <div style="background:rgba(6,182,212,0.05); border:1px solid rgba(6,182,212,0.15); border-radius:8px; padding:6px 10px; font-size:10px; color:#7878A0; flex:1;">
+                <div style="display:flex; align-items:center; gap:4px; margin-bottom:2px;">
+                  <span style="color:#06B6D4; font-size:9px; font-weight:500;">Tool: Edit</span>
+                  <span style="font-size:9px; opacity:0.5;">packages/server/routes/api.ts</span>
+                  <span style="font-size:9px; color:#34D399; margin-left:auto;">done</span>
+                </div>
+              </div>
+            </div>
+            <!-- Chat input at bottom -->
+            <div style="margin-top:auto; display:flex; gap:6px;">
+              <div style="flex:1; background:#14141E; border:1px solid #252540; border-radius:6px; padding:6px 10px; font-size:10px; color:#7878A0;">Send message to agent...</div>
+              <div style="padding:4px 8px; background:#7C6AEF; border-radius:5px; font-size:10px; color:white;">Send</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body" style="background:#14141E; padding:16px; border-top:1px solid #252540;">
+      <h3 style="color:#E4E4ED; margin:0 0 4px;">A. Tabbed Panels (Recommended)</h3>
+      <p style="color:#7878A0; font-size:13px; margin:0; line-height:1.5;">Conversation, Terminal, Events, Diff, Todos as tabs. One panel visible at a time -- full height. DAG pipeline inline in the header bar. Chat input pinned at bottom of Conversation tab. Clean, focused, like Cursor's agent view. Keyboard shortcuts to switch tabs (1-5).</p>
+    </div>
+  </div>
+
+  <!-- Option B: Split Panes -->
+  <div class="card" data-choice="split-panes" onclick="toggleSelect(this)" style="border-radius:12px; overflow:hidden; border:1px solid rgba(124,106,239,0.2);">
+    <div class="card-image" style="background:#0C0C14; padding:16px;">
+      <div style="display:flex; gap:0; height:280px; border-radius:8px; overflow:hidden; border:1px solid #252540;">
+        <!-- Left: Session list -->
+        <div style="width:160px; background:#0F0F18; border-right:1px solid #252540; padding:8px; flex-shrink:0;">
+          <div style="padding:4px 8px; margin-bottom:6px;">
+            <div style="background:#14141E; border:1px solid #252540; border-radius:5px; padding:4px 8px; font-size:9px; color:#7878A0;">Search...</div>
+          </div>
+          <div style="padding:5px 8px; background:#1E1E30; border-radius:5px; margin-bottom:2px; display:flex; align-items:center; gap:5px; border-left:2px solid #7C6AEF;">
+            <div style="width:5px; height:5px; border-radius:50%; background:#34D399;"></div>
+            <span style="font-size:10px; color:#E4E4ED; font-family:monospace;">s-a1b2</span>
+          </div>
+          <div style="padding:5px 8px; border-radius:5px; margin-bottom:2px; display:flex; align-items:center; gap:5px;">
+            <div style="width:5px; height:5px; border-radius:50%; background:#FBBF24;"></div>
+            <span style="font-size:10px; color:#7878A0; font-family:monospace;">s-c3d4</span>
+          </div>
+        </div>
+
+        <!-- Middle: Conversation (always visible) -->
+        <div style="flex:1; background:#0C0C14; display:flex; flex-direction:column; border-right:1px solid #252540;">
+          <div style="padding:6px 10px; border-bottom:1px solid #252540; display:flex; align-items:center; gap:6px; flex-shrink:0;">
+            <div style="width:6px; height:6px; border-radius:50%; background:#34D399;"></div>
+            <span style="font-size:11px; color:#E4E4ED; font-weight:600; font-family:monospace;">s-a1b2</span>
+            <span style="font-size:10px; color:#7C6AEF; margin-left:auto;">$0.82</span>
+          </div>
+          <!-- Mini pipeline -->
+          <div style="padding:4px 10px; border-bottom:1px solid #252540; display:flex; gap:3px;">
+            <div style="padding:1px 4px; background:#34D399; color:#0C0C14; border-radius:2px; font-size:7px; font-weight:600;">plan</div>
+            <div style="width:6px; height:1px; background:#252540; align-self:center;"></div>
+            <div style="padding:1px 4px; background:#7C6AEF; color:white; border-radius:2px; font-size:7px; font-weight:600;">impl</div>
+            <div style="width:6px; height:1px; background:#252540; align-self:center;"></div>
+            <div style="padding:1px 4px; background:#1E1E30; color:#7878A0; border-radius:2px; font-size:7px;">verify</div>
+          </div>
+          <div style="flex:1; padding:8px; overflow:hidden;">
+            <div style="display:flex; gap:6px; margin-bottom:6px;">
+              <div style="width:16px; height:16px; border-radius:50%; background:linear-gradient(135deg,#7C6AEF,#06B6D4); flex-shrink:0; margin-top:2px;"></div>
+              <div style="background:#14141E; border:1px solid #252540; border-radius:6px; padding:6px 8px; font-size:9px; color:#E4E4ED; line-height:1.4;">
+                Found 3 files to modify...
+              </div>
+            </div>
+            <div style="display:flex; gap:6px;">
+              <div style="width:16px; height:16px; border-radius:3px; background:#1E1E30; flex-shrink:0; margin-top:2px;"></div>
+              <div style="background:rgba(6,182,212,0.05); border:1px solid rgba(6,182,212,0.12); border-radius:6px; padding:4px 8px; font-size:9px; color:#7878A0;">
+                <span style="color:#06B6D4;">Edit</span> api.ts <span style="color:#34D399;">done</span>
+              </div>
+            </div>
+          </div>
+          <div style="padding:6px 8px; border-top:1px solid #252540;">
+            <div style="background:#14141E; border:1px solid #252540; border-radius:5px; padding:4px 8px; font-size:9px; color:#7878A0;">Message agent...</div>
+          </div>
+        </div>
+
+        <!-- Right: Secondary panel (Terminal/Events/Diff) -->
+        <div style="width:200px; background:#0C0C14; display:flex; flex-direction:column; flex-shrink:0;">
+          <div style="display:flex; gap:0; border-bottom:1px solid #252540; flex-shrink:0;">
+            <div style="padding:4px 8px; font-size:9px; color:#7C6AEF; border-bottom:1px solid #7C6AEF;">Terminal</div>
+            <div style="padding:4px 8px; font-size:9px; color:#7878A0;">Events</div>
+            <div style="padding:4px 8px; font-size:9px; color:#7878A0;">Diff</div>
+          </div>
+          <div style="flex:1; padding:8px; font-family:monospace; font-size:8px; color:#7878A0; line-height:1.6; background:#08080E;">
+            <span style="color:#34D399;">$</span> bun test routes.test.ts<br>
+            <span style="color:#E4E4ED;">PASS</span> auth middleware<br>
+            <span style="color:#E4E4ED;">PASS</span> session routes<br>
+            <span style="color:#34D399;">3 passed</span>, 0 failed
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body" style="background:#14141E; padding:16px; border-top:1px solid #252540;">
+      <h3 style="color:#E4E4ED; margin:0 0 4px;">B. Split Panes (Conversation + Side Panel)</h3>
+      <p style="color:#7878A0; font-size:13px; margin:0; line-height:1.5;">Conversation always visible on the left. Terminal/Events/Diff in a tabbed side panel on the right. Like VS Code's editor + panel. See the agent's thinking AND its output simultaneously. Side panel is resizable and collapsible. More information density but splits horizontal space.</p>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:20px; padding:16px; background:rgba(124,106,239,0.06); border:1px solid rgba(124,106,239,0.15); border-radius:8px;">
+  <h3 style="margin:0 0 8px; font-size:14px;">Key decisions baked in</h3>
+  <ul style="font-size:12px; color:#7878A0; margin:0; padding-left:16px; line-height:1.7;">
+    <li>DAG pipeline always visible in the session header (not a separate tab)</li>
+    <li>Chat input pinned at bottom of conversation area</li>
+    <li>Tool calls rendered as collapsible blocks (like Cursor 3)</li>
+    <li>Session list on the left (from the icon-rail master-detail layout)</li>
+  </ul>
+</div>

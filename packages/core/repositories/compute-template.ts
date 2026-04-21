@@ -1,95 +1,107 @@
+/**
+ * ComputeTemplateRepository -- thin adapter over ComputeRepository.
+ *
+ * Templates and concrete compute targets now share the same `compute` table,
+ * distinguished only by the `is_template` flag. This adapter preserves the
+ * legacy shape (`app.computeTemplates.*`, `compute-template/*` RPC handlers,
+ * `ark compute template *` CLI subcommands) so callers don't have to change
+ * while we collapse the surfaces upstream.
+ *
+ * Methods delegate to ComputeRepository. The adapter accepts the legacy
+ * `ComputeTemplate` shape and translates to/from the unified `Compute` row.
+ */
+
 import type { IDatabase } from "../database/index.js";
-import type { ComputeTemplate, ComputeProviderName, ComputeConfig } from "../../types/index.js";
-import { now } from "../util/time.js";
+import type {
+  ComputeTemplate,
+  ComputeProviderName,
+  ComputeConfig,
+  ComputeKindName,
+  RuntimeKindName,
+} from "../../types/index.js";
+import { providerToPair } from "../../compute/adapters/provider-map.js";
+import { ComputeRepository } from "./compute.js";
 
-interface TemplateRow {
+function computeToTemplate(c: {
   name: string;
-  description: string | null;
-  provider: string;
-  config: string;
-  tenant_id: string;
-  created_at: string;
-  updated_at: string;
-}
-
-function rowToTemplate(row: TemplateRow): ComputeTemplate {
+  provider: ComputeProviderName;
+  config: ComputeConfig;
+  description?: string | null;
+}): ComputeTemplate {
   return {
-    name: row.name,
-    description: row.description ?? undefined,
-    provider: row.provider as ComputeProviderName,
-    config: JSON.parse(row.config || "{}") as Partial<ComputeConfig>,
-    tenant_id: row.tenant_id,
+    name: c.name,
+    description: (c as { description?: string | null }).description ?? undefined,
+    provider: c.provider,
+    config: c.config as Partial<ComputeConfig>,
   };
 }
 
 export class ComputeTemplateRepository {
-  private tenantId: string = "default";
+  private inner: ComputeRepository;
 
-  constructor(private db: IDatabase) {}
+  constructor(db: IDatabase) {
+    this.inner = new ComputeRepository(db);
+  }
 
   setTenant(id: string): void {
-    this.tenantId = id;
+    this.inner.setTenant(id);
   }
 
   async list(): Promise<ComputeTemplate[]> {
-    const rows = (await this.db
-      .prepare("SELECT * FROM compute_templates WHERE tenant_id = ? ORDER BY name")
-      .all(this.tenantId)) as TemplateRow[];
-    return rows.map(rowToTemplate);
+    const rows = await this.inner.listTemplates();
+    return rows.map((r) => computeToTemplate(r));
   }
 
   async get(name: string): Promise<ComputeTemplate | null> {
-    const row = (await this.db
-      .prepare("SELECT * FROM compute_templates WHERE name = ? AND tenant_id = ?")
-      .get(name, this.tenantId)) as TemplateRow | undefined;
-    return row ? rowToTemplate(row) : null;
+    const row = await this.inner.get(name);
+    if (!row) return null;
+    return computeToTemplate(row);
   }
 
   async create(template: ComputeTemplate): Promise<void> {
-    const ts = now();
-    await this.db
-      .prepare(
-        "INSERT INTO compute_templates (name, description, provider, config, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      )
-      .run(
-        template.name,
-        template.description ?? null,
-        template.provider,
-        JSON.stringify(template.config),
-        this.tenantId,
-        ts,
-        ts,
-      );
+    // Tolerate older callers that JSON.stringify'd the config before
+    // handing it to us (the previous repository wrote a string column).
+    const cfg =
+      typeof (template as { config?: unknown }).config === "string"
+        ? safeParse((template as unknown as { config: string }).config)
+        : ((template.config ?? {}) as Partial<ComputeConfig>);
+
+    const provider = (template.provider ?? "local") as ComputeProviderName;
+    const pair = providerToPair(provider);
+
+    await this.inner.create({
+      name: template.name,
+      provider,
+      compute: pair.compute as ComputeKindName,
+      runtime: pair.runtime as RuntimeKindName,
+      config: cfg,
+      is_template: true,
+    });
   }
 
   async update(
     name: string,
     fields: Partial<Pick<ComputeTemplate, "description" | "provider" | "config">>,
   ): Promise<void> {
-    const sets: string[] = [];
-    const params: any[] = [];
-    if (fields.description !== undefined) {
-      sets.push("description = ?");
-      params.push(fields.description);
-    }
-    if (fields.provider !== undefined) {
-      sets.push("provider = ?");
-      params.push(fields.provider);
-    }
-    if (fields.config !== undefined) {
-      sets.push("config = ?");
-      params.push(JSON.stringify(fields.config));
-    }
-    if (sets.length === 0) return;
-    sets.push("updated_at = ?");
-    params.push(now());
-    params.push(name, this.tenantId);
-    await this.db
-      .prepare(`UPDATE compute_templates SET ${sets.join(", ")} WHERE name = ? AND tenant_id = ?`)
-      .run(...params);
+    const patch: Record<string, unknown> = {};
+    if (fields.provider !== undefined) patch.provider = fields.provider;
+    if (fields.config !== undefined) patch.config = fields.config;
+    // `description` has no column in the unified compute table -- we drop
+    // it on the floor for now. Callers that need it should switch to the
+    // unified `compute/*` RPC family (which also lacks a description today).
+    if (Object.keys(patch).length === 0) return;
+    await this.inner.update(name, patch);
   }
 
   async delete(name: string): Promise<void> {
-    await this.db.prepare("DELETE FROM compute_templates WHERE name = ? AND tenant_id = ?").run(name, this.tenantId);
+    await this.inner.delete(name);
+  }
+}
+
+function safeParse(s: string): Partial<ComputeConfig> {
+  try {
+    return JSON.parse(s) as Partial<ComputeConfig>;
+  } catch {
+    return {};
   }
 }

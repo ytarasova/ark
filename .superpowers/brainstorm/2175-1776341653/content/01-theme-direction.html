@@ -1,0 +1,217 @@
+<h2>Theme Direction</h2>
+<p class="subtitle">Which visual identity feels right for Ark's agent command center? Click to select.</p>
+
+<div class="cards" style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;">
+
+  <!-- Theme A: Midnight Circuit -->
+  <div class="card" data-choice="midnight-circuit" onclick="toggleSelect(this)" style="border-radius:12px; overflow:hidden; border:1px solid #252540;">
+    <div class="card-image" style="background:#0C0C14; padding:20px; min-height:260px; position:relative;">
+      <!-- Simulated UI -->
+      <div style="display:flex; gap:12px; height:220px;">
+        <!-- Sidebar -->
+        <div style="width:48px; background:#0A0A12; border-radius:8px; padding:8px 0; display:flex; flex-direction:column; align-items:center; gap:10px;">
+          <div style="width:28px; height:28px; border-radius:6px; background:linear-gradient(135deg, #7C6AEF, #06B6D4); opacity:0.9;"></div>
+          <div style="width:24px; height:24px; border-radius:5px; background:#1E1E30;"></div>
+          <div style="width:24px; height:24px; border-radius:5px; background:#7C6AEF; opacity:0.3;"></div>
+          <div style="width:24px; height:24px; border-radius:5px; background:#1E1E30;"></div>
+          <div style="width:24px; height:24px; border-radius:5px; background:#1E1E30;"></div>
+        </div>
+        <!-- Main -->
+        <div style="flex:1; display:flex; flex-direction:column; gap:10px;">
+          <!-- KPI row -->
+          <div style="display:flex; gap:8px;">
+            <div style="flex:1; background:#14141E; border:1px solid #252540; border-radius:8px; padding:8px 10px;">
+              <div style="font-size:9px; color:#7878A0; text-transform:uppercase; letter-spacing:0.5px;">Active</div>
+              <div style="font-size:18px; color:#34D399; font-weight:600; margin-top:2px;">7</div>
+            </div>
+            <div style="flex:1; background:#14141E; border:1px solid #252540; border-radius:8px; padding:8px 10px;">
+              <div style="font-size:9px; color:#7878A0; text-transform:uppercase; letter-spacing:0.5px;">Cost</div>
+              <div style="font-size:18px; color:#E4E4ED; font-weight:600; margin-top:2px;">$4.20</div>
+            </div>
+            <div style="flex:1; background:#14141E; border:1px solid #252540; border-radius:8px; padding:8px 10px;">
+              <div style="font-size:9px; color:#7878A0; text-transform:uppercase; letter-spacing:0.5px;">Success</div>
+              <div style="font-size:18px; color:#7C6AEF; font-weight:600; margin-top:2px;">94%</div>
+            </div>
+          </div>
+          <!-- Session list -->
+          <div style="flex:1; background:#14141E; border:1px solid #252540; border-radius:8px; padding:10px; overflow:hidden;">
+            <div style="display:flex; align-items:center; gap:6px; padding:6px 0; border-bottom:1px solid #252540;">
+              <div style="width:7px; height:7px; border-radius:50%; background:#34D399; box-shadow:0 0 6px rgba(52,211,153,0.5);"></div>
+              <span style="font-size:11px; color:#E4E4ED; font-family:monospace;">s-a1b2</span>
+              <span style="font-size:10px; color:#7878A0; margin-left:auto;">implementer</span>
+              <span style="font-size:10px; color:#7C6AEF;">$0.82</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; padding:6px 0; border-bottom:1px solid #252540;">
+              <div style="width:7px; height:7px; border-radius:50%; background:#FBBF24;"></div>
+              <span style="font-size:11px; color:#E4E4ED; font-family:monospace;">s-c3d4</span>
+              <span style="font-size:10px; color:#7878A0; margin-left:auto;">reviewer</span>
+              <span style="font-size:10px; color:#7C6AEF;">$0.34</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; padding:6px 0;">
+              <div style="width:7px; height:7px; border-radius:50%; background:#60A5FA;"></div>
+              <span style="font-size:11px; color:#E4E4ED; font-family:monospace;">s-e5f6</span>
+              <span style="font-size:10px; color:#7878A0; margin-left:auto;">planner</span>
+              <span style="font-size:10px; color:#7C6AEF;">$1.05</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body" style="background:#14141E; padding:16px; border-top:1px solid #252540;">
+      <h3 style="color:#E4E4ED; margin:0 0 6px;">A. Midnight Circuit</h3>
+      <p style="color:#7878A0; font-size:13px; margin:0; line-height:1.4;">Deep blue-black. Purple-cyan accents. Neural network aesthetic. Premium, technical, AI-native.</p>
+      <div style="display:flex; gap:6px; margin-top:10px;">
+        <div style="width:20px; height:20px; border-radius:4px; background:#0C0C14; border:1px solid #252540;" title="#0C0C14"></div>
+        <div style="width:20px; height:20px; border-radius:4px; background:#14141E; border:1px solid #252540;" title="#14141E"></div>
+        <div style="width:20px; height:20px; border-radius:4px; background:#7C6AEF;" title="#7C6AEF"></div>
+        <div style="width:20px; height:20px; border-radius:4px; background:#06B6D4;" title="#06B6D4"></div>
+        <div style="width:20px; height:20px; border-radius:4px; background:#252540; border:1px solid #3a3a55;" title="#252540"></div>
+        <div style="width:20px; height:20px; border-radius:4px; background:#E4E4ED;" title="#E4E4ED"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Theme B: Arctic Slate -->
+  <div class="card" data-choice="arctic-slate" onclick="toggleSelect(this)" style="border-radius:12px; overflow:hidden; border:1px solid #1F2937;">
+    <div class="card-image" style="background:#0F1117; padding:20px; min-height:260px; position:relative;">
+      <!-- Simulated UI -->
+      <div style="display:flex; gap:12px; height:220px;">
+        <!-- Sidebar -->
+        <div style="width:48px; background:#0B0D13; border-radius:8px; padding:8px 0; display:flex; flex-direction:column; align-items:center; gap:10px;">
+          <div style="width:28px; height:28px; border-radius:6px; background:#3B82F6; opacity:0.9;"></div>
+          <div style="width:24px; height:24px; border-radius:5px; background:#1A1D28;"></div>
+          <div style="width:24px; height:24px; border-radius:5px; background:#3B82F6; opacity:0.3;"></div>
+          <div style="width:24px; height:24px; border-radius:5px; background:#1A1D28;"></div>
+          <div style="width:24px; height:24px; border-radius:5px; background:#1A1D28;"></div>
+        </div>
+        <!-- Main -->
+        <div style="flex:1; display:flex; flex-direction:column; gap:10px;">
+          <!-- KPI row -->
+          <div style="display:flex; gap:8px;">
+            <div style="flex:1; background:#161922; border:1px solid #1F2937; border-radius:8px; padding:8px 10px;">
+              <div style="font-size:9px; color:#6B7280; text-transform:uppercase; letter-spacing:0.5px;">Active</div>
+              <div style="font-size:18px; color:#34D399; font-weight:600; margin-top:2px;">7</div>
+            </div>
+            <div style="flex:1; background:#161922; border:1px solid #1F2937; border-radius:8px; padding:8px 10px;">
+              <div style="font-size:9px; color:#6B7280; text-transform:uppercase; letter-spacing:0.5px;">Cost</div>
+              <div style="font-size:18px; color:#E5E7EB; font-weight:600; margin-top:2px;">$4.20</div>
+            </div>
+            <div style="flex:1; background:#161922; border:1px solid #1F2937; border-radius:8px; padding:8px 10px;">
+              <div style="font-size:9px; color:#6B7280; text-transform:uppercase; letter-spacing:0.5px;">Success</div>
+              <div style="font-size:18px; color:#3B82F6; font-weight:600; margin-top:2px;">94%</div>
+            </div>
+          </div>
+          <!-- Session list -->
+          <div style="flex:1; background:#161922; border:1px solid #1F2937; border-radius:8px; padding:10px; overflow:hidden;">
+            <div style="display:flex; align-items:center; gap:6px; padding:6px 0; border-bottom:1px solid #1F2937;">
+              <div style="width:7px; height:7px; border-radius:50%; background:#34D399; box-shadow:0 0 6px rgba(52,211,153,0.5);"></div>
+              <span style="font-size:11px; color:#E5E7EB; font-family:monospace;">s-a1b2</span>
+              <span style="font-size:10px; color:#6B7280; margin-left:auto;">implementer</span>
+              <span style="font-size:10px; color:#3B82F6;">$0.82</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; padding:6px 0; border-bottom:1px solid #1F2937;">
+              <div style="width:7px; height:7px; border-radius:50%; background:#FBBF24;"></div>
+              <span style="font-size:11px; color:#E5E7EB; font-family:monospace;">s-c3d4</span>
+              <span style="font-size:10px; color:#6B7280; margin-left:auto;">reviewer</span>
+              <span style="font-size:10px; color:#3B82F6;">$0.34</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; padding:6px 0;">
+              <div style="width:7px; height:7px; border-radius:50%; background:#60A5FA;"></div>
+              <span style="font-size:11px; color:#E5E7EB; font-family:monospace;">s-e5f6</span>
+              <span style="font-size:10px; color:#6B7280; margin-left:auto;">planner</span>
+              <span style="font-size:10px; color:#3B82F6;">$1.05</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body" style="background:#161922; padding:16px; border-top:1px solid #1F2937;">
+      <h3 style="color:#E5E7EB; margin:0 0 6px;">B. Arctic Slate</h3>
+      <p style="color:#6B7280; font-size:13px; margin:0; line-height:1.4;">Cool neutral gray-blue. Electric blue accent. GitHub/Vercel feel. Clean, infrastructure-grade, trustworthy.</p>
+      <div style="display:flex; gap:6px; margin-top:10px;">
+        <div style="width:20px; height:20px; border-radius:4px; background:#0F1117; border:1px solid #1F2937;" title="#0F1117"></div>
+        <div style="width:20px; height:20px; border-radius:4px; background:#161922; border:1px solid #1F2937;" title="#161922"></div>
+        <div style="width:20px; height:20px; border-radius:4px; background:#3B82F6;" title="#3B82F6"></div>
+        <div style="width:20px; height:20px; border-radius:4px; background:#60A5FA;" title="#60A5FA"></div>
+        <div style="width:20px; height:20px; border-radius:4px; background:#1F2937; border:1px solid #374151;" title="#1F2937"></div>
+        <div style="width:20px; height:20px; border-radius:4px; background:#E5E7EB;" title="#E5E7EB"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Theme C: Warm Obsidian -->
+  <div class="card" data-choice="warm-obsidian" onclick="toggleSelect(this)" style="border-radius:12px; overflow:hidden; border:1px solid #2A2520;">
+    <div class="card-image" style="background:#0E0D0B; padding:20px; min-height:260px; position:relative;">
+      <!-- Simulated UI -->
+      <div style="display:flex; gap:12px; height:220px;">
+        <!-- Sidebar -->
+        <div style="width:48px; background:#0A0908; border-radius:8px; padding:8px 0; display:flex; flex-direction:column; align-items:center; gap:10px;">
+          <div style="width:28px; height:28px; border-radius:6px; background:linear-gradient(135deg, #F59E0B, #EF4444); opacity:0.9;"></div>
+          <div style="width:24px; height:24px; border-radius:5px; background:#1C1A16;"></div>
+          <div style="width:24px; height:24px; border-radius:5px; background:#F59E0B; opacity:0.3;"></div>
+          <div style="width:24px; height:24px; border-radius:5px; background:#1C1A16;"></div>
+          <div style="width:24px; height:24px; border-radius:5px; background:#1C1A16;"></div>
+        </div>
+        <!-- Main -->
+        <div style="flex:1; display:flex; flex-direction:column; gap:10px;">
+          <!-- KPI row -->
+          <div style="display:flex; gap:8px;">
+            <div style="flex:1; background:#16140F; border:1px solid #2A2520; border-radius:8px; padding:8px 10px;">
+              <div style="font-size:9px; color:#8B8579; text-transform:uppercase; letter-spacing:0.5px;">Active</div>
+              <div style="font-size:18px; color:#34D399; font-weight:600; margin-top:2px;">7</div>
+            </div>
+            <div style="flex:1; background:#16140F; border:1px solid #2A2520; border-radius:8px; padding:8px 10px;">
+              <div style="font-size:9px; color:#8B8579; text-transform:uppercase; letter-spacing:0.5px;">Cost</div>
+              <div style="font-size:18px; color:#E8E4DE; font-weight:600; margin-top:2px;">$4.20</div>
+            </div>
+            <div style="flex:1; background:#16140F; border:1px solid #2A2520; border-radius:8px; padding:8px 10px;">
+              <div style="font-size:9px; color:#8B8579; text-transform:uppercase; letter-spacing:0.5px;">Success</div>
+              <div style="font-size:18px; color:#F59E0B; font-weight:600; margin-top:2px;">94%</div>
+            </div>
+          </div>
+          <!-- Session list -->
+          <div style="flex:1; background:#16140F; border:1px solid #2A2520; border-radius:8px; padding:10px; overflow:hidden;">
+            <div style="display:flex; align-items:center; gap:6px; padding:6px 0; border-bottom:1px solid #2A2520;">
+              <div style="width:7px; height:7px; border-radius:50%; background:#34D399; box-shadow:0 0 6px rgba(52,211,153,0.5);"></div>
+              <span style="font-size:11px; color:#E8E4DE; font-family:monospace;">s-a1b2</span>
+              <span style="font-size:10px; color:#8B8579; margin-left:auto;">implementer</span>
+              <span style="font-size:10px; color:#F59E0B;">$0.82</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; padding:6px 0; border-bottom:1px solid #2A2520;">
+              <div style="width:7px; height:7px; border-radius:50%; background:#FBBF24;"></div>
+              <span style="font-size:11px; color:#E8E4DE; font-family:monospace;">s-c3d4</span>
+              <span style="font-size:10px; color:#8B8579; margin-left:auto;">reviewer</span>
+              <span style="font-size:10px; color:#F59E0B;">$0.34</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; padding:6px 0;">
+              <div style="width:7px; height:7px; border-radius:50%; background:#60A5FA;"></div>
+              <span style="font-size:11px; color:#E8E4DE; font-family:monospace;">s-e5f6</span>
+              <span style="font-size:10px; color:#8B8579; margin-left:auto;">planner</span>
+              <span style="font-size:10px; color:#F59E0B;">$1.05</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body" style="background:#16140F; padding:16px; border-top:1px solid #2A2520;">
+      <h3 style="color:#E8E4DE; margin:0 0 6px;">C. Warm Obsidian</h3>
+      <p style="color:#8B8579; font-size:13px; margin:0; line-height:1.4;">Warm dark stone. Amber/gold accent. Grafana-inspired energy. Distinctive, bold, high-alertness.</p>
+      <div style="display:flex; gap:6px; margin-top:10px;">
+        <div style="width:20px; height:20px; border-radius:4px; background:#0E0D0B; border:1px solid #2A2520;" title="#0E0D0B"></div>
+        <div style="width:20px; height:20px; border-radius:4px; background:#16140F; border:1px solid #2A2520;" title="#16140F"></div>
+        <div style="width:20px; height:20px; border-radius:4px; background:#F59E0B;" title="#F59E0B"></div>
+        <div style="width:20px; height:20px; border-radius:4px; background:#FBBF24;" title="#FBBF24"></div>
+        <div style="width:20px; height:20px; border-radius:4px; background:#2A2520; border:1px solid #3D3730;" title="#2A2520"></div>
+        <div style="width:20px; height:20px; border-radius:4px; background:#E8E4DE;" title="#E8E4DE"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:24px; padding:16px; background:rgba(124,106,239,0.06); border:1px solid rgba(124,106,239,0.15); border-radius:8px;">
+  <h3 style="margin:0 0 8px; font-size:14px;">Research-backed recommendation</h3>
+  <p style="font-size:13px; margin:0; line-height:1.5; opacity:0.8;">
+    <strong>Midnight Circuit</strong> is the strongest fit. Purple aligns Ark with the AI/agent space (Linear, Anthropic, Stripe) while the cyan secondary evokes "flow" and "orchestration" -- Ark's core metaphor. The deep blue-black background provides the premium, technical feel that competitors like Cursor 3 and Windsurf 2.0 have adopted. Arctic Slate is safer (GitHub-neutral) but less distinctive. Warm Obsidian is bold but amber conflicts with warning/status colors.
+  </p>
+</div>

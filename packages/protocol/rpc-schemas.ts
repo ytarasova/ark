@@ -105,6 +105,11 @@ const computeSchema = z
     runtime_kind: z.string().optional(),
     status: computeStatusSchema,
     config: z.record(z.string(), z.unknown()),
+    // Unified-model fields -- `is_template` distinguishes template rows
+    // from concrete targets, `cloned_from` marks ephemeral clones. Both
+    // optional on the wire for back-compat with older server builds.
+    is_template: z.boolean().optional(),
+    cloned_from: z.string().nullable().optional(),
     created_at: z.string(),
     updated_at: z.string(),
   })
@@ -285,7 +290,11 @@ export type SessionRestoreResponse = z.infer<typeof sessionRestoreResponse>;
 
 // ── compute/list ────────────────────────────────────────────────────────────
 
-export const computeListRequest = z.object({}).loose();
+export const computeListRequest = z
+  .object({
+    include: z.enum(["all", "concrete", "template"]).optional(),
+  })
+  .loose();
 export type ComputeListRequest = z.infer<typeof computeListRequest>;
 
 export const computeListResponse = z.object({ targets: z.array(computeSchema) });
@@ -301,6 +310,9 @@ export const computeCreateRequest = z.object({
   runtime: z.string().optional(),
   config: z.record(z.string(), z.unknown()).optional(),
   template: z.string().optional(),
+  // Unified-model fields: templates vs concrete rows in the same table.
+  is_template: z.boolean().optional(),
+  cloned_from: z.string().optional(),
 });
 export type ComputeCreateRequest = z.infer<typeof computeCreateRequest>;
 

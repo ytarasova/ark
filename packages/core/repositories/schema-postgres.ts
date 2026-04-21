@@ -75,7 +75,9 @@ export async function initPostgresSchema(db: IDatabase): Promise<void> {
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_group ON sessions(group_name)`);
   await db.exec(`CREATE INDEX IF NOT EXISTS idx_sessions_pr_url ON sessions(pr_url)`);
 
-  // Compute table. Includes compute_kind + runtime_kind columns.
+  // Compute table. Includes compute_kind + runtime_kind columns and the
+  // is_template flag that unifies compute targets and templates into a
+  // single row type.
   await db.exec(`
     CREATE TABLE IF NOT EXISTS compute (
       name TEXT PRIMARY KEY,
@@ -84,6 +86,8 @@ export async function initPostgresSchema(db: IDatabase): Promise<void> {
       runtime_kind TEXT NOT NULL DEFAULT 'direct',
       status TEXT NOT NULL DEFAULT 'stopped',
       config TEXT DEFAULT '{}',
+      is_template BOOLEAN NOT NULL DEFAULT FALSE,
+      cloned_from TEXT,
       tenant_id TEXT NOT NULL DEFAULT 'default',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
