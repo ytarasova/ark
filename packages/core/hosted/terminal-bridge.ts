@@ -14,8 +14,6 @@
  */
 
 import { spawn, type Subprocess, type ServerWebSocket } from "bun";
-import { mkdirSync, renameSync, writeFileSync } from "fs";
-import { join } from "path";
 import * as tmux from "../infra/tmux.js";
 import { logInfo, logDebug } from "../observability/structured-log.js";
 
@@ -42,14 +40,8 @@ export interface TerminalSession {
   sessionName: string;
   /** The ark session id -- `sessionName` is always `ark-<sessionId>`. */
   sessionId: string;
-  /**
-   * Absolute path to the session's tracks directory, used as
-   * `$ARK_SESSION_DIR` in the launcher. The geometry sentinel is written
-   * here as a sibling of the exit-code sentinel.
-   */
-  sessionDir: string;
-  /** Set once the geometry sentinel has been written for this session. */
-  geometryWritten: boolean;
+  /** Set once the first resize has been observed for this session. */
+  geometryPersisted: boolean;
   /** Optional hook to update the DB row with the observed geometry. */
   onGeometry?: GeometryPersistFn;
   alive: boolean;
@@ -73,14 +65,6 @@ function buildAttachCommand(sessionName: string): string[] {
 export interface StartBridgeOpts {
   /** Ark session id (maps to `<sessionName>` minus `ark-` prefix). */
   sessionId: string;
-  /**
-   * Session directory -- normally `<tracksDir>/<sessionId>`. The geometry
-   * sentinel lands at `<sessionDir>/geometry` and the launcher reads it
-   * from `$ARK_SESSION_DIR` (the executor exports the same path into the
-   * launch env). Required so the first client resize can unblock the
-   * claude launch without racing the launcher's fallback deadline.
-   */
-  sessionDir: string;
   /** Optional hook to persist observed geometry onto the DB row. */
   onGeometry?: GeometryPersistFn;
 }
@@ -108,8 +92,7 @@ export function startTerminalBridge(
     proc,
     sessionName,
     sessionId: opts.sessionId,
-    sessionDir: opts.sessionDir,
-    geometryWritten: false,
+    geometryPersisted: false,
     onGeometry: opts.onGeometry,
     alive: true,
   };
@@ -200,38 +183,17 @@ export function handleTerminalInput(ws: ServerWebSocket<unknown>, data: string |
 }
 
 /**
- * Write the geometry sentinel atomically (tmp + rename) so the launcher's
- * shell `read` never sees a partial line. The launcher only reads COLUMNS /
- * LINES once and validates they're numeric; this write is belt-and-braces.
- */
-export function writeGeometrySentinel(sessionDir: string, cols: number, rows: number): void {
-  if (!Number.isFinite(cols) || !Number.isFinite(rows) || cols <= 0 || rows <= 0) return;
-  try {
-    mkdirSync(sessionDir, { recursive: true });
-    const sentinelPath = join(sessionDir, "geometry");
-    const tmpPath = sentinelPath + ".tmp";
-    writeFileSync(tmpPath, `${Math.floor(cols)} ${Math.floor(rows)}\n`);
-    renameSync(tmpPath, sentinelPath);
-  } catch (e: any) {
-    logDebug("web", `geometry sentinel write failed: ${e?.message ?? e}`);
-  }
-}
-
-/**
- * Resize the tmux window. On the first resize we also write the geometry
- * sentinel so the launcher (blocked in a short busy-wait) can read the real
- * client geometry before invoking claude. Later resizes just propagate a
- * SIGWINCH via `tmux resize-window`.
+ * Resize the tmux window. `tmux resize-window` sends SIGWINCH to the running
+ * claude process, which reflows its TUI. The first resize also persists the
+ * observed geometry onto the session row so the recorded replay renders at
+ * the same width.
  */
 function handleResize(session: TerminalSession, cols: number, rows: number): void {
   const safeCols = Math.max(1, cols | 0);
   const safeRows = Math.max(1, rows | 0);
 
-  // Write the sentinel once per bridge -- subsequent resizes just reshape
-  // the tmux window; claude is already running and picks up SIGWINCH.
-  if (!session.geometryWritten) {
-    writeGeometrySentinel(session.sessionDir, safeCols, safeRows);
-    session.geometryWritten = true;
+  if (!session.geometryPersisted) {
+    session.geometryPersisted = true;
     try {
       session.onGeometry?.(session.sessionId, safeCols, safeRows);
     } catch (e: any) {

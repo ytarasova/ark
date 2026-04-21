@@ -3,13 +3,12 @@
  * so ANSI escape codes (colors, formatting) render correctly.
  *
  * Column detection strategy:
- *   1. Use the explicit `cols` prop when provided. The server pins the tmux
- *      PTY geometry at dispatch (see session.pty_cols) so the replay renders
- *      at the same width the agent wrote against. Cursor-position ANSI codes
- *      then land where the agent put them.
+ *   1. Use the explicit `cols` prop when provided. `session.pty_cols` /
+ *      `pty_rows` are observed on the first client resize (terminal-bridge),
+ *      so the replay renders at the same width the live agent saw.
  *   2. Otherwise fall back to auto-detection -- widest line after ANSI strip,
- *      floored at 120. The floor is a safety net for wide output captured
- *      before pty_cols was persisted.
+ *      floored at 120. This covers sessions that never got a live client
+ *      (CLI-only dispatches) and pre-observation rows still NULL in the DB.
  *
  * The container has overflow-x-auto so users can scroll to see long lines
  * even when the measured geometry exceeds the browser viewport.
@@ -30,6 +29,10 @@ interface StaticTerminalProps {
 
 const ANSI_RE = /\x1b\[[0-9;?]*[A-Za-z]/g;
 const DEFAULT_COL_FLOOR = 120;
+// xterm.js rejects `undefined` rows in the constructor ("rows must be numeric").
+// Any positive number works as a seed -- `fitRows()` resizes to the real
+// container height immediately after `open()`. 24 is the classic vt100 default.
+const INITIAL_ROWS_FALLBACK = 24;
 
 function stripAnsi(s: string): string {
   return s.replace(ANSI_RE, "");
@@ -54,7 +57,7 @@ export function StaticTerminal({ output, cols: colsProp, rows: rowsProp }: Stati
 
     const term = new XTerm({
       cols,
-      rows: rowsProp && rowsProp > 0 ? rowsProp : undefined,
+      rows: rowsProp && rowsProp > 0 ? rowsProp : INITIAL_ROWS_FALLBACK,
       cursorBlink: false,
       disableStdin: true,
       fontSize: 10,
