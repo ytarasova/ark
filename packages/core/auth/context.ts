@@ -74,7 +74,7 @@ export function localAdminContext(defaultTenant: string | null | undefined): Ten
 export function anonymousContext(): TenantContext {
   return {
     tenantId: "anonymous",
-    userId: null as unknown as string,
+    userId: null,
     role: "viewer",
     isAdmin: false,
   };

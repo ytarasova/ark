@@ -1,6 +1,6 @@
 export interface TenantContext {
   tenantId: string;
-  userId: string;
+  userId: string | null;
   role: "admin" | "member" | "viewer";
 }
 
