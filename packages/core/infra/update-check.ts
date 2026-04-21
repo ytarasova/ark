@@ -4,6 +4,15 @@
  * This is a best-effort background check. Errors (network, parse, disk)
  * are swallowed: a failed update check MUST NOT block the user from running
  * Ark. The caller treats `null` as "no update available / couldn't check".
+ *
+ * LOCAL-ONLY. Called exclusively from the `ark` CLI binary's startup path
+ * (`packages/cli/index.ts`) to render an "update available" banner to an
+ * interactive user. It writes `{arkDir}/update-check.json` to throttle
+ * subsequent checks. Neither the binary-update flow nor the cache file
+ * makes sense on a hosted control plane where operators manage the image
+ * lifecycle out of band. If a caller passes no `arkDir` the function
+ * short-circuits to `null`, so any accidental wiring from shared handler
+ * code simply no-ops rather than writing to a random disk location.
  */
 
 const REPO = process.env.ARK_GITHUB_REPO ?? "yana/ark";
