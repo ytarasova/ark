@@ -1,8 +1,54 @@
 import { fmtCost, relTime } from "../util.js";
 import { cn } from "../lib/utils.js";
-import { AlertCircle, CheckCircle2, Clock, RotateCcw, Eye } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, RotateCcw, Eye, PlugZap } from "lucide-react";
 import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
 import { useDashboardSummaryQuery, useRunningSessionsQuery } from "../hooks/useDashboardQuery.js";
+import { Button } from "./ui/button.js";
+
+/**
+ * `fetch()` throws a TypeError with the literal message "Failed to fetch" when
+ * the network layer rejects the request (server down, DNS fail, CORS before
+ * response, etc). Distinguishing this from a real RPC error lets us show an
+ * actionable "API unreachable" hint instead of the raw browser message.
+ */
+function isNetworkUnreachable(err: unknown): boolean {
+  if (!err) return false;
+  const msg = (err as { message?: string }).message ?? "";
+  return err instanceof TypeError || msg.includes("Failed to fetch") || msg.includes("NetworkError");
+}
+
+function DashboardErrorState({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+  const unreachable = isNetworkUnreachable(error);
+  const base = typeof window !== "undefined" ? window.location.origin : "";
+  const message = (error as { message?: string })?.message ?? "unknown error";
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-3 px-6 text-center">
+      <div className="rounded-full bg-muted p-3 text-muted-foreground">
+        {unreachable ? <PlugZap className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+      </div>
+      <div className="space-y-1">
+        <div className="text-sm font-medium">
+          {unreachable ? "Can't reach the Ark API" : "Dashboard request failed"}
+        </div>
+        <div className="text-xs text-muted-foreground max-w-md">
+          {unreachable ? (
+            <>
+              Tried <code className="font-mono">{base}/api/rpc</code> and got no response. Is{" "}
+              <code className="font-mono">make dev</code> running?
+            </>
+          ) : (
+            message
+          )}
+        </div>
+      </div>
+      <Button variant="outline" size="sm" onClick={onRetry} className="gap-1.5">
+        <RotateCcw className="h-3.5 w-3.5" />
+        Retry
+      </Button>
+    </div>
+  );
+}
 
 interface DashboardData {
   counts: Record<string, number>;
@@ -50,12 +96,7 @@ export function DashboardView({
   const sessions = sessionsQuery.data ?? [];
 
   if (summaryQuery.isError) {
-    const err: any = summaryQuery.error;
-    return (
-      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-        Failed to load dashboard: {err?.message ?? "unknown error"}
-      </div>
-    );
+    return <DashboardErrorState error={summaryQuery.error} onRetry={() => summaryQuery.refetch()} />;
   }
 
   if (!data) {
