@@ -93,7 +93,7 @@ describe("Gemini runtime resolution", () => {
 
 // ── CLI-agent executor with gemini config ────────────────────────────────────
 
-describe("Gemini dispatch via cli-agent executor", () => {
+describe("Gemini dispatch via cli-agent executor", async () => {
   let createSpy: ReturnType<typeof spyOn>;
   let sendTextSpy: ReturnType<typeof spyOn>;
 
@@ -163,10 +163,10 @@ describe("Gemini dispatch via cli-agent executor", () => {
 
 // ── Status poller + autonomous flow completion ──────────────────────────────
 
-describe("Gemini runtime + autonomous flow completion", () => {
+describe("Gemini runtime + autonomous flow completion", async () => {
   it("status poller completes session when gemini tmux exits", async () => {
-    const session = app.sessions.create({ summary: "gemini autonomous test", flow: "autonomous" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "gemini autonomous test", flow: "autonomous" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "work",
       session_id: "ark-" + session.id,
@@ -179,12 +179,12 @@ describe("Gemini runtime + autonomous flow completion", () => {
     try {
       startStatusPoller(app, session.id, "ark-" + session.id, "cli-agent");
 
-      await waitFor(() => {
-        const s = app.sessions.get(session.id);
+      await waitFor(async () => {
+        const s = await app.sessions.get(session.id);
         return s?.status === "completed";
       });
 
-      const updated = app.sessions.get(session.id);
+      const updated = await app.sessions.get(session.id);
       expect(updated?.status).toBe("completed");
     } finally {
       spy.mockRestore();
@@ -192,8 +192,8 @@ describe("Gemini runtime + autonomous flow completion", () => {
   });
 
   it("status poller logs session_completed event", async () => {
-    const session = app.sessions.create({ summary: "gemini event test", flow: "autonomous" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "gemini event test", flow: "autonomous" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "work",
       session_id: "ark-" + session.id,
@@ -204,13 +204,13 @@ describe("Gemini runtime + autonomous flow completion", () => {
     try {
       startStatusPoller(app, session.id, "ark-" + session.id, "cli-agent");
 
-      await waitFor(() => {
-        const s = app.sessions.get(session.id);
+      await waitFor(async () => {
+        const s = await app.sessions.get(session.id);
         return s?.status === "completed";
       });
 
       // Verify that a session_completed event was logged
-      const events = app.events.list(session.id);
+      const events = await app.events.list(session.id);
       const completedEvent = events.find((e) => e.type === "session_completed");
       expect(completedEvent).not.toBeUndefined();
       // data is stored as JSON string -- parse and check the reason field
@@ -222,8 +222,8 @@ describe("Gemini runtime + autonomous flow completion", () => {
   });
 
   it("status poller clears session_id on completion", async () => {
-    const session = app.sessions.create({ summary: "gemini cleanup test", flow: "autonomous" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "gemini cleanup test", flow: "autonomous" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "work",
       session_id: "ark-" + session.id,
@@ -234,12 +234,12 @@ describe("Gemini runtime + autonomous flow completion", () => {
     try {
       startStatusPoller(app, session.id, "ark-" + session.id, "cli-agent");
 
-      await waitFor(() => {
-        const s = app.sessions.get(session.id);
+      await waitFor(async () => {
+        const s = await app.sessions.get(session.id);
         return s?.status === "completed";
       });
 
-      const updated = app.sessions.get(session.id);
+      const updated = await app.sessions.get(session.id);
       // session_id should be cleared (tmux handle no longer valid)
       expect(updated?.session_id).toBeNull();
     } finally {
@@ -248,8 +248,8 @@ describe("Gemini runtime + autonomous flow completion", () => {
   });
 
   it("does not double-poll the same session", async () => {
-    const session = app.sessions.create({ summary: "gemini no-double test", flow: "autonomous" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "gemini no-double test", flow: "autonomous" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "work",
       session_id: "ark-" + session.id,
@@ -263,7 +263,7 @@ describe("Gemini runtime + autonomous flow completion", () => {
 
       // Wait a polling cycle to ensure only one poller is active
       await Bun.sleep(100);
-      const s = app.sessions.get(session.id);
+      const s = await app.sessions.get(session.id);
       expect(s?.status).toBe("running"); // Still running, not double-completed
     } finally {
       spy.mockRestore();
@@ -273,13 +273,13 @@ describe("Gemini runtime + autonomous flow completion", () => {
 
 // ── Transcript parser wiring ────────────────────────────────────────────────
 
-describe("Gemini transcript parser registration", () => {
-  it("GeminiTranscriptParser is registered in TranscriptParserRegistry", () => {
+describe("Gemini transcript parser registration", async () => {
+  it("GeminiTranscriptParser is registered in TranscriptParserRegistry", async () => {
     const registry = app.transcriptParsers;
     expect(registry).not.toBeUndefined();
 
     // The registry should have a gemini parser registered
-    const parser = registry.get("gemini");
+    const parser = await registry.get("gemini");
     expect(parser).not.toBeUndefined();
   });
 

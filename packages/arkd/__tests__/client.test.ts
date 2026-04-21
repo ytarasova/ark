@@ -35,7 +35,7 @@ afterAll(() => {
 
 // ── Health ──────────────────────────────────────────────────────────────────
 
-describe("client.health()", () => {
+describe("client.health()", async () => {
   it("returns valid HealthRes", async () => {
     const h = await client.health();
     expect(h.status).toBe("ok");
@@ -52,7 +52,7 @@ describe("client.health()", () => {
 
 // ── File operations ─────────────────────────────────────────────────────────
 
-describe("client file ops", () => {
+describe("client file ops", async () => {
   it("writeFile + readFile round-trip", async () => {
     const path = join(tempDir, "client-roundtrip.txt");
     const w = await client.writeFile({ path, content: "client test" });
@@ -115,7 +115,7 @@ describe("client file ops", () => {
 
 // ── Process running ─────────────────────────────────────────────────────────
 
-describe("client.run()", () => {
+describe("client.run()", async () => {
   it("runs command and captures stdout", async () => {
     const res = await client.run({ command: "echo", args: ["client-test"] });
     expect(res.exitCode).toBe(0);
@@ -146,7 +146,7 @@ describe("client.run()", () => {
 
 // ── Agent lifecycle ─────────────────────────────────────────────────────────
 
-describe("client agent lifecycle", () => {
+describe("client agent lifecycle", async () => {
   const SESSION_NAME = `arkd-client-test-${Date.now()}`;
 
   afterAll(async () => {
@@ -197,7 +197,7 @@ describe("client agent lifecycle", () => {
 
 // ── System ──────────────────────────────────────────────────────────────────
 
-describe("client system", () => {
+describe("client system", async () => {
   it("metrics returns numeric fields", async () => {
     const m = await client.metrics();
     expect(typeof m.cpu).toBe("number");
@@ -225,7 +225,7 @@ describe("client system", () => {
 
 // ── Error handling ──────────────────────────────────────────────────────────
 
-describe("client errors", () => {
+describe("client errors", async () => {
   it("read nonexistent file throws ArkdClientError", async () => {
     try {
       await client.readFile("/nonexistent/client-err.txt");

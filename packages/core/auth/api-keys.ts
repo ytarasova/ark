@@ -6,8 +6,8 @@
  */
 
 import { createHash, randomBytes } from "crypto";
-import type { IDatabase } from "./database/index.js";
-import type { TenantContext, ApiKey } from "../types/index.js";
+import type { IDatabase } from "../database/index.js";
+import type { TenantContext, ApiKey } from "../../types/index.js";
 import { now } from "../util/time.js";
 
 // ── Row type ─────────────────────────────────────────────────────────────────
@@ -49,19 +49,19 @@ export class ApiKeyManager {
    * Create a new API key. Returns the plaintext key (only shown once) and
    * the persisted record id.
    */
-  create(
+  async create(
     tenantId: string,
     name: string,
     role: "admin" | "member" | "viewer" = "member",
     expiresAt?: string,
-  ): { key: string; id: string } {
+  ): Promise<{ key: string; id: string }> {
     const id = `ak-${randomBytes(4).toString("hex")}`;
     const secret = randomBytes(24).toString("hex");
     const key = `ark_${tenantId}_${secret}`;
     const keyHash = hashKey(key);
     const ts = now();
 
-    this.db
+    await this.db
       .prepare(
         `
       INSERT INTO api_keys (id, tenant_id, key_hash, name, role, created_at, last_used_at, expires_at)
@@ -76,7 +76,7 @@ export class ApiKeyManager {
   /**
    * Validate an API key and return the tenant context, or null if invalid/expired.
    */
-  validate(key: string): TenantContext | null {
+  async validate(key: string): Promise<TenantContext | null> {
     // Parse the key format: ark_<tenantId>_<secret>
     if (!key.startsWith("ark_")) return null;
     const parts = key.split("_");
@@ -85,9 +85,9 @@ export class ApiKeyManager {
     const tenantId = parts[1];
 
     const keyHash = hashKey(key);
-    const row = this.db
+    const row = (await this.db
       .prepare("SELECT * FROM api_keys WHERE key_hash = ? AND tenant_id = ?")
-      .get(keyHash, tenantId) as ApiKeyRow | undefined;
+      .get(keyHash, tenantId)) as ApiKeyRow | undefined;
 
     if (!row) return null;
 
@@ -97,7 +97,7 @@ export class ApiKeyManager {
     }
 
     // Update last_used_at
-    this.db.prepare("UPDATE api_keys SET last_used_at = ? WHERE id = ?").run(now(), row.id);
+    await this.db.prepare("UPDATE api_keys SET last_used_at = ? WHERE id = ?").run(now(), row.id);
 
     return {
       tenantId: row.tenant_id,
@@ -109,10 +109,10 @@ export class ApiKeyManager {
   /**
    * List all API keys for a tenant (key hashes are included but not the plaintext keys).
    */
-  list(tenantId: string): ApiKey[] {
-    const rows = this.db
+  async list(tenantId: string): Promise<ApiKey[]> {
+    const rows = (await this.db
       .prepare("SELECT * FROM api_keys WHERE tenant_id = ? ORDER BY created_at DESC")
-      .all(tenantId) as ApiKeyRow[];
+      .all(tenantId)) as ApiKeyRow[];
     return rows.map(rowToApiKey);
   }
 
@@ -125,12 +125,12 @@ export class ApiKeyManager {
    * of tenant -- callers that reach this path already hold the local DB
    * file and have full access anyway.
    */
-  revoke(id: string, tenantId?: string): boolean {
+  async revoke(id: string, tenantId?: string): Promise<boolean> {
     if (tenantId) {
-      const result = this.db.prepare("DELETE FROM api_keys WHERE id = ? AND tenant_id = ?").run(id, tenantId);
+      const result = await this.db.prepare("DELETE FROM api_keys WHERE id = ? AND tenant_id = ?").run(id, tenantId);
       return result.changes > 0;
     }
-    const result = this.db.prepare("DELETE FROM api_keys WHERE id = ?").run(id);
+    const result = await this.db.prepare("DELETE FROM api_keys WHERE id = ?").run(id);
     return result.changes > 0;
   }
 
@@ -142,17 +142,17 @@ export class ApiKeyManager {
    * (which would both invalidate the victim's key and leak a new key
    * belonging to the victim's tenant back to the attacker).
    */
-  rotate(id: string, tenantId?: string): { key: string } | null {
+  async rotate(id: string, tenantId?: string): Promise<{ key: string } | null> {
     const sql = tenantId
       ? "SELECT * FROM api_keys WHERE id = ? AND tenant_id = ?"
       : "SELECT * FROM api_keys WHERE id = ?";
-    const row = (tenantId ? this.db.prepare(sql).get(id, tenantId) : this.db.prepare(sql).get(id)) as
+    const row = (await (tenantId ? this.db.prepare(sql).get(id, tenantId) : this.db.prepare(sql).get(id))) as
       | ApiKeyRow
       | undefined;
     if (!row) return null;
 
-    this.revoke(id, tenantId);
-    const result = this.create(row.tenant_id, row.name, row.role as ApiKey["role"], row.expires_at ?? undefined);
+    await this.revoke(id, tenantId);
+    const result = await this.create(row.tenant_id, row.name, row.role as ApiKey["role"], row.expires_at ?? undefined);
     return { key: result.key };
   }
 }

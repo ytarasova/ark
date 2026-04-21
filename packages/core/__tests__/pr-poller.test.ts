@@ -89,7 +89,7 @@ beforeEach(() => {
 
 // ── pollPRReviews ────────────────────────────────────────────────────────────
 
-describe("pollPRReviews", () => {
+describe("pollPRReviews", async () => {
   it("skips sessions without pr_url", async () => {
     const session = getApp().sessions.create({ summary: "no pr", flow: "review-flow" });
     getApp().sessions.update(session.id, { status: "running", stage: "review" });
@@ -143,7 +143,7 @@ describe("pollPRReviews", () => {
 
 // ── checkSessionPR ───────────────────────────────────────────────────────────
 
-describe("checkSessionPR", () => {
+describe("checkSessionPR", async () => {
   it("detects new approval and logs pr_approved event", async () => {
     const session = createReviewSession();
 
@@ -261,7 +261,7 @@ describe("checkSessionPR", () => {
 
 // ── fetchPRReviews ──────────────────────────────────────────────────────────
 
-describe("fetchPRReviews", () => {
+describe("fetchPRReviews", async () => {
   it("parses PR data from gh CLI output", async () => {
     const mockExec = async () => ({
       stdout: JSON.stringify({
@@ -297,7 +297,7 @@ describe("fetchPRReviews", () => {
 
 // ── processReviewFeedback ───────────────────────────────────────────────────
 
-describe("processReviewFeedback", () => {
+describe("processReviewFeedback", async () => {
   it("skips when no new reviews detected", async () => {
     const session = createReviewSession();
     const config = { review_count: 1, last_review_time: "2026-03-27T12:00:00Z" };

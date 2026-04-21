@@ -31,7 +31,7 @@ afterEach(async () => {
   // no-op -- beforeEach handles cleanup
 });
 
-describe("action stage chaining", () => {
+describe("action stage chaining", async () => {
   it("single action stage chains to completion", async () => {
     // Flow: agent -> action:close (last stage)
     app.flows.save("test-single-action", {
@@ -42,8 +42,8 @@ describe("action stage chaining", () => {
       ],
     } as any);
 
-    const session = app.sessions.create({ summary: "single action test", flow: "test-single-action" });
-    app.sessions.update(session.id, { status: "ready", stage: "work" });
+    const session = await app.sessions.create({ summary: "single action test", flow: "test-single-action" });
+    await app.sessions.update(session.id, { status: "ready", stage: "work" });
 
     // Handoff from work -> finish (action:close)
     const result = await mediateStageHandoff(app, session.id, {
@@ -57,15 +57,15 @@ describe("action stage chaining", () => {
 
     // Wait for async action chain to complete the flow
     await waitFor(
-      () => {
-        const s = app.sessions.get(session.id);
+      async () => {
+        const s = await app.sessions.get(session.id);
         return s?.status === "completed";
       },
       { timeout: 5000, message: "Expected session to reach completed status" },
     );
 
     // Verify action_executed event was logged
-    const events = app.events.list(session.id);
+    const events = await app.events.list(session.id);
     const actionEvents = events.filter((e) => e.type === "action_executed");
     expect(actionEvents.length).toBeGreaterThanOrEqual(1);
     expect(actionEvents.some((e) => e.data?.action === "close")).toBe(true);
@@ -82,8 +82,8 @@ describe("action stage chaining", () => {
       ],
     } as any);
 
-    const session = app.sessions.create({ summary: "chain test", flow: "test-chain-actions" });
-    app.sessions.update(session.id, { status: "ready", stage: "work" });
+    const session = await app.sessions.create({ summary: "chain test", flow: "test-chain-actions" });
+    await app.sessions.update(session.id, { status: "ready", stage: "work" });
 
     // Handoff from work -> step1 (action:close)
     const result = await mediateStageHandoff(app, session.id, {
@@ -97,15 +97,15 @@ describe("action stage chaining", () => {
 
     // Wait for both actions to chain-execute and complete the flow
     await waitFor(
-      () => {
-        const s = app.sessions.get(session.id);
+      async () => {
+        const s = await app.sessions.get(session.id);
         return s?.status === "completed";
       },
       { timeout: 5000, message: "Expected session to reach completed after chained actions" },
     );
 
     // Verify both action_executed events were logged
-    const events = app.events.list(session.id);
+    const events = await app.events.list(session.id);
     const actionEvents = events.filter((e) => e.type === "action_executed");
     expect(actionEvents.length).toBeGreaterThanOrEqual(2);
   });
@@ -122,8 +122,8 @@ describe("action stage chaining", () => {
       ],
     } as any);
 
-    const session = app.sessions.create({ summary: "fail chain test", flow: "test-fail-chain" });
-    app.sessions.update(session.id, { status: "ready", stage: "work" });
+    const session = await app.sessions.create({ summary: "fail chain test", flow: "test-fail-chain" });
+    await app.sessions.update(session.id, { status: "ready", stage: "work" });
 
     // Handoff from work -> pr (action:create_pr, will fail)
     const result = await mediateStageHandoff(app, session.id, {
@@ -137,19 +137,19 @@ describe("action stage chaining", () => {
 
     // Wait for the failure to propagate
     await waitFor(
-      () => {
-        const s = app.sessions.get(session.id);
+      async () => {
+        const s = await app.sessions.get(session.id);
         return s?.status === "failed";
       },
       { timeout: 5000, message: "Expected session to reach failed status" },
     );
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.status).toBe("failed");
     expect(updated?.error).toContain("create_pr");
 
     // Verify auto_merge was NOT executed
-    const events = app.events.list(session.id);
+    const events = await app.events.list(session.id);
     const mergeEvents = events.filter((e) => e.type === "action_executed" && e.data?.action === "auto_merge");
     expect(mergeEvents.length).toBe(0);
   });
@@ -165,8 +165,8 @@ describe("action stage chaining", () => {
       ],
     } as any);
 
-    const session = app.sessions.create({ summary: "action then agent test", flow: "test-action-then-agent" });
-    app.sessions.update(session.id, { status: "ready", stage: "work1" });
+    const session = await app.sessions.create({ summary: "action then agent test", flow: "test-action-then-agent" });
+    await app.sessions.update(session.id, { status: "ready", stage: "work1" });
 
     // Handoff from work1 -> middle (action:close)
     const result = await mediateStageHandoff(app, session.id, {
@@ -180,19 +180,19 @@ describe("action stage chaining", () => {
 
     // Wait for the action to execute and advance to work2
     await waitFor(
-      () => {
-        const s = app.sessions.get(session.id);
+      async () => {
+        const s = await app.sessions.get(session.id);
         return s?.stage === "work2";
       },
       { timeout: 5000, message: "Expected session to advance to work2 stage" },
     );
 
     // Verify session is at work2 with ready status (dispatch will fail in test but stage should advance)
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.stage).toBe("work2");
 
     // Verify the close action was executed
-    const events = app.events.list(session.id);
+    const events = await app.events.list(session.id);
     const actionEvents = events.filter((e) => e.type === "action_executed" && e.data?.action === "close");
     expect(actionEvents.length).toBe(1);
   });
@@ -208,8 +208,8 @@ describe("action stage chaining", () => {
       ],
     } as any);
 
-    const session = app.sessions.create({ summary: "no advance test", flow: "test-no-advance" });
-    app.sessions.update(session.id, { status: "ready", stage: "finish" });
+    const session = await app.sessions.create({ summary: "no advance test", flow: "test-no-advance" });
+    await app.sessions.update(session.id, { status: "ready", stage: "finish" });
 
     // Call executeAction directly
     const result = await executeAction(app, session.id, "close");
@@ -218,7 +218,7 @@ describe("action stage chaining", () => {
     expect(result.message).toContain("close");
 
     // Session stage should remain at "finish" -- executeAction no longer advances
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.stage).toBe("finish");
   });
 });

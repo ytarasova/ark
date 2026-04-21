@@ -127,21 +127,25 @@ interface SessionRow {
   updated_at: string;
 }
 
-export function findSessionByPR(app: AppContext, prUrl: string): Session | null {
+export async function findSessionByPR(app: AppContext, prUrl: string): Promise<Session | null> {
   const db = app.db;
-  const row = db.prepare("SELECT * FROM sessions WHERE pr_url = ? ORDER BY rowid DESC LIMIT 1").get(prUrl) as
+  const row = (await db.prepare("SELECT * FROM sessions WHERE pr_url = ? ORDER BY rowid DESC LIMIT 1").get(prUrl)) as
     | SessionRow
     | undefined;
   if (!row) return null;
   return {
     ...row,
     config: safeParseConfig(row.config),
-  };
+  } as Session;
 }
 
 // ── Main handler ────────────────────────────────────────────────────────────
 
-export function handleGitHubWebhook(app: AppContext, event: string, payload: Record<string, any>): WebhookResult {
+export async function handleGitHubWebhook(
+  app: AppContext,
+  event: string,
+  payload: Record<string, any>,
+): Promise<WebhookResult> {
   // Only handle review-related events
   if (event !== "pull_request_review" && event !== "pull_request_review_comment") {
     return { action: "ignore", message: `Unhandled event: ${event}` };
@@ -154,7 +158,7 @@ export function handleGitHubWebhook(app: AppContext, event: string, payload: Rec
   }
 
   // Find matching session
-  const session = findSessionByPR(app, prUrl);
+  const session = await findSessionByPR(app, prUrl);
   if (!session) {
     return { action: "ignore", message: `No session for PR: ${prUrl}` };
   }
@@ -165,7 +169,7 @@ export function handleGitHubWebhook(app: AppContext, event: string, payload: Rec
 
   // Handle approved reviews
   if (event === "pull_request_review" && payload.review?.state === "approved") {
-    app.events.log(session.id, "webhook_review_approved", {
+    await app.events.log(session.id, "webhook_review_approved", {
       actor: "github",
       data: { pr_url: prUrl, reviewer: payload.review?.user?.login },
     });
@@ -177,9 +181,9 @@ export function handleGitHubWebhook(app: AppContext, event: string, payload: Rec
     const prompt = formatReviewPrompt(prTitle, prNumber, comments, payload.review?.state);
 
     // Store as a message so the UI shows it
-    app.messages.send(session.id, "system", prompt, "text");
+    await app.messages.send(session.id, "system", prompt, "text");
 
-    app.events.log(session.id, "webhook_review_steer", {
+    await app.events.log(session.id, "webhook_review_steer", {
       actor: "github",
       data: {
         pr_url: prUrl,
@@ -191,7 +195,7 @@ export function handleGitHubWebhook(app: AppContext, event: string, payload: Rec
 
     // Steer via channel if session is running (fire-and-forget)
     if (session.status === "running") {
-      const channelPort = app.sessions.channelPort(session.id);
+      const channelPort = await app.sessions.channelPort(session.id);
       const steerPayload = { type: "steer", sessionId: session.id, message: prompt, from: "github-review" };
       safeAsync(`[github-pr] deliverToChannel for ${session.id}`, async () => {
         const { deliverToChannel } = await import("../conductor/conductor.js");

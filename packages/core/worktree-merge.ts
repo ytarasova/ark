@@ -9,7 +9,7 @@ export async function mergeChildBranches(
   parentId: string,
   children: Session[],
 ): Promise<{ merged: string[]; conflicts: string[] }> {
-  const parent = app.sessions.get(parentId);
+  const parent = await app.sessions.get(parentId);
   if (!parent?.workdir) return { merged: [], conflicts: [] };
 
   const parentWorktree = `${process.env.HOME}/.ark/worktrees/${parentId}`;
@@ -46,11 +46,11 @@ export async function mergeChildBranches(
   }
 
   if (conflicts.length > 0) {
-    app.events.log(parentId, "merge_conflict", {
+    await app.events.log(parentId, "merge_conflict", {
       actor: "system",
       data: { merged, conflicts },
     });
-    app.sessions.update(parentId, { status: "waiting" });
+    await app.sessions.update(parentId, { status: "waiting" });
   }
 
   return { merged, conflicts };

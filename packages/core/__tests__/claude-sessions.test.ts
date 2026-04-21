@@ -51,17 +51,17 @@ async function writeAndRefresh(projectDirName: string, filename: string, lines: 
 
 // ── listClaudeSessions ──────────────────────────────────────────────────────
 
-describe("listClaudeSessions", () => {
+describe("listClaudeSessions", async () => {
   it("returns empty array when baseDir does not exist", async () => {
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
-    const sessions = listClaudeSessions(getApp());
+    const sessions = await listClaudeSessions(getApp());
     expect(sessions).toEqual([]);
   });
 
   it("returns empty array for an empty directory", async () => {
     mkdirSync(baseDir(), { recursive: true });
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
-    const sessions = listClaudeSessions(getApp());
+    const sessions = await listClaudeSessions(getApp());
     expect(sessions).toEqual([]);
   });
 
@@ -90,7 +90,7 @@ describe("listClaudeSessions", () => {
     writeTranscript("-Users-yana-Projects-ark", "abc-123.jsonl", msgs);
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
-    const sessions = listClaudeSessions(getApp());
+    const sessions = await listClaudeSessions(getApp());
     expect(sessions.length).toBe(1);
 
     const s = sessions[0];
@@ -106,7 +106,7 @@ describe("listClaudeSessions", () => {
     ]);
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
-    const sessions = listClaudeSessions(getApp());
+    const sessions = await listClaudeSessions(getApp());
     expect(sessions[0].project).toBe("/Users/yana/Projects/ark");
     expect(sessions[0].projectDir).toBe("-Users-yana-Projects-ark");
   });
@@ -132,7 +132,7 @@ describe("listClaudeSessions", () => {
     writeTranscript("-test-proj", "s2.jsonl", msgs);
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
-    const sessions = listClaudeSessions(getApp());
+    const sessions = await listClaudeSessions(getApp());
     expect(sessions[0].messageCount).toBe(11); // 6 user + 5 assistant, system excluded
   });
 
@@ -146,7 +146,7 @@ describe("listClaudeSessions", () => {
     ]);
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
-    const sessions = listClaudeSessions(getApp());
+    const sessions = await listClaudeSessions(getApp());
     expect(sessions[0].summary).toBe("refactor the auth module");
   });
 
@@ -160,7 +160,7 @@ describe("listClaudeSessions", () => {
     ]);
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
-    const sessions = listClaudeSessions(getApp());
+    const sessions = await listClaudeSessions(getApp());
     expect(sessions[0].summary).toBe("deploy to staging");
   });
 
@@ -196,7 +196,7 @@ describe("listClaudeSessions", () => {
     writeTranscript("-proj-b", "new.jsonl", newMsgs);
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
-    const sessions = listClaudeSessions(getApp());
+    const sessions = await listClaudeSessions(getApp());
     expect(sessions.length).toBe(2);
     expect(sessions[0].sessionId).toBe("new");
     expect(sessions[1].sessionId).toBe("old");
@@ -222,7 +222,7 @@ describe("listClaudeSessions", () => {
     );
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
-    const sessions = listClaudeSessions(getApp());
+    const sessions = await listClaudeSessions(getApp());
     expect(sessions.length).toBe(1);
     expect(sessions[0].sessionId).toBe("main-session");
   });
@@ -236,7 +236,7 @@ describe("listClaudeSessions", () => {
     }
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
-    const sessions = listClaudeSessions(getApp(), { limit: 3 });
+    const sessions = await listClaudeSessions(getApp(), { limit: 3 });
     expect(sessions.length).toBe(3);
   });
 
@@ -249,7 +249,7 @@ describe("listClaudeSessions", () => {
     ]);
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
-    const sessions = listClaudeSessions(getApp(), { project: "ark" });
+    const sessions = await listClaudeSessions(getApp(), { project: "ark" });
     expect(sessions.length).toBe(1);
     expect(sessions[0].sessionId).toBe("ark-s");
   });
@@ -260,7 +260,7 @@ describe("listClaudeSessions", () => {
     writeFileSync(join(dir, "empty.jsonl"), "");
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
-    const sessions = listClaudeSessions(getApp());
+    const sessions = await listClaudeSessions(getApp());
     expect(sessions).toEqual([]);
   });
 
@@ -274,7 +274,7 @@ describe("listClaudeSessions", () => {
     ]);
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
-    const sessions = listClaudeSessions(getApp());
+    const sessions = await listClaudeSessions(getApp());
     expect(sessions[0].summary).not.toContain("<context>");
     expect(sessions[0].summary).toContain("fix this");
   });
@@ -282,7 +282,7 @@ describe("listClaudeSessions", () => {
 
 // ── incremental refresh ─────────────────────────────────────────────────────
 
-describe("incremental refresh", () => {
+describe("incremental refresh", async () => {
   it("skips unmodified files on second refresh (returns 0 new)", async () => {
     writeTranscript("-incr-proj", "sess-incr.jsonl", [
       { type: "system", sessionId: "sess-incr", timestamp: "2026-03-24T10:00:00Z" },
@@ -304,7 +304,7 @@ describe("incremental refresh", () => {
     ]);
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
-    const before = listClaudeSessions(getApp());
+    const before = await listClaudeSessions(getApp());
     const countBefore = before.length;
 
     // Set explicit future mtime to guarantee incremental refresh detects the new file
@@ -319,14 +319,14 @@ describe("incremental refresh", () => {
     const added = await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
     expect(added).toBeGreaterThanOrEqual(1);
 
-    const after = listClaudeSessions(getApp());
+    const after = await listClaudeSessions(getApp());
     expect(after.length).toBeGreaterThan(countBefore);
   });
 });
 
 // ── getClaudeSession ────────────────────────────────────────────────────────
 
-describe("getClaudeSession", () => {
+describe("getClaudeSession", async () => {
   it("finds session by full ID", async () => {
     writeTranscript("-proj", "abc-def-123.jsonl", [
       { type: "system", sessionId: "abc-def-123", timestamp: "2026-01-01T00:00:00Z" },
@@ -364,7 +364,7 @@ describe("getClaudeSession", () => {
 
 // ── Filtering ────────────────────────────────────────────────────────────────
 
-describe("claude sessions filtering", () => {
+describe("claude sessions filtering", async () => {
   it("sessions with few messages are included (MIN_MESSAGE_COUNT=1)", async () => {
     // Write a session with only 4 user+assistant messages (8 total lines with system)
     const fewMsgs: object[] = [{ type: "system", sessionId: "few-msgs", timestamp: "2026-03-24T10:00:00Z" }];
@@ -387,7 +387,7 @@ describe("claude sessions filtering", () => {
     writeFileSync(join(dir, "few-msgs.jsonl"), fewMsgs.map((l) => JSON.stringify(l)).join("\n"));
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
-    const sessions = listClaudeSessions(getApp());
+    const sessions = await listClaudeSessions(getApp());
     const found = sessions.find((s) => s.sessionId === "few-msgs");
     // With MIN_MESSAGE_COUNT=1, short conversations should be included
     expect(found).toBeDefined();
@@ -399,7 +399,7 @@ describe("claude sessions filtering", () => {
       { type: "user", message: { role: "user", content: "hello" }, timestamp: "2026-03-24T10:01:00Z" },
     ]);
 
-    const sessions = listClaudeSessions(getApp());
+    const sessions = await listClaudeSessions(getApp());
     const found = sessions.find((s) => s.sessionId === "many-msgs");
     expect(found).toBeTruthy();
     expect(found!.messageCount).toBeGreaterThanOrEqual(10);
@@ -428,7 +428,7 @@ describe("claude sessions filtering", () => {
     writeFileSync(join(varFolderDir, "var-folder-session.jsonl"), msgs.map((l) => JSON.stringify(l)).join("\n"));
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
-    const sessions = listClaudeSessions(getApp());
+    const sessions = await listClaudeSessions(getApp());
     const found = sessions.find((s) => s.sessionId === "var-folder-session");
     expect(found).toBeUndefined();
   });
@@ -455,7 +455,7 @@ describe("claude sessions filtering", () => {
     writeFileSync(join(worktreeDir, "worktree-session.jsonl"), msgs.map((l) => JSON.stringify(l)).join("\n"));
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
-    const sessions = listClaudeSessions(getApp());
+    const sessions = await listClaudeSessions(getApp());
     const found = sessions.find((s) => s.sessionId === "worktree-session");
     expect(found).toBeUndefined();
   });
@@ -472,7 +472,7 @@ describe("claude sessions filtering", () => {
     expect(firstCount).toBeGreaterThanOrEqual(1);
 
     // Verify cache has the session
-    let sessions = listClaudeSessions(getApp());
+    let sessions = await listClaudeSessions(getApp());
     expect(sessions.find((s) => s.sessionId === "first-session")).toBeTruthy();
 
     // Second refresh with no changes - incremental should return 0
@@ -494,7 +494,7 @@ describe("claude sessions filtering", () => {
     expect(thirdCount).toBeGreaterThanOrEqual(1);
 
     // Both sessions should now be in cache
-    sessions = listClaudeSessions(getApp());
+    sessions = await listClaudeSessions(getApp());
     expect(sessions.find((s) => s.sessionId === "first-session")).toBeTruthy();
     expect(sessions.find((s) => s.sessionId === "second-session")).toBeTruthy();
   });

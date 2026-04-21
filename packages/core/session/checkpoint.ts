@@ -27,8 +27,8 @@ export interface Checkpoint {
 // ── Save / Load ────────────────────────────────────────────────────────────
 
 /** Save a checkpoint for a session. Stores full state snapshot as a checkpoint event. */
-export function saveCheckpoint(app: AppContext, sessionId: string): void {
-  const session = app.sessions.get(sessionId);
+export async function saveCheckpoint(app: AppContext, sessionId: string): Promise<void> {
+  const session = await app.sessions.get(sessionId);
   if (!session) return;
 
   const data: Record<string, unknown> = {
@@ -45,12 +45,12 @@ export function saveCheckpoint(app: AppContext, sessionId: string): void {
     config: session.config,
   };
 
-  app.events.log(sessionId, "checkpoint", { stage: session.stage ?? undefined, actor: "system", data });
+  await app.events.log(sessionId, "checkpoint", { stage: session.stage ?? undefined, actor: "system", data });
 }
 
 /** Get the latest checkpoint for a session. */
-export function getCheckpoint(app: AppContext, sessionId: string): Checkpoint | null {
-  const events = app.events.list(sessionId, { type: "checkpoint" }) ?? [];
+export async function getCheckpoint(app: AppContext, sessionId: string): Promise<Checkpoint | null> {
+  const events = (await app.events.list(sessionId, { type: "checkpoint" })) ?? [];
   if (events.length === 0) return null;
 
   const latest = events[events.length - 1];
@@ -58,8 +58,8 @@ export function getCheckpoint(app: AppContext, sessionId: string): Checkpoint | 
 }
 
 /** List all checkpoints for a session, oldest first. */
-export function listCheckpoints(app: AppContext, sessionId: string): Checkpoint[] {
-  const events = app.events.list(sessionId, { type: "checkpoint" }) ?? [];
+export async function listCheckpoints(app: AppContext, sessionId: string): Promise<Checkpoint[]> {
+  const events = (await app.events.list(sessionId, { type: "checkpoint" })) ?? [];
   return events.map((e) => eventToCheckpoint(sessionId, e));
 }
 
@@ -70,9 +70,9 @@ export function listCheckpoints(app: AppContext, sessionId: string): Checkpoint[
  * A session is orphaned if its status is "running" or "waiting" but its
  * tmux session no longer exists.
  */
-export function findOrphanedSessions(app: AppContext): Session[] {
-  const running = app.sessions.list({ status: "running" });
-  const waiting = app.sessions.list({ status: "waiting" });
+export async function findOrphanedSessions(app: AppContext): Promise<Session[]> {
+  const running = await app.sessions.list({ status: "running" });
+  const waiting = await app.sessions.list({ status: "waiting" });
   const candidates = [...running, ...waiting];
 
   return candidates.filter((session) => {
@@ -96,11 +96,11 @@ export function findOrphanedSessions(app: AppContext): Session[] {
  * 3. Preserve claude_session_id for --resume on next dispatch
  * 4. Log recovery event
  */
-export function recoverSession(app: AppContext, sessionId: string): { ok: boolean; message: string } {
-  const session = app.sessions.get(sessionId);
+export async function recoverSession(app: AppContext, sessionId: string): Promise<{ ok: boolean; message: string }> {
+  const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
-  const checkpoint = getCheckpoint(app, sessionId);
+  const checkpoint = await getCheckpoint(app, sessionId);
 
   // Build recovery fields
   const updates: Partial<Session> = {
@@ -120,9 +120,9 @@ export function recoverSession(app: AppContext, sessionId: string): { ok: boolea
     updates.claude_session_id = claudeId;
   }
 
-  app.sessions.update(sessionId, updates);
+  await app.sessions.update(sessionId, updates);
 
-  app.events.log(sessionId, "session_recovered", {
+  await app.events.log(sessionId, "session_recovered", {
     stage: updates.stage ?? session.stage ?? undefined,
     actor: "system",
     data: {

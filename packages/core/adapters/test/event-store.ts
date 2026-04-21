@@ -25,7 +25,7 @@ export class InMemoryEventStore implements EventStore {
     return this.tenantId;
   }
 
-  log(trackId: string, type: string, opts?: EventLogOpts): void {
+  async log(trackId: string, type: string, opts?: EventLogOpts): Promise<void> {
     const row: StoredEvent = {
       id: this.nextId++,
       track_id: trackId,
@@ -39,7 +39,7 @@ export class InMemoryEventStore implements EventStore {
     this.rows.push(row);
   }
 
-  list(trackId: string, opts?: EventListOpts): Event[] {
+  async list(trackId: string, opts?: EventListOpts): Promise<Event[]> {
     const limit = opts?.limit ?? 200;
     const filtered = this.rows.filter((r) => {
       if (r.track_id !== trackId) return false;
@@ -54,7 +54,7 @@ export class InMemoryEventStore implements EventStore {
     });
   }
 
-  deleteForTrack(trackId: string): void {
+  async deleteForTrack(trackId: string): Promise<void> {
     this.rows = this.rows.filter((r) => !(r.track_id === trackId && r.tenant_id === this.tenantId));
   }
 }

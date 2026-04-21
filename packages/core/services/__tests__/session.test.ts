@@ -51,32 +51,32 @@ afterEach(async () => {
   await app?.shutdown();
 });
 
-describe("SessionService", () => {
+describe("SessionService", async () => {
   // ── start() ────────────────────────────────────────────────────────────────
 
-  describe("start", () => {
-    it("creates a session with correct defaults", () => {
-      const s = svc.start({});
+  describe("start", async () => {
+    it("creates a session with correct defaults", async () => {
+      const s = await svc.start({});
       expect(s.id).toMatch(/^s-[0-9a-z]{10}$/);
       expect(s.status).toBe("pending");
       expect(s.flow).toBe("default");
     });
 
-    it("stores ticket, summary, repo", () => {
-      const s = svc.start({ ticket: "PROJ-1", summary: "Fix bug", repo: "/tmp/repo" });
+    it("stores ticket, summary, repo", async () => {
+      const s = await svc.start({ ticket: "PROJ-1", summary: "Fix bug", repo: "/tmp/repo" });
       expect(s.ticket).toBe("PROJ-1");
       expect(s.summary).toBe("Fix bug");
       expect(s.repo).toBe("/tmp/repo");
     });
 
-    it("applies agent override", () => {
-      const s = svc.start({ agent: "planner" });
+    it("applies agent override", async () => {
+      const s = await svc.start({ agent: "planner" });
       expect(s.agent).toBe("planner");
     });
 
-    it("logs session_created event", () => {
-      const s = svc.start({ summary: "Test" });
-      const evts = events.list(s.id, { type: "session_created" });
+    it("logs session_created event", async () => {
+      const s = await svc.start({ summary: "Test" });
+      const evts = await events.list(s.id, { type: "session_created" });
       expect(evts.length).toBe(1);
       expect(evts[0].actor).toBe("system");
     });
@@ -84,47 +84,47 @@ describe("SessionService", () => {
 
   // ── stop() ─────────────────────────────────────────────────────────────────
 
-  describe("stop", () => {
+  describe("stop", async () => {
     it("transitions running -> stopped", async () => {
-      const s = svc.start({});
-      sessions.update(s.id, { status: "running" as SessionStatus } as Partial<Session>);
+      const s = await svc.start({});
+      await sessions.update(s.id, { status: "running" as SessionStatus } as Partial<Session>);
       const result = await svc.stop(s.id);
       expect(result.ok).toBe(true);
-      const updated = sessions.get(s.id)!;
+      const updated = await sessions.get(s.id)!;
       expect(updated.status).toBe("stopped");
     });
 
     it("is idempotent on already-stopped", async () => {
-      const s = svc.start({});
-      sessions.update(s.id, { status: "stopped" as SessionStatus } as Partial<Session>);
+      const s = await svc.start({});
+      await sessions.update(s.id, { status: "stopped" as SessionStatus } as Partial<Session>);
       const result = await svc.stop(s.id);
       expect(result.ok).toBe(true);
     });
 
     it("is idempotent on completed", async () => {
-      const s = svc.start({});
-      sessions.update(s.id, { status: "completed" as SessionStatus } as Partial<Session>);
+      const s = await svc.start({});
+      await sessions.update(s.id, { status: "completed" as SessionStatus } as Partial<Session>);
       const result = await svc.stop(s.id);
       expect(result.ok).toBe(true);
     });
 
     it("is idempotent on failed", async () => {
-      const s = svc.start({});
-      sessions.update(s.id, { status: "failed" as SessionStatus } as Partial<Session>);
+      const s = await svc.start({});
+      await sessions.update(s.id, { status: "failed" as SessionStatus } as Partial<Session>);
       const result = await svc.stop(s.id);
       expect(result.ok).toBe(true);
     });
 
     it("clears runtime fields (session_id, error) but preserves claude_session_id", async () => {
-      const s = svc.start({});
-      sessions.update(s.id, {
+      const s = await svc.start({});
+      await sessions.update(s.id, {
         status: "running" as SessionStatus,
         session_id: "ark-s-abc",
         claude_session_id: "claude-123",
         error: "some error",
       } as Partial<Session>);
       await svc.stop(s.id);
-      const updated = sessions.get(s.id)!;
+      const updated = await sessions.get(s.id)!;
       expect(updated.session_id).toBeNull();
       expect(updated.error).toBeNull();
       // claude_session_id preserved for resume
@@ -137,36 +137,36 @@ describe("SessionService", () => {
     });
 
     it("logs session_stopped event", async () => {
-      const s = svc.start({});
-      sessions.update(s.id, { status: "running" as SessionStatus } as Partial<Session>);
+      const s = await svc.start({});
+      await sessions.update(s.id, { status: "running" as SessionStatus } as Partial<Session>);
       await svc.stop(s.id);
-      const evts = events.list(s.id, { type: "session_stopped" });
+      const evts = await events.list(s.id, { type: "session_stopped" });
       expect(evts.length).toBe(1);
     });
   });
 
   // ── resume() ───────────────────────────────────────────────────────────────
 
-  describe("resume", () => {
+  describe("resume", async () => {
     it("transitions stopped -> ready", async () => {
-      const s = svc.start({});
-      sessions.update(s.id, { status: "stopped" as SessionStatus } as Partial<Session>);
+      const s = await svc.start({});
+      await sessions.update(s.id, { status: "stopped" as SessionStatus } as Partial<Session>);
       const result = await svc.resume(s.id);
       expect(result.ok).toBe(true);
-      expect(sessions.get(s.id)!.status).toBe("ready");
+      expect((await sessions.get(s.id))!.status).toBe("ready");
     });
 
     it("fails on completed sessions", async () => {
-      const s = svc.start({});
-      sessions.update(s.id, { status: "completed" as SessionStatus } as Partial<Session>);
+      const s = await svc.start({});
+      await sessions.update(s.id, { status: "completed" as SessionStatus } as Partial<Session>);
       const result = await svc.resume(s.id);
       expect(result.ok).toBe(false);
       expect(result.message).toContain("completed");
     });
 
     it("clears error, breakpoint_reason, attached_by, session_id", async () => {
-      const s = svc.start({});
-      sessions.update(s.id, {
+      const s = await svc.start({});
+      await sessions.update(s.id, {
         status: "failed" as SessionStatus,
         error: "some error",
         breakpoint_reason: "waiting for input",
@@ -174,7 +174,7 @@ describe("SessionService", () => {
         session_id: "ark-s-old",
       } as Partial<Session>);
       await svc.resume(s.id);
-      const updated = sessions.get(s.id)!;
+      const updated = await sessions.get(s.id)!;
       expect(updated.error).toBeNull();
       expect(updated.breakpoint_reason).toBeNull();
       expect(updated.attached_by).toBeNull();
@@ -182,10 +182,10 @@ describe("SessionService", () => {
     });
 
     it("logs session_resumed event", async () => {
-      const s = svc.start({});
-      sessions.update(s.id, { status: "stopped" as SessionStatus } as Partial<Session>);
+      const s = await svc.start({});
+      await sessions.update(s.id, { status: "stopped" as SessionStatus } as Partial<Session>);
       await svc.resume(s.id);
-      const evts = events.list(s.id, { type: "session_resumed" });
+      const evts = await events.list(s.id, { type: "session_resumed" });
       expect(evts.length).toBe(1);
     });
 
@@ -197,86 +197,86 @@ describe("SessionService", () => {
 
   // ── complete() ─────────────────────────────────────────────────────────────
 
-  describe("complete", () => {
-    it("transitions to ready and clears session_id", () => {
-      const s = svc.start({});
-      sessions.update(s.id, { status: "running" as SessionStatus, session_id: "tmux-1" } as Partial<Session>);
-      const result = svc.complete(s.id);
+  describe("complete", async () => {
+    it("transitions to ready and clears session_id", async () => {
+      const s = await svc.start({});
+      await sessions.update(s.id, { status: "running" as SessionStatus, session_id: "tmux-1" } as Partial<Session>);
+      const result = await svc.complete(s.id);
       expect(result.ok).toBe(true);
-      const updated = sessions.get(s.id)!;
+      const updated = await sessions.get(s.id)!;
       expect(updated.status).toBe("ready");
       expect(updated.session_id).toBeNull();
     });
 
-    it("marks messages as read", () => {
-      const s = svc.start({});
+    it("marks messages as read", async () => {
+      const s = await svc.start({});
       messages.send(s.id, "agent", "hello", "text");
       expect(messages.unreadCount(s.id)).toBe(1);
-      svc.complete(s.id);
+      await svc.complete(s.id);
       expect(messages.unreadCount(s.id)).toBe(0);
     });
 
-    it("logs stage_completed event", () => {
-      const s = svc.start({});
-      sessions.update(s.id, { stage: "plan" } as Partial<Session>);
-      svc.complete(s.id);
-      const evts = events.list(s.id, { type: "stage_completed" });
+    it("logs stage_completed event", async () => {
+      const s = await svc.start({});
+      await sessions.update(s.id, { stage: "plan" } as Partial<Session>);
+      await svc.complete(s.id);
+      const evts = await events.list(s.id, { type: "stage_completed" });
       expect(evts.length).toBe(1);
     });
 
-    it("returns error for nonexistent session", () => {
-      const result = svc.complete("s-000000");
+    it("returns error for nonexistent session", async () => {
+      const result = await svc.complete("s-000000");
       expect(result.ok).toBe(false);
     });
   });
 
   // ── pause() ────────────────────────────────────────────────────────────────
 
-  describe("pause", () => {
-    it("transitions to blocked with reason", () => {
-      const s = svc.start({});
-      sessions.update(s.id, { status: "running" as SessionStatus } as Partial<Session>);
-      const result = svc.pause(s.id, "Need review");
+  describe("pause", async () => {
+    it("transitions to blocked with reason", async () => {
+      const s = await svc.start({});
+      await sessions.update(s.id, { status: "running" as SessionStatus } as Partial<Session>);
+      const result = await svc.pause(s.id, "Need review");
       expect(result.ok).toBe(true);
-      const updated = sessions.get(s.id)!;
+      const updated = await sessions.get(s.id)!;
       expect(updated.status).toBe("blocked");
       expect(updated.breakpoint_reason).toBe("Need review");
     });
 
-    it("defaults reason to 'User paused'", () => {
-      const s = svc.start({});
-      svc.pause(s.id);
-      expect(sessions.get(s.id)!.breakpoint_reason).toBe("User paused");
+    it("defaults reason to 'User paused'", async () => {
+      const s = await svc.start({});
+      await svc.pause(s.id);
+      expect((await sessions.get(s.id))!.breakpoint_reason).toBe("User paused");
     });
 
-    it("logs session_paused event", () => {
-      const s = svc.start({});
-      svc.pause(s.id);
-      const evts = events.list(s.id, { type: "session_paused" });
+    it("logs session_paused event", async () => {
+      const s = await svc.start({});
+      await svc.pause(s.id);
+      const evts = await events.list(s.id, { type: "session_paused" });
       expect(evts.length).toBe(1);
     });
 
-    it("returns error for nonexistent session", () => {
-      const result = svc.pause("s-000000");
+    it("returns error for nonexistent session", async () => {
+      const result = await svc.pause("s-000000");
       expect(result.ok).toBe(false);
     });
   });
 
   // ── delete() ───────────────────────────────────────────────────────────────
 
-  describe("delete", () => {
+  describe("delete", async () => {
     it("soft-deletes session (status -> deleting)", async () => {
-      const s = svc.start({});
+      const s = await svc.start({});
       const result = await svc.delete(s.id);
       expect(result.ok).toBe(true);
-      const deleted = sessions.get(s.id)!;
+      const deleted = await sessions.get(s.id)!;
       expect(deleted.status).toBe("deleting");
     });
 
     it("logs session_deleted event", async () => {
-      const s = svc.start({});
+      const s = await svc.start({});
       await svc.delete(s.id);
-      const evts = events.list(s.id, { type: "session_deleted" });
+      const evts = await events.list(s.id, { type: "session_deleted" });
       expect(evts.length).toBe(1);
     });
 
@@ -288,28 +288,28 @@ describe("SessionService", () => {
 
   // ── undelete() ─────────────────────────────────────────────────────────────
 
-  describe("undelete", () => {
+  describe("undelete", async () => {
     it("restores a soft-deleted session", async () => {
-      const s = svc.start({});
-      sessions.update(s.id, { status: "running" as SessionStatus } as Partial<Session>);
+      const s = await svc.start({});
+      await sessions.update(s.id, { status: "running" as SessionStatus } as Partial<Session>);
       await svc.delete(s.id);
       const result = await svc.undelete(s.id);
       expect(result.ok).toBe(true);
-      const restored = sessions.get(s.id)!;
+      const restored = await sessions.get(s.id)!;
       expect(restored.status).toBe("running");
     });
 
     it("returns error for non-deleted session", async () => {
-      const s = svc.start({});
+      const s = await svc.start({});
       const result = await svc.undelete(s.id);
       expect(result.ok).toBe(false);
     });
 
     it("logs session_undeleted event", async () => {
-      const s = svc.start({});
+      const s = await svc.start({});
       await svc.delete(s.id);
       await svc.undelete(s.id);
-      const evts = events.list(s.id, { type: "session_undeleted" });
+      const evts = await events.list(s.id, { type: "session_undeleted" });
       expect(evts.length).toBe(1);
     });
   });
@@ -321,20 +321,20 @@ describe("SessionService", () => {
 
   // ── get / list ─────────────────────────────────────────────────────────────
 
-  describe("get / list", () => {
-    it("get returns session by id", () => {
-      const s = svc.start({ summary: "hello" });
-      expect(svc.get(s.id)!.summary).toBe("hello");
+  describe("get / list", async () => {
+    it("get returns session by id", async () => {
+      const s = await svc.start({ summary: "hello" });
+      expect((await svc.get(s.id))!.summary).toBe("hello");
     });
 
-    it("get returns null for nonexistent", () => {
-      expect(svc.get("s-000000")).toBeNull();
+    it("get returns null for nonexistent", async () => {
+      expect(await svc.get("s-000000")).toBeNull();
     });
 
-    it("list returns all sessions", () => {
-      svc.start({ summary: "a" });
-      svc.start({ summary: "b" });
-      expect(svc.list().length).toBe(2);
+    it("list returns all sessions", async () => {
+      await svc.start({ summary: "a" });
+      await svc.start({ summary: "b" });
+      expect((await svc.list()).length).toBe(2);
     });
   });
 
@@ -402,20 +402,20 @@ describe("SessionService", () => {
 
   // ── list with filters ─────────────────────────────────────────────────
 
-  describe("list with filters", () => {
-    it("list passes filters through to repository", () => {
-      svc.start({ flow: "quick" });
-      svc.start({ flow: "default" });
-      const quickSessions = svc.list({ flow: "quick" });
+  describe("list with filters", async () => {
+    it("list passes filters through to repository", async () => {
+      await svc.start({ flow: "quick" });
+      await svc.start({ flow: "default" });
+      const quickSessions = await svc.list({ flow: "quick" });
       expect(quickSessions.length).toBe(1);
       expect(quickSessions[0].flow).toBe("quick");
     });
 
-    it("list filters by status", () => {
-      const s = svc.start({});
-      sessions.update(s.id, { status: "running" as SessionStatus } as Partial<Session>);
-      svc.start({});
-      const running = svc.list({ status: "running" });
+    it("list filters by status", async () => {
+      const s = await svc.start({});
+      await sessions.update(s.id, { status: "running" as SessionStatus } as Partial<Session>);
+      await svc.start({});
+      const running = await svc.list({ status: "running" });
       expect(running.length).toBe(1);
       expect(running[0].id).toBe(s.id);
     });
@@ -423,16 +423,16 @@ describe("SessionService", () => {
 
   // ── stop edge cases ───────────────────────────────────────────────────
 
-  describe("stop edge cases", () => {
+  describe("stop edge cases", async () => {
     it("stops a pending session (no session_id)", async () => {
-      const s = svc.start({});
+      const s = await svc.start({});
       const result = await svc.stop(s.id);
       expect(result.ok).toBe(true);
-      expect(sessions.get(s.id)!.status).toBe("stopped");
+      expect((await sessions.get(s.id))!.status).toBe("stopped");
     });
 
     it("returns sessionId in result", async () => {
-      const s = svc.start({});
+      const s = await svc.start({});
       const result = await svc.stop(s.id);
       expect(result.sessionId).toBe(s.id);
     });
@@ -440,26 +440,26 @@ describe("SessionService", () => {
 
   // ── resume edge cases ─────────────────────────────────────────────────
 
-  describe("resume edge cases", () => {
+  describe("resume edge cases", async () => {
     it("resumes a failed session", async () => {
-      const s = svc.start({});
-      sessions.update(s.id, { status: "failed" as SessionStatus } as Partial<Session>);
+      const s = await svc.start({});
+      await sessions.update(s.id, { status: "failed" as SessionStatus } as Partial<Session>);
       const result = await svc.resume(s.id);
       expect(result.ok).toBe(true);
-      expect(sessions.get(s.id)!.status).toBe("ready");
+      expect((await sessions.get(s.id))!.status).toBe("ready");
     });
 
     it("resumes a blocked session", async () => {
-      const s = svc.start({});
-      sessions.update(s.id, { status: "blocked" as SessionStatus } as Partial<Session>);
+      const s = await svc.start({});
+      await sessions.update(s.id, { status: "blocked" as SessionStatus } as Partial<Session>);
       const result = await svc.resume(s.id);
       expect(result.ok).toBe(true);
-      expect(sessions.get(s.id)!.status).toBe("ready");
+      expect((await sessions.get(s.id))!.status).toBe("ready");
     });
 
     it("returns sessionId in result", async () => {
-      const s = svc.start({});
-      sessions.update(s.id, { status: "stopped" as SessionStatus } as Partial<Session>);
+      const s = await svc.start({});
+      await sessions.update(s.id, { status: "stopped" as SessionStatus } as Partial<Session>);
       const result = await svc.resume(s.id);
       expect(result.sessionId).toBe(s.id);
     });
@@ -467,43 +467,43 @@ describe("SessionService", () => {
 
   // ── complete edge cases ───────────────────────────────────────────────
 
-  describe("complete edge cases", () => {
-    it("returns sessionId in result", () => {
-      const s = svc.start({});
-      const result = svc.complete(s.id);
+  describe("complete edge cases", async () => {
+    it("returns sessionId in result", async () => {
+      const s = await svc.start({});
+      const result = await svc.complete(s.id);
       expect(result.sessionId).toBe(s.id);
     });
   });
 
   // ── pause edge cases ──────────────────────────────────────────────────
 
-  describe("pause edge cases", () => {
-    it("returns sessionId in result", () => {
-      const s = svc.start({});
-      const result = svc.pause(s.id);
+  describe("pause edge cases", async () => {
+    it("returns sessionId in result", async () => {
+      const s = await svc.start({});
+      const result = await svc.pause(s.id);
       expect(result.sessionId).toBe(s.id);
     });
 
-    it("logs the previous status in event data", () => {
-      const s = svc.start({});
-      sessions.update(s.id, { status: "running" as SessionStatus } as Partial<Session>);
-      svc.pause(s.id, "Need review");
-      const evts = events.list(s.id, { type: "session_paused" });
+    it("logs the previous status in event data", async () => {
+      const s = await svc.start({});
+      await sessions.update(s.id, { status: "running" as SessionStatus } as Partial<Session>);
+      await svc.pause(s.id, "Need review");
+      const evts = await events.list(s.id, { type: "session_paused" });
       expect(evts.length).toBe(1);
     });
   });
 
   // ── delete/undelete edge cases ────────────────────────────────────────
 
-  describe("delete/undelete edge cases", () => {
+  describe("delete/undelete edge cases", async () => {
     it("delete returns sessionId in result", async () => {
-      const s = svc.start({});
+      const s = await svc.start({});
       const result = await svc.delete(s.id);
       expect(result.sessionId).toBe(s.id);
     });
 
     it("undelete returns sessionId in result", async () => {
-      const s = svc.start({});
+      const s = await svc.start({});
       await svc.delete(s.id);
       const result = await svc.undelete(s.id);
       expect(result.sessionId).toBe(s.id);
@@ -523,8 +523,8 @@ describe("SessionService", () => {
   // sessionService after an override gives us a fresh instance wired to the
   // fake -- proving the container can rebuild services from test doubles.
 
-  describe("container overrides", () => {
-    it("swapping the events repo reroutes session_created logging", () => {
+  describe("container overrides", async () => {
+    it("swapping the events repo reroutes session_created logging", async () => {
       // Spy that records every event logged through the service.
       const recorded: Array<{ sessionId: string; type: string }> = [];
       const fakeEvents = {
@@ -544,7 +544,7 @@ describe("SessionService", () => {
       });
 
       const freshSvc = app.container.resolve("sessionService");
-      const s = freshSvc.start({ summary: "override test" });
+      const s = await freshSvc.start({ summary: "override test" });
 
       expect(recorded.length).toBe(1);
       expect(recorded[0].sessionId).toBe(s.id);
@@ -583,13 +583,13 @@ describe("SessionService", () => {
   // construct SessionService directly. Prefer the container path above when
   // the test touches more than one repository.
 
-  describe("pure unit construction (no container)", () => {
+  describe("pure unit construction (no container)", async () => {
     let pureDb: IDatabase;
     let pureSvc: SessionService;
 
-    beforeEach(() => {
+    beforeEach(async () => {
       pureDb = new BunSqliteAdapter(new Database(":memory:"));
-      initSchema(pureDb);
+      await initSchema(pureDb);
       pureSvc = new SessionService(
         new SessionRepository(pureDb),
         new EventRepository(pureDb),
@@ -597,8 +597,8 @@ describe("SessionService", () => {
       );
     });
 
-    it("start() works without an AppContext", () => {
-      const s = pureSvc.start({ summary: "pure unit" });
+    it("start() works without an AppContext", async () => {
+      const s = await pureSvc.start({ summary: "pure unit" });
       expect(s.id).toMatch(/^s-[0-9a-z]{10}$/);
     });
   });

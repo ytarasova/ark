@@ -58,7 +58,7 @@ async function drain(s: ReadableStream<Uint8Array>): Promise<Uint8Array> {
   return out;
 }
 
-describe("FsSnapshotStore", () => {
+describe("FsSnapshotStore", async () => {
   it("save() mints an id, fills createdAt + sizeBytes, and round-trips metadata", async () => {
     const payload = new TextEncoder().encode("hello snapshot");
     const before = Date.now() - 1;
@@ -100,7 +100,7 @@ describe("FsSnapshotStore", () => {
       streamOf(new Uint8Array([9, 9, 9])),
     );
     await store.delete(saved.id);
-    await expect(store.load(saved.id)).rejects.toBeInstanceOf(SnapshotNotFoundError);
+    (await expect(store.load(saved.id))).rejects.toBeInstanceOf(SnapshotNotFoundError);
   });
 
   it("delete() on an unknown id is a no-op", async () => {
@@ -109,7 +109,7 @@ describe("FsSnapshotStore", () => {
   });
 
   it("load() on an unknown id throws SnapshotNotFoundError", async () => {
-    await expect(store.load("no-such-id")).rejects.toBeInstanceOf(SnapshotNotFoundError);
+    (await expect(store.load("no-such-id"))).rejects.toBeInstanceOf(SnapshotNotFoundError);
   });
 
   it("list() filters by sessionId and computeKind", async () => {

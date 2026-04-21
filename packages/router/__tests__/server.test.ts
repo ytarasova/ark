@@ -25,7 +25,7 @@ function makeTestConfig(): RouterConfig {
   };
 }
 
-describe("Router Server", () => {
+describe("Router Server", async () => {
   let server: RouterServer;
 
   beforeAll(() => {

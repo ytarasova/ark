@@ -55,11 +55,11 @@ export interface ResumeFromSnapshotResult {
  * which matches the seeded names in the repo. Unknown or missing computes
  * resolve to `local`.
  */
-export function resolveSessionCompute(
+export async function resolveSessionCompute(
   app: AppContext,
   sessionId: string,
-): { kind: ComputeKind; handle: ComputeHandle } | null {
-  const session = app.sessions.get(sessionId);
+): Promise<{ kind: ComputeKind; handle: ComputeHandle } | null> {
+  const session = await app.sessions.get(sessionId);
   if (!session) return null;
 
   const name = session.compute_name || "local";
@@ -106,10 +106,10 @@ export async function pauseWithSnapshot(
   sessionId: string,
   opts?: { reason?: string },
 ): Promise<PauseWithSnapshotResult> {
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
-  const resolved = resolveSessionCompute(app, sessionId);
+  const resolved = await resolveSessionCompute(app, sessionId);
   if (!resolved) return { ok: false, message: "Session has no resolvable compute" };
   const compute = app.getCompute(resolved.kind);
   if (!compute) return { ok: false, message: `Compute not registered: ${resolved.kind}` };
@@ -155,13 +155,13 @@ export async function pauseWithSnapshot(
     last_snapshot_id: ref.id,
     last_snapshot_at: ref.createdAt,
   };
-  app.sessions.update(sessionId, {
+  await app.sessions.update(sessionId, {
     status: "blocked",
     breakpoint_reason: opts?.reason ?? "User paused",
     config: mergedConfig,
   });
 
-  app.events.log(sessionId, "session_paused", {
+  await app.events.log(sessionId, "session_paused", {
     stage: session.stage,
     actor: "user",
     data: {
@@ -185,7 +185,7 @@ export async function resumeFromSnapshot(
   sessionId: string,
   opts?: { snapshotId?: string },
 ): Promise<ResumeFromSnapshotResult> {
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   // Pick the snapshot id: explicit > session.last_snapshot_id > latest for session.
@@ -236,12 +236,12 @@ export async function resumeFromSnapshot(
     return { ok: false, message: `restore failed: ${e?.message ?? e}` };
   }
 
-  app.sessions.update(sessionId, {
+  await app.sessions.update(sessionId, {
     status: "ready",
     breakpoint_reason: null,
   });
 
-  app.events.log(sessionId, "session_resumed", {
+  await app.events.log(sessionId, "session_resumed", {
     stage: session.stage,
     actor: "user",
     data: { from_status: session.status, snapshot_id: blob.ref.id },

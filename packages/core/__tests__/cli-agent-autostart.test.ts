@@ -82,8 +82,8 @@ function baseLaunchOpts(overrides: Partial<LaunchOpts> = {}): LaunchOpts {
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-describe("cli-agent auto-start (initialPrompt)", () => {
-  describe("task_delivery: arg", () => {
+describe("cli-agent auto-start (initialPrompt)", async () => {
+  describe("task_delivery: arg", async () => {
     it("appends initialPrompt as positional arg to command", async () => {
       const opts = baseLaunchOpts({
         initialPrompt: "Fix the login bug in auth.ts",
@@ -123,7 +123,7 @@ describe("cli-agent auto-start (initialPrompt)", () => {
     });
   });
 
-  describe("task_delivery: stdin", () => {
+  describe("task_delivery: stdin", async () => {
     it("launches without pipe and sends initialPrompt via sendTextAsync", async () => {
       const opts = baseLaunchOpts({
         initialPrompt: "Refactor the parser module",
@@ -168,7 +168,7 @@ describe("cli-agent auto-start (initialPrompt)", () => {
     });
   });
 
-  describe("task_delivery: file", () => {
+  describe("task_delivery: file", async () => {
     it("writes initialPrompt to task file when provided", async () => {
       const opts = baseLaunchOpts({
         initialPrompt: "Analyze the codebase structure",

@@ -63,7 +63,7 @@ function resolveGitHubUrl(dir?: string | null): string | null {
   }
 }
 
-export function startSession(
+export async function startSession(
   app: AppContext,
   opts: {
     ticket?: string;
@@ -86,7 +86,7 @@ export function startSession(
     inputs?: { files?: Record<string, string>; params?: Record<string, string> };
     attachments?: Array<{ name: string; content: string; type: string }>;
   },
-): Session {
+): Promise<Session> {
   const repoDir = opts.workdir ?? opts.repo;
   const repoConfig = repoDir ? loadRepoConfig(repoDir) : {};
 
@@ -134,7 +134,7 @@ export function startSession(
     };
   }
 
-  const session = app.sessions.create(mergedOpts);
+  const session = await app.sessions.create(mergedOpts);
 
   // Workspace-scoped dispatch (Wave 2b-1 -- LOCAL compute only). When a
   // workspace_id is set, lay out `~/.ark/workspaces/<session_id>/` with a
@@ -143,18 +143,18 @@ export function startSession(
   // single-repo sessions are untouched. Errors here fail session startup
   // loudly rather than silently falling back to a repo-only workdir.
   if (mergedOpts.workspace_id) {
-    const ws = app.codeIntel.getWorkspace(mergedOpts.workspace_id);
+    const ws = await app.codeIntel.getWorkspace(mergedOpts.workspace_id);
     if (!ws) {
       throw new Error(`workspace ${mergedOpts.workspace_id} not found; cannot dispatch session ${session.id}`);
     }
+    const reposInWs = opts.repo ? await app.codeIntel.listReposInWorkspace(ws.tenant_id, ws.id) : [];
     const primaryRepoId =
       opts.repo && ws
-        ? (app.codeIntel
-            .listReposInWorkspace(ws.tenant_id, ws.id)
-            .find((r) => r.name === opts.repo || r.local_path === opts.repo || r.repo_url === opts.repo)?.id ?? null)
+        ? (reposInWs.find((r) => r.name === opts.repo || r.local_path === opts.repo || r.repo_url === opts.repo)?.id ??
+          null)
         : null;
-    const wsWorkdir = provisionWorkspaceWorkdir(app, session, ws, { primaryRepoId });
-    app.sessions.update(session.id, { workdir: wsWorkdir });
+    const wsWorkdir = await provisionWorkspaceWorkdir(app, session, ws, { primaryRepoId });
+    await app.sessions.update(session.id, { workdir: wsWorkdir });
     (session as { workdir: string | null }).workdir = wsWorkdir;
   }
 
@@ -163,7 +163,7 @@ export function startSession(
   app.sessionService.emitSessionCreated(session.id);
 
   // Audit: log session creation with full context
-  app.events.log(session.id, "session_created", {
+  await app.events.log(session.id, "session_created", {
     actor: "user",
     data: {
       summary: opts.summary,
@@ -180,15 +180,15 @@ export function startSession(
 
   // Apply agent override if specified
   if (opts.agent) {
-    app.sessions.update(session.id, { agent: opts.agent });
+    await app.sessions.update(session.id, { agent: opts.agent });
   }
 
   // Set first stage
   const firstStage = flow.getFirstStage(app, mergedOpts.flow ?? "default");
   if (firstStage) {
     const action = flow.getStageAction(app, mergedOpts.flow ?? "default", firstStage);
-    app.sessions.update(session.id, { stage: firstStage, status: "ready" });
-    app.events.log(session.id, "stage_ready", {
+    await app.sessions.update(session.id, { stage: firstStage, status: "ready" });
+    await app.events.log(session.id, "stage_ready", {
       stage: firstStage,
       actor: "system",
       data: { stage: firstStage, gate: "auto", stage_type: action.type, stage_agent: action.agent },
@@ -204,7 +204,7 @@ export function startSession(
       emitStageSpanStart(session.id, { stage: firstStage, agent: stageAction.agent, gate: "auto" });
     }
   }
-  return app.sessions.get(session.id)!;
+  return (await app.sessions.get(session.id))!;
 }
 
 /**
@@ -249,7 +249,7 @@ async function withProvider(
   label: string,
   fn: (provider: ComputeProvider, compute: Compute) => Promise<void>,
 ): Promise<boolean> {
-  const { provider, compute } = resolveProvider(session);
+  const { provider, compute } = await resolveProvider(session);
   if (!provider || !compute) return false;
   return safeAsync(label, () => fn(provider, compute));
 }
@@ -283,7 +283,7 @@ export async function stop(
   sessionId: string,
   opts?: { force?: boolean },
 ): Promise<{ ok: boolean; message: string }> {
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   // Skip if already stopped (unless force -- used by stopAll for cleanup)
@@ -359,8 +359,8 @@ export async function stop(
   await removeSessionWorktree(app, session);
 
   // Preserve claude_session_id so restart can --resume the conversation
-  app.sessions.update(sessionId, { status: "stopped", error: null, session_id: null });
-  app.events.log(sessionId, "session_stopped", {
+  await app.sessions.update(sessionId, { status: "stopped", error: null, session_id: null });
+  await app.events.log(sessionId, "session_stopped", {
     stage: session.stage,
     actor: "user",
     data: { session_id: session.session_id, agent: session.agent },
@@ -368,6 +368,15 @@ export async function stop(
 
   // Observability: track session stop
   recordEvent({ type: "session_end", sessionId, data: { status: "stopped" } });
+
+  // GC any template-lifecycle compute the session was using (k8s, docker,
+  // firecracker, ...). Persistent computes (local, ec2) are kept around.
+  try {
+    const { garbageCollectComputeIfTemplate } = await import("./compute-lifecycle.js");
+    await garbageCollectComputeIfTemplate(app, session.compute_name);
+  } catch (e: any) {
+    logDebug("session", `compute gc on stop ${sessionId}: ${e?.message ?? e}`);
+  }
 
   emitStageSpanEnd(sessionId, { status: "stopped" });
   emitSessionSpanEnd(sessionId, { status: "stopped" });
@@ -416,12 +425,12 @@ export async function runVerification(
   sessionId: string,
   opts?: { runScript?: VerifyScriptRunner; timeoutMs?: number },
 ): Promise<VerificationResult> {
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session)
     return { ok: false, todosResolved: true, pendingTodos: [], scriptResults: [], message: "Session not found" };
 
   // Check todos
-  const todos = app.todos.list(sessionId);
+  const todos = await app.todos.list(sessionId);
   const pending = todos.filter((t) => !t.done);
   const todosResolved = pending.length === 0;
 
@@ -465,12 +474,16 @@ export async function runVerification(
   };
 }
 
-export function pause(app: AppContext, sessionId: string, reason?: string): { ok: boolean; message: string } {
-  const session = app.sessions.get(sessionId);
+export async function pause(
+  app: AppContext,
+  sessionId: string,
+  reason?: string,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
-  app.sessions.update(sessionId, { status: "blocked", breakpoint_reason: reason ?? "User paused" });
-  app.events.log(sessionId, "session_paused", {
+  await app.sessions.update(sessionId, { status: "blocked", breakpoint_reason: reason ?? "User paused" });
+  await app.events.log(sessionId, "session_paused", {
     stage: session.stage,
     actor: "user",
     data: { reason, was_status: session.status },
@@ -479,7 +492,7 @@ export function pause(app: AppContext, sessionId: string, reason?: string): { ok
 }
 
 export async function archive(app: AppContext, sessionId: string): Promise<{ ok: boolean; message: string }> {
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   // Stop if running
@@ -487,8 +500,8 @@ export async function archive(app: AppContext, sessionId: string): Promise<{ ok:
     await app.launcher.kill(session.session_id);
   }
 
-  app.sessions.update(sessionId, { status: "archived", session_id: null });
-  app.events.log(sessionId, "session_archived", {
+  await app.sessions.update(sessionId, { status: "archived", session_id: null });
+  await app.events.log(sessionId, "session_archived", {
     stage: session.stage,
     actor: "user",
     data: { from_status: session.status },
@@ -496,13 +509,13 @@ export async function archive(app: AppContext, sessionId: string): Promise<{ ok:
   return { ok: true, message: "Session archived" };
 }
 
-export function restore(app: AppContext, sessionId: string): { ok: boolean; message: string } {
-  const session = app.sessions.get(sessionId);
+export async function restore(app: AppContext, sessionId: string): Promise<{ ok: boolean; message: string }> {
+  const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
   if (session.status !== "archived") return { ok: false, message: `Session is ${session.status}, not archived` };
 
-  app.sessions.update(sessionId, { status: "stopped" });
-  app.events.log(sessionId, "session_restored", {
+  await app.sessions.update(sessionId, { status: "stopped" });
+  await app.events.log(sessionId, "session_restored", {
     stage: session.stage,
     actor: "user",
     data: {},
@@ -511,7 +524,7 @@ export function restore(app: AppContext, sessionId: string): { ok: boolean; mess
 }
 
 export async function interrupt(app: AppContext, sessionId: string): Promise<{ ok: boolean; message: string }> {
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
   if (session.status !== "running" && session.status !== "waiting") {
     return { ok: false, message: `Session is ${session.status}, not running` };
@@ -521,8 +534,8 @@ export async function interrupt(app: AppContext, sessionId: string): Promise<{ o
   // Send Ctrl+C to interrupt the agent without killing the session
   await app.launcher.sendKeys(session.session_id, "C-c");
 
-  app.sessions.update(sessionId, { status: "waiting" });
-  app.events.log(sessionId, "session_interrupted", {
+  await app.sessions.update(sessionId, { status: "waiting" });
+  await app.events.log(sessionId, "session_interrupted", {
     stage: session.stage,
     actor: "user",
     data: { session_id: session.session_id },
@@ -537,10 +550,10 @@ export async function approveReviewGate(
   sessionId: string,
   advanceFn: (app: AppContext, sessionId: string, force?: boolean) => Promise<{ ok: boolean; message: string }>,
 ): Promise<{ ok: boolean; message: string }> {
-  const s = app.sessions.get(sessionId);
+  const s = await app.sessions.get(sessionId);
   if (!s) return { ok: false, message: "Session not found" };
 
-  app.events.log(sessionId, "review_approved", {
+  await app.events.log(sessionId, "review_approved", {
     stage: s.stage ?? undefined,
     actor: "github",
   });
@@ -574,7 +587,7 @@ export async function rejectReviewGate(
   reason: string,
   dispatchFn: (app: AppContext, sessionId: string) => Promise<{ ok: boolean; message: string }>,
 ): Promise<{ ok: boolean; message: string }> {
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: "Session not found" };
 
   const stageName = session.stage;
@@ -596,13 +609,13 @@ export async function rejectReviewGate(
 
   // Enforce the cap BEFORE mutating session state so a hit doesn't bump the counter.
   if (typeof max === "number" && max >= 0 && currentCount >= max) {
-    app.sessions.update(sessionId, { status: "failed", error: "max_rejections exceeded" });
-    app.events.log(sessionId, "review_rejected", {
+    await app.sessions.update(sessionId, { status: "failed", error: "max_rejections exceeded" });
+    await app.events.log(sessionId, "review_rejected", {
       stage: stageName,
       actor: "user",
       data: { reason, rejection_count: currentCount, max_rejections: max, capped: true },
     });
-    app.events.log(sessionId, "session_failed", {
+    await app.events.log(sessionId, "session_failed", {
       stage: stageName,
       actor: "system",
       data: { reason: "max_rejections exceeded", rejection_count: currentCount, max_rejections: max },
@@ -616,7 +629,7 @@ export async function rejectReviewGate(
   const rendered = renderReworkPrompt(template, reason, vars);
 
   const nextCount = currentCount + 1;
-  app.sessions.update(sessionId, {
+  await app.sessions.update(sessionId, {
     rework_prompt: rendered,
     rejection_count: nextCount,
     rejected_at: new Date().toISOString(),
@@ -631,7 +644,7 @@ export async function rejectReviewGate(
     error: null,
   });
 
-  app.events.log(sessionId, "review_rejected", {
+  await app.events.log(sessionId, "review_rejected", {
     stage: stageName,
     actor: "user",
     data: { reason, rejection_count: nextCount, max_rejections: max ?? null },
@@ -643,12 +656,12 @@ export async function rejectReviewGate(
 /**
  * Fork: shallow copy - same compute, repo, flow, group. Fresh session, no resume.
  */
-export function forkSession(app: AppContext, sessionId: string, newName?: string): SessionOpResult {
-  const original = app.sessions.get(sessionId);
+export async function forkSession(app: AppContext, sessionId: string, newName?: string): Promise<SessionOpResult> {
+  const original = await app.sessions.get(sessionId);
   if (!original) return { ok: false, message: `Session ${sessionId} not found` };
 
   const baseName = original.summary || sessionId;
-  const fork = app.sessions.create({
+  const fork = await app.sessions.create({
     ticket: original.ticket || undefined,
     summary: newName ?? `${baseName} (fork)`,
     repo: original.repo || undefined,
@@ -657,13 +670,13 @@ export function forkSession(app: AppContext, sessionId: string, newName?: string
     workdir: original.workdir || undefined,
   });
 
-  app.sessions.update(fork.id, {
+  await app.sessions.update(fork.id, {
     stage: original.stage,
     status: "ready",
     group_name: original.group_name,
   });
 
-  app.events.log(fork.id, "session_forked", {
+  await app.events.log(fork.id, "session_forked", {
     stage: original.stage,
     actor: "user",
     data: { forked_from: sessionId },
@@ -677,12 +690,12 @@ export function forkSession(app: AppContext, sessionId: string, newName?: string
  * Clone: deep copy - same as fork PLUS claude_session_id for --resume.
  * The new session will resume the same Claude conversation.
  */
-export function cloneSession(app: AppContext, sessionId: string, newName?: string): SessionOpResult {
-  const original = app.sessions.get(sessionId);
+export async function cloneSession(app: AppContext, sessionId: string, newName?: string): Promise<SessionOpResult> {
+  const original = await app.sessions.get(sessionId);
   if (!original) return { ok: false, message: `Session ${sessionId} not found` };
 
   const baseName = original.summary || sessionId;
-  const clone = app.sessions.create({
+  const clone = await app.sessions.create({
     ticket: original.ticket || undefined,
     summary: newName ?? `${baseName} (clone)`,
     repo: original.repo || undefined,
@@ -691,14 +704,14 @@ export function cloneSession(app: AppContext, sessionId: string, newName?: strin
     workdir: original.workdir || undefined,
   });
 
-  app.sessions.update(clone.id, {
+  await app.sessions.update(clone.id, {
     stage: original.stage,
     status: "ready",
     group_name: original.group_name,
     claude_session_id: original.claude_session_id, // --resume handoff
   });
 
-  app.events.log(clone.id, "session_cloned", {
+  await app.events.log(clone.id, "session_cloned", {
     stage: original.stage,
     actor: "user",
     data: { cloned_from: sessionId, claude_session_id: original.claude_session_id },
@@ -716,7 +729,7 @@ export async function deleteSessionAsync(
   app: AppContext,
   sessionId: string,
 ): Promise<{ ok: boolean; message: string }> {
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   // 1. Kill agent + clean up provider resources
@@ -755,9 +768,9 @@ export async function deleteSessionAsync(
   }
 
   // 4. Soft-delete (keeps DB row for 90s undo window)
-  app.sessions.softDelete(sessionId);
+  await app.sessions.softDelete(sessionId);
 
-  app.events.log(sessionId, "session_deleted", { actor: "user" });
+  await app.events.log(sessionId, "session_deleted", { actor: "user" });
 
   return { ok: true, message: "Session deleted (undo available for 90s)" };
 }
@@ -766,17 +779,17 @@ export async function undeleteSessionAsync(
   app: AppContext,
   sessionId: string,
 ): Promise<{ ok: boolean; message: string }> {
-  const restored = app.sessions.undelete(sessionId);
+  const restored = await app.sessions.undelete(sessionId);
   if (!restored) return { ok: false, message: `Session ${sessionId} not found or not deleted` };
 
-  app.events.log(sessionId, "session_undeleted", { actor: "user" });
+  await app.events.log(sessionId, "session_undeleted", { actor: "user" });
 
   return { ok: true, message: `Session restored (status: ${restored.status})` };
 }
 
 /** Clean up provider resources when a session reaches a terminal state (completed/failed). */
 export async function cleanupOnTerminal(app: AppContext, sessionId: string): Promise<void> {
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session) return;
   await withProvider(session, `cleanup ${sessionId}`, (p, c) => p.cleanupSession(c, session));
 }
@@ -792,7 +805,7 @@ export async function waitForCompletion(
   const start = Date.now();
 
   while (true) {
-    const session = app.sessions.get(sessionId);
+    const session = await app.sessions.get(sessionId);
     if (!session) return { session: null, timedOut: false };
 
     const terminal = ["completed", "failed", "stopped"].includes(session.status);

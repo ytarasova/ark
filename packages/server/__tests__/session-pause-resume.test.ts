@@ -95,7 +95,7 @@ async function startSession(opts: Record<string, unknown> = {}): Promise<string>
   return session.id as string;
 }
 
-describe("session/pause", () => {
+describe("session/pause", async () => {
   it("on a snapshot-capable compute: calls compute.snapshot() and persists via SnapshotStore", async () => {
     // Seed a compute row so the session resolves to the firecracker kind.
     ensureCompute(app, "firecracker-1", "local-firecracker");
@@ -116,7 +116,7 @@ describe("session/pause", () => {
     expect(result.snapshot.metadata).toEqual({ memFilePath: "/tmp/m", stateFilePath: "/tmp/s" });
 
     // The session row records the snapshot id for use by resume().
-    const session = app.sessions.get(id)!;
+    const session = await app.sessions.get(id)!;
     expect(session.status).toBe("blocked");
     expect((session.config as Record<string, unknown>).last_snapshot_id).toBe(result.snapshot.id);
   });
@@ -131,12 +131,12 @@ describe("session/pause", () => {
     expect(result.notSupported).toBe(true);
     expect(result.snapshot).toBe(null);
 
-    const session = app.sessions.get(id)!;
+    const session = await app.sessions.get(id)!;
     expect(session.status).toBe("blocked");
   });
 });
 
-describe("session/resume", () => {
+describe("session/resume", async () => {
   it("restores from the session's last snapshot and clears blocked state", async () => {
     ensureCompute(app, "firecracker-resume", "local-firecracker");
     const fake = new FakeSnapshotCompute();
@@ -157,7 +157,7 @@ describe("session/resume", () => {
     expect(fake.restoreCalls).toBe(1);
     expect(fake.lastRestored?.id).toBe(pauseResult.snapshot.id);
 
-    const session = app.sessions.get(id)!;
+    const session = await app.sessions.get(id)!;
     expect(session.status).toBe("ready");
     expect(session.breakpoint_reason).toBeNull();
   });
@@ -171,7 +171,7 @@ describe("session/resume", () => {
     const result = (res as JsonRpcResponse).result as Record<string, any>;
 
     expect(result.ok).toBe(true);
-    const session = app.sessions.get(id)!;
+    const session = await app.sessions.get(id)!;
     expect(session.status).toBe("ready");
   });
 
@@ -187,15 +187,15 @@ describe("session/resume", () => {
 
     // Create a session and point it at that snapshot.
     const id = await startSession();
-    app.sessions.update(id, {
-      config: { ...(app.sessions.get(id)!.config as Record<string, unknown>), last_snapshot_id: saved.id },
+    await app.sessions.update(id, {
+      config: { ...((await app.sessions.get(id))!.config as Record<string, unknown>), last_snapshot_id: saved.id },
     });
 
     const res = await router.dispatch(createRequest(2, "session/resume", { sessionId: id }));
     // notSupported path: falls back to state-only resume.
     const result = (res as JsonRpcResponse).result as Record<string, any>;
     expect(result.ok).toBe(true);
-    expect(app.sessions.get(id)!.status).toBe("ready");
+    expect((await app.sessions.get(id))!.status).toBe("ready");
   });
 });
 

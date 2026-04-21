@@ -47,7 +47,7 @@ async function dockerAvailable(): Promise<boolean> {
 // names from the compute name).
 const COMPUTE_NAME = `docker-sidecar-e2e-${process.pid}`;
 
-describe("Docker arkd-sidecar e2e", () => {
+describe("Docker arkd-sidecar e2e", async () => {
   let app: AppContext;
   let available = false;
 
@@ -64,7 +64,7 @@ describe("Docker arkd-sidecar e2e", () => {
     if (!available) return;
 
     // Best-effort cleanup of the container regardless of test outcome.
-    await execFileAsync("docker", ["rm", "-f", `ark-${COMPUTE_NAME}`]).catch(() => {});
+    (await execFileAsync("docker", ["rm", "-f", `ark-${COMPUTE_NAME}`])).catch(() => {});
 
     await app?.shutdown();
     clearApp();
@@ -76,13 +76,13 @@ describe("Docker arkd-sidecar e2e", () => {
       const provider = new LocalDockerProvider();
       provider.setApp(app);
 
-      app.computes.create({ name: COMPUTE_NAME, provider: "docker" });
-      let compute = app.computes.get(COMPUTE_NAME)!;
+      await app.computes.create({ name: COMPUTE_NAME, provider: "docker" });
+      let compute = await app.computes.get(COMPUTE_NAME)!;
       expect(compute.status).toBe("stopped");
 
       // ── Provision (pull + create + bootstrap + start arkd) ────────────────
       await provider.provision(compute);
-      compute = app.computes.get(COMPUTE_NAME)!;
+      compute = await app.computes.get(COMPUTE_NAME)!;
       expect(compute.status).toBe("running");
 
       const cfg = compute.config as Record<string, unknown>;
@@ -119,7 +119,7 @@ describe("Docker arkd-sidecar e2e", () => {
 
       // ── Destroy (rm container + cascade DB) ───────────────────────────────
       await provider.destroy(compute);
-      compute = app.computes.get(COMPUTE_NAME)!;
+      compute = await app.computes.get(COMPUTE_NAME)!;
       expect(compute.status).toBe("destroyed");
 
       // Container should be gone on the host side.

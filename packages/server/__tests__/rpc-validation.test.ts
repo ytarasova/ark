@@ -257,13 +257,13 @@ const fixtures: Record<string, MethodFixture> = {
   },
 };
 
-describe("RPC boundary validation", () => {
+describe("RPC boundary validation", async () => {
   it("covers every method registered in rpcMethodSchemas", () => {
     const uncovered = COVERED_METHODS.filter((m) => !(m in fixtures));
     expect(uncovered).toEqual([]);
   });
 
-  describe("valid requests pass through to handler", () => {
+  describe("valid requests pass through to handler", async () => {
     let router: Router;
     beforeEach(() => {
       router = new Router();
@@ -286,7 +286,7 @@ describe("RPC boundary validation", () => {
     }
   });
 
-  describe("invalid requests return -32602 before reaching handler", () => {
+  describe("invalid requests return -32602 before reaching handler", async () => {
     let router: Router;
     beforeEach(() => {
       router = new Router();

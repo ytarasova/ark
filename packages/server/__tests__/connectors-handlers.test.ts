@@ -38,7 +38,7 @@ function asResult(r: unknown): Record<string, unknown> {
   return (r as JsonRpcResponse).result as Record<string, unknown>;
 }
 
-describe("connectors/* JSON-RPC handlers", () => {
+describe("connectors/* JSON-RPC handlers", async () => {
   it("connectors/list returns one entry per registered connector with the expected shape", async () => {
     const res = asResult(await router.dispatch(createRequest(1, "connectors/list", {})));
     const list = res.connectors as Array<{

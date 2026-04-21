@@ -20,7 +20,7 @@ export class LocalBinaryExecutor implements BinaryExecutor {
     const proc = Bun.spawn([binary, ...args], {
       cwd: opts.cwd,
       env: { ...process.env, ...(opts.env ?? {}) },
-      stdin: opts.stdin ?? "ignore",
+      stdin: (opts.stdin as any) ?? "ignore",
       stdout: "pipe",
       stderr: "pipe",
     });

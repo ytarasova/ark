@@ -21,6 +21,7 @@ import { listClaudeSessions, refreshClaudeSessionsCache } from "../claude/sessio
 import { indexTranscripts } from "../search/search.js";
 import type {
   AppMode,
+  ComputeBootstrapCapability,
   DatabaseMode,
   FsCapability,
   FsListDirResult,
@@ -33,6 +34,9 @@ import type {
   TenantResolverCapability,
 } from "./app-mode.js";
 import { resolveBearerAuth, resolveDatabaseMode } from "./app-mode.js";
+import { seedLocalCompute } from "../repositories/schema.js";
+import { seedLocalComputePostgres } from "../repositories/schema-postgres.js";
+import { buildMigrationsCapability } from "./migrations-capability.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -174,11 +178,11 @@ function makeFtsRebuildCapability(app: AppContext): FtsRebuildCapability {
       // claude_sessions_cache + transcript_index index the local user's
       // `~/.claude` transcripts and are NOT tenant-scoped. Wiping them is
       // only safe in single-user local mode.
-      db.run("DELETE FROM claude_sessions_cache");
-      db.run("DELETE FROM transcript_index");
+      await db.prepare("DELETE FROM claude_sessions_cache").run();
+      await db.prepare("DELETE FROM transcript_index").run();
       const sessionCount = await refreshClaudeSessionsCache(app, {});
       const indexCount = await indexTranscripts(app, {});
-      const items = listClaudeSessions(app);
+      const items = await listClaudeSessions(app);
       return { sessionCount, indexCount, items };
     },
   };
@@ -221,10 +225,24 @@ function makeHostCommandCapability(): HostCommandCapability {
  */
 function makeLocalTenantResolver(): TenantResolverCapability {
   return {
-    resolve({ authHeader, tenantHeader, validateToken }) {
+    async resolve({ authHeader, tenantHeader, validateToken }) {
       if (authHeader) return resolveBearerAuth(authHeader, tenantHeader, validateToken);
       if (tenantHeader) return { ok: true, tenantId: tenantHeader };
       return { ok: true, tenantId: "default" };
+    },
+  };
+}
+
+// ── Compute bootstrap ──────────────────────────────────────────────────────
+
+function makeLocalComputeBootstrap(dialect: "sqlite" | "postgres"): ComputeBootstrapCapability {
+  return {
+    async seed(db) {
+      // Local mode: agents run on the same host as ark via tmux. Seed the
+      // canonical `local` compute target so a fresh laptop install works
+      // without any operator action.
+      if (dialect === "postgres") await seedLocalComputePostgres(db);
+      else await seedLocalCompute(db);
     },
   };
 }
@@ -257,6 +275,8 @@ export function buildLocalAppMode(app?: AppContext, database?: DatabaseMode): Ap
     repoMapCapability,
     ftsRebuildCapability,
     hostCommandCapability,
+    computeBootstrap: makeLocalComputeBootstrap(db.dialect),
+    migrations: buildMigrationsCapability(db.dialect),
     tenantResolver,
     database: db,
   };

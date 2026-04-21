@@ -48,18 +48,18 @@ export async function startHostedServer(config: ArkConfig): Promise<{
 
   // Start web server
   const { startWebServer } = await import("./web.js");
-  const webServer = startWebServer(app, config);
+  const webServer = startWebServer(app, { port: config.ports?.web });
 
   // Start worker health checker (prune stale workers every 60s)
   const healthInterval = setInterval(() => {
-    registry.pruneStale(90_000); // 90s timeout
+    void registry.pruneStale(90_000); // 90s timeout
   }, 60_000);
 
   // Start LLM router if configured
   if (config.router?.enabled) {
     try {
-      const { startRouter } = await import("../router/server.js");
-      startRouter(config.router);
+      const { startRouter } = await import("../../router/server.js");
+      startRouter(config.router as unknown as import("../../router/types.js").RouterConfig);
     } catch {
       logDebug("web", "Router module not available - skip");
     }

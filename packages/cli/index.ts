@@ -48,6 +48,7 @@ import { registerExecTryCommands } from "./commands/exec-try.js";
 import { registerDaemonCommands } from "./commands/daemon.js";
 import { registerMiscCommands } from "./commands/misc.js";
 import { registerSageCommands } from "./commands/sage.js";
+import { registerDbCommands } from "./commands/db.js";
 
 // ── Resolve remote mode early (before AppContext boot) ──────────────────────
 // Commander hasn't parsed yet, so peek at argv + env for --server / --token.
@@ -150,6 +151,7 @@ registerDaemonCommands(program);
 registerExecTryCommands(program, app);
 registerMiscCommands(program, app);
 registerSageCommands(program, app);
+registerDbCommands(program, localApp);
 
 // ── Run ─────────────────────────────────────────────────────────────────────
 

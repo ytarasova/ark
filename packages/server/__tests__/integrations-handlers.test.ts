@@ -46,7 +46,7 @@ function listIntegrations(): Promise<IntegrationView[]> {
   });
 }
 
-describe("integrations/* JSON-RPC handlers", () => {
+describe("integrations/* JSON-RPC handlers", async () => {
   it("integrations/list returns the paired catalog as a non-empty array", async () => {
     const list = await listIntegrations();
     expect(Array.isArray(list)).toBe(true);

@@ -37,7 +37,7 @@ async function createSession(summary: string): Promise<string> {
 
 // ── session/read ───────────────────────────────────────────────────────────
 
-describe("session/read", () => {
+describe("session/read", async () => {
   it("returns session by id", async () => {
     const id = await createSession("read-basic");
     const res = await router.dispatch(createRequest(2, "session/read", { sessionId: id }));
@@ -54,7 +54,7 @@ describe("session/read", () => {
 
   it("includes events when requested", async () => {
     const id = await createSession("read-events");
-    app.events.log(id, "test-event", { stage: "init", data: { foo: "bar" } });
+    await app.events.log(id, "test-event", { stage: "init", data: { foo: "bar" } });
 
     const res = await router.dispatch(createRequest(2, "session/read", { sessionId: id, include: ["events"] }));
     const result = ok(res);
@@ -78,7 +78,7 @@ describe("session/read", () => {
 
   it("includes both events and messages when requested", async () => {
     const id = await createSession("read-both");
-    app.events.log(id, "both-event");
+    await app.events.log(id, "both-event");
     app.messages.send(id, "system", "both-msg");
 
     const res = await router.dispatch(
@@ -93,7 +93,7 @@ describe("session/read", () => {
 
   it("omits events and messages when include is not specified", async () => {
     const id = await createSession("read-no-include");
-    app.events.log(id, "omitted-event");
+    await app.events.log(id, "omitted-event");
     app.messages.send(id, "user", "omitted-msg");
 
     const res = await router.dispatch(createRequest(2, "session/read", { sessionId: id }));
@@ -105,7 +105,7 @@ describe("session/read", () => {
 
 // ── agent/read ─────────────────────────────────────────────────────────────
 
-describe("agent/read", () => {
+describe("agent/read", async () => {
   it("returns a builtin agent", async () => {
     const res = await router.dispatch(createRequest(1, "agent/read", { name: "implementer" }));
     const result = ok(res);
@@ -122,7 +122,7 @@ describe("agent/read", () => {
 
 // ── flow/read ──────────────────────────────────────────────────────────────
 
-describe("flow/read", () => {
+describe("flow/read", async () => {
   it("returns a builtin flow", async () => {
     const res = await router.dispatch(createRequest(1, "flow/read", { name: "default" }));
     const result = ok(res);
@@ -140,7 +140,7 @@ describe("flow/read", () => {
 
 // ── compute/read ───────────────────────────────────────────────────────────
 
-describe("compute/read", () => {
+describe("compute/read", async () => {
   it("returns a compute target after creation", async () => {
     const name = `read-test-${Date.now()}`;
     await router.dispatch(createRequest(1, "compute/create", { name, provider: "docker" }));

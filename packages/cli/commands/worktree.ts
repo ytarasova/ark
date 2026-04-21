@@ -102,7 +102,7 @@ export function registerWorktreeCommands(program: Command, app: AppContext) {
     .description("Find and remove orphaned worktrees")
     .option("--dry-run", "Only show what would be removed")
     .action(async (opts) => {
-      const orphans = findOrphanedWorktrees(app);
+      const orphans = await findOrphanedWorktrees(app);
       if (orphans.length === 0) {
         console.log(chalk.dim("No orphaned worktrees found"));
         return;

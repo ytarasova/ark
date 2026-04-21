@@ -123,7 +123,7 @@ describe("sessionExists", () => {
 
 // ── listArkSessionsAsync ─────────────────────────────────────────────────────────
 
-describe("listArkSessionsAsync", () => {
+describe("listArkSessionsAsync", async () => {
   it("returns an array", async () => {
     const sessions = await listArkSessionsAsync();
     expect(Array.isArray(sessions)).toBe(true);

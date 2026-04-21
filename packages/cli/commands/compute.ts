@@ -465,7 +465,7 @@ export function registerComputeCommands(program: Command, app: AppContext) {
         if (opts.size) config.size = opts.size;
         if (opts.region) config.region = opts.region;
         if (opts.image) config.image = opts.image;
-        const pool = manager.createPool({
+        const pool = await manager.createPool({
           name,
           provider: opts.provider,
           min: parseInt(opts.min, 10),
@@ -487,7 +487,7 @@ export function registerComputeCommands(program: Command, app: AppContext) {
     .action(async () => {
       try {
         const manager = new ComputePoolManager(app);
-        const pools = manager.listPools();
+        const pools = await manager.listPools();
         if (!pools.length) {
           console.log(chalk.dim("No pools. Create one: ark compute pool create <name> --provider ec2"));
           return;
@@ -512,7 +512,7 @@ export function registerComputeCommands(program: Command, app: AppContext) {
     .action(async (name) => {
       try {
         const manager = new ComputePoolManager(app);
-        const deleted = manager.deletePool(name);
+        const deleted = await manager.deletePool(name);
         if (deleted) {
           console.log(chalk.green(`Pool '${name}' deleted`));
         } else {
@@ -532,7 +532,7 @@ export function registerComputeCommands(program: Command, app: AppContext) {
     .description("List compute templates")
     .action(async () => {
       try {
-        const templates = app.computeTemplates.list();
+        const templates = await app.computeTemplates.list();
 
         // Also show config-defined templates
         const configTemplates = app.config.computeTemplates ?? [];
@@ -574,7 +574,7 @@ export function registerComputeCommands(program: Command, app: AppContext) {
     .argument("<name>", "Template name")
     .action(async (name) => {
       try {
-        let tmpl = app.computeTemplates.get(name);
+        let tmpl: any = await app.computeTemplates.get(name);
 
         // Fall back to config
         if (!tmpl) {

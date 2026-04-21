@@ -42,7 +42,7 @@ afterAll(() => {
   server?.stop();
 });
 
-describe("WebSocket transport", () => {
+describe("WebSocket transport", async () => {
   it("connects and sends/receives messages", async () => {
     const url = `ws://localhost:${serverPort}`;
     const { transport, ready } = createWebSocketTransport(url);

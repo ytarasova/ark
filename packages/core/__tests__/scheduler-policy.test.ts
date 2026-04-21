@@ -29,10 +29,10 @@ afterAll(async () => {
   await app?.shutdown();
 });
 
-describe("SessionScheduler with tenant policies", () => {
+describe("SessionScheduler with tenant policies", async () => {
   it("rejects dispatch when provider is not allowed for tenant", async () => {
     // Set up a policy that only allows k8s
-    pm.setPolicy({
+    await pm.setPolicy({
       tenant_id: "strict-tenant",
       allowed_providers: ["k8s"],
       default_provider: "k8s",
@@ -42,14 +42,14 @@ describe("SessionScheduler with tenant policies", () => {
     });
 
     // Create a compute record with ec2 provider
-    app.computes.create({
+    await app.computes.create({
       name: "ec2-box",
       provider: "ec2" as any,
       config: {},
     });
 
     // Register a worker for that compute
-    registry.register({
+    await registry.register({
       id: "w-ec2-policy",
       url: "http://ec2:19300",
       capacity: 5,
@@ -67,13 +67,13 @@ describe("SessionScheduler with tenant policies", () => {
     const scheduler = new SessionScheduler(app);
     scheduler.setPolicyManager(pm);
 
-    await expect(scheduler.schedule(session, "strict-tenant")).rejects.toThrow(
+    (await expect(scheduler.schedule(session, "strict-tenant"))).rejects.toThrow(
       'Provider "ec2" not allowed for tenant "strict-tenant"',
     );
   });
 
   it("uses default provider from tenant policy", async () => {
-    pm.setPolicy({
+    await pm.setPolicy({
       tenant_id: "default-prov-tenant",
       allowed_providers: ["k8s", "ec2"],
       default_provider: "k8s",
@@ -83,7 +83,7 @@ describe("SessionScheduler with tenant policies", () => {
     });
 
     // Register a k8s worker
-    registry.register({
+    await registry.register({
       id: "w-k8s-default",
       url: "http://k8s:19300",
       capacity: 5,
@@ -103,7 +103,7 @@ describe("SessionScheduler with tenant policies", () => {
   });
 
   it("allows dispatch when provider is in allowed list", async () => {
-    pm.setPolicy({
+    await pm.setPolicy({
       tenant_id: "multi-prov-tenant",
       allowed_providers: ["k8s", "ec2", "docker"],
       default_provider: "ec2",
@@ -113,7 +113,7 @@ describe("SessionScheduler with tenant policies", () => {
     });
 
     // Register an ec2 worker
-    registry.register({
+    await registry.register({
       id: "w-ec2-allowed",
       url: "http://ec2-ok:19300",
       capacity: 5,
@@ -133,7 +133,7 @@ describe("SessionScheduler with tenant policies", () => {
   });
 
   it("allows all providers when allowed_providers is empty", async () => {
-    pm.setPolicy({
+    await pm.setPolicy({
       tenant_id: "open-tenant",
       allowed_providers: [],
       default_provider: "k8s",
@@ -144,7 +144,7 @@ describe("SessionScheduler with tenant policies", () => {
 
     // Clean workers and add a fresh one
     app.db.prepare("DELETE FROM workers WHERE id = 'w-any-provider'").run();
-    registry.register({
+    await registry.register({
       id: "w-any-provider",
       url: "http://any:19300",
       capacity: 5,
@@ -166,7 +166,7 @@ describe("SessionScheduler with tenant policies", () => {
     // Clean workers
     app.db.prepare("DELETE FROM workers").run();
 
-    registry.register({
+    await registry.register({
       id: "w-no-policy",
       url: "http://nopol:19300",
       capacity: 5,

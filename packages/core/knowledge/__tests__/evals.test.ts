@@ -43,14 +43,14 @@ function makeSession(overrides: Partial<Session> = {}): Session {
   return { ...base, ...overrides };
 }
 
-describe("evaluateSession", () => {
-  it("creates eval node in knowledge graph", () => {
+describe("evaluateSession", async () => {
+  it("creates eval node in knowledge graph", async () => {
     const session = makeSession({ id: "s-eval-test-1", agent: "implementer" });
     // Create the session in the DB so events.list works
-    app.sessions.create({ summary: session.summary, repo: session.repo, flow: session.flow });
-    const created = app.sessions.list()[0];
-    app.sessions.update(created.id, { status: "completed", agent: "implementer" } as Partial<Session>);
-    const freshSession = app.sessions.get(created.id)!;
+    await app.sessions.create({ summary: session.summary, repo: session.repo, flow: session.flow });
+    const created = (await app.sessions.list())[0];
+    await app.sessions.update(created.id, { status: "completed", agent: "implementer" } as Partial<Session>);
+    const freshSession = await app.sessions.get(created.id)!;
 
     const result = evaluateSession(app, freshSession);
 
@@ -59,48 +59,48 @@ describe("evaluateSession", () => {
     expect(result.sessionId).toBe(created.id);
 
     // Verify knowledge node was created
-    const node = app.knowledge.getNode(`eval:${created.id}`);
+    const node = await app.knowledge.getNode(`eval:${created.id}`);
     expect(node).not.toBeNull();
     expect(node!.type).toBe("session");
     expect((node!.metadata as any).eval).toBe(true);
     expect((node!.metadata as any).agentRole).toBe("implementer");
   });
 
-  it("records failed session metrics", () => {
+  it("records failed session metrics", async () => {
     const session = makeSession({ id: "s-eval-fail", agent: "worker", status: "failed" });
-    app.sessions.create({ summary: "fail test", repo: "/tmp/test", flow: "bare" });
-    const created = app.sessions.list().find((s) => s.summary === "fail test")!;
-    app.sessions.update(created.id, { status: "failed", agent: "worker" } as Partial<Session>);
-    const freshSession = app.sessions.get(created.id)!;
+    await app.sessions.create({ summary: "fail test", repo: "/tmp/test", flow: "bare" });
+    const created = (await app.sessions.list()).find((s) => s.summary === "fail test")!;
+    await app.sessions.update(created.id, { status: "failed", agent: "worker" } as Partial<Session>);
+    const freshSession = await app.sessions.get(created.id)!;
 
     const result = evaluateSession(app, freshSession);
     expect(result.metrics.completed).toBe(false);
     expect(result.agentRole).toBe("worker");
   });
 
-  it("detects PR creation", () => {
-    app.sessions.create({ summary: "pr test", repo: "/tmp/test", flow: "bare" });
-    const created = app.sessions.list().find((s) => s.summary === "pr test")!;
-    app.sessions.update(created.id, {
+  it("detects PR creation", async () => {
+    await app.sessions.create({ summary: "pr test", repo: "/tmp/test", flow: "bare" });
+    const created = (await app.sessions.list()).find((s) => s.summary === "pr test")!;
+    await app.sessions.update(created.id, {
       status: "completed",
       agent: "implementer",
       pr_url: "https://github.com/test/repo/pull/42",
     } as Partial<Session>);
-    const freshSession = app.sessions.get(created.id)!;
+    const freshSession = await app.sessions.get(created.id)!;
 
     const result = evaluateSession(app, freshSession);
     expect(result.metrics.prCreated).toBe(true);
   });
 });
 
-describe("getAgentStats", () => {
-  it("returns correct aggregates", () => {
+describe("getAgentStats", async () => {
+  it("returns correct aggregates", async () => {
     // Clear existing eval nodes
-    app.knowledge.clear({ type: "session" });
+    await app.knowledge.clear({ type: "session" });
 
     // Create 3 eval nodes manually
     for (let i = 0; i < 3; i++) {
-      app.knowledge.addNode({
+      await app.knowledge.addNode({
         id: `eval:s-stats-${i}`,
         type: "session",
         label: `Eval ${i}`,
@@ -136,7 +136,7 @@ describe("getAgentStats", () => {
   });
 });
 
-describe("detectDrift", () => {
+describe("detectDrift", async () => {
   it("returns no alert with insufficient data", () => {
     const drift = detectDrift(app, "some-agent-with-no-data");
     expect(drift.alert).toBe(false);
@@ -145,14 +145,14 @@ describe("detectDrift", () => {
     expect(drift.avgTurnsDelta).toBe(0);
   });
 
-  it("detects degradation when completion drops", () => {
-    app.knowledge.clear({ type: "session" });
+  it("detects degradation when completion drops", async () => {
+    await app.knowledge.clear({ type: "session" });
 
     const now = Date.now();
 
     // Baseline (14-21 days ago): all completed
     for (let i = 0; i < 5; i++) {
-      const nodeId = app.knowledge.addNode({
+      const nodeId = await app.knowledge.addNode({
         id: `eval:s-drift-base-${i}`,
         type: "session",
         label: `Baseline ${i}`,
@@ -167,7 +167,7 @@ describe("detectDrift", () => {
       });
       // Manually set created_at to baseline window
       const baselineDate = new Date(now - 14 * 86400000 - i * 86400000).toISOString();
-      app.knowledge.updateNode(nodeId, {
+      await app.knowledge.updateNode(nodeId, {
         metadata: {
           eval: true,
           agentRole: "drifter",
@@ -188,11 +188,11 @@ describe("detectDrift", () => {
   });
 });
 
-describe("listEvals", () => {
-  it("returns eval results", () => {
-    app.knowledge.clear({ type: "session" });
+describe("listEvals", async () => {
+  it("returns eval results", async () => {
+    await app.knowledge.clear({ type: "session" });
 
-    app.knowledge.addNode({
+    await app.knowledge.addNode({
       id: "eval:s-list-1",
       type: "session",
       label: "Eval 1",
@@ -221,17 +221,17 @@ describe("listEvals", () => {
     expect(evals[0].metrics.turnCount).toBe(5);
   });
 
-  it("filters by agent role", () => {
-    app.knowledge.clear({ type: "session" });
+  it("filters by agent role", async () => {
+    await app.knowledge.clear({ type: "session" });
 
-    app.knowledge.addNode({
+    await app.knowledge.addNode({
       id: "eval:s-filter-1",
       type: "session",
       label: "Eval A",
       content: "{}",
       metadata: { eval: true, agentRole: "planner" },
     });
-    app.knowledge.addNode({
+    await app.knowledge.addNode({
       id: "eval:s-filter-2",
       type: "session",
       label: "Eval B",
@@ -247,11 +247,11 @@ describe("listEvals", () => {
     expect(implEvals.length).toBe(1);
   });
 
-  it("respects limit", () => {
-    app.knowledge.clear({ type: "session" });
+  it("respects limit", async () => {
+    await app.knowledge.clear({ type: "session" });
 
     for (let i = 0; i < 10; i++) {
-      app.knowledge.addNode({
+      await app.knowledge.addNode({
         id: `eval:s-limit-${i}`,
         type: "session",
         label: `Eval ${i}`,

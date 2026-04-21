@@ -109,16 +109,16 @@ function buildInitialRepoRows(repos: Repo[], sessionId: string, workdir: string)
  *
  * Returns the absolute workdir path.
  */
-export function provisionWorkspaceWorkdir(
+export async function provisionWorkspaceWorkdir(
   app: AppContext,
   session: Session,
   workspace: Workspace,
   opts?: { primaryRepoId?: string | null },
-): string {
+): Promise<string> {
   const workdir = workspaceWorkdir(app, session.id);
   mkdirSync(workdir, { recursive: true });
 
-  const repos = app.codeIntel.listReposInWorkspace(workspace.tenant_id, workspace.id);
+  const repos = await app.codeIntel.listReposInWorkspace(workspace.tenant_id, workspace.id);
   const fresh = buildInitialRepoRows(repos, session.id, workdir);
 
   // Preserve any existing clone state from a prior provisioning pass.
@@ -245,11 +245,11 @@ export async function ensureRepoCloned(
     return entry;
   }
 
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session) throw new Error(`session ${sessionId} not found`);
   const tenantId = session.tenant_id ?? DEFAULT_TENANT_ID;
 
-  const repoRow = app.codeIntel.getRepo(tenantId, entry.repo_id);
+  const repoRow = await app.codeIntel.getRepo(tenantId, entry.repo_id);
   if (!repoRow) {
     throw new Error(
       `workspace repo ${entry.repo_id} (slug=${repoSlug}) missing from code_intel_repos for tenant ${tenantId}`,

@@ -40,6 +40,7 @@ export interface StageDefinition {
   on_outcome?: Record<string, string>;
   optional?: boolean;
   model?: string; // override model for this stage (e.g., "opus" for planning, "haiku" for docs)
+  compute?: string; // existing compute target name -- ref, not provisioned
   compute_template?: string; // named compute template to use for this stage
   verify?: string[]; // Scripts that must pass before stage completion
   depends_on?: string[]; // DAG: stage names that must complete before this stage runs

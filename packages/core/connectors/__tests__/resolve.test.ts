@@ -43,15 +43,15 @@ describe("flowConnectorsFor", () => {
   });
 });
 
-describe("collectMcpEntries", () => {
-  test("returns empty array when no runtime or flow connectors declared", () => {
-    const session = app.sessions.create({ summary: "x", flow: "flow-with-connectors" });
+describe("collectMcpEntries", async () => {
+  test("returns empty array when no runtime or flow connectors declared", async () => {
+    const session = await app.sessions.create({ summary: "x", flow: "flow-with-connectors" });
     const entries = collectMcpEntries(app, session, {});
     expect(entries).toEqual([]);
   });
 
-  test("flow connectors resolve to configName or inline MCP entries", () => {
-    const session = app.sessions.create({ summary: "x", flow: "flow-with-connectors" });
+  test("flow connectors resolve to configName or inline MCP entries", async () => {
+    const session = await app.sessions.create({ summary: "x", flow: "flow-with-connectors" });
     const entries = collectMcpEntries(app, session, {
       flowConnectors: ["pi-sage", "jira"],
     });
@@ -59,8 +59,8 @@ describe("collectMcpEntries", () => {
     expect(entries).toContain("atlassian");
   });
 
-  test("session connectors merge on top of flow", () => {
-    const session = app.sessions.create({ summary: "x", flow: "flow-with-connectors" });
+  test("session connectors merge on top of flow", async () => {
+    const session = await app.sessions.create({ summary: "x", flow: "flow-with-connectors" });
     const entries = collectMcpEntries(app, session, {
       flowConnectors: ["pi-sage"],
       sessionConnectors: ["jira"],
@@ -70,18 +70,18 @@ describe("collectMcpEntries", () => {
     expect(entries).toContain("atlassian");
   });
 
-  test("unknown connector names are ignored silently", () => {
-    const session = app.sessions.create({ summary: "x", flow: "flow-with-connectors" });
+  test("unknown connector names are ignored silently", async () => {
+    const session = await app.sessions.create({ summary: "x", flow: "flow-with-connectors" });
     const entries = collectMcpEntries(app, session, {
       flowConnectors: ["unknown", "pi-sage"],
     });
     expect(entries).toEqual(["pi-sage"]);
   });
 
-  test("applied connectors are persisted to session.config.applied_connectors", () => {
-    const session = app.sessions.create({ summary: "x", flow: "flow-with-connectors" });
+  test("applied connectors are persisted to session.config.applied_connectors", async () => {
+    const session = await app.sessions.create({ summary: "x", flow: "flow-with-connectors" });
     collectMcpEntries(app, session, { flowConnectors: ["pi-sage"], sessionConnectors: ["jira"] });
-    const reloaded = app.sessions.get(session.id);
+    const reloaded = await app.sessions.get(session.id);
     const cfg = (reloaded?.config ?? {}) as { applied_connectors?: string[] };
     expect(cfg.applied_connectors).toEqual(["pi-sage", "jira"]);
   });

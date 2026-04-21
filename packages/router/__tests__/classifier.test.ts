@@ -14,7 +14,7 @@ function makeRequest(overrides: Partial<ChatCompletionRequest> = {}): ChatComple
   };
 }
 
-describe("classifier", () => {
+describe("classifier", async () => {
   test("trivial message gets low score", () => {
     const result = classify(
       makeRequest({
@@ -37,7 +37,7 @@ describe("classifier", () => {
     expect(result.difficulty).toBe("trivial");
   });
 
-  test("code request gets high score", () => {
+  test("code request gets high score", async () => {
     const result = classify(
       makeRequest({
         messages: [
@@ -144,13 +144,13 @@ describe("classifier", () => {
     expect(result.task_type).toBe("extraction");
   });
 
-  test("score is clamped between 0 and 1", () => {
+  test("score is clamped between 0 and 1", async () => {
     // Very complex request
     const tools = Array.from({ length: 10 }, (_, i) => ({
       type: "function" as const,
       function: { name: `tool_${i}`, parameters: {} },
     }));
-    const messages = Array.from({ length: 30 }, (_, i) => ({
+    const messages = Array.from({ length: 30 }, async (_, i) => ({
       role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
       content: `Explain step-by-step how to implement and analyze the architecture design pattern for ${i}. import { foo } from "./bar.js"; const x = async () => await fetch(); \`\`\`ts code \`\`\``,
     }));

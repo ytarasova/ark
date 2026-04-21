@@ -43,11 +43,11 @@ function createWorkdirWithVerifyScripts(scripts: string[], opts?: { extraYaml?: 
 
 // ── 1. Verify scripts from repo config ──────────────────────────────────
 
-describe("verify scripts from repo config (.ark.yaml)", () => {
+describe("verify scripts from repo config (.ark.yaml)", async () => {
   it("passing verify scripts allow handoff", async () => {
     const workdir = createWorkdirWithVerifyScripts(["true"]);
-    const session = app.sessions.create({ summary: "verify pass test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
+    const session = await app.sessions.create({ summary: "verify pass test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
 
     const result = await runVerification(app, session.id);
 
@@ -60,8 +60,8 @@ describe("verify scripts from repo config (.ark.yaml)", () => {
 
   it("failing verify scripts block handoff", async () => {
     const workdir = createWorkdirWithVerifyScripts(["exit 1"]);
-    const session = app.sessions.create({ summary: "verify fail test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
+    const session = await app.sessions.create({ summary: "verify fail test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
 
     const result = await runVerification(app, session.id);
 
@@ -73,8 +73,8 @@ describe("verify scripts from repo config (.ark.yaml)", () => {
 
   it("partial script failures block even if some pass", async () => {
     const workdir = createWorkdirWithVerifyScripts(["true", "exit 1", "true"]);
-    const session = app.sessions.create({ summary: "partial fail test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
+    const session = await app.sessions.create({ summary: "partial fail test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
 
     const result = await runVerification(app, session.id);
 
@@ -87,8 +87,8 @@ describe("verify scripts from repo config (.ark.yaml)", () => {
 
   it("captures script output in results", async () => {
     const workdir = createWorkdirWithVerifyScripts(["echo hello-from-verify"]);
-    const session = app.sessions.create({ summary: "output capture test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
+    const session = await app.sessions.create({ summary: "output capture test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
 
     const result = await runVerification(app, session.id);
 
@@ -98,8 +98,8 @@ describe("verify scripts from repo config (.ark.yaml)", () => {
 
   it("captures stderr from failing scripts", async () => {
     const workdir = createWorkdirWithVerifyScripts(["echo error-output >&2 && exit 1"]);
-    const session = app.sessions.create({ summary: "stderr capture test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
+    const session = await app.sessions.create({ summary: "stderr capture test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
 
     const result = await runVerification(app, session.id);
 
@@ -110,7 +110,7 @@ describe("verify scripts from repo config (.ark.yaml)", () => {
 
 // ── 2. Verify scripts from flow stage definition ────────────────────────
 
-describe("verify scripts from flow stage definition", () => {
+describe("verify scripts from flow stage definition", async () => {
   it("default flow verify stage has verify scripts", () => {
     const stage = app.flows.get("default")?.stages.find((s) => s.name === "verify");
     expect(stage).toBeTruthy();
@@ -137,11 +137,11 @@ describe("verify scripts from flow stage definition", () => {
       ].join("\n"),
     );
 
-    const session = app.sessions.create({
+    const session = await app.sessions.create({
       summary: "stage verify precedence test",
       flow: "test-stage-verify",
     });
-    app.sessions.update(session.id, { status: "ready", stage: "work", workdir });
+    await app.sessions.update(session.id, { status: "ready", stage: "work", workdir });
 
     const result = await runVerification(app, session.id);
 
@@ -155,11 +155,11 @@ describe("verify scripts from flow stage definition", () => {
 
 // ── 3. Todo blocking ────────────────────────────────────────────────────
 
-describe("todos block stage validation", () => {
+describe("todos block stage validation", async () => {
   it("single unresolved todo blocks verification", async () => {
-    const session = app.sessions.create({ summary: "todo block test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement" });
-    app.todos.add(session.id, "Fix the failing test");
+    const session = await app.sessions.create({ summary: "todo block test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement" });
+    await app.todos.add(session.id, "Fix the failing test");
 
     const result = await runVerification(app, session.id);
 
@@ -169,11 +169,11 @@ describe("todos block stage validation", () => {
   });
 
   it("multiple unresolved todos all appear in message", async () => {
-    const session = app.sessions.create({ summary: "multi-todo test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement" });
-    app.todos.add(session.id, "Add error handling");
-    app.todos.add(session.id, "Write unit tests");
-    app.todos.add(session.id, "Update documentation");
+    const session = await app.sessions.create({ summary: "multi-todo test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement" });
+    await app.todos.add(session.id, "Add error handling");
+    await app.todos.add(session.id, "Write unit tests");
+    await app.todos.add(session.id, "Update documentation");
 
     const result = await runVerification(app, session.id);
 
@@ -186,10 +186,10 @@ describe("todos block stage validation", () => {
   });
 
   it("resolved todos do not block verification", async () => {
-    const session = app.sessions.create({ summary: "resolved todos test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement" });
-    const t1 = app.todos.add(session.id, "Already done task");
-    app.todos.toggle(t1.id);
+    const session = await app.sessions.create({ summary: "resolved todos test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement" });
+    const t1 = await app.todos.add(session.id, "Already done task");
+    await app.todos.toggle(t1.id);
 
     const result = await runVerification(app, session.id);
 
@@ -199,11 +199,11 @@ describe("todos block stage validation", () => {
   });
 
   it("mix of resolved and unresolved todos: only unresolved block", async () => {
-    const session = app.sessions.create({ summary: "mixed todos test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement" });
-    const t1 = app.todos.add(session.id, "Done task");
-    app.todos.toggle(t1.id);
-    app.todos.add(session.id, "Still pending");
+    const session = await app.sessions.create({ summary: "mixed todos test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement" });
+    const t1 = await app.todos.add(session.id, "Done task");
+    await app.todos.toggle(t1.id);
+    await app.todos.add(session.id, "Still pending");
 
     const result = await runVerification(app, session.id);
 
@@ -214,13 +214,13 @@ describe("todos block stage validation", () => {
 
 // ── 4. Combined: todos AND verify scripts ───────────────────────────────
 
-describe("combined todo + verify script validation", () => {
+describe("combined todo + verify script validation", async () => {
   it("both passing todos and scripts result in ok=true", async () => {
     const workdir = createWorkdirWithVerifyScripts(["true"]);
-    const session = app.sessions.create({ summary: "both pass test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
-    const t = app.todos.add(session.id, "Completed task");
-    app.todos.toggle(t.id);
+    const session = await app.sessions.create({ summary: "both pass test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
+    const t = await app.todos.add(session.id, "Completed task");
+    await app.todos.toggle(t.id);
 
     const result = await runVerification(app, session.id);
 
@@ -231,9 +231,9 @@ describe("combined todo + verify script validation", () => {
 
   it("passing scripts but pending todos: blocked", async () => {
     const workdir = createWorkdirWithVerifyScripts(["true"]);
-    const session = app.sessions.create({ summary: "scripts pass todos fail", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
-    app.todos.add(session.id, "Not done yet");
+    const session = await app.sessions.create({ summary: "scripts pass todos fail", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
+    await app.todos.add(session.id, "Not done yet");
 
     const result = await runVerification(app, session.id);
 
@@ -245,10 +245,10 @@ describe("combined todo + verify script validation", () => {
 
   it("failing scripts but resolved todos: blocked", async () => {
     const workdir = createWorkdirWithVerifyScripts(["exit 1"]);
-    const session = app.sessions.create({ summary: "scripts fail todos pass", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
-    const t = app.todos.add(session.id, "All done");
-    app.todos.toggle(t.id);
+    const session = await app.sessions.create({ summary: "scripts fail todos pass", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
+    const t = await app.todos.add(session.id, "All done");
+    await app.todos.toggle(t.id);
 
     const result = await runVerification(app, session.id);
 
@@ -260,9 +260,9 @@ describe("combined todo + verify script validation", () => {
 
   it("both failing: message includes both todo and script failures", async () => {
     const workdir = createWorkdirWithVerifyScripts(["echo lint-error && exit 1"]);
-    const session = app.sessions.create({ summary: "both fail test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
-    app.todos.add(session.id, "Unfinished work");
+    const session = await app.sessions.create({ summary: "both fail test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
+    await app.todos.add(session.id, "Unfinished work");
 
     const result = await runVerification(app, session.id);
 
@@ -276,11 +276,11 @@ describe("combined todo + verify script validation", () => {
 
 // ── 5. mediateStageHandoff with verify scripts ──────────────────────────
 
-describe("mediateStageHandoff with verify scripts", () => {
+describe("mediateStageHandoff with verify scripts", async () => {
   it("blocks handoff when repo config verify scripts fail", async () => {
     const workdir = createWorkdirWithVerifyScripts(["exit 1"]);
-    const session = app.sessions.create({ summary: "handoff verify block", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
+    const session = await app.sessions.create({ summary: "handoff verify block", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
 
     const result = await mediateStageHandoff(app, session.id, {
       autoDispatch: false,
@@ -291,15 +291,15 @@ describe("mediateStageHandoff with verify scripts", () => {
     expect(result.blockedByVerification).toBe(true);
     expect(result.fromStage).toBe("implement");
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.status).toBe("blocked");
     expect(updated?.breakpoint_reason).toContain("Verification failed");
   });
 
   it("allows handoff when repo config verify scripts pass", async () => {
     const workdir = createWorkdirWithVerifyScripts(["true"]);
-    const session = app.sessions.create({ summary: "handoff verify pass", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
+    const session = await app.sessions.create({ summary: "handoff verify pass", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
 
     const result = await mediateStageHandoff(app, session.id, {
       autoDispatch: false,
@@ -309,19 +309,19 @@ describe("mediateStageHandoff with verify scripts", () => {
     expect(result.ok).toBe(true);
     expect(result.toStage).toBe("verify");
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.stage).toBe("verify");
     expect(updated?.status).toBe("ready");
   });
 
   it("logs stage_handoff_blocked event with script failure details", async () => {
     const workdir = createWorkdirWithVerifyScripts(["echo test-failure-output && exit 1"]);
-    const session = app.sessions.create({ summary: "blocked event test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
+    const session = await app.sessions.create({ summary: "blocked event test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
 
     await mediateStageHandoff(app, session.id, { source: "channel_report" });
 
-    const events = app.events.list(session.id);
+    const events = await app.events.list(session.id);
     const blocked = events.find((e) => e.type === "stage_handoff_blocked");
     expect(blocked).toBeTruthy();
     expect(blocked!.data?.reason).toBe("verification_failed");
@@ -332,12 +332,12 @@ describe("mediateStageHandoff with verify scripts", () => {
 
   it("sends error message to session when blocked", async () => {
     const workdir = createWorkdirWithVerifyScripts(["exit 1"]);
-    const session = app.sessions.create({ summary: "error msg test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
+    const session = await app.sessions.create({ summary: "error msg test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
 
     await mediateStageHandoff(app, session.id, { source: "test" });
 
-    const msgs = app.messages.list(session.id);
+    const msgs = await app.messages.list(session.id);
     const errorMsg = msgs.find((m) => m.content.includes("Advance blocked"));
     expect(errorMsg).toBeTruthy();
     expect(errorMsg!.content).toContain("implement");
@@ -346,9 +346,9 @@ describe("mediateStageHandoff with verify scripts", () => {
 
   it("blocks handoff with combined todo + script failures", async () => {
     const workdir = createWorkdirWithVerifyScripts(["exit 1"]);
-    const session = app.sessions.create({ summary: "combined block test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
-    app.todos.add(session.id, "Incomplete task");
+    const session = await app.sessions.create({ summary: "combined block test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
+    await app.todos.add(session.id, "Incomplete task");
 
     const result = await mediateStageHandoff(app, session.id, {
       autoDispatch: false,
@@ -358,7 +358,7 @@ describe("mediateStageHandoff with verify scripts", () => {
     expect(result.ok).toBe(false);
     expect(result.blockedByVerification).toBe(true);
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.status).toBe("blocked");
     expect(updated?.breakpoint_reason).toContain("Verification failed");
   });
@@ -366,11 +366,11 @@ describe("mediateStageHandoff with verify scripts", () => {
 
 // ── 6. complete() function verification ─────────────────────────────────
 
-describe("complete() with verification", () => {
+describe("complete() with verification", async () => {
   it("blocks completion when verify scripts fail", async () => {
     const workdir = createWorkdirWithVerifyScripts(["exit 1"]);
-    const session = app.sessions.create({ summary: "complete block test", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement", workdir });
+    const session = await app.sessions.create({ summary: "complete block test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement", workdir });
 
     const result = await complete(app, session.id);
 
@@ -378,14 +378,14 @@ describe("complete() with verification", () => {
     expect(result.message).toContain("Verification failed");
 
     // Session should NOT have advanced
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.stage).toBe("implement");
   });
 
   it("blocks completion when todos are pending", async () => {
-    const session = app.sessions.create({ summary: "complete todo block", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement" });
-    app.todos.add(session.id, "Must complete this first");
+    const session = await app.sessions.create({ summary: "complete todo block", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement" });
+    await app.todos.add(session.id, "Must complete this first");
 
     const result = await complete(app, session.id);
 
@@ -396,40 +396,40 @@ describe("complete() with verification", () => {
 
   it("force flag bypasses verification", async () => {
     const workdir = createWorkdirWithVerifyScripts(["exit 1"]);
-    const session = app.sessions.create({ summary: "force complete test", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement", workdir });
-    app.todos.add(session.id, "Pending todo");
+    const session = await app.sessions.create({ summary: "force complete test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement", workdir });
+    await app.todos.add(session.id, "Pending todo");
 
     const result = await complete(app, session.id, { force: true });
 
     expect(result.ok).toBe(true);
 
     // Session should have advanced past implement
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.stage).not.toBe("implement");
   });
 
   it("allows completion when verification passes", async () => {
     const workdir = createWorkdirWithVerifyScripts(["true"]);
-    const session = app.sessions.create({ summary: "complete pass test", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement", workdir });
+    const session = await app.sessions.create({ summary: "complete pass test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement", workdir });
 
     const result = await complete(app, session.id);
 
     expect(result.ok).toBe(true);
 
     // Session should have advanced
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.stage).toBe("verify");
   });
 
   it("logs stage_completed event on success", async () => {
-    const session = app.sessions.create({ summary: "complete event test", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement" });
+    const session = await app.sessions.create({ summary: "complete event test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
     await complete(app, session.id);
 
-    const events = app.events.list(session.id);
+    const events = await app.events.list(session.id);
     const completed = events.find((e) => e.type === "stage_completed");
     expect(completed).toBeTruthy();
     expect(completed!.data?.note).toBe("Manually completed");
@@ -438,13 +438,13 @@ describe("complete() with verification", () => {
 
 // ── 7. Full lifecycle: block -> fix -> advance ──────────────────────────
 
-describe("full verification lifecycle", () => {
+describe("full verification lifecycle", async () => {
   it("todo lifecycle: add -> block -> resolve -> unblock -> advance", async () => {
-    const session = app.sessions.create({ summary: "todo lifecycle test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement" });
+    const session = await app.sessions.create({ summary: "todo lifecycle test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement" });
 
     // Step 1: Add a todo -- should block
-    const todo = app.todos.add(session.id, "Write tests for the feature");
+    const todo = await app.todos.add(session.id, "Write tests for the feature");
 
     const r1 = await mediateStageHandoff(app, session.id, {
       autoDispatch: false,
@@ -452,14 +452,14 @@ describe("full verification lifecycle", () => {
     });
     expect(r1.ok).toBe(false);
     expect(r1.blockedByVerification).toBe(true);
-    expect(app.sessions.get(session.id)?.status).toBe("blocked");
+    expect((await app.sessions.get(session.id))?.status).toBe("blocked");
 
     // Step 2: Resolve the todo
-    app.todos.toggle(todo.id);
+    await app.todos.toggle(todo.id);
     expect(app.todos.allDone(session.id)).toBe(true);
 
     // Step 3: Reset status to ready (as the agent would after fixing)
-    app.sessions.update(session.id, { status: "ready", breakpoint_reason: null });
+    await app.sessions.update(session.id, { status: "ready", breakpoint_reason: null });
 
     // Step 4: Retry handoff -- should succeed
     const r2 = await mediateStageHandoff(app, session.id, {
@@ -468,7 +468,7 @@ describe("full verification lifecycle", () => {
     });
     expect(r2.ok).toBe(true);
     expect(r2.toStage).toBe("verify");
-    expect(app.sessions.get(session.id)?.status).toBe("ready");
+    expect((await app.sessions.get(session.id))?.status).toBe("ready");
   });
 
   it("script lifecycle: fail -> fix -> advance", async () => {
@@ -477,8 +477,8 @@ describe("full verification lifecycle", () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, ".ark.yaml"), 'verify:\n  - "test -f DONE.txt"\n');
 
-    const session = app.sessions.create({ summary: "script lifecycle test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement", workdir: dir });
+    const session = await app.sessions.create({ summary: "script lifecycle test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir: dir });
 
     // Step 1: Script fails (DONE.txt doesn't exist yet)
     const r1 = await mediateStageHandoff(app, session.id, {
@@ -490,7 +490,7 @@ describe("full verification lifecycle", () => {
 
     // Step 2: Fix the issue (create the file the script checks for)
     writeFileSync(join(dir, "DONE.txt"), "work completed");
-    app.sessions.update(session.id, { status: "ready", breakpoint_reason: null });
+    await app.sessions.update(session.id, { status: "ready", breakpoint_reason: null });
 
     // Step 3: Retry handoff -- should succeed now
     const r2 = await mediateStageHandoff(app, session.id, {
@@ -504,8 +504,8 @@ describe("full verification lifecycle", () => {
   it("multi-stage advancement: verify at each stage", async () => {
     // Create a workdir with verify scripts that always pass
     const workdir = createWorkdirWithVerifyScripts(["true"]);
-    const session = app.sessions.create({ summary: "multi-stage verify", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
+    const session = await app.sessions.create({ summary: "multi-stage verify", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
 
     // implement -> verify
     const r1 = await mediateStageHandoff(app, session.id, {
@@ -524,7 +524,7 @@ describe("full verification lifecycle", () => {
     expect(r2.toStage).toBe("pr");
 
     // Verify events were logged for each handoff
-    const events = app.events.list(session.id);
+    const events = await app.events.list(session.id);
     const handoffs = events.filter((e) => e.type === "stage_handoff");
     expect(handoffs.length).toBeGreaterThanOrEqual(2);
   });
@@ -534,7 +534,7 @@ describe("full verification lifecycle", () => {
 
 const TEST_PORT = 19198;
 
-describe("conductor HTTP integration with stage validation", () => {
+describe("conductor HTTP integration with stage validation", async () => {
   let server: { stop(): void } | null = null;
 
   afterEach(() => {
@@ -551,9 +551,9 @@ describe("conductor HTTP integration with stage validation", () => {
   it("channel report is blocked by unresolved todos via conductor", async () => {
     server = startConductor(app, TEST_PORT, { quiet: true });
 
-    const session = app.sessions.create({ summary: "conductor todo block", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement" });
-    app.todos.add(session.id, "Must fix before advancing");
+    const session = await app.sessions.create({ summary: "conductor todo block", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement" });
+    await app.todos.add(session.id, "Must fix before advancing");
 
     const resp = await fetch(`http://localhost:${TEST_PORT}/api/channel/${session.id}`, {
       method: "POST",
@@ -571,12 +571,12 @@ describe("conductor HTTP integration with stage validation", () => {
     expect(resp.status).toBe(200);
     await new Promise((r) => setTimeout(r, 150));
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.status).toBe("blocked");
     expect(updated?.breakpoint_reason).toContain("Verification failed");
 
     // Verify stage_handoff_blocked event
-    const events = app.events.list(session.id);
+    const events = await app.events.list(session.id);
     const blocked = events.find((e) => e.type === "stage_handoff_blocked");
     expect(blocked).toBeTruthy();
   });
@@ -585,8 +585,8 @@ describe("conductor HTTP integration with stage validation", () => {
     server = startConductor(app, TEST_PORT, { quiet: true });
 
     const workdir = createWorkdirWithVerifyScripts(["exit 1"]);
-    const session = app.sessions.create({ summary: "conductor script block", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement", workdir });
+    const session = await app.sessions.create({ summary: "conductor script block", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement", workdir });
 
     const resp = await fetch(`http://localhost:${TEST_PORT}/api/channel/${session.id}`, {
       method: "POST",
@@ -604,7 +604,7 @@ describe("conductor HTTP integration with stage validation", () => {
     expect(resp.status).toBe(200);
     await new Promise((r) => setTimeout(r, 150));
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.status).toBe("blocked");
   });
 
@@ -612,8 +612,8 @@ describe("conductor HTTP integration with stage validation", () => {
     server = startConductor(app, TEST_PORT, { quiet: true });
 
     const workdir = createWorkdirWithVerifyScripts(["true"]);
-    const session = app.sessions.create({ summary: "conductor verify pass", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement", workdir });
+    const session = await app.sessions.create({ summary: "conductor verify pass", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement", workdir });
 
     const resp = await fetch(`http://localhost:${TEST_PORT}/api/channel/${session.id}`, {
       method: "POST",
@@ -631,7 +631,7 @@ describe("conductor HTTP integration with stage validation", () => {
     expect(resp.status).toBe(200);
     await new Promise((r) => setTimeout(r, 150));
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.stage).toBe("verify");
     // Status is "ready" after advance, but background auto-dispatch may set it
     // to "running" if the executor succeeds -- either means handoff succeeded.
@@ -639,7 +639,7 @@ describe("conductor HTTP integration with stage validation", () => {
     expect(updated?.status).not.toBe("blocked");
 
     // Verify stage_handoff event (not blocked)
-    const events = app.events.list(session.id);
+    const events = await app.events.list(session.id);
     const handoff = events.find((e) => e.type === "stage_handoff");
     expect(handoff).toBeTruthy();
     expect(handoff!.data?.from_stage).toBe("implement");
@@ -649,9 +649,9 @@ describe("conductor HTTP integration with stage validation", () => {
   it("todo resolve -> retry handoff succeeds via conductor", async () => {
     server = startConductor(app, TEST_PORT, { quiet: true });
 
-    const session = app.sessions.create({ summary: "conductor todo resolve", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement" });
-    const todo = app.todos.add(session.id, "Blocking todo");
+    const session = await app.sessions.create({ summary: "conductor todo resolve", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement" });
+    const todo = await app.todos.add(session.id, "Blocking todo");
 
     // First attempt: blocked by todo
     await fetch(`http://localhost:${TEST_PORT}/api/channel/${session.id}`, {
@@ -667,11 +667,11 @@ describe("conductor HTTP integration with stage validation", () => {
       }),
     });
     await new Promise((r) => setTimeout(r, 150));
-    expect(app.sessions.get(session.id)?.status).toBe("blocked");
+    expect((await app.sessions.get(session.id))?.status).toBe("blocked");
 
     // Resolve the todo and reset status
-    app.todos.toggle(todo.id);
-    app.sessions.update(session.id, { status: "running", breakpoint_reason: null });
+    await app.todos.toggle(todo.id);
+    await app.sessions.update(session.id, { status: "running", breakpoint_reason: null });
 
     // Second attempt: should advance
     await fetch(`http://localhost:${TEST_PORT}/api/channel/${session.id}`, {
@@ -688,7 +688,7 @@ describe("conductor HTTP integration with stage validation", () => {
     });
     await new Promise((r) => setTimeout(r, 150));
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.stage).toBe("verify");
     // Status is "running" because auto-dispatch is now properly awaited
     expect(updated?.status).toBe("running");
@@ -697,10 +697,10 @@ describe("conductor HTTP integration with stage validation", () => {
 
 // ── 9. Edge cases ───────────────────────────────────────────────────────
 
-describe("stage validation edge cases", () => {
+describe("stage validation edge cases", async () => {
   it("no verify scripts and no todos: verification passes trivially", async () => {
-    const session = app.sessions.create({ summary: "no gates test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement" });
+    const session = await app.sessions.create({ summary: "no gates test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement" });
 
     const result = await runVerification(app, session.id);
 
@@ -710,8 +710,8 @@ describe("stage validation edge cases", () => {
   });
 
   it("session with no workdir runs without scripts", async () => {
-    const session = app.sessions.create({ summary: "no workdir test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement" });
+    const session = await app.sessions.create({ summary: "no workdir test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement" });
 
     const result = await runVerification(app, session.id);
 
@@ -731,8 +731,8 @@ describe("stage validation edge cases", () => {
     writeFileSync(join(dir, "marker.txt"), "found-it");
     writeFileSync(join(dir, ".ark.yaml"), 'verify:\n  - "cat marker.txt"\n');
 
-    const session = app.sessions.create({ summary: "workdir context test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement", workdir: dir });
+    const session = await app.sessions.create({ summary: "workdir context test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir: dir });
 
     const result = await runVerification(app, session.id);
 
@@ -741,10 +741,10 @@ describe("stage validation edge cases", () => {
   });
 
   it("deleted todos do not block verification", async () => {
-    const session = app.sessions.create({ summary: "deleted todo test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement" });
-    const t = app.todos.add(session.id, "Will be deleted");
-    app.todos.delete(t.id);
+    const session = await app.sessions.create({ summary: "deleted todo test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement" });
+    const t = await app.todos.add(session.id, "Will be deleted");
+    await app.todos.delete(t.id);
 
     const result = await runVerification(app, session.id);
 
@@ -753,11 +753,11 @@ describe("stage validation edge cases", () => {
   });
 
   it("deleteForSession clears all todos, unblocking verification", async () => {
-    const session = app.sessions.create({ summary: "clear todos test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement" });
-    app.todos.add(session.id, "Task 1");
-    app.todos.add(session.id, "Task 2");
-    app.todos.add(session.id, "Task 3");
+    const session = await app.sessions.create({ summary: "clear todos test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement" });
+    await app.todos.add(session.id, "Task 1");
+    await app.todos.add(session.id, "Task 2");
+    await app.todos.add(session.id, "Task 3");
 
     // Before clearing: blocked
     expect((await runVerification(app, session.id)).ok).toBe(false);

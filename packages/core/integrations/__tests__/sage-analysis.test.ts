@@ -20,7 +20,7 @@ async function loadSample(): Promise<SageAnalysis> {
 
 // ── fetchAnalysis: file:// round-trip ───────────────────────────────────────
 
-describe("fetchAnalysis(file://)", () => {
+describe("fetchAnalysis(file://)", async () => {
   test("round-trips against the bundled sample", async () => {
     const analysis = await fetchAnalysis(pathToFileURL(SAMPLE_PATH).href, "IN-18342");
     expect(analysis.jira_id).toBe("IN-18342");
@@ -35,7 +35,7 @@ describe("fetchAnalysis(file://)", () => {
   });
 
   test("throws a helpful error for missing files", async () => {
-    await expect(fetchAnalysis("/tmp/does-not-exist.json", "X")).rejects.toThrow(/failed to read/);
+    (await expect(fetchAnalysis("/tmp/does-not-exist.json", "X"))).rejects.toThrow(/failed to read/);
   });
 
   test("extracts pi-sage's wrapped `raw` envelope", async () => {
@@ -61,7 +61,7 @@ describe("fetchAnalysis(file://)", () => {
 
 // ── buildStreamSubtasks: one subtask per plan_stream ────────────────────────
 
-describe("buildStreamSubtasks", () => {
+describe("buildStreamSubtasks", async () => {
   test("emits one subtask per plan_stream, with ordered task blocks", async () => {
     const analysis = await loadSample();
     const subtasks = buildStreamSubtasks(analysis);
@@ -89,7 +89,7 @@ describe("buildStreamSubtasks", () => {
 
 // ── Flow validator: from-sage-analysis.yaml loads with expected stages ──────
 
-describe("from-sage-analysis flow", () => {
+describe("from-sage-analysis flow", async () => {
   let app: AppContext;
 
   beforeAll(async () => {
@@ -128,7 +128,7 @@ describe("from-sage-analysis flow", () => {
       bytes,
     );
 
-    const session = startSession(app, {
+    const session = await startSession(app, {
       summary: "sage:IN-18342",
       flow: "from-sage-analysis",
       inputs: {
@@ -136,7 +136,7 @@ describe("from-sage-analysis flow", () => {
         params: { analysis_id: "IN-18342" },
       },
     });
-    const sessionRecord = app.sessions.get(session.id)!;
+    const sessionRecord = (await app.sessions.get(session.id))!;
     const subtasks = await extractSubtasks(app, sessionRecord);
     expect(subtasks).toHaveLength(3);
     // The first subtask prompt must contain the repo name + at least one task title.
@@ -145,11 +145,11 @@ describe("from-sage-analysis flow", () => {
   });
 
   test("extractSubtasks falls back to default when analysis_json is missing", async () => {
-    const session = startSession(app, {
+    const session = await startSession(app, {
       summary: "no-analysis",
       flow: "from-sage-analysis",
     });
-    const sessionRecord = app.sessions.get(session.id)!;
+    const sessionRecord = (await app.sessions.get(session.id))!;
     const subtasks = await extractSubtasks(app, sessionRecord);
     // Default fallback returns implementation + tests
     expect(subtasks.length).toBeGreaterThan(0);

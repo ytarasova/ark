@@ -28,7 +28,7 @@ export async function handleAcpRequest(app: AppContext, req: AcpRequest): Promis
     switch (req.method) {
       case "session/create": {
         const p = req.params ?? {};
-        const session = startSession(app, {
+        const session = await startSession(app, {
           summary: p.summary as string,
           repo: p.repo as string,
           flow: p.flow as string,

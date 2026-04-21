@@ -81,7 +81,7 @@ export async function prepareRemoteEnvironment(
 
   // Store ports on session config
   if (ports.length > 0) {
-    app.sessions.update(session.id, {
+    await app.sessions.update(session.id, {
       config: { ...session.config, ports },
     });
   }
@@ -119,7 +119,7 @@ export async function _launchAgentTmux(
   const tmuxName = `ark-${session.id}`;
 
   // Resolve compute + provider
-  const compute = session.compute_name ? app.computes.get(session.compute_name) : null;
+  const compute = session.compute_name ? await app.computes.get(session.compute_name) : null;
   const provider = getProvider(compute?.provider ?? "local");
 
   // Setup worktree + trust
@@ -211,7 +211,7 @@ export async function _launchAgentTmux(
       ports,
     });
 
-    app.sessions.update(session.id, { claude_session_id: claudeSessionId });
+    await app.sessions.update(session.id, { claude_session_id: claudeSessionId });
 
     // Deliver task via channel (tunnels are now up, channel port is accessible locally)
     log("Delivering task...");

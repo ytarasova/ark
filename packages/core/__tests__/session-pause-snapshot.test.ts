@@ -73,7 +73,7 @@ function makeNoSnapshotCompute(kind = "local" as const): Compute {
   };
 }
 
-describe("pauseWithSnapshot", () => {
+describe("pauseWithSnapshot", async () => {
   it("returns ok: false for nonexistent session", async () => {
     const result = await pauseWithSnapshot(app, "s-nonexistent");
     expect(result.ok).toBe(false);
@@ -81,8 +81,8 @@ describe("pauseWithSnapshot", () => {
   });
 
   it("returns notSupported when compute lacks snapshot capability", async () => {
-    const session = app.sessions.create({ summary: "pause-no-snap" });
-    app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "local-test" });
+    const session = await app.sessions.create({ summary: "pause-no-snap" });
+    await app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "local-test" });
     app.registerCompute(makeNoSnapshotCompute());
 
     const result = await pauseWithSnapshot(app, session.id);
@@ -92,8 +92,8 @@ describe("pauseWithSnapshot", () => {
   });
 
   it("pauses a running session with snapshot-capable compute", async () => {
-    const session = app.sessions.create({ summary: "pause-ok" });
-    app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
+    const session = await app.sessions.create({ summary: "pause-ok" });
+    await app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
     app.registerCompute(makeSnapshotCapableCompute());
 
     const result = await pauseWithSnapshot(app, session.id);
@@ -104,52 +104,52 @@ describe("pauseWithSnapshot", () => {
   });
 
   it("sets session status to blocked with breakpoint_reason", async () => {
-    const session = app.sessions.create({ summary: "pause-status" });
-    app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
+    const session = await app.sessions.create({ summary: "pause-status" });
+    await app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
     app.registerCompute(makeSnapshotCapableCompute());
 
     await pauseWithSnapshot(app, session.id, { reason: "manual pause" });
 
-    const updated = app.sessions.get(session.id)!;
+    const updated = await app.sessions.get(session.id)!;
     expect(updated.status).toBe("blocked");
     expect(updated.breakpoint_reason).toBe("manual pause");
   });
 
   it("uses default reason when none provided", async () => {
-    const session = app.sessions.create({ summary: "pause-default-reason" });
-    app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
+    const session = await app.sessions.create({ summary: "pause-default-reason" });
+    await app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
     app.registerCompute(makeSnapshotCapableCompute());
 
     await pauseWithSnapshot(app, session.id);
 
-    const updated = app.sessions.get(session.id)!;
+    const updated = await app.sessions.get(session.id)!;
     expect(updated.breakpoint_reason).toBe("User paused");
   });
 
   it("stores last_snapshot_id in session config", async () => {
-    const session = app.sessions.create({ summary: "pause-config" });
-    app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
+    const session = await app.sessions.create({ summary: "pause-config" });
+    await app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
     app.registerCompute(makeSnapshotCapableCompute());
 
     const result = await pauseWithSnapshot(app, session.id);
 
-    const updated = app.sessions.get(session.id)!;
+    const updated = await app.sessions.get(session.id)!;
     const config = updated.config as Record<string, unknown>;
     expect(config.last_snapshot_id).toBe(result.snapshot!.id);
     expect(config.last_snapshot_at).toBeTruthy();
   });
 
   it("returns ok: false when session has no resolvable compute", async () => {
-    const session = app.sessions.create({ summary: "pause-no-compute" });
-    app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "unknown-xyz" });
+    const session = await app.sessions.create({ summary: "pause-no-compute" });
+    await app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "unknown-xyz" });
 
     const result = await pauseWithSnapshot(app, session.id);
     expect(result.ok).toBe(false);
   });
 
   it("persists snapshot bytes to the store", async () => {
-    const session = app.sessions.create({ summary: "pause-persist" });
-    app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
+    const session = await app.sessions.create({ summary: "pause-persist" });
+    await app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
     app.registerCompute(makeSnapshotCapableCompute());
 
     const result = await pauseWithSnapshot(app, session.id);
@@ -160,7 +160,7 @@ describe("pauseWithSnapshot", () => {
   });
 });
 
-describe("resumeFromSnapshot", () => {
+describe("resumeFromSnapshot", async () => {
   it("returns ok: false for nonexistent session", async () => {
     const result = await resumeFromSnapshot(app, "s-nonexistent");
     expect(result.ok).toBe(false);
@@ -168,8 +168,8 @@ describe("resumeFromSnapshot", () => {
   });
 
   it("returns ok: false when no snapshot is available", async () => {
-    const session = app.sessions.create({ summary: "resume-no-snap" });
-    app.sessions.update(session.id, { status: "blocked", stage: "work", compute_name: "firecracker-test" });
+    const session = await app.sessions.create({ summary: "resume-no-snap" });
+    await app.sessions.update(session.id, { status: "blocked", stage: "work", compute_name: "firecracker-test" });
     app.registerCompute(makeSnapshotCapableCompute());
 
     const result = await resumeFromSnapshot(app, session.id);
@@ -178,8 +178,8 @@ describe("resumeFromSnapshot", () => {
   });
 
   it("resumes from the latest snapshot when snapshotId is omitted", async () => {
-    const session = app.sessions.create({ summary: "resume-latest" });
-    app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
+    const session = await app.sessions.create({ summary: "resume-latest" });
+    await app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
     app.registerCompute(makeSnapshotCapableCompute());
 
     const pauseResult = await pauseWithSnapshot(app, session.id);
@@ -191,23 +191,23 @@ describe("resumeFromSnapshot", () => {
   });
 
   it("sets session status to ready after resume", async () => {
-    const session = app.sessions.create({ summary: "resume-status" });
-    app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
+    const session = await app.sessions.create({ summary: "resume-status" });
+    await app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
     app.registerCompute(makeSnapshotCapableCompute());
 
     await pauseWithSnapshot(app, session.id, { reason: "test pause" });
-    const paused = app.sessions.get(session.id)!;
+    const paused = await app.sessions.get(session.id)!;
     expect(paused.status).toBe("blocked");
 
     await resumeFromSnapshot(app, session.id);
-    const resumed = app.sessions.get(session.id)!;
+    const resumed = await app.sessions.get(session.id)!;
     expect(resumed.status).toBe("ready");
     expect(resumed.breakpoint_reason).toBeNull();
   });
 
   it("resumes using explicit snapshotId", async () => {
-    const session = app.sessions.create({ summary: "resume-explicit" });
-    app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
+    const session = await app.sessions.create({ summary: "resume-explicit" });
+    await app.sessions.update(session.id, { status: "running", stage: "work", compute_name: "firecracker-test" });
     app.registerCompute(makeSnapshotCapableCompute());
 
     const pauseResult = await pauseWithSnapshot(app, session.id);
@@ -220,8 +220,8 @@ describe("resumeFromSnapshot", () => {
   });
 
   it("returns notSupported when compute lacks snapshot capability on resume", async () => {
-    const session = app.sessions.create({ summary: "resume-no-cap" });
-    app.sessions.update(session.id, { status: "blocked", stage: "work", compute_name: "local-test" });
+    const session = await app.sessions.create({ summary: "resume-no-cap" });
+    await app.sessions.update(session.id, { status: "blocked", stage: "work", compute_name: "local-test" });
 
     const fcCompute = makeSnapshotCapableCompute();
     app.registerCompute(fcCompute);
@@ -240,7 +240,7 @@ describe("resumeFromSnapshot", () => {
         },
       }),
     );
-    app.sessions.update(session.id, { config: { last_snapshot_id: ref.id } });
+    await app.sessions.update(session.id, { config: { last_snapshot_id: ref.id } });
 
     const resumeResult = await resumeFromSnapshot(app, session.id);
     expect(resumeResult.ok).toBe(false);
@@ -248,8 +248,8 @@ describe("resumeFromSnapshot", () => {
   });
 
   it("full pause/resume round-trip preserves session fields", async () => {
-    const session = app.sessions.create({ summary: "round-trip", repo: "/my/repo" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "round-trip", repo: "/my/repo" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "work",
       agent: "coder",
@@ -260,7 +260,7 @@ describe("resumeFromSnapshot", () => {
     await pauseWithSnapshot(app, session.id, { reason: "cost savings" });
     await resumeFromSnapshot(app, session.id);
 
-    const updated = app.sessions.get(session.id)!;
+    const updated = await app.sessions.get(session.id)!;
     expect(updated.status).toBe("ready");
     expect(updated.summary).toBe("round-trip");
     expect(updated.repo).toBe("/my/repo");
@@ -269,38 +269,38 @@ describe("resumeFromSnapshot", () => {
   });
 });
 
-describe("resolveSessionCompute", () => {
-  it("returns null for nonexistent session", () => {
-    const result = resolveSessionCompute(app, "s-nonexistent");
+describe("resolveSessionCompute", async () => {
+  it("returns null for nonexistent session", async () => {
+    const result = await resolveSessionCompute(app, "s-nonexistent");
     expect(result).toBeNull();
   });
 
-  it("infers firecracker kind from compute_name", () => {
-    const session = app.sessions.create({ summary: "resolve-fc" });
-    app.sessions.update(session.id, { compute_name: "firecracker-xl" });
+  it("infers firecracker kind from compute_name", async () => {
+    const session = await app.sessions.create({ summary: "resolve-fc" });
+    await app.sessions.update(session.id, { compute_name: "firecracker-xl" });
     app.registerCompute(makeSnapshotCapableCompute("firecracker"));
 
-    const result = resolveSessionCompute(app, session.id);
+    const result = await resolveSessionCompute(app, session.id);
     expect(result).not.toBeNull();
     expect(result!.kind).toBe("firecracker");
   });
 
-  it("infers ec2 kind from compute_name", () => {
-    const session = app.sessions.create({ summary: "resolve-ec2" });
-    app.sessions.update(session.id, { compute_name: "ec2-medium" });
+  it("infers ec2 kind from compute_name", async () => {
+    const session = await app.sessions.create({ summary: "resolve-ec2" });
+    await app.sessions.update(session.id, { compute_name: "ec2-medium" });
     app.registerCompute(makeSnapshotCapableCompute("ec2" as any));
 
-    const result = resolveSessionCompute(app, session.id);
+    const result = await resolveSessionCompute(app, session.id);
     expect(result).not.toBeNull();
     expect(result!.kind).toBe("ec2");
   });
 
-  it("defaults to local for unknown compute_name", () => {
-    const session = app.sessions.create({ summary: "resolve-local" });
-    app.sessions.update(session.id, { compute_name: "something-weird" });
+  it("defaults to local for unknown compute_name", async () => {
+    const session = await app.sessions.create({ summary: "resolve-local" });
+    await app.sessions.update(session.id, { compute_name: "something-weird" });
     app.registerCompute(makeNoSnapshotCompute());
 
-    const result = resolveSessionCompute(app, session.id);
+    const result = await resolveSessionCompute(app, session.id);
     expect(result).not.toBeNull();
     expect(result!.kind).toBe("local");
   });

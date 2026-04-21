@@ -19,7 +19,7 @@ export const createPrAction: ActionHandler = {
 
     // Skip if we already know about a PR
     if (session.pr_url) {
-      app.events.log(sessionId, "action_executed", {
+      await app.events.log(sessionId, "action_executed", {
         stage: session.stage ?? undefined,
         actor: "system",
         data: { action, pr_url: session.pr_url, skipped: "pr_already_exists" },
@@ -37,8 +37,8 @@ export const createPrAction: ActionHandler = {
         );
         if (prUrl?.trim()) {
           const url = prUrl.trim();
-          app.sessions.update(sessionId, { pr_url: url });
-          app.events.log(sessionId, "action_executed", {
+          await app.sessions.update(sessionId, { pr_url: url });
+          await app.events.log(sessionId, "action_executed", {
             stage: session.stage ?? undefined,
             actor: "system",
             data: { action, pr_url: url, skipped: "pr_found_on_branch" },
@@ -52,7 +52,7 @@ export const createPrAction: ActionHandler = {
 
     const result = await createWorktreePR(app, sessionId, { title: session.summary ?? undefined });
     if (result.ok) {
-      app.events.log(sessionId, "action_executed", {
+      await app.events.log(sessionId, "action_executed", {
         stage: session.stage ?? undefined,
         actor: "system",
         data: { action, pr_url: result.pr_url },

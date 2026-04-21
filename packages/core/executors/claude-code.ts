@@ -21,7 +21,7 @@ export const claudeCodeExecutor: Executor = {
   async launch(opts: LaunchOpts): Promise<LaunchResult> {
     const app = opts.app!;
     const log = opts.onLog ?? (() => {});
-    const session = app.sessions.get(opts.sessionId);
+    const session = await app.sessions.get(opts.sessionId);
     if (!session) {
       return { ok: false, handle: "", message: `Session ${opts.sessionId} not found` };
     }
@@ -30,7 +30,7 @@ export const claudeCodeExecutor: Executor = {
     const stage = opts.stage ?? "work";
 
     // Resolve compute + provider
-    const compute = session.compute_name ? app.computes.get(session.compute_name) : null;
+    const compute = session.compute_name ? await app.computes.get(session.compute_name) : null;
     const provider = getProvider(compute?.provider ?? "local");
 
     // Setup worktree + trust (dynamic import to avoid circular dependency)
@@ -161,7 +161,7 @@ export const claudeCodeExecutor: Executor = {
         ports,
       });
 
-      app.sessions.update(session.id, { claude_session_id: claudeSessionId });
+      await app.sessions.update(session.id, { claude_session_id: claudeSessionId });
 
       // Deliver task via channel
       log("Delivering task...");

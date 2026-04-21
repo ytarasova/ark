@@ -173,7 +173,7 @@ export class Bridge {
     let sessions: Array<{ status: string }> = [];
     if (app) {
       try {
-        sessions = app.sessions.list({ limit: 100 });
+        sessions = await app.sessions.list({ limit: 100 });
       } catch {
         logInfo("bridge", "app not booted");
       }

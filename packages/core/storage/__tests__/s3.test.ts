@@ -40,7 +40,7 @@ if (!dockerAvailable) {
 }
 const maybe = dockerAvailable ? describe : describe.skip;
 
-maybe("S3BlobStore (LocalStack integration)", () => {
+maybe("S3BlobStore (LocalStack integration)", async () => {
   let ls: LocalStackHandle;
   let store: S3BlobStore;
   let restoreEnv: () => void;
@@ -102,7 +102,7 @@ maybe("S3BlobStore (LocalStack integration)", () => {
       { tenantId: "tenant-a", namespace: "inputs", id: "r2", filename: "a.txt" },
       Buffer.from("secret"),
     );
-    await expect(store.get(locator, "tenant-b")).rejects.toThrow(/tenant/i);
+    (await expect(store.get(locator, "tenant-b"))).rejects.toThrow(/tenant/i);
   });
 
   it("rejects cross-tenant deletes", async () => {
@@ -110,7 +110,7 @@ maybe("S3BlobStore (LocalStack integration)", () => {
       { tenantId: "tenant-a", namespace: "inputs", id: "r3", filename: "a.txt" },
       Buffer.from("a"),
     );
-    await expect(store.delete(locator, "tenant-b")).rejects.toThrow(/tenant/i);
+    (await expect(store.delete(locator, "tenant-b"))).rejects.toThrow(/tenant/i);
   });
 
   it("delete then get throws NotFound", async () => {
@@ -121,7 +121,7 @@ maybe("S3BlobStore (LocalStack integration)", () => {
     await store.delete(locator, "tenant-c");
     // S3 GET on a missing key throws (NoSuchKey / 404). We don't care about
     // the exact error shape -- only that it surfaces.
-    await expect(store.get(locator, "tenant-c")).rejects.toThrow();
+    (await expect(store.get(locator, "tenant-c"))).rejects.toThrow();
   });
 
   it("rejects payloads larger than maxBytes BEFORE the network call", async () => {
@@ -135,10 +135,12 @@ maybe("S3BlobStore (LocalStack integration)", () => {
       endpoint: ls.endpoint,
     });
     const big = Buffer.alloc(1024, 0x41);
-    await expect(
-      oversizedStore.put({ tenantId: LOCAL_TENANT_ID, namespace: "inputs", id: "r-big", filename: "big.bin" }, big, {
-        maxBytes: 512,
-      }),
+    (
+      await expect(
+        oversizedStore.put({ tenantId: LOCAL_TENANT_ID, namespace: "inputs", id: "r-big", filename: "big.bin" }, big, {
+          maxBytes: 512,
+        }),
+      )
     ).rejects.toThrow(/exceeds maxBytes/);
     await oversizedStore.dispose?.();
   });

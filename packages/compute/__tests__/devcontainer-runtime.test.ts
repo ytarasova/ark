@@ -198,7 +198,7 @@ function buildHarness(opts: HarnessOpts = {}) {
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
-describe("DevcontainerRuntime", () => {
+describe("DevcontainerRuntime", async () => {
   let tmpCleanup: string[] = [];
 
   beforeEach(() => {
@@ -220,7 +220,7 @@ describe("DevcontainerRuntime", () => {
 
   // ── Image-only branch ────────────────────────────────────────────────────
 
-  describe("image branch", () => {
+  describe("image branch", async () => {
     it("builds image, creates + bootstraps + starts arkd, records meta", async () => {
       const { runtime, log } = buildHarness();
       const h = makeHandle("unit-image");
@@ -289,7 +289,7 @@ describe("DevcontainerRuntime", () => {
 
       const { runtime, log } = buildHarness({ failPostCreate: true });
       const h = makeHandle("fail-pc");
-      await expect(runtime.prepare(new LocalCompute(), h, prepareCtx(workdir))).rejects.toThrow("postCreate failed");
+      (await expect(runtime.prepare(new LocalCompute(), h, prepareCtx(workdir)))).rejects.toThrow("postCreate failed");
 
       const methods = log.map((e) => e.op);
       // We created a container and must have torn it down on error.
@@ -320,7 +320,7 @@ describe("DevcontainerRuntime", () => {
 
   // ── Compose branch ───────────────────────────────────────────────────────
 
-  describe("compose branch", () => {
+  describe("compose branch", async () => {
     it("compose up -> find container -> bootstrap -> arkd start -> forwarder", async () => {
       const { runtime, log } = buildHarness({ composeServiceContainerId: "cid-compose-1" });
       const h = makeHandle("compose-1");
@@ -371,7 +371,7 @@ describe("DevcontainerRuntime", () => {
     it("throws when compose ps returns no container for the service", async () => {
       const { runtime } = buildHarness({ composeServiceContainerId: "" });
       const h = makeHandle("compose-empty");
-      await expect(runtime.prepare(new LocalCompute(), h, prepareCtx(COMPOSE))).rejects.toThrow(
+      (await expect(runtime.prepare(new LocalCompute(), h, prepareCtx(COMPOSE)))).rejects.toThrow(
         /no container for service/,
       );
     });
@@ -379,7 +379,7 @@ describe("DevcontainerRuntime", () => {
 
   // ── shutdown ────────────────────────────────────────────────────────────
 
-  describe("shutdown", () => {
+  describe("shutdown", async () => {
     it("image mode: stops + removes the container, no compose calls", async () => {
       const { runtime, log } = buildHarness();
       const h = makeHandle("shutdown-image");
@@ -428,12 +428,12 @@ describe("DevcontainerRuntime", () => {
 
   // ── Missing devcontainer.json ───────────────────────────────────────────
 
-  describe("missing devcontainer.json", () => {
+  describe("missing devcontainer.json", async () => {
     it("prepare throws a targeted error pointing at the expected paths", async () => {
       const workdir = mkTmpWorkdir();
       tmpCleanup.push(workdir);
       const { runtime } = buildHarness();
-      await expect(runtime.prepare(new LocalCompute(), makeHandle("none"), prepareCtx(workdir))).rejects.toThrow(
+      (await expect(runtime.prepare(new LocalCompute(), makeHandle("none"), prepareCtx(workdir)))).rejects.toThrow(
         /no devcontainer\.json found/,
       );
     });
@@ -441,7 +441,7 @@ describe("DevcontainerRuntime", () => {
 
   // ── launchAgent ─────────────────────────────────────────────────────────
 
-  describe("launchAgent", () => {
+  describe("launchAgent", async () => {
     it("forwards to arkd client built against the stored arkd URL", async () => {
       const calls: { url: string; req: unknown }[] = [];
       const harness = buildHarness();

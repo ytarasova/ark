@@ -33,10 +33,10 @@ async function cleanZombieSessions(app: AppContext): Promise<number> {
   let cleaned = 0;
   for (const ts of tmuxSessions) {
     const sessionId = ts.name.replace("ark-", "");
-    const dbSession = app.sessions.get(sessionId);
+    const dbSession = await app.sessions.get(sessionId);
     if (!dbSession || ["failed", "completed"].includes(dbSession.status)) {
       await killSessionAsync(ts.name);
-      if (dbSession) app.sessions.update(dbSession.id, { session_id: null });
+      if (dbSession) await app.sessions.update(dbSession.id, { session_id: null });
       cleaned++;
     }
   }
@@ -222,7 +222,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const recipe = app.recipes.get(name);
     if (!recipe) throw new Error(`Recipe '${name}' not found`);
     const instance = instantiateRecipe(recipe, (variables ?? {}) as Record<string, string>);
-    const session = app.sessionService.start(instance);
+    const session = await app.sessionService.start(instance);
     return { session };
   });
 
@@ -236,7 +236,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const ok = app.recipes.delete(name, resolvedScope, projectArg(resolvedScope, projectRoot));
     return { ok };
   });
-  router.handle("compute/list", async () => ({ targets: app.computes.list() }));
+  router.handle("compute/list", async () => ({ targets: await app.computes.list() }));
   router.handle("compute/create", async (p) => {
     // Accept either legacy `{provider}` or new `{compute, runtime}`.
     // When only `provider` is given the repo derives the pair via
@@ -263,7 +263,35 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
         "local") as import("../../types/index.js").ComputeProviderName;
     }
 
-    const compute = app.computes.create({
+    // K8s targets must specify context, namespace, image up-front -- fail
+    // at create time rather than letting a misconfigured target provision
+    // pods into the wrong cluster/namespace later. Match on the new compute
+    // kind (preferred) and the legacy provider string (back-compat callers).
+    const providerStr = String(effectiveProvider ?? "");
+    const isK8s = computeKind === "k8s" || providerStr === "k8s" || providerStr === "k8s-kata";
+    if (isK8s) {
+      const cfg = (config ?? {}) as Record<string, unknown>;
+      const missing = ["context", "namespace", "image"].filter((k) => !cfg[k]);
+      if (missing.length) {
+        throw new RpcError(
+          `k8s compute requires ${missing.join(", ")} in config -- missing values would silently default to the kubeconfig current-context / "ark" namespace / ubuntu image`,
+          ErrorCodes.INVALID_PARAMS,
+        );
+      }
+      // Tenant policy gate: lock down which clusters this tenant can target.
+      // Empty allowed_k8s_contexts means "no restriction".
+      if (app.tenantPolicyManager && app.tenantId) {
+        const allowed = await app.tenantPolicyManager.isK8sContextAllowed(app.tenantId, cfg.context as string);
+        if (!allowed) {
+          throw new RpcError(
+            `Tenant "${app.tenantId}" is not permitted to target k8s context "${cfg.context}"`,
+            ErrorCodes.INVALID_PARAMS,
+          );
+        }
+      }
+    }
+
+    const compute = await app.computes.create({
       name,
       provider: effectiveProvider,
       compute: computeKind,
@@ -272,49 +300,87 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     });
     return { compute };
   });
+
+  // Discover available k8s contexts + namespaces from the local kubeconfig
+  // (or in-cluster service-account). Powers the compute-create UI / CLI
+  // pickers so users don't have to type cluster names from memory.
+  router.handle("k8s/discover", async (p) => {
+    const { kubeconfig, includeNamespaces } = extract<{ kubeconfig?: string; includeNamespaces?: boolean }>(p, []);
+    const k8s = await import("@kubernetes/client-node");
+    const kc = new k8s.KubeConfig();
+    if (kubeconfig) kc.loadFromFile(kubeconfig);
+    else kc.loadFromDefault();
+    const contexts = kc.getContexts().map((c) => ({ name: c.name, cluster: c.cluster, user: c.user }));
+    const current = kc.getCurrentContext();
+    const result: { contexts: typeof contexts; current: string; namespacesByContext?: Record<string, string[]> } = {
+      contexts,
+      current,
+    };
+    if (includeNamespaces) {
+      const namespacesByContext: Record<string, string[]> = {};
+      for (const ctx of contexts) {
+        try {
+          const scoped = new k8s.KubeConfig();
+          if (kubeconfig) scoped.loadFromFile(kubeconfig);
+          else scoped.loadFromDefault();
+          scoped.setCurrentContext(ctx.name);
+          const api = scoped.makeApiClient(k8s.CoreV1Api);
+          const { items } = await api.listNamespace();
+          namespacesByContext[ctx.name] = (items || []).map((n: any) => n.metadata?.name).filter(Boolean) as string[];
+        } catch {
+          // Context may be unreachable from this machine (no VPN / wrong
+          // creds / cluster down). Skip silently -- the picker just won't
+          // show namespaces for it.
+          namespacesByContext[ctx.name] = [];
+        }
+      }
+      result.namespacesByContext = namespacesByContext;
+    }
+    return result;
+  });
   // Surface registered Compute / Runtime kinds so the web UI can populate
   // dropdowns without duplicating our enum.
   router.handle("compute/kinds", async () => ({ kinds: app.listComputes() }));
   router.handle("runtime/kinds", async () => ({ kinds: app.listRuntimes() }));
   router.handle("compute/update", async (p) => {
     const { name, fields } = extract<ComputeUpdateParams>(p, ["name", "fields"]);
-    app.computes.update(name, fields as Record<string, unknown>);
+    await app.computes.update(name, fields as Record<string, unknown>);
     return { ok: true };
   });
   router.handle("compute/read", async (p) => {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
-    const compute = app.computes.get(name);
+    const compute = await app.computes.get(name);
     if (!compute) throw new RpcError("Compute not found", ErrorCodes.SESSION_NOT_FOUND);
     return { compute };
   });
   router.handle("compute/provision", async (p) => {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
-    const compute = app.computes.get(name);
+    const compute = await app.computes.get(name);
     if (!compute) throw new Error("Compute not found");
     const { getProvider } = await import("../../compute/index.js");
     const provider = getProvider(compute.provider);
     if (!provider) throw new Error(`Provider '${compute.provider}' not found`);
-    app.computes.update(compute.name, { status: "provisioning" });
+    await app.computes.update(compute.name, { status: "provisioning" });
     await provider.provision(compute);
-    app.computes.update(compute.name, { status: "running" });
+    await app.computes.update(compute.name, { status: "running" });
     return { ok: true };
   });
   router.handle("compute/stop-instance", async (p) => {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
-    const compute = app.computes.get(name);
+    const compute = await app.computes.get(name);
     if (!compute) throw new Error("Compute not found");
     const { getProvider } = await import("../../compute/index.js");
     const provider = getProvider(compute.provider);
     if (!provider) throw new Error(`Provider '${compute.provider}' not found`);
     try {
       await provider.stop(compute);
-      app.computes.update(compute.name, { status: "stopped" });
+      await app.computes.update(compute.name, { status: "stopped" });
     } catch (e: any) {
       if (provider.checkStatus) {
         const real = await provider.checkStatus(compute).catch(() => null);
         if (real === "destroyed" || real === "terminated") {
-          app.computes.update(compute.name, { status: "destroyed" });
-          app.computes.mergeConfig(compute.name, { ip: null });
+          await app.computes.update(compute.name, { status: "destroyed" });
+          await app.computes.mergeConfig(compute.name, { ip: null });
           return { ok: true, status: "destroyed" };
         }
       }
@@ -324,18 +390,18 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   });
   router.handle("compute/start-instance", async (p) => {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
-    const compute = app.computes.get(name);
+    const compute = await app.computes.get(name);
     if (!compute) throw new Error("Compute not found");
     const { getProvider } = await import("../../compute/index.js");
     const provider = getProvider(compute.provider);
     if (!provider) throw new Error(`Provider '${compute.provider}' not found`);
     await provider.start(compute);
-    app.computes.update(compute.name, { status: "running" });
+    await app.computes.update(compute.name, { status: "running" });
     return { ok: true };
   });
   router.handle("compute/destroy", async (p) => {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
-    const compute = app.computes.get(name);
+    const compute = await app.computes.get(name);
     if (!compute) throw new Error("Compute not found");
     const { getProvider } = await import("../../compute/index.js");
     const provider = getProvider(compute.provider);
@@ -343,19 +409,19 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     await provider.destroy(compute);
     // destroy cascades to the DB row. There is no "destroyed but still
     // listed" state -- if a user asks for destroy, they want it gone.
-    app.computes.delete(compute.name);
+    await app.computes.delete(compute.name);
     return { ok: true };
   });
   router.handle("compute/clean", async (p) => {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
-    const compute = app.computes.get(name);
+    const compute = await app.computes.get(name);
     if (!compute) throw new Error("Compute not found");
     const cleaned = await cleanZombieSessions(app);
     return { ok: true, cleaned };
   });
   router.handle("compute/reboot", async (p) => {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
-    const compute = app.computes.get(name);
+    const compute = await app.computes.get(name);
     if (!compute) throw new Error("Compute not found");
     const { getProvider } = await import("../../compute/index.js");
     const provider = getProvider(compute.provider);
@@ -365,7 +431,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   });
   router.handle("compute/ping", async (p) => {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
-    const compute = app.computes.get(name);
+    const compute = await app.computes.get(name);
     if (!compute) throw new Error("Compute not found");
     const cfg = compute.config as Record<string, unknown>;
     const ip = cfg?.ip as string | undefined;
@@ -384,7 +450,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
       if (provider?.checkStatus) {
         const real = await provider.checkStatus(compute).catch(() => null);
         if (real && real !== compute.status) {
-          app.computes.update(compute.name, { status: real });
+          await app.computes.update(compute.name, { status: real });
         }
         return { reachable: false, message: `Unreachable -- AWS status: ${real ?? "unknown"}` };
       }
@@ -399,7 +465,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   });
   // ── Compute templates ──────────────────────────────────────────────────
   router.handle("compute/template/list", async () => {
-    const dbTemplates = app.computeTemplates.list();
+    const dbTemplates = await app.computeTemplates.list();
     const configTemplates = app.config.computeTemplates ?? [];
     const dbNames = new Set(dbTemplates.map((t) => t.name));
     const merged = [
@@ -417,7 +483,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   });
   router.handle("compute/template/get", async (p) => {
     const { name } = extract<{ name: string }>(p, ["name"]);
-    let tmpl = app.computeTemplates.get(name);
+    let tmpl: any = await app.computeTemplates.get(name);
     if (!tmpl) {
       const cfgTmpl = (app.config.computeTemplates ?? []).find((t) => t.name === name);
       if (cfgTmpl) {
@@ -438,24 +504,32 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
       config?: Record<string, unknown>;
       description?: string;
     }>(p, ["name", "provider"]);
-    app.computeTemplates.create({ name, description, provider: provider as ComputeProviderName, config: config ?? {} });
+    await app.computeTemplates.create({
+      name,
+      description: description ?? null,
+      provider: provider as ComputeProviderName,
+      config: JSON.stringify(config ?? {}),
+      tenant_id: "default",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as any);
     return { ok: true };
   });
   router.handle("compute/template/delete", async (p) => {
     const { name } = extract<{ name: string }>(p, ["name"]);
-    app.computeTemplates.delete(name);
+    await app.computeTemplates.delete(name);
     return { ok: true };
   });
 
-  router.handle("group/list", async () => ({ groups: app.sessions.getGroups() }));
+  router.handle("group/list", async () => ({ groups: await app.sessions.getGroups() }));
   router.handle("group/create", async (p) => {
     const { name } = extract<GroupCreateParams>(p, ["name"]);
-    app.sessions.createGroup(name);
+    await app.sessions.createGroup(name);
     return { group: { name } };
   });
   router.handle("group/delete", async (p) => {
     const { name } = extract<GroupDeleteParams>(p, ["name"]);
-    app.sessions.deleteGroup(name);
+    await app.sessions.deleteGroup(name);
     return { ok: true };
   });
 }

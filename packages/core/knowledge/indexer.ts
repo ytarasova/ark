@@ -76,16 +76,15 @@ export async function indexCodebase(
   // If incremental, only re-index changed files
   if (opts?.incremental && opts.changedFiles?.length) {
     for (const f of opts.changedFiles) {
-      store.removeNode(`file:${f}`);
-      const symbolNodes = store
-        .listNodes({ type: "symbol" })
-        .filter((n) => (n.metadata?.file as string | undefined) === f);
-      for (const sn of symbolNodes) store.removeNode(sn.id);
+      await store.removeNode(`file:${f}`);
+      const allSymbols = await store.listNodes({ type: "symbol" });
+      const symbolNodes = allSymbols.filter((n) => (n.metadata?.file as string | undefined) === f);
+      for (const sn of symbolNodes) await store.removeNode(sn.id);
     }
   } else if (!opts?.incremental) {
     // Full re-index: clear existing codebase nodes (preserve session/memory/learning nodes)
-    store.clear({ type: "file" });
-    store.clear({ type: "symbol" });
+    await store.clear({ type: "file" });
+    await store.clear({ type: "symbol" });
   }
 
   // Build graph with codegraph native engine
@@ -330,20 +329,20 @@ export function indexCoChanges(
 /**
  * After a session completes, create session node + modified_by edges.
  */
-export function indexSessionCompletion(
+export async function indexSessionCompletion(
   store: KnowledgeStore,
   sessionId: string,
   summary: string,
   outcome: string,
   changedFiles: string[],
-): void {
-  const existing = store.getNode(`session:${sessionId}`);
+): Promise<void> {
+  const existing = await store.getNode(`session:${sessionId}`);
   if (existing) {
-    store.updateNode(`session:${sessionId}`, {
+    await store.updateNode(`session:${sessionId}`, {
       metadata: { ...existing.metadata, outcome, files_changed: changedFiles },
     });
   } else {
-    store.addNode({
+    await store.addNode({
       id: `session:${sessionId}`,
       type: "session",
       label: summary ?? sessionId,
@@ -353,6 +352,6 @@ export function indexSessionCompletion(
   }
 
   for (const file of changedFiles) {
-    store.addEdge(`file:${file}`, `session:${sessionId}`, "modified_by");
+    await store.addEdge(`file:${file}`, `session:${sessionId}`, "modified_by");
   }
 }

@@ -55,7 +55,7 @@ describe("renderReworkPrompt", () => {
 
 // ── rejectReviewGate happy path ─────────────────────────────────────────────
 
-describe("rejectReviewGate", () => {
+describe("rejectReviewGate", async () => {
   it("renders declared on_reject.prompt and dispatches a rework", async () => {
     writeUserFlow("reject-custom", {
       name: "reject-custom",
@@ -72,7 +72,7 @@ describe("rejectReviewGate", () => {
       ],
     });
 
-    const session = startSession(getApp(), { flow: "reject-custom", summary: "custom reject" });
+    const session = await startSession(getApp(), { flow: "reject-custom", summary: "custom reject" });
     expect(session.stage).toBe("qa");
 
     let dispatched = 0;
@@ -106,7 +106,7 @@ describe("rejectReviewGate", () => {
       ],
     });
 
-    const session = startSession(getApp(), { flow: "reject-default", summary: "default" });
+    const session = await startSession(getApp(), { flow: "reject-default", summary: "default" });
     const result = await rejectReviewGate(getApp(), session.id, "needs more tests", async () => ({
       ok: true,
       message: "ok",
@@ -124,7 +124,7 @@ describe("rejectReviewGate", () => {
       stages: [{ name: "sign-off", agent: "reviewer", gate: "manual" }],
     });
 
-    const session = startSession(getApp(), { flow: "reject-manual", summary: "manual gate" });
+    const session = await startSession(getApp(), { flow: "reject-manual", summary: "manual gate" });
     const res = await rejectReviewGate(getApp(), session.id, "nope", async () => ({ ok: true, message: "ok" }));
     expect(res.ok).toBe(true);
     expect(getApp().sessions.get(session.id)!.rejection_count).toBe(1);
@@ -135,7 +135,7 @@ describe("rejectReviewGate", () => {
       name: "reject-auto",
       stages: [{ name: "build", agent: "builder", gate: "auto" }],
     });
-    const session = startSession(getApp(), { flow: "reject-auto", summary: "auto" });
+    const session = await startSession(getApp(), { flow: "reject-auto", summary: "auto" });
     const res = await rejectReviewGate(getApp(), session.id, "nope", async () => ({ ok: true, message: "ok" }));
     expect(res.ok).toBe(false);
     expect(res.message).toContain("'auto'");
@@ -152,7 +152,7 @@ describe("rejectReviewGate", () => {
       name: "reject-clear",
       stages: [{ name: "review", agent: "reviewer", gate: "review" }],
     });
-    const session = startSession(getApp(), { flow: "reject-clear", summary: "clear" });
+    const session = await startSession(getApp(), { flow: "reject-clear", summary: "clear" });
     // Pre-populate runtime ids to verify they're nulled out.
     getApp().sessions.update(session.id, {
       claude_session_id: "prev-claude",
@@ -170,7 +170,7 @@ describe("rejectReviewGate", () => {
 
 // ── max_rejections cap ──────────────────────────────────────────────────────
 
-describe("rejectReviewGate max_rejections", () => {
+describe("rejectReviewGate max_rejections", async () => {
   it("marks the session failed when the cap is hit", async () => {
     writeUserFlow("reject-cap", {
       name: "reject-cap",
@@ -184,7 +184,7 @@ describe("rejectReviewGate max_rejections", () => {
       ],
     });
 
-    const session = startSession(getApp(), { flow: "reject-cap", summary: "cap" });
+    const session = await startSession(getApp(), { flow: "reject-cap", summary: "cap" });
 
     let dispatchCount = 0;
     const stubDispatch = async () => {
@@ -237,7 +237,7 @@ describe("rejectReviewGate max_rejections", () => {
         },
       ],
     });
-    const session = startSession(getApp(), { flow: "reject-zero", summary: "zero" });
+    const session = await startSession(getApp(), { flow: "reject-zero", summary: "zero" });
     let dispatched = 0;
     const res = await rejectReviewGate(getApp(), session.id, "no", async () => {
       dispatched++;
@@ -257,7 +257,7 @@ describe("rejectReviewGate max_rejections", () => {
 // would be delivered by a real dispatch; this test asserts the *state
 // transitions* around the rework step, not the prompt text.
 
-describe("review gate integration", () => {
+describe("review gate integration", async () => {
   it("reject -> dispatch -> approve advances past the gate", async () => {
     writeUserFlow("integration", {
       name: "integration",
@@ -272,7 +272,7 @@ describe("review gate integration", () => {
       ],
     });
 
-    const session = startSession(getApp(), { flow: "integration", summary: "integration" });
+    const session = await startSession(getApp(), { flow: "integration", summary: "integration" });
     expect(session.stage).toBe("review");
 
     // Reject with a stub dispatch to simulate rework.

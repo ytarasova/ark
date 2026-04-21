@@ -77,7 +77,7 @@ async function waitUntilGone(port: number, timeoutMs: number): Promise<boolean> 
   return false;
 }
 
-describe("ARK_WATCH_PARENT parent-death watchdog", () => {
+describe("ARK_WATCH_PARENT parent-death watchdog", async () => {
   it("exits ark web child process when the spawner is SIGKILLed", async () => {
     const port = await allocatePort();
 

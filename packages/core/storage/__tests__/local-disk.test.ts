@@ -24,7 +24,7 @@ afterAll(() => {
   if (existsSync(root)) rmSync(root, { recursive: true, force: true });
 });
 
-describe("LocalDiskBlobStore", () => {
+describe("LocalDiskBlobStore", async () => {
   it("puts then gets the same bytes", async () => {
     const bytes = Buffer.from("hello world", "utf-8");
     const meta = await store.put(
@@ -46,7 +46,7 @@ describe("LocalDiskBlobStore", () => {
       { tenantId: "tenant-a", namespace: "inputs", id: "r2", filename: "a.txt" },
       Buffer.from("a"),
     );
-    await expect(store.get(locator, "tenant-b")).rejects.toThrow(/tenant/i);
+    (await expect(store.get(locator, "tenant-b"))).rejects.toThrow(/tenant/i);
   });
 
   it("rejects cross-tenant deletes", async () => {
@@ -54,7 +54,7 @@ describe("LocalDiskBlobStore", () => {
       { tenantId: "tenant-a", namespace: "inputs", id: "r3", filename: "a.txt" },
       Buffer.from("a"),
     );
-    await expect(store.delete(locator, "tenant-b")).rejects.toThrow(/tenant/i);
+    (await expect(store.delete(locator, "tenant-b"))).rejects.toThrow(/tenant/i);
   });
 
   it("delete removes the file + drops empty parent dirs", async () => {
@@ -64,7 +64,7 @@ describe("LocalDiskBlobStore", () => {
     );
     await store.delete(locator, "tenant-c");
     // Read back should fail.
-    await expect(store.get(locator, "tenant-c")).rejects.toThrow();
+    (await expect(store.get(locator, "tenant-c"))).rejects.toThrow();
     // Per-blob dir cleaned up.
     const perBlobDir = join(root, "tenant-c", "inputs", "r4");
     expect(existsSync(perBlobDir)).toBe(false);
@@ -90,10 +90,12 @@ describe("LocalDiskBlobStore", () => {
 
   it("rejects payloads larger than maxBytes", async () => {
     const big = Buffer.alloc(1024, 0x41);
-    await expect(
-      store.put({ tenantId: LOCAL_TENANT_ID, namespace: "inputs", id: "r6", filename: "big.bin" }, big, {
-        maxBytes: 512,
-      }),
+    (
+      await expect(
+        store.put({ tenantId: LOCAL_TENANT_ID, namespace: "inputs", id: "r6", filename: "big.bin" }, big, {
+          maxBytes: 512,
+        }),
+      )
     ).rejects.toThrow(/exceeds maxBytes/);
   });
 });

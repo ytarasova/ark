@@ -17,7 +17,7 @@ afterEach(async () => {
   }
 });
 
-describe("subprocess executor", () => {
+describe("subprocess executor", async () => {
   it("has correct name", () => {
     expect(subprocessExecutor.name).toBe("subprocess");
   });

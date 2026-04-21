@@ -38,8 +38,8 @@ export interface ComputePoolStatus extends ComputePool {
 
 // ── Schema ─────────────────────────────────────────────────────────────────
 
-export function initPoolSchema(db: { exec(sql: string): void }): void {
-  db.exec(`
+export async function initPoolSchema(db: { exec(sql: string): Promise<void> }): Promise<void> {
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS compute_pools (
       name TEXT NOT NULL,
       provider TEXT NOT NULL,
@@ -58,6 +58,7 @@ export function initPoolSchema(db: { exec(sql: string): void }): void {
 
 export class ComputePoolManager {
   private tenantId: string = "default";
+  private _initialized: Promise<void> | null = null;
 
   constructor(private app: AppContext) {}
 
@@ -68,16 +69,18 @@ export class ComputePoolManager {
     return this.tenantId;
   }
 
-  /** Ensure the compute_pools table exists. */
-  ensureSchema(): void {
-    initPoolSchema(this.app.db);
+  /** Ensure the compute_pools table exists. Idempotent. */
+  async ensureSchema(): Promise<void> {
+    if (this._initialized) return this._initialized;
+    this._initialized = initPoolSchema(this.app.db);
+    return this._initialized;
   }
 
   /** Create a pool definition. */
-  createPool(pool: ComputePool): ComputePool {
-    this.ensureSchema();
+  async createPool(pool: ComputePool): Promise<ComputePool> {
+    await this.ensureSchema();
     const ts = new Date().toISOString();
-    this.app.db
+    await this.app.db
       .prepare(
         `
       INSERT INTO compute_pools (name, provider, min_instances, max_instances, config, tenant_id, created_at, updated_at)
@@ -89,19 +92,19 @@ export class ComputePoolManager {
   }
 
   /** Get a pool by name. Returns null if not found. */
-  getPool(name: string): ComputePool | null {
-    this.ensureSchema();
-    const row = this.app.db
+  async getPool(name: string): Promise<ComputePool | null> {
+    await this.ensureSchema();
+    const row = (await this.app.db
       .prepare("SELECT * FROM compute_pools WHERE name = ? AND tenant_id = ?")
-      .get(name, this.tenantId) as ComputePoolRow | undefined;
+      .get(name, this.tenantId)) as ComputePoolRow | undefined;
     if (!row) return null;
     return this._rowToPool(row);
   }
 
   /** Delete a pool definition. Returns true if deleted. */
-  deletePool(name: string): boolean {
-    this.ensureSchema();
-    const result = this.app.db
+  async deletePool(name: string): Promise<boolean> {
+    await this.ensureSchema();
+    const result = await this.app.db
       .prepare("DELETE FROM compute_pools WHERE name = ? AND tenant_id = ?")
       .run(name, this.tenantId);
     return (result?.changes ?? 0) > 0;
@@ -112,12 +115,12 @@ export class ComputePoolManager {
    * Returns an available (idle) compute, or provisions a new one if under max.
    */
   async requestCompute(poolName: string): Promise<Compute> {
-    const pool = this.getPool(poolName);
+    const pool = await this.getPool(poolName);
     if (!pool) throw new Error(`Pool '${poolName}' not found`);
 
     // Find computes belonging to this pool that are not assigned to any running session
-    const poolComputes = this._getPoolComputes(poolName);
-    const runningSessions = this.app.sessions.list({ status: "running" });
+    const poolComputes = await this._getPoolComputes(poolName);
+    const runningSessions = await this.app.sessions.list({ status: "running" });
     const busyComputeNames = new Set(runningSessions.map((s) => s.compute_name).filter(Boolean) as string[]);
 
     // Find an idle compute in the pool
@@ -132,7 +135,7 @@ export class ComputePoolManager {
     // Create a new compute in the pool
     const idx = poolComputes.length + 1;
     const computeName = `${poolName}-${idx}`;
-    const compute = this.app.computes.create({
+    const compute = await this.app.computes.create({
       name: computeName,
       provider: pool.provider as ComputeProviderName,
       config: { ...pool.config, pool: poolName },
@@ -142,24 +145,25 @@ export class ComputePoolManager {
     const provider = this.app.getProvider(pool.provider);
     if (provider) {
       await provider.provision(compute);
-      this.app.computes.update(computeName, { status: "running" });
+      await this.app.computes.update(computeName, { status: "running" });
     }
 
-    return this.app.computes.get(computeName)!;
+    return (await this.app.computes.get(computeName))!;
   }
 
   /** Release a compute back to the pool after session completes. */
-  releaseCompute(poolName: string, _computeName: string): void {
-    const pool = this.getPool(poolName);
+  async releaseCompute(poolName: string, _computeName: string): Promise<void> {
+    const pool = await this.getPool(poolName);
     if (!pool) return;
 
     // The compute stays running but becomes available for new sessions.
     // If we're over min instances, we could optionally stop it.
-    const poolComputes = this._getPoolComputes(poolName);
-    const runningSessions = this.app.sessions.list({ status: "running" });
-    const busyCount = runningSessions.filter(
-      (s) => s.compute_name && this._isPoolCompute(s.compute_name, poolName),
-    ).length;
+    const poolComputes = await this._getPoolComputes(poolName);
+    const runningSessions = await this.app.sessions.list({ status: "running" });
+    const checks = await Promise.all(
+      runningSessions.map(async (s) => (s.compute_name ? await this._isPoolCompute(s.compute_name, poolName) : false)),
+    );
+    const busyCount = checks.filter(Boolean).length;
 
     // If after release we have more running than min, and this compute
     // would be excess, mark it for potential cleanup (but don't destroy yet).
@@ -169,24 +173,28 @@ export class ComputePoolManager {
   }
 
   /** List all pools with their current utilization. */
-  listPools(): ComputePoolStatus[] {
-    this.ensureSchema();
-    const rows = this.app.db
+  async listPools(): Promise<ComputePoolStatus[]> {
+    await this.ensureSchema();
+    const rows = (await this.app.db
       .prepare("SELECT * FROM compute_pools WHERE tenant_id = ? ORDER BY name")
-      .all(this.tenantId) as ComputePoolRow[];
-    const runningSessions = this.app.sessions.list({ status: "running" });
+      .all(this.tenantId)) as ComputePoolRow[];
+    const runningSessions = await this.app.sessions.list({ status: "running" });
 
-    return rows.map((row) => {
+    const out: ComputePoolStatus[] = [];
+    for (const row of rows) {
       const pool = this._rowToPool(row);
-      const poolComputes = this._getPoolComputes(pool.name);
-      const busyComputeNames = new Set(
-        runningSessions.map((s) => s.compute_name).filter((n) => n && this._isPoolCompute(n, pool.name)) as string[],
-      );
-      const active = busyComputeNames.size;
-      const available = poolComputes.filter((c) => !busyComputeNames.has(c.name) && c.status === "running").length;
-
-      return { ...pool, active, available };
-    });
+      const poolComputes = await this._getPoolComputes(pool.name);
+      const busyNames = new Set<string>();
+      for (const s of runningSessions) {
+        if (s.compute_name && (await this._isPoolCompute(s.compute_name, pool.name))) {
+          busyNames.add(s.compute_name);
+        }
+      }
+      const active = busyNames.size;
+      const available = poolComputes.filter((c) => !busyNames.has(c.name) && c.status === "running").length;
+      out.push({ ...pool, active, available });
+    }
+    return out;
   }
 
   // ── Internal ───────────────────────────────────────────────────────────
@@ -207,14 +215,19 @@ export class ComputePoolManager {
     };
   }
 
-  private _getPoolComputes(poolName: string): Compute[] {
-    return this.app.computes.list().filter((c) => this._isPoolCompute(c.name, poolName));
+  private async _getPoolComputes(poolName: string): Promise<Compute[]> {
+    const all = await this.app.computes.list();
+    const out: Compute[] = [];
+    for (const c of all) {
+      if (await this._isPoolCompute(c.name, poolName)) out.push(c);
+    }
+    return out;
   }
 
-  private _isPoolCompute(computeName: string, poolName: string): boolean {
+  private async _isPoolCompute(computeName: string, poolName: string): Promise<boolean> {
     // Pool computes are named <poolName>-<N> or have pool config
     if (computeName.startsWith(`${poolName}-`)) return true;
-    const compute = this.app.computes.get(computeName);
+    const compute = await this.app.computes.get(computeName);
     if (compute && (compute.config as Record<string, unknown>)?.pool === poolName) return true;
     return false;
   }

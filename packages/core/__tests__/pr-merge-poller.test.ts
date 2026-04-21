@@ -48,7 +48,7 @@ beforeEach(() => {
 
 // ── fetchPRState ──────────────────────────────────────────────────────────
 
-describe("fetchPRState", () => {
+describe("fetchPRState", async () => {
   it("parses OPEN state", async () => {
     const mockExec = async () => ({
       stdout: JSON.stringify({ state: "OPEN" }),
@@ -94,7 +94,7 @@ describe("fetchPRState", () => {
 
 // ── pollPRMerges ────────────────────────────────────────────────────────
 
-describe("pollPRMerges", () => {
+describe("pollPRMerges", async () => {
   it("skips sessions without pr_url", async () => {
     const session = getApp().sessions.create({ summary: "no pr" });
     getApp().sessions.update(session.id, {
@@ -170,7 +170,7 @@ describe("pollPRMerges", () => {
 
 // ── checkSessionMerge ───────────────────────────────────────────────────
 
-describe("checkSessionMerge", () => {
+describe("checkSessionMerge", async () => {
   it("advances session when PR is MERGED", async () => {
     const session = createMergeSession();
 

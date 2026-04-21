@@ -83,7 +83,7 @@ describe("splitEditorCommand", () => {
   });
 });
 
-describe("forkCloneHandler deduplication", () => {
+describe("forkCloneHandler deduplication", async () => {
   test("fork and clone share the same handler (verified by source)", async () => {
     // We verify the deduplication by reading the source and confirming
     // both commands reference the same function name

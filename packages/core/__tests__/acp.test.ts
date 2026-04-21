@@ -13,7 +13,7 @@ function req(method: string, params?: Record<string, unknown>, id: number = 1): 
   return { jsonrpc: "2.0", method, params, id };
 }
 
-describe("handleAcpRequest", () => {
+describe("handleAcpRequest", async () => {
   it("session/create creates a new session", async () => {
     const resp = await handleAcpRequest(
       getApp(),

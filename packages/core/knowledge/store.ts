@@ -33,16 +33,16 @@ export class KnowledgeStore {
   }
 
   // --- Node CRUD ---
-  addNode(opts: {
+  async addNode(opts: {
     id?: string;
     type: NodeType;
     label: string;
     content?: string;
     metadata?: Record<string, unknown>;
-  }): string {
+  }): Promise<string> {
     const id = opts.id ?? `${opts.type}:${randomUUID().slice(0, 8)}`;
     const now = new Date().toISOString();
-    this.db
+    await this.db
       .prepare(
         "INSERT OR REPLACE INTO knowledge (id, type, label, content, metadata, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       )
@@ -59,14 +59,14 @@ export class KnowledgeStore {
     return id;
   }
 
-  getNode(id: string): KnowledgeNode | null {
-    const row = this.db.prepare("SELECT * FROM knowledge WHERE id = ? AND tenant_id = ?").get(id, this.tenantId) as
-      | NodeRow
-      | undefined;
+  async getNode(id: string): Promise<KnowledgeNode | null> {
+    const row = (await this.db
+      .prepare("SELECT * FROM knowledge WHERE id = ? AND tenant_id = ?")
+      .get(id, this.tenantId)) as NodeRow | undefined;
     return row ? this.rowToNode(row) : null;
   }
 
-  updateNode(id: string, fields: Partial<Pick<KnowledgeNode, "label" | "content" | "metadata">>): void {
+  async updateNode(id: string, fields: Partial<Pick<KnowledgeNode, "label" | "content" | "metadata">>): Promise<void> {
     const sets: string[] = [];
     const params: any[] = [];
     if (fields.label !== undefined) {
@@ -85,17 +85,17 @@ export class KnowledgeStore {
     sets.push("updated_at = ?");
     params.push(new Date().toISOString());
     params.push(id, this.tenantId);
-    this.db.prepare(`UPDATE knowledge SET ${sets.join(", ")} WHERE id = ? AND tenant_id = ?`).run(...params);
+    await this.db.prepare(`UPDATE knowledge SET ${sets.join(", ")} WHERE id = ? AND tenant_id = ?`).run(...params);
   }
 
-  removeNode(id: string): void {
-    this.db
+  async removeNode(id: string): Promise<void> {
+    await this.db
       .prepare("DELETE FROM knowledge_edges WHERE (source_id = ? OR target_id = ?) AND tenant_id = ?")
       .run(id, id, this.tenantId);
-    this.db.prepare("DELETE FROM knowledge WHERE id = ? AND tenant_id = ?").run(id, this.tenantId);
+    await this.db.prepare("DELETE FROM knowledge WHERE id = ? AND tenant_id = ?").run(id, this.tenantId);
   }
 
-  listNodes(opts?: { type?: NodeType; limit?: number }): KnowledgeNode[] {
+  async listNodes(opts?: { type?: NodeType; limit?: number }): Promise<KnowledgeNode[]> {
     let sql = "SELECT * FROM knowledge WHERE tenant_id = ?";
     const params: unknown[] = [this.tenantId];
     if (opts?.type) {
@@ -107,18 +107,19 @@ export class KnowledgeStore {
       sql += " LIMIT ?";
       params.push(opts.limit);
     }
-    return (this.db.prepare(sql).all(...params) as NodeRow[]).map((r) => this.rowToNode(r));
+    const rows = (await this.db.prepare(sql).all(...params)) as NodeRow[];
+    return rows.map((r) => this.rowToNode(r));
   }
 
   // --- Edge CRUD ---
-  addEdge(
+  async addEdge(
     sourceId: string,
     targetId: string,
     relation: EdgeRelation,
     weight: number = 1.0,
     metadata?: Record<string, unknown>,
-  ): void {
-    this.db
+  ): Promise<void> {
+    await this.db
       .prepare(
         "INSERT OR REPLACE INTO knowledge_edges (source_id, target_id, relation, weight, metadata, tenant_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
       )
@@ -133,19 +134,22 @@ export class KnowledgeStore {
       );
   }
 
-  removeEdge(sourceId: string, targetId: string, relation?: EdgeRelation): void {
+  async removeEdge(sourceId: string, targetId: string, relation?: EdgeRelation): Promise<void> {
     if (relation) {
-      this.db
+      await this.db
         .prepare("DELETE FROM knowledge_edges WHERE source_id = ? AND target_id = ? AND relation = ? AND tenant_id = ?")
         .run(sourceId, targetId, relation, this.tenantId);
     } else {
-      this.db
+      await this.db
         .prepare("DELETE FROM knowledge_edges WHERE source_id = ? AND target_id = ? AND tenant_id = ?")
         .run(sourceId, targetId, this.tenantId);
     }
   }
 
-  getEdges(nodeId: string, opts?: { relation?: EdgeRelation; direction?: "out" | "in" | "both" }): KnowledgeEdge[] {
+  async getEdges(
+    nodeId: string,
+    opts?: { relation?: EdgeRelation; direction?: "out" | "in" | "both" },
+  ): Promise<KnowledgeEdge[]> {
     const dir = opts?.direction ?? "both";
     const parts: string[] = [];
     const params: unknown[] = [];
@@ -163,14 +167,15 @@ export class KnowledgeStore {
       sql += " AND relation = ?";
       params.push(opts.relation);
     }
-    return (this.db.prepare(sql).all(...params) as EdgeRow[]).map((r) => this.rowToEdge(r));
+    const rows = (await this.db.prepare(sql).all(...params)) as EdgeRow[];
+    return rows.map((r) => this.rowToEdge(r));
   }
 
   // --- Traversal ---
-  neighbors(
+  async neighbors(
     id: string,
     opts?: { relation?: EdgeRelation; direction?: "out" | "in" | "both"; maxDepth?: number; types?: NodeType[] },
-  ): KnowledgeNode[] {
+  ): Promise<KnowledgeNode[]> {
     const maxDepth = opts?.maxDepth ?? 2;
     const visited = new Set<string>([id]);
     let frontier = [id];
@@ -178,7 +183,7 @@ export class KnowledgeStore {
     for (let depth = 0; depth < maxDepth && frontier.length > 0; depth++) {
       const nextFrontier: string[] = [];
       for (const nodeId of frontier) {
-        const edges = this.getEdges(nodeId, { relation: opts?.relation, direction: opts?.direction });
+        const edges = await this.getEdges(nodeId, { relation: opts?.relation, direction: opts?.direction });
         for (const edge of edges) {
           const neighborId = edge.source_id === nodeId ? edge.target_id : edge.source_id;
           if (!visited.has(neighborId)) {
@@ -193,7 +198,7 @@ export class KnowledgeStore {
     visited.delete(id); // exclude the starting node
     const nodes: KnowledgeNode[] = [];
     for (const nid of visited) {
-      const node = this.getNode(nid);
+      const node = await this.getNode(nid);
       if (node && (!opts?.types || opts.types.includes(node.type))) {
         nodes.push(node);
       }
@@ -202,7 +207,10 @@ export class KnowledgeStore {
   }
 
   // --- Search ---
-  search(query: string, opts?: { types?: NodeType[]; limit?: number }): Array<KnowledgeNode & { score: number }> {
+  async search(
+    query: string,
+    opts?: { types?: NodeType[]; limit?: number },
+  ): Promise<Array<KnowledgeNode & { score: number }>> {
     const words = query
       .toLowerCase()
       .split(/\s+/)
@@ -224,7 +232,7 @@ export class KnowledgeStore {
     sql += ` LIMIT ?`;
     params.push(opts?.limit ?? 20);
 
-    const rows = this.db.prepare(sql).all(...params) as NodeRow[];
+    const rows = (await this.db.prepare(sql).all(...params)) as NodeRow[];
     return rows
       .map((row) => {
         const node = this.rowToNode(row);
@@ -237,46 +245,43 @@ export class KnowledgeStore {
   }
 
   // --- Bulk ---
-  clear(opts?: { type?: NodeType }): void {
+  async clear(opts?: { type?: NodeType }): Promise<void> {
     if (opts?.type) {
-      const ids = (
-        this.db
-          .prepare("SELECT id FROM knowledge WHERE type = ? AND tenant_id = ?")
-          .all(opts.type, this.tenantId) as Array<{ id: string }>
-      ).map((r) => r.id);
-      for (const id of ids) this.removeNode(id);
+      const idRows = (await this.db
+        .prepare("SELECT id FROM knowledge WHERE type = ? AND tenant_id = ?")
+        .all(opts.type, this.tenantId)) as Array<{ id: string }>;
+      const ids = idRows.map((r) => r.id);
+      for (const id of ids) await this.removeNode(id);
     } else {
-      this.db.prepare("DELETE FROM knowledge_edges WHERE tenant_id = ?").run(this.tenantId);
-      this.db.prepare("DELETE FROM knowledge WHERE tenant_id = ?").run(this.tenantId);
+      await this.db.prepare("DELETE FROM knowledge_edges WHERE tenant_id = ?").run(this.tenantId);
+      await this.db.prepare("DELETE FROM knowledge WHERE tenant_id = ?").run(this.tenantId);
     }
   }
 
-  nodeCount(type?: NodeType): number {
+  async nodeCount(type?: NodeType): Promise<number> {
     if (type) {
-      return (
-        this.db
-          .prepare("SELECT COUNT(*) as c FROM knowledge WHERE type = ? AND tenant_id = ?")
-          .get(type, this.tenantId) as { c: number }
-      ).c;
+      const row = (await this.db
+        .prepare("SELECT COUNT(*) as c FROM knowledge WHERE type = ? AND tenant_id = ?")
+        .get(type, this.tenantId)) as { c: number };
+      return row.c;
     }
-    return (
-      this.db.prepare("SELECT COUNT(*) as c FROM knowledge WHERE tenant_id = ?").get(this.tenantId) as { c: number }
-    ).c;
+    const row = (await this.db
+      .prepare("SELECT COUNT(*) as c FROM knowledge WHERE tenant_id = ?")
+      .get(this.tenantId)) as { c: number };
+    return row.c;
   }
 
-  edgeCount(relation?: EdgeRelation): number {
+  async edgeCount(relation?: EdgeRelation): Promise<number> {
     if (relation) {
-      return (
-        this.db
-          .prepare("SELECT COUNT(*) as c FROM knowledge_edges WHERE relation = ? AND tenant_id = ?")
-          .get(relation, this.tenantId) as { c: number }
-      ).c;
+      const row = (await this.db
+        .prepare("SELECT COUNT(*) as c FROM knowledge_edges WHERE relation = ? AND tenant_id = ?")
+        .get(relation, this.tenantId)) as { c: number };
+      return row.c;
     }
-    return (
-      this.db.prepare("SELECT COUNT(*) as c FROM knowledge_edges WHERE tenant_id = ?").get(this.tenantId) as {
-        c: number;
-      }
-    ).c;
+    const row = (await this.db
+      .prepare("SELECT COUNT(*) as c FROM knowledge_edges WHERE tenant_id = ?")
+      .get(this.tenantId)) as { c: number };
+    return row.c;
   }
 
   // --- Helpers ---

@@ -5,7 +5,7 @@
 import { describe, it, expect, mock, afterEach } from "bun:test";
 import { safeAsync } from "../safe.js";
 
-describe("safeAsync", () => {
+describe("safeAsync", async () => {
   it("returns true when function succeeds", async () => {
     const result = await safeAsync("test", async () => {});
     expect(result).toBe(true);

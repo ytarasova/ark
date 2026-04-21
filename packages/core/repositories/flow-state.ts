@@ -76,10 +76,10 @@ export class FlowStateRepository {
   }
 
   /** Load the flow-state row for a session. Returns null if none exists. */
-  load(sessionId: string): FlowState | null {
-    const row = this.db
+  async load(sessionId: string): Promise<FlowState | null> {
+    const row = (await this.db
       .prepare("SELECT * FROM flow_state WHERE session_id = ? AND tenant_id = ?")
-      .get(sessionId, this.tenantId) as FlowStateRow | undefined;
+      .get(sessionId, this.tenantId)) as FlowStateRow | undefined;
     return row ? rowToState(row) : null;
   }
 
@@ -88,7 +88,7 @@ export class FlowStateRepository {
    * usually go through the helpers below (`markStageCompleted`, ...) which
    * load + mutate + save.
    */
-  save(state: FlowState): void {
+  async save(state: FlowState): Promise<void> {
     const ts = now();
     const row: FlowStateRow = {
       session_id: state.sessionId,
@@ -102,7 +102,7 @@ export class FlowStateRepository {
       updated_at: ts,
     };
     // Portable upsert: the IDatabase adapter handles SQLite vs Postgres parameter binding.
-    this.db
+    await this.db
       .prepare(
         `INSERT INTO flow_state (
            session_id, tenant_id, flow_name, completed_stages, skipped_stages,
@@ -131,8 +131,8 @@ export class FlowStateRepository {
   }
 
   /** Mark a stage as completed + record its result. Clears `currentStage`. */
-  markStageCompleted(sessionId: string, stageName: string, data?: Record<string, unknown>): void {
-    const state = this.load(sessionId) ?? this.seed(sessionId, stageName, "");
+  async markStageCompleted(sessionId: string, stageName: string, data?: Record<string, unknown>): Promise<void> {
+    const state = (await this.load(sessionId)) ?? this.seed(sessionId, stageName, "");
     if (!state.completedStages.includes(stageName)) {
       state.completedStages.push(stageName);
     }
@@ -142,12 +142,12 @@ export class FlowStateRepository {
       data,
     };
     state.currentStage = null;
-    this.save(state);
+    await this.save(state);
   }
 
   /** Mark stages as skipped (not on the active conditional path). */
-  markStagesSkipped(sessionId: string, stageNames: string[]): void {
-    const state = this.load(sessionId) ?? this.seed(sessionId, null, "");
+  async markStagesSkipped(sessionId: string, stageNames: string[]): Promise<void> {
+    const state = (await this.load(sessionId)) ?? this.seed(sessionId, null, "");
     for (const name of stageNames) {
       if (!state.skippedStages.includes(name)) {
         state.skippedStages.push(name);
@@ -157,25 +157,25 @@ export class FlowStateRepository {
         completedAt: now(),
       };
     }
-    this.save(state);
+    await this.save(state);
   }
 
   /** Return the skipped-stage list for a session (empty when no row). */
-  getSkippedStages(sessionId: string): string[] {
-    return this.load(sessionId)?.skippedStages ?? [];
+  async getSkippedStages(sessionId: string): Promise<string[]> {
+    return (await this.load(sessionId))?.skippedStages ?? [];
   }
 
   /** Set the currently-executing stage. Seeds the row if it doesn't exist. */
-  setCurrentStage(sessionId: string, stageName: string, flowName?: string): void {
-    const state = this.load(sessionId) ?? this.seed(sessionId, stageName, flowName ?? "");
+  async setCurrentStage(sessionId: string, stageName: string, flowName?: string): Promise<void> {
+    const state = (await this.load(sessionId)) ?? this.seed(sessionId, stageName, flowName ?? "");
     state.currentStage = stageName;
     if (flowName) state.flowName = flowName;
-    this.save(state);
+    await this.save(state);
   }
 
   /** True iff `stageName` is recorded as completed for this session. */
-  isStageCompleted(sessionId: string, stageName: string): boolean {
-    return this.load(sessionId)?.completedStages.includes(stageName) ?? false;
+  async isStageCompleted(sessionId: string, stageName: string): Promise<boolean> {
+    return (await this.load(sessionId))?.completedStages.includes(stageName) ?? false;
   }
 
   /**
@@ -184,8 +184,10 @@ export class FlowStateRepository {
    * stalls at a phantom join-barrier because every stage is still marked
    * completed).
    */
-  delete(sessionId: string): void {
-    this.db.prepare("DELETE FROM flow_state WHERE session_id = ? AND tenant_id = ?").run(sessionId, this.tenantId);
+  async delete(sessionId: string): Promise<void> {
+    await this.db
+      .prepare("DELETE FROM flow_state WHERE session_id = ? AND tenant_id = ?")
+      .run(sessionId, this.tenantId);
   }
 
   /** Build a zero-state FlowState for the seed path in the mutators. */

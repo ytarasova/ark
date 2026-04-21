@@ -12,11 +12,11 @@ afterAll(async () => {
   await app?.shutdown();
 });
 
-describe("UsageRecorder", () => {
-  describe("record", () => {
-    it("inserts a usage record", () => {
-      const session = app.sessions.create({ summary: "usage-test" });
-      app.usageRecorder.record({
+describe("UsageRecorder", async () => {
+  describe("record", async () => {
+    it("inserts a usage record", async () => {
+      const session = await app.sessions.create({ summary: "usage-test" });
+      await app.usageRecorder.record({
         sessionId: session.id,
         model: "claude-sonnet-4-6",
         provider: "anthropic",
@@ -31,7 +31,7 @@ describe("UsageRecorder", () => {
         source: "transcript",
       });
 
-      const { cost, records } = app.usageRecorder.getSessionCost(session.id);
+      const { cost, records } = await app.usageRecorder.getSessionCost(session.id);
       expect(records).toHaveLength(1);
       expect(records[0].model).toBe("claude-sonnet-4-6");
       expect(records[0].provider).toBe("anthropic");
@@ -47,25 +47,25 @@ describe("UsageRecorder", () => {
       expect(cost).toBeCloseTo(5.4, 2);
     });
 
-    it("uses default tenant and source", () => {
-      const session = app.sessions.create({ summary: "defaults-test" });
-      app.usageRecorder.record({
+    it("uses default tenant and source", async () => {
+      const session = await app.sessions.create({ summary: "defaults-test" });
+      await app.usageRecorder.record({
         sessionId: session.id,
         model: "gpt-4.1",
         provider: "openai",
         usage: { input_tokens: 1000, output_tokens: 500 },
       });
 
-      const { records } = app.usageRecorder.getSessionCost(session.id);
+      const { records } = await app.usageRecorder.getSessionCost(session.id);
       expect(records[0].tenant_id).toBe("default");
       expect(records[0].source).toBe("api");
     });
 
-    it("ignores a caller-supplied tenantId that does not match the scoped tenant", () => {
+    it("ignores a caller-supplied tenantId that does not match the scoped tenant", async () => {
       // Security: a remote RPC (costs/record) must not be able to attribute
       // usage to another tenant by passing tenantId in the request body.
-      const session = app.sessions.create({ summary: "cross-tenant-record" });
-      app.usageRecorder.record({
+      const session = await app.sessions.create({ summary: "cross-tenant-record" });
+      await app.usageRecorder.record({
         sessionId: session.id,
         tenantId: "victim-tenant",
         model: "gpt-4.1",
@@ -74,63 +74,63 @@ describe("UsageRecorder", () => {
       });
       // The row is attributed to the recorder's scoped tenant ("default"),
       // not to "victim-tenant".
-      const { records } = app.usageRecorder.getSessionCost(session.id);
+      const { records } = await app.usageRecorder.getSessionCost(session.id);
       expect(records[0].tenant_id).toBe("default");
     });
   });
 
-  describe("getSessionCost", () => {
-    it("sums multiple records for a session", () => {
-      const session = app.sessions.create({ summary: "multi-record" });
-      app.usageRecorder.record({
+  describe("getSessionCost", async () => {
+    it("sums multiple records for a session", async () => {
+      const session = await app.sessions.create({ summary: "multi-record" });
+      await app.usageRecorder.record({
         sessionId: session.id,
         model: "claude-haiku-4-5",
         provider: "anthropic",
         usage: { input_tokens: 1_000_000, output_tokens: 0 },
       });
-      app.usageRecorder.record({
+      await app.usageRecorder.record({
         sessionId: session.id,
         model: "claude-haiku-4-5",
         provider: "anthropic",
         usage: { input_tokens: 1_000_000, output_tokens: 0 },
       });
 
-      const { cost, records } = app.usageRecorder.getSessionCost(session.id);
+      const { cost, records } = await app.usageRecorder.getSessionCost(session.id);
       expect(records).toHaveLength(2);
       // haiku input: 1M * 0.8/1M = 0.80 each, total = 1.60
       expect(cost).toBeCloseTo(1.6, 2);
     });
 
-    it("returns zero for session with no records", () => {
-      const { cost, records } = app.usageRecorder.getSessionCost("nonexistent-session");
+    it("returns zero for session with no records", async () => {
+      const { cost, records } = await app.usageRecorder.getSessionCost("nonexistent-session");
       expect(records).toHaveLength(0);
       expect(cost).toBe(0);
     });
   });
 
-  describe("getSummary", () => {
-    it("groups by model correctly", () => {
-      const session = app.sessions.create({ summary: "summary-test" });
-      app.usageRecorder.record({
+  describe("getSummary", async () => {
+    it("groups by model correctly", async () => {
+      const session = await app.sessions.create({ summary: "summary-test" });
+      await app.usageRecorder.record({
         sessionId: session.id,
         model: "test-model-a",
         provider: "test-provider",
         usage: { input_tokens: 100, output_tokens: 50 },
       });
-      app.usageRecorder.record({
+      await app.usageRecorder.record({
         sessionId: session.id,
         model: "test-model-a",
         provider: "test-provider",
         usage: { input_tokens: 200, output_tokens: 100 },
       });
-      app.usageRecorder.record({
+      await app.usageRecorder.record({
         sessionId: session.id,
         model: "test-model-b",
         provider: "test-provider",
         usage: { input_tokens: 50, output_tokens: 25 },
       });
 
-      const summary = app.usageRecorder.getSummary({ groupBy: "model" });
+      const summary = await app.usageRecorder.getSummary({ groupBy: "model" });
       const modelA = summary.find((r) => r.key === "test-model-a");
       const modelB = summary.find((r) => r.key === "test-model-b");
 
@@ -144,19 +144,19 @@ describe("UsageRecorder", () => {
       expect(modelB!.input_tokens).toBe(50);
     });
 
-    it("groups by provider", () => {
-      const summary = app.usageRecorder.getSummary({ groupBy: "provider" });
+    it("groups by provider", async () => {
+      const summary = await app.usageRecorder.getSummary({ groupBy: "provider" });
       expect(summary.length).toBeGreaterThan(0);
       // Should have at least "anthropic" from the earlier tests
       const anthropic = summary.find((r) => r.key === "anthropic");
       expect(anthropic).toBeDefined();
     });
 
-    it("rejects invalid groupBy column", () => {
-      expect(() => app.usageRecorder.getSummary({ groupBy: "DROP TABLE sessions" })).toThrow();
+    it("rejects invalid groupBy column", async () => {
+      expect(async () => await app.usageRecorder.getSummary({ groupBy: "DROP TABLE sessions" })).toThrow();
     });
 
-    it("filters by the scoped tenant only", () => {
+    it("filters by the scoped tenant only", async () => {
       // Security: a caller in tenant A cannot query tenant B's summary by
       // passing tenantId: "team-alpha". We scope a child recorder to
       // "team-alpha" and verify that the caller on the default app sees
@@ -178,27 +178,27 @@ describe("UsageRecorder", () => {
       // Caller on the default tenant can NOT see team-alpha's row even if
       // they try to specify tenantId: "team-alpha" explicitly -- the
       // recorder ignores the override and keeps its own tenant scope.
-      const crossTenant = app.usageRecorder.getSummary({ tenantId: "team-alpha", groupBy: "model" });
+      const crossTenant = await app.usageRecorder.getSummary({ tenantId: "team-alpha", groupBy: "model" });
       const crossTenantTotal = crossTenant.reduce((s, r) => s + r.count, 0);
       // Default-tenant rows may exist from earlier tests; what matters is
       // that the team-alpha record is not mixed in.
-      const defaultSummary = app.usageRecorder.getSummary({ groupBy: "model" });
+      const defaultSummary = await app.usageRecorder.getSummary({ groupBy: "model" });
       const defaultTotal = defaultSummary.reduce((s, r) => s + r.count, 0);
       expect(crossTenantTotal).toBe(defaultTotal);
     });
   });
 
-  describe("getDailyTrend", () => {
-    it("returns daily aggregates", () => {
-      const session = app.sessions.create({ summary: "trend-test" });
-      app.usageRecorder.record({
+  describe("getDailyTrend", async () => {
+    it("returns daily aggregates", async () => {
+      const session = await app.sessions.create({ summary: "trend-test" });
+      await app.usageRecorder.record({
         sessionId: session.id,
         model: "claude-sonnet-4-6",
         provider: "anthropic",
         usage: { input_tokens: 1_000_000, output_tokens: 100_000 },
       });
 
-      const trend = app.usageRecorder.getDailyTrend({ days: 1 });
+      const trend = await app.usageRecorder.getDailyTrend({ days: 1 });
       expect(trend.length).toBeGreaterThan(0);
       expect(trend[0].date).toBeDefined();
       expect(trend[0].cost).toBeGreaterThan(0);
@@ -212,9 +212,9 @@ describe("UsageRecorder", () => {
     });
   });
 
-  describe("getTotalCost", () => {
-    it("returns total across all records", () => {
-      const total = app.usageRecorder.getTotalCost();
+  describe("getTotalCost", async () => {
+    it("returns total across all records", async () => {
+      const total = await app.usageRecorder.getTotalCost();
       expect(total).toBeGreaterThan(0);
     });
 
@@ -227,12 +227,12 @@ describe("UsageRecorder", () => {
     });
   });
 
-  describe("multi-runtime tracking", () => {
-    it("tracks costs across different runtimes", () => {
-      const session = app.sessions.create({ summary: "multi-runtime" });
+  describe("multi-runtime tracking", async () => {
+    it("tracks costs across different runtimes", async () => {
+      const session = await app.sessions.create({ summary: "multi-runtime" });
 
       // Claude usage
-      app.usageRecorder.record({
+      await app.usageRecorder.record({
         sessionId: session.id,
         model: "claude-sonnet-4-6",
         provider: "anthropic",
@@ -241,7 +241,7 @@ describe("UsageRecorder", () => {
       });
 
       // Codex usage
-      app.usageRecorder.record({
+      await app.usageRecorder.record({
         sessionId: session.id,
         model: "gpt-4.1-mini",
         provider: "openai",
@@ -250,7 +250,7 @@ describe("UsageRecorder", () => {
       });
 
       // Gemini usage
-      app.usageRecorder.record({
+      await app.usageRecorder.record({
         sessionId: session.id,
         model: "gemini-2.5-flash",
         provider: "google",
@@ -258,12 +258,12 @@ describe("UsageRecorder", () => {
         usage: { input_tokens: 1_000_000, output_tokens: 100_000 },
       });
 
-      const { cost, records } = app.usageRecorder.getSessionCost(session.id);
+      const { cost, records } = await app.usageRecorder.getSessionCost(session.id);
       expect(records).toHaveLength(3);
       expect(cost).toBeGreaterThan(0);
 
       // Check runtime grouping
-      const runtimeSummary = app.usageRecorder.getSummary({ groupBy: "runtime" });
+      const runtimeSummary = await app.usageRecorder.getSummary({ groupBy: "runtime" });
       const claude = runtimeSummary.find((r) => r.key === "claude");
       const codex = runtimeSummary.find((r) => r.key === "codex");
       const gemini = runtimeSummary.find((r) => r.key === "gemini");

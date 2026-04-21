@@ -16,6 +16,7 @@ import { execFile } from "child_process";
 const execFileAsync = promisify(execFile);
 
 import type { AppContext } from "../app.js";
+import type { Session } from "../../types/index.js";
 import * as flow from "../state/flow.js";
 import * as agentRegistry from "../agent/agent.js";
 import { saveCheckpoint } from "../session/checkpoint.js";
@@ -34,18 +35,30 @@ import { indexRepoForDispatch, injectKnowledgeContext, injectRepoMap } from "./d
  * already exists (named "<template>"), reuses it; otherwise provisions one.
  * Returns the compute name to use, or null if no template specified / not found.
  */
-export function resolveComputeForStage(
+export async function resolveComputeForStage(
   app: AppContext,
   stageDef: flow.StageDefinition | null,
   sessionId: string,
   log: (msg: string) => void = () => {},
-): string | null {
+): Promise<string | null> {
+  // Direct compute reference takes precedence over template lookup.
+  // Use this when you want to point a stage at an already-provisioned
+  // long-lived target (e.g. a shared EC2 fleet member).
+  if (stageDef?.compute) {
+    const existing = await app.computes.get(stageDef.compute);
+    if (!existing) {
+      log(`Stage compute '${stageDef.compute}' not found, falling back to session default`);
+      return null;
+    }
+    return stageDef.compute;
+  }
+
   if (!stageDef?.compute_template) return null;
 
   const templateName = stageDef.compute_template;
 
   // Resolve template: DB first, then config
-  let tmpl = app.computeTemplates.get(templateName);
+  let tmpl = await app.computeTemplates.get(templateName);
   if (!tmpl) {
     const cfgTmpl = (app.config.computeTemplates ?? []).find((t) => t.name === templateName);
     if (cfgTmpl) {
@@ -64,7 +77,7 @@ export function resolveComputeForStage(
   }
 
   // Check if a compute with the template name already exists
-  const existing = app.computes.get(templateName);
+  const existing = await app.computes.get(templateName);
   if (existing) {
     log(`Using existing compute '${templateName}' from template`);
     return templateName;
@@ -72,12 +85,12 @@ export function resolveComputeForStage(
 
   // Provision a new compute from the template
   log(`Provisioning compute '${templateName}' from template`);
-  app.computes.create({
+  await app.computes.create({
     name: templateName,
     provider: tmpl.provider,
     config: tmpl.config,
   });
-  app.events.log(sessionId, "compute_provisioned_from_template", {
+  await app.events.log(sessionId, "compute_provisioned_from_template", {
     actor: "system",
     data: { template: templateName, provider: tmpl.provider },
   });
@@ -89,7 +102,7 @@ export function resolveComputeForStage(
 async function dispatchHosted(
   app: AppContext,
   sessionId: string,
-  session: ReturnType<AppContext["sessions"]["get"]> & object,
+  session: Session,
   log: (msg: string) => void,
 ): Promise<{ ok: boolean; message: string } | null> {
   // Scheduler is only wired in hosted mode; `app.scheduler` throws in local mode.
@@ -115,8 +128,8 @@ async function dispatchHosted(
       script,
       workdir: session.workdir ?? session.repo ?? ".",
     });
-    app.sessions.update(sessionId, { status: "running", compute_name: worker.compute_name });
-    app.events.log(sessionId, "dispatched_to_worker", {
+    await app.sessions.update(sessionId, { status: "running", compute_name: worker.compute_name });
+    await app.events.log(sessionId, "dispatched_to_worker", {
       actor: "scheduler",
       data: { worker_id: worker.id, worker_url: worker.url, tenant_id: tenantId },
     });
@@ -130,7 +143,7 @@ async function dispatchHosted(
 async function cloneRemoteRepoIfNeeded(
   app: AppContext,
   sessionId: string,
-  session: ReturnType<AppContext["sessions"]["get"]> & object,
+  session: Session,
   log: (msg: string) => void,
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   if (!session.config?.remoteRepo || session.workdir) return { ok: true };
@@ -140,11 +153,11 @@ async function cloneRemoteRepoIfNeeded(
     const tmpDir = join(app.arkDir, "worktrees", sessionId);
     mkdirSync(tmpDir, { recursive: true });
     await execFileAsync("git", ["clone", "--depth", "1", remoteUrl, tmpDir], { timeout: 120_000 });
-    app.sessions.update(sessionId, { workdir: tmpDir });
-    const updated = app.sessions.get(sessionId);
+    await app.sessions.update(sessionId, { workdir: tmpDir });
+    const updated = await app.sessions.get(sessionId);
     if (updated) (session as { workdir: string | null }).workdir = updated.workdir;
     log(`Cloned remote repo to ${tmpDir}`);
-    app.events.log(sessionId, "remote_repo_cloned", {
+    await app.events.log(sessionId, "remote_repo_cloned", {
       actor: "system",
       data: { url: remoteUrl, dir: tmpDir },
     });
@@ -160,7 +173,7 @@ export async function dispatch(
   opts?: { onLog?: (msg: string) => void },
 ): Promise<{ ok: boolean; message: string }> {
   const log = opts?.onLog ?? (() => {});
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   if (session.status === "running" && session.session_id) {
@@ -174,7 +187,7 @@ export async function dispatch(
   if (!stage) return { ok: false, message: "No current stage. The session may have completed its flow." };
 
   // Validate compute exists if specified
-  if (session.compute_name && !app.computes.get(session.compute_name)) {
+  if (session.compute_name && !(await app.computes.get(session.compute_name))) {
     return { ok: false, message: `Compute '${session.compute_name}' not found. Delete and recreate the session.` };
   }
 
@@ -183,20 +196,20 @@ export async function dispatch(
   if (hosted) return hosted;
 
   const cloned = await cloneRemoteRepoIfNeeded(app, sessionId, session, log);
-  if (!cloned.ok) return cloned;
+  if (cloned.ok === false) return { ok: false, message: cloned.message };
 
   // Check task summary for prompt injection
   try {
     const injection = detectInjection(session.summary ?? "");
     if (injection.severity === "high") {
-      app.events.log(sessionId, "prompt_injection_blocked", {
+      await app.events.log(sessionId, "prompt_injection_blocked", {
         actor: "system",
         data: { patterns: injection.patterns, context: "dispatch" },
       });
       return { ok: false, message: "Dispatch blocked: potential prompt injection in task summary" };
     }
     if (injection.detected) {
-      app.events.log(sessionId, "prompt_injection_warning", {
+      await app.events.log(sessionId, "prompt_injection_warning", {
         actor: "system",
         data: { patterns: injection.patterns, severity: injection.severity, context: "dispatch" },
       });
@@ -209,9 +222,9 @@ export async function dispatch(
   const stageDef = flow.getStage(app, session.flow, stage);
 
   // Resolve per-stage compute template override
-  const stageCompute = resolveComputeForStage(app, stageDef, sessionId, log);
+  const stageCompute = await resolveComputeForStage(app, stageDef, sessionId, log);
   if (stageCompute) {
-    app.sessions.update(sessionId, { compute_name: stageCompute });
+    await app.sessions.update(sessionId, { compute_name: stageCompute });
     (session as { compute_name: string | null }).compute_name = stageCompute;
   }
 
@@ -284,7 +297,7 @@ export async function dispatch(
   }
 
   // Log the fully assembled prompt for audit trail
-  app.events.log(sessionId, "prompt_sent", {
+  await app.events.log(sessionId, "prompt_sent", {
     stage,
     actor: "orchestrator",
     data: {
@@ -323,7 +336,7 @@ export async function dispatch(
     // system prompt + channel delivery instead.
     initialPrompt: session.summary ?? task.slice(0, 2000),
     compute: session.compute_name
-      ? ((app.computes.get(session.compute_name) as unknown as {
+      ? (((await app.computes.get(session.compute_name)) as unknown as {
           name: string;
           provider: string;
           [k: string]: unknown;
@@ -337,7 +350,7 @@ export async function dispatch(
 
   // Persist launch PID for process-tree tracking
   if (launchResult.pid) {
-    app.sessions.mergeConfig(sessionId, {
+    await app.sessions.mergeConfig(sessionId, {
       launch_pid: launchResult.pid,
       launch_executor: runtime,
       launched_at: new Date().toISOString(),
@@ -362,7 +375,7 @@ export async function dispatch(
   // completed) while we were spinning up the launcher, don't stomp its
   // current status/session_id with "running" for a stage that no longer
   // belongs to it. Best-effort: tear the just-launched tmux down and log.
-  const currentSession = app.sessions.get(sessionId);
+  const currentSession = await app.sessions.get(sessionId);
   if (!currentSession || currentSession.stage !== stage || currentSession.status === "completed") {
     log(`Session moved past stage '${stage}' during dispatch -- aborting write.`);
     try {
@@ -373,7 +386,7 @@ export async function dispatch(
     return { ok: false, message: `Session moved on during dispatch` };
   }
 
-  app.sessions.update(sessionId, {
+  await app.sessions.update(sessionId, {
     status: "running",
     agent: agentName,
     session_id: tmuxName,
@@ -382,9 +395,9 @@ export async function dispatch(
     ...(reworkPrompt ? { rework_prompt: null } : {}),
   });
   if (stageStartSha) {
-    app.sessions.mergeConfig(sessionId, { stage_start_sha: stageStartSha });
+    await app.sessions.mergeConfig(sessionId, { stage_start_sha: stageStartSha });
   }
-  app.events.log(sessionId, "stage_started", {
+  await app.events.log(sessionId, "stage_started", {
     stage,
     actor: "user",
     data: {
@@ -401,7 +414,7 @@ export async function dispatch(
 
   // Persist flow state: mark current stage
   try {
-    app.flowStates.setCurrentStage(sessionId, session.stage!, session.flow);
+    await app.flowStates.setCurrentStage(sessionId, session.stage!, session.flow);
   } catch {
     logDebug("session", "skip flow-state on error");
   }
@@ -431,20 +444,20 @@ export async function resume(
   sessionId: string,
   opts?: { onLog?: (msg: string) => void },
 ): Promise<{ ok: boolean; message: string }> {
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
   if (session.status === "running" && session.session_id) return { ok: false, message: "Already running" };
 
   if (session.session_id) await app.launcher.kill(session.session_id);
 
-  app.sessions.update(sessionId, {
+  await app.sessions.update(sessionId, {
     status: "ready",
     error: null,
     breakpoint_reason: null,
     attached_by: null,
     session_id: null,
   });
-  app.events.log(sessionId, "session_resumed", {
+  await app.events.log(sessionId, "session_resumed", {
     stage: session.stage,
     actor: "user",
     data: { from_status: session.status },
@@ -464,7 +477,7 @@ async function dispatchFork(
   stageDef: flow.StageDefinition,
 ): Promise<{ ok: boolean; message: string }> {
   // Read PLAN.md or use default subtasks
-  const session = app.sessions.get(sessionId)!;
+  const session = (await app.sessions.get(sessionId))!;
   const subtasks = await extractSubtasks(app, session);
 
   const { fork } = await import("./fork-join.js");
@@ -475,8 +488,8 @@ async function dispatchFork(
     if (result.ok) children.push(result.sessionId);
   }
 
-  app.sessions.update(sessionId, { status: "running" });
-  app.events.log(sessionId, "fork_started", {
+  await app.sessions.update(sessionId, { status: "running" });
+  await app.events.log(sessionId, "fork_started", {
     stage: session.stage,
     actor: "system",
     data: { children_count: children.length, children },
@@ -490,13 +503,13 @@ async function dispatchFanOut(
   sessionId: string,
   stageDef: flow.StageDefinition,
 ): Promise<{ ok: boolean; message: string }> {
-  const session = app.sessions.get(sessionId)!;
+  const session = (await app.sessions.get(sessionId))!;
   const subtasks = await extractSubtasks(app, session);
 
   const { fanOut } = await import("./fork-join.js");
 
   const maxParallel = stageDef.max_parallel ?? 8;
-  const result = fanOut(app, sessionId, {
+  const result = await fanOut(app, sessionId, {
     tasks: subtasks.slice(0, maxParallel).map((s) => ({
       summary: s.task,
       agent: stageDef.agent ?? session.agent ?? "implementer",

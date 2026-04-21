@@ -80,10 +80,51 @@ export interface HostCommandCapability {
 }
 
 /**
+ * Default compute targets to seed at first DB init. Local-mode bootstrap
+ * inserts a `local` row (single-user laptop semantics: agents spawn via
+ * tmux on the same host). Hosted-mode bootstrap inserts nothing -- the
+ * operator registers a real compute target (k8s / docker / ec2 / firecracker)
+ * after onboarding. Hosted MUST NOT silently get a `local` row because
+ * "local" inside a control-plane pod means "spawn agents inside the pod
+ * itself" which has no isolation and competes with the control plane.
+ */
+export interface ComputeBootstrapCapability {
+  seed(db: import("../database/index.js").IDatabase): Promise<void>;
+}
+
+/**
+ * Schema migrations capability. Always non-null (every mode has migrations).
+ * The polymorphic surface here is the bound dialect: local mode is usually
+ * sqlite (laptop default) but flips to postgres if a `DATABASE_URL` is set;
+ * hosted mode is postgres-only by definition. Downstream callers
+ * (AppContext.boot, the `ark db` CLI) read `app.mode.migrations.*` and
+ * never branch on dialect themselves.
+ */
+export interface MigrationsCapability {
+  readonly dialect: "sqlite" | "postgres";
+  apply(
+    db: import("../database/index.js").IDatabase,
+    opts?: { targetVersion?: number },
+  ): Promise<void>;
+  status(
+    db: import("../database/index.js").IDatabase,
+  ): Promise<import("../migrations/types.js").MigrationStatus>;
+  /** Phase 1: rejects with "not implemented". Stubbed so the CLI compiles. */
+  down(
+    db: import("../database/index.js").IDatabase,
+    opts: { targetVersion: number },
+  ): Promise<never>;
+}
+
+/**
  * Database dialect + connection URL. Populated once at DI composition from
  * the resolved config -- handlers read `app.mode.database.dialect` instead
  * of each re-sniffing `config.databaseUrl` with their own regex. Callers
  * that need the raw URL (e.g. the adapter factory) get it here too.
+ *
+ * The `MigrationsCapability` binds the same dialect at construction, so
+ * `app.mode.database.dialect === app.mode.migrations.dialect` is an
+ * invariant that both capabilities preserve.
  */
 export interface DatabaseMode {
   readonly dialect: "sqlite" | "postgres";
@@ -96,13 +137,17 @@ export interface DatabaseMode {
  * `app.ts` can compute it once at boot (before the container is built and
  * `buildAppMode` runs) and hand the same object to `buildAppMode`.
  */
-export function resolveDatabaseMode(config: { databaseUrl?: string; database?: { url?: string } }): DatabaseMode {
+export function resolveDatabaseMode(config: {
+  databaseUrl?: string;
+  database?: { url?: string };
+}): DatabaseMode {
   const raw = config.database?.url ?? config.databaseUrl ?? null;
   // Normalise empty strings to null so callers get a consistent "no URL"
   // signal -- otherwise `!!url` passes on "" and `startsWith` returns false,
   // but `url` is then still "" which is a footgun for downstream loggers.
   const url = raw && raw.length > 0 ? raw : null;
-  const isPostgres = !!url && (url.startsWith("postgres://") || url.startsWith("postgresql://"));
+  const isPostgres =
+    !!url && (url.startsWith("postgres://") || url.startsWith("postgresql://"));
   return { dialect: isPostgres ? "postgres" : "sqlite", url };
 }
 
@@ -123,16 +168,18 @@ export function resolveDatabaseMode(config: { databaseUrl?: string; database?: {
  * `app.mode.kind`.
  */
 export interface TenantResolverCapability {
-  resolve(args: TenantResolverInput): TenantResolverResult;
+  resolve(args: TenantResolverInput): Promise<TenantResolverResult>;
 }
 
 export interface TenantResolverInput {
   authHeader: string | null;
   tenantHeader: string | null;
-  validateToken: (token: string) => { tenantId: string } | null;
+  validateToken: (token: string) => Promise<{ tenantId: string } | null>;
 }
 
-export type TenantResolverResult = { ok: true; tenantId: string } | { ok: false; status: number; error: string };
+export type TenantResolverResult =
+  | { ok: true; tenantId: string }
+  | { ok: false; status: number; error: string };
 
 // ── AppMode contract ───────────────────────────────────────────────────────
 
@@ -150,6 +197,10 @@ export interface AppMode {
   readonly repoMapCapability: RepoMapCapability | null;
   readonly ftsRebuildCapability: FtsRebuildCapability | null;
   readonly hostCommandCapability: HostCommandCapability | null;
+  /** Bootstrap seed (local: insert the "local" compute row; hosted: no-op). */
+  readonly computeBootstrap: ComputeBootstrapCapability;
+  /** Dialect-bound migrations runner. */
+  readonly migrations: MigrationsCapability;
   /**
    * Always present (both modes use HTTP auth). The implementation encodes
    * the mode-specific trust rules for tenant + Bearer headers.
@@ -168,17 +219,17 @@ const BEARER_PATTERN = /^Bearer\s+(.+)$/i;
  * and resolve its tenant. Used by both LocalTenantResolver and HostedTenantResolver
  * -- the only difference between the two is what they do when the header is ABSENT.
  */
-export function resolveBearerAuth(
+export async function resolveBearerAuth(
   authHeader: string,
   tenantHeader: string | null,
-  validateToken: (token: string) => { tenantId: string } | null,
-): TenantResolverResult {
+  validateToken: (token: string) => Promise<{ tenantId: string } | null>,
+): Promise<TenantResolverResult> {
   const match = authHeader.match(BEARER_PATTERN);
   const token = match?.[1]?.trim();
   if (!token) {
     return { ok: false, status: 401, error: "malformed Authorization header" };
   }
-  const ctx = validateToken(token);
+  const ctx = await validateToken(token);
   if (!ctx) {
     return { ok: false, status: 401, error: "invalid or expired API key" };
   }
@@ -204,6 +255,9 @@ export function resolveBearerAuth(
  */
 export function buildAppMode(config: ArkConfig, app?: AppContext): AppMode {
   const database = resolveDatabaseMode(config);
+  // Only a postgres URL selects hosted mode. The older "any URL is hosted"
+  // rule classified `sqlite://...` URLs as hosted even though the DB
+  // adapter then opened SQLite anyway -- dialect + mode now agree.
   const isHosted = database.dialect === "postgres";
   return isHosted ? buildHostedAppMode(database) : buildLocalAppMode(app, database);
 }

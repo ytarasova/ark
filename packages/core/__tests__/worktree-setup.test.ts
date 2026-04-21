@@ -17,7 +17,7 @@ afterEach(() => {
   rmSync(worktreeDir, { recursive: true, force: true });
 });
 
-describe("copyWorktreeFiles", () => {
+describe("copyWorktreeFiles", async () => {
   it("copies matching untracked files", async () => {
     writeFileSync(join(sourceDir, ".env"), "SECRET=abc");
     mkdirSync(join(sourceDir, "config"), { recursive: true });
@@ -69,7 +69,7 @@ describe("copyWorktreeFiles", () => {
   });
 });
 
-describe("runWorktreeSetup", () => {
+describe("runWorktreeSetup", async () => {
   it("executes command in worktree directory", async () => {
     const logs: string[] = [];
     await runWorktreeSetup(worktreeDir, "echo hello > marker.txt", (msg) => logs.push(msg));

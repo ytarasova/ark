@@ -60,7 +60,7 @@ const fakeSession: Session = {
   updated_at: new Date().toISOString(),
 };
 
-describe("LocalProvider", () => {
+describe("LocalProvider", async () => {
   it("has name 'local'", () => {
     expect(provider.name).toBe("local");
   });

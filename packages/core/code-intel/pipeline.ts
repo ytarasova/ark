@@ -51,8 +51,8 @@ export class CodeIntelPipeline implements Pipeline {
     repo_id: string,
     extractors: ReadonlyArray<Extractor>,
   ): Promise<IndexingRun> {
-    const repo = this.requireRepo(tenant_id, repo_id);
-    const runDb = this.opts.store.beginIndexingRun({
+    const repo = await this.requireRepo(tenant_id, repo_id);
+    const runDb = await this.opts.store.beginIndexingRun({
       tenant_id,
       repo_id,
       branch: repo.default_branch,
@@ -83,12 +83,12 @@ export class CodeIntelPipeline implements Pipeline {
         };
         let rowCount = 0;
         for await (const row of extractor.run(ctx)) {
-          this.persist(row);
+          await this.persist(row);
           rowCount += 1;
         }
         counts[extractor.name] = rowCount;
       }
-      this.opts.store.finalizeIndexingRun({
+      await this.opts.store.finalizeIndexingRun({
         run_id: run.id,
         status: "ok",
         extractor_counts: counts,
@@ -96,7 +96,7 @@ export class CodeIntelPipeline implements Pipeline {
       return { ...run, status: "ok", extractor_counts: counts };
     } catch (err: any) {
       errorMsg = err?.message ?? String(err);
-      this.opts.store.finalizeIndexingRun({
+      await this.opts.store.finalizeIndexingRun({
         run_id: run.id,
         status: "error",
         extractor_counts: counts,
@@ -106,8 +106,8 @@ export class CodeIntelPipeline implements Pipeline {
     }
   }
 
-  private requireRepo(tenant_id: string, repo_id: string): Repo {
-    const r = this.opts.store.getRepo(tenant_id, repo_id);
+  private async requireRepo(tenant_id: string, repo_id: string): Promise<Repo> {
+    const r = await this.opts.store.getRepo(tenant_id, repo_id);
     if (!r) throw new Error(`pipeline: repo ${repo_id} not found for tenant ${tenant_id}`);
     return {
       id: r.id,
@@ -120,39 +120,39 @@ export class CodeIntelPipeline implements Pipeline {
     };
   }
 
-  private persist(row: ExtractorRow): void {
+  private async persist(row: ExtractorRow): Promise<void> {
     const r = row.row;
     switch (row.kind) {
       case "files":
-        this.opts.store.insertFile(r as any);
+        await this.opts.store.insertFile(r as any);
         return;
       case "symbols":
-        this.opts.store.insertSymbol(r as any);
+        await this.opts.store.insertSymbol(r as any);
         return;
       case "chunks":
-        this.opts.store.insertChunk(r as any);
+        await this.opts.store.insertChunk(r as any);
         return;
       case "edges":
-        this.opts.store.insertEdge(r as any);
+        await this.opts.store.insertEdge(r as any);
         return;
       case "external_refs":
-        this.opts.store.insertExternalRef(r as any);
+        await this.opts.store.insertExternalRef(r as any);
         return;
       case "embeddings":
-        this.opts.store.insertEmbedding(r as any);
+        await this.opts.store.insertEmbedding(r as any);
         return;
       case "dependencies":
-        this.opts.store.insertDependency(r as any);
+        await this.opts.store.insertDependency(r as any);
         return;
       case "people":
-        this.opts.store.upsertPerson(r as any);
+        await this.opts.store.upsertPerson(r as any);
         return;
       case "contributions": {
         // git-contributors yields person_email; resolve to person_id here.
         const emailField = (r as any).person_email;
         if (emailField && !(r as any).person_id) {
           const tenant_id = String((r as any).tenant_id);
-          const person = this.opts.store.upsertPerson({
+          const person = await this.opts.store.upsertPerson({
             tenant_id,
             primary_email: String(emailField),
             name: null,
@@ -160,11 +160,11 @@ export class CodeIntelPipeline implements Pipeline {
           (r as any).person_id = person.id;
         }
         delete (r as any).person_email;
-        this.opts.store.insertContribution(r as any);
+        await this.opts.store.insertContribution(r as any);
         return;
       }
       case "file_hotspots":
-        this.opts.store.insertHotspot(r as any);
+        await this.opts.store.insertHotspot(r as any);
         return;
       // Wave 2 row kinds: store hooks ship in Wave 2; ignore for now.
       case "endpoints":

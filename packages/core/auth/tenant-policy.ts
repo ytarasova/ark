@@ -7,7 +7,7 @@
  * in SQLite and provides validation helpers used by the scheduler.
  */
 
-import type { IDatabase } from "./database/index.js";
+import type { IDatabase } from "../database/index.js";
 import { logInfo, logDebug } from "../observability/structured-log.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -26,6 +26,7 @@ export interface TenantComputePolicy {
   auto_index: boolean | null; // null = inherit from global config
   auto_index_required: boolean; // tenant MUST auto-index
   tensorzero_enabled: boolean | null; // null = inherit from global config
+  allowed_k8s_contexts: string[]; // empty = all contexts allowed
 }
 
 export interface ComputePoolRef {
@@ -49,32 +50,50 @@ const DEFAULT_POLICY: Omit<TenantComputePolicy, "tenant_id"> = {
   auto_index: null,
   auto_index_required: false,
   tensorzero_enabled: null,
+  allowed_k8s_contexts: [],
 };
 
 // ── Manager ────────────────────────────────────────────────────────────────
 
 export class TenantPolicyManager {
-  constructor(private db: IDatabase) {
-    this.db.exec(`CREATE TABLE IF NOT EXISTS tenant_policies (
-      tenant_id TEXT PRIMARY KEY,
-      allowed_providers TEXT NOT NULL DEFAULT '[]',
-      default_provider TEXT NOT NULL DEFAULT 'k8s',
-      max_concurrent_sessions INTEGER NOT NULL DEFAULT 10,
-      max_cost_per_day_usd REAL,
-      compute_pools TEXT NOT NULL DEFAULT '[]',
-      router_enabled INTEGER,
-      router_required INTEGER NOT NULL DEFAULT 0,
-      router_policy TEXT,
-      auto_index INTEGER,
-      auto_index_required INTEGER NOT NULL DEFAULT 0,
-      tensorzero_enabled INTEGER,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )`);
-    this._migrateIntegrationColumns();
+  private _initialized: Promise<void> | null = null;
+
+  constructor(private db: IDatabase) {}
+
+  /**
+   * Lazily ensure the schema exists. Replaces the (now-async) constructor
+   * work that used to init schema synchronously. Every public method awaits
+   * this once before touching the table.
+   */
+  private async ensureSchema(): Promise<void> {
+    if (this._initialized) return this._initialized;
+    this._initialized = (async () => {
+      await this.db
+        .prepare(
+          `CREATE TABLE IF NOT EXISTS tenant_policies (
+            tenant_id TEXT PRIMARY KEY,
+            allowed_providers TEXT NOT NULL DEFAULT '[]',
+            default_provider TEXT NOT NULL DEFAULT 'k8s',
+            max_concurrent_sessions INTEGER NOT NULL DEFAULT 10,
+            max_cost_per_day_usd REAL,
+            compute_pools TEXT NOT NULL DEFAULT '[]',
+            router_enabled INTEGER,
+            router_required INTEGER NOT NULL DEFAULT 0,
+            router_policy TEXT,
+            auto_index INTEGER,
+            auto_index_required INTEGER NOT NULL DEFAULT 0,
+            tensorzero_enabled INTEGER,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+          )`,
+        )
+        .run();
+      await this._migrateIntegrationColumns();
+    })();
+    return this._initialized;
   }
 
-  private _migrateIntegrationColumns(): void {
+  private async _migrateIntegrationColumns(): Promise<void> {
     const cols: [string, string][] = [
       ["router_enabled", "INTEGER"],
       ["router_required", "INTEGER NOT NULL DEFAULT 0"],
@@ -82,10 +101,11 @@ export class TenantPolicyManager {
       ["auto_index", "INTEGER"],
       ["auto_index_required", "INTEGER NOT NULL DEFAULT 0"],
       ["tensorzero_enabled", "INTEGER"],
+      ["allowed_k8s_contexts", "TEXT NOT NULL DEFAULT '[]'"],
     ];
     for (const [col, def] of cols) {
       try {
-        this.db.prepare(`ALTER TABLE tenant_policies ADD COLUMN ${col} ${def}`).run();
+        await this.db.prepare(`ALTER TABLE tenant_policies ADD COLUMN ${col} ${def}`).run();
       } catch {
         logInfo("general", "exists");
       }
@@ -93,8 +113,9 @@ export class TenantPolicyManager {
   }
 
   /** Get the policy for a tenant, or null if no explicit policy exists. */
-  getPolicy(tenantId: string): TenantComputePolicy | null {
-    const row = this.db.prepare("SELECT * FROM tenant_policies WHERE tenant_id = ?").get(tenantId) as
+  async getPolicy(tenantId: string): Promise<TenantComputePolicy | null> {
+    await this.ensureSchema();
+    const row = (await this.db.prepare("SELECT * FROM tenant_policies WHERE tenant_id = ?").get(tenantId)) as
       | TenantPolicyRow
       | undefined;
     return row ? this._hydrateRow(row) : null;
@@ -104,25 +125,29 @@ export class TenantPolicyManager {
    * Get the effective policy for a tenant.
    * Returns the explicit policy if one exists, otherwise returns the default policy.
    */
-  getEffectivePolicy(tenantId: string): TenantComputePolicy {
-    return this.getPolicy(tenantId) ?? { tenant_id: tenantId, ...DEFAULT_POLICY };
+  async getEffectivePolicy(tenantId: string): Promise<TenantComputePolicy> {
+    return (await this.getPolicy(tenantId)) ?? { tenant_id: tenantId, ...DEFAULT_POLICY };
   }
 
   /** Set (create or update) a tenant policy. */
-  setPolicy(policy: TenantComputePolicy): void {
+  async setPolicy(policy: TenantComputePolicy): Promise<void> {
+    await this.ensureSchema();
     const now = new Date().toISOString();
     const providers = JSON.stringify(policy.allowed_providers);
     const pools = JSON.stringify(policy.compute_pools);
+    const k8sContexts = JSON.stringify(policy.allowed_k8s_contexts ?? []);
     const routerEnabled = policy.router_enabled == null ? null : policy.router_enabled ? 1 : 0;
     const routerRequired = policy.router_required ? 1 : 0;
     const autoIndex = policy.auto_index == null ? null : policy.auto_index ? 1 : 0;
     const autoIndexRequired = policy.auto_index_required ? 1 : 0;
     const tensorzeroEnabled = policy.tensorzero_enabled == null ? null : policy.tensorzero_enabled ? 1 : 0;
 
-    const existing = this.db.prepare("SELECT tenant_id FROM tenant_policies WHERE tenant_id = ?").get(policy.tenant_id);
+    const existing = await this.db
+      .prepare("SELECT tenant_id FROM tenant_policies WHERE tenant_id = ?")
+      .get(policy.tenant_id);
 
     if (existing) {
-      this.db
+      await this.db
         .prepare(
           `
         UPDATE tenant_policies
@@ -131,6 +156,7 @@ export class TenantPolicyManager {
             compute_pools = ?,
             router_enabled = ?, router_required = ?, router_policy = ?,
             auto_index = ?, auto_index_required = ?, tensorzero_enabled = ?,
+            allowed_k8s_contexts = ?,
             updated_at = ?
         WHERE tenant_id = ?
       `,
@@ -147,11 +173,12 @@ export class TenantPolicyManager {
           autoIndex,
           autoIndexRequired,
           tensorzeroEnabled,
+          k8sContexts,
           now,
           policy.tenant_id,
         );
     } else {
-      this.db
+      await this.db
         .prepare(
           `
         INSERT INTO tenant_policies
@@ -159,8 +186,9 @@ export class TenantPolicyManager {
            max_concurrent_sessions, max_cost_per_day_usd, compute_pools,
            router_enabled, router_required, router_policy,
            auto_index, auto_index_required, tensorzero_enabled,
+           allowed_k8s_contexts,
            created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
         )
         .run(
@@ -176,6 +204,7 @@ export class TenantPolicyManager {
           autoIndex,
           autoIndexRequired,
           tensorzeroEnabled,
+          k8sContexts,
           now,
           now,
         );
@@ -183,14 +212,16 @@ export class TenantPolicyManager {
   }
 
   /** Delete a tenant policy. Returns true if a policy was deleted. */
-  deletePolicy(tenantId: string): boolean {
-    const result = this.db.prepare("DELETE FROM tenant_policies WHERE tenant_id = ?").run(tenantId);
+  async deletePolicy(tenantId: string): Promise<boolean> {
+    await this.ensureSchema();
+    const result = await this.db.prepare("DELETE FROM tenant_policies WHERE tenant_id = ?").run(tenantId);
     return result.changes > 0;
   }
 
   /** List all tenant policies. */
-  listPolicies(): TenantComputePolicy[] {
-    const rows = this.db.prepare("SELECT * FROM tenant_policies ORDER BY tenant_id").all() as TenantPolicyRow[];
+  async listPolicies(): Promise<TenantComputePolicy[]> {
+    await this.ensureSchema();
+    const rows = (await this.db.prepare("SELECT * FROM tenant_policies ORDER BY tenant_id").all()) as TenantPolicyRow[];
     return rows.map((r) => this._hydrateRow(r));
   }
 
@@ -200,24 +231,35 @@ export class TenantPolicyManager {
    * Check if a provider is allowed for a tenant.
    * An empty allowed_providers list means all providers are allowed.
    */
-  isProviderAllowed(tenantId: string, provider: string): boolean {
-    const policy = this.getEffectivePolicy(tenantId);
+  async isProviderAllowed(tenantId: string, provider: string): Promise<boolean> {
+    const policy = await this.getEffectivePolicy(tenantId);
     if (policy.allowed_providers.length === 0) return true;
     return policy.allowed_providers.includes(provider);
+  }
+
+  /**
+   * Check if a k8s kubeconfig context is allowed for a tenant.
+   * An empty allowed_k8s_contexts list means all contexts are allowed --
+   * use this to lock a tenant to specific clusters.
+   */
+  async isK8sContextAllowed(tenantId: string, context: string): Promise<boolean> {
+    const policy = await this.getEffectivePolicy(tenantId);
+    if (!policy.allowed_k8s_contexts || policy.allowed_k8s_contexts.length === 0) return true;
+    return policy.allowed_k8s_contexts.includes(context);
   }
 
   /**
    * Get the number of active (running) sessions for a tenant.
    * Queries the sessions table via the shared database connection.
    */
-  getActiveSessions(tenantId: string): number {
+  async getActiveSessions(tenantId: string): Promise<number> {
     try {
-      const row = this.db
+      const row = (await this.db
         .prepare(
           `SELECT COUNT(*) as cnt FROM sessions
          WHERE status = 'running' AND tenant_id = ?`,
         )
-        .get(tenantId) as { cnt: number } | undefined;
+        .get(tenantId)) as { cnt: number } | undefined;
       if (row) return row.cnt;
     } catch {
       logDebug("general", "tenant_id column may not exist on sessions table in some setups");
@@ -229,9 +271,9 @@ export class TenantPolicyManager {
    * Check whether a tenant is allowed to dispatch a new session.
    * Returns { allowed: true } or { allowed: false, reason: "..." }.
    */
-  canDispatch(tenantId: string): { allowed: boolean; reason?: string } {
-    const policy = this.getEffectivePolicy(tenantId);
-    const active = this.getActiveSessions(tenantId);
+  async canDispatch(tenantId: string): Promise<{ allowed: boolean; reason?: string }> {
+    const policy = await this.getEffectivePolicy(tenantId);
+    const active = await this.getActiveSessions(tenantId);
 
     if (active >= policy.max_concurrent_sessions) {
       return {
@@ -244,7 +286,7 @@ export class TenantPolicyManager {
   }
 
   /** Get effective integration settings: tenant policy -> global config fallback. */
-  getEffectiveIntegrationSettings(
+  async getEffectiveIntegrationSettings(
     tenantId: string,
     globalConfig: {
       routerEnabled: boolean;
@@ -252,13 +294,13 @@ export class TenantPolicyManager {
       tensorZeroEnabled: boolean;
       routerPolicy: string;
     },
-  ): {
+  ): Promise<{
     routerEnabled: boolean;
     routerPolicy: string;
     autoIndex: boolean;
     tensorZeroEnabled: boolean;
-  } {
-    const policy = this.getEffectivePolicy(tenantId);
+  }> {
+    const policy = await this.getEffectivePolicy(tenantId);
     return {
       routerEnabled: policy.router_required || (policy.router_enabled ?? globalConfig.routerEnabled),
       routerPolicy: policy.router_policy ?? globalConfig.routerPolicy,
@@ -272,6 +314,7 @@ export class TenantPolicyManager {
   private _hydrateRow(row: TenantPolicyRow): TenantComputePolicy {
     let allowedProviders: string[] = [];
     let computePools: ComputePoolRef[] = [];
+    let k8sContexts: string[] = [];
     try {
       allowedProviders = JSON.parse(row.allowed_providers);
     } catch {
@@ -279,6 +322,11 @@ export class TenantPolicyManager {
     }
     try {
       computePools = JSON.parse(row.compute_pools);
+    } catch {
+      logDebug("general", "default");
+    }
+    try {
+      if (row.allowed_k8s_contexts) k8sContexts = JSON.parse(row.allowed_k8s_contexts);
     } catch {
       logDebug("general", "default");
     }
@@ -296,6 +344,7 @@ export class TenantPolicyManager {
       auto_index: row.auto_index == null ? null : !!row.auto_index,
       auto_index_required: !!row.auto_index_required,
       tensorzero_enabled: row.tensorzero_enabled == null ? null : !!row.tensorzero_enabled,
+      allowed_k8s_contexts: k8sContexts,
     };
   }
 }
@@ -313,4 +362,5 @@ interface TenantPolicyRow {
   auto_index: number | null;
   auto_index_required: number | null;
   tensorzero_enabled: number | null;
+  allowed_k8s_contexts: string | null;
 }

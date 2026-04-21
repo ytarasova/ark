@@ -9,22 +9,22 @@ let store: CodeIntelStore;
 let runId: string;
 let fileId: string;
 
-beforeAll(() => {
+beforeAll(async () => {
   db = new BunSqliteAdapter(new Database(":memory:"));
   store = new CodeIntelStore(db);
-  store.migrate();
-  const repo = store.createRepo({
+  await store.migrate();
+  const repo = await store.createRepo({
     tenant_id: DEFAULT_TENANT_ID,
     repo_url: "file:///search",
     name: "search",
   });
-  const run = store.beginIndexingRun({
+  const run = await store.beginIndexingRun({
     tenant_id: DEFAULT_TENANT_ID,
     repo_id: repo.id,
     branch: "main",
   });
   runId = run.id;
-  const f = store.insertFile({
+  const f = await store.insertFile({
     tenant_id: DEFAULT_TENANT_ID,
     repo_id: repo.id,
     path: "src/cool.ts",
@@ -32,7 +32,7 @@ beforeAll(() => {
     indexing_run_id: runId,
   });
   fileId = f.id;
-  store.insertChunk({
+  await store.insertChunk({
     tenant_id: DEFAULT_TENANT_ID,
     file_id: fileId,
     content: "function authenticateUser(username, password) {}",
@@ -40,7 +40,7 @@ beforeAll(() => {
     path_hint: "src/cool.ts",
     symbol_name: "authenticateUser",
   });
-  store.insertChunk({
+  await store.insertChunk({
     tenant_id: DEFAULT_TENANT_ID,
     file_id: fileId,
     content: "const PI = 3.14159;",
@@ -50,9 +50,11 @@ beforeAll(() => {
   });
 });
 
-afterAll(() => db.close());
+afterAll(async () => {
+  await db.close();
+});
 
-describe("searchQuery", () => {
+describe("searchQuery", async () => {
   it("matches a known token", async () => {
     const hits = await searchQuery.run({ tenant_id: DEFAULT_TENANT_ID, store }, { query: "authenticateUser" });
     expect(hits.length).toBe(1);

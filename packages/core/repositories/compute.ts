@@ -11,7 +11,7 @@ import type {
 import { providerToPair, pairToProvider } from "../../compute/adapters/provider-map.js";
 import { now } from "../util/time.js";
 
-// ── Row type (config stored as JSON string) ─────────────────────────────────
+// -- Row type (config stored as JSON string) ------------------------------
 
 interface ComputeRow {
   name: string;
@@ -24,7 +24,7 @@ interface ComputeRow {
   updated_at: string;
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// -- Helpers --------------------------------------------------------------
 
 function safeParseConfig(raw: unknown): ComputeConfig {
   if (typeof raw === "object" && raw !== null) return raw as ComputeConfig;
@@ -57,7 +57,7 @@ const COMPUTE_COLUMNS = new Set(["provider", "compute_kind", "runtime_kind", "st
 // Providers that allow only one compute instance per tenant.
 const SINGLETON_PROVIDERS = new Set(["local"]);
 
-// ── Repository ──────────────────────────────────────────────────────────────
+// -- Repository -----------------------------------------------------------
 
 export class ComputeRepository {
   private tenantId: string = "default";
@@ -71,7 +71,7 @@ export class ComputeRepository {
     return this.tenantId;
   }
 
-  create(opts: CreateComputeOpts): Compute {
+  async create(opts: CreateComputeOpts): Promise<Compute> {
     const ts = now();
 
     // When caller passes the new axes (`compute`, `runtime`) without a
@@ -86,9 +86,9 @@ export class ComputeRepository {
 
     // Singleton providers allow only one compute instance per tenant.
     if (SINGLETON_PROVIDERS.has(provider)) {
-      const existing = this.db
+      const existing = (await this.db
         .prepare("SELECT name FROM compute WHERE provider = ? AND tenant_id = ?")
-        .get(provider, this.tenantId) as { name: string } | undefined;
+        .get(provider, this.tenantId)) as { name: string } | undefined;
       if (existing) {
         throw new Error(`Provider '${provider}' is a singleton -- compute '${existing.name}' already exists`);
       }
@@ -102,7 +102,7 @@ export class ComputeRepository {
     const computeKind = (opts.compute ?? fallback.compute) as ComputeKindName;
     const runtimeKind = (opts.runtime ?? fallback.runtime) as RuntimeKindName;
 
-    this.db
+    await this.db
       .prepare(
         `
       INSERT INTO compute (name, provider, compute_kind, runtime_kind, status, config, tenant_id, created_at, updated_at)
@@ -121,18 +121,18 @@ export class ComputeRepository {
         ts,
       );
 
-    return this.get(opts.name)!;
+    return (await this.get(opts.name))!;
   }
 
-  get(name: string): Compute | null {
-    const row = this.db.prepare("SELECT * FROM compute WHERE name = ? AND tenant_id = ?").get(name, this.tenantId) as
-      | ComputeRow
-      | undefined;
+  async get(name: string): Promise<Compute | null> {
+    const row = (await this.db
+      .prepare("SELECT * FROM compute WHERE name = ? AND tenant_id = ?")
+      .get(name, this.tenantId)) as ComputeRow | undefined;
     if (!row) return null;
     return rowToCompute(row);
   }
 
-  list(filters?: { status?: ComputeStatus; provider?: ComputeProviderName; limit?: number }): Compute[] {
+  async list(filters?: { status?: ComputeStatus; provider?: ComputeProviderName; limit?: number }): Promise<Compute[]> {
     let sql = "SELECT * FROM compute WHERE tenant_id = ?";
     const params: any[] = [this.tenantId];
 
@@ -148,10 +148,10 @@ export class ComputeRepository {
     sql += " ORDER BY created_at DESC LIMIT ?";
     params.push(filters?.limit ?? 100);
 
-    return (this.db.prepare(sql).all(...params) as ComputeRow[]).map(rowToCompute);
+    return ((await this.db.prepare(sql).all(...params)) as ComputeRow[]).map(rowToCompute);
   }
 
-  update(name: string, fields: Partial<Compute>): Compute | null {
+  async update(name: string, fields: Partial<Compute>): Promise<Compute | null> {
     const updates: string[] = ["updated_at = ?"];
     const values: any[] = [now()];
 
@@ -168,25 +168,27 @@ export class ComputeRepository {
     }
     values.push(name, this.tenantId);
 
-    this.db.prepare(`UPDATE compute SET ${updates.join(", ")} WHERE name = ? AND tenant_id = ?`).run(...values);
+    await this.db.prepare(`UPDATE compute SET ${updates.join(", ")} WHERE name = ? AND tenant_id = ?`).run(...values);
     return this.get(name);
   }
 
-  delete(name: string): boolean {
+  async delete(name: string): Promise<boolean> {
     if (name === "local") return false;
-    const result = this.db.prepare("DELETE FROM compute WHERE name = ? AND tenant_id = ?").run(name, this.tenantId);
+    const result = await this.db
+      .prepare("DELETE FROM compute WHERE name = ? AND tenant_id = ?")
+      .run(name, this.tenantId);
     return result.changes > 0;
   }
 
-  mergeConfig(name: string, patch: Partial<ComputeConfig>): Compute | null {
-    this.db.transaction(() => {
-      const row = this.db
+  async mergeConfig(name: string, patch: Partial<ComputeConfig>): Promise<Compute | null> {
+    await this.db.transaction(async () => {
+      const row = (await this.db
         .prepare("SELECT config FROM compute WHERE name = ? AND tenant_id = ?")
-        .get(name, this.tenantId) as { config: string } | undefined;
+        .get(name, this.tenantId)) as { config: string } | undefined;
       if (!row) return;
       const existing = safeParseConfig(row.config);
       const merged = { ...existing, ...patch };
-      this.db
+      await this.db
         .prepare("UPDATE compute SET config = ?, updated_at = ? WHERE name = ? AND tenant_id = ?")
         .run(JSON.stringify(merged), new Date().toISOString(), name, this.tenantId);
     });

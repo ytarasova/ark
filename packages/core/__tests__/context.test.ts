@@ -25,7 +25,7 @@ afterAll(async () => {
   }
 });
 
-describe("Store context isolation", () => {
+describe("Store context isolation", async () => {
   it("creates database in temp directory", () => {
     const db = getApp().db;
     expect(db).toBeDefined();

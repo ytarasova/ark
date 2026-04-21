@@ -139,7 +139,12 @@ export class DevcontainerRuntime implements Runtime {
       startArkdInContainer: deps.startArkdInContainer ?? startArkdInContainer,
       waitForArkdHealth: deps.waitForArkdHealth ?? waitForArkdHealth,
       resolveArkSourceRoot: deps.resolveArkSourceRoot ?? resolveArkSourceRoot,
-      execFile: deps.execFile ?? ((cmd, args, opts) => execFileAsync(cmd, args, opts as never)),
+      execFile:
+        deps.execFile ??
+        (async (cmd, args, opts) => {
+          const { stdout, stderr } = await execFileAsync(cmd, args, opts as never);
+          return { stdout: String(stdout ?? ""), stderr: String(stderr ?? "") };
+        }),
       arkdClientFactory: deps.arkdClientFactory ?? ((url: string) => new ArkdClient(url)),
     };
   }

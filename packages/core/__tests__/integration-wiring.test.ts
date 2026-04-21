@@ -17,17 +17,17 @@ afterAll(async () => {
   await app?.shutdown();
 });
 
-beforeEach(() => {
-  store.clear();
+beforeEach(async () => {
+  await store.clear();
 });
 
 // ── buildContext token budget ──────────────────────────────────────────────
 
-describe("buildContext token budget", () => {
-  it("respects maxTokens by limiting items", () => {
+describe("buildContext token budget", async () => {
+  it("respects maxTokens by limiting items", async () => {
     // Add many items
     for (let i = 0; i < 20; i++) {
-      store.addNode({
+      await store.addNode({
         id: `memory:m-${i}`,
         type: "memory",
         label: `Memory about topic ${i} with keywords for search`,
@@ -41,36 +41,41 @@ describe("buildContext token budget", () => {
     expect(ctx.memories.length).toBeLessThanOrEqual(3);
   });
 
-  it("default limits are 5 files, 3 memories, 3 sessions, 2 learnings, 2 skills", () => {
+  it("default limits are 5 files, 3 memories, 3 sessions, 2 learnings, 2 skills", async () => {
     for (let i = 0; i < 10; i++) {
-      store.addNode({
+      await store.addNode({
         id: `file:src/f${i}.ts`,
         type: "file",
         label: `src/f${i}.ts`,
         content: "test file content",
         metadata: { language: "typescript" },
       });
-      store.addNode({
+      await store.addNode({
         id: `memory:m${i}`,
         type: "memory",
         label: `Memory ${i} test`,
         content: `test content ${i}`,
         metadata: { importance: 0.5, scope: "global" },
       });
-      store.addNode({
+      await store.addNode({
         id: `session:s${i}`,
         type: "session",
         label: `Session ${i} test`,
         content: `session content ${i}`,
         metadata: { outcome: "success", files_changed: [] },
       });
-      store.addNode({
+      await store.addNode({
         id: `learning:l${i}`,
         type: "learning",
         label: `Learning ${i} test`,
         content: `learning content ${i}`,
       });
-      store.addNode({ id: `skill:sk${i}`, type: "skill", label: `Skill ${i} test`, content: `skill content ${i}` });
+      await store.addNode({
+        id: `skill:sk${i}`,
+        type: "skill",
+        label: `Skill ${i} test`,
+        content: `skill content ${i}`,
+      });
     }
 
     const ctx = buildContext(store, "test content");
@@ -206,7 +211,7 @@ describe("tenant integration policies", () => {
 
 // ── ingestRemoteIndex ────────────────────────────────────────────────────
 
-describe("ingestRemoteIndex", () => {
+describe("ingestRemoteIndex", async () => {
   it("maps remote nodes/edges into knowledge store", async () => {
     // Simulate the data returned by arkd /codegraph/index
     const remoteData = {
@@ -242,7 +247,7 @@ describe("ingestRemoteIndex", () => {
     const addedFiles = new Set<string>();
     for (const node of remoteData.nodes) {
       if (node.file && !addedFiles.has(node.file)) {
-        store.addNode({
+        await store.addNode({
           id: `file:${node.file}`,
           type: "file",
           label: node.file,
@@ -250,7 +255,7 @@ describe("ingestRemoteIndex", () => {
         });
         addedFiles.add(node.file);
       }
-      store.addNode({
+      await store.addNode({
         id: `symbol:${node.file}::${node.name}:${node.line}`,
         type: "symbol",
         label: node.name,
@@ -265,16 +270,16 @@ describe("ingestRemoteIndex", () => {
     }
 
     // Verify files
-    expect(store.getNode("file:src/app.ts")).not.toBeNull();
-    expect(store.getNode("file:src/db.ts")).not.toBeNull();
+    expect(await store.getNode("file:src/app.ts")).not.toBeNull();
+    expect(await store.getNode("file:src/db.ts")).not.toBeNull();
 
     // Verify symbols
-    const boot = store.getNode("symbol:src/app.ts::boot:10");
+    const boot = await store.getNode("symbol:src/app.ts::boot:10");
     expect(boot).not.toBeNull();
     expect(boot!.metadata.kind).toBe("function");
     expect(boot!.metadata.exported).toBe(true);
 
-    const db = store.getNode("symbol:src/db.ts::Database:5");
+    const db = await store.getNode("symbol:src/db.ts::Database:5");
     expect(db).not.toBeNull();
     expect(db!.metadata.kind).toBe("class");
   });

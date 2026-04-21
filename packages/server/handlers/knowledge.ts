@@ -16,7 +16,7 @@ import { logInfo } from "../../core/observability/structured-log.js";
 export function registerKnowledgeHandlers(router: Router, app: AppContext): void {
   router.handle("knowledge/search", async (p) => {
     const { query, types, limit } = extract<{ query: string; types?: NodeType[]; limit?: number }>(p, ["query"]);
-    const results = app.knowledge.search(query, { types, limit });
+    const results = await app.knowledge.search(query, { types, limit });
     return { results };
   });
 
@@ -36,7 +36,7 @@ export function registerKnowledgeHandlers(router: Router, app: AppContext): void
     const byNodeType: Record<string, number> = {};
     let totalNodes = 0;
     for (const t of nodeTypes) {
-      const c = app.knowledge.nodeCount(t);
+      const c = await app.knowledge.nodeCount(t);
       if (c > 0) byNodeType[t] = c;
       totalNodes += c;
     }
@@ -44,7 +44,7 @@ export function registerKnowledgeHandlers(router: Router, app: AppContext): void
     const byEdgeType: Record<string, number> = {};
     let totalEdges = 0;
     for (const r of edgeTypes) {
-      const c = app.knowledge.edgeCount(r);
+      const c = await app.knowledge.edgeCount(r);
       if (c > 0) byEdgeType[r] = c;
       totalEdges += c;
     }

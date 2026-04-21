@@ -196,8 +196,8 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
     }
   });
 
-  function broadcastSessions() {
-    const sessions = app.sessions.list({ limit: 200 });
+  async function broadcastSessions() {
+    const sessions = await app.sessions.list({ limit: 200 });
     broadcast(
       "sessions",
       sessions.map((s) => ({
@@ -212,17 +212,17 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
     );
   }
 
-  const statusInterval = setInterval(broadcastSessions, 3000);
+  const statusInterval = setInterval(() => void broadcastSessions(), 3000);
 
   const unsubEventBus = eventBus.onAll((event) => {
     if (event.type === "hook_status" || event.type.startsWith("session")) {
-      broadcastSessions();
+      void broadcastSessions();
     }
   });
 
   // ── Auth config ──────────────────────────────────────────────────────────
   const authConfig: AuthConfig = app.config.auth ?? { enabled: false, apiKeyEnabled: false };
-  let apiKeyMgr: import("./api-keys.js").ApiKeyManager | null = null;
+  let apiKeyMgr: import("../auth/api-keys.js").ApiKeyManager | null = null;
   try {
     apiKeyMgr = app.apiKeys;
   } catch {
@@ -270,7 +270,7 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
       // Multi-tenant auth -- extract tenant context from request
       let tenantCtx: TenantContext | null = null;
       if (authConfig.enabled) {
-        tenantCtx = extractTenantContext(req, authConfig, apiKeyMgr);
+        tenantCtx = await extractTenantContext(req, authConfig, apiKeyMgr);
         if (!tenantCtx) {
           return jsonResponse({ error: "Unauthorized - valid API key required" }, 401);
         }
@@ -367,7 +367,7 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
             registerAllHandlers(rpcRouter, requestApp);
             rpcRouter.markInitialized();
           }
-          const result = await rpcRouter.dispatch(body);
+          const result = await rpcRouter.dispatch(body as import("../../protocol/types.js").JsonRpcRequest);
           return jsonResponse(result);
         } catch (err) {
           return errorResponse(err, 400);

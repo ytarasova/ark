@@ -20,7 +20,6 @@ export async function getGitRemoteUrl(localPath: string): Promise<string | null>
     // stdio "pipe" so git's stderr doesn't leak to our process stderr for soft failures
     const { stdout } = await execFileAsync("git", ["-C", localPath, "remote", "get-url", "origin"], {
       encoding: "utf-8",
-      stdio: ["ignore", "pipe", "pipe"],
     });
     return stdout.trim() || null;
   } catch {

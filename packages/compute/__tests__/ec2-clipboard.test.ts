@@ -2,11 +2,11 @@ import { describe, it, expect } from "bun:test";
 
 import { getClipboardImage, uploadToSession, watchClipboard } from "../providers/ec2/clipboard.js";
 
-describe("EC2 clipboard sync", () => {
+describe("EC2 clipboard sync", async () => {
   // -----------------------------------------------------------------------
   // getClipboardImage
   // -----------------------------------------------------------------------
-  describe("getClipboardImage", () => {
+  describe("getClipboardImage", async () => {
     it("returns string or null without crashing", async () => {
       const result = await getClipboardImage();
       expect(result === null || typeof result === "string").toBe(true);

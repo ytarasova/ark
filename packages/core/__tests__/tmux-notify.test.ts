@@ -4,7 +4,7 @@ import { getApp } from "./test-helpers.js";
 
 withTestContext();
 
-describe("tmux-notify", () => {
+describe("tmux-notify", async () => {
   it("exports updateTmuxStatusBar and clearTmuxStatusBar", async () => {
     const mod = await import("../infra/tmux-notify.js");
     expect(typeof mod.updateTmuxStatusBar).toBe("function");

@@ -46,14 +46,14 @@ export interface EventStore {
   getTenant(): string;
 
   /** Append an event (audit trail) for a given track (session / group) id. */
-  log(trackId: string, type: string, opts?: EventLogOpts): void;
+  log(trackId: string, type: string, opts?: EventLogOpts): Promise<void>;
 
   /** List events for a track, optionally filtered by type. Default limit 200. */
-  list(trackId: string, opts?: EventListOpts): Event[];
+  list(trackId: string, opts?: EventListOpts): Promise<Event[]>;
 
   /**
    * Remove every event for a track. Session-delete cascade only.
    * See port-level doc for immutability semantics.
    */
-  deleteForTrack(trackId: string): void;
+  deleteForTrack(trackId: string): Promise<void>;
 }

@@ -19,6 +19,10 @@ export interface LaunchOpts {
     permission_mode: string;
     env: Record<string, string>;
     command?: string[];
+    /** Runtime kind (claude-code | goose | codex | gemini | cli-agent). */
+    runtime?: string;
+    /** Resolved runtime kind from RuntimeStore merge (mirrors AgentDefinition). */
+    _resolved_runtime_type?: string;
     /** Optional goose recipe path (native YAML), handled by gooseExecutor. */
     recipe?: string;
     /** Optional goose sub-recipe paths, handled by gooseExecutor. */
@@ -37,8 +41,6 @@ export interface LaunchOpts {
   initialPrompt?: string;
   /** AppContext passed from dispatch -- avoids getApp() in executors. */
   app?: import("./app.js").AppContext;
-  /** Initial prompt to send to the agent at launch (auto-start). */
-  initialPrompt?: string;
 }
 
 export interface LaunchResult {

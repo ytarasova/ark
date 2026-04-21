@@ -115,7 +115,7 @@ afterAll(() => {
 
 // ── Launch + Kill + Status ──────────────────────────────────────────────────
 
-describe("ArkdBackedProvider agent lifecycle", () => {
+describe("ArkdBackedProvider agent lifecycle", async () => {
   const TMUX_NAME = `arkd-backed-test-${Date.now()}`;
 
   afterAll(async () => {
@@ -186,7 +186,7 @@ describe("ArkdBackedProvider agent lifecycle", () => {
 
 // ── Metrics ─────────────────────────────────────────────────────────────────
 
-describe("ArkdBackedProvider getMetrics", () => {
+describe("ArkdBackedProvider getMetrics", async () => {
   // Timeout is 30s (not the bun-test default 5s) because /snapshot on arkd
   // shells out to `top -l 1`, `vm_stat`, `df`, `uptime`, `ps aux`, `tmux
   // list-sessions` (with per-session introspection), and `docker stats
@@ -211,7 +211,7 @@ describe("ArkdBackedProvider getMetrics", () => {
 
 // ── Port probing ────────────────────────────────────────────────────────────
 
-describe("ArkdBackedProvider probePorts", () => {
+describe("ArkdBackedProvider probePorts", async () => {
   it("probes ports and maps back to PortDecl", async () => {
     const ports = [
       { port: TEST_PORT, name: "arkd", source: "test" },

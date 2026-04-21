@@ -24,10 +24,10 @@ export interface MigrationApplyContext {
   dialect: "sqlite" | "postgres";
 }
 
-export function up(ctx: MigrationApplyContext): void {
+export async function up(ctx: MigrationApplyContext): Promise<void> {
   const docsDDL = ctx.dialect === "sqlite" ? platformDocsSchema.sqliteDDL() : platformDocsSchema.postgresDDL();
   const versionsDDL =
     ctx.dialect === "sqlite" ? platformDocVersionsSchema.sqliteDDL() : platformDocVersionsSchema.postgresDDL();
-  ctx.db.exec(docsDDL);
-  ctx.db.exec(versionsDDL);
+  await ctx.db.exec(docsDDL);
+  await ctx.db.exec(versionsDDL);
 }

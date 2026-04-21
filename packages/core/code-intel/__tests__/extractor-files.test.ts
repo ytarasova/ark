@@ -30,7 +30,7 @@ afterAll(() => {
   rmSync(repoDir, { recursive: true, force: true });
 });
 
-describe("filesExtractor", () => {
+describe("filesExtractor", async () => {
   it("supports a git working tree", () => {
     const repo: Repo = {
       id: "r",

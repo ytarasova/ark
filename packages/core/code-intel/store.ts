@@ -10,6 +10,9 @@
  * Postgres. Dialect-specific SQL is kept in one shared place (this file)
  * because Wave 1 queries are simple; richer queries move to per-dialect
  * modules when they diverge.
+ *
+ * Every method is async: PR 1 of the async-DB refactor flipped IDatabase
+ * to async, and this store passes the calls straight through.
  */
 
 import type { AppContext } from "../app.js";
@@ -290,54 +293,54 @@ export class CodeIntelStore {
   }
 
   /** Idempotent: applies any pending migrations. Safe to call on boot. */
-  migrate(opts?: { targetVersion?: number }): void {
-    this.runner.migrate(opts);
+  async migrate(opts?: { targetVersion?: number }): Promise<void> {
+    await this.runner.migrate(opts);
   }
 
   /** Migration status (current version + pending). */
-  migrationStatus() {
+  async migrationStatus() {
     return this.runner.status();
   }
 
   /** Drop every code-intel table (dev only). */
-  reset(): void {
-    this.runner.reset();
+  async reset(): Promise<void> {
+    await this.runner.reset();
   }
 
   // ── tenants ───────────────────────────────────────────────────────────────
 
-  createTenant(input: { id?: string; name: string; slug: string }): Tenant {
+  async createTenant(input: { id?: string; name: string; slug: string }): Promise<Tenant> {
     const id = input.id ?? randomUUID();
     const created_at = nowIso();
-    this.db
+    await this.db
       .prepare(`INSERT INTO ${TENANTS_TABLE} (id, name, slug, created_at) VALUES (${this.phs(1, 4)})`)
       .run(id, input.name, input.slug, created_at);
     return { id, name: input.name, slug: input.slug, created_at };
   }
 
-  getTenant(id: string): Tenant | null {
-    const row = this.db
+  async getTenant(id: string): Promise<Tenant | null> {
+    const row = (await this.db
       .prepare(`SELECT id, name, slug, created_at FROM ${TENANTS_TABLE} WHERE id = ${this.ph(1)}`)
-      .get(id) as Tenant | undefined;
+      .get(id)) as Tenant | undefined;
     return row ?? null;
   }
 
-  getTenantBySlug(slug: string): Tenant | null {
-    const row = this.db
+  async getTenantBySlug(slug: string): Promise<Tenant | null> {
+    const row = (await this.db
       .prepare(`SELECT id, name, slug, created_at FROM ${TENANTS_TABLE} WHERE slug = ${this.ph(1)}`)
-      .get(slug) as Tenant | undefined;
+      .get(slug)) as Tenant | undefined;
     return row ?? null;
   }
 
-  listTenants(): Tenant[] {
-    return this.db
+  async listTenants(): Promise<Tenant[]> {
+    return (await this.db
       .prepare(`SELECT id, name, slug, created_at FROM ${TENANTS_TABLE} ORDER BY created_at ASC`)
-      .all() as Tenant[];
+      .all()) as Tenant[];
   }
 
   // ── repos ────────────────────────────────────────────────────────────────
 
-  createRepo(input: {
+  async createRepo(input: {
     id?: string;
     tenant_id: string;
     repo_url: string;
@@ -346,12 +349,12 @@ export class CodeIntelStore {
     primary_language?: string | null;
     local_path?: string | null;
     config?: Record<string, unknown>;
-  }): Repo {
+  }): Promise<Repo> {
     const id = input.id ?? randomUUID();
     const created_at = nowIso();
     const default_branch = input.default_branch ?? "main";
     const config = input.config ?? {};
-    this.db
+    await this.db
       .prepare(
         `INSERT INTO ${REPOS_TABLE} (id, tenant_id, repo_url, name, default_branch, primary_language, local_path, config, created_at)
          VALUES (${this.phs(1, 9)})`,
@@ -381,38 +384,38 @@ export class CodeIntelStore {
     };
   }
 
-  getRepo(tenant_id: string, id: string): Repo | null {
-    const row = this.db
+  async getRepo(tenant_id: string, id: string): Promise<Repo | null> {
+    const row = (await this.db
       .prepare(
         `SELECT id, tenant_id, repo_url, name, default_branch, primary_language, local_path, config, created_at, deleted_at
          FROM ${REPOS_TABLE} WHERE tenant_id = ${this.ph(1)} AND id = ${this.ph(2)} AND deleted_at IS NULL`,
       )
-      .get(tenant_id, id) as (Omit<Repo, "config"> & { config: string }) | undefined;
+      .get(tenant_id, id)) as (Omit<Repo, "config"> & { config: string }) | undefined;
     return row ? { ...row, config: jsonParse(row.config, {}) } : null;
   }
 
-  findRepoByUrl(tenant_id: string, repo_url: string): Repo | null {
-    const row = this.db
+  async findRepoByUrl(tenant_id: string, repo_url: string): Promise<Repo | null> {
+    const row = (await this.db
       .prepare(
         `SELECT id, tenant_id, repo_url, name, default_branch, primary_language, local_path, config, created_at, deleted_at
          FROM ${REPOS_TABLE} WHERE tenant_id = ${this.ph(1)} AND repo_url = ${this.ph(2)} AND deleted_at IS NULL`,
       )
-      .get(tenant_id, repo_url) as (Omit<Repo, "config"> & { config: string }) | undefined;
+      .get(tenant_id, repo_url)) as (Omit<Repo, "config"> & { config: string }) | undefined;
     return row ? { ...row, config: jsonParse(row.config, {}) } : null;
   }
 
-  listRepos(tenant_id: string): Repo[] {
-    const rows = this.db
+  async listRepos(tenant_id: string): Promise<Repo[]> {
+    const rows = (await this.db
       .prepare(
         `SELECT id, tenant_id, repo_url, name, default_branch, primary_language, local_path, config, created_at, deleted_at
          FROM ${REPOS_TABLE} WHERE tenant_id = ${this.ph(1)} AND deleted_at IS NULL ORDER BY name ASC`,
       )
-      .all(tenant_id) as Array<Omit<Repo, "config"> & { config: string }>;
+      .all(tenant_id)) as Array<Omit<Repo, "config"> & { config: string }>;
     return rows.map((r) => ({ ...r, config: jsonParse(r.config, {}) }));
   }
 
-  softDeleteRepo(tenant_id: string, id: string): void {
-    this.db
+  async softDeleteRepo(tenant_id: string, id: string): Promise<void> {
+    await this.db
       .prepare(
         `UPDATE ${REPOS_TABLE} SET deleted_at = ${this.ph(1)} WHERE tenant_id = ${this.ph(2)} AND id = ${this.ph(3)}`,
       )
@@ -421,16 +424,16 @@ export class CodeIntelStore {
 
   // ── indexing runs ────────────────────────────────────────────────────────
 
-  beginIndexingRun(input: {
+  async beginIndexingRun(input: {
     id?: string;
     tenant_id: string;
     repo_id: string;
     branch: string;
     commit_sha?: string | null;
-  }): IndexingRun {
+  }): Promise<IndexingRun> {
     const id = input.id ?? randomUUID();
     const started_at = nowIso();
-    this.db
+    await this.db
       .prepare(
         `INSERT INTO ${RUNS_TABLE} (id, tenant_id, repo_id, branch, commit_sha, status, extractor_counts, started_at)
          VALUES (${this.phs(1, 8)})`,
@@ -464,15 +467,15 @@ export class CodeIntelStore {
    * to a different run for this (tenant, repo). This makes the new run the
    * sole "live" state atomically from the query surface's point of view.
    */
-  finalizeIndexingRun(input: {
+  async finalizeIndexingRun(input: {
     run_id: string;
     status: "ok" | "error" | "cancelled";
     extractor_counts?: Record<string, number>;
     error_msg?: string | null;
-  }): void {
+  }): Promise<void> {
     const finished_at = nowIso();
-    this.db.transaction(() => {
-      this.db
+    await this.db.transaction(async () => {
+      await this.db
         .prepare(
           `UPDATE ${RUNS_TABLE} SET status = ${this.ph(1)}, finished_at = ${this.ph(2)}, extractor_counts = ${this.ph(3)}, error_msg = ${this.ph(4)} WHERE id = ${this.ph(5)}`,
         )
@@ -487,9 +490,9 @@ export class CodeIntelStore {
       if (input.status !== "ok") return;
 
       // Find the run we just finalized to identify its (tenant, repo).
-      const run = this.db
+      const run = (await this.db
         .prepare(`SELECT tenant_id, repo_id FROM ${RUNS_TABLE} WHERE id = ${this.ph(1)}`)
-        .get(input.run_id) as { tenant_id: string; repo_id: string } | undefined;
+        .get(input.run_id)) as { tenant_id: string; repo_id: string } | undefined;
       if (!run) return;
 
       // Tables we soft-delete to let the latest run win. `embeddings` and
@@ -497,11 +500,11 @@ export class CodeIntelStore {
       const tables = [FILES_TABLE, SYMBOLS_TABLE, CHUNKS_TABLE, EDGES_TABLE, DEPS_TABLE, CONTRIB_TABLE, HOTSPOTS_TABLE];
       // Resolve prior runs once so the inner UPDATE doesn't carry a subquery
       // (subqueries with our placeholder helper would double-count parameters).
-      const priorRuns = this.db
+      const priorRuns = (await this.db
         .prepare(
           `SELECT id FROM ${RUNS_TABLE} WHERE tenant_id = ${this.ph(1)} AND repo_id = ${this.ph(2)} AND id != ${this.ph(3)}`,
         )
-        .all(run.tenant_id, run.repo_id, input.run_id) as Array<{ id: string }>;
+        .all(run.tenant_id, run.repo_id, input.run_id)) as Array<{ id: string }>;
       if (priorRuns.length === 0) return;
 
       for (const t of tables) {
@@ -512,44 +515,44 @@ export class CodeIntelStore {
                AND deleted_at IS NULL
                AND indexing_run_id IN (${placeholders})`;
         const params = [finished_at, run.tenant_id, ...priorRuns.map((r) => r.id)];
-        this.db.prepare(sql).run(...params);
+        await this.db.prepare(sql).run(...params);
       }
     });
   }
 
-  getIndexingRun(id: string): IndexingRun | null {
-    const row = this.db
+  async getIndexingRun(id: string): Promise<IndexingRun | null> {
+    const row = (await this.db
       .prepare(
         `SELECT id, tenant_id, repo_id, branch, commit_sha, status, extractor_counts, error_msg, started_at, finished_at
          FROM ${RUNS_TABLE} WHERE id = ${this.ph(1)}`,
       )
-      .get(id) as (Omit<IndexingRun, "extractor_counts"> & { extractor_counts: string }) | undefined;
+      .get(id)) as (Omit<IndexingRun, "extractor_counts"> & { extractor_counts: string }) | undefined;
     return row ? { ...row, extractor_counts: jsonParse(row.extractor_counts, {}) } : null;
   }
 
-  listIndexingRuns(tenant_id: string, repo_id?: string, limit = 50): IndexingRun[] {
+  async listIndexingRuns(tenant_id: string, repo_id?: string, limit = 50): Promise<IndexingRun[]> {
     const rows = repo_id
-      ? (this.db
+      ? ((await this.db
           .prepare(
             `SELECT id, tenant_id, repo_id, branch, commit_sha, status, extractor_counts, error_msg, started_at, finished_at
              FROM ${RUNS_TABLE} WHERE tenant_id = ${this.ph(1)} AND repo_id = ${this.ph(2)}
              ORDER BY started_at DESC, id DESC LIMIT ${this.ph(3)}`,
           )
-          .all(tenant_id, repo_id, limit) as Array<
+          .all(tenant_id, repo_id, limit)) as Array<
           Omit<IndexingRun, "extractor_counts"> & { extractor_counts: string }
         >)
-      : (this.db
+      : ((await this.db
           .prepare(
             `SELECT id, tenant_id, repo_id, branch, commit_sha, status, extractor_counts, error_msg, started_at, finished_at
              FROM ${RUNS_TABLE} WHERE tenant_id = ${this.ph(1)} ORDER BY started_at DESC, id DESC LIMIT ${this.ph(2)}`,
           )
-          .all(tenant_id, limit) as Array<Omit<IndexingRun, "extractor_counts"> & { extractor_counts: string }>);
+          .all(tenant_id, limit)) as Array<Omit<IndexingRun, "extractor_counts"> & { extractor_counts: string }>);
     return rows.map((r) => ({ ...r, extractor_counts: jsonParse(r.extractor_counts, {}) }));
   }
 
   // ── files ────────────────────────────────────────────────────────────────
 
-  insertFile(input: {
+  async insertFile(input: {
     id?: string;
     tenant_id: string;
     repo_id: string;
@@ -559,10 +562,10 @@ export class CodeIntelStore {
     language?: string | null;
     size_bytes?: number | null;
     indexing_run_id: string;
-  }): FileRow {
+  }): Promise<FileRow> {
     const id = input.id ?? randomUUID();
     const created_at = nowIso();
-    this.db
+    await this.db
       .prepare(
         `INSERT INTO ${FILES_TABLE} (id, tenant_id, repo_id, path, sha, mtime, language, size_bytes, indexing_run_id, created_at)
          VALUES (${this.phs(1, 10)})`,
@@ -594,37 +597,37 @@ export class CodeIntelStore {
     };
   }
 
-  getFile(tenant_id: string, id: string): FileRow | null {
-    const row = this.db
+  async getFile(tenant_id: string, id: string): Promise<FileRow | null> {
+    const row = (await this.db
       .prepare(
         `SELECT * FROM ${FILES_TABLE} WHERE tenant_id = ${this.ph(1)} AND id = ${this.ph(2)} AND deleted_at IS NULL`,
       )
-      .get(tenant_id, id) as FileRow | undefined;
+      .get(tenant_id, id)) as FileRow | undefined;
     return row ?? null;
   }
 
-  listFiles(tenant_id: string, repo_id: string, limit = 1000): FileRow[] {
-    return this.db
+  async listFiles(tenant_id: string, repo_id: string, limit = 1000): Promise<FileRow[]> {
+    return (await this.db
       .prepare(
         `SELECT * FROM ${FILES_TABLE} WHERE tenant_id = ${this.ph(1)} AND repo_id = ${this.ph(2)} AND deleted_at IS NULL
          ORDER BY path ASC LIMIT ${this.ph(3)}`,
       )
-      .all(tenant_id, repo_id, limit) as FileRow[];
+      .all(tenant_id, repo_id, limit)) as FileRow[];
   }
 
-  findFileByPath(tenant_id: string, repo_id: string, path: string): FileRow | null {
-    const row = this.db
+  async findFileByPath(tenant_id: string, repo_id: string, path: string): Promise<FileRow | null> {
+    const row = (await this.db
       .prepare(
         `SELECT * FROM ${FILES_TABLE} WHERE tenant_id = ${this.ph(1)} AND repo_id = ${this.ph(2)} AND path = ${this.ph(3)} AND deleted_at IS NULL
          ORDER BY created_at DESC LIMIT 1`,
       )
-      .get(tenant_id, repo_id, path) as FileRow | undefined;
+      .get(tenant_id, repo_id, path)) as FileRow | undefined;
     return row ?? null;
   }
 
   // ── symbols ──────────────────────────────────────────────────────────────
 
-  insertSymbol(input: {
+  async insertSymbol(input: {
     id?: string;
     tenant_id: string;
     file_id: string;
@@ -636,10 +639,10 @@ export class CodeIntelStore {
     line_end?: number | null;
     parent_symbol_id?: string | null;
     indexing_run_id: string;
-  }): SymbolRow {
+  }): Promise<SymbolRow> {
     const id = input.id ?? randomUUID();
     const created_at = nowIso();
-    this.db
+    await this.db
       .prepare(
         `INSERT INTO ${SYMBOLS_TABLE} (id, tenant_id, file_id, kind, name, fqn, signature, line_start, line_end, parent_symbol_id, indexing_run_id, created_at)
          VALUES (${this.phs(1, 12)})`,
@@ -675,25 +678,25 @@ export class CodeIntelStore {
     };
   }
 
-  listSymbolsByFile(tenant_id: string, file_id: string): SymbolRow[] {
-    return this.db
+  async listSymbolsByFile(tenant_id: string, file_id: string): Promise<SymbolRow[]> {
+    return (await this.db
       .prepare(
         `SELECT * FROM ${SYMBOLS_TABLE} WHERE tenant_id = ${this.ph(1)} AND file_id = ${this.ph(2)} AND deleted_at IS NULL ORDER BY line_start ASC`,
       )
-      .all(tenant_id, file_id) as SymbolRow[];
+      .all(tenant_id, file_id)) as SymbolRow[];
   }
 
-  findSymbolByName(tenant_id: string, name: string, limit = 50): SymbolRow[] {
-    return this.db
+  async findSymbolByName(tenant_id: string, name: string, limit = 50): Promise<SymbolRow[]> {
+    return (await this.db
       .prepare(
         `SELECT * FROM ${SYMBOLS_TABLE} WHERE tenant_id = ${this.ph(1)} AND name = ${this.ph(2)} AND deleted_at IS NULL LIMIT ${this.ph(3)}`,
       )
-      .all(tenant_id, name, limit) as SymbolRow[];
+      .all(tenant_id, name, limit)) as SymbolRow[];
   }
 
   // ── chunks ───────────────────────────────────────────────────────────────
 
-  insertChunk(input: {
+  async insertChunk(input: {
     id?: string;
     tenant_id: string;
     file_id: string;
@@ -708,12 +711,12 @@ export class CodeIntelStore {
     /** Optional FTS hints (path + symbol name) so search matches file paths + symbol names. */
     path_hint?: string;
     symbol_name?: string;
-  }): ChunkRow {
+  }): Promise<ChunkRow> {
     const id = input.id ?? randomUUID();
     const created_at = nowIso();
     const chunk_kind = input.chunk_kind ?? "code";
     const attrs = input.attrs ?? {};
-    this.db
+    await this.db
       .prepare(
         `INSERT INTO ${CHUNKS_TABLE} (id, tenant_id, file_id, symbol_id, parent_chunk_id, chunk_kind, content, line_start, line_end, attrs, indexing_run_id, created_at)
          VALUES (${this.phs(1, 12)})`,
@@ -735,7 +738,7 @@ export class CodeIntelStore {
     // SQLite FTS insert (content-linked table). Postgres uses generated tsvector
     // in the base table already; nothing to do there.
     if (this.dialect === "sqlite") {
-      this.db
+      await this.db
         .prepare(
           `INSERT INTO ${CHUNKS_FTS_TABLE} (chunk_id, tenant_id, content, path_hint, symbol_name) VALUES (?, ?, ?, ?, ?)`,
         )
@@ -758,23 +761,23 @@ export class CodeIntelStore {
     };
   }
 
-  getChunk(tenant_id: string, id: string): ChunkRow | null {
-    const row = this.db
+  async getChunk(tenant_id: string, id: string): Promise<ChunkRow | null> {
+    const row = (await this.db
       .prepare(
         `SELECT id, tenant_id, file_id, symbol_id, parent_chunk_id, chunk_kind, content, line_start, line_end, attrs, indexing_run_id, created_at, deleted_at
          FROM ${CHUNKS_TABLE} WHERE tenant_id = ${this.ph(1)} AND id = ${this.ph(2)} AND deleted_at IS NULL`,
       )
-      .get(tenant_id, id) as (Omit<ChunkRow, "attrs"> & { attrs: string }) | undefined;
+      .get(tenant_id, id)) as (Omit<ChunkRow, "attrs"> & { attrs: string }) | undefined;
     return row ? { ...row, attrs: jsonParse(row.attrs, {}) } : null;
   }
 
-  listChunksByFile(tenant_id: string, file_id: string): ChunkRow[] {
-    const rows = this.db
+  async listChunksByFile(tenant_id: string, file_id: string): Promise<ChunkRow[]> {
+    const rows = (await this.db
       .prepare(
         `SELECT id, tenant_id, file_id, symbol_id, parent_chunk_id, chunk_kind, content, line_start, line_end, attrs, indexing_run_id, created_at, deleted_at
          FROM ${CHUNKS_TABLE} WHERE tenant_id = ${this.ph(1)} AND file_id = ${this.ph(2)} AND deleted_at IS NULL ORDER BY line_start ASC`,
       )
-      .all(tenant_id, file_id) as Array<Omit<ChunkRow, "attrs"> & { attrs: string }>;
+      .all(tenant_id, file_id)) as Array<Omit<ChunkRow, "attrs"> & { attrs: string }>;
     return rows.map((r) => ({ ...r, attrs: jsonParse(r.attrs, {}) }));
   }
 
@@ -782,21 +785,21 @@ export class CodeIntelStore {
    * Simple FTS over chunks. SQLite uses fts5 MATCH; Postgres falls back to
    * plainto_tsquery against the generated tsvector column.
    */
-  searchChunks(tenant_id: string, query: string, limit = 50): Array<ChunkRow & { match_score: number }> {
+  async searchChunks(tenant_id: string, query: string, limit = 50): Promise<Array<ChunkRow & { match_score: number }>> {
     if (this.dialect === "sqlite") {
-      const rows = this.db
+      const rows = (await this.db
         .prepare(
           `SELECT c.id, c.tenant_id, c.file_id, c.symbol_id, c.parent_chunk_id, c.chunk_kind, c.content, c.line_start, c.line_end, c.attrs, c.indexing_run_id, c.created_at, c.deleted_at, bm25(${CHUNKS_FTS_TABLE}) AS match_score
            FROM ${CHUNKS_FTS_TABLE} f JOIN ${CHUNKS_TABLE} c ON c.id = f.chunk_id
            WHERE f.tenant_id = ? AND ${CHUNKS_FTS_TABLE} MATCH ? AND c.deleted_at IS NULL
            ORDER BY match_score ASC LIMIT ?`,
         )
-        .all(tenant_id, sanitizeFtsQuery(query), limit) as Array<
+        .all(tenant_id, sanitizeFtsQuery(query), limit)) as Array<
         Omit<ChunkRow, "attrs"> & { attrs: string; match_score: number }
       >;
       return rows.map((r) => ({ ...r, attrs: jsonParse(r.attrs, {}) }));
     }
-    const rows = this.db
+    const rows = (await this.db
       .prepare(
         `SELECT id, tenant_id, file_id, symbol_id, parent_chunk_id, chunk_kind, content, line_start, line_end, attrs, indexing_run_id, created_at, deleted_at,
                 ts_rank(fts_tsv, plainto_tsquery('english', $2)) AS match_score
@@ -804,13 +807,13 @@ export class CodeIntelStore {
          WHERE tenant_id = $1 AND fts_tsv @@ plainto_tsquery('english', $2) AND deleted_at IS NULL
          ORDER BY match_score DESC LIMIT $3`,
       )
-      .all(tenant_id, query, limit) as Array<Omit<ChunkRow, "attrs"> & { attrs: string; match_score: number }>;
+      .all(tenant_id, query, limit)) as Array<Omit<ChunkRow, "attrs"> & { attrs: string; match_score: number }>;
     return rows.map((r) => ({ ...r, attrs: jsonParse(r.attrs, {}) }));
   }
 
   // ── edges ────────────────────────────────────────────────────────────────
 
-  insertEdge(input: {
+  async insertEdge(input: {
     id?: string;
     tenant_id: string;
     source_kind: EntityKind;
@@ -822,12 +825,12 @@ export class CodeIntelStore {
     weight?: number;
     attrs?: Record<string, unknown>;
     indexing_run_id: string;
-  }): EdgeRow {
+  }): Promise<EdgeRow> {
     const id = input.id ?? randomUUID();
     const created_at = nowIso();
     const weight = input.weight ?? 1.0;
     const attrs = input.attrs ?? {};
-    this.db
+    await this.db
       .prepare(
         `INSERT INTO ${EDGES_TABLE} (id, tenant_id, source_kind, source_id, target_kind, target_id, relation, evidence_chunk_id, weight, attrs, indexing_run_id, created_at)
          VALUES (${this.phs(1, 12)})`,
@@ -863,39 +866,39 @@ export class CodeIntelStore {
     };
   }
 
-  listEdgesFrom(tenant_id: string, source_kind: EntityKind, source_id: string): EdgeRow[] {
-    const rows = this.db
+  async listEdgesFrom(tenant_id: string, source_kind: EntityKind, source_id: string): Promise<EdgeRow[]> {
+    const rows = (await this.db
       .prepare(
         `SELECT id, tenant_id, source_kind, source_id, target_kind, target_id, relation, evidence_chunk_id, weight, attrs, indexing_run_id, created_at, deleted_at
          FROM ${EDGES_TABLE} WHERE tenant_id = ${this.ph(1)} AND source_kind = ${this.ph(2)} AND source_id = ${this.ph(3)} AND deleted_at IS NULL`,
       )
-      .all(tenant_id, source_kind, source_id) as Array<Omit<EdgeRow, "attrs"> & { attrs: string }>;
+      .all(tenant_id, source_kind, source_id)) as Array<Omit<EdgeRow, "attrs"> & { attrs: string }>;
     return rows.map((r) => ({ ...r, attrs: jsonParse(r.attrs, {}) }));
   }
 
-  listEdgesTo(tenant_id: string, target_kind: EntityKind, target_id: string): EdgeRow[] {
-    const rows = this.db
+  async listEdgesTo(tenant_id: string, target_kind: EntityKind, target_id: string): Promise<EdgeRow[]> {
+    const rows = (await this.db
       .prepare(
         `SELECT id, tenant_id, source_kind, source_id, target_kind, target_id, relation, evidence_chunk_id, weight, attrs, indexing_run_id, created_at, deleted_at
          FROM ${EDGES_TABLE} WHERE tenant_id = ${this.ph(1)} AND target_kind = ${this.ph(2)} AND target_id = ${this.ph(3)} AND deleted_at IS NULL`,
       )
-      .all(tenant_id, target_kind, target_id) as Array<Omit<EdgeRow, "attrs"> & { attrs: string }>;
+      .all(tenant_id, target_kind, target_id)) as Array<Omit<EdgeRow, "attrs"> & { attrs: string }>;
     return rows.map((r) => ({ ...r, attrs: jsonParse(r.attrs, {}) }));
   }
 
   // ── external_refs ────────────────────────────────────────────────────────
 
-  insertExternalRef(input: {
+  async insertExternalRef(input: {
     id?: string;
     tenant_id: string;
     symbol_id: string;
     external_repo_hint?: string | null;
     external_fqn: string;
     indexing_run_id: string;
-  }): ExternalRefRow {
+  }): Promise<ExternalRefRow> {
     const id = input.id ?? randomUUID();
     const created_at = nowIso();
-    this.db
+    await this.db
       .prepare(
         `INSERT INTO ${EXT_REFS_TABLE} (id, tenant_id, symbol_id, external_repo_hint, external_fqn, indexing_run_id, created_at)
          VALUES (${this.phs(1, 7)})`,
@@ -922,16 +925,16 @@ export class CodeIntelStore {
     };
   }
 
-  listExternalRefs(tenant_id: string, onlyUnresolved = false): ExternalRefRow[] {
+  async listExternalRefs(tenant_id: string, onlyUnresolved = false): Promise<ExternalRefRow[]> {
     const sql = onlyUnresolved
       ? `SELECT * FROM ${EXT_REFS_TABLE} WHERE tenant_id = ${this.ph(1)} AND resolved_symbol_id IS NULL`
       : `SELECT * FROM ${EXT_REFS_TABLE} WHERE tenant_id = ${this.ph(1)}`;
-    return this.db.prepare(sql).all(tenant_id) as ExternalRefRow[];
+    return (await this.db.prepare(sql).all(tenant_id)) as ExternalRefRow[];
   }
 
   // ── embeddings ───────────────────────────────────────────────────────────
 
-  insertEmbedding(input: {
+  async insertEmbedding(input: {
     id?: string;
     tenant_id: string;
     subject_kind: SubjectKind;
@@ -941,10 +944,10 @@ export class CodeIntelStore {
     dim: number;
     vector: Uint8Array;
     indexing_run_id: string;
-  }): EmbeddingRow {
+  }): Promise<EmbeddingRow> {
     const id = input.id ?? randomUUID();
     const created_at = nowIso();
-    this.db
+    await this.db
       .prepare(
         `INSERT INTO ${EMBEDDINGS_TABLE} (id, tenant_id, subject_kind, subject_id, model, model_version, dim, vector, indexing_run_id, created_at)
          VALUES (${this.phs(1, 10)})`,
@@ -975,24 +978,24 @@ export class CodeIntelStore {
     };
   }
 
-  getEmbedding(
+  async getEmbedding(
     tenant_id: string,
     subject_kind: SubjectKind,
     subject_id: string,
     model: string,
     model_version: string,
-  ): EmbeddingRow | null {
-    const row = this.db
+  ): Promise<EmbeddingRow | null> {
+    const row = (await this.db
       .prepare(
         `SELECT * FROM ${EMBEDDINGS_TABLE} WHERE tenant_id = ${this.ph(1)} AND subject_kind = ${this.ph(2)} AND subject_id = ${this.ph(3)} AND model = ${this.ph(4)} AND model_version = ${this.ph(5)}`,
       )
-      .get(tenant_id, subject_kind, subject_id, model, model_version) as EmbeddingRow | undefined;
+      .get(tenant_id, subject_kind, subject_id, model, model_version)) as EmbeddingRow | undefined;
     return row ?? null;
   }
 
   // ── dependencies ─────────────────────────────────────────────────────────
 
-  insertDependency(input: {
+  async insertDependency(input: {
     id?: string;
     tenant_id: string;
     repo_id: string;
@@ -1003,11 +1006,11 @@ export class CodeIntelStore {
     resolved_version?: string | null;
     dep_type?: "prod" | "dev" | "peer" | "optional";
     indexing_run_id: string;
-  }): DependencyRow {
+  }): Promise<DependencyRow> {
     const id = input.id ?? randomUUID();
     const created_at = nowIso();
     const dep_type = input.dep_type ?? "prod";
-    this.db
+    await this.db
       .prepare(
         `INSERT INTO ${DEPS_TABLE} (id, tenant_id, repo_id, file_id, manifest_kind, name, version_constraint, resolved_version, dep_type, indexing_run_id, created_at)
          VALUES (${this.phs(1, 11)})`,
@@ -1041,30 +1044,30 @@ export class CodeIntelStore {
     };
   }
 
-  listDependencies(tenant_id: string, repo_id: string): DependencyRow[] {
-    return this.db
+  async listDependencies(tenant_id: string, repo_id: string): Promise<DependencyRow[]> {
+    return (await this.db
       .prepare(
         `SELECT * FROM ${DEPS_TABLE} WHERE tenant_id = ${this.ph(1)} AND repo_id = ${this.ph(2)} AND deleted_at IS NULL ORDER BY manifest_kind, name`,
       )
-      .all(tenant_id, repo_id) as DependencyRow[];
+      .all(tenant_id, repo_id)) as DependencyRow[];
   }
 
   // ── people ───────────────────────────────────────────────────────────────
 
-  upsertPerson(input: {
+  async upsertPerson(input: {
     id?: string;
     tenant_id: string;
     primary_email: string;
     name?: string | null;
     alt_emails?: string[];
     alt_names?: string[];
-  }): PersonRow {
-    const existing = this.db
+  }): Promise<PersonRow> {
+    const existing = (await this.db
       .prepare(
         `SELECT id, tenant_id, primary_email, name, alt_emails, alt_names, created_at FROM ${PEOPLE_TABLE}
          WHERE tenant_id = ${this.ph(1)} AND primary_email = ${this.ph(2)}`,
       )
-      .get(input.tenant_id, input.primary_email) as
+      .get(input.tenant_id, input.primary_email)) as
       | (Omit<PersonRow, "alt_emails" | "alt_names"> & { alt_emails: string; alt_names: string })
       | undefined;
     if (existing) {
@@ -1078,7 +1081,7 @@ export class CodeIntelStore {
     const created_at = nowIso();
     const alt_emails = input.alt_emails ?? [];
     const alt_names = input.alt_names ?? [];
-    this.db
+    await this.db
       .prepare(
         `INSERT INTO ${PEOPLE_TABLE} (id, tenant_id, primary_email, name, alt_emails, alt_names, created_at) VALUES (${this.phs(1, 7)})`,
       )
@@ -1102,12 +1105,14 @@ export class CodeIntelStore {
     };
   }
 
-  listPeople(tenant_id: string): PersonRow[] {
-    const rows = this.db
+  async listPeople(tenant_id: string): Promise<PersonRow[]> {
+    const rows = (await this.db
       .prepare(
         `SELECT id, tenant_id, primary_email, name, alt_emails, alt_names, created_at FROM ${PEOPLE_TABLE} WHERE tenant_id = ${this.ph(1)} ORDER BY name`,
       )
-      .all(tenant_id) as Array<Omit<PersonRow, "alt_emails" | "alt_names"> & { alt_emails: string; alt_names: string }>;
+      .all(tenant_id)) as Array<
+      Omit<PersonRow, "alt_emails" | "alt_names"> & { alt_emails: string; alt_names: string }
+    >;
     return rows.map((r) => ({
       ...r,
       alt_emails: jsonParse(r.alt_emails, [] as string[]),
@@ -1117,7 +1122,7 @@ export class CodeIntelStore {
 
   // ── contributions ───────────────────────────────────────────────────────
 
-  insertContribution(input: {
+  async insertContribution(input: {
     id?: string;
     tenant_id: string;
     person_id: string;
@@ -1129,13 +1134,13 @@ export class CodeIntelStore {
     first_commit?: string | null;
     last_commit?: string | null;
     indexing_run_id: string;
-  }): ContributionRow {
+  }): Promise<ContributionRow> {
     const id = input.id ?? randomUUID();
     const created_at = nowIso();
     const commit_count = input.commit_count ?? 0;
     const loc_added = input.loc_added ?? 0;
     const loc_removed = input.loc_removed ?? 0;
-    this.db
+    await this.db
       .prepare(
         `INSERT INTO ${CONTRIB_TABLE} (id, tenant_id, person_id, repo_id, file_id, commit_count, loc_added, loc_removed, first_commit, last_commit, indexing_run_id, created_at)
          VALUES (${this.phs(1, 12)})`,
@@ -1171,27 +1176,27 @@ export class CodeIntelStore {
     };
   }
 
-  listContributionsForRepo(tenant_id: string, repo_id: string, limit = 100): ContributionRow[] {
-    return this.db
+  async listContributionsForRepo(tenant_id: string, repo_id: string, limit = 100): Promise<ContributionRow[]> {
+    return (await this.db
       .prepare(
         `SELECT * FROM ${CONTRIB_TABLE} WHERE tenant_id = ${this.ph(1)} AND repo_id = ${this.ph(2)} AND file_id IS NULL AND deleted_at IS NULL
          ORDER BY commit_count DESC LIMIT ${this.ph(3)}`,
       )
-      .all(tenant_id, repo_id, limit) as ContributionRow[];
+      .all(tenant_id, repo_id, limit)) as ContributionRow[];
   }
 
-  listContributionsForFile(tenant_id: string, file_id: string, limit = 20): ContributionRow[] {
-    return this.db
+  async listContributionsForFile(tenant_id: string, file_id: string, limit = 20): Promise<ContributionRow[]> {
+    return (await this.db
       .prepare(
         `SELECT * FROM ${CONTRIB_TABLE} WHERE tenant_id = ${this.ph(1)} AND file_id = ${this.ph(2)} AND deleted_at IS NULL
          ORDER BY commit_count DESC LIMIT ${this.ph(3)}`,
       )
-      .all(tenant_id, file_id, limit) as ContributionRow[];
+      .all(tenant_id, file_id, limit)) as ContributionRow[];
   }
 
   // ── hotspots ─────────────────────────────────────────────────────────────
 
-  insertHotspot(input: {
+  async insertHotspot(input: {
     id?: string;
     tenant_id: string;
     file_id: string;
@@ -1201,10 +1206,10 @@ export class CodeIntelStore {
     lines_touched: number;
     risk_score: number;
     indexing_run_id: string;
-  }): HotspotRow {
+  }): Promise<HotspotRow> {
     const id = input.id ?? randomUUID();
     const computed_at = nowIso();
-    this.db
+    await this.db
       .prepare(
         `INSERT INTO ${HOTSPOTS_TABLE} (id, tenant_id, file_id, change_count_30d, change_count_90d, authors_count, lines_touched, risk_score, computed_at, indexing_run_id)
          VALUES (${this.phs(1, 10)})`,
@@ -1224,30 +1229,30 @@ export class CodeIntelStore {
     return { ...input, id, computed_at, deleted_at: null };
   }
 
-  getHotspotForFile(tenant_id: string, file_id: string): HotspotRow | null {
-    const row = this.db
+  async getHotspotForFile(tenant_id: string, file_id: string): Promise<HotspotRow | null> {
+    const row = (await this.db
       .prepare(
         `SELECT * FROM ${HOTSPOTS_TABLE} WHERE tenant_id = ${this.ph(1)} AND file_id = ${this.ph(2)} AND deleted_at IS NULL ORDER BY computed_at DESC LIMIT 1`,
       )
-      .get(tenant_id, file_id) as HotspotRow | undefined;
+      .get(tenant_id, file_id)) as HotspotRow | undefined;
     return row ?? null;
   }
 
   // ── workspaces (Wave 2a) ─────────────────────────────────────────────────
 
-  createWorkspace(input: {
+  async createWorkspace(input: {
     id?: string;
     tenant_id: string;
     slug: string;
     name: string;
     description?: string | null;
     config?: Record<string, unknown>;
-  }): Workspace {
+  }): Promise<Workspace> {
     const id = input.id ?? randomUUID();
     const created_at = nowIso();
     const description = input.description ?? null;
     const config = input.config ?? {};
-    this.db
+    await this.db
       .prepare(
         `INSERT INTO ${WORKSPACES_TABLE} (id, tenant_id, slug, name, description, config, created_at)
          VALUES (${this.phs(1, 7)})`,
@@ -1265,33 +1270,33 @@ export class CodeIntelStore {
     };
   }
 
-  getWorkspace(id: string): Workspace | null {
-    const row = this.db
+  async getWorkspace(id: string): Promise<Workspace | null> {
+    const row = (await this.db
       .prepare(
         `SELECT id, tenant_id, slug, name, description, config, created_at, deleted_at
          FROM ${WORKSPACES_TABLE} WHERE id = ${this.ph(1)} AND deleted_at IS NULL`,
       )
-      .get(id) as (Omit<Workspace, "config"> & { config: string }) | undefined;
+      .get(id)) as (Omit<Workspace, "config"> & { config: string }) | undefined;
     return row ? { ...row, config: jsonParse(row.config, {}) } : null;
   }
 
-  getWorkspaceBySlug(tenant_id: string, slug: string): Workspace | null {
-    const row = this.db
+  async getWorkspaceBySlug(tenant_id: string, slug: string): Promise<Workspace | null> {
+    const row = (await this.db
       .prepare(
         `SELECT id, tenant_id, slug, name, description, config, created_at, deleted_at
          FROM ${WORKSPACES_TABLE} WHERE tenant_id = ${this.ph(1)} AND slug = ${this.ph(2)} AND deleted_at IS NULL`,
       )
-      .get(tenant_id, slug) as (Omit<Workspace, "config"> & { config: string }) | undefined;
+      .get(tenant_id, slug)) as (Omit<Workspace, "config"> & { config: string }) | undefined;
     return row ? { ...row, config: jsonParse(row.config, {}) } : null;
   }
 
-  listWorkspaces(tenant_id: string): Workspace[] {
-    const rows = this.db
+  async listWorkspaces(tenant_id: string): Promise<Workspace[]> {
+    const rows = (await this.db
       .prepare(
         `SELECT id, tenant_id, slug, name, description, config, created_at, deleted_at
          FROM ${WORKSPACES_TABLE} WHERE tenant_id = ${this.ph(1)} AND deleted_at IS NULL ORDER BY slug ASC`,
       )
-      .all(tenant_id) as Array<Omit<Workspace, "config"> & { config: string }>;
+      .all(tenant_id)) as Array<Omit<Workspace, "config"> & { config: string }>;
     return rows.map((r) => ({ ...r, config: jsonParse(r.config, {}) }));
   }
 
@@ -1301,10 +1306,10 @@ export class CodeIntelStore {
    * with `force`, repos are detached (`workspace_id = NULL`) and the
    * workspace is marked deleted.
    */
-  softDeleteWorkspace(id: string, opts: { force?: boolean } = {}): void {
-    const attached = this.db
+  async softDeleteWorkspace(id: string, opts: { force?: boolean } = {}): Promise<void> {
+    const attached = (await this.db
       .prepare(`SELECT COUNT(*) AS n FROM ${REPOS_TABLE} WHERE workspace_id = ${this.ph(1)} AND deleted_at IS NULL`)
-      .get(id) as { n: number } | undefined;
+      .get(id)) as { n: number } | undefined;
     const attachedCount = attached?.n ?? 0;
     if (attachedCount > 0 && !opts.force) {
       throw new Error(
@@ -1312,56 +1317,58 @@ export class CodeIntelStore {
       );
     }
     const now = nowIso();
-    this.db.transaction(() => {
+    await this.db.transaction(async () => {
       if (attachedCount > 0) {
-        this.db.prepare(`UPDATE ${REPOS_TABLE} SET workspace_id = NULL WHERE workspace_id = ${this.ph(1)}`).run(id);
+        await this.db
+          .prepare(`UPDATE ${REPOS_TABLE} SET workspace_id = NULL WHERE workspace_id = ${this.ph(1)}`)
+          .run(id);
       }
-      this.db
+      await this.db
         .prepare(`UPDATE ${WORKSPACES_TABLE} SET deleted_at = ${this.ph(1)} WHERE id = ${this.ph(2)}`)
         .run(now, id);
     });
   }
 
   /** Attach a repo to a workspace. Both must belong to the same tenant. */
-  addRepoToWorkspace(repo_id: string, workspace_id: string): void {
-    const repo = this.db.prepare(`SELECT tenant_id FROM ${REPOS_TABLE} WHERE id = ${this.ph(1)}`).get(repo_id) as
-      | { tenant_id: string }
-      | undefined;
+  async addRepoToWorkspace(repo_id: string, workspace_id: string): Promise<void> {
+    const repo = (await this.db
+      .prepare(`SELECT tenant_id FROM ${REPOS_TABLE} WHERE id = ${this.ph(1)}`)
+      .get(repo_id)) as { tenant_id: string } | undefined;
     if (!repo) throw new Error(`repo ${repo_id} not found`);
-    const ws = this.db
+    const ws = (await this.db
       .prepare(`SELECT tenant_id FROM ${WORKSPACES_TABLE} WHERE id = ${this.ph(1)} AND deleted_at IS NULL`)
-      .get(workspace_id) as { tenant_id: string } | undefined;
+      .get(workspace_id)) as { tenant_id: string } | undefined;
     if (!ws) throw new Error(`workspace ${workspace_id} not found`);
     if (repo.tenant_id !== ws.tenant_id) {
       throw new Error(`repo and workspace belong to different tenants`);
     }
-    this.db
+    await this.db
       .prepare(`UPDATE ${REPOS_TABLE} SET workspace_id = ${this.ph(1)} WHERE id = ${this.ph(2)}`)
       .run(workspace_id, repo_id);
   }
 
   /** Detach a repo from whatever workspace currently owns it. */
-  removeRepoFromWorkspace(repo_id: string): void {
-    this.db.prepare(`UPDATE ${REPOS_TABLE} SET workspace_id = NULL WHERE id = ${this.ph(1)}`).run(repo_id);
+  async removeRepoFromWorkspace(repo_id: string): Promise<void> {
+    await this.db.prepare(`UPDATE ${REPOS_TABLE} SET workspace_id = NULL WHERE id = ${this.ph(1)}`).run(repo_id);
   }
 
   /** Return `workspace_id` for a repo (null if unattached or unknown). */
-  getRepoWorkspaceId(repo_id: string): string | null {
-    const row = this.db.prepare(`SELECT workspace_id FROM ${REPOS_TABLE} WHERE id = ${this.ph(1)}`).get(repo_id) as
-      | { workspace_id: string | null }
-      | undefined;
+  async getRepoWorkspaceId(repo_id: string): Promise<string | null> {
+    const row = (await this.db
+      .prepare(`SELECT workspace_id FROM ${REPOS_TABLE} WHERE id = ${this.ph(1)}`)
+      .get(repo_id)) as { workspace_id: string | null } | undefined;
     return row?.workspace_id ?? null;
   }
 
   /** List repos attached to a workspace. Tenant-scoped to belt-and-braces. */
-  listReposInWorkspace(tenant_id: string, workspace_id: string): Repo[] {
-    const rows = this.db
+  async listReposInWorkspace(tenant_id: string, workspace_id: string): Promise<Repo[]> {
+    const rows = (await this.db
       .prepare(
         `SELECT id, tenant_id, repo_url, name, default_branch, primary_language, local_path, config, created_at, deleted_at
          FROM ${REPOS_TABLE} WHERE tenant_id = ${this.ph(1)} AND workspace_id = ${this.ph(2)} AND deleted_at IS NULL
          ORDER BY name ASC`,
       )
-      .all(tenant_id, workspace_id) as Array<Omit<Repo, "config"> & { config: string }>;
+      .all(tenant_id, workspace_id)) as Array<Omit<Repo, "config"> & { config: string }>;
     return rows.map((r) => ({ ...r, config: jsonParse(r.config, {}) }));
   }
 
@@ -1382,7 +1389,7 @@ export class CodeIntelStore {
    * path; they just pass `generated_by: 'llm' | 'hybrid'` plus a `model`
    * and an optional `generated_from_run_id`.
    */
-  upsertPlatformDoc(input: {
+  async upsertPlatformDoc(input: {
     id?: string;
     tenant_id: string;
     workspace_id: string;
@@ -1393,7 +1400,7 @@ export class CodeIntelStore {
     generated_by?: PlatformDocFlavor;
     generated_from_run_id?: string | null;
     model?: string | null;
-  }): PlatformDoc {
+  }): Promise<PlatformDoc> {
     const id = input.id ?? randomUUID();
     const generated_at = nowIso();
     const source = input.source ?? {};
@@ -1402,39 +1409,39 @@ export class CodeIntelStore {
     const model = input.model ?? null;
 
     let created: PlatformDoc | null = null;
-    this.db.transaction(() => {
+    await this.db.transaction(async () => {
       // Find the previous active row (there can be at most one live per
       // workspace/doc_type thanks to the partial unique index).
-      const previousActive = this.db
+      const previousActive = (await this.db
         .prepare(
           `SELECT id FROM ${PLATFORM_DOCS_TABLE}
            WHERE workspace_id = ${this.ph(1)} AND doc_type = ${this.ph(2)} AND deleted_at IS NULL`,
         )
-        .get(input.workspace_id, input.doc_type) as { id: string } | undefined;
+        .get(input.workspace_id, input.doc_type)) as { id: string } | undefined;
 
       // Determine the next version by walking all past rows for this
       // (workspace_id, doc_type) -- including soft-deleted ones -- and
       // taking max(version)+1.
-      const versionRow = this.db
+      const versionRow = (await this.db
         .prepare(
           `SELECT COALESCE(MAX(v.version), 0) AS max_version
              FROM ${PLATFORM_DOCS_TABLE} d
              LEFT JOIN ${PLATFORM_DOC_VERSIONS_TABLE} v ON v.doc_id = d.id
              WHERE d.workspace_id = ${this.ph(1)} AND d.doc_type = ${this.ph(2)}`,
         )
-        .get(input.workspace_id, input.doc_type) as { max_version: number | null } | undefined;
+        .get(input.workspace_id, input.doc_type)) as { max_version: number | null } | undefined;
       const nextVersion = (versionRow?.max_version ?? 0) + 1;
 
       // Soft-delete the previous active row so the partial unique index
       // stays satisfied for the new insert.
       if (previousActive) {
-        this.db
+        await this.db
           .prepare(`UPDATE ${PLATFORM_DOCS_TABLE} SET deleted_at = ${this.ph(1)} WHERE id = ${this.ph(2)}`)
           .run(generated_at, previousActive.id);
       }
 
       // Insert the new active row.
-      this.db
+      await this.db
         .prepare(
           `INSERT INTO ${PLATFORM_DOCS_TABLE}
              (id, tenant_id, workspace_id, doc_type, title, content_md, source, generated_by, generated_from_run_id, model, generated_at)
@@ -1455,7 +1462,7 @@ export class CodeIntelStore {
         );
 
       // Append an immutable version snapshot.
-      this.db
+      await this.db
         .prepare(
           `INSERT INTO ${PLATFORM_DOC_VERSIONS_TABLE} (id, doc_id, version, content_md, generated_at)
            VALUES (${this.phs(1, 5)})`,
@@ -1481,28 +1488,28 @@ export class CodeIntelStore {
   }
 
   /** Get the currently-active doc for a (workspace_id, doc_type). */
-  getPlatformDoc(workspace_id: string, doc_type: string): PlatformDoc | null {
-    const row = this.db
+  async getPlatformDoc(workspace_id: string, doc_type: string): Promise<PlatformDoc | null> {
+    const row = (await this.db
       .prepare(
         `SELECT id, tenant_id, workspace_id, doc_type, title, content_md, source, generated_by, generated_from_run_id, model, generated_at, deleted_at
            FROM ${PLATFORM_DOCS_TABLE}
            WHERE workspace_id = ${this.ph(1)} AND doc_type = ${this.ph(2)} AND deleted_at IS NULL
            LIMIT 1`,
       )
-      .get(workspace_id, doc_type) as (Omit<PlatformDoc, "source"> & { source: string }) | undefined;
+      .get(workspace_id, doc_type)) as (Omit<PlatformDoc, "source"> & { source: string }) | undefined;
     return row ? { ...row, source: jsonParse(row.source, {}) } : null;
   }
 
   /** List every active doc in a workspace, ordered by doc_type for determinism. */
-  listPlatformDocs(workspace_id: string): PlatformDoc[] {
-    const rows = this.db
+  async listPlatformDocs(workspace_id: string): Promise<PlatformDoc[]> {
+    const rows = (await this.db
       .prepare(
         `SELECT id, tenant_id, workspace_id, doc_type, title, content_md, source, generated_by, generated_from_run_id, model, generated_at, deleted_at
            FROM ${PLATFORM_DOCS_TABLE}
            WHERE workspace_id = ${this.ph(1)} AND deleted_at IS NULL
            ORDER BY doc_type ASC`,
       )
-      .all(workspace_id) as Array<Omit<PlatformDoc, "source"> & { source: string }>;
+      .all(workspace_id)) as Array<Omit<PlatformDoc, "source"> & { source: string }>;
     return rows.map((r) => ({ ...r, source: jsonParse(r.source, {}) }));
   }
 
@@ -1511,15 +1518,15 @@ export class CodeIntelStore {
    * full immutable snapshot history of the *doc row* itself (NOT the whole
    * workspace/doc_type timeline; use `listDocVersionsByType` for that).
    */
-  listDocVersions(doc_id: string): PlatformDocVersion[] {
-    return this.db
+  async listDocVersions(doc_id: string): Promise<PlatformDocVersion[]> {
+    return (await this.db
       .prepare(
         `SELECT id, doc_id, version, content_md, generated_at
            FROM ${PLATFORM_DOC_VERSIONS_TABLE}
            WHERE doc_id = ${this.ph(1)}
            ORDER BY version ASC`,
       )
-      .all(doc_id) as PlatformDocVersion[];
+      .all(doc_id)) as PlatformDocVersion[];
   }
 
   /**
@@ -1529,8 +1536,8 @@ export class CodeIntelStore {
    * monotonically increasing per (workspace_id, doc_type), a single walk
    * over every `platform_docs` row for the key pairs their snapshots up.
    */
-  listDocVersionsByType(workspace_id: string, doc_type: string): PlatformDocVersion[] {
-    return this.db
+  async listDocVersionsByType(workspace_id: string, doc_type: string): Promise<PlatformDocVersion[]> {
+    return (await this.db
       .prepare(
         `SELECT v.id, v.doc_id, v.version, v.content_md, v.generated_at
            FROM ${PLATFORM_DOC_VERSIONS_TABLE} v
@@ -1538,18 +1545,18 @@ export class CodeIntelStore {
            WHERE d.workspace_id = ${this.ph(1)} AND d.doc_type = ${this.ph(2)}
            ORDER BY v.version ASC`,
       )
-      .all(workspace_id, doc_type) as PlatformDocVersion[];
+      .all(workspace_id, doc_type)) as PlatformDocVersion[];
   }
 
   /** Fetch one specific snapshot of a doc by `doc_id` + `version`. */
-  getDocVersion(doc_id: string, version: number): PlatformDocVersion | null {
-    const row = this.db
+  async getDocVersion(doc_id: string, version: number): Promise<PlatformDocVersion | null> {
+    const row = (await this.db
       .prepare(
         `SELECT id, doc_id, version, content_md, generated_at
            FROM ${PLATFORM_DOC_VERSIONS_TABLE}
            WHERE doc_id = ${this.ph(1)} AND version = ${this.ph(2)}`,
       )
-      .get(doc_id, version) as PlatformDocVersion | undefined;
+      .get(doc_id, version)) as PlatformDocVersion | undefined;
     return row ?? null;
   }
 

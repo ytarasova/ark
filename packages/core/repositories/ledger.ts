@@ -74,17 +74,24 @@ export class LedgerRepository {
     return this.tenantId;
   }
 
-  load(conductorId: string): Ledger {
-    const rows = this.db
-      .prepare("SELECT * FROM ledger_entries WHERE conductor_id = ? AND tenant_id = ? ORDER BY created_at ASC, id ASC")
-      .all(conductorId, this.tenantId) as LedgerEntryRow[];
+  async load(conductorId: string): Promise<Ledger> {
+    const rows = (await this.db
+      .prepare(
+        "SELECT * FROM ledger_entries WHERE conductor_id = ? AND tenant_id = ? ORDER BY created_at ASC, id ASC",
+      )
+      .all(conductorId, this.tenantId)) as LedgerEntryRow[];
     const entries = rows.map(rowToEntry);
     const stallCount = entries.filter((e) => e.type === "stall").length;
     const lastActivity = entries.length > 0 ? entries[entries.length - 1].updatedAt : new Date().toISOString();
     return { conductorId, entries, lastActivity, stallCount };
   }
 
-  addEntry(conductorId: string, type: LedgerEntryType, content: string, sessionId?: string): LedgerEntry {
+  async addEntry(
+    conductorId: string,
+    type: LedgerEntryType,
+    content: string,
+    sessionId?: string,
+  ): Promise<LedgerEntry> {
     const ts = now();
     const entry: LedgerEntry = {
       id: `le-${nanoid(10)}`,
@@ -95,7 +102,7 @@ export class LedgerRepository {
       createdAt: ts,
       updatedAt: ts,
     };
-    this.db
+    await this.db
       .prepare(
         `INSERT INTO ledger_entries
            (id, conductor_id, tenant_id, type, content, status, session_id, created_at, updated_at)
@@ -115,14 +122,16 @@ export class LedgerRepository {
     return entry;
   }
 
-  updateEntry(
+  async updateEntry(
     conductorId: string,
     entryId: string,
     updates: Partial<Pick<LedgerEntry, "type" | "content" | "status" | "sessionId">>,
-  ): void {
-    const existing = this.db
-      .prepare("SELECT * FROM ledger_entries WHERE id = ? AND conductor_id = ? AND tenant_id = ?")
-      .get(entryId, conductorId, this.tenantId) as LedgerEntryRow | undefined;
+  ): Promise<void> {
+    const existing = (await this.db
+      .prepare(
+        "SELECT * FROM ledger_entries WHERE id = ? AND conductor_id = ? AND tenant_id = ?",
+      )
+      .get(entryId, conductorId, this.tenantId)) as LedgerEntryRow | undefined;
     if (!existing) return;
     const merged: LedgerEntryRow = {
       ...existing,
@@ -132,7 +141,7 @@ export class LedgerRepository {
       session_id: updates.sessionId !== undefined ? (updates.sessionId ?? null) : existing.session_id,
       updated_at: now(),
     };
-    this.db
+    await this.db
       .prepare(
         `UPDATE ledger_entries SET type = ?, content = ?, status = ?, session_id = ?, updated_at = ?
          WHERE id = ? AND conductor_id = ? AND tenant_id = ?`,
@@ -155,36 +164,40 @@ export class LedgerRepository {
    * transition from "not stalled" to "stalled" so downstream consumers can
    * see the transition in the ledger.
    */
-  detectStall(conductorId: string, thresholdMinutes: number = 10): boolean {
-    const lastProgressRow = this.db
+  async detectStall(conductorId: string, thresholdMinutes: number = 10): Promise<boolean> {
+    const lastProgressRow = (await this.db
       .prepare(
         `SELECT * FROM ledger_entries
          WHERE conductor_id = ? AND tenant_id = ? AND type = 'progress'
          ORDER BY created_at DESC, id DESC LIMIT 1`,
       )
-      .get(conductorId, this.tenantId) as LedgerEntryRow | undefined;
+      .get(conductorId, this.tenantId)) as LedgerEntryRow | undefined;
     if (!lastProgressRow) return false;
 
     const elapsed = Date.now() - new Date(lastProgressRow.created_at).getTime();
     const stalled = elapsed > thresholdMinutes * 60 * 1000;
     if (!stalled) return false;
 
-    const stallCountRow = this.db
-      .prepare("SELECT COUNT(*) AS c FROM ledger_entries WHERE conductor_id = ? AND tenant_id = ? AND type = 'stall'")
-      .get(conductorId, this.tenantId) as { c: number };
+    const stallCountRow = (await this.db
+      .prepare(
+        "SELECT COUNT(*) AS c FROM ledger_entries WHERE conductor_id = ? AND tenant_id = ? AND type = 'stall'",
+      )
+      .get(conductorId, this.tenantId)) as { c: number };
     if (stallCountRow.c === 0) {
-      this.addEntry(conductorId, "stall", `No progress for ${thresholdMinutes} minutes`);
+      await this.addEntry(conductorId, "stall", `No progress for ${thresholdMinutes} minutes`);
     }
     return true;
   }
 
   /** Markdown summary for injection into the conductor prompt. Empty string if the ledger is empty. */
-  formatPrompt(conductorId: string): string {
-    const ledger = this.load(conductorId);
+  async formatPrompt(conductorId: string): Promise<string> {
+    const ledger = await this.load(conductorId);
     if (ledger.entries.length === 0) return "";
 
     const facts = ledger.entries.filter((e) => e.type === "fact").map((e) => `- ${e.content}`);
-    const plan = ledger.entries.filter((e) => e.type === "plan_step").map((e) => `- [${e.status}] ${e.content}`);
+    const plan = ledger.entries
+      .filter((e) => e.type === "plan_step")
+      .map((e) => `- [${e.status}] ${e.content}`);
     const recent = ledger.entries.slice(-5).map((e) => `- [${e.type}] ${e.content}`);
 
     let out = "\n## Task Ledger\n";
@@ -198,8 +211,8 @@ export class LedgerRepository {
   }
 
   /** Wipe every entry for a conductor. Used by tests + cleanup paths. */
-  delete(conductorId: string): void {
-    this.db
+  async delete(conductorId: string): Promise<void> {
+    await this.db
       .prepare("DELETE FROM ledger_entries WHERE conductor_id = ? AND tenant_id = ?")
       .run(conductorId, this.tenantId);
   }

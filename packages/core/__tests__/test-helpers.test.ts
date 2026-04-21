@@ -43,7 +43,7 @@ describe("withTestContext", () => {
 
 // ── waitFor ─────────────────────────────────────────────────────────────────
 
-describe("waitFor", () => {
+describe("waitFor", async () => {
   it("resolves immediately when condition is already true", async () => {
     const start = Date.now();
     await waitFor(() => true);
@@ -69,11 +69,13 @@ describe("waitFor", () => {
   });
 
   it("throws after timeout if condition never becomes true", async () => {
-    await expect(waitFor(() => false, { timeout: 100, interval: 10 })).rejects.toThrow("waitFor timed out after 100ms");
+    (await expect(waitFor(() => false, { timeout: 100, interval: 10 }))).rejects.toThrow(
+      "waitFor timed out after 100ms",
+    );
   });
 
   it("throws with custom message on timeout", async () => {
-    await expect(waitFor(() => false, { timeout: 50, interval: 10, message: "custom failure" })).rejects.toThrow(
+    (await expect(waitFor(() => false, { timeout: 50, interval: 10, message: "custom failure" }))).rejects.toThrow(
       "custom failure",
     );
   });

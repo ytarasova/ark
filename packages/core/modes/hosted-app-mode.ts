@@ -8,8 +8,26 @@
  * with a consistent `RpcError` via the shared wrapper.
  */
 
-import type { AppMode, DatabaseMode, TenantResolverCapability } from "./app-mode.js";
+import type {
+  AppMode,
+  ComputeBootstrapCapability,
+  DatabaseMode,
+  TenantResolverCapability,
+} from "./app-mode.js";
 import { resolveBearerAuth } from "./app-mode.js";
+import { buildMigrationsCapability } from "./migrations-capability.js";
+
+/**
+ * Hosted compute bootstrap is intentionally a no-op. The operator
+ * registers real compute targets (k8s / docker / ec2 / firecracker) post-
+ * onboarding via `ark compute add`. We never silently seed a `local` row
+ * because "local" inside a control-plane pod means agents would spawn in
+ * the control-plane container itself -- no isolation, competes with the
+ * control plane for resources.
+ */
+function makeNoopComputeBootstrap(): ComputeBootstrapCapability {
+  return { seed: async () => undefined };
+}
 
 /**
  * Hosted multi-tenant resolver.
@@ -25,7 +43,7 @@ import { resolveBearerAuth } from "./app-mode.js";
  */
 function makeHostedTenantResolver(): TenantResolverCapability {
   return {
-    resolve({ authHeader, tenantHeader, validateToken }) {
+    async resolve({ authHeader, tenantHeader, validateToken }) {
       if (authHeader) return resolveBearerAuth(authHeader, tenantHeader, validateToken);
       if (tenantHeader) {
         return {
@@ -48,6 +66,8 @@ export function buildHostedAppMode(database: DatabaseMode): AppMode {
     repoMapCapability: null,
     ftsRebuildCapability: null,
     hostCommandCapability: null,
+    computeBootstrap: makeNoopComputeBootstrap(),
+    migrations: buildMigrationsCapability("postgres"),
     tenantResolver: makeHostedTenantResolver(),
     database,
   };

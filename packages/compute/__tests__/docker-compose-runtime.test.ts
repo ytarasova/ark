@@ -199,7 +199,7 @@ describe("DockerComposeRuntime -- identity", () => {
 
 // ── prepare (happy paths) ───────────────────────────────────────────────────
 
-describe("DockerComposeRuntime.prepare -- file only", () => {
+describe("DockerComposeRuntime.prepare -- file only", async () => {
   it("passes the resolved compose file to composeUpWithFiles and does not write an inline tempfile", async () => {
     writeArc({ compose: true });
     const { runtime, calls } = makeRuntime();
@@ -250,7 +250,7 @@ describe("DockerComposeRuntime.prepare -- file only", () => {
   it("throws when the configured file is missing", async () => {
     writeArc({ compose: { file: "does-not-exist.yml" } });
     const { runtime, calls } = makeRuntime();
-    await expect(runtime.prepare(new LocalCompute(), makeHandle(), ctx())).rejects.toThrow(/compose file not found/);
+    (await expect(runtime.prepare(new LocalCompute(), makeHandle(), ctx()))).rejects.toThrow(/compose file not found/);
     // Compose up must NOT have been invoked.
     expect(calls.composeUp).toHaveLength(0);
   });
@@ -258,7 +258,7 @@ describe("DockerComposeRuntime.prepare -- file only", () => {
 
 // ── prepare (inline only) ───────────────────────────────────────────────────
 
-describe("DockerComposeRuntime.prepare -- inline only", () => {
+describe("DockerComposeRuntime.prepare -- inline only", async () => {
   it("writes the inline spec as YAML and passes it as a single -f", async () => {
     // Remove the default docker-compose.yml so only inline is used.
     rmSync(composePath);
@@ -348,7 +348,7 @@ describe("DockerComposeRuntime.prepare -- inline only", () => {
 
 // ── prepare (file + inline) ─────────────────────────────────────────────────
 
-describe("DockerComposeRuntime.prepare -- file + inline", () => {
+describe("DockerComposeRuntime.prepare -- file + inline", async () => {
   it("passes both files, file first, inline second", async () => {
     const inline = { services: { extra: { image: "busybox" } } };
     writeArc({ compose: { file: "docker-compose.yml", inline } });
@@ -388,7 +388,7 @@ describe("DockerComposeRuntime.prepare -- file + inline", () => {
 
 // ── shutdown ────────────────────────────────────────────────────────────────
 
-describe("DockerComposeRuntime.shutdown", () => {
+describe("DockerComposeRuntime.shutdown", async () => {
   it("removes the inline tempfile and runs compose down", async () => {
     rmSync(composePath);
     writeArc({ compose: { inline: { services: { q: { image: "rabbitmq" } } } } });
@@ -437,7 +437,7 @@ describe("DockerComposeRuntime.shutdown", () => {
 
 // ── rollback on sidecar failure ─────────────────────────────────────────────
 
-describe("DockerComposeRuntime.prepare -- rollback", () => {
+describe("DockerComposeRuntime.prepare -- rollback", async () => {
   it("rolls the compose stack + inline tempfile back when bootstrap fails", async () => {
     rmSync(composePath);
     writeArc({ compose: { inline: { services: { web: { image: "nginx" } } } } });
@@ -446,7 +446,7 @@ describe("DockerComposeRuntime.prepare -- rollback", () => {
     const { runtime, calls } = makeRuntime({ bootstrapThrows: err });
     const handle = makeHandle("rollback");
 
-    await expect(runtime.prepare(new LocalCompute(), handle, ctx())).rejects.toThrow("bootstrap exploded");
+    (await expect(runtime.prepare(new LocalCompute(), handle, ctx()))).rejects.toThrow("bootstrap exploded");
 
     // Sidecar removal attempted.
     expect(calls.remove).toEqual(["ark-rollback-compose"]);
@@ -467,7 +467,7 @@ describe("DockerComposeRuntime.prepare -- rollback", () => {
     writeArc({ compose: { inline: { services: {} } } });
     const { runtime, calls } = makeRuntime({ composeUpOk: false, composeUpError: "boom" });
 
-    await expect(runtime.prepare(new LocalCompute(), makeHandle("compose-fail"), ctx())).rejects.toThrow(
+    (await expect(runtime.prepare(new LocalCompute(), makeHandle("compose-fail"), ctx()))).rejects.toThrow(
       /docker compose up failed.*boom/,
     );
 
@@ -482,7 +482,7 @@ describe("DockerComposeRuntime.prepare -- rollback", () => {
   it("skips compose down during rollback when skipUp is set", async () => {
     writeArc({ compose: { file: "docker-compose.yml", skipUp: true } });
     const { runtime, calls } = makeRuntime({ waitThrows: new Error("unhealthy") });
-    await expect(runtime.prepare(new LocalCompute(), makeHandle("skip-down"), ctx())).rejects.toThrow("unhealthy");
+    (await expect(runtime.prepare(new LocalCompute(), makeHandle("skip-down"), ctx()))).rejects.toThrow("unhealthy");
     // Sidecar removed.
     expect(calls.remove).toHaveLength(1);
     // But we did not ask the user to bring a stack up, so we don't bring it down either.
@@ -492,21 +492,21 @@ describe("DockerComposeRuntime.prepare -- rollback", () => {
 
 // ── arc.json surface errors ─────────────────────────────────────────────────
 
-describe("DockerComposeRuntime.prepare -- config errors", () => {
+describe("DockerComposeRuntime.prepare -- config errors", async () => {
   it("throws a clear error when arc.json has no compose block", async () => {
     writeArc({ ports: [{ port: 3000 }] });
     const { runtime } = makeRuntime();
-    await expect(runtime.prepare(new LocalCompute(), makeHandle(), ctx())).rejects.toThrow(/no compose config/);
+    (await expect(runtime.prepare(new LocalCompute(), makeHandle(), ctx()))).rejects.toThrow(/no compose config/);
   });
 
   it("throws when arc.json is missing entirely", async () => {
     const { runtime } = makeRuntime();
-    await expect(runtime.prepare(new LocalCompute(), makeHandle(), ctx())).rejects.toThrow(/no compose config/);
+    (await expect(runtime.prepare(new LocalCompute(), makeHandle(), ctx()))).rejects.toThrow(/no compose config/);
   });
 
   it("throws when ark source cannot be located", async () => {
     writeArc({ compose: true });
     const { runtime } = makeRuntime({ arkSourceNull: true });
-    await expect(runtime.prepare(new LocalCompute(), makeHandle(), ctx())).rejects.toThrow(/ark source tree/);
+    (await expect(runtime.prepare(new LocalCompute(), makeHandle(), ctx()))).rejects.toThrow(/ark source tree/);
   });
 });

@@ -7,7 +7,7 @@ import { describe, it, expect, afterEach } from "bun:test";
 import { AppContext } from "../app.js";
 import { clearApp, getApp, setApp } from "./test-helpers.js";
 
-describe("AppContext lifecycle", () => {
+describe("AppContext lifecycle", async () => {
   let app: AppContext | null = null;
 
   afterEach(async () => {

@@ -38,7 +38,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     // `startSession` emits `session_created` before returning; the default
     // dispatcher listener (registered above) kicks the background launcher.
     const { startSession } = await import("../../core/services/session-orchestration.js");
-    const session = startSession(app, opts);
+    const session = await startSession(app, opts);
     notify("session/created", { session });
     return { session };
   });
@@ -70,32 +70,33 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
     const result = await app.sessionService.stop(sessionId);
     if (!result.ok) throw new RpcError(result.message ?? "Stop failed", SESSION_NOT_FOUND);
-    const session = app.sessions.get(sessionId);
+    const session = await app.sessions.get(sessionId);
     if (session) notify("session/updated", { session });
     return result;
   });
 
   router.handle("session/advance", async (params, notify) => {
     const { sessionId, force } = extract<SessionAdvanceParams>(params, ["sessionId"]);
-    app.events.log(sessionId, "stage_advanced", {
+    const sessForLog = await app.sessions.get(sessionId);
+    await app.events.log(sessionId, "stage_advanced", {
       actor: "user",
-      stage: app.sessions.get(sessionId)?.stage ?? undefined,
+      stage: sessForLog?.stage ?? undefined,
       data: { force: force ?? false },
     });
     const result = await app.sessionService.advance(sessionId, force ?? false);
-    const session = app.sessions.get(sessionId);
+    const session = await app.sessions.get(sessionId);
     if (session) notify("session/updated", { session });
     return result;
   });
 
   router.handle("session/complete", async (params, notify) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
-    const result = app.sessionService.complete(sessionId);
+    const result = await app.sessionService.complete(sessionId);
     if (!result.ok) throw new RpcError(result.message ?? "Complete failed", SESSION_NOT_FOUND);
     // Advance the flow after completing the stage -- without this, sessions
     // get stuck at "ready" instead of progressing to the next stage or "completed".
     await app.sessionService.advance(sessionId, true);
-    const session = app.sessions.get(sessionId);
+    const session = await app.sessions.get(sessionId);
     if (session) notify("session/updated", { session });
     return result;
   });
@@ -110,7 +111,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   router.handle("session/undelete", async (params, notify) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
     const result = await app.sessionService.undelete(sessionId);
-    const session = app.sessions.get(sessionId);
+    const session = await app.sessions.get(sessionId);
     if (session) notify("session/created", { session });
     return result;
   });
@@ -122,9 +123,9 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
       throw new RpcError(result.message, SESSION_NOT_FOUND);
     }
     if (group_name && result.sessionId) {
-      app.sessions.update(result.sessionId, { group_name });
+      await app.sessions.update(result.sessionId, { group_name });
     }
-    const session = result.sessionId ? app.sessions.get(result.sessionId) : null;
+    const session = result.sessionId ? await app.sessions.get(result.sessionId) : null;
     if (session) notify("session/created", { session });
     return { session };
   });
@@ -135,41 +136,41 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     if (!result.ok) {
       throw new RpcError(result.message, SESSION_NOT_FOUND);
     }
-    const session = result.sessionId ? app.sessions.get(result.sessionId) : null;
+    const session = result.sessionId ? await app.sessions.get(result.sessionId) : null;
     if (session) notify("session/created", { session });
     return { session };
   });
 
   router.handle("session/update", async (params, notify) => {
     const { sessionId, fields } = extract<SessionUpdateParams>(params, ["sessionId", "fields"]);
-    const existing = app.sessions.get(sessionId);
+    const existing = await app.sessions.get(sessionId);
     if (!existing) {
       throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
     }
-    app.sessions.update(sessionId, fields);
-    const session = app.sessions.get(sessionId);
+    await app.sessions.update(sessionId, fields);
+    const session = await app.sessions.get(sessionId);
     notify("session/updated", { session });
     return { session };
   });
 
   router.handle("session/list", async (params, _notify) => {
     const filters = extract<SessionListParams>(params, []);
-    const sessions = app.sessions.list(filters);
+    const sessions = await app.sessions.list(filters);
     return { sessions };
   });
 
   router.handle("session/read", async (params, _notify) => {
     const { sessionId, include } = extract<SessionReadParams>(params, ["sessionId"]);
-    const session = app.sessions.get(sessionId);
+    const session = await app.sessions.get(sessionId);
     if (!session) {
       throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
     }
     const result: Record<string, unknown> = { session };
     if (include?.includes("events")) {
-      result.events = app.events.list(sessionId);
+      result.events = await app.events.list(sessionId);
     }
     if (include?.includes("messages")) {
-      result.messages = app.messages.list(sessionId);
+      result.messages = await app.messages.list(sessionId);
     }
     return result;
   });
@@ -178,31 +179,31 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
 
   router.handle("session/events", async (params, _notify) => {
     const { sessionId, limit } = extract<SessionEventsParams>(params, ["sessionId"]);
-    const events = app.events.list(sessionId, { limit });
+    const events = await app.events.list(sessionId, { limit });
     return { events };
   });
 
   router.handle("session/messages", async (params, _notify) => {
     const { sessionId, limit } = extract<SessionMessagesParams>(params, ["sessionId"]);
-    const messages = app.messages.list(sessionId, { limit });
+    const messages = await app.messages.list(sessionId, { limit });
     return { messages };
   });
 
   router.handle("session/search", async (params, _notify) => {
     const { query } = extract<SessionSearchParams>(params, ["query"]);
-    const results = searchSessions(app, query);
+    const results = await searchSessions(app, query);
     return { results };
   });
 
   router.handle("session/conversation", async (params, _notify) => {
     const { sessionId, limit } = extract<{ sessionId: string; limit?: number }>(params, ["sessionId"]);
-    const turns = getSessionConversation(app, sessionId, { limit });
+    const turns = await getSessionConversation(app, sessionId, { limit });
     return { turns };
   });
 
   router.handle("session/search-conversation", async (params, _notify) => {
     const { sessionId, query } = extract<{ sessionId: string; query: string }>(params, ["sessionId", "query"]);
-    const results = searchSessionConversation(app, sessionId, query);
+    const results = await searchSessionConversation(app, sessionId, query);
     return { results };
   });
 
@@ -222,7 +223,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   router.handle("session/handoff", async (params, notify) => {
     const { sessionId, agent, instructions } = extract<SessionHandoffParams>(params, ["sessionId", "agent"]);
     const result = await app.sessionService.handoff(sessionId, agent, instructions);
-    const session = app.sessions.get(sessionId);
+    const session = await app.sessions.get(sessionId);
     if (session) notify("session/updated", { session });
     return result;
   });
@@ -242,7 +243,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
       group_name,
     });
     if (result.sessionId) {
-      const session = app.sessions.get(result.sessionId);
+      const session = await app.sessions.get(result.sessionId);
       if (session) notify("session/created", { session });
       // spawn() emits session_created internally; the default listener handles dispatch.
     }
@@ -257,7 +258,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const result = await app.sessionService.fanOut(sessionId, { tasks });
     if (!result.ok) throw new RpcError(result.message ?? "Fan-out failed", SESSION_NOT_FOUND);
     for (const childId of result.childIds ?? []) {
-      const session = app.sessions.get(childId);
+      const session = await app.sessions.get(childId);
       if (session) notify("session/created", { session });
     }
     // Fan-out children are dispatched en masse by the orchestrator (see
@@ -271,7 +272,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     // Snapshot-backed restore bypasses rewind: restoring a pinned snapshot is
     // a different operation from "re-run from stage X". If the caller wants
     // a rewind, they must not also ask for a snapshot.
-    const session = app.sessions.get(sessionId);
+    const session = await app.sessions.get(sessionId);
     const lastSnapshotId =
       snapshotId ?? (session?.config as Record<string, unknown> | undefined)?.last_snapshot_id ?? undefined;
 
@@ -279,7 +280,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
       const { resumeFromSnapshot } = await import("../../core/services/session-snapshot.js");
       const snapResult = await resumeFromSnapshot(app, sessionId, { snapshotId: lastSnapshotId as string });
       if (snapResult.ok) {
-        const updated = app.sessions.get(sessionId);
+        const updated = await app.sessions.get(sessionId);
         if (updated) notify("session/updated", { session: updated });
         return { ok: true, message: snapResult.message, snapshotId: snapResult.snapshotId };
       }
@@ -292,14 +293,14 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     }
 
     const result = await app.sessionService.resume(sessionId, { rewindToStage });
-    const updated = app.sessions.get(sessionId);
+    const updated = await app.sessions.get(sessionId);
     if (updated) notify("session/updated", { session: updated });
     return result;
   });
 
   router.handle("session/flowStages", async (params) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
-    const session = app.sessions.get(sessionId);
+    const session = await app.sessions.get(sessionId);
     if (!session) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
     const { getStages } = await import("../../core/state/flow.js");
     const stages = getStages(app, session.flow).map((s) => ({
@@ -319,7 +320,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     // local sessions keep working the way they did before snapshotting.
     const { pauseWithSnapshot } = await import("../../core/services/session-snapshot.js");
     const snapResult = await pauseWithSnapshot(app, sessionId, { reason });
-    const session = app.sessions.get(sessionId);
+    const session = await app.sessions.get(sessionId);
 
     if (snapResult.ok) {
       if (session) notify("session/updated", { session });
@@ -331,8 +332,8 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     }
 
     // Fallback: state-only pause (pre-Phase-3 behaviour).
-    const result = app.sessionService.pause(sessionId, reason);
-    const updated = app.sessions.get(sessionId);
+    const result = await app.sessionService.pause(sessionId, reason);
+    const updated = await app.sessions.get(sessionId);
     if (updated) notify("session/updated", { session: updated });
     return { ...result, snapshot: null, notSupported: true };
   });
@@ -340,7 +341,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   router.handle("session/interrupt", async (params, notify) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
     const result = await app.sessionService.interrupt(sessionId);
-    const session = app.sessions.get(sessionId);
+    const session = await app.sessions.get(sessionId);
     if (session) notify("session/updated", { session });
     return result;
   });
@@ -348,14 +349,14 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   router.handle("session/archive", async (params, notify) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
     const result = await app.sessionService.archive(sessionId);
-    if (result.ok) notify("session/updated", { session: app.sessions.get(sessionId) });
+    if (result.ok) notify("session/updated", { session: await app.sessions.get(sessionId) });
     return result;
   });
 
   router.handle("session/restore", async (params, notify) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
     const result = await app.sessionService.restore(sessionId);
-    if (result.ok) notify("session/updated", { session: app.sessions.get(sessionId) });
+    if (result.ok) notify("session/updated", { session: await app.sessions.get(sessionId) });
     return result;
   });
 
@@ -373,7 +374,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
       draft?: boolean;
     }>(params, ["sessionId"]);
     const result = await app.sessionService.createWorktreePR(sessionId, { title, body, base, draft });
-    const session = app.sessions.get(sessionId);
+    const session = await app.sessions.get(sessionId);
     if (session) notify("session/updated", { session });
     return result;
   });
@@ -391,23 +392,23 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
 
   router.handle("todo/list", async (params) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
-    return { todos: app.todos.list(sessionId) };
+    return { todos: await app.todos.list(sessionId) };
   });
 
   router.handle("todo/add", async (params) => {
     const { sessionId, content } = extract<{ sessionId: string; content: string }>(params, ["sessionId", "content"]);
-    return { todo: app.todos.add(sessionId, content) };
+    return { todo: await app.todos.add(sessionId, content) };
   });
 
   router.handle("todo/toggle", async (params) => {
     const { id } = extract<{ id: number }>(params, ["id"]);
-    const todo = app.todos.toggle(id);
+    const todo = await app.todos.toggle(id);
     return { todo };
   });
 
   router.handle("todo/delete", async (params) => {
     const { id } = extract<{ id: number }>(params, ["id"]);
-    return { ok: app.todos.delete(id) };
+    return { ok: await app.todos.delete(id) };
   });
 
   // ── Verification ─────────────────────────────────────────────────────────
@@ -424,10 +425,10 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const { sessionId, filePath } = extract<{ sessionId: string; filePath?: string }>(params, ["sessionId"]);
     const { exportSession, exportSessionToFile } = await import("../../core/session/share.js");
     if (filePath) {
-      const ok = exportSessionToFile(app, sessionId, filePath);
+      const ok = await exportSessionToFile(app, sessionId, filePath);
       return { ok, filePath };
     }
-    const data = exportSession(app, sessionId);
+    const data = await exportSession(app, sessionId);
     if (!data) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
     return { ok: true, data };
   });
@@ -436,13 +437,13 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
 
   router.handle("session/artifacts/list", async (params) => {
     const { sessionId, type } = extract<{ sessionId: string; type?: string }>(params, ["sessionId"]);
-    const artifacts = app.artifacts.list(sessionId, type as any);
+    const artifacts = await app.artifacts.list(sessionId, type as any);
     return { artifacts };
   });
 
   router.handle("session/artifacts/query", async (params) => {
     const q = extract<{ session_id?: string; type?: string; value?: string; limit?: number }>(params, []);
-    const artifacts = app.artifacts.query(q as any);
+    const artifacts = await app.artifacts.query(q as any);
     return { artifacts };
   });
 
@@ -451,7 +452,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   router.handle("session/replay", async (params) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
     const { buildReplay } = await import("../../core/session/replay.js");
-    const steps = buildReplay(app, sessionId);
+    const steps = await buildReplay(app, sessionId);
     return { steps };
   });
 }

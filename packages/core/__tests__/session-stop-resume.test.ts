@@ -21,7 +21,7 @@ afterEach(async () => {
   clearApp();
 });
 
-describe("session stop", () => {
+describe("session stop", async () => {
   it("sets status to 'stopped' (not 'failed')", async () => {
     const session = getApp().sessions.create({ summary: "stop-test" });
     getApp().sessions.update(session.id, { status: "running", stage: "work" });
@@ -152,7 +152,7 @@ describe("session stop", () => {
   });
 });
 
-describe("session resume", () => {
+describe("session resume", async () => {
   // Note: resume(app) calls dispatch(app) which requires tmux and claude CLI,
   // so we test the status changes and guard clauses rather than full dispatch.
 

@@ -29,7 +29,7 @@ export const searchQuery: QueryMethod<SearchArgs, SearchHit[]> = {
   cost: "cheap",
   async run(ctx: QueryContext, args: SearchArgs): Promise<SearchHit[]> {
     const limit = Math.max(1, Math.min(args.limit ?? 25, 200));
-    const rows = ctx.store.searchChunks(ctx.tenant_id, args.query, limit);
+    const rows = await ctx.store.searchChunks(ctx.tenant_id, args.query, limit);
     return rows.map((r) => ({
       chunk_id: r.id,
       file_id: r.file_id,

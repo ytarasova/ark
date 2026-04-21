@@ -140,7 +140,7 @@ afterEach(async () => {
 
 // ── Tests ──────────────────────────────────────────────────────────────────
 
-describe("ComputeTarget pool-consult", () => {
+describe("ComputeTarget pool-consult", async () => {
   it("provision acquires from the pool and does NOT call compute.provision when capabilities.pool is true and a pool is registered", async () => {
     const compute = new StubCompute("local", poolCaps);
     const pool = new StubPool(compute);

@@ -72,65 +72,65 @@ afterAll(async () => {
   clearApp();
 });
 
-describe("DAG-based advance", () => {
+describe("DAG-based advance", async () => {
   test("DAG flow: advance to next stage after first stage completes", async () => {
-    const s = app.sessions.create({ summary: "Test DAG advance", flow: "test-dag" });
-    app.sessions.update(s.id, { stage: "plan", status: "ready" });
+    const s = await app.sessions.create({ summary: "Test DAG advance", flow: "test-dag" });
+    await app.sessions.update(s.id, { stage: "plan", status: "ready" });
 
     const result = await advance(app, s.id, true); // force=true to bypass gate
     expect(result.ok).toBe(true);
 
-    const updated = app.sessions.get(s.id);
+    const updated = await app.sessions.get(s.id);
     // After plan completes, implement should be next (it depends on plan)
     expect(updated!.stage).toBe("implement");
     expect(updated!.status).toBe("ready");
   });
 
   test("DAG flow: advance completes flow when last stage done", async () => {
-    const s = app.sessions.create({ summary: "Test DAG completion", flow: "test-dag" });
-    app.sessions.update(s.id, { stage: "review", status: "ready" });
+    const s = await app.sessions.create({ summary: "Test DAG completion", flow: "test-dag" });
+    await app.sessions.update(s.id, { stage: "review", status: "ready" });
     // Log stage_advance events so getCompletedStages picks them up
-    app.events.log(s.id, "stage_advance", { actor: "system", data: { from: "plan", to: "implement" } });
-    app.events.log(s.id, "stage_advance", { actor: "system", data: { from: "implement", to: "review" } });
+    await app.events.log(s.id, "stage_advance", { actor: "system", data: { from: "plan", to: "implement" } });
+    await app.events.log(s.id, "stage_advance", { actor: "system", data: { from: "implement", to: "review" } });
 
     const result = await advance(app, s.id, true); // force=true to bypass gate
     expect(result.ok).toBe(true);
 
-    const updated = app.sessions.get(s.id);
+    const updated = await app.sessions.get(s.id);
     expect(updated!.status).toBe("completed");
   });
 
   test("linear flow (quick) advances to next stage", async () => {
-    const s = app.sessions.create({ summary: "Test linear quick flow", flow: "quick" });
-    app.sessions.update(s.id, { stage: "implement", status: "ready" });
+    const s = await app.sessions.create({ summary: "Test linear quick flow", flow: "quick" });
+    await app.sessions.update(s.id, { stage: "implement", status: "ready" });
 
     const result = await advance(app, s.id, true);
     expect(result.ok).toBe(true);
-    const updated = app.sessions.get(s.id);
+    const updated = await app.sessions.get(s.id);
     // implement -> verify is the next stage in quick flow
     expect(updated!.stage).toBe("verify");
   });
 
   test("linear flow (quick) completes when last stage done", async () => {
-    const s = app.sessions.create({ summary: "Test linear completion", flow: "quick" });
-    app.sessions.update(s.id, { stage: "merge", status: "ready" });
+    const s = await app.sessions.create({ summary: "Test linear completion", flow: "quick" });
+    await app.sessions.update(s.id, { stage: "merge", status: "ready" });
 
     const result = await advance(app, s.id, true);
     expect(result.ok).toBe(true);
-    const updated = app.sessions.get(s.id);
+    const updated = await app.sessions.get(s.id);
     expect(updated!.status).toBe("completed");
   });
 });
 
-describe("Parallel DAG advance via depends_on", () => {
+describe("Parallel DAG advance via depends_on", async () => {
   test("advance from plan moves to first ready parallel stage", async () => {
-    const s = app.sessions.create({ summary: "Test parallel DAG", flow: "test-dag-parallel" });
-    app.sessions.update(s.id, { stage: "plan", status: "ready" });
+    const s = await app.sessions.create({ summary: "Test parallel DAG", flow: "test-dag-parallel" });
+    await app.sessions.update(s.id, { stage: "plan", status: "ready" });
 
     const result = await advance(app, s.id, true);
     expect(result.ok).toBe(true);
 
-    const updated = app.sessions.get(s.id);
+    const updated = await app.sessions.get(s.id);
     // Should advance to one of the parallel stages (implement or test)
     expect(["implement", "test"]).toContain(updated!.stage);
     expect(updated!.status).toBe("ready");
@@ -142,8 +142,8 @@ describe("Parallel DAG advance via depends_on", () => {
   });
 
   test("join barrier blocks integrate until both parallel stages complete", async () => {
-    const s = app.sessions.create({ summary: "Test join barrier", flow: "test-dag-parallel" });
-    app.sessions.update(s.id, { stage: "implement", status: "ready" });
+    const s = await app.sessions.create({ summary: "Test join barrier", flow: "test-dag-parallel" });
+    await app.sessions.update(s.id, { stage: "implement", status: "ready" });
 
     // Mark plan as completed in flow state (it ran before implement)
     app.flowStates.markStageCompleted(s.id, "plan");
@@ -151,7 +151,7 @@ describe("Parallel DAG advance via depends_on", () => {
     const result = await advance(app, s.id, true);
     expect(result.ok).toBe(true);
 
-    const updated = app.sessions.get(s.id);
+    const updated = await app.sessions.get(s.id);
     // integrate requires both implement AND test to complete
     // test is not yet done, so integrate is blocked
     // session should be waiting (join barrier) or advance to test
@@ -161,8 +161,8 @@ describe("Parallel DAG advance via depends_on", () => {
   });
 
   test("integrate becomes ready after both parallel stages complete", async () => {
-    const s = app.sessions.create({ summary: "Test join complete", flow: "test-dag-parallel" });
-    app.sessions.update(s.id, { stage: "test", status: "ready" });
+    const s = await app.sessions.create({ summary: "Test join complete", flow: "test-dag-parallel" });
+    await app.sessions.update(s.id, { stage: "test", status: "ready" });
 
     // Mark plan and implement as completed in flow state
     app.flowStates.markStageCompleted(s.id, "plan");
@@ -171,14 +171,14 @@ describe("Parallel DAG advance via depends_on", () => {
     const result = await advance(app, s.id, true);
     expect(result.ok).toBe(true);
 
-    const updated = app.sessions.get(s.id);
+    const updated = await app.sessions.get(s.id);
     expect(updated!.stage).toBe("integrate");
     expect(updated!.status).toBe("ready");
   });
 
   test("parallel DAG flow completes when last stage done", async () => {
-    const s = app.sessions.create({ summary: "Test parallel completion", flow: "test-dag-parallel" });
-    app.sessions.update(s.id, { stage: "integrate", status: "ready" });
+    const s = await app.sessions.create({ summary: "Test parallel completion", flow: "test-dag-parallel" });
+    await app.sessions.update(s.id, { stage: "integrate", status: "ready" });
 
     // Mark all preceding stages as completed
     app.flowStates.markStageCompleted(s.id, "plan");
@@ -188,7 +188,7 @@ describe("Parallel DAG advance via depends_on", () => {
     const result = await advance(app, s.id, true);
     expect(result.ok).toBe(true);
 
-    const updated = app.sessions.get(s.id);
+    const updated = await app.sessions.get(s.id);
     expect(updated!.status).toBe("completed");
   });
 });

@@ -130,11 +130,11 @@ describe("autonomous-sdlc DAG validation", () => {
 
 // ── 3. Verify stage handoff with repo config scripts ───────────────────
 
-describe("verify stage quality gate enforcement", () => {
+describe("verify stage quality gate enforcement", async () => {
   it("blocks handoff from verify when repo config scripts fail", async () => {
     const workdir = createWorkdirWithVerify(["exit 1"]);
-    const session = app.sessions.create({ summary: "qg block test", flow: "autonomous-sdlc" });
-    app.sessions.update(session.id, { status: "ready", stage: "verify", workdir });
+    const session = await app.sessions.create({ summary: "qg block test", flow: "autonomous-sdlc" });
+    await app.sessions.update(session.id, { status: "ready", stage: "verify", workdir });
 
     const result = await mediateStageHandoff(app, session.id, {
       autoDispatch: false,
@@ -145,15 +145,15 @@ describe("verify stage quality gate enforcement", () => {
     expect(result.blockedByVerification).toBe(true);
     expect(result.fromStage).toBe("verify");
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.status).toBe("blocked");
     expect(updated?.breakpoint_reason).toContain("Verification failed");
   });
 
   it("allows handoff from verify when repo config scripts pass", async () => {
     const workdir = createWorkdirWithVerify(["true"]);
-    const session = app.sessions.create({ summary: "qg pass test", flow: "autonomous-sdlc" });
-    app.sessions.update(session.id, { status: "ready", stage: "verify", workdir });
+    const session = await app.sessions.create({ summary: "qg pass test", flow: "autonomous-sdlc" });
+    await app.sessions.update(session.id, { status: "ready", stage: "verify", workdir });
 
     const result = await mediateStageHandoff(app, session.id, {
       autoDispatch: false,
@@ -163,15 +163,15 @@ describe("verify stage quality gate enforcement", () => {
     expect(result.ok).toBe(true);
     expect(result.toStage).toBe("review");
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.stage).toBe("review");
     expect(updated?.status).toBe("ready");
   });
 
   it("captures verify script output on failure", async () => {
     const workdir = createWorkdirWithVerify(["echo quality-gate-failed >&2 && exit 1"]);
-    const session = app.sessions.create({ summary: "qg output test", flow: "autonomous-sdlc" });
-    app.sessions.update(session.id, { status: "ready", stage: "verify", workdir });
+    const session = await app.sessions.create({ summary: "qg output test", flow: "autonomous-sdlc" });
+    await app.sessions.update(session.id, { status: "ready", stage: "verify", workdir });
 
     const result = await runVerification(app, session.id);
 
@@ -183,8 +183,8 @@ describe("verify stage quality gate enforcement", () => {
 
   it("runs multiple verify scripts and blocks on partial failure", async () => {
     const workdir = createWorkdirWithVerify(["true", "exit 1", "true"]);
-    const session = app.sessions.create({ summary: "qg partial fail", flow: "autonomous-sdlc" });
-    app.sessions.update(session.id, { status: "ready", stage: "verify", workdir });
+    const session = await app.sessions.create({ summary: "qg partial fail", flow: "autonomous-sdlc" });
+    await app.sessions.update(session.id, { status: "ready", stage: "verify", workdir });
 
     const result = await runVerification(app, session.id);
 
@@ -198,11 +198,11 @@ describe("verify stage quality gate enforcement", () => {
 
 // ── 4. Todos block verify stage in autonomous flows ────────────────────
 
-describe("todo enforcement at verify stage", () => {
+describe("todo enforcement at verify stage", async () => {
   it("unresolved todos block verify stage handoff", async () => {
-    const session = app.sessions.create({ summary: "qg todo block", flow: "autonomous-sdlc" });
-    app.sessions.update(session.id, { status: "ready", stage: "verify" });
-    app.todos.add(session.id, "Fix test coverage");
+    const session = await app.sessions.create({ summary: "qg todo block", flow: "autonomous-sdlc" });
+    await app.sessions.update(session.id, { status: "ready", stage: "verify" });
+    await app.todos.add(session.id, "Fix test coverage");
 
     const result = await mediateStageHandoff(app, session.id, {
       autoDispatch: false,
@@ -212,15 +212,15 @@ describe("todo enforcement at verify stage", () => {
     expect(result.ok).toBe(false);
     expect(result.blockedByVerification).toBe(true);
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.status).toBe("blocked");
   });
 
   it("resolved todos allow verify stage handoff", async () => {
-    const session = app.sessions.create({ summary: "qg todo pass", flow: "autonomous-sdlc" });
-    app.sessions.update(session.id, { status: "ready", stage: "verify" });
-    const todo = app.todos.add(session.id, "Fix test coverage");
-    app.todos.toggle(todo.id);
+    const session = await app.sessions.create({ summary: "qg todo pass", flow: "autonomous-sdlc" });
+    await app.sessions.update(session.id, { status: "ready", stage: "verify" });
+    const todo = await app.todos.add(session.id, "Fix test coverage");
+    await app.todos.toggle(todo.id);
 
     const result = await mediateStageHandoff(app, session.id, {
       autoDispatch: false,
@@ -234,11 +234,11 @@ describe("todo enforcement at verify stage", () => {
 
 // ── 5. Full pipeline: implement -> verify -> review advancement ────────
 
-describe("autonomous-sdlc pipeline with quality gates", () => {
+describe("autonomous-sdlc pipeline with quality gates", async () => {
   it("advances implement -> verify -> review with passing scripts", async () => {
     const workdir = createWorkdirWithVerify(["true"]);
-    const session = app.sessions.create({ summary: "pipeline test", flow: "autonomous-sdlc" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
+    const session = await app.sessions.create({ summary: "pipeline test", flow: "autonomous-sdlc" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
 
     // implement -> verify
     const r1 = await mediateStageHandoff(app, session.id, {
@@ -256,7 +256,7 @@ describe("autonomous-sdlc pipeline with quality gates", () => {
     expect(r2.ok).toBe(true);
     expect(r2.toStage).toBe("review");
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.stage).toBe("review");
     expect(updated?.status).toBe("ready");
   });
@@ -266,8 +266,8 @@ describe("autonomous-sdlc pipeline with quality gates", () => {
     const dir = join(app.arkDir, `workdir-block-${Date.now()}`);
     mkdirSync(dir, { recursive: true });
 
-    const session = app.sessions.create({ summary: "pipeline block test", flow: "autonomous-sdlc" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement", workdir: dir });
+    const session = await app.sessions.create({ summary: "pipeline block test", flow: "autonomous-sdlc" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir: dir });
 
     // implement -> verify: advances (no verify scripts configured yet)
     const r1 = await mediateStageHandoff(app, session.id, {
@@ -290,7 +290,7 @@ describe("autonomous-sdlc pipeline with quality gates", () => {
     expect(r2.fromStage).toBe("verify");
 
     // Session stuck at verify, not review
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.stage).toBe("verify");
     expect(updated?.status).toBe("blocked");
   });
@@ -300,8 +300,8 @@ describe("autonomous-sdlc pipeline with quality gates", () => {
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, ".ark.yaml"), 'verify:\n  - "test -f VERIFIED.txt"\n');
 
-    const session = app.sessions.create({ summary: "lifecycle test", flow: "autonomous-sdlc" });
-    app.sessions.update(session.id, { status: "ready", stage: "verify", workdir: dir });
+    const session = await app.sessions.create({ summary: "lifecycle test", flow: "autonomous-sdlc" });
+    await app.sessions.update(session.id, { status: "ready", stage: "verify", workdir: dir });
 
     // Step 1: Blocked (VERIFIED.txt doesn't exist)
     const r1 = await mediateStageHandoff(app, session.id, {
@@ -313,7 +313,7 @@ describe("autonomous-sdlc pipeline with quality gates", () => {
 
     // Step 2: Fix (create the file)
     writeFileSync(join(dir, "VERIFIED.txt"), "quality gate passed");
-    app.sessions.update(session.id, { status: "ready", breakpoint_reason: null });
+    await app.sessions.update(session.id, { status: "ready", breakpoint_reason: null });
 
     // Step 3: Retry -- should advance
     const r2 = await mediateStageHandoff(app, session.id, {
@@ -325,14 +325,14 @@ describe("autonomous-sdlc pipeline with quality gates", () => {
   });
 
   it("advances through full pipeline to completion", async () => {
-    const session = app.sessions.create({ summary: "full pipeline test", flow: "autonomous-sdlc" });
-    app.sessions.update(session.id, { status: "ready", stage: "plan" });
+    const session = await app.sessions.create({ summary: "full pipeline test", flow: "autonomous-sdlc" });
+    await app.sessions.update(session.id, { status: "ready", stage: "plan" });
 
     const stageSequence = ["plan", "implement", "verify", "review", "pr", "merge"];
 
     for (let i = 0; i < stageSequence.length; i++) {
       const currentStage = stageSequence[i];
-      expect(app.sessions.get(session.id)?.stage).toBe(currentStage);
+      expect((await app.sessions.get(session.id))?.stage).toBe(currentStage);
 
       const result = await mediateStageHandoff(app, session.id, {
         autoDispatch: false,
@@ -349,22 +349,22 @@ describe("autonomous-sdlc pipeline with quality gates", () => {
       }
     }
 
-    const final = app.sessions.get(session.id);
+    const final = await app.sessions.get(session.id);
     expect(final?.status).toBe("completed");
   });
 });
 
 // ── 6. Observability: events emitted correctly ─────────────────────────
 
-describe("quality gate observability", () => {
+describe("quality gate observability", async () => {
   it("emits stage_handoff_blocked event on verify failure", async () => {
     const workdir = createWorkdirWithVerify(["echo test-failed && exit 1"]);
-    const session = app.sessions.create({ summary: "qg event test", flow: "autonomous-sdlc" });
-    app.sessions.update(session.id, { status: "ready", stage: "verify", workdir });
+    const session = await app.sessions.create({ summary: "qg event test", flow: "autonomous-sdlc" });
+    await app.sessions.update(session.id, { status: "ready", stage: "verify", workdir });
 
     await mediateStageHandoff(app, session.id, { source: "channel_report" });
 
-    const events = app.events.list(session.id);
+    const events = await app.events.list(session.id);
     const blocked = events.find((e) => e.type === "stage_handoff_blocked");
     expect(blocked).toBeTruthy();
     expect(blocked!.data?.reason).toBe("verification_failed");
@@ -375,15 +375,15 @@ describe("quality gate observability", () => {
 
   it("emits stage_handoff event on verify success", async () => {
     const workdir = createWorkdirWithVerify(["true"]);
-    const session = app.sessions.create({ summary: "qg handoff event", flow: "autonomous-sdlc" });
-    app.sessions.update(session.id, { status: "ready", stage: "verify", workdir });
+    const session = await app.sessions.create({ summary: "qg handoff event", flow: "autonomous-sdlc" });
+    await app.sessions.update(session.id, { status: "ready", stage: "verify", workdir });
 
     await mediateStageHandoff(app, session.id, {
       autoDispatch: false,
       source: "channel_report",
     });
 
-    const events = app.events.list(session.id);
+    const events = await app.events.list(session.id);
     const handoff = events.find((e) => e.type === "stage_handoff");
     expect(handoff).toBeTruthy();
     expect(handoff!.data?.from_stage).toBe("verify");
@@ -392,12 +392,12 @@ describe("quality gate observability", () => {
 
   it("sends error message to session on verify failure", async () => {
     const workdir = createWorkdirWithVerify(["exit 1"]);
-    const session = app.sessions.create({ summary: "qg error msg test", flow: "autonomous-sdlc" });
-    app.sessions.update(session.id, { status: "ready", stage: "verify", workdir });
+    const session = await app.sessions.create({ summary: "qg error msg test", flow: "autonomous-sdlc" });
+    await app.sessions.update(session.id, { status: "ready", stage: "verify", workdir });
 
     await mediateStageHandoff(app, session.id, { source: "test" });
 
-    const msgs = app.messages.list(session.id);
+    const msgs = await app.messages.list(session.id);
     const errorMsg = msgs.find((m) => m.content.includes("Advance blocked"));
     expect(errorMsg).toBeTruthy();
     expect(errorMsg!.content).toContain("verify");
@@ -406,7 +406,7 @@ describe("quality gate observability", () => {
 
 // ── 7. Comparison: autonomous flow (no verify stage) ───────────────────
 
-describe("autonomous flow (single stage, no verify)", () => {
+describe("autonomous flow (single stage, no verify)", async () => {
   it("autonomous flow has no verify stage", () => {
     const stages = flow.getStages(app, "autonomous");
     const verifyStage = stages.find((s) => s.name === "verify");
@@ -415,8 +415,8 @@ describe("autonomous flow (single stage, no verify)", () => {
 
   it("autonomous flow still respects repo config verify on work stage", async () => {
     const workdir = createWorkdirWithVerify(["exit 1"]);
-    const session = app.sessions.create({ summary: "autonomous verify test", flow: "autonomous" });
-    app.sessions.update(session.id, { status: "ready", stage: "work", workdir });
+    const session = await app.sessions.create({ summary: "autonomous verify test", flow: "autonomous" });
+    await app.sessions.update(session.id, { status: "ready", stage: "work", workdir });
 
     const result = await mediateStageHandoff(app, session.id, {
       autoDispatch: false,
@@ -430,8 +430,8 @@ describe("autonomous flow (single stage, no verify)", () => {
 
   it("autonomous flow completes when repo config verify passes", async () => {
     const workdir = createWorkdirWithVerify(["true"]);
-    const session = app.sessions.create({ summary: "autonomous pass test", flow: "autonomous" });
-    app.sessions.update(session.id, { status: "ready", stage: "work", workdir });
+    const session = await app.sessions.create({ summary: "autonomous pass test", flow: "autonomous" });
+    await app.sessions.update(session.id, { status: "ready", stage: "work", workdir });
 
     const result = await mediateStageHandoff(app, session.id, {
       autoDispatch: false,

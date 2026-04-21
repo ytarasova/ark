@@ -14,7 +14,7 @@ const { getCtx } = withTestContext();
 
 // ── indexTranscripts transaction safety ─────────────────────────────────────
 
-describe("indexTranscripts transaction safety", () => {
+describe("indexTranscripts transaction safety", async () => {
   it("uses transaction -- old data is preserved if indexing fails mid-way", async () => {
     const transcriptsDir = join(getCtx().arkDir, "claude-projects");
     const projectDir = join(transcriptsDir, "-tx-project");
@@ -87,7 +87,7 @@ describe("ftsTableExists", () => {
 
 // ── MIN_MESSAGE_COUNT filters trivial conversations ─────────────────────────
 
-describe("MIN_MESSAGE_COUNT filters trivial conversations", () => {
+describe("MIN_MESSAGE_COUNT filters trivial conversations", async () => {
   it("excludes sessions with fewer than 5 messages", async () => {
     const bd = join(getCtx().arkDir, "claude-projects");
     const projectDir = join(bd, "-short-conv");
@@ -111,7 +111,7 @@ describe("MIN_MESSAGE_COUNT filters trivial conversations", () => {
     writeFileSync(join(projectDir, "short-sess.jsonl"), lines.join("\n"));
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: bd });
-    const sessions = listClaudeSessions(getApp());
+    const sessions = await listClaudeSessions(getApp());
 
     // With MIN_MESSAGE_COUNT=5, this 2-message session should be excluded
     const found = sessions.find((s) => s.sessionId === "short-sess");
@@ -139,7 +139,7 @@ describe("MIN_MESSAGE_COUNT filters trivial conversations", () => {
     writeFileSync(join(projectDir, "real-sess.jsonl"), lines.join("\n"));
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: bd });
-    const sessions = listClaudeSessions(getApp());
+    const sessions = await listClaudeSessions(getApp());
 
     const found = sessions.find((s) => s.sessionId === "real-sess");
     expect(found).toBeDefined();

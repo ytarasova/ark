@@ -4,7 +4,7 @@ import { getAllSessionCosts, checkBudget } from "../../core/observability/costs.
 
 export function registerDashboardHandlers(router: Router, app: AppContext): void {
   router.handle("dashboard/summary", async () => {
-    const sessions = app.sessions.list({ limit: 500 });
+    const sessions = await app.sessions.list({ limit: 500 });
 
     // Fleet status counts
     const counts: Record<string, number> = {
@@ -36,20 +36,20 @@ export function registerDashboardHandlers(router: Router, app: AppContext): void
     let costSessions: any[];
 
     // Try usage_records first (universal tracking)
-    const usageTotal = app.usageRecorder.getTotalCost();
+    const usageTotal = await app.usageRecorder.getTotalCost();
     if (usageTotal > 0) {
       totalCost = usageTotal;
-      todayCost = app.usageRecorder.getTotalCost({ since: todayStart });
-      weekCost = app.usageRecorder.getTotalCost({ since: weekStart.toISOString() });
-      monthCost = app.usageRecorder.getTotalCost({ since: monthStart });
-      const modelSummary = app.usageRecorder.getSummary({ groupBy: "model" });
+      todayCost = await app.usageRecorder.getTotalCost({ since: todayStart });
+      weekCost = await app.usageRecorder.getTotalCost({ since: weekStart.toISOString() });
+      monthCost = await app.usageRecorder.getTotalCost({ since: monthStart });
+      const modelSummary = await app.usageRecorder.getSummary({ groupBy: "model" });
       for (const row of modelSummary) {
         byModel[row.key ?? "unknown"] = row.cost;
       }
       costSessions = [];
     } else {
       // Fall back to per-session cost lookup from UsageRecorder
-      const all = getAllSessionCosts(app, sessions);
+      const all = await getAllSessionCosts(app, sessions);
       totalCost = all.total;
       costSessions = all.sessions;
       for (const c of costSessions) {
@@ -60,14 +60,14 @@ export function registerDashboardHandlers(router: Router, app: AppContext): void
       const todaySessions = sessions.filter((s) => s.updated_at >= todayStart);
       const weekSessions = sessions.filter((s) => s.updated_at >= weekStart.toISOString());
       const monthSessions = sessions.filter((s) => s.updated_at >= monthStart);
-      todayCost = getAllSessionCosts(app, todaySessions).total;
-      weekCost = getAllSessionCosts(app, weekSessions).total;
-      monthCost = getAllSessionCosts(app, monthSessions).total;
+      todayCost = (await getAllSessionCosts(app, todaySessions)).total;
+      weekCost = (await getAllSessionCosts(app, weekSessions)).total;
+      monthCost = (await getAllSessionCosts(app, monthSessions)).total;
     }
 
     // Budget info
     const budgets = app.config.budgets ?? {};
-    const budget = checkBudget(app, sessions, budgets);
+    const budget = await checkBudget(app, sessions, budgets);
 
     // Recent events (last 10 across all sessions)
     const recentEvents: any[] = [];
@@ -76,7 +76,7 @@ export function registerDashboardHandlers(router: Router, app: AppContext): void
       .sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? ""))
       .slice(0, 20);
     for (const s of recentSessions) {
-      const evts = app.events.list(s.id, { limit: 5 });
+      const evts = await app.events.list(s.id, { limit: 5 });
       for (const e of evts) {
         recentEvents.push({
           sessionId: s.id,
@@ -104,7 +104,7 @@ export function registerDashboardHandlers(router: Router, app: AppContext): void
     };
 
     // Active compute count
-    const computes = app.computes.list();
+    const computes = await app.computes.list();
     const activeCompute = computes.filter((c: any) => c.status === "running" || c.status === "provisioned").length;
 
     return {

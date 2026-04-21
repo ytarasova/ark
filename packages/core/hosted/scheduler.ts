@@ -36,22 +36,22 @@ export class SessionScheduler {
     // 1. Check tenant policy (if policy manager is available)
     let policy: TenantComputePolicy | null = null;
     if (this.policyManager) {
-      const canDispatch = this.policyManager.canDispatch(tid);
+      const canDispatch = await this.policyManager.canDispatch(tid);
       if (!canDispatch.allowed) throw new Error(canDispatch.reason);
-      policy = this.policyManager.getEffectivePolicy(tid);
+      policy = await this.policyManager.getEffectivePolicy(tid);
     }
 
     // 2. Determine provider
     let provider: string | null = null;
     if (session.compute_name) {
-      provider = this._resolveProviderFromCompute(session.compute_name);
+      provider = await this._resolveProviderFromCompute(session.compute_name);
     }
     if (!provider && policy) {
       provider = policy.default_provider;
     }
 
     // 3. Validate provider is allowed
-    if (provider && this.policyManager && !this.policyManager.isProviderAllowed(tid, provider)) {
+    if (provider && this.policyManager && !(await this.policyManager.isProviderAllowed(tid, provider))) {
       const allowed = policy?.allowed_providers?.join(", ") ?? "all";
       throw new Error(`Provider "${provider}" not allowed for tenant "${tid}". Allowed: ${allowed}`);
     }
@@ -72,22 +72,22 @@ export class SessionScheduler {
 
     // Try existing idle worker for this tenant and provider
     if (provider) {
-      const tenantWorkers = registry.getAvailable({ tenantId, computeName: provider });
+      const tenantWorkers = await registry.getAvailable({ tenantId, computeName: provider });
       if (tenantWorkers.length > 0) return this._pickBest(tenantWorkers);
 
       // Try any available worker with matching provider
-      const anyProvider = registry.getAvailable({ computeName: provider });
+      const anyProvider = await registry.getAvailable({ computeName: provider });
       if (anyProvider.length > 0) return this._pickBest(anyProvider);
     }
 
     // If session has a specific compute, find a worker for that compute
     if (session.compute_name) {
-      const workers = registry.getAvailable({ computeName: session.compute_name });
+      const workers = await registry.getAvailable({ computeName: session.compute_name });
       if (workers.length > 0) return this._pickBest(workers);
     }
 
     // Find any available worker
-    const available = registry.getAvailable();
+    const available = await registry.getAvailable();
     if (available.length > 0) return this._pickBest(available);
 
     // Try to provision new compute from pool
@@ -113,7 +113,7 @@ export class SessionScheduler {
 
     // Check pool limits
     const registry = this.app.workerRegistry;
-    const active = registry.list({ tenantId }).filter((w) => w.compute_name === provider).length;
+    const active = (await registry.list({ tenantId })).filter((w) => w.compute_name === provider).length;
     if (active >= poolRef.max) {
       throw new Error(`Pool "${poolRef.pool_name}" at max capacity (${poolRef.max})`);
     }
@@ -126,12 +126,12 @@ export class SessionScheduler {
 
     // Create compute record
     const computeName = `${tenantId}-${provider}-${Date.now()}`;
-    this.app.computes.create({
+    await this.app.computes.create({
       name: computeName,
       provider: provider as ComputeProviderName,
       config: poolRef.config ?? {},
     });
-    const compute = this.app.computes.get(computeName)!;
+    const compute = (await this.app.computes.get(computeName))!;
 
     // Provision
     await computeProvider.provision(compute);
@@ -143,7 +143,7 @@ export class SessionScheduler {
   private async _waitForWorkerRegistration(computeName: string, timeoutMs: number): Promise<WorkerNode> {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      const workers = this.app.workerRegistry.list();
+      const workers = await this.app.workerRegistry.list();
       const online = workers.find((w) => w.compute_name === computeName && w.status === "online");
       if (online) return online;
       await new Promise((r) => setTimeout(r, 2000));
@@ -152,8 +152,8 @@ export class SessionScheduler {
   }
 
   /** Resolve the provider name from a compute record. */
-  private _resolveProviderFromCompute(computeName: string): string | null {
-    const compute = this.app.computes.get(computeName);
+  private async _resolveProviderFromCompute(computeName: string): Promise<string | null> {
+    const compute = await this.app.computes.get(computeName);
     return compute?.provider ?? null;
   }
 

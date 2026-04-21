@@ -28,7 +28,7 @@ function ok(res: unknown): Record<string, unknown> {
 
 // ── Session list ────────────────────────────────────────────────────────────
 
-describe("session/list", () => {
+describe("session/list", async () => {
   it("returns an array of sessions", async () => {
     await router.dispatch(createRequest(1, "session/start", { summary: "list-a", repo: ".", flow: "bare" }));
     await router.dispatch(createRequest(2, "session/start", { summary: "list-b", repo: ".", flow: "bare" }));
@@ -87,7 +87,7 @@ describe("session/list", () => {
 
 // ── Resource list handlers ──────────────────────────────────────────────────
 
-describe("agent/list", () => {
+describe("agent/list", async () => {
   it("returns builtin agents", async () => {
     const res = ok(await router.dispatch(createRequest(1, "agent/list", {})));
     const agents = res.agents as Array<{ name: string; _source: string }>;
@@ -106,7 +106,7 @@ describe("agent/list", () => {
   });
 });
 
-describe("flow/list", () => {
+describe("flow/list", async () => {
   it("returns builtin flows", async () => {
     const res = ok(await router.dispatch(createRequest(1, "flow/list", {})));
     const flows = res.flows as Array<{ name: string }>;
@@ -123,7 +123,7 @@ describe("flow/list", () => {
   });
 });
 
-describe("skill/list", () => {
+describe("skill/list", async () => {
   it("returns builtin skills", async () => {
     const res = ok(await router.dispatch(createRequest(1, "skill/list", {})));
     const skills = res.skills as Array<{ name: string }>;
@@ -132,7 +132,7 @@ describe("skill/list", () => {
   });
 });
 
-describe("recipe/list", () => {
+describe("recipe/list", async () => {
   it("returns builtin recipes", async () => {
     const res = ok(await router.dispatch(createRequest(1, "recipe/list", {})));
     const recipes = res.recipes as Array<{ name: string }>;
@@ -141,7 +141,7 @@ describe("recipe/list", () => {
   });
 });
 
-describe("runtime/list", () => {
+describe("runtime/list", async () => {
   it("returns available runtimes", async () => {
     const res = ok(await router.dispatch(createRequest(1, "runtime/list", {})));
     const runtimes = res.runtimes as Array<{ name: string; type: string }>;
@@ -158,7 +158,7 @@ describe("runtime/list", () => {
   });
 });
 
-describe("compute/list", () => {
+describe("compute/list", async () => {
   it("returns compute targets", async () => {
     const res = ok(await router.dispatch(createRequest(1, "compute/list", {})));
     const targets = res.targets as unknown[];
@@ -172,7 +172,7 @@ describe("compute/list", () => {
   });
 });
 
-describe("compute/kinds", () => {
+describe("compute/kinds", async () => {
   it("returns compute kind names", async () => {
     const res = ok(await router.dispatch(createRequest(1, "compute/kinds", {})));
     const kinds = res.kinds as string[];
@@ -182,7 +182,7 @@ describe("compute/kinds", () => {
   });
 });
 
-describe("runtime/kinds", () => {
+describe("runtime/kinds", async () => {
   it("returns runtime kind names", async () => {
     const res = ok(await router.dispatch(createRequest(1, "runtime/kinds", {})));
     const kinds = res.kinds as string[];
@@ -192,7 +192,7 @@ describe("runtime/kinds", () => {
   });
 });
 
-describe("group/list", () => {
+describe("group/list", async () => {
   it("returns session groups", async () => {
     const res = ok(await router.dispatch(createRequest(1, "group/list", {})));
     const groups = res.groups as unknown[];

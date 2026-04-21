@@ -36,7 +36,7 @@ export const serviceDependencyGraphExtractor: PlatformDocExtractor = {
   flavor: "mechanical",
   cadence: "on_reindex",
   async generate(ctx: PlatformDocContext, workspace_id: string): Promise<PlatformDocInput> {
-    const repos = ctx.store.listReposInWorkspace(ctx.tenant_id, workspace_id);
+    const repos = await ctx.store.listReposInWorkspace(ctx.tenant_id, workspace_id);
     if (repos.length === 0) {
       return {
         title: "Service Dependency Graph",
@@ -50,10 +50,12 @@ export const serviceDependencyGraphExtractor: PlatformDocExtractor = {
     }
 
     // Pull dependencies per repo; tally totals as we go.
-    const perRepo = repos.map((r) => {
-      const deps = ctx.store.listDependencies(ctx.tenant_id, r.id);
-      return { repo: r, deps };
-    });
+    const perRepo = await Promise.all(
+      repos.map(async (r) => {
+        const deps = await ctx.store.listDependencies(ctx.tenant_id, r.id);
+        return { repo: r, deps };
+      }),
+    );
     const totalDeps = perRepo.reduce((acc, r) => acc + r.deps.length, 0);
 
     if (totalDeps === 0) {

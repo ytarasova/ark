@@ -31,23 +31,23 @@ export class ComputeTemplateRepository {
     this.tenantId = id;
   }
 
-  list(): ComputeTemplate[] {
-    const rows = this.db
+  async list(): Promise<ComputeTemplate[]> {
+    const rows = (await this.db
       .prepare("SELECT * FROM compute_templates WHERE tenant_id = ? ORDER BY name")
-      .all(this.tenantId) as TemplateRow[];
+      .all(this.tenantId)) as TemplateRow[];
     return rows.map(rowToTemplate);
   }
 
-  get(name: string): ComputeTemplate | null {
-    const row = this.db
+  async get(name: string): Promise<ComputeTemplate | null> {
+    const row = (await this.db
       .prepare("SELECT * FROM compute_templates WHERE name = ? AND tenant_id = ?")
-      .get(name, this.tenantId) as TemplateRow | undefined;
+      .get(name, this.tenantId)) as TemplateRow | undefined;
     return row ? rowToTemplate(row) : null;
   }
 
-  create(template: ComputeTemplate): void {
+  async create(template: ComputeTemplate): Promise<void> {
     const ts = now();
-    this.db
+    await this.db
       .prepare(
         "INSERT INTO compute_templates (name, description, provider, config, tenant_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
       )
@@ -62,7 +62,10 @@ export class ComputeTemplateRepository {
       );
   }
 
-  update(name: string, fields: Partial<Pick<ComputeTemplate, "description" | "provider" | "config">>): void {
+  async update(
+    name: string,
+    fields: Partial<Pick<ComputeTemplate, "description" | "provider" | "config">>,
+  ): Promise<void> {
     const sets: string[] = [];
     const params: any[] = [];
     if (fields.description !== undefined) {
@@ -81,10 +84,12 @@ export class ComputeTemplateRepository {
     sets.push("updated_at = ?");
     params.push(now());
     params.push(name, this.tenantId);
-    this.db.prepare(`UPDATE compute_templates SET ${sets.join(", ")} WHERE name = ? AND tenant_id = ?`).run(...params);
+    await this.db
+      .prepare(`UPDATE compute_templates SET ${sets.join(", ")} WHERE name = ? AND tenant_id = ?`)
+      .run(...params);
   }
 
-  delete(name: string): void {
-    this.db.prepare("DELETE FROM compute_templates WHERE name = ? AND tenant_id = ?").run(name, this.tenantId);
+  async delete(name: string): Promise<void> {
+    await this.db.prepare("DELETE FROM compute_templates WHERE name = ? AND tenant_id = ?").run(name, this.tenantId);
   }
 }

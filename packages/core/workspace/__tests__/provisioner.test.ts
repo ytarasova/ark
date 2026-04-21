@@ -70,54 +70,54 @@ afterAll(async () => {
   rmSync(scratchDir, { recursive: true, force: true });
 });
 
-function makeWorkspaceWithRepos(slugSuffix: string): {
+async function makeWorkspaceWithRepos(slugSuffix: string): Promise<{
   workspaceId: string;
   repoIdA: string;
   repoIdB: string;
-} {
-  const ws = app.codeIntel.createWorkspace({
+}> {
+  const ws = await app.codeIntel.createWorkspace({
     tenant_id: DEFAULT_TENANT_ID,
     slug: `ws-${slugSuffix}`,
     name: `Workspace ${slugSuffix}`,
   });
   // repo_url has UNIQUE(tenant_id, repo_url); include the suffix to avoid
   // collisions with repos created by sibling tests in this file.
-  const a = app.codeIntel.createRepo({
+  const a = await app.codeIntel.createRepo({
     tenant_id: DEFAULT_TENANT_ID,
     repo_url: `file://${cloneSourceA}#${slugSuffix}`,
     name: `payments-${slugSuffix}`,
     local_path: cloneSourceA,
   });
-  const b = app.codeIntel.createRepo({
+  const b = await app.codeIntel.createRepo({
     tenant_id: DEFAULT_TENANT_ID,
     repo_url: `file://${cloneSourceB}#${slugSuffix}`,
     name: `auth-${slugSuffix}`,
     local_path: cloneSourceB,
   });
-  app.codeIntel.addRepoToWorkspace(a.id, ws.id);
-  app.codeIntel.addRepoToWorkspace(b.id, ws.id);
+  await app.codeIntel.addRepoToWorkspace(a.id, ws.id);
+  await app.codeIntel.addRepoToWorkspace(b.id, ws.id);
   return { workspaceId: ws.id, repoIdA: a.id, repoIdB: b.id };
 }
 
-describe("workspace provisioner", () => {
-  it("provisionWorkspaceWorkdir creates the dir + writes .ark-workspace.yaml", () => {
-    const { workspaceId } = makeWorkspaceWithRepos("p1");
-    const ws = app.codeIntel.getWorkspace(workspaceId)!;
-    const session = app.sessions.create({ summary: "p1-session", workspace_id: workspaceId });
+describe("workspace provisioner", async () => {
+  it("provisionWorkspaceWorkdir creates the dir + writes .ark-workspace.yaml", async () => {
+    const { workspaceId } = await makeWorkspaceWithRepos("p1");
+    const ws = (await app.codeIntel.getWorkspace(workspaceId))!;
+    const session = await app.sessions.create({ summary: "p1-session", workspace_id: workspaceId });
 
-    const wd = provisionWorkspaceWorkdir(app, session, ws);
+    const wd = await provisionWorkspaceWorkdir(app, session, ws);
     expect(wd).toBe(workspaceWorkdir(app, session.id));
     expect(existsSync(wd)).toBe(true);
     expect(existsSync(join(wd, MANIFEST_FILENAME))).toBe(true);
     expect(manifestPath(wd)).toBe(join(wd, MANIFEST_FILENAME));
   });
 
-  it("manifest lists every workspace repo with cloned=false on first provision", () => {
-    const { workspaceId } = makeWorkspaceWithRepos("p2");
-    const ws = app.codeIntel.getWorkspace(workspaceId)!;
-    const session = app.sessions.create({ summary: "p2-session", workspace_id: workspaceId });
+  it("manifest lists every workspace repo with cloned=false on first provision", async () => {
+    const { workspaceId } = await makeWorkspaceWithRepos("p2");
+    const ws = (await app.codeIntel.getWorkspace(workspaceId))!;
+    const session = await app.sessions.create({ summary: "p2-session", workspace_id: workspaceId });
 
-    const wd = provisionWorkspaceWorkdir(app, session, ws, { primaryRepoId: null });
+    const wd = await provisionWorkspaceWorkdir(app, session, ws, { primaryRepoId: null });
     const manifest = readManifest(wd)!;
     expect(manifest.session_id).toBe(session.id);
     expect(manifest.workspace_id).toBe(workspaceId);
@@ -134,10 +134,10 @@ describe("workspace provisioner", () => {
   });
 
   it("ensureRepoCloned creates the on-disk clone and flips manifest.cloned", async () => {
-    const { workspaceId } = makeWorkspaceWithRepos("p3");
-    const ws = app.codeIntel.getWorkspace(workspaceId)!;
-    const session = app.sessions.create({ summary: "p3-session", workspace_id: workspaceId });
-    const wd = provisionWorkspaceWorkdir(app, session, ws);
+    const { workspaceId } = await makeWorkspaceWithRepos("p3");
+    const ws = (await app.codeIntel.getWorkspace(workspaceId))!;
+    const session = await app.sessions.create({ summary: "p3-session", workspace_id: workspaceId });
+    const wd = await provisionWorkspaceWorkdir(app, session, ws);
 
     const before = readManifest(wd)!.repos.find((r) => r.slug.startsWith("payments"))!;
     expect(before.cloned).toBe(false);
@@ -156,10 +156,10 @@ describe("workspace provisioner", () => {
   });
 
   it("ensureRepoCloned is idempotent: second call no-ops on already-cloned repos", async () => {
-    const { workspaceId } = makeWorkspaceWithRepos("p4");
-    const ws = app.codeIntel.getWorkspace(workspaceId)!;
-    const session = app.sessions.create({ summary: "p4-session", workspace_id: workspaceId });
-    const wd = provisionWorkspaceWorkdir(app, session, ws);
+    const { workspaceId } = await makeWorkspaceWithRepos("p4");
+    const ws = (await app.codeIntel.getWorkspace(workspaceId))!;
+    const session = await app.sessions.create({ summary: "p4-session", workspace_id: workspaceId });
+    const wd = await provisionWorkspaceWorkdir(app, session, ws);
 
     const slug = readManifest(wd)!.repos[0].slug;
     const first = await ensureRepoCloned(app, session.id, slug);
@@ -184,27 +184,27 @@ describe("workspace provisioner", () => {
     mkdirSync(dedicatedSource, { recursive: true });
     await gitInit(dedicatedSource, { "README.md": "collide source\n" });
 
-    const ws = app.codeIntel.createWorkspace({
+    const ws = await app.codeIntel.createWorkspace({
       tenant_id: DEFAULT_TENANT_ID,
       slug: "ws-p5",
       name: "WS p5",
     });
-    const repo = app.codeIntel.createRepo({
+    const repo = await app.codeIntel.createRepo({
       tenant_id: DEFAULT_TENANT_ID,
       repo_url: `file://${dedicatedSource}#p5`,
       name: "collide-p5",
       local_path: dedicatedSource,
     });
-    app.codeIntel.addRepoToWorkspace(repo.id, ws.id);
+    await app.codeIntel.addRepoToWorkspace(repo.id, ws.id);
 
-    const session = app.sessions.create({ summary: "p5-session", workspace_id: ws.id });
+    const session = await app.sessions.create({ summary: "p5-session", workspace_id: ws.id });
     const baseBranch = sessionBranchName(session.id);
 
     // Rename the default HEAD branch in the source to the colliding name so
     // the clone lands with refs/heads/<baseBranch> already present.
     await execFileAsync("git", ["-C", dedicatedSource, "branch", "-M", baseBranch], { encoding: "utf-8" });
 
-    const wd = provisionWorkspaceWorkdir(app, session, ws);
+    const wd = await provisionWorkspaceWorkdir(app, session, ws);
     const slug = readManifest(wd)!.repos[0].slug;
 
     const result = await ensureRepoCloned(app, session.id, slug);
@@ -215,33 +215,33 @@ describe("workspace provisioner", () => {
   });
 
   it("ensureRepoCloned errors when the manifest is missing", async () => {
-    const session = app.sessions.create({ summary: "no-manifest-session" });
-    await expect(ensureRepoCloned(app, session.id, "anything")).rejects.toThrow(/no workspace manifest/);
+    const session = await app.sessions.create({ summary: "no-manifest-session" });
+    (await expect(ensureRepoCloned(app, session.id, "anything"))).rejects.toThrow(/no workspace manifest/);
   });
 
   it("ensureRepoCloned errors when the slug does not exist in the manifest", async () => {
-    const { workspaceId } = makeWorkspaceWithRepos("p6");
-    const ws = app.codeIntel.getWorkspace(workspaceId)!;
-    const session = app.sessions.create({ summary: "p6-session", workspace_id: workspaceId });
-    provisionWorkspaceWorkdir(app, session, ws);
-    await expect(ensureRepoCloned(app, session.id, "nope-not-here")).rejects.toThrow(/no repo with slug/);
+    const { workspaceId } = await makeWorkspaceWithRepos("p6");
+    const ws = (await app.codeIntel.getWorkspace(workspaceId))!;
+    const session = await app.sessions.create({ summary: "p6-session", workspace_id: workspaceId });
+    await provisionWorkspaceWorkdir(app, session, ws);
+    (await expect(ensureRepoCloned(app, session.id, "nope-not-here"))).rejects.toThrow(/no repo with slug/);
   });
 
-  it("readSessionManifest returns null for a session that was never workspace-provisioned", () => {
-    const session = app.sessions.create({ summary: "legacy-session" });
+  it("readSessionManifest returns null for a session that was never workspace-provisioned", async () => {
+    const session = await app.sessions.create({ summary: "legacy-session" });
     expect(readSessionManifest(app, session.id)).toBeNull();
   });
 
   it("re-running provisionWorkspaceWorkdir preserves cloned=true on already-materialised repos", async () => {
-    const { workspaceId } = makeWorkspaceWithRepos("p7");
-    const ws = app.codeIntel.getWorkspace(workspaceId)!;
-    const session = app.sessions.create({ summary: "p7-session", workspace_id: workspaceId });
-    const wd = provisionWorkspaceWorkdir(app, session, ws);
+    const { workspaceId } = await makeWorkspaceWithRepos("p7");
+    const ws = (await app.codeIntel.getWorkspace(workspaceId))!;
+    const session = await app.sessions.create({ summary: "p7-session", workspace_id: workspaceId });
+    const wd = await provisionWorkspaceWorkdir(app, session, ws);
     const slug = readManifest(wd)!.repos[0].slug;
     await ensureRepoCloned(app, session.id, slug);
 
     // Re-provision (idempotent path).
-    provisionWorkspaceWorkdir(app, session, ws);
+    await provisionWorkspaceWorkdir(app, session, ws);
     const reloaded = readManifest(wd)!;
     const cloned = reloaded.repos.find((r) => r.slug === slug)!;
     expect(cloned.cloned).toBe(true);

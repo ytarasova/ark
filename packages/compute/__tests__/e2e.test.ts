@@ -89,7 +89,7 @@ function cleanupTmux() {
 
 // ── Test 1: Full compute lifecycle ──────────────────────────────────────────────
 
-describe("E2E: Full compute lifecycle", () => {
+describe("E2E: Full compute lifecycle", async () => {
   afterEach(() => {
     cleanupComputes();
     cleanupTmux();
@@ -134,7 +134,7 @@ describe("E2E: Full compute lifecycle", () => {
 
 // ── Test 2: Launch and probe a session ───────────────────────────────────────
 
-describe("E2E: Launch and probe a session", () => {
+describe("E2E: Launch and probe a session", async () => {
   afterEach(() => {
     cleanupTmux();
     cleanupComputes();
@@ -210,7 +210,7 @@ describe("E2E: Launch and probe a session", () => {
 
 // ── Test 3: arc.json -> port resolution -> probing ───────────────────────────
 
-describe("E2E: arc.json port resolution and probing", () => {
+describe("E2E: arc.json port resolution and probing", async () => {
   let tempDir: string;
 
   beforeEach(() => {

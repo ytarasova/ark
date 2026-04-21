@@ -56,7 +56,7 @@ export class NotifyDaemon {
     if (!this.running) return;
 
     try {
-      const sessions = this.app.sessions.list({ limit: 200 });
+      const sessions = await this.app.sessions.list({ limit: 200 });
       let hasRunning = false;
       let hasWaiting = false;
 

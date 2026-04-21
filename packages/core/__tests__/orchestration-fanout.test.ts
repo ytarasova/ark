@@ -79,7 +79,7 @@ describe("fanOut", () => {
   });
 });
 
-describe("joinFork", () => {
+describe("joinFork", async () => {
   it("returns ok: false when there are no children", async () => {
     const parent = getApp().sessions.create({ summary: "lonely" });
     const result = await joinFork(getApp(), parent.id);
@@ -113,7 +113,7 @@ describe("joinFork", () => {
   });
 });
 
-describe("checkAutoJoin", () => {
+describe("checkAutoJoin", async () => {
   it("returns false when child has no parent", async () => {
     const child = getApp().sessions.create({ summary: "orphan" });
     const advanced = await checkAutoJoin(getApp(), child.id);
@@ -141,7 +141,7 @@ describe("checkAutoJoin", () => {
   });
 });
 
-describe("fork (single child)", () => {
+describe("fork (single child)", async () => {
   it("rejects an unknown parent", async () => {
     const result = await fork(getApp(), "s-nope", "do something");
     expect(result.ok).toBe(false);
@@ -177,17 +177,17 @@ describe("fork (single child)", () => {
   });
 });
 
-describe("spawnSubagent", () => {
-  it("rejects an unknown parent", () => {
-    const result = spawnSubagent(getApp(), "s-nope", { task: "x" });
+describe("spawnSubagent", async () => {
+  it("rejects an unknown parent", async () => {
+    const result = await spawnSubagent(getApp(), "s-nope", { task: "x" });
     expect(result.ok).toBe(false);
   });
 
-  it("creates a quick-flow child with subagent metadata", () => {
+  it("creates a quick-flow child with subagent metadata", async () => {
     const parent = getApp().sessions.create({ summary: "parent" });
     getApp().sessions.update(parent.id, { agent: "implementer", workdir: "/wd" });
 
-    const result = spawnSubagent(getApp(), parent.id, {
+    const result = await spawnSubagent(getApp(), parent.id, {
       task: "doc this function",
       model: "haiku",
     });
@@ -203,25 +203,25 @@ describe("spawnSubagent", () => {
     expect(child.config?.model_override).toBe("haiku");
   });
 
-  it("agent override takes precedence over the parent's agent", () => {
+  it("agent override takes precedence over the parent's agent", async () => {
     const parent = getApp().sessions.create({ summary: "parent" });
     getApp().sessions.update(parent.id, { agent: "implementer" });
 
-    const result = spawnSubagent(getApp(), parent.id, { task: "review", agent: "reviewer" });
+    const result = await spawnSubagent(getApp(), parent.id, { task: "review", agent: "reviewer" });
     expect(result.ok).toBe(true);
     expect(getApp().sessions.get(result.sessionId!)!.agent).toBe("reviewer");
   });
 
-  it("logs a subagent_spawned event", () => {
+  it("logs a subagent_spawned event", async () => {
     const parent = getApp().sessions.create({ summary: "parent" });
-    const result = spawnSubagent(getApp(), parent.id, { task: "x" });
+    const result = await spawnSubagent(getApp(), parent.id, { task: "x" });
     expect(result.ok).toBe(true);
     const events = getApp().events.list(result.sessionId!);
     expect(events.some((e) => e.type === "subagent_spawned")).toBe(true);
   });
 });
 
-describe("spawnParallelSubagents", () => {
+describe("spawnParallelSubagents", async () => {
   it("returns the list of spawned ids and logs events on each", async () => {
     const parent = getApp().sessions.create({ summary: "parent" });
     const result = await spawnParallelSubagents(getApp(), parent.id, [{ task: "a" }, { task: "b" }, { task: "c" }]);

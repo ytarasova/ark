@@ -2,7 +2,7 @@ import type { IDatabase } from "../database/index.js";
 import type { Event } from "../../types/index.js";
 import { now } from "../util/time.js";
 
-// ── Row type (data stored as JSON string) ───────────────────────────────────
+// -- Row type (data stored as JSON string) --------------------------------
 
 interface EventRow {
   id: number;
@@ -14,13 +14,13 @@ interface EventRow {
   created_at: string;
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// -- Helpers --------------------------------------------------------------
 
 function rowToEvent(row: EventRow): Event {
   return { ...row, data: row.data ? JSON.parse(row.data) : null };
 }
 
-// ── Repository ──────────────────────────────────────────────────────────────
+// -- Repository -----------------------------------------------------------
 
 export class EventRepository {
   private tenantId: string = "default";
@@ -34,8 +34,12 @@ export class EventRepository {
     return this.tenantId;
   }
 
-  log(trackId: string, type: string, opts?: { stage?: string; actor?: string; data?: Record<string, unknown> }): void {
-    this.db
+  async log(
+    trackId: string,
+    type: string,
+    opts?: { stage?: string; actor?: string; data?: Record<string, unknown> },
+  ): Promise<void> {
+    await this.db
       .prepare(
         `
       INSERT INTO events (track_id, type, stage, actor, data, tenant_id, created_at)
@@ -53,7 +57,7 @@ export class EventRepository {
       );
   }
 
-  list(trackId: string, opts?: { type?: string; limit?: number }): Event[] {
+  async list(trackId: string, opts?: { type?: string; limit?: number }): Promise<Event[]> {
     let sql = "SELECT * FROM events WHERE track_id = ? AND tenant_id = ?";
     const params: any[] = [trackId, this.tenantId];
     if (opts?.type) {
@@ -63,10 +67,10 @@ export class EventRepository {
     sql += " ORDER BY id ASC LIMIT ?";
     params.push(opts?.limit ?? 200);
 
-    return (this.db.prepare(sql).all(...params) as EventRow[]).map(rowToEvent);
+    return ((await this.db.prepare(sql).all(...params)) as EventRow[]).map(rowToEvent);
   }
 
-  deleteForTrack(trackId: string): void {
-    this.db.prepare("DELETE FROM events WHERE track_id = ? AND tenant_id = ?").run(trackId, this.tenantId);
+  async deleteForTrack(trackId: string): Promise<void> {
+    await this.db.prepare("DELETE FROM events WHERE track_id = ? AND tenant_id = ?").run(trackId, this.tenantId);
   }
 }

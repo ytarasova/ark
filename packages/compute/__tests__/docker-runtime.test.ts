@@ -80,14 +80,14 @@ function launchOpts(): LaunchOpts {
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-describe("DockerRuntime", () => {
+describe("DockerRuntime", async () => {
   it("has kind=docker and matching name", () => {
     const r = new DockerRuntime();
     expect(r.kind).toBe("docker");
     expect(r.name).toBe("docker");
   });
 
-  describe("prepare", () => {
+  describe("prepare", async () => {
     it("runs pull -> create -> start -> bootstrap -> startArkd -> waitForHealth in order", async () => {
       const { helpers, calls } = makeHelpers();
       const r = new DockerRuntime();
@@ -179,7 +179,7 @@ describe("DockerRuntime", () => {
       const r = new DockerRuntime();
       r.setHelpersForTesting(helpers);
 
-      await expect(r.prepare(makeCompute(), makeHandle(), prepareCtx())).rejects.toThrow(/ark source tree/);
+      (await expect(r.prepare(makeCompute(), makeHandle(), prepareCtx()))).rejects.toThrow(/ark source tree/);
     });
 
     it("cleans up the partially-created container if a later step fails", async () => {
@@ -193,7 +193,7 @@ describe("DockerRuntime", () => {
       r.setHelpersForTesting(helpers);
 
       const handle = makeHandle();
-      await expect(r.prepare(makeCompute(), handle, prepareCtx())).rejects.toThrow("bootstrap blew up");
+      (await expect(r.prepare(makeCompute(), handle, prepareCtx()))).rejects.toThrow("bootstrap blew up");
 
       // Container was created then startContainer ran -- cleanup must remove it.
       expect(calls.find((c) => c.fn === "createContainer")).toBeDefined();
@@ -212,7 +212,7 @@ describe("DockerRuntime", () => {
       const r = new DockerRuntime();
       r.setHelpersForTesting(helpers);
 
-      await expect(r.prepare(makeCompute(), makeHandle(), prepareCtx())).rejects.toThrow("docker create failed");
+      (await expect(r.prepare(makeCompute(), makeHandle(), prepareCtx()))).rejects.toThrow("docker create failed");
       // Nothing to remove: container was never created.
       expect(calls.find((c) => c.fn === "removeContainer")).toBeUndefined();
     });
@@ -227,12 +227,12 @@ describe("DockerRuntime", () => {
       const r = new DockerRuntime();
       r.setHelpersForTesting(helpers);
 
-      await expect(r.prepare(makeCompute(), makeHandle(), prepareCtx())).rejects.toThrow("arkd never came up");
+      (await expect(r.prepare(makeCompute(), makeHandle(), prepareCtx()))).rejects.toThrow("arkd never came up");
       expect(calls.find((c) => c.fn === "removeContainer")).toBeDefined();
     });
   });
 
-  describe("launchAgent", () => {
+  describe("launchAgent", async () => {
     it("delegates to ArkdClient.launchAgent with tmuxName / script / workdir", async () => {
       const { helpers } = makeHelpers();
       const r = new DockerRuntime();
@@ -272,7 +272,7 @@ describe("DockerRuntime", () => {
     it("throws if called before prepare", async () => {
       const r = new DockerRuntime();
       r.setClientFactory(() => stubClient([]));
-      await expect(r.launchAgent(makeCompute(), makeHandle(), launchOpts())).rejects.toThrow(
+      (await expect(r.launchAgent(makeCompute(), makeHandle(), launchOpts()))).rejects.toThrow(
         /handle\.meta\.docker missing/,
       );
     });
@@ -285,11 +285,11 @@ describe("DockerRuntime", () => {
       const handle = makeHandle();
       await r.prepare(makeCompute(), handle, prepareCtx());
       r.setClientFactory(() => stubClient(null, new Error("arkd down")));
-      await expect(r.launchAgent(makeCompute(), handle, launchOpts())).rejects.toThrow("arkd down");
+      (await expect(r.launchAgent(makeCompute(), handle, launchOpts()))).rejects.toThrow("arkd down");
     });
   });
 
-  describe("shutdown", () => {
+  describe("shutdown", async () => {
     it("stops + removes the container", async () => {
       const { helpers, calls } = makeHelpers();
       const r = new DockerRuntime();

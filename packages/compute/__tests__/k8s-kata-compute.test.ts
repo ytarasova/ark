@@ -90,7 +90,7 @@ function makeKataCompute(deps: K8sComputeDeps): KataCompute {
 
 // ── Tests ─────────────────────────────────────────────────────────────────
 
-describe("KataCompute", () => {
+describe("KataCompute", async () => {
   it("advertises `kind: 'k8s-kata'` and microVM-appropriate capabilities", () => {
     const c = new KataCompute();
     expect(c.kind).toBe("k8s-kata");
@@ -134,7 +134,7 @@ describe("KataCompute", () => {
     const harness = makeHarness();
     const c = makeKataCompute(harness.deps);
     const h = await c.provision({ tags: { name: "micro" }, config: {} });
-    await expect(c.snapshot(h)).rejects.toBeInstanceOf(NotSupportedError);
+    (await expect(c.snapshot(h))).rejects.toBeInstanceOf(NotSupportedError);
   });
 
   it("restore still throws NotSupportedError", async () => {
@@ -147,6 +147,6 @@ describe("KataCompute", () => {
       sizeBytes: 0,
       metadata: {},
     };
-    await expect(c.restore(snap)).rejects.toBeInstanceOf(NotSupportedError);
+    (await expect(c.restore(snap))).rejects.toBeInstanceOf(NotSupportedError);
   });
 });

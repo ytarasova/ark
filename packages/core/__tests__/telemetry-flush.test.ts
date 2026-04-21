@@ -17,7 +17,7 @@ afterEach(() => {
   resetTelemetry();
 });
 
-describe("telemetry flush", () => {
+describe("telemetry flush", async () => {
   it("flush sends events and clears buffer", async () => {
     configureTelemetry({ enabled: true, endpoint: "http://localhost:19999/telemetry" });
     track("test_event", { foo: "bar" });

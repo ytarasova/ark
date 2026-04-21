@@ -20,7 +20,7 @@ beforeEach(() => {
   registerSessionHandlers(router, app);
 });
 
-describe("session/fan-out handler", () => {
+describe("session/fan-out handler", async () => {
   it("creates child sessions with parent_id set and parent goes to waiting", async () => {
     // Create parent session
     const startRes = await router.dispatch(
@@ -55,12 +55,12 @@ describe("session/fan-out handler", () => {
     expect(notifications.length).toBe(2);
 
     // Parent should be in "waiting" status
-    const parent = app.sessions.get(parentId);
+    const parent = await app.sessions.get(parentId);
     expect(parent?.status).toBe("waiting");
 
     // Each child should have parent_id set
     for (const childId of childIds) {
-      const child = app.sessions.get(childId);
+      const child = await app.sessions.get(childId);
       expect(child).toBeDefined();
       expect(child?.parent_id).toBe(parentId);
     }
@@ -88,7 +88,7 @@ describe("session/fan-out handler", () => {
     expect(result.ok).toBe(true);
     const childIds = result.childIds as string[];
 
-    const summaries = childIds.map((id) => app.sessions.get(id)?.summary);
+    const summaries = childIds.map(async (id) => (await app.sessions.get(id))?.summary);
     expect(summaries).toContain("first task");
     expect(summaries).toContain("second task");
   });

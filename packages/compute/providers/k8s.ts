@@ -24,8 +24,9 @@ import { logDebug } from "../../core/observability/structured-log.js";
 
 export interface K8sConfig {
   provider: "k8s" | "k8s-kata";
-  namespace?: string; // default: "ark"
-  image?: string; // default: "ubuntu:22.04"
+  context: string; // kubeconfig context (required) -- which cluster to target
+  namespace: string; // required -- which namespace to provision pods in
+  image: string; // required -- container image for agent pods
   kubeconfig?: string; // path to kubeconfig (default: in-cluster or ~/.kube/config)
   runtimeClassName?: string; // "kata-fc" for Firecracker, null for vanilla
   serviceAccount?: string;
@@ -34,6 +35,24 @@ export interface K8sConfig {
     memory?: string; // e.g. "4Gi"
   };
   [key: string]: unknown;
+}
+
+/**
+ * Validate the required fields on a k8s compute config and throw a clear
+ * error if anything is missing. Called at the entry point of every provider
+ * method so a misconfigured compute fails fast with an actionable message
+ * (rather than a confusing cluster-side 404 on the wrong namespace).
+ */
+function requireK8sConfig(cfg: K8sConfig): void {
+  if (!cfg.context) {
+    throw new Error("k8s compute is missing required `context` -- which kubeconfig context (cluster) to target");
+  }
+  if (!cfg.namespace) {
+    throw new Error("k8s compute is missing required `namespace`");
+  }
+  if (!cfg.image) {
+    throw new Error("k8s compute is missing required `image`");
+  }
 }
 
 const EMPTY_METRICS: ComputeMetrics = {
@@ -73,14 +92,26 @@ export class K8sProvider implements ComputeProvider {
 
   private async getApi(compute: Compute): Promise<any> {
     if (this.kubeApi) return this.kubeApi;
+    const cfg = compute.config as K8sConfig;
+    requireK8sConfig(cfg);
     const k8s = await this.getK8sModule();
     const kc = new k8s.KubeConfig();
-    const cfg = compute.config as K8sConfig;
     if (cfg.kubeconfig) {
       kc.loadFromFile(cfg.kubeconfig);
     } else {
       kc.loadFromDefault(); // in-cluster or ~/.kube/config
     }
+    // Pin to the configured context. Without this, kc would use whatever
+    // current-context the kubeconfig file happens to have set -- which is
+    // exactly the silent-default footgun this provider used to have.
+    if (!kc.getContextObject(cfg.context)) {
+      const available = kc
+        .getContexts()
+        .map((c: any) => c.name)
+        .join(", ");
+      throw new Error(`k8s context "${cfg.context}" not found in kubeconfig. Available: ${available || "(none)"}`);
+    }
+    kc.setCurrentContext(cfg.context);
     this.kubeApi = kc.makeApiClient(k8s.CoreV1Api);
     return this.kubeApi;
   }
@@ -93,7 +124,7 @@ export class K8sProvider implements ComputeProvider {
     // Validate K8s connectivity
     const api = await this.getApi(compute);
     const cfg = compute.config as K8sConfig;
-    const ns = cfg.namespace || "ark";
+    const ns = cfg.namespace;
 
     // Ensure namespace exists
     try {
@@ -108,7 +139,7 @@ export class K8sProvider implements ComputeProvider {
   async launch(compute: Compute, session: Session, opts: LaunchOpts): Promise<string> {
     const api = await this.getApi(compute);
     const cfg = compute.config as K8sConfig;
-    const ns = cfg.namespace || "ark";
+    const ns = cfg.namespace;
     const name = this.podName(session);
 
     const pod = {
@@ -127,7 +158,7 @@ export class K8sProvider implements ComputeProvider {
         containers: [
           {
             name: "agent",
-            image: cfg.image || "ubuntu:22.04",
+            image: cfg.image,
             command: ["/bin/bash", "-c", opts.launcherContent],
             resources: cfg.resources
               ? {
@@ -147,7 +178,7 @@ export class K8sProvider implements ComputeProvider {
   async killAgent(compute: Compute, session: Session): Promise<void> {
     const api = await this.getApi(compute);
     const cfg = compute.config as K8sConfig;
-    const ns = cfg.namespace || "ark";
+    const ns = cfg.namespace;
     try {
       await api.deleteNamespacedPod({ name: this.podName(session), namespace: ns });
     } catch {
@@ -167,7 +198,7 @@ export class K8sProvider implements ComputeProvider {
     // Delete all ark pods in namespace
     const api = await this.getApi(compute);
     const cfg = compute.config as K8sConfig;
-    const ns = cfg.namespace || "ark";
+    const ns = cfg.namespace;
     try {
       await api.deleteCollectionNamespacedPod({
         namespace: ns,
@@ -191,7 +222,7 @@ export class K8sProvider implements ComputeProvider {
   async captureOutput(compute: Compute, session: Session, _opts?: { lines?: number }): Promise<string> {
     const api = await this.getApi(compute);
     const cfg = compute.config as K8sConfig;
-    const ns = cfg.namespace || "ark";
+    const ns = cfg.namespace;
     try {
       const res = await api.readNamespacedPodLog({
         name: this.podName(session),
@@ -207,7 +238,7 @@ export class K8sProvider implements ComputeProvider {
   async checkSession(compute: Compute, tmuxSessionId: string): Promise<boolean> {
     const api = await this.getApi(compute);
     const cfg = compute.config as K8sConfig;
-    const ns = cfg.namespace || "ark";
+    const ns = cfg.namespace;
     try {
       const pod = await api.readNamespacedPod({ name: tmuxSessionId, namespace: ns });
       const phase = pod?.status?.phase;
@@ -220,7 +251,7 @@ export class K8sProvider implements ComputeProvider {
   async getMetrics(compute: Compute): Promise<ComputeSnapshot> {
     const api = await this.getApi(compute);
     const cfg = compute.config as K8sConfig;
-    const ns = cfg.namespace || "ark";
+    const ns = cfg.namespace;
     try {
       const { items } = await api.listNamespacedPod({
         namespace: ns,
@@ -253,7 +284,7 @@ export class K8sProvider implements ComputeProvider {
 
   getAttachCommand(compute: Compute, session: Session): string[] {
     const cfg = compute.config as K8sConfig;
-    const ns = cfg.namespace || "ark";
+    const ns = cfg.namespace;
     return ["kubectl", "exec", "-it", "-n", ns, this.podName(session), "--", "/bin/bash"];
   }
 
@@ -290,9 +321,9 @@ export class KataProvider extends K8sProvider {
     // Ensure runtimeClassName defaults to "kata-fc" if not set
     const cfg = compute.config as K8sConfig;
     if (!cfg.runtimeClassName) {
-      this.app!.computes.mergeConfig(compute.name, { runtimeClassName: "kata-fc" });
+      await this.app!.computes.mergeConfig(compute.name, { runtimeClassName: "kata-fc" });
       // Re-read compute with updated config
-      const updated = this.app!.computes.get(compute.name);
+      const updated = await this.app!.computes.get(compute.name);
       if (updated) return super.launch(updated, session, opts);
     }
     return super.launch(compute, session, opts);

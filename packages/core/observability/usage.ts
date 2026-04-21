@@ -80,12 +80,12 @@ export class UsageRecorder {
    * scoped tenant, otherwise the scoped tenant is used. This prevents a
    * remote RPC (`costs/record`) from writing rows attributed to other tenants.
    */
-  record(opts: RecordOpts): void {
+  async record(opts: RecordOpts): Promise<void> {
     const costMode = opts.costMode ?? "api";
     // Subscription and free modes record zero cost (tokens still tracked for productivity/rate limits)
     const cost = costMode === "api" ? this.pricing.calculateCost(opts.model, opts.usage) : 0;
     const tenantId = opts.tenantId && opts.tenantId === this.tenantId ? opts.tenantId : this.tenantId;
-    this.db
+    await this.db
       .prepare(
         `
       INSERT INTO usage_records (session_id, tenant_id, user_id, model, provider, runtime, agent_role,
@@ -118,7 +118,7 @@ export class UsageRecorder {
    * prevent cross-tenant cost disclosure. A caller in tenant A cannot read
    * tenant B's usage by guessing a session id.
    */
-  getSessionCost(sessionId: string): {
+  async getSessionCost(sessionId: string): Promise<{
     cost: number;
     input_tokens: number;
     output_tokens: number;
@@ -126,10 +126,10 @@ export class UsageRecorder {
     cache_write_tokens: number;
     total_tokens: number;
     records: UsageRecord[];
-  } {
-    const records = this.db
+  }> {
+    const records = (await this.db
       .prepare("SELECT * FROM usage_records WHERE session_id = ? AND tenant_id = ? ORDER BY created_at")
-      .all(sessionId, this.tenantId) as UsageRecord[];
+      .all(sessionId, this.tenantId)) as UsageRecord[];
     let cost = 0,
       input = 0,
       output = 0,
@@ -161,7 +161,12 @@ export class UsageRecorder {
    * otherwise. A caller cannot pass an arbitrary tenantId to see another
    * tenant's data -- mismatches are ignored in favor of the scoped tenant.
    */
-  getSummary(opts?: { tenantId?: string; since?: string; until?: string; groupBy?: string }): UsageSummaryRow[] {
+  async getSummary(opts?: {
+    tenantId?: string;
+    since?: string;
+    until?: string;
+    groupBy?: string;
+  }): Promise<UsageSummaryRow[]> {
     const groupCol = opts?.groupBy ?? "model";
     // Validate column name to prevent SQL injection
     if (!VALID_GROUP_COLS.has(groupCol)) {
@@ -186,7 +191,7 @@ export class UsageRecorder {
                  WHERE ${conditions.join(" AND ")}
                  GROUP BY ${groupCol} ORDER BY cost DESC`;
 
-    return this.db.prepare(sql).all(...params) as UsageSummaryRow[];
+    return (await this.db.prepare(sql).all(...params)) as UsageSummaryRow[];
   }
 
   /**
@@ -195,21 +200,21 @@ export class UsageRecorder {
    * Tenant scoping: always filtered by the recorder's configured tenant.
    * A caller-supplied `opts.tenantId` that does not match is ignored.
    */
-  getDailyTrend(opts?: { tenantId?: string; days?: number }): DailyTrendRow[] {
+  async getDailyTrend(opts?: { tenantId?: string; days?: number }): Promise<DailyTrendRow[]> {
     const days = opts?.days ?? 30;
-    // Clamp to a sane positive range so an attacker can't pass arbitrary
-    // text through string interpolation. (The datetime modifier is not
-    // parameterizable in SQLite, so we coerce and clamp to integer first.)
     const safeDays = Math.max(1, Math.min(3650, Math.floor(Number(days) || 30)));
-    const conditions: string[] = [`created_at >= datetime('now', '-${safeDays} days')`, "tenant_id = ?"];
-    const params: any[] = [this.tenantId];
+    // Compute the cutoff in JS so the query is dialect-portable -- SQLite's
+    // datetime('now', '-N days') has no Postgres equivalent.
+    const since = new Date(Date.now() - safeDays * 86400_000).toISOString();
+    const conditions: string[] = ["created_at >= ?", "tenant_id = ?"];
+    const params: any[] = [since, this.tenantId];
 
     const sql = `SELECT DATE(created_at) as date, SUM(cost_usd) as cost
                  FROM usage_records
                  WHERE ${conditions.join(" AND ")}
                  GROUP BY DATE(created_at) ORDER BY date`;
 
-    return this.db.prepare(sql).all(...params) as DailyTrendRow[];
+    return (await this.db.prepare(sql).all(...params)) as DailyTrendRow[];
   }
 
   /**
@@ -218,7 +223,7 @@ export class UsageRecorder {
    * Tenant scoping: always filtered by the recorder's configured tenant --
    * a caller-supplied `opts.tenantId` cannot override the scoped tenant.
    */
-  getTotalCost(opts?: { tenantId?: string; since?: string; until?: string }): number {
+  async getTotalCost(opts?: { tenantId?: string; since?: string; until?: string }): Promise<number> {
     const conditions: string[] = ["tenant_id = ?"];
     const params: any[] = [this.tenantId];
     if (opts?.since) {
@@ -231,7 +236,7 @@ export class UsageRecorder {
     }
 
     const sql = `SELECT COALESCE(SUM(cost_usd), 0) as total FROM usage_records WHERE ${conditions.join(" AND ")}`;
-    const row = this.db.prepare(sql).get(...params) as { total: number } | undefined;
+    const row = (await this.db.prepare(sql).get(...params)) as { total: number } | undefined;
     return row?.total ?? 0;
   }
 }

@@ -107,7 +107,7 @@ afterEach(() => {
   rmSync(sandbox, { recursive: true, force: true });
 });
 
-describe("createVm().start()", () => {
+describe("createVm().start()", async () => {
   it("issues boot-source, rootfs, machine-config, network-iface, InstanceStart in order", async () => {
     const vm = createVm({
       id: "test",
@@ -226,7 +226,7 @@ describe("createVm().start()", () => {
       kernelPath: join(sandbox, "does-not-exist"),
       rootfsPath,
     });
-    await expect(vm.start()).rejects.toThrow(/kernel not found/i);
+    (await expect(vm.start())).rejects.toThrow(/kernel not found/i);
   });
 
   it("throws a readable error when the rootfs file is missing", async () => {
@@ -235,7 +235,7 @@ describe("createVm().start()", () => {
       kernelPath,
       rootfsPath: join(sandbox, "does-not-exist"),
     });
-    await expect(vm.start()).rejects.toThrow(/rootfs not found/i);
+    (await expect(vm.start())).rejects.toThrow(/rootfs not found/i);
   });
 
   it("throws when Firecracker returns a non-2xx response", async () => {
@@ -248,11 +248,11 @@ describe("createVm().start()", () => {
       readArpTable: async () => "",
     });
     const vm = createVm({ id: "err", kernelPath, rootfsPath });
-    await expect(vm.start()).rejects.toThrow(/400.*boom/);
+    (await expect(vm.start())).rejects.toThrow(/400.*boom/);
   });
 });
 
-describe("pause / resume", () => {
+describe("pause / resume", async () => {
   it("PATCHes /vm with the correct state", async () => {
     const vm = createVm({ id: "pr", kernelPath, rootfsPath });
     await vm.start();
@@ -268,7 +268,7 @@ describe("pause / resume", () => {
   });
 });
 
-describe("snapshot / restore", () => {
+describe("snapshot / restore", async () => {
   it("pauses the VM then issues /snapshot/create with the right paths", async () => {
     const vm = createVm({ id: "snap", kernelPath, rootfsPath });
     await vm.start();
@@ -330,13 +330,13 @@ describe("snapshot / restore", () => {
 
   it("restore throws if the snapshot files are missing", async () => {
     const vm = createVm({ id: "restore-bad", kernelPath, rootfsPath });
-    await expect(
-      vm.restore({ memFilePath: join(sandbox, "nope-mem"), stateFilePath: join(sandbox, "nope-state") }),
+    (
+      await expect(vm.restore({ memFilePath: join(sandbox, "nope-mem"), stateFilePath: join(sandbox, "nope-state") }))
     ).rejects.toThrow(/snapshot memory file not found/);
   });
 });
 
-describe("stop", () => {
+describe("stop", async () => {
   it("sends SIGTERM and waits for exit", async () => {
     const vm = createVm({ id: "stop", kernelPath, rootfsPath });
     await vm.start();
@@ -385,7 +385,7 @@ describe("stop", () => {
   }, 10_000);
 });
 
-describe("getGuestIp", () => {
+describe("getGuestIp", async () => {
   it("returns the ARP entry matching the tap name", async () => {
     const vm = createVm({ id: "test", kernelPath, rootfsPath, networkTapName: "fc-test" });
     // No need to start -- ARP lookup is independent of VM state.

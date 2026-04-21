@@ -47,12 +47,12 @@ export function listActions(): string[] {
  * event and return `ok: true` to preserve the prior switch's behaviour.
  */
 export async function executeAction(app: AppContext, sessionId: string, action: string): Promise<ActionResult> {
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: "Session not found" };
 
   const handler = ACTION_INDEX.get(action);
   if (!handler) {
-    app.events.log(sessionId, "action_skipped", {
+    await app.events.log(sessionId, "action_skipped", {
       stage: session.stage ?? undefined,
       actor: "system",
       data: { action, reason: "unknown action type" },

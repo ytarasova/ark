@@ -13,7 +13,7 @@ import { FilesystemVendorResolver } from "../vendor.js";
 import type { ExtractorContext, Repo } from "../interfaces/index.js";
 import type { CodeIntelStore } from "../store.js";
 
-describe("dependenciesSyftExtractor (stub)", () => {
+describe("dependenciesSyftExtractor (stub)", async () => {
   it("declares the dependencies row kind", () => {
     expect(dependenciesSyftExtractor.produces).toContain("dependencies");
   });

@@ -58,7 +58,7 @@ export async function fetchPRState(prUrl: string, ghExec: GhExecFn = _ghExec): P
  * Finds sessions in `waiting` status with `merge_queued_at` in config and checks PR state.
  */
 export async function pollPRMerges(app: AppContext, opts?: MergePollerOptions): Promise<void> {
-  const sessions = app.sessions.list({ limit: 100 }) as Session[];
+  const sessions = (await app.sessions.list({ limit: 100 })) as Session[];
   const now = Date.now();
 
   for (const s of sessions) {
@@ -90,14 +90,14 @@ export async function checkSessionMerge(app: AppContext, session: Session, opts?
   const data = await fetchPRState(session.pr_url!, ghExec);
   if (!data) {
     // gh CLI error -- update timestamp and keep polling
-    app.sessions.update(session.id, {
+    await app.sessions.update(session.id, {
       config: { ...config, last_merge_check: new Date().toISOString() },
     });
     return;
   }
 
   if (data.state === "MERGED") {
-    app.events.log(session.id, "pr_merged_confirmed", {
+    await app.events.log(session.id, "pr_merged_confirmed", {
       stage: session.stage ?? undefined,
       actor: "github",
       data: { pr_url: session.pr_url, merged_at: data.mergedAt },
@@ -110,13 +110,13 @@ export async function checkSessionMerge(app: AppContext, session: Session, opts?
   }
 
   if (data.state === "CLOSED") {
-    app.events.log(session.id, "pr_merge_failed", {
+    await app.events.log(session.id, "pr_merge_failed", {
       stage: session.stage ?? undefined,
       actor: "github",
       data: { pr_url: session.pr_url, reason: "PR was closed without merging" },
     });
 
-    app.sessions.update(session.id, {
+    await app.sessions.update(session.id, {
       status: "failed",
       error: "PR was closed without merging -- CI checks may have failed",
     });
@@ -124,7 +124,7 @@ export async function checkSessionMerge(app: AppContext, session: Session, opts?
   }
 
   // state === "OPEN" -- still waiting for CI, update timestamp
-  app.sessions.update(session.id, {
+  await app.sessions.update(session.id, {
     config: { ...config, last_merge_check: new Date().toISOString() },
   });
 }

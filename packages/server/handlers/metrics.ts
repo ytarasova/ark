@@ -18,7 +18,7 @@ export function registerMetricsHandlers(router: Router, app: AppContext): void {
   router.handle("metrics/snapshot", async (p) => {
     const { computeName } = extract<MetricsSnapshotParams>(p, []);
     const resolved = computeName ?? "local";
-    const compute = app.computes.get(resolved);
+    const compute = await app.computes.get(resolved);
     if (!compute) return { snapshot: null };
     const provider = getProvider(compute.provider);
     if (!provider?.getMetrics) return { snapshot: null };
@@ -27,8 +27,8 @@ export function registerMetricsHandlers(router: Router, app: AppContext): void {
   });
 
   router.handle("costs/read", async () => {
-    const sessions = app.sessions.list({ limit: 500 });
-    const { sessions: costs, total } = getAllSessionCosts(app, sessions);
+    const sessions = await app.sessions.list({ limit: 500 });
+    const { sessions: costs, total } = await getAllSessionCosts(app, sessions);
     return { costs, total };
   });
 
@@ -43,8 +43,8 @@ export function registerMetricsHandlers(router: Router, app: AppContext): void {
     // tenantId is intentionally NOT forwarded from the client -- the
     // UsageRecorder enforces its own tenant scope. A remote caller cannot
     // query another tenant's costs by passing that tenant's id here.
-    const summary = app.usageRecorder.getSummary({ groupBy, since, until });
-    const total = app.usageRecorder.getTotalCost({ since, until });
+    const summary = await app.usageRecorder.getSummary({ groupBy, since, until });
+    const total = await app.usageRecorder.getTotalCost({ since, until });
     return { summary, total };
   });
 
@@ -53,7 +53,7 @@ export function registerMetricsHandlers(router: Router, app: AppContext): void {
     const days = params.days ?? 30;
 
     // tenantId is intentionally NOT forwarded from the client.
-    const trend = app.usageRecorder.getDailyTrend({ days });
+    const trend = await app.usageRecorder.getDailyTrend({ days });
     return { trend };
   });
 
@@ -67,10 +67,10 @@ export function registerMetricsHandlers(router: Router, app: AppContext): void {
     // us return 404-style errors for sessions that don't exist in this
     // tenant, instead of silently returning an empty cost record (which
     // could be used to probe session ids).
-    const session = app.sessions.get(sessionId);
+    const session = await app.sessions.get(sessionId);
     if (!session) throw new Error("Session not found");
 
-    const result = app.usageRecorder.getSessionCost(sessionId);
+    const result = await app.usageRecorder.getSessionCost(sessionId);
     return result;
   });
 
@@ -83,12 +83,12 @@ export function registerMetricsHandlers(router: Router, app: AppContext): void {
     // tenant-scoped; .get() returns null for sessions in other tenants,
     // which both prevents cross-tenant write attribution and hides the
     // existence of other tenants' sessions from enumerators.
-    const session = app.sessions.get(params.sessionId);
+    const session = await app.sessions.get(params.sessionId);
     if (!session) throw new Error("Session not found");
     // tenantId is intentionally NOT forwarded from the client -- the
     // UsageRecorder is tenant-scoped and will attribute the record to the
     // caller's tenant regardless.
-    app.usageRecorder.record({
+    await app.usageRecorder.record({
       sessionId: params.sessionId,
       model: params.model,
       provider: params.provider,

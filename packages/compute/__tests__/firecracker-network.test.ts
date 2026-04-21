@@ -79,7 +79,7 @@ function readInvocations(): string[][] {
     .map((line) => line.split("\t"));
 }
 
-describe("ensureBridge", () => {
+describe("ensureBridge", async () => {
   it("issues `ip link add ... type bridge` then `ip link set up`", async () => {
     await ensureBridge("arkbr-test");
     const invocations = readInvocations();
@@ -102,11 +102,11 @@ describe("ensureBridge", () => {
   it("propagates unexpected errors from `ip link add`", async () => {
     process.env.FC_TEST_FAIL_PATTERN = "link.*add.*type.*bridge";
     process.env.FC_TEST_FAIL_STDERR = "Operation not permitted";
-    await expect(ensureBridge("arkbr-test")).rejects.toThrow(/Operation not permitted/);
+    (await expect(ensureBridge("arkbr-test"))).rejects.toThrow(/Operation not permitted/);
   });
 });
 
-describe("createTap", () => {
+describe("createTap", async () => {
   it("adds tap, enslaves to bridge, brings up", async () => {
     await createTap("fc-abc", "arkbr-test");
     const invocations = readInvocations();
@@ -118,7 +118,7 @@ describe("createTap", () => {
   });
 });
 
-describe("removeTap", () => {
+describe("removeTap", async () => {
   it("issues `ip link delete`", async () => {
     await removeTap("fc-abc");
     const invocations = readInvocations();
@@ -134,11 +134,11 @@ describe("removeTap", () => {
   it("propagates other errors", async () => {
     process.env.FC_TEST_FAIL_PATTERN = "link.*delete";
     process.env.FC_TEST_FAIL_STDERR = "RTNETLINK answers: Operation not permitted";
-    await expect(removeTap("fc-abc")).rejects.toThrow(/Operation not permitted/);
+    (await expect(removeTap("fc-abc"))).rejects.toThrow(/Operation not permitted/);
   });
 });
 
-describe("assignGuestIp", () => {
+describe("assignGuestIp", async () => {
   it("returns a /30 pair and configures the host side", async () => {
     const addr = await assignGuestIp("fc-xyz");
     expect(addr.prefixLen).toBe(30);

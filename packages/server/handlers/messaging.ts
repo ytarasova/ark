@@ -24,12 +24,12 @@ export function registerMessagingHandlers(router: Router, app: AppContext): void
 
   router.handle("message/markRead", async (p) => {
     const { sessionId } = extract<SessionIdParams>(p, ["sessionId"]);
-    app.messages.markRead(sessionId);
+    await app.messages.markRead(sessionId);
     return { ok: true };
   });
 
   router.handle("session/unread-counts", async () => {
-    const counts = app.messages.unreadCounts();
+    const counts = await app.messages.unreadCounts();
     return { counts };
   });
 }

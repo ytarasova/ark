@@ -81,7 +81,7 @@ describe("soft delete", () => {
 
 import { deleteSessionAsync, undeleteSessionAsync } from "../services/session-orchestration.js";
 
-describe("deleteSessionAsync with soft delete", () => {
+describe("deleteSessionAsync with soft delete", async () => {
   it("soft-deletes instead of hard-deleting", async () => {
     const s = getApp().sessions.create({ summary: "soft-kill" });
     getApp().sessions.update(s.id, { status: "running" });
@@ -93,7 +93,7 @@ describe("deleteSessionAsync with soft delete", () => {
   });
 });
 
-describe("undeleteSessionAsync", () => {
+describe("undeleteSessionAsync", async () => {
   it("restores a soft-deleted session", async () => {
     const s = getApp().sessions.create({ summary: "restore" });
     getApp().sessions.update(s.id, { status: "stopped" });
@@ -110,7 +110,7 @@ describe("undeleteSessionAsync", () => {
   });
 });
 
-describe("soft delete edge cases", () => {
+describe("soft delete edge cases", async () => {
   it("softDeleteSession returns false for non-existent session", () => {
     expect(getApp().sessions.softDelete("nonexistent")).toBe(false);
   });

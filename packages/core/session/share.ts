@@ -14,9 +14,9 @@ export interface SessionExport {
 }
 
 /** Export a session to a JSON file. */
-export function exportSession(app: AppContext, sessionId: string): SessionExport | null {
-  const session = app.sessions.get(sessionId);
-  const events = app.events.list(sessionId) as Event[];
+export async function exportSession(app: AppContext, sessionId: string): Promise<SessionExport | null> {
+  const session = await app.sessions.get(sessionId);
+  const events = (await app.events.list(sessionId)) as Event[];
   if (!session) return null;
 
   return {
@@ -37,18 +37,18 @@ export function exportSession(app: AppContext, sessionId: string): SessionExport
 }
 
 /** Export session to a file path. */
-export function exportSessionToFile(app: AppContext, sessionId: string, filePath: string): boolean {
-  const data = exportSession(app, sessionId);
+export async function exportSessionToFile(app: AppContext, sessionId: string, filePath: string): Promise<boolean> {
+  const data = await exportSession(app, sessionId);
   if (!data) return false;
   writeFileSync(filePath, JSON.stringify(data, null, 2));
   return true;
 }
 
 /** Import a session from a JSON file. */
-export function importSessionFromFile(
+export async function importSessionFromFile(
   app: AppContext,
   filePath: string,
-): { ok: boolean; sessionId?: string; message: string } {
+): Promise<{ ok: boolean; sessionId?: string; message: string }> {
   try {
     const raw = readFileSync(filePath, "utf-8");
     const data = JSON.parse(raw) as SessionExport;
@@ -63,10 +63,10 @@ export function importSessionFromFile(
       config: data.session.config,
       group_name: data.session.group_name,
     };
-    const session = app.sessions.create(createOpts);
+    const session = await app.sessions.create(createOpts);
 
     if (data.session.agent) {
-      app.sessions.update(session.id, { agent: data.session.agent });
+      await app.sessions.update(session.id, { agent: data.session.agent });
     }
 
     return { ok: true, sessionId: session.id, message: `Imported as ${session.id}` };

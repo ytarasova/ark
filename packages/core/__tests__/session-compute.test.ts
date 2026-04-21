@@ -5,13 +5,13 @@ import { getApp } from "./test-helpers.js";
 
 withTestContext();
 
-describe("session compute dispatch", () => {
-  it("dispatch is an async function that returns a Promise", () => {
+describe("session compute dispatch", async () => {
+  it("dispatch is an async function that returns a Promise", async () => {
     // dispatch should be a function
     expect(typeof dispatch).toBe("function");
 
     // Calling dispatch with a nonexistent session should return a Promise
-    const result = dispatch(getApp(), "nonexistent-id");
+    const result = await dispatch(getApp(), "nonexistent-id");
     expect(result).toBeInstanceOf(Promise);
   });
 

@@ -121,7 +121,7 @@ export async function appendPreviousStageContext(app: AppContext, session: Sessi
   const parts: string[] = [];
 
   // Previous stage context
-  const events = app.events.list(session.id);
+  const events = await app.events.list(session.id);
   const completed = events.filter((e) => e.type === "stage_completed");
   if (completed.length) {
     parts.push("\n## Previous stages:");
@@ -181,7 +181,7 @@ export async function buildTaskWithHandoff(
     if (agent) {
       const mFilter = parseMessageFilter(agent);
       if (mFilter) {
-        const messages = app.messages.list(session.id).map((m) => ({
+        const messages = (await app.messages.list(session.id)).map((m) => ({
           role: m.role,
           content: m.content,
           timestamp: m.created_at,

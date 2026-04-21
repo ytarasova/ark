@@ -9,7 +9,7 @@ export const closeAction: ActionHandler = {
   name: "close_ticket",
   aliases: ["close"],
   async execute(app, session, action) {
-    app.events.log(session.id, "action_executed", {
+    await app.events.log(session.id, "action_executed", {
       stage: session.stage ?? undefined,
       actor: "system",
       data: { action },

@@ -28,7 +28,7 @@ async function rpcResult(
   return data;
 }
 
-describe("web server", () => {
+describe("web server", async () => {
   let server: { stop: () => void; url: string } | null = null;
   afterEach(() => {
     server?.stop();

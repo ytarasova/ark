@@ -23,14 +23,14 @@ export class MaintenancePollers {
 
   start(): void {
     // Purge expired soft-deletes every 30s
-    this.purgeInterval = setInterval(() => {
+    this.purgeInterval = setInterval(async () => {
       try {
-        const deleted = this.app.sessions.listDeleted();
+        const deleted = await this.app.sessions.listDeleted();
         const cutoff = Date.now() - 90 * 1000;
         for (const s of deleted) {
           const deletedAt = s.config?._deleted_at as string | undefined;
           if (deletedAt && new Date(deletedAt).getTime() < cutoff) {
-            this.app.sessions.delete(s.id);
+            await this.app.sessions.delete(s.id);
           }
         }
       } catch {
@@ -40,7 +40,7 @@ export class MaintenancePollers {
 
     // tmux status bar every 5s
     this.tmuxStatusInterval = setInterval(() => {
-      updateTmuxStatusBar(this.app);
+      void updateTmuxStatusBar(this.app);
     }, 5_000);
 
     this.notifyDaemon = startNotifyDaemon(this.app);
@@ -48,7 +48,7 @@ export class MaintenancePollers {
     // Log cleanup is fire-and-forget
     safeAsync("boot: cleanup logs", async () => {
       const { cleanupLogs } = await import("../observability/log-manager.js");
-      cleanupLogs(this.app);
+      await cleanupLogs(this.app);
     });
   }
 

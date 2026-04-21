@@ -11,7 +11,7 @@ const fakeCompute = {
   updated_at: "",
 };
 
-describe("DockerProvider", () => {
+describe("DockerProvider", async () => {
   it("has name 'docker'", () => {
     expect(provider.name).toBe("docker");
   });
@@ -80,7 +80,7 @@ describe("containerName", () => {
   });
 });
 
-describe("DockerProvider.provision", () => {
+describe("DockerProvider.provision", async () => {
   it("throws when Docker is not available", async () => {
     // This test will only pass in environments without Docker.
     // In CI with Docker, provision would succeed. We check that

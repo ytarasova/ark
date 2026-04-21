@@ -20,8 +20,8 @@ afterAll(async () => {
   await app?.shutdown();
 });
 
-beforeEach(() => {
-  store.clear();
+beforeEach(async () => {
+  await store.clear();
 });
 
 describe("isCodegraphInstalled", () => {
@@ -33,7 +33,7 @@ describe("isCodegraphInstalled", () => {
   });
 });
 
-describe("indexCodebase", () => {
+describe("indexCodebase", async () => {
   it("reads codegraph DB and maps nodes/edges into knowledge store", async () => {
     // Create a fake repo with a pre-built .codegraph/graph.db
     const tmpDir = join(app.config.arkDir, "test-repo-cg");
@@ -80,22 +80,22 @@ describe("indexCodebase", () => {
     expect(result.edges).toBeGreaterThanOrEqual(1);
 
     // Verify file nodes
-    const appFile = store.getNode("file:src/app.ts");
+    const appFile = await store.getNode("file:src/app.ts");
     expect(appFile).not.toBeNull();
     expect(appFile!.type).toBe("file");
 
-    const dbFile = store.getNode("file:src/db.ts");
+    const dbFile = await store.getNode("file:src/db.ts");
     expect(dbFile).not.toBeNull();
 
     // Verify symbol nodes
-    const bootNode = store.getNode("symbol:src/app.ts::boot:10");
+    const bootNode = await store.getNode("symbol:src/app.ts::boot:10");
     expect(bootNode).not.toBeNull();
     expect(bootNode!.type).toBe("symbol");
     expect(bootNode!.label).toBe("boot");
     expect(bootNode!.metadata.kind).toBe("function");
     expect(bootNode!.metadata.exported).toBe(true);
 
-    const dbNode = store.getNode("symbol:src/db.ts::Database:5");
+    const dbNode = await store.getNode("symbol:src/db.ts::Database:5");
     expect(dbNode).not.toBeNull();
     expect(dbNode!.metadata.kind).toBe("class");
 
@@ -138,8 +138,8 @@ describe("indexCodebase", () => {
     expect(result.symbols).toBe(3);
 
     // Both 'app' parameters should exist as separate nodes
-    const app1 = store.getNode("symbol:src/orchestration.ts::app:10");
-    const app2 = store.getNode("symbol:src/orchestration.ts::app:25");
+    const app1 = await store.getNode("symbol:src/orchestration.ts::app:10");
+    const app2 = await store.getNode("symbol:src/orchestration.ts::app:25");
     expect(app1).not.toBeNull();
     expect(app2).not.toBeNull();
     expect(app1!.metadata.line_start).toBe(10);
@@ -150,9 +150,9 @@ describe("indexCodebase", () => {
 
   it("full re-index clears existing file and symbol nodes", async () => {
     // Pre-populate
-    store.addNode({ id: "file:old.ts", type: "file", label: "old.ts" });
-    store.addNode({ id: "symbol:old.ts::foo", type: "symbol", label: "foo" });
-    store.addNode({ id: "memory:keep-me", type: "memory", label: "should not be cleared" });
+    await store.addNode({ id: "file:old.ts", type: "file", label: "old.ts" });
+    await store.addNode({ id: "symbol:old.ts::foo", type: "symbol", label: "foo" });
+    await store.addNode({ id: "memory:keep-me", type: "memory", label: "should not be cleared" });
 
     // Create empty codegraph DB
     const tmpDir = join(app.config.arkDir, "test-repo-cg2");
@@ -176,10 +176,10 @@ describe("indexCodebase", () => {
     await indexCodebase(tmpDir, store, { exec: fakeExec });
 
     // Old file and symbol nodes should be gone
-    expect(store.getNode("file:old.ts")).toBeNull();
-    expect(store.getNode("symbol:old.ts::foo")).toBeNull();
+    expect(await store.getNode("file:old.ts")).toBeNull();
+    expect(await store.getNode("symbol:old.ts::foo")).toBeNull();
     // Memory node should survive
-    expect(store.getNode("memory:keep-me")).not.toBeNull();
+    expect(await store.getNode("memory:keep-me")).not.toBeNull();
 
     rmSync(tmpDir, { recursive: true, force: true });
   });
@@ -194,14 +194,16 @@ describe("indexCodebase", () => {
       return "";
     };
 
-    await expect(indexCodebase("/fake/repo", store, { exec: fakeExec })).rejects.toThrow("codegraph is required");
+    (await expect(await indexCodebase("/fake/repo", store, { exec: fakeExec }))).rejects.toThrow(
+      "codegraph is required",
+    );
   });
 });
 
-describe("indexCoChanges", () => {
-  it("creates co_changes edges from git log", () => {
-    store.addNode({ id: "file:src/a.ts", type: "file", label: "src/a.ts" });
-    store.addNode({ id: "file:src/b.ts", type: "file", label: "src/b.ts" });
+describe("indexCoChanges", async () => {
+  it("creates co_changes edges from git log", async () => {
+    await store.addNode({ id: "file:src/a.ts", type: "file", label: "src/a.ts" });
+    await store.addNode({ id: "file:src/b.ts", type: "file", label: "src/b.ts" });
 
     const gitLog = [
       "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111",
@@ -226,7 +228,7 @@ describe("indexCoChanges", () => {
     const count = indexCoChanges("/fake/repo", store, { exec: fakeExec });
     expect(count).toBeGreaterThanOrEqual(1);
 
-    const edges = store.getEdges("file:src/a.ts", { relation: "co_changes" });
+    const edges = await store.getEdges("file:src/a.ts", { relation: "co_changes" });
     expect(edges.length).toBeGreaterThanOrEqual(1);
     const coEdge = edges.find(
       (e) =>
@@ -266,27 +268,27 @@ describe("indexCoChanges", () => {
   });
 });
 
-describe("indexSessionCompletion", () => {
-  it("creates session node and modified_by edges", () => {
-    store.addNode({ id: "file:src/main.ts", type: "file", label: "src/main.ts" });
-    store.addNode({ id: "file:src/utils.ts", type: "file", label: "src/utils.ts" });
+describe("indexSessionCompletion", async () => {
+  it("creates session node and modified_by edges", async () => {
+    await store.addNode({ id: "file:src/main.ts", type: "file", label: "src/main.ts" });
+    await store.addNode({ id: "file:src/utils.ts", type: "file", label: "src/utils.ts" });
 
     indexSessionCompletion(store, "s-123", "Fix login bug", "success", ["src/main.ts", "src/utils.ts"]);
 
-    const sessionNode = store.getNode("session:s-123");
+    const sessionNode = await store.getNode("session:s-123");
     expect(sessionNode).not.toBeNull();
     expect(sessionNode!.type).toBe("session");
     expect(sessionNode!.label).toBe("Fix login bug");
     expect(sessionNode!.metadata.outcome).toBe("success");
     expect(sessionNode!.metadata.files_changed).toEqual(["src/main.ts", "src/utils.ts"]);
 
-    const mainEdges = store.getEdges("file:src/main.ts", { relation: "modified_by", direction: "out" });
+    const mainEdges = await store.getEdges("file:src/main.ts", { relation: "modified_by", direction: "out" });
     expect(mainEdges.length).toBe(1);
     expect(mainEdges[0].target_id).toBe("session:s-123");
   });
 
-  it("updates existing session node", () => {
-    store.addNode({
+  it("updates existing session node", async () => {
+    await store.addNode({
       id: "session:s-456",
       type: "session",
       label: "Initial summary",
@@ -296,21 +298,21 @@ describe("indexSessionCompletion", () => {
 
     indexSessionCompletion(store, "s-456", "Updated summary", "success", ["src/app.ts"]);
 
-    const node = store.getNode("session:s-456");
+    const node = await store.getNode("session:s-456");
     expect(node).not.toBeNull();
     expect(node!.metadata.outcome).toBe("success");
     expect(node!.metadata.files_changed).toEqual(["src/app.ts"]);
     expect(node!.label).toBe("Initial summary");
   });
 
-  it("handles empty changed files list", () => {
+  it("handles empty changed files list", async () => {
     indexSessionCompletion(store, "s-789", "No file changes", "success", []);
 
-    const node = store.getNode("session:s-789");
+    const node = await store.getNode("session:s-789");
     expect(node).not.toBeNull();
     expect(node!.metadata.files_changed).toEqual([]);
 
-    const edges = store.getEdges("session:s-789", { relation: "modified_by" });
+    const edges = await store.getEdges("session:s-789", { relation: "modified_by" });
     expect(edges.length).toBe(0);
   });
 });

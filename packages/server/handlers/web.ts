@@ -37,7 +37,7 @@ async function probeHealth(baseUrl: string, timeoutMs = 2000): Promise<boolean> 
 export function registerWebHandlers(router: Router, app: AppContext): void {
   // ── Status ───────────────────────────────────────────────────────────────
   router.handle("status/get", async () => {
-    const sessions = app.sessions.list({ limit: 500 });
+    const sessions = await app.sessions.list({ limit: 500 });
     const byStatus: Record<string, number> = {};
     for (const s of sessions) {
       byStatus[s.status] = (byStatus[s.status] || 0) + 1;
@@ -62,8 +62,8 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
   // ── Search ───────────────────────────────────────────────────────────────
   router.handle("search/sessions", async (p) => {
     const { query, limit } = extract<{ query: string; limit?: number }>(p, ["query"]);
-    const sessions = searchSessions(app, query, { limit: limit ?? 50 });
-    const transcripts = searchTranscripts(app, query, { limit: limit ?? 50 });
+    const sessions = await searchSessions(app, query, { limit: limit ?? 50 });
+    const transcripts = await searchTranscripts(app, query, { limit: limit ?? 50 });
     return { sessions, transcripts };
   });
 
@@ -88,16 +88,16 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
   // ── Cost export ──────────────────────────────────────────────────────────
   router.handle("cost/export", async (p) => {
     const { format } = extract<{ format?: string }>(p, []);
-    const sessions = app.sessions.list({ limit: 500 });
+    const sessions = await app.sessions.list({ limit: 500 });
     if (format === "csv") {
-      return { csv: exportCostsCsv(app, sessions) };
+      return { csv: await exportCostsCsv(app, sessions) };
     }
-    return getAllSessionCosts(app, sessions);
+    return await getAllSessionCosts(app, sessions);
   });
 
   // ── Conductor learnings ──────────────────────────────────────────────────
   router.handle("learning/list", async (_p) => {
-    const nodes = app.knowledge.listNodes({ type: "learning" });
+    const nodes = await app.knowledge.listNodes({ type: "learning" });
     return {
       learnings: nodes.map((n: KnowledgeNode) => ({
         title: n.label,
@@ -114,28 +114,28 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
       "description",
     ]);
     // Check for existing learning with same label and increment recurrence
-    const existing = app.knowledge.search(title, { types: ["learning"], limit: 5 });
+    const existing = await app.knowledge.search(title, { types: ["learning"], limit: 5 });
     const match = existing.find((n) => n.label === title);
     if (match) {
       const recurrence = ((match.metadata.recurrence as number) ?? 1) + 1;
-      app.knowledge.updateNode(match.id, {
+      await app.knowledge.updateNode(match.id, {
         content: description || match.content,
         metadata: { ...match.metadata, recurrence },
       });
-      const updated = app.knowledge.getNode(match.id)!;
+      const updated = (await app.knowledge.getNode(match.id))!;
       return {
         ok: true,
         learning: { title: updated.label, description: updated.content, recurrence, lastSeen: updated.updated_at },
         promoted: recurrence >= 3,
       };
     }
-    const id = app.knowledge.addNode({
+    const id = await app.knowledge.addNode({
       type: "learning",
       label: title,
       content: description,
       metadata: { recurrence: 1 },
     });
-    const node = app.knowledge.getNode(id)!;
+    const node = (await app.knowledge.getNode(id))!;
     return {
       ok: true,
       learning: { title: node.label, description: node.content, recurrence: 1, lastSeen: node.updated_at },
@@ -145,7 +145,7 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
 
   // ── Worktree list & cleanup ──────────────────────────────────────────────
   router.handle("worktree/list", async () => {
-    const sessions = app.sessions.list({ limit: 500 });
+    const sessions = await app.sessions.list({ limit: 500 });
     const withWorktrees = sessions.filter((s) => s.workdir && s.branch);
     return { worktrees: withWorktrees };
   });
@@ -172,7 +172,7 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
     if (body.version !== 1) {
       throw new Error("Unsupported export version");
     }
-    const session = app.sessions.create({
+    const session = await app.sessions.create({
       ticket: body.session.ticket,
       summary: body.session.summary ? `[imported] ${body.session.summary}` : "[imported session]",
       repo: body.session.repo,
@@ -180,14 +180,14 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
       config: body.session.config,
       group_name: body.session.group_name,
     });
-    if (body.session.agent) app.sessions.update(session.id, { agent: body.session.agent });
+    if (body.session.agent) await app.sessions.update(session.id, { agent: body.session.agent });
     return { ok: true, sessionId: session.id, message: `Imported as ${session.id}` };
   });
 
   // ── Session export (by id, no file path) ─────────────────────────────────
   router.handle("session/export-data", async (p) => {
     const { sessionId } = extract<{ sessionId: string }>(p, ["sessionId"]);
-    const data = exportSession(app, sessionId);
+    const data = await exportSession(app, sessionId);
     if (!data) throw new Error("Session not found");
     return data;
   });

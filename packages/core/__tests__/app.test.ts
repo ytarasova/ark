@@ -8,7 +8,7 @@ afterEach(async () => {
   app = null;
 });
 
-describe("AppContext", () => {
+describe("AppContext", async () => {
   it("starts in created phase", async () => {
     app = await AppContext.forTestAsync();
     expect(app.phase).toBe("created");

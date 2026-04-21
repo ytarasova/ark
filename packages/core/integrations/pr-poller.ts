@@ -86,7 +86,7 @@ export async function processReviewFeedback(
   if (newReviews.length === 0) return;
 
   // Update state
-  app.sessions.update(session.id, {
+  await app.sessions.update(session.id, {
     config: {
       ...config,
       last_review_check: new Date().toISOString(),
@@ -99,7 +99,7 @@ export async function processReviewFeedback(
   // Check for approvals
   const approvals = newReviews.filter((r) => r.state === "APPROVED");
   if (approvals.length > 0) {
-    app.events.log(session.id, "pr_approved", {
+    await app.events.log(session.id, "pr_approved", {
       actor: "github",
       data: {
         pr_url: session.pr_url,
@@ -126,9 +126,9 @@ export async function processReviewFeedback(
   const prompt = formatReviewPrompt(data.title, data.number, comments, newReviews[0]?.state);
 
   // Store as message for the UI
-  app.messages.send(session.id, "system", prompt, "text");
+  await app.messages.send(session.id, "system", prompt, "text");
 
-  app.events.log(session.id, "pr_review_feedback", {
+  await app.events.log(session.id, "pr_review_feedback", {
     actor: "github",
     data: {
       pr_url: session.pr_url,
@@ -140,7 +140,7 @@ export async function processReviewFeedback(
   // Steer via channel if running
   if (session.status !== "running") return;
 
-  const channelPort = app.sessions.channelPort(session.id);
+  const channelPort = await app.sessions.channelPort(session.id);
   const steerPayload = { type: "steer", sessionId: session.id, message: prompt, from: "github-review" };
   const delivered = await safeAsync(`pr-poller: deliverToChannel for ${session.id}`, async () => {
     const { deliverToChannel } = await import("../conductor/conductor.js");
@@ -163,7 +163,7 @@ export async function processReviewFeedback(
  * Finds sessions with pr_url in review-gated stages and checks for new reviews.
  */
 export async function pollPRReviews(app: AppContext, opts?: PRPollerOptions): Promise<void> {
-  const sessions = app.sessions.list({ limit: 100 }) as Session[];
+  const sessions = (await app.sessions.list({ limit: 100 })) as Session[];
   const now = Date.now();
 
   for (const s of sessions) {
@@ -198,13 +198,13 @@ export async function checkSessionPR(app: AppContext, session: Session, opts?: P
   if (!data) return;
 
   // Update check timestamp
-  app.sessions.update(session.id, {
+  await app.sessions.update(session.id, {
     config: { ...config, last_review_check: new Date().toISOString(), pr_state: data.state },
   });
 
   // PR merged or closed - stop polling
   if (data.state === "MERGED" || data.state === "CLOSED") {
-    app.events.log(session.id, "pr_status", {
+    await app.events.log(session.id, "pr_status", {
       actor: "github",
       data: { state: data.state, pr_url: session.pr_url },
     });

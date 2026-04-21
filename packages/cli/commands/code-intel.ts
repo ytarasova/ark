@@ -26,16 +26,16 @@ import { getContextQuery } from "../../core/code-intel/queries/get-context.js";
 import { DEFAULT_TENANT_ID } from "../../core/code-intel/constants.js";
 import { runGit } from "../../core/code-intel/util/git.js";
 
-function resolveTenantId(app: AppContext, explicitSlug?: string | null): string {
+async function resolveTenantId(app: AppContext, explicitSlug?: string | null): Promise<string> {
   // Explicit --tenant; otherwise the configured default; else the seeded local tenant.
   if (explicitSlug) {
-    const t = app.codeIntel.getTenantBySlug(explicitSlug);
+    const t = await app.codeIntel.getTenantBySlug(explicitSlug);
     if (!t) throw new Error(`tenant "${explicitSlug}" not found -- run \`ark tenant create\` first`);
     return t.id;
   }
   const fallbackSlug = app.config.authSection.defaultTenant;
   if (fallbackSlug) {
-    const t = app.codeIntel.getTenantBySlug(fallbackSlug);
+    const t = await app.codeIntel.getTenantBySlug(fallbackSlug);
     if (t) return t.id;
   }
   return DEFAULT_TENANT_ID;
@@ -50,17 +50,17 @@ export function registerCodeIntelCommands(program: Command, app: AppContext) {
   db.command("migrate")
     .description("Apply any pending code-intel migrations")
     .option("--to <version>", "Target version (default: latest)")
-    .action((opts) => {
+    .action(async (opts) => {
       const target = opts.to ? Number(opts.to) : undefined;
-      app.codeIntel.migrate({ targetVersion: target });
-      const status = app.codeIntel.migrationStatus();
+      await app.codeIntel.migrate({ targetVersion: target });
+      const status = await app.codeIntel.migrationStatus();
       console.log(chalk.green(`Applied. Current version: ${status.currentVersion}`));
     });
 
   db.command("status")
     .description("Print current schema version + pending migrations")
-    .action(() => {
-      const status = app.codeIntel.migrationStatus();
+    .action(async () => {
+      const status = await app.codeIntel.migrationStatus();
       console.log(`Current version: ${chalk.cyan(status.currentVersion)}`);
       if (status.pending.length === 0) {
         console.log(chalk.green("No pending migrations."));
@@ -73,13 +73,13 @@ export function registerCodeIntelCommands(program: Command, app: AppContext) {
   db.command("reset")
     .description("Drop every code-intel table (DEV ONLY).")
     .option("--yes", "Confirm destructive operation")
-    .action((opts) => {
+    .action(async (opts) => {
       if (!opts.yes) {
         console.log(chalk.red("Refusing to reset without --yes."));
         process.exitCode = 1;
         return;
       }
-      app.codeIntel.reset();
+      await app.codeIntel.reset();
       console.log(chalk.yellow("Dropped all code-intel tables."));
     });
 
@@ -93,18 +93,18 @@ export function registerCodeIntelCommands(program: Command, app: AppContext) {
     .option("--tenant <slug>", "Tenant slug (default: local default)")
     .option("--name <name>", "Display name (default: derived)")
     .option("--default-branch <branch>", "Default branch", "main")
-    .action((urlOrPath: string, opts) => {
-      const tenant_id = resolveTenantId(app, opts.tenant);
+    .action(async (urlOrPath: string, opts) => {
+      const tenant_id = await resolveTenantId(app, opts.tenant);
       const isLocal = existsSync(urlOrPath);
       const local_path = isLocal ? resolve(urlOrPath) : null;
       const repo_url = isLocal ? `file://${resolve(urlOrPath)}` : urlOrPath;
       const name = opts.name ?? (isLocal ? resolve(urlOrPath).split("/").pop() : urlOrPath.split("/").pop()) ?? "repo";
-      const existing = app.codeIntel.findRepoByUrl(tenant_id, repo_url);
+      const existing = await app.codeIntel.findRepoByUrl(tenant_id, repo_url);
       if (existing) {
         console.log(chalk.yellow(`Already registered: ${existing.id} (${existing.name})`));
         return;
       }
-      const created = app.codeIntel.createRepo({
+      const created = await app.codeIntel.createRepo({
         tenant_id,
         repo_url,
         name,
@@ -118,9 +118,9 @@ export function registerCodeIntelCommands(program: Command, app: AppContext) {
     .command("list")
     .description("List repos for a tenant")
     .option("--tenant <slug>", "Tenant slug (default: local default)")
-    .action((opts) => {
-      const tenant_id = resolveTenantId(app, opts.tenant);
-      const repos = app.codeIntel.listRepos(tenant_id);
+    .action(async (opts) => {
+      const tenant_id = await resolveTenantId(app, opts.tenant);
+      const repos = await app.codeIntel.listRepos(tenant_id);
       if (repos.length === 0) {
         console.log(chalk.dim("No repos registered."));
         return;
@@ -138,8 +138,8 @@ export function registerCodeIntelCommands(program: Command, app: AppContext) {
     .option("--repo <id-or-name>", "Repo id or name (default: only one if unambiguous)")
     .option("--extractors <names>", "Comma-separated extractor names (default: all)")
     .action(async (opts) => {
-      const tenant_id = resolveTenantId(app, opts.tenant);
-      const repos = app.codeIntel.listRepos(tenant_id);
+      const tenant_id = await resolveTenantId(app, opts.tenant);
+      const repos = await app.codeIntel.listRepos(tenant_id);
       if (repos.length === 0) {
         console.log(chalk.red("No repos registered. Use `ark code-intel repo add`."));
         return;
@@ -182,7 +182,7 @@ export function registerCodeIntelCommands(program: Command, app: AppContext) {
     .option("--tenant <slug>", "Tenant slug (default: local default)")
     .option("-n, --limit <n>", "Max results", "20")
     .action(async (query: string, opts) => {
-      const tenant_id = resolveTenantId(app, opts.tenant);
+      const tenant_id = await resolveTenantId(app, opts.tenant);
       const hits = await searchQuery.run({ tenant_id, store: app.codeIntel }, { query, limit: Number(opts.limit) });
       if (hits.length === 0) {
         console.log(chalk.dim("No matches."));
@@ -204,10 +204,11 @@ export function registerCodeIntelCommands(program: Command, app: AppContext) {
     .option("--tenant <slug>", "Tenant slug (default: local default)")
     .option("--repo <id-or-name>", "Repo id or name (helps path lookup)")
     .action(async (subject: string, opts) => {
-      const tenant_id = resolveTenantId(app, opts.tenant);
+      const tenant_id = await resolveTenantId(app, opts.tenant);
       let repo_id: string | undefined;
       if (opts.repo) {
-        const r = app.codeIntel.listRepos(tenant_id).find((x) => x.id.startsWith(opts.repo) || x.name === opts.repo);
+        const repos = await app.codeIntel.listRepos(tenant_id);
+        const r = repos.find((x) => x.id.startsWith(opts.repo) || x.name === opts.repo);
         repo_id = r?.id;
       }
       const result = await getContextQuery.run({ tenant_id, store: app.codeIntel }, { subject, repo_id });
@@ -248,10 +249,10 @@ export function registerCodeIntelCommands(program: Command, app: AppContext) {
   cmd
     .command("health")
     .description("High-level store + deployment health")
-    .action(() => {
-      const status = app.codeIntel.migrationStatus();
-      const tenants = app.codeIntel.listTenants();
-      const repos = app.codeIntel.listRepos(DEFAULT_TENANT_ID);
+    .action(async () => {
+      const status = await app.codeIntel.migrationStatus();
+      const tenants = await app.codeIntel.listTenants();
+      const repos = await app.codeIntel.listRepos(DEFAULT_TENANT_ID);
       console.log(chalk.bold("Code-intel health"));
       console.log(`  schema version: ${chalk.cyan(status.currentVersion)} (pending: ${status.pending.length})`);
       console.log(`  deployment mode: ${chalk.cyan(app.deployment.mode)}`);

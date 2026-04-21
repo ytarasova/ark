@@ -50,7 +50,7 @@ async function postReport(sessionId: string, report: Record<string, unknown>): P
   });
 }
 
-describe("Conductor E2E -- report pipeline", () => {
+describe("Conductor E2E -- report pipeline", async () => {
   it("progress report creates an agent message in the DB", async () => {
     const session = getApp().sessions.create({ summary: "test session" });
 
@@ -289,7 +289,7 @@ describe("Conductor E2E -- report pipeline", () => {
   });
 });
 
-describe("Conductor cleanup", () => {
+describe("Conductor cleanup", async () => {
   it("stop() clears interval timers (no leaked pollers)", async () => {
     // Track active timers before and after conductor lifecycle
     const timersBefore = new Set<ReturnType<typeof setInterval>>();

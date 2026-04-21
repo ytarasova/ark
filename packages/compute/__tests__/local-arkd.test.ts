@@ -101,7 +101,7 @@ afterAll(() => {
 
 // ── LocalWorktreeProvider ───────────────────────────────────────────────────
 
-describe("LocalWorktreeProvider", () => {
+describe("LocalWorktreeProvider", async () => {
   const provider = new LocalWorktreeProvider();
 
   it("has correct name and flags", () => {
@@ -182,7 +182,7 @@ describe("LocalWorktreeProvider", () => {
 
   // ── Agent lifecycle through arkd ────────────────────────────────────────
 
-  describe("agent lifecycle via arkd", () => {
+  describe("agent lifecycle via arkd", async () => {
     const TMUX_NAME = `local-wt-test-${Date.now()}`;
 
     afterAll(async () => {
@@ -244,7 +244,7 @@ describe("LocalWorktreeProvider", () => {
 
   // ── Metrics via arkd ────────────────────────────────────────────────────
 
-  describe("getMetrics via arkd", () => {
+  describe("getMetrics via arkd", async () => {
     // 30s timeout (not the bun-test default 5s): /snapshot shells out to
     // top / vm_stat / df / uptime / ps aux / tmux list-sessions / docker
     // stats --no-stream, and on a loaded host that routinely exceeds 5s
@@ -265,7 +265,7 @@ describe("LocalWorktreeProvider", () => {
 
   // ── Port probing via arkd ───────────────────────────────────────────────
 
-  describe("probePorts via arkd", () => {
+  describe("probePorts via arkd", async () => {
     it("detects arkd port and maps back PortDecl fields", async () => {
       const results = await provider.probePorts(compute, [
         { port: ARKD_PORT, name: "arkd", source: "test" },
@@ -320,7 +320,7 @@ describe("LocalDockerProvider", () => {
 
 // ── LocalDevcontainerProvider ───────────────────────────────────────────────
 
-describe("LocalDevcontainerProvider", () => {
+describe("LocalDevcontainerProvider", async () => {
   const provider = new LocalDevcontainerProvider();
 
   it("has correct name and flags", () => {
@@ -379,7 +379,7 @@ describe("LocalDevcontainerProvider", () => {
 
 // ── LocalFirecrackerProvider ────────────────────────────────────────────────
 
-describe("LocalFirecrackerProvider", () => {
+describe("LocalFirecrackerProvider", async () => {
   const provider = new LocalFirecrackerProvider();
 
   it("has correct name and flags", () => {

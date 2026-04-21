@@ -17,11 +17,11 @@ const { getCtx } = withTestContext();
 
 // ── Unit tests for applyReport / applyHookStatus ────────────────────────────
 
-describe("applyReport auto-gate completion", () => {
-  it("sets shouldAdvance for gate:auto stage", () => {
+describe("applyReport auto-gate completion", async () => {
+  it("sets shouldAdvance for gate:auto stage", async () => {
     const app = getApp();
-    const session = app.sessions.create({ summary: "auto test", flow: "autonomous" });
-    app.sessions.update(session.id, { status: "running", stage: "work" });
+    const session = await app.sessions.create({ summary: "auto test", flow: "autonomous" });
+    await app.sessions.update(session.id, { status: "running", stage: "work" });
 
     const result = applyReport(app, session.id, {
       type: "completed",
@@ -34,11 +34,11 @@ describe("applyReport auto-gate completion", () => {
     expect(result.updates.status).toBe("ready");
   });
 
-  it("clears stale error on completed report so auto-gate passes", () => {
+  it("clears stale error on completed report so auto-gate passes", async () => {
     const app = getApp();
-    const session = app.sessions.create({ summary: "stale error test", flow: "autonomous" });
+    const session = await app.sessions.create({ summary: "stale error test", flow: "autonomous" });
     // Simulate: agent failed once, error was set, then retry succeeded
-    app.sessions.update(session.id, {
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "work",
       error: "previous failure from first attempt",
@@ -56,10 +56,10 @@ describe("applyReport auto-gate completion", () => {
     expect(result.updates.error).toBeNull();
   });
 
-  it("does NOT set shouldAdvance for gate:manual stage", () => {
+  it("does NOT set shouldAdvance for gate:manual stage", async () => {
     const app = getApp();
-    const session = app.sessions.create({ summary: "manual test", flow: "bare" });
-    app.sessions.update(session.id, { status: "running", stage: "work" });
+    const session = await app.sessions.create({ summary: "manual test", flow: "bare" });
+    await app.sessions.update(session.id, { status: "running", stage: "work" });
 
     const result = applyReport(app, session.id, {
       type: "completed",
@@ -74,12 +74,12 @@ describe("applyReport auto-gate completion", () => {
   });
 });
 
-describe("applyHookStatus SessionEnd auto-gate fallback", () => {
-  it("sets shouldAdvance on SessionEnd for auto-gate running session", () => {
+describe("applyHookStatus SessionEnd auto-gate fallback", async () => {
+  it("sets shouldAdvance on SessionEnd for auto-gate running session", async () => {
     const app = getApp();
-    const session = app.sessions.create({ summary: "auto test", flow: "autonomous" });
-    app.sessions.update(session.id, { status: "running", stage: "work" });
-    const fresh = app.sessions.get(session.id)!;
+    const session = await app.sessions.create({ summary: "auto test", flow: "autonomous" });
+    await app.sessions.update(session.id, { status: "running", stage: "work" });
+    const fresh = await app.sessions.get(session.id)!;
 
     const result = applyHookStatus(app, fresh, "SessionEnd", {});
 
@@ -88,11 +88,11 @@ describe("applyHookStatus SessionEnd auto-gate fallback", () => {
     expect(result.newStatus).toBe("ready");
   });
 
-  it("does NOT set shouldAdvance on SessionEnd for manual-gate session", () => {
+  it("does NOT set shouldAdvance on SessionEnd for manual-gate session", async () => {
     const app = getApp();
-    const session = app.sessions.create({ summary: "manual test", flow: "bare" });
-    app.sessions.update(session.id, { status: "running", stage: "work" });
-    const fresh = app.sessions.get(session.id)!;
+    const session = await app.sessions.create({ summary: "manual test", flow: "bare" });
+    await app.sessions.update(session.id, { status: "running", stage: "work" });
+    const fresh = await app.sessions.get(session.id)!;
 
     const result = applyHookStatus(app, fresh, "SessionEnd", {});
 
@@ -101,12 +101,12 @@ describe("applyHookStatus SessionEnd auto-gate fallback", () => {
     expect(result.newStatus).toBe("running");
   });
 
-  it("does NOT set shouldAdvance when session is not running", () => {
+  it("does NOT set shouldAdvance when session is not running", async () => {
     const app = getApp();
-    const session = app.sessions.create({ summary: "auto test", flow: "autonomous" });
+    const session = await app.sessions.create({ summary: "auto test", flow: "autonomous" });
     // Session already completed -- late hook should not trigger advance
-    app.sessions.update(session.id, { status: "completed", stage: "work" });
-    const fresh = app.sessions.get(session.id)!;
+    await app.sessions.update(session.id, { status: "completed", stage: "work" });
+    const fresh = await app.sessions.get(session.id)!;
 
     const result = applyHookStatus(app, fresh, "SessionEnd", {});
 
@@ -118,7 +118,7 @@ describe("applyHookStatus SessionEnd auto-gate fallback", () => {
 
 const TEST_PORT = 19197;
 
-describe("autonomous flow via conductor", () => {
+describe("autonomous flow via conductor", async () => {
   let server: { stop(): void };
 
   beforeEach(() => {
@@ -143,26 +143,26 @@ describe("autonomous flow via conductor", () => {
 
   it("SessionEnd on single-stage autonomous flow completes the session", async () => {
     const app = getApp();
-    const session = app.sessions.create({ summary: "auto complete test", flow: "autonomous" });
-    app.sessions.update(session.id, { status: "running", stage: "work" });
+    const session = await app.sessions.create({ summary: "auto complete test", flow: "autonomous" });
+    await app.sessions.update(session.id, { status: "running", stage: "work" });
 
     const resp = await postHook(session.id, { hook_event_name: "SessionEnd" });
     expect(resp.status).toBe(200);
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     // advance() on single-stage flow completes the session
     expect(updated?.status).toBe("completed");
   });
 
   it("SessionEnd on manual-gate bare flow keeps session running", async () => {
     const app = getApp();
-    const session = app.sessions.create({ summary: "bare test", flow: "bare" });
-    app.sessions.update(session.id, { status: "running", stage: "work" });
+    const session = await app.sessions.create({ summary: "bare test", flow: "bare" });
+    await app.sessions.update(session.id, { status: "running", stage: "work" });
 
     const resp = await postHook(session.id, { hook_event_name: "SessionEnd" });
     expect(resp.status).toBe(200);
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.status).toBe("running");
   });
 });

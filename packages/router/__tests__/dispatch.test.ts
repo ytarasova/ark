@@ -40,7 +40,7 @@ function makeResponse(model = "test-model"): ChatCompletionResponse {
   };
 }
 
-describe("Dispatcher", () => {
+describe("Dispatcher", async () => {
   test("dispatches to the selected provider", async () => {
     // We can't easily mock Provider.complete since it does real HTTP,
     // but we can verify the dispatcher structure and error paths

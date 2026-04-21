@@ -192,7 +192,7 @@ describe("buildGooseCommand", () => {
 
 // ── Plugin discovery ──────────────────────────────────────────────────────
 
-describe("loadPluginExecutors", () => {
+describe("loadPluginExecutors", async () => {
   it("returns an empty array when the plugin dir does not exist", async () => {
     const { loadPluginExecutors } = await import("../executors/index.js");
     const result = await loadPluginExecutors("/nonexistent/ark/dir");
@@ -202,7 +202,7 @@ describe("loadPluginExecutors", () => {
 
 // ── Barrel ────────────────────────────────────────────────────────────────
 
-describe("builtinExecutors", () => {
+describe("builtinExecutors", async () => {
   it("includes claude-code, subprocess, cli-agent, and goose", async () => {
     const { builtinExecutors } = await import("../executors/index.js");
     const names = builtinExecutors.map((e) => e.name).sort();

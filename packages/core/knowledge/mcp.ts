@@ -11,17 +11,17 @@ export interface KnowledgeToolResult {
  * These tools let agents query the knowledge graph, remember things,
  * and understand file impact/history during a session.
  */
-export function handleKnowledgeTool(
+export async function handleKnowledgeTool(
   store: KnowledgeStore,
   toolName: string,
   params: Record<string, unknown>,
-): KnowledgeToolResult {
+): Promise<KnowledgeToolResult> {
   switch (toolName) {
     case "knowledge/search": {
       const query = params.query as string;
       const types = params.types as NodeType[] | undefined;
       const limit = params.limit as number | undefined;
-      const results = store.search(query, { types, limit });
+      const results = await store.search(query, { types, limit });
       return {
         content: results
           .map((r) => `[${r.type}] ${r.label}: ${r.content?.slice(0, 200) ?? ""} (score: ${r.score.toFixed(2)})`)
@@ -32,9 +32,9 @@ export function handleKnowledgeTool(
 
     case "knowledge/context": {
       const filePath = params.file as string;
-      const node = store.getNode(`file:${filePath}`);
+      const node = await store.getNode(`file:${filePath}`);
       if (!node) return { content: `File not found in knowledge graph: ${filePath}` };
-      const neighbors = store.neighbors(node.id, { maxDepth: 2 });
+      const neighbors = await store.neighbors(node.id, { maxDepth: 2 });
       const grouped: Record<string, string[]> = {};
       for (const n of neighbors) {
         (grouped[n.type] ??= []).push(`${n.label}: ${n.content?.slice(0, 150) ?? ""}`);
@@ -48,13 +48,13 @@ export function handleKnowledgeTool(
 
     case "knowledge/impact": {
       const filePath = params.file as string;
-      const dependents = store.neighbors(`file:${filePath}`, {
+      const dependents = await store.neighbors(`file:${filePath}`, {
         relation: "depends_on",
         direction: "in",
         maxDepth: 3,
         types: ["file"],
       });
-      const coChanges = store.neighbors(`file:${filePath}`, {
+      const coChanges = await store.neighbors(`file:${filePath}`, {
         relation: "co_changes",
         maxDepth: 1,
         types: ["file"],
@@ -74,7 +74,7 @@ export function handleKnowledgeTool(
 
     case "knowledge/history": {
       const filePath = params.file as string;
-      const sessions = store.neighbors(`file:${filePath}`, {
+      const sessions = await store.neighbors(`file:${filePath}`, {
         relation: "modified_by",
         direction: "out",
         types: ["session"],
@@ -93,7 +93,7 @@ export function handleKnowledgeTool(
       const content = params.content as string;
       const tags = (params.tags as string[]) ?? [];
       const importance = (params.importance as number) ?? 0.5;
-      const id = store.addNode({
+      const id = await store.addNode({
         type: "memory",
         label: content.slice(0, 100),
         content,
@@ -104,7 +104,7 @@ export function handleKnowledgeTool(
 
     case "knowledge/recall": {
       const query = params.query as string;
-      const results = store.search(query, { types: ["memory", "learning"], limit: 10 });
+      const results = await store.search(query, { types: ["memory", "learning"], limit: 10 });
       return {
         content:
           results.length > 0

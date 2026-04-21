@@ -109,7 +109,7 @@ export const gooseExecutor: Executor = {
   async launch(opts: LaunchOpts): Promise<LaunchResult> {
     const app = opts.app!;
     const log = opts.onLog ?? (() => {});
-    const session = app.sessions.get(opts.sessionId);
+    const session = await app.sessions.get(opts.sessionId);
     if (!session) {
       return { ok: false, handle: "", message: `Session ${opts.sessionId} not found` };
     }
@@ -118,7 +118,7 @@ export const gooseExecutor: Executor = {
     const tmuxName = `ark-${session.id}`;
 
     // Worktree + compute provider
-    const compute = session.compute_name ? app.computes.get(session.compute_name) : null;
+    const compute = session.compute_name ? await app.computes.get(session.compute_name) : null;
     const { getProvider } = await import("../../compute/index.js");
     const provider = getProvider(compute?.provider ?? "local");
     const { setupSessionWorktree } = await import("../services/session-orchestration.js");

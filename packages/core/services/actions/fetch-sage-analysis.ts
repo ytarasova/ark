@@ -29,7 +29,7 @@ export const fetchSageAnalysisAction: ActionHandler = {
 
     // Short-circuit: the CLI entry point supplies the locator directly.
     if (files.analysis_json) {
-      app.events.log(sessionId, "action_executed", {
+      await app.events.log(sessionId, "action_executed", {
         stage: session.stage ?? undefined,
         actor: "system",
         data: { action, skipped: "analysis_json_already_present", locator: files.analysis_json },
@@ -74,14 +74,14 @@ export const fetchSageAnalysisAction: ActionHandler = {
       { contentType: "application/json" },
     );
 
-    app.sessions.mergeConfig(sessionId, {
+    await app.sessions.mergeConfig(sessionId, {
       inputs: {
         ...inputs,
         files: { ...files, analysis_json: meta.locator },
       },
     });
 
-    app.events.log(sessionId, "action_executed", {
+    await app.events.log(sessionId, "action_executed", {
       stage: session.stage ?? undefined,
       actor: "system",
       data: {

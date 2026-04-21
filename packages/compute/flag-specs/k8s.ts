@@ -1,37 +1,55 @@
 /**
  * Kubernetes provider flag spec (covers both `k8s` and `k8s-kata`).
  *
- * Owns `--namespace`, `--image`, `--kubeconfig`, `--runtime-class`.
+ * Owns `--context`, `--namespace`, `--image`, `--kubeconfig`,
+ * `--service-account`, `--runtime-class`, `--cpu`, `--memory`.
  * The `k8s-kata` alias maps to the same spec via `flag-specs/index.ts`.
+ *
+ * `--context` and `--namespace` and `--image` have no silent defaults --
+ * a misconfigured compute target should fail at create time, not provision
+ * pods into the wrong cluster or namespace.
  */
 
 import type { ProviderFlagSpec } from "../flag-spec.js";
 
-const DEFAULT_NAMESPACE = "ark";
-const DEFAULT_IMAGE = "ubuntu:22.04";
-
 export const k8sFlagSpec: ProviderFlagSpec = {
   name: "k8s",
   options: [
-    { flag: "--namespace <ns>", description: "K8s namespace (k8s/k8s-kata provider)", default: DEFAULT_NAMESPACE },
-    { flag: "--image <image>", description: "Docker image (default: ubuntu:22.04)" },
-    { flag: "--kubeconfig <path>", description: "Path to kubeconfig (k8s/k8s-kata provider)" },
-    { flag: "--runtime-class <class>", description: "K8s runtime class (kata-fc for Firecracker)" },
+    { flag: "--context <name>", description: "Kubeconfig context (cluster) -- required" },
+    { flag: "--namespace <ns>", description: "K8s namespace -- required" },
+    { flag: "--image <image>", description: "Container image for agent pods -- required" },
+    { flag: "--kubeconfig <path>", description: "Path to kubeconfig (default: in-cluster or ~/.kube/config)" },
+    { flag: "--service-account <sa>", description: "Pod service account name (for IRSA, etc.)" },
+    { flag: "--runtime-class <class>", description: "K8s runtime class (e.g. kata-fc for Firecracker)" },
+    { flag: "--cpu <amt>", description: "CPU request/limit (e.g. 2 or 500m)" },
+    { flag: "--memory <amt>", description: "Memory request/limit (e.g. 4Gi)" },
   ],
   configFromFlags(opts) {
-    return {
-      ...(opts.namespace ? { namespace: opts.namespace } : {}),
-      ...(opts.image ? { image: opts.image } : {}),
-      ...(opts.kubeconfig ? { kubeconfig: opts.kubeconfig } : {}),
-      ...(opts.runtimeClass ? { runtimeClassName: opts.runtimeClass } : {}),
-    };
+    const cfg: Record<string, unknown> = {};
+    if (opts.context) cfg.context = opts.context;
+    if (opts.namespace) cfg.namespace = opts.namespace;
+    if (opts.image) cfg.image = opts.image;
+    if (opts.kubeconfig) cfg.kubeconfig = opts.kubeconfig;
+    if (opts.serviceAccount) cfg.serviceAccount = opts.serviceAccount;
+    if (opts.runtimeClass) cfg.runtimeClassName = opts.runtimeClass;
+    if (opts.cpu || opts.memory) {
+      cfg.resources = {
+        ...(opts.cpu ? { cpu: String(opts.cpu) } : {}),
+        ...(opts.memory ? { memory: String(opts.memory) } : {}),
+      };
+    }
+    return cfg;
   },
   displaySummary(config) {
     const lines: string[] = [];
-    lines.push(`  Namespace:  ${(config.namespace as string) ?? DEFAULT_NAMESPACE}`);
-    lines.push(`  Image:      ${(config.image as string) ?? DEFAULT_IMAGE}`);
+    if (config.context) lines.push(`  Context:    ${config.context}`);
+    if (config.namespace) lines.push(`  Namespace:  ${config.namespace}`);
+    if (config.image) lines.push(`  Image:      ${config.image}`);
+    if (config.serviceAccount) lines.push(`  ServiceAcc: ${config.serviceAccount}`);
     if (config.runtimeClassName) lines.push(`  Runtime:    ${config.runtimeClassName}`);
     if (config.kubeconfig) lines.push(`  Kubeconfig: ${config.kubeconfig}`);
+    const res = config.resources as { cpu?: string; memory?: string } | undefined;
+    if (res?.cpu || res?.memory) lines.push(`  Resources:  cpu=${res?.cpu ?? "-"} mem=${res?.memory ?? "-"}`);
     return lines;
   },
 };

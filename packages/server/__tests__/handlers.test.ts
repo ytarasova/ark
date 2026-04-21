@@ -20,7 +20,7 @@ beforeEach(() => {
   registerSessionHandlers(router, app);
 });
 
-describe("session handlers", () => {
+describe("session handlers", async () => {
   it("session/start creates a session", async () => {
     const req = createRequest(1, "session/start", { summary: "test session", repo: ".", flow: "bare" });
     const res = await router.dispatch(req);

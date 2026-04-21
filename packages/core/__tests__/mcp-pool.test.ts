@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "bun:test";
 import { McpPool, getMcpPool, destroyMcpPool, discoverPoolSockets } from "../mcp-pool.js";
 
-describe("McpPool", () => {
+describe("McpPool", async () => {
   afterEach(() => destroyMcpPool());
 
   it("constructs without error", () => {

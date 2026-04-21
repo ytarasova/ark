@@ -66,7 +66,7 @@ describe("Cradle interface structure", () => {
   });
 });
 
-describe("container registration and resolution", () => {
+describe("container registration and resolution", async () => {
   it("can register and resolve a simple value", () => {
     const container = createAppContainer();
     const testConfig = { arkDir: "/test" };
@@ -84,6 +84,6 @@ describe("container registration and resolution", () => {
   it("dispose is callable without error", async () => {
     const container = createAppContainer();
     // Should not throw
-    await expect(container.dispose()).resolves.toBeUndefined();
+    (await expect(container.dispose())).resolves.toBeUndefined();
   });
 });

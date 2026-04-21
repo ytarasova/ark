@@ -21,7 +21,7 @@ describe("getCurrentVersion", () => {
   });
 });
 
-describe("checkForUpdate", () => {
+describe("checkForUpdate", async () => {
   it("returns null or a version string", async () => {
     const result = await checkForUpdate(getApp().config.arkDir);
     // null = no update or network error, string = new version

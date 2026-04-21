@@ -74,7 +74,7 @@ export class Conductor {
   private readonly app: AppContext;
   private readonly port: number;
   private readonly opts: ConductorOptions;
-  private server: { stop(): void } | null = null;
+  private server: { stop(closeActiveConnections?: boolean): void } | null = null;
   private timers: Array<ReturnType<typeof setInterval>> = [];
 
   constructor(app: AppContext, port: number = DEFAULT_PORT, opts: ConductorOptions = {}) {
@@ -99,7 +99,7 @@ export class Conductor {
       setInterval(
         () =>
           safeAsync("schedule polling", async () => {
-            const schedules = listSchedules(this.app).filter((s) => s.enabled);
+            const schedules = (await listSchedules(this.app)).filter((s) => s.enabled);
             const now = new Date();
             for (const sched of schedules) {
               if (!cronMatches(sched.cron, now)) continue;
@@ -113,7 +113,7 @@ export class Conductor {
                   continue;
               }
               await safeAsync(`scheduled dispatch for ${sched.id}`, async () => {
-                const s = session.startSession(this.app, {
+                const s = await session.startSession(this.app, {
                   summary: sched.summary ?? `Scheduled: ${sched.id}`,
                   repo: sched.repo ?? undefined,
                   workdir: sched.workdir ?? undefined,
@@ -122,8 +122,8 @@ export class Conductor {
                   group_name: sched.group_name ?? undefined,
                 });
                 await session.dispatch(this.app, s.id);
-                updateScheduleLastRun(this.app, sched.id);
-                this.app.events.log(s.id, "scheduled_dispatch", {
+                await updateScheduleLastRun(this.app, sched.id);
+                await this.app.events.log(s.id, "scheduled_dispatch", {
                   actor: "scheduler",
                   data: { schedule_id: sched.id, cron: sched.cron },
                 });
@@ -266,8 +266,10 @@ export class Conductor {
     });
   }
 
-  private appForRequest(req: Request): { ok: true; app: AppContext } | { ok: false; response: Response } {
-    const r = this.resolveTenant(req);
+  private async appForRequest(
+    req: Request,
+  ): Promise<{ ok: true; app: AppContext } | { ok: false; response: Response }> {
+    const r = await this.resolveTenant(req);
     if (r.ok === false) {
       return { ok: false, response: Response.json({ error: r.error }, { status: r.status }) };
     }
@@ -277,7 +279,7 @@ export class Conductor {
   // ── Route handlers ───────────────────────────────────────────────────────
 
   private async handleChannelReport(req: Request, sessionId: string): Promise<Response> {
-    const resolved = this.appForRequest(req);
+    const resolved = await this.appForRequest(req);
     if (resolved.ok === false) return resolved.response;
     const report = (await req.json()) as OutboundMessage;
     await handleReport(resolved.app, sessionId, report);
@@ -285,7 +287,7 @@ export class Conductor {
   }
 
   private async handleAgentRelay(req: Request): Promise<Response> {
-    const resolved = this.appForRequest(req);
+    const resolved = await this.appForRequest(req);
     if (resolved.ok === false) return resolved.response;
     const { from, target, message } = (await req.json()) as {
       from: string;
@@ -293,7 +295,7 @@ export class Conductor {
       message: string;
     };
     const scoped = resolved.app;
-    const targetSession = scoped.sessions.get(target);
+    const targetSession = await scoped.sessions.get(target);
     if (targetSession) {
       const channelPort = scoped.sessions.channelPort(target);
       const payload = { type: "steer", message, from, sessionId: target };
@@ -306,10 +308,10 @@ export class Conductor {
     const sessionId = url.searchParams.get("session");
     if (!sessionId) return Response.json({ error: "missing session param" }, { status: 400 });
 
-    const resolved = this.appForRequest(req);
+    const resolved = await this.appForRequest(req);
     if (resolved.ok === false) return resolved.response;
     const app = resolved.app;
-    const s = app.sessions.get(sessionId);
+    const s = await app.sessions.get(sessionId);
     if (!s) return Response.json({ error: "session not found" }, { status: 404 });
 
     const payload = (await req.json()) as Record<string, unknown>;
@@ -329,12 +331,12 @@ export class Conductor {
       const evalResult = evaluateToolCall(toolName, toolInput);
 
       if (evalResult.action === "block") {
-        app.events.log(sessionId, "guardrail_blocked", {
+        await app.events.log(sessionId, "guardrail_blocked", {
           actor: "system",
           data: { tool: toolName, pattern: evalResult.rule?.pattern, input: toolInput },
         });
       } else if (evalResult.action === "warn") {
-        app.events.log(sessionId, "guardrail_warning", {
+        await app.events.log(sessionId, "guardrail_warning", {
           actor: "system",
           data: { tool: toolName, pattern: evalResult.rule?.pattern },
         });
@@ -344,26 +346,26 @@ export class Conductor {
     }
 
     // Delegate business logic to session.ts
-    const result = session.applyHookStatus(app, s, event, payload);
+    const result = await session.applyHookStatus(app, s, event, payload);
 
     // Apply events
     for (const evt of result.events ?? []) {
-      app.events.log(sessionId, evt.type, evt.opts);
+      await app.events.log(sessionId, evt.type, evt.opts);
     }
 
     // Apply store updates
     if (result.updates) {
-      app.sessions.update(sessionId, result.updates);
+      await app.sessions.update(sessionId, result.updates);
     }
 
     // Mark messages read on terminal states
     if (result.markRead) {
-      app.messages.markRead(sessionId);
+      await app.messages.markRead(sessionId);
     }
 
     // On-failure retry loop
     if (result.shouldRetry && result.newStatus === "failed") {
-      const retryResult = session.retryWithContext(app, sessionId, {
+      const retryResult = await session.retryWithContext(app, sessionId, {
         maxRetries: result.retryMaxRetries,
       });
       if (retryResult.ok) {
@@ -386,15 +388,15 @@ export class Conductor {
       });
 
       if (result.newStatus === "completed" || result.newStatus === "failed") {
-        session.cleanupOnTerminal(app, sessionId);
+        await session.cleanupOnTerminal(app, sessionId);
         emitStageSpanEnd(sessionId, { status: result.newStatus });
         emitSessionSpanEnd(sessionId, { status: result.newStatus });
         flushSpans();
 
         try {
           const { evaluateSession } = await import("../knowledge/evals.js");
-          const freshSession = app.sessions.get(sessionId);
-          if (freshSession) evaluateSession(app, freshSession);
+          const freshSession = await app.sessions.get(sessionId);
+          if (freshSession) await evaluateSession(app, freshSession);
         } catch {
           logDebug("conductor", "skip eval on error");
         }
@@ -410,13 +412,18 @@ export class Conductor {
 
     if (result.shouldIndex && result.indexTranscript) {
       await safeAsync("transcript indexing", async () => {
-        indexSession(app, result.indexTranscript!.transcriptPath, result.indexTranscript!.sessionId);
+        await indexSession(app, result.indexTranscript!.transcriptPath, result.indexTranscript!.sessionId);
       });
     }
 
     if (result.newStatus) {
       try {
-        app.ledger.addEntry("default", "progress", `Session ${sessionId} status: ${result.newStatus}`, sessionId);
+        await app.ledger.addEntry(
+          "default",
+          "progress",
+          `Session ${sessionId} status: ${result.newStatus}`,
+          sessionId,
+        );
       } catch {
         logDebug("conductor", "skip ledger on error");
       }
@@ -425,7 +432,7 @@ export class Conductor {
     return Response.json({ status: "ok", mapped: result.newStatus ?? "no-op" });
   }
 
-  private handleRestApi(req: Request, path: string): Response {
+  private async handleRestApi(req: Request, path: string): Promise<Response> {
     if (path === "/health") {
       return Response.json({
         status: "ok",
@@ -433,22 +440,22 @@ export class Conductor {
       });
     }
 
-    const resolved = this.appForRequest(req);
+    const resolved = await this.appForRequest(req);
     if (resolved.ok === false) return resolved.response;
     const app = resolved.app;
 
-    if (path === "/api/sessions") return Response.json(app.sessions.list());
+    if (path === "/api/sessions") return Response.json(await app.sessions.list());
     if (path.startsWith("/api/sessions/")) {
       const id = extractPathSegment(path, 3);
       if (!id) return Response.json({ error: "missing session id" }, { status: 400 });
-      const s = app.sessions.get(id);
+      const s = await app.sessions.get(id);
       return s ? Response.json(s) : Response.json({ error: "not found" }, { status: 404 });
     }
     if (path.startsWith("/api/events/")) {
       const id = extractPathSegment(path, 3);
       if (!id) return Response.json({ error: "missing session id" }, { status: 400 });
-      if (!app.sessions.get(id)) return Response.json({ error: "not found" }, { status: 404 });
-      return Response.json(app.events.list(id));
+      if (!(await app.sessions.get(id))) return Response.json({ error: "not found" }, { status: 404 });
+      return Response.json(await app.events.list(id));
     }
     return new Response("Not found", { status: 404 });
   }
@@ -466,7 +473,7 @@ export class Conductor {
       return Response.json({ status: "incomplete_payload" }, { status: 400 });
     }
 
-    const sessions = this.app.sessions.list();
+    const sessions = await this.app.sessions.list();
     const matchedSession = sessions.find((s) => {
       return s.config?.github_url === pr.html_url || s.branch === pr.head?.ref;
     });
@@ -647,7 +654,14 @@ export class Conductor {
         default_provider: (body.default_provider as string) ?? "k8s",
         max_concurrent_sessions: (body.max_concurrent_sessions as number) ?? 10,
         max_cost_per_day_usd: (body.max_cost_per_day_usd as number | null) ?? null,
-        compute_pools: (body.compute_pools as Array<{ pool_id: string; weight?: number }>) ?? [],
+        compute_pools: (body.compute_pools as unknown as import("../auth/tenant-policy.js").ComputePoolRef[]) ?? [],
+        router_enabled: (body.router_enabled as boolean | null) ?? null,
+        router_required: (body.router_required as boolean) ?? false,
+        router_policy: (body.router_policy as string | null) ?? null,
+        auto_index: (body.auto_index as boolean | null) ?? null,
+        auto_index_required: (body.auto_index_required as boolean) ?? false,
+        tensorzero_enabled: (body.tensorzero_enabled as boolean | null) ?? null,
+        allowed_k8s_contexts: (body.allowed_k8s_contexts as string[]) ?? [],
       });
       logInfo("conductor", `Tenant policy set for: ${tenantId}`);
       return Response.json({ status: "ok", tenant_id: tenantId });
@@ -760,7 +774,7 @@ export async function deliverToChannel(
   // Try arkd delivery first (works for both local and remote)
   const computeName = targetSession.compute_name || "local";
   const tenantApp = targetSession.tenant_id ? app.forTenant(targetSession.tenant_id) : app;
-  const compute = tenantApp.computes.get(computeName);
+  const compute = await tenantApp.computes.get(computeName);
   const provider = compute ? getProvider(compute.provider) : null;
   if (provider?.getArkdUrl) {
     try {
@@ -813,7 +827,7 @@ interface GitHubPRWebhookPayload {
  * Exported so `Conductor.recoverStuckSessions` can stay a thin wrapper.
  */
 async function recoverStuckSessions(app: AppContext): Promise<void> {
-  const sessions = app.sessions.list({ status: "running" });
+  const sessions = await app.sessions.list({ status: "running" });
   for (const s of sessions) {
     if (!s.session_id) continue; // No tmux handle -- skip
 
@@ -855,8 +869,8 @@ async function recoverStuckSessions(app: AppContext): Promise<void> {
     }
 
     if (hasNewCommits) {
-      app.sessions.update(s.id, { status: "ready", error: null, session_id: null });
-      app.events.log(s.id, "stuck_session_recovered", {
+      await app.sessions.update(s.id, { status: "ready", error: null, session_id: null });
+      await app.events.log(s.id, "stuck_session_recovered", {
         actor: "system",
         stage: s.stage ?? undefined,
         data: { action: "advance", reason: "agent exited with commits" },
@@ -870,12 +884,12 @@ async function recoverStuckSessions(app: AppContext): Promise<void> {
         logError("conductor", `stuck recovery advance failed for ${s.id}: ${e?.message ?? e}`);
       }
     } else {
-      app.sessions.update(s.id, {
+      await app.sessions.update(s.id, {
         status: "failed",
         error: "Agent exited without committing any changes (recovered by conductor)",
         session_id: null,
       });
-      app.events.log(s.id, "stuck_session_recovered", {
+      await app.events.log(s.id, "stuck_session_recovered", {
         actor: "system",
         stage: s.stage ?? undefined,
         data: { action: "failed", reason: "agent exited without commits" },
@@ -887,14 +901,14 @@ async function recoverStuckSessions(app: AppContext): Promise<void> {
 // ── Report handling ─────────────────────────────────────────────────────────
 
 async function handleReport(app: AppContext, sessionId: string, report: OutboundMessage): Promise<void> {
-  const result = session.applyReport(app, sessionId, report);
+  const result = await session.applyReport(app, sessionId, report);
 
   for (const evt of result.logEvents ?? []) {
-    app.events.log(sessionId, evt.type, evt.opts);
+    await app.events.log(sessionId, evt.type, evt.opts);
   }
 
   if (result.message) {
-    app.messages.send(sessionId, result.message.role, result.message.content, result.message.type);
+    await app.messages.send(sessionId, result.message.role, result.message.content, result.message.type);
   }
 
   for (const evt of result.busEvents ?? []) {
@@ -902,7 +916,7 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
   }
 
   if (Object.keys(result.updates).length > 0) {
-    app.sessions.update(sessionId, result.updates);
+    await app.sessions.update(sessionId, result.updates);
   }
 
   if (result.shouldAdvance) {
@@ -916,7 +930,7 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
         logWarn("conductor", `stage handoff failed for ${sessionId}: ${handoff.message}`);
       }
       if (handoff.blockedByVerification) {
-        const s = app.sessions.get(sessionId);
+        const s = await app.sessions.get(sessionId);
         await sendOSNotification(
           "Ark: Verification failed",
           `${s?.summary ?? sessionId} - ${handoff.message.slice(0, 100)}`,
@@ -929,7 +943,7 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
   }
 
   if (result.shouldRetry) {
-    const retryResult = session.retryWithContext(app, sessionId, {
+    const retryResult = await session.retryWithContext(app, sessionId, {
       maxRetries: result.retryMaxRetries,
     });
     if (retryResult.ok) {
@@ -942,7 +956,7 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
     logWarn("conductor", `on_failure retry exhausted for ${sessionId}: ${retryResult.message}`);
   }
 
-  const finalSession = app.sessions.get(sessionId);
+  const finalSession = await app.sessions.get(sessionId);
   if (finalSession && (report.type === "completed" || report.type === "error")) {
     const notifyTitle = report.type === "completed" ? "Stage completed" : "Session failed";
     const notifyBody = `${finalSession.summary ?? sessionId} - ${finalSession.stage ?? ""}`;
@@ -950,7 +964,7 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
   }
 
   if (result.prUrl) {
-    app.events.log(sessionId, "pr_detected", {
+    await app.events.log(sessionId, "pr_detected", {
       actor: "agent",
       data: { pr_url: result.prUrl },
     });
@@ -959,17 +973,17 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
   try {
     const r = report as unknown as Record<string, unknown>;
     if (result.prUrl) {
-      app.artifacts.add(sessionId, "pr", [result.prUrl]);
+      await app.artifacts.add(sessionId, "pr", [result.prUrl]);
     }
     if (Array.isArray(r.filesChanged) && r.filesChanged.length > 0) {
-      app.artifacts.add(sessionId, "file", r.filesChanged as string[]);
+      await app.artifacts.add(sessionId, "file", r.filesChanged as string[]);
     }
     if (Array.isArray(r.commits) && r.commits.length > 0) {
-      app.artifacts.add(sessionId, "commit", r.commits as string[]);
+      await app.artifacts.add(sessionId, "commit", r.commits as string[]);
     }
-    const s = app.sessions.get(sessionId);
+    const s = await app.sessions.get(sessionId);
     if (s?.branch && report.type === "completed") {
-      app.artifacts.add(sessionId, "branch", [s.branch]);
+      await app.artifacts.add(sessionId, "branch", [s.branch]);
     }
   } catch {
     logDebug("conductor", "best-effort artifact tracking");
@@ -978,16 +992,16 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
   if (report.type === "completed" && app.knowledge) {
     try {
       const { indexSessionCompletion } = await import("../knowledge/indexer.js");
-      const s = app.sessions.get(sessionId);
-      const changedFiles = ((report as Record<string, unknown>).filesChanged as string[] | undefined) ?? [];
-      indexSessionCompletion(app.knowledge, sessionId, s?.summary ?? "", "completed", changedFiles);
+      const s = await app.sessions.get(sessionId);
+      const changedFiles = ((report as unknown as Record<string, unknown>).filesChanged as string[] | undefined) ?? [];
+      await indexSessionCompletion(app.knowledge, sessionId, s?.summary ?? "", "completed", changedFiles);
     } catch {
       logDebug("conductor", "best-effort knowledge indexing");
     }
   }
 
   if (report.type === "completed" && !result.prUrl) {
-    const s = app.sessions.get(sessionId);
+    const s = await app.sessions.get(sessionId);
     if (s && !s.pr_url && s.config?.github_url && s.branch) {
       const { loadRepoConfig } = await import("../repo-config.js");
       const repoConfig = s.workdir ? loadRepoConfig(s.workdir) : {};

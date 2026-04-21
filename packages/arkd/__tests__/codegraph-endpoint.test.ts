@@ -51,7 +51,7 @@ afterAll(() => {
   }
 });
 
-describe("POST /codegraph/index", () => {
+describe("POST /codegraph/index", async () => {
   it("returns nodes and edges for a small repo", async () => {
     // Skip if codegraph binary isn't available
     const cgBin = join(process.cwd(), "node_modules", ".bin", "codegraph");

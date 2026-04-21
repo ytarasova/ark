@@ -73,7 +73,10 @@ ingress:
   className: nginx
   host: ark.internal.ap-south-1.platform.mlops.pai.mypaytm.com
   tls:
-    enabled: true
+    # Cluster ALB terminates TLS upstream (foundry pattern); no per-ingress
+    # cert needed. Setting tls.enabled=true with no provisioned secret
+    # caused nginx-ingress to issue HTTP->HTTPS redirects that loop.
+    enabled: false
     secretName: ark-tls
 
 # IRSA -- IAM role for the ark service account. Must be created out-of-

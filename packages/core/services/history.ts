@@ -30,12 +30,12 @@ export class HistoryService {
    * Search sessions by metadata (ticket, summary, repo, id).
    * Uses simple LIKE queries against the sessions table.
    */
-  search(query: string, opts?: { limit?: number }): HistorySearchResult[] {
+  async search(query: string, opts?: { limit?: number }): Promise<HistorySearchResult[]> {
     const limit = opts?.limit ?? 50;
     const pattern = `%${query}%`;
     const results: HistorySearchResult[] = [];
 
-    const rows = this.db
+    const rows = (await this.db
       .prepare(
         `
       SELECT id, ticket, summary, repo, created_at FROM sessions
@@ -47,7 +47,7 @@ export class HistoryService {
       ORDER BY created_at DESC LIMIT ?
     `,
       )
-      .all(pattern, pattern, pattern, pattern, limit) as HistoryRow[];
+      .all(pattern, pattern, pattern, pattern, limit)) as HistoryRow[];
 
     for (const row of rows) {
       results.push({

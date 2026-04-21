@@ -56,7 +56,7 @@ export function buildControlPlaneBindings(_cradle: BindingCradle): ControlPlaneB
     sessionStore: new ControlPlaneSessionStore(),
     computeStore: new ControlPlaneComputeStore(),
     eventBus: new RedisEventBus(),
-    eventStore: new ControlPlaneEventStore(),
+    eventStore: new ControlPlaneEventStore((_cradle as { db: import("../../database/index.js").IDatabase }).db),
     workspace: new ObjectStoreWorkspace(),
     processRunner: new RemoteProcessRunner(),
     clock: new ControlPlaneClock(),

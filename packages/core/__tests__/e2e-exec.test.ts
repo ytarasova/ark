@@ -32,10 +32,10 @@ afterAll(async () => {
 // Track sessions for cleanup
 const sessionIds: string[] = [];
 
-afterEach(() => {
+afterEach(async () => {
   for (const id of sessionIds) {
     try {
-      app.sessions.delete(id);
+      await app.sessions.delete(id);
     } catch {
       /* already gone */
     }
@@ -45,7 +45,7 @@ afterEach(() => {
 
 // ── waitForCompletion ─────────────────────────────────────────────────────
 
-describe("waitForCompletion", () => {
+describe("waitForCompletion", async () => {
   it("returns immediately for completed session", async () => {
     const session = getApp().sessions.create({ summary: "wfc-completed" });
     sessionIds.push(session.id);
@@ -123,9 +123,9 @@ describe("waitForCompletion", () => {
 
 // ── exec flow (session creation) ────────────────────────────────────────────
 
-describe("exec session creation", () => {
-  it("creates session with correct flow/summary/compute from opts", () => {
-    const session = startSession(app, {
+describe("exec session creation", async () => {
+  it("creates session with correct flow/summary/compute from opts", async () => {
+    const session = await startSession(app, {
       summary: "exec-test-summary",
       repo: "my-repo",
       flow: "bare",
@@ -144,7 +144,7 @@ describe("exec session creation", () => {
 
 // ── CLI help ────────────────────────────────────────────────────────────────
 
-describe("exec CLI", () => {
+describe("exec CLI", async () => {
   it("execSession is importable and callable", async () => {
     // Verify the exec module exists and exports the expected function
     const mod = await import("../../cli/exec.js");

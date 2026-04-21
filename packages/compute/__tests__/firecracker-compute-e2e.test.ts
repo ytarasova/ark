@@ -49,7 +49,7 @@ function canRunE2e(): { run: boolean; reason: string } {
 
 const { run, reason } = canRunE2e();
 
-describe.skipIf(!run)(`FirecrackerCompute e2e (${reason})`, () => {
+describe.skipIf(!run)(`FirecrackerCompute e2e (${reason})`, async () => {
   it("boots a real microVM, reaches arkd /snapshot from the host, destroys", async () => {
     const compute = new FirecrackerCompute();
     const logs: string[] = [];

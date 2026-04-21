@@ -229,7 +229,7 @@ describe("LocalFirecrackerPool construction", () => {
   });
 });
 
-describe("start()", () => {
+describe("start()", async () => {
   it("pre-warms `target` VMs and snapshots each baseline", async () => {
     const { compute, stats } = makeHarness();
     pool = new LocalFirecrackerPool(compute, cfg({ target: 3, min: 0, max: 5 }));
@@ -266,7 +266,7 @@ describe("start()", () => {
   });
 });
 
-describe("acquire()", () => {
+describe("acquire()", async () => {
   it("pops a warm handle when available (no extra provision)", async () => {
     const { compute, stats } = makeHarness();
     pool = new LocalFirecrackerPool(compute, cfg({ target: 2 }));
@@ -305,7 +305,7 @@ describe("acquire()", () => {
   });
 });
 
-describe("release() with snapshot-capable compute", () => {
+describe("release() with snapshot-capable compute", async () => {
   it("calls restore() and requeues the handle into warm", async () => {
     const { compute, stats } = makeHarness();
     pool = new LocalFirecrackerPool(compute, cfg({ target: 1 }));
@@ -334,7 +334,7 @@ describe("release() with snapshot-capable compute", () => {
   });
 });
 
-describe("release() fallbacks", () => {
+describe("release() fallbacks", async () => {
   it("falls back to stop/start when restore throws NotSupportedError", async () => {
     const { compute, stats } = makeHarness({ restoreBehaviour: "notSupported" });
     pool = new LocalFirecrackerPool(compute, cfg({ target: 1 }));
@@ -432,7 +432,7 @@ describe("release() fallbacks", () => {
   });
 });
 
-describe("autoscale", () => {
+describe("autoscale", async () => {
   it("grows when utilization >= growAbove", async () => {
     const { compute, stats } = makeHarness();
     pool = new LocalFirecrackerPool(
@@ -561,7 +561,7 @@ describe("autoscale", () => {
   });
 });
 
-describe("stop()", () => {
+describe("stop()", async () => {
   it("destroys warm + in-use handles and clears the tick", async () => {
     const { compute, stats } = makeHarness();
     pool = new LocalFirecrackerPool(compute, cfg({ target: 2, min: 0, max: 4, scaleIntervalMs: 10 }));
@@ -607,7 +607,7 @@ describe("stop()", () => {
   });
 });
 
-describe("AppContext integration", () => {
+describe("AppContext integration", async () => {
   it("registerComputePool / getComputePool round-trips by compute kind", async () => {
     const { AppContext } = await import("../../core/app.js");
     const helpers = await import("../../core/__tests__/test-helpers.js");

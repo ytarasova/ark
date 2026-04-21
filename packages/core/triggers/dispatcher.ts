@@ -70,9 +70,9 @@ export class DefaultTriggerDispatcher implements TriggerDispatcher {
       // Late import to keep the module graph shallow.
       const { startSession } = await import("../services/session-orchestration.js");
       const tenantApp = config.tenant ? this.app.forTenant(config.tenant) : this.app;
-      const session = startSession(tenantApp, createOpts);
+      const session = await startSession(tenantApp, createOpts);
       logInfo("triggers", `trigger ${config.name} -> session ${session.id}`);
-      this.app.events.log(session.id, "trigger_fired", {
+      await this.app.events.log(session.id, "trigger_fired", {
         actor: event.source,
         data: {
           trigger: config.name,

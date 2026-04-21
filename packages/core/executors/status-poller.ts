@@ -98,7 +98,7 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
       if (exitCode !== null) {
         stopStatusPoller(app, sessionId);
 
-        const session = app.sessions.get(sessionId);
+        const session = await app.sessions.get(sessionId);
         if (!session || session.status !== "running") return;
 
         // Tail the stderr/log for a helpful reason, best-effort.
@@ -113,13 +113,13 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
         }
 
         const reason = tail ? `Claude exited with code ${exitCode}\n${tail}` : `Claude exited with code ${exitCode}`;
-        app.sessions.update(sessionId, {
+        await app.sessions.update(sessionId, {
           status: "failed",
           error: reason,
           session_id: null,
         });
 
-        app.events.log(sessionId, "session_failed", {
+        await app.events.log(sessionId, "session_failed", {
           stage: session.stage,
           actor: "system",
           data: { reason: "agent exit-code sentinel", exitCode },
@@ -137,7 +137,7 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
           const { snapshotSessionTree } = await import("./process-tree.js");
           const tree = await snapshotSessionTree(handle);
           if (tree) {
-            app.sessions.mergeConfig(sessionId, { process_tree: tree });
+            await app.sessions.mergeConfig(sessionId, { process_tree: tree });
           }
         } catch {
           logDebug("status", "best-effort");
@@ -147,7 +147,7 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
       if (status.state === "completed" || status.state === "failed" || status.state === "not_found") {
         stopStatusPoller(app, sessionId);
 
-        const session = app.sessions.get(sessionId);
+        const session = await app.sessions.get(sessionId);
         if (!session || session.status !== "running") return;
 
         // Guard: verify the session's current tmux handle still matches the one
@@ -159,13 +159,13 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
         const newStatus = status.state === "failed" ? "failed" : "completed";
         const error = status.state === "failed" ? (status as { error?: string }).error : null;
 
-        app.sessions.update(sessionId, {
+        await app.sessions.update(sessionId, {
           status: newStatus,
           error: error ?? null,
           session_id: null,
         });
 
-        app.events.log(sessionId, `session_${newStatus}`, {
+        await app.events.log(sessionId, `session_${newStatus}`, {
           stage: session.stage,
           actor: "system",
           data: { reason: "agent process exited", exitCode: (status as { exitCode?: number }).exitCode },
@@ -177,7 +177,7 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
         // Use mediateStageHandoff instead of raw advance() so auto-dispatch fires.
         if (newStatus === "completed") {
           // Clear error before advancing so auto-gate doesn't reject
-          app.sessions.update(sessionId, { status: "ready", error: null });
+          await app.sessions.update(sessionId, { status: "ready", error: null });
           try {
             const { mediateStageHandoff } = await import("../services/session-orchestration.js");
             await mediateStageHandoff(app, sessionId, {

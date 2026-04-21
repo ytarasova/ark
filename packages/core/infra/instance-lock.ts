@@ -14,35 +14,36 @@ function isShutdownRace(msg: string): boolean {
 }
 
 /** Register this instance and start heartbeat. Returns cleanup function. */
-export function registerInstance(app: AppContext, instanceId: string): { stop: () => void; isPrimary: () => boolean } {
+export async function registerInstance(
+  app: AppContext,
+  instanceId: string,
+): Promise<{ stop: () => void; isPrimary: () => Promise<boolean> }> {
   const db = app.db;
 
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS instance_heartbeat (
-      id TEXT PRIMARY KEY,
-      pid INTEGER NOT NULL,
-      started_at TEXT NOT NULL,
-      last_heartbeat TEXT NOT NULL
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS instance_heartbeat (
+        id TEXT PRIMARY KEY,
+        pid INTEGER NOT NULL,
+        started_at TEXT NOT NULL,
+        last_heartbeat TEXT NOT NULL
+      )`,
     )
-  `);
+    .run();
 
-  cleanStaleInstances(app);
+  await cleanStaleInstances(app);
 
   const now = new Date().toISOString();
-  db.prepare(
-    `
-    INSERT OR REPLACE INTO instance_heartbeat (id, pid, started_at, last_heartbeat)
-    VALUES (?, ?, ?, ?)
-  `,
-  ).run(instanceId, process.pid, now, now);
+  await db
+    .prepare(`INSERT OR REPLACE INTO instance_heartbeat (id, pid, started_at, last_heartbeat) VALUES (?, ?, ?, ?)`)
+    .run(instanceId, process.pid, now, now);
 
-  const interval = setInterval(() => {
+  const interval = setInterval(async () => {
     try {
-      db.prepare("UPDATE instance_heartbeat SET last_heartbeat = ? WHERE id = ?").run(
-        new Date().toISOString(),
-        instanceId,
-      );
-      cleanStaleInstances(app);
+      await db
+        .prepare("UPDATE instance_heartbeat SET last_heartbeat = ? WHERE id = ?")
+        .run(new Date().toISOString(), instanceId);
+      await cleanStaleInstances(app);
     } catch (e: any) {
       // The DB is normally closed during shutdown between the interval firing and stop() running.
       // Tolerate that specific case but surface anything else so a heartbeat stall is visible.
@@ -56,18 +57,21 @@ export function registerInstance(app: AppContext, instanceId: string): { stop: (
   return {
     stop: () => {
       clearInterval(interval);
-      try {
-        db.prepare("DELETE FROM instance_heartbeat WHERE id = ?").run(instanceId);
-      } catch (e: any) {
-        const msg = String(e?.message ?? e);
-        if (!isShutdownRace(msg)) {
-          logWarn("session", `instance-lock: heartbeat delete failed: ${msg}`);
-        }
-      }
+      // Fire-and-forget cleanup: shutdown is sync from the caller's POV. The
+      // DB is about to close anyway; errors here are best-effort.
+      void db
+        .prepare("DELETE FROM instance_heartbeat WHERE id = ?")
+        .run(instanceId)
+        .catch((e: any) => {
+          const msg = String(e?.message ?? e);
+          if (!isShutdownRace(msg)) {
+            logWarn("session", `instance-lock: heartbeat delete failed: ${msg}`);
+          }
+        });
     },
-    isPrimary: () => {
+    isPrimary: async () => {
       try {
-        const first = db.prepare("SELECT id FROM instance_heartbeat ORDER BY started_at ASC LIMIT 1").get() as
+        const first = (await db.prepare("SELECT id FROM instance_heartbeat ORDER BY started_at ASC LIMIT 1").get()) as
           | { id: string }
           | undefined;
         return first?.id === instanceId;
@@ -80,11 +84,11 @@ export function registerInstance(app: AppContext, instanceId: string): { stop: (
 }
 
 /** Remove instances that haven't sent a heartbeat recently. */
-function cleanStaleInstances(app: AppContext): void {
+async function cleanStaleInstances(app: AppContext): Promise<void> {
   try {
     const db = app.db;
     const cutoff = new Date(Date.now() - STALE_THRESHOLD_MS).toISOString();
-    db.prepare("DELETE FROM instance_heartbeat WHERE last_heartbeat < ?").run(cutoff);
+    await db.prepare("DELETE FROM instance_heartbeat WHERE last_heartbeat < ?").run(cutoff);
   } catch (e: any) {
     const msg = String(e?.message ?? e);
     if (!isShutdownRace(msg)) {
@@ -94,15 +98,19 @@ function cleanStaleInstances(app: AppContext): void {
 }
 
 /** Get count of active instances. */
-export function activeInstanceCount(app: AppContext): number {
+export async function activeInstanceCount(app: AppContext): Promise<number> {
   try {
     const db = app.db;
-    db.exec(`CREATE TABLE IF NOT EXISTS instance_heartbeat (
-      id TEXT PRIMARY KEY, pid INTEGER NOT NULL,
-      started_at TEXT NOT NULL, last_heartbeat TEXT NOT NULL
-    )`);
-    cleanStaleInstances(app);
-    const row = db.prepare("SELECT COUNT(*) as count FROM instance_heartbeat").get() as { count: number };
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS instance_heartbeat (
+          id TEXT PRIMARY KEY, pid INTEGER NOT NULL,
+          started_at TEXT NOT NULL, last_heartbeat TEXT NOT NULL
+        )`,
+      )
+      .run();
+    await cleanStaleInstances(app);
+    const row = (await db.prepare("SELECT COUNT(*) as count FROM instance_heartbeat").get()) as { count: number };
     return row.count;
   } catch (e: any) {
     logWarn("session", `instance-lock: activeInstanceCount failed: ${String(e?.message ?? e)}`);

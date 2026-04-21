@@ -201,7 +201,7 @@ describe("getNextStage", () => {
 
 // ── evaluateGate ─────────────────────────────────────────────────────────────
 
-describe("evaluateGate", () => {
+describe("evaluateGate", async () => {
   it("auto gate passes without error", () => {
     const result = evaluateGate(getApp(), "default", "implement", {});
     expect(result.canProceed).toBe(true);
@@ -235,7 +235,7 @@ describe("evaluateGate", () => {
     expect(result.reason).toContain("condition");
   });
 
-  it("review gate always blocks", () => {
+  it("review gate always blocks", async () => {
     writeUserFlow("review-flow", {
       name: "review-flow",
       stages: [{ name: "await-pr", agent: "reviewer", gate: "review" }],
@@ -244,7 +244,7 @@ describe("evaluateGate", () => {
     expect(result.canProceed).toBe(false);
   });
 
-  it("review gate reason contains 'awaiting PR approval'", () => {
+  it("review gate reason contains 'awaiting PR approval'", async () => {
     writeUserFlow("review-flow2", {
       name: "review-flow2",
       stages: [{ name: "await-pr", agent: "reviewer", gate: "review" }],

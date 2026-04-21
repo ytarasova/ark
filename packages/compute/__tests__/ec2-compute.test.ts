@@ -139,7 +139,7 @@ function makeProvisionedHandle(meta: Partial<EC2HandleMeta> = {}): ComputeHandle
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-describe("EC2Compute", () => {
+describe("EC2Compute", async () => {
   it("advertises the expected capability flags", () => {
     const c = new EC2Compute();
     expect(c.kind).toBe("ec2");
@@ -151,7 +151,7 @@ describe("EC2Compute", () => {
     });
   });
 
-  describe("provision", () => {
+  describe("provision", async () => {
     it("runs generateSshKey -> buildUserData -> provisionStack -> SSH poll -> cloud-init poll -> allocatePort -> openSshTunnel -> health poll", async () => {
       const { helpers, calls } = makeHelpers();
       const c = new EC2Compute();
@@ -240,7 +240,7 @@ describe("EC2Compute", () => {
       const c = new EC2Compute();
       c.setHelpersForTesting(helpers);
 
-      await expect(c.provision({ tags: { name: "test" } })).rejects.toThrow(/arkd never became reachable/);
+      (await expect(c.provision({ tags: { name: "test" } }))).rejects.toThrow(/arkd never became reachable/);
 
       // The tunnel must have been killed so we don't leak the ssh process.
       const killCalls = calls.filter((call) => call.fn === "killSshTunnel");
@@ -253,7 +253,7 @@ describe("EC2Compute", () => {
       const c = new EC2Compute();
       c.setHelpersForTesting(helpers);
 
-      await expect(c.provision({ tags: { name: "test" } })).rejects.toThrow(/no IP/);
+      (await expect(c.provision({ tags: { name: "test" } }))).rejects.toThrow(/no IP/);
     });
 
     it("propagates provisionStack errors", async () => {
@@ -261,7 +261,7 @@ describe("EC2Compute", () => {
       const c = new EC2Compute();
       c.setHelpersForTesting(helpers);
 
-      await expect(c.provision({ tags: { name: "test" } })).rejects.toThrow("quota exceeded");
+      (await expect(c.provision({ tags: { name: "test" } }))).rejects.toThrow("quota exceeded");
     });
   });
 
@@ -279,7 +279,7 @@ describe("EC2Compute", () => {
     });
   });
 
-  describe("start", () => {
+  describe("start", async () => {
     it("calls StartInstances, re-opens the tunnel, and waits for arkd health", async () => {
       const { helpers, calls } = makeHelpers();
       const c = new EC2Compute();
@@ -309,7 +309,7 @@ describe("EC2Compute", () => {
       const c = new EC2Compute();
       c.setHelpersForTesting(helpers);
 
-      await expect(c.start(makeProvisionedHandle())).rejects.toThrow(/no IP after start/);
+      (await expect(c.start(makeProvisionedHandle()))).rejects.toThrow(/no IP after start/);
     });
 
     it("falls back to privateIp when publicIp is null", async () => {
@@ -329,7 +329,7 @@ describe("EC2Compute", () => {
       c.setHelpersForTesting(helpers);
 
       const handle = makeProvisionedHandle({ sshPid: null });
-      await expect(c.start(handle)).rejects.toThrow(/arkd never came back/);
+      (await expect(c.start(handle))).rejects.toThrow(/arkd never came back/);
 
       // Exactly one kill -- the fresh tunnel we spawned. The pre-existing
       // PID was null so we didn't try to kill anything first.
@@ -339,7 +339,7 @@ describe("EC2Compute", () => {
     });
   });
 
-  describe("stop", () => {
+  describe("stop", async () => {
     it("kills the tunnel and then calls StopInstances", async () => {
       const { helpers, calls } = makeHelpers();
       const c = new EC2Compute();
@@ -372,7 +372,7 @@ describe("EC2Compute", () => {
     });
   });
 
-  describe("destroy", () => {
+  describe("destroy", async () => {
     it("kills the tunnel, then calls destroyStack with the stored ids", async () => {
       const { helpers, calls } = makeHelpers();
       const c = new EC2Compute();
@@ -403,14 +403,14 @@ describe("EC2Compute", () => {
       c.setHelpersForTesting(helpers);
 
       const bogus: ComputeHandle = { kind: "ec2", name: "test", meta: {} };
-      await expect(c.destroy(bogus)).rejects.toThrow(/missing meta.ec2/);
+      (await expect(c.destroy(bogus))).rejects.toThrow(/missing meta.ec2/);
     });
   });
 
-  describe("snapshot / restore", () => {
+  describe("snapshot / restore", async () => {
     it("throws NotSupportedError on snapshot (deferred)", async () => {
       const c = new EC2Compute();
-      await expect(c.snapshot(makeProvisionedHandle())).rejects.toBeInstanceOf(NotSupportedError);
+      (await expect(c.snapshot(makeProvisionedHandle()))).rejects.toBeInstanceOf(NotSupportedError);
     });
 
     it("throws NotSupportedError on restore (deferred)", async () => {
@@ -422,7 +422,7 @@ describe("EC2Compute", () => {
         sizeBytes: 0,
         metadata: {},
       };
-      await expect(c.restore(snap)).rejects.toBeInstanceOf(NotSupportedError);
+      (await expect(c.restore(snap))).rejects.toBeInstanceOf(NotSupportedError);
     });
 
     it("still reports capabilities.snapshot = true so dispatch advertises the eventual shape", () => {

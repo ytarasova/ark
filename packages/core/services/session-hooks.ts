@@ -54,7 +54,7 @@ export interface HookStatusResult {
 
 /** Detect session status from tmux content (fallback when hooks don't fire). */
 export async function detectStatus(app: AppContext, sessionId: string): Promise<string | null> {
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session?.session_id) return null;
   const { detectSessionStatus } = await import("../observability/status-detect.js");
   const detected = await detectSessionStatus(session.session_id);
@@ -70,12 +70,12 @@ export async function detectStatus(app: AppContext, sessionId: string): Promise<
  * which writes events and config to the store via app. This is intentional --
  * handoff detection is best-effort and should not block the hook response.
  */
-export function applyHookStatus(
+export async function applyHookStatus(
   app: AppContext,
   session: Session,
   hookEvent: string,
   payload: Record<string, unknown>,
-): HookStatusResult {
+): Promise<HookStatusResult> {
   const result: HookStatusResult = { events: [] };
 
   // Check if this session uses manual gate (interactive - user controls lifecycle)
@@ -136,8 +136,7 @@ export function applyHookStatus(
       newStatus = "failed" as any;
       if (!result.updates) result.updates = {};
       result.updates.error = "Agent exited without committing any changes";
-      if (!result.logEvents) result.logEvents = [];
-      result.logEvents.push({
+      result.events!.push({
         type: "completion_rejected",
         opts: { stage: session.stage ?? undefined, actor: "system", data: { reason: "no commits on SessionEnd" } },
       });
@@ -252,7 +251,7 @@ export function applyHookStatus(
         const ctx: TerminationContext = {
           session,
           turnCount: (session.config?.turns as number | undefined) ?? 0,
-          tokenCount: app.usageRecorder.getSessionCost(session.id).total_tokens,
+          tokenCount: (await app.usageRecorder.getSessionCost(session.id)).total_tokens,
           elapsedMs: Date.now() - new Date(session.updated_at).getTime(),
           lastOutput: "",
         };
@@ -297,15 +296,15 @@ export function applyHookStatus(
   // Check for agent-initiated handoff on session end (fire-and-forget async)
   if (hookEvent === "SessionEnd" || hookEvent === "Stop") {
     getOutput(app, session.id, { lines: 50 })
-      .then((output) => {
+      .then(async (output) => {
         try {
           const handoff = detectHandoff(output);
           if (handoff) {
-            app.events.log(session.id, "handoff_detected", {
+            await app.events.log(session.id, "handoff_detected", {
               actor: "system",
               data: { targetAgent: handoff.targetAgent, reason: handoff.reason },
             });
-            app.sessions.mergeConfig(session.id, {
+            await app.sessions.mergeConfig(session.id, {
               _pending_handoff: { agent: handoff.targetAgent, instructions: handoff.reason },
             });
           }
@@ -351,8 +350,8 @@ export interface ReportResult {
  * Determines state transitions, messages, and events without
  * touching the store, event bus, or session lifecycle directly.
  */
-export function applyReport(app: AppContext, sessionId: string, report: OutboundMessage): ReportResult {
-  const session = app.sessions.get(sessionId);
+export async function applyReport(app: AppContext, sessionId: string, report: OutboundMessage): Promise<ReportResult> {
+  const session = await app.sessions.get(sessionId);
   if (!session) {
     return { updates: {}, logEvents: [], busEvents: [] };
   }
@@ -647,7 +646,7 @@ export async function mediateStageHandoff(
   const autoDispatch = opts?.autoDispatch ?? true;
   const source = opts?.source ?? "unknown";
 
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session) {
     return { ok: false, message: `Session ${sessionId} not found` };
   }
@@ -657,23 +656,23 @@ export async function mediateStageHandoff(
   // Step 1: Pre-advance verification (verify scripts + unresolved todos)
   if (fromStage && session.flow) {
     const stageDef = flow.getStage(app, session.flow, fromStage);
-    const hasTodos = app.todos.list(sessionId).some((t) => !t.done);
+    const hasTodos = (await app.todos.list(sessionId)).some((t) => !t.done);
     const repoVerify = session.workdir ? loadRepoConfig(session.workdir).verify : undefined;
     if (stageDef?.verify?.length || repoVerify?.length || hasTodos) {
       const verify = await runVerification(app, sessionId);
       if (!verify.ok) {
         logWarn("handoff", `stage handoff blocked by verification for ${sessionId}/${fromStage}: ${verify.message}`);
-        app.sessions.update(sessionId, {
+        await app.sessions.update(sessionId, {
           status: "blocked",
           breakpoint_reason: `Verification failed before advancing: ${verify.message.slice(0, 200)}`,
         });
-        app.messages.send(
+        await app.messages.send(
           sessionId,
           "system",
           `Advance blocked: verification failed for stage '${fromStage}'. ${verify.message}`,
           "error",
         );
-        app.events.log(sessionId, "stage_handoff_blocked", {
+        await app.events.log(sessionId, "stage_handoff_blocked", {
           actor: "system",
           stage: fromStage,
           data: { reason: "verification_failed", source, message: verify.message.slice(0, 500) },
@@ -694,11 +693,11 @@ export async function mediateStageHandoff(
     return { ok: false, message: advResult.message, fromStage };
   }
 
-  const updated = app.sessions.get(sessionId);
+  const updated = await app.sessions.get(sessionId);
 
   // Check if the flow completed (no more stages)
   if (updated?.status === "completed") {
-    app.events.log(sessionId, "stage_handoff", {
+    await app.events.log(sessionId, "stage_handoff", {
       actor: "system",
       stage: fromStage ?? undefined,
       data: { from_stage: fromStage, to_stage: null, flow_completed: true, source },
@@ -719,16 +718,16 @@ export async function mediateStageHandoff(
   if (autoDispatch && updated?.status === "ready" && toStage) {
     const nextAction = flow.getStageAction(app, updated.flow, toStage);
     if (nextAction.type === "agent" || nextAction.type === "fork") {
-      const dispatchResult = await safeAsync(`handoff: auto-dispatch ${sessionId}/${toStage}`, () =>
-        dispatch(app, sessionId),
-      );
+      const dispatchResult = await safeAsync(`handoff: auto-dispatch ${sessionId}/${toStage}`, async () => {
+        await dispatch(app, sessionId);
+      });
       dispatched = dispatchResult;
     } else if (nextAction.type === "action") {
       await safeAsync(`auto-action: ${sessionId}/${nextAction.action}`, async () => {
         const verify = await runVerification(app, sessionId);
         if (!verify.ok) {
           logWarn("handoff", `action stage blocked by verification for ${sessionId}/${toStage}: ${verify.message}`);
-          app.sessions.update(sessionId, {
+          await app.sessions.update(sessionId, {
             status: "blocked",
             breakpoint_reason: `Verification failed: ${verify.message.slice(0, 200)}`,
           });
@@ -737,7 +736,7 @@ export async function mediateStageHandoff(
         const result = await executeAction(app, sessionId, nextAction.action ?? "");
         if (!result.ok) {
           logWarn("handoff", `action '${nextAction.action}' failed for ${sessionId}: ${result.message}`);
-          app.sessions.update(sessionId, {
+          await app.sessions.update(sessionId, {
             status: "failed",
             error: `Action '${nextAction.action}' failed: ${result.message.slice(0, 200)}`,
           });
@@ -745,7 +744,7 @@ export async function mediateStageHandoff(
         }
         // Action succeeded -- chain into next stage unless the action
         // set a non-ready status (e.g. auto_merge sets "waiting").
-        const postAction = app.sessions.get(sessionId);
+        const postAction = await app.sessions.get(sessionId);
         if (postAction?.status === "ready") {
           await mediateStageHandoff(app, sessionId, {
             autoDispatch: true,
@@ -758,7 +757,7 @@ export async function mediateStageHandoff(
   }
 
   // Step 4: Emit handoff event for observability
-  app.events.log(sessionId, "stage_handoff", {
+  await app.events.log(sessionId, "stage_handoff", {
     actor: "system",
     stage: toStage ?? undefined,
     data: {
@@ -794,23 +793,23 @@ export function parseOnFailure(directive: string | undefined): { retry: true; ma
   return { retry: true, maxRetries: parseInt(match[1], 10) };
 }
 
-export function retryWithContext(
+export async function retryWithContext(
   app: AppContext,
   sessionId: string,
   opts?: { maxRetries?: number },
-): { ok: boolean; message: string } {
-  const s = app.sessions.get(sessionId);
+): Promise<{ ok: boolean; message: string }> {
+  const s = await app.sessions.get(sessionId);
   if (!s) return { ok: false, message: "Session not found" };
   if (s.status !== "failed") return { ok: false, message: "Session is not in failed state" };
 
   const maxRetries = opts?.maxRetries ?? 3;
-  const priorRetries = app.events.list(sessionId).filter((e) => e.type === "retry_with_context").length;
+  const priorRetries = (await app.events.list(sessionId)).filter((e) => e.type === "retry_with_context").length;
   if (priorRetries >= maxRetries) {
     return { ok: false, message: `Max retries (${maxRetries}) reached` };
   }
 
   // Log the retry event with error context
-  app.events.log(sessionId, "retry_with_context", {
+  await app.events.log(sessionId, "retry_with_context", {
     actor: "system",
     data: {
       attempt: priorRetries + 1,
@@ -820,7 +819,7 @@ export function retryWithContext(
   });
 
   // Reset to ready for re-dispatch
-  app.sessions.update(sessionId, { status: "ready", error: null });
+  await app.sessions.update(sessionId, { status: "ready", error: null });
 
   return { ok: true, message: `Retry ${priorRetries + 1}/${maxRetries} queued` };
 }

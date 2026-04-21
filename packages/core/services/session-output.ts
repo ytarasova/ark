@@ -14,12 +14,12 @@ export async function getOutput(
   sessionId: string,
   opts?: { lines?: number; ansi?: boolean },
 ): Promise<string> {
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session) return "";
 
   // For running sessions, capture live from tmux
   if (session.session_id) {
-    const { provider, compute } = resolveProvider(session);
+    const { provider, compute } = await resolveProvider(session);
     if (provider && compute) {
       const live = await provider.captureOutput(compute, session, opts);
       if (live) return live;
@@ -37,21 +37,21 @@ export async function send(
   sessionId: string,
   message: string,
 ): Promise<{ ok: boolean; message: string }> {
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session?.session_id) return { ok: false, message: "No active session" };
 
   // Check for prompt injection in user messages
   try {
     const injection = detectInjection(message);
     if (injection.severity === "high") {
-      app.events.log(sessionId, "prompt_injection_blocked", {
+      await app.events.log(sessionId, "prompt_injection_blocked", {
         actor: "system",
         data: { patterns: injection.patterns },
       });
       return { ok: false, message: "Message blocked: potential prompt injection detected" };
     }
     if (injection.detected) {
-      app.events.log(sessionId, "prompt_injection_warning", {
+      await app.events.log(sessionId, "prompt_injection_warning", {
         actor: "system",
         data: { patterns: injection.patterns, severity: injection.severity },
       });
@@ -61,14 +61,14 @@ export async function send(
   }
 
   // Audit: log user message sent
-  app.events.log(sessionId, "message_sent", {
+  await app.events.log(sessionId, "message_sent", {
     actor: "user",
     stage: session.stage ?? undefined,
     data: { length: message.length, preview: message.slice(0, 100) },
   });
 
   // Persist user message to conversation history before sending to agent
-  app.messages.send(sessionId, "user", message, "text");
+  await app.messages.send(sessionId, "user", message, "text");
 
   const { sendReliable } = await import("../send-reliable.js");
   const result = await sendReliable(session.session_id, message, { waitForReady: false, maxRetries: 3 });

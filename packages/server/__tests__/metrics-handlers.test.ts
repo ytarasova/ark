@@ -46,7 +46,7 @@ function err(res: unknown): { code: number; message: string } {
   return (res as JsonRpcError).error as { code: number; message: string };
 }
 
-describe("metrics/snapshot", () => {
+describe("metrics/snapshot", async () => {
   it("returns snapshot:null for an unknown compute name", async () => {
     const res = ok(await router.dispatch(createRequest(1, "metrics/snapshot", { computeName: "does-not-exist" })));
     expect(res.snapshot).toBeNull();
@@ -62,7 +62,7 @@ describe("metrics/snapshot", () => {
   });
 });
 
-describe("costs/read", () => {
+describe("costs/read", async () => {
   it("returns an object shaped { costs, total }", async () => {
     const res = ok(await router.dispatch(createRequest(1, "costs/read", {})));
     expect(res).toHaveProperty("costs");
@@ -73,12 +73,12 @@ describe("costs/read", () => {
   });
 });
 
-describe("costs/record + costs/summary + costs/trend + costs/session", () => {
+describe("costs/record + costs/summary + costs/trend + costs/session", async () => {
   it("records a usage event that summary + trend + session then reflect", async () => {
     // The costs/record handler verifies the session belongs to the caller's
     // tenant via app.sessions.get(sessionId); create one first so the
     // handler doesn't reject with "Session not found".
-    const session = app.sessions.create({ summary: "cost-record-session" });
+    const session = await app.sessions.create({ summary: "cost-record-session" });
     const sessionId = session.id;
 
     // Record a synthetic event via RPC
@@ -146,7 +146,7 @@ describe("costs/record + costs/summary + costs/trend + costs/session", () => {
   });
 });
 
-describe("compute/kill-process + docker actions (validation only)", () => {
+describe("compute/kill-process + docker actions (validation only)", async () => {
   it("compute/kill-process rejects missing pid", async () => {
     const res = err(await router.dispatch(createRequest(1, "compute/kill-process", {})));
     expect(res.message).toContain("pid");

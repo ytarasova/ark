@@ -33,7 +33,7 @@ beforeAll(() => {
 
 afterAll(() => rmSync(repoDir, { recursive: true, force: true }));
 
-describe("gitContributorsExtractor", () => {
+describe("gitContributorsExtractor", async () => {
   it("supports any git repo", () => {
     const repo: Repo = {
       id: "r",

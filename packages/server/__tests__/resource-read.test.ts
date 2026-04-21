@@ -28,7 +28,7 @@ function err(res: unknown): { code: number; message: string } {
   return (res as JsonRpcError).error as { code: number; message: string };
 }
 
-describe("agent/read", () => {
+describe("agent/read", async () => {
   it("returns a builtin agent by name", async () => {
     const agents = ok(await router.dispatch(createRequest(1, "agent/list", {})));
     const first = (agents.agents as Array<{ name: string }>)[0];
@@ -46,7 +46,7 @@ describe("agent/read", () => {
   });
 });
 
-describe("flow/read", () => {
+describe("flow/read", async () => {
   it("returns a builtin flow by name", async () => {
     const flows = ok(await router.dispatch(createRequest(1, "flow/list", {})));
     const first = (flows.flows as Array<{ name: string }>)[0];
@@ -64,7 +64,7 @@ describe("flow/read", () => {
   });
 });
 
-describe("skill/read", () => {
+describe("skill/read", async () => {
   it("returns a builtin skill by name", async () => {
     const skills = ok(await router.dispatch(createRequest(1, "skill/list", {})));
     const first = (skills.skills as Array<{ name: string }>)[0];
@@ -83,7 +83,7 @@ describe("skill/read", () => {
   });
 });
 
-describe("runtime/read", () => {
+describe("runtime/read", async () => {
   it("returns a builtin runtime by name", async () => {
     const runtimes = ok(await router.dispatch(createRequest(1, "runtime/list", {})));
     const first = (runtimes.runtimes as Array<{ name: string }>)[0];
@@ -101,7 +101,7 @@ describe("runtime/read", () => {
   });
 });
 
-describe("recipe/read", () => {
+describe("recipe/read", async () => {
   it("returns a builtin recipe by name", async () => {
     const recipes = ok(await router.dispatch(createRequest(1, "recipe/list", {})));
     const first = (recipes.recipes as Array<{ name: string }>)[0];
@@ -119,7 +119,7 @@ describe("recipe/read", () => {
   });
 });
 
-describe("compute/read", () => {
+describe("compute/read", async () => {
   it("reads the seeded local compute target", async () => {
     const listRes = await router.dispatch(createRequest(1, "compute/list", {}));
     const targets = ok(listRes).targets as Array<{ name: string }>;
@@ -137,7 +137,7 @@ describe("compute/read", () => {
   });
 });
 
-describe("compute/kinds and runtime/kinds", () => {
+describe("compute/kinds and runtime/kinds", async () => {
   it("compute/kinds returns a non-empty list", async () => {
     const res = await router.dispatch(createRequest(1, "compute/kinds", {}));
     const kinds = ok(res).kinds as unknown[];
@@ -151,7 +151,7 @@ describe("compute/kinds and runtime/kinds", () => {
   });
 });
 
-describe("group/list", () => {
+describe("group/list", async () => {
   it("returns groups array", async () => {
     const res = await router.dispatch(createRequest(1, "group/list", {}));
     const groups = ok(res).groups;

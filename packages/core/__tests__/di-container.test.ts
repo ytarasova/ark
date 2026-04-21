@@ -31,7 +31,7 @@ afterEach(async () => {
 
 // ── Container registration ──────────────────────────────────────────────────
 
-describe("DI container registration", () => {
+describe("DI container registration", async () => {
   it("boot() registers all cradle keys", async () => {
     app = await AppContext.forTestAsync();
     await app.boot();
@@ -71,7 +71,7 @@ describe("DI container registration", () => {
 
 // ── Accessor resolution ─────────────────────────────────────────────────────
 
-describe("AppContext accessors resolve from container", () => {
+describe("AppContext accessors resolve from container", async () => {
   it("accessors return the same instances as direct container resolve", async () => {
     app = await AppContext.forTestAsync();
     await app.boot();
@@ -110,7 +110,7 @@ describe("AppContext accessors resolve from container", () => {
 
 // ── Type correctness ────────────────────────────────────────────────────────
 
-describe("resolved instances have correct types", () => {
+describe("resolved instances have correct types", async () => {
   it("repositories are correct classes", async () => {
     app = await AppContext.forTestAsync();
     await app.boot();
@@ -136,24 +136,24 @@ describe("resolved instances have correct types", () => {
 
 // ── Dependency injection wiring ─────────────────────────────────────────────
 
-describe("service dependency injection", () => {
+describe("service dependency injection", async () => {
   it("SessionService can create and query sessions (repos wired)", async () => {
     app = await AppContext.forTestAsync();
     await app.boot();
     setApp(app);
 
     const svc = app.sessionService;
-    const session = svc.start({ summary: "DI test", ticket: "DI-1" });
+    const session = await svc.start({ summary: "DI test", ticket: "DI-1" });
     expect(session.id).toMatch(/^s-[0-9a-z]{10}$/);
     expect(session.summary).toBe("DI test");
 
     // Verify it's in the DB via the repository
-    const fromRepo = app.sessions.get(session.id);
+    const fromRepo = await app.sessions.get(session.id);
     expect(fromRepo).not.toBeNull();
     expect(fromRepo!.summary).toBe("DI test");
 
     // Verify event was logged
-    const evts = app.events.list(session.id, { type: "session_created" });
+    const evts = await app.events.list(session.id, { type: "session_created" });
     expect(evts.length).toBe(1);
   });
 
@@ -163,12 +163,12 @@ describe("service dependency injection", () => {
     setApp(app);
 
     const svc = app.sessionService;
-    const session = svc.start({});
-    app.sessions.update(session.id, { status: "running" } as any);
+    const session = await svc.start({});
+    await app.sessions.update(session.id, { status: "running" } as any);
 
     const result = await svc.stop(session.id);
     expect(result.ok).toBe(true);
-    expect(app.sessions.get(session.id)!.status).toBe("stopped");
+    expect((await app.sessions.get(session.id))!.status).toBe("stopped");
   });
 
   it("ComputeService delegates to ComputeRepository correctly", async () => {
@@ -181,7 +181,7 @@ describe("service dependency injection", () => {
     expect(c.name).toBe("di-docker");
 
     // Verify it's in the DB via the repository
-    const fromRepo = app.computes.get("di-docker");
+    const fromRepo = await app.computes.get("di-docker");
     expect(fromRepo).not.toBeNull();
     expect(fromRepo!.provider).toBe("docker");
   });
@@ -192,7 +192,7 @@ describe("service dependency injection", () => {
     setApp(app);
 
     // Create a session via service, then search via history
-    app.sessionService.start({ summary: "Searchable DI session" });
+    await app.sessionService.start({ summary: "Searchable DI session" });
     const results = app.historyService.search("Searchable DI");
     expect(results.length).toBe(1);
     expect(results[0].match).toBe("Searchable DI session");
@@ -201,7 +201,7 @@ describe("service dependency injection", () => {
 
 // ── Test isolation ──────────────────────────────────────────────────────────
 
-describe("forTest() isolation", () => {
+describe("forTest() isolation", async () => {
   it("two forTest() instances have independent databases", async () => {
     const app1 = await AppContext.forTestAsync();
     await app1.boot();
@@ -251,7 +251,7 @@ describe("forTest() isolation", () => {
 
 // ── Lifecycle phases ────────────────────────────────────────────────────────
 
-describe("container lifecycle phases", () => {
+describe("container lifecycle phases", async () => {
   it("phase transitions: created -> booting -> ready -> shutting_down -> stopped", async () => {
     app = await AppContext.forTestAsync();
     expect(app.phase).toBe("created");
@@ -273,7 +273,7 @@ describe("container lifecycle phases", () => {
     await app.boot();
     setApp(app);
 
-    await expect(app.boot()).rejects.toThrow("Cannot boot");
+    (await expect(app.boot())).rejects.toThrow("Cannot boot");
   });
 
   it("double shutdown is idempotent", async () => {
@@ -322,7 +322,7 @@ describe("container lifecycle phases", () => {
 
 // ── Resource stores ─────────────────────────────────────────────────────────
 
-describe("resource stores via container", () => {
+describe("resource stores via container", async () => {
   it("flows store is accessible and has list()", async () => {
     app = await AppContext.forTestAsync();
     await app.boot();
@@ -365,7 +365,7 @@ describe("resource stores via container", () => {
 
 // ── Cross-service integration ───────────────────────────────────────────────
 
-describe("cross-service integration through container", () => {
+describe("cross-service integration through container", async () => {
   it("full session lifecycle through DI-wired services", async () => {
     app = await AppContext.forTestAsync();
     await app.boot();
@@ -374,36 +374,36 @@ describe("cross-service integration through container", () => {
     const svc = app.sessionService;
 
     // Create
-    const session = svc.start({ summary: "Full lifecycle", ticket: "LC-1" });
+    const session = await svc.start({ summary: "Full lifecycle", ticket: "LC-1" });
     expect(session.status).toBe("pending");
 
     // Pause
-    const pauseResult = svc.pause(session.id, "Waiting for review");
+    const pauseResult = await svc.pause(session.id, "Waiting for review");
     expect(pauseResult.ok).toBe(true);
-    expect(app.sessions.get(session.id)!.status).toBe("blocked");
+    expect((await app.sessions.get(session.id))!.status).toBe("blocked");
 
     // Resume
     const resumeResult = await svc.resume(session.id);
     expect(resumeResult.ok).toBe(true);
-    expect(app.sessions.get(session.id)!.status).toBe("ready");
+    expect((await app.sessions.get(session.id))!.status).toBe("ready");
 
     // Stop
     const stopResult = await svc.stop(session.id);
     expect(stopResult.ok).toBe(true);
-    expect(app.sessions.get(session.id)!.status).toBe("stopped");
+    expect((await app.sessions.get(session.id))!.status).toBe("stopped");
 
     // Delete
     const deleteResult = await svc.delete(session.id);
     expect(deleteResult.ok).toBe(true);
-    expect(app.sessions.get(session.id)!.status).toBe("deleting");
+    expect((await app.sessions.get(session.id))!.status).toBe("deleting");
 
     // Undelete
     const undeleteResult = await svc.undelete(session.id);
     expect(undeleteResult.ok).toBe(true);
-    expect(app.sessions.get(session.id)!.status).toBe("stopped");
+    expect((await app.sessions.get(session.id))!.status).toBe("stopped");
 
     // Verify events trail
-    const allEvents = app.events.list(session.id);
+    const allEvents = await app.events.list(session.id);
     const types = allEvents.map((e) => e.type);
     expect(types).toContain("session_created");
     expect(types).toContain("session_paused");
@@ -419,12 +419,12 @@ describe("cross-service integration through container", () => {
     setApp(app);
 
     // Create session and compute through services
-    const session = app.sessionService.start({ summary: "With compute" });
+    const session = await app.sessionService.start({ summary: "With compute" });
     const compute = app.computeService.create({ name: "test-ec2", provider: "ec2" });
 
     // Both write to the same underlying database
-    expect(app.sessions.get(session.id)).not.toBeNull();
-    expect(app.computes.get("test-ec2")).not.toBeNull();
+    expect(await app.sessions.get(session.id)).not.toBeNull();
+    expect(await app.computes.get("test-ec2")).not.toBeNull();
 
     // History service sees the session
     const results = app.historyService.search("With compute");
@@ -436,25 +436,25 @@ describe("cross-service integration through container", () => {
     await app.boot();
     setApp(app);
 
-    const session = app.sessionService.start({ summary: "Msg test" });
+    const session = await app.sessionService.start({ summary: "Msg test" });
     app.messages.send(session.id, "agent", "Done!", "text");
     expect(app.messages.unreadCount(session.id)).toBe(1);
 
     // complete() marks messages as read
-    app.sessionService.complete(session.id);
+    await app.sessionService.complete(session.id);
     expect(app.messages.unreadCount(session.id)).toBe(0);
   });
 });
 
 // -- Transitive dependency sharing ------------------------------------------
 
-describe("transitive dependency sharing", () => {
+describe("transitive dependency sharing", async () => {
   it("SessionService and SessionRepository share the same DB", async () => {
     app = await AppContext.forTestAsync();
     await app.boot();
     setApp(app);
 
-    const session = app.sessionService.start({ summary: "Shared DB test" });
+    const session = await app.sessionService.start({ summary: "Shared DB test" });
 
     // Write directly to the DB via the db accessor
     const row = app.db.prepare("SELECT id FROM sessions WHERE id = ?").get(session.id) as { id: string } | undefined;
@@ -467,7 +467,7 @@ describe("transitive dependency sharing", () => {
     await app.boot();
     setApp(app);
 
-    app.sessionService.start({ summary: "History transitive test" });
+    await app.sessionService.start({ summary: "History transitive test" });
 
     const results = app.historyService.search("History transitive");
     expect(results.length).toBe(1);
@@ -481,10 +481,10 @@ describe("transitive dependency sharing", () => {
     const db = app.container.resolve("db");
     expect(app.db).toBe(db);
 
-    const session = app.sessions.create({});
-    app.events.log(session.id, "test_event", { actor: "test" });
+    const session = await app.sessions.create({});
+    await app.events.log(session.id, "test_event", { actor: "test" });
 
-    const events = app.events.list(session.id, { type: "test_event" });
+    const events = await app.events.list(session.id, { type: "test_event" });
     expect(events.length).toBe(1);
   });
 
@@ -493,9 +493,9 @@ describe("transitive dependency sharing", () => {
     await app.boot();
     setApp(app);
 
-    const session = app.sessions.create({});
-    app.todos.add(session.id, "Test todo");
-    const todos = app.todos.list(session.id);
+    const session = await app.sessions.create({});
+    await app.todos.add(session.id, "Test todo");
+    const todos = await app.todos.list(session.id);
     expect(todos.length).toBe(1);
     expect(todos[0].content).toBe("Test todo");
   });
@@ -503,14 +503,14 @@ describe("transitive dependency sharing", () => {
 
 // -- Container override for test doubles ------------------------------------
 
-describe("container override", () => {
+describe("container override", async () => {
   it("can override a singleton registration with asValue", async () => {
     app = await AppContext.forTestAsync();
     await app.boot();
     setApp(app);
 
-    const session = app.sessionService.start({ summary: "Before override" });
-    expect(app.sessions.get(session.id)).not.toBeNull();
+    const session = await app.sessionService.start({ summary: "Before override" });
+    expect(await app.sessions.get(session.id)).not.toBeNull();
 
     const fakeSessions = {
       get: (id: string) => ({ id, summary: "FAKE", status: "pending" }),
@@ -527,7 +527,7 @@ describe("container override", () => {
     setApp(app);
 
     const originalRepo = app.sessions;
-    const session = app.sessionService.start({ summary: "ref test" });
+    const session = await app.sessionService.start({ summary: "ref test" });
 
     app.container.register({ sessions: asValue({ get: () => null }) });
 
@@ -539,7 +539,7 @@ describe("container override", () => {
 
 // -- Post-shutdown behavior -------------------------------------------------
 
-describe("post-shutdown behavior", () => {
+describe("post-shutdown behavior", async () => {
   it("phase is stopped after shutdown and DB is closed", async () => {
     const tempApp = await AppContext.forTestAsync();
     await tempApp.boot();
@@ -559,7 +559,7 @@ describe("post-shutdown behavior", () => {
     await tempApp.boot();
     await tempApp.shutdown();
 
-    await expect(tempApp.boot()).rejects.toThrow();
+    (await expect(tempApp.boot())).rejects.toThrow();
   });
 
   it("temp directory is removed after shutdown with cleanupOnShutdown", async () => {
@@ -577,7 +577,7 @@ describe("post-shutdown behavior", () => {
 
 // -- getApp() global singleton integration ----------------------------------
 
-describe("getApp() global singleton integration", () => {
+describe("getApp() global singleton integration", async () => {
   it("getApp() resolves same instances as direct container access", async () => {
     app = await AppContext.forTestAsync();
     await app.boot();
@@ -600,7 +600,7 @@ describe("getApp() global singleton integration", () => {
 
     const session = getApp().sessionService.start({ summary: "Global write" });
 
-    const found = app.sessions.get(session.id);
+    const found = await app.sessions.get(session.id);
     expect(found).not.toBeNull();
     expect(found!.summary).toBe("Global write");
   });

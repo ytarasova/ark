@@ -41,8 +41,8 @@ export interface SessionCostSummary {
 }
 
 /** Get cost info for a single session from UsageRecorder. */
-export function getSessionCost(app: AppContext, session: Session): SessionCostSummary {
-  const agg = app.usageRecorder.getSessionCost(session.id);
+export async function getSessionCost(app: AppContext, session: Session): Promise<SessionCostSummary> {
+  const agg = await app.usageRecorder.getSessionCost(session.id);
   const first = agg.records[0];
   const usage: TokenUsage | null = first
     ? {
@@ -62,13 +62,12 @@ export function getSessionCost(app: AppContext, session: Session): SessionCostSu
 }
 
 /** Get costs for all sessions, sorted by cost descending. */
-export function getAllSessionCosts(
+export async function getAllSessionCosts(
   app: AppContext,
   sessions: Session[],
-): { sessions: SessionCostSummary[]; total: number } {
-  const costs = sessions
-    .map((s) => getSessionCost(app, s))
-    .filter((c) => c.cost > 0 || (c.usage?.input_tokens ?? 0) > 0);
+): Promise<{ sessions: SessionCostSummary[]; total: number }> {
+  const all = await Promise.all(sessions.map((s) => getSessionCost(app, s)));
+  const costs = all.filter((c) => c.cost > 0 || (c.usage?.input_tokens ?? 0) > 0);
   costs.sort((a, b) => b.cost - a.cost);
   const total = costs.reduce((sum, c) => sum + c.cost, 0);
   return { sessions: costs, total };
@@ -87,7 +86,7 @@ export interface BudgetStatus {
 }
 
 /** Check budget status against configured limits. */
-export function checkBudget(app: AppContext, sessions: Session[], budgets: BudgetConfig): BudgetStatus {
+export async function checkBudget(app: AppContext, sessions: Session[], budgets: BudgetConfig): Promise<BudgetStatus> {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
   const weekStart = new Date(now.getTime() - now.getDay() * 86400000);
@@ -98,9 +97,14 @@ export function checkBudget(app: AppContext, sessions: Session[], budgets: Budge
   const weeklySessions = sessions.filter((s) => s.updated_at >= weekStart.toISOString());
   const monthlySessions = sessions.filter((s) => s.updated_at >= monthStart);
 
-  const dailySpent = getAllSessionCosts(app, dailySessions).total;
-  const weeklySpent = getAllSessionCosts(app, weeklySessions).total;
-  const monthlySpent = getAllSessionCosts(app, monthlySessions).total;
+  const [dailyAgg, weeklyAgg, monthlyAgg] = await Promise.all([
+    getAllSessionCosts(app, dailySessions),
+    getAllSessionCosts(app, weeklySessions),
+    getAllSessionCosts(app, monthlySessions),
+  ]);
+  const dailySpent = dailyAgg.total;
+  const weeklySpent = weeklyAgg.total;
+  const monthlySpent = monthlyAgg.total;
 
   function bucket(spent: number, limit: number | undefined | null) {
     const lim = limit ?? null;
@@ -120,14 +124,14 @@ export function checkBudget(app: AppContext, sessions: Session[], budgets: Budge
  * have cost data yet. Uses the polymorphic TranscriptParserRegistry so it
  * works across all runtimes (Claude, Codex, Gemini, ...).
  */
-export function syncCosts(app: AppContext): { synced: number; skipped: number } {
-  const sessions = app.sessions.list({ limit: 1000 });
+export async function syncCosts(app: AppContext): Promise<{ synced: number; skipped: number }> {
+  const sessions = await app.sessions.list({ limit: 1000 });
   let synced = 0;
   let skipped = 0;
 
   for (const session of sessions) {
     // Skip sessions that already have recorded usage
-    if (app.usageRecorder.getSessionCost(session.id).records.length > 0) {
+    if ((await app.usageRecorder.getSessionCost(session.id)).records.length > 0) {
       skipped++;
       continue;
     }
@@ -163,7 +167,7 @@ export function syncCosts(app: AppContext): { synced: number; skipped: number } 
 
     const provider =
       kind === "claude" ? "anthropic" : kind === "codex" ? "openai" : kind === "gemini" ? "google" : kind;
-    app.usageRecorder.record({
+    await app.usageRecorder.record({
       sessionId: session.id,
       model: model ?? (session.config?.model as string) ?? "unknown",
       provider,
@@ -180,8 +184,8 @@ export function syncCosts(app: AppContext): { synced: number; skipped: number } 
 }
 
 /** Export cost data as CSV string. */
-export function exportCostsCsv(app: AppContext, sessions: Session[]): string {
-  const costs = getAllSessionCosts(app, sessions);
+export async function exportCostsCsv(app: AppContext, sessions: Session[]): Promise<string> {
+  const costs = await getAllSessionCosts(app, sessions);
   const lines = ["session_id,summary,model,cost_usd,input_tokens,output_tokens,cache_read,cache_write,total_tokens"];
   for (const c of costs.sessions) {
     const u = c.usage;

@@ -57,14 +57,14 @@ function cfg(): TriggerConfig {
   };
 }
 
-describe("DefaultTriggerDispatcher", () => {
+describe("DefaultTriggerDispatcher", async () => {
   test("creates a session with mapped inputs + group name", async () => {
     const dispatcher = new DefaultTriggerDispatcher(app);
     const result = await dispatcher.dispatch({ event: ev(), config: cfg() });
     expect(result.ok).toBe(true);
     expect(result.sessionId).toBeDefined();
 
-    const s = app.sessions.get(result.sessionId!);
+    const s = await app.sessions.get(result.sessionId!);
     expect(s).not.toBeNull();
     expect(s!.flow).toBe("trigger-test-flow");
     expect(s!.group_name).toBe("trigger:github-pr-opened");
@@ -87,7 +87,7 @@ describe("DefaultTriggerDispatcher", () => {
     // session. We assert the ok path holds instead and that no stage fires.
     const result = await dispatcher.dispatch({ event: ev(), config });
     expect(result.ok).toBe(true);
-    const s = app.sessions.get(result.sessionId!);
+    const s = await app.sessions.get(result.sessionId!);
     expect(s!.flow).toBe("does-not-exist");
   });
 });

@@ -130,23 +130,23 @@ describe("formatReviewPrompt", () => {
 
 // ── findSessionByPR ──────────────────────────────────────────────────────────
 
-describe("findSessionByPR", () => {
-  it("returns session matching pr_url", () => {
+describe("findSessionByPR", async () => {
+  it("returns session matching pr_url", async () => {
     const session = getApp().sessions.create({ summary: "test session" });
     getApp().sessions.update(session.id, { pr_url: "https://github.com/org/repo/pull/42" });
 
-    const found = findSessionByPR(getApp(), "https://github.com/org/repo/pull/42");
+    const found = await findSessionByPR(getApp(), "https://github.com/org/repo/pull/42");
     expect(found).not.toBeNull();
     expect(found!.id).toBe(session.id);
     expect(found!.pr_url).toBe("https://github.com/org/repo/pull/42");
   });
 
-  it("returns null for unknown PR", () => {
-    const found = findSessionByPR(getApp(), "https://github.com/org/repo/pull/999");
+  it("returns null for unknown PR", async () => {
+    const found = await findSessionByPR(getApp(), "https://github.com/org/repo/pull/999");
     expect(found).toBeNull();
   });
 
-  it("returns most recent session for same PR", () => {
+  it("returns most recent session for same PR", async () => {
     const prUrl = "https://github.com/org/repo/pull/77";
 
     const older = getApp().sessions.create({ summary: "older" });
@@ -156,7 +156,7 @@ describe("findSessionByPR", () => {
     const newer = getApp().sessions.create({ summary: "newer" });
     getApp().sessions.update(newer.id, { pr_url: prUrl });
 
-    const found = findSessionByPR(getApp(), prUrl);
+    const found = await findSessionByPR(getApp(), prUrl);
     expect(found).not.toBeNull();
     expect(found!.id).toBe(newer.id);
     expect(found!.summary).toBe("newer");

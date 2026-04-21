@@ -37,7 +37,7 @@ const defaultConfig: IssueWebhookConfig = {
   autoDispatch: false,
 };
 
-describe("handleIssueWebhook", () => {
+describe("handleIssueWebhook", async () => {
   it("creates session for labeled action with matching label", async () => {
     const payload = makePayload();
     const result = await handleIssueWebhook(getApp(), payload, defaultConfig);

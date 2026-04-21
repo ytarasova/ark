@@ -17,26 +17,26 @@ let symbolId: string;
 let chunkId: string;
 let personId: string;
 
-beforeAll(() => {
+beforeAll(async () => {
   db = new BunSqliteAdapter(new Database(":memory:"));
   store = new CodeIntelStore(db);
-  store.migrate();
+  await store.migrate();
 });
 
-afterAll(() => {
-  db.close();
+afterAll(async () => {
+  await db.close();
 });
 
-describe("CodeIntelStore CRUD", () => {
-  it("tenants -- list seed + create + lookup", () => {
-    expect(store.listTenants().length).toBe(1);
-    const t = store.createTenant({ name: "Acme", slug: "acme" });
-    expect(store.getTenant(t.id)?.slug).toBe("acme");
-    expect(store.getTenantBySlug("default")?.id).toBe(DEFAULT_TENANT_ID);
+describe("CodeIntelStore CRUD", async () => {
+  it("tenants -- list seed + create + lookup", async () => {
+    expect((await store.listTenants()).length).toBe(1);
+    const t = await store.createTenant({ name: "Acme", slug: "acme" });
+    expect((await store.getTenant(t.id))?.slug).toBe("acme");
+    expect((await store.getTenantBySlug("default"))?.id).toBe(DEFAULT_TENANT_ID);
   });
 
-  it("repos -- create + list + lookup by url", () => {
-    const r = store.createRepo({
+  it("repos -- create + list + lookup by url", async () => {
+    const r = await store.createRepo({
       tenant_id: DEFAULT_TENANT_ID,
       repo_url: "file:///tmp/repo-a",
       name: "repo-a",
@@ -44,28 +44,28 @@ describe("CodeIntelStore CRUD", () => {
       primary_language: "typescript",
     });
     repoId = r.id;
-    expect(store.listRepos(DEFAULT_TENANT_ID).length).toBe(1);
-    expect(store.findRepoByUrl(DEFAULT_TENANT_ID, "file:///tmp/repo-a")?.id).toBe(repoId);
-    expect(store.getRepo(DEFAULT_TENANT_ID, repoId)?.name).toBe("repo-a");
+    expect((await store.listRepos(DEFAULT_TENANT_ID)).length).toBe(1);
+    expect((await store.findRepoByUrl(DEFAULT_TENANT_ID, "file:///tmp/repo-a"))?.id).toBe(repoId);
+    expect((await store.getRepo(DEFAULT_TENANT_ID, repoId))?.name).toBe("repo-a");
   });
 
-  it("indexing_runs -- begin + finalize", () => {
-    const run = store.beginIndexingRun({ tenant_id: DEFAULT_TENANT_ID, repo_id: repoId, branch: "main" });
+  it("indexing_runs -- begin + finalize", async () => {
+    const run = await store.beginIndexingRun({ tenant_id: DEFAULT_TENANT_ID, repo_id: repoId, branch: "main" });
     runId = run.id;
     expect(run.status).toBe("running");
-    store.finalizeIndexingRun({ run_id: runId, status: "ok", extractor_counts: { files: 3 } });
-    const fin = store.getIndexingRun(runId);
+    await store.finalizeIndexingRun({ run_id: runId, status: "ok", extractor_counts: { files: 3 } });
+    const fin = await store.getIndexingRun(runId);
     expect(fin?.status).toBe("ok");
     expect(fin?.extractor_counts).toEqual({ files: 3 });
-    expect(store.listIndexingRuns(DEFAULT_TENANT_ID, repoId).length).toBe(1);
+    expect((await store.listIndexingRuns(DEFAULT_TENANT_ID, repoId)).length).toBe(1);
   });
 
-  it("files -- insert + lookup by id and path", () => {
+  it("files -- insert + lookup by id and path", async () => {
     // Use a fresh run since the previous one was finalized; re-using a
     // finalized run would soft-delete on the next finalize.
-    const run = store.beginIndexingRun({ tenant_id: DEFAULT_TENANT_ID, repo_id: repoId, branch: "main" });
+    const run = await store.beginIndexingRun({ tenant_id: DEFAULT_TENANT_ID, repo_id: repoId, branch: "main" });
     runId = run.id;
-    const f = store.insertFile({
+    const f = await store.insertFile({
       tenant_id: DEFAULT_TENANT_ID,
       repo_id: repoId,
       path: "src/app.ts",
@@ -76,13 +76,13 @@ describe("CodeIntelStore CRUD", () => {
       indexing_run_id: runId,
     });
     fileId = f.id;
-    expect(store.getFile(DEFAULT_TENANT_ID, fileId)?.path).toBe("src/app.ts");
-    expect(store.findFileByPath(DEFAULT_TENANT_ID, repoId, "src/app.ts")?.id).toBe(fileId);
-    expect(store.listFiles(DEFAULT_TENANT_ID, repoId).length).toBe(1);
+    expect((await store.getFile(DEFAULT_TENANT_ID, fileId))?.path).toBe("src/app.ts");
+    expect((await store.findFileByPath(DEFAULT_TENANT_ID, repoId, "src/app.ts"))?.id).toBe(fileId);
+    expect((await store.listFiles(DEFAULT_TENANT_ID, repoId)).length).toBe(1);
   });
 
-  it("symbols -- insert + lookup by name + by file", () => {
-    const s = store.insertSymbol({
+  it("symbols -- insert + lookup by name + by file", async () => {
+    const s = await store.insertSymbol({
       tenant_id: DEFAULT_TENANT_ID,
       file_id: fileId,
       kind: "function",
@@ -93,12 +93,12 @@ describe("CodeIntelStore CRUD", () => {
       indexing_run_id: runId,
     });
     symbolId = s.id;
-    expect(store.listSymbolsByFile(DEFAULT_TENANT_ID, fileId).length).toBe(1);
-    expect(store.findSymbolByName(DEFAULT_TENANT_ID, "init").length).toBe(1);
+    expect((await store.listSymbolsByFile(DEFAULT_TENANT_ID, fileId)).length).toBe(1);
+    expect((await store.findSymbolByName(DEFAULT_TENANT_ID, "init")).length).toBe(1);
   });
 
-  it("chunks -- insert + lookup + list by file", () => {
-    const c = store.insertChunk({
+  it("chunks -- insert + lookup + list by file", async () => {
+    const c = await store.insertChunk({
       tenant_id: DEFAULT_TENANT_ID,
       file_id: fileId,
       symbol_id: symbolId,
@@ -110,12 +110,12 @@ describe("CodeIntelStore CRUD", () => {
       symbol_name: "init",
     });
     chunkId = c.id;
-    expect(store.getChunk(DEFAULT_TENANT_ID, chunkId)?.attrs).toEqual({ extracted_by: "files" });
-    expect(store.listChunksByFile(DEFAULT_TENANT_ID, fileId).length).toBe(1);
+    expect((await store.getChunk(DEFAULT_TENANT_ID, chunkId))?.attrs).toEqual({ extracted_by: "files" });
+    expect((await store.listChunksByFile(DEFAULT_TENANT_ID, fileId)).length).toBe(1);
   });
 
-  it("edges -- insert + outbound + inbound", () => {
-    store.insertEdge({
+  it("edges -- insert + outbound + inbound", async () => {
+    await store.insertEdge({
       tenant_id: DEFAULT_TENANT_ID,
       source_kind: "symbol",
       source_id: symbolId,
@@ -125,25 +125,25 @@ describe("CodeIntelStore CRUD", () => {
       evidence_chunk_id: chunkId,
       indexing_run_id: runId,
     });
-    expect(store.listEdgesFrom(DEFAULT_TENANT_ID, "symbol", symbolId).length).toBe(1);
-    expect(store.listEdgesTo(DEFAULT_TENANT_ID, "file", fileId).length).toBe(1);
+    expect((await store.listEdgesFrom(DEFAULT_TENANT_ID, "symbol", symbolId)).length).toBe(1);
+    expect((await store.listEdgesTo(DEFAULT_TENANT_ID, "file", fileId)).length).toBe(1);
   });
 
-  it("external_refs -- insert and list", () => {
-    store.insertExternalRef({
+  it("external_refs -- insert and list", async () => {
+    await store.insertExternalRef({
       tenant_id: DEFAULT_TENANT_ID,
       symbol_id: symbolId,
       external_repo_hint: "github.com/foo/bar",
       external_fqn: "bar.qux.zot",
       indexing_run_id: runId,
     });
-    expect(store.listExternalRefs(DEFAULT_TENANT_ID).length).toBe(1);
-    expect(store.listExternalRefs(DEFAULT_TENANT_ID, true).length).toBe(1);
+    expect((await store.listExternalRefs(DEFAULT_TENANT_ID)).length).toBe(1);
+    expect((await store.listExternalRefs(DEFAULT_TENANT_ID, true)).length).toBe(1);
   });
 
-  it("embeddings -- insert + lookup by composite key", () => {
+  it("embeddings -- insert + lookup by composite key", async () => {
     const vec = new Uint8Array([1, 2, 3, 4]);
-    store.insertEmbedding({
+    await store.insertEmbedding({
       tenant_id: DEFAULT_TENANT_ID,
       subject_kind: "chunk",
       subject_id: chunkId,
@@ -153,12 +153,12 @@ describe("CodeIntelStore CRUD", () => {
       vector: vec,
       indexing_run_id: runId,
     });
-    const got = store.getEmbedding(DEFAULT_TENANT_ID, "chunk", chunkId, "test-model", "v1");
+    const got = await store.getEmbedding(DEFAULT_TENANT_ID, "chunk", chunkId, "test-model", "v1");
     expect(got?.dim).toBe(1);
   });
 
-  it("dependencies -- insert + list per repo", () => {
-    store.insertDependency({
+  it("dependencies -- insert + list per repo", async () => {
+    await store.insertDependency({
       tenant_id: DEFAULT_TENANT_ID,
       repo_id: repoId,
       manifest_kind: "npm",
@@ -166,27 +166,27 @@ describe("CodeIntelStore CRUD", () => {
       resolved_version: "4.17.21",
       indexing_run_id: runId,
     });
-    expect(store.listDependencies(DEFAULT_TENANT_ID, repoId).length).toBe(1);
+    expect((await store.listDependencies(DEFAULT_TENANT_ID, repoId)).length).toBe(1);
   });
 
-  it("people -- upsert returns existing, second call dedupes", () => {
-    const p = store.upsertPerson({
+  it("people -- upsert returns existing, second call dedupes", async () => {
+    const p = await store.upsertPerson({
       tenant_id: DEFAULT_TENANT_ID,
       primary_email: "alice@example.com",
       name: "Alice",
     });
     personId = p.id;
-    const again = store.upsertPerson({
+    const again = await store.upsertPerson({
       tenant_id: DEFAULT_TENANT_ID,
       primary_email: "alice@example.com",
       name: "Alice",
     });
     expect(again.id).toBe(personId);
-    expect(store.listPeople(DEFAULT_TENANT_ID).length).toBe(1);
+    expect((await store.listPeople(DEFAULT_TENANT_ID)).length).toBe(1);
   });
 
-  it("contributions -- insert and list per file + per repo", () => {
-    store.insertContribution({
+  it("contributions -- insert and list per file + per repo", async () => {
+    await store.insertContribution({
       tenant_id: DEFAULT_TENANT_ID,
       person_id: personId,
       repo_id: repoId,
@@ -196,7 +196,7 @@ describe("CodeIntelStore CRUD", () => {
       loc_removed: 20,
       indexing_run_id: runId,
     });
-    store.insertContribution({
+    await store.insertContribution({
       tenant_id: DEFAULT_TENANT_ID,
       person_id: personId,
       repo_id: repoId,
@@ -206,12 +206,12 @@ describe("CodeIntelStore CRUD", () => {
       loc_removed: 200,
       indexing_run_id: runId,
     });
-    expect(store.listContributionsForFile(DEFAULT_TENANT_ID, fileId).length).toBe(1);
-    expect(store.listContributionsForRepo(DEFAULT_TENANT_ID, repoId).length).toBe(1);
+    expect((await store.listContributionsForFile(DEFAULT_TENANT_ID, fileId)).length).toBe(1);
+    expect((await store.listContributionsForRepo(DEFAULT_TENANT_ID, repoId)).length).toBe(1);
   });
 
-  it("file_hotspots -- insert and lookup", () => {
-    store.insertHotspot({
+  it("file_hotspots -- insert and lookup", async () => {
+    await store.insertHotspot({
       tenant_id: DEFAULT_TENANT_ID,
       file_id: fileId,
       change_count_30d: 4,
@@ -221,6 +221,6 @@ describe("CodeIntelStore CRUD", () => {
       risk_score: 0.42,
       indexing_run_id: runId,
     });
-    expect(store.getHotspotForFile(DEFAULT_TENANT_ID, fileId)?.risk_score).toBeCloseTo(0.42);
+    expect((await store.getHotspotForFile(DEFAULT_TENANT_ID, fileId))?.risk_score).toBeCloseTo(0.42);
   });
 });

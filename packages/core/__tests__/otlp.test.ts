@@ -11,7 +11,7 @@ import {
 
 beforeEach(() => resetOtlp());
 
-describe("OTLP span builder", () => {
+describe("OTLP span builder", async () => {
   it("startSpan creates a span with correct attributes", () => {
     configureOtlp({ enabled: true, endpoint: "http://localhost:4318/v1/traces" });
     const spanId = startSpan({

@@ -83,11 +83,11 @@ describe("readExitCodeSentinel", () => {
 
 // ── Poller + sentinel integration ────────────────────────────────────────────
 
-describe("status-poller with exit-code sentinel", () => {
+describe("status-poller with exit-code sentinel", async () => {
   it("flips the session to failed when a non-zero sentinel exists", async () => {
-    const session = app.sessions.create({ summary: "sentinel-failed test", flow: "autonomous" });
+    const session = await app.sessions.create({ summary: "sentinel-failed test", flow: "autonomous" });
     const handle = "ark-" + session.id;
-    app.sessions.update(session.id, {
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "work",
       session_id: handle,
@@ -103,17 +103,17 @@ describe("status-poller with exit-code sentinel", () => {
     try {
       startStatusPoller(app, session.id, handle, "claude-code");
 
-      await waitFor(() => {
-        const s = app.sessions.get(session.id);
+      await waitFor(async () => {
+        const s = await app.sessions.get(session.id);
         return s?.status === "failed";
       });
 
-      const updated = app.sessions.get(session.id);
+      const updated = await app.sessions.get(session.id);
       expect(updated?.status).toBe("failed");
       expect(updated?.error).toContain("exited with code 1");
       expect(updated?.session_id).toBeNull();
 
-      const events = app.events.list(session.id);
+      const events = await app.events.list(session.id);
       const failed = events.find((e) => e.type === "session_failed");
       expect(failed).not.toBeUndefined();
       const data = typeof failed!.data === "string" ? JSON.parse(failed!.data) : failed!.data;
@@ -125,9 +125,9 @@ describe("status-poller with exit-code sentinel", () => {
   });
 
   it("happy path: no sentinel, tmux alive, session stays running", async () => {
-    const session = app.sessions.create({ summary: "sentinel-happy test", flow: "autonomous" });
+    const session = await app.sessions.create({ summary: "sentinel-happy test", flow: "autonomous" });
     const handle = "ark-" + session.id;
-    app.sessions.update(session.id, {
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "work",
       session_id: handle,
@@ -139,7 +139,7 @@ describe("status-poller with exit-code sentinel", () => {
     try {
       startStatusPoller(app, session.id, handle, "claude-code");
       await Bun.sleep(150);
-      const s = app.sessions.get(session.id);
+      const s = await app.sessions.get(session.id);
       expect(s?.status).toBe("running");
     } finally {
       spy.mockRestore();
@@ -147,9 +147,9 @@ describe("status-poller with exit-code sentinel", () => {
   });
 
   it("sentinel value of 0 is ignored (not treated as failure)", async () => {
-    const session = app.sessions.create({ summary: "sentinel-zero test", flow: "autonomous" });
+    const session = await app.sessions.create({ summary: "sentinel-zero test", flow: "autonomous" });
     const handle = "ark-" + session.id;
-    app.sessions.update(session.id, {
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "work",
       session_id: handle,
@@ -164,7 +164,7 @@ describe("status-poller with exit-code sentinel", () => {
     try {
       startStatusPoller(app, session.id, handle, "claude-code");
       await Bun.sleep(150);
-      const s = app.sessions.get(session.id);
+      const s = await app.sessions.get(session.id);
       expect(s?.status).toBe("running");
     } finally {
       spy.mockRestore();

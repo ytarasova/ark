@@ -231,7 +231,11 @@ export function assembleDatabaseUrlFromParts(
   const port = env.DB_PORT ?? "5432";
   const u = encodeURIComponent(user);
   const p = encodeURIComponent(pass);
-  return `postgresql://${u}:${p}@${host}:${port}/${name}`;
+  // RDS / managed Postgres typically reject unencrypted connections.
+  // Default to sslmode=require; operator overrides via DB_SSLMODE for
+  // self-hosted Postgres without TLS (rare).
+  const sslmode = env.DB_SSLMODE ?? "require";
+  return `postgresql://${u}:${p}@${host}:${port}/${name}?sslmode=${encodeURIComponent(sslmode)}`;
 }
 
 /**
@@ -310,7 +314,14 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
   // RDS-managed credentials arrive as separate secret keys and shell-side
   // URL composition mishandles special chars in the password.
   const dbAssembled = assembleDatabaseUrlFromParts(process.env);
-  const databaseUrl = overrides.databaseUrl ?? merged.databaseUrl ?? process.env.DATABASE_URL ?? dbAssembled;
+  // Note: empty string is treated as "not set" (some k8s configmap paths
+  // inject DATABASE_URL="" which would otherwise win the ?? chain).
+  const blankToUndef = (v: string | undefined): string | undefined => (v && v.length > 0 ? v : undefined);
+  const databaseUrl =
+    blankToUndef(overrides.databaseUrl) ??
+    blankToUndef(merged.databaseUrl) ??
+    blankToUndef(process.env.DATABASE_URL) ??
+    dbAssembled;
   const database: DatabaseConfig = { url: databaseUrl };
 
   const storage: StorageConfig = {

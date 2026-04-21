@@ -29,7 +29,7 @@ beforeEach(() => {
 
 // ── approveReviewGate ─────────────────────────────────────────────────────
 
-describe("approveReviewGate", () => {
+describe("approveReviewGate", async () => {
   it("advances a session at a review stage", async () => {
     writeUserFlow("pr-flow", {
       name: "pr-flow",
@@ -40,7 +40,7 @@ describe("approveReviewGate", () => {
       ],
     });
 
-    const session = startSession(getApp(), { flow: "pr-flow", summary: "test review gate" });
+    const session = await startSession(getApp(), { flow: "pr-flow", summary: "test review gate" });
     // startSession puts us at stage "code" -- advance past auto gate to "wait-review"
     const adv = await advance(getApp(), session.id, true);
     expect(adv.ok).toBe(true);
@@ -78,7 +78,7 @@ describe("approveReviewGate", () => {
       ],
     });
 
-    const session = startSession(getApp(), { flow: "rev-evt", summary: "event test" });
+    const session = await startSession(getApp(), { flow: "rev-evt", summary: "event test" });
     await approveReviewGate(getApp(), session.id);
 
     const events = getApp().events.list(session.id, { type: "review_approved" });
@@ -90,7 +90,7 @@ describe("approveReviewGate", () => {
 
 // ── Review gate blocks until approved ────────────────────────────────────
 
-describe("review gate blocking", () => {
+describe("review gate blocking", async () => {
   it("session with review gate blocks until approved", async () => {
     writeUserFlow("block-flow", {
       name: "block-flow",
@@ -100,7 +100,7 @@ describe("review gate blocking", () => {
       ],
     });
 
-    const session = startSession(getApp(), { flow: "block-flow", summary: "block test" });
+    const session = await startSession(getApp(), { flow: "block-flow", summary: "block test" });
     expect(session.stage).toBe("review-stage");
 
     // Gate blocks

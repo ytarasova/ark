@@ -9,7 +9,7 @@ withTestContext();
 // We can't easily test real git operations, but we can test the function's
 // pre-condition checks and session cleanup behavior.
 
-describe("finishWorktree preconditions", () => {
+describe("finishWorktree preconditions", async () => {
   it("rejects non-existent session", async () => {
     const { finishWorktree } = await import("../services/session-orchestration.js");
     const result = await finishWorktree(getApp(), "nonexistent");
@@ -35,7 +35,7 @@ describe("finishWorktree preconditions", () => {
   });
 });
 
-describe("finishWorktree with options", () => {
+describe("finishWorktree with options", async () => {
   it("finishWorktree with noMerge still soft-deletes the session", async () => {
     const s = getApp().sessions.create({ summary: "no-merge-test", repo: "/tmp/fake-repo" });
     getApp().sessions.update(s.id, { workdir: "/tmp/fake-workdir", branch: "feature-x" });

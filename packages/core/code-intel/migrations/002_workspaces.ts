@@ -27,44 +27,44 @@ export interface MigrationApplyContext {
   dialect: "sqlite" | "postgres";
 }
 
-export function up(ctx: MigrationApplyContext): void {
+export async function up(ctx: MigrationApplyContext): Promise<void> {
   // 1. Create the workspaces table (DDL is idempotent on its own).
   const ddl = ctx.dialect === "sqlite" ? workspacesSchema.sqliteDDL() : workspacesSchema.postgresDDL();
-  ctx.db.exec(ddl);
+  await ctx.db.exec(ddl);
 
   // 2. Add workspace_id to repos if not already present.
-  if (!hasColumn(ctx, REPOS_TABLE, "workspace_id")) {
+  if (!(await hasColumn(ctx, REPOS_TABLE, "workspace_id"))) {
     if (ctx.dialect === "sqlite") {
-      ctx.db.exec(`ALTER TABLE ${REPOS_TABLE} ADD COLUMN workspace_id TEXT`);
+      await ctx.db.exec(`ALTER TABLE ${REPOS_TABLE} ADD COLUMN workspace_id TEXT`);
     } else {
-      ctx.db.exec(`ALTER TABLE ${REPOS_TABLE} ADD COLUMN workspace_id UUID`);
+      await ctx.db.exec(`ALTER TABLE ${REPOS_TABLE} ADD COLUMN workspace_id UUID`);
     }
-    ctx.db.exec(`CREATE INDEX IF NOT EXISTS idx_${REPOS_TABLE}_workspace ON ${REPOS_TABLE}(workspace_id)`);
+    await ctx.db.exec(`CREATE INDEX IF NOT EXISTS idx_${REPOS_TABLE}_workspace ON ${REPOS_TABLE}(workspace_id)`);
   }
 
   // 3 + 4. Per tenant, ensure a `default` workspace exists, then attach orphan repos.
-  const tenants = ctx.db.prepare(`SELECT id FROM ${TENANTS_TABLE}`).all() as Array<{ id: string }>;
+  const tenants = (await ctx.db.prepare(`SELECT id FROM ${TENANTS_TABLE}`).all()) as Array<{ id: string }>;
   const now = new Date().toISOString();
   for (const t of tenants) {
-    const existing = ctx.db
+    const existing = (await ctx.db
       .prepare(
         ctx.dialect === "sqlite"
           ? `SELECT id FROM ${WORKSPACES_TABLE} WHERE tenant_id = ? AND slug = ?`
           : `SELECT id FROM ${WORKSPACES_TABLE} WHERE tenant_id = $1 AND slug = $2`,
       )
-      .get(t.id, "default") as { id: string } | undefined;
+      .get(t.id, "default")) as { id: string } | undefined;
 
     let workspaceId = existing?.id;
     if (!workspaceId) {
       workspaceId = randomUUID();
       if (ctx.dialect === "sqlite") {
-        ctx.db
+        await ctx.db
           .prepare(
             `INSERT INTO ${WORKSPACES_TABLE} (id, tenant_id, slug, name, description, config, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
           )
           .run(workspaceId, t.id, "default", "Default", "Auto-created default workspace", "{}", now);
       } else {
-        ctx.db
+        await ctx.db
           .prepare(
             `INSERT INTO ${WORKSPACES_TABLE} (id, tenant_id, slug, name, description, config, created_at)
              VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7) ON CONFLICT (tenant_id, slug) DO NOTHING`,
@@ -75,11 +75,11 @@ export function up(ctx: MigrationApplyContext): void {
 
     // Backfill orphan repos belonging to this tenant.
     if (ctx.dialect === "sqlite") {
-      ctx.db
+      await ctx.db
         .prepare(`UPDATE ${REPOS_TABLE} SET workspace_id = ? WHERE tenant_id = ? AND workspace_id IS NULL`)
         .run(workspaceId, t.id);
     } else {
-      ctx.db
+      await ctx.db
         .prepare(`UPDATE ${REPOS_TABLE} SET workspace_id = $1 WHERE tenant_id = $2 AND workspace_id IS NULL`)
         .run(workspaceId, t.id);
     }
@@ -87,13 +87,13 @@ export function up(ctx: MigrationApplyContext): void {
 }
 
 /** Probe whether a table already has a given column. Dialect-aware. */
-function hasColumn(ctx: MigrationApplyContext, table: string, column: string): boolean {
+async function hasColumn(ctx: MigrationApplyContext, table: string, column: string): Promise<boolean> {
   if (ctx.dialect === "sqlite") {
-    const rows = ctx.db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+    const rows = (await ctx.db.prepare(`PRAGMA table_info(${table})`).all()) as Array<{ name: string }>;
     return rows.some((r) => r.name === column);
   }
-  const row = ctx.db
+  const row = (await ctx.db
     .prepare(`SELECT 1 AS present FROM information_schema.columns WHERE table_name = $1 AND column_name = $2 LIMIT 1`)
-    .get(table, column) as { present: number } | undefined;
+    .get(table, column)) as { present: number } | undefined;
   return !!row;
 }

@@ -9,11 +9,11 @@ import {
   autoAcceptChannelPrompt,
 } from "../providers/ec2/remote-setup.js";
 
-describe("EC2 remote setup", () => {
+describe("EC2 remote setup", async () => {
   // -----------------------------------------------------------------------
   // getGitRemoteUrl
   // -----------------------------------------------------------------------
-  describe("getGitRemoteUrl", () => {
+  describe("getGitRemoteUrl", async () => {
     it("returns URL for a git repo (ark repo itself)", async () => {
       const url = await getGitRemoteUrl(process.cwd());
       expect(url).not.toBeNull();
@@ -29,7 +29,7 @@ describe("EC2 remote setup", () => {
   // -----------------------------------------------------------------------
   // resolveRepoUrl
   // -----------------------------------------------------------------------
-  describe("resolveRepoUrl", () => {
+  describe("resolveRepoUrl", async () => {
     it("converts org/repo to git@github.com:org/repo.git", async () => {
       expect(await resolveRepoUrl("org/repo")).toBe("git@github.com:org/repo.git");
     });

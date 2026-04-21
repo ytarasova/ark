@@ -52,16 +52,16 @@ export class SessionService {
    * Port of session.ts startSession() -- simplified: no flow-stage resolution,
    * no telemetry, no OTLP spans (those belong at the orchestration layer above).
    */
-  start(opts: CreateSessionOpts): Session {
-    const session = this.sessions.create(opts);
+  async start(opts: CreateSessionOpts): Promise<Session> {
+    const session = await this.sessions.create(opts);
 
     // Apply agent override if specified
     if (opts.agent) {
-      this.sessions.update(session.id, { agent: opts.agent } as Partial<Session>);
+      await this.sessions.update(session.id, { agent: opts.agent } as Partial<Session>);
     }
 
     // Log creation event
-    this.events.log(session.id, "session_created", {
+    await this.events.log(session.id, "session_created", {
       actor: "system",
       data: {
         flow: opts.flow ?? "default",
@@ -70,7 +70,7 @@ export class SessionService {
       },
     });
 
-    return this.sessions.get(session.id)!;
+    return (await this.sessions.get(session.id))!;
   }
 
   /**
@@ -79,7 +79,7 @@ export class SessionService {
    * delegates for proper tmux/provider cleanup. Otherwise does a local state transition.
    */
   async stop(id: string, opts?: { force?: boolean }): Promise<SessionOpResult> {
-    const session = this.sessions.get(id);
+    const session = await this.sessions.get(id);
     if (!session) return { ok: false, message: `Session ${id} not found` };
 
     // Idempotent: already in terminal state with no running process
@@ -99,8 +99,12 @@ export class SessionService {
     }
 
     // Local state transition -- no process cleanup needed (or not available)
-    this.sessions.update(id, { status: "stopped" as SessionStatus, error: null, session_id: null } as Partial<Session>);
-    this.events.log(id, "session_stopped", {
+    await this.sessions.update(id, {
+      status: "stopped" as SessionStatus,
+      error: null,
+      session_id: null,
+    } as Partial<Session>);
+    await this.events.log(id, "session_stopped", {
       stage: session.stage ?? undefined,
       actor: "user",
       data: { session_id: session.session_id, agent: session.agent },
@@ -112,13 +116,37 @@ export class SessionService {
   /**
    * Stop all running sessions. Used during test teardown and hosted shutdown.
    * Goes through the proper stop sequence for each (provider kill + cleanup).
+   *
+   * IMPORTANT: callers (AppContext.shutdown) must await this BEFORE closing the
+   * underlying database. Previously the sync `app.sessions.list({})` call was
+   * scheduled after the DB was already closed in some shutdown orderings,
+   * producing the "Cannot use a closed database" stderr noise across tests.
+   * Now `list({})` is a real promise that resolves against the live db, and
+   * we swallow + log a warn if the db has already been closed -- shutdown is
+   * best-effort.
    */
   async stopAll(): Promise<void> {
+    let all: Session[] = [];
+    try {
+      all = await this.sessions.list({});
+    } catch (err: any) {
+      const msg = String(err?.message ?? err);
+      // Tolerate the race where shutdown teardown raced ahead of stopAll.
+      if (/closed/i.test(msg) || /database/i.test(msg)) {
+        logDebug("session", `stopAll: db already closed, skipping (${msg})`);
+        return;
+      }
+      throw err;
+    }
+    if (all.length === 0) return;
     const { stop: orchStop } = await import("./session-orchestration.js");
-    const all = this.sessions.list({});
     for (const s of all) {
       if (s.session_id) {
-        await orchStop(this.app, s.id, { force: true });
+        try {
+          await orchStop(this.app, s.id, { force: true });
+        } catch (err: any) {
+          logDebug("session", `stopAll: ${s.id}: ${err?.message ?? err}`);
+        }
       }
     }
   }
@@ -159,7 +187,8 @@ export class SessionService {
       try {
         l(sessionId);
       } catch (err) {
-        this.events.log(sessionId, "session_created_listener_error", {
+        // Fire-and-forget: listener errors should not block dispatch.
+        void this.events.log(sessionId, "session_created_listener_error", {
           actor: "system",
           data: { reason: err instanceof Error ? err.message : String(err) },
         });
@@ -190,27 +219,27 @@ export class SessionService {
 
   private kickDispatch(sessionId: string, onDispatched: (session: Session | null) => void): void {
     const promise = this.dispatch(sessionId)
-      .then((result) => {
+      .then(async (result) => {
         // dispatch returns `{ ok: false, message }` for non-throw failures
         // (e.g. "Stage 'pr' is create_pr, not agent" on an action stage).
         // Without this log, kickDispatch silently swallows the failure and
         // the session sits idle -- which is what broke the Restart button
         // on completed sessions whose terminal stage is an action.
         if (result && result.ok === false) {
-          this.events.log(sessionId, "dispatch_failed", {
+          await this.events.log(sessionId, "dispatch_failed", {
             actor: "system",
             data: { reason: result.message ?? "dispatch returned ok: false" },
           });
         }
       })
-      .catch((err) => {
-        this.events.log(sessionId, "dispatch_failed", {
+      .catch(async (err) => {
+        await this.events.log(sessionId, "dispatch_failed", {
           actor: "system",
           data: { reason: err instanceof Error ? err.message : String(err) },
         });
       })
-      .then(() => {
-        onDispatched(this.sessions.get(sessionId));
+      .then(async () => {
+        onDispatched(await this.sessions.get(sessionId));
       });
     this._pendingDispatches.add(promise);
     promise.finally(() => this._pendingDispatches.delete(promise)).catch(() => {});
@@ -270,7 +299,7 @@ export class SessionService {
    * from holding the claude session-id across a resume.
    */
   async resume(id: string, opts?: { rewindToStage?: string }): Promise<SessionOpResult> {
-    const session = this.sessions.get(id);
+    const session = await this.sessions.get(id);
     if (!session) return { ok: false, message: `Session ${id} not found` };
 
     // Rewind allows re-running a completed session from any stage. Without a
@@ -323,14 +352,14 @@ export class SessionService {
       // refuses to advance because it thinks all successors have already
       // run. Delete the row so the rewind truly starts over.
       try {
-        this.app.flowStates.delete(id);
+        await this.app.flowStates.delete(id);
       } catch {
         logDebug("session", "flow-state delete is best-effort");
       }
     }
-    this.sessions.update(id, updates);
+    await this.sessions.update(id, updates);
 
-    this.events.log(id, "session_resumed", {
+    await this.events.log(id, "session_resumed", {
       stage: targetStage ?? undefined,
       actor: "user",
       data: {
@@ -369,7 +398,7 @@ export class SessionService {
       if (action.type === "agent" || action.type === "fork" || action.type === "fan_out") return "agent";
       if (action.type === "action") return "action";
     } catch (err) {
-      this.events.log(sessionId, "dispatch_failed", {
+      await this.events.log(sessionId, "dispatch_failed", {
         actor: "system",
         data: { reason: `resolveResumeRoute failed: ${err instanceof Error ? err.message : String(err)}` },
       });
@@ -386,7 +415,7 @@ export class SessionService {
   private kickActionStage(sessionId: string): void {
     const promise = (async () => {
       try {
-        const session = this.sessions.get(sessionId);
+        const session = await this.sessions.get(sessionId);
         if (!session?.stage) return;
         const flow = await import("../state/flow.js");
         const action = flow.getStageAction(this.app, session.flow, session.stage);
@@ -394,13 +423,13 @@ export class SessionService {
         const { executeAction } = await import("./actions/index.js");
         const result = await executeAction(this.app, sessionId, action.action);
         if (!result.ok) {
-          this.events.log(sessionId, "dispatch_failed", {
+          await this.events.log(sessionId, "dispatch_failed", {
             actor: "system",
             data: { reason: `action '${action.action}' failed: ${result.message}` },
           });
         }
       } catch (err) {
-        this.events.log(sessionId, "dispatch_failed", {
+        await this.events.log(sessionId, "dispatch_failed", {
           actor: "system",
           data: { reason: err instanceof Error ? err.message : String(err) },
         });
@@ -415,18 +444,18 @@ export class SessionService {
    * Port of session.ts complete() -- simplified: just marks ready + logs event.
    * The advance() call is the caller's responsibility.
    */
-  complete(id: string): SessionOpResult {
-    const session = this.sessions.get(id);
+  async complete(id: string): Promise<SessionOpResult> {
+    const session = await this.sessions.get(id);
     if (!session) return { ok: false, message: `Session ${id} not found` };
 
-    this.events.log(id, "stage_completed", {
+    await this.events.log(id, "stage_completed", {
       stage: session.stage ?? undefined,
       actor: "user",
       data: { note: "Manually completed" },
     });
 
-    this.messages.markRead(id);
-    this.sessions.update(id, { status: "ready" as SessionStatus, session_id: null } as Partial<Session>);
+    await this.messages.markRead(id);
+    await this.sessions.update(id, { status: "ready" as SessionStatus, session_id: null } as Partial<Session>);
 
     return { ok: true, message: "OK", sessionId: id };
   }
@@ -435,16 +464,16 @@ export class SessionService {
    * Pause a session (set to blocked).
    * Port of session.ts pause().
    */
-  pause(id: string, reason?: string): SessionOpResult {
-    const session = this.sessions.get(id);
+  async pause(id: string, reason?: string): Promise<SessionOpResult> {
+    const session = await this.sessions.get(id);
     if (!session) return { ok: false, message: `Session ${id} not found` };
 
-    this.sessions.update(id, {
+    await this.sessions.update(id, {
       status: "blocked" as SessionStatus,
       breakpoint_reason: reason ?? "User paused",
     } as Partial<Session>);
 
-    this.events.log(id, "session_paused", {
+    await this.events.log(id, "session_paused", {
       stage: session.stage ?? undefined,
       actor: "user",
       data: { reason, was_status: session.status },
@@ -486,12 +515,12 @@ export class SessionService {
    * cleanup (caller handles), just state transition.
    */
   async delete(id: string): Promise<SessionOpResult> {
-    const session = this.sessions.get(id);
+    const session = await this.sessions.get(id);
     if (!session) return { ok: false, message: `Session ${id} not found` };
 
-    this.sessions.softDelete(id);
+    await this.sessions.softDelete(id);
 
-    this.events.log(id, "session_deleted", { actor: "user" });
+    await this.events.log(id, "session_deleted", { actor: "user" });
 
     return { ok: true, message: "OK", sessionId: id };
   }
@@ -501,10 +530,10 @@ export class SessionService {
    * Port of session.ts undeleteSessionAsync().
    */
   async undelete(id: string): Promise<SessionOpResult> {
-    const restored = this.sessions.undelete(id);
+    const restored = await this.sessions.undelete(id);
     if (!restored) return { ok: false, message: `Session ${id} not found or not deleted` };
 
-    this.events.log(id, "session_undeleted", { actor: "user" });
+    await this.events.log(id, "session_undeleted", { actor: "user" });
 
     return { ok: true, message: "OK", sessionId: id };
   }
@@ -680,11 +709,11 @@ export class SessionService {
 
   // ── Query helpers ─────────────────────────────────────────────────────────
 
-  get(id: string): Session | null {
+  get(id: string): Promise<Session | null> {
     return this.sessions.get(id);
   }
 
-  list(filters?: Parameters<SessionRepository["list"]>[0]): Session[] {
+  list(filters?: Parameters<SessionRepository["list"]>[0]): Promise<Session[]> {
     return this.sessions.list(filters);
   }
 }

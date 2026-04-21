@@ -2,7 +2,7 @@ import type { IDatabase } from "../database/index.js";
 import type { Message, MessageRole, MessageType } from "../../types/index.js";
 import { now } from "../util/time.js";
 
-// ── Row type (read stored as integer 0/1) ───────────────────────────────────
+// -- Row type (read stored as integer 0/1) --------------------------------
 
 interface MessageRow {
   id: number;
@@ -14,7 +14,7 @@ interface MessageRow {
   created_at: string;
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
+// -- Helpers --------------------------------------------------------------
 
 function rowToMessage(row: MessageRow): Message {
   return {
@@ -25,7 +25,7 @@ function rowToMessage(row: MessageRow): Message {
   };
 }
 
-// ── Repository ──────────────────────────────────────────────────────────────
+// -- Repository -----------------------------------------------------------
 
 export class MessageRepository {
   private tenantId: string = "default";
@@ -39,20 +39,20 @@ export class MessageRepository {
     return this.tenantId;
   }
 
-  send(sessionId: string, role: MessageRole, content: string, type?: MessageType): Message {
+  async send(sessionId: string, role: MessageRole, content: string, type?: MessageType): Promise<Message> {
     const ts = now();
-    this.db
+    await this.db
       .prepare(
         "INSERT INTO messages (session_id, role, content, type, read, tenant_id, created_at) VALUES (?, ?, ?, ?, 0, ?, ?)",
       )
       .run(sessionId, role, content, type ?? "text", this.tenantId, ts);
-    const row = this.db
+    const row = (await this.db
       .prepare("SELECT * FROM messages WHERE session_id = ? AND tenant_id = ? ORDER BY id DESC LIMIT 1")
-      .get(sessionId, this.tenantId) as MessageRow;
+      .get(sessionId, this.tenantId)) as MessageRow;
     return rowToMessage(row);
   }
 
-  list(sessionId: string, opts?: { limit?: number; unreadOnly?: boolean }): Message[] {
+  async list(sessionId: string, opts?: { limit?: number; unreadOnly?: boolean }): Promise<Message[]> {
     let sql = "SELECT * FROM messages WHERE session_id = ? AND tenant_id = ?";
     const params: any[] = [sessionId, this.tenantId];
 
@@ -63,32 +63,32 @@ export class MessageRepository {
     sql += " ORDER BY id DESC LIMIT ?";
     params.push(opts?.limit ?? 50);
 
-    const rows = this.db.prepare(sql).all(...params) as MessageRow[];
+    const rows = (await this.db.prepare(sql).all(...params)) as MessageRow[];
     return rows.reverse().map(rowToMessage);
   }
 
-  markRead(sessionId: string): void {
-    this.db
+  async markRead(sessionId: string): Promise<void> {
+    await this.db
       .prepare("UPDATE messages SET read = 1 WHERE session_id = ? AND tenant_id = ? AND read = 0")
       .run(sessionId, this.tenantId);
   }
 
-  unreadCount(sessionId: string): number {
-    const row = this.db
+  async unreadCount(sessionId: string): Promise<number> {
+    const row = (await this.db
       .prepare(
         "SELECT COUNT(*) as count FROM messages WHERE session_id = ? AND tenant_id = ? AND role = 'agent' AND read = 0",
       )
-      .get(sessionId, this.tenantId) as { count: number } | undefined;
+      .get(sessionId, this.tenantId)) as { count: number } | undefined;
     return row?.count ?? 0;
   }
 
   /** Return unread counts for all sessions that have at least one unread agent message. */
-  unreadCounts(): Record<string, number> {
-    const rows = this.db
+  async unreadCounts(): Promise<Record<string, number>> {
+    const rows = (await this.db
       .prepare(
         "SELECT session_id, COUNT(*) as count FROM messages WHERE tenant_id = ? AND role = 'agent' AND read = 0 GROUP BY session_id",
       )
-      .all(this.tenantId) as { session_id: string; count: number }[];
+      .all(this.tenantId)) as { session_id: string; count: number }[];
     const result: Record<string, number> = {};
     for (const row of rows) {
       result[row.session_id] = row.count;
