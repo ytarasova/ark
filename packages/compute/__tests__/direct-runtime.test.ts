@@ -49,7 +49,7 @@ function opts(): LaunchOpts {
   };
 }
 
-describe("DirectRuntime", () => {
+describe("DirectRuntime", async () => {
   it("has kind=direct and matching name", () => {
     const r = new DirectRuntime();
     expect(r.kind).toBe("direct");
@@ -101,7 +101,7 @@ describe("DirectRuntime", () => {
   it("launchAgent propagates arkd errors", async () => {
     const r = new DirectRuntime();
     r.setClientFactory(() => stubClient(null, new Error("arkd down")));
-    await expect(r.launchAgent(makeCompute(), makeHandle(), opts())).rejects.toThrow("arkd down");
+    (await expect(r.launchAgent(makeCompute(), makeHandle(), opts()))).rejects.toThrow("arkd down");
   });
 
   it("shutdown is a no-op", async () => {

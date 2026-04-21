@@ -35,7 +35,10 @@ export function truncateLog(filePath: string, maxLines: number): void {
 }
 
 /** Clean up log files: truncate oversized, remove orphans. */
-export function cleanupLogs(app: AppContext, opts?: LogManagerOptions): { truncated: number; removed: number } {
+export async function cleanupLogs(
+  app: AppContext,
+  opts?: LogManagerOptions,
+): Promise<{ truncated: number; removed: number }> {
   const o = { ...DEFAULTS, ...opts };
   const dir = logDir(app);
   if (!existsSync(dir)) return { truncated: 0, removed: 0 };
@@ -43,7 +46,7 @@ export function cleanupLogs(app: AppContext, opts?: LogManagerOptions): { trunca
   let truncated = 0;
   let removed = 0;
 
-  const sessionIds = new Set(app.sessions.list({ limit: 1000 }).map((s) => s.id));
+  const sessionIds = new Set((await app.sessions.list({ limit: 1000 })).map((s) => s.id));
   const files = readdirSync(dir).filter((f) => f.endsWith(".log"));
 
   for (const file of files) {

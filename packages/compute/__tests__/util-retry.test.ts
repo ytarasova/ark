@@ -8,7 +8,7 @@
 import { describe, it, expect } from "bun:test";
 import { retry, poll, sleep } from "../util.js";
 
-describe("retry (p-retry wrapper)", () => {
+describe("retry (p-retry wrapper)", async () => {
   it("returns result on first success", async () => {
     const result = await retry(async () => 42);
     expect(result).toBe(42);
@@ -77,7 +77,7 @@ describe("retry (p-retry wrapper)", () => {
   });
 });
 
-describe("poll (p-wait-for wrapper)", () => {
+describe("poll (p-wait-for wrapper)", async () => {
   it("returns true when condition is met immediately", async () => {
     const result = await poll(() => true, { maxAttempts: 10, delayMs: 100 });
     expect(result).toBe(true);
@@ -114,7 +114,7 @@ describe("poll (p-wait-for wrapper)", () => {
   });
 });
 
-describe("sleep", () => {
+describe("sleep", async () => {
   it("resolves after delay", async () => {
     const start = Date.now();
     await sleep(100);

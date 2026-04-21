@@ -8,6 +8,9 @@
  * The runner is dialect-aware because a single DDL source is emitted per
  * dialect upstream; the migration modules only drive when + which script
  * applies.
+ *
+ * Every method is async because IDatabase is async (PR 1 of the async-DB
+ * refactor). The body is otherwise unchanged.
  */
 
 import type { IDatabase } from "../database/index.js";
@@ -19,7 +22,7 @@ import { TABLE as MIGRATIONS_TABLE } from "./schema/schema-migrations.js";
 export interface Migration {
   version: number;
   name: string;
-  up(ctx: { db: IDatabase; dialect: "sqlite" | "postgres" }): void;
+  up(ctx: { db: IDatabase; dialect: "sqlite" | "postgres" }): Promise<void>;
 }
 
 const MIGRATIONS: ReadonlyArray<Migration> = [
@@ -46,28 +49,28 @@ export class MigrationRunner {
   ) {}
 
   /** Ensure the migrations table exists, then apply any missing versions. */
-  migrate(opts: MigrationRunnerOptions = {}): void {
-    this.ensureMigrationsTable();
-    const current = this.currentVersion();
+  async migrate(opts: MigrationRunnerOptions = {}): Promise<void> {
+    await this.ensureMigrationsTable();
+    const current = await this.currentVersion();
     for (const migration of MIGRATIONS) {
       if (migration.version <= current) continue;
       if (opts.targetVersion !== undefined && migration.version > opts.targetVersion) break;
-      migration.up({ db: this.db, dialect: this.dialect });
-      this.recordApplied(migration);
+      await migration.up({ db: this.db, dialect: this.dialect });
+      await this.recordApplied(migration);
     }
   }
 
-  status(): MigrationStatus {
-    this.ensureMigrationsTable();
-    const current = this.currentVersion();
-    const applied = this.db
+  async status(): Promise<MigrationStatus> {
+    await this.ensureMigrationsTable();
+    const current = await this.currentVersion();
+    const applied = (await this.db
       .prepare(`SELECT version, name, applied_at FROM ${MIGRATIONS_TABLE} ORDER BY version ASC`)
-      .all() as Array<{ version: number; name: string; applied_at: string }>;
+      .all()) as Array<{ version: number; name: string; applied_at: string }>;
     const pending = MIGRATIONS.filter((m) => m.version > current);
     return { currentVersion: current, pending: [...pending], applied };
   }
 
-  private ensureMigrationsTable(): void {
+  private async ensureMigrationsTable(): Promise<void> {
     // The first migration creates this table, but we must be able to query
     // before applying it.  Emit the same DDL here (idempotent).
     const mod = migration001; // schema_migrations is inside the Wave 1 DDL
@@ -75,25 +78,25 @@ export class MigrationRunner {
       this.dialect === "sqlite"
         ? `CREATE TABLE IF NOT EXISTS ${MIGRATIONS_TABLE} (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL);`
         : `CREATE TABLE IF NOT EXISTS ${MIGRATIONS_TABLE} (version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TIMESTAMPTZ NOT NULL);`;
-    this.db.exec(ddl);
+    await this.db.exec(ddl);
     void mod;
   }
 
-  private currentVersion(): number {
-    const row = this.db.prepare(`SELECT COALESCE(MAX(version), 0) AS v FROM ${MIGRATIONS_TABLE}`).get() as
+  private async currentVersion(): Promise<number> {
+    const row = (await this.db.prepare(`SELECT COALESCE(MAX(version), 0) AS v FROM ${MIGRATIONS_TABLE}`).get()) as
       | { v: number | null }
       | undefined;
     return row?.v ?? 0;
   }
 
-  private recordApplied(m: Migration): void {
+  private async recordApplied(m: Migration): Promise<void> {
     const now = new Date().toISOString();
     if (this.dialect === "sqlite") {
-      this.db
+      await this.db
         .prepare(`INSERT INTO ${MIGRATIONS_TABLE} (version, name, applied_at) VALUES (?, ?, ?)`)
         .run(m.version, m.name, now);
     } else {
-      this.db
+      await this.db
         .prepare(
           `INSERT INTO ${MIGRATIONS_TABLE} (version, name, applied_at) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
         )
@@ -102,7 +105,7 @@ export class MigrationRunner {
   }
 
   /** Drop every code-intel table. Dev-only; exposed by `ark code-intel db reset`. */
-  reset(): void {
+  async reset(): Promise<void> {
     const tables = [
       "code_intel_platform_doc_versions",
       "code_intel_platform_docs",
@@ -125,7 +128,7 @@ export class MigrationRunner {
     ];
     for (const t of tables) {
       try {
-        this.db.exec(`DROP TABLE IF EXISTS ${t};`);
+        await this.db.exec(`DROP TABLE IF EXISTS ${t};`);
       } catch {
         // ignore -- FTS virtual tables / views may refuse the DDL depending on adapter.
       }

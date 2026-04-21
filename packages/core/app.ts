@@ -129,7 +129,7 @@ export class AppContext {
     this._initFilesystem();
     const db = await this._openDatabase();
     await this._initSchema(db);
-    this._seedComputeTemplates(db);
+    await this._seedComputeTemplates(db);
     this._apiKeys = new ApiKeyManager(db);
 
     // Container + lifecycle. `buildContainer()` wires every repo, store,
@@ -138,6 +138,14 @@ export class AppContext {
     // resolution so `container.dispose()` later tears them down in reverse.
     this._container = buildContainer({ app: this, config: this.config, db, bootOptions: this.options });
     await this._container.cradle.lifecycle.start();
+
+    // Eagerly construct + migrate the code-intel store. The store's migrate()
+    // is async and we want it to land before any handler reads `app.codeIntel`.
+    // The accessor below remains synchronous so handlers stay simple; if a
+    // caller hits the accessor before `boot()` finishes (rare), they will get
+    // a freshly-constructed but as-yet-unmigrated store.
+    this._codeIntel = CodeIntelStoreCtor.fromApp(this);
+    await this._codeIntel.migrate();
 
     track("app_boot");
     this.phase = "ready";
@@ -200,16 +208,16 @@ export class AppContext {
     // as already-applied so its body doesn't re-run.
     const { buildAppMode } = await import("./modes/app-mode.js");
     const mode = buildAppMode(this.config);
-    mode.migrations.apply(db);
-    mode.computeBootstrap.seed(db);
+    await mode.migrations.apply(db);
+    await mode.computeBootstrap.seed(db);
   }
 
-  private _seedComputeTemplates(db: IDatabase): void {
+  private async _seedComputeTemplates(db: IDatabase): Promise<void> {
     if (!this.config.computeTemplates?.length) return;
     const tmplRepo = new ComputeTemplateRepositoryCtor(db);
     for (const tmpl of this.config.computeTemplates) {
-      if (!tmplRepo.get(tmpl.name)) {
-        tmplRepo.create({
+      if (!(await tmplRepo.get(tmpl.name))) {
+        await tmplRepo.create({
           name: tmpl.name,
           description: tmpl.description,
           provider: tmpl.provider as ComputeProviderName,
@@ -295,15 +303,16 @@ export class AppContext {
   }
 
   /**
-   * Code-intel store -- lazy. Constructed on first access and migrated
-   * automatically. Backed by SQLite locally, Postgres in control-plane.
-   * The store is independent of the legacy KnowledgeStore (which keeps
-   * operating in parallel).
+   * Code-intel store -- normally eagerly initialized in `boot()` so its
+   * async `migrate()` finishes before any handler reads this. Pre-boot
+   * callers (rare; mostly tests that instantiate AppContext but skip
+   * boot) fall back to a freshly-constructed store; in that case the
+   * caller is responsible for awaiting `app.codeIntel.migrate()` itself.
+   * Backed by SQLite locally, Postgres in control-plane.
    */
   get codeIntel(): CodeIntelStore {
     if (!this._codeIntel) {
       this._codeIntel = CodeIntelStoreCtor.fromApp(this);
-      this._codeIntel.migrate();
     }
     return this._codeIntel;
   }
@@ -586,7 +595,7 @@ export class AppContext {
   }
 
   /** Resolve the compute provider for a session. Delegated to compute-resolver.ts. */
-  resolveProvider(session: Session): { provider: ComputeProvider | null; compute: Compute | null } {
+  resolveProvider(session: Session): Promise<{ provider: ComputeProvider | null; compute: Compute | null }> {
     return resolveProvider(this, session);
   }
 

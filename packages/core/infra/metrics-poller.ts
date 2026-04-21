@@ -21,7 +21,7 @@ export class MetricsPoller {
     const intervalMs = this.opts.intervalMs ?? 30_000;
     this.handle = setInterval(async () => {
       await safeAsync("metrics: poll computes", async () => {
-        const computes = this.app.computes?.list({ status: "running" }) ?? [];
+        const computes = (await this.app.computes?.list({ status: "running" })) ?? [];
         for (const c of computes) {
           await safeAsync(`metrics: poll compute "${c.name}"`, async () => {
             const compute = (await import("../../compute/index.js")) as Record<string, unknown>;

@@ -31,7 +31,7 @@ describe("buildTunnelArgs", () => {
 // the argument construction pattern rather than the spawn itself.
 // The function follows the same pattern as setupTunnels (which is
 // already validated in production) but with -R instead of -L.
-describe("setupReverseTunnel", () => {
+describe("setupReverseTunnel", async () => {
   it("is exported from ports module", async () => {
     const ports = await import("../providers/ec2/ports.js");
     expect(typeof ports.setupReverseTunnel).toBe("function");

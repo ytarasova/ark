@@ -24,10 +24,10 @@ afterAll(async () => {
   await app?.shutdown();
 });
 
-beforeEach(() => {
+beforeEach(async () => {
   // Clean out everything except the seeded `local` row.
-  for (const c of app.computes.list()) {
-    if (c.name !== "local") app.computes.delete(c.name);
+  for (const c of await app.computes.list()) {
+    if (c.name !== "local") await app.computes.delete(c.name);
   }
 });
 
@@ -37,7 +37,7 @@ async function call(method: string, params: Record<string, unknown>): Promise<an
   return (result as any).result;
 }
 
-describe("compute/create (two-axis form)", () => {
+describe("compute/create (two-axis form)", async () => {
   it("accepts legacy {provider} and backfills compute_kind + runtime_kind", async () => {
     const { compute } = await call("compute/create", {
       name: "legacy-docker",

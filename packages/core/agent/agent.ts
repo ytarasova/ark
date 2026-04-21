@@ -31,6 +31,10 @@ export interface AgentDefinition {
   runtime?: string;
   command?: string[];
   task_delivery?: "stdin" | "file" | "arg";
+  /** Optional goose recipe path (native YAML), handled by gooseExecutor. */
+  recipe?: string;
+  /** Optional goose sub-recipe paths, handled by gooseExecutor. */
+  sub_recipes?: string[];
   /** Resolved runtime type (claude-code, cli-agent, subprocess). Set by resolveAgentWithRuntime. */
   _resolved_runtime_type?: string;
   _source?: "builtin" | "global" | "project";

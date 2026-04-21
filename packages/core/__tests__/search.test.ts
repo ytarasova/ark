@@ -24,95 +24,95 @@ const { getCtx } = withTestContext();
 
 // ── searchSessions ──────────────────────────────────────────────────────────
 
-describe("searchSessions", () => {
-  it("finds session by summary", () => {
+describe("searchSessions", async () => {
+  it("finds session by summary", async () => {
     getApp().sessions.create({ summary: "Fix login redirect bug" });
-    const results = searchSessions(getApp(), "login redirect");
+    const results = await searchSessions(getApp(), "login redirect");
     expect(results.length).toBeGreaterThanOrEqual(1);
     expect(results.some((r) => r.source === "metadata")).toBe(true);
     expect(results[0].match).toContain("Fix login redirect bug");
   });
 
-  it("finds session by ticket (jira_key)", () => {
+  it("finds session by ticket (jira_key)", async () => {
     getApp().sessions.create({ ticket: "PROJ-1234", summary: "some task" });
-    const results = searchSessions(getApp(), "PROJ-1234");
+    const results = await searchSessions(getApp(), "PROJ-1234");
     expect(results.length).toBeGreaterThanOrEqual(1);
     const meta = results.find((r) => r.source === "metadata");
     expect(meta).toBeDefined();
   });
 
-  it("finds session by repo", () => {
+  it("finds session by repo", async () => {
     getApp().sessions.create({ repo: "acme/widget-service", summary: "work" });
-    const results = searchSessions(getApp(), "widget-service");
+    const results = await searchSessions(getApp(), "widget-service");
     expect(results.length).toBeGreaterThanOrEqual(1);
     const meta = results.find((r) => r.source === "metadata");
     expect(meta).toBeDefined();
   });
 
-  it("finds matches in event data", () => {
+  it("finds matches in event data", async () => {
     const session = getApp().sessions.create({ summary: "unrelated" });
     getApp().events.log(session.id, "deploy", { data: { message: "deployed to staging-east" } });
-    const results = searchSessions(getApp(), "staging-east");
+    const results = await searchSessions(getApp(), "staging-east");
     const ev = results.find((r) => r.source === "event");
     expect(ev).toBeDefined();
     expect(ev!.sessionId).toBe(session.id);
   });
 
-  it("finds matches in messages", () => {
+  it("finds matches in messages", async () => {
     const session = getApp().sessions.create({ summary: "unrelated" });
     getApp().messages.send(session.id, "agent" as MessageRole, "Refactored the payment module");
-    const results = searchSessions(getApp(), "payment module");
+    const results = await searchSessions(getApp(), "payment module");
     const msg = results.find((r) => r.source === "message");
     expect(msg).toBeDefined();
     expect(msg!.sessionId).toBe(session.id);
   });
 
-  it("is case insensitive", () => {
+  it("is case insensitive", async () => {
     getApp().sessions.create({ summary: "Upgrade PostgreSQL driver" });
-    const upper = searchSessions(getApp(), "POSTGRESQL");
-    const lower = searchSessions(getApp(), "postgresql");
+    const upper = await searchSessions(getApp(), "POSTGRESQL");
+    const lower = await searchSessions(getApp(), "postgresql");
     expect(upper.length).toBeGreaterThanOrEqual(1);
     expect(lower.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("limits results", () => {
+  it("limits results", async () => {
     for (let i = 0; i < 10; i++) {
       getApp().sessions.create({ summary: `batch task ${i}` });
     }
-    const results = searchSessions(getApp(), "batch task", { limit: 3 });
+    const results = await searchSessions(getApp(), "batch task", { limit: 3 });
     expect(results.length).toBeLessThanOrEqual(3);
   });
 
-  it("deduplicates by sessionId + source", () => {
+  it("deduplicates by sessionId + source", async () => {
     // A session whose summary AND ticket both match
     getApp().sessions.create({ ticket: "DUP-99", summary: "DUP-99 duplicate test" });
-    const results = searchSessions(getApp(), "DUP-99");
+    const results = await searchSessions(getApp(), "DUP-99");
     const metaResults = results.filter((r) => r.source === "metadata");
     // Should appear at most once for metadata even though both jira_key and jira_summary match
     expect(metaResults.length).toBe(1);
   });
 
-  it("returns empty array when nothing matches", () => {
+  it("returns empty array when nothing matches", async () => {
     getApp().sessions.create({ summary: "something else" });
-    const results = searchSessions(getApp(), "zzz_nonexistent_zzz");
+    const results = await searchSessions(getApp(), "zzz_nonexistent_zzz");
     expect(results).toEqual([]);
   });
 
-  it("returns results with timestamps", () => {
+  it("returns results with timestamps", async () => {
     getApp().sessions.create({ summary: "timestamped session" });
-    const results = searchSessions(getApp(), "timestamped");
+    const results = await searchSessions(getApp(), "timestamped");
     expect(results.length).toBeGreaterThanOrEqual(1);
     for (const r of results) {
       expect(typeof r.timestamp).toBe("string");
     }
   });
 
-  it("returns results from multiple sources", () => {
+  it("returns results from multiple sources", async () => {
     const session = getApp().sessions.create({ summary: "multi-source alpha" });
     getApp().messages.send(session.id, "agent" as MessageRole, "working on alpha feature");
     getApp().events.log(session.id, "note", { data: { note: "alpha checkpoint" } });
 
-    const results = searchSessions(getApp(), "alpha");
+    const results = await searchSessions(getApp(), "alpha");
     const sources = new Set(results.map((r) => r.source));
     expect(sources.has("metadata")).toBe(true);
     expect(sources.has("message")).toBe(true);
@@ -122,8 +122,8 @@ describe("searchSessions", () => {
 
 // ── searchTranscripts ───────────────────────────────────────────────────────
 
-describe("searchTranscripts", () => {
-  it("finds match in JSONL transcript files", () => {
+describe("searchTranscripts", async () => {
+  it("finds match in JSONL transcript files", async () => {
     // Set up a fake transcripts directory inside the test's arkDir
     const transcriptsDir = join(getCtx().arkDir, "transcripts");
     const projectDir = join(transcriptsDir, "test-project");
@@ -140,14 +140,14 @@ describe("searchTranscripts", () => {
 
     writeFileSync(join(projectDir, "session-abc.jsonl"), jsonl);
 
-    const results = searchTranscripts(getApp(), "frobnicator", { transcriptsDir });
+    const results = await searchTranscripts(getApp(), "frobnicator", { transcriptsDir });
     expect(results.length).toBe(1);
     expect(results[0].source).toBe("transcript");
     expect(results[0].sessionId).toBe("session-abc");
     expect(results[0].match).toContain("frobnicator");
   });
 
-  it("handles array content in transcript entries", () => {
+  it("handles array content in transcript entries", async () => {
     const transcriptsDir = join(getCtx().arkDir, "transcripts");
     const projectDir = join(transcriptsDir, "array-project");
     mkdirSync(projectDir, { recursive: true });
@@ -160,12 +160,12 @@ describe("searchTranscripts", () => {
 
     writeFileSync(join(projectDir, "session-arr.jsonl"), jsonl);
 
-    const results = searchTranscripts(getApp(), "zygomorphic", { transcriptsDir });
+    const results = await searchTranscripts(getApp(), "zygomorphic", { transcriptsDir });
     expect(results.length).toBe(1);
     expect(results[0].match).toContain("zygomorphic");
   });
 
-  it("returns empty when no transcripts match", () => {
+  it("returns empty when no transcripts match", async () => {
     const transcriptsDir = join(getCtx().arkDir, "transcripts");
     const projectDir = join(transcriptsDir, "empty-project");
     mkdirSync(projectDir, { recursive: true });
@@ -177,16 +177,16 @@ describe("searchTranscripts", () => {
     });
     writeFileSync(join(projectDir, "session-no.jsonl"), jsonl);
 
-    const results = searchTranscripts(getApp(), "zzz_impossible_zzz", { transcriptsDir });
+    const results = await searchTranscripts(getApp(), "zzz_impossible_zzz", { transcriptsDir });
     expect(results).toEqual([]);
   });
 
-  it("returns empty when directory does not exist", () => {
-    const results = searchTranscripts(getApp(), "anything", { transcriptsDir: "/tmp/no-such-dir-ever" });
+  it("returns empty when directory does not exist", async () => {
+    const results = await searchTranscripts(getApp(), "anything", { transcriptsDir: "/tmp/no-such-dir-ever" });
     expect(results).toEqual([]);
   });
 
-  it("limits transcript results", () => {
+  it("limits transcript results", async () => {
     const transcriptsDir = join(getCtx().arkDir, "transcripts");
     const projectDir = join(transcriptsDir, "many-project");
     mkdirSync(projectDir, { recursive: true });
@@ -200,11 +200,11 @@ describe("searchTranscripts", () => {
       writeFileSync(join(projectDir, `session-${i}.jsonl`), jsonl);
     }
 
-    const results = searchTranscripts(getApp(), "match keyword", { transcriptsDir, limit: 3 });
+    const results = await searchTranscripts(getApp(), "match keyword", { transcriptsDir, limit: 3 });
     expect(results.length).toBeLessThanOrEqual(3);
   });
 
-  it("is case insensitive", () => {
+  it("is case insensitive", async () => {
     const transcriptsDir = join(getCtx().arkDir, "transcripts");
     const projectDir = join(transcriptsDir, "case-project");
     mkdirSync(projectDir, { recursive: true });
@@ -216,11 +216,11 @@ describe("searchTranscripts", () => {
     });
     writeFileSync(join(projectDir, "session-case.jsonl"), jsonl);
 
-    const results = searchTranscripts(getApp(), "camelcase search target", { transcriptsDir });
+    const results = await searchTranscripts(getApp(), "camelcase search target", { transcriptsDir });
     expect(results.length).toBe(1);
   });
 
-  it("returns one match per file", () => {
+  it("returns one match per file", async () => {
     const transcriptsDir = join(getCtx().arkDir, "transcripts");
     const projectDir = join(transcriptsDir, "dedup-project");
     mkdirSync(projectDir, { recursive: true });
@@ -245,14 +245,14 @@ describe("searchTranscripts", () => {
 
     writeFileSync(join(projectDir, "session-dedup.jsonl"), jsonl);
 
-    const results = searchTranscripts(getApp(), "repeated term", { transcriptsDir });
+    const results = await searchTranscripts(getApp(), "repeated term", { transcriptsDir });
     expect(results.length).toBe(1);
   });
 });
 
 // ── indexTranscripts ─────────────────────────────────────────────────────────
 
-describe("indexTranscripts", () => {
+describe("indexTranscripts", async () => {
   it("indexes JSONL files and returns count", async () => {
     const projectDir = join(getCtx().arkDir, "claude-projects", "-test-project");
     mkdirSync(projectDir, { recursive: true });
@@ -291,7 +291,7 @@ describe("indexTranscripts", () => {
     );
 
     await indexTranscripts(getApp(), { transcriptsDir: join(getCtx().arkDir, "claude-projects") });
-    const results = searchTranscripts(getApp(), "SQL injection");
+    const results = await searchTranscripts(getApp(), "SQL injection");
     expect(results.length).toBeGreaterThan(0);
     expect(results[0].source).toBe("transcript");
   });
@@ -318,17 +318,17 @@ describe("indexTranscripts", () => {
     await indexTranscripts(getApp(), { transcriptsDir: join(getCtx().arkDir, "claude-projects") });
 
     // Single terms find the session
-    const alphaResults = searchTranscripts(getApp(), "alpha");
+    const alphaResults = await searchTranscripts(getApp(), "alpha");
     expect(alphaResults.some((r) => r.sessionId === "sess-multi")).toBe(true);
-    const bravoResults = searchTranscripts(getApp(), "bravo");
+    const bravoResults = await searchTranscripts(getApp(), "bravo");
     expect(bravoResults.some((r) => r.sessionId === "sess-multi")).toBe(true);
 
     // Multi-term: both terms exist in the session (different turns) -- should find it
-    const multiResults = searchTranscripts(getApp(), "alpha bravo");
+    const multiResults = await searchTranscripts(getApp(), "alpha bravo");
     expect(multiResults.some((r) => r.sessionId === "sess-multi")).toBe(true);
 
     // Multi-term with a non-existent term -- should NOT find it
-    const noResults = searchTranscripts(getApp(), "alpha zzzznonexistent");
+    const noResults = await searchTranscripts(getApp(), "alpha zzzznonexistent");
     expect(noResults.some((r) => r.sessionId === "sess-multi")).toBe(false);
   });
 
@@ -351,7 +351,7 @@ describe("indexTranscripts", () => {
     await indexTranscripts(getApp(), { transcriptsDir: join(getCtx().arkDir, "claude-projects") });
 
     const start = performance.now();
-    searchTranscripts(getApp(), "implementing feature");
+    await searchTranscripts(getApp(), "implementing feature");
     const elapsed = performance.now() - start;
     expect(elapsed).toBeLessThan(1000); // Performance bound: FTS5 search should complete in under 1s on any machine
   });
@@ -359,7 +359,7 @@ describe("indexTranscripts", () => {
 
 // ── indexTranscripts filtering ────────────────────────────────────────────────
 
-describe("indexTranscripts filtering", () => {
+describe("indexTranscripts filtering", async () => {
   it("does NOT index tool_result entries", async () => {
     const projectDir = join(getCtx().arkDir, "claude-projects", "-filter-project");
     mkdirSync(projectDir, { recursive: true });
@@ -510,7 +510,7 @@ describe("indexSession", () => {
 
 // ── getSessionConversation ────────────────────────────────────────────────────
 
-describe("getSessionConversation", () => {
+describe("getSessionConversation", async () => {
   it("returns turns for a known session", async () => {
     const projectDir = join(getCtx().arkDir, "claude-projects", "-conv-proj");
     mkdirSync(projectDir, { recursive: true });
@@ -589,7 +589,7 @@ describe("getSessionConversation", () => {
 
 // ── searchSessionConversation ────────────────────────────────────────────────
 
-describe("searchSessionConversation", () => {
+describe("searchSessionConversation", async () => {
   it("finds matches within a session", async () => {
     const projectDir = join(getCtx().arkDir, "claude-projects", "-search-conv-proj");
     mkdirSync(projectDir, { recursive: true });

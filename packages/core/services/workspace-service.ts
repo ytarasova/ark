@@ -127,7 +127,7 @@ export async function setupSessionWorktree(
   // absolute path. Idempotent: skip the write if the row already matches.
   const persisted = resolve(effectiveWorkdir);
   if (session.workdir !== persisted) {
-    app.sessions.update(session.id, { workdir: persisted });
+    await app.sessions.update(session.id, { workdir: persisted });
     (session as { workdir: string | null }).workdir = persisted;
   }
 
@@ -286,7 +286,7 @@ export async function worktreeDiff(
   modifiedSinceReview: string[];
   message?: string;
 }> {
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session)
     return {
       ok: false,
@@ -392,7 +392,8 @@ export async function worktreeDiff(
       }
 
       // Compare against previously reviewed hashes
-      const prevReviewed = app.sessions.get(sessionId)?.config?.reviewed_files as Record<string, string> | undefined;
+      const prevSessionForReview = await app.sessions.get(sessionId);
+      const prevReviewed = prevSessionForReview?.config?.reviewed_files as Record<string, string> | undefined;
       if (prevReviewed) {
         for (const file of files) {
           if (prevReviewed[file] && prevReviewed[file] !== fileHashes[file]) {
@@ -446,7 +447,7 @@ export async function rebaseOntoBase(
     base?: string;
   },
 ): Promise<{ ok: boolean; message: string }> {
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   const repo = session.repo;
@@ -469,7 +470,7 @@ export async function rebaseOntoBase(
       timeout: 60_000,
     });
 
-    app.events.log(sessionId, "rebase_completed", {
+    await app.events.log(sessionId, "rebase_completed", {
       stage: session.stage ?? undefined,
       actor: "system",
       data: { base },
@@ -506,7 +507,7 @@ export async function createWorktreePR(
     draft?: boolean;
   },
 ): Promise<{ ok: boolean; message: string; pr_url?: string }> {
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   const repo = session.repo;
@@ -557,8 +558,8 @@ export async function createWorktreePR(
     const prUrl = stdout.trim();
 
     // 3. Store PR URL on session
-    app.sessions.update(sessionId, { pr_url: prUrl });
-    app.events.log(sessionId, "pr_created", {
+    await app.sessions.update(sessionId, { pr_url: prUrl });
+    await app.events.log(sessionId, "pr_created", {
       stage: session.stage ?? undefined,
       actor: "user",
       data: { pr_url: prUrl, branch, base, draft: opts?.draft ?? false },
@@ -582,7 +583,7 @@ export async function mergeWorktreePR(
     deleteAfter?: boolean;
   },
 ): Promise<{ ok: boolean; message: string }> {
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   const prUrl = session.pr_url;
@@ -600,7 +601,7 @@ export async function mergeWorktreePR(
     const cwd = session.workdir ?? repo;
     await execFileAsync("gh", ghArgs, { encoding: "utf-8", timeout: 30_000, cwd });
 
-    app.events.log(sessionId, "pr_merged", {
+    await app.events.log(sessionId, "pr_merged", {
       stage: session.stage ?? undefined,
       actor: "system",
       data: { pr_url: prUrl, method, delete_branch: deleteAfter },
@@ -647,7 +648,7 @@ export async function finishWorktree(
     force?: boolean;
   },
 ): Promise<{ ok: boolean; message: string }> {
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   const workdir = session.workdir;
@@ -710,7 +711,7 @@ export async function finishWorktree(
       }
     }
     if (_deleteSessionAsync) await _deleteSessionAsync(app, sessionId);
-    app.events.log(sessionId, "worktree_finished", {
+    await app.events.log(sessionId, "worktree_finished", {
       actor: "user",
       data: { branch, targetBranch, merged: false, pr: true },
     });
@@ -777,7 +778,7 @@ export async function finishWorktree(
   if (_deleteSessionAsync) await _deleteSessionAsync(app, sessionId);
 
   const mergeMsg = opts?.noMerge ? "skipped merge" : `merged ${branch} -> ${targetBranch}`;
-  app.events.log(sessionId, "worktree_finished", {
+  await app.events.log(sessionId, "worktree_finished", {
     actor: "user",
     data: { branch, targetBranch, merged: !opts?.noMerge },
   });
@@ -814,11 +815,11 @@ export async function removeSessionWorktree(app: AppContext, session: Session): 
 }
 
 /** Find orphaned worktrees -- worktree dirs with no matching session. */
-export function findOrphanedWorktrees(app: AppContext): string[] {
+export async function findOrphanedWorktrees(app: AppContext): Promise<string[]> {
   const wtDir = app.config.worktreesDir;
   if (!existsSync(wtDir)) return [];
 
-  const sessionIds = new Set(app.sessions.list({ limit: 1000 }).map((s) => s.id));
+  const sessionIds = new Set((await app.sessions.list({ limit: 1000 })).map((s) => s.id));
   const orphans: string[] = [];
 
   try {
@@ -836,7 +837,7 @@ export function findOrphanedWorktrees(app: AppContext): string[] {
 
 /** Remove orphaned worktrees. Returns count of removed. */
 export async function cleanupWorktrees(app: AppContext): Promise<{ removed: number; errors: string[] }> {
-  const orphans = findOrphanedWorktrees(app);
+  const orphans = await findOrphanedWorktrees(app);
   let removed = 0;
   const errors: string[] = [];
 

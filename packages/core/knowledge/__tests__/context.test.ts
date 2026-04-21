@@ -16,11 +16,11 @@ afterAll(async () => {
   await app?.shutdown();
 });
 
-beforeEach(() => {
-  store.clear();
+beforeEach(async () => {
+  await store.clear();
 });
 
-describe("buildContext", () => {
+describe("buildContext", async () => {
   it("returns empty package for empty store", () => {
     const ctx = buildContext(store, "fix the login bug");
     expect(ctx.files).toEqual([]);
@@ -30,15 +30,15 @@ describe("buildContext", () => {
     expect(ctx.skills).toEqual([]);
   });
 
-  it("finds memories by keyword", () => {
-    store.addNode({
+  it("finds memories by keyword", async () => {
+    await store.addNode({
       id: "memory:auth-tip",
       type: "memory",
       label: "Auth requires token refresh",
       content: "Always refresh the authentication token before API calls",
       metadata: { importance: 0.9, scope: "global" },
     });
-    store.addNode({
+    await store.addNode({
       id: "memory:unrelated",
       type: "memory",
       label: "Database tuning",
@@ -53,20 +53,20 @@ describe("buildContext", () => {
     expect(authMemory!.importance).toBe(0.9);
   });
 
-  it("includes file neighbors", () => {
-    const fileA = store.addNode({
+  it("includes file neighbors", async () => {
+    const fileA = await store.addNode({
       id: "file:src/auth.ts",
       type: "file",
       label: "src/auth.ts",
       metadata: { language: "typescript" },
     });
-    const fileB = store.addNode({
+    const fileB = await store.addNode({
       id: "file:src/session.ts",
       type: "file",
       label: "src/session.ts",
       metadata: { language: "typescript" },
     });
-    store.addEdge(fileA, fileB, "imports");
+    await store.addEdge(fileA, fileB, "imports");
 
     const ctx = buildContext(store, "update auth", { files: ["src/auth.ts"] });
     // Should include src/session.ts as a neighbor of src/auth.ts
@@ -74,15 +74,15 @@ describe("buildContext", () => {
     expect(sessionFile).not.toBeUndefined();
   });
 
-  it("excludes current session", () => {
-    store.addNode({
+  it("excludes current session", async () => {
+    await store.addNode({
       id: "session:s-current",
       type: "session",
       label: "Current session task",
       content: "Working on fixing the login bug",
       metadata: { outcome: "running", files_changed: [] },
     });
-    store.addNode({
+    await store.addNode({
       id: "session:s-past",
       type: "session",
       label: "Past login fix",
@@ -96,26 +96,26 @@ describe("buildContext", () => {
     // Past session may or may not be found depending on search match, but current should never appear
   });
 
-  it("populates file context with dependents count and recent sessions", () => {
-    store.addNode({
+  it("populates file context with dependents count and recent sessions", async () => {
+    await store.addNode({
       id: "file:src/utils.ts",
       type: "file",
       label: "src/utils.ts",
       content: "utility functions",
       metadata: { language: "typescript" },
     });
-    store.addNode({ id: "file:src/a.ts", type: "file", label: "src/a.ts", metadata: { language: "typescript" } });
-    store.addNode({ id: "file:src/b.ts", type: "file", label: "src/b.ts", metadata: { language: "typescript" } });
-    store.addNode({
+    await store.addNode({ id: "file:src/a.ts", type: "file", label: "src/a.ts", metadata: { language: "typescript" } });
+    await store.addNode({ id: "file:src/b.ts", type: "file", label: "src/b.ts", metadata: { language: "typescript" } });
+    await store.addNode({
       id: "session:s-old",
       type: "session",
       label: "Refactored utils",
       metadata: { outcome: "success" },
     });
 
-    store.addEdge("file:src/a.ts", "file:src/utils.ts", "imports");
-    store.addEdge("file:src/b.ts", "file:src/utils.ts", "imports");
-    store.addEdge("file:src/utils.ts", "session:s-old", "modified_by");
+    await store.addEdge("file:src/a.ts", "file:src/utils.ts", "imports");
+    await store.addEdge("file:src/b.ts", "file:src/utils.ts", "imports");
+    await store.addEdge("file:src/utils.ts", "session:s-old", "modified_by");
 
     const ctx = buildContext(store, "update utility functions");
     const utilsFile = ctx.files.find((f) => f.path === "src/utils.ts");
@@ -126,22 +126,22 @@ describe("buildContext", () => {
     expect(utilsFile!.recent_sessions[0].id).toBe("s-old");
   });
 
-  it("sorts memories by importance descending", () => {
-    store.addNode({
+  it("sorts memories by importance descending", async () => {
+    await store.addNode({
       id: "memory:low",
       type: "memory",
       label: "Low importance test tip",
       content: "Low importance test memory",
       metadata: { importance: 0.2, scope: "global" },
     });
-    store.addNode({
+    await store.addNode({
       id: "memory:high",
       type: "memory",
       label: "High importance test tip",
       content: "High importance test memory",
       metadata: { importance: 0.95, scope: "global" },
     });
-    store.addNode({
+    await store.addNode({
       id: "memory:mid",
       type: "memory",
       label: "Mid importance test tip",
@@ -157,10 +157,10 @@ describe("buildContext", () => {
     }
   });
 
-  it("respects limit", () => {
+  it("respects limit", async () => {
     // Add many memories
     for (let i = 0; i < 20; i++) {
-      store.addNode({
+      await store.addNode({
         id: `memory:bulk-${i}`,
         type: "memory",
         label: `Bulk memory number ${i}`,
@@ -173,8 +173,8 @@ describe("buildContext", () => {
     expect(ctx.memories.length).toBeLessThanOrEqual(5);
   });
 
-  it("populates learnings from search results", () => {
-    store.addNode({
+  it("populates learnings from search results", async () => {
+    await store.addNode({
       id: "learning:testing-tip",
       type: "learning",
       label: "Sequential Testing Required",

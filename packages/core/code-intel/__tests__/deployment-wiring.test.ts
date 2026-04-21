@@ -17,7 +17,7 @@ afterAll(async () => {
   await app?.shutdown();
 });
 
-describe("Deployment factory -- local mode wiring", () => {
+describe("Deployment factory -- local mode wiring", async () => {
   it("populates every seam with a local implementation", () => {
     const d = buildDeployment(app);
     expect(d.mode).toBe("local");

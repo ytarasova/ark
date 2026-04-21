@@ -52,7 +52,7 @@ beforeEach(() => {
 
 // ── fetchLabeledIssues ──────────────────────────────────────────────────────
 
-describe("fetchLabeledIssues", () => {
+describe("fetchLabeledIssues", async () => {
   it("parses issue list from gh output", async () => {
     const issues = [makeIssue(), makeIssue({ number: 43, title: "Another bug" })];
     ghOutput = makeGhOutput(issues);
@@ -99,7 +99,7 @@ describe("issueAlreadyTracked", () => {
 
 // ── createSessionFromIssue ──────────────────────────────────────────────────
 
-describe("createSessionFromIssue", () => {
+describe("createSessionFromIssue", async () => {
   it("creates session with correct ticket and summary", async () => {
     const issue = makeIssue();
     const session = await createSessionFromIssue(getApp(), issue);
@@ -143,7 +143,7 @@ describe("createSessionFromIssue", () => {
 
 // ── pollIssues ──────────────────────────────────────────────────────────────
 
-describe("pollIssues", () => {
+describe("pollIssues", async () => {
   it("creates sessions for new issues", async () => {
     ghOutput = makeGhOutput([makeIssue({ number: 10, title: "Bug A" }), makeIssue({ number: 11, title: "Bug B" })]);
 

@@ -36,7 +36,7 @@ async function postHook(sessionId: string, payload: Record<string, unknown>): Pr
   });
 }
 
-describe("Conductor /hooks/status endpoint", () => {
+describe("Conductor /hooks/status endpoint", async () => {
   it("UserPromptSubmit maps to status running", async () => {
     const session = getApp().sessions.create({ summary: "hook test" });
     getApp().sessions.update(session.id, { status: "ready" });

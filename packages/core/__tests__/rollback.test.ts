@@ -58,7 +58,7 @@ describe("rollback -- createRevertPayload", () => {
   });
 });
 
-describe("rollback -- pollCheckSuites", () => {
+describe("rollback -- pollCheckSuites", async () => {
   it("calls fetcher and returns results", async () => {
     const mockFetcher = async () => ({
       check_suites: [{ id: 1, conclusion: "success", status: "completed" }],

@@ -72,7 +72,7 @@ beforeEach(async () => {
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-describe("autoAcceptChannelPrompt", () => {
+describe("autoAcceptChannelPrompt", async () => {
   it("sends '1' + Enter when prompt is detected", async () => {
     captureResponses = [PROMPT_OUTPUT, WORKING_OUTPUT];
 

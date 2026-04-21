@@ -12,13 +12,13 @@ import type { MigrationsCapability } from "./app-mode.js";
 export function buildMigrationsCapability(dialect: "sqlite" | "postgres"): MigrationsCapability {
   return {
     dialect,
-    apply(db: IDatabase, opts?: { targetVersion?: number }) {
-      new MigrationRunner(db, dialect).apply(opts);
+    async apply(db: IDatabase, opts?: { targetVersion?: number }): Promise<void> {
+      await new MigrationRunner(db, dialect).apply(opts);
     },
-    status(db: IDatabase) {
+    async status(db: IDatabase) {
       return new MigrationRunner(db, dialect).status();
     },
-    down(db: IDatabase, opts: { targetVersion: number }): never {
+    async down(db: IDatabase, opts: { targetVersion: number }): Promise<never> {
       return new MigrationRunner(db, dialect).down(opts);
     },
   };

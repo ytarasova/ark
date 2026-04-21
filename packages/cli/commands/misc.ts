@@ -40,7 +40,7 @@ export function registerMiscCommands(program: Command, app: AppContext | null) {
     .argument("<pr-url>", "GitHub PR URL")
     .action(async (prUrl) => {
       const { findSessionByPR } = await import("../../core/integrations/github-pr.js");
-      const session = findSessionByPR(requireApp(), prUrl);
+      const session = await findSessionByPR(requireApp(), prUrl);
       if (!session) {
         console.log(chalk.yellow(`No session for ${prUrl}`));
         return;

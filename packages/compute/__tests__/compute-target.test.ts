@@ -108,8 +108,8 @@ function sampleHandle(): ComputeHandle {
   return { kind: "local", name: "fake", meta: {} };
 }
 
-describe("ComputeTarget", () => {
-  describe("compute delegation", () => {
+describe("ComputeTarget", async () => {
+  describe("compute delegation", async () => {
     it("provision / start / stop / destroy delegate to Compute", async () => {
       const compute = new FakeCompute();
       const runtime = new FakeRuntime();
@@ -144,11 +144,11 @@ describe("ComputeTarget", () => {
       const compute = new FakeCompute();
       compute.failOn.add("provision");
       const target = new ComputeTarget(compute, new FakeRuntime());
-      await expect(target.provision({})).rejects.toThrow("fake-compute-provision-failed");
+      (await expect(target.provision({}))).rejects.toThrow("fake-compute-provision-failed");
     });
   });
 
-  describe("runtime delegation", () => {
+  describe("runtime delegation", async () => {
     it("prepare / launchAgent / shutdown delegate to Runtime with the Compute forwarded", async () => {
       const compute = new FakeCompute();
       const runtime = new FakeRuntime();
@@ -175,12 +175,14 @@ describe("ComputeTarget", () => {
       const runtime = new FakeRuntime();
       runtime.failOn.add("launchAgent");
       const target = new ComputeTarget(new FakeCompute(), runtime);
-      await expect(
-        target.launchAgent(sampleHandle(), {
-          tmuxName: "x",
-          workdir: "/tmp",
-          launcherContent: "#!/bin/bash\n:",
-        }),
+      (
+        await expect(
+          target.launchAgent(sampleHandle(), {
+            tmuxName: "x",
+            workdir: "/tmp",
+            launcherContent: "#!/bin/bash\n:",
+          }),
+        )
       ).rejects.toThrow("fake-runtime-launchAgent-failed");
     });
   });

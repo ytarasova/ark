@@ -11,9 +11,9 @@
 import type { IDatabase } from "../database/index.js";
 import { initSchema } from "../repositories/schema.js";
 
-export function applySqliteInitial(db: IDatabase): void {
+export async function applySqliteInitial(db: IDatabase): Promise<void> {
   // initSchema is idempotent (CREATE TABLE IF NOT EXISTS throughout) -- safe
   // to invoke from a migration body even though the runner already gates by
   // version.
-  initSchema(db);
+  await initSchema(db);
 }

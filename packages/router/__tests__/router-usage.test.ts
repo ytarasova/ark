@@ -19,7 +19,7 @@ describe("RouterUsageEvent", () => {
   });
 });
 
-describe("onUsage callback wiring", () => {
+describe("onUsage callback wiring", async () => {
   it("emitUsage calculates cost from model pricing", async () => {
     // Import the server module to access emitUsage indirectly via startRouter
     const { startRouter } = await import("../server.js");

@@ -5,7 +5,7 @@ import { withTestContext, mockSession } from "./test-helpers.js";
 
 withTestContext();
 
-describe("Bridge", () => {
+describe("Bridge", async () => {
   it("constructs without error", () => {
     const bridge = new Bridge({});
     expect(bridge).toBeDefined();
@@ -80,7 +80,7 @@ describe("Bridge", () => {
   });
 });
 
-describe("Bridge status notifications", () => {
+describe("Bridge status notifications", async () => {
   it("notifySessionStatus uses correct emoji for each status", async () => {
     const bridge = new Bridge({});
     const texts: string[] = [];
@@ -142,7 +142,7 @@ describe("Bridge config", () => {
   });
 });
 
-describe("Bridge handler invocation", () => {
+describe("Bridge handler invocation", async () => {
   it("multiple handlers are all called", async () => {
     const bridge = new Bridge({});
     const results: string[] = [];

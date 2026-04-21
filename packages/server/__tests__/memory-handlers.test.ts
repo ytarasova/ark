@@ -24,13 +24,13 @@ afterAll(async () => {
 
 let router: Router;
 
-beforeEach(() => {
+beforeEach(async () => {
   // Fresh router per test, but share the AppContext + knowledge store; we
   // clear memory nodes between tests below so the store is effectively
   // reset without tearing down the DB.
   router = new Router();
   registerMemoryHandlers(router, app);
-  app.knowledge.clear({ type: "memory" });
+  await app.knowledge.clear({ type: "memory" });
 });
 
 function ok(res: unknown): Record<string, any> {
@@ -42,7 +42,7 @@ async function addMemory(content: string, opts: { tags?: string[]; scope?: strin
   return ok(res).memory;
 }
 
-describe("memory/add", () => {
+describe("memory/add", async () => {
   it("persists content and returns a memory entry with defaults", async () => {
     const memory = await addMemory("remember this");
     expect(memory).toBeDefined();
@@ -67,7 +67,7 @@ describe("memory/add", () => {
   });
 });
 
-describe("memory/list", () => {
+describe("memory/list", async () => {
   it("returns all memories when no scope filter is provided", async () => {
     await addMemory("global-a", { scope: "global" });
     await addMemory("global-b", { scope: "global" });
@@ -96,7 +96,7 @@ describe("memory/list", () => {
   });
 });
 
-describe("memory/recall", () => {
+describe("memory/recall", async () => {
   it("returns results that semantically match the query", async () => {
     await addMemory("ark uses bun as the runtime", { tags: ["build"] });
     await addMemory("unrelated memory about cooking", { tags: ["food"] });
@@ -115,7 +115,7 @@ describe("memory/recall", () => {
   });
 });
 
-describe("memory/forget", () => {
+describe("memory/forget", async () => {
   it("removes an existing memory and returns ok:true", async () => {
     const memory = await addMemory("forget me");
     const res = ok(await router.dispatch(createRequest(1, "memory/forget", { id: memory.id })));
@@ -132,7 +132,7 @@ describe("memory/forget", () => {
   });
 });
 
-describe("memory/clear", () => {
+describe("memory/clear", async () => {
   it("clears memories matching a specific scope and returns the count", async () => {
     await addMemory("team-a", { scope: "team" });
     await addMemory("team-b", { scope: "team" });

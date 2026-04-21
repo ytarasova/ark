@@ -89,7 +89,7 @@ export interface HostCommandCapability {
  * itself" which has no isolation and competes with the control plane.
  */
 export interface ComputeBootstrapCapability {
-  seed(db: import("../database/index.js").IDatabase): void;
+  seed(db: import("../database/index.js").IDatabase): Promise<void>;
 }
 
 /**
@@ -102,10 +102,10 @@ export interface ComputeBootstrapCapability {
  */
 export interface MigrationsCapability {
   readonly dialect: "sqlite" | "postgres";
-  apply(db: import("../database/index.js").IDatabase, opts?: { targetVersion?: number }): void;
-  status(db: import("../database/index.js").IDatabase): import("../migrations/types.js").MigrationStatus;
-  /** Phase 1: throws "not implemented". Stubbed so the CLI compiles. */
-  down(db: import("../database/index.js").IDatabase, opts: { targetVersion: number }): never;
+  apply(db: import("../database/index.js").IDatabase, opts?: { targetVersion?: number }): Promise<void>;
+  status(db: import("../database/index.js").IDatabase): Promise<import("../migrations/types.js").MigrationStatus>;
+  /** Phase 1: rejects with "not implemented". Stubbed so the CLI compiles. */
+  down(db: import("../database/index.js").IDatabase, opts: { targetVersion: number }): Promise<never>;
 }
 
 // ── AppMode contract ───────────────────────────────────────────────────────

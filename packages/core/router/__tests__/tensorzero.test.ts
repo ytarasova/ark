@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { TensorZeroManager } from "../tensorzero.js";
 
-describe("TensorZeroManager", () => {
+describe("TensorZeroManager", async () => {
   it("constructs with default options", () => {
     const mgr = new TensorZeroManager({});
     expect(mgr.url).toBe("http://localhost:3000");

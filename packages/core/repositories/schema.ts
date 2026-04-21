@@ -2,8 +2,8 @@ import type { IDatabase } from "../database/index.js";
 import { initPoolSchema } from "../compute/pool.js";
 import { logDebug } from "../observability/structured-log.js";
 
-export function initSchema(db: IDatabase): void {
-  db.exec(`
+export async function initSchema(db: IDatabase): Promise<void> {
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       ticket TEXT,
@@ -190,21 +190,21 @@ export function initSchema(db: IDatabase): void {
 
   // Compute pools table (defined in its own module so the pool manager can
   // re-run it when booted directly in tests).
-  initPoolSchema(db);
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_compute_pools_tenant ON compute_pools(tenant_id)");
+  await initPoolSchema(db);
+  await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_compute_pools_tenant ON compute_pools(tenant_id)");
 
   // Knowledge graph tables
-  initKnowledgeSchema(db);
+  await initKnowledgeSchema(db);
 
   // Usage records table (universal cost tracking)
-  initUsageSchema(db);
+  await initUsageSchema(db);
 
   // Session artifacts table (queryable artifact tracking)
-  initArtifactSchema(db);
+  await initArtifactSchema(db);
 }
 
-export function initKnowledgeSchema(db: IDatabase): void {
-  safeExec(
+export async function initKnowledgeSchema(db: IDatabase): Promise<void> {
+  await safeExec(
     db,
     `
     CREATE TABLE IF NOT EXISTS knowledge (
@@ -219,10 +219,10 @@ export function initKnowledgeSchema(db: IDatabase): void {
     )
   `,
   );
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_knowledge_type ON knowledge(tenant_id, type)");
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_knowledge_label ON knowledge(tenant_id, label)");
+  await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_knowledge_type ON knowledge(tenant_id, type)");
+  await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_knowledge_label ON knowledge(tenant_id, label)");
 
-  safeExec(
+  await safeExec(
     db,
     `
     CREATE TABLE IF NOT EXISTS knowledge_edges (
@@ -237,13 +237,13 @@ export function initKnowledgeSchema(db: IDatabase): void {
     )
   `,
   );
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_edges_source ON knowledge_edges(tenant_id, source_id)");
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_edges_target ON knowledge_edges(tenant_id, target_id)");
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_edges_relation ON knowledge_edges(relation)");
+  await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_edges_source ON knowledge_edges(tenant_id, source_id)");
+  await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_edges_target ON knowledge_edges(tenant_id, target_id)");
+  await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_edges_relation ON knowledge_edges(relation)");
 }
 
-export function initUsageSchema(db: IDatabase): void {
-  safeExec(
+export async function initUsageSchema(db: IDatabase): Promise<void> {
+  await safeExec(
     db,
     `
     CREATE TABLE IF NOT EXISTS usage_records (
@@ -266,16 +266,16 @@ export function initUsageSchema(db: IDatabase): void {
     )
   `,
   );
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_session ON usage_records(session_id)");
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_cost_mode ON usage_records(cost_mode)");
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_tenant ON usage_records(tenant_id)");
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_user ON usage_records(user_id)");
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_model ON usage_records(model)");
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_created ON usage_records(created_at)");
+  await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_session ON usage_records(session_id)");
+  await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_cost_mode ON usage_records(cost_mode)");
+  await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_tenant ON usage_records(tenant_id)");
+  await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_user ON usage_records(user_id)");
+  await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_model ON usage_records(model)");
+  await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_created ON usage_records(created_at)");
 }
 
-export function initArtifactSchema(db: IDatabase): void {
-  safeExec(
+export async function initArtifactSchema(db: IDatabase): Promise<void> {
+  await safeExec(
     db,
     `
     CREATE TABLE IF NOT EXISTS session_artifacts (
@@ -289,26 +289,28 @@ export function initArtifactSchema(db: IDatabase): void {
     )
   `,
   );
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_artifacts_session ON session_artifacts(session_id)");
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_artifacts_type_value ON session_artifacts(type, value)");
-  safeExec(db, "CREATE INDEX IF NOT EXISTS idx_artifacts_tenant ON session_artifacts(tenant_id)");
+  await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_artifacts_session ON session_artifacts(session_id)");
+  await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_artifacts_type_value ON session_artifacts(type, value)");
+  await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_artifacts_tenant ON session_artifacts(tenant_id)");
 }
 
 /** Execute a SQL statement, swallowing errors (for best-effort idempotent init). */
-function safeExec(db: IDatabase, sql: string): void {
+async function safeExec(db: IDatabase, sql: string): Promise<void> {
   try {
-    db.exec(sql);
+    await db.exec(sql);
   } catch {
     logDebug("general", "Already exists or other benign error");
   }
 }
 
-export function seedLocalCompute(db: IDatabase): void {
+export async function seedLocalCompute(db: IDatabase): Promise<void> {
   const ts = new Date().toISOString();
-  db.prepare(
-    `
+  await db
+    .prepare(
+      `
     INSERT OR IGNORE INTO compute (name, provider, compute_kind, runtime_kind, status, config, created_at, updated_at)
     VALUES ('local', 'local', 'local', 'direct', 'running', '{}', ?, ?)
   `,
-  ).run(ts, ts);
+    )
+    .run(ts, ts);
 }

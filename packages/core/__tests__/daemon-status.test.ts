@@ -14,7 +14,7 @@ async function rpcResult(port: number, method: string, params: Record<string, un
   return resp.json() as Promise<Record<string, unknown>>;
 }
 
-describe("daemon/status RPC handler", () => {
+describe("daemon/status RPC handler", async () => {
   let server: { stop: () => void; url: string } | null = null;
   afterEach(() => {
     server?.stop();

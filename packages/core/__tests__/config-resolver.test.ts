@@ -268,7 +268,7 @@ describe("profile defaults", () => {
 
 // ── loadAppConfig async path with dynamic ports in the test profile ─────
 
-describe("loadAppConfig (async)", () => {
+describe("loadAppConfig (async)", async () => {
   it("test profile allocates unique ports each call", async () => {
     const a = await loadAppConfig({ profile: "test" });
     const b = await loadAppConfig({ profile: "test" });
@@ -307,7 +307,7 @@ describe("loadAppConfig (async)", () => {
 
 // ── Port allocator sanity ────────────────────────────────────────────────
 
-describe("allocatePort", () => {
+describe("allocatePort", async () => {
   it("returns distinct ports on repeated calls", async () => {
     const ports = await Promise.all([allocatePort(), allocatePort(), allocatePort(), allocatePort()]);
     const unique = new Set(ports);

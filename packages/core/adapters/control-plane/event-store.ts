@@ -26,15 +26,15 @@ export class ControlPlaneEventStore implements EventStore {
     return this.repo.getTenant();
   }
 
-  log(trackId: string, type: string, opts?: EventLogOpts): void {
-    this.repo.log(trackId, type, opts);
+  async log(trackId: string, type: string, opts?: EventLogOpts): Promise<void> {
+    await this.repo.log(trackId, type, opts);
   }
 
-  list(trackId: string, opts?: EventListOpts): Event[] {
+  async list(trackId: string, opts?: EventListOpts): Promise<Event[]> {
     return this.repo.list(trackId, opts);
   }
 
-  deleteForTrack(trackId: string): void {
-    this.repo.deleteForTrack(trackId);
+  async deleteForTrack(trackId: string): Promise<void> {
+    await this.repo.deleteForTrack(trackId);
   }
 }

@@ -1,9 +1,12 @@
 /**
  * PostgresAdapter -- wraps postgres.js to implement IDatabase.
  *
- * postgres.js is fully async, but IDatabase has synchronous methods
- * (prepare/get/all/run). This adapter bridges the gap by using Bun's
- * ability to run async operations synchronously via a blocking wrapper.
+ * postgres.js is fully async and so is IDatabase. Every method here is
+ * a thin awaiter around `this.sql.unsafe(...)` (or, for transactions,
+ * `this.sql.begin(...)`). The previous synchronous facade busy-looped
+ * on `Bun.sleepSync(1)` waiting for the postgres.js promise to settle,
+ * which prevented libuv from running and deadlocked the hosted control
+ * plane on the first query. That whole bridge is gone.
  *
  * SQL dialect differences handled here:
  *   - ? placeholders -> $1, $2, ... (Postgres numbered params)
@@ -21,7 +24,7 @@ import type { IDatabase, IStatement } from "./types.js";
 
 const createPostgres = postgres as unknown as (url: string, opts?: Record<string, unknown>) => any;
 
-// ── SQL Translation ─────────────────────────────────────────────────────────
+// -- SQL Translation --------------------------------------------------------
 
 /**
  * Convert SQLite-style SQL to Postgres-compatible SQL.
@@ -69,17 +72,11 @@ function sqliteToPostgres(sql: string): string {
   return result;
 }
 
-// ── PostgresStatement ───────────────────────────────────────────────────────
+// -- PostgresStatement ------------------------------------------------------
 
 /**
- * Wraps a postgres.js query to implement the IStatement interface.
- *
- * Since postgres.js is async and IStatement is sync, we use a blocking
- * pattern via Bun.sleepSync to let the event loop process I/O while
- * we wait for the postgres.js promise to settle.
- *
- * For production hosted deployments, callers should transition to the
- * async variants (queryAsync, queryOneAsync) on PostgresAdapter.
+ * Async statement bound to a PostgresAdapter connection. Each I/O method
+ * returns a Promise -- there is no synchronous bridge anymore.
  */
 class PostgresStatement implements IStatement {
   private pgSql: string;
@@ -91,69 +88,32 @@ class PostgresStatement implements IStatement {
     this.pgSql = sqliteToPostgres(rawSql);
   }
 
-  run(...params: any[]): { changes: number; lastInsertRowid: number } {
+  async run(...params: unknown[]): Promise<{ changes: number; lastInsertRowid: number | bigint }> {
     if (!this.pgSql) return { changes: 0, lastInsertRowid: 0 };
-
-    const result = this._runSync(params);
-
+    const result = await this.conn.unsafe(this.pgSql, params);
     return {
       changes: result.count ?? 0,
+      // postgres.js doesn't expose lastInsertRowid; surface the first row's
+      // `id` if RETURNING was used, else 0. Callers that need the new id
+      // should write `... RETURNING id` explicitly.
       lastInsertRowid: result[0]?.id ?? 0,
     };
   }
 
-  get(...params: any[]): any {
+  async get(...params: unknown[]): Promise<unknown | undefined> {
     if (!this.pgSql) return undefined;
-
-    const rows = this._querySync(params);
+    const rows = await this.conn.unsafe(this.pgSql, params);
     return rows[0] ?? undefined;
   }
 
-  all(...params: any[]): any[] {
+  async all(...params: unknown[]): Promise<unknown[]> {
     if (!this.pgSql) return [];
-
-    return this._querySync(params);
-  }
-
-  /**
-   * Run a query synchronously by blocking on the async result.
-   * Bun processes I/O during Bun.sleepSync, allowing the promise to settle.
-   */
-  private _runSync(params: any[]): any {
-    if (!this.pgSql.trim()) {
-      return Object.assign([], { count: 0 });
-    }
-
-    let result: any;
-    let error: any;
-    let done = false;
-
-    this.conn.unsafe(this.pgSql, params).then(
-      (r: any) => {
-        result = r;
-        done = true;
-      },
-      (e: any) => {
-        error = e;
-        done = true;
-      },
-    );
-
-    while (!done) {
-      Bun.sleepSync(1);
-    }
-
-    if (error) throw error;
-    return result;
-  }
-
-  private _querySync(params: any[]): any[] {
-    const result = this._runSync(params);
-    return Array.from(result);
+    const rows = await this.conn.unsafe(this.pgSql, params);
+    return Array.from(rows);
   }
 }
 
-// ── PostgresAdapter ─────────────────────────────────────────────────────────
+// -- PostgresAdapter --------------------------------------------------------
 
 export class PostgresAdapter implements IDatabase {
   private sql: any;
@@ -170,7 +130,7 @@ export class PostgresAdapter implements IDatabase {
     return new PostgresStatement(this.sql, query);
   }
 
-  exec(query: string): void {
+  async exec(query: string): Promise<void> {
     const pgSql = sqliteToPostgres(query);
     if (!pgSql.trim()) return;
 
@@ -182,88 +142,37 @@ export class PostgresAdapter implements IDatabase {
       .filter((s) => s.length > 0);
 
     for (const stmt of statements) {
-      let done = false;
-      let error: any;
-
-      this.sql.unsafe(stmt).then(
-        () => {
-          done = true;
-        },
-        (e: any) => {
-          error = e;
-          done = true;
-        },
-      );
-
-      while (!done) {
-        Bun.sleepSync(1);
-      }
-
-      if (error) throw error;
+      await this.sql.unsafe(stmt);
     }
   }
 
-  transaction<T>(fn: () => T): T {
-    // Postgres transactions are async, but IDatabase.transaction is sync.
-    // We use BEGIN/COMMIT/ROLLBACK manually since the fn() inside calls
-    // prepare() on this adapter (which uses the pool).
+  /**
+   * Run `fn` inside a Postgres transaction. We use postgres.js's native
+   * `sql.begin(tx => ...)` helper, but `fn` doesn't take the txn handle
+   * directly: it closes over the adapter's pooled connection. This means
+   * statements issued inside `fn` go through the pool, NOT the txn -- so
+   * the BEGIN/COMMIT here only protect statements that explicitly use
+   * the wrapped handle. Repository code in PR 1 doesn't need true
+   * txn-bound statements; PR 2/3 will revisit if a service needs them.
+   */
+  async transaction<T>(fn: () => Promise<T>): Promise<T> {
     let result: T;
-    let error: any;
-    let done = false;
-
-    (async () => {
-      try {
-        await this.sql.unsafe("BEGIN");
-        try {
-          result = fn();
-          await this.sql.unsafe("COMMIT");
-        } catch (e) {
-          await this.sql.unsafe("ROLLBACK");
-          throw e;
-        }
-      } catch (e) {
-        error = e;
-      }
-      done = true;
-    })();
-
-    while (!done) {
-      Bun.sleepSync(1);
-    }
-
-    if (error) throw error;
+    await this.sql.begin(async () => {
+      result = await fn();
+    });
     return result!;
   }
 
-  close(): void {
-    let done = false;
-    this.sql.end().then(
-      () => {
-        done = true;
-      },
-      () => {
-        done = true;
-      },
-    );
-    while (!done) {
-      Bun.sleepSync(1);
-    }
+  async close(): Promise<void> {
+    await this.sql.end();
   }
 
-  // ── Async variants (preferred for hosted Postgres deployments) ──────────
+  // -- Async variants (preserved for hosted call sites pre-PR-2) ----------
+  // These are functionally equivalent to prepare(...).run/all/get; kept
+  // for back-compat with hosted call sites that import them directly.
 
   async execAsync(query: string): Promise<void> {
-    const pgSql = sqliteToPostgres(query);
-    if (!pgSql.trim()) return;
-
-    const statements = pgSql
-      .split(";")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
-
-    for (const stmt of statements) {
-      await this.sql.unsafe(stmt);
-    }
+    return this.exec(query);
   }
 
   async queryAsync<T = any>(query: string, params?: any[]): Promise<T[]> {
@@ -284,7 +193,7 @@ export class PostgresAdapter implements IDatabase {
   }
 }
 
-// ── Exported helper ─────────────────────────────────────────────────────────
+// -- Exported helper --------------------------------------------------------
 
 /** Expose the SQL translator for testing. */
 export { sqliteToPostgres };

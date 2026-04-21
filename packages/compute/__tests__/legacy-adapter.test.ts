@@ -45,7 +45,7 @@ afterAll(async () => {
   clearApp();
 });
 
-describe("computeProviderToTarget", () => {
+describe("computeProviderToTarget", async () => {
   it("maps LocalWorktreeProvider onto LocalCompute + DirectRuntime", () => {
     const legacy = new LocalWorktreeProvider();
     legacy.setApp?.(app);

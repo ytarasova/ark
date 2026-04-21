@@ -3,7 +3,7 @@ import { Database } from "bun:sqlite";
 import { BunSqliteAdapter } from "../../database/sqlite.js";
 import { TABLE_MODULES, sqliteSchema, postgresSchema } from "../schema/index.js";
 
-describe("schema DDL emitters", () => {
+describe("schema DDL emitters", async () => {
   it("emits 15 Wave 1 + Wave 2a tables", () => {
     expect(TABLE_MODULES.length).toBe(15);
   });
@@ -24,21 +24,21 @@ describe("schema DDL emitters", () => {
     }
   });
 
-  it("aggregated SQLite schema applies cleanly to an in-memory DB", () => {
+  it("aggregated SQLite schema applies cleanly to an in-memory DB", async () => {
     const raw = new Database(":memory:");
     const db = new BunSqliteAdapter(raw);
-    const apply = () => db.exec(sqliteSchema());
-    expect(apply).not.toThrow();
-    db.close();
+    const apply = async () => db.exec(sqliteSchema());
+    (await expect(apply())).resolves.toBeUndefined();
+    await db.close();
   });
 
-  it("re-applying the SQLite schema is idempotent", () => {
+  it("re-applying the SQLite schema is idempotent", async () => {
     const raw = new Database(":memory:");
     const db = new BunSqliteAdapter(raw);
-    db.exec(sqliteSchema());
-    const reapply = () => db.exec(sqliteSchema());
-    expect(reapply).not.toThrow();
-    db.close();
+    await db.exec(sqliteSchema());
+    const reapply = async () => db.exec(sqliteSchema());
+    (await expect(reapply())).resolves.toBeUndefined();
+    await db.close();
   });
 
   it("Postgres DDL contains UUID primary keys", () => {

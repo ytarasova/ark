@@ -8,7 +8,7 @@
  * "default" tenant context with admin role.
  */
 
-import type { TenantContext } from "../types/index.js";
+import type { TenantContext } from "../../types/index.js";
 import type { ApiKeyManager } from "./api-keys.js";
 
 export interface AuthConfig {
@@ -39,11 +39,11 @@ export const DEFAULT_TENANT_CONTEXT: TenantContext = {
  * Returns null if no valid credentials found and auth is enabled.
  * Returns DEFAULT_TENANT_CONTEXT if auth is disabled.
  */
-export function extractTenantContext(
+export async function extractTenantContext(
   req: Request,
   config: AuthConfig,
   apiKeyManager: ApiKeyManager | null,
-): TenantContext | null {
+): Promise<TenantContext | null> {
   if (!config.enabled) {
     return DEFAULT_TENANT_CONTEXT;
   }
@@ -52,7 +52,7 @@ export function extractTenantContext(
   const auth = req.headers.get("authorization");
   if (auth?.startsWith("Bearer ") && apiKeyManager) {
     const token = auth.slice(7);
-    const ctx = apiKeyManager.validate(token);
+    const ctx = await apiKeyManager.validate(token);
     if (ctx) return ctx;
   }
 
@@ -60,7 +60,7 @@ export function extractTenantContext(
   const url = new URL(req.url);
   const qToken = url.searchParams.get("token");
   if (qToken && apiKeyManager) {
-    const ctx = apiKeyManager.validate(qToken);
+    const ctx = await apiKeyManager.validate(qToken);
     if (ctx) return ctx;
   }
 

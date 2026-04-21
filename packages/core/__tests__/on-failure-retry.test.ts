@@ -52,12 +52,12 @@ describe("parseOnFailure", () => {
 
 // ── applyReport on_failure retry ────────────────────────────────────────────
 
-describe("applyReport error with on_failure retry", () => {
-  it("sets shouldRetry when stage has on_failure: retry(N)", () => {
+describe("applyReport error with on_failure retry", async () => {
+  it("sets shouldRetry when stage has on_failure: retry(N)", async () => {
     const app = getApp();
     // quick flow has implement stage with on_failure: "retry(3)"
-    const session = app.sessions.create({ summary: "retry test", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement" });
+    const session = await app.sessions.create({ summary: "retry test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
     const result = applyReport(app, session.id, {
       type: "error",
@@ -71,11 +71,11 @@ describe("applyReport error with on_failure retry", () => {
     expect(result.retryMaxRetries).toBe(3);
   });
 
-  it("does NOT set shouldRetry when stage has no on_failure", () => {
+  it("does NOT set shouldRetry when stage has no on_failure", async () => {
     const app = getApp();
     // quick flow's verify stage has no on_failure
-    const session = app.sessions.create({ summary: "no retry test", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "verify" });
+    const session = await app.sessions.create({ summary: "no retry test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "verify" });
 
     const result = applyReport(app, session.id, {
       type: "error",
@@ -88,11 +88,11 @@ describe("applyReport error with on_failure retry", () => {
     expect(result.retryMaxRetries).toBeUndefined();
   });
 
-  it("does NOT set shouldRetry when on_failure is notify", () => {
+  it("does NOT set shouldRetry when on_failure is notify", async () => {
     const app = getApp();
     // bare flow has no on_failure at all, but let's test with a session that has no flow
-    const session = app.sessions.create({ summary: "bare test", flow: "bare" });
-    app.sessions.update(session.id, { status: "running", stage: "work" });
+    const session = await app.sessions.create({ summary: "bare test", flow: "bare" });
+    await app.sessions.update(session.id, { status: "running", stage: "work" });
 
     const result = applyReport(app, session.id, {
       type: "error",
@@ -104,10 +104,10 @@ describe("applyReport error with on_failure retry", () => {
     expect(result.shouldRetry).toBeFalsy();
   });
 
-  it("does NOT set shouldRetry for non-error reports", () => {
+  it("does NOT set shouldRetry for non-error reports", async () => {
     const app = getApp();
-    const session = app.sessions.create({ summary: "progress test", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement" });
+    const session = await app.sessions.create({ summary: "progress test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
     const result = applyReport(app, session.id, {
       type: "progress",
@@ -121,12 +121,12 @@ describe("applyReport error with on_failure retry", () => {
 
 // ── applyHookStatus on_failure retry ────────────────────────────────────────
 
-describe("applyHookStatus failure with on_failure retry", () => {
-  it("sets shouldRetry on StopFailure when stage has on_failure: retry(N)", () => {
+describe("applyHookStatus failure with on_failure retry", async () => {
+  it("sets shouldRetry on StopFailure when stage has on_failure: retry(N)", async () => {
     const app = getApp();
-    const session = app.sessions.create({ summary: "hook retry test", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement" });
-    const fresh = app.sessions.get(session.id)!;
+    const session = await app.sessions.create({ summary: "hook retry test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement" });
+    const fresh = await app.sessions.get(session.id)!;
 
     const result = applyHookStatus(app, fresh, "StopFailure", {
       error: "Agent crashed",
@@ -137,11 +137,11 @@ describe("applyHookStatus failure with on_failure retry", () => {
     expect(result.retryMaxRetries).toBe(3);
   });
 
-  it("does NOT set shouldRetry on StopFailure when stage has no on_failure", () => {
+  it("does NOT set shouldRetry on StopFailure when stage has no on_failure", async () => {
     const app = getApp();
-    const session = app.sessions.create({ summary: "hook no-retry test", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "verify" });
-    const fresh = app.sessions.get(session.id)!;
+    const session = await app.sessions.create({ summary: "hook no-retry test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "verify" });
+    const fresh = await app.sessions.get(session.id)!;
 
     const result = applyHookStatus(app, fresh, "StopFailure", {
       error: "Agent crashed",
@@ -151,11 +151,11 @@ describe("applyHookStatus failure with on_failure retry", () => {
     expect(result.shouldRetry).toBeFalsy();
   });
 
-  it("does NOT set shouldRetry on SessionStart (not a failure)", () => {
+  it("does NOT set shouldRetry on SessionStart (not a failure)", async () => {
     const app = getApp();
-    const session = app.sessions.create({ summary: "start test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement" });
-    const fresh = app.sessions.get(session.id)!;
+    const session = await app.sessions.create({ summary: "start test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement" });
+    const fresh = await app.sessions.get(session.id)!;
 
     const result = applyHookStatus(app, fresh, "SessionStart", {});
 
@@ -168,7 +168,7 @@ describe("applyHookStatus failure with on_failure retry", () => {
 
 const TEST_PORT = 19198;
 
-describe("conductor on_failure retry loop", () => {
+describe("conductor on_failure retry loop", async () => {
   let server: { stop(): void };
 
   beforeEach(() => {
@@ -201,8 +201,8 @@ describe("conductor on_failure retry loop", () => {
 
   it("error report on retry stage resets to ready and logs retry event", async () => {
     const app = getApp();
-    const session = app.sessions.create({ summary: "conductor retry test", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement" });
+    const session = await app.sessions.create({ summary: "conductor retry test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
     const resp = await postReport(session.id, {
       type: "error",
@@ -212,12 +212,12 @@ describe("conductor on_failure retry loop", () => {
     expect(resp.status).toBe(200);
 
     // retryWithContext should have reset to ready
-    const updated = app.sessions.get(session.id)!;
+    const updated = await app.sessions.get(session.id)!;
     expect(updated.status).toBe("ready");
     expect(updated.error).toBeNull();
 
     // Should have logged a retry event
-    const events = app.events.list(session.id);
+    const events = await app.events.list(session.id);
     const retryEvent = events.find((e) => e.type === "retry_with_context");
     expect(retryEvent).toBeDefined();
     expect(retryEvent!.data!.attempt).toBe(1);
@@ -226,12 +226,12 @@ describe("conductor on_failure retry loop", () => {
 
   it("error report falls through to failed when max retries exhausted", async () => {
     const app = getApp();
-    const session = app.sessions.create({ summary: "exhausted retry test", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement" });
+    const session = await app.sessions.create({ summary: "exhausted retry test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
     // Simulate 3 prior retries (quick flow has retry(3))
     for (let i = 0; i < 3; i++) {
-      app.events.log(session.id, "retry_with_context", {
+      await app.events.log(session.id, "retry_with_context", {
         actor: "system",
         data: { attempt: i + 1 },
       });
@@ -245,15 +245,15 @@ describe("conductor on_failure retry loop", () => {
     expect(resp.status).toBe(200);
 
     // Should remain failed -- retries exhausted
-    const updated = app.sessions.get(session.id)!;
+    const updated = await app.sessions.get(session.id)!;
     expect(updated.status).toBe("failed");
     expect(updated.error).toBe("Still failing");
   });
 
   it("error report on non-retry stage stays failed", async () => {
     const app = getApp();
-    const session = app.sessions.create({ summary: "no-retry test", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "verify" });
+    const session = await app.sessions.create({ summary: "no-retry test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "verify" });
 
     const resp = await postReport(session.id, {
       type: "error",
@@ -262,20 +262,20 @@ describe("conductor on_failure retry loop", () => {
     });
     expect(resp.status).toBe(200);
 
-    const updated = app.sessions.get(session.id)!;
+    const updated = await app.sessions.get(session.id)!;
     expect(updated.status).toBe("failed");
     expect(updated.error).toBe("Verification failed");
 
     // No retry event should be logged
-    const events = app.events.list(session.id);
+    const events = await app.events.list(session.id);
     const retryEvent = events.find((e) => e.type === "retry_with_context");
     expect(retryEvent).toBeUndefined();
   });
 
   it("hook StopFailure on retry stage resets to ready", async () => {
     const app = getApp();
-    const session = app.sessions.create({ summary: "hook retry test", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement" });
+    const session = await app.sessions.create({ summary: "hook retry test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
     const resp = await postHook(session.id, {
       hook_event_name: "StopFailure",
@@ -284,11 +284,11 @@ describe("conductor on_failure retry loop", () => {
     expect(resp.status).toBe(200);
 
     // retryWithContext should have reset to ready
-    const updated = app.sessions.get(session.id)!;
+    const updated = await app.sessions.get(session.id)!;
     expect(updated.status).toBe("ready");
 
     // Should have logged a retry event
-    const events = app.events.list(session.id);
+    const events = await app.events.list(session.id);
     const retryEvent = events.find((e) => e.type === "retry_with_context");
     expect(retryEvent).toBeDefined();
   });

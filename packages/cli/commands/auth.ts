@@ -77,13 +77,13 @@ export function registerAuthCommands(program: Command, app: AppContext) {
     .option("--role <role>", "Role: admin, member, or viewer", "member")
     .option("--tenant <tenantId>", "Tenant ID", "default")
     .option("--expires <date>", "Expiration date (ISO 8601)")
-    .action((opts: any) => {
+    .action(async (opts: any) => {
       const role = opts.role as "admin" | "member" | "viewer";
       if (!["admin", "member", "viewer"].includes(role)) {
         console.error(chalk.red(`Invalid role: ${role}. Must be admin, member, or viewer.`));
         process.exit(1);
       }
-      const result = app.apiKeys.create(opts.tenant, opts.name, role, opts.expires);
+      const result = await app.apiKeys.create(opts.tenant, opts.name, role, opts.expires);
       console.log(chalk.green("API key created successfully."));
       console.log();
       console.log(`  ${chalk.bold("ID:")}    ${result.id}`);
@@ -98,8 +98,8 @@ export function registerAuthCommands(program: Command, app: AppContext) {
     .command("list-keys")
     .description("List API keys")
     .option("--tenant <tenantId>", "Tenant ID", "default")
-    .action((opts: any) => {
-      const keys = app.apiKeys.list(opts.tenant);
+    .action(async (opts: any) => {
+      const keys = await app.apiKeys.list(opts.tenant);
       if (!keys.length) {
         console.log(chalk.dim("No API keys found."));
         return;
@@ -119,8 +119,8 @@ export function registerAuthCommands(program: Command, app: AppContext) {
     .command("revoke-key")
     .description("Revoke an API key")
     .argument("<id>", "API key ID (e.g. ak-abcd1234)")
-    .action((id: string) => {
-      const ok = app.apiKeys.revoke(id);
+    .action(async (id: string) => {
+      const ok = await app.apiKeys.revoke(id);
       if (ok) {
         console.log(chalk.green(`Revoked API key: ${id}`));
       } else {
@@ -133,8 +133,8 @@ export function registerAuthCommands(program: Command, app: AppContext) {
     .command("rotate-key")
     .description("Rotate an API key (revoke old, create new with same metadata)")
     .argument("<id>", "API key ID to rotate")
-    .action((id: string) => {
-      const result = app.apiKeys.rotate(id);
+    .action(async (id: string) => {
+      const result = await app.apiKeys.rotate(id);
       if (!result) {
         console.error(chalk.red(`API key not found: ${id}`));
         process.exit(1);

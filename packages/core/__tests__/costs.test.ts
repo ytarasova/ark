@@ -67,44 +67,44 @@ describe("formatCost", () => {
   it("formats large cost", () => expect(formatCost(99.99)).toBe("$99.99"));
 });
 
-describe("getSessionCost", () => {
-  it("returns cost from UsageRecorder records", () => {
+describe("getSessionCost", async () => {
+  it("returns cost from UsageRecorder records", async () => {
     const app = getApp();
-    const s = app.sessions.create({ summary: "test" });
+    const s = await app.sessions.create({ summary: "test" });
     recordUsage(s.id, "sonnet", { input_tokens: 1_000_000, output_tokens: 0 });
-    const sc = getSessionCost(app, app.sessions.get(s.id)!);
+    const sc = getSessionCost(app, await app.sessions.get(s.id)!);
     expect(sc.cost).toBeCloseTo(3.0, 2);
   });
 
-  it("returns 0 cost for session without records", () => {
+  it("returns 0 cost for session without records", async () => {
     const app = getApp();
-    const s = app.sessions.create({ summary: "no-usage" });
+    const s = await app.sessions.create({ summary: "no-usage" });
     const sc = getSessionCost(app, s);
     expect(sc.cost).toBe(0);
   });
 });
 
-describe("getAllSessionCosts", () => {
-  it("returns sorted costs and total", () => {
+describe("getAllSessionCosts", async () => {
+  it("returns sorted costs and total", async () => {
     const app = getApp();
-    const s1 = app.sessions.create({ summary: "cheap" });
-    const s2 = app.sessions.create({ summary: "expensive" });
+    const s1 = await app.sessions.create({ summary: "cheap" });
+    const s2 = await app.sessions.create({ summary: "expensive" });
     recordUsage(s1.id, "haiku", { input_tokens: 100_000, output_tokens: 0 });
     recordUsage(s2.id, "opus", { input_tokens: 100_000, output_tokens: 0 });
-    const sessions = [app.sessions.get(s1.id)!, app.sessions.get(s2.id)!];
-    const result = getAllSessionCosts(app, sessions);
+    const sessions = [await app.sessions.get(s1.id)!, await app.sessions.get(s2.id)!];
+    const result = await getAllSessionCosts(app, sessions);
     expect(result.sessions.length).toBe(2);
     expect(result.sessions[0].sessionId).toBe(s2.id); // opus is more expensive
     expect(result.total).toBeGreaterThan(0);
   });
 
-  it("filters out zero-cost sessions", () => {
+  it("filters out zero-cost sessions", async () => {
     const app = getApp();
-    const s1 = app.sessions.create({ summary: "has-cost" });
-    const s2 = app.sessions.create({ summary: "no-cost" });
+    const s1 = await app.sessions.create({ summary: "has-cost" });
+    const s2 = await app.sessions.create({ summary: "no-cost" });
     recordUsage(s1.id, "sonnet", { input_tokens: 100_000, output_tokens: 0 });
-    const sessions = [app.sessions.get(s1.id)!, s2];
-    const result = getAllSessionCosts(app, sessions);
+    const sessions = [await app.sessions.get(s1.id)!, s2];
+    const result = await getAllSessionCosts(app, sessions);
     expect(result.sessions.length).toBe(1);
     expect(result.sessions[0].sessionId).toBe(s1.id);
   });
@@ -140,61 +140,61 @@ describe("formatCost edge cases", () => {
   it("formats small negative cost", () => expect(formatCost(-0.05)).toBe("-$0.05"));
 });
 
-describe("getAllSessionCosts edge cases", () => {
-  it("returns empty for no sessions", () => {
+describe("getAllSessionCosts edge cases", async () => {
+  it("returns empty for no sessions", async () => {
     const app = getApp();
-    const result = getAllSessionCosts(app, []);
+    const result = await getAllSessionCosts(app, []);
     expect(result.sessions).toEqual([]);
     expect(result.total).toBe(0);
   });
 
-  it("skips sessions with zero cost", () => {
+  it("skips sessions with zero cost", async () => {
     const app = getApp();
-    const s = app.sessions.create({ summary: "no-tokens" });
-    const result = getAllSessionCosts(app, [app.sessions.get(s.id)!]);
+    const s = await app.sessions.create({ summary: "no-tokens" });
+    const result = await getAllSessionCosts(app, [await app.sessions.get(s.id)!]);
     expect(result.sessions).toHaveLength(0);
   });
 
-  it("handles multiple sessions with different models", () => {
+  it("handles multiple sessions with different models", async () => {
     const app = getApp();
-    const s1 = app.sessions.create({ summary: "opus-session" });
-    const s2 = app.sessions.create({ summary: "haiku-session" });
+    const s1 = await app.sessions.create({ summary: "opus-session" });
+    const s2 = await app.sessions.create({ summary: "haiku-session" });
     recordUsage(s1.id, "opus", { input_tokens: 100_000, output_tokens: 0 });
     recordUsage(s2.id, "haiku", { input_tokens: 100_000, output_tokens: 0 });
 
-    const result = getAllSessionCosts(app, [app.sessions.get(s1.id)!, app.sessions.get(s2.id)!]);
+    const result = await getAllSessionCosts(app, [await app.sessions.get(s1.id)!, await app.sessions.get(s2.id)!]);
     expect(result.sessions).toHaveLength(2);
     expect(result.sessions[0].cost).toBeGreaterThan(result.sessions[1].cost); // opus > haiku
     expect(result.total).toBeGreaterThan(0);
   });
 });
 
-describe("checkBudget", () => {
-  it("detects daily limit exceeded", () => {
+describe("checkBudget", async () => {
+  it("detects daily limit exceeded", async () => {
     const app = getApp();
-    const s = app.sessions.create({ summary: "budget-test" });
+    const s = await app.sessions.create({ summary: "budget-test" });
     recordUsage(s.id, "opus", { input_tokens: 10_000_000, output_tokens: 1_000_000 });
 
-    const sessions = [app.sessions.get(s.id)!];
-    const status = checkBudget(app, sessions, { dailyLimit: 10 });
+    const sessions = [await app.sessions.get(s.id)!];
+    const status = await checkBudget(app, sessions, { dailyLimit: 10 });
     expect(status.daily.exceeded).toBe(true);
     expect(status.daily.warning).toBe(true);
   });
 
-  it("no warning when under budget", () => {
+  it("no warning when under budget", async () => {
     const app = getApp();
-    const s = app.sessions.create({ summary: "cheap" });
+    const s = await app.sessions.create({ summary: "cheap" });
     recordUsage(s.id, "haiku", { input_tokens: 1000, output_tokens: 100 });
 
-    const sessions = [app.sessions.get(s.id)!];
-    const status = checkBudget(app, sessions, { dailyLimit: 100 });
+    const sessions = [await app.sessions.get(s.id)!];
+    const status = await checkBudget(app, sessions, { dailyLimit: 100 });
     expect(status.daily.exceeded).toBe(false);
     expect(status.daily.warning).toBe(false);
   });
 
-  it("handles no limits configured", () => {
+  it("handles no limits configured", async () => {
     const app = getApp();
-    const status = checkBudget(app, [], {});
+    const status = await checkBudget(app, [], {});
     expect(status.daily.limit).toBeNull();
     expect(status.daily.exceeded).toBe(false);
   });

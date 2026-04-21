@@ -25,7 +25,7 @@ afterAll(async () => {
 
 // ── TmuxLauncher interface compliance ──────────────────────────────────────
 
-describe("TmuxLauncher", () => {
+describe("TmuxLauncher", async () => {
   it("implements SessionLauncher interface", () => {
     const launcher = new TmuxLauncher();
 
@@ -61,7 +61,7 @@ describe("TmuxLauncher", () => {
 
 // ── ContainerLauncher interface compliance ─────────────────────────────────
 
-describe("ContainerLauncher", () => {
+describe("ContainerLauncher", async () => {
   it("implements SessionLauncher interface", () => {
     const launcher = new ContainerLauncher("http://localhost:19300");
 
@@ -83,7 +83,7 @@ describe("ContainerLauncher", () => {
 
 // ── ArkdLauncher interface compliance ──────────────────────────────────────
 
-describe("ArkdLauncher", () => {
+describe("ArkdLauncher", async () => {
   it("implements SessionLauncher interface", () => {
     const launcher = new ArkdLauncher("http://localhost:19300");
 
@@ -136,7 +136,7 @@ describe("AppContext launcher", () => {
 
 // ── Orchestration integration ──────────────────────────────────────────────
 
-describe("orchestration uses app.launcher", () => {
+describe("orchestration uses app.launcher", async () => {
   it("interrupt sends keys via app.launcher", async () => {
     let sendKeysCalled = false;
     let receivedKeys: string[] = [];
@@ -155,8 +155,8 @@ describe("orchestration uses app.launcher", () => {
     app.setLauncher(mockLauncher);
 
     try {
-      const session = app.sessions.create({ summary: "interrupt-test" });
-      app.sessions.update(session.id, { status: "running", session_id: "ark-int-test" });
+      const session = await app.sessions.create({ summary: "interrupt-test" });
+      await app.sessions.update(session.id, { status: "running", session_id: "ark-int-test" });
 
       const { interrupt } = await import("../../services/session-orchestration.js");
       const result = await interrupt(app, session.id);
@@ -187,8 +187,8 @@ describe("orchestration uses app.launcher", () => {
     app.setLauncher(mockLauncher);
 
     try {
-      const session = app.sessions.create({ summary: "archive-kill-test" });
-      app.sessions.update(session.id, { status: "running", session_id: "ark-archive-kill" });
+      const session = await app.sessions.create({ summary: "archive-kill-test" });
+      await app.sessions.update(session.id, { status: "running", session_id: "ark-archive-kill" });
 
       const { archive } = await import("../../services/session-orchestration.js");
       const result = await archive(app, session.id);
@@ -219,9 +219,12 @@ describe("orchestration uses app.launcher", () => {
     app.setLauncher(mockLauncher);
 
     try {
-      const session = app.sessions.create({ summary: "delete-kill-test", compute_name: "nonexistent-compute-xyz" });
+      const session = await app.sessions.create({
+        summary: "delete-kill-test",
+        compute_name: "nonexistent-compute-xyz",
+      });
       // Set session_id with unknown compute -- so withProvider returns false
-      app.sessions.update(session.id, { status: "running", session_id: "ark-delete-kill" });
+      await app.sessions.update(session.id, { status: "running", session_id: "ark-delete-kill" });
 
       const { deleteSessionAsync } = await import("../../services/session-orchestration.js");
       const result = await deleteSessionAsync(app, session.id);
@@ -252,9 +255,9 @@ describe("orchestration uses app.launcher", () => {
     app.setLauncher(mockLauncher);
 
     try {
-      const session = app.sessions.create({ summary: "stop-kill-test", compute_name: "nonexistent-compute-xyz" });
+      const session = await app.sessions.create({ summary: "stop-kill-test", compute_name: "nonexistent-compute-xyz" });
       // Set session_id with unknown compute -- so withProvider returns false
-      app.sessions.update(session.id, { status: "running", session_id: "ark-stop-kill" });
+      await app.sessions.update(session.id, { status: "running", session_id: "ark-stop-kill" });
 
       const { stop } = await import("../../services/session-orchestration.js");
       const result = await stop(app, session.id);
@@ -283,8 +286,8 @@ describe("orchestration uses app.launcher", () => {
     app.setLauncher(mockLauncher);
 
     try {
-      const session = app.sessions.create({ summary: "resume-kill-test" });
-      app.sessions.update(session.id, {
+      const session = await app.sessions.create({ summary: "resume-kill-test" });
+      await app.sessions.update(session.id, {
         status: "stopped",
         session_id: "ark-resume-old",
         stage: "work",

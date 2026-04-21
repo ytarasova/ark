@@ -33,7 +33,7 @@ afterEach(async () => {
   }
 });
 
-describe("Lifecycle orchestrator", () => {
+describe("Lifecycle orchestrator", async () => {
   it("boot() builds the container and resolves every launcher", async () => {
     app = AppContext.forTest();
     await app.boot();
@@ -73,7 +73,7 @@ describe("Lifecycle orchestrator", () => {
   });
 });
 
-describe("Launcher disposers fire via container.dispose()", () => {
+describe("Launcher disposers fire via container.dispose()", async () => {
   it("ConductorLauncher.stop() is idempotent", async () => {
     app = AppContext.forTest();
     await app.boot();
@@ -130,7 +130,7 @@ describe("Launcher disposers fire via container.dispose()", () => {
   });
 });
 
-describe("container.dispose() runs each launcher's disposer", () => {
+describe("container.dispose() runs each launcher's disposer", async () => {
   it("calls stop() on every launcher with a disposer", async () => {
     app = AppContext.forTest();
     await app.boot();
@@ -209,7 +209,7 @@ describe("container.dispose() runs each launcher's disposer", () => {
   });
 });
 
-describe("Infra launchers honor enablement", () => {
+describe("Infra launchers honor enablement", async () => {
   let app2: AppContext;
 
   beforeAll(async () => {

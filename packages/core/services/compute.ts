@@ -18,27 +18,27 @@ import type { ComputeRepository } from "../repositories/compute.js";
 export class ComputeService {
   constructor(private computes: ComputeRepository) {}
 
-  create(opts: CreateComputeOpts): Compute {
+  create(opts: CreateComputeOpts): Promise<Compute> {
     return this.computes.create(opts);
   }
 
-  get(name: string): Compute | null {
+  get(name: string): Promise<Compute | null> {
     return this.computes.get(name);
   }
 
-  list(filters?: { status?: ComputeStatus; provider?: ComputeProviderName; limit?: number }): Compute[] {
+  list(filters?: { status?: ComputeStatus; provider?: ComputeProviderName; limit?: number }): Promise<Compute[]> {
     return this.computes.list(filters);
   }
 
-  update(name: string, fields: Partial<Compute>): Compute | null {
+  update(name: string, fields: Partial<Compute>): Promise<Compute | null> {
     return this.computes.update(name, fields);
   }
 
-  delete(name: string): boolean {
+  delete(name: string): Promise<boolean> {
     return this.computes.delete(name);
   }
 
-  mergeConfig(name: string, patch: Partial<ComputeConfig>): Compute | null {
+  mergeConfig(name: string, patch: Partial<ComputeConfig>): Promise<Compute | null> {
     return this.computes.mergeConfig(name, patch);
   }
 }

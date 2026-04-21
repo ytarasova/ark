@@ -49,7 +49,7 @@ export const databaseSchemaMapExtractor: PlatformDocExtractor = {
   flavor: "mechanical",
   cadence: "on_reindex",
   async generate(ctx: PlatformDocContext, workspace_id: string): Promise<PlatformDocInput> {
-    const repos = ctx.store.listReposInWorkspace(ctx.tenant_id, workspace_id);
+    const repos = await ctx.store.listReposInWorkspace(ctx.tenant_id, workspace_id);
     if (repos.length === 0) {
       return {
         title: "Database Schema Map",
@@ -66,7 +66,7 @@ export const databaseSchemaMapExtractor: PlatformDocExtractor = {
     for (const repo of repos) {
       // listFiles is capped at 1000 by default; 5000 is a cheap bump for
       // mechanical scans that care about path hits, not content.
-      const files = ctx.store.listFiles(ctx.tenant_id, repo.id, 5000);
+      const files = await ctx.store.listFiles(ctx.tenant_id, repo.id, 5000);
       for (const f of files) {
         const kind = classify(f.path);
         if (kind) hits.push({ repo: repo.name, path: f.path, kind });

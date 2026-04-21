@@ -21,7 +21,7 @@ export function registerConductorCommands(program: Command, app: AppContext) {
     .command("learnings")
     .description("Show conductor learnings")
     .action(async () => {
-      const learnings = app.knowledge.listNodes({ type: "learning" });
+      const learnings = await app.knowledge.listNodes({ type: "learning" });
 
       if (learnings.length > 0) {
         // Split into "promoted" (recurrence >= 3) and active
@@ -57,11 +57,11 @@ export function registerConductorCommands(program: Command, app: AppContext) {
     .argument("[description]")
     .action(async (title, description) => {
       // Check for existing learning with same label and increment recurrence
-      const existing = app.knowledge.search(title, { types: ["learning"], limit: 5 });
+      const existing = await app.knowledge.search(title, { types: ["learning"], limit: 5 });
       const match = existing.find((n) => n.label === title);
       if (match) {
         const recurrence = ((match.metadata.recurrence as number) ?? 1) + 1;
-        app.knowledge.updateNode(match.id, {
+        await app.knowledge.updateNode(match.id, {
           content: description || match.content,
           metadata: { ...match.metadata, recurrence },
         });
@@ -71,7 +71,7 @@ export function registerConductorCommands(program: Command, app: AppContext) {
           console.log(chalk.blue(`Recorded: ${title} (recurrence: ${recurrence}/3)`));
         }
       } else {
-        app.knowledge.addNode({
+        await app.knowledge.addNode({
           type: "learning",
           label: title,
           content: description ?? "",
@@ -110,7 +110,7 @@ export function registerConductorCommands(program: Command, app: AppContext) {
         if (text === "/status" || text === "status") {
           await bridge.notifyStatusSummary(app);
         } else if (text === "/sessions" || text === "sessions") {
-          const sessions = app.sessions.list({ limit: 20 });
+          const sessions = await app.sessions.list({ limit: 20 });
           const lines = sessions.map((s) => `\u2022 ${s.summary ?? s.id} (${s.status})`);
           await bridge.notify(lines.join("\n") || "No sessions");
         } else {

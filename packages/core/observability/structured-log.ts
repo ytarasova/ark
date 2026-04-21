@@ -18,7 +18,9 @@ export type LogComponent =
   | "triggers"
   | "connectors"
   | "code-intel"
-  | "workspace";
+  | "workspace"
+  | "handoff"
+  | "compute-pool";
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
 interface LogEntry {

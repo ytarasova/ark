@@ -38,7 +38,7 @@ function genId() {
   return `sched-${nanoid(10)}`;
 }
 
-export function createSchedule(
+export async function createSchedule(
   app: AppContext,
   opts: {
     cron: string;
@@ -50,64 +50,69 @@ export function createSchedule(
     group_name?: string;
     user_id?: string;
   },
-): Schedule {
+): Promise<Schedule> {
   const db = app.db;
   const tenantId = app.sessions.getTenant();
   const id = genId();
   const ts = now();
-  db.prepare(
-    `INSERT INTO schedules (id, cron, flow, repo, workdir, summary, compute_name, group_name, tenant_id, user_id, created_at)
+  await db
+    .prepare(
+      `INSERT INTO schedules (id, cron, flow, repo, workdir, summary, compute_name, group_name, tenant_id, user_id, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).run(
-    id,
-    opts.cron,
-    opts.flow ?? "bare",
-    opts.repo ?? null,
-    opts.workdir ?? null,
-    opts.summary ?? null,
-    opts.compute_name ?? null,
-    opts.group_name ?? null,
-    tenantId,
-    opts.user_id ?? null,
-    ts,
-  );
-  return getSchedule(app, id)!;
+    )
+    .run(
+      id,
+      opts.cron,
+      opts.flow ?? "bare",
+      opts.repo ?? null,
+      opts.workdir ?? null,
+      opts.summary ?? null,
+      opts.compute_name ?? null,
+      opts.group_name ?? null,
+      tenantId,
+      opts.user_id ?? null,
+      ts,
+    );
+  return (await getSchedule(app, id))!;
 }
 
-export function listSchedules(app: AppContext): Schedule[] {
+export async function listSchedules(app: AppContext): Promise<Schedule[]> {
   const db = app.db;
   const tenantId = app.sessions.getTenant();
-  return (
-    db.prepare("SELECT * FROM schedules WHERE tenant_id = ? ORDER BY created_at DESC").all(tenantId) as ScheduleRow[]
-  ).map(mapRow);
+  const rows = (await db
+    .prepare("SELECT * FROM schedules WHERE tenant_id = ? ORDER BY created_at DESC")
+    .all(tenantId)) as ScheduleRow[];
+  return rows.map(mapRow);
 }
 
-export function getSchedule(app: AppContext, id: string): Schedule | null {
+export async function getSchedule(app: AppContext, id: string): Promise<Schedule | null> {
   const db = app.db;
   const tenantId = app.sessions.getTenant();
-  const row = db.prepare("SELECT * FROM schedules WHERE id = ? AND tenant_id = ?").get(id, tenantId) as
+  const row = (await db.prepare("SELECT * FROM schedules WHERE id = ? AND tenant_id = ?").get(id, tenantId)) as
     | ScheduleRow
     | undefined;
   return row ? mapRow(row) : null;
 }
 
-export function deleteSchedule(app: AppContext, id: string): boolean {
+export async function deleteSchedule(app: AppContext, id: string): Promise<boolean> {
   const db = app.db;
   const tenantId = app.sessions.getTenant();
-  const result = db.prepare("DELETE FROM schedules WHERE id = ? AND tenant_id = ?").run(id, tenantId);
+  const result = await db.prepare("DELETE FROM schedules WHERE id = ? AND tenant_id = ?").run(id, tenantId);
   return result.changes > 0;
 }
 
-export function updateScheduleLastRun(app: AppContext, id: string): void {
+export async function updateScheduleLastRun(app: AppContext, id: string): Promise<void> {
   const db = app.db;
   const tenantId = app.sessions.getTenant();
-  db.prepare("UPDATE schedules SET last_run = ? WHERE id = ? AND tenant_id = ?").run(now(), id, tenantId);
+  await db.prepare("UPDATE schedules SET last_run = ? WHERE id = ? AND tenant_id = ?").run(now(), id, tenantId);
 }
 
-export function enableSchedule(app: AppContext, id: string, enabled: boolean): void {
+export async function enableSchedule(app: AppContext, id: string, enabled: boolean): Promise<void> {
   const db = app.db;
   const tenantId = app.sessions.getTenant();
-  db.prepare("UPDATE schedules SET enabled = ? WHERE id = ? AND tenant_id = ?").run(enabled ? 1 : 0, id, tenantId);
+  await db
+    .prepare("UPDATE schedules SET enabled = ? WHERE id = ? AND tenant_id = ?")
+    .run(enabled ? 1 : 0, id, tenantId);
 }
 
 function mapRow(r: ScheduleRow): Schedule {

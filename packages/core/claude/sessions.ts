@@ -218,7 +218,7 @@ interface MaxTsRow {
  * List Claude sessions from cache (instant).
  * Call refreshClaudeSessionsCache() to populate/update the cache.
  */
-export function listClaudeSessions(app: AppContext, opts?: ListOpts): ClaudeSession[] {
+export async function listClaudeSessions(app: AppContext, opts?: ListOpts): Promise<ClaudeSession[]> {
   const db = app.db;
   const limit = opts?.limit ?? 100;
 
@@ -234,7 +234,7 @@ export function listClaudeSessions(app: AppContext, opts?: ListOpts): ClaudeSess
   params.push(limit);
 
   try {
-    const rows = db.prepare(sql).all(...params) as ClaudeSessionCacheRow[];
+    const rows = (await db.prepare(sql).all(...params)) as ClaudeSessionCacheRow[];
     return rows.map((r) => ({
       sessionId: r.session_id,
       project: r.project,
@@ -257,12 +257,16 @@ export function listClaudeSessions(app: AppContext, opts?: ListOpts): ClaudeSess
 /**
  * Find a specific Claude session by ID (prefix match supported).
  */
-export function getClaudeSession(app: AppContext, sessionId: string, _opts?: ListOpts): ClaudeSession | null {
+export async function getClaudeSession(
+  app: AppContext,
+  sessionId: string,
+  _opts?: ListOpts,
+): Promise<ClaudeSession | null> {
   const db = app.db;
   try {
-    const row = db
+    const row = (await db
       .prepare("SELECT * FROM claude_sessions_cache WHERE session_id = ? OR session_id LIKE ?")
-      .get(sessionId, `${sessionId}%`) as ClaudeSessionCacheRow | undefined;
+      .get(sessionId, `${sessionId}%`)) as ClaudeSessionCacheRow | undefined;
     if (!row) return null;
     return {
       sessionId: row.session_id,
@@ -304,7 +308,9 @@ export async function refreshClaudeSessionsCache(
   // Get the most recent cached_at timestamp for incremental refresh
   let lastCachedAt = "";
   try {
-    const row = db.prepare("SELECT MAX(cached_at) as max_ts FROM claude_sessions_cache").get() as MaxTsRow | undefined;
+    const row = (await db.prepare("SELECT MAX(cached_at) as max_ts FROM claude_sessions_cache").get()) as
+      | MaxTsRow
+      | undefined;
     lastCachedAt = row?.max_ts ?? "";
   } catch (e: any) {
     // Table may not exist yet on first refresh -- that's fine, we'll do a full scan
@@ -397,7 +403,7 @@ export async function refreshClaudeSessionsCache(
       if (!meta) continue;
       if (meta.messageCount < MIN_MESSAGE_COUNT) continue;
 
-      insert.run(
+      await insert.run(
         meta.sessionId,
         decodedProject,
         projectDir,

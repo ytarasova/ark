@@ -10,11 +10,11 @@ import { logDebug, logInfo } from "../observability/structured-log.js";
 import { generateRepoMap, formatRepoMap } from "../repo-map.js";
 
 /** Ingest nodes/edges from a remote arkd /codegraph/index response into the knowledge store. */
-export function ingestRemoteIndex(app: AppContext, data: any, log: (msg: string) => void): void {
+export async function ingestRemoteIndex(app: AppContext, data: any, log: (msg: string) => void): Promise<void> {
   const addedFiles = new Set<string>();
   for (const node of data.nodes ?? []) {
     if (node.file && !addedFiles.has(node.file)) {
-      app.knowledge.addNode({
+      await app.knowledge.addNode({
         id: `file:${node.file}`,
         type: "file",
         label: node.file,
@@ -22,7 +22,7 @@ export function ingestRemoteIndex(app: AppContext, data: any, log: (msg: string)
       });
       addedFiles.add(node.file);
     }
-    app.knowledge.addNode({
+    await app.knowledge.addNode({
       id: `symbol:${node.file}::${node.name}:${node.line}`,
       type: "symbol",
       label: node.name,
@@ -39,7 +39,7 @@ export function ingestRemoteIndex(app: AppContext, data: any, log: (msg: string)
     const srcNode = (data.nodes ?? []).find((n: any) => n.id === edge.source_id);
     const tgtNode = (data.nodes ?? []).find((n: any) => n.id === edge.target_id);
     if (srcNode && tgtNode) {
-      app.knowledge.addEdge(
+      await app.knowledge.addEdge(
         `symbol:${srcNode.file}::${srcNode.name}:${srcNode.line}`,
         `symbol:${tgtNode.file}::${tgtNode.name}:${tgtNode.line}`,
         edge.kind === "imports" ? "imports" : "depends_on",
@@ -62,7 +62,7 @@ export async function indexRepoForDispatch(
   if (!session.repo) return;
 
   const repoPath = session.workdir ?? session.repo;
-  const compute = session.compute_name ? app.computes.get(session.compute_name) : null;
+  const compute = session.compute_name ? await app.computes.get(session.compute_name) : null;
   const computeIp = compute?.config?.ip as string | undefined;
 
   if (computeIp) {
@@ -78,7 +78,7 @@ export async function indexRepoForDispatch(
       });
       if (resp.ok) {
         const data = (await resp.json()) as { ok?: boolean; files?: number; symbols?: number; error?: string };
-        ingestRemoteIndex(app, data, log);
+        await ingestRemoteIndex(app, data, log);
       }
     } catch (e: any) {
       log(`Remote index failed: ${e.message}`);
@@ -90,7 +90,7 @@ export async function indexRepoForDispatch(
 
   try {
     const { indexCodebase } = await import("../knowledge/indexer.js");
-    const existingFiles = app.knowledge.listNodes({ type: "file", limit: 1 });
+    const existingFiles = await app.knowledge.listNodes({ type: "file", limit: 1 });
     if (existingFiles.length === 0) {
       log("Auto-indexing codebase...");
       await indexCodebase(repoPath, app.knowledge);
@@ -108,7 +108,7 @@ export async function injectKnowledgeContext(app: AppContext, session: Session, 
   if (!app.knowledge) return task;
   try {
     const { buildContext, formatContextAsMarkdown } = await import("../knowledge/context.js");
-    const ctx = buildContext(app.knowledge, task, {
+    const ctx = await buildContext(app.knowledge, task, {
       repo: session.repo ?? undefined,
       sessionId: session.id,
     });

@@ -31,7 +31,7 @@ export function registerSearchCommands(program: Command, app: AppContext) {
       }
 
       if (opts.hybrid) {
-        const knowledgeResults = app.knowledge.search(query, { limit });
+        const knowledgeResults = await app.knowledge.search(query, { limit });
         if (knowledgeResults.length === 0) {
           console.log(chalk.yellow("No knowledge search results found."));
           return;

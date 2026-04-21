@@ -11,7 +11,7 @@ export const mergePrAction: ActionHandler = {
   async execute(app, session, action) {
     const result = await finishWorktree(app, session.id, { force: true });
     if (result.ok) {
-      app.events.log(session.id, "action_executed", {
+      await app.events.log(session.id, "action_executed", {
         stage: session.stage ?? undefined,
         actor: "system",
         data: { action },

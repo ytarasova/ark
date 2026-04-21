@@ -24,27 +24,27 @@ afterAll(async () => {
   }
 });
 
-describe("tenant scoping", () => {
-  describe("sessions", () => {
-    it("default tenant sees its own sessions", () => {
-      const session = app.sessions.create({ summary: "default tenant session" });
-      const found = app.sessions.get(session.id);
+describe("tenant scoping", async () => {
+  describe("sessions", async () => {
+    it("default tenant sees its own sessions", async () => {
+      const session = await app.sessions.create({ summary: "default tenant session" });
+      const found = await app.sessions.get(session.id);
       expect(found).not.toBeNull();
       expect(found!.id).toBe(session.id);
     });
 
-    it("scoped tenant cannot see default tenant sessions", () => {
-      const session = app.sessions.create({ summary: "default only" });
+    it("scoped tenant cannot see default tenant sessions", async () => {
+      const session = await app.sessions.create({ summary: "default only" });
 
       const scopedApp = app.forTenant("other-tenant");
       const found = scopedApp.sessions.get(session.id);
       expect(found).toBeNull();
     });
 
-    it("different tenants have isolated session lists", () => {
+    it("different tenants have isolated session lists", async () => {
       // Create sessions in default tenant
-      app.sessions.create({ summary: "default 1" });
-      app.sessions.create({ summary: "default 2" });
+      await app.sessions.create({ summary: "default 1" });
+      await app.sessions.create({ summary: "default 2" });
 
       // Create sessions in tenant A
       const tenantA = app.forTenant("tenant-a");
@@ -57,7 +57,7 @@ describe("tenant scoping", () => {
       tenantB.sessions.create({ summary: "tenant B 3" });
 
       // Each tenant only sees its own sessions
-      expect(app.sessions.list().length).toBe(2);
+      expect((await app.sessions.list()).length).toBe(2);
       expect(tenantA.sessions.list().length).toBe(1);
       expect(tenantB.sessions.list().length).toBe(3);
     });
@@ -81,15 +81,15 @@ describe("tenant scoping", () => {
       expect(updated!.summary).toBe("after update");
     });
 
-    it("scoped tenant cannot update another tenant's sessions", () => {
-      const session = app.sessions.create({ summary: "default tenant" });
+    it("scoped tenant cannot update another tenant's sessions", async () => {
+      const session = await app.sessions.create({ summary: "default tenant" });
 
       const scoped = app.forTenant("other");
       const result = scoped.sessions.update(session.id, { summary: "hijacked" });
       expect(result).toBeNull();
 
       // Original should be unchanged
-      const original = app.sessions.get(session.id);
+      const original = await app.sessions.get(session.id);
       expect(original!.summary).toBe("default tenant");
     });
 
@@ -102,15 +102,15 @@ describe("tenant scoping", () => {
       expect(scoped.sessions.get(session.id)).toBeNull();
     });
 
-    it("scoped tenant cannot delete another tenant's sessions", () => {
-      const session = app.sessions.create({ summary: "protected" });
+    it("scoped tenant cannot delete another tenant's sessions", async () => {
+      const session = await app.sessions.create({ summary: "protected" });
 
       const scoped = app.forTenant("other");
       const ok = scoped.sessions.delete(session.id);
       expect(ok).toBe(false);
 
       // Original should still exist
-      expect(app.sessions.get(session.id)).not.toBeNull();
+      expect(await app.sessions.get(session.id)).not.toBeNull();
     });
 
     it("claim is tenant-scoped", () => {
@@ -127,8 +127,8 @@ describe("tenant scoping", () => {
       expect(otherOk).toBe(false);
     });
 
-    it("search is tenant-scoped", () => {
-      app.sessions.create({ summary: "searchable default" });
+    it("search is tenant-scoped", async () => {
+      await app.sessions.create({ summary: "searchable default" });
       const scoped = app.forTenant("search-tenant");
       scoped.sessions.create({ summary: "searchable scoped" });
 
@@ -223,7 +223,7 @@ describe("tenant scoping", () => {
     });
   });
 
-  describe("compute", () => {
+  describe("compute", async () => {
     it("compute records are tenant-scoped", () => {
       const scoped = app.forTenant("compute-tenant");
       scoped.computes.create({ name: "my-compute" });
@@ -239,16 +239,16 @@ describe("tenant scoping", () => {
       expect(otherFound).toBeNull();
     });
 
-    it("compute list is tenant-scoped", () => {
+    it("compute list is tenant-scoped", async () => {
       // Default tenant already has "local" compute from seed
-      const defaultComputes = app.computes.list();
+      const defaultComputes = await app.computes.list();
       const defaultCount = defaultComputes.length;
 
       const scoped = app.forTenant("list-compute-tenant");
       scoped.computes.create({ name: "tenant-compute" });
 
       expect(scoped.computes.list().length).toBe(1);
-      expect(app.computes.list().length).toBe(defaultCount);
+      expect((await app.computes.list()).length).toBe(defaultCount);
     });
   });
 
@@ -279,15 +279,15 @@ describe("tenant scoping", () => {
     });
   });
 
-  describe("backward compatibility", () => {
-    it("default tenant works without explicit scoping", () => {
-      const session = app.sessions.create({ summary: "no scoping needed" });
+  describe("backward compatibility", async () => {
+    it("default tenant works without explicit scoping", async () => {
+      const session = await app.sessions.create({ summary: "no scoping needed" });
       expect(session).not.toBeNull();
 
-      const found = app.sessions.get(session.id);
+      const found = await app.sessions.get(session.id);
       expect(found).not.toBeNull();
 
-      const list = app.sessions.list();
+      const list = await app.sessions.list();
       expect(list.length).toBeGreaterThan(0);
     });
 

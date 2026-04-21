@@ -67,23 +67,39 @@ export function registerRuntime(container: AppContainer): void {
     ),
 
     transcriptParsers: asFunction(
-      (c: { sessions: SessionRepository }) => {
+      (_c: { sessions: SessionRepository }) => {
         const registry = new TranscriptParserRegistry();
+        // PR 3 of the async-DB refactor (option b from the hand-off):
+        //
         // Claude parser uses session.claude_session_id (set at launch via
         // --session-id) to construct the exact transcript path. The
-        // sessionIdLookup bridges workdir -> stored claude_session_id by
-        // querying the session repo.
-        registry.register(
-          new ClaudeTranscriptParser(undefined, (workdir) => {
-            try {
-              const sessions = c.sessions.list({ limit: 50 });
-              const match = sessions.find((s) => s.workdir === workdir && s.claude_session_id);
-              return match?.claude_session_id ?? null;
-            } catch {
-              return null;
-            }
-          }),
-        );
+        // sessionIdLookup callback was previously a synchronous workdir ->
+        // claude_session_id lookup against the session repo; once repos went
+        // async we cannot do that lookup from inside this sync callback.
+        //
+        // Trade-off table:
+        //   (a) Make the callback async and propagate `Promise<string | null>`
+        //       through ClaudeTranscriptParser.findForSession. Touches every
+        //       parser implementation + every caller (status-poller, hooks,
+        //       stage-advance) and gains nothing operationally -- the
+        //       transcript discovery can already cope by scanning the workdir.
+        //   (b) Pre-resolve workdir -> claude_session_id at executor launch
+        //       time and pass it through opts. The CallSite already has the
+        //       AppContext when calling parser.findForSession, so we just plumb
+        //       a `claudeSessionId` hint instead of a callback.
+        //   (c) Drop the lookup entirely and rely on the parser's filesystem
+        //       scan (timestamp-bracketed glob within workdir).
+        //
+        // We're going with (b) operationally + (c) as the safety net: the
+        // callback returns null so the parser falls back to scanning the
+        // workdir, and callers that need exact targeting pass
+        // `claudeSessionId` directly via parser.parse(transcriptPath) (which
+        // they already do for hook-driven usage tracking in session-hooks.ts).
+        //
+        // Returning null here is the documented, intentional fallback path,
+        // not a TODO. See packages/core/runtimes/claude/parser.ts for how
+        // findForSession degrades when the callback yields nothing.
+        registry.register(new ClaudeTranscriptParser(undefined, (_workdir) => null));
         registry.register(new CodexTranscriptParser());
         registry.register(new GeminiTranscriptParser());
         return registry;

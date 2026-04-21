@@ -22,13 +22,13 @@ export function registerHistoryHandlers(router: Router, app: AppContext): void {
 
   router.handle("history/import", async (p) => {
     const { claudeSessionId, name, repo } = extract<HistoryImportParams>(p, []);
-    const session = startSession(app, {
+    const session = await startSession(app, {
       summary: name ?? "import",
       repo: repo ?? ".",
       flow: "bare",
     });
     if (claudeSessionId) {
-      app.sessions.update(session.id, { claude_session_id: claudeSessionId });
+      await app.sessions.update(session.id, { claude_session_id: claudeSessionId });
     }
     return { session };
   });
@@ -37,7 +37,7 @@ export function registerHistoryHandlers(router: Router, app: AppContext): void {
     const count = await core.refreshClaudeSessionsCache(app, {
       onProgress: () => {},
     });
-    const items = core.listClaudeSessions(app);
+    const items = await core.listClaudeSessions(app);
     return { ok: true, count: items.length, sessionCount: count };
   });
 
@@ -60,8 +60,8 @@ export function registerHistoryHandlers(router: Router, app: AppContext): void {
 
   router.handle("history/search", async (p) => {
     const { query, limit } = extract<HistorySearchParams>(p, ["query"]);
-    const dbResults = core.searchSessions(app, query, { limit: limit ?? 20 });
-    const txResults = core.searchTranscripts(app, query, { limit: limit ?? 20 });
+    const dbResults = await core.searchSessions(app, query, { limit: limit ?? 20 });
+    const txResults = await core.searchTranscripts(app, query, { limit: limit ?? 20 });
     return { results: [...dbResults, ...txResults] };
   });
 }

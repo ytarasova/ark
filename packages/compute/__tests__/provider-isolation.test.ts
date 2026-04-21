@@ -23,7 +23,7 @@ afterEach(async () => {
   clearApp();
 });
 
-describe("provider isolation modes", () => {
+describe("provider isolation modes", async () => {
   it("LocalProvider has worktree and inplace modes", () => {
     const provider = app.getProvider("local");
     expect(provider).not.toBeNull();

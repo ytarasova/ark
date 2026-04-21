@@ -117,8 +117,8 @@ export function registerCostsCommands(program: Command, app: AppContext) {
   program
     .command("costs-sync")
     .description("Backfill cost data from Claude transcripts")
-    .action(() => {
-      const result = core.syncCosts(app);
+    .action(async () => {
+      const result = await core.syncCosts(app);
       console.log(chalk.green(`Synced: ${result.synced} sessions, Skipped: ${result.skipped}`));
     });
 
@@ -132,8 +132,8 @@ export function registerCostsCommands(program: Command, app: AppContext) {
       const sessions = await ark.sessionList({ limit: 500 });
       const data =
         opts.format === "csv"
-          ? core.exportCostsCsv(app, sessions)
-          : JSON.stringify(core.getAllSessionCosts(app, sessions), null, 2);
+          ? await core.exportCostsCsv(app, sessions)
+          : JSON.stringify(await core.getAllSessionCosts(app, sessions), null, 2);
       if (opts.output) {
         writeFileSync(opts.output, data);
         console.log(chalk.green(`Exported to ${opts.output}`));

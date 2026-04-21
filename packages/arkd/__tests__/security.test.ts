@@ -14,7 +14,7 @@ import { allocatePort } from "../../core/config/port-allocator.js";
 
 // ── Auth tests ────────────────────────────────────────────────────────────────
 
-describe("ArkD auth (token option)", () => {
+describe("ArkD auth (token option)", async () => {
   let AUTH_PORT: number;
   let AUTH_BASE: string;
   const TOKEN = "test-secret-token-12345";
@@ -84,7 +84,7 @@ describe("ArkD auth (token option)", () => {
 
 // ── Exec allowlist tests ──────────────────────────────────────────────────────
 
-describe("ArkD exec command allowlist", () => {
+describe("ArkD exec command allowlist", async () => {
   let EXEC_PORT: number;
   let EXEC_BASE: string;
   let server: { stop(): void };
@@ -156,7 +156,7 @@ describe("ArkD exec command allowlist", () => {
 // for cwd on /exec. The legacy no-confinement mode is preserved for
 // local-only / single-user deployments (tested elsewhere).
 
-describe("ArkD workspace confinement (P1-4)", () => {
+describe("ArkD workspace confinement (P1-4)", async () => {
   const CONFINE_PORT = 19372;
   const CONFINE_BASE = `http://localhost:${CONFINE_PORT}`;
   let server: { stop(): void };

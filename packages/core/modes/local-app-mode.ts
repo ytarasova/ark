@@ -175,11 +175,14 @@ function makeFtsRebuildCapability(app: AppContext): FtsRebuildCapability {
       // claude_sessions_cache + transcript_index index the local user's
       // `~/.claude` transcripts and are NOT tenant-scoped. Wiping them is
       // only safe in single-user local mode.
-      db.run("DELETE FROM claude_sessions_cache");
-      db.run("DELETE FROM transcript_index");
+      // Note: pre-PR-1 this used the (non-existent) `db.run` shortcut; the
+      // async IDatabase contract has no such helper, so we go through the
+      // statement API.
+      await db.prepare("DELETE FROM claude_sessions_cache").run();
+      await db.prepare("DELETE FROM transcript_index").run();
       const sessionCount = await refreshClaudeSessionsCache(app, {});
       const indexCount = await indexTranscripts(app, {});
-      const items = listClaudeSessions(app);
+      const items = await listClaudeSessions(app);
       return { sessionCount, indexCount, items };
     },
   };
@@ -216,12 +219,12 @@ function makeHostCommandCapability(): HostCommandCapability {
  */
 function makeLocalComputeBootstrap(dialect: "sqlite" | "postgres"): ComputeBootstrapCapability {
   return {
-    seed(db) {
+    async seed(db) {
       // Local mode: agents run on the same host as ark via tmux. Seed the
       // canonical `local` compute target so a fresh laptop install works
       // without any operator action.
-      if (dialect === "postgres") seedLocalComputePostgres(db);
-      else seedLocalCompute(db);
+      if (dialect === "postgres") await seedLocalComputePostgres(db);
+      else await seedLocalCompute(db);
     },
   };
 }

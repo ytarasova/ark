@@ -25,7 +25,7 @@ afterAll(async () => {
   clearApp();
 });
 
-describe("session stop preserves claude_session_id", () => {
+describe("session stop preserves claude_session_id", async () => {
   it("stop(app) sets status to stopped", async () => {
     const session = getApp().sessions.create({ summary: "stop-status-test" });
     getApp().sessions.update(session.id, { status: "running", stage: "work" });

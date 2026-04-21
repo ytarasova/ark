@@ -112,7 +112,7 @@ describe("Goose runtime resolution", () => {
 
 // ── Goose executor with autonomous dispatch config ─────────────────────────
 
-describe("Goose dispatch via goose executor", () => {
+describe("Goose dispatch via goose executor", async () => {
   let createSpy: ReturnType<typeof spyOn>;
 
   beforeEach(() => {
@@ -239,10 +239,10 @@ describe("buildGooseCommand for autonomous dispatch", () => {
 
 // ── Status poller + autonomous flow completion ──────────────────────────────
 
-describe("Goose runtime + autonomous flow completion", () => {
+describe("Goose runtime + autonomous flow completion", async () => {
   it("status poller completes session when goose tmux exits", async () => {
-    const session = app.sessions.create({ summary: "goose autonomous test", flow: "autonomous" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "goose autonomous test", flow: "autonomous" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "work",
       session_id: "ark-" + session.id,
@@ -255,12 +255,12 @@ describe("Goose runtime + autonomous flow completion", () => {
     try {
       startStatusPoller(app, session.id, "ark-" + session.id, "goose");
 
-      await waitFor(() => {
-        const s = app.sessions.get(session.id);
+      await waitFor(async () => {
+        const s = await app.sessions.get(session.id);
         return s?.status === "completed";
       });
 
-      const updated = app.sessions.get(session.id);
+      const updated = await app.sessions.get(session.id);
       expect(updated?.status).toBe("completed");
     } finally {
       spy.mockRestore();
@@ -268,8 +268,8 @@ describe("Goose runtime + autonomous flow completion", () => {
   });
 
   it("status poller logs session_completed event", async () => {
-    const session = app.sessions.create({ summary: "goose event test", flow: "autonomous" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "goose event test", flow: "autonomous" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "work",
       session_id: "ark-" + session.id,
@@ -280,13 +280,13 @@ describe("Goose runtime + autonomous flow completion", () => {
     try {
       startStatusPoller(app, session.id, "ark-" + session.id, "goose");
 
-      await waitFor(() => {
-        const s = app.sessions.get(session.id);
+      await waitFor(async () => {
+        const s = await app.sessions.get(session.id);
         return s?.status === "completed";
       });
 
       // Verify that a session_completed event was logged
-      const events = app.events.list(session.id);
+      const events = await app.events.list(session.id);
       const completedEvent = events.find((e) => e.type === "session_completed");
       expect(completedEvent).not.toBeUndefined();
       const data = typeof completedEvent!.data === "string" ? JSON.parse(completedEvent!.data) : completedEvent!.data;
@@ -297,8 +297,8 @@ describe("Goose runtime + autonomous flow completion", () => {
   });
 
   it("status poller clears session_id on completion", async () => {
-    const session = app.sessions.create({ summary: "goose cleanup test", flow: "autonomous" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "goose cleanup test", flow: "autonomous" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "work",
       session_id: "ark-" + session.id,
@@ -309,12 +309,12 @@ describe("Goose runtime + autonomous flow completion", () => {
     try {
       startStatusPoller(app, session.id, "ark-" + session.id, "goose");
 
-      await waitFor(() => {
-        const s = app.sessions.get(session.id);
+      await waitFor(async () => {
+        const s = await app.sessions.get(session.id);
         return s?.status === "completed";
       });
 
-      const updated = app.sessions.get(session.id);
+      const updated = await app.sessions.get(session.id);
       expect(updated?.session_id).toBeNull();
     } finally {
       spy.mockRestore();
@@ -322,8 +322,8 @@ describe("Goose runtime + autonomous flow completion", () => {
   });
 
   it("does not double-poll the same session", async () => {
-    const session = app.sessions.create({ summary: "goose no-double test", flow: "autonomous" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "goose no-double test", flow: "autonomous" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "work",
       session_id: "ark-" + session.id,
@@ -337,7 +337,7 @@ describe("Goose runtime + autonomous flow completion", () => {
 
       // Wait a polling cycle to ensure only one poller is active
       await Bun.sleep(100);
-      const s = app.sessions.get(session.id);
+      const s = await app.sessions.get(session.id);
       expect(s?.status).toBe("running"); // Still running, not double-completed
     } finally {
       spy.mockRestore();
@@ -378,7 +378,7 @@ describe("Goose runtime billing and transcript config", () => {
 
 // ── Executor dispatch path (runtime type -> executor) ───────────────────────
 
-describe("Goose runtime executor dispatch path", () => {
+describe("Goose runtime executor dispatch path", async () => {
   it("goose executor is in builtinExecutors", async () => {
     const { builtinExecutors } = await import("../executors/index.js");
     const names = builtinExecutors.map((e) => e.name);

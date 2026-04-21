@@ -18,18 +18,18 @@ export interface MigrationApplyContext {
   dialect: "sqlite" | "postgres";
 }
 
-export function up(ctx: MigrationApplyContext): void {
+export async function up(ctx: MigrationApplyContext): Promise<void> {
   const ddl = ctx.dialect === "sqlite" ? sqliteSchema() : postgresSchema();
-  ctx.db.exec(ddl);
+  await ctx.db.exec(ddl);
 
   // Seed a default tenant so local mode works out of the box.
   const now = new Date().toISOString();
   if (ctx.dialect === "sqlite") {
-    ctx.db
+    await ctx.db
       .prepare(`INSERT OR IGNORE INTO ${TENANTS_TABLE} (id, name, slug, created_at) VALUES (?, ?, ?, ?)`)
       .run(DEFAULT_TENANT_ID, "Default", "default", now);
   } else {
-    ctx.db
+    await ctx.db
       .prepare(
         `INSERT INTO ${TENANTS_TABLE} (id, name, slug, created_at) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING`,
       )

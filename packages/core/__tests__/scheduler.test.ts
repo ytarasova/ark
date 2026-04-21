@@ -21,12 +21,12 @@ afterAll(async () => {
   await app?.shutdown();
 });
 
-describe("SessionScheduler", () => {
+describe("SessionScheduler", async () => {
   it("throws when no workers are available", async () => {
     const scheduler = new SessionScheduler(app);
     const session = mockSession({ id: "s-no-worker" });
 
-    await expect(scheduler.schedule(session)).rejects.toThrow("No workers available");
+    (await expect(scheduler.schedule(session))).rejects.toThrow("No workers available");
   });
 
   it("schedules to the least loaded worker", async () => {
@@ -34,7 +34,7 @@ describe("SessionScheduler", () => {
     const scheduler = new SessionScheduler(app);
 
     // Register two workers
-    registry.register({
+    await registry.register({
       id: "w-sched-1",
       url: "http://sched1:19300",
       capacity: 5,
@@ -42,7 +42,7 @@ describe("SessionScheduler", () => {
       tenant_id: null,
       metadata: {},
     });
-    registry.register({
+    await registry.register({
       id: "w-sched-2",
       url: "http://sched2:19300",
       capacity: 5,
@@ -67,7 +67,7 @@ describe("SessionScheduler", () => {
     const registry = app.workerRegistry;
     const scheduler = new SessionScheduler(app);
 
-    registry.register({
+    await registry.register({
       id: "w-gpu",
       url: "http://gpu:19300",
       capacity: 5,
@@ -75,7 +75,7 @@ describe("SessionScheduler", () => {
       tenant_id: null,
       metadata: {},
     });
-    registry.register({
+    await registry.register({
       id: "w-general",
       url: "http://general:19300",
       capacity: 5,
@@ -97,7 +97,7 @@ describe("SessionScheduler", () => {
     const registry = app.workerRegistry;
     const scheduler = new SessionScheduler(app);
 
-    registry.register({
+    await registry.register({
       id: "w-specific-full",
       url: "http://specific:19300",
       capacity: 1,
@@ -105,7 +105,7 @@ describe("SessionScheduler", () => {
       tenant_id: null,
       metadata: {},
     });
-    registry.register({
+    await registry.register({
       id: "w-fallback",
       url: "http://fallback:19300",
       capacity: 10,
@@ -139,7 +139,7 @@ describe("SessionScheduler", () => {
   });
 });
 
-describe("AppContext hosted mode guards", () => {
+describe("AppContext hosted mode guards", async () => {
   it("throws when accessing workerRegistry without initialization", async () => {
     const bareApp = await AppContext.forTestAsync();
     await bareApp.boot();

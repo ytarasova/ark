@@ -15,14 +15,14 @@ afterAll(async () => {
   await app?.shutdown();
 });
 
-describe("TenantPolicyManager", () => {
-  describe("getPolicy / setPolicy", () => {
-    it("returns null for non-existent tenant", () => {
-      expect(pm.getPolicy("nonexistent")).toBeNull();
+describe("TenantPolicyManager", async () => {
+  describe("getPolicy / setPolicy", async () => {
+    it("returns null for non-existent tenant", async () => {
+      expect(await pm.getPolicy("nonexistent")).toBeNull();
     });
 
-    it("creates and retrieves a policy", () => {
-      pm.setPolicy({
+    it("creates and retrieves a policy", async () => {
+      await pm.setPolicy({
         tenant_id: "tenant-a",
         allowed_providers: ["k8s", "ec2"],
         default_provider: "k8s",
@@ -31,7 +31,7 @@ describe("TenantPolicyManager", () => {
         compute_pools: [{ pool_name: "pool-1", provider: "k8s", min: 1, max: 5, config: { namespace: "prod" } }],
       });
 
-      const policy = pm.getPolicy("tenant-a");
+      const policy = await pm.getPolicy("tenant-a");
       expect(policy).not.toBeNull();
       expect(policy!.tenant_id).toBe("tenant-a");
       expect(policy!.allowed_providers).toEqual(["k8s", "ec2"]);
@@ -43,8 +43,8 @@ describe("TenantPolicyManager", () => {
       expect(policy!.compute_pools[0].config).toEqual({ namespace: "prod" });
     });
 
-    it("updates an existing policy", () => {
-      pm.setPolicy({
+    it("updates an existing policy", async () => {
+      await pm.setPolicy({
         tenant_id: "tenant-a",
         allowed_providers: ["k8s"],
         default_provider: "k8s",
@@ -53,7 +53,7 @@ describe("TenantPolicyManager", () => {
         compute_pools: [],
       });
 
-      const policy = pm.getPolicy("tenant-a");
+      const policy = await pm.getPolicy("tenant-a");
       expect(policy!.allowed_providers).toEqual(["k8s"]);
       expect(policy!.max_concurrent_sessions).toBe(5);
       expect(policy!.max_cost_per_day_usd).toBeNull();
@@ -61,7 +61,7 @@ describe("TenantPolicyManager", () => {
     });
   });
 
-  describe("getEffectivePolicy", () => {
+  describe("getEffectivePolicy", async () => {
     it("returns default policy for unknown tenant", () => {
       const policy = pm.getEffectivePolicy("unknown-tenant");
       expect(policy.tenant_id).toBe("unknown-tenant");
@@ -71,8 +71,8 @@ describe("TenantPolicyManager", () => {
       expect(policy.max_cost_per_day_usd).toBeNull();
     });
 
-    it("returns explicit policy when set", () => {
-      pm.setPolicy({
+    it("returns explicit policy when set", async () => {
+      await pm.setPolicy({
         tenant_id: "tenant-b",
         allowed_providers: ["ec2"],
         default_provider: "ec2",
@@ -88,9 +88,9 @@ describe("TenantPolicyManager", () => {
     });
   });
 
-  describe("deletePolicy", () => {
-    it("deletes an existing policy", () => {
-      pm.setPolicy({
+  describe("deletePolicy", async () => {
+    it("deletes an existing policy", async () => {
+      await pm.setPolicy({
         tenant_id: "tenant-del",
         allowed_providers: [],
         default_provider: "k8s",
@@ -99,25 +99,25 @@ describe("TenantPolicyManager", () => {
         compute_pools: [],
       });
 
-      expect(pm.getPolicy("tenant-del")).not.toBeNull();
-      const result = pm.deletePolicy("tenant-del");
+      expect(await pm.getPolicy("tenant-del")).not.toBeNull();
+      const result = await pm.deletePolicy("tenant-del");
       expect(result).toBe(true);
-      expect(pm.getPolicy("tenant-del")).toBeNull();
+      expect(await pm.getPolicy("tenant-del")).toBeNull();
     });
 
-    it("returns false when deleting non-existent policy", () => {
-      const result = pm.deletePolicy("nonexistent-del");
+    it("returns false when deleting non-existent policy", async () => {
+      const result = await pm.deletePolicy("nonexistent-del");
       expect(result).toBe(false);
     });
   });
 
-  describe("listPolicies", () => {
-    it("lists all policies", () => {
+  describe("listPolicies", async () => {
+    it("lists all policies", async () => {
       // Clear all policies for a clean test
-      const existing = pm.listPolicies();
-      for (const p of existing) pm.deletePolicy(p.tenant_id);
+      const existing = await pm.listPolicies();
+      for (const p of existing) await pm.deletePolicy(p.tenant_id);
 
-      pm.setPolicy({
+      await pm.setPolicy({
         tenant_id: "list-a",
         allowed_providers: ["k8s"],
         default_provider: "k8s",
@@ -125,7 +125,7 @@ describe("TenantPolicyManager", () => {
         max_cost_per_day_usd: null,
         compute_pools: [],
       });
-      pm.setPolicy({
+      await pm.setPolicy({
         tenant_id: "list-b",
         allowed_providers: ["ec2", "docker"],
         default_provider: "ec2",
@@ -134,14 +134,14 @@ describe("TenantPolicyManager", () => {
         compute_pools: [],
       });
 
-      const policies = pm.listPolicies();
+      const policies = await pm.listPolicies();
       expect(policies.length).toBe(2);
       expect(policies.map((p) => p.tenant_id)).toContain("list-a");
       expect(policies.map((p) => p.tenant_id)).toContain("list-b");
     });
   });
 
-  describe("isProviderAllowed", () => {
+  describe("isProviderAllowed", async () => {
     it("allows all providers when allowed_providers is empty", () => {
       // Default policy has empty allowed_providers
       expect(pm.isProviderAllowed("no-policy-tenant", "k8s")).toBe(true);
@@ -149,8 +149,8 @@ describe("TenantPolicyManager", () => {
       expect(pm.isProviderAllowed("no-policy-tenant", "docker")).toBe(true);
     });
 
-    it("allows only listed providers", () => {
-      pm.setPolicy({
+    it("allows only listed providers", async () => {
+      await pm.setPolicy({
         tenant_id: "restricted-tenant",
         allowed_providers: ["k8s", "k8s-kata"],
         default_provider: "k8s",
@@ -166,9 +166,9 @@ describe("TenantPolicyManager", () => {
     });
   });
 
-  describe("canDispatch", () => {
-    it("allows dispatch when under the limit", () => {
-      pm.setPolicy({
+  describe("canDispatch", async () => {
+    it("allows dispatch when under the limit", async () => {
+      await pm.setPolicy({
         tenant_id: "can-dispatch-tenant",
         allowed_providers: [],
         default_provider: "k8s",

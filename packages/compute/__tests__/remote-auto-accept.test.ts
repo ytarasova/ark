@@ -77,7 +77,7 @@ beforeEach(() => {
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-describe("remote autoAcceptChannelPrompt", () => {
+describe("remote autoAcceptChannelPrompt", async () => {
   it("sends '1' then Enter when prompt is detected", async () => {
     sshResponses = [ok(PROMPT_OUTPUT), ok(WORKING_OUTPUT)];
 

@@ -24,7 +24,7 @@ export function registerTenantCommands(program: Command, app: AppContext) {
     .option("--default-provider <provider>", "Default provider", "k8s")
     .option("--max-sessions <n>", "Maximum concurrent sessions", "10")
     .option("--max-cost <usd>", "Maximum daily cost in USD")
-    .action((tenantId, opts) => {
+    .action(async (tenantId, opts) => {
       try {
         const pm = new TenantPolicyManager(app.db);
 
@@ -35,13 +35,19 @@ export function registerTenantCommands(program: Command, app: AppContext) {
               .filter(Boolean)
           : [];
 
-        pm.setPolicy({
+        await pm.setPolicy({
           tenant_id: tenantId,
           allowed_providers: allowedProviders,
           default_provider: opts.defaultProvider,
           max_concurrent_sessions: parseInt(opts.maxSessions, 10),
           max_cost_per_day_usd: opts.maxCost ? parseFloat(opts.maxCost) : null,
           compute_pools: [],
+          router_enabled: null,
+          router_required: false,
+          router_policy: null,
+          auto_index: null,
+          auto_index_required: false,
+          tensorzero_enabled: null,
         });
 
         console.log(chalk.green(`Policy set for tenant '${tenantId}'`));
@@ -60,10 +66,10 @@ export function registerTenantCommands(program: Command, app: AppContext) {
     .command("get")
     .description("Get compute policy for a tenant")
     .argument("<tenant-id>", "Tenant ID")
-    .action((tenantId) => {
+    .action(async (tenantId) => {
       try {
         const pm = new TenantPolicyManager(app.db);
-        const p = pm.getPolicy(tenantId);
+        const p = await pm.getPolicy(tenantId);
 
         if (!p) {
           console.log(chalk.dim(`No explicit policy for tenant '${tenantId}'. Default policy applies.`));
@@ -96,10 +102,10 @@ export function registerTenantCommands(program: Command, app: AppContext) {
   policy
     .command("list")
     .description("List all tenant compute policies")
-    .action(() => {
+    .action(async () => {
       try {
         const pm = new TenantPolicyManager(app.db);
-        const policies = pm.listPolicies();
+        const policies = await pm.listPolicies();
 
         if (!policies.length) {
           console.log(chalk.dim("No tenant policies configured. Default policy applies to all tenants."));
@@ -125,10 +131,10 @@ export function registerTenantCommands(program: Command, app: AppContext) {
     .command("delete")
     .description("Delete compute policy for a tenant")
     .argument("<tenant-id>", "Tenant ID")
-    .action((tenantId) => {
+    .action(async (tenantId) => {
       try {
         const pm = new TenantPolicyManager(app.db);
-        const deleted = pm.deletePolicy(tenantId);
+        const deleted = await pm.deletePolicy(tenantId);
 
         if (deleted) {
           console.log(chalk.green(`Policy deleted for tenant '${tenantId}'`));

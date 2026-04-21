@@ -39,10 +39,10 @@ afterEach(async () => {
 
 // ── Fresh isolation (default) ────────────────────────────────────────────
 
-describe("stage isolation: fresh runtime per stage", () => {
+describe("stage isolation: fresh runtime per stage", async () => {
   it("clears claude_session_id on advance (default fresh isolation)", async () => {
-    const session = app.sessions.create({ summary: "isolation test", flow: "quick" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "isolation test", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "ready",
       stage: "implement",
       claude_session_id: "prev-claude-session-abc",
@@ -52,7 +52,7 @@ describe("stage isolation: fresh runtime per stage", () => {
     const result = await advance(app, session.id);
     expect(result.ok).toBe(true);
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.stage).toBe("verify");
     expect(updated?.status).toBe("ready");
     // Fresh isolation: claude_session_id should be cleared
@@ -62,8 +62,8 @@ describe("stage isolation: fresh runtime per stage", () => {
   });
 
   it("clears session_id (tmux handle) on advance", async () => {
-    const session = app.sessions.create({ summary: "tmux clear test", flow: "quick" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "tmux clear test", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "ready",
       stage: "implement",
       session_id: "ark-s-old-tmux",
@@ -72,14 +72,14 @@ describe("stage isolation: fresh runtime per stage", () => {
     const result = await advance(app, session.id);
     expect(result.ok).toBe(true);
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.session_id).toBeNull();
   });
 
   it("clears runtime state through multi-stage flow", async () => {
     // quick flow: implement -> verify -> pr -> merge
-    const session = app.sessions.create({ summary: "multi-stage isolation", flow: "quick" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "multi-stage isolation", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "ready",
       stage: "implement",
       claude_session_id: "claude-session-stage-1",
@@ -89,13 +89,13 @@ describe("stage isolation: fresh runtime per stage", () => {
     // Stage 1 -> 2: implement -> verify
     const r1 = await advance(app, session.id);
     expect(r1.ok).toBe(true);
-    let s = app.sessions.get(session.id);
+    let s = await app.sessions.get(session.id);
     expect(s?.stage).toBe("verify");
     expect(s?.claude_session_id).toBeNull();
     expect(s?.session_id).toBeNull();
 
     // Simulate stage 2 running and getting new IDs
-    app.sessions.update(session.id, {
+    await app.sessions.update(session.id, {
       claude_session_id: "claude-session-stage-2",
       session_id: "tmux-stage-2",
     });
@@ -103,7 +103,7 @@ describe("stage isolation: fresh runtime per stage", () => {
     // Stage 2 -> 3: verify -> pr
     const r2 = await advance(app, session.id);
     expect(r2.ok).toBe(true);
-    s = app.sessions.get(session.id);
+    s = await app.sessions.get(session.id);
     expect(s?.stage).toBe("pr");
     expect(s?.claude_session_id).toBeNull();
     expect(s?.session_id).toBeNull();
@@ -111,8 +111,8 @@ describe("stage isolation: fresh runtime per stage", () => {
 
   it("does not clear claude_session_id on flow completion", async () => {
     // autonomous flow has one stage: "work" with auto gate
-    const session = app.sessions.create({ summary: "completion test", flow: "autonomous" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "completion test", flow: "autonomous" });
+    await app.sessions.update(session.id, {
       status: "ready",
       stage: "work",
       claude_session_id: "final-session-id",
@@ -122,7 +122,7 @@ describe("stage isolation: fresh runtime per stage", () => {
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Flow completed");
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.status).toBe("completed");
     // On flow completion, claude_session_id is preserved (no next stage to isolate)
     expect(updated?.claude_session_id).toBe("final-session-id");
@@ -131,10 +131,10 @@ describe("stage isolation: fresh runtime per stage", () => {
 
 // ── Observability ────────────────────────────────────────────────────────
 
-describe("stage isolation: observability", () => {
+describe("stage isolation: observability", async () => {
   it("logs isolation mode in stage_ready event", async () => {
-    const session = app.sessions.create({ summary: "observability test", flow: "quick" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "observability test", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "ready",
       stage: "implement",
       claude_session_id: "obs-session",
@@ -142,7 +142,7 @@ describe("stage isolation: observability", () => {
 
     await advance(app, session.id);
 
-    const events = app.events.list(session.id);
+    const events = await app.events.list(session.id);
     const stageReady = events.find((e) => e.type === "stage_ready");
     expect(stageReady).toBeTruthy();
     expect(stageReady!.data?.isolation).toBe("fresh");
@@ -153,10 +153,10 @@ describe("stage isolation: observability", () => {
 
 // ── mediateStageHandoff integration ──────────────────────────────────────
 
-describe("stage isolation: mediateStageHandoff integration", () => {
+describe("stage isolation: mediateStageHandoff integration", async () => {
   it("clears runtime state during mediated handoff", async () => {
-    const session = app.sessions.create({ summary: "mediated isolation test", flow: "quick" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "mediated isolation test", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "ready",
       stage: "implement",
       claude_session_id: "pre-handoff-session",
@@ -172,7 +172,7 @@ describe("stage isolation: mediateStageHandoff integration", () => {
     expect(result.fromStage).toBe("implement");
     expect(result.toStage).toBe("verify");
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.stage).toBe("verify");
     expect(updated?.claude_session_id).toBeNull();
     expect(updated?.session_id).toBeNull();
@@ -180,8 +180,8 @@ describe("stage isolation: mediateStageHandoff integration", () => {
 
   it("clears runtime state through complete flow via mediateStageHandoff", async () => {
     // quick flow: implement -> verify -> pr -> merge
-    const session = app.sessions.create({ summary: "full mediation test", flow: "quick" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "full mediation test", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "ready",
       stage: "implement",
       claude_session_id: "session-impl",
@@ -199,11 +199,11 @@ describe("stage isolation: mediateStageHandoff integration", () => {
       expect(r.fromStage).toBe(fromStage);
 
       if (!r.flowCompleted) {
-        const s = app.sessions.get(session.id);
+        const s = await app.sessions.get(session.id);
         expect(s?.claude_session_id).toBeNull();
         expect(s?.session_id).toBeNull();
         // Simulate next stage running
-        app.sessions.update(session.id, {
+        await app.sessions.update(session.id, {
           claude_session_id: `session-${r.toStage}`,
           session_id: `tmux-${r.toStage}`,
         });
@@ -222,7 +222,7 @@ describe("stage isolation: mediateStageHandoff integration", () => {
 
 // ── Continue isolation mode ─────────────────────────────────────────────
 
-describe("stage isolation: continue mode", () => {
+describe("stage isolation: continue mode", async () => {
   it("preserves claude_session_id when next stage has isolation=continue", async () => {
     // Register a custom flow with isolation=continue on the second stage
     const customFlow = {
@@ -236,8 +236,8 @@ describe("stage isolation: continue mode", () => {
     };
     app.flows.save(customFlow.name, customFlow);
 
-    const session = app.sessions.create({ summary: "continue isolation test", flow: "isolation-test-flow" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "continue isolation test", flow: "isolation-test-flow" });
+    await app.sessions.update(session.id, {
       status: "ready",
       stage: "plan",
       claude_session_id: "plan-session-id",
@@ -248,7 +248,7 @@ describe("stage isolation: continue mode", () => {
     const r1 = await advance(app, session.id);
     expect(r1.ok).toBe(true);
 
-    let updated = app.sessions.get(session.id);
+    let updated = await app.sessions.get(session.id);
     expect(updated?.stage).toBe("refine");
     // Continue mode: claude_session_id preserved for --resume
     expect(updated?.claude_session_id).toBe("plan-session-id");
@@ -256,7 +256,7 @@ describe("stage isolation: continue mode", () => {
     expect(updated?.session_id).toBeNull();
 
     // Simulate refine stage running
-    app.sessions.update(session.id, {
+    await app.sessions.update(session.id, {
       session_id: "refine-tmux",
     });
 
@@ -264,7 +264,7 @@ describe("stage isolation: continue mode", () => {
     const r2 = await advance(app, session.id);
     expect(r2.ok).toBe(true);
 
-    updated = app.sessions.get(session.id);
+    updated = await app.sessions.get(session.id);
     expect(updated?.stage).toBe("implement");
     // Fresh isolation: claude_session_id cleared
     expect(updated?.claude_session_id).toBeNull();
@@ -281,8 +281,8 @@ describe("stage isolation: continue mode", () => {
     };
     app.flows.save(customFlow.name, customFlow);
 
-    const session = app.sessions.create({ summary: "event isolation test", flow: "isolation-event-flow" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "event isolation test", flow: "isolation-event-flow" });
+    await app.sessions.update(session.id, {
       status: "ready",
       stage: "draft",
       claude_session_id: "draft-session",
@@ -290,7 +290,7 @@ describe("stage isolation: continue mode", () => {
 
     await advance(app, session.id);
 
-    const events = app.events.list(session.id);
+    const events = await app.events.list(session.id);
     const stageReady = events.find((e) => e.type === "stage_ready");
     expect(stageReady).toBeTruthy();
     expect(stageReady!.data?.isolation).toBe("continue");

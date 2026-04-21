@@ -19,10 +19,10 @@ export function registerDbCommands(program: Command, app: AppContext) {
     .command("migrate")
     .description("Apply any pending Ark migrations")
     .option("--to <version>", "Target version (default: latest)")
-    .action((opts) => {
+    .action(async (opts) => {
       const targetVersion = opts.to ? Number(opts.to) : undefined;
-      app.mode.migrations.apply(app.db, { targetVersion });
-      const status = app.mode.migrations.status(app.db);
+      await app.mode.migrations.apply(app.db, { targetVersion });
+      const status = await app.mode.migrations.status(app.db);
       console.log(
         chalk.green(`Applied. Current version: ${status.currentVersion} (dialect: ${app.mode.migrations.dialect})`),
       );
@@ -31,8 +31,8 @@ export function registerDbCommands(program: Command, app: AppContext) {
   cmd
     .command("status")
     .description("Print current schema version + pending migrations")
-    .action(() => {
-      const status = app.mode.migrations.status(app.db);
+    .action(async () => {
+      const status = await app.mode.migrations.status(app.db);
       console.log(`Dialect:         ${chalk.cyan(app.mode.migrations.dialect)}`);
       console.log(`Current version: ${chalk.cyan(status.currentVersion)}`);
       if (status.applied.length > 0) {
@@ -53,9 +53,9 @@ export function registerDbCommands(program: Command, app: AppContext) {
     .command("down")
     .description("Roll back to a target version (Phase 1: not implemented)")
     .requiredOption("--to <version>", "Target version")
-    .action((opts) => {
+    .action(async (opts) => {
       try {
-        app.mode.migrations.down(app.db, { targetVersion: Number(opts.to) });
+        await app.mode.migrations.down(app.db, { targetVersion: Number(opts.to) });
       } catch (err: any) {
         console.error(chalk.red(err.message ?? String(err)));
         process.exitCode = 1;

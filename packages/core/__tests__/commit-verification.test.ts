@@ -59,11 +59,11 @@ function makeReport(sessionId: string, stage: string, overrides?: Partial<Outbou
 
 // ── Uncommitted changes gate ──────────────────────────────────────────────────
 
-describe("Commit verification: uncommitted changes", () => {
-  it("rejects completion when staged but uncommitted changes exist", () => {
+describe("Commit verification: uncommitted changes", async () => {
+  it("rejects completion when staged but uncommitted changes exist", async () => {
     const gitDir = createTempGitRepo();
-    const session = app.sessions.create({ summary: "staged changes test", flow: "quick" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "staged changes test", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -82,7 +82,7 @@ describe("Commit verification: uncommitted changes", () => {
     expect(result.message?.content).toContain("uncommitted changes");
   });
 
-  it("rejects completion when modified tracked files are not committed", () => {
+  it("rejects completion when modified tracked files are not committed", async () => {
     const gitDir = createTempGitRepo();
 
     // Create and commit a file first
@@ -92,8 +92,8 @@ describe("Commit verification: uncommitted changes", () => {
       cwd: gitDir,
     });
 
-    const session = app.sessions.create({ summary: "modified tracked test", flow: "quick" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "modified tracked test", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -111,7 +111,7 @@ describe("Commit verification: uncommitted changes", () => {
     expect(result.message?.content).toContain("uncommitted changes");
   });
 
-  it("allows completion when only untracked files exist (no tracked changes)", () => {
+  it("allows completion when only untracked files exist (no tracked changes)", async () => {
     const gitDir = createTempGitRepo();
 
     // Add and commit a real change so the commit check passes
@@ -121,8 +121,8 @@ describe("Commit verification: uncommitted changes", () => {
       cwd: gitDir,
     });
 
-    const session = app.sessions.create({ summary: "untracked only test", flow: "quick" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "untracked only test", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -140,7 +140,7 @@ describe("Commit verification: uncommitted changes", () => {
     expect(result.updates.status).toBe("ready");
   });
 
-  it("allows completion when working tree is clean with commits", () => {
+  it("allows completion when working tree is clean with commits", async () => {
     const gitDir = createTempGitRepo();
 
     // Create and commit a change
@@ -150,8 +150,8 @@ describe("Commit verification: uncommitted changes", () => {
       cwd: gitDir,
     });
 
-    const session = app.sessions.create({ summary: "clean test", flow: "quick" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "clean test", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -169,10 +169,10 @@ describe("Commit verification: uncommitted changes", () => {
 
 // ── No workdir/branch -- check skipped ─────────────────────────────────────────
 
-describe("Commit verification: sessions without workdir", () => {
-  it("skips commit check when no workdir is set", () => {
-    const session = app.sessions.create({ summary: "no workdir test", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement" });
+describe("Commit verification: sessions without workdir", async () => {
+  it("skips commit check when no workdir is set", async () => {
+    const session = await app.sessions.create({ summary: "no workdir test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
     const result = applyReport(app, session.id, makeReport(session.id, "implement"));
 
@@ -181,9 +181,9 @@ describe("Commit verification: sessions without workdir", () => {
     expect(result.updates.status).toBe("ready");
   });
 
-  it("skips commit check when no branch is set", () => {
-    const session = app.sessions.create({ summary: "no branch test", flow: "quick" });
-    app.sessions.update(session.id, {
+  it("skips commit check when no branch is set", async () => {
+    const session = await app.sessions.create({ summary: "no branch test", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "implement",
       workdir: "/tmp/some-dir",
@@ -199,11 +199,11 @@ describe("Commit verification: sessions without workdir", () => {
 
 // ── Rejection details ──────────────────────────────────────────────────────────
 
-describe("Commit verification: rejection events", () => {
-  it("logs completion_rejected event with file details on uncommitted changes", () => {
+describe("Commit verification: rejection events", async () => {
+  it("logs completion_rejected event with file details on uncommitted changes", async () => {
     const gitDir = createTempGitRepo();
-    const session = app.sessions.create({ summary: "rejection event test", flow: "quick" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "rejection event test", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -224,10 +224,10 @@ describe("Commit verification: rejection events", () => {
     expect(rejectionEvent!.opts.data?.files).toBeTruthy();
   });
 
-  it("does not set session_id to null when rejecting (agent stays alive)", () => {
+  it("does not set session_id to null when rejecting (agent stays alive)", async () => {
     const gitDir = createTempGitRepo();
-    const session = app.sessions.create({ summary: "session alive test", flow: "quick" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "session alive test", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -245,10 +245,10 @@ describe("Commit verification: rejection events", () => {
     expect(result.updates.status).toBeUndefined();
   });
 
-  it("still saves completion config data even when rejecting", () => {
+  it("still saves completion config data even when rejecting", async () => {
     const gitDir = createTempGitRepo();
-    const session = app.sessions.create({ summary: "config saved test", flow: "quick" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "config saved test", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -274,11 +274,11 @@ describe("Commit verification: rejection events", () => {
 
 // ── Manual gate interaction ────────────────────────────────────────────────────
 
-describe("Commit verification: manual gate interaction", () => {
-  it("skips commit check for manual gate stages (bare flow)", () => {
+describe("Commit verification: manual gate interaction", async () => {
+  it("skips commit check for manual gate stages (bare flow)", async () => {
     // Manual gate stages don't advance, so commit verification is deferred to human
-    const session = app.sessions.create({ summary: "manual gate test", flow: "bare" });
-    app.sessions.update(session.id, { status: "running", stage: "work" });
+    const session = await app.sessions.create({ summary: "manual gate test", flow: "bare" });
+    await app.sessions.update(session.id, { status: "running", stage: "work" });
 
     const result = applyReport(app, session.id, makeReport(session.id, "work"));
 
@@ -291,8 +291,8 @@ describe("Commit verification: manual gate interaction", () => {
 
 // ── Per-stage commit verification (stage_start_sha) ──────────────────────────
 
-describe("Per-stage commit verification via stage_start_sha", () => {
-  it("rejects completion when HEAD matches stage_start_sha (no new commits this stage)", () => {
+describe("Per-stage commit verification via stage_start_sha", async () => {
+  it("rejects completion when HEAD matches stage_start_sha (no new commits this stage)", async () => {
     const gitDir = createTempGitRepo();
 
     // Record initial HEAD as stage_start_sha (simulating what dispatch does)
@@ -301,8 +301,8 @@ describe("Per-stage commit verification via stage_start_sha", () => {
       encoding: "utf-8",
     }).trim();
 
-    const session = app.sessions.create({ summary: "no stage commits", flow: "quick" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "no stage commits", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -318,7 +318,7 @@ describe("Per-stage commit verification via stage_start_sha", () => {
     expect(result.message?.content).toContain("no new commits found for this stage");
   });
 
-  it("allows completion when HEAD differs from stage_start_sha (commits made this stage)", () => {
+  it("allows completion when HEAD differs from stage_start_sha (commits made this stage)", async () => {
     const gitDir = createTempGitRepo();
 
     // Record initial HEAD as stage_start_sha
@@ -334,8 +334,8 @@ describe("Per-stage commit verification via stage_start_sha", () => {
       cwd: gitDir,
     });
 
-    const session = app.sessions.create({ summary: "has stage commits", flow: "quick" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "has stage commits", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -351,7 +351,7 @@ describe("Per-stage commit verification via stage_start_sha", () => {
     expect(result.updates.status).toBe("ready");
   });
 
-  it("rejects even when branch has prior-stage commits but none for current stage", () => {
+  it("rejects even when branch has prior-stage commits but none for current stage", async () => {
     const gitDir = createTempGitRepo();
 
     // Simulate a prior stage making commits
@@ -371,8 +371,8 @@ describe("Per-stage commit verification via stage_start_sha", () => {
 
     // No new commits after stage started
 
-    const session = app.sessions.create({ summary: "prior commits only", flow: "quick" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "prior commits only", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -388,15 +388,15 @@ describe("Per-stage commit verification via stage_start_sha", () => {
     expect(result.message?.content).toContain("no new commits found for this stage");
   });
 
-  it("includes stage_start_sha in completion_rejected event data", () => {
+  it("includes stage_start_sha in completion_rejected event data", async () => {
     const gitDir = createTempGitRepo();
     const headSha = execFileSync("git", ["rev-parse", "HEAD"], {
       cwd: gitDir,
       encoding: "utf-8",
     }).trim();
 
-    const session = app.sessions.create({ summary: "rejection sha test", flow: "quick" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "rejection sha test", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -411,7 +411,7 @@ describe("Per-stage commit verification via stage_start_sha", () => {
     expect(rejectionEvent!.opts.data?.stage_start_sha).toBe(headSha);
   });
 
-  it("falls back to origin/main..HEAD when stage_start_sha is not set", () => {
+  it("falls back to origin/main..HEAD when stage_start_sha is not set", async () => {
     const gitDir = createTempGitRepo();
 
     // Make a commit so origin/main..HEAD fallback finds something
@@ -421,8 +421,8 @@ describe("Per-stage commit verification via stage_start_sha", () => {
       cwd: gitDir,
     });
 
-    const session = app.sessions.create({ summary: "no sha fallback", flow: "quick" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "no sha fallback", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -440,16 +440,16 @@ describe("Per-stage commit verification via stage_start_sha", () => {
 
 // ── Per-stage commit verification in applyHookStatus ─────────────────────────
 
-describe("Per-stage commit verification in applyHookStatus (SessionEnd)", () => {
-  it("rejects auto-advance when HEAD matches stage_start_sha on SessionEnd", () => {
+describe("Per-stage commit verification in applyHookStatus (SessionEnd)", async () => {
+  it("rejects auto-advance when HEAD matches stage_start_sha on SessionEnd", async () => {
     const gitDir = createTempGitRepo();
     const headSha = execFileSync("git", ["rev-parse", "HEAD"], {
       cwd: gitDir,
       encoding: "utf-8",
     }).trim();
 
-    const session = app.sessions.create({ summary: "hook no commits", flow: "quick" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "hook no commits", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -458,7 +458,7 @@ describe("Per-stage commit verification in applyHookStatus (SessionEnd)", () => 
     app.sessions.mergeConfig(session.id, { stage_start_sha: headSha });
 
     // Re-fetch session to include merged config
-    const freshSession = app.sessions.get(session.id)!;
+    const freshSession = await app.sessions.get(session.id)!;
 
     const result = applyHookStatus(app, freshSession, "SessionEnd", {});
 
@@ -467,7 +467,7 @@ describe("Per-stage commit verification in applyHookStatus (SessionEnd)", () => 
     expect(result.updates?.error).toContain("without committing");
   });
 
-  it("allows auto-advance when HEAD differs from stage_start_sha on SessionEnd", () => {
+  it("allows auto-advance when HEAD differs from stage_start_sha on SessionEnd", async () => {
     const gitDir = createTempGitRepo();
     const startSha = execFileSync("git", ["rev-parse", "HEAD"], {
       cwd: gitDir,
@@ -481,8 +481,8 @@ describe("Per-stage commit verification in applyHookStatus (SessionEnd)", () => 
       cwd: gitDir,
     });
 
-    const session = app.sessions.create({ summary: "hook has commits", flow: "quick" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "hook has commits", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -490,7 +490,7 @@ describe("Per-stage commit verification in applyHookStatus (SessionEnd)", () => 
     });
     app.sessions.mergeConfig(session.id, { stage_start_sha: startSha });
 
-    const freshSession = app.sessions.get(session.id)!;
+    const freshSession = await app.sessions.get(session.id)!;
 
     const result = applyHookStatus(app, freshSession, "SessionEnd", {});
 
@@ -499,7 +499,7 @@ describe("Per-stage commit verification in applyHookStatus (SessionEnd)", () => 
     expect(result.shouldAutoDispatch).toBe(true);
   });
 
-  it("falls back to origin/main..HEAD when stage_start_sha is not set in hook path", () => {
+  it("falls back to origin/main..HEAD when stage_start_sha is not set in hook path", async () => {
     const gitDir = createTempGitRepo();
 
     // Make a commit so there's content on branch
@@ -509,8 +509,8 @@ describe("Per-stage commit verification in applyHookStatus (SessionEnd)", () => 
       cwd: gitDir,
     });
 
-    const session = app.sessions.create({ summary: "hook no sha", flow: "quick" });
-    app.sessions.update(session.id, {
+    const session = await app.sessions.create({ summary: "hook no sha", flow: "quick" });
+    await app.sessions.update(session.id, {
       status: "running",
       stage: "implement",
       workdir: gitDir,
@@ -518,7 +518,7 @@ describe("Per-stage commit verification in applyHookStatus (SessionEnd)", () => 
     });
     // No stage_start_sha set
 
-    const freshSession = app.sessions.get(session.id)!;
+    const freshSession = await app.sessions.get(session.id)!;
 
     const result = applyHookStatus(app, freshSession, "SessionEnd", {});
 

@@ -75,10 +75,10 @@ export async function execSession(app: AppContext, opts: ExecOpts): Promise<numb
     const tenantSlug = app.config.authSection.defaultTenant;
     let tenantId = DEFAULT_TENANT_ID;
     if (tenantSlug) {
-      const t = app.codeIntel.getTenantBySlug(tenantSlug);
+      const t = await app.codeIntel.getTenantBySlug(tenantSlug);
       if (t) tenantId = t.id;
     }
-    const ws = app.codeIntel.getWorkspaceBySlug(tenantId, opts.workspace);
+    const ws = await app.codeIntel.getWorkspaceBySlug(tenantId, opts.workspace);
     if (!ws) {
       console.error(chalk.red(`Workspace '${opts.workspace}' not found in tenant '${tenantSlug ?? "default"}'.`));
       return 1;
@@ -117,7 +117,7 @@ export async function execSession(app: AppContext, opts: ExecOpts): Promise<numb
 
   // Create session
   log(`Creating session: ${summary}`);
-  const session = startSession(app, {
+  const session = await startSession(app, {
     ticket: opts.ticket,
     summary,
     repo,

@@ -13,9 +13,9 @@ export function registerKnowledgeCommands(program: Command, app: AppContext) {
     .argument("<query>", "Search query")
     .option("-t, --types <types>", "Comma-separated node types to filter (file,symbol,session,memory,learning,skill)")
     .option("-n, --limit <n>", "Max results", "20")
-    .action((query: string, opts) => {
+    .action(async (query: string, opts) => {
       const types = opts.types ? opts.types.split(",").map((t: string) => t.trim()) : undefined;
-      const results = app.knowledge.search(query, { types, limit: Number(opts.limit) });
+      const results = await app.knowledge.search(query, { types, limit: Number(opts.limit) });
       if (!results.length) {
         console.log(chalk.dim("No results found."));
         return;
@@ -59,13 +59,13 @@ export function registerKnowledgeCommands(program: Command, app: AppContext) {
   cmd
     .command("stats")
     .description("Show node/edge counts by type")
-    .action(() => {
+    .action(async () => {
       const store = app.knowledge;
       const nodeTypes = ["file", "symbol", "session", "memory", "learning", "skill", "recipe", "agent"] as const;
       console.log(chalk.bold("Nodes:"));
       let totalNodes = 0;
       for (const t of nodeTypes) {
-        const count = store.nodeCount(t);
+        const count = await store.nodeCount(t);
         if (count > 0) {
           console.log(`  ${t.padEnd(12)} ${count}`);
           totalNodes += count;
@@ -86,7 +86,7 @@ export function registerKnowledgeCommands(program: Command, app: AppContext) {
       console.log(chalk.bold("\nEdges:"));
       let totalEdges = 0;
       for (const r of edgeTypes) {
-        const count = store.edgeCount(r);
+        const count = await store.edgeCount(r);
         if (count > 0) {
           console.log(`  ${r.padEnd(16)} ${count}`);
           totalEdges += count;
@@ -101,10 +101,10 @@ export function registerKnowledgeCommands(program: Command, app: AppContext) {
     .argument("<content>", "Memory content")
     .option("-t, --tags <tags>", "Comma-separated tags")
     .option("-i, --importance <n>", "Importance 0-1 (default: 0.5)")
-    .action((content: string, opts) => {
+    .action(async (content: string, opts) => {
       const tags = opts.tags ? opts.tags.split(",").map((t: string) => t.trim()) : [];
       const importance = opts.importance ? parseFloat(opts.importance) : 0.5;
-      const id = app.knowledge.addNode({
+      const id = await app.knowledge.addNode({
         type: "memory",
         label: content.slice(0, 100),
         content,
@@ -118,8 +118,8 @@ export function registerKnowledgeCommands(program: Command, app: AppContext) {
     .description("Search memories and learnings")
     .argument("<query>", "Search query")
     .option("-n, --limit <n>", "Max results", "10")
-    .action((query: string, opts) => {
-      const results = app.knowledge.search(query, {
+    .action(async (query: string, opts) => {
+      const results = await app.knowledge.search(query, {
         types: ["memory", "learning"],
         limit: Number(opts.limit),
       });
@@ -145,7 +145,7 @@ export function registerKnowledgeCommands(program: Command, app: AppContext) {
       const { exportToMarkdown } = await import("../../core/knowledge/export.js");
       const outputDir = resolve(opts.dir);
       const types = opts.types ? opts.types.split(",").map((t: string) => t.trim()) : undefined;
-      const result = exportToMarkdown(app.knowledge, outputDir, { types });
+      const result = await exportToMarkdown(app.knowledge, outputDir, { types });
       console.log(chalk.green(`Exported ${result.exported} nodes to ${outputDir}`));
     });
 
@@ -160,7 +160,7 @@ export function registerKnowledgeCommands(program: Command, app: AppContext) {
         console.log(chalk.red(`Directory not found: ${inputDir}`));
         return;
       }
-      const result = importFromMarkdown(app.knowledge, inputDir);
+      const result = await importFromMarkdown(app.knowledge, inputDir);
       console.log(chalk.green(`Imported ${result.imported} nodes from ${inputDir}`));
     });
 

@@ -13,12 +13,12 @@ import type { ComputeProvider } from "../compute/types.js";
 import type { ComputeKind, RuntimeKind } from "../compute/core/types.js";
 import { safeParseConfig } from "./util.js";
 
-export function resolveProvider(
+export async function resolveProvider(
   app: AppContext,
   session: Session,
-): { provider: ComputeProvider | null; compute: Compute | null } {
+): Promise<{ provider: ComputeProvider | null; compute: Compute | null }> {
   const computeName = session.compute_name || "local";
-  const row = app.db?.prepare("SELECT * FROM compute WHERE name = ?").get(computeName) as
+  const row = (await app.db?.prepare("SELECT * FROM compute WHERE name = ?").get(computeName)) as
     | { name: string; provider: string; status: string; config: string; created_at: string; updated_at: string }
     | undefined;
   if (!row) return { provider: null, compute: null };
@@ -31,7 +31,7 @@ export async function resolveComputeTarget(
   app: AppContext,
   session: Session,
 ): Promise<{ target: import("../compute/core/compute-target.js").ComputeTarget | null; compute: Compute | null }> {
-  const { compute } = resolveProvider(app, session);
+  const { compute } = await resolveProvider(app, session);
   if (!compute) return { target: null, compute: null };
 
   const { providerToPair } = await import("../compute/adapters/provider-map.js");

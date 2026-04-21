@@ -19,7 +19,7 @@ afterAll(async () => {
   await app?.shutdown();
 });
 
-describe("SessionService.saveInput -> blob store", () => {
+describe("SessionService.saveInput -> blob store", async () => {
   it("returns { locator } and stores bytes retrievable via blobStore.get", async () => {
     const content = Buffer.from("recipe body").toString("base64");
     const { locator } = await app.sessionService.saveInput({

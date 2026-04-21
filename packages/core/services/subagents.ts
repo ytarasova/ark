@@ -14,7 +14,7 @@ import * as flow from "../state/flow.js";
  * Unlike fork (which copies the parent's config), subagents can use different
  * models and agents for cost optimization or specialization.
  */
-export function spawnSubagent(
+export async function spawnSubagent(
   app: AppContext,
   parentId: string,
   opts: {
@@ -24,11 +24,11 @@ export function spawnSubagent(
     group_name?: string;
     extensions?: string[];
   },
-): { ok: boolean; sessionId?: string; message: string } {
-  const parent = app.sessions.get(parentId);
+): Promise<{ ok: boolean; sessionId?: string; message: string }> {
+  const parent = await app.sessions.get(parentId);
   if (!parent) return { ok: false, message: "Parent session not found" };
 
-  const session = app.sessions.create({
+  const session = await app.sessions.create({
     summary: opts.task,
     repo: parent.repo || undefined,
     flow: "quick",
@@ -44,15 +44,15 @@ export function spawnSubagent(
   });
 
   const agentName = opts.agent ?? parent.agent;
-  app.sessions.update(session.id, { agent: agentName, parent_id: parentId });
+  await app.sessions.update(session.id, { agent: agentName, parent_id: parentId });
 
   // Set first stage so the subagent is dispatchable
   const firstStage = flow.getFirstStage(app, "quick");
   if (firstStage) {
-    app.sessions.update(session.id, { stage: firstStage, status: "ready" });
+    await app.sessions.update(session.id, { stage: firstStage, status: "ready" });
   }
 
-  app.events.log(session.id, "subagent_spawned", {
+  await app.events.log(session.id, "subagent_spawned", {
     actor: "system",
     data: { parent_id: parentId, task: opts.task, agent: agentName, model: opts.model },
   });
@@ -75,7 +75,7 @@ export async function spawnParallelSubagents(
 ): Promise<{ ok: boolean; sessionIds: string[]; message: string }> {
   const ids: string[] = [];
   for (const t of tasks) {
-    const result = spawnSubagent(app, parentId, t);
+    const result = await spawnSubagent(app, parentId, t);
     if (result.ok && result.sessionId) {
       ids.push(result.sessionId);
     }

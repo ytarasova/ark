@@ -37,7 +37,7 @@ async function createSession(summary = "test"): Promise<string> {
   const result = (res as JsonRpcResponse).result as Record<string, any>;
   const id = result.session.id;
   // Set session_id to simulate a dispatched session (send() requires it)
-  app.sessions.update(id, { session_id: "ark-" + id, status: "running" });
+  await app.sessions.update(id, { session_id: "ark-" + id, status: "running" });
   return id;
 }
 
@@ -48,7 +48,7 @@ async function listMessages(sessionId: string): Promise<any[]> {
   return result.messages;
 }
 
-describe("messaging handlers", () => {
+describe("messaging handlers", async () => {
   it("message/send persists user message even when delivery fails", async () => {
     const sessionId = await createSession("send-test");
     // Send will fail at sendReliable (no tmux session) but should still persist

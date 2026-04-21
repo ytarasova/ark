@@ -23,10 +23,10 @@ afterAll(async () => {
 });
 
 const sessionIds: string[] = [];
-afterEach(() => {
+afterEach(async () => {
   for (const id of sessionIds) {
     try {
-      app.sessions.delete(id);
+      await app.sessions.delete(id);
     } catch {
       /* cleanup */
     }
@@ -34,12 +34,12 @@ afterEach(() => {
   sessionIds.length = 0;
 });
 
-describe("repo-scoped config E2E", () => {
-  it("startSession picks up flow and group from .ark.yaml", () => {
+describe("repo-scoped config E2E", async () => {
+  it("startSession picks up flow and group from .ark.yaml", async () => {
     const repoDir = mkdtempSync(join(tmpdir(), "ark-e2e-repo-"));
     writeFileSync(join(repoDir, ".ark.yaml"), "flow: bare\ngroup: team-alpha\n");
 
-    const session = startSession(app, {
+    const session = await startSession(app, {
       summary: "e2e-repo-config-basic",
       workdir: repoDir,
     });
@@ -49,11 +49,11 @@ describe("repo-scoped config E2E", () => {
     expect(session.group_name).toBe("team-alpha");
   });
 
-  it("explicit options override .ark.yaml defaults", () => {
+  it("explicit options override .ark.yaml defaults", async () => {
     const repoDir = mkdtempSync(join(tmpdir(), "ark-e2e-repo-"));
     writeFileSync(join(repoDir, ".ark.yaml"), "flow: bare\ngroup: config-group\ncompute: config-compute\n");
 
-    const session = startSession(app, {
+    const session = await startSession(app, {
       summary: "e2e-repo-config-override",
       workdir: repoDir,
       flow: "bare",
@@ -65,10 +65,10 @@ describe("repo-scoped config E2E", () => {
     expect(session.group_name).toBe("explicit-group");
   });
 
-  it("no config file means defaults are used", () => {
+  it("no config file means defaults are used", async () => {
     const repoDir = mkdtempSync(join(tmpdir(), "ark-e2e-repo-empty-"));
 
-    const session = startSession(app, {
+    const session = await startSession(app, {
       summary: "e2e-repo-config-none",
       workdir: repoDir,
     });
@@ -80,11 +80,11 @@ describe("repo-scoped config E2E", () => {
     expect(session.compute_name).toBeNull();
   });
 
-  it("falls back to repo path when workdir is not set", () => {
+  it("falls back to repo path when workdir is not set", async () => {
     const repoDir = mkdtempSync(join(tmpdir(), "ark-e2e-repo-fallback-"));
     writeFileSync(join(repoDir, ".ark.yaml"), "group: from-repo\n");
 
-    const session = startSession(app, {
+    const session = await startSession(app, {
       summary: "e2e-repo-config-fallback",
       repo: repoDir,
     });
@@ -93,11 +93,11 @@ describe("repo-scoped config E2E", () => {
     expect(session.group_name).toBe("from-repo");
   });
 
-  it("handles .ark.yml variant", () => {
+  it("handles .ark.yml variant", async () => {
     const repoDir = mkdtempSync(join(tmpdir(), "ark-e2e-repo-yml-"));
     writeFileSync(join(repoDir, ".ark.yml"), "flow: bare\n");
 
-    const session = startSession(app, {
+    const session = await startSession(app, {
       summary: "e2e-repo-config-yml",
       workdir: repoDir,
     });
@@ -106,11 +106,11 @@ describe("repo-scoped config E2E", () => {
     expect(session.flow).toBe("bare");
   });
 
-  it("malformed YAML does not break session creation", () => {
+  it("malformed YAML does not break session creation", async () => {
     const repoDir = mkdtempSync(join(tmpdir(), "ark-e2e-repo-bad-"));
     writeFileSync(join(repoDir, ".ark.yaml"), "{{{{invalid");
 
-    const session = startSession(app, {
+    const session = await startSession(app, {
       summary: "e2e-repo-config-bad-yaml",
       workdir: repoDir,
     });

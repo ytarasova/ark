@@ -120,7 +120,7 @@ export class DockerProvider implements ComputeProvider {
     const image = (cfg.image as string) || DEFAULT_IMAGE;
     const extraVolumes = (cfg.volumes as string[]) ?? [];
 
-    this.app.computes.update(compute.name, { status: "provisioning" });
+    await this.app.computes.update(compute.name, { status: "provisioning" });
 
     try {
       if (useDevcontainer) {
@@ -133,7 +133,7 @@ export class DockerProvider implements ComputeProvider {
         if (!result.ok) {
           throw new Error(`devcontainer up failed: ${result.error}`);
         }
-        this.app.computes.mergeConfig(compute.name, {
+        await this.app.computes.mergeConfig(compute.name, {
           container_name: name,
           devcontainer: true,
           workdir,
@@ -141,20 +141,20 @@ export class DockerProvider implements ComputeProvider {
       } else {
         // Plain Docker path -- pull image, create persistent container
         await pullImage(image);
-        await createContainer(name, image, extraVolumes);
+        await createContainer(name, image, { extraVolumes });
         await startContainer(name);
 
         // Read back the real container ID
         const containerId = await run("docker", ["inspect", "--format", "{{.Id}}", name]);
 
-        this.app.computes.mergeConfig(compute.name, {
+        await this.app.computes.mergeConfig(compute.name, {
           image,
           container_id: containerId || name,
           container_name: name,
         });
       }
 
-      this.app.computes.update(compute.name, { status: "running" });
+      await this.app.computes.update(compute.name, { status: "running" });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.app.computes.mergeConfig(compute.name, { last_error: message });

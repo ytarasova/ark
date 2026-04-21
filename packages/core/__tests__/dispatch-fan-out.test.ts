@@ -13,15 +13,15 @@ afterAll(async () => {
   await app?.shutdown();
 }, 30_000);
 
-describe("dispatch fan_out stage", () => {
+describe("dispatch fan_out stage", async () => {
   test("fan_out stage creates children and sets parent to waiting", async () => {
-    const parent = app.sessions.create({ summary: "Test fan-out", flow: "fan-out" });
-    app.sessions.update(parent.id, { stage: "execute", status: "ready" });
+    const parent = await app.sessions.create({ summary: "Test fan-out", flow: "fan-out" });
+    await app.sessions.update(parent.id, { stage: "execute", status: "ready" });
 
     const result = await dispatch(app, parent.id);
     expect(result.ok).toBe(true);
 
-    const updated = app.sessions.get(parent.id);
+    const updated = await app.sessions.get(parent.id);
     expect(updated!.status).toBe("waiting");
 
     const children = app.sessions.getChildren(parent.id);

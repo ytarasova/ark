@@ -79,12 +79,12 @@ const TEST_MODELS: ModelConfig[] = [
 
 function makeRegistry(): ProviderRegistry {
   const registry = new ProviderRegistry();
-  registry.register({
+  await registry.register({
     name: "test-a",
     base_url: "http://localhost:9999",
     models: TEST_MODELS.filter((m) => m.provider === "test-a"),
   });
-  registry.register({
+  await registry.register({
     name: "test-b",
     base_url: "http://localhost:9998",
     models: TEST_MODELS.filter((m) => m.provider === "test-b"),

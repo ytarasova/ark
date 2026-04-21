@@ -43,7 +43,7 @@ function waitFor(fn: () => boolean, timeoutMs = 10000): Promise<void> {
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe("Codex runtime + autonomous flow", () => {
+describe("Codex runtime + autonomous flow", async () => {
   it("cli-agent executor returns not_found when tmux session is gone", async () => {
     const spy = spyOn(tmux, "sessionExistsAsync").mockResolvedValue(false);
     try {
@@ -56,8 +56,8 @@ describe("Codex runtime + autonomous flow", () => {
 
   it("status poller completes session when tmux exits (not_found)", async () => {
     // Create a session on the autonomous flow
-    const session = app.sessions.create({ summary: "codex test", flow: "autonomous" });
-    app.sessions.update(session.id, { status: "running", stage: "work", session_id: "ark-" + session.id });
+    const session = await app.sessions.create({ summary: "codex test", flow: "autonomous" });
+    await app.sessions.update(session.id, { status: "running", stage: "work", session_id: "ark-" + session.id });
 
     // Mock: tmux session is already gone (Codex finished)
     const spy = spyOn(tmux, "sessionExistsAsync").mockResolvedValue(false);
@@ -67,12 +67,12 @@ describe("Codex runtime + autonomous flow", () => {
       startStatusPoller(app, session.id, "ark-" + session.id, "cli-agent");
 
       // Wait for the poller to detect not_found and complete the session
-      await waitFor(() => {
-        const s = app.sessions.get(session.id);
+      await waitFor(async () => {
+        const s = await app.sessions.get(session.id);
         return s?.status === "completed";
       });
 
-      const updated = app.sessions.get(session.id);
+      const updated = await app.sessions.get(session.id);
       expect(updated?.status).toBe("completed");
     } finally {
       spy.mockRestore();
@@ -80,8 +80,8 @@ describe("Codex runtime + autonomous flow", () => {
   });
 
   it("status poller handles failed state correctly", async () => {
-    const session = app.sessions.create({ summary: "codex fail test", flow: "autonomous" });
-    app.sessions.update(session.id, { status: "running", stage: "work", session_id: "ark-" + session.id });
+    const session = await app.sessions.create({ summary: "codex fail test", flow: "autonomous" });
+    await app.sessions.update(session.id, { status: "running", stage: "work", session_id: "ark-" + session.id });
 
     // Mock a cli-agent that returns "not_found" (same as exit)
     // The cli-agent always returns not_found or running -- never "failed"
@@ -91,12 +91,12 @@ describe("Codex runtime + autonomous flow", () => {
     try {
       startStatusPoller(app, session.id, "ark-" + session.id, "cli-agent");
 
-      await waitFor(() => {
-        const s = app.sessions.get(session.id);
+      await waitFor(async () => {
+        const s = await app.sessions.get(session.id);
         return s?.status !== "running";
       });
 
-      const updated = app.sessions.get(session.id);
+      const updated = await app.sessions.get(session.id);
       // cli-agent returns not_found (not failed), so it should be completed
       expect(updated?.status).toBe("completed");
     } finally {

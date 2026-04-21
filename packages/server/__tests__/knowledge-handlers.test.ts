@@ -32,7 +32,7 @@ afterAll(async () => {
 
 let router: Router;
 
-beforeEach(() => {
+beforeEach(async () => {
   router = new Router();
   registerKnowledgeHandlers(router, app);
   // knowledge/index + knowledge/export + knowledge/import live in the
@@ -43,7 +43,7 @@ beforeEach(() => {
   // Clear any carry-over knowledge nodes between tests to keep expectations
   // stable across the full suite
   for (const t of ["memory", "learning", "skill", "recipe", "agent", "session", "symbol", "file"] as const) {
-    app.knowledge.clear({ type: t });
+    await app.knowledge.clear({ type: t });
   }
 });
 
@@ -55,15 +55,15 @@ function err(res: unknown): { code: number; message: string } {
   return (res as JsonRpcError).error as { code: number; message: string };
 }
 
-describe("knowledge/search", () => {
+describe("knowledge/search", async () => {
   it("returns results matching the query", async () => {
-    app.knowledge.addNode({
+    await app.knowledge.addNode({
       type: "memory",
       label: "ark is a bun-only orchestrator",
       content: "ark is a bun-only orchestrator",
       metadata: {},
     });
-    app.knowledge.addNode({
+    await app.knowledge.addNode({
       type: "memory",
       label: "unrelated fact",
       content: "unrelated fact",
@@ -78,8 +78,8 @@ describe("knowledge/search", () => {
   });
 
   it("narrows results with a types filter", async () => {
-    app.knowledge.addNode({ type: "memory", label: "bun fact m", content: "bun memory", metadata: {} });
-    app.knowledge.addNode({ type: "learning", label: "bun fact l", content: "bun learning", metadata: {} });
+    await app.knowledge.addNode({ type: "memory", label: "bun fact m", content: "bun memory", metadata: {} });
+    await app.knowledge.addNode({ type: "learning", label: "bun fact l", content: "bun learning", metadata: {} });
 
     const res = ok(await router.dispatch(createRequest(1, "knowledge/search", { query: "bun", types: ["learning"] })));
     const results = res.results as Array<{ type: string }>;
@@ -95,11 +95,11 @@ describe("knowledge/search", () => {
   });
 });
 
-describe("knowledge/stats", () => {
+describe("knowledge/stats", async () => {
   it("returns aggregated node + edge counts", async () => {
-    app.knowledge.addNode({ type: "memory", label: "m1", content: "m1", metadata: {} });
-    app.knowledge.addNode({ type: "memory", label: "m2", content: "m2", metadata: {} });
-    app.knowledge.addNode({ type: "learning", label: "l1", content: "l1", metadata: {} });
+    await app.knowledge.addNode({ type: "memory", label: "m1", content: "m1", metadata: {} });
+    await app.knowledge.addNode({ type: "memory", label: "m2", content: "m2", metadata: {} });
+    await app.knowledge.addNode({ type: "learning", label: "l1", content: "l1", metadata: {} });
 
     const res = ok(await router.dispatch(createRequest(1, "knowledge/stats", {})));
     expect(res.nodes).toBeGreaterThanOrEqual(3);
@@ -111,11 +111,11 @@ describe("knowledge/stats", () => {
   });
 });
 
-describe("knowledge/export + knowledge/import", () => {
+describe("knowledge/export + knowledge/import", async () => {
   it("round-trips memory nodes through the markdown export and import", async () => {
     const dir = mkdtempSync(join(tmpdir(), "ark-knowledge-"));
     try {
-      app.knowledge.addNode({
+      await app.knowledge.addNode({
         type: "memory",
         label: "portable memory",
         content: "portable memory content",
@@ -126,19 +126,19 @@ describe("knowledge/export + knowledge/import", () => {
       expect(exportRes.ok).toBe(true);
 
       // Clear and re-import
-      app.knowledge.clear({ type: "memory" });
-      expect(app.knowledge.nodeCount("memory")).toBe(0);
+      await app.knowledge.clear({ type: "memory" });
+      expect(await app.knowledge.nodeCount("memory")).toBe(0);
 
       const importRes = ok(await router.dispatch(createRequest(2, "knowledge/import", { dir })));
       expect(importRes.ok).toBe(true);
-      expect(app.knowledge.nodeCount("memory")).toBeGreaterThan(0);
+      expect(await app.knowledge.nodeCount("memory")).toBeGreaterThan(0);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
 });
 
-describe("knowledge/codebase/status", () => {
+describe("knowledge/codebase/status", async () => {
   it("reports availability without throwing", async () => {
     const res = ok(await router.dispatch(createRequest(1, "knowledge/codebase/status", {})));
     // binary may or may not be vendored on this host; either way the

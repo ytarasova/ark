@@ -29,7 +29,7 @@ afterAll(async () => {
   await app?.shutdown();
 });
 
-describe("ArkServer health endpoint", () => {
+describe("ArkServer health endpoint", async () => {
   it("GET /health returns JSON with status, pid, and uptime", async () => {
     const resp = await fetch(`http://localhost:${port}/health`);
     expect(resp.status).toBe(200);

@@ -273,7 +273,7 @@ describe("conditional routing - validation", () => {
 
 // ── Integration tests with flow state persistence ──────────────────────────
 
-describe("conditional routing - flow state integration", () => {
+describe("conditional routing - flow state integration", async () => {
   let app: AppContext;
 
   beforeAll(async () => {

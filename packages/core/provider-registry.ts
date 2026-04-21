@@ -10,7 +10,9 @@ import type { ComputeProvider } from "../compute/types.js";
 import type { Session, Compute } from "../types/index.js";
 
 // App-level provider resolver -- set by AppContext.boot() via setProviderResolver()
-export type ProviderResolver = (session: Session) => { provider: ComputeProvider | null; compute: Compute | null };
+export type ProviderResolver = (
+  session: Session,
+) => Promise<{ provider: ComputeProvider | null; compute: Compute | null }>;
 let _providerResolver: ProviderResolver | null = null;
 
 /** Called by AppContext to register the provider resolver. */
@@ -27,7 +29,9 @@ export function clearProviderResolver(): void {
  * Resolve the compute provider for a session.
  * Uses the AppContext-registered resolver. Returns null if not yet booted.
  */
-export function resolveProvider(session: Session): { provider: ComputeProvider | null; compute: Compute | null } {
+export async function resolveProvider(
+  session: Session,
+): Promise<{ provider: ComputeProvider | null; compute: Compute | null }> {
   if (!_providerResolver) return { provider: null, compute: null };
   return _providerResolver(session);
 }

@@ -27,11 +27,11 @@ import type { KnowledgeNode, NodeType } from "./types.js";
  * The two are tightly coupled since the JWT refactor in session s-abc123.
  * ```
  */
-export function exportToMarkdown(
+export async function exportToMarkdown(
   store: KnowledgeStore,
   outputDir: string,
   opts?: { types?: NodeType[] },
-): { exported: number } {
+): Promise<{ exported: number }> {
   mkdirSync(outputDir, { recursive: true });
   const types = opts?.types ?? ["memory", "learning"];
   let exported = 0;
@@ -40,7 +40,7 @@ export function exportToMarkdown(
     const typeDir = join(outputDir, type);
     mkdirSync(typeDir, { recursive: true });
 
-    const nodes = store.listNodes({ type });
+    const nodes = await store.listNodes({ type });
     for (const node of nodes) {
       const filename = sanitizeFilename(node.label) + ".md";
       const frontmatter = buildFrontmatter(node);
@@ -67,7 +67,7 @@ export function exportToMarkdown(
  *     always-run-tests.md
  * ```
  */
-export function importFromMarkdown(store: KnowledgeStore, inputDir: string): { imported: number } {
+export async function importFromMarkdown(store: KnowledgeStore, inputDir: string): Promise<{ imported: number }> {
   if (!existsSync(inputDir)) return { imported: 0 };
   let imported = 0;
 
@@ -98,10 +98,10 @@ export function importFromMarkdown(store: KnowledgeStore, inputDir: string): { i
       if (frontmatter.source) metadata.source = frontmatter.source;
 
       // Upsert: remove old if exists, then add
-      const existing = store.getNode(id);
-      if (existing) store.removeNode(id);
+      const existing = await store.getNode(id);
+      if (existing) await store.removeNode(id);
 
-      store.addNode({ id, type, label, content: body.trim(), metadata });
+      await store.addNode({ id, type, label, content: body.trim(), metadata });
       imported++;
     }
   }

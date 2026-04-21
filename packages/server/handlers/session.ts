@@ -77,25 +77,26 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
 
   router.handle("session/advance", async (params, notify) => {
     const { sessionId, force } = extract<SessionAdvanceParams>(params, ["sessionId"]);
+    const sessForLog = await app.sessions.get(sessionId);
     app.events.log(sessionId, "stage_advanced", {
       actor: "user",
-      stage: app.sessions.get(sessionId)?.stage ?? undefined,
+      stage: sessForLog?.stage ?? undefined,
       data: { force: force ?? false },
     });
     const result = await app.sessionService.advance(sessionId, force ?? false);
-    const session = app.sessions.get(sessionId);
+    const session = await app.sessions.get(sessionId);
     if (session) notify("session/updated", { session });
     return result;
   });
 
   router.handle("session/complete", async (params, notify) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
-    const result = app.sessionService.complete(sessionId);
+    const result = await app.sessionService.complete(sessionId);
     if (!result.ok) throw new RpcError(result.message ?? "Complete failed", SESSION_NOT_FOUND);
     // Advance the flow after completing the stage -- without this, sessions
     // get stuck at "ready" instead of progressing to the next stage or "completed".
     await app.sessionService.advance(sessionId, true);
-    const session = app.sessions.get(sessionId);
+    const session = await app.sessions.get(sessionId);
     if (session) notify("session/updated", { session });
     return result;
   });
@@ -271,7 +272,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     // If the session has a persisted snapshot (or the caller supplied one
     // explicitly), prefer the snapshot-based restore path. Otherwise fall
     // back to the state-only resume for backends that don't snapshot.
-    const session = app.sessions.get(sessionId);
+    const session = await app.sessions.get(sessionId);
     const lastSnapshotId =
       snapshotId ?? (session?.config as Record<string, unknown> | undefined)?.last_snapshot_id ?? undefined;
 
@@ -279,7 +280,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
       const { resumeFromSnapshot } = await import("../../core/services/session-snapshot.js");
       const snapResult = await resumeFromSnapshot(app, sessionId, { snapshotId: lastSnapshotId as string });
       if (snapResult.ok) {
-        const updated = app.sessions.get(sessionId);
+        const updated = await app.sessions.get(sessionId);
         if (updated) notify("session/updated", { session: updated });
         return { ok: true, message: snapResult.message, snapshotId: snapResult.snapshotId };
       }

@@ -23,7 +23,12 @@ export interface MigrationApplyContext {
 export interface Migration {
   version: number;
   name: string;
-  up(ctx: MigrationApplyContext): void;
+  /**
+   * Apply the migration body. Async because IDatabase is async; bodies
+   * that don't await anything can still return a sync `void` and the
+   * runner will await whatever is returned.
+   */
+  up(ctx: MigrationApplyContext): void | Promise<void>;
 }
 
 export interface MigrationStatus {

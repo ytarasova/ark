@@ -15,7 +15,7 @@ function createBlackHoleTransport(): Transport {
   };
 }
 
-describe("ArkClient.close()", () => {
+describe("ArkClient.close()", async () => {
   it("rejects pending promises with 'ArkClient closed' error", async () => {
     const client = new ArkClient(createBlackHoleTransport());
     const pending = client.initialize().catch((err) => err);

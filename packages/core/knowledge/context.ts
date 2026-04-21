@@ -23,7 +23,7 @@ function truncate(s: string, max: number): string {
 /**
  * Build a context package for an agent about to work on a task.
  */
-export function buildContext(
+export async function buildContext(
   store: KnowledgeStore,
   task: string,
   opts?: {
@@ -33,7 +33,7 @@ export function buildContext(
     limit?: number;
     maxTokens?: number;
   },
-): ContextPackage {
+): Promise<ContextPackage> {
   const maxFiles = Math.min(opts?.limit ?? DEFAULT_LIMITS.files, DEFAULT_LIMITS.files);
   const maxMemories = Math.min(opts?.limit ?? DEFAULT_LIMITS.memories, DEFAULT_LIMITS.memories);
   const maxSessions = Math.min(opts?.limit ?? DEFAULT_LIMITS.sessions, DEFAULT_LIMITS.sessions);
@@ -44,12 +44,12 @@ export function buildContext(
   const ctx: ContextPackage = { files: [], memories: [], sessions: [], learnings: [], skills: [] };
 
   // 1. Search by task keywords
-  const searchResults = store.search(task, { limit: searchLimit * 2 });
+  const searchResults = await store.search(task, { limit: searchLimit * 2 });
 
   // 2. If specific files provided, get their neighbors
   const fileNeighbors: KnowledgeNode[] = [];
   for (const f of opts?.files ?? []) {
-    const neighbors = store.neighbors(`file:${f}`, { maxDepth: 2 });
+    const neighbors = await store.neighbors(`file:${f}`, { maxDepth: 2 });
     fileNeighbors.push(...neighbors);
   }
 
@@ -66,16 +66,20 @@ export function buildContext(
     switch (node.type) {
       case "file":
         if (ctx.files.length < maxFiles) {
-          const sessions = store.getEdges(node.id, { relation: "modified_by", direction: "out" });
+          const sessions = await store.getEdges(node.id, { relation: "modified_by", direction: "out" });
+          const inboundEdges = await store.getEdges(node.id, { direction: "in" });
+          const recentSessions = await Promise.all(
+            sessions.slice(0, 3).map(async (e) => ({
+              id: e.target_id.replace("session:", ""),
+              summary: (await store.getNode(e.target_id))?.label ?? "",
+              date: e.created_at,
+            })),
+          );
           ctx.files.push({
             path: node.label,
             language: (node.metadata.language as string) ?? "",
-            dependents: store.getEdges(node.id, { direction: "in" }).length,
-            recent_sessions: sessions.slice(0, 3).map((e) => ({
-              id: e.target_id.replace("session:", ""),
-              summary: store.getNode(e.target_id)?.label ?? "",
-              date: e.created_at,
-            })),
+            dependents: inboundEdges.length,
+            recent_sessions: recentSessions,
           });
         }
         break;

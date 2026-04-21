@@ -565,7 +565,7 @@ export function registerSessionCommands(program: Command, app: AppContext) {
     .action(async (action, id, text) => {
       switch (action) {
         case "list": {
-          const todos = app.todos.list(id);
+          const todos = await app.todos.list(id);
           if (todos.length === 0) {
             console.log(chalk.dim("No todos"));
           } else {
@@ -581,7 +581,7 @@ export function registerSessionCommands(program: Command, app: AppContext) {
             console.log(chalk.red("Usage: ark session todo add <session-id> <content>"));
             return;
           }
-          const todo = app.todos.add(id, text);
+          const todo = await app.todos.add(id, text);
           console.log(chalk.green(`Added todo #${todo.id}: ${todo.content}`));
           break;
         }
@@ -590,7 +590,7 @@ export function registerSessionCommands(program: Command, app: AppContext) {
             console.log(chalk.red("Usage: ark session todo done <session-id> <todo-id>"));
             return;
           }
-          const todo = app.todos.toggle(parseInt(text, 10));
+          const todo = await app.todos.toggle(parseInt(text, 10));
           if (todo) {
             console.log(chalk.green(`Todo #${todo.id} ${todo.done ? "done" : "undone"}`));
           } else {
@@ -767,8 +767,8 @@ export function registerSessionCommands(program: Command, app: AppContext) {
     .command("import")
     .description("Import session from file")
     .argument("<file>")
-    .action((file) => {
-      const result = core.importSessionFromFile(app, file);
+    .action(async (file) => {
+      const result = await core.importSessionFromFile(app, file);
       console.log(result.ok ? chalk.green(result.message) : chalk.red(result.message));
     });
 }

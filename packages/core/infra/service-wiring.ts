@@ -36,14 +36,14 @@ export class ServiceWiring {
     }
 
     // fire-and-forget: plugin loading is best-effort, never blocks boot
-    loadPluginExecutors(this.app.config.arkDir, (msg) => logWarn("plugins", msg))
+    loadPluginExecutors(this.app.config.arkDir, (msg) => logWarn("general", `[plugins] ${msg}`))
       .then((plugins) => {
         for (const ex of plugins) {
           this.pluginRegistry.register({ kind: "executor", name: ex.name, impl: ex, source: "user" });
           registerExecutor(ex);
         }
       })
-      .catch((e: any) => logWarn("plugins", `loadPluginExecutors failed: ${e?.message ?? e}`));
+      .catch((e: any) => logWarn("general", `[plugins] loadPluginExecutors failed: ${e?.message ?? e}`));
 
     // Clear the module-level event bus in case a previous app instance
     // left handlers attached. AppContext.eventBus returns the same

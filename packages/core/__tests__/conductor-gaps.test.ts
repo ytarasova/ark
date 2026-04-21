@@ -23,7 +23,7 @@ withTestContext();
 
 // ── Test 1: interrupt(getApp()) ───────────────────────────────────────────────────────
 
-describe("interrupt(getApp())", () => {
+describe("interrupt(getApp())", async () => {
   it("returns error for non-existent session", async () => {
     const result = await interrupt(getApp(), "s-nonexistent");
     expect(result.ok).toBe(false);
@@ -55,7 +55,7 @@ describe("interrupt(getApp())", () => {
 
 // ── Test 2: worktreeDiff(getApp()) ────────────────────────────────────────────────────
 
-describe("worktreeDiff(getApp())", () => {
+describe("worktreeDiff(getApp())", async () => {
   it("returns error for non-existent session", async () => {
     const result = await worktreeDiff(getApp(), "s-nonexistent");
     expect(result.ok).toBe(false);
@@ -86,7 +86,7 @@ describe("worktreeDiff(getApp())", () => {
 
 // ── Test 2b: worktreeDiff re-review flagging ─────────────────────────────────
 
-describe("worktreeDiff re-review flagging", () => {
+describe("worktreeDiff re-review flagging", async () => {
   it("returns empty modifiedSinceReview for non-existent session", async () => {
     const result = await worktreeDiff(getApp(), "s-nonexistent");
     expect(result.modifiedSinceReview).toEqual([]);
@@ -101,7 +101,7 @@ describe("worktreeDiff re-review flagging", () => {
 
 // ── Test 3: createWorktreePR(getApp()) ────────────────────────────────────────────────
 
-describe("createWorktreePR(getApp())", () => {
+describe("createWorktreePR(getApp())", async () => {
   it("returns error for non-existent session", async () => {
     const result = await createWorktreePR(getApp(), "s-nonexistent");
     expect(result.ok).toBe(false);
@@ -133,7 +133,7 @@ describe("createWorktreePR(getApp())", () => {
 
 // ── Test 3b: mergeWorktreePR(getApp()) ──────────────────────────────────────────────
 
-describe("mergeWorktreePR(getApp())", () => {
+describe("mergeWorktreePR(getApp())", async () => {
   it("returns error for non-existent session", async () => {
     const result = await mergeWorktreePR(getApp(), "s-nonexistent");
     expect(result.ok).toBe(false);
@@ -165,7 +165,7 @@ describe("mergeWorktreePR(getApp())", () => {
 // instead of immediately completing) is tested in pr-merge-poller.test.ts.
 // These tests verify the error paths which remain unchanged.
 
-describe("executeAction auto_merge", () => {
+describe("executeAction auto_merge", async () => {
   it("returns error when session has no PR URL", async () => {
     const session = getApp().sessions.create({ summary: "auto-merge-no-pr", flow: "autonomous-sdlc" });
     getApp().sessions.update(session.id, { stage: "merge" });
@@ -304,7 +304,7 @@ describe("TodoRepository", () => {
 
 // ── Test 5: runVerification(getApp()) ─────────────────────────────────────────────────
 
-describe("runVerification(getApp())", () => {
+describe("runVerification(getApp())", async () => {
   it("returns ok when no todos and no verify scripts", async () => {
     const session = getApp().sessions.create({ summary: "verify-clean" });
 
@@ -480,7 +480,7 @@ describe("RepoConfig verify field", () => {
 
 // ── Test 8: archive(getApp()) and restore(getApp()) ──────────────────────────────────────────
 
-describe("archive(getApp()) and restore(getApp())", () => {
+describe("archive(getApp()) and restore(getApp())", async () => {
   it("archive sets status to archived", async () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { archive } = require("../services/session-orchestration.js");
@@ -553,7 +553,7 @@ describe("archive(getApp()) and restore(getApp())", () => {
 
 import { cliAgentExecutor } from "../executors/cli-agent.js";
 
-describe("cli-agent executor", () => {
+describe("cli-agent executor", async () => {
   it("is exported and registered", () => {
     expect(typeof cliAgentExecutor).toBe("object");
     expect(cliAgentExecutor.name).toBe("cli-agent");
@@ -588,7 +588,7 @@ describe("cli-agent executor", () => {
 
 // ── status poller ───────────────────────────────────────────────────────────
 
-describe("status poller", () => {
+describe("status poller", async () => {
   it("exports startStatusPoller and stopStatusPoller", async () => {
     const mod = await import("../executors/status-poller.js");
     expect(typeof mod.startStatusPoller).toBe("function");

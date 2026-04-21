@@ -13,14 +13,14 @@ export const autoMergeAction: ActionHandler = {
     const result = await mergeWorktreePR(app, sessionId);
     if (!result.ok) return result;
 
-    app.events.log(sessionId, "action_executed", {
+    await app.events.log(sessionId, "action_executed", {
       stage: session.stage ?? undefined,
       actor: "system",
       data: { action, pr_url: session.pr_url ?? undefined },
     });
 
     // Transition to waiting; pr-merge-poller advances once CI passes + PR merges.
-    app.sessions.update(sessionId, {
+    await app.sessions.update(sessionId, {
       status: "waiting",
       breakpoint_reason: "Waiting for CI checks to pass and PR to merge",
       config: {
@@ -28,7 +28,7 @@ export const autoMergeAction: ActionHandler = {
         merge_queued_at: new Date().toISOString(),
       },
     });
-    app.events.log(sessionId, "merge_waiting", {
+    await app.events.log(sessionId, "merge_waiting", {
       stage: session.stage ?? undefined,
       actor: "system",
       data: {

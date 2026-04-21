@@ -15,7 +15,7 @@ import {
   generateSshKey,
 } from "../providers/ec2/ssh.js";
 
-describe("EC2 SSH primitives", () => {
+describe("EC2 SSH primitives", async () => {
   // -----------------------------------------------------------------------
   // sshKeyPath
   // -----------------------------------------------------------------------
@@ -84,7 +84,7 @@ describe("EC2 SSH primitives", () => {
   // -----------------------------------------------------------------------
   // sshExec - graceful failure
   // -----------------------------------------------------------------------
-  describe("sshExec", () => {
+  describe("sshExec", async () => {
     it("handles failure gracefully (unreachable host, nonexistent key)", async () => {
       // 192.0.2.1 is TEST-NET-1 (RFC 5737) - guaranteed unreachable.
       // Use a very short timeout so the test doesn't block.

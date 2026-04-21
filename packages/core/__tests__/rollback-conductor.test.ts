@@ -13,7 +13,7 @@ const config: RollbackConfig = {
   health_url: null,
 };
 
-describe("watchMergedPR integration", () => {
+describe("watchMergedPR integration", async () => {
   it("returns none when all checks pass", async () => {
     const session = getApp().sessions.create({ summary: "test" });
     let callCount = 0;

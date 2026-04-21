@@ -199,7 +199,7 @@ describe("E2E Compute: resolvePortDecls with all three sources", () => {
 
 // ── Test 4: Local provider getMetrics ───────────────────────────────────────
 
-describe("E2E Compute: Local provider getMetrics", () => {
+describe("E2E Compute: Local provider getMetrics", async () => {
   beforeEach(() => ensureProviders());
   afterEach(() => cleanupComputes());
 
@@ -242,7 +242,7 @@ describe("E2E Compute: Local provider getMetrics", () => {
 
 // ── Test 5: Local provider probePorts with live server ──────────────────────
 
-describe("E2E Compute: Local provider probePorts", () => {
+describe("E2E Compute: Local provider probePorts", async () => {
   beforeEach(() => ensureProviders());
   afterEach(() => cleanupComputes());
 

@@ -11,7 +11,7 @@ afterAll(async () => {
   await app?.shutdown();
 });
 
-describe("ComputePoolManager", () => {
+describe("ComputePoolManager", async () => {
   it("creates a pool and retrieves it", () => {
     const manager = new ComputePoolManager(app);
     const pool = manager.createPool({

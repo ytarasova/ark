@@ -10,5 +10,11 @@ data:
   ARK_CONDUCTOR_PORT: {{ .Values.controlPlane.ports.conductor | quote }}
   ARK_AUTH_ENABLED: {{ .Values.controlPlane.auth.enabled | quote }}
   ARK_ROUTER_POLICY: {{ .Values.controlPlane.router.policy | quote }}
-  DATABASE_URL: {{ include "ark.databaseUrl" . | quote }}
-  REDIS_URL: {{ include "ark.redisUrl" . | quote }}
+  {{- $dbUrl := include "ark.databaseUrl" . }}
+  {{- if $dbUrl }}
+  DATABASE_URL: {{ $dbUrl | quote }}
+  {{- end }}
+  {{- $redisUrl := include "ark.redisUrl" . }}
+  {{- if $redisUrl }}
+  REDIS_URL: {{ $redisUrl | quote }}
+  {{- end }}

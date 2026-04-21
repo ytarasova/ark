@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "bun:test";
 import { Router } from "../router.js";
 import { createRequest, ErrorCodes, RpcError, type JsonRpcResponse, type JsonRpcError } from "../../protocol/types.js";
 
-describe("Router", () => {
+describe("Router", async () => {
   let router: Router;
   beforeEach(() => {
     router = new Router();

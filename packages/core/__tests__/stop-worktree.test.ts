@@ -23,7 +23,7 @@ afterEach(async () => {
   clearApp();
 });
 
-describe("stop() worktree cleanup", () => {
+describe("stop() worktree cleanup", async () => {
   it("removes worktree directory when session is stopped", async () => {
     const session = getApp().sessions.create({ summary: "stop-wt-test", repo: "/tmp/fake-repo" });
     const wtPath = join(getApp().config.worktreesDir, session.id);
@@ -61,7 +61,7 @@ describe("stop() worktree cleanup", () => {
   });
 });
 
-describe("removeSessionWorktree()", () => {
+describe("removeSessionWorktree()", async () => {
   it("removes directory via rmSync fallback when no repo is set", async () => {
     const session = getApp().sessions.create({ summary: "rmwt-no-repo" });
     const wtPath = join(getApp().config.worktreesDir, session.id);

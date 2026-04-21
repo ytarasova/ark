@@ -57,10 +57,10 @@ afterAll(async () => {
 
 // ── Manual completion path (bare flow, gate: manual) ────────────────────────
 
-describe("Manual completion path (bare flow)", () => {
-  it("applyReport(completed) keeps manual-gate session running, does not advance", () => {
-    const session = app.sessions.create({ summary: "manual test", flow: "bare" });
-    app.sessions.update(session.id, { status: "running", stage: "work" });
+describe("Manual completion path (bare flow)", async () => {
+  it("applyReport(completed) keeps manual-gate session running, does not advance", async () => {
+    const session = await app.sessions.create({ summary: "manual test", flow: "bare" });
+    await app.sessions.update(session.id, { status: "running", stage: "work" });
 
     const report: OutboundMessage = {
       type: "completed",
@@ -86,8 +86,8 @@ describe("Manual completion path (bare flow)", () => {
   });
 
   it("advance() fails on manual gate without force", async () => {
-    const session = app.sessions.create({ summary: "manual advance test", flow: "bare" });
-    app.sessions.update(session.id, { status: "running", stage: "work" });
+    const session = await app.sessions.create({ summary: "manual advance test", flow: "bare" });
+    await app.sessions.update(session.id, { status: "running", stage: "work" });
 
     const advResult = await advance(app, session.id);
     expect(advResult.ok).toBe(false);
@@ -95,20 +95,20 @@ describe("Manual completion path (bare flow)", () => {
   });
 
   it("advance(force=true) completes the session past manual gate", async () => {
-    const session = app.sessions.create({ summary: "manual force test", flow: "bare" });
-    app.sessions.update(session.id, { status: "running", stage: "work" });
+    const session = await app.sessions.create({ summary: "manual force test", flow: "bare" });
+    await app.sessions.update(session.id, { status: "running", stage: "work" });
 
     const advResult = await advance(app, session.id, true);
     expect(advResult.ok).toBe(true);
     expect(advResult.message).toContain("completed");
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.status).toBe("completed");
   });
 
   it("full manual path: report -> human advance -> completed", async () => {
-    const session = app.sessions.create({ summary: "full manual path", flow: "bare" });
-    app.sessions.update(session.id, { status: "running", stage: "work" });
+    const session = await app.sessions.create({ summary: "full manual path", flow: "bare" });
+    await app.sessions.update(session.id, { status: "running", stage: "work" });
 
     // Step 1: Agent reports completed
     const report: OutboundMessage = {
@@ -123,17 +123,17 @@ describe("Manual completion path (bare flow)", () => {
 
     // Apply updates (conductor would do this)
     if (Object.keys(result.updates).length > 0) {
-      app.sessions.update(session.id, result.updates);
+      await app.sessions.update(session.id, result.updates);
     }
     if (result.message) {
       app.messages.send(session.id, result.message.role, result.message.content, result.message.type);
     }
 
     // Session should still be running (manual gate)
-    let current = app.sessions.get(session.id);
+    let current = await app.sessions.get(session.id);
     expect(current?.status).toBe("running");
     // Message should be stored
-    const msgs = app.messages.list(session.id);
+    const msgs = await app.messages.list(session.id);
     expect(msgs.length).toBe(1);
     expect(msgs[0].type).toBe("completed");
 
@@ -142,17 +142,17 @@ describe("Manual completion path (bare flow)", () => {
     expect(advResult.ok).toBe(true);
 
     // Step 3: Session should be completed (bare flow has only one stage)
-    current = app.sessions.get(session.id);
+    current = await app.sessions.get(session.id);
     expect(current?.status).toBe("completed");
   });
 });
 
 // ── Auto completion path (quick flow, gate: auto) ───────────────────────────
 
-describe("Auto completion path (quick flow)", () => {
-  it("applyReport(completed) sets shouldAdvance=true for auto-gate stage", () => {
-    const session = app.sessions.create({ summary: "auto test", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement" });
+describe("Auto completion path (quick flow)", async () => {
+  it("applyReport(completed) sets shouldAdvance=true for auto-gate stage", async () => {
+    const session = await app.sessions.create({ summary: "auto test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
     const report: OutboundMessage = {
       type: "completed",
@@ -171,34 +171,34 @@ describe("Auto completion path (quick flow)", () => {
   });
 
   it("advance() succeeds on auto-gate stage and moves to next stage", async () => {
-    const session = app.sessions.create({ summary: "auto advance test", flow: "quick" });
-    app.sessions.update(session.id, { status: "ready", stage: "implement" });
+    const session = await app.sessions.create({ summary: "auto advance test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "ready", stage: "implement" });
 
     const advResult = await advance(app, session.id);
     expect(advResult.ok).toBe(true);
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     // quick flow: implement -> verify -> pr
     expect(updated?.stage).toBe("verify");
     expect(updated?.status).toBe("ready");
   });
 
   it("advance() on last auto-gate stage completes the session", async () => {
-    const session = app.sessions.create({ summary: "auto last stage", flow: "quick" });
+    const session = await app.sessions.create({ summary: "auto last stage", flow: "quick" });
     // merge is the last stage in quick flow
-    app.sessions.update(session.id, { status: "ready", stage: "merge" });
+    await app.sessions.update(session.id, { status: "ready", stage: "merge" });
 
     const advResult = await advance(app, session.id);
     expect(advResult.ok).toBe(true);
     expect(advResult.message).toContain("completed");
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.status).toBe("completed");
   });
 
   it("full auto path: report -> advance -> next stage ready", async () => {
-    const session = app.sessions.create({ summary: "full auto path", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement" });
+    const session = await app.sessions.create({ summary: "full auto path", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
     // Step 1: Agent reports completed
     const report: OutboundMessage = {
@@ -212,7 +212,7 @@ describe("Auto completion path (quick flow)", () => {
     const result = applyReport(app, session.id, report);
 
     // Apply updates (conductor would do this)
-    app.sessions.update(session.id, result.updates);
+    await app.sessions.update(session.id, result.updates);
 
     // Step 2: Auto-advance (conductor would trigger this because shouldAdvance=true)
     expect(result.shouldAdvance).toBe(true);
@@ -220,14 +220,14 @@ describe("Auto completion path (quick flow)", () => {
     expect(advResult.ok).toBe(true);
 
     // Step 3: Session should be at next stage
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.stage).toBe("verify");
     expect(updated?.status).toBe("ready");
   });
 
   it("full auto path through all stages to completion", async () => {
-    const session = app.sessions.create({ summary: "full auto completion", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement" });
+    const session = await app.sessions.create({ summary: "full auto completion", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
     // Simulate implement stage completion
     const r1 = applyReport(app, session.id, {
@@ -238,11 +238,11 @@ describe("Auto completion path (quick flow)", () => {
       filesChanged: [],
       commits: [],
     });
-    app.sessions.update(session.id, r1.updates);
+    await app.sessions.update(session.id, r1.updates);
     await advance(app, session.id);
 
     // Now at verify stage -- simulate verify completion
-    app.sessions.update(session.id, { status: "running" });
+    await app.sessions.update(session.id, { status: "running" });
     const r2 = applyReport(app, session.id, {
       type: "completed",
       sessionId: session.id,
@@ -251,11 +251,11 @@ describe("Auto completion path (quick flow)", () => {
       filesChanged: [],
       commits: [],
     });
-    app.sessions.update(session.id, r2.updates);
+    await app.sessions.update(session.id, r2.updates);
     await advance(app, session.id);
 
     // Now at pr stage -- simulate pr completion
-    app.sessions.update(session.id, { status: "running" });
+    await app.sessions.update(session.id, { status: "running" });
     const r3 = applyReport(app, session.id, {
       type: "completed",
       sessionId: session.id,
@@ -264,11 +264,11 @@ describe("Auto completion path (quick flow)", () => {
       filesChanged: [],
       commits: [],
     });
-    app.sessions.update(session.id, r3.updates);
+    await app.sessions.update(session.id, r3.updates);
     await advance(app, session.id);
 
     // Now at merge stage -- simulate merge completion
-    app.sessions.update(session.id, { status: "running" });
+    await app.sessions.update(session.id, { status: "running" });
     const r4 = applyReport(app, session.id, {
       type: "completed",
       sessionId: session.id,
@@ -277,25 +277,25 @@ describe("Auto completion path (quick flow)", () => {
       filesChanged: [],
       commits: [],
     });
-    app.sessions.update(session.id, r4.updates);
+    await app.sessions.update(session.id, r4.updates);
     const finalAdv = await advance(app, session.id);
 
     // Session should now be completed (merge is last stage)
     expect(finalAdv.ok).toBe(true);
     expect(finalAdv.message).toContain("completed");
-    const final = app.sessions.get(session.id);
+    const final = await app.sessions.get(session.id);
     expect(final?.status).toBe("completed");
   });
 });
 
 // ── Hook fallback path (SessionEnd on auto-gate) ────────────────────────────
 
-describe("Hook fallback path (SessionEnd)", () => {
-  it("SessionEnd on auto-gate session sets status to ready with shouldAdvance", () => {
-    const session = app.sessions.create({ summary: "hook fallback", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement" });
+describe("Hook fallback path (SessionEnd)", async () => {
+  it("SessionEnd on auto-gate session sets status to ready with shouldAdvance", async () => {
+    const session = await app.sessions.create({ summary: "hook fallback", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
-    const freshSession = app.sessions.get(session.id)!;
+    const freshSession = await app.sessions.get(session.id)!;
     const result = applyHookStatus(app, freshSession, "SessionEnd", {});
 
     expect(result.newStatus).toBe("ready");
@@ -303,11 +303,11 @@ describe("Hook fallback path (SessionEnd)", () => {
     expect(result.shouldAdvance).toBe(true);
   });
 
-  it("SessionEnd on manual-gate session keeps status running", () => {
-    const session = app.sessions.create({ summary: "hook manual", flow: "bare" });
-    app.sessions.update(session.id, { status: "running", stage: "work" });
+  it("SessionEnd on manual-gate session keeps status running", async () => {
+    const session = await app.sessions.create({ summary: "hook manual", flow: "bare" });
+    await app.sessions.update(session.id, { status: "running", stage: "work" });
 
-    const freshSession = app.sessions.get(session.id)!;
+    const freshSession = await app.sessions.get(session.id)!;
     const result = applyHookStatus(app, freshSession, "SessionEnd", {});
 
     // Manual gate: SessionEnd maps to "running" (not "completed")
@@ -315,11 +315,11 @@ describe("Hook fallback path (SessionEnd)", () => {
     expect(result.updates?.status).toBe("running");
   });
 
-  it("StopFailure on auto-gate session sets status to failed", () => {
-    const session = app.sessions.create({ summary: "hook failure", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement" });
+  it("StopFailure on auto-gate session sets status to failed", async () => {
+    const session = await app.sessions.create({ summary: "hook failure", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
-    const freshSession = app.sessions.get(session.id)!;
+    const freshSession = await app.sessions.get(session.id)!;
     const result = applyHookStatus(app, freshSession, "StopFailure", {
       error: "agent crashed",
     });
@@ -329,11 +329,11 @@ describe("Hook fallback path (SessionEnd)", () => {
     expect(result.updates?.error).toBe("agent crashed");
   });
 
-  it("StopFailure on manual-gate session keeps status running", () => {
-    const session = app.sessions.create({ summary: "hook manual failure", flow: "bare" });
-    app.sessions.update(session.id, { status: "running", stage: "work" });
+  it("StopFailure on manual-gate session keeps status running", async () => {
+    const session = await app.sessions.create({ summary: "hook manual failure", flow: "bare" });
+    await app.sessions.update(session.id, { status: "running", stage: "work" });
 
-    const freshSession = app.sessions.get(session.id)!;
+    const freshSession = await app.sessions.get(session.id)!;
     const result = applyHookStatus(app, freshSession, "StopFailure", {
       error: "auth failed",
     });
@@ -342,33 +342,33 @@ describe("Hook fallback path (SessionEnd)", () => {
     expect(result.newStatus).toBe("running");
   });
 
-  it("SessionEnd does not override already-completed status", () => {
-    const session = app.sessions.create({ summary: "already done", flow: "quick" });
-    app.sessions.update(session.id, { status: "completed", stage: "implement" });
+  it("SessionEnd does not override already-completed status", async () => {
+    const session = await app.sessions.create({ summary: "already done", flow: "quick" });
+    await app.sessions.update(session.id, { status: "completed", stage: "implement" });
 
-    const freshSession = app.sessions.get(session.id)!;
+    const freshSession = await app.sessions.get(session.id)!;
     const result = applyHookStatus(app, freshSession, "SessionEnd", {});
 
     // Auto-gate SessionEnd maps to "ready", but guard blocks overriding "completed"
     expect(result.newStatus).toBeUndefined();
   });
 
-  it("SessionEnd does not override stopped status", () => {
-    const session = app.sessions.create({ summary: "stopped session", flow: "quick" });
-    app.sessions.update(session.id, { status: "stopped", stage: "implement" });
+  it("SessionEnd does not override stopped status", async () => {
+    const session = await app.sessions.create({ summary: "stopped session", flow: "quick" });
+    await app.sessions.update(session.id, { status: "stopped", stage: "implement" });
 
-    const freshSession = app.sessions.get(session.id)!;
+    const freshSession = await app.sessions.get(session.id)!;
     const result = applyHookStatus(app, freshSession, "SessionEnd", {});
 
     // Should be no-op -- session was manually stopped
     expect(result.newStatus).toBeUndefined();
   });
 
-  it("hook events always generate audit log entries", () => {
-    const session = app.sessions.create({ summary: "audit test", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement" });
+  it("hook events always generate audit log entries", async () => {
+    const session = await app.sessions.create({ summary: "audit test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
-    const freshSession = app.sessions.get(session.id)!;
+    const freshSession = await app.sessions.get(session.id)!;
     const result = applyHookStatus(app, freshSession, "SessionEnd", { reason: "task_complete" });
 
     expect(result.events).toBeTruthy();
@@ -382,12 +382,12 @@ describe("Hook fallback path (SessionEnd)", () => {
 
 // ── Conductor HTTP endpoint wiring ──────────────────────────────────────────
 
-describe("Conductor channel report delivery", () => {
+describe("Conductor channel report delivery", async () => {
   it("POST /api/channel/:id with completed report stores message and updates session", async () => {
     server = startConductor(app, TEST_PORT, { quiet: true });
 
-    const session = app.sessions.create({ summary: "conductor test", flow: "bare" });
-    app.sessions.update(session.id, { status: "running", stage: "work" });
+    const session = await app.sessions.create({ summary: "conductor test", flow: "bare" });
+    await app.sessions.update(session.id, { status: "running", stage: "work" });
 
     const resp = await fetch(`http://localhost:${TEST_PORT}/api/channel/${session.id}`, {
       method: "POST",
@@ -405,22 +405,22 @@ describe("Conductor channel report delivery", () => {
     expect(resp.status).toBe(200);
 
     // Message should be stored
-    const msgs = app.messages.list(session.id);
+    const msgs = await app.messages.list(session.id);
     expect(msgs.length).toBe(1);
     expect(msgs[0].role).toBe("agent");
     expect(msgs[0].type).toBe("completed");
     expect(msgs[0].content).toContain("Task finished");
 
     // Manual gate: session should stay running
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.status).toBe("running");
   });
 
   it("POST /api/channel/:id with completed report on auto-gate advances session", async () => {
     server = startConductor(app, TEST_PORT, { quiet: true });
 
-    const session = app.sessions.create({ summary: "auto conductor test", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement" });
+    const session = await app.sessions.create({ summary: "auto conductor test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
     const resp = await fetch(`http://localhost:${TEST_PORT}/api/channel/${session.id}`, {
       method: "POST",
@@ -440,7 +440,7 @@ describe("Conductor channel report delivery", () => {
     // Auto gate: conductor should have advanced to next stage and auto-dispatched
     // Give a moment for the async advance to complete
     await new Promise((r) => setTimeout(r, 100));
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.stage).toBe("verify");
     // Status is "running" because auto-dispatch is now properly awaited
     expect(updated?.status).toBe("running");
@@ -449,8 +449,8 @@ describe("Conductor channel report delivery", () => {
   it("POST /hooks/status with SessionEnd on auto-gate advances session via HTTP", async () => {
     server = startConductor(app, TEST_PORT, { quiet: true });
 
-    const session = app.sessions.create({ summary: "hook http test", flow: "quick" });
-    app.sessions.update(session.id, { status: "running", stage: "implement" });
+    const session = await app.sessions.create({ summary: "hook http test", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
     const resp = await fetch(`http://localhost:${TEST_PORT}/hooks/status?session=${session.id}`, {
       method: "POST",
@@ -464,7 +464,7 @@ describe("Conductor channel report delivery", () => {
 
     // Give a moment for the async advance to complete
     await new Promise((r) => setTimeout(r, 100));
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     // Auto-gate SessionEnd triggers advance to next stage and auto-dispatch
     expect(updated?.stage).toBe("verify");
     // Status is "running" because auto-dispatch is now properly awaited
@@ -474,8 +474,8 @@ describe("Conductor channel report delivery", () => {
   it("POST /hooks/status with SessionEnd on manual-gate keeps session running via HTTP", async () => {
     server = startConductor(app, TEST_PORT, { quiet: true });
 
-    const session = app.sessions.create({ summary: "hook http manual", flow: "bare" });
-    app.sessions.update(session.id, { status: "running", stage: "work" });
+    const session = await app.sessions.create({ summary: "hook http manual", flow: "bare" });
+    await app.sessions.update(session.id, { status: "running", stage: "work" });
 
     const resp = await fetch(`http://localhost:${TEST_PORT}/hooks/status?session=${session.id}`, {
       method: "POST",
@@ -485,22 +485,22 @@ describe("Conductor channel report delivery", () => {
 
     expect(resp.status).toBe(200);
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.status).toBe("running");
   });
 });
 
 // ── Regression: SessionService.complete() must advance, not leave "ready" ───
 
-describe("Regression: complete() must advance flow (not leave status=ready)", () => {
+describe("Regression: complete() must advance flow (not leave status=ready)", async () => {
   it("SessionService.complete() + advance() on single-stage flow (bare) reaches 'completed'", async () => {
     // Use startSession (orchestration) to properly wire stage/flow like production
     const { startSession } = await import("../services/session-orchestration.js");
-    const session = startSession(app, { summary: "svc complete bare", flow: "bare" });
-    app.sessions.update(session.id, { status: "running" });
+    const session = await startSession(app, { summary: "svc complete bare", flow: "bare" });
+    await app.sessions.update(session.id, { status: "running" });
 
     // Call complete via SessionService (same path as RPC handler)
-    const result = app.sessionService.complete(session.id);
+    const result = await app.sessionService.complete(session.id);
     expect(result.ok).toBe(true);
 
     // Must call advance -- this is what the RPC handler must do
@@ -508,32 +508,32 @@ describe("Regression: complete() must advance flow (not leave status=ready)", ()
     expect(advResult.ok).toBe(true);
 
     // Session must be "completed", not stuck at "ready"
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.status).toBe("completed");
   });
 
   it("SessionService.complete() + advance() on multi-stage flow (quick) advances to next stage", async () => {
     const { startSession } = await import("../services/session-orchestration.js");
-    const session = startSession(app, { summary: "svc complete quick", flow: "quick" });
+    const session = await startSession(app, { summary: "svc complete quick", flow: "quick" });
     // startSession sets stage to "implement" for quick flow
-    app.sessions.update(session.id, { status: "running" });
+    await app.sessions.update(session.id, { status: "running" });
 
-    const result = app.sessionService.complete(session.id);
+    const result = await app.sessionService.complete(session.id);
     expect(result.ok).toBe(true);
 
     const advResult = await app.sessionService.advance(session.id, true);
     expect(advResult.ok).toBe(true);
 
     // Should advance to next stage (verify), not stay at "ready" on "implement"
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.stage).toBe("verify");
     expect(updated?.status).toBe("ready");
   });
 
   it("RPC session/complete handler advances bare flow to 'completed'", async () => {
     const { startSession } = await import("../services/session-orchestration.js");
-    const session = startSession(app, { summary: "rpc complete bare", flow: "bare" });
-    app.sessions.update(session.id, { status: "running" });
+    const session = await startSession(app, { summary: "rpc complete bare", flow: "bare" });
+    await app.sessions.update(session.id, { status: "running" });
 
     // Use Router + registerSessionHandlers (same pattern as handler tests)
     const { Router } = await import("../../server/router.js");
@@ -549,14 +549,14 @@ describe("Regression: complete() must advance flow (not leave status=ready)", ()
     expect((res as any).error).toBeUndefined();
 
     // The session must reach "completed" -- not stay at "ready"
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.status).toBe("completed");
   });
 
   it("RPC session/complete handler advances quick flow to next stage", async () => {
     const { startSession } = await import("../services/session-orchestration.js");
-    const session = startSession(app, { summary: "rpc complete quick", flow: "quick" });
-    app.sessions.update(session.id, { status: "running" });
+    const session = await startSession(app, { summary: "rpc complete quick", flow: "quick" });
+    await app.sessions.update(session.id, { status: "running" });
 
     const { Router } = await import("../../server/router.js");
     const { registerSessionHandlers } = await import("../../server/handlers/session.js");
@@ -570,7 +570,7 @@ describe("Regression: complete() must advance flow (not leave status=ready)", ()
     expect((res as any).error).toBeUndefined();
 
     // Should advance to "verify" stage, not stay at "ready" on "implement"
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.stage).toBe("verify");
     expect(updated?.status).toBe("ready");
   });

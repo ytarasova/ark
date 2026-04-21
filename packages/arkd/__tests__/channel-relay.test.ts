@@ -74,7 +74,7 @@ afterAll(() => {
 
 // ── Config endpoint ────────────────────────────────────────────────────────
 
-describe("/config", () => {
+describe("/config", async () => {
   it("GET returns current conductorUrl", async () => {
     const cfg = await client.getConfig();
     expect(cfg.ok).toBe(true);
@@ -93,7 +93,7 @@ describe("/config", () => {
 
 // ── Channel report forwarding ──────────────────────────────────────────────
 
-describe("/channel/:sessionId (report forwarding)", () => {
+describe("/channel/:sessionId (report forwarding)", async () => {
   it("forwards report to conductor", async () => {
     conductorRequests = [];
     const report = { type: "progress", message: "Working on it", stage: "work" };
@@ -148,7 +148,7 @@ describe("/channel/:sessionId (report forwarding)", () => {
 
 // ── Channel relay ──────────────────────────────────────────────────────────
 
-describe("/channel/relay", () => {
+describe("/channel/relay", async () => {
   it("forwards relay to conductor /api/relay", async () => {
     conductorRequests = [];
 
@@ -170,7 +170,7 @@ describe("/channel/relay", () => {
 
 // ── Channel deliver ────────────────────────────────────────────────────────
 
-describe("/channel/deliver", () => {
+describe("/channel/deliver", async () => {
   it("delivers task to local channel port", async () => {
     channelRequests = [];
 
@@ -210,7 +210,7 @@ describe("/channel/deliver", () => {
 
 // ── Full round-trip ────────────────────────────────────────────────────────
 
-describe("full relay chain", () => {
+describe("full relay chain", async () => {
   it("report → arkd → conductor (end-to-end)", async () => {
     conductorRequests = [];
 

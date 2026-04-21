@@ -32,7 +32,7 @@ export interface SearchOpts {
   transcriptsDir?: string;
 }
 
-export function searchSessions(app: AppContext, query: string, opts?: SearchOpts): SearchResult[] {
+export async function searchSessions(app: AppContext, query: string, opts?: SearchOpts): Promise<SearchResult[]> {
   const limit = opts?.limit ?? 50;
   const results: SearchResult[] = [];
   const seen = new Set<string>();
@@ -48,7 +48,7 @@ export function searchSessions(app: AppContext, query: string, opts?: SearchOpts
   const pattern = `%${query}%`;
 
   // 1. Session metadata
-  const metaRows = db
+  const metaRows = (await db
     .prepare(
       `SELECT id, ticket, summary, repo, created_at FROM sessions
      WHERE summary LIKE ? COLLATE NOCASE
@@ -56,7 +56,7 @@ export function searchSessions(app: AppContext, query: string, opts?: SearchOpts
         OR repo LIKE ? COLLATE NOCASE
      ORDER BY created_at DESC LIMIT ?`,
     )
-    .all(pattern, pattern, pattern, limit) as {
+    .all(pattern, pattern, pattern, limit)) as {
     id: string;
     ticket: string | null;
     summary: string | null;
@@ -74,26 +74,26 @@ export function searchSessions(app: AppContext, query: string, opts?: SearchOpts
   }
 
   // 2. Events
-  const eventRows = db
+  const eventRows = (await db
     .prepare(
       `SELECT track_id, data, created_at FROM events
      WHERE data LIKE ? COLLATE NOCASE
      ORDER BY created_at DESC LIMIT ?`,
     )
-    .all(pattern, limit) as { track_id: string; data: string | null; created_at: string }[];
+    .all(pattern, limit)) as { track_id: string; data: string | null; created_at: string }[];
 
   for (const row of eventRows) {
     add({ sessionId: row.track_id, source: "event", match: row.data ?? "", timestamp: row.created_at });
   }
 
   // 3. Messages
-  const msgRows = db
+  const msgRows = (await db
     .prepare(
       `SELECT session_id, content, created_at FROM messages
      WHERE content LIKE ? COLLATE NOCASE
      ORDER BY created_at DESC LIMIT ?`,
     )
-    .all(pattern, limit) as { session_id: string; content: string | null; created_at: string }[];
+    .all(pattern, limit)) as { session_id: string; content: string | null; created_at: string }[];
 
   for (const row of msgRows) {
     add({ sessionId: row.session_id, source: "message", match: row.content ?? "", timestamp: row.created_at });
@@ -103,13 +103,13 @@ export function searchSessions(app: AppContext, query: string, opts?: SearchOpts
 }
 
 /** Check if the FTS5 transcript_index table exists in the database */
-export function ftsTableExists(app: AppContext): boolean {
+export async function ftsTableExists(app: AppContext): Promise<boolean> {
   const db = app.db;
-  const row = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='transcript_index'").get();
+  const row = await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='transcript_index'").get();
   return !!row;
 }
 
-export function searchTranscripts(app: AppContext, query: string, opts?: SearchOpts): SearchResult[] {
+export async function searchTranscripts(app: AppContext, query: string, opts?: SearchOpts): Promise<SearchResult[]> {
   const limit = opts?.limit ?? 50;
 
   // When a custom transcriptsDir is provided, always use file scanning (used by tests)
@@ -118,7 +118,7 @@ export function searchTranscripts(app: AppContext, query: string, opts?: SearchO
   }
 
   // Use FTS5 index when the table exists (even if empty -- empty means no transcripts indexed yet)
-  if (ftsTableExists(app)) {
+  if (await ftsTableExists(app)) {
     return searchTranscriptsFTS(app, query, limit);
   }
 
@@ -126,7 +126,7 @@ export function searchTranscripts(app: AppContext, query: string, opts?: SearchO
   return searchTranscriptsFiles(query, opts);
 }
 
-function searchTranscriptsFTS(app: AppContext, query: string, limit: number): SearchResult[] {
+async function searchTranscriptsFTS(app: AppContext, query: string, limit: number): Promise<SearchResult[]> {
   const db = app.db;
   const terms = query
     .replace(/['"*()]/g, "")
@@ -136,7 +136,7 @@ function searchTranscriptsFTS(app: AppContext, query: string, limit: number): Se
 
   // Single term: simple FTS query
   if (terms.length === 1) {
-    const rows = db
+    const rows = (await db
       .prepare(
         `SELECT session_id, role, content, timestamp,
               snippet(transcript_index, 3, '>>>','<<<', '...', ${FTS_SNIPPET_WORDS}) as snippet
@@ -145,7 +145,7 @@ function searchTranscriptsFTS(app: AppContext, query: string, limit: number): Se
        ORDER BY rank
        LIMIT ?`,
       )
-      .all(`"${terms[0]}"`, limit) as FtsRow[];
+      .all(`"${terms[0]}"`, limit)) as FtsRow[];
     return rows.map(ftsRowToResult);
   }
 
@@ -153,9 +153,9 @@ function searchTranscriptsFTS(app: AppContext, query: string, limit: number): Se
   // 1. Find session IDs matching each term, intersect in JS
   let matchingSessions: Set<string> | null = null;
   for (const term of terms) {
-    const rows = db
+    const rows = (await db
       .prepare(`SELECT DISTINCT session_id FROM transcript_index WHERE transcript_index MATCH ?`)
-      .all(`"${term}"`) as { session_id: string }[];
+      .all(`"${term}"`)) as { session_id: string }[];
     const ids = new Set(rows.map((r) => r.session_id));
     if (matchingSessions === null) {
       matchingSessions = ids;
@@ -169,7 +169,7 @@ function searchTranscriptsFTS(app: AppContext, query: string, limit: number): Se
   const sessionIds = [...matchingSessions!];
   const placeholders = sessionIds.map(() => "?").join(",");
   const orQuery = terms.map((t) => `"${t}"`).join(" OR ");
-  const rows = db
+  const rows = (await db
     .prepare(
       `SELECT session_id, role, content, timestamp,
             snippet(transcript_index, 3, '>>>','<<<', '...', ${FTS_SNIPPET_WORDS}) as snippet
@@ -179,7 +179,7 @@ function searchTranscriptsFTS(app: AppContext, query: string, limit: number): Se
      ORDER BY rank
      LIMIT ?`,
     )
-    .all(...sessionIds, orQuery, limit) as FtsRow[];
+    .all(...sessionIds, orQuery, limit)) as FtsRow[];
   return rows.map(ftsRowToResult);
 }
 
@@ -254,41 +254,40 @@ function searchTranscriptsFiles(query: string, opts?: SearchOpts): SearchResult[
 // ── Per-session conversation ─────────────────────────────────────────────────
 
 /** Get conversation turns for a specific session, ordered chronologically */
-export function getSessionConversation(
+export async function getSessionConversation(
   app: AppContext,
   sessionId: string,
   opts?: { limit?: number },
-): { role: string; content: string; timestamp: string }[] {
-  if (!ftsTableExists(app)) return [];
+): Promise<{ role: string; content: string; timestamp: string }[]> {
+  if (!(await ftsTableExists(app))) return [];
   const db = app.db;
   const limit = opts?.limit ?? 100;
   try {
-    return (
-      db
-        .prepare(
-          `SELECT role, content, timestamp FROM transcript_index
+    const rows = (await db
+      .prepare(
+        `SELECT role, content, timestamp FROM transcript_index
        WHERE session_id = ? ORDER BY rowid DESC LIMIT ?`,
-        )
-        .all(sessionId, limit) as { role: string; content: string; timestamp: string }[]
-    ).reverse();
+      )
+      .all(sessionId, limit)) as { role: string; content: string; timestamp: string }[];
+    return rows.reverse();
   } catch {
     return [];
   }
 }
 
 /** Search within a specific session's conversation */
-export function searchSessionConversation(
+export async function searchSessionConversation(
   app: AppContext,
   sessionId: string,
   query: string,
   opts?: { limit?: number },
-): SearchResult[] {
-  if (!ftsTableExists(app)) return [];
+): Promise<SearchResult[]> {
+  if (!(await ftsTableExists(app))) return [];
   const db = app.db;
   const limit = opts?.limit ?? 20;
   const ftsQuery = escapeFtsQuery(query);
   try {
-    const rows = db
+    const rows = (await db
       .prepare(
         `SELECT role, content, timestamp,
               snippet(transcript_index, 3, '>>>','<<<', '...', ${FTS_SNIPPET_WORDS}) as snippet
@@ -296,7 +295,7 @@ export function searchSessionConversation(
        WHERE session_id = ? AND transcript_index MATCH ?
        ORDER BY rank LIMIT ?`,
       )
-      .all(sessionId, ftsQuery, limit) as {
+      .all(sessionId, ftsQuery, limit)) as {
       role: string;
       content: string | null;
       timestamp: string | null;
@@ -306,7 +305,7 @@ export function searchSessionConversation(
       sessionId,
       source: "transcript" as const,
       match: r.snippet || r.content?.slice(0, 120) || "",
-      timestamp: r.timestamp,
+      timestamp: r.timestamp ?? undefined,
     }));
   } catch {
     return [];
@@ -325,7 +324,7 @@ export async function indexTranscripts(
   const db = app.db;
 
   // Clear existing index
-  db.exec("DELETE FROM transcript_index");
+  await db.prepare("DELETE FROM transcript_index").run();
 
   const insert = db.prepare(
     "INSERT INTO transcript_index (session_id, project, role, content, timestamp) VALUES (?, ?, ?, ?, ?)",
@@ -368,7 +367,7 @@ export async function indexTranscripts(
           }
           const text = extractText(entry);
           if (!text.trim() || text.length < 10) continue;
-          insert.run(sessionId, projectDir, entry.type, text, entry.timestamp ?? null);
+          await insert.run(sessionId, projectDir, entry.type, text, entry.timestamp ?? null);
           indexed++;
         } catch {
           logDebug("general", "skip malformed entries");
@@ -386,7 +385,12 @@ export async function indexTranscripts(
   return indexed;
 }
 
-export function indexSession(app: AppContext, transcriptPath: string, sessionId: string, project?: string): number {
+export async function indexSession(
+  app: AppContext,
+  transcriptPath: string,
+  sessionId: string,
+  project?: string,
+): Promise<number> {
   if (!existsSync(transcriptPath)) return 0;
 
   const db = app.db;
@@ -394,9 +398,9 @@ export function indexSession(app: AppContext, transcriptPath: string, sessionId:
   // Incremental: find the max timestamp already indexed for this session
   let maxTs: string | null = null;
   try {
-    const row = db.prepare("SELECT MAX(timestamp) as ts FROM transcript_index WHERE session_id = ?").get(sessionId) as
-      | { ts: string | null }
-      | undefined;
+    const row = (await db
+      .prepare("SELECT MAX(timestamp) as ts FROM transcript_index WHERE session_id = ?")
+      .get(sessionId)) as { ts: string | null } | undefined;
     maxTs = row?.ts ?? null;
   } catch {
     logDebug("general", "index table may not exist yet");
@@ -435,7 +439,7 @@ export function indexSession(app: AppContext, transcriptPath: string, sessionId:
       const text = extractText(entry);
       if (!text.trim() || text.length < 10) continue;
 
-      insert.run(sessionId, project ?? "", entry.type, text, ts);
+      await insert.run(sessionId, project ?? "", entry.type, text, ts);
       indexed++;
     } catch {
       logDebug("general", "skip malformed entries");
@@ -445,15 +449,14 @@ export function indexSession(app: AppContext, transcriptPath: string, sessionId:
   return indexed;
 }
 
-export function getIndexStats(app: AppContext): { entries: number; sessions: number } {
+export async function getIndexStats(app: AppContext): Promise<{ entries: number; sessions: number }> {
   const db = app.db;
   try {
-    const entries =
-      (db.prepare("SELECT COUNT(*) as c FROM transcript_index").get() as { c: number } | undefined)?.c ?? 0;
-    const sessions =
-      (db.prepare("SELECT COUNT(DISTINCT session_id) as c FROM transcript_index").get() as { c: number } | undefined)
-        ?.c ?? 0;
-    return { entries, sessions };
+    const eRow = (await db.prepare("SELECT COUNT(*) as c FROM transcript_index").get()) as { c: number } | undefined;
+    const sRow = (await db.prepare("SELECT COUNT(DISTINCT session_id) as c FROM transcript_index").get()) as
+      | { c: number }
+      | undefined;
+    return { entries: eRow?.c ?? 0, sessions: sRow?.c ?? 0 };
   } catch {
     return { entries: 0, sessions: 0 };
   }

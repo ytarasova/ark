@@ -45,25 +45,26 @@ export const getContextQuery: QueryMethod<GetContextArgs, GetContextResult> = {
     let file: FileRow | null = null;
 
     // Try as file id first.
-    file = ctx.store.getFile(ctx.tenant_id, args.subject);
+    file = await ctx.store.getFile(ctx.tenant_id, args.subject);
 
     // If not a file id and we have a repo_id, try as a path.
     if (!file && args.repo_id) {
-      file = ctx.store.findFileByPath(ctx.tenant_id, args.repo_id, args.subject);
+      file = await ctx.store.findFileByPath(ctx.tenant_id, args.repo_id, args.subject);
     }
 
     // If still no file, try resolving via symbol name -> first symbol's file.
     if (!file) {
-      const symbols = ctx.store.findSymbolByName(ctx.tenant_id, args.subject, 1);
+      const symbols = await ctx.store.findSymbolByName(ctx.tenant_id, args.subject, 1);
       if (symbols.length > 0) {
-        file = ctx.store.getFile(ctx.tenant_id, symbols[0].file_id);
+        file = await ctx.store.getFile(ctx.tenant_id, symbols[0].file_id);
       }
     }
 
     if (!file) return empty;
 
-    const symbols_in_file = ctx.store.listSymbolsByFile(ctx.tenant_id, file.id);
-    const top_contributors = ctx.store.listContributionsForFile(ctx.tenant_id, file.id, 5).map((c) => ({
+    const symbols_in_file = await ctx.store.listSymbolsByFile(ctx.tenant_id, file.id);
+    const contribs = await ctx.store.listContributionsForFile(ctx.tenant_id, file.id, 5);
+    const top_contributors = contribs.map((c) => ({
       person_id: c.person_id,
       commit_count: c.commit_count,
       loc_added: c.loc_added,
@@ -73,9 +74,9 @@ export const getContextQuery: QueryMethod<GetContextArgs, GetContextResult> = {
 
     // Dependents = inbound edges to this file. Counts symbol-level edges into any of the file's symbols
     // plus direct file-level edges.
-    let dependents_count = ctx.store.listEdgesTo(ctx.tenant_id, "file", file.id).length;
+    let dependents_count = (await ctx.store.listEdgesTo(ctx.tenant_id, "file", file.id)).length;
     for (const s of symbols_in_file) {
-      dependents_count += ctx.store.listEdgesTo(ctx.tenant_id, "symbol", s.id).length;
+      dependents_count += (await ctx.store.listEdgesTo(ctx.tenant_id, "symbol", s.id)).length;
     }
 
     return { file, symbols_in_file, top_contributors, dependents_count };

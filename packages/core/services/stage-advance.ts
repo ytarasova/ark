@@ -24,7 +24,7 @@ export async function advance(
   force = false,
   outcome?: string,
 ): Promise<{ ok: boolean; message: string }> {
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   const { flow: flowName, stage } = session;
@@ -98,8 +98,8 @@ export async function advance(
         if (graphIsolation === "fresh") {
           graphSessionUpdates.claude_session_id = null;
         }
-        app.sessions.update(sessionId, graphSessionUpdates);
-        app.events.log(sessionId, "stage_ready", {
+        await app.sessions.update(sessionId, graphSessionUpdates);
+        await app.events.log(sessionId, "stage_ready", {
           actor: "system",
           stage: graphNextStage,
           data: {
@@ -135,8 +135,8 @@ export async function advance(
         } catch {
           logDebug("session", "flow-state persistence is best-effort -- stage still advances");
         }
-        app.sessions.update(sessionId, { status: "waiting" });
-        app.events.log(sessionId, "stage_waiting", {
+        await app.sessions.update(sessionId, { status: "waiting" });
+        await app.events.log(sessionId, "stage_waiting", {
           actor: "system",
           stage,
           data: { via: "graph-flow-conditional", waiting_for: allSuccessors, reason: "join-barrier" },
@@ -150,16 +150,16 @@ export async function advance(
       } catch {
         logDebug("session", "flow-state persistence is best-effort -- stage still advances");
       }
-      app.sessions.update(sessionId, { status: "completed" });
-      app.events.log(sessionId, "session_completed", {
+      await app.sessions.update(sessionId, { status: "completed" });
+      await app.events.log(sessionId, "session_completed", {
         stage,
         actor: "system",
         data: { final_stage: stage, flow: flowName, via: "graph-flow-conditional" },
       });
-      app.messages.markRead(sessionId);
+      await app.messages.markRead(sessionId);
       emitStageSpanEnd(sessionId, { status: "completed" });
-      const s = app.sessions.get(sessionId);
-      const agg = app.usageRecorder.getSessionCost(sessionId);
+      const s = await app.sessions.get(sessionId);
+      const agg = await app.usageRecorder.getSessionCost(sessionId);
       emitSessionSpanEnd(sessionId, {
         status: "completed",
         tokens_in: agg.input_tokens,
@@ -183,18 +183,18 @@ export async function advance(
     } catch {
       logDebug("session", "flow-state persistence is best-effort -- stage still advances");
     }
-    app.sessions.update(sessionId, { status: "completed" });
-    app.events.log(sessionId, "session_completed", {
+    await app.sessions.update(sessionId, { status: "completed" });
+    await app.events.log(sessionId, "session_completed", {
       stage,
       actor: "system",
       data: { final_stage: stage, flow: flowName },
     });
     // Auto-clear unread badge so completed sessions don't show stale notifications
-    app.messages.markRead(sessionId);
+    await app.messages.markRead(sessionId);
 
     emitStageSpanEnd(sessionId, { status: "completed" });
-    const s = app.sessions.get(sessionId);
-    const agg = app.usageRecorder.getSessionCost(sessionId);
+    const s = await app.sessions.get(sessionId);
+    const agg = await app.usageRecorder.getSessionCost(sessionId);
     emitSessionSpanEnd(sessionId, {
       status: "completed",
       tokens_in: agg.input_tokens,
@@ -209,7 +209,7 @@ export async function advance(
     try {
       const { extractAndSaveSkills } = await import("../agent/skill-extractor.js");
       const { getSessionConversation } = await import("../search/search.js");
-      const conv = getSessionConversation(app, sessionId);
+      const conv = await getSessionConversation(app, sessionId);
       if (conv.length > 0) {
         const turns = conv.map((c) => ({ role: c.role === "message" ? "user" : "assistant", content: c.content }));
         extractAndSaveSkills(sessionId, turns, app);
@@ -249,9 +249,9 @@ export async function advance(
   if (isolation === "fresh") {
     sessionUpdates.claude_session_id = null;
   }
-  app.sessions.update(sessionId, sessionUpdates);
+  await app.sessions.update(sessionId, sessionUpdates);
 
-  app.events.log(sessionId, "stage_ready", {
+  await app.events.log(sessionId, "stage_ready", {
     stage: nextStage,
     actor: "system",
     data: {
@@ -279,13 +279,13 @@ export async function complete(
   sessionId: string,
   opts?: { force?: boolean },
 ): Promise<{ ok: boolean; message: string }> {
-  const session = app.sessions.get(sessionId);
+  const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
   // Run verification unless --force.
   // Quick sync check: only call async runVerification if there are todos or verify scripts.
   if (!opts?.force) {
-    const hasTodos = app.todos.list(sessionId).length > 0;
+    const hasTodos = (await app.todos.list(sessionId)).length > 0;
     const stageVerify =
       session.stage && session.flow ? flow.getStage(app, session.flow, session.stage)?.verify : undefined;
     const repoVerify = session.workdir ? loadRepoConfig(session.workdir).verify : undefined;
@@ -299,18 +299,18 @@ export async function complete(
     }
   }
 
-  app.events.log(sessionId, "stage_completed", {
+  await app.events.log(sessionId, "stage_completed", {
     stage: session.stage,
     actor: "user",
     data: { note: "Manually completed" },
   });
-  app.messages.markRead(sessionId);
+  await app.messages.markRead(sessionId);
 
   // Parse agent transcript for token usage (non-Claude agents).
   // Claude usage is captured via hooks in applyHookStatus(); this handles codex/gemini.
   parseNonClaudeTranscript(app, session);
 
-  app.sessions.update(sessionId, { status: "ready", session_id: null });
+  await app.sessions.update(sessionId, { status: "ready", session_id: null });
   return await advance(app, sessionId, true);
 }
 
@@ -362,10 +362,10 @@ export async function handoff(
   toAgent: string,
   instructions?: string,
 ): Promise<{ ok: boolean; message: string }> {
-  const result = cloneSession(app, sessionId, instructions);
+  const result = await cloneSession(app, sessionId, instructions);
   if (!result.ok) return { ok: false, message: (result as { ok: false; message: string }).message };
 
-  app.events.log(result.sessionId, "session_handoff", {
+  await app.events.log(result.sessionId, "session_handoff", {
     actor: "user",
     data: { from_session: sessionId, to_agent: toAgent, instructions },
   });

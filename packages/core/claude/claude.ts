@@ -1040,7 +1040,7 @@ export async function deliverTask(
     // Try arkd delivery first
     if (opts?.arkdUrl) {
       try {
-        const { ArkdClient } = await import("../arkd/client.js");
+        const { ArkdClient } = await import("../../arkd/client.js");
         const client = new ArkdClient(opts.arkdUrl);
         const result = await client.channelDeliver({ channelPort, payload });
         if (result.delivered) return;

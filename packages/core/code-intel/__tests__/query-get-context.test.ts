@@ -11,14 +11,14 @@ let fileId: string;
 let symbolId: string;
 let personId: string;
 
-beforeAll(() => {
+beforeAll(async () => {
   db = new BunSqliteAdapter(new Database(":memory:"));
   store = new CodeIntelStore(db);
-  store.migrate();
-  const repo = store.createRepo({ tenant_id: DEFAULT_TENANT_ID, repo_url: "file:///ctx", name: "ctx" });
+  await store.migrate();
+  const repo = await store.createRepo({ tenant_id: DEFAULT_TENANT_ID, repo_url: "file:///ctx", name: "ctx" });
   repoId = repo.id;
-  const run = store.beginIndexingRun({ tenant_id: DEFAULT_TENANT_ID, repo_id: repoId, branch: "main" });
-  const f = store.insertFile({
+  const run = await store.beginIndexingRun({ tenant_id: DEFAULT_TENANT_ID, repo_id: repoId, branch: "main" });
+  const f = await store.insertFile({
     tenant_id: DEFAULT_TENANT_ID,
     repo_id: repoId,
     path: "lib/auth.ts",
@@ -27,7 +27,7 @@ beforeAll(() => {
     indexing_run_id: run.id,
   });
   fileId = f.id;
-  const sym = store.insertSymbol({
+  const sym = await store.insertSymbol({
     tenant_id: DEFAULT_TENANT_ID,
     file_id: fileId,
     kind: "function",
@@ -35,13 +35,13 @@ beforeAll(() => {
     indexing_run_id: run.id,
   });
   symbolId = sym.id;
-  const person = store.upsertPerson({
+  const person = await store.upsertPerson({
     tenant_id: DEFAULT_TENANT_ID,
     primary_email: "ada@example.com",
     name: "Ada",
   });
   personId = person.id;
-  store.insertContribution({
+  await store.insertContribution({
     tenant_id: DEFAULT_TENANT_ID,
     person_id: personId,
     repo_id: repoId,
@@ -53,9 +53,11 @@ beforeAll(() => {
   });
 });
 
-afterAll(() => db.close());
+afterAll(async () => {
+  await db.close();
+});
 
-describe("getContextQuery", () => {
+describe("getContextQuery", async () => {
   it("resolves by file id and returns symbols + contributors", async () => {
     const result = await getContextQuery.run({ tenant_id: DEFAULT_TENANT_ID, store }, { subject: fileId });
     expect(result.file?.path).toBe("lib/auth.ts");
@@ -89,15 +91,15 @@ describe("getContextQuery", () => {
 
   it("includes dependents_count from inbound edges", async () => {
     // Add an inbound edge to a symbol; expect dependents_count >= 1.
-    const run2 = store.beginIndexingRun({ tenant_id: DEFAULT_TENANT_ID, repo_id: repoId, branch: "main" });
-    const callerSym = store.insertSymbol({
+    const run2 = await store.beginIndexingRun({ tenant_id: DEFAULT_TENANT_ID, repo_id: repoId, branch: "main" });
+    const callerSym = await store.insertSymbol({
       tenant_id: DEFAULT_TENANT_ID,
       file_id: fileId,
       kind: "function",
       name: "caller",
       indexing_run_id: run2.id,
     });
-    store.insertEdge({
+    await store.insertEdge({
       tenant_id: DEFAULT_TENANT_ID,
       source_kind: "symbol",
       source_id: callerSym.id,

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { getProcessTree, killProcessTree, snapshotSessionTree } from "../executors/process-tree.js";
 
-describe("process-tree", () => {
+describe("process-tree", async () => {
   it("discovers children of the current process", async () => {
     const tree = await getProcessTree(process.pid);
     expect(tree.rootPid).toBe(process.pid);

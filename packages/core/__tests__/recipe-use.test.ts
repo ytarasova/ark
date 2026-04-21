@@ -10,13 +10,13 @@ import { getApp } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
 
-describe("recipe use", () => {
-  it("creates a session from a recipe with defaults", () => {
+describe("recipe use", async () => {
+  it("creates a session from a recipe with defaults", async () => {
     const recipe = getApp().recipes.get("quick-fix")!;
     expect(recipe).not.toBeNull();
 
     const instance = instantiateRecipe(recipe, { repo: "/tmp/test", summary: "test fix" });
-    const session = startSession(getApp(), {
+    const session = await startSession(getApp(), {
       summary: instance.summary ?? recipe.description,
       repo: instance.repo,
       flow: instance.flow,
@@ -30,12 +30,12 @@ describe("recipe use", () => {
     expect(session.flow).toBe(recipe.flow);
   });
 
-  it("creates a session with overridden values", () => {
+  it("creates a session with overridden values", async () => {
     const recipe = getApp().recipes.get("code-review")!;
     expect(recipe).not.toBeNull();
 
     const instance = instantiateRecipe(recipe, { repo: "/tmp/myrepo", summary: "Custom review task" });
-    const session = startSession(getApp(), {
+    const session = await startSession(getApp(), {
       summary: instance.summary ?? recipe.description,
       repo: instance.repo,
       flow: instance.flow,
@@ -47,10 +47,10 @@ describe("recipe use", () => {
     expect(session.repo).toBe("/tmp/myrepo");
   });
 
-  it("falls back to recipe description when no summary provided", () => {
+  it("falls back to recipe description when no summary provided", async () => {
     const recipe = getApp().recipes.get("quick-fix")!;
     const instance = instantiateRecipe(recipe, { repo: "/tmp/test" });
-    const session = startSession(getApp(), {
+    const session = await startSession(getApp(), {
       summary: instance.summary ?? recipe.description,
       repo: instance.repo,
       flow: instance.flow,
@@ -59,12 +59,12 @@ describe("recipe use", () => {
     expect(session.summary).toBe(recipe.description);
   });
 
-  it("passes agent from recipe instance to startSession", () => {
+  it("passes agent from recipe instance to startSession", async () => {
     const recipe = getApp().recipes.get("quick-fix")!;
     expect(recipe).not.toBeNull();
 
     const instance = instantiateRecipe(recipe, { repo: "/tmp/test", summary: "test agent" });
-    const session = startSession(getApp(), {
+    const session = await startSession(getApp(), {
       summary: instance.summary ?? recipe.description,
       repo: instance.repo,
       flow: instance.flow,
@@ -82,8 +82,8 @@ describe("recipe use", () => {
     }
   });
 
-  it("startSession with explicit agent sets it on the session", () => {
-    const session = startSession(getApp(), {
+  it("startSession with explicit agent sets it on the session", async () => {
+    const session = await startSession(getApp(), {
       summary: "test-agent-param",
       repo: "/tmp/test",
       flow: "bare",
@@ -94,8 +94,8 @@ describe("recipe use", () => {
     expect(fetched.agent).toBe("worker");
   });
 
-  it("startSession without agent leaves it null", () => {
-    const session = startSession(getApp(), {
+  it("startSession without agent leaves it null", async () => {
+    const session = await startSession(getApp(), {
       summary: "test-no-agent",
       repo: "/tmp/test",
       flow: "bare",

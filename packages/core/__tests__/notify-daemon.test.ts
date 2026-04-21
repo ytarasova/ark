@@ -6,7 +6,7 @@ import { getApp } from "./test-helpers.js";
 
 withTestContext();
 
-describe("NotifyDaemon", () => {
+describe("NotifyDaemon", async () => {
   let daemon: NotifyDaemon | null = null;
   afterEach(() => {
     daemon?.stop();

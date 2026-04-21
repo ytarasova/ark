@@ -34,7 +34,7 @@ function err(res: unknown): { code: number; message: string } {
   return (res as JsonRpcError).error as { code: number; message: string };
 }
 
-describe("agent CRUD handlers", () => {
+describe("agent CRUD handlers", async () => {
   it("agent/create persists a new agent and agent/delete removes it", async () => {
     const create = await router.dispatch(
       createRequest(1, "agent/create", {
@@ -76,7 +76,7 @@ describe("agent CRUD handlers", () => {
   });
 });
 
-describe("flow CRUD handlers", () => {
+describe("flow CRUD handlers", async () => {
   it("flow/create persists a flow and flow/delete removes it", async () => {
     const stages = [
       { name: "plan", agent: "spec-planner", gate: "manual" },
@@ -113,7 +113,7 @@ describe("flow CRUD handlers", () => {
   });
 });
 
-describe("skill CRUD handlers", () => {
+describe("skill CRUD handlers", async () => {
   it("skill/save creates and skill/delete removes", async () => {
     const save = await router.dispatch(
       createRequest(1, "skill/save", {
@@ -140,7 +140,7 @@ describe("skill CRUD handlers", () => {
   });
 });
 
-describe("recipe CRUD handlers", () => {
+describe("recipe CRUD handlers", async () => {
   it("recipe/delete refuses builtin recipes", async () => {
     const res = await router.dispatch(createRequest(1, "recipe/delete", { name: "quick-fix" }));
     expect(err(res)).toBeDefined();

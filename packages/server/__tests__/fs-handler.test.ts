@@ -62,7 +62,7 @@ async function call(path?: string) {
   return router.dispatch(req);
 }
 
-describe("fs/list-dir handler", () => {
+describe("fs/list-dir handler", async () => {
   it("lists only directories, sorted case-insensitively", async () => {
     const res = (await call(tmpRoot)) as JsonRpcResponse;
     const result = res.result as any;

@@ -170,8 +170,8 @@ describe("validateDAG with on_outcome", () => {
 
 // ── applyReport outcome extraction ──────────────────────────────────────────
 
-describe("applyReport outcome extraction", () => {
-  it("captures outcome from completed report", () => {
+describe("applyReport outcome extraction", async () => {
+  it("captures outcome from completed report", async () => {
     writeFlow("outcome-report-flow", {
       name: "outcome-report-flow",
       stages: [
@@ -180,8 +180,8 @@ describe("applyReport outcome extraction", () => {
       ],
     });
 
-    const session = app.sessions.create({ summary: "Test outcome", flow: "outcome-report-flow" });
-    app.sessions.update(session.id, { status: "running", stage: "review", agent: "reviewer" });
+    const session = await app.sessions.create({ summary: "Test outcome", flow: "outcome-report-flow" });
+    await app.sessions.update(session.id, { status: "running", stage: "review", agent: "reviewer" });
 
     const result = applyReport(app, session.id, {
       type: "completed",
@@ -193,7 +193,7 @@ describe("applyReport outcome extraction", () => {
     expect(result.outcome).toBe("approved");
   });
 
-  it("does not set outcome when not provided in report", () => {
+  it("does not set outcome when not provided in report", async () => {
     writeFlow("outcome-no-report", {
       name: "outcome-no-report",
       stages: [
@@ -202,8 +202,8 @@ describe("applyReport outcome extraction", () => {
       ],
     });
 
-    const session = app.sessions.create({ summary: "Test no outcome", flow: "outcome-no-report" });
-    app.sessions.update(session.id, { status: "running", stage: "build", agent: "builder" });
+    const session = await app.sessions.create({ summary: "Test no outcome", flow: "outcome-no-report" });
+    await app.sessions.update(session.id, { status: "running", stage: "build", agent: "builder" });
 
     const result = applyReport(app, session.id, {
       type: "completed",
@@ -217,7 +217,7 @@ describe("applyReport outcome extraction", () => {
 
 // ── advance() with outcome routing ──────────────────────────────────────────
 
-describe("advance with outcome routing", () => {
+describe("advance with outcome routing", async () => {
   it("advances to outcome-routed stage", async () => {
     writeFlow("outcome-advance", {
       name: "outcome-advance",
@@ -228,15 +228,15 @@ describe("advance with outcome routing", () => {
       ],
     });
 
-    const session = app.sessions.create({ summary: "Test advance", flow: "outcome-advance" });
-    app.sessions.update(session.id, { status: "running", stage: "review", agent: "reviewer" });
+    const session = await app.sessions.create({ summary: "Test advance", flow: "outcome-advance" });
+    await app.sessions.update(session.id, { status: "running", stage: "review", agent: "reviewer" });
 
     // Advance with outcome "approved" -- should go to "deploy" (skipping "revise")
     const result = await advance(app, session.id, true, "approved");
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Advanced to deploy");
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.stage).toBe("deploy");
   });
 
@@ -250,15 +250,15 @@ describe("advance with outcome routing", () => {
       ],
     });
 
-    const session = app.sessions.create({ summary: "Test advance rejected", flow: "outcome-advance2" });
-    app.sessions.update(session.id, { status: "running", stage: "review", agent: "reviewer" });
+    const session = await app.sessions.create({ summary: "Test advance rejected", flow: "outcome-advance2" });
+    await app.sessions.update(session.id, { status: "running", stage: "review", agent: "reviewer" });
 
     // Advance with outcome "rejected" -- should go to "revise"
     const result = await advance(app, session.id, true, "rejected");
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Advanced to revise");
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.stage).toBe("revise");
   });
 
@@ -272,15 +272,15 @@ describe("advance with outcome routing", () => {
       ],
     });
 
-    const session = app.sessions.create({ summary: "Test linear fallback", flow: "outcome-advance-linear" });
-    app.sessions.update(session.id, { status: "running", stage: "review", agent: "reviewer" });
+    const session = await app.sessions.create({ summary: "Test linear fallback", flow: "outcome-advance-linear" });
+    await app.sessions.update(session.id, { status: "running", stage: "review", agent: "reviewer" });
 
     // Advance without outcome -- should go to linear next ("revise")
     const result = await advance(app, session.id, true);
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Advanced to revise");
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated?.stage).toBe("revise");
   });
 });

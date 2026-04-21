@@ -22,7 +22,7 @@ export const apiEndpointRegistryExtractor: PlatformDocExtractor = {
   flavor: "mechanical",
   cadence: "on_reindex",
   async generate(ctx: PlatformDocContext, workspace_id: string): Promise<PlatformDocInput> {
-    const repos = ctx.store.listReposInWorkspace(ctx.tenant_id, workspace_id);
+    const repos = await ctx.store.listReposInWorkspace(ctx.tenant_id, workspace_id);
     const repoCount = repos.length;
     const body =
       repoCount === 0

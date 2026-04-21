@@ -96,7 +96,7 @@ describe("StageDefinition compute_template field", () => {
 
 // ── resolveComputeForStage ─────────────────────────────────────────────────
 
-describe("resolveComputeForStage", () => {
+describe("resolveComputeForStage", async () => {
   it("returns null when stageDef is null", () => {
     const result = resolveComputeForStage(app, null, "s-test");
     expect(result).toBeNull();
@@ -116,7 +116,7 @@ describe("resolveComputeForStage", () => {
     expect(logs.some((l) => l.includes("not found"))).toBe(true);
   });
 
-  it("provisions compute from DB template when no existing compute", () => {
+  it("provisions compute from DB template when no existing compute", async () => {
     // Create a template in DB
     app.computeTemplates.create({
       name: "fast-docker",
@@ -124,7 +124,7 @@ describe("resolveComputeForStage", () => {
       config: { image: "node:20" },
     });
 
-    const session = app.sessions.create({ summary: "template-test" });
+    const session = await app.sessions.create({ summary: "template-test" });
     const stageDef = { name: "implement", gate: "auto" as const, compute_template: "fast-docker" };
     const logs: string[] = [];
 
@@ -132,30 +132,30 @@ describe("resolveComputeForStage", () => {
     expect(result).toBe("fast-docker");
 
     // Verify compute was created
-    const compute = app.computes.get("fast-docker");
+    const compute = await app.computes.get("fast-docker");
     expect(compute).not.toBeNull();
     expect(compute!.provider).toBe("docker");
 
     // Verify event was logged
-    const events = app.events.list(session.id);
+    const events = await app.events.list(session.id);
     const provisionEvent = events.find((e) => e.type === "compute_provisioned_from_template");
     expect(provisionEvent).toBeDefined();
     expect(provisionEvent!.data?.template).toBe("fast-docker");
 
     // Clean up
-    app.computes.delete("fast-docker");
+    await app.computes.delete("fast-docker");
   });
 
-  it("reuses existing compute when it matches template name", () => {
+  it("reuses existing compute when it matches template name", async () => {
     // Create template and a matching compute
     app.computeTemplates.create({
       name: "existing-compute",
       provider: "ec2",
       config: { size: "xl" },
     });
-    app.computes.create({ name: "existing-compute", provider: "ec2", config: { size: "xl" } });
+    await app.computes.create({ name: "existing-compute", provider: "ec2", config: { size: "xl" } });
 
-    const session = app.sessions.create({ summary: "reuse-test" });
+    const session = await app.sessions.create({ summary: "reuse-test" });
     const stageDef = { name: "work", gate: "auto" as const, compute_template: "existing-compute" };
     const logs: string[] = [];
 
@@ -164,32 +164,32 @@ describe("resolveComputeForStage", () => {
     expect(logs.some((l) => l.includes("existing compute"))).toBe(true);
 
     // Verify no new provision event (reused existing)
-    const events = app.events.list(session.id);
+    const events = await app.events.list(session.id);
     const provisionEvent = events.find((e) => e.type === "compute_provisioned_from_template");
     expect(provisionEvent).toBeUndefined();
 
-    app.computes.delete("existing-compute");
+    await app.computes.delete("existing-compute");
   });
 
-  it("resolves template from config when not in DB", () => {
+  it("resolves template from config when not in DB", async () => {
     // Temporarily add to config
     const originalTemplates = app.config.computeTemplates;
     app.config.computeTemplates = [{ name: "config-tmpl", provider: "docker", config: { image: "alpine" } }];
 
-    const session = app.sessions.create({ summary: "config-test" });
+    const session = await app.sessions.create({ summary: "config-test" });
     const stageDef = { name: "build", gate: "auto" as const, compute_template: "config-tmpl" };
 
     const result = resolveComputeForStage(app, stageDef, session.id);
     expect(result).toBe("config-tmpl");
 
     // Verify compute was created from config template
-    const compute = app.computes.get("config-tmpl");
+    const compute = await app.computes.get("config-tmpl");
     expect(compute).not.toBeNull();
     expect(compute!.provider).toBe("docker");
 
     // Restore config
     app.config.computeTemplates = originalTemplates;
-    app.computes.delete("config-tmpl");
+    await app.computes.delete("config-tmpl");
   });
 });
 

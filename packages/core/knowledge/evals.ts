@@ -63,8 +63,8 @@ function asEvalMeta(metadata: Record<string, unknown> | undefined): EvalNodeMeta
  * Evaluate a completed session and store results in the knowledge graph.
  * Called automatically when a session completes.
  */
-export function evaluateSession(app: AppContext, session: Session): AgentEvalResult {
-  const events = app.events.list(session.id);
+export async function evaluateSession(app: AppContext, session: Session): Promise<AgentEvalResult> {
+  const events = await app.events.list(session.id);
 
   // Count turns (stage_started events approximate turns)
   const turnCount = events.filter((e) => e.type === "agent_progress" || e.type === "stage_started").length;
@@ -86,7 +86,7 @@ export function evaluateSession(app: AppContext, session: Session): AgentEvalRes
   const updated = new Date(session.updated_at).getTime();
   const durationMs = updated - created;
 
-  const tokenCost = app.usageRecorder.getSessionCost(session.id).cost;
+  const tokenCost = (await app.usageRecorder.getSessionCost(session.id)).cost;
 
   const config = (session.config ?? {}) as Record<string, unknown>;
   const filesChanged = Array.isArray(config.filesChanged) ? config.filesChanged.length : 0;
@@ -111,7 +111,7 @@ export function evaluateSession(app: AppContext, session: Session): AgentEvalRes
     timestamp: new Date().toISOString(),
   };
 
-  app.knowledge.addNode({
+  await app.knowledge.addNode({
     id: `eval:${session.id}`,
     type: "session",
     label: `Eval: ${session.summary ?? session.id}`,
@@ -125,9 +125,9 @@ export function evaluateSession(app: AppContext, session: Session): AgentEvalRes
     },
   });
 
-  const sessionNode = app.knowledge.getNode(`session:${session.id}`);
+  const sessionNode = await app.knowledge.getNode(`session:${session.id}`);
   if (sessionNode) {
-    app.knowledge.addEdge(`eval:${session.id}`, `session:${session.id}`, "relates_to");
+    await app.knowledge.addEdge(`eval:${session.id}`, `session:${session.id}`, "relates_to");
   }
 
   return result;
@@ -137,10 +137,10 @@ export function evaluateSession(app: AppContext, session: Session): AgentEvalRes
  * Get aggregate stats for an agent role, or across all agents when
  * `agentRole` is omitted.
  */
-export function getAgentStats(
+export async function getAgentStats(
   app: AppContext,
   agentRole?: string,
-): {
+): Promise<{
   totalSessions: number;
   completionRate: number;
   avgDurationMs: number;
@@ -148,9 +148,9 @@ export function getAgentStats(
   avgTurns: number;
   testPassRate: number;
   prRate: number;
-} {
-  const evalNodes = app.knowledge
-    .listNodes({ type: "session" })
+}> {
+  const allNodes = await app.knowledge.listNodes({ type: "session" });
+  const evalNodes = allNodes
     .map((n) => ({ node: n, meta: asEvalMeta(n.metadata) }))
     .filter(({ meta }) => meta.eval && (!agentRole || meta.agentRole === agentRole));
 
@@ -189,19 +189,19 @@ export function getAgentStats(
  * Detect drift: compare recent performance to baseline.
  * Returns positive if improving, negative if degrading.
  */
-export function detectDrift(
+export async function detectDrift(
   app: AppContext,
   agentRole: string,
   recentDays: number = 7,
   baselineDays: number = 28,
-): {
+): Promise<{
   completionRateDelta: number;
   avgCostDelta: number;
   avgTurnsDelta: number;
   alert: boolean;
-} {
-  const allEvals = app.knowledge
-    .listNodes({ type: "session" })
+}> {
+  const allNodes = await app.knowledge.listNodes({ type: "session" });
+  const allEvals = allNodes
     .map((n) => ({ node: n, meta: asEvalMeta(n.metadata) }))
     .filter(({ meta }) => meta.eval && meta.agentRole === agentRole);
 
@@ -246,11 +246,9 @@ export function detectDrift(
 /**
  * List eval nodes, optionally filtered by agent role.
  */
-export function listEvals(app: AppContext, agentRole?: string, limit: number = 20): AgentEvalResult[] {
-  let evalNodes = app.knowledge
-    .listNodes({ type: "session", limit: limit * 2 })
-    .map((n) => ({ node: n, meta: asEvalMeta(n.metadata) }))
-    .filter(({ meta }) => meta.eval);
+export async function listEvals(app: AppContext, agentRole?: string, limit: number = 20): Promise<AgentEvalResult[]> {
+  const allNodes = await app.knowledge.listNodes({ type: "session", limit: limit * 2 });
+  let evalNodes = allNodes.map((n) => ({ node: n, meta: asEvalMeta(n.metadata) })).filter(({ meta }) => meta.eval);
 
   if (agentRole) {
     evalNodes = evalNodes.filter(({ meta }) => meta.agentRole === agentRole);

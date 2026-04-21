@@ -23,7 +23,7 @@ afterAll(async () => {
   await app?.shutdown();
 });
 
-describe("action registry", () => {
+describe("action registry", async () => {
   it("listActions exposes canonical names (no aliases)", () => {
     const names = listActions();
     expect(names).toEqual(expect.arrayContaining(["create_pr", "merge_pr", "auto_merge", "close_ticket"]));
@@ -48,41 +48,41 @@ describe("action registry", () => {
   });
 
   it("executeAction logs a skipped event for unknown actions and returns ok", async () => {
-    const s = app.sessions.create({ summary: "unknown-action test", flow: "default" });
+    const s = await app.sessions.create({ summary: "unknown-action test", flow: "default" });
     const res = await executeAction(app, s.id, "invented_action");
     expect(res.ok).toBe(true);
     expect(res.message).toContain("unknown");
-    const events = app.events.list(s.id);
+    const events = await app.events.list(s.id);
     const skipped = events.find((e) => e.type === "action_skipped");
     expect(skipped).toBeDefined();
     expect(skipped?.data?.action).toBe("invented_action");
   });
 
   it("close action logs action_executed and returns ok", async () => {
-    const s = app.sessions.create({ summary: "close test", flow: "default" });
+    const s = await app.sessions.create({ summary: "close test", flow: "default" });
     const res = await executeAction(app, s.id, "close");
     expect(res.ok).toBe(true);
-    const events = app.events.list(s.id);
+    const events = await app.events.list(s.id);
     const executed = events.find((e) => e.type === "action_executed" && e.data?.action === "close");
     expect(executed).toBeDefined();
   });
 
   it("close_ticket (canonical) logs action_executed and returns ok", async () => {
-    const s = app.sessions.create({ summary: "close-canonical test", flow: "default" });
+    const s = await app.sessions.create({ summary: "close-canonical test", flow: "default" });
     const res = await executeAction(app, s.id, "close_ticket");
     expect(res.ok).toBe(true);
-    const events = app.events.list(s.id);
+    const events = await app.events.list(s.id);
     const executed = events.find((e) => e.type === "action_executed" && e.data?.action === "close_ticket");
     expect(executed).toBeDefined();
   });
 
   it("create_pr short-circuits when session already tracks a pr_url", async () => {
-    const s = app.sessions.create({ summary: "pr-already test", flow: "default" });
-    app.sessions.update(s.id, { pr_url: "https://github.com/owner/repo/pull/42" });
+    const s = await app.sessions.create({ summary: "pr-already test", flow: "default" });
+    await app.sessions.update(s.id, { pr_url: "https://github.com/owner/repo/pull/42" });
     const res = await executeAction(app, s.id, "create_pr");
     expect(res.ok).toBe(true);
     expect(res.message).toContain("PR already exists");
-    const events = app.events.list(s.id);
+    const events = await app.events.list(s.id);
     const executed = events.find((e) => e.type === "action_executed" && e.data?.action === "create_pr");
     expect(executed?.data?.skipped).toBe("pr_already_exists");
     expect(executed?.data?.pr_url).toBe("https://github.com/owner/repo/pull/42");

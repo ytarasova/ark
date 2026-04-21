@@ -11,9 +11,9 @@
 import type { IDatabase } from "../database/index.js";
 import { initPostgresSchema } from "../repositories/schema-postgres.js";
 
-export function applyPostgresInitial(db: IDatabase): void {
+export async function applyPostgresInitial(db: IDatabase): Promise<void> {
   // initPostgresSchema is idempotent (CREATE TABLE IF NOT EXISTS) -- safe to
   // invoke from a migration body even though the runner already gates by
   // version.
-  initPostgresSchema(db);
+  await initPostgresSchema(db);
 }

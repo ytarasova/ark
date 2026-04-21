@@ -64,7 +64,7 @@ export function registerSageCommands(program: Command, app: AppContext | null): 
       }
 
       const summary = `sage:${analysis.jira_id}`;
-      const session = startSession(resolvedApp, {
+      const session = await startSession(resolvedApp, {
         ticket: analysis.jira_id,
         summary,
         repo: opts.repo ?? ".",

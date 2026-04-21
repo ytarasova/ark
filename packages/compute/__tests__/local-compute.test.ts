@@ -30,7 +30,7 @@ function makeHandle(): ComputeHandle {
   return { kind: "local", name: "local", meta: {} };
 }
 
-describe("LocalCompute", () => {
+describe("LocalCompute", async () => {
   it("advertises the expected capability flags", () => {
     const c = new LocalCompute();
     expect(c.kind).toBe("local");
@@ -67,22 +67,22 @@ describe("LocalCompute", () => {
 
   it("start throws NotSupportedError", async () => {
     const c = new LocalCompute();
-    await expect(c.start(makeHandle())).rejects.toBeInstanceOf(NotSupportedError);
+    (await expect(c.start(makeHandle()))).rejects.toBeInstanceOf(NotSupportedError);
   });
 
   it("stop throws NotSupportedError", async () => {
     const c = new LocalCompute();
-    await expect(c.stop(makeHandle())).rejects.toBeInstanceOf(NotSupportedError);
+    (await expect(c.stop(makeHandle()))).rejects.toBeInstanceOf(NotSupportedError);
   });
 
   it("destroy throws NotSupportedError", async () => {
     const c = new LocalCompute();
-    await expect(c.destroy(makeHandle())).rejects.toBeInstanceOf(NotSupportedError);
+    (await expect(c.destroy(makeHandle()))).rejects.toBeInstanceOf(NotSupportedError);
   });
 
   it("snapshot throws NotSupportedError", async () => {
     const c = new LocalCompute();
-    await expect(c.snapshot(makeHandle())).rejects.toBeInstanceOf(NotSupportedError);
+    (await expect(c.snapshot(makeHandle()))).rejects.toBeInstanceOf(NotSupportedError);
   });
 
   it("restore throws NotSupportedError", async () => {
@@ -94,6 +94,6 @@ describe("LocalCompute", () => {
       sizeBytes: 0,
       metadata: {},
     };
-    await expect(c.restore(snap)).rejects.toBeInstanceOf(NotSupportedError);
+    (await expect(c.restore(snap))).rejects.toBeInstanceOf(NotSupportedError);
   });
 });

@@ -20,10 +20,10 @@ import { databaseSchemaMapExtractor } from "../extractors/platform-docs/database
 import { serviceDependencyGraphExtractor } from "../extractors/platform-docs/service-dependency-graph.js";
 import type { PlatformDocContext } from "../interfaces/platform-doc-extractor.js";
 
-function freshStore() {
+async function freshStore() {
   const db = new BunSqliteAdapter(new Database(":memory:"));
   const store = new CodeIntelStore(db);
-  store.migrate();
+  await store.migrate();
   return { db, store };
 }
 
@@ -31,7 +31,7 @@ function ctx(store: CodeIntelStore, tenant_id = DEFAULT_TENANT_ID): PlatformDocC
   return { tenant_id, store };
 }
 
-describe("platform-docs extractors -- generator-equivalent end-to-end", () => {
+describe("platform-docs extractors -- generator-equivalent end-to-end", async () => {
   it("registered extractors all carry doc_type + flavor + cadence + generate", () => {
     const all = [
       apiEndpointRegistryExtractor,
@@ -52,8 +52,8 @@ describe("platform-docs extractors -- generator-equivalent end-to-end", () => {
   });
 
   it("empty workspace -> every stub extractor returns graceful 'no data' content (no throws)", async () => {
-    const { db, store } = freshStore();
-    const ws = store.createWorkspace({ tenant_id: DEFAULT_TENANT_ID, slug: "empty", name: "Empty" });
+    const { db, store } = await freshStore();
+    const ws = await store.createWorkspace({ tenant_id: DEFAULT_TENANT_ID, slug: "empty", name: "Empty" });
 
     const results = await Promise.all([
       apiEndpointRegistryExtractor.generate(ctx(store), ws.id),
@@ -72,7 +72,7 @@ describe("platform-docs extractors -- generator-equivalent end-to-end", () => {
       databaseSchemaMapExtractor,
       serviceDependencyGraphExtractor,
     ].entries()) {
-      store.upsertPlatformDoc({
+      await store.upsertPlatformDoc({
         tenant_id: DEFAULT_TENANT_ID,
         workspace_id: ws.id,
         doc_type: e.doc_type,
@@ -81,21 +81,21 @@ describe("platform-docs extractors -- generator-equivalent end-to-end", () => {
         source: results[i].source ?? {},
       });
     }
-    expect(store.listPlatformDocs(ws.id)).toHaveLength(4);
-    db.close();
+    expect(await store.listPlatformDocs(ws.id)).toHaveLength(4);
+    await db.close();
   });
 
   it("workspace with seeded dependencies -> service-dependency-graph emits Mermaid + table", async () => {
-    const { db, store } = freshStore();
-    const ws = store.createWorkspace({ tenant_id: DEFAULT_TENANT_ID, slug: "deps", name: "Deps" });
-    const repo = store.createRepo({
+    const { db, store } = await freshStore();
+    const ws = await store.createWorkspace({ tenant_id: DEFAULT_TENANT_ID, slug: "deps", name: "Deps" });
+    const repo = await store.createRepo({
       tenant_id: DEFAULT_TENANT_ID,
       repo_url: "file:///tmp/sdg-repo",
       name: "payments",
     });
-    store.addRepoToWorkspace(repo.id, ws.id);
-    const run = store.beginIndexingRun({ tenant_id: DEFAULT_TENANT_ID, repo_id: repo.id, branch: "main" });
-    store.insertDependency({
+    await store.addRepoToWorkspace(repo.id, ws.id);
+    const run = await store.beginIndexingRun({ tenant_id: DEFAULT_TENANT_ID, repo_id: repo.id, branch: "main" });
+    await store.insertDependency({
       tenant_id: DEFAULT_TENANT_ID,
       repo_id: repo.id,
       manifest_kind: "npm",
@@ -103,7 +103,7 @@ describe("platform-docs extractors -- generator-equivalent end-to-end", () => {
       resolved_version: "4.17.21",
       indexing_run_id: run.id,
     });
-    store.insertDependency({
+    await store.insertDependency({
       tenant_id: DEFAULT_TENANT_ID,
       repo_id: repo.id,
       manifest_kind: "npm",
@@ -122,31 +122,31 @@ describe("platform-docs extractors -- generator-equivalent end-to-end", () => {
     // Provenance counts come along for free.
     expect((out.source as { repo_count: number }).repo_count).toBe(1);
     expect((out.source as { dependency_count: number }).dependency_count).toBe(2);
-    db.close();
+    await db.close();
   });
 
   it("workspace with contributions + people -> contributor-expertise-map renders table", async () => {
-    const { db, store } = freshStore();
-    const ws = store.createWorkspace({ tenant_id: DEFAULT_TENANT_ID, slug: "contribs", name: "Contribs" });
-    const repo = store.createRepo({
+    const { db, store } = await freshStore();
+    const ws = await store.createWorkspace({ tenant_id: DEFAULT_TENANT_ID, slug: "contribs", name: "Contribs" });
+    const repo = await store.createRepo({
       tenant_id: DEFAULT_TENANT_ID,
       repo_url: "file:///tmp/contrib-repo",
       name: "auth-service",
     });
-    store.addRepoToWorkspace(repo.id, ws.id);
-    const run = store.beginIndexingRun({ tenant_id: DEFAULT_TENANT_ID, repo_id: repo.id, branch: "main" });
+    await store.addRepoToWorkspace(repo.id, ws.id);
+    const run = await store.beginIndexingRun({ tenant_id: DEFAULT_TENANT_ID, repo_id: repo.id, branch: "main" });
 
-    const alice = store.upsertPerson({
+    const alice = await store.upsertPerson({
       tenant_id: DEFAULT_TENANT_ID,
       primary_email: "alice@example.com",
       name: "Alice Author",
     });
-    const bob = store.upsertPerson({
+    const bob = await store.upsertPerson({
       tenant_id: DEFAULT_TENANT_ID,
       primary_email: "bob@example.com",
       name: "Bob Builder",
     });
-    store.insertContribution({
+    await store.insertContribution({
       tenant_id: DEFAULT_TENANT_ID,
       person_id: alice.id,
       repo_id: repo.id,
@@ -158,7 +158,7 @@ describe("platform-docs extractors -- generator-equivalent end-to-end", () => {
       last_commit: "2026-04-19T00:00:00Z",
       indexing_run_id: run.id,
     });
-    store.insertContribution({
+    await store.insertContribution({
       tenant_id: DEFAULT_TENANT_ID,
       person_id: bob.id,
       repo_id: repo.id,
@@ -181,21 +181,21 @@ describe("platform-docs extractors -- generator-equivalent end-to-end", () => {
     // Top contributor (Alice, 42 commits) is in the table.
     expect(out.content_md).toMatch(/Alice Author.*alice@example\.com.*42/);
     expect((out.source as { contribution_row_count: number }).contribution_row_count).toBe(2);
-    db.close();
+    await db.close();
   });
 
   it("workspace with attached repos but no DDL/migration files -> database-schema-map stub message", async () => {
-    const { db, store } = freshStore();
-    const ws = store.createWorkspace({ tenant_id: DEFAULT_TENANT_ID, slug: "noddl", name: "NoDDL" });
-    const repo = store.createRepo({
+    const { db, store } = await freshStore();
+    const ws = await store.createWorkspace({ tenant_id: DEFAULT_TENANT_ID, slug: "noddl", name: "NoDDL" });
+    const repo = await store.createRepo({
       tenant_id: DEFAULT_TENANT_ID,
       repo_url: "file:///tmp/noddl-repo",
       name: "frontend",
     });
-    store.addRepoToWorkspace(repo.id, ws.id);
-    const run = store.beginIndexingRun({ tenant_id: DEFAULT_TENANT_ID, repo_id: repo.id, branch: "main" });
+    await store.addRepoToWorkspace(repo.id, ws.id);
+    const run = await store.beginIndexingRun({ tenant_id: DEFAULT_TENANT_ID, repo_id: repo.id, branch: "main" });
     // A non-DDL file -- the heuristic must not match it.
-    store.insertFile({
+    await store.insertFile({
       tenant_id: DEFAULT_TENANT_ID,
       repo_id: repo.id,
       path: "src/index.tsx",
@@ -210,7 +210,7 @@ describe("platform-docs extractors -- generator-equivalent end-to-end", () => {
     expect((out.source as { repo_count: number }).repo_count).toBe(1);
 
     // Now add a real migration file and re-run -- it should be picked up.
-    store.insertFile({
+    await store.insertFile({
       tenant_id: DEFAULT_TENANT_ID,
       repo_id: repo.id,
       path: "db/migrations/001_init.sql",
@@ -220,18 +220,18 @@ describe("platform-docs extractors -- generator-equivalent end-to-end", () => {
     const out2 = await databaseSchemaMapExtractor.generate(ctx(store), ws.id);
     expect(out2.content_md).toContain("db/migrations/001_init.sql");
     expect((out2.source as { hit_count: number }).hit_count).toBe(1);
-    db.close();
+    await db.close();
   });
 
   it("api-endpoint-registry returns workspace summary even without an endpoints table", async () => {
-    const { db, store } = freshStore();
-    const ws = store.createWorkspace({ tenant_id: DEFAULT_TENANT_ID, slug: "api", name: "API" });
-    const repo = store.createRepo({
+    const { db, store } = await freshStore();
+    const ws = await store.createWorkspace({ tenant_id: DEFAULT_TENANT_ID, slug: "api", name: "API" });
+    const repo = await store.createRepo({
       tenant_id: DEFAULT_TENANT_ID,
       repo_url: "file:///tmp/api-repo",
       name: "edge",
     });
-    store.addRepoToWorkspace(repo.id, ws.id);
+    await store.addRepoToWorkspace(repo.id, ws.id);
 
     const out = await apiEndpointRegistryExtractor.generate(ctx(store), ws.id);
     expect(out.title).toBe("API Endpoint Registry");
@@ -241,7 +241,7 @@ describe("platform-docs extractors -- generator-equivalent end-to-end", () => {
     expect(out.content_md).toContain("file:///tmp/api-repo");
     expect((out.source as { stub: boolean }).stub).toBe(true);
     expect((out.source as { repo_count: number }).repo_count).toBe(1);
-    db.close();
+    await db.close();
   });
 
   // The following two cases need `platform-docs/generator.ts`, which the

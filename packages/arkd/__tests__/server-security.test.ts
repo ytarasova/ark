@@ -26,8 +26,8 @@ afterAll(() => {
   server.stop();
 });
 
-describe("arkd security", () => {
-  describe("bearer token auth", () => {
+describe("arkd security", async () => {
+  describe("bearer token auth", async () => {
     it("accepts the correct Bearer token", async () => {
       const resp = await fetch(`${BASE}/metrics`, {
         headers: { Authorization: `Bearer ${TOKEN}` },
@@ -60,7 +60,7 @@ describe("arkd security", () => {
     });
   });
 
-  describe("agent session name validation", () => {
+  describe("agent session name validation", async () => {
     const headers = { "Content-Type": "application/json", Authorization: `Bearer ${TOKEN}` };
 
     it("rejects path-traversal session names in agent/launch", async () => {

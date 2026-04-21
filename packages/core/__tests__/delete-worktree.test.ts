@@ -23,7 +23,7 @@ afterEach(async () => {
   clearApp();
 });
 
-describe("deleteSessionAsync worktree cleanup", () => {
+describe("deleteSessionAsync worktree cleanup", async () => {
   it("removes worktree directory when session is deleted", async () => {
     const session = getApp().sessions.create({ summary: "wt-cleanup-test", repo: "/tmp/fake-repo" });
     const wtPath = join(getApp().config.worktreesDir, session.id);

@@ -41,8 +41,8 @@ afterAll(async () => {
 
 // ── Worktree creation logic ──────────────────────────────────────────────────
 
-describe("dispatch compute: worktree creation", () => {
-  it("creates worktree for local compute with a git repo", () => {
+describe("dispatch compute: worktree creation", async () => {
+  it("creates worktree for local compute with a git repo", async () => {
     // Create a bare git repo to serve as the session workdir
     const repoDir = join(app.config.arkDir, "test-repo");
     mkdirSync(repoDir, { recursive: true });
@@ -54,7 +54,7 @@ describe("dispatch compute: worktree creation", () => {
 
     // Simulate what launchAgentTmux checks:
     // isLocal = no compute or compute.provider === "local"
-    const compute = session.compute_name ? app.computes.get(session.compute_name) : null;
+    const compute = session.compute_name ? await app.computes.get(session.compute_name) : null;
     const isLocal = !compute || compute.provider === "local";
     expect(isLocal).toBe(true);
 
@@ -67,12 +67,12 @@ describe("dispatch compute: worktree creation", () => {
     expect(existsSync(join(repoDir, ".git"))).toBe(true);
   });
 
-  it("does NOT create worktree for EC2 compute", () => {
+  it("does NOT create worktree for EC2 compute", async () => {
     // Register an EC2 compute in the store
-    app.computes.create({ name: "my-ec2", provider: "ec2", config: { ip: "1.2.3.4" } });
+    await app.computes.create({ name: "my-ec2", provider: "ec2", config: { ip: "1.2.3.4" } });
     const session = getApp().sessions.create({ summary: "ec2-test", compute_name: "my-ec2" });
 
-    const compute = app.computes.get(session.compute_name!);
+    const compute = await app.computes.get(session.compute_name!);
     expect(compute).not.toBeNull();
     expect(compute!.provider).toBe("ec2");
 
@@ -83,7 +83,7 @@ describe("dispatch compute: worktree creation", () => {
     // launchAgentTmux skips worktree setup when isLocal is false
   });
 
-  it("does NOT create worktree when config.worktree === false", () => {
+  it("does NOT create worktree when config.worktree === false", async () => {
     const repoDir = join(app.config.arkDir, "test-repo-no-wt");
     mkdirSync(repoDir, { recursive: true });
     execFileSync("git", ["init", repoDir], { stdio: "pipe" });
@@ -96,7 +96,7 @@ describe("dispatch compute: worktree creation", () => {
       config: { worktree: false },
     });
 
-    const compute = session.compute_name ? app.computes.get(session.compute_name) : null;
+    const compute = session.compute_name ? await app.computes.get(session.compute_name) : null;
     const isLocal = !compute || compute.provider === "local";
     expect(isLocal).toBe(true);
 
@@ -207,7 +207,7 @@ describe("dispatch compute: config file writing", () => {
 
 // ── Session defaults at creation ─────────────────────────────────────────────
 
-describe("dispatch compute: session creation defaults", () => {
+describe("dispatch compute: session creation defaults", async () => {
   it("session starts with no session_id (tmux name)", () => {
     const session = getApp().sessions.create({ summary: "defaults-test" });
     expect(session.session_id).toBeNull();
@@ -218,8 +218,8 @@ describe("dispatch compute: session creation defaults", () => {
     expect(session.claude_session_id).toBeNull();
   });
 
-  it("session stores compute_name when specified", () => {
-    app.computes.create({ name: "test-compute", provider: "ec2" });
+  it("session stores compute_name when specified", async () => {
+    await app.computes.create({ name: "test-compute", provider: "ec2" });
     const session = getApp().sessions.create({ summary: "compute-name-test", compute_name: "test-compute" });
     expect(session.compute_name).toBe("test-compute");
   });

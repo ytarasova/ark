@@ -40,7 +40,7 @@ export const cliAgentExecutor: Executor = {
     let effectiveWorkdir = workdir;
     try {
       const { setupSessionWorktree } = await import("../services/session-orchestration.js");
-      const session = app.sessions.get(sessionId);
+      const session = await app.sessions.get(sessionId);
       if (session) {
         const result = await setupSessionWorktree(app, session, null, null, log);
         if (result) effectiveWorkdir = result;

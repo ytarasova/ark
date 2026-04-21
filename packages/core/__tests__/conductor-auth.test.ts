@@ -75,7 +75,7 @@ afterEach(async () => {
   await app.shutdown();
 });
 
-describe("P1-1 -- conductor tenant identity must not be spoofable", () => {
+describe("P1-1 -- conductor tenant identity must not be spoofable", async () => {
   it("rejects X-Ark-Tenant-Id header without a Bearer token", async () => {
     const resp = await postChannel("s-nope", { "X-Ark-Tenant-Id": "attacker-picks-anything" });
     expect(resp.status).toBe(401);
@@ -96,7 +96,7 @@ describe("P1-1 -- conductor tenant identity must not be spoofable", () => {
   });
 
   it("rejects when X-Ark-Tenant-Id disagrees with the validated token", async () => {
-    const { key } = app.apiKeys.create("tenant-a", "test key", "admin");
+    const { key } = await app.apiKeys.create("tenant-a", "test key", "admin");
     const resp = await postChannel("s-nope", {
       Authorization: `Bearer ${key}`,
       "X-Ark-Tenant-Id": "tenant-b-victim",
@@ -107,7 +107,7 @@ describe("P1-1 -- conductor tenant identity must not be spoofable", () => {
   });
 
   it("a valid token is accepted (positive control)", async () => {
-    const { key } = app.apiKeys.create("tenant-a", "test key", "admin");
+    const { key } = await app.apiKeys.create("tenant-a", "test key", "admin");
     const resp = await postChannel("s-anything", { Authorization: `Bearer ${key}` });
     // The session does not exist but auth passed -- either 200 (accepted and
     // ignored because no session) or a non-auth error. It must NOT be 401/403.
@@ -116,7 +116,7 @@ describe("P1-1 -- conductor tenant identity must not be spoofable", () => {
   });
 });
 
-describe("P1-1 -- local single-tenant mode is preserved when no credentials are present", () => {
+describe("P1-1 -- local single-tenant mode is preserved when no credentials are present", async () => {
   it("allows unauthenticated requests in local mode (no databaseUrl)", async () => {
     await boot({ hostedMode: false });
     const resp = await postChannel("s-local");
@@ -130,7 +130,7 @@ describe("P1-1 -- local single-tenant mode is preserved when no credentials are 
   });
 });
 
-describe("P1-2 -- cross-tenant REST leak", () => {
+describe("P1-2 -- cross-tenant REST leak", async () => {
   async function createSessionForTenant(tenantId: string, summary: string): Promise<string> {
     const scoped = app.forTenant(tenantId);
     const session = scoped.sessions.create({ summary });
@@ -138,8 +138,8 @@ describe("P1-2 -- cross-tenant REST leak", () => {
   }
 
   it("GET /api/sessions scopes rows to the caller's tenant", async () => {
-    const { key: keyA } = app.apiKeys.create("tenant-a", "a", "admin");
-    app.apiKeys.create("tenant-b", "b", "admin");
+    const { key: keyA } = await app.apiKeys.create("tenant-a", "a", "admin");
+    await app.apiKeys.create("tenant-b", "b", "admin");
 
     await createSessionForTenant("tenant-a", "a-session");
     const bSessionId = await createSessionForTenant("tenant-b", "b-session");
@@ -163,7 +163,7 @@ describe("P1-2 -- cross-tenant REST leak", () => {
   });
 
   it("GET /api/sessions/:id of another tenant's session returns 404", async () => {
-    const { key: keyA } = app.apiKeys.create("tenant-a", "a", "admin");
+    const { key: keyA } = await app.apiKeys.create("tenant-a", "a", "admin");
     const bSessionId = await createSessionForTenant("tenant-b", "b-session");
     const resp = await fetch(`${BASE}/api/sessions/${bSessionId}`, {
       headers: { Authorization: `Bearer ${keyA}` },
@@ -172,7 +172,7 @@ describe("P1-2 -- cross-tenant REST leak", () => {
   });
 
   it("GET /api/events/:id of another tenant's session returns 404", async () => {
-    const { key: keyA } = app.apiKeys.create("tenant-a", "a", "admin");
+    const { key: keyA } = await app.apiKeys.create("tenant-a", "a", "admin");
     const bSessionId = await createSessionForTenant("tenant-b", "b-session");
     const resp = await fetch(`${BASE}/api/events/${bSessionId}`, {
       headers: { Authorization: `Bearer ${keyA}` },

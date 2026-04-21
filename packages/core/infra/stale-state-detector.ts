@@ -24,7 +24,7 @@ export class StaleStateDetector {
   async start(): Promise<void> {
     await safeAsync("boot: detect orphaned sessions", async () => {
       const { findOrphanedSessions } = await import("../session/checkpoint.js");
-      const orphaned = findOrphanedSessions(this.app);
+      const orphaned = await findOrphanedSessions(this.app);
       if (orphaned.length > 0) {
         this._orphaned = orphaned;
         for (const s of orphaned) {
@@ -44,7 +44,7 @@ export class StaleStateDetector {
         const match = cmd.match(/session=([^'&\s]+)/);
         const sid = match?.[1];
         if (!sid) return;
-        const session = this.app.sessions.get(sid);
+        const session = await this.app.sessions.get(sid);
         if (!session || !["running", "waiting"].includes(session.status)) {
           logWarn(
             "session",
@@ -67,7 +67,7 @@ export class StaleStateDetector {
         const channelEnv = content?.mcpServers?.["ark-channel"]?.env;
         if (!channelEnv?.ARK_SESSION_ID) return;
         const sid = channelEnv.ARK_SESSION_ID;
-        const session = this.app.sessions.get(sid);
+        const session = await this.app.sessions.get(sid);
         if (!session || !["running", "waiting"].includes(session.status)) {
           const { removeChannelConfig } = await import("../claude/claude.js");
           removeChannelConfig(cwd);
@@ -79,15 +79,15 @@ export class StaleStateDetector {
 
     await safeAsync("boot: detect stale sessions", async () => {
       const { sessionExistsAsync } = await import("./tmux.js");
-      const running = this.app.sessions.list({ status: "running" });
+      const running = await this.app.sessions.list({ status: "running" });
       for (const s of running) {
         if (s.session_id && !(await sessionExistsAsync(s.session_id))) {
-          this.app.sessions.update(s.id, {
+          await this.app.sessions.update(s.id, {
             status: "failed",
             error: "Agent process exited while Ark was not running",
             session_id: null,
           });
-          this.app.events.log(s.id, "session_stale_detected", { actor: "system" });
+          await this.app.events.log(s.id, "session_stale_detected", { actor: "system" });
         }
       }
     });

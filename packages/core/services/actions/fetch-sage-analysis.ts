@@ -31,7 +31,7 @@ export const fetchSageAnalysisAction: ActionHandler = {
 
     // Short-circuit: the CLI entry point supplies the JSON directly.
     if (files.analysis_json) {
-      app.events.log(sessionId, "action_executed", {
+      await app.events.log(sessionId, "action_executed", {
         stage: session.stage ?? undefined,
         actor: "system",
         data: { action, skipped: "analysis_json_already_present", path: files.analysis_json },
@@ -65,7 +65,7 @@ export const fetchSageAnalysisAction: ActionHandler = {
 
     // Persist the file path into session inputs so downstream stages pick it up
     // via the standard `{{inputs.files.analysis_json}}` resolution path.
-    app.sessions.mergeConfig(sessionId, {
+    await app.sessions.mergeConfig(sessionId, {
       inputs: {
         ...inputs,
         files: { ...files, analysis_json: outPath },

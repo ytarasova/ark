@@ -58,12 +58,12 @@ afterEach(async () => {
   await app?.shutdown();
 });
 
-describe("setupSessionWorktree -- worktree isolation", () => {
+describe("setupSessionWorktree -- worktree isolation", async () => {
   it("creates a worktree when repo='.', even with no explicit workdir", async () => {
     // Reproduces the s-6d2686 failure: `--recipe self-dogfood` passes
     // `repo: "."` and leaves workdir null. The old code bailed because
     // `workdir ?? "."` was exactly ".".
-    const session = app.sessions.create({
+    const session = await app.sessions.create({
       summary: "self-dogfood regression",
       repo: ".",
     });
@@ -84,7 +84,7 @@ describe("setupSessionWorktree -- worktree isolation", () => {
   });
 
   it("persists the absolute worktree path to the session row", async () => {
-    const session = app.sessions.create({
+    const session = await app.sessions.create({
       summary: "persist-workdir test",
       repo: ".",
     });
@@ -92,7 +92,7 @@ describe("setupSessionWorktree -- worktree isolation", () => {
     const provider = getProvider("local") ?? undefined;
     const effectiveWorkdir = await setupSessionWorktree(app, session, null, provider);
 
-    const updated = app.sessions.get(session.id);
+    const updated = await app.sessions.get(session.id);
     expect(updated).not.toBeNull();
     expect(updated!.workdir).toBe(resolve(effectiveWorkdir));
     // And it must be an absolute path, not "." or null.
@@ -104,7 +104,7 @@ describe("setupSessionWorktree -- worktree isolation", () => {
     // The "normal" path -- workdir is an absolute directory that happens to
     // be a git repo. This was already working before the fix; this test
     // guards against regressions from the repoSource resolution change.
-    const session = app.sessions.create({
+    const session = await app.sessions.create({
       summary: "absolute workdir",
       repo: repoDir,
       workdir: repoDir,
@@ -119,7 +119,7 @@ describe("setupSessionWorktree -- worktree isolation", () => {
   });
 
   it("does NOT create a worktree when config.worktree === false", async () => {
-    const session = app.sessions.create({
+    const session = await app.sessions.create({
       summary: "opt-out",
       repo: ".",
       config: { worktree: false },
@@ -140,7 +140,7 @@ describe("setupSessionWorktree -- worktree isolation", () => {
     const nonGitDir = join(app.config.arkDir, "not-a-repo");
     mkdirSync(nonGitDir, { recursive: true });
 
-    const session = app.sessions.create({
+    const session = await app.sessions.create({
       summary: "non-git",
       repo: nonGitDir,
       workdir: nonGitDir,

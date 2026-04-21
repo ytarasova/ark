@@ -45,7 +45,7 @@ function createInMemoryPair(): { client: ArkClient; server: ArkServer } {
   return { client: new ArkClient(clientTransport), server };
 }
 
-describe("end-to-end: server + client", () => {
+describe("end-to-end: server + client", async () => {
   it("full session lifecycle over protocol", async () => {
     const { client } = createInMemoryPair();
     const info = await client.initialize({ subscribe: ["session/*"] });

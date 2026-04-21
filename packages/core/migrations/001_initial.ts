@@ -18,10 +18,10 @@ import { applyPostgresInitial } from "./001_initial_postgres.js";
 export const VERSION = 1;
 export const NAME = "initial";
 
-export function up(ctx: MigrationApplyContext): void {
+export async function up(ctx: MigrationApplyContext): Promise<void> {
   if (ctx.dialect === "sqlite") {
-    applySqliteInitial(ctx.db);
+    await applySqliteInitial(ctx.db);
   } else {
-    applyPostgresInitial(ctx.db);
+    await applyPostgresInitial(ctx.db);
   }
 }

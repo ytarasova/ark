@@ -22,41 +22,41 @@ afterEach(async () => {
   await app?.shutdown();
 });
 
-describe("pty_cols / pty_rows", () => {
-  it("defaults to null on newly created sessions", () => {
-    const s = app.sessions.create({ summary: "pty default test" });
+describe("pty_cols / pty_rows", async () => {
+  it("defaults to null on newly created sessions", async () => {
+    const s = await app.sessions.create({ summary: "pty default test" });
     expect(s.pty_cols).toBeNull();
     expect(s.pty_rows).toBeNull();
   });
 
-  it("round-trips pty_cols and pty_rows through update()", () => {
-    const s = app.sessions.create({ summary: "pty round-trip test" });
-    const updated = app.sessions.update(s.id, { pty_cols: 150, pty_rows: 50 });
+  it("round-trips pty_cols and pty_rows through update()", async () => {
+    const s = await app.sessions.create({ summary: "pty round-trip test" });
+    const updated = await app.sessions.update(s.id, { pty_cols: 150, pty_rows: 50 });
     expect(updated?.pty_cols).toBe(150);
     expect(updated?.pty_rows).toBe(50);
 
     // Re-read to make sure the values survive a fresh SELECT.
-    const fetched = app.sessions.get(s.id);
+    const fetched = await app.sessions.get(s.id);
     expect(fetched?.pty_cols).toBe(150);
     expect(fetched?.pty_rows).toBe(50);
   });
 
-  it("accepts updates to pty_cols without clobbering pty_rows (and vice versa)", () => {
-    const s = app.sessions.create({ summary: "pty partial update" });
-    app.sessions.update(s.id, { pty_cols: 120, pty_rows: 50 });
-    app.sessions.update(s.id, { pty_cols: 200 });
-    const fetched = app.sessions.get(s.id);
+  it("accepts updates to pty_cols without clobbering pty_rows (and vice versa)", async () => {
+    const s = await app.sessions.create({ summary: "pty partial update" });
+    await app.sessions.update(s.id, { pty_cols: 120, pty_rows: 50 });
+    await app.sessions.update(s.id, { pty_cols: 200 });
+    const fetched = await app.sessions.get(s.id);
     expect(fetched?.pty_cols).toBe(200);
     expect(fetched?.pty_rows).toBe(50);
   });
 
-  it("tolerates zero / negative via the NULL fallback in rowToSession", () => {
+  it("tolerates zero / negative via the NULL fallback in rowToSession", async () => {
     // rowToSession uses `typeof row.pty_cols === "number"`, so 0 survives
     // the mapper as 0 (we don't want to second-guess; the write path is
     // the validator).
-    const s = app.sessions.create({ summary: "pty zero test" });
-    app.sessions.update(s.id, { pty_cols: 0, pty_rows: 0 });
-    const fetched = app.sessions.get(s.id);
+    const s = await app.sessions.create({ summary: "pty zero test" });
+    await app.sessions.update(s.id, { pty_cols: 0, pty_rows: 0 });
+    const fetched = await app.sessions.get(s.id);
     expect(fetched?.pty_cols).toBe(0);
     expect(fetched?.pty_rows).toBe(0);
   });

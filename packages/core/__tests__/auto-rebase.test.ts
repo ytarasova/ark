@@ -84,7 +84,7 @@ afterAll(async () => {
   }
 });
 
-describe("rebaseOntoBase", () => {
+describe("rebaseOntoBase", async () => {
   it("rebases session branch onto origin/main", async () => {
     const { work } = setupRepo(testDir, "rebase-ok");
 
@@ -101,8 +101,8 @@ describe("rebaseOntoBase", () => {
     git(work, "checkout", "ark-s-rebase01");
 
     // Create session pointing to this repo
-    const session = app.sessions.create({ repo: work, workdir: work });
-    app.sessions.update(session.id, { branch: "ark-s-rebase01" });
+    const session = await app.sessions.create({ repo: work, workdir: work });
+    await app.sessions.update(session.id, { branch: "ark-s-rebase01" });
 
     const result = await rebaseOntoBase(app, session.id, { base: "main" });
     expect(result.ok).toBe(true);
@@ -114,7 +114,7 @@ describe("rebaseOntoBase", () => {
     expect(log).toContain("other commit");
 
     // Verify event was logged
-    const events = app.events.list(session.id);
+    const events = await app.events.list(session.id);
     expect(events.some((e) => e.type === "rebase_completed")).toBe(true);
   });
 
@@ -132,8 +132,8 @@ describe("rebaseOntoBase", () => {
 
     git(work, "checkout", "ark-s-conflict01");
 
-    const session = app.sessions.create({ repo: work, workdir: work });
-    app.sessions.update(session.id, { branch: "ark-s-conflict01" });
+    const session = await app.sessions.create({ repo: work, workdir: work });
+    await app.sessions.update(session.id, { branch: "ark-s-conflict01" });
 
     const result = await rebaseOntoBase(app, session.id, { base: "main" });
     expect(result.ok).toBe(false);
@@ -151,7 +151,7 @@ describe("rebaseOntoBase", () => {
   });
 
   it("returns error for session without repo", async () => {
-    const session = app.sessions.create({ summary: "no repo" });
+    const session = await app.sessions.create({ summary: "no repo" });
     const result = await rebaseOntoBase(app, session.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("no repo");
@@ -161,8 +161,8 @@ describe("rebaseOntoBase", () => {
     const { work } = setupRepo(testDir, "rebase-wt");
 
     // Create session
-    const session = app.sessions.create({ repo: work, workdir: work });
-    app.sessions.update(session.id, { branch: "ark-s-wt01" });
+    const session = await app.sessions.create({ repo: work, workdir: work });
+    await app.sessions.update(session.id, { branch: "ark-s-wt01" });
 
     // Create a worktree directory at the expected path
     const wtDir = join(app.config.worktreesDir, session.id);
@@ -203,7 +203,7 @@ describe("rebaseOntoBase", () => {
   });
 });
 
-describe("createWorktreePR auto-rebase integration", () => {
+describe("createWorktreePR auto-rebase integration", async () => {
   it("skips rebase when auto_rebase is false in repo config", async () => {
     const { work } = setupRepo(testDir, "skip-rebase");
 
@@ -219,8 +219,8 @@ describe("createWorktreePR auto-rebase integration", () => {
     // Write .ark.yaml with auto_rebase: false
     writeFileSync(join(work, ".ark.yaml"), "auto_rebase: false\n");
 
-    const session = app.sessions.create({ repo: work, workdir: work });
-    app.sessions.update(session.id, { branch: "ark-s-skiprebase01" });
+    const session = await app.sessions.create({ repo: work, workdir: work });
+    await app.sessions.update(session.id, { branch: "ark-s-skiprebase01" });
 
     // Remember the commit before (should stay unchanged since rebase is skipped)
     const commitBefore = git(work, "rev-parse", "HEAD");
@@ -235,7 +235,7 @@ describe("createWorktreePR auto-rebase integration", () => {
     expect(commitAfter).toBe(commitBefore);
 
     // There should be no rebase_completed event
-    const events = app.events.list(session.id);
+    const events = await app.events.list(session.id);
     expect(events.some((e) => e.type === "rebase_completed")).toBe(false);
   });
 
@@ -251,8 +251,8 @@ describe("createWorktreePR auto-rebase integration", () => {
     git(work, "push", "origin", "main");
     git(work, "checkout", "ark-s-defaultrebase01");
 
-    const session = app.sessions.create({ repo: work, workdir: work });
-    app.sessions.update(session.id, { branch: "ark-s-defaultrebase01" });
+    const session = await app.sessions.create({ repo: work, workdir: work });
+    await app.sessions.update(session.id, { branch: "ark-s-defaultrebase01" });
 
     const commitBefore = git(work, "rev-parse", "HEAD");
 
@@ -265,7 +265,7 @@ describe("createWorktreePR auto-rebase integration", () => {
     expect(commitAfter).not.toBe(commitBefore);
 
     // Rebase event should be logged
-    const events = app.events.list(session.id);
+    const events = await app.events.list(session.id);
     expect(events.some((e) => e.type === "rebase_completed")).toBe(true);
   });
 });

@@ -121,7 +121,7 @@ describe("daemon PID file management", () => {
 
 // ── Daemon server lifecycle tests ─────────────────────────────────────────────
 
-describe("daemon start/stop lifecycle", () => {
+describe("daemon start/stop lifecycle", async () => {
   let server: { stop(): void } | null = null;
 
   afterEach(() => {
@@ -190,7 +190,7 @@ describe("daemon start/stop lifecycle", () => {
 
 // ── Status detection tests ──────────────────────────────────────────────────
 
-describe("daemon status detection", () => {
+describe("daemon status detection", async () => {
   it("detects daemon is not running on unused port", async () => {
     // Port 19361 should not have anything running
     try {

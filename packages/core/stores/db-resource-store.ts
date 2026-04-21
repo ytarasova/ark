@@ -13,8 +13,8 @@ import YAML from "yaml";
 
 // ── Schema ─────────────────────────────────────────────────────────────────
 
-export function initResourceDefinitionsTable(db: IDatabase): void {
-  db.exec(`
+export async function initResourceDefinitionsTable(db: IDatabase): Promise<void> {
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS resource_definitions (
       name TEXT NOT NULL,
       kind TEXT NOT NULL,
@@ -58,21 +58,21 @@ export class DbResourceStore<T extends { name: string }> {
     return this.tenantId;
   }
 
-  list(): T[] {
-    const rows = this.db
+  async list(): Promise<T[]> {
+    const rows = (await this.db
       .prepare("SELECT * FROM resource_definitions WHERE kind = ? AND tenant_id = ? ORDER BY name")
-      .all(this.kind, this.tenantId) as ResourceRow[];
+      .all(this.kind, this.tenantId)) as ResourceRow[];
     return rows.map((r) => this.rowToResource(r));
   }
 
-  get(name: string): T | null {
-    const row = this.db
+  async get(name: string): Promise<T | null> {
+    const row = (await this.db
       .prepare("SELECT * FROM resource_definitions WHERE name = ? AND kind = ? AND tenant_id = ?")
-      .get(name, this.kind, this.tenantId) as ResourceRow | undefined;
+      .get(name, this.kind, this.tenantId)) as ResourceRow | undefined;
     return row ? this.rowToResource(row) : null;
   }
 
-  save(name: string, resource: T): void {
+  async save(name: string, resource: T): Promise<void> {
     const ts = new Date().toISOString();
     // Strip synthetic fields before serialising. `_source` / `_path` are
     // markers the file-backed store adds so callers can see which tier a
@@ -82,7 +82,7 @@ export class DbResourceStore<T extends { name: string }> {
     void _p;
     const content = YAML.stringify(data);
 
-    this.db
+    await this.db
       .prepare(
         `
       INSERT INTO resource_definitions (name, kind, content, tenant_id, created_at, updated_at)
@@ -93,16 +93,17 @@ export class DbResourceStore<T extends { name: string }> {
       .run(name, this.kind, content, this.tenantId, ts, ts, content, ts);
   }
 
-  delete(name: string): boolean {
-    const result = this.db
+  async delete(name: string): Promise<boolean> {
+    const result = await this.db
       .prepare("DELETE FROM resource_definitions WHERE name = ? AND kind = ? AND tenant_id = ?")
       .run(name, this.kind, this.tenantId);
     return result.changes > 0;
   }
 
   /** Export all resources as YAML (for file-backed export). */
-  exportAll(): Array<{ name: string; yaml: string }> {
-    return this.list().map((r) => {
+  async exportAll(): Promise<Array<{ name: string; yaml: string }>> {
+    const all = await this.list();
+    return all.map((r) => {
       const rec = r as T & { name: string; _source?: string; _path?: string };
       const { _source: _s, _path: _p, ...data } = rec;
       void _s;
@@ -112,12 +113,12 @@ export class DbResourceStore<T extends { name: string }> {
   }
 
   /** Import resources from YAML (for control plane import from local files). */
-  importAll(resources: Array<{ name: string; yaml: string }>): number {
+  async importAll(resources: Array<{ name: string; yaml: string }>): Promise<number> {
     let count = 0;
     for (const { name, yaml } of resources) {
       const parsed = YAML.parse(yaml);
       if (parsed) {
-        this.save(name, { ...this.defaults, ...parsed, name } as T);
+        await this.save(name, { ...this.defaults, ...parsed, name } as T);
         count++;
       }
     }

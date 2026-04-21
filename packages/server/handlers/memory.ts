@@ -28,7 +28,7 @@ function nodeToMemoryEntry(node: KnowledgeNode): MemoryEntry {
 export function registerMemoryHandlers(router: Router, app: AppContext): void {
   router.handle("memory/list", async (p) => {
     const { scope } = extract<MemoryListParams>(p, []);
-    const nodes = app.knowledge.listNodes({ type: "memory" });
+    const nodes = await app.knowledge.listNodes({ type: "memory" });
     const filtered = scope
       ? nodes.filter((n) => (n.metadata.scope as string) === scope || (n.metadata.scope as string) === "global")
       : nodes;
@@ -37,7 +37,7 @@ export function registerMemoryHandlers(router: Router, app: AppContext): void {
 
   router.handle("memory/recall", async (p) => {
     const { query, scope: _scope, limit } = extract<MemoryRecallParams>(p, ["query"]);
-    const results = app.knowledge.search(query, {
+    const results = await app.knowledge.search(query, {
       types: ["memory", "learning"],
       limit: limit ?? 10,
     });
@@ -48,15 +48,15 @@ export function registerMemoryHandlers(router: Router, app: AppContext): void {
 
   router.handle("memory/forget", async (p) => {
     const { id } = extract<MemoryForgetParams>(p, ["id"]);
-    const existing = app.knowledge.getNode(id);
+    const existing = await app.knowledge.getNode(id);
     if (!existing) return { ok: false };
-    app.knowledge.removeNode(id);
+    await app.knowledge.removeNode(id);
     return { ok: true };
   });
 
   router.handle("memory/add", async (p) => {
     const { content, tags, scope, importance } = extract<MemoryAddParams>(p, ["content"]);
-    const id = app.knowledge.addNode({
+    const id = await app.knowledge.addNode({
       type: "memory",
       label: content.slice(0, 100),
       content,
@@ -67,7 +67,7 @@ export function registerMemoryHandlers(router: Router, app: AppContext): void {
         accessCount: 0,
       },
     });
-    const node = app.knowledge.getNode(id)!;
+    const node = (await app.knowledge.getNode(id))!;
     return { memory: nodeToMemoryEntry(node) };
   });
 
@@ -75,19 +75,19 @@ export function registerMemoryHandlers(router: Router, app: AppContext): void {
     const { scope } = extract<MemoryClearParams>(p, []);
     if (scope) {
       // Clear memories matching the scope
-      const nodes = app.knowledge.listNodes({ type: "memory" });
+      const nodes = await app.knowledge.listNodes({ type: "memory" });
       let count = 0;
       for (const n of nodes) {
         if ((n.metadata.scope as string) === scope) {
-          app.knowledge.removeNode(n.id);
+          await app.knowledge.removeNode(n.id);
           count++;
         }
       }
       return { count };
     }
     // Clear all memories
-    const beforeCount = app.knowledge.nodeCount("memory");
-    app.knowledge.clear({ type: "memory" });
+    const beforeCount = await app.knowledge.nodeCount("memory");
+    await app.knowledge.clear({ type: "memory" });
     return { count: beforeCount };
   });
 }

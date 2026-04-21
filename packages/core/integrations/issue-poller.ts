@@ -74,8 +74,8 @@ export async function fetchLabeledIssues(label: string, ghExec: GhExecFn = _ghEx
  * Check if a session already exists for a given issue ticket.
  * Ticket format is "#<number>" (e.g. "#42").
  */
-export function issueAlreadyTracked(app: AppContext, ticket: string): boolean {
-  const sessions = app.sessions.list({ limit: 500 });
+export async function issueAlreadyTracked(app: AppContext, ticket: string): Promise<boolean> {
+  const sessions = await app.sessions.list({ limit: 500 });
   return sessions.some((s) => s.ticket === ticket);
 }
 
@@ -90,12 +90,12 @@ export async function createSessionFromIssue(
 ): Promise<Session | null> {
   const ticket = `#${issue.number}`;
 
-  if (issueAlreadyTracked(app, ticket)) return null;
+  if (await issueAlreadyTracked(app, ticket)) return null;
 
   // Lazy import to avoid circular deps (same pattern as pr-poller.ts)
   const { startSession, dispatch } = await import("../services/session-orchestration.js");
 
-  const session = startSession(app, {
+  const session = await startSession(app, {
     ticket,
     summary: issue.title,
     config: {
@@ -105,7 +105,7 @@ export async function createSessionFromIssue(
     },
   });
 
-  app.events.log(session.id, "issue_imported", {
+  await app.events.log(session.id, "issue_imported", {
     actor: "github",
     data: {
       issue_number: issue.number,

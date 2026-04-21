@@ -34,7 +34,7 @@ function mkReq(headers: Record<string, string>, body: string) {
 
 // ── GitHub ────────────────────────────────────────────────────────────────
 
-describe("github source", () => {
+describe("github source", async () => {
   const SECRET = "gh_secret";
   const body = JSON.stringify({
     action: "opened",
@@ -80,7 +80,7 @@ describe("github source", () => {
 
 // ── Bitbucket ─────────────────────────────────────────────────────────────
 
-describe("bitbucket source", () => {
+describe("bitbucket source", async () => {
   const SECRET = "bb_secret";
   const body = JSON.stringify({
     pullrequest: { id: 4, title: "PR", source: { branch: { name: "feat/y" } } },
@@ -115,7 +115,7 @@ describe("bitbucket source", () => {
 
 // ── Slack ─────────────────────────────────────────────────────────────────
 
-describe("slack source", () => {
+describe("slack source", async () => {
   const SECRET = "slk_secret";
   const body = JSON.stringify({ event: { type: "app_mention", user: "U1", channel: "C1", text: "hi" } });
 
@@ -163,7 +163,7 @@ describe("slack source", () => {
 
 // ── Linear ────────────────────────────────────────────────────────────────
 
-describe("linear source", () => {
+describe("linear source", async () => {
   const SECRET = "ln_secret";
   const body = JSON.stringify({
     action: "create",
@@ -191,7 +191,7 @@ describe("linear source", () => {
 
 // ── Jira ──────────────────────────────────────────────────────────────────
 
-describe("jira source", () => {
+describe("jira source", async () => {
   const SECRET = "ji_secret";
   const body = JSON.stringify({
     webhookEvent: "jira:issue_created",
@@ -221,7 +221,7 @@ describe("jira source", () => {
 
 // ── Generic HMAC ──────────────────────────────────────────────────────────
 
-describe("generic-hmac source", () => {
+describe("generic-hmac source", async () => {
   const SECRET = "generic_secret";
   const body = JSON.stringify({ event: "deploy.started", ref: "build-123" });
 
@@ -247,7 +247,7 @@ describe("generic-hmac source", () => {
 
 // ── Scaffolded + stub sources ────────────────────────────────────────────
 
-describe("pi-sage source (scaffolded)", () => {
+describe("pi-sage source (scaffolded)", async () => {
   const SECRET = "sage_secret";
   const body = JSON.stringify({ event: "analysis.ready", analysis_id: "A-99", ticket: "T-1" });
 
@@ -269,7 +269,7 @@ describe("pi-sage source (scaffolded)", () => {
   });
 });
 
-describe("alertmanager + prometheus (scaffolded)", () => {
+describe("alertmanager + prometheus (scaffolded)", async () => {
   const SECRET = "am_secret";
   const body = JSON.stringify({ status: "firing", commonLabels: { alertname: "HighCpu" } });
 
@@ -292,7 +292,7 @@ describe("alertmanager + prometheus (scaffolded)", () => {
   });
 });
 
-describe("pagerduty source (scaffolded)", () => {
+describe("pagerduty source (scaffolded)", async () => {
   const SECRET = "pd_secret";
   const body = JSON.stringify({
     event: { event_type: "incident.triggered", id: "E1", data: { incident: { id: "INC1" } } },
@@ -311,7 +311,7 @@ describe("pagerduty source (scaffolded)", () => {
   });
 });
 
-describe("email stub", () => {
+describe("email stub", async () => {
   test("verify always returns false", async () => {
     expect(await emailSource.verify(mkReq({}, ""), "s")).toBe(false);
   });

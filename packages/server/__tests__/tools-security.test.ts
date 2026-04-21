@@ -29,7 +29,7 @@ afterAll(async () => {
   await app?.shutdown();
 });
 
-describe("tools/delete security", () => {
+describe("tools/delete security", async () => {
   it("refuses to unlink files outside the claude skills dirs", async () => {
     // Create a decoy file that the handler MUST NOT be able to delete.
     const decoyDir = join(tmpdir(), `tools-sec-${Date.now()}`);

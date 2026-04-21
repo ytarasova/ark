@@ -62,7 +62,7 @@ async function pollUntil(
 
 // ── Health ──────────────────────────────────────────────────────────────────
 
-describe("GET /health", () => {
+describe("GET /health", async () => {
   it("returns status, version, hostname, platform", async () => {
     const { status, data } = await get<any>("/health");
     expect(status).toBe(200);
@@ -75,7 +75,7 @@ describe("GET /health", () => {
 
 // ── File operations ─────────────────────────────────────────────────────────
 
-describe("File operations", () => {
+describe("File operations", async () => {
   it("write + read round-trip", async () => {
     const filePath = join(tempDir, "test-roundtrip.txt");
     const content = "hello arkd\nline 2\n";
@@ -207,7 +207,7 @@ describe("File operations", () => {
 
 // ── Process running ─────────────────────────────────────────────────────────
 
-describe("POST /exec", () => {
+describe("POST /exec", async () => {
   it("runs a command and captures output", async () => {
     const { status, data } = await post<any>("/exec", {
       command: "echo",
@@ -277,7 +277,7 @@ describe("POST /exec", () => {
 
 // ── Agent lifecycle ─────────────────────────────────────────────────────────
 
-describe("Agent lifecycle (tmux)", () => {
+describe("Agent lifecycle (tmux)", async () => {
   const SESSION_NAME = `arkd-test-agent-${Date.now()}`;
 
   afterAll(async () => {
@@ -350,7 +350,7 @@ describe("Agent lifecycle (tmux)", () => {
 
 // ── Metrics ─────────────────────────────────────────────────────────────────
 
-describe("GET /metrics", () => {
+describe("GET /metrics", async () => {
   it("returns cpu, memory, disk, uptime", async () => {
     const { status, data } = await get<any>("/metrics");
     expect(status).toBe(200);
@@ -366,7 +366,7 @@ describe("GET /metrics", () => {
 
 // ── Snapshot ────────────────────────────────────────────────────────────────
 
-describe("GET /snapshot", () => {
+describe("GET /snapshot", async () => {
   it("returns full system snapshot with all sections", async () => {
     const { status, data } = await get<any>("/snapshot");
     expect(status).toBe(200);
@@ -418,7 +418,7 @@ describe("GET /snapshot", () => {
 
 // ── Port probing ────────────────────────────────────────────────────────────
 
-describe("POST /ports/probe", () => {
+describe("POST /ports/probe", async () => {
   it("detects the arkd server's own port as listening", async () => {
     const { data } = await post<any>("/ports/probe", { ports: [TEST_PORT, 19999] });
     expect(data.results.length).toBe(2);
@@ -433,7 +433,7 @@ describe("POST /ports/probe", () => {
 
 // ── Error handling ──────────────────────────────────────────────────────────
 
-describe("Error handling", () => {
+describe("Error handling", async () => {
   it("invalid JSON returns 400", async () => {
     const resp = await fetch(`${BASE}/exec`, {
       method: "POST",
@@ -459,9 +459,9 @@ describe("Error handling", () => {
 
 // ── Concurrent requests ─────────────────────────────────────────────────────
 
-describe("Concurrent requests", () => {
+describe("Concurrent requests", async () => {
   it("handles 10 parallel file write+read operations", async () => {
-    const ops = Array.from({ length: 10 }, (_, i) => {
+    const ops = Array.from({ length: 10 }, async (_, i) => {
       const filePath = join(tempDir, `concurrent-${i}.txt`);
       const content = `content-${i}-${Date.now()}`;
       return (async () => {
@@ -491,7 +491,7 @@ describe("Concurrent requests", () => {
 
 // ── Server lifecycle ────────────────────────────────────────────────────────
 
-describe("Server lifecycle", () => {
+describe("Server lifecycle", async () => {
   it("stop() makes the server unreachable", async () => {
     const ephemeralPort = await allocatePort();
     const ephemeral = startArkd(ephemeralPort, { quiet: true });
@@ -524,7 +524,7 @@ describe("Server lifecycle", () => {
 
 // ── Channel report forwarding ──────────────────────────────────────────────
 
-describe("Channel report forwarding", () => {
+describe("Channel report forwarding", async () => {
   it("defaults conductorUrl to localhost:19100", () => {
     // The main test server was started without conductorUrl.
     // With the fix, it defaults to http://localhost:19100.

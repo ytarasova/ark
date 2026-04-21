@@ -30,47 +30,47 @@ export class TodoRepository {
     return this.tenantId;
   }
 
-  add(sessionId: string, content: string): Todo {
+  async add(sessionId: string, content: string): Promise<Todo> {
     const ts = now();
-    this.db
+    await this.db
       .prepare("INSERT INTO todos (session_id, content, done, tenant_id, created_at) VALUES (?, ?, 0, ?, ?)")
       .run(sessionId, content, this.tenantId, ts);
-    const row = this.db
+    const row = (await this.db
       .prepare("SELECT * FROM todos WHERE session_id = ? AND tenant_id = ? ORDER BY id DESC LIMIT 1")
-      .get(sessionId, this.tenantId) as TodoRow;
+      .get(sessionId, this.tenantId)) as TodoRow;
     return { ...row, done: !!row.done };
   }
 
-  list(sessionId: string): Todo[] {
-    const rows = this.db
+  async list(sessionId: string): Promise<Todo[]> {
+    const rows = (await this.db
       .prepare("SELECT * FROM todos WHERE session_id = ? AND tenant_id = ? ORDER BY id ASC")
-      .all(sessionId, this.tenantId) as TodoRow[];
+      .all(sessionId, this.tenantId)) as TodoRow[];
     return rows.map((r) => ({ ...r, done: !!r.done }));
   }
 
-  toggle(id: number): Todo | null {
-    const row = this.db.prepare("SELECT * FROM todos WHERE id = ? AND tenant_id = ?").get(id, this.tenantId) as
+  async toggle(id: number): Promise<Todo | null> {
+    const row = (await this.db.prepare("SELECT * FROM todos WHERE id = ? AND tenant_id = ?").get(id, this.tenantId)) as
       | TodoRow
       | undefined;
     if (!row) return null;
     const newDone = row.done ? 0 : 1;
-    this.db.prepare("UPDATE todos SET done = ? WHERE id = ? AND tenant_id = ?").run(newDone, id, this.tenantId);
+    await this.db.prepare("UPDATE todos SET done = ? WHERE id = ? AND tenant_id = ?").run(newDone, id, this.tenantId);
     return { ...row, done: !!newDone };
   }
 
-  delete(id: number): boolean {
-    const result = this.db.prepare("DELETE FROM todos WHERE id = ? AND tenant_id = ?").run(id, this.tenantId);
+  async delete(id: number): Promise<boolean> {
+    const result = await this.db.prepare("DELETE FROM todos WHERE id = ? AND tenant_id = ?").run(id, this.tenantId);
     return result.changes > 0;
   }
 
-  allDone(sessionId: string): boolean {
-    const row = this.db
+  async allDone(sessionId: string): Promise<boolean> {
+    const row = (await this.db
       .prepare("SELECT COUNT(*) as count FROM todos WHERE session_id = ? AND tenant_id = ? AND done = 0")
-      .get(sessionId, this.tenantId) as { count: number };
+      .get(sessionId, this.tenantId)) as { count: number };
     return row.count === 0;
   }
 
-  deleteForSession(sessionId: string): void {
-    this.db.prepare("DELETE FROM todos WHERE session_id = ? AND tenant_id = ?").run(sessionId, this.tenantId);
+  async deleteForSession(sessionId: string): Promise<void> {
+    await this.db.prepare("DELETE FROM todos WHERE session_id = ? AND tenant_id = ?").run(sessionId, this.tenantId);
   }
 }

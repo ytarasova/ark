@@ -290,9 +290,9 @@ export class KataProvider extends K8sProvider {
     // Ensure runtimeClassName defaults to "kata-fc" if not set
     const cfg = compute.config as K8sConfig;
     if (!cfg.runtimeClassName) {
-      this.app!.computes.mergeConfig(compute.name, { runtimeClassName: "kata-fc" });
+      await this.app!.computes.mergeConfig(compute.name, { runtimeClassName: "kata-fc" });
       // Re-read compute with updated config
-      const updated = this.app!.computes.get(compute.name);
+      const updated = await this.app!.computes.get(compute.name);
       if (updated) return super.launch(updated, session, opts);
     }
     return super.launch(compute, session, opts);

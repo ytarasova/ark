@@ -63,14 +63,14 @@ describe("shellEscape -- primitive sanity", () => {
   });
 });
 
-describe("sshExecArgs -- argv-based remote exec validates + escapes inputs", () => {
+describe("sshExecArgs -- argv-based remote exec validates + escapes inputs", async () => {
   test("rejects empty argv", async () => {
-    await expect(sshExecArgs("key", "ip", [])).rejects.toThrow(/non-empty/);
+    (await expect(sshExecArgs("key", "ip", []))).rejects.toThrow(/non-empty/);
   });
 
   test("rejects non-string argv elements", async () => {
     // @ts-expect-error -- deliberately bad input
-    await expect(sshExecArgs("key", "ip", ["mkdir", 123])).rejects.toThrow(/must be strings/);
+    (await expect(sshExecArgs("key", "ip", ["mkdir", 123]))).rejects.toThrow(/must be strings/);
   });
 
   test("malicious session id in argv is shell-escaped end-to-end", async () => {

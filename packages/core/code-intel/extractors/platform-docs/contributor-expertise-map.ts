@@ -31,7 +31,7 @@ export const contributorExpertiseMapExtractor: PlatformDocExtractor = {
   flavor: "mechanical",
   cadence: "on_reindex",
   async generate(ctx: PlatformDocContext, workspace_id: string): Promise<PlatformDocInput> {
-    const repos = ctx.store.listReposInWorkspace(ctx.tenant_id, workspace_id);
+    const repos = await ctx.store.listReposInWorkspace(ctx.tenant_id, workspace_id);
     if (repos.length === 0) {
       return {
         title: "Contributor Expertise Map",
@@ -45,7 +45,7 @@ export const contributorExpertiseMapExtractor: PlatformDocExtractor = {
     }
 
     // Build a person_id -> display info map once per workspace.
-    const people = ctx.store.listPeople(ctx.tenant_id);
+    const people = await ctx.store.listPeople(ctx.tenant_id);
     const peopleById = new Map<string, { name: string; email: string }>();
     for (const p of people) {
       peopleById.set(p.id, { name: p.name ?? p.primary_email, email: p.primary_email });
@@ -54,7 +54,7 @@ export const contributorExpertiseMapExtractor: PlatformDocExtractor = {
     let totalContribRows = 0;
     const sections: string[] = [];
     for (const repo of repos) {
-      const contribs = ctx.store.listContributionsForRepo(ctx.tenant_id, repo.id, TOP_N_PER_REPO);
+      const contribs = await ctx.store.listContributionsForRepo(ctx.tenant_id, repo.id, TOP_N_PER_REPO);
       if (contribs.length === 0) {
         sections.push(`### ${repo.name}\n\n_No contributor data indexed yet._\n`);
         continue;

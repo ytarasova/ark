@@ -128,7 +128,7 @@ function makeK8sCompute(deps: K8sComputeDeps): K8sCompute {
 
 // ── Tests ─────────────────────────────────────────────────────────────────
 
-describe("K8sCompute", () => {
+describe("K8sCompute", async () => {
   it("advertises the documented capability flags", () => {
     const c = new K8sCompute();
     expect(c.kind).toBe("k8s");
@@ -140,7 +140,7 @@ describe("K8sCompute", () => {
     });
   });
 
-  describe("provision", () => {
+  describe("provision", async () => {
     let harness: Harness;
     let c: K8sCompute;
 
@@ -223,7 +223,7 @@ describe("K8sCompute", () => {
     });
   });
 
-  describe("getArkdUrl", () => {
+  describe("getArkdUrl", async () => {
     it("points at the local port-forward endpoint", async () => {
       const harness = makeHarness({ nextPort: 50001 });
       const c = makeK8sCompute(harness.deps);
@@ -239,7 +239,7 @@ describe("K8sCompute", () => {
     });
   });
 
-  describe("start / stop", () => {
+  describe("start / stop", async () => {
     it("stop kills the port-forward subprocess and clears the pid", async () => {
       const harness = makeHarness();
       const c = makeK8sCompute(harness.deps);
@@ -296,7 +296,7 @@ describe("K8sCompute", () => {
     });
   });
 
-  describe("destroy", () => {
+  describe("destroy", async () => {
     it("deletes the pod and tears down the port-forward", async () => {
       const harness = makeHarness();
       const c = makeK8sCompute(harness.deps);
@@ -319,12 +319,12 @@ describe("K8sCompute", () => {
     });
   });
 
-  describe("snapshot / restore", () => {
+  describe("snapshot / restore", async () => {
     it("snapshot throws NotSupportedError", async () => {
       const harness = makeHarness();
       const c = makeK8sCompute(harness.deps);
       const h = await c.provision({ tags: { name: "w" }, config: {} });
-      await expect(c.snapshot(h)).rejects.toBeInstanceOf(NotSupportedError);
+      (await expect(c.snapshot(h))).rejects.toBeInstanceOf(NotSupportedError);
     });
 
     it("restore throws NotSupportedError", async () => {
@@ -337,7 +337,7 @@ describe("K8sCompute", () => {
         sizeBytes: 0,
         metadata: {},
       };
-      await expect(c.restore(snap)).rejects.toBeInstanceOf(NotSupportedError);
+      (await expect(c.restore(snap))).rejects.toBeInstanceOf(NotSupportedError);
     });
   });
 });

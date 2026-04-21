@@ -20,7 +20,7 @@ try {
 
 const hasKey = !!process.env.ANTHROPIC_API_KEY;
 
-describe.skipIf(!hasDocker || !hasKey)("TensorZero integration", () => {
+describe.skipIf(!hasDocker || !hasKey)("TensorZero integration", async () => {
   let manager: TensorZeroManager;
 
   afterAll(async () => {

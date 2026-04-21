@@ -22,7 +22,7 @@ afterEach(async () => {
   }
 });
 
-describe("v0.5 gaps integration", () => {
+describe("v0.5 gaps integration", async () => {
   it("skill create -> list -> delete round-trip", () => {
     getApp().skills.save("int-test", { name: "int-test", description: "Integration", prompt: "test prompt" }, "global");
     const found = getApp()
@@ -55,8 +55,8 @@ describe("v0.5 gaps integration", () => {
     expect(getApp().recipes.get("int-recipe")).toBeNull();
   });
 
-  it("sessionToRecipe creates valid recipe from session", () => {
-    const session = app.sessions.create({ summary: "Integration test", flow: "default" });
+  it("sessionToRecipe creates valid recipe from session", async () => {
+    const session = await app.sessions.create({ summary: "Integration test", flow: "default" });
     const recipe = core.sessionToRecipe(session, "from-int-test");
     expect(recipe.name).toBe("from-int-test");
     expect(recipe.flow).toBe("default");

@@ -176,12 +176,12 @@ describe("FirecrackerCompute kind and capabilities", () => {
   });
 });
 
-describe("provision", () => {
+describe("provision", async () => {
   it("short-circuits with an actionable error when Firecracker is unavailable", async () => {
     ({ compute, log } = makeCompute({
       availability: { ok: false, reason: "Firecracker requires Linux with KVM; detected darwin" },
     }));
-    await expect(compute.provision({ tags: { name: "vm1" } })).rejects.toThrow(/Firecracker compute unavailable/i);
+    (await expect(compute.provision({ tags: { name: "vm1" } }))).rejects.toThrow(/Firecracker compute unavailable/i);
     // Nothing else should have been attempted on the gated path.
     expect(log.ensureRootfs).toBe(0);
     expect(log.ensureBridge).toEqual([]);
@@ -236,14 +236,14 @@ describe("provision", () => {
 
   it("cleans up the TAP when VM start fails", async () => {
     ({ compute, log } = makeCompute({ startShouldFail: true }));
-    await expect(compute.provision({ tags: { name: "vm1" } })).rejects.toThrow(/fake boot failure/);
+    (await expect(compute.provision({ tags: { name: "vm1" } }))).rejects.toThrow(/fake boot failure/);
     expect(log.removeTap).toHaveLength(1);
     expect(log.waitForArkdReady).toEqual([]);
   });
 
   it("cleans up the TAP + VM when arkd readiness times out", async () => {
     ({ compute, log } = makeCompute({ waitShouldFail: true }));
-    await expect(compute.provision({ tags: { name: "vm1" } })).rejects.toThrow(/arkd did not come ready/);
+    (await expect(compute.provision({ tags: { name: "vm1" } }))).rejects.toThrow(/arkd did not come ready/);
     expect(log.removeTap).toHaveLength(1);
     // vm.stop called once during cleanup.
     const stops = log.vms[0].calls.filter((c) => c.op === "stop");
@@ -263,7 +263,7 @@ describe("provision", () => {
   });
 });
 
-describe("start / stop", () => {
+describe("start / stop", async () => {
   it("stop() pauses the VM, start() resumes it", async () => {
     const h = await compute.provision({ tags: { name: "vm1" } });
     log.vms[0].calls.length = 0;
@@ -300,7 +300,7 @@ describe("start / stop", () => {
   });
 });
 
-describe("destroy", () => {
+describe("destroy", async () => {
   it("stops the VM and removes the TAP", async () => {
     const h = await compute.provision({ tags: { name: "vm1" } });
     log.vms[0].calls.length = 0;
@@ -336,7 +336,7 @@ describe("destroy", () => {
   });
 });
 
-describe("getArkdUrl", () => {
+describe("getArkdUrl", async () => {
   it("returns handle.meta.firecracker.arkdUrl", async () => {
     const h = await compute.provision({ tags: { name: "vm1" } });
     expect(compute.getArkdUrl(h)).toBe("http://192.168.127.2:19300");
@@ -348,7 +348,7 @@ describe("getArkdUrl", () => {
   });
 });
 
-describe("snapshot / restore", () => {
+describe("snapshot / restore", async () => {
   it("snapshot() delegates to the VM manager and returns metadata with artifact paths", async () => {
     const h = await compute.provision({ tags: { name: "vm1" } });
     const snap = await compute.snapshot(h);
@@ -384,7 +384,7 @@ describe("snapshot / restore", () => {
         },
       },
     };
-    await expect(compute.snapshot(handle)).rejects.toThrow(/VM not live for snapshot/);
+    (await expect(compute.snapshot(handle))).rejects.toThrow(/VM not live for snapshot/);
   });
 
   it("restore() rehydrates the VM and returns a fresh handle", async () => {
@@ -417,7 +417,7 @@ describe("snapshot / restore", () => {
       sizeBytes: 0,
       metadata: {},
     };
-    await expect(compute.restore(badSnapshot)).rejects.toThrow(/Snapshot is for ec2/);
+    (await expect(compute.restore(badSnapshot))).rejects.toThrow(/Snapshot is for ec2/);
   });
 
   it("restore() rejects a snapshot with missing metadata fields", async () => {
@@ -428,6 +428,6 @@ describe("snapshot / restore", () => {
       sizeBytes: 0,
       metadata: { vmId: "x" /* missing tapName, kernelPath, rootfsPath, artifacts */ },
     };
-    await expect(compute.restore(incomplete)).rejects.toThrow(/missing required fields/);
+    (await expect(compute.restore(incomplete))).rejects.toThrow(/missing required fields/);
   });
 });

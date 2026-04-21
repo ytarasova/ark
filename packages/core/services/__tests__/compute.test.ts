@@ -32,7 +32,7 @@ afterEach(async () => {
   await app?.shutdown();
 });
 
-describe("ComputeService", () => {
+describe("ComputeService", async () => {
   // ── create ─────────────────────────────────────────────────────────────────
 
   it("create delegates to repository", () => {
@@ -49,54 +49,54 @@ describe("ComputeService", () => {
 
   // ── get ────────────────────────────────────────────────────────────────────
 
-  it("get returns seeded local compute", () => {
-    const c = svc.get("local");
+  it("get returns seeded local compute", async () => {
+    const c = await svc.get("local");
     expect(c).not.toBeNull();
     expect(c!.provider).toBe("local");
   });
 
-  it("get returns null for nonexistent", () => {
-    expect(svc.get("no-such")).toBeNull();
+  it("get returns null for nonexistent", async () => {
+    expect(await svc.get("no-such")).toBeNull();
   });
 
   // ── list ───────────────────────────────────────────────────────────────────
 
-  it("list returns all compute entries", () => {
+  it("list returns all compute entries", async () => {
     svc.create({ name: "d1", provider: "docker" });
-    const all = svc.list();
+    const all = await svc.list();
     expect(all.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("list filters by provider", () => {
+  it("list filters by provider", async () => {
     svc.create({ name: "d1", provider: "docker" });
     svc.create({ name: "e1", provider: "ec2" });
-    const dockers = svc.list({ provider: "docker" });
+    const dockers = await svc.list({ provider: "docker" });
     expect(dockers.every((c) => c.provider === "docker")).toBe(true);
   });
 
   // ── update ─────────────────────────────────────────────────────────────────
 
-  it("update changes fields", () => {
+  it("update changes fields", async () => {
     svc.create({ name: "upd", provider: "docker" });
-    const updated = svc.update("upd", { status: "running" as ComputeStatus });
+    const updated = await svc.update("upd", { status: "running" as ComputeStatus });
     expect(updated!.status).toBe("running");
   });
 
   // ── delete ─────────────────────────────────────────────────────────────────
 
-  it("delete removes compute", () => {
+  it("delete removes compute", async () => {
     svc.create({ name: "del-me", provider: "docker" });
-    expect(svc.delete("del-me")).toBe(true);
-    expect(svc.get("del-me")).toBeNull();
+    expect(await svc.delete("del-me")).toBe(true);
+    expect(await svc.get("del-me")).toBeNull();
   });
 
-  it("delete prevents deleting 'local'", () => {
-    expect(svc.delete("local")).toBe(false);
-    expect(svc.get("local")).not.toBeNull();
+  it("delete prevents deleting 'local'", async () => {
+    expect(await svc.delete("local")).toBe(false);
+    expect(await svc.get("local")).not.toBeNull();
   });
 
-  it("delete returns false for nonexistent", () => {
-    expect(svc.delete("no-such")).toBe(false);
+  it("delete returns false for nonexistent", async () => {
+    expect(await svc.delete("no-such")).toBe(false);
   });
 
   // ── mergeConfig ────────────────────────────────────────────────────────────

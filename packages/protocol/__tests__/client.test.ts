@@ -45,7 +45,7 @@ function createPair(): { client: ArkClient; server: ArkServer } {
   return { client: new ArkClient(clientTransport), server };
 }
 
-describe("ArkClient", () => {
+describe("ArkClient", async () => {
   it("initializes and gets server info", async () => {
     const { client } = createPair();
     const info = await client.initialize();
