@@ -16,32 +16,32 @@ namespace: ark
 
 controlPlane:
   image:
-    repository: 880170353725.dkr.ecr.ap-south-1.amazonaws.com/pai-mlops-platform/ark
+    repository: ghcr.io/ytarasova/ark
     tag: latest
     pullPolicy: Always
   resources:
     requests:
-      cpu: 500m
-      memory: 1Gi
+      cpu: 200m
+      memory: 512Mi
     limits:
-      cpu: 2000m
-      memory: 4Gi
+      cpu: 1500m
+      memory: 2Gi
 
 workers:
   enabled: true
-  replicaCount: 3
+  replicaCount: 1
   image:
-    repository: 880170353725.dkr.ecr.ap-south-1.amazonaws.com/pai-mlops-platform/ark
+    repository: ghcr.io/ytarasova/ark
     tag: latest
     pullPolicy: Always
   resources:
     requests:
-      cpu: 1000m
-      memory: 2Gi
+      cpu: 250m
+      memory: 512Mi
     limits:
-      cpu: 4000m
-      memory: 8Gi
-  capacity: 5
+      cpu: 2000m
+      memory: 4Gi
+  capacity: 3
   kata:
     enabled: false
 
@@ -84,7 +84,7 @@ serviceAccount:
   create: true
   name: ark
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::880170353725:role/platform-ark-service
+    eks.amazonaws.com/role-arn: arn:aws:iam::880170353725:role/platform-ark
 
 # external-secrets pulls app + RDS secrets at runtime.
 externalSecret:
@@ -112,6 +112,20 @@ database:
 # LLM router defaults; per-tenant overrides via tenant config.
 llm:
   existingSecret: ark-secrets
+
+tensorZero:
+  enabled: false
+  image:
+    repository: tensorzero/gateway
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
 
 # Profile is control-plane in production.
 config:

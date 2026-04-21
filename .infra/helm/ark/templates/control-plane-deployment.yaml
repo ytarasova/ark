@@ -25,6 +25,10 @@ spec:
         - name: ark
           image: "{{ .Values.controlPlane.image.repository }}:{{ .Values.controlPlane.image.tag }}"
           imagePullPolicy: {{ .Values.controlPlane.image.pullPolicy }}
+          # Ark assembles DATABASE_URL from DB_HOST/DB_PORT/DB_USERNAME/
+          # DB_PASSWORD/DB_NAME when DATABASE_URL itself isn't set, with
+          # proper URL-encoding (see `assembleDatabaseUrlFromParts`).
+          # No shell wrapper needed.
           command:
             - bun
             - packages/cli/index.ts
@@ -47,11 +51,34 @@ spec:
             - configMapRef:
                 name: {{ include "ark.fullname" . }}-config
           env:
+            {{- if and (not .Values.postgresql.enabled) .Values.postgresql.external.host }}
+            # External Postgres -- DB_USERNAME/DB_PASSWORD from the
+            # RDS-managed secret (rotating). DATABASE_URL is built at
+            # startup by the wrapper command above (URL-encodes special
+            # chars in the password).
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.external.existingSecret }}
+                  key: DB_USERNAME
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.external.existingSecret }}
+                  key: DB_PASSWORD
+            - name: DB_HOST
+              value: {{ .Values.postgresql.external.host | quote }}
+            - name: DB_PORT
+              value: {{ .Values.postgresql.external.port | quote }}
+            - name: DB_NAME
+              value: {{ .Values.postgresql.external.database | quote }}
+            {{- else }}
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: {{ include "ark.dbSecretName" . }}
                   key: DATABASE_URL
+            {{- end }}
             - name: ARK_TENSORZERO_URL
               value: "http://localhost:3000"
             - name: ARK_TENSORZERO_ENABLED
@@ -84,22 +111,35 @@ spec:
             httpGet:
               path: /health
               port: conductor
-            initialDelaySeconds: 5
+            initialDelaySeconds: 30
             periodSeconds: 10
+            failureThreshold: 6
           livenessProbe:
             httpGet:
               path: /health
               port: conductor
-            initialDelaySeconds: 15
+            initialDelaySeconds: 90
             periodSeconds: 30
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health
+              port: conductor
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 30
           resources:
             {{- toYaml .Values.controlPlane.resources | nindent 12 }}
           volumeMounts:
             - name: ark-data
               mountPath: /root/.ark
+        {{- if .Values.tensorZero.enabled }}
         - name: tensorzero
           image: "{{ .Values.tensorZero.image.repository | default "tensorzero/gateway" }}:{{ .Values.tensorZero.image.tag | default "latest" }}"
           imagePullPolicy: {{ .Values.tensorZero.image.pullPolicy | default "IfNotPresent" }}
+          args:
+            - --config-file
+            - /app/config/tensorzero.toml
           ports:
             - name: tensorzero
               containerPort: 3000
@@ -140,6 +180,7 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml (.Values.tensorZero.resources | default (dict "requests" (dict "cpu" "100m" "memory" "128Mi") "limits" (dict "cpu" "500m" "memory" "256Mi"))) | nindent 12 }}
+        {{- end }}
       volumes:
         - name: ark-data
           emptyDir: {}

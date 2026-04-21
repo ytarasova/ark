@@ -212,6 +212,29 @@ export async function loadAppConfig(overrides: LoadConfigOptions = {}): Promise<
 }
 
 /**
+ * Assemble a postgres URL from individual DB_* env vars when DATABASE_URL
+ * isn't set directly. Used by the k8s deploy where the RDS-managed
+ * password arrives as a separate secret key and shell-side URL
+ * composition mishandles special chars (`$`, `:`, `@`, etc.). This
+ * helper does the URL-encoding correctly, in-process.
+ *
+ * Returns undefined if any required part is missing.
+ */
+export function assembleDatabaseUrlFromParts(
+  env: Record<string, string | undefined> = process.env,
+): string | undefined {
+  const host = env.DB_HOST;
+  const user = env.DB_USERNAME ?? env.DB_USER;
+  const pass = env.DB_PASSWORD;
+  const name = env.DB_NAME ?? env.DB_DATABASE;
+  if (!host || !user || pass === undefined || !name) return undefined;
+  const port = env.DB_PORT ?? "5432";
+  const u = encodeURIComponent(user);
+  const p = encodeURIComponent(pass);
+  return `postgresql://${u}:${p}@${host}:${port}/${name}`;
+}
+
+/**
  * Synchronous loader -- maintains the existing contract used across the
  * codebase. In `test` profile, the sync loader does NOT auto-allocate
  * ports; callers that want dynamic allocation use `loadAppConfig`
@@ -282,7 +305,13 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
     codegraph: merged.features.codegraph ?? defaults.features.codegraph,
     codeIntelV2: merged.features.codeIntelV2 ?? defaults.features.codeIntelV2 ?? false,
   };
-  const databaseUrl = overrides.databaseUrl ?? merged.databaseUrl ?? process.env.DATABASE_URL;
+  // DATABASE_URL takes precedence; fall back to assembling from DB_* parts
+  // (host/port/user/password/name). The latter is ergonomic for k8s where
+  // RDS-managed credentials arrive as separate secret keys and shell-side
+  // URL composition mishandles special chars in the password.
+  const dbAssembled = assembleDatabaseUrlFromParts(process.env);
+  const databaseUrl =
+    overrides.databaseUrl ?? merged.databaseUrl ?? process.env.DATABASE_URL ?? dbAssembled;
   const database: DatabaseConfig = { url: databaseUrl };
 
   const storage: StorageConfig = {
