@@ -13,14 +13,14 @@ export interface RuntimeBilling {
   plan?: string;
   /** Fixed monthly cost in USD for this subscription */
   cost_per_month?: number;
-  /** Transcript parser to use: 'claude' | 'codex' | 'gemini' | 'goose' (defaults based on type) */
-  transcript_parser?: "claude" | "codex" | "gemini" | "goose";
+  /** Transcript parser to use: 'claude' | 'codex' | 'gemini' | 'goose' | 'opencode' (defaults based on type) */
+  transcript_parser?: "claude" | "codex" | "gemini" | "goose" | "opencode";
 }
 
 export interface RuntimeDefinition {
   name: string;
   description?: string;
-  type: "claude-code" | "cli-agent" | "subprocess" | "goose";
+  type: "claude-code" | "cli-agent" | "subprocess" | "goose" | "opencode";
   command?: string[];
   task_delivery?: "stdin" | "file" | "arg";
   models?: Array<{ id: string; label: string }>;

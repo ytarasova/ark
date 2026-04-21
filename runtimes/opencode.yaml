@@ -1,0 +1,18 @@
+name: opencode
+description: "OpenCode -- open-source terminal AI coding agent"
+type: opencode
+command: ["opencode"]
+task_delivery: arg
+models:
+  - id: claude-sonnet-4-6
+    label: "Claude Sonnet 4.6 (via router)"
+  - id: claude-opus-4-6
+    label: "Claude Opus 4.6 (via router)"
+  - id: gpt-4.1
+    label: "GPT-4.1 (via router)"
+  - id: gemini-2.5-pro
+    label: "Gemini 2.5 Pro (via router)"
+default_model: claude-sonnet-4-6
+billing:
+  mode: api
+  transcript_parser: opencode

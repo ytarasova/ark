@@ -90,8 +90,8 @@ describe("Goose runtime resolution", () => {
     expect(agent!.model).toBe("claude-sonnet-4-6");
   });
 
-  it("all five builtin runtimes are loadable", () => {
-    const names = ["claude", "claude-max", "codex", "gemini", "goose"];
+  it("all six builtin runtimes are loadable", () => {
+    const names = ["claude", "claude-max", "codex", "gemini", "goose", "opencode"];
     for (const name of names) {
       const runtime = app.runtimes.get(name);
       expect(runtime).not.toBeNull();

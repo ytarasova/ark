@@ -162,7 +162,15 @@ export function syncCosts(app: AppContext): { synced: number; skipped: number } 
     }
 
     const provider =
-      kind === "claude" ? "anthropic" : kind === "codex" ? "openai" : kind === "gemini" ? "google" : kind;
+      kind === "claude"
+        ? "anthropic"
+        : kind === "codex"
+          ? "openai"
+          : kind === "gemini"
+            ? "google"
+            : kind === "opencode"
+              ? "multi"
+              : kind;
     app.usageRecorder.record({
       sessionId: session.id,
       model: model ?? (session.config?.model as string) ?? "unknown",

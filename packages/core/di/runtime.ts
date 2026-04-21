@@ -27,6 +27,7 @@ import { TranscriptParserRegistry } from "../runtimes/transcript-parser.js";
 import { ClaudeTranscriptParser } from "../runtimes/claude/parser.js";
 import { CodexTranscriptParser } from "../runtimes/codex/parser.js";
 import { GeminiTranscriptParser } from "../runtimes/gemini/parser.js";
+import { OpenCodeTranscriptParser } from "../runtimes/opencode/parser.js";
 import { createPluginRegistry } from "../plugins/registry.js";
 import { FsSnapshotStore } from "../../compute/core/snapshot-store-fs.js";
 import type { SessionRepository } from "../repositories/session.js";
@@ -86,6 +87,7 @@ export function registerRuntime(container: AppContainer): void {
         );
         registry.register(new CodexTranscriptParser());
         registry.register(new GeminiTranscriptParser());
+        registry.register(new OpenCodeTranscriptParser());
         return registry;
       },
       { lifetime: Lifetime.SINGLETON },
