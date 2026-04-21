@@ -202,12 +202,12 @@ export class UsageRecorder {
    */
   async getDailyTrend(opts?: { tenantId?: string; days?: number }): Promise<DailyTrendRow[]> {
     const days = opts?.days ?? 30;
-    // Clamp to a sane positive range so an attacker can't pass arbitrary
-    // text through string interpolation. (The datetime modifier is not
-    // parameterizable in SQLite, so we coerce and clamp to integer first.)
     const safeDays = Math.max(1, Math.min(3650, Math.floor(Number(days) || 30)));
-    const conditions: string[] = [`created_at >= datetime('now', '-${safeDays} days')`, "tenant_id = ?"];
-    const params: any[] = [this.tenantId];
+    // Compute the cutoff in JS so the query is dialect-portable -- SQLite's
+    // datetime('now', '-N days') has no Postgres equivalent.
+    const since = new Date(Date.now() - safeDays * 86400_000).toISOString();
+    const conditions: string[] = ["created_at >= ?", "tenant_id = ?"];
+    const params: any[] = [since, this.tenantId];
 
     const sql = `SELECT DATE(created_at) as date, SUM(cost_usd) as cost
                  FROM usage_records
