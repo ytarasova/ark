@@ -8,7 +8,7 @@
  * with a consistent `RpcError` via the shared wrapper.
  */
 
-import type { AppMode, TenantResolverCapability } from "./app-mode.js";
+import type { AppMode, DatabaseMode, TenantResolverCapability } from "./app-mode.js";
 import { resolveBearerAuth } from "./app-mode.js";
 
 /**
@@ -39,7 +39,7 @@ function makeHostedTenantResolver(): TenantResolverCapability {
   };
 }
 
-export function buildHostedAppMode(): AppMode {
+export function buildHostedAppMode(database: DatabaseMode): AppMode {
   return {
     kind: "hosted",
     fsCapability: null,
@@ -49,5 +49,6 @@ export function buildHostedAppMode(): AppMode {
     ftsRebuildCapability: null,
     hostCommandCapability: null,
     tenantResolver: makeHostedTenantResolver(),
+    database,
   };
 }

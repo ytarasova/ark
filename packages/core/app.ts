@@ -182,10 +182,14 @@ export class AppContext {
   }
 
   private async _openDatabase(): Promise<IDatabase> {
-    const dbUrl = this.config.databaseUrl;
-    if (dbUrl && (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://"))) {
+    // `this.mode` lazily builds a `preBootMode` when the container isn't up
+    // yet -- safe at boot-time because `buildAppMode` is a pure function of
+    // config. All downstream dialect decisions read `mode.database.dialect`
+    // instead of re-sniffing `databaseUrl`, so this is the ONE place in the
+    // codebase that converts a URL into a dialect + constructs the adapter.
+    if (this.mode.database.dialect === "postgres") {
       const { PostgresAdapter } = await import("./database/postgres.js");
-      return new PostgresAdapter(dbUrl);
+      return new PostgresAdapter(this.mode.database.url!);
     }
     const rawDb = new Database(this.config.dbPath);
     rawDb.run("PRAGMA journal_mode = WAL");
@@ -194,9 +198,7 @@ export class AppContext {
   }
 
   private async _initSchema(db: IDatabase): Promise<void> {
-    const dbUrl = this.config.databaseUrl;
-    const isPostgres = !!(dbUrl && (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://")));
-    if (isPostgres) {
+    if (this.mode.database.dialect === "postgres") {
       const { initPostgresSchema, seedLocalComputePostgres } = await import("./repositories/schema-postgres.js");
       initPostgresSchema(db);
       seedLocalComputePostgres(db);

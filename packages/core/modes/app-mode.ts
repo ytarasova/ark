@@ -80,6 +80,33 @@ export interface HostCommandCapability {
 }
 
 /**
+ * Database dialect + connection URL. Populated once at DI composition from
+ * the resolved config -- handlers read `app.mode.database.dialect` instead
+ * of each re-sniffing `config.databaseUrl` with their own regex. Callers
+ * that need the raw URL (e.g. the adapter factory) get it here too.
+ */
+export interface DatabaseMode {
+  readonly dialect: "sqlite" | "postgres";
+  /** Connection string for Postgres, or null for file-backed SQLite. */
+  readonly url: string | null;
+}
+
+/**
+ * Derive the `DatabaseMode` descriptor from a resolved config. Exported so
+ * `app.ts` can compute it once at boot (before the container is built and
+ * `buildAppMode` runs) and hand the same object to `buildAppMode`.
+ */
+export function resolveDatabaseMode(config: { databaseUrl?: string; database?: { url?: string } }): DatabaseMode {
+  const raw = config.database?.url ?? config.databaseUrl ?? null;
+  // Normalise empty strings to null so callers get a consistent "no URL"
+  // signal -- otherwise `!!url` passes on "" and `startsWith` returns false,
+  // but `url` is then still "" which is a footgun for downstream loggers.
+  const url = raw && raw.length > 0 ? raw : null;
+  const isPostgres = !!url && (url.startsWith("postgres://") || url.startsWith("postgresql://"));
+  return { dialect: isPostgres ? "postgres" : "sqlite", url };
+}
+
+/**
  * Inbound HTTP tenant resolution (Authorization + X-Ark-Tenant-Id headers).
  *
  * The conductor's HTTP surface is the same endpoints in both modes, but the
@@ -128,6 +155,8 @@ export interface AppMode {
    * the mode-specific trust rules for tenant + Bearer headers.
    */
   readonly tenantResolver: TenantResolverCapability;
+  /** Dialect + URL of the configured database. Set once at boot. */
+  readonly database: DatabaseMode;
 }
 
 // ── Shared helper: Bearer-token path is identical in both modes ────────────
@@ -174,13 +203,9 @@ export function resolveBearerAuth(
  * first use -- not what you want at runtime.
  */
 export function buildAppMode(config: ArkConfig, app?: AppContext): AppMode {
-  const url =
-    (config.database as { url?: string } | undefined)?.url ?? (config as { databaseUrl?: string }).databaseUrl;
-  const isHosted = typeof url === "string" && url.length > 0;
-  if (isHosted) {
-    return buildHostedAppMode();
-  }
-  return buildLocalAppMode(app);
+  const database = resolveDatabaseMode(config);
+  const isHosted = database.dialect === "postgres";
+  return isHosted ? buildHostedAppMode(database) : buildLocalAppMode(app, database);
 }
 
 export { buildLocalAppMode, buildHostedAppMode };

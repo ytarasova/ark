@@ -50,10 +50,19 @@ async function boot(opts: { hostedMode: boolean }): Promise<void> {
     await app.shutdown();
   }
   app = await AppContext.forTestAsync();
-  if (opts.hostedMode) {
-    (app.config as { databaseUrl?: string }).databaseUrl = "sqlite://test-hosted";
-  }
   await app.boot();
+  if (opts.hostedMode) {
+    // Swap the DI-registered AppMode to the hosted impl AFTER boot so we
+    // exercise the hosted-mode tenant resolver (P1-1 contract) without
+    // forcing the boot path to open a real Postgres connection. The test
+    // context's SQLite adapter stays bound at `app.db`.
+    const { buildHostedAppMode } = await import("../modes/app-mode.js");
+    const { asValue } = await import("awilix");
+    const hostedMode = buildHostedAppMode({ dialect: "postgres", url: "postgres://test-hosted" });
+    (app as unknown as { _container: { register: (r: Record<string, unknown>) => void } })._container.register({
+      mode: asValue(hostedMode),
+    });
+  }
   server = startConductor(app, TEST_PORT, { quiet: true });
 }
 

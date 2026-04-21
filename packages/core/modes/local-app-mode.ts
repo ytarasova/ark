@@ -21,6 +21,7 @@ import { listClaudeSessions, refreshClaudeSessionsCache } from "../claude/sessio
 import { indexTranscripts } from "../search/search.js";
 import type {
   AppMode,
+  DatabaseMode,
   FsCapability,
   FsListDirResult,
   FsDirEntry,
@@ -31,7 +32,7 @@ import type {
   HostCommandCapability,
   TenantResolverCapability,
 } from "./app-mode.js";
-import { resolveBearerAuth } from "./app-mode.js";
+import { resolveBearerAuth, resolveDatabaseMode } from "./app-mode.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -237,7 +238,7 @@ function makeLocalTenantResolver(): TenantResolverCapability {
  * can run before `AppContext.boot()` wires the knowledge/db cradle entries
  * (tests + container-building callers).
  */
-export function buildLocalAppMode(app?: AppContext): AppMode {
+export function buildLocalAppMode(app?: AppContext, database?: DatabaseMode): AppMode {
   const fsCapability = makeFsCapability();
   const mcpDirCapability = makeMcpDirCapability();
   const repoMapCapability = makeRepoMapCapability();
@@ -245,6 +246,9 @@ export function buildLocalAppMode(app?: AppContext): AppMode {
   const ftsRebuildCapability = app ? makeFtsRebuildCapability(app) : null;
   const hostCommandCapability = makeHostCommandCapability();
   const tenantResolver = makeLocalTenantResolver();
+  // Default to SQLite/null when no config was passed (tests that build a
+  // bare local mode without going through `buildAppMode`).
+  const db: DatabaseMode = database ?? resolveDatabaseMode(app?.config ?? {});
   return {
     kind: "local",
     fsCapability,
@@ -254,5 +258,6 @@ export function buildLocalAppMode(app?: AppContext): AppMode {
     ftsRebuildCapability,
     hostCommandCapability,
     tenantResolver,
+    database: db,
   };
 }
