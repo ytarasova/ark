@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import chalk from "chalk";
-import { existsSync, statSync, mkdirSync, writeFileSync } from "fs";
-import { resolve, isAbsolute, join } from "path";
+import { existsSync, readFileSync, statSync } from "fs";
+import { resolve, isAbsolute, basename } from "path";
 
 import type { AppContext } from "../../core/app.js";
 import { fetchAnalysis, type SageAnalysis } from "../../core/integrations/sage-analysis.js";
@@ -50,18 +50,24 @@ export function registerSageCommands(program: Command, app: AppContext | null): 
         return;
       }
 
-      // Materialise the analysis so the session can consume it via
-      // inputs.files.analysis_json. If the caller already pointed us at a
-      // local file, reuse that path directly.
-      let analysisPath: string;
-      if (localPath) {
-        analysisPath = localPath;
-      } else {
-        const sageDir = join(resolvedApp.config.arkDir, "sage");
-        mkdirSync(sageDir, { recursive: true });
-        analysisPath = join(sageDir, `${analysisId}.analysis.json`);
-        writeFileSync(analysisPath, JSON.stringify(analysis, null, 2), "utf-8");
-      }
+      // Persist the analysis into tenant-scoped blob storage so downstream
+      // stages (potentially on different replicas in hosted mode) can read
+      // it back via `app.blobStore.get(locator, tenantId)`. If the caller
+      // pointed us at a local file, load the bytes off disk and upload the
+      // same JSON so the contract downstream is uniform (always a locator).
+      const bytes = localPath ? readFileSync(localPath) : Buffer.from(JSON.stringify(analysis, null, 2), "utf-8");
+      const filename = localPath ? basename(localPath) : `${analysisId}.analysis.json`;
+      // Upload under the same tenant the session row will carry -- otherwise
+      // the downstream `extractSubtasks` read gets a tenant-mismatch error
+      // because locator decoding is scoped. Root AppContext has tenantId=null;
+      // `startSession` below uses SessionRepository's "default" fallback, so
+      // we match it explicitly here.
+      const tenantId = resolvedApp.tenantId ?? "default";
+      const meta = await resolvedApp.blobStore.put(
+        { tenantId, namespace: "sage-analysis", id: `cli-${analysisId}-${Date.now()}`, filename },
+        bytes,
+        { contentType: "application/json" },
+      );
 
       const summary = `sage:${analysis.jira_id}`;
       const session = startSession(resolvedApp, {
@@ -72,7 +78,7 @@ export function registerSageCommands(program: Command, app: AppContext | null): 
         flow: "from-sage-analysis",
         compute_name: opts.compute,
         inputs: {
-          files: { analysis_json: analysisPath },
+          files: { analysis_json: meta.locator },
           params: { analysis_id: analysis.jira_id, sage_base_url: baseUrl },
         },
         config: opts.runtime ? { runtime_override: opts.runtime } : undefined,

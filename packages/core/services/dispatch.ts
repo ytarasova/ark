@@ -465,7 +465,7 @@ async function dispatchFork(
 ): Promise<{ ok: boolean; message: string }> {
   // Read PLAN.md or use default subtasks
   const session = app.sessions.get(sessionId)!;
-  const subtasks = extractSubtasks(app, session);
+  const subtasks = await extractSubtasks(app, session);
 
   const { fork } = await import("./fork-join.js");
 
@@ -491,7 +491,7 @@ async function dispatchFanOut(
   stageDef: flow.StageDefinition,
 ): Promise<{ ok: boolean; message: string }> {
   const session = app.sessions.get(sessionId)!;
-  const subtasks = extractSubtasks(app, session);
+  const subtasks = await extractSubtasks(app, session);
 
   const { fanOut } = await import("./fork-join.js");
 

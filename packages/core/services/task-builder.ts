@@ -165,21 +165,22 @@ export async function buildTaskWithHandoff(
   return [...header, ...context].join("\n");
 }
 
-export function extractSubtasks(app: AppContext, session: Session): { name: string; task: string }[] {
+export async function extractSubtasks(app: AppContext, session: Session): Promise<{ name: string; task: string }[]> {
   // Sage-analysis path: when the session was seeded with a pi-sage analysis
-  // JSON (via --input analysis_json=<path> or the `fetch_sage_analysis`
-  // action), fan out one subtask per plan_stream. This is the happy path for
-  // the `from-sage-analysis` flow.
+  // JSON (via `ark sage` or the `fetch_sage_analysis` action), the locator
+  // lives on `inputs.files.analysis_json`. Fan out one subtask per
+  // plan_stream. Happy path for the `from-sage-analysis` flow.
   const inputs = (session.config as any)?.inputs as { files?: Record<string, string> } | undefined;
-  const analysisPath = inputs?.files?.analysis_json;
-  if (analysisPath && existsSync(analysisPath)) {
+  const analysisLocator = inputs?.files?.analysis_json;
+  if (analysisLocator) {
     try {
-      const analysis = JSON.parse(readFileSync(analysisPath, "utf-8")) as SageAnalysis;
+      const { bytes } = await app.blobStore.get(analysisLocator, session.tenant_id);
+      const analysis = JSON.parse(bytes.toString("utf-8")) as SageAnalysis;
       if (Array.isArray(analysis.plan_streams) && analysis.plan_streams.length > 0) {
         return buildStreamSubtasks(analysis).map((s) => ({ name: s.name, task: s.task }));
       }
     } catch (e: any) {
-      logWarn("session", `extractSubtasks: failed to load analysis from ${analysisPath}: ${e?.message ?? e}`);
+      logWarn("session", `extractSubtasks: failed to load analysis ${analysisLocator}: ${e?.message ?? e}`);
     }
   }
 

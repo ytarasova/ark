@@ -10,10 +10,10 @@ import { getApp } from "./test-helpers.js";
 withTestContext();
 
 describe("extractSubtasks", () => {
-  it("returns default implementation + tests when no PLAN.md exists", () => {
+  it("returns default implementation + tests when no PLAN.md exists", async () => {
     const app = getApp();
     const session = app.sessions.create({ summary: "Build auth system", flow: "bare" });
-    const subtasks = extractSubtasks(app, session);
+    const subtasks = await extractSubtasks(app, session);
 
     expect(subtasks).toHaveLength(2);
     expect(subtasks[0].name).toBe("implementation");
@@ -23,7 +23,7 @@ describe("extractSubtasks", () => {
     expect(subtasks[1].task).toContain("Write tests");
   });
 
-  it("parses PLAN.md steps when present", () => {
+  it("parses PLAN.md steps when present", async () => {
     const app = getApp();
     const session = app.sessions.create({ summary: "Big feature", flow: "bare" });
 
@@ -45,7 +45,7 @@ describe("extractSubtasks", () => {
       ].join("\n"),
     );
 
-    const subtasks = extractSubtasks(app, session);
+    const subtasks = await extractSubtasks(app, session);
     expect(subtasks).toHaveLength(3);
     expect(subtasks[0].name).toBe("step-1");
     expect(subtasks[0].task).toContain("Set up database schema");
@@ -55,7 +55,7 @@ describe("extractSubtasks", () => {
     expect(subtasks[2].task).toContain("Add authentication middleware");
   });
 
-  it("falls back to defaults when PLAN.md has fewer than 2 steps", () => {
+  it("falls back to defaults when PLAN.md has fewer than 2 steps", async () => {
     const app = getApp();
     const session = app.sessions.create({ summary: "Simple fix", flow: "bare" });
 
@@ -63,20 +63,20 @@ describe("extractSubtasks", () => {
     mkdirSync(wtDir, { recursive: true });
     writeFileSync(join(wtDir, "PLAN.md"), "# Plan\n\n## Step 1: Fix the bug\nJust do it.\n");
 
-    const subtasks = extractSubtasks(app, session);
+    const subtasks = await extractSubtasks(app, session);
     expect(subtasks).toHaveLength(2);
     expect(subtasks[0].name).toBe("implementation");
   });
 
-  it("uses 'the task' when session has no summary", () => {
+  it("uses 'the task' when session has no summary", async () => {
     const app = getApp();
     const session = app.sessions.create({ flow: "bare" });
-    const subtasks = extractSubtasks(app, session);
+    const subtasks = await extractSubtasks(app, session);
 
     expect(subtasks[0].task).toContain("the task");
   });
 
-  it("handles numbered headings without Step prefix", () => {
+  it("handles numbered headings without Step prefix", async () => {
     const app = getApp();
     const session = app.sessions.create({ summary: "Feature", flow: "bare" });
 
@@ -87,7 +87,7 @@ describe("extractSubtasks", () => {
       ["# Plan", "", "## 1. First thing", "Details.", "", "## 2. Second thing", "More details."].join("\n"),
     );
 
-    const subtasks = extractSubtasks(app, session);
+    const subtasks = await extractSubtasks(app, session);
     expect(subtasks).toHaveLength(2);
     expect(subtasks[0].task).toContain("First thing");
     expect(subtasks[1].task).toContain("Second thing");
@@ -137,7 +137,7 @@ describe("dispatch with fan_out stage", () => {
 });
 
 describe("fan-out lifecycle integration", () => {
-  it("second fan-out on same parent replaces fork_group", () => {
+  it("second fan-out on same parent replaces fork_group", async () => {
     const app = getApp();
     const parent = app.sessions.create({ summary: "Multi fan-out", flow: "bare" });
 
@@ -221,7 +221,7 @@ describe("fan-out lifecycle integration", () => {
     expect(events.some((e) => e.type === "fork_joined")).toBe(true);
   });
 
-  it("children inherit compute context through fan-out", () => {
+  it("children inherit compute context through fan-out", async () => {
     const app = getApp();
     const parent = app.sessions.create({ summary: "Compute inherit", flow: "bare" });
     app.sessions.update(parent.id, {
@@ -242,7 +242,7 @@ describe("fan-out lifecycle integration", () => {
     }
   });
 
-  it("fan-out with custom flows assigns correct flow per child", () => {
+  it("fan-out with custom flows assigns correct flow per child", async () => {
     const app = getApp();
     const parent = app.sessions.create({ summary: "Mixed flows", flow: "bare" });
 
@@ -261,7 +261,7 @@ describe("fan-out lifecycle integration", () => {
     expect(children[2].flow).toBe("bare");
   });
 
-  it("fan-out with custom agents assigns correct agent per child", () => {
+  it("fan-out with custom agents assigns correct agent per child", async () => {
     const app = getApp();
     const parent = app.sessions.create({ summary: "Mixed agents", flow: "bare" });
 
@@ -280,7 +280,7 @@ describe("fan-out lifecycle integration", () => {
     expect(children[2].agent).toBeNull();
   });
 
-  it("getChildren returns only direct children, not grandchildren", () => {
+  it("getChildren returns only direct children, not grandchildren", async () => {
     const app = getApp();
     const grandparent = app.sessions.create({ summary: "Grandparent", flow: "bare" });
     const parentResult = fanOut(app, grandparent.id, {
