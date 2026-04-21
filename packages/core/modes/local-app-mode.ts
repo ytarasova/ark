@@ -29,7 +29,10 @@ import type {
   RepoMapCapability,
   FtsRebuildCapability,
   HostCommandCapability,
+  ComputeBootstrapCapability,
 } from "./app-mode.js";
+import { seedLocalCompute } from "../repositories/schema.js";
+import { seedLocalComputePostgres } from "../repositories/schema-postgres.js";
 
 const execFileAsync = promisify(execFile);
 
