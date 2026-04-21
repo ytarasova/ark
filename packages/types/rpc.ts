@@ -144,6 +144,15 @@ export interface SessionResumeParams {
   sessionId: string;
   /** Optional snapshot id to restore from. When omitted, the session's latest snapshot is used. */
   snapshotId?: string;
+  /**
+   * Optional stage to rewind the flow to before re-dispatching. When set, the
+   * session's `stage` is reset to this value, `claude_session_id` + `pr_url` are
+   * cleared, and any cached flow-graph state downstream of the target stage is
+   * dropped. Used by the "Restart from stage..." dialog in the web UI so users
+   * can re-run a completed flow from any point (e.g. re-run `implement` after a
+   * completed `pr` stage without starting the planner over).
+   */
+  rewindToStage?: string;
 }
 
 // ── Messaging ───────────────────────────────────────────────────────────────

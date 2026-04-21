@@ -165,7 +165,24 @@ export const api = {
   // TODO: add Zod schema for session/import
   importSession: (data: any) => rpc<any>("session/import", data),
   // TODO: add Zod schema for session/resume
-  restart: (id: string) => rpc<any>("session/resume", { sessionId: id }),
+  restart: (id: string, opts?: { rewindToStage?: string }) =>
+    rpc<any>("session/resume", {
+      sessionId: id,
+      ...(opts?.rewindToStage ? { rewindToStage: opts.rewindToStage } : {}),
+    }),
+  // Stage list used by the Restart-from-stage dialog. `currentStage` is the
+  // session's current pointer; `stages` is the full flow definition in order.
+  getFlowStages: (id: string) =>
+    rpc<{
+      flow: string;
+      currentStage: string | null;
+      stages: {
+        name: string;
+        type: "agent" | "action" | "fork" | "fan_out";
+        agent: string | null;
+        action: string | null;
+      }[];
+    }>("session/flowStages", { sessionId: id }),
   // TODO: add Zod schema for session/clone (separate from fork above)
   fork: (id: string, name?: string) =>
     rpc<any>("session/clone", { sessionId: id, name }).then((r) => ({ ok: true, sessionId: r.session?.id })),
