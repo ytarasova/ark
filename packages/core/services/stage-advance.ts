@@ -16,6 +16,7 @@ import { emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, flushSpans } 
 import { loadRepoConfig } from "../repo-config.js";
 
 import { recordSessionUsage, runVerification, cloneSession } from "./session-lifecycle.js";
+import { capturePlanMdIfPresent } from "./plan-artifact.js";
 
 export async function advance(
   app: AppContext,
@@ -33,6 +34,12 @@ export async function advance(
     const { canProceed, reason } = flow.evaluateGate(app, flowName, stage, session);
     if (!canProceed) return { ok: false, message: reason };
   }
+
+  // Snapshot PLAN.md from the worktree into BlobStore before we advance off
+  // this stage. Downstream stages (including ones on a different replica)
+  // read the locator from `session.config.plan_md_locator` instead of
+  // expecting the file to still be on whatever local disk wrote it.
+  await capturePlanMdIfPresent(app, session);
 
   // Checkpoint before advancing to next stage
   saveCheckpoint(app, sessionId);

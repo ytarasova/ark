@@ -4,7 +4,7 @@
  * Extracted from session-orchestration.ts. All functions take app: AppContext as first arg.
  */
 
-import { existsSync, readFileSync } from "fs";
+import { existsSync } from "fs";
 import { join } from "path";
 import { promisify } from "util";
 import { execFile } from "child_process";
@@ -19,6 +19,7 @@ import { resolveFlow } from "../state/flow.js";
 import { filterMessages, parseMessageFilter } from "../message-filter.js";
 import { logDebug, logWarn } from "../observability/structured-log.js";
 import { buildStreamSubtasks, type SageAnalysis } from "../integrations/sage-analysis.js";
+import { readPlanMd } from "./plan-artifact.js";
 
 /** Convert a typed Session to a plain Record for template variable resolution. */
 export function sessionAsVars(session: Session): Record<string, unknown> {
@@ -133,13 +134,12 @@ export async function appendPreviousStageContext(app: AppContext, session: Sessi
   // Attachment preview (fetches from BlobStore for uploaded attachments)
   parts.push(...(await renderAttachmentsBlock(app, session)));
 
-  // Check for PLAN.md
+  // Check for PLAN.md (BlobStore locator preferred, worktree FS fallback)
   const wtDir = join(app.config.worktreesDir, session.id);
-  const planPath = join(wtDir, "PLAN.md");
-  if (existsSync(planPath)) {
-    let plan = readFileSync(planPath, "utf-8");
-    if (plan.length > 3000) plan = plan.slice(0, 3000) + "\n... (truncated)";
-    parts.push(`\n## PLAN.md:\n${plan}`);
+  const plan = await readPlanMd(app, session);
+  if (plan !== null) {
+    const trimmed = plan.length > 3000 ? plan.slice(0, 3000) + "\n... (truncated)" : plan;
+    parts.push(`\n## PLAN.md:\n${trimmed}`);
   } else {
     // Fallback: inject completion summary from previous stage as plan context.
     // Covers cases where the planner reported its analysis in the completion
@@ -221,11 +221,9 @@ export async function extractSubtasks(app: AppContext, session: Session): Promis
     }
   }
 
-  const wtDir = join(app.config.worktreesDir, session.id);
-  const planPath = join(wtDir, "PLAN.md");
-
-  if (existsSync(planPath)) {
-    const plan = readFileSync(planPath, "utf-8");
+  // PLAN.md fallback: BlobStore locator first, then worktree FS
+  const plan = await readPlanMd(app, session);
+  if (plan) {
     const steps = [...plan.matchAll(/^##\s+(?:Step\s+)?(\d+)[.:]\s*(.+)/gm)];
     if (steps.length >= 2) {
       return steps.map(([, num, title]) => ({
