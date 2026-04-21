@@ -31,9 +31,9 @@ describe("sessionChannelPort", () => {
 });
 
 describe("isChannelPortAvailable", async () => {
-  it("returns true when no running sessions use the port", () => {
+  it("returns true when no running sessions use the port", async () => {
     const port = getApp().sessions.channelPort("s-aaa111");
-    expect(getApp().sessions.isChannelPortAvailable(port)).toBe(true);
+    expect(await getApp().sessions.isChannelPortAvailable(port)).toBe(true);
   });
 
   it("returns false when a running session uses the port", async () => {
@@ -41,8 +41,8 @@ describe("isChannelPortAvailable", async () => {
     const port = getApp().sessions.channelPort(session.id);
     // startSession creates a session with status 'pending', update to 'running'
 
-    getApp().sessions.update(session.id, { status: "running" });
-    expect(getApp().sessions.isChannelPortAvailable(port)).toBe(false);
+    await getApp().sessions.update(session.id, { status: "running" });
+    expect(await getApp().sessions.isChannelPortAvailable(port)).toBe(false);
   });
 
   it("returns true when excludeSessionId matches the running session", async () => {
@@ -54,7 +54,7 @@ describe("isChannelPortAvailable", async () => {
     });
     const port = getApp().sessions.channelPort(session.id);
 
-    getApp().sessions.update(session.id, { status: "running" });
-    expect(getApp().sessions.isChannelPortAvailable(port, session.id)).toBe(true);
+    await getApp().sessions.update(session.id, { status: "running" });
+    expect(await getApp().sessions.isChannelPortAvailable(port, session.id)).toBe(true);
   });
 });

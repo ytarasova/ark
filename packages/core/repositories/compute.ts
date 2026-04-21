@@ -1,4 +1,7 @@
 import type { IDatabase } from "../database/index.js";
+import { drizzleFromIDatabase } from "../drizzle/from-idb.js";
+import type { DrizzleClient } from "../drizzle/client.js";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
 import type {
   Compute,
   ComputeStatus,
@@ -13,18 +16,19 @@ import { now } from "../util/time.js";
 
 // -- Row type (config stored as JSON string) ------------------------------
 
-interface ComputeRow {
+type DrizzleSelectCompute = {
   name: string;
   provider: string;
-  compute_kind?: string | null;
-  runtime_kind?: string | null;
+  computeKind: string | null;
+  runtimeKind: string | null;
   status: string;
-  config: string;
-  is_template?: number | boolean | null;
-  cloned_from?: string | null;
-  created_at: string;
-  updated_at: string;
-}
+  config: string | null;
+  isTemplate: number | boolean | null;
+  clonedFrom: string | null;
+  tenantId: string;
+  createdAt: string;
+  updatedAt: string;
+};
 
 // -- Helpers --------------------------------------------------------------
 
@@ -37,35 +41,23 @@ function safeParseConfig(raw: unknown): ComputeConfig {
   }
 }
 
-function rowToCompute(row: ComputeRow): Compute {
-  // Legacy rows may not carry compute_kind/runtime_kind -- fall back via the
-  // provider-map so every consumer sees both axes regardless of row age.
+function rowToCompute(row: DrizzleSelectCompute): Compute {
   const fallback = providerToPair(row.provider);
-  const compute_kind = (row.compute_kind as ComputeKindName | undefined | null) ?? fallback.compute;
-  const runtime_kind = (row.runtime_kind as RuntimeKindName | undefined | null) ?? fallback.runtime;
+  const compute_kind = (row.computeKind as ComputeKindName | undefined | null) ?? fallback.compute;
+  const runtime_kind = (row.runtimeKind as RuntimeKindName | undefined | null) ?? fallback.runtime;
   return {
-    ...row,
+    name: row.name,
     provider: row.provider as ComputeProviderName,
     compute_kind: compute_kind as ComputeKindName,
     runtime_kind: runtime_kind as RuntimeKindName,
     status: row.status as ComputeStatus,
     config: safeParseConfig(row.config),
-    is_template: !!row.is_template,
-    cloned_from: row.cloned_from ?? null,
-  };
+    is_template: !!row.isTemplate,
+    cloned_from: row.clonedFrom ?? null,
+    created_at: row.createdAt,
+    updated_at: row.updatedAt,
+  } as Compute;
 }
-
-// Valid compute columns (from schema).
-const COMPUTE_COLUMNS = new Set([
-  "provider",
-  "compute_kind",
-  "runtime_kind",
-  "status",
-  "config",
-  "is_template",
-  "cloned_from",
-  "updated_at",
-]);
 
 // Providers that allow only one compute instance per tenant.
 const SINGLETON_PROVIDERS = new Set(["local"]);
@@ -74,8 +66,14 @@ const SINGLETON_PROVIDERS = new Set(["local"]);
 
 export class ComputeRepository {
   private tenantId: string = "default";
+  private _d: DrizzleClient | null = null;
 
   constructor(private db: IDatabase) {}
+
+  private d(): DrizzleClient {
+    if (!this._d) this._d = drizzleFromIDatabase(this.db);
+    return this._d;
+  }
 
   setTenant(tenantId: string): void {
     this.tenantId = tenantId;
@@ -87,24 +85,24 @@ export class ComputeRepository {
   async create(opts: CreateComputeOpts): Promise<Compute> {
     const ts = now();
 
-    // When caller passes the new axes (`compute`, `runtime`) without a
-    // legacy `provider`, reverse-map to the best legacy name so back-compat
-    // reads (`compute.provider`) keep working and the singleton check below
-    // uses the correct key.
     let provider = opts.provider;
     if (!provider && opts.compute && opts.runtime) {
       provider = (pairToProvider({ compute: opts.compute, runtime: opts.runtime }) ?? opts.compute) as any;
     }
     provider = provider ?? "local";
 
-    // Singleton providers allow only one *concrete* instance per tenant.
-    // Templates are blueprints and never run on real infra, so they're
-    // exempt; likewise clones are per-session ephemeral rows. The
-    // constraint only matters for concrete rows that model real hardware.
     if (SINGLETON_PROVIDERS.has(provider) && !opts.is_template && !opts.cloned_from) {
-      const existing = (await this.db
-        .prepare("SELECT name FROM compute WHERE provider = ? AND tenant_id = ? AND NOT is_template")
-        .get(provider, this.tenantId)) as { name: string } | undefined;
+      const d = this.d();
+      const c = d.schema.compute;
+      // NOT is_template compiled across dialects: SQLite stores 0/1 integer,
+      // Postgres stores boolean. `eq(c.isTemplate, false as any)` works for
+      // both because drizzle's codec maps `false` -> 0 on SQLite.
+      const rows = await (d.db as any)
+        .select({ name: c.name })
+        .from(c)
+        .where(and(eq(c.provider, provider), eq(c.tenantId, this.tenantId), eq(c.isTemplate, false as any)))
+        .limit(1);
+      const existing = (rows as Array<{ name: string }>)[0];
       if (existing) {
         throw new Error(`Provider '${provider}' is a singleton -- compute '${existing.name}' already exists`);
       }
@@ -112,126 +110,142 @@ export class ComputeRepository {
 
     const initialStatus: ComputeStatus = provider === "local" ? "running" : "stopped";
 
-    // Derive compute_kind + runtime_kind. Callers may pass the new axes
-    // explicitly; otherwise we compute them from the legacy provider name.
     const fallback = providerToPair(provider);
     const computeKind = (opts.compute ?? fallback.compute) as ComputeKindName;
     const runtimeKind = (opts.runtime ?? fallback.runtime) as RuntimeKindName;
 
-    // SQLite stores booleans as 0/1; Postgres uses BOOLEAN. Pass a JS
-    // boolean and let each driver encode appropriately. rowToCompute
-    // normalizes back to a TS boolean on read.
     const isTemplate = !!opts.is_template;
     const clonedFrom = opts.cloned_from ?? null;
 
-    await this.db
-      .prepare(
-        `
-      INSERT INTO compute (name, provider, compute_kind, runtime_kind, status, config, is_template, cloned_from, tenant_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-      )
-      .run(
-        opts.name,
-        provider,
-        computeKind,
-        runtimeKind,
-        initialStatus,
-        JSON.stringify(opts.config ?? {}),
-        isTemplate,
-        clonedFrom,
-        this.tenantId,
-        ts,
-        ts,
-      );
+    const d = this.d();
+    await (d.db as any).insert(d.schema.compute).values({
+      name: opts.name,
+      provider,
+      computeKind,
+      runtimeKind,
+      status: initialStatus,
+      config: JSON.stringify(opts.config ?? {}),
+      isTemplate: isTemplate as any,
+      clonedFrom,
+      tenantId: this.tenantId,
+      createdAt: ts,
+      updatedAt: ts,
+    });
 
     return (await this.get(opts.name))!;
   }
 
   async get(name: string): Promise<Compute | null> {
-    const row = (await this.db
-      .prepare("SELECT * FROM compute WHERE name = ? AND tenant_id = ?")
-      .get(name, this.tenantId)) as ComputeRow | undefined;
-    if (!row) return null;
-    return rowToCompute(row);
+    const d = this.d();
+    const c = d.schema.compute;
+    const rows = await (d.db as any)
+      .select()
+      .from(c)
+      .where(and(eq(c.name, name), eq(c.tenantId, this.tenantId)))
+      .limit(1);
+    const row = (rows as DrizzleSelectCompute[])[0];
+    return row ? rowToCompute(row) : null;
   }
 
   async list(filters?: { status?: ComputeStatus; provider?: ComputeProviderName; limit?: number }): Promise<Compute[]> {
-    let sql = "SELECT * FROM compute WHERE tenant_id = ?";
-    const params: any[] = [this.tenantId];
-
-    if (filters?.provider) {
-      sql += " AND provider = ?";
-      params.push(filters.provider);
-    }
-    if (filters?.status) {
-      sql += " AND status = ?";
-      params.push(filters.status);
-    }
-
-    sql += " ORDER BY created_at DESC LIMIT ?";
-    params.push(filters?.limit ?? 100);
-
-    return ((await this.db.prepare(sql).all(...params)) as ComputeRow[]).map(rowToCompute);
+    const d = this.d();
+    const c = d.schema.compute;
+    const conditions: any[] = [eq(c.tenantId, this.tenantId)];
+    if (filters?.provider) conditions.push(eq(c.provider, filters.provider));
+    if (filters?.status) conditions.push(eq(c.status, filters.status));
+    const rows = await (d.db as any)
+      .select()
+      .from(c)
+      .where(and(...conditions))
+      .orderBy(desc(c.createdAt))
+      .limit(filters?.limit ?? 100);
+    return (rows as DrizzleSelectCompute[]).map(rowToCompute);
   }
 
   /** Filter view: rows that are reusable config blueprints. */
   async listTemplates(): Promise<Compute[]> {
-    const rows = (await this.db
-      .prepare("SELECT * FROM compute WHERE tenant_id = ? AND is_template ORDER BY created_at DESC")
-      .all(this.tenantId)) as ComputeRow[];
-    return rows.map(rowToCompute);
+    const d = this.d();
+    const c = d.schema.compute;
+    const rows = await (d.db as any)
+      .select()
+      .from(c)
+      .where(and(eq(c.tenantId, this.tenantId), eq(c.isTemplate, true as any)))
+      .orderBy(desc(c.createdAt));
+    return (rows as DrizzleSelectCompute[]).map(rowToCompute);
   }
 
   /** Filter view: rows that are concrete (non-template) compute targets. */
   async listConcrete(): Promise<Compute[]> {
-    const rows = (await this.db
-      .prepare("SELECT * FROM compute WHERE tenant_id = ? AND NOT is_template ORDER BY created_at DESC")
-      .all(this.tenantId)) as ComputeRow[];
-    return rows.map(rowToCompute);
+    const d = this.d();
+    const c = d.schema.compute;
+    const rows = await (d.db as any)
+      .select()
+      .from(c)
+      .where(and(eq(c.tenantId, this.tenantId), eq(c.isTemplate, false as any)))
+      .orderBy(desc(c.createdAt));
+    return (rows as DrizzleSelectCompute[]).map(rowToCompute);
   }
 
   async update(name: string, fields: Partial<Compute>): Promise<Compute | null> {
-    const updates: string[] = ["updated_at = ?"];
-    const values: any[] = [now()];
+    const d = this.d();
+    const c = d.schema.compute;
 
-    for (const [key, value] of Object.entries(fields)) {
-      if (key === "name" || key === "created_at") continue;
-      if (!COMPUTE_COLUMNS.has(key)) continue;
-      if (key === "config" && typeof value === "object") {
-        updates.push("config = ?");
-        values.push(JSON.stringify(value));
-      } else {
-        updates.push(`${key} = ?`);
-        values.push(value ?? null);
-      }
+    const set: Record<string, any> = { updatedAt: now() };
+    if (fields.provider !== undefined) set.provider = fields.provider;
+    if (fields.compute_kind !== undefined) set.computeKind = fields.compute_kind;
+    if (fields.runtime_kind !== undefined) set.runtimeKind = fields.runtime_kind;
+    if (fields.status !== undefined) set.status = fields.status;
+    if (fields.config !== undefined) {
+      set.config =
+        typeof fields.config === "object" && fields.config !== null ? JSON.stringify(fields.config) : fields.config;
     }
-    values.push(name, this.tenantId);
+    if ((fields as any).is_template !== undefined) set.isTemplate = !!(fields as any).is_template as any;
+    if ((fields as any).cloned_from !== undefined) set.clonedFrom = (fields as any).cloned_from ?? null;
 
-    await this.db.prepare(`UPDATE compute SET ${updates.join(", ")} WHERE name = ? AND tenant_id = ?`).run(...values);
+    await (d.db as any)
+      .update(c)
+      .set(set)
+      .where(and(eq(c.name, name), eq(c.tenantId, this.tenantId)));
     return this.get(name);
   }
 
   async delete(name: string): Promise<boolean> {
     if (name === "local") return false;
-    const result = await this.db
-      .prepare("DELETE FROM compute WHERE name = ? AND tenant_id = ?")
-      .run(name, this.tenantId);
-    return result.changes > 0;
+    const d = this.d();
+    const c = d.schema.compute;
+    const res = await (d.db as any).delete(c).where(and(eq(c.name, name), eq(c.tenantId, this.tenantId)));
+    return extractChangesLocal(res) > 0;
   }
 
   async mergeConfig(name: string, patch: Partial<ComputeConfig>): Promise<Compute | null> {
+    // Stay inside IDatabase.transaction for SQL portability. Inside the
+    // transaction we read with drizzle (both drivers share the same raw
+    // connection for SQLite; Postgres uses its pool but pg is serializable
+    // on the row we're touching so the race window stays narrow).
     await this.db.transaction(async () => {
-      const row = (await this.db
-        .prepare("SELECT config FROM compute WHERE name = ? AND tenant_id = ?")
-        .get(name, this.tenantId)) as { config: string } | undefined;
-      if (!row) return;
-      const existing = safeParseConfig(row.config);
-      const merged = { ...existing, ...patch };
-      await this.db
-        .prepare("UPDATE compute SET config = ?, updated_at = ? WHERE name = ? AND tenant_id = ?")
-        .run(JSON.stringify(merged), new Date().toISOString(), name, this.tenantId);
+      const existing = await this.get(name);
+      if (!existing) return;
+      const merged = { ...(existing.config ?? {}), ...patch };
+      const d = this.d();
+      const c = d.schema.compute;
+      await (d.db as any)
+        .update(c)
+        .set({ config: JSON.stringify(merged), updatedAt: new Date().toISOString() })
+        .where(and(eq(c.name, name), eq(c.tenantId, this.tenantId)));
     });
     return this.get(name);
   }
 }
+
+function extractChangesLocal(res: unknown): number {
+  if (!res || typeof res !== "object") return 0;
+  const r = res as { changes?: number; rowCount?: number; count?: number };
+  if (typeof r.changes === "number") return r.changes;
+  if (typeof r.rowCount === "number") return r.rowCount;
+  if (typeof r.count === "number") return r.count;
+  return 0;
+}
+
+// Silence unused imports in case a future edit drops sql/ne usage:
+void sql;
+void ne;

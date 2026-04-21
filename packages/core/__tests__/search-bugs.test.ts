@@ -72,16 +72,16 @@ describe("indexTranscripts transaction safety", async () => {
 // ── ftsTableExists ──────────────────────────────────────────────────────────
 
 describe("ftsTableExists", () => {
-  it("returns true when transcript_index table exists", () => {
+  it("returns true when transcript_index table exists", async () => {
     // The test context creates the schema including the FTS5 table
-    expect(ftsTableExists(getApp())).toBe(true);
+    expect(await ftsTableExists(getApp())).toBe(true);
   });
 
-  it("returns false when table does not exist", () => {
+  it("returns false when table does not exist", async () => {
     // Drop the table and check
     const db = getApp().db;
     db.exec("DROP TABLE IF EXISTS transcript_index");
-    expect(ftsTableExists(getApp())).toBe(false);
+    expect(await ftsTableExists(getApp())).toBe(false);
   });
 });
 

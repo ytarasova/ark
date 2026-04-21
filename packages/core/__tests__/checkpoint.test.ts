@@ -16,9 +16,9 @@ import { getApp } from "./test-helpers.js";
 withTestContext();
 
 describe("saveCheckpoint", () => {
-  it("stores a checkpoint event with full state", () => {
-    const session = getApp().sessions.create({ summary: "test checkpoint", repo: "/tmp/repo" });
-    getApp().sessions.update(session.id, {
+  it("stores a checkpoint event with full state", async () => {
+    const session = await getApp().sessions.create({ summary: "test checkpoint", repo: "/tmp/repo" });
+    await getApp().sessions.update(session.id, {
       stage: "implement",
       status: "running",
       claude_session_id: "claude-abc",
@@ -28,9 +28,9 @@ describe("saveCheckpoint", () => {
       agent: "implementer",
     });
 
-    saveCheckpoint(getApp(), session.id);
+    await saveCheckpoint(getApp(), session.id);
 
-    const events = getApp().events.list(session.id, { type: "checkpoint" });
+    const events = await getApp().events.list(session.id, { type: "checkpoint" });
     expect(events.length).toBe(1);
     expect(events[0].type).toBe("checkpoint");
     expect(events[0].stage).toBe("implement");
@@ -46,157 +46,157 @@ describe("saveCheckpoint", () => {
     expect(data.agent).toBe("implementer");
   });
 
-  it("does nothing for nonexistent session", () => {
+  it("does nothing for nonexistent session", async () => {
     // Should not throw
-    saveCheckpoint(getApp(), "s-nonexistent");
+    await saveCheckpoint(getApp(), "s-nonexistent");
   });
 });
 
 describe("getCheckpoint", () => {
-  it("returns latest checkpoint", () => {
-    const session = getApp().sessions.create({ summary: "multi checkpoint" });
-    getApp().sessions.update(session.id, { stage: "plan", status: "running" });
-    saveCheckpoint(getApp(), session.id);
+  it("returns latest checkpoint", async () => {
+    const session = await getApp().sessions.create({ summary: "multi checkpoint" });
+    await getApp().sessions.update(session.id, { stage: "plan", status: "running" });
+    await saveCheckpoint(getApp(), session.id);
 
-    getApp().sessions.update(session.id, { stage: "implement", status: "running" });
-    saveCheckpoint(getApp(), session.id);
+    await getApp().sessions.update(session.id, { stage: "implement", status: "running" });
+    await saveCheckpoint(getApp(), session.id);
 
-    const cp = getCheckpoint(getApp(), session.id);
+    const cp = await getCheckpoint(getApp(), session.id);
     expect(cp).not.toBeNull();
     expect(cp!.stage).toBe("implement");
     expect(cp!.sessionId).toBe(session.id);
   });
 
-  it("returns null when no checkpoints exist", () => {
-    const session = getApp().sessions.create({ summary: "no checkpoints" });
-    expect(getCheckpoint(getApp(), session.id)).toBeNull();
+  it("returns null when no checkpoints exist", async () => {
+    const session = await getApp().sessions.create({ summary: "no checkpoints" });
+    expect(await getCheckpoint(getApp(), session.id)).toBeNull();
   });
 });
 
 describe("listCheckpoints", () => {
-  it("returns all checkpoints in order", () => {
-    const session = getApp().sessions.create({ summary: "list test" });
+  it("returns all checkpoints in order", async () => {
+    const session = await getApp().sessions.create({ summary: "list test" });
 
-    getApp().sessions.update(session.id, { stage: "plan", status: "running" });
-    saveCheckpoint(getApp(), session.id);
+    await getApp().sessions.update(session.id, { stage: "plan", status: "running" });
+    await saveCheckpoint(getApp(), session.id);
 
-    getApp().sessions.update(session.id, { stage: "implement", status: "running" });
-    saveCheckpoint(getApp(), session.id);
+    await getApp().sessions.update(session.id, { stage: "implement", status: "running" });
+    await saveCheckpoint(getApp(), session.id);
 
-    getApp().sessions.update(session.id, { stage: "review", status: "running" });
-    saveCheckpoint(getApp(), session.id);
+    await getApp().sessions.update(session.id, { stage: "review", status: "running" });
+    await saveCheckpoint(getApp(), session.id);
 
-    const checkpoints = listCheckpoints(getApp(), session.id);
+    const checkpoints = await listCheckpoints(getApp(), session.id);
     expect(checkpoints.length).toBe(3);
     expect(checkpoints[0].stage).toBe("plan");
     expect(checkpoints[1].stage).toBe("implement");
     expect(checkpoints[2].stage).toBe("review");
   });
 
-  it("returns empty array when no checkpoints", () => {
-    const session = getApp().sessions.create({ summary: "empty" });
-    expect(listCheckpoints(getApp(), session.id)).toEqual([]);
+  it("returns empty array when no checkpoints", async () => {
+    const session = await getApp().sessions.create({ summary: "empty" });
+    expect(await listCheckpoints(getApp(), session.id)).toEqual([]);
   });
 });
 
 describe("findOrphanedSessions", () => {
-  it("finds running sessions with no tmux session_id", () => {
-    const session = getApp().sessions.create({ summary: "orphan no tmux" });
-    getApp().sessions.update(session.id, { status: "running", session_id: null });
+  it("finds running sessions with no tmux session_id", async () => {
+    const session = await getApp().sessions.create({ summary: "orphan no tmux" });
+    await getApp().sessions.update(session.id, { status: "running", session_id: null });
 
-    const orphaned = findOrphanedSessions(getApp());
+    const orphaned = await findOrphanedSessions(getApp());
     expect(orphaned.some((s) => s.id === session.id)).toBe(true);
   });
 
-  it("does not include stopped or pending sessions", () => {
-    const stopped = getApp().sessions.create({ summary: "stopped" });
-    getApp().sessions.update(stopped.id, { status: "stopped" });
+  it("does not include stopped or pending sessions", async () => {
+    const stopped = await getApp().sessions.create({ summary: "stopped" });
+    await getApp().sessions.update(stopped.id, { status: "stopped" });
 
-    const pending = getApp().sessions.create({ summary: "pending" });
+    const pending = await getApp().sessions.create({ summary: "pending" });
     // pending is default status
 
-    const orphaned = findOrphanedSessions(getApp());
+    const orphaned = await findOrphanedSessions(getApp());
     expect(orphaned.some((s) => s.id === stopped.id)).toBe(false);
     expect(orphaned.some((s) => s.id === pending.id)).toBe(false);
   });
 
-  it("finds running sessions where tmux session is dead", () => {
-    const session = getApp().sessions.create({ summary: "dead tmux" });
+  it("finds running sessions where tmux session is dead", async () => {
+    const session = await getApp().sessions.create({ summary: "dead tmux" });
     // Use a tmux name that definitely doesn't exist
-    getApp().sessions.update(session.id, { status: "running", session_id: "ark-nonexistent-test-session-xyz" });
+    await getApp().sessions.update(session.id, { status: "running", session_id: "ark-nonexistent-test-session-xyz" });
 
-    const orphaned = findOrphanedSessions(getApp());
+    const orphaned = await findOrphanedSessions(getApp());
     expect(orphaned.some((s) => s.id === session.id)).toBe(true);
   });
 });
 
 describe("recoverSession", () => {
-  it("resets session to ready with checkpoint data", () => {
-    const session = getApp().sessions.create({ summary: "recover me" });
-    getApp().sessions.update(session.id, {
+  it("resets session to ready with checkpoint data", async () => {
+    const session = await getApp().sessions.create({ summary: "recover me" });
+    await getApp().sessions.update(session.id, {
       stage: "implement",
       status: "running",
       claude_session_id: "claude-xyz",
       session_id: "ark-dead-session",
     });
 
-    saveCheckpoint(getApp(), session.id);
+    await saveCheckpoint(getApp(), session.id);
 
     // Simulate crash: session still says "running" but tmux is dead
-    const result = recoverSession(getApp(), session.id);
+    const result = await recoverSession(getApp(), session.id);
     expect(result.ok).toBe(true);
     expect(result.message).toContain("Recovered from checkpoint");
 
-    const recovered = getApp().sessions.get(session.id)!;
+    const recovered = (await getApp().sessions.get(session.id))!;
     expect(recovered.status).toBe("ready");
     expect(recovered.session_id).toBeNull(); // dead tmux cleared
     expect(recovered.claude_session_id).toBe("claude-xyz"); // preserved for --resume
     expect(recovered.stage).toBe("implement"); // restored from checkpoint
 
     // Verify recovery event logged
-    const events = getApp().events.list(session.id, { type: "session_recovered" });
+    const events = await getApp().events.list(session.id, { type: "session_recovered" });
     expect(events.length).toBe(1);
     expect(events[0].data!.from_status).toBe("running");
     expect(events[0].data!.had_checkpoint).toBe(true);
   });
 
-  it("recovers without checkpoint (uses current session state)", () => {
-    const session = getApp().sessions.create({ summary: "no checkpoint recovery" });
-    getApp().sessions.update(session.id, {
+  it("recovers without checkpoint (uses current session state)", async () => {
+    const session = await getApp().sessions.create({ summary: "no checkpoint recovery" });
+    await getApp().sessions.update(session.id, {
       stage: "plan",
       status: "running",
       session_id: "ark-dead",
     });
 
     // No checkpoint saved -- recover from current state
-    const result = recoverSession(getApp(), session.id);
+    const result = await recoverSession(getApp(), session.id);
     expect(result.ok).toBe(true);
     expect(result.message).toContain("no checkpoint");
 
-    const recovered = getApp().sessions.get(session.id)!;
+    const recovered = (await getApp().sessions.get(session.id))!;
     expect(recovered.status).toBe("ready");
     expect(recovered.session_id).toBeNull();
   });
 
-  it("returns error for nonexistent session", () => {
-    const result = recoverSession(getApp(), "s-nonexistent");
+  it("returns error for nonexistent session", async () => {
+    const result = await recoverSession(getApp(), "s-nonexistent");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
   });
 
-  it("preserves claude_session_id from session when no checkpoint", () => {
-    const session = getApp().sessions.create({ summary: "preserve claude id" });
-    getApp().sessions.update(session.id, {
+  it("preserves claude_session_id from session when no checkpoint", async () => {
+    const session = await getApp().sessions.create({ summary: "preserve claude id" });
+    await getApp().sessions.update(session.id, {
       stage: "work",
       status: "running",
       claude_session_id: "claude-from-session",
       session_id: "ark-dead",
     });
 
-    const result = recoverSession(getApp(), session.id);
+    const result = await recoverSession(getApp(), session.id);
     expect(result.ok).toBe(true);
 
-    const recovered = getApp().sessions.get(session.id)!;
+    const recovered = (await getApp().sessions.get(session.id))!;
     expect(recovered.claude_session_id).toBe("claude-from-session");
   });
 });

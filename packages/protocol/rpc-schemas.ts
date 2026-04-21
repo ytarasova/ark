@@ -581,6 +581,1108 @@ export const knowledgeStatsResponse = z.object({
 });
 export type KnowledgeStatsResponse = z.infer<typeof knowledgeStatsResponse>;
 
+// ── session/output ──────────────────────────────────────────────────────────
+
+export const sessionOutputRequest = z.object({
+  sessionId: z.string().min(1),
+  lines: z.number().optional(),
+});
+export type SessionOutputRequest = z.infer<typeof sessionOutputRequest>;
+
+export const sessionOutputResponse = z.object({ output: z.string() }).loose();
+export type SessionOutputResponse = z.infer<typeof sessionOutputResponse>;
+
+// ── session/recording ───────────────────────────────────────────────────────
+
+export const sessionRecordingRequest = sessionIdParams;
+export type SessionRecordingRequest = z.infer<typeof sessionRecordingRequest>;
+
+export const sessionRecordingResponse = z
+  .object({
+    ok: z.boolean(),
+    output: z.string().nullable(),
+  })
+  .loose();
+export type SessionRecordingResponse = z.infer<typeof sessionRecordingResponse>;
+
+// ── session/events ──────────────────────────────────────────────────────────
+
+export const sessionEventsRequest = z.object({
+  sessionId: z.string().min(1),
+  limit: z.number().optional(),
+});
+export type SessionEventsRequest = z.infer<typeof sessionEventsRequest>;
+
+export const sessionEventsResponse = z.object({ events: z.array(eventSchema) }).loose();
+export type SessionEventsResponse = z.infer<typeof sessionEventsResponse>;
+
+// ── session/messages ────────────────────────────────────────────────────────
+
+export const sessionMessagesRequest = z.object({
+  sessionId: z.string().min(1),
+  limit: z.number().optional(),
+});
+export type SessionMessagesRequest = z.infer<typeof sessionMessagesRequest>;
+
+export const sessionMessagesResponse = z.object({ messages: z.array(messageSchema) }).loose();
+export type SessionMessagesResponse = z.infer<typeof sessionMessagesResponse>;
+
+// ── session/export-data ─────────────────────────────────────────────────────
+
+const sessionExportShape = z
+  .object({
+    version: z.literal(1),
+    exportedAt: z.string(),
+    session: z.record(z.string(), z.unknown()),
+    events: z.array(eventSchema),
+  })
+  .loose();
+
+export const sessionExportDataRequest = sessionIdParams;
+export type SessionExportDataRequest = z.infer<typeof sessionExportDataRequest>;
+
+export const sessionExportDataResponse = sessionExportShape;
+export type SessionExportDataResponse = z.infer<typeof sessionExportDataResponse>;
+
+// ── session/import ──────────────────────────────────────────────────────────
+
+export const sessionImportRequest = z
+  .object({
+    version: z.number(),
+    session: z
+      .object({
+        ticket: z.string().optional(),
+        summary: z.string().optional(),
+        repo: z.string().optional(),
+        flow: z.string().optional(),
+        config: z.record(z.string(), z.unknown()).optional(),
+        group_name: z.string().optional(),
+        agent: z.string().optional(),
+      })
+      .loose(),
+  })
+  .loose();
+export type SessionImportRequest = z.infer<typeof sessionImportRequest>;
+
+export const sessionImportResponse = z
+  .object({
+    ok: z.boolean(),
+    sessionId: z.string(),
+    message: z.string().optional(),
+  })
+  .loose();
+export type SessionImportResponse = z.infer<typeof sessionImportResponse>;
+
+// ── session/resume ──────────────────────────────────────────────────────────
+
+export const sessionResumeRequest = z.object({
+  sessionId: z.string().min(1),
+  snapshotId: z.string().optional(),
+});
+export type SessionResumeRequest = z.infer<typeof sessionResumeRequest>;
+
+export const sessionResumeResponse = z
+  .object({
+    ok: z.boolean(),
+    message: z.string().optional(),
+    snapshotId: z.string().optional(),
+  })
+  .loose();
+export type SessionResumeResponse = z.infer<typeof sessionResumeResponse>;
+
+// ── session/clone ───────────────────────────────────────────────────────────
+
+export const sessionCloneRequest = z.object({
+  sessionId: z.string().min(1),
+  name: z.string().optional(),
+});
+export type SessionCloneRequest = z.infer<typeof sessionCloneRequest>;
+
+export const sessionCloneResponse = z.object({ session: sessionSchema.nullable() });
+export type SessionCloneResponse = z.infer<typeof sessionCloneResponse>;
+
+// ── session/pause ───────────────────────────────────────────────────────────
+
+export const sessionPauseRequest = z.object({
+  sessionId: z.string().min(1),
+  reason: z.string().optional(),
+});
+export type SessionPauseRequest = z.infer<typeof sessionPauseRequest>;
+
+export const sessionPauseResponse = z
+  .object({
+    ok: z.boolean(),
+    message: z.string().optional(),
+    snapshot: z.unknown().nullable().optional(),
+    notSupported: z.boolean().optional(),
+  })
+  .loose();
+export type SessionPauseResponse = z.infer<typeof sessionPauseResponse>;
+
+// ── session/interrupt ───────────────────────────────────────────────────────
+
+export const sessionInterruptRequest = sessionIdParams;
+export type SessionInterruptRequest = z.infer<typeof sessionInterruptRequest>;
+
+export const sessionInterruptResponse = sessionOpResult;
+export type SessionInterruptResponse = z.infer<typeof sessionInterruptResponse>;
+
+// ── session/complete ────────────────────────────────────────────────────────
+
+export const sessionCompleteRequest = sessionIdParams;
+export type SessionCompleteRequest = z.infer<typeof sessionCompleteRequest>;
+
+export const sessionCompleteResponse = sessionOpResult;
+export type SessionCompleteResponse = z.infer<typeof sessionCompleteResponse>;
+
+// ── session/spawn ───────────────────────────────────────────────────────────
+
+export const sessionSpawnRequest = z
+  .object({
+    sessionId: z.string().min(1),
+    task: z.string(),
+    agent: z.string().optional(),
+    model: z.string().optional(),
+    group_name: z.string().optional(),
+  })
+  .loose();
+export type SessionSpawnRequest = z.infer<typeof sessionSpawnRequest>;
+
+export const sessionSpawnResponse = z
+  .object({
+    ok: z.boolean(),
+    message: z.string().optional(),
+    sessionId: z.string().optional(),
+  })
+  .loose();
+export type SessionSpawnResponse = z.infer<typeof sessionSpawnResponse>;
+
+// ── session/unread-counts ───────────────────────────────────────────────────
+
+export const sessionUnreadCountsRequest = z.object({}).loose();
+export type SessionUnreadCountsRequest = z.infer<typeof sessionUnreadCountsRequest>;
+
+export const sessionUnreadCountsResponse = z.object({ counts: z.record(z.string(), z.number()) });
+export type SessionUnreadCountsResponse = z.infer<typeof sessionUnreadCountsResponse>;
+
+// ── session/conversation ────────────────────────────────────────────────────
+
+const conversationTurnSchema = z
+  .object({
+    role: z.string(),
+    content: z.string(),
+    timestamp: z.string(),
+  })
+  .loose();
+
+export const sessionConversationRequest = z.object({
+  sessionId: z.string().min(1),
+  limit: z.number().optional(),
+});
+export type SessionConversationRequest = z.infer<typeof sessionConversationRequest>;
+
+export const sessionConversationResponse = z.object({ turns: z.array(conversationTurnSchema) }).loose();
+export type SessionConversationResponse = z.infer<typeof sessionConversationResponse>;
+
+// ── message/send ────────────────────────────────────────────────────────────
+
+export const messageSendRequest = z.object({
+  sessionId: z.string().min(1),
+  content: z.string(),
+});
+export type MessageSendRequest = z.infer<typeof messageSendRequest>;
+
+export const messageSendResponse = sessionOpResult;
+export type MessageSendResponse = z.infer<typeof messageSendResponse>;
+
+// ── message/markRead ────────────────────────────────────────────────────────
+
+export const messageMarkReadRequest = sessionIdParams;
+export type MessageMarkReadRequest = z.infer<typeof messageMarkReadRequest>;
+
+export const messageMarkReadResponse = z.object({ ok: z.boolean() });
+export type MessageMarkReadResponse = z.infer<typeof messageMarkReadResponse>;
+
+// ── gate/approve ────────────────────────────────────────────────────────────
+
+export const gateApproveRequest = sessionIdParams;
+export type GateApproveRequest = z.infer<typeof gateApproveRequest>;
+
+export const gateApproveResponse = z
+  .object({
+    ok: z.boolean(),
+    message: z.string().optional(),
+  })
+  .loose();
+export type GateApproveResponse = z.infer<typeof gateApproveResponse>;
+
+// ── gate/reject ─────────────────────────────────────────────────────────────
+
+export const gateRejectRequest = z.object({
+  sessionId: z.string().min(1),
+  reason: z.string(),
+});
+export type GateRejectRequest = z.infer<typeof gateRejectRequest>;
+
+export const gateRejectResponse = z
+  .object({
+    ok: z.boolean(),
+    message: z.string().optional(),
+  })
+  .loose();
+export type GateRejectResponse = z.infer<typeof gateRejectResponse>;
+
+// ── todo/list ───────────────────────────────────────────────────────────────
+
+export const todoListRequest = sessionIdParams;
+export type TodoListRequest = z.infer<typeof todoListRequest>;
+
+export const todoListResponse = z.object({ todos: z.array(todoSchema) });
+export type TodoListResponse = z.infer<typeof todoListResponse>;
+
+// ── todo/delete ─────────────────────────────────────────────────────────────
+
+export const todoDeleteRequest = z.object({ id: z.number() });
+export type TodoDeleteRequest = z.infer<typeof todoDeleteRequest>;
+
+export const todoDeleteResponse = z.object({ ok: z.boolean() });
+export type TodoDeleteResponse = z.infer<typeof todoDeleteResponse>;
+
+// ── verify/run ──────────────────────────────────────────────────────────────
+
+export const verifyRunRequest = sessionIdParams;
+export type VerifyRunRequest = z.infer<typeof verifyRunRequest>;
+
+export const verifyRunResponse = z
+  .object({
+    ok: z.boolean(),
+    todosResolved: z.boolean(),
+    pendingTodos: z.array(z.unknown()),
+    scriptResults: z.array(
+      z
+        .object({
+          script: z.string(),
+          passed: z.boolean(),
+          output: z.string(),
+        })
+        .loose(),
+    ),
+    message: z.string().optional(),
+  })
+  .loose();
+export type VerifyRunResponse = z.infer<typeof verifyRunResponse>;
+
+// ── costs/session ───────────────────────────────────────────────────────────
+
+export const costsSessionRequest = sessionIdParams;
+export type CostsSessionRequest = z.infer<typeof costsSessionRequest>;
+
+export const costsSessionResponse = z
+  .object({
+    cost: z.number(),
+    input_tokens: z.number(),
+    output_tokens: z.number(),
+    cache_read_tokens: z.number(),
+    cache_write_tokens: z.number(),
+    total_tokens: z.number(),
+  })
+  .loose();
+export type CostsSessionResponse = z.infer<typeof costsSessionResponse>;
+
+// ── cost/export ─────────────────────────────────────────────────────────────
+
+export const costExportRequest = z.object({ format: z.string().optional() }).loose();
+export type CostExportRequest = z.infer<typeof costExportRequest>;
+
+export const costExportResponse = z
+  .object({
+    csv: z.string().optional(),
+    sessions: z.array(sessionCostSchema).optional(),
+    total: z.number().optional(),
+  })
+  .loose();
+export type CostExportResponse = z.infer<typeof costExportResponse>;
+
+// ── search/sessions ─────────────────────────────────────────────────────────
+
+const searchResultSchema = z
+  .object({
+    sessionId: z.string(),
+    source: z.enum(["metadata", "event", "message", "transcript"]),
+    match: z.string(),
+    timestamp: z.string().optional(),
+  })
+  .loose();
+
+export const searchSessionsRequest = z.object({
+  query: z.string(),
+  limit: z.number().optional(),
+});
+export type SearchSessionsRequest = z.infer<typeof searchSessionsRequest>;
+
+export const searchSessionsResponse = z
+  .object({
+    sessions: z.array(searchResultSchema),
+    transcripts: z.array(searchResultSchema),
+  })
+  .loose();
+export type SearchSessionsResponse = z.infer<typeof searchSessionsResponse>;
+
+// ── search/global ───────────────────────────────────────────────────────────
+
+const globalSearchResultSchema = z
+  .object({
+    projectPath: z.string(),
+    projectName: z.string(),
+    fileName: z.string(),
+    matchLine: z.string(),
+    lineNumber: z.number(),
+    modifiedAt: z.unknown(),
+  })
+  .loose();
+
+export const searchGlobalRequest = z.object({ query: z.string() });
+export type SearchGlobalRequest = z.infer<typeof searchGlobalRequest>;
+
+// `searchAllConversations` returns a bare array; the handler forwards it verbatim.
+export const searchGlobalResponse = z.array(globalSearchResultSchema);
+export type SearchGlobalResponse = z.infer<typeof searchGlobalResponse>;
+
+// ── history/list ────────────────────────────────────────────────────────────
+
+const claudeSessionSchema = z
+  .object({
+    sessionId: z.string(),
+    project: z.string(),
+    projectDir: z.string(),
+    transcriptPath: z.string(),
+    summary: z.string(),
+    messageCount: z.number(),
+    timestamp: z.string(),
+    lastActivity: z.string(),
+  })
+  .loose();
+
+export const historyListRequest = z.object({ limit: z.number().optional() }).loose();
+export type HistoryListRequest = z.infer<typeof historyListRequest>;
+
+export const historyListResponse = z.object({ items: z.array(claudeSessionSchema) });
+export type HistoryListResponse = z.infer<typeof historyListResponse>;
+
+// ── history/refresh-and-index ───────────────────────────────────────────────
+
+export const historyRefreshAndIndexRequest = z.object({}).loose();
+export type HistoryRefreshAndIndexRequest = z.infer<typeof historyRefreshAndIndexRequest>;
+
+export const historyRefreshAndIndexResponse = z
+  .object({
+    ok: z.boolean(),
+    sessionCount: z.number(),
+    indexCount: z.number(),
+    items: z.array(claudeSessionSchema),
+  })
+  .loose();
+export type HistoryRefreshAndIndexResponse = z.infer<typeof historyRefreshAndIndexResponse>;
+
+// ── history/rebuild-fts ─────────────────────────────────────────────────────
+
+export const historyRebuildFtsRequest = z.object({}).loose();
+export type HistoryRebuildFtsRequest = z.infer<typeof historyRebuildFtsRequest>;
+
+export const historyRebuildFtsResponse = z.object({ ok: z.boolean() }).loose();
+export type HistoryRebuildFtsResponse = z.infer<typeof historyRebuildFtsResponse>;
+
+// ── status/get ──────────────────────────────────────────────────────────────
+
+export const statusGetRequest = z.object({}).loose();
+export type StatusGetRequest = z.infer<typeof statusGetRequest>;
+
+export const statusGetResponse = z
+  .object({
+    total: z.number(),
+    byStatus: z.record(z.string(), z.number()),
+  })
+  .loose();
+export type StatusGetResponse = z.infer<typeof statusGetResponse>;
+
+// ── daemon/status ───────────────────────────────────────────────────────────
+
+export const daemonStatusRequest = z.object({}).loose();
+export type DaemonStatusRequest = z.infer<typeof daemonStatusRequest>;
+
+export const daemonStatusResponse = z
+  .object({
+    conductor: z.object({ online: z.boolean(), url: z.string() }).loose(),
+    arkd: z.object({ online: z.boolean(), url: z.string() }).loose(),
+    router: z.object({ online: z.boolean() }).loose(),
+  })
+  .loose();
+export type DaemonStatusResponse = z.infer<typeof daemonStatusResponse>;
+
+// ── group/list ──────────────────────────────────────────────────────────────
+
+const groupSchema = z.object({ name: z.string() }).loose();
+
+export const groupListRequest = z.object({}).loose();
+export type GroupListRequest = z.infer<typeof groupListRequest>;
+
+export const groupListResponse = z.object({ groups: z.array(groupSchema) }).loose();
+export type GroupListResponse = z.infer<typeof groupListResponse>;
+
+// ── config/get ──────────────────────────────────────────────────────────────
+
+export const configGetRequest = z.object({}).loose();
+export type ConfigGetRequest = z.infer<typeof configGetRequest>;
+
+export const configGetResponse = z
+  .object({
+    hotkeys: z.unknown(),
+    theme: z.unknown(),
+    profile: z.unknown(),
+    mode: z.string(),
+    hosted: z.boolean(),
+  })
+  .loose();
+export type ConfigGetResponse = z.infer<typeof configGetResponse>;
+
+// ── profile/list ────────────────────────────────────────────────────────────
+
+const profileSchema = z
+  .object({
+    name: z.string(),
+    description: z.string().optional(),
+    config: z.record(z.string(), z.unknown()).optional(),
+    createdAt: z.string().optional(),
+  })
+  .loose();
+
+export const profileListRequest = z.object({}).loose();
+export type ProfileListRequest = z.infer<typeof profileListRequest>;
+
+export const profileListResponse = z
+  .object({
+    profiles: z.array(profileSchema),
+    active: z.string().nullable().optional(),
+  })
+  .loose();
+export type ProfileListResponse = z.infer<typeof profileListResponse>;
+
+// ── profile/create ──────────────────────────────────────────────────────────
+
+export const profileCreateRequest = z.object({
+  name: z.string().min(1),
+  description: z.string().optional(),
+});
+export type ProfileCreateRequest = z.infer<typeof profileCreateRequest>;
+
+export const profileCreateResponse = z.object({ profile: profileSchema });
+export type ProfileCreateResponse = z.infer<typeof profileCreateResponse>;
+
+// ── profile/delete ──────────────────────────────────────────────────────────
+
+export const profileDeleteRequest = z.object({ name: z.string().min(1) });
+export type ProfileDeleteRequest = z.infer<typeof profileDeleteRequest>;
+
+export const profileDeleteResponse = z.object({ ok: z.boolean() });
+export type ProfileDeleteResponse = z.infer<typeof profileDeleteResponse>;
+
+// ── tools/list ──────────────────────────────────────────────────────────────
+
+const toolEntrySchema = z
+  .object({
+    kind: z.enum(["mcp-server", "command", "claude-skill", "ark-skill", "ark-recipe", "context"]),
+    name: z.string(),
+    description: z.string(),
+    source: z.string(),
+    config: z.record(z.string(), z.unknown()).optional(),
+  })
+  .loose();
+
+export const toolsListRequest = z.object({ projectRoot: z.string().optional() }).loose();
+export type ToolsListRequest = z.infer<typeof toolsListRequest>;
+
+export const toolsListResponse = z.object({ tools: z.array(toolEntrySchema) });
+export type ToolsListResponse = z.infer<typeof toolsListResponse>;
+
+// ── mcp/attach-by-dir ───────────────────────────────────────────────────────
+
+export const mcpAttachByDirRequest = z.object({
+  dir: z.string().min(1),
+  name: z.string().min(1),
+  config: z.record(z.string(), z.unknown()),
+});
+export type McpAttachByDirRequest = z.infer<typeof mcpAttachByDirRequest>;
+
+export const mcpAttachByDirResponse = z.object({ ok: z.boolean() });
+export type McpAttachByDirResponse = z.infer<typeof mcpAttachByDirResponse>;
+
+// ── mcp/detach-by-dir ───────────────────────────────────────────────────────
+
+export const mcpDetachByDirRequest = z.object({
+  dir: z.string().min(1),
+  name: z.string().min(1),
+});
+export type McpDetachByDirRequest = z.infer<typeof mcpDetachByDirRequest>;
+
+export const mcpDetachByDirResponse = z.object({ ok: z.boolean() });
+export type McpDetachByDirResponse = z.infer<typeof mcpDetachByDirResponse>;
+
+// ── skill/save ──────────────────────────────────────────────────────────────
+
+export const skillSaveRequest = z
+  .object({
+    name: z.string().min(1),
+    description: z.string().optional(),
+    prompt: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+    scope: z.enum(["builtin", "global", "project"]).optional(),
+    yaml: z.string().optional(),
+  })
+  .loose();
+export type SkillSaveRequest = z.infer<typeof skillSaveRequest>;
+
+export const skillSaveResponse = z
+  .object({
+    ok: z.boolean(),
+    name: z.string(),
+    scope: z.string().optional(),
+  })
+  .loose();
+export type SkillSaveResponse = z.infer<typeof skillSaveResponse>;
+
+// ── skill/delete ────────────────────────────────────────────────────────────
+
+export const skillDeleteRequest = z.object({
+  name: z.string().min(1),
+  scope: z.string().optional(),
+});
+export type SkillDeleteRequest = z.infer<typeof skillDeleteRequest>;
+
+export const skillDeleteResponse = z.object({ ok: z.boolean() });
+export type SkillDeleteResponse = z.infer<typeof skillDeleteResponse>;
+
+// ── recipe/list ─────────────────────────────────────────────────────────────
+
+const recipeDefinitionSchema = z
+  .object({
+    name: z.string(),
+    description: z.string(),
+    repo: z.string().optional(),
+    flow: z.string(),
+    agent: z.string().optional(),
+    compute: z.string().optional(),
+    group: z.string().optional(),
+    variables: z.array(z.unknown()),
+    parameters: z.array(z.unknown()).optional(),
+    defaults: z.record(z.string(), z.string()).optional(),
+    sub_recipes: z.array(z.unknown()).optional(),
+    _source: z.enum(["builtin", "project", "global"]).optional(),
+  })
+  .loose();
+
+export const recipeListRequest = z.object({}).loose();
+export type RecipeListRequest = z.infer<typeof recipeListRequest>;
+
+export const recipeListResponse = z.object({ recipes: z.array(recipeDefinitionSchema) });
+export type RecipeListResponse = z.infer<typeof recipeListResponse>;
+
+// ── recipe/delete ───────────────────────────────────────────────────────────
+
+export const recipeDeleteRequest = z.object({
+  name: z.string().min(1),
+  scope: z.string().optional(),
+});
+export type RecipeDeleteRequest = z.infer<typeof recipeDeleteRequest>;
+
+export const recipeDeleteResponse = z.object({ ok: z.boolean() });
+export type RecipeDeleteResponse = z.infer<typeof recipeDeleteResponse>;
+
+// ── runtime/list ────────────────────────────────────────────────────────────
+
+const runtimeDefinitionSchema = z
+  .object({
+    name: z.string(),
+    description: z.string().optional(),
+    type: z.string(),
+    command: z.array(z.string()).optional(),
+    task_delivery: z.enum(["stdin", "file", "arg"]).optional(),
+    models: z.array(z.object({ id: z.string(), label: z.string() }).loose()).optional(),
+    default_model: z.string().optional(),
+    permission_mode: z.string().optional(),
+    env: z.record(z.string(), z.string()).optional(),
+    mcp_servers: z.array(z.union([z.string(), z.record(z.string(), z.unknown())])).optional(),
+    billing: z.record(z.string(), z.unknown()).optional(),
+    secrets: z.array(z.string()).optional(),
+    _source: z.enum(["builtin", "global", "project"]).optional(),
+    _path: z.string().optional(),
+  })
+  .loose();
+
+export const runtimeListRequest = z.object({}).loose();
+export type RuntimeListRequest = z.infer<typeof runtimeListRequest>;
+
+export const runtimeListResponse = z.object({ runtimes: z.array(runtimeDefinitionSchema) });
+export type RuntimeListResponse = z.infer<typeof runtimeListResponse>;
+
+// ── runtime/read ────────────────────────────────────────────────────────────
+
+export const runtimeReadRequest = z.object({ name: z.string().min(1) });
+export type RuntimeReadRequest = z.infer<typeof runtimeReadRequest>;
+
+export const runtimeReadResponse = z.object({ runtime: runtimeDefinitionSchema });
+export type RuntimeReadResponse = z.infer<typeof runtimeReadResponse>;
+
+// ── agent/create ────────────────────────────────────────────────────────────
+
+export const agentCreateRequest = z
+  .object({
+    name: z.string().min(1),
+    yaml: z.string().optional(),
+    scope: z.enum(["builtin", "global", "project"]).optional(),
+  })
+  .loose();
+export type AgentCreateRequest = z.infer<typeof agentCreateRequest>;
+
+export const agentCreateResponse = z
+  .object({
+    ok: z.boolean(),
+    name: z.string(),
+    scope: z.string().optional(),
+  })
+  .loose();
+export type AgentCreateResponse = z.infer<typeof agentCreateResponse>;
+
+// ── agent/update ────────────────────────────────────────────────────────────
+
+export const agentUpdateRequest = agentCreateRequest;
+export type AgentUpdateRequest = z.infer<typeof agentUpdateRequest>;
+
+export const agentUpdateResponse = agentCreateResponse;
+export type AgentUpdateResponse = z.infer<typeof agentUpdateResponse>;
+
+// ── agent/delete ────────────────────────────────────────────────────────────
+
+export const agentDeleteRequest = z.object({
+  name: z.string().min(1),
+  scope: z.string().optional(),
+});
+export type AgentDeleteRequest = z.infer<typeof agentDeleteRequest>;
+
+export const agentDeleteResponse = z.object({ ok: z.boolean() });
+export type AgentDeleteResponse = z.infer<typeof agentDeleteResponse>;
+
+// ── flow/create ─────────────────────────────────────────────────────────────
+
+export const flowCreateRequest = z
+  .object({
+    name: z.string().min(1),
+    description: z.string().optional(),
+    stages: z.array(stageDefinitionSchema),
+    scope: z.enum(["global", "project"]).optional(),
+  })
+  .loose();
+export type FlowCreateRequest = z.infer<typeof flowCreateRequest>;
+
+export const flowCreateResponse = z.object({ ok: z.boolean(), name: z.string() });
+export type FlowCreateResponse = z.infer<typeof flowCreateResponse>;
+
+// ── flow/delete ─────────────────────────────────────────────────────────────
+
+export const flowDeleteRequest = z.object({
+  name: z.string().min(1),
+  scope: z.string().optional(),
+});
+export type FlowDeleteRequest = z.infer<typeof flowDeleteRequest>;
+
+export const flowDeleteResponse = z.object({ ok: z.boolean() });
+export type FlowDeleteResponse = z.infer<typeof flowDeleteResponse>;
+
+// ── worktree/list ───────────────────────────────────────────────────────────
+
+export const worktreeListRequest = z.object({}).loose();
+export type WorktreeListRequest = z.infer<typeof worktreeListRequest>;
+
+// The handler returns a filtered slice of sessions (those with workdir+branch).
+export const worktreeListResponse = z.object({ worktrees: z.array(sessionSchema) });
+export type WorktreeListResponse = z.infer<typeof worktreeListResponse>;
+
+// ── worktree/diff ───────────────────────────────────────────────────────────
+
+export const worktreeDiffRequest = z.object({
+  sessionId: z.string().min(1),
+  base: z.string().optional(),
+});
+export type WorktreeDiffRequest = z.infer<typeof worktreeDiffRequest>;
+
+// Shape of worktreeDiff varies across backends; accept any object.
+export const worktreeDiffResponse = z.record(z.string(), z.unknown());
+export type WorktreeDiffResponse = z.infer<typeof worktreeDiffResponse>;
+
+// ── worktree/finish ─────────────────────────────────────────────────────────
+
+export const worktreeFinishRequest = z
+  .object({
+    sessionId: z.string().min(1),
+    noMerge: z.boolean().optional(),
+    createPR: z.boolean().optional(),
+    into: z.string().optional(),
+    keepBranch: z.boolean().optional(),
+  })
+  .loose();
+export type WorktreeFinishRequest = z.infer<typeof worktreeFinishRequest>;
+
+export const worktreeFinishResponse = sessionOpResult;
+export type WorktreeFinishResponse = z.infer<typeof worktreeFinishResponse>;
+
+// ── worktree/create-pr ──────────────────────────────────────────────────────
+
+export const worktreeCreatePrRequest = z
+  .object({
+    sessionId: z.string().min(1),
+    title: z.string().optional(),
+    body: z.string().optional(),
+    base: z.string().optional(),
+    draft: z.boolean().optional(),
+  })
+  .loose();
+export type WorktreeCreatePrRequest = z.infer<typeof worktreeCreatePrRequest>;
+
+export const worktreeCreatePrResponse = z
+  .object({
+    ok: z.boolean(),
+    message: z.string().optional(),
+    sessionId: z.string().optional(),
+    pr_url: z.string().optional(),
+  })
+  .loose();
+export type WorktreeCreatePrResponse = z.infer<typeof worktreeCreatePrResponse>;
+
+// ── worktree/cleanup ────────────────────────────────────────────────────────
+
+export const worktreeCleanupRequest = z.object({}).loose();
+export type WorktreeCleanupRequest = z.infer<typeof worktreeCleanupRequest>;
+
+export const worktreeCleanupResponse = z.object({ ok: z.boolean() }).loose();
+export type WorktreeCleanupResponse = z.infer<typeof worktreeCleanupResponse>;
+
+// ── learning/list ───────────────────────────────────────────────────────────
+
+const learningEntrySchema = z
+  .object({
+    title: z.string(),
+    description: z.string(),
+    recurrence: z.number(),
+    lastSeen: z.string(),
+  })
+  .loose();
+
+export const learningListRequest = z.object({}).loose();
+export type LearningListRequest = z.infer<typeof learningListRequest>;
+
+export const learningListResponse = z.object({ learnings: z.array(learningEntrySchema) });
+export type LearningListResponse = z.infer<typeof learningListResponse>;
+
+// ── learning/add ────────────────────────────────────────────────────────────
+
+export const learningAddRequest = z.object({
+  title: z.string().min(1),
+  description: z.string(),
+});
+export type LearningAddRequest = z.infer<typeof learningAddRequest>;
+
+export const learningAddResponse = z
+  .object({
+    ok: z.boolean(),
+    learning: learningEntrySchema,
+    promoted: z.boolean(),
+  })
+  .loose();
+export type LearningAddResponse = z.infer<typeof learningAddResponse>;
+
+// ── memory/list ─────────────────────────────────────────────────────────────
+
+const memoryEntrySchema = z
+  .object({
+    id: z.string(),
+    content: z.string(),
+    tags: z.array(z.string()),
+    scope: z.string(),
+    importance: z.number(),
+    createdAt: z.string(),
+    accessedAt: z.string(),
+    accessCount: z.number(),
+  })
+  .loose();
+
+export const memoryListRequest = z.object({ scope: z.string().optional() }).loose();
+export type MemoryListRequest = z.infer<typeof memoryListRequest>;
+
+export const memoryListResponse = z.object({ memories: z.array(memoryEntrySchema) });
+export type MemoryListResponse = z.infer<typeof memoryListResponse>;
+
+// ── memory/recall ───────────────────────────────────────────────────────────
+
+export const memoryRecallRequest = z.object({
+  query: z.string(),
+  scope: z.string().optional(),
+  limit: z.number().optional(),
+});
+export type MemoryRecallRequest = z.infer<typeof memoryRecallRequest>;
+
+export const memoryRecallResponse = z.object({ results: z.array(memoryEntrySchema) });
+export type MemoryRecallResponse = z.infer<typeof memoryRecallResponse>;
+
+// ── memory/add ──────────────────────────────────────────────────────────────
+
+export const memoryAddRequest = z
+  .object({
+    content: z.string(),
+    tags: z.array(z.string()).optional(),
+    scope: z.string().optional(),
+    importance: z.number().optional(),
+  })
+  .loose();
+export type MemoryAddRequest = z.infer<typeof memoryAddRequest>;
+
+export const memoryAddResponse = z.object({ memory: memoryEntrySchema });
+export type MemoryAddResponse = z.infer<typeof memoryAddResponse>;
+
+// ── memory/forget ───────────────────────────────────────────────────────────
+
+export const memoryForgetRequest = z.object({ id: z.string().min(1) });
+export type MemoryForgetRequest = z.infer<typeof memoryForgetRequest>;
+
+export const memoryForgetResponse = z.object({ ok: z.boolean() });
+export type MemoryForgetResponse = z.infer<typeof memoryForgetResponse>;
+
+// ── knowledge/ingest ────────────────────────────────────────────────────────
+
+export const knowledgeIngestRequest = z
+  .object({
+    path: z.string().min(1),
+    directory: z.boolean().optional(),
+    scope: z.string().optional(),
+    tags: z.array(z.string()).optional(),
+    recursive: z.boolean().optional(),
+  })
+  .loose();
+export type KnowledgeIngestRequest = z.infer<typeof knowledgeIngestRequest>;
+
+export const knowledgeIngestResponse = z
+  .object({
+    ok: z.boolean(),
+    files: z.number().optional(),
+    chunks: z.number().optional(),
+    error: z.string().optional(),
+  })
+  .loose();
+export type KnowledgeIngestResponse = z.infer<typeof knowledgeIngestResponse>;
+
+// ── knowledge/search ────────────────────────────────────────────────────────
+
+const knowledgeNodeSchema = z
+  .object({
+    id: z.string(),
+    type: z.string(),
+    label: z.string(),
+    content: z.string().nullable().optional(),
+    metadata: z.record(z.string(), z.unknown()),
+    created_at: z.string(),
+    updated_at: z.string(),
+  })
+  .loose();
+
+export const knowledgeSearchRequest = z
+  .object({
+    query: z.string(),
+    types: z.array(z.string()).optional(),
+    limit: z.number().optional(),
+  })
+  .loose();
+export type KnowledgeSearchRequest = z.infer<typeof knowledgeSearchRequest>;
+
+export const knowledgeSearchResponse = z.object({ results: z.array(knowledgeNodeSchema) });
+export type KnowledgeSearchResponse = z.infer<typeof knowledgeSearchResponse>;
+
+// ── knowledge/index ─────────────────────────────────────────────────────────
+
+export const knowledgeIndexRequest = z.object({ repo: z.string().optional() }).loose();
+export type KnowledgeIndexRequest = z.infer<typeof knowledgeIndexRequest>;
+
+export const knowledgeIndexResponse = z
+  .object({
+    ok: z.boolean(),
+    error: z.string().optional(),
+  })
+  .loose();
+export type KnowledgeIndexResponse = z.infer<typeof knowledgeIndexResponse>;
+
+// ── knowledge/export ────────────────────────────────────────────────────────
+
+export const knowledgeExportRequest = z.object({ dir: z.string().optional() }).loose();
+export type KnowledgeExportRequest = z.infer<typeof knowledgeExportRequest>;
+
+export const knowledgeExportResponse = z.object({ ok: z.boolean() }).loose();
+export type KnowledgeExportResponse = z.infer<typeof knowledgeExportResponse>;
+
+// ── knowledge/import ────────────────────────────────────────────────────────
+
+export const knowledgeImportRequest = z.object({ dir: z.string().optional() }).loose();
+export type KnowledgeImportRequest = z.infer<typeof knowledgeImportRequest>;
+
+export const knowledgeImportResponse = z.object({ ok: z.boolean() }).loose();
+export type KnowledgeImportResponse = z.infer<typeof knowledgeImportResponse>;
+
+// ── schedule/delete ─────────────────────────────────────────────────────────
+
+export const scheduleDeleteRequest = z.object({ id: z.string().min(1) });
+export type ScheduleDeleteRequest = z.infer<typeof scheduleDeleteRequest>;
+
+export const scheduleDeleteResponse = z.object({ ok: z.boolean() });
+export type ScheduleDeleteResponse = z.infer<typeof scheduleDeleteResponse>;
+
+// ── schedule/enable ─────────────────────────────────────────────────────────
+
+export const scheduleEnableRequest = z.object({ id: z.string().min(1) });
+export type ScheduleEnableRequest = z.infer<typeof scheduleEnableRequest>;
+
+export const scheduleEnableResponse = z.object({ ok: z.boolean() });
+export type ScheduleEnableResponse = z.infer<typeof scheduleEnableResponse>;
+
+// ── schedule/disable ────────────────────────────────────────────────────────
+
+export const scheduleDisableRequest = z.object({ id: z.string().min(1) });
+export type ScheduleDisableRequest = z.infer<typeof scheduleDisableRequest>;
+
+export const scheduleDisableResponse = z.object({ ok: z.boolean() });
+export type ScheduleDisableResponse = z.infer<typeof scheduleDisableResponse>;
+
+// ── compute/provision ───────────────────────────────────────────────────────
+
+export const computeProvisionRequest = z.object({ name: z.string().min(1) });
+export type ComputeProvisionRequest = z.infer<typeof computeProvisionRequest>;
+
+export const computeProvisionResponse = z
+  .object({
+    ok: z.boolean(),
+    name: z.string().optional(),
+    cloned_from: z.string().optional(),
+    status: z.string().optional(),
+  })
+  .loose();
+export type ComputeProvisionResponse = z.infer<typeof computeProvisionResponse>;
+
+// ── compute/start-instance ──────────────────────────────────────────────────
+
+export const computeStartInstanceRequest = z.object({ name: z.string().min(1) });
+export type ComputeStartInstanceRequest = z.infer<typeof computeStartInstanceRequest>;
+
+export const computeStartInstanceResponse = z.object({ ok: z.boolean() }).loose();
+export type ComputeStartInstanceResponse = z.infer<typeof computeStartInstanceResponse>;
+
+// ── compute/stop-instance ───────────────────────────────────────────────────
+
+export const computeStopInstanceRequest = z.object({ name: z.string().min(1) });
+export type ComputeStopInstanceRequest = z.infer<typeof computeStopInstanceRequest>;
+
+export const computeStopInstanceResponse = z.object({ ok: z.boolean(), status: z.string().optional() }).loose();
+export type ComputeStopInstanceResponse = z.infer<typeof computeStopInstanceResponse>;
+
+// ── compute/destroy ─────────────────────────────────────────────────────────
+
+export const computeDestroyRequest = z.object({ name: z.string().min(1) });
+export type ComputeDestroyRequest = z.infer<typeof computeDestroyRequest>;
+
+export const computeDestroyResponse = z.object({ ok: z.boolean() }).loose();
+export type ComputeDestroyResponse = z.infer<typeof computeDestroyResponse>;
+
+// ── metrics/snapshot ────────────────────────────────────────────────────────
+
+export const metricsSnapshotRequest = z.object({ computeName: z.string().optional() }).loose();
+export type MetricsSnapshotRequest = z.infer<typeof metricsSnapshotRequest>;
+
+export const metricsSnapshotResponse = z.object({ snapshot: z.unknown().nullable() });
+export type MetricsSnapshotResponse = z.infer<typeof metricsSnapshotResponse>;
+
+// ── compute/kill-process ────────────────────────────────────────────────────
+
+export const computeKillProcessRequest = z.object({ pid: z.union([z.string(), z.number()]) });
+export type ComputeKillProcessRequest = z.infer<typeof computeKillProcessRequest>;
+
+export const computeKillProcessResponse = z.object({ ok: z.boolean() });
+export type ComputeKillProcessResponse = z.infer<typeof computeKillProcessResponse>;
+
+// ── compute/docker-logs ─────────────────────────────────────────────────────
+
+export const computeDockerLogsRequest = z.object({
+  container: z.string().min(1),
+  tail: z.number().optional(),
+});
+export type ComputeDockerLogsRequest = z.infer<typeof computeDockerLogsRequest>;
+
+export const computeDockerLogsResponse = z.object({ logs: z.string() });
+export type ComputeDockerLogsResponse = z.infer<typeof computeDockerLogsResponse>;
+
+// ── compute/docker-action ───────────────────────────────────────────────────
+
+export const computeDockerActionRequest = z.object({
+  container: z.string().min(1),
+  action: z.enum(["stop", "restart"]),
+});
+export type ComputeDockerActionRequest = z.infer<typeof computeDockerActionRequest>;
+
+export const computeDockerActionResponse = z.object({ ok: z.boolean() });
+export type ComputeDockerActionResponse = z.infer<typeof computeDockerActionResponse>;
+
+// ── compute/template/list ───────────────────────────────────────────────────
+
+const computeTemplateSchema = z
+  .object({
+    name: z.string(),
+    description: z.string().nullable().optional(),
+    provider: z.string(),
+    config: z.unknown().optional(),
+  })
+  .loose();
+
+export const computeTemplateListRequest = z.object({}).loose();
+export type ComputeTemplateListRequest = z.infer<typeof computeTemplateListRequest>;
+
+export const computeTemplateListResponse = z.object({ templates: z.array(computeTemplateSchema) });
+export type ComputeTemplateListResponse = z.infer<typeof computeTemplateListResponse>;
+
+// ── repo-map/get ────────────────────────────────────────────────────────────
+
+export const repoMapGetRequest = z.object({ dir: z.string().optional() }).loose();
+export type RepoMapGetRequest = z.infer<typeof repoMapGetRequest>;
+
+// repoMap.generate returns an opaque shape -- accept any object.
+export const repoMapGetResponse = z.record(z.string(), z.unknown());
+export type RepoMapGetResponse = z.infer<typeof repoMapGetResponse>;
+
+// ── fs/list-dir ─────────────────────────────────────────────────────────────
+
+const fsEntrySchema = z
+  .object({
+    name: z.string(),
+    path: z.string(),
+    isGitRepo: z.boolean().optional(),
+  })
+  .loose();
+
+export const fsListDirRequest = z.object({ path: z.string().optional() }).loose();
+export type FsListDirRequest = z.infer<typeof fsListDirRequest>;
+
+export const fsListDirResponse = z
+  .object({
+    cwd: z.string(),
+    parent: z.string().nullable(),
+    home: z.string(),
+    entries: z.array(fsEntrySchema),
+  })
+  .loose();
+export type FsListDirResponse = z.infer<typeof fsListDirResponse>;
+
 // ── Registry ────────────────────────────────────────────────────────────────
 
 /**
@@ -621,7 +1723,86 @@ export const rpcMethodSchemas: Record<string, RpcMethodSchemas> = {
   "dashboard/summary": { request: dashboardSummaryRequest, response: dashboardSummaryResponse },
   "todo/add": { request: todoAddRequest, response: todoAddResponse },
   "todo/toggle": { request: todoToggleRequest, response: todoToggleResponse },
+  "todo/list": { request: todoListRequest, response: todoListResponse },
+  "todo/delete": { request: todoDeleteRequest, response: todoDeleteResponse },
+  "verify/run": { request: verifyRunRequest, response: verifyRunResponse },
   "knowledge/stats": { request: knowledgeStatsRequest, response: knowledgeStatsResponse },
+  "session/output": { request: sessionOutputRequest, response: sessionOutputResponse },
+  "session/recording": { request: sessionRecordingRequest, response: sessionRecordingResponse },
+  "session/events": { request: sessionEventsRequest, response: sessionEventsResponse },
+  "session/messages": { request: sessionMessagesRequest, response: sessionMessagesResponse },
+  "session/export-data": { request: sessionExportDataRequest, response: sessionExportDataResponse },
+  "session/import": { request: sessionImportRequest, response: sessionImportResponse },
+  "session/resume": { request: sessionResumeRequest, response: sessionResumeResponse },
+  "session/clone": { request: sessionCloneRequest, response: sessionCloneResponse },
+  "session/pause": { request: sessionPauseRequest, response: sessionPauseResponse },
+  "session/interrupt": { request: sessionInterruptRequest, response: sessionInterruptResponse },
+  "session/complete": { request: sessionCompleteRequest, response: sessionCompleteResponse },
+  "session/spawn": { request: sessionSpawnRequest, response: sessionSpawnResponse },
+  "session/unread-counts": { request: sessionUnreadCountsRequest, response: sessionUnreadCountsResponse },
+  "session/conversation": { request: sessionConversationRequest, response: sessionConversationResponse },
+  "message/send": { request: messageSendRequest, response: messageSendResponse },
+  "message/markRead": { request: messageMarkReadRequest, response: messageMarkReadResponse },
+  "gate/approve": { request: gateApproveRequest, response: gateApproveResponse },
+  "gate/reject": { request: gateRejectRequest, response: gateRejectResponse },
+  "costs/session": { request: costsSessionRequest, response: costsSessionResponse },
+  "cost/export": { request: costExportRequest, response: costExportResponse },
+  "search/sessions": { request: searchSessionsRequest, response: searchSessionsResponse },
+  "search/global": { request: searchGlobalRequest, response: searchGlobalResponse },
+  "history/list": { request: historyListRequest, response: historyListResponse },
+  "history/refresh-and-index": { request: historyRefreshAndIndexRequest, response: historyRefreshAndIndexResponse },
+  "history/rebuild-fts": { request: historyRebuildFtsRequest, response: historyRebuildFtsResponse },
+  "status/get": { request: statusGetRequest, response: statusGetResponse },
+  "daemon/status": { request: daemonStatusRequest, response: daemonStatusResponse },
+  "group/list": { request: groupListRequest, response: groupListResponse },
+  "config/get": { request: configGetRequest, response: configGetResponse },
+  "profile/list": { request: profileListRequest, response: profileListResponse },
+  "profile/create": { request: profileCreateRequest, response: profileCreateResponse },
+  "profile/delete": { request: profileDeleteRequest, response: profileDeleteResponse },
+  "tools/list": { request: toolsListRequest, response: toolsListResponse },
+  "mcp/attach-by-dir": { request: mcpAttachByDirRequest, response: mcpAttachByDirResponse },
+  "mcp/detach-by-dir": { request: mcpDetachByDirRequest, response: mcpDetachByDirResponse },
+  "skill/save": { request: skillSaveRequest, response: skillSaveResponse },
+  "skill/delete": { request: skillDeleteRequest, response: skillDeleteResponse },
+  "recipe/list": { request: recipeListRequest, response: recipeListResponse },
+  "recipe/delete": { request: recipeDeleteRequest, response: recipeDeleteResponse },
+  "runtime/list": { request: runtimeListRequest, response: runtimeListResponse },
+  "runtime/read": { request: runtimeReadRequest, response: runtimeReadResponse },
+  "agent/create": { request: agentCreateRequest, response: agentCreateResponse },
+  "agent/update": { request: agentUpdateRequest, response: agentUpdateResponse },
+  "agent/delete": { request: agentDeleteRequest, response: agentDeleteResponse },
+  "flow/create": { request: flowCreateRequest, response: flowCreateResponse },
+  "flow/delete": { request: flowDeleteRequest, response: flowDeleteResponse },
+  "worktree/list": { request: worktreeListRequest, response: worktreeListResponse },
+  "worktree/diff": { request: worktreeDiffRequest, response: worktreeDiffResponse },
+  "worktree/finish": { request: worktreeFinishRequest, response: worktreeFinishResponse },
+  "worktree/create-pr": { request: worktreeCreatePrRequest, response: worktreeCreatePrResponse },
+  "worktree/cleanup": { request: worktreeCleanupRequest, response: worktreeCleanupResponse },
+  "learning/list": { request: learningListRequest, response: learningListResponse },
+  "learning/add": { request: learningAddRequest, response: learningAddResponse },
+  "memory/list": { request: memoryListRequest, response: memoryListResponse },
+  "memory/recall": { request: memoryRecallRequest, response: memoryRecallResponse },
+  "memory/add": { request: memoryAddRequest, response: memoryAddResponse },
+  "memory/forget": { request: memoryForgetRequest, response: memoryForgetResponse },
+  "knowledge/ingest": { request: knowledgeIngestRequest, response: knowledgeIngestResponse },
+  "knowledge/search": { request: knowledgeSearchRequest, response: knowledgeSearchResponse },
+  "knowledge/index": { request: knowledgeIndexRequest, response: knowledgeIndexResponse },
+  "knowledge/export": { request: knowledgeExportRequest, response: knowledgeExportResponse },
+  "knowledge/import": { request: knowledgeImportRequest, response: knowledgeImportResponse },
+  "schedule/delete": { request: scheduleDeleteRequest, response: scheduleDeleteResponse },
+  "schedule/enable": { request: scheduleEnableRequest, response: scheduleEnableResponse },
+  "schedule/disable": { request: scheduleDisableRequest, response: scheduleDisableResponse },
+  "compute/provision": { request: computeProvisionRequest, response: computeProvisionResponse },
+  "compute/start-instance": { request: computeStartInstanceRequest, response: computeStartInstanceResponse },
+  "compute/stop-instance": { request: computeStopInstanceRequest, response: computeStopInstanceResponse },
+  "compute/destroy": { request: computeDestroyRequest, response: computeDestroyResponse },
+  "metrics/snapshot": { request: metricsSnapshotRequest, response: metricsSnapshotResponse },
+  "compute/kill-process": { request: computeKillProcessRequest, response: computeKillProcessResponse },
+  "compute/docker-logs": { request: computeDockerLogsRequest, response: computeDockerLogsResponse },
+  "compute/docker-action": { request: computeDockerActionRequest, response: computeDockerActionResponse },
+  "compute/template/list": { request: computeTemplateListRequest, response: computeTemplateListResponse },
+  "repo-map/get": { request: repoMapGetRequest, response: repoMapGetResponse },
+  "fs/list-dir": { request: fsListDirRequest, response: fsListDirResponse },
 };
 
 /** List of method names covered by Zod validation. */

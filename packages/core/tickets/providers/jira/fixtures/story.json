@@ -1,0 +1,55 @@
+{
+  "id": "10011",
+  "key": "PROJ-2",
+  "self": "https://acme.atlassian.net/rest/api/3/issue/10011",
+  "fields": {
+    "summary": "Implement ticket framework",
+    "issuetype": { "name": "Story" },
+    "status": {
+      "id": "3",
+      "name": "In Progress",
+      "statusCategory": { "key": "indeterminate", "name": "In Progress" }
+    },
+    "priority": { "name": "Medium" },
+    "labels": ["backend"],
+    "reporter": {
+      "accountId": "712020:a1b2c3",
+      "emailAddress": "yana@acme.io",
+      "displayName": "Yana Tarasova"
+    },
+    "assignee": {
+      "accountId": "712020:d4e5f6",
+      "emailAddress": null,
+      "displayName": "Aisha Rao"
+    },
+    "created": "2026-03-10T12:00:00.000+0000",
+    "updated": "2026-04-18T16:45:00.000+0000",
+    "description": {
+      "version": 1,
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [
+            { "type": "text", "text": "Goal: " },
+            { "type": "text", "text": "generic ticket API", "marks": [{ "type": "strong" }] },
+            { "type": "text", "text": " so Ark talks to every tracker." }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "content": [
+            {
+              "type": "text",
+              "text": "Blocked by",
+              "marks": [{ "type": "em" }]
+            },
+            { "type": "text", "text": " upstream schema landing." }
+          ]
+        }
+      ]
+    },
+    "parent": { "id": "10001", "key": "PROJ-1" },
+    "customfield_10014": "PROJ-1"
+  }
+}

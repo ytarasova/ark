@@ -18,6 +18,8 @@ import * as m007 from "./007_tenant_claude_auth.js";
 // --- BEGIN agent-G: migration 008 ---
 import * as m008 from "./008_tenant_compute_config.js";
 // --- END agent-G ---
+// Migration 009: drizzle cutover marker (no DDL). See 009_drizzle_cutover.ts.
+import * as m009 from "./009_drizzle_cutover.js";
 
 export const MIGRATIONS: ReadonlyArray<Migration> = [
   { version: m001.VERSION, name: m001.NAME, up: m001.up },
@@ -32,4 +34,5 @@ export const MIGRATIONS: ReadonlyArray<Migration> = [
   // --- BEGIN agent-G: migration 008 ---
   { version: m008.VERSION, name: m008.NAME, up: m008.up },
   // --- END agent-G ---
+  { version: m009.VERSION, name: m009.NAME, up: m009.up },
 ];

@@ -82,18 +82,18 @@ describe("fetchLabeledIssues", async () => {
 // ── issueAlreadyTracked ─────────────────────────────────────────────────────
 
 describe("issueAlreadyTracked", () => {
-  it("returns false when no matching session exists", () => {
-    expect(issueAlreadyTracked(getApp(), "#42")).toBe(false);
+  it("returns false when no matching session exists", async () => {
+    expect(await issueAlreadyTracked(getApp(), "#42")).toBe(false);
   });
 
-  it("returns true when session with same ticket exists", () => {
-    getApp().sessions.create({ ticket: "#42", summary: "existing" });
-    expect(issueAlreadyTracked(getApp(), "#42")).toBe(true);
+  it("returns true when session with same ticket exists", async () => {
+    await getApp().sessions.create({ ticket: "#42", summary: "existing" });
+    expect(await issueAlreadyTracked(getApp(), "#42")).toBe(true);
   });
 
-  it("does not match different ticket numbers", () => {
-    getApp().sessions.create({ ticket: "#99", summary: "other issue" });
-    expect(issueAlreadyTracked(getApp(), "#42")).toBe(false);
+  it("does not match different ticket numbers", async () => {
+    await getApp().sessions.create({ ticket: "#99", summary: "other issue" });
+    expect(await issueAlreadyTracked(getApp(), "#42")).toBe(false);
   });
 });
 
@@ -176,7 +176,7 @@ describe("pollIssues", async () => {
     // Should not throw
     await pollIssues(getApp(), { label: "ark" });
 
-    const sessions = getApp().sessions.list();
+    const sessions = await getApp().sessions.list();
     expect(sessions).toHaveLength(0);
   });
 

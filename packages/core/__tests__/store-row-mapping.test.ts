@@ -136,8 +136,8 @@ describe("rowToSession", () => {
 // ── rowToSession via createSession/getSession (round-trip) ──────────────────
 
 describe("rowToSession round-trip via DB", () => {
-  it("createSession stores and retrieves with correct field mapping", () => {
-    const session = getApp().sessions.create({
+  it("createSession stores and retrieves with correct field mapping", async () => {
+    const session = await getApp().sessions.create({
       ticket: "TICKET-1",
       summary: "My task",
       flow: "quick",
@@ -150,25 +150,25 @@ describe("rowToSession round-trip via DB", () => {
     expect(session.config).toEqual({ priority: "high" });
   });
 
-  it("getSession returns properly mapped fields", () => {
-    const created = getApp().sessions.create({
+  it("getSession returns properly mapped fields", async () => {
+    const created = await getApp().sessions.create({
       ticket: "TICKET-2",
       summary: "Another task",
       flow: "bare",
     });
 
-    const fetched = getApp().sessions.get(created.id);
+    const fetched = await getApp().sessions.get(created.id);
     expect(fetched).not.toBeNull();
     expect(fetched!.ticket).toBe("TICKET-2");
     expect(fetched!.summary).toBe("Another task");
     expect(fetched!.flow).toBe("bare");
   });
 
-  it("updateSession with config merges and parses JSON", () => {
-    const session = getApp().sessions.create({ summary: "cfg test" });
-    getApp().sessions.update(session.id, { config: { foo: "bar", count: 42 } });
+  it("updateSession with config merges and parses JSON", async () => {
+    const session = await getApp().sessions.create({ summary: "cfg test" });
+    await getApp().sessions.update(session.id, { config: { foo: "bar", count: 42 } });
 
-    const updated = getApp().sessions.get(session.id);
+    const updated = await getApp().sessions.get(session.id);
     expect(updated!.config).toEqual({ foo: "bar", count: 42 });
   });
 });
@@ -176,30 +176,30 @@ describe("rowToSession round-trip via DB", () => {
 // ── rowToCompute (via public API) ───────────────────────────────────────────
 
 describe("rowToCompute via DB", () => {
-  it("parses config JSON on getCompute", () => {
-    const compute = getApp().computes.create({
+  it("parses config JSON on getCompute", async () => {
+    const compute = await getApp().computes.create({
       name: "test-compute-1",
       provider: "docker",
       config: { instanceType: "t3.large", region: "us-east-1" },
     });
 
-    const fetched = getApp().computes.get("test-compute-1");
+    const fetched = await getApp().computes.get("test-compute-1");
     expect(fetched).not.toBeNull();
     expect(fetched!.config).toEqual({ instanceType: "t3.large", region: "us-east-1" });
     expect(typeof fetched!.config).toBe("object");
   });
 
-  it("returns empty object for empty config", () => {
-    const compute = getApp().computes.create({ name: "test-compute-2", provider: "docker" });
-    const fetched = getApp().computes.get("test-compute-2");
+  it("returns empty object for empty config", async () => {
+    const compute = await getApp().computes.create({ name: "test-compute-2", provider: "docker" });
+    const fetched = await getApp().computes.get("test-compute-2");
     expect(fetched!.config).toEqual({});
   });
 
-  it("updateCompute preserves config as parsed object", () => {
-    getApp().computes.create({ name: "test-compute-3", provider: "docker", config: { a: 1 } });
-    getApp().computes.update("test-compute-3", { config: { a: 1, b: 2 } });
+  it("updateCompute preserves config as parsed object", async () => {
+    await getApp().computes.create({ name: "test-compute-3", provider: "docker", config: { a: 1 } });
+    await getApp().computes.update("test-compute-3", { config: { a: 1, b: 2 } });
 
-    const fetched = getApp().computes.get("test-compute-3");
+    const fetched = await getApp().computes.get("test-compute-3");
     expect(fetched!.config).toEqual({ a: 1, b: 2 });
   });
 });
@@ -207,35 +207,35 @@ describe("rowToCompute via DB", () => {
 // ── rowToEvent (via public API) ──────────────────────────────────────────────
 
 describe("rowToEvent via DB", () => {
-  it("parses data JSON on getEvents", () => {
-    const session = getApp().sessions.create({ summary: "event test" });
-    getApp().events.log(session.id, "test_event", {
+  it("parses data JSON on getEvents", async () => {
+    const session = await getApp().sessions.create({ summary: "event test" });
+    await getApp().events.log(session.id, "test_event", {
       stage: "plan",
       actor: "agent",
       data: { result: "success", items: [1, 2, 3] },
     });
 
-    const events = getApp().events.list(session.id, { type: "test_event" });
+    const events = await getApp().events.list(session.id, { type: "test_event" });
     expect(events.length).toBeGreaterThanOrEqual(1);
     const ev = events[events.length - 1];
     expect(ev.data).toEqual({ result: "success", items: [1, 2, 3] });
     expect(typeof ev.data).toBe("object");
   });
 
-  it("returns null data when event has no data", () => {
-    const session = getApp().sessions.create({ summary: "event no data" });
-    getApp().events.log(session.id, "bare_event");
+  it("returns null data when event has no data", async () => {
+    const session = await getApp().sessions.create({ summary: "event no data" });
+    await getApp().events.log(session.id, "bare_event");
 
-    const events = getApp().events.list(session.id, { type: "bare_event" });
+    const events = await getApp().events.list(session.id, { type: "bare_event" });
     expect(events.length).toBe(1);
     expect(events[0].data).toBeNull();
   });
 
-  it("preserves event metadata fields", () => {
-    const session = getApp().sessions.create({ summary: "event meta" });
-    getApp().events.log(session.id, "meta_event", { stage: "review", actor: "reviewer" });
+  it("preserves event metadata fields", async () => {
+    const session = await getApp().sessions.create({ summary: "event meta" });
+    await getApp().events.log(session.id, "meta_event", { stage: "review", actor: "reviewer" });
 
-    const events = getApp().events.list(session.id, { type: "meta_event" });
+    const events = await getApp().events.list(session.id, { type: "meta_event" });
     expect(events[0].stage).toBe("review");
     expect(events[0].actor).toBe("reviewer");
     expect(events[0].track_id).toBe(session.id);
@@ -247,29 +247,34 @@ describe("rowToEvent via DB", () => {
 // ── rowToMessage (via public API) ────────────────────────────────────────────
 
 describe("rowToMessage via DB", () => {
-  it("converts read from 0/1 integer to boolean", () => {
-    const session = getApp().sessions.create({ summary: "msg test" });
-    const msg = getApp().messages.send(session.id, "agent" as MessageRole, "hello");
+  it("converts read from 0/1 integer to boolean", async () => {
+    const session = await getApp().sessions.create({ summary: "msg test" });
+    const msg = await getApp().messages.send(session.id, "agent" as MessageRole, "hello");
 
     // Freshly created message should have read = false (stored as 0)
     expect(msg.read).toBe(false);
     expect(typeof msg.read).toBe("boolean");
   });
 
-  it("read is true after marking messages read", () => {
-    const session = getApp().sessions.create({ summary: "read test" });
-    getApp().messages.send(session.id, "agent" as MessageRole, "unread");
+  it("read is true after marking messages read", async () => {
+    const session = await getApp().sessions.create({ summary: "read test" });
+    await getApp().messages.send(session.id, "agent" as MessageRole, "unread");
 
-    getApp().messages.markRead(session.id);
+    await getApp().messages.markRead(session.id);
 
-    const msgs = getApp().messages.list(session.id);
+    const msgs = await getApp().messages.list(session.id);
     expect(msgs[0].read).toBe(true);
     expect(typeof msgs[0].read).toBe("boolean");
   });
 
-  it("preserves message fields", () => {
-    const session = getApp().sessions.create({ summary: "field test" });
-    const msg = getApp().messages.send(session.id, "user" as MessageRole, "test content", "progress" as MessageType);
+  it("preserves message fields", async () => {
+    const session = await getApp().sessions.create({ summary: "field test" });
+    const msg = await getApp().messages.send(
+      session.id,
+      "user" as MessageRole,
+      "test content",
+      "progress" as MessageType,
+    );
 
     expect(msg.session_id).toBe(session.id);
     expect(msg.role).toBe("user");

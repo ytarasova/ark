@@ -253,19 +253,34 @@ function NewScheduleForm({ onClose, onSubmit }: { onClose: () => void; onSubmit:
       .then((f) => {
         if (!cancelled) setFlows(f);
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.warn(
+          `ScheduleView: getFlows failed (schedule form will show no flow options):`,
+          err instanceof Error ? err.message : err,
+        );
+      });
     api
       .getCompute()
       .then((c) => {
         if (!cancelled) setComputes(c);
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.warn(
+          `ScheduleView: getCompute failed (schedule form will show no compute options):`,
+          err instanceof Error ? err.message : err,
+        );
+      });
     api
       .getGroups()
       .then((g) => {
         if (!cancelled) setGroups(g);
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.warn(
+          `ScheduleView: getGroups failed (schedule form will show no group options):`,
+          err instanceof Error ? err.message : err,
+        );
+      });
     return () => {
       cancelled = true;
     };

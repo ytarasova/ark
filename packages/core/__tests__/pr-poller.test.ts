@@ -98,7 +98,7 @@ describe("pollPRReviews", async () => {
     await pollPRReviews(getApp());
 
     // Should not have created any pr_ events
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const prEvents = events.filter((e) => e.type.startsWith("pr_"));
     expect(prEvents).toHaveLength(0);
   });
@@ -113,7 +113,7 @@ describe("pollPRReviews", async () => {
 
     await pollPRReviews(getApp());
 
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const prEvents = events.filter((e) => e.type.startsWith("pr_"));
     expect(prEvents).toHaveLength(0);
   });
@@ -135,7 +135,7 @@ describe("pollPRReviews", async () => {
     await pollPRReviews(getApp());
 
     // Should have been skipped due to cooldown - no pr_approved event
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const approvals = events.filter((e) => e.type === "pr_approved");
     expect(approvals).toHaveLength(0);
   });
@@ -156,7 +156,7 @@ describe("checkSessionPR", async () => {
 
     await checkSessionPR(getApp(), session);
 
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const approvals = events.filter((e) => e.type === "pr_approved");
     expect(approvals).toHaveLength(1);
 
@@ -184,12 +184,12 @@ describe("checkSessionPR", async () => {
     await checkSessionPR(getApp(), session);
 
     // Should have logged pr_review_feedback event
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const feedback = events.filter((e) => e.type === "pr_review_feedback");
     expect(feedback).toHaveLength(1);
 
     // Should have stored a message
-    const messages = getApp().messages.list(session.id);
+    const messages = await getApp().messages.list(session.id);
     const systemMsgs = messages.filter((m) => m.role === "system");
     expect(systemMsgs.length).toBeGreaterThanOrEqual(1);
     expect(systemMsgs[systemMsgs.length - 1].content).toContain("Fix the error handling");
@@ -203,7 +203,7 @@ describe("checkSessionPR", async () => {
     await checkSessionPR(getApp(), session);
 
     // No events should have been created
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const prEvents = events.filter((e) => e.type.startsWith("pr_"));
     expect(prEvents).toHaveLength(0);
   });
@@ -215,7 +215,7 @@ describe("checkSessionPR", async () => {
     await checkSessionPR(getApp(), session);
 
     // Only timestamp update, no review events
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const prEvents = events.filter((e) => e.type.startsWith("pr_"));
     expect(prEvents).toHaveLength(0);
   });
@@ -226,7 +226,7 @@ describe("checkSessionPR", async () => {
 
     await checkSessionPR(getApp(), session);
 
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const statusEvents = events.filter((e) => e.type === "pr_status");
     expect(statusEvents).toHaveLength(1);
 
@@ -253,7 +253,7 @@ describe("checkSessionPR", async () => {
     await checkSessionPR(getApp(), session);
 
     // Should not create pr_approved because review_count hasn't increased
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const approvals = events.filter((e) => e.type === "pr_approved");
     expect(approvals).toHaveLength(0);
   });
@@ -310,7 +310,7 @@ describe("processReviewFeedback", async () => {
 
     await processReviewFeedback(getApp(), session, data, config);
 
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const prEvents = events.filter((e) => e.type.startsWith("pr_"));
     expect(prEvents).toHaveLength(0);
   });
@@ -327,7 +327,7 @@ describe("processReviewFeedback", async () => {
 
     await processReviewFeedback(getApp(), session, data, config);
 
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const approvals = events.filter((e) => e.type === "pr_approved");
     expect(approvals).toHaveLength(1);
   });
@@ -351,12 +351,12 @@ describe("processReviewFeedback", async () => {
 
     await processReviewFeedback(getApp(), session, data, config);
 
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const feedback = events.filter((e) => e.type === "pr_review_feedback");
     expect(feedback).toHaveLength(1);
 
     // Should have stored a message
-    const messages = getApp().messages.list(session.id);
+    const messages = await getApp().messages.list(session.id);
     const systemMsgs = messages.filter((m) => m.role === "system");
     expect(systemMsgs.length).toBeGreaterThanOrEqual(1);
   });
@@ -373,7 +373,7 @@ describe("processReviewFeedback", async () => {
 
     await processReviewFeedback(getApp(), session, data, config);
 
-    const updated = getApp().sessions.get(session.id)!;
+    const updated = (await getApp().sessions.get(session.id))!;
     const updatedConfig = updated.config as Record<string, any>;
     expect(updatedConfig.review_count).toBe(1);
   });

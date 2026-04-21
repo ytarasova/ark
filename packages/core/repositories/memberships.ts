@@ -1,18 +1,20 @@
 /**
- * MembershipRepository -- SQL adapter for the `memberships` table.
+ * MembershipRepository -- drizzle-backed adapter for the `memberships` table.
  *
- * A membership binds a user to a team with a flat role string
- * ("owner" | "admin" | "member" | "viewer"). Authorization decisions are
- * made elsewhere (tenant_policies + future policy code). Role is NOT a
- * permissions matrix -- keep it simple.
+ * A membership binds a user to a team with a flat role string. Soft-delete
+ * semantics: `deleted_at IS NULL` for live rows. `(user_id, team_id)` is
+ * unique only among live rows (partial unique index).
  *
- * Soft-delete: `deleted_at` lands in migration 004. `(user_id, team_id)`
- * is unique only among live rows so a user can be removed and re-added.
+ * Public surface preserved from the pre-cutover hand-rolled SQL version.
  */
 
 import type { IDatabase } from "../database/index.js";
+import { drizzleFromIDatabase } from "../drizzle/from-idb.js";
+import type { DrizzleClient } from "../drizzle/client.js";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { now } from "../util/time.js";
+import { extractChanges } from "./tenants.js";
 
 export type MembershipRole = "owner" | "admin" | "member" | "viewer";
 
@@ -35,114 +37,170 @@ export interface ListOptions {
   includeDeleted?: boolean;
 }
 
+type DrizzleSelectMembership = {
+  id: string;
+  userId: string;
+  teamId: string;
+  role: string;
+  deletedAt: string | null;
+  deletedBy: string | null;
+  createdAt: string;
+};
+
+function toPublic(row: DrizzleSelectMembership): MembershipRow {
+  return {
+    id: row.id,
+    user_id: row.userId,
+    team_id: row.teamId,
+    role: row.role as MembershipRole,
+    deleted_at: row.deletedAt ?? null,
+    deleted_by: row.deletedBy ?? null,
+    created_at: row.createdAt,
+  };
+}
+
 export class MembershipRepository {
+  private _d: DrizzleClient | null = null;
+
   constructor(private db: IDatabase) {}
 
+  private d(): DrizzleClient {
+    if (!this._d) this._d = drizzleFromIDatabase(this.db);
+    return this._d;
+  }
+
   async listByTeam(teamId: string, opts: ListOptions = {}): Promise<MembershipWithUser[]> {
-    const deletedFilter = opts.includeDeleted ? "" : "AND m.deleted_at IS NULL AND u.deleted_at IS NULL";
-    const rows = (await this.db
-      .prepare(
-        `SELECT m.id, m.user_id, m.team_id, m.role, m.deleted_at, m.deleted_by, m.created_at, u.email, u.name
-         FROM memberships m
-         INNER JOIN users u ON u.id = m.user_id
-         WHERE m.team_id = ? ${deletedFilter}
-         ORDER BY u.email ASC`,
-      )
-      .all(teamId)) as MembershipWithUser[];
-    return rows;
+    const d = this.d();
+    const m = d.schema.memberships;
+    const u = d.schema.users;
+    const where = opts.includeDeleted
+      ? eq(m.teamId, teamId)
+      : and(eq(m.teamId, teamId), isNull(m.deletedAt), isNull(u.deletedAt));
+    const rows = await (d.db as any)
+      .select({
+        id: m.id,
+        userId: m.userId,
+        teamId: m.teamId,
+        role: m.role,
+        deletedAt: m.deletedAt,
+        deletedBy: m.deletedBy,
+        createdAt: m.createdAt,
+        email: u.email,
+        name: u.name,
+      })
+      .from(m)
+      .innerJoin(u, eq(u.id, m.userId))
+      .where(where)
+      .orderBy(asc(u.email));
+    return (rows as Array<DrizzleSelectMembership & { email: string; name: string | null }>).map((r) => ({
+      ...toPublic(r),
+      email: r.email,
+      name: r.name ?? null,
+    }));
   }
 
   async listByUser(userId: string, opts: ListOptions = {}): Promise<MembershipRow[]> {
-    const where = opts.includeDeleted ? "WHERE user_id = ?" : "WHERE user_id = ? AND deleted_at IS NULL";
-    const rows = (await this.db
-      .prepare(`SELECT * FROM memberships ${where} ORDER BY created_at ASC`)
-      .all(userId)) as MembershipRow[];
-    return rows;
+    const d = this.d();
+    const m = d.schema.memberships;
+    const where = opts.includeDeleted ? eq(m.userId, userId) : and(eq(m.userId, userId), isNull(m.deletedAt));
+    const rows = await (d.db as any).select().from(m).where(where).orderBy(asc(m.createdAt));
+    return (rows as DrizzleSelectMembership[]).map(toPublic);
   }
 
   async get(userId: string, teamId: string, opts: ListOptions = {}): Promise<MembershipRow | null> {
-    const sql = opts.includeDeleted
-      ? "SELECT * FROM memberships WHERE user_id = ? AND team_id = ?"
-      : "SELECT * FROM memberships WHERE user_id = ? AND team_id = ? AND deleted_at IS NULL";
-    const row = (await this.db.prepare(sql).get(userId, teamId)) as MembershipRow | undefined;
-    return row ?? null;
+    const d = this.d();
+    const m = d.schema.memberships;
+    const where = opts.includeDeleted
+      ? and(eq(m.userId, userId), eq(m.teamId, teamId))
+      : and(eq(m.userId, userId), eq(m.teamId, teamId), isNull(m.deletedAt));
+    const rows = await (d.db as any).select().from(m).where(where).limit(1);
+    const row = (rows as DrizzleSelectMembership[])[0];
+    return row ? toPublic(row) : null;
   }
 
   async add(userId: string, teamId: string, role: MembershipRole): Promise<MembershipRow> {
     const existing = await this.get(userId, teamId);
     if (existing) {
       if (existing.role !== role) {
-        await this.db
-          .prepare("UPDATE memberships SET role = ? WHERE user_id = ? AND team_id = ? AND deleted_at IS NULL")
-          .run(role, userId, teamId);
+        const d = this.d();
+        const m = d.schema.memberships;
+        await (d.db as any)
+          .update(m)
+          .set({ role })
+          .where(and(eq(m.userId, userId), eq(m.teamId, teamId), isNull(m.deletedAt)));
         return (await this.get(userId, teamId))!;
       }
       return existing;
     }
     const id = `m-${randomBytes(6).toString("hex")}`;
-    await this.db
-      .prepare("INSERT INTO memberships (id, user_id, team_id, role, created_at) VALUES (?, ?, ?, ?, ?)")
-      .run(id, userId, teamId, role, now());
+    const d = this.d();
+    await (d.db as any).insert(d.schema.memberships).values({
+      id,
+      userId,
+      teamId,
+      role,
+      createdAt: now(),
+    });
     return (await this.get(userId, teamId))!;
   }
 
   /**
-   * Soft-remove: sets `deleted_at` on the live membership row (if any) and
-   * records `deleted_by` with the caller's user id (null for system /
-   * unauthenticated paths). Returns `true` if a row was affected OR if the
-   * membership was already soft-deleted (idempotent -- the second call does
-   * NOT overwrite the audit fields). Returns `false` if no such membership
-   * ever existed.
+   * Soft-remove. Idempotent -- calling on an already-soft-deleted row
+   * returns `true` without overwriting audit fields.
    */
   async softRemove(userId: string, teamId: string, deletedBy: string | null = null): Promise<boolean> {
-    const row = (await this.db
-      .prepare("SELECT deleted_at FROM memberships WHERE user_id = ? AND team_id = ?")
-      .get(userId, teamId)) as { deleted_at: string | null } | undefined;
+    const d = this.d();
+    const m = d.schema.memberships;
+    const rows = await (d.db as any)
+      .select({ deletedAt: m.deletedAt })
+      .from(m)
+      .where(and(eq(m.userId, userId), eq(m.teamId, teamId)))
+      .limit(1);
+    const row = (rows as Array<{ deletedAt: string | null }>)[0];
     if (!row) return false;
-    if (row.deleted_at) return true;
-    const res = await this.db
-      .prepare(
-        "UPDATE memberships SET deleted_at = ?, deleted_by = ? WHERE user_id = ? AND team_id = ? AND deleted_at IS NULL",
-      )
-      .run(now(), deletedBy, userId, teamId);
-    return res.changes > 0;
+    if (row.deletedAt) return true;
+    const res = await (d.db as any)
+      .update(m)
+      .set({ deletedAt: now(), deletedBy })
+      .where(and(eq(m.userId, userId), eq(m.teamId, teamId), isNull(m.deletedAt)));
+    return extractChanges(res) > 0;
   }
 
   async restore(userId: string, teamId: string): Promise<boolean> {
-    const res = await this.db
-      .prepare(
-        "UPDATE memberships SET deleted_at = NULL, deleted_by = NULL WHERE user_id = ? AND team_id = ? AND deleted_at IS NOT NULL",
-      )
-      .run(userId, teamId);
-    return res.changes > 0;
+    const d = this.d();
+    const m = d.schema.memberships;
+    const res = await (d.db as any)
+      .update(m)
+      .set({ deletedAt: null, deletedBy: null })
+      .where(and(eq(m.userId, userId), eq(m.teamId, teamId)));
+    return extractChanges(res) > 0;
   }
 
   async setRole(userId: string, teamId: string, role: MembershipRole): Promise<MembershipRow | null> {
-    await this.db
-      .prepare("UPDATE memberships SET role = ? WHERE user_id = ? AND team_id = ? AND deleted_at IS NULL")
-      .run(role, userId, teamId);
+    const d = this.d();
+    const m = d.schema.memberships;
+    await (d.db as any)
+      .update(m)
+      .set({ role })
+      .where(and(eq(m.userId, userId), eq(m.teamId, teamId), isNull(m.deletedAt)));
     return this.get(userId, teamId);
   }
 
-  /**
-   * Cascade helper -- soft-delete every membership for a given team.
-   * Used when a team is itself soft-deleted (which in turn cascades from
-   * a tenant soft-delete). `deletedBy` is propagated so the cascade carries
-   * the upstream actor's identity.
-   */
   async softRemoveByTeam(teamId: string, deletedBy: string | null = null): Promise<void> {
-    await this.db
-      .prepare("UPDATE memberships SET deleted_at = ?, deleted_by = ? WHERE team_id = ? AND deleted_at IS NULL")
-      .run(now(), deletedBy, teamId);
+    const d = this.d();
+    const m = d.schema.memberships;
+    await (d.db as any)
+      .update(m)
+      .set({ deletedAt: now(), deletedBy })
+      .where(and(eq(m.teamId, teamId), isNull(m.deletedAt)));
   }
 
-  /**
-   * Cascade helper -- soft-delete every membership for a given user.
-   * Used when a user is soft-deleted.
-   */
   async softRemoveByUser(userId: string, deletedBy: string | null = null): Promise<void> {
-    await this.db
-      .prepare("UPDATE memberships SET deleted_at = ?, deleted_by = ? WHERE user_id = ? AND deleted_at IS NULL")
-      .run(now(), deletedBy, userId);
+    const d = this.d();
+    const m = d.schema.memberships;
+    await (d.db as any)
+      .update(m)
+      .set({ deletedAt: now(), deletedBy })
+      .where(and(eq(m.userId, userId), isNull(m.deletedAt)));
   }
 }

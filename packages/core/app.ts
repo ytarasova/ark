@@ -15,6 +15,7 @@ import { Database } from "bun:sqlite";
 import { mkdirSync, rmSync, existsSync, mkdtempSync } from "fs";
 import type { IDatabase } from "./database/index.js";
 import { BunSqliteAdapter } from "./database/index.js";
+import { buildSqliteDrizzle, buildPostgresDrizzle, type DrizzleClient } from "./drizzle/index.js";
 import { join } from "path";
 import { tmpdir } from "os";
 
@@ -89,6 +90,7 @@ export class AppContext {
   private _launcher: SessionLauncher = new TmuxLauncher();
   private _eventBusReady = false;
   private _apiKeys: ApiKeyManager | null = null;
+  private _drizzle: DrizzleClient | null = null;
   private _codeIntel: CodeIntelStore | null = null;
   private _deployment: Deployment | null = null;
   private _hostedServices: {
@@ -148,6 +150,20 @@ export class AppContext {
       await seedBuiltinResources(this);
     }
 
+    // Boot-time reconciliation of orphaned per-session creds Secrets.
+    // Runs as a background tail-task so a slow / unreachable cluster
+    // never blocks the daemon from serving its first request. See
+    // `services/creds-secret-reconciler.ts` for the full contract.
+    void (async () => {
+      try {
+        const { reconcileOrphanedCredsSecrets } = await import("./services/creds-secret-reconciler.js");
+        await reconcileOrphanedCredsSecrets(this);
+      } catch (e: any) {
+        const { logWarn } = await import("./observability/structured-log.js");
+        logWarn("session", `creds-reconciler: boot invocation failed: ${e?.message ?? e}`);
+      }
+    })();
+
     // Eagerly construct + migrate the code-intel store. The store's migrate()
     // is async and we want it to land before any handler reads `app.codeIntel`.
     // The accessor below remains synchronous so handlers stay simple; if a
@@ -174,7 +190,12 @@ export class AppContext {
     } else {
       // Fast path: never booted -- dispose only closes the (likely unopened)
       // DB and clears the placeholder container.
-      await this._container.dispose().catch(() => {});
+      await this._container.dispose().catch(async (err) => {
+        const { logWarn } = await import("./observability/structured-log.js");
+        logWarn("session", `AppContext: pre-boot container dispose failed (fast-path shutdown)`, {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
     }
 
     // Clean up temp directory (test mode)
@@ -199,11 +220,17 @@ export class AppContext {
     const dbUrl = this.config.databaseUrl;
     if (dbUrl && (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://"))) {
       const { PostgresAdapter } = await import("./database/postgres.js");
-      return new PostgresAdapter(dbUrl);
+      const adapter = new PostgresAdapter(dbUrl);
+      // Expose a drizzle client sharing the same postgres.js connection so
+      // repository rewrites (Phase B of the cutover) can opt in incrementally
+      // without spinning up a second pool.
+      this._drizzle = buildPostgresDrizzle(adapter.connection);
+      return adapter;
     }
     const rawDb = new Database(this.config.dbPath);
     rawDb.run("PRAGMA journal_mode = WAL");
     rawDb.run("PRAGMA busy_timeout = 5000");
+    this._drizzle = buildSqliteDrizzle(rawDb);
     return new BunSqliteAdapter(rawDb);
   }
 
@@ -245,6 +272,22 @@ export class AppContext {
 
   get db(): IDatabase {
     return this._resolve("db");
+  }
+
+  /**
+   * Dialect-tagged drizzle client. Populated in `_openDatabase()`; available
+   * after `boot()` starts. Null before `_openDatabase()` runs (rare — tests
+   * that construct AppContext without booting).
+   *
+   * This is the Phase-A foothold for the drizzle cutover: repositories are
+   * still on hand-rolled SQL, but new code can opt in to the typed query
+   * builder by reading from `app.drizzle.db` + `app.drizzle.schema`.
+   */
+  get drizzle(): DrizzleClient {
+    if (!this._drizzle) {
+      throw new Error("AppContext drizzle client not initialized -- _openDatabase() has not run");
+    }
+    return this._drizzle;
   }
 
   get eventBus(): typeof eventBus {

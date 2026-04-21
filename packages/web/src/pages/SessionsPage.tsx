@@ -60,7 +60,12 @@ export function SessionsPage({
     api
       .getUnreadCounts()
       .then(setUnreadCounts)
-      .catch(() => {});
+      .catch((err) => {
+        console.warn(
+          `SessionsPage: getUnreadCounts failed (next 10s poll will retry):`,
+          err instanceof Error ? err.message : err,
+        );
+      });
   }, []);
 
   useEffect(() => {
@@ -100,7 +105,12 @@ export function SessionsPage({
               setFlowStagesMap((inner) => (inner[name] ? inner : { ...inner, [name]: d.stages }));
             }
           })
-          .catch(() => {});
+          .catch((err) => {
+            console.warn(
+              `SessionsPage: getFlowDetail failed (flow="${name}"; pipeline viz will render without stages):`,
+              err instanceof Error ? err.message : err,
+            );
+          });
       }
       return prev;
     });

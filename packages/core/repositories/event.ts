@@ -1,4 +1,7 @@
 import type { IDatabase } from "../database/index.js";
+import { drizzleFromIDatabase } from "../drizzle/from-idb.js";
+import type { DrizzleClient } from "../drizzle/client.js";
+import { and, asc, eq } from "drizzle-orm";
 import type { Event } from "../../types/index.js";
 import { now } from "../util/time.js";
 
@@ -14,18 +17,43 @@ interface EventRow {
   created_at: string;
 }
 
-// -- Helpers --------------------------------------------------------------
+type DrizzleSelectEvent = {
+  id: number;
+  trackId: string;
+  type: string;
+  stage: string | null;
+  actor: string | null;
+  data: string | null;
+  tenantId: string;
+  createdAt: string;
+};
+
+function drizzleToRow(row: DrizzleSelectEvent): EventRow {
+  return {
+    id: row.id,
+    track_id: row.trackId,
+    type: row.type,
+    stage: row.stage,
+    actor: row.actor,
+    data: row.data,
+    created_at: row.createdAt,
+  };
+}
 
 function rowToEvent(row: EventRow): Event {
   return { ...row, data: row.data ? JSON.parse(row.data) : null };
 }
 
-// -- Repository -----------------------------------------------------------
-
 export class EventRepository {
   private tenantId: string = "default";
+  private _d: DrizzleClient | null = null;
 
   constructor(private db: IDatabase) {}
+
+  private d(): DrizzleClient {
+    if (!this._d) this._d = drizzleFromIDatabase(this.db);
+    return this._d;
+  }
 
   setTenant(tenantId: string): void {
     this.tenantId = tenantId;
@@ -39,38 +67,35 @@ export class EventRepository {
     type: string,
     opts?: { stage?: string; actor?: string; data?: Record<string, unknown> },
   ): Promise<void> {
-    await this.db
-      .prepare(
-        `
-      INSERT INTO events (track_id, type, stage, actor, data, tenant_id, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `,
-      )
-      .run(
-        trackId,
-        type,
-        opts?.stage ?? null,
-        opts?.actor ?? null,
-        opts?.data ? JSON.stringify(opts.data) : null,
-        this.tenantId,
-        now(),
-      );
+    const d = this.d();
+    await (d.db as any).insert(d.schema.events).values({
+      trackId,
+      type,
+      stage: opts?.stage ?? null,
+      actor: opts?.actor ?? null,
+      data: opts?.data ? JSON.stringify(opts.data) : null,
+      tenantId: this.tenantId,
+      createdAt: now(),
+    });
   }
 
   async list(trackId: string, opts?: { type?: string; limit?: number }): Promise<Event[]> {
-    let sql = "SELECT * FROM events WHERE track_id = ? AND tenant_id = ?";
-    const params: any[] = [trackId, this.tenantId];
-    if (opts?.type) {
-      sql += " AND type = ?";
-      params.push(opts.type);
-    }
-    sql += " ORDER BY id ASC LIMIT ?";
-    params.push(opts?.limit ?? 200);
-
-    return ((await this.db.prepare(sql).all(...params)) as EventRow[]).map(rowToEvent);
+    const d = this.d();
+    const e = d.schema.events;
+    const filters = [eq(e.trackId, trackId), eq(e.tenantId, this.tenantId)];
+    if (opts?.type) filters.push(eq(e.type, opts.type));
+    const rows = await (d.db as any)
+      .select()
+      .from(e)
+      .where(and(...filters))
+      .orderBy(asc(e.id))
+      .limit(opts?.limit ?? 200);
+    return (rows as DrizzleSelectEvent[]).map((r) => rowToEvent(drizzleToRow(r)));
   }
 
   async deleteForTrack(trackId: string): Promise<void> {
-    await this.db.prepare("DELETE FROM events WHERE track_id = ? AND tenant_id = ?").run(trackId, this.tenantId);
+    const d = this.d();
+    const e = d.schema.events;
+    await (d.db as any).delete(e).where(and(eq(e.trackId, trackId), eq(e.tenantId, this.tenantId)));
   }
 }

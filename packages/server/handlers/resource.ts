@@ -4,6 +4,7 @@ import { extract } from "../validate.js";
 import { instantiateRecipe } from "../../core/agent/recipe.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { guardBuiltin, projectArg, resolveProjectRoot, resolveScope, type Scope } from "./scope-helpers.js";
+import { logDebug } from "../../core/observability/structured-log.js";
 import type {
   AgentDefinition,
   AgentReadParams,
@@ -441,7 +442,14 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
       await app.computes.update(compute.name, { status: "stopped" });
     } catch (e: any) {
       if (provider.checkStatus) {
-        const real = await provider.checkStatus(compute).catch(() => null);
+        const real = await provider.checkStatus(compute).catch((err) => {
+          logDebug("compute", `compute/stop-instance: checkStatus probe failed (name=${compute.name})`, {
+            name: compute.name,
+            provider: compute.provider,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return null;
+        });
         if (real === "destroyed" || real === "terminated") {
           await app.computes.update(compute.name, { status: "destroyed" });
           await app.computes.mergeConfig(compute.name, { ip: null });
@@ -512,7 +520,14 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
       const { getProvider } = await import("../../compute/index.js");
       const provider = getProvider(compute.provider);
       if (provider?.checkStatus) {
-        const real = await provider.checkStatus(compute).catch(() => null);
+        const real = await provider.checkStatus(compute).catch((err) => {
+          logDebug("compute", `compute/ping: checkStatus probe failed (name=${compute.name})`, {
+            name: compute.name,
+            provider: compute.provider,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return null;
+        });
         if (real && real !== compute.status) {
           await app.computes.update(compute.name, { status: real });
         }

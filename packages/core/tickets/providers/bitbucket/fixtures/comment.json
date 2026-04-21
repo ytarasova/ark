@@ -1,0 +1,17 @@
+{
+  "id": 5001,
+  "content": {
+    "type": "rendered",
+    "markup": "markdown",
+    "raw": "Confirmed. Fixed in commit `abc123` on the [feature branch](https://bitbucket.org/acme/widgets/branch/fix-500)."
+  },
+  "user": {
+    "uuid": "{22222222-2222-2222-2222-222222222222}",
+    "display_name": "Bob Singh",
+    "username": "bob"
+  },
+  "created_on": "2024-07-02T07:15:00.000000+00:00",
+  "updated_on": "2024-07-02T07:15:00.000000+00:00",
+  "parent": null,
+  "links": { "html": { "href": "https://bitbucket.org/acme/widgets/issues/7#comment-5001" } }
+}

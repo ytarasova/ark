@@ -133,7 +133,7 @@ describe("P1-1 -- local single-tenant mode is preserved when no credentials are 
 describe("P1-2 -- cross-tenant REST leak", async () => {
   async function createSessionForTenant(tenantId: string, summary: string): Promise<string> {
     const scoped = app.forTenant(tenantId);
-    const session = scoped.sessions.create({ summary });
+    const session = await scoped.sessions.create({ summary });
     return session.id;
   }
 

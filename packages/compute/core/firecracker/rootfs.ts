@@ -175,7 +175,12 @@ async function ensureArtifact(url: string, sha256: string, dest: string, label: 
   } catch (err) {
     // Best-effort cleanup so retries start clean. Swallow rm errors -- the
     // artifact may never have been written.
-    await rm(dest, { force: true }).catch(() => {});
+    await rm(dest, { force: true }).catch((rmErr) => {
+      logDebug("compute", `firecracker: best-effort rm of partial artifact failed (${dest})`, {
+        dest,
+        error: rmErr instanceof Error ? rmErr.message : String(rmErr),
+      });
+    });
     throw new Error(
       `Firecracker ${label} fetch failed from ${url}: ${err instanceof Error ? err.message : String(err)}`,
     );

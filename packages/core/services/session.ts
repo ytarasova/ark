@@ -14,7 +14,7 @@ import type { SessionRepository } from "../repositories/session.js";
 import type { EventRepository } from "../repositories/event.js";
 import type { MessageRepository } from "../repositories/message.js";
 import type { AppContext } from "../app.js";
-import { logDebug } from "../observability/structured-log.js";
+import { logDebug, logWarn } from "../observability/structured-log.js";
 
 // ── SessionService ───────────────────────────────────────────────────────────
 
@@ -229,7 +229,14 @@ export class SessionService {
         onDispatched(await this.sessions.get(sessionId));
       });
     this._pendingDispatches.add(promise);
-    promise.finally(() => this._pendingDispatches.delete(promise)).catch(() => {});
+    promise
+      .finally(() => this._pendingDispatches.delete(promise))
+      .catch((err) => {
+        logWarn("session", `SessionService: background dispatch chain threw (sessionId=${sessionId})`, {
+          sessionId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
   }
 
   /** Await every in-flight background dispatch. Called by app.shutdown(). */

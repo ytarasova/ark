@@ -1,0 +1,26 @@
+{
+  "action": "created",
+  "issue": {
+    "id": 123456,
+    "number": 42,
+    "title": "Crash when importing large CSV",
+    "body": "Something is wrong.",
+    "state": "open",
+    "state_reason": null,
+    "html_url": "https://github.com/acme/widgets/issues/42",
+    "repository_url": "https://api.github.com/repos/acme/widgets",
+    "user": { "id": 11, "login": "alice" },
+    "assignee": null,
+    "labels": [],
+    "created_at": "2024-10-10T10:00:00Z",
+    "updated_at": "2024-10-10T11:05:00Z"
+  },
+  "comment": {
+    "id": 9002,
+    "body": "Reproduced locally.",
+    "user": { "id": 22, "login": "bob" },
+    "created_at": "2024-10-10T11:05:00Z",
+    "updated_at": "2024-10-10T11:05:00Z"
+  },
+  "sender": { "id": 22, "login": "bob" }
+}

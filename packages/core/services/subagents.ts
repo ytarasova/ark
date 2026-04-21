@@ -8,6 +8,7 @@
 
 import type { AppContext } from "../app.js";
 import * as flow from "../state/flow.js";
+import { logWarn } from "../observability/structured-log.js";
 
 /**
  * Spawn a subagent -- an independent child session with its own model/agent.
@@ -83,7 +84,41 @@ export async function spawnParallelSubagents(
 
   // Break cycle between subagents.ts and dispatch.ts via dynamic import.
   const { dispatch } = await import("./dispatch.js");
-  await Promise.allSettled(ids.map((id) => dispatch(app, id).catch(() => {})));
+  // TODO(follow-up): add retry strategy + observable dispatch status for
+  // subagents. Today we log + persist a dispatch_failed event on the child
+  // session so the parent flow (and operators tailing events) can see which
+  // subagent failed to launch; a caller that currently only reads the
+  // returned sessionIds still has no signal that one of them is wedged.
+  await Promise.allSettled(
+    ids.map(async (id) => {
+      try {
+        await dispatch(app, id);
+      } catch (err) {
+        logWarn("session", `subagents: dispatch failed for child session (parent=${parentId}, child=${id})`, {
+          parentId,
+          childId: id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        // Best-effort: record on the child session so the parent flow (and
+        // operators) can observe the failure instead of silently dropping it.
+        try {
+          await app.events.log(id, "dispatch_failed", {
+            actor: "system",
+            data: {
+              reason: err instanceof Error ? err.message : String(err),
+              parent_id: parentId,
+              source: "spawnParallelSubagents",
+            },
+          });
+        } catch (logErr) {
+          logWarn("session", `subagents: failed to persist dispatch_failed event (child=${id})`, {
+            childId: id,
+            error: logErr instanceof Error ? logErr.message : String(logErr),
+          });
+        }
+      }
+    }),
+  );
 
   return { ok: true, sessionIds: ids, message: `${ids.length} subagents spawned and dispatched` };
 }

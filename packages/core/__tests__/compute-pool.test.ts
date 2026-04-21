@@ -12,9 +12,9 @@ afterAll(async () => {
 });
 
 describe("ComputePoolManager", async () => {
-  it("creates a pool and retrieves it", () => {
+  it("creates a pool and retrieves it", async () => {
     const manager = new ComputePoolManager(app);
-    const pool = manager.createPool({
+    const pool = await manager.createPool({
       name: "test-pool",
       provider: "ec2",
       min: 2,
@@ -26,23 +26,23 @@ describe("ComputePoolManager", async () => {
     expect(pool.min).toBe(2);
     expect(pool.max).toBe(10);
 
-    const retrieved = manager.getPool("test-pool");
+    const retrieved = await manager.getPool("test-pool");
     expect(retrieved).not.toBeNull();
     expect(retrieved!.name).toBe("test-pool");
     expect(retrieved!.config.size).toBe("m");
     expect(retrieved!.config.region).toBe("us-east-1");
   });
 
-  it("returns null for nonexistent pool", () => {
+  it("returns null for nonexistent pool", async () => {
     const manager = new ComputePoolManager(app);
-    const pool = manager.getPool("nonexistent");
+    const pool = await manager.getPool("nonexistent");
     expect(pool).toBeNull();
   });
 
-  it("lists pools with utilization", () => {
+  it("lists pools with utilization", async () => {
     const manager = new ComputePoolManager(app);
     // Create another pool
-    manager.createPool({
+    await manager.createPool({
       name: "test-pool-2",
       provider: "docker",
       min: 0,
@@ -50,7 +50,7 @@ describe("ComputePoolManager", async () => {
       config: { image: "ubuntu:22.04" },
     });
 
-    const pools = manager.listPools();
+    const pools = await manager.listPools();
     expect(pools.length).toBeGreaterThanOrEqual(2);
 
     const dockerPool = pools.find((p) => p.name === "test-pool-2");
@@ -60,25 +60,25 @@ describe("ComputePoolManager", async () => {
     expect(dockerPool!.available).toBe(0);
   });
 
-  it("deletes a pool", () => {
+  it("deletes a pool", async () => {
     const manager = new ComputePoolManager(app);
-    manager.createPool({
+    await manager.createPool({
       name: "to-delete",
       provider: "local",
       min: 0,
       max: 1,
       config: {},
     });
-    expect(manager.getPool("to-delete")).not.toBeNull();
+    expect(await manager.getPool("to-delete")).not.toBeNull();
 
-    const deleted = manager.deletePool("to-delete");
+    const deleted = await manager.deletePool("to-delete");
     expect(deleted).toBe(true);
-    expect(manager.getPool("to-delete")).toBeNull();
+    expect(await manager.getPool("to-delete")).toBeNull();
   });
 
-  it("delete returns false for nonexistent pool", () => {
+  it("delete returns false for nonexistent pool", async () => {
     const manager = new ComputePoolManager(app);
-    const deleted = manager.deletePool("nonexistent");
+    const deleted = await manager.deletePool("nonexistent");
     expect(deleted).toBe(false);
   });
 
@@ -92,9 +92,9 @@ describe("ComputePoolManager", async () => {
     }
   });
 
-  it("releaseCompute is a no-op for nonexistent pool", () => {
+  it("releaseCompute is a no-op for nonexistent pool", async () => {
     const manager = new ComputePoolManager(app);
     // Should not throw
-    manager.releaseCompute("nonexistent", "some-compute");
+    await manager.releaseCompute("nonexistent", "some-compute");
   });
 });

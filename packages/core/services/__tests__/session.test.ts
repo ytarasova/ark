@@ -210,10 +210,10 @@ describe("SessionService", async () => {
 
     it("marks messages as read", async () => {
       const s = await svc.start({});
-      messages.send(s.id, "agent", "hello", "text");
-      expect(messages.unreadCount(s.id)).toBe(1);
+      await messages.send(s.id, "agent", "hello", "text");
+      expect(await messages.unreadCount(s.id)).toBe(1);
       await svc.complete(s.id);
-      expect(messages.unreadCount(s.id)).toBe(0);
+      expect(await messages.unreadCount(s.id)).toBe(0);
     });
 
     it("logs stage_completed event", async () => {

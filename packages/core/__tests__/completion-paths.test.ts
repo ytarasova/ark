@@ -126,7 +126,7 @@ describe("Manual completion path (bare flow)", async () => {
       await app.sessions.update(session.id, result.updates);
     }
     if (result.message) {
-      app.messages.send(session.id, result.message.role, result.message.content, result.message.type);
+      await app.messages.send(session.id, result.message.role, result.message.content, result.message.type);
     }
 
     // Session should still be running (manual gate)
@@ -295,7 +295,7 @@ describe("Hook fallback path (SessionEnd)", async () => {
     const session = await app.sessions.create({ summary: "hook fallback", flow: "quick" });
     await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
-    const freshSession = await app.sessions.get(session.id)!;
+    const freshSession = (await app.sessions.get(session.id))!;
     const result = applyHookStatus(app, freshSession, "SessionEnd", {});
 
     expect(result.newStatus).toBe("ready");
@@ -307,7 +307,7 @@ describe("Hook fallback path (SessionEnd)", async () => {
     const session = await app.sessions.create({ summary: "hook manual", flow: "bare" });
     await app.sessions.update(session.id, { status: "running", stage: "work" });
 
-    const freshSession = await app.sessions.get(session.id)!;
+    const freshSession = (await app.sessions.get(session.id))!;
     const result = applyHookStatus(app, freshSession, "SessionEnd", {});
 
     // Manual gate: SessionEnd maps to "running" (not "completed")
@@ -319,7 +319,7 @@ describe("Hook fallback path (SessionEnd)", async () => {
     const session = await app.sessions.create({ summary: "hook failure", flow: "quick" });
     await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
-    const freshSession = await app.sessions.get(session.id)!;
+    const freshSession = (await app.sessions.get(session.id))!;
     const result = applyHookStatus(app, freshSession, "StopFailure", {
       error: "agent crashed",
     });
@@ -333,7 +333,7 @@ describe("Hook fallback path (SessionEnd)", async () => {
     const session = await app.sessions.create({ summary: "hook manual failure", flow: "bare" });
     await app.sessions.update(session.id, { status: "running", stage: "work" });
 
-    const freshSession = await app.sessions.get(session.id)!;
+    const freshSession = (await app.sessions.get(session.id))!;
     const result = applyHookStatus(app, freshSession, "StopFailure", {
       error: "auth failed",
     });
@@ -346,7 +346,7 @@ describe("Hook fallback path (SessionEnd)", async () => {
     const session = await app.sessions.create({ summary: "already done", flow: "quick" });
     await app.sessions.update(session.id, { status: "completed", stage: "implement" });
 
-    const freshSession = await app.sessions.get(session.id)!;
+    const freshSession = (await app.sessions.get(session.id))!;
     const result = applyHookStatus(app, freshSession, "SessionEnd", {});
 
     // Auto-gate SessionEnd maps to "ready", but guard blocks overriding "completed"
@@ -357,7 +357,7 @@ describe("Hook fallback path (SessionEnd)", async () => {
     const session = await app.sessions.create({ summary: "stopped session", flow: "quick" });
     await app.sessions.update(session.id, { status: "stopped", stage: "implement" });
 
-    const freshSession = await app.sessions.get(session.id)!;
+    const freshSession = (await app.sessions.get(session.id))!;
     const result = applyHookStatus(app, freshSession, "SessionEnd", {});
 
     // Should be no-op -- session was manually stopped
@@ -368,7 +368,7 @@ describe("Hook fallback path (SessionEnd)", async () => {
     const session = await app.sessions.create({ summary: "audit test", flow: "quick" });
     await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
-    const freshSession = await app.sessions.get(session.id)!;
+    const freshSession = (await app.sessions.get(session.id))!;
     const result = applyHookStatus(app, freshSession, "SessionEnd", { reason: "task_complete" });
 
     expect(result.events).toBeTruthy();

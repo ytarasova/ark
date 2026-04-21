@@ -420,7 +420,33 @@ export class K8sProvider implements ComputeProvider {
       },
     };
 
-    await api.createNamespacedPod({ namespace: ns, body: pod });
+    const created = await api.createNamespacedPod({ namespace: ns, body: pod });
+
+    // Attach the per-session creds Secret's ownerReferences to the Pod so
+    // k8s native garbage collection reaps the Secret when the Pod is
+    // deleted (covers daemon crashes between Secret create and session
+    // teardown). Best-effort: `setSecretOwnerToPod` swallows failures --
+    // the boot-time reconciler catches anything that slips through.
+    if (cfg.credsSecretName && this.app) {
+      try {
+        const { setSecretOwnerToPod } = await import("../../core/services/dispatch-claude-auth.js");
+        await setSecretOwnerToPod(this.app, {
+          clusterConfig: cfg as unknown as Record<string, unknown>,
+          namespace: ns,
+          secretName: cfg.credsSecretName,
+          pod: (created ?? pod) as { metadata?: { name?: string; uid?: string } },
+          // Reuse the provider's already-initialized CoreV1Api so we don't
+          // rebuild a KubeConfig just to patch one resource.
+          api: api as unknown as import("../../core/services/dispatch-claude-auth.js").K8sSecretsApi,
+        });
+      } catch (e: any) {
+        // Defensive: `setSecretOwnerToPod` already swallows its own errors,
+        // but a dynamic-import failure or unexpected throw must NOT break
+        // launch. Log + continue.
+        logDebug("compute", `owner-ref patch threw: ${e?.message ?? e}`);
+      }
+    }
+
     return name;
   }
 

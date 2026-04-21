@@ -33,15 +33,15 @@ afterEach(async () => {
 });
 
 describe("HistoryService", async () => {
-  it("search returns empty for no matches", () => {
-    const results = svc.search("nonexistent");
+  it("search returns empty for no matches", async () => {
+    const results = await svc.search("nonexistent");
     expect(results).toEqual([]);
   });
 
   it("search finds sessions by summary", async () => {
     await sessionRepo.create({ summary: "Fix authentication bug" });
     await sessionRepo.create({ summary: "Add feature X" });
-    const results = svc.search("authentication");
+    const results = await svc.search("authentication");
     expect(results.length).toBe(1);
     expect(results[0].match).toBe("Fix authentication bug");
     expect(results[0].source).toBe("metadata");
@@ -49,20 +49,20 @@ describe("HistoryService", async () => {
 
   it("search finds sessions by ticket", async () => {
     await sessionRepo.create({ ticket: "PROJ-999", summary: "Some work" });
-    const results = svc.search("PROJ-999");
+    const results = await svc.search("PROJ-999");
     expect(results.length).toBe(1);
     expect(results[0].sessionId).toBeTruthy();
   });
 
   it("search finds sessions by repo", async () => {
     await sessionRepo.create({ repo: "/home/user/my-cool-project" });
-    const results = svc.search("my-cool-project");
+    const results = await svc.search("my-cool-project");
     expect(results.length).toBe(1);
   });
 
   it("search finds sessions by id", async () => {
     const s = await sessionRepo.create({});
-    const results = svc.search(s.id);
+    const results = await svc.search(s.id);
     expect(results.length).toBe(1);
     expect(results[0].sessionId).toBe(s.id);
   });
@@ -71,20 +71,20 @@ describe("HistoryService", async () => {
     await sessionRepo.create({ summary: "match A" });
     await sessionRepo.create({ summary: "match B" });
     await sessionRepo.create({ summary: "match C" });
-    const results = svc.search("match", { limit: 2 });
+    const results = await svc.search("match", { limit: 2 });
     expect(results.length).toBe(2);
   });
 
   it("search excludes deleting sessions", async () => {
     const s = await sessionRepo.create({ summary: "Searchable" });
-    sessionRepo.softDelete(s.id);
-    const results = svc.search("Searchable");
+    await sessionRepo.softDelete(s.id);
+    const results = await svc.search("Searchable");
     expect(results.length).toBe(0);
   });
 
   it("search is case-insensitive", async () => {
     await sessionRepo.create({ summary: "Fix Authentication Bug" });
-    const results = svc.search("fix authentication");
+    const results = await svc.search("fix authentication");
     expect(results.length).toBe(1);
   });
 
@@ -104,7 +104,7 @@ describe("HistoryService", async () => {
       const fakeDb = new BunSqliteAdapter(new Database(":memory:"));
       initSchema(fakeDb);
       const fakeSessions = new SessionRepository(fakeDb);
-      fakeSessions.create({ summary: "isolated-via-container-override" });
+      await fakeSessions.create({ summary: "isolated-via-container-override" });
 
       app.container.register({
         historyService: asValue(new HistoryService(fakeDb)),
@@ -112,11 +112,11 @@ describe("HistoryService", async () => {
 
       // Freshly resolved service sees only the fake DB.
       const freshSvc = app.container.resolve("historyService");
-      expect(freshSvc.search("isolated-via-container-override").length).toBe(1);
-      expect(freshSvc.search("pre-override-row").length).toBe(0);
+      expect((await freshSvc.search("isolated-via-container-override")).length).toBe(1);
+      expect((await freshSvc.search("pre-override-row")).length).toBe(0);
 
       // The previously-captured service still sees the real DB.
-      expect(realSvc.search("pre-override-row").length).toBe(1);
+      expect((await realSvc.search("pre-override-row")).length).toBe(1);
 
       // Cleanup fake db
       fakeDb.close();
@@ -135,10 +135,10 @@ describe("HistoryService", async () => {
       pureSvc = new HistoryService(pureDb);
     });
 
-    it("search() works without an AppContext", () => {
+    it("search() works without an AppContext", async () => {
       const pureRepo = new SessionRepository(pureDb);
-      pureRepo.create({ summary: "pure-unit-search" });
-      const results = pureSvc.search("pure-unit-search");
+      await pureRepo.create({ summary: "pure-unit-search" });
+      const results = await pureSvc.search("pure-unit-search");
       expect(results.length).toBe(1);
     });
   });

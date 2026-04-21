@@ -294,7 +294,13 @@ export function registerMiscCommands(program: Command) {
           try {
             const probe = await fetch(`http://localhost:${DEFAULT_CONDUCTOR_PORT}/health`, {
               signal: AbortSignal.timeout(500),
-            }).catch(() => null);
+            }).catch((err) => {
+              logDebug("conductor", `cli/web: conductor health probe failed (will start new instance)`, {
+                port: DEFAULT_CONDUCTOR_PORT,
+                error: err instanceof Error ? err.message : String(err),
+              });
+              return null;
+            });
             if (probe?.ok) {
               console.log(chalk.dim(`Conductor already running on :${DEFAULT_CONDUCTOR_PORT} -- reusing`));
             } else {
@@ -310,7 +316,13 @@ export function registerMiscCommands(program: Command) {
           try {
             const probe = await fetch(`http://localhost:${DEFAULT_ARKD_PORT}/health`, {
               signal: AbortSignal.timeout(500),
-            }).catch(() => null);
+            }).catch((err) => {
+              logDebug("general", `cli/web: arkd health probe failed (will start new instance)`, {
+                port: DEFAULT_ARKD_PORT,
+                error: err instanceof Error ? err.message : String(err),
+              });
+              return null;
+            });
             if (probe?.ok) {
               console.log(chalk.dim(`ArkD already running on :${DEFAULT_ARKD_PORT} -- reusing`));
             } else {

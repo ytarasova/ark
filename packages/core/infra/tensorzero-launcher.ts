@@ -7,6 +7,7 @@
 import type { ArkConfig } from "../config.js";
 import type { TensorZeroManager } from "../router/tensorzero.js";
 import { safeAsync } from "../safe.js";
+import { logWarn } from "../observability/structured-log.js";
 
 export class TensorZeroLauncher {
   private manager: TensorZeroManager | null = null;
@@ -37,7 +38,11 @@ export class TensorZeroLauncher {
 
   async stop(): Promise<void> {
     if (this.manager) {
-      await this.manager.stop().catch(() => {});
+      await this.manager.stop().catch((err) => {
+        logWarn("general", `TensorZeroLauncher: manager stop failed during shutdown`, {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
       this.manager = null;
     }
   }

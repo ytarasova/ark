@@ -1,0 +1,80 @@
+{
+  "id": "10030",
+  "key": "PROJ-5",
+  "self": "https://acme.atlassian.net/rest/api/3/issue/10030",
+  "fields": {
+    "summary": "TypeError when dispatching to idle compute",
+    "issuetype": { "name": "Bug" },
+    "status": {
+      "id": "10002",
+      "name": "Open",
+      "statusCategory": { "key": "new", "name": "To Do" }
+    },
+    "priority": { "name": "Highest" },
+    "labels": ["bug", "dispatch"],
+    "reporter": {
+      "accountId": "712020:a1b2c3",
+      "displayName": "Yana Tarasova"
+    },
+    "assignee": {
+      "accountId": "712020:d4e5f6",
+      "displayName": "Aisha Rao"
+    },
+    "created": "2026-04-10T09:00:00.000+0000",
+    "updated": "2026-04-20T14:10:00.000+0000",
+    "description": {
+      "version": 1,
+      "type": "doc",
+      "content": [
+        {
+          "type": "paragraph",
+          "content": [{ "type": "text", "text": "Repro:" }]
+        },
+        {
+          "type": "codeBlock",
+          "attrs": { "language": "ts" },
+          "content": [
+            {
+              "type": "text",
+              "text": "await dispatch(sessionId, { computeId: 'idle-01' });"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "changelog": {
+    "histories": [
+      {
+        "id": "50001",
+        "author": {
+          "accountId": "712020:d4e5f6",
+          "displayName": "Aisha Rao"
+        },
+        "created": "2026-04-20T14:10:00.000+0000",
+        "items": [
+          {
+            "field": "status",
+            "fromString": "To Do",
+            "toString": "In Progress"
+          }
+        ]
+      },
+      {
+        "id": "50002",
+        "author": {
+          "accountId": "712020:a1b2c3",
+          "displayName": "Yana Tarasova"
+        },
+        "created": "2026-04-20T15:00:00.000+0000",
+        "items": [
+          {
+            "field": "labels",
+            "fromString": "bug",
+            "toString": "bug dispatch"
+          }
+        ]
+      }
+    ]
+  }
+}

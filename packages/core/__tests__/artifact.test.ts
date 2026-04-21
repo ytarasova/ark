@@ -100,7 +100,7 @@ describe("ArtifactRepository", async () => {
     await app.artifacts.add(s2.id, "file", ["src/shared.ts", "src/only-s2.ts"]);
 
     // Query for shared.ts across all sessions
-    const results = app.artifacts.query({ type: "file", value: "shared.ts" });
+    const results = await app.artifacts.query({ type: "file", value: "shared.ts" });
     expect(results.length).toBe(2);
     const sessionIds = results.map((a) => a.session_id);
     expect(sessionIds).toContain(s1.id);
@@ -117,7 +117,7 @@ describe("ArtifactRepository", async () => {
       "packages/types/session.ts",
     ]);
 
-    const coreFiles = app.artifacts.query({ type: "file", value: "packages/core" });
+    const coreFiles = await app.artifacts.query({ type: "file", value: "packages/core" });
     expect(coreFiles.length).toBe(2);
   });
 
@@ -129,7 +129,7 @@ describe("ArtifactRepository", async () => {
     await app.artifacts.add(s1.id, "file", ["a.ts"]);
     await app.artifacts.add(s2.id, "file", ["b.ts"]);
 
-    const results = app.artifacts.query({ session_id: s1.id });
+    const results = await app.artifacts.query({ session_id: s1.id });
     expect(results.length).toBe(1);
     expect(results[0].value).toBe("a.ts");
   });
@@ -139,7 +139,7 @@ describe("ArtifactRepository", async () => {
     const session = await app.sessions.create({ summary: "limit test" });
     await app.artifacts.add(session.id, "file", ["a.ts", "b.ts", "c.ts", "d.ts", "e.ts"]);
 
-    const results = app.artifacts.query({ session_id: session.id, limit: 2 });
+    const results = await app.artifacts.query({ session_id: session.id, limit: 2 });
     expect(results.length).toBe(2);
   });
 
@@ -152,10 +152,10 @@ describe("ArtifactRepository", async () => {
     await app.artifacts.add(session.id, "file", ["a.ts", "b.ts"]);
     await app.artifacts.add(session.id, "commit", ["abc123"]);
 
-    expect(app.artifacts.count(session.id)).toBe(3);
-    expect(app.artifacts.count(session.id, "file")).toBe(2);
-    expect(app.artifacts.count(session.id, "commit")).toBe(1);
-    expect(app.artifacts.count(session.id, "pr")).toBe(0);
+    expect(await app.artifacts.count(session.id)).toBe(3);
+    expect(await app.artifacts.count(session.id, "file")).toBe(2);
+    expect(await app.artifacts.count(session.id, "commit")).toBe(1);
+    expect(await app.artifacts.count(session.id, "pr")).toBe(0);
   });
 
   // ── sessionsForArtifact ───────────────────────────────────────────────────
@@ -170,7 +170,7 @@ describe("ArtifactRepository", async () => {
     await app.artifacts.add(s2.id, "file", ["shared.ts"]);
     await app.artifacts.add(s3.id, "file", ["other.ts"]);
 
-    const sessions = app.artifacts.sessionsForArtifact("file", "shared.ts");
+    const sessions = await app.artifacts.sessionsForArtifact("file", "shared.ts");
     expect(sessions.length).toBe(2);
     expect(sessions).toContain(s1.id);
     expect(sessions).toContain(s2.id);
@@ -185,12 +185,12 @@ describe("ArtifactRepository", async () => {
 
     await app.artifacts.add(session.id, "file", ["a.ts", "b.ts"]);
     await app.artifacts.add(session.id, "commit", ["abc123"]);
-    expect(app.artifacts.count(session.id)).toBe(3);
+    expect(await app.artifacts.count(session.id)).toBe(3);
 
     // Hard delete (the repository delete includes artifact cleanup)
     await app.sessions.delete(session.id);
 
-    expect(app.artifacts.count(session.id)).toBe(0);
+    expect(await app.artifacts.count(session.id)).toBe(0);
     expect((await app.artifacts.list(session.id)).length).toBe(0);
   });
 
@@ -200,10 +200,10 @@ describe("ArtifactRepository", async () => {
 
     await app.artifacts.add(session.id, "file", ["a.ts"]);
     await app.artifacts.add(session.id, "pr", ["https://github.com/org/repo/pull/1"]);
-    expect(app.artifacts.count(session.id)).toBe(2);
+    expect(await app.artifacts.count(session.id)).toBe(2);
 
-    app.artifacts.deleteForSession(session.id);
-    expect(app.artifacts.count(session.id)).toBe(0);
+    await app.artifacts.deleteForSession(session.id);
+    expect(await app.artifacts.count(session.id)).toBe(0);
   });
 
   // ── All artifact types ────────────────────────────────────────────────────

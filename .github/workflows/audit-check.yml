@@ -1,0 +1,28 @@
+name: audit-check
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      # Regenerate architecture docs into a temp dir, diff against the
+      # committed copies, and fail the build on drift.  The script prints
+      # a line-level diff for every artifact that changed so contributors
+      # know exactly what to regenerate.
+      - name: Run audit-check
+        run: make audit-check

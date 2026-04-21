@@ -46,22 +46,22 @@ describe("ApiKeyManager", async () => {
   describe("validate", async () => {
     it("validates a valid key and returns tenant context", async () => {
       const { key } = await app.apiKeys.create("acme", "ci-key", "member");
-      const ctx = app.apiKeys.validate(key);
+      const ctx = await app.apiKeys.validate(key);
 
       expect(ctx).not.toBeNull();
       expect(ctx!.tenantId).toBe("acme");
       expect(ctx!.role).toBe("member");
     });
 
-    it("returns null for invalid key", () => {
-      const ctx = app.apiKeys.validate("ark_fake_notreal");
+    it("returns null for invalid key", async () => {
+      const ctx = await app.apiKeys.validate("ark_fake_notreal");
       expect(ctx).toBeNull();
     });
 
-    it("returns null for malformed key", () => {
-      expect(app.apiKeys.validate("not-an-ark-key")).toBeNull();
-      expect(app.apiKeys.validate("")).toBeNull();
-      expect(app.apiKeys.validate("ark_")).toBeNull();
+    it("returns null for malformed key", async () => {
+      expect(await app.apiKeys.validate("not-an-ark-key")).toBeNull();
+      expect(await app.apiKeys.validate("")).toBeNull();
+      expect(await app.apiKeys.validate("ark_")).toBeNull();
     });
 
     it("updates last_used_at on successful validation", async () => {
@@ -70,7 +70,7 @@ describe("ApiKeyManager", async () => {
       const before = keysBefore.find((k) => k.id === id);
       expect(before!.lastUsedAt).toBeNull();
 
-      app.apiKeys.validate(key);
+      await app.apiKeys.validate(key);
 
       const keysAfter = await app.apiKeys.list("acme");
       const after = keysAfter.find((k) => k.id === id);
@@ -80,14 +80,14 @@ describe("ApiKeyManager", async () => {
     it("rejects expired keys", async () => {
       const pastDate = new Date(Date.now() - 86400000).toISOString(); // 1 day ago
       const { key } = await app.apiKeys.create("acme", "expired-key", "member", pastDate);
-      const ctx = app.apiKeys.validate(key);
+      const ctx = await app.apiKeys.validate(key);
       expect(ctx).toBeNull();
     });
 
     it("accepts non-expired keys", async () => {
       const futureDate = new Date(Date.now() + 86400000).toISOString(); // 1 day from now
       const { key } = await app.apiKeys.create("acme", "valid-key", "member", futureDate);
-      const ctx = app.apiKeys.validate(key);
+      const ctx = await app.apiKeys.validate(key);
       expect(ctx).not.toBeNull();
       expect(ctx!.tenantId).toBe("acme");
     });
@@ -117,13 +117,13 @@ describe("ApiKeyManager", async () => {
   describe("revoke", async () => {
     it("revokes an existing key", async () => {
       const { key, id } = await app.apiKeys.create("acme", "to-revoke", "member");
-      expect(app.apiKeys.validate(key)).not.toBeNull();
+      expect(await app.apiKeys.validate(key)).not.toBeNull();
 
       const ok = await app.apiKeys.revoke(id);
       expect(ok).toBe(true);
 
       // Key should no longer validate
-      expect(app.apiKeys.validate(key)).toBeNull();
+      expect(await app.apiKeys.validate(key)).toBeNull();
     });
 
     it("returns false for nonexistent key", async () => {
@@ -139,14 +139,14 @@ describe("ApiKeyManager", async () => {
       const ok = await app.apiKeys.revoke(victim.id, "tenant-attacker");
       expect(ok).toBe(false);
       // Victim key still works.
-      expect(app.apiKeys.validate(victim.key)).not.toBeNull();
+      expect(await app.apiKeys.validate(victim.key)).not.toBeNull();
     });
 
     it("revokes within the supplied tenant scope", async () => {
       const own = await app.apiKeys.create("tenant-owner", "own-key", "member");
       const ok = await app.apiKeys.revoke(own.id, "tenant-owner");
       expect(ok).toBe(true);
-      expect(app.apiKeys.validate(own.key)).toBeNull();
+      expect(await app.apiKeys.validate(own.key)).toBeNull();
     });
   });
 
@@ -160,7 +160,7 @@ describe("ApiKeyManager", async () => {
       expect(rotated!.key).toMatch(/^ark_acme_/);
 
       // Old key should be invalid
-      expect(app.apiKeys.validate(original.key)).toBeNull();
+      expect(await app.apiKeys.validate(original.key)).toBeNull();
 
       // New key should be valid
       const ctx = app.apiKeys.validate(rotated!.key);
@@ -183,7 +183,7 @@ describe("ApiKeyManager", async () => {
       const result = await app.apiKeys.rotate(victim.id, "tenant-attacker2");
       expect(result).toBeNull();
       // Victim key still works.
-      expect(app.apiKeys.validate(victim.key)).not.toBeNull();
+      expect(await app.apiKeys.validate(victim.key)).not.toBeNull();
     });
   });
 });

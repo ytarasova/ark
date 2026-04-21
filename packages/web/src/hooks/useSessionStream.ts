@@ -91,7 +91,16 @@ export function useSessionStream(sessionId: string): SessionStream {
 
   const costQuery = useQuery<SessionCostTotals | null>({
     queryKey: ["session", sessionId, "cost", detailQuery.data?.session?.updated_at ?? null],
-    queryFn: () => api.getSessionCost(sessionId).catch(() => null),
+    queryFn: () =>
+      api.getSessionCost(sessionId).catch((err) => {
+        // Cost endpoint can 404 while a brand-new session has no usage rows
+        // yet; keep the null sentinel but surface unexpected failures.
+        console.warn(
+          `useSessionStream: getSessionCost failed (sessionId=${sessionId}):`,
+          err instanceof Error ? err.message : err,
+        );
+        return null;
+      }),
     enabled: !!sessionId,
     refetchInterval: isActive ? 5000 : false,
   });

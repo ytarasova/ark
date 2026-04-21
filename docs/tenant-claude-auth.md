@@ -95,8 +95,48 @@ kubectl -n <ns> get secret -l ark.dev/session-creds=true -o json \
   | xargs -n1 kubectl -n <ns> delete secret
 ```
 
-A future GC loop in arkd can automate this; for now it's an operator
-manual.
+## Leak recovery
+
+Three layers protect against the "daemon crashed before teardown" leak,
+ordered from tightest to broadest window:
+
+1. **k8s owner-ref GC (inline, post-launch).** Immediately after
+   `K8sProvider.launch` creates the session Pod, dispatch patches the
+   per-session Secret's `metadata.ownerReferences` to point at the Pod
+   (`apiVersion: v1`, `kind: Pod`, `blockOwnerDeletion: true`,
+   `controller: false`). From that moment on, the cluster's native
+   garbage collector deletes the Secret whenever the Pod is removed --
+   including when Ark is offline. This handles the "crashed after Pod
+   created" window. The patch is best-effort: a 404 on the Secret or
+   Pod is logged at warn and the launch continues (covers the race
+   where the Pod was already deleted mid-flight).
+
+2. **Boot-time reconciler.** On every daemon boot, after migrations +
+   resource seeding, `reconcileOrphanedCredsSecrets` walks every
+   configured cluster, lists Secrets labeled
+   `ark.dev/session-creds=true`, and:
+   - skips Secrets that already have `ownerReferences` (k8s GC owns
+     them),
+   - deletes Secrets whose backing session is missing or in a terminal
+     state (`completed` / `failed` / `archived` / `stopped`),
+   - keeps Secrets that belong to an active session (a late-arriving
+     `setSecretOwnerToPod` is expected to attach the owner-ref) and
+     logs one warning per kept Secret.
+
+   Runs as a non-blocking tail-task off `AppContext.boot()` -- a slow
+   or unreachable cluster never blocks the daemon from serving the
+   first request. Summary line is emitted at info-level:
+   `creds-reconciler: pass complete { deleted, kept, errors, clusters }`.
+   This handles the "crashed between Secret create and Pod create"
+   window, which the owner-ref path can't reach.
+
+3. **Periodic janitor (pending).** A future arkd loop will run the same
+   sweep at a configurable cadence so long-lived daemons also converge
+   even without a boot. Tracked in the GH issue for
+   `ark.dev/session-creds` janitor work. Until it ships, a daemon that
+   never restarts will accumulate orphans from the active-session
+   warn-and-keep branch -- operators can run the `kubectl` one-liner
+   above as a manual sweep.
 
 ## Blob storage layout
 

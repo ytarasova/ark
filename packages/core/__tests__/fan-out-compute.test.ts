@@ -16,7 +16,7 @@ describe("fan-out compute inheritance", async () => {
     const parent = await app.sessions.create({ summary: "Parent on EC2", flow: "bare" });
     await app.sessions.update(parent.id, { status: "running", stage: "implement", compute_name: "my-ec2" });
 
-    const result = fanOut(app, parent.id, {
+    const result = await fanOut(app, parent.id, {
       tasks: [{ summary: "Child A" }, { summary: "Child B" }],
     });
 
@@ -37,7 +37,7 @@ describe("fan-out compute inheritance", async () => {
       repo: "myrepo",
     });
 
-    const result = fanOut(app, parent.id, { tasks: [{ summary: "Child" }] });
+    const result = await fanOut(app, parent.id, { tasks: [{ summary: "Child" }] });
     expect(result.ok).toBe(true);
 
     const child = await app.sessions.get(result.childIds![0]);

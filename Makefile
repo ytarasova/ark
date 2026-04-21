@@ -14,6 +14,7 @@
 .PHONY: help install dev dev-daemon dev-arkd dev-web claude-tfy web desktop \
         test test-file test-e2e test-e2e-fast test-e2e-web test-e2e-web-dev test-install test-watch lint lint-fix \
         format format-check \
+        audit audit-check \
         build build-cli build-web build-desktop \
         package package-cli package-desktop \
         vendor-tmux vendor-tensorzero vendor-codegraph \
@@ -178,11 +179,23 @@ lint: ## Lint the codebase (ESLint + TypeScript)
 lint-fix: ## Auto-fix lint issues
 	npx eslint packages/ --fix
 
+drift: ## Check drizzle schema vs generated migrations (both dialects)
+	$(BUN) x drizzle-kit check --config drizzle.config.ts
+	DRIZZLE_DIALECT=postgres $(BUN) x drizzle-kit check --config drizzle.config.ts
+
 format: ## Format code with Prettier
 	npx prettier --write "packages/**/*.{ts,tsx,js,jsx,json,css}"
 
 format-check: ## Check code formatting (CI gate)
 	npx prettier --check "packages/**/*.{ts,tsx,js,jsx,json,css}"
+
+# ── Audit ────────────────────────────────────────────────────────────────────
+
+audit: ## Regenerate docs/architecture/* + docs/audit/audit.json (deterministic)
+	$(BUN) run scripts/audit-codebase.ts generate
+
+audit-check: ## CI gate: regenerate audit and diff against committed copy (non-zero on drift)
+	$(BUN) run scripts/audit-codebase.ts check
 
 # ── Building ─────────────────────────────────────────────────────────────────
 

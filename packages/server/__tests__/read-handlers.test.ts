@@ -66,7 +66,7 @@ describe("session/read", async () => {
 
   it("includes messages when requested", async () => {
     const id = await createSession("read-messages");
-    app.messages.send(id, "user", "hello from test");
+    await app.messages.send(id, "user", "hello from test");
 
     const res = await router.dispatch(createRequest(2, "session/read", { sessionId: id, include: ["messages"] }));
     const result = ok(res);
@@ -79,7 +79,7 @@ describe("session/read", async () => {
   it("includes both events and messages when requested", async () => {
     const id = await createSession("read-both");
     await app.events.log(id, "both-event");
-    app.messages.send(id, "system", "both-msg");
+    await app.messages.send(id, "system", "both-msg");
 
     const res = await router.dispatch(
       createRequest(2, "session/read", { sessionId: id, include: ["events", "messages"] }),
@@ -94,7 +94,7 @@ describe("session/read", async () => {
   it("omits events and messages when include is not specified", async () => {
     const id = await createSession("read-no-include");
     await app.events.log(id, "omitted-event");
-    app.messages.send(id, "user", "omitted-msg");
+    await app.messages.send(id, "user", "omitted-msg");
 
     const res = await router.dispatch(createRequest(2, "session/read", { sessionId: id }));
     const result = ok(res);

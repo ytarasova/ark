@@ -22,6 +22,7 @@ import type { PluginRegistry } from "../plugins/registry.js";
 import type { UsageRecorder } from "../observability/usage.js";
 import type { TensorZeroLauncher as TensorZeroLauncherType } from "../infra/tensorzero-launcher.js";
 import { PricingRegistry } from "../observability/pricing.js";
+import { logWarn } from "../observability/structured-log.js";
 import { UsageRecorder as UsageRecorderCtor } from "../observability/usage.js";
 import { TranscriptParserRegistry } from "../runtimes/transcript-parser.js";
 import { ClaudeTranscriptParser } from "../runtimes/claude/parser.js";
@@ -53,7 +54,11 @@ export function registerRuntime(container: AppContainer): void {
       () => {
         const reg = new PricingRegistry();
         // Non-blocking remote refresh -- failures are fine, we have defaults.
-        reg.refreshFromRemote().catch(() => {});
+        reg.refreshFromRemote().catch((err) => {
+          logWarn("general", `pricing: remote refresh failed, using bundled defaults`, {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
         return reg;
       },
       { lifetime: Lifetime.SINGLETON },

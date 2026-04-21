@@ -43,15 +43,28 @@ export class MigrationRunner {
    * no-op when the apply log already covers the target.
    */
   async apply(opts: MigrationRunOptions = {}): Promise<void> {
-    await this.ensureMigrationsTable();
-    await this.absorbLegacyInstall();
-    const current = await this.currentVersion();
-    const ctx: MigrationApplyContext = { db: this.db, dialect: this.dialect };
-    for (const m of this.migrations) {
-      if (m.version <= current) continue;
-      if (opts.targetVersion !== undefined && m.version > opts.targetVersion) break;
-      await m.up(ctx);
-      await this.recordApplied(m);
+    // Postgres boot: take a session-level advisory lock so two instances
+    // colliding at startup don't double-apply the same migration. The lock
+    // key is a stable hash of a fixed string so every instance agrees. The
+    // lock is released in a `finally` — even if a migration throws, another
+    // booting instance must be able to retry after we exit.
+    //
+    // SQLite doesn't need this because bun:sqlite is process-local: the only
+    // concurrent writers are inside one process, already serialized by the
+    // apply loop below.
+    const released = await this.acquireAdvisoryLock();
+    try {
+      await this.ensureMigrationsTable();
+      await this.absorbLegacyInstall();
+      const current = await this.currentVersion();
+      const ctx: MigrationApplyContext = { db: this.db, dialect: this.dialect };
+      for (const m of this.migrations) {
+        if (m.version <= current) continue;
+        if (opts.targetVersion !== undefined && m.version > opts.targetVersion) break;
+        await this.applyOne(m, ctx);
+      }
+    } finally {
+      await released();
     }
   }
 
@@ -81,6 +94,38 @@ export class MigrationRunner {
   }
 
   // -- Internals --------------------------------------------------------
+
+  /**
+   * Apply a single migration inside a transaction wrap.
+   *
+   * Wrapping `up()` + `recordApplied()` together means a crash mid-migration
+   * can never leave the apply log out of sync with the actual DDL state --
+   * either both land or neither does.
+   *
+   * SQLite quirk: migration 004_soft_delete toggles `PRAGMA foreign_keys =
+   * OFF` around a table rebuild because DROP TABLE would otherwise cascade
+   * to dependent rows. `PRAGMA foreign_keys` is a no-op inside an open
+   * transaction, so we toggle it OUTSIDE the BEGIN/COMMIT window for the
+   * SQLite path. Postgres doesn't need this -- its FK checks can be deferred
+   * with `SET CONSTRAINTS ALL DEFERRED` inside the txn if a future migration
+   * needs it.
+   */
+  private async applyOne(m: Migration, ctx: MigrationApplyContext): Promise<void> {
+    const sqliteDialect = this.dialect === "sqlite";
+    if (sqliteDialect) {
+      await this.db.exec("PRAGMA foreign_keys = OFF");
+    }
+    try {
+      await this.db.transaction(async () => {
+        await m.up(ctx);
+        await this.recordApplied(m);
+      });
+    } finally {
+      if (sqliteDialect) {
+        await this.db.exec("PRAGMA foreign_keys = ON");
+      }
+    }
+  }
 
   /** Create the apply log if it doesn't exist. Dialect-aware DDL. */
   private async ensureMigrationsTable(): Promise<void> {
@@ -128,6 +173,30 @@ export class MigrationRunner {
       | { v: number | null }
       | undefined;
     return row?.v ?? 0;
+  }
+
+  /**
+   * Postgres session-level advisory lock held across the entire `apply()`
+   * loop. On SQLite this is a no-op — bun:sqlite is process-local, so the
+   * only concurrent writers are inside one process and already serialized.
+   *
+   * Returns a `release()` function callers MUST invoke in a `finally`. The
+   * lock uses the constant key `hashtext('ark_migrations')` so every Ark
+   * instance in the same Postgres DB agrees on the lock identity.
+   */
+  private async acquireAdvisoryLock(): Promise<() => Promise<void>> {
+    if (this.dialect !== "postgres") {
+      return async () => {};
+    }
+    await this.db.prepare(`SELECT pg_advisory_lock(hashtext('ark_migrations'))`).run();
+    return async () => {
+      try {
+        await this.db.prepare(`SELECT pg_advisory_unlock(hashtext('ark_migrations'))`).run();
+      } catch {
+        // Unlock can fail if the connection was already reset; the lock is
+        // session-scoped so Postgres will reclaim it on disconnect anyway.
+      }
+    };
   }
 
   private async recordApplied(m: Migration): Promise<void> {

@@ -1,0 +1,27 @@
+{
+  "action": "update",
+  "type": "Issue",
+  "createdAt": "2024-10-02T15:30:00.000Z",
+  "actor": { "id": "user-b", "name": "Bob Singh", "displayName": "bob" },
+  "updatedFrom": {
+    "stateId": "state-backlog"
+  },
+  "data": {
+    "id": "issue-uuid-1",
+    "identifier": "ENG-123",
+    "title": "Investigate flaky test",
+    "description": "Body",
+    "url": "https://linear.app/acme/issue/ENG-123",
+    "priority": 2,
+    "priorityLabel": "High",
+    "createdAt": "2024-10-01T09:00:00.000Z",
+    "updatedAt": "2024-10-02T15:30:00.000Z",
+    "stateId": "state-started",
+    "state": { "id": "state-started", "name": "In Progress", "type": "started" },
+    "assignee": { "id": "user-b", "name": "Bob Singh", "displayName": "bob" },
+    "creator": { "id": "user-a", "name": "Alice Chen", "displayName": "alice" },
+    "labels": { "nodes": [{ "id": "label-1", "name": "bug" }] },
+    "parent": null,
+    "team": { "id": "team-eng", "key": "ENG" }
+  }
+}

@@ -60,7 +60,12 @@ export function ComputeView({
       .then((data) => {
         if (!cancelled) setSessions(data);
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.warn(
+          `ComputeView: initial getSessions failed (running-sessions list will be empty):`,
+          err instanceof Error ? err.message : err,
+        );
+      });
     return () => {
       cancelled = true;
     };
@@ -108,7 +113,12 @@ export function ComputeView({
         .then((data) => {
           if (mountedRef.current) setSessions(data);
         })
-        .catch(() => {});
+        .catch((err) => {
+          console.warn(
+            `ComputeView: poll getSessions failed (next 15s tick will retry):`,
+            err instanceof Error ? err.message : err,
+          );
+        });
     }, []),
     15000,
   );

@@ -1,0 +1,15 @@
+{
+  "id": "comment-uuid-7",
+  "body": "I reproduced this locally with `pnpm test:e2e -- --retries=0`.",
+  "createdAt": "2024-10-02T10:00:00.000Z",
+  "updatedAt": "2024-10-02T10:00:00.000Z",
+  "user": {
+    "id": "user-b",
+    "name": "Bob Singh",
+    "displayName": "bob",
+    "email": "bob@example.com",
+    "avatarUrl": null
+  },
+  "parent": null,
+  "issue": { "id": "issue-uuid-1" }
+}

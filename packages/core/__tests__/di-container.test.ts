@@ -210,10 +210,10 @@ describe("forTest() isolation", async () => {
     await app2.boot();
 
     // Create session in app1
-    app1.sessionService.start({ summary: "app1 session" });
+    await app1.sessionService.start({ summary: "app1 session" });
 
     // app2 should not see it
-    const results = app2.historyService.search("app1 session");
+    const results = await app2.historyService.search("app1 session");
     expect(results.length).toBe(0);
 
     // Cleanup
@@ -427,7 +427,7 @@ describe("cross-service integration through container", async () => {
     expect(await app.computes.get("test-ec2")).not.toBeNull();
 
     // History service sees the session
-    const results = app.historyService.search("With compute");
+    const results = await app.historyService.search("With compute");
     expect(results.length).toBe(1);
   });
 
@@ -437,12 +437,12 @@ describe("cross-service integration through container", async () => {
     setApp(app);
 
     const session = await app.sessionService.start({ summary: "Msg test" });
-    app.messages.send(session.id, "agent", "Done!", "text");
-    expect(app.messages.unreadCount(session.id)).toBe(1);
+    await app.messages.send(session.id, "agent", "Done!", "text");
+    expect(await app.messages.unreadCount(session.id)).toBe(1);
 
     // complete() marks messages as read
     await app.sessionService.complete(session.id);
-    expect(app.messages.unreadCount(session.id)).toBe(0);
+    expect(await app.messages.unreadCount(session.id)).toBe(0);
   });
 });
 

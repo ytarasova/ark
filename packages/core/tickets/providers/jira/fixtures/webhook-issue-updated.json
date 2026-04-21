@@ -1,0 +1,45 @@
+{
+  "timestamp": 1745154600000,
+  "webhookEvent": "jira:issue_updated",
+  "issue_event_type_name": "issue_generic",
+  "user": {
+    "accountId": "712020:d4e5f6",
+    "displayName": "Aisha Rao"
+  },
+  "issue": {
+    "id": "10040",
+    "key": "PROJ-9",
+    "fields": {
+      "summary": "Ship ticket framework",
+      "issuetype": { "name": "Task" },
+      "status": {
+        "id": "3",
+        "name": "In Progress",
+        "statusCategory": { "key": "indeterminate", "name": "In Progress" }
+      },
+      "priority": { "name": "Medium" },
+      "labels": [],
+      "reporter": {
+        "accountId": "712020:a1b2c3",
+        "displayName": "Yana Tarasova"
+      },
+      "assignee": {
+        "accountId": "712020:d4e5f6",
+        "displayName": "Aisha Rao"
+      },
+      "created": "2026-04-20T10:00:00.000+0000",
+      "updated": "2026-04-20T10:10:00.000+0000",
+      "description": null
+    }
+  },
+  "changelog": {
+    "id": "80001",
+    "items": [
+      {
+        "field": "status",
+        "fromString": "To Do",
+        "toString": "In Progress"
+      }
+    ]
+  }
+}

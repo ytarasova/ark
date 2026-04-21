@@ -152,7 +152,13 @@ if (!isRemoteMode()) {
     .then((latest) => {
       if (latest) console.error(chalk.yellow(`Update available: v${latest}`));
     })
-    .catch(() => {});
+    .catch((err) => {
+      // Update check is best-effort; surface only under ARK_DEBUG so
+      // offline users aren't spammed, but operators can still diagnose.
+      if (process.env.ARK_DEBUG) {
+        console.error(chalk.dim(`ark: update check failed (${err instanceof Error ? err.message : String(err)})`));
+      }
+    });
 }
 
 closeArkClient();

@@ -12,6 +12,7 @@
 
 import { substituteVars } from "../template.js";
 import type { AppContext } from "../app.js";
+import { logDebug } from "../observability/structured-log.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -132,7 +133,13 @@ function loadFlow(app: AppContext, name: string): FlowDefinition | null {
       // Hosted DB store cache miss -- Promise return. Fire-and-forget so
       // the cache warms for the next call; for this call there's nothing
       // to return synchronously.
-      void (result as Promise<FlowDefinition | null>).catch(() => null);
+      void (result as Promise<FlowDefinition | null>).catch((err) => {
+        logDebug("session", `flow.loadFlow: async cache-warm failed for flow "${name}"`, {
+          flow: name,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return null;
+      });
       return null;
     }
     return result as FlowDefinition | null;

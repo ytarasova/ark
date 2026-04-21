@@ -246,6 +246,115 @@ export async function deletePerSessionCredsSecret(
 export interface K8sSecretsApi {
   createNamespacedSecret(args: { namespace: string; body: unknown }): Promise<unknown>;
   deleteNamespacedSecret(args: { name: string; namespace: string }): Promise<unknown>;
+  /**
+   * Strategic-merge patch used to attach `ownerReferences` post-hoc. The
+   * real `@kubernetes/client-node` CoreV1Api accepts an `options` arg with a
+   * `headers` entry -- we model that explicitly so the stub in unit tests
+   * can assert the content-type.
+   */
+  patchNamespacedSecret?(args: {
+    name: string;
+    namespace: string;
+    body: unknown;
+    options?: { headers?: Record<string, string> };
+  }): Promise<unknown>;
+  /** List secrets in a namespace with an optional label selector. */
+  listNamespacedSecret?(args: {
+    namespace: string;
+    labelSelector?: string;
+  }): Promise<{ items?: Array<Record<string, unknown>> }>;
+}
+
+/** Minimal pod metadata shape we require for the owner-ref patch. */
+export interface PodMetaRef {
+  metadata?: {
+    name?: string;
+    uid?: string;
+  };
+}
+
+/**
+ * Patch `ownerReferences` on a per-session creds Secret to point at the
+ * freshly-created session Pod. Once set, k8s native garbage collection
+ * deletes the Secret when the Pod is removed -- even if the daemon is
+ * unavailable during teardown. This closes the "crash between Secret
+ * create and session teardown" leak window.
+ *
+ * Best-effort: a 404 (Pod already gone / wrong secret name race) is
+ * logged at warn and swallowed. Any other failure is also warned but not
+ * rethrown; the session launch itself has already succeeded by the time
+ * we reach here, and the boot-time reconciler will catch leaks.
+ */
+export async function setSecretOwnerToPod(
+  app: AppContext,
+  opts: {
+    clusterConfig: Record<string, unknown>;
+    namespace: string;
+    secretName: string;
+    pod: PodMetaRef;
+    /**
+     * Already-constructed k8s client. Preferred: the caller
+     * (`K8sProvider.launch`) already has one wired up, so we reuse it
+     * rather than rebuilding a KubeConfig. When omitted, falls back to
+     * the default factory (used by standalone / test invocations).
+     */
+    api?: K8sSecretsApi;
+    k8sApiFactory?: (cfg: Record<string, unknown>) => Promise<K8sSecretsApi>;
+  },
+): Promise<void> {
+  const { clusterConfig, namespace, secretName, pod } = opts;
+  const podName = pod?.metadata?.name;
+  const podUid = pod?.metadata?.uid;
+  if (!podName || !podUid) {
+    logWarn(
+      "session",
+      `setSecretOwnerToPod: pod metadata missing name/uid for secret ${namespace}/${secretName}; skipping owner-ref patch`,
+    );
+    return;
+  }
+  // Narrow the AppContext reference (logs rely on structured-log's ambient
+  // arkDir which boot already wired). We don't need anything off `app`
+  // directly; keeping the param signature for symmetry with other helpers.
+  void app;
+
+  try {
+    const api = opts.api ?? (await (opts.k8sApiFactory ?? defaultK8sApiFactory)(clusterConfig));
+    if (!api.patchNamespacedSecret) {
+      logWarn("session", `k8s api missing patchNamespacedSecret; cannot set owner-ref on ${namespace}/${secretName}`);
+      return;
+    }
+    const body = {
+      metadata: {
+        ownerReferences: [
+          {
+            apiVersion: "v1",
+            kind: "Pod",
+            name: podName,
+            uid: podUid,
+            controller: false,
+            blockOwnerDeletion: true,
+          },
+        ],
+      },
+    };
+    await api.patchNamespacedSecret({
+      name: secretName,
+      namespace,
+      body,
+      options: { headers: { "Content-Type": "application/strategic-merge-patch+json" } },
+    });
+    logDebug("session", `owner-ref set on secret ${namespace}/${secretName} -> Pod ${podName} (${podUid})`);
+  } catch (e: any) {
+    const status = extractStatusCode(e);
+    if (status === 404) {
+      logWarn(
+        "session",
+        `setSecretOwnerToPod: 404 patching ${namespace}/${secretName} (pod or secret already gone); continuing`,
+      );
+      return;
+    }
+    logWarn("session", `setSecretOwnerToPod: failed to patch ${namespace}/${secretName}: ${e?.message ?? e}`);
+  }
 }
 
 async function defaultK8sApiFactory(cfg: Record<string, unknown>): Promise<K8sSecretsApi> {

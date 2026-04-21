@@ -26,7 +26,7 @@ const { getCtx } = withTestContext();
 
 describe("searchSessions", async () => {
   it("finds session by summary", async () => {
-    getApp().sessions.create({ summary: "Fix login redirect bug" });
+    await getApp().sessions.create({ summary: "Fix login redirect bug" });
     const results = await searchSessions(getApp(), "login redirect");
     expect(results.length).toBeGreaterThanOrEqual(1);
     expect(results.some((r) => r.source === "metadata")).toBe(true);
@@ -34,7 +34,7 @@ describe("searchSessions", async () => {
   });
 
   it("finds session by ticket (jira_key)", async () => {
-    getApp().sessions.create({ ticket: "PROJ-1234", summary: "some task" });
+    await getApp().sessions.create({ ticket: "PROJ-1234", summary: "some task" });
     const results = await searchSessions(getApp(), "PROJ-1234");
     expect(results.length).toBeGreaterThanOrEqual(1);
     const meta = results.find((r) => r.source === "metadata");
@@ -42,7 +42,7 @@ describe("searchSessions", async () => {
   });
 
   it("finds session by repo", async () => {
-    getApp().sessions.create({ repo: "acme/widget-service", summary: "work" });
+    await getApp().sessions.create({ repo: "acme/widget-service", summary: "work" });
     const results = await searchSessions(getApp(), "widget-service");
     expect(results.length).toBeGreaterThanOrEqual(1);
     const meta = results.find((r) => r.source === "metadata");
@@ -50,8 +50,8 @@ describe("searchSessions", async () => {
   });
 
   it("finds matches in event data", async () => {
-    const session = getApp().sessions.create({ summary: "unrelated" });
-    getApp().events.log(session.id, "deploy", { data: { message: "deployed to staging-east" } });
+    const session = await getApp().sessions.create({ summary: "unrelated" });
+    await getApp().events.log(session.id, "deploy", { data: { message: "deployed to staging-east" } });
     const results = await searchSessions(getApp(), "staging-east");
     const ev = results.find((r) => r.source === "event");
     expect(ev).toBeDefined();
@@ -59,8 +59,8 @@ describe("searchSessions", async () => {
   });
 
   it("finds matches in messages", async () => {
-    const session = getApp().sessions.create({ summary: "unrelated" });
-    getApp().messages.send(session.id, "agent" as MessageRole, "Refactored the payment module");
+    const session = await getApp().sessions.create({ summary: "unrelated" });
+    await getApp().messages.send(session.id, "agent" as MessageRole, "Refactored the payment module");
     const results = await searchSessions(getApp(), "payment module");
     const msg = results.find((r) => r.source === "message");
     expect(msg).toBeDefined();
@@ -68,7 +68,7 @@ describe("searchSessions", async () => {
   });
 
   it("is case insensitive", async () => {
-    getApp().sessions.create({ summary: "Upgrade PostgreSQL driver" });
+    await getApp().sessions.create({ summary: "Upgrade PostgreSQL driver" });
     const upper = await searchSessions(getApp(), "POSTGRESQL");
     const lower = await searchSessions(getApp(), "postgresql");
     expect(upper.length).toBeGreaterThanOrEqual(1);
@@ -77,7 +77,7 @@ describe("searchSessions", async () => {
 
   it("limits results", async () => {
     for (let i = 0; i < 10; i++) {
-      getApp().sessions.create({ summary: `batch task ${i}` });
+      await getApp().sessions.create({ summary: `batch task ${i}` });
     }
     const results = await searchSessions(getApp(), "batch task", { limit: 3 });
     expect(results.length).toBeLessThanOrEqual(3);
@@ -85,7 +85,7 @@ describe("searchSessions", async () => {
 
   it("deduplicates by sessionId + source", async () => {
     // A session whose summary AND ticket both match
-    getApp().sessions.create({ ticket: "DUP-99", summary: "DUP-99 duplicate test" });
+    await getApp().sessions.create({ ticket: "DUP-99", summary: "DUP-99 duplicate test" });
     const results = await searchSessions(getApp(), "DUP-99");
     const metaResults = results.filter((r) => r.source === "metadata");
     // Should appear at most once for metadata even though both jira_key and jira_summary match
@@ -93,13 +93,13 @@ describe("searchSessions", async () => {
   });
 
   it("returns empty array when nothing matches", async () => {
-    getApp().sessions.create({ summary: "something else" });
+    await getApp().sessions.create({ summary: "something else" });
     const results = await searchSessions(getApp(), "zzz_nonexistent_zzz");
     expect(results).toEqual([]);
   });
 
   it("returns results with timestamps", async () => {
-    getApp().sessions.create({ summary: "timestamped session" });
+    await getApp().sessions.create({ summary: "timestamped session" });
     const results = await searchSessions(getApp(), "timestamped");
     expect(results.length).toBeGreaterThanOrEqual(1);
     for (const r of results) {
@@ -108,9 +108,9 @@ describe("searchSessions", async () => {
   });
 
   it("returns results from multiple sources", async () => {
-    const session = getApp().sessions.create({ summary: "multi-source alpha" });
-    getApp().messages.send(session.id, "agent" as MessageRole, "working on alpha feature");
-    getApp().events.log(session.id, "note", { data: { note: "alpha checkpoint" } });
+    const session = await getApp().sessions.create({ summary: "multi-source alpha" });
+    await getApp().messages.send(session.id, "agent" as MessageRole, "working on alpha feature");
+    await getApp().events.log(session.id, "note", { data: { note: "alpha checkpoint" } });
 
     const results = await searchSessions(getApp(), "alpha");
     const sources = new Set(results.map((r) => r.source));
