@@ -334,7 +334,7 @@ describe("getClaudeSession", async () => {
     ]);
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
-    const session = getClaudeSession(getApp(), "abc-def-123", { baseDir: baseDir() });
+    const session = await getClaudeSession(getApp(), "abc-def-123", { baseDir: baseDir() });
     expect(session).not.toBeNull();
     expect(session!.sessionId).toBe("abc-def-123");
     expect(session!.summary).toBe("found it");
@@ -346,7 +346,7 @@ describe("getClaudeSession", async () => {
     ]);
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
-    const session = getClaudeSession(getApp(), "xyz-long", { baseDir: baseDir() });
+    const session = await getClaudeSession(getApp(), "xyz-long", { baseDir: baseDir() });
     expect(session).not.toBeNull();
     expect(session!.sessionId).toBe("xyz-long-id-456");
   });
@@ -357,7 +357,7 @@ describe("getClaudeSession", async () => {
     ]);
 
     await refreshClaudeSessionsCache(getApp(), { baseDir: baseDir() });
-    const session = getClaudeSession(getApp(), "does-not-exist", { baseDir: baseDir() });
+    const session = await getClaudeSession(getApp(), "does-not-exist", { baseDir: baseDir() });
     expect(session).toBeNull();
   });
 });

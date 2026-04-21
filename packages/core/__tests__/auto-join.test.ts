@@ -16,7 +16,7 @@ describe("auto-join", async () => {
     const parent = await app.sessions.create({ summary: "Parent", flow: "fan-out" });
     await app.sessions.update(parent.id, { stage: "execute", status: "running" });
 
-    const result = fanOut(app, parent.id, { tasks: [{ summary: "A" }, { summary: "B" }] });
+    const result = await fanOut(app, parent.id, { tasks: [{ summary: "A" }, { summary: "B" }] });
     expect(result.ok).toBe(true);
 
     for (const childId of result.childIds!) {
@@ -34,7 +34,7 @@ describe("auto-join", async () => {
     const parent = await app.sessions.create({ summary: "Parent2", flow: "fan-out" });
     await app.sessions.update(parent.id, { stage: "execute", status: "running" });
 
-    const result = fanOut(app, parent.id, { tasks: [{ summary: "C" }, { summary: "D" }] });
+    const result = await fanOut(app, parent.id, { tasks: [{ summary: "C" }, { summary: "D" }] });
 
     await app.sessions.update(result.childIds![0], { status: "completed" });
 

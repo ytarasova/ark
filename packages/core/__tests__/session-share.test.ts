@@ -10,7 +10,7 @@ withTestContext();
 
 describe("session sharing", async () => {
   it("exportSession returns session data", async () => {
-    const s = getApp().sessions.create({ summary: "export-test", repo: "/tmp/repo" });
+    const s = await getApp().sessions.create({ summary: "export-test", repo: "/tmp/repo" });
     const exported = await exportSession(getApp(), s.id);
     expect(exported).not.toBeNull();
     expect(exported!.version).toBe(1);
@@ -22,7 +22,7 @@ describe("session sharing", async () => {
   });
 
   it("importSessionFromFile creates a new session", async () => {
-    const s = getApp().sessions.create({ summary: "to-share", repo: "/tmp/repo" });
+    const s = await getApp().sessions.create({ summary: "to-share", repo: "/tmp/repo" });
     const exported = await exportSession(getApp(), s.id);
 
     const dir = mkdtempSync(join(tmpdir(), "ark-share-"));
@@ -33,7 +33,7 @@ describe("session sharing", async () => {
     expect(result.ok).toBe(true);
     expect(result.sessionId).toBeDefined();
 
-    const imported = getApp().sessions.get(result.sessionId!);
+    const imported = await getApp().sessions.get(result.sessionId!);
     expect(imported).not.toBeNull();
     expect(imported!.summary).toContain("[imported]");
     expect(imported!.summary).toContain("to-share");
@@ -48,11 +48,11 @@ describe("session sharing", async () => {
   });
 
   it("exportSessionToFile writes to disk and is re-importable", async () => {
-    const s = getApp().sessions.create({ summary: "roundtrip test", repo: "/tmp/repo" });
+    const s = await getApp().sessions.create({ summary: "roundtrip test", repo: "/tmp/repo" });
     const dir = mkdtempSync(join(tmpdir(), "ark-export-"));
     const filePath = join(dir, "export.json");
 
-    const ok = exportSessionToFile(getApp(), s.id, filePath);
+    const ok = await exportSessionToFile(getApp(), s.id, filePath);
     expect(ok).toBe(true);
 
     // Verify the file was created
@@ -67,11 +67,11 @@ describe("session sharing", async () => {
     expect(result.sessionId).toBeDefined();
   });
 
-  it("exportSessionToFile returns false for missing session", () => {
+  it("exportSessionToFile returns false for missing session", async () => {
     const dir = mkdtempSync(join(tmpdir(), "ark-export-"));
     const filePath = join(dir, "missing.json");
 
-    const ok = exportSessionToFile(getApp(), "nonexistent", filePath);
+    const ok = await exportSessionToFile(getApp(), "nonexistent", filePath);
     expect(ok).toBe(false);
   });
 });

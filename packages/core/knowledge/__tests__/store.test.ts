@@ -261,7 +261,7 @@ describe("KnowledgeStore", async () => {
       const c = await store.addNode({ type: "file", label: "c.ts" });
       await store.addEdge(a, b, "imports");
       await store.addEdge(a, c, "imports");
-      const neighbors = store.neighbors(a, { maxDepth: 1 });
+      const neighbors = await store.neighbors(a, { maxDepth: 1 });
       expect(neighbors.length).toBe(2);
       const labels = neighbors.map((n) => n.label).sort();
       expect(labels).toEqual(["b.ts", "c.ts"]);
@@ -274,7 +274,7 @@ describe("KnowledgeStore", async () => {
       const c = await store.addNode({ type: "file", label: "c.ts" });
       await store.addEdge(a, b, "imports");
       await store.addEdge(b, c, "imports");
-      const neighbors = store.neighbors(a, { maxDepth: 2 });
+      const neighbors = await store.neighbors(a, { maxDepth: 2 });
       expect(neighbors.length).toBe(2);
       const labels = neighbors.map((n) => n.label).sort();
       expect(labels).toEqual(["b.ts", "c.ts"]);
@@ -286,7 +286,7 @@ describe("KnowledgeStore", async () => {
       const b = await store.addNode({ type: "file", label: "b.ts" });
       await store.addEdge(a, b, "imports");
       await store.addEdge(b, a, "imports"); // cycle back
-      const neighbors = store.neighbors(a, { maxDepth: 2 });
+      const neighbors = await store.neighbors(a, { maxDepth: 2 });
       expect(neighbors.length).toBe(1);
       expect(neighbors[0].label).toBe("b.ts");
     });
@@ -298,7 +298,7 @@ describe("KnowledgeStore", async () => {
       const s = await store.addNode({ type: "session", label: "s-1" });
       await store.addEdge(a, b, "imports");
       await store.addEdge(a, s, "modified_by");
-      const fileNeighbors = store.neighbors(a, { maxDepth: 1, types: ["file"] });
+      const fileNeighbors = await store.neighbors(a, { maxDepth: 1, types: ["file"] });
       expect(fileNeighbors.length).toBe(1);
       expect(fileNeighbors[0].label).toBe("b.ts");
     });
@@ -310,7 +310,7 @@ describe("KnowledgeStore", async () => {
       const c = await store.addNode({ type: "file", label: "c.ts" });
       await store.addEdge(a, b, "imports");
       await store.addEdge(a, c, "co_changes");
-      const importNeighbors = store.neighbors(a, { maxDepth: 1, relation: "imports" });
+      const importNeighbors = await store.neighbors(a, { maxDepth: 1, relation: "imports" });
       expect(importNeighbors.length).toBe(1);
       expect(importNeighbors[0].label).toBe("b.ts");
     });
@@ -325,7 +325,7 @@ describe("KnowledgeStore", async () => {
       await store.addEdge(b, c, "imports");
       await store.addEdge(c, d, "imports");
       // Default maxDepth is 2, so d (3 hops) should not be included
-      const neighbors = store.neighbors(a);
+      const neighbors = await store.neighbors(a);
       expect(neighbors.length).toBe(2);
       const labels = neighbors.map((n) => n.label).sort();
       expect(labels).toEqual(["b.ts", "c.ts"]);
@@ -468,7 +468,7 @@ describe("KnowledgeStore", async () => {
       store2.setTenant("tenant-b");
 
       await store.addNode({ id: "file:shared-label", type: "file", label: "shared.ts" });
-      store2.addNode({ id: "file:tenant-b-only", type: "file", label: "private.ts" });
+      await store2.addNode({ id: "file:tenant-b-only", type: "file", label: "private.ts" });
 
       // Default tenant sees only its own node
       expect(await store.nodeCount()).toBe(1);
@@ -476,12 +476,12 @@ describe("KnowledgeStore", async () => {
       expect(await store.getNode("file:tenant-b-only")).toBeNull();
 
       // Tenant B sees only its own node
-      expect(store2.nodeCount()).toBe(1);
-      expect(store2.getNode("file:tenant-b-only")).not.toBeNull();
-      expect(store2.getNode("file:shared-label")).toBeNull();
+      expect(await store2.nodeCount()).toBe(1);
+      expect(await store2.getNode("file:tenant-b-only")).not.toBeNull();
+      expect(await store2.getNode("file:shared-label")).toBeNull();
 
       // Cleanup tenant-b data
-      store2.clear();
+      await store2.clear();
     });
 
     it("tenants do not see each other's edges", async () => {
@@ -493,17 +493,17 @@ describe("KnowledgeStore", async () => {
       const b = await store.addNode({ type: "file", label: "b.ts" });
       await store.addEdge(a, b, "imports");
 
-      const c = store2.addNode({ type: "file", label: "c.ts" });
-      const d = store2.addNode({ type: "file", label: "d.ts" });
-      store2.addEdge(c, d, "depends_on");
+      const c = await store2.addNode({ type: "file", label: "c.ts" });
+      const d = await store2.addNode({ type: "file", label: "d.ts" });
+      await store2.addEdge(c, d, "depends_on");
 
       expect(await store.edgeCount()).toBe(1);
-      expect(store2.edgeCount()).toBe(1);
+      expect(await store2.edgeCount()).toBe(1);
       expect(await store.edgeCount("depends_on")).toBe(0);
-      expect(store2.edgeCount("imports")).toBe(0);
+      expect(await store2.edgeCount("imports")).toBe(0);
 
       // Cleanup
-      store2.clear();
+      await store2.clear();
     });
 
     it("search is tenant-scoped", async () => {
@@ -512,20 +512,20 @@ describe("KnowledgeStore", async () => {
       store2.setTenant("tenant-d");
 
       await store.addNode({ type: "file", label: "visible.ts", content: "this is visible" });
-      store2.addNode({ type: "file", label: "hidden.ts", content: "this is hidden" });
+      await store2.addNode({ type: "file", label: "hidden.ts", content: "this is hidden" });
 
       const defaultResults = await store.search("visible");
       expect(defaultResults.length).toBe(1);
       const defaultHidden = await store.search("hidden");
       expect(defaultHidden.length).toBe(0);
 
-      const tenantResults = store2.search("hidden");
+      const tenantResults = await store2.search("hidden");
       expect(tenantResults.length).toBe(1);
-      const tenantVisible = store2.search("visible");
+      const tenantVisible = await store2.search("visible");
       expect(tenantVisible.length).toBe(0);
 
       // Cleanup
-      store2.clear();
+      await store2.clear();
     });
 
     it("forTenant on AppContext creates scoped KnowledgeStore", async () => {
@@ -533,15 +533,15 @@ describe("KnowledgeStore", async () => {
       const scoped = app.forTenant("tenant-e");
 
       await store.addNode({ id: "file:default-node", type: "file", label: "default-only.ts" });
-      scoped.knowledge.addNode({ id: "file:tenant-e-node", type: "file", label: "tenant-e-only.ts" });
+      await scoped.knowledge.addNode({ id: "file:tenant-e-node", type: "file", label: "tenant-e-only.ts" });
 
       expect(await store.getNode("file:default-node")).not.toBeNull();
       expect(await store.getNode("file:tenant-e-node")).toBeNull();
-      expect(scoped.knowledge.getNode("file:tenant-e-node")).not.toBeNull();
-      expect(scoped.knowledge.getNode("file:default-node")).toBeNull();
+      expect(await scoped.knowledge.getNode("file:tenant-e-node")).not.toBeNull();
+      expect(await scoped.knowledge.getNode("file:default-node")).toBeNull();
 
       // Cleanup
-      scoped.knowledge.clear();
+      await scoped.knowledge.clear();
     });
   });
 });

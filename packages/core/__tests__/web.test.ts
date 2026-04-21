@@ -51,7 +51,7 @@ describe("web server", async () => {
   });
 
   it("serves session list via RPC", async () => {
-    getApp().sessions.create({ summary: "web-test" });
+    await getApp().sessions.create({ summary: "web-test" });
     server = startWebServer(getApp(), { port: 18421 });
     const data = await rpcResult(18421, "session/list", { limit: 200 });
     expect(data.result).toBeDefined();
@@ -118,7 +118,7 @@ describe("web server", async () => {
   });
 
   it("returns session detail with events via RPC", async () => {
-    const s = getApp().sessions.create({ summary: "detail-test" });
+    const s = await getApp().sessions.create({ summary: "detail-test" });
     server = startWebServer(getApp(), { port: 18425 });
     const data = await rpcResult(18425, "session/read", { sessionId: s.id, include: ["events"] });
     const result = data.result as Record<string, unknown>;
@@ -141,8 +141,8 @@ describe("web server", async () => {
   });
 
   it("returns system status via RPC", async () => {
-    getApp().sessions.create({ summary: "status-test-1" });
-    getApp().sessions.create({ summary: "status-test-2" });
+    await getApp().sessions.create({ summary: "status-test-1" });
+    await getApp().sessions.create({ summary: "status-test-2" });
     server = startWebServer(getApp(), { port: 18431 });
     const data = await rpcResult(18431, "status/get");
     const result = data.result as Record<string, unknown>;
@@ -177,7 +177,7 @@ describe("web server", async () => {
   // --- RPC endpoint tests ---
 
   it("session/clone works via RPC", async () => {
-    const s = getApp().sessions.create({ summary: "fork-me" });
+    const s = await getApp().sessions.create({ summary: "fork-me" });
     server = startWebServer(getApp(), { port: 18535 });
     const data = await rpcResult(18535, "session/clone", { sessionId: s.id, name: "forked-copy" });
     const result = data.result as Record<string, unknown>;
@@ -230,7 +230,7 @@ describe("web server", async () => {
   });
 
   it("session/events returns events via RPC", async () => {
-    const s = getApp().sessions.create({ summary: "events-test" });
+    const s = await getApp().sessions.create({ summary: "events-test" });
     server = startWebServer(getApp(), { port: 18543 });
     const data = await rpcResult(18543, "session/events", { sessionId: s.id });
     const result = data.result as Record<string, unknown>;
@@ -293,14 +293,14 @@ describe("web server", async () => {
   });
 
   it("terminal endpoint is blocked in read-only mode", async () => {
-    const s = getApp().sessions.create({ summary: "terminal-readonly-test" });
+    const s = await getApp().sessions.create({ summary: "terminal-readonly-test" });
     server = startWebServer(getApp(), { port: 18550, readOnly: true });
     const resp = await fetch(`http://localhost:18550/api/terminal?session=${s.id}`);
     expect(resp.status).toBe(403);
   });
 
   it("terminal WebSocket upgrade works for valid session", async () => {
-    const s = getApp().sessions.create({ summary: "terminal-ws-test" });
+    const s = await getApp().sessions.create({ summary: "terminal-ws-test" });
     server = startWebServer(getApp(), { port: 18551 });
     // Attempt WebSocket connection -- the tmux session won't exist,
     // so the bridge will send an error and close, but upgrade should succeed

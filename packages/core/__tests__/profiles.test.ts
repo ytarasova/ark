@@ -67,33 +67,33 @@ describe("profiles", () => {
 });
 
 describe("profile-scoped session listing", () => {
-  it("listSessions with groupPrefix filters by prefix", () => {
-    getApp().sessions.create({ summary: "work-task", group_name: "work/frontend" });
-    getApp().sessions.create({ summary: "personal-task", group_name: "personal/blog" });
+  it("listSessions with groupPrefix filters by prefix", async () => {
+    await getApp().sessions.create({ summary: "work-task", group_name: "work/frontend" });
+    await getApp().sessions.create({ summary: "personal-task", group_name: "personal/blog" });
 
-    const workSessions = getApp().sessions.list({ groupPrefix: "work/" });
+    const workSessions = await getApp().sessions.list({ groupPrefix: "work/" });
     expect(workSessions.every((s) => s.group_name?.startsWith("work/"))).toBe(true);
     expect(workSessions.some((s) => s.summary === "work-task")).toBe(true);
     expect(workSessions.some((s) => s.summary === "personal-task")).toBe(false);
 
-    const personalSessions = getApp().sessions.list({ groupPrefix: "personal/" });
+    const personalSessions = await getApp().sessions.list({ groupPrefix: "personal/" });
     expect(personalSessions.every((s) => s.group_name?.startsWith("personal/"))).toBe(true);
     expect(personalSessions.some((s) => s.summary === "personal-task")).toBe(true);
     expect(personalSessions.some((s) => s.summary === "work-task")).toBe(false);
   });
 
-  it("listSessions without groupPrefix returns all", () => {
-    getApp().sessions.create({ summary: "all-1", group_name: "work/a" });
-    getApp().sessions.create({ summary: "all-2", group_name: "personal/b" });
-    const all = getApp().sessions.list();
+  it("listSessions without groupPrefix returns all", async () => {
+    await getApp().sessions.create({ summary: "all-1", group_name: "work/a" });
+    await getApp().sessions.create({ summary: "all-2", group_name: "personal/b" });
+    const all = await getApp().sessions.list();
     expect(all.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("groupPrefix does not match sessions without group_name", () => {
-    getApp().sessions.create({ summary: "ungrouped" });
-    getApp().sessions.create({ summary: "grouped", group_name: "work/misc" });
+  it("groupPrefix does not match sessions without group_name", async () => {
+    await getApp().sessions.create({ summary: "ungrouped" });
+    await getApp().sessions.create({ summary: "grouped", group_name: "work/misc" });
 
-    const workSessions = getApp().sessions.list({ groupPrefix: "work/" });
+    const workSessions = await getApp().sessions.list({ groupPrefix: "work/" });
     expect(workSessions.some((s) => s.summary === "ungrouped")).toBe(false);
     expect(workSessions.some((s) => s.summary === "grouped")).toBe(true);
   });

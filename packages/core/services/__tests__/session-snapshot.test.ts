@@ -77,7 +77,7 @@ class FakeSnapshotCompute implements Compute {
   }
 }
 
-function seedSession(computeName?: string): string {
+async function seedSession(computeName?: string): Promise<string> {
   const session = await app.sessionService.start({ summary: "pause-snap-test", repo: ".", flow: "bare" });
   if (computeName) {
     await app.sessions.update(session.id, { compute_name: computeName });
@@ -85,7 +85,7 @@ function seedSession(computeName?: string): string {
   return session.id;
 }
 
-function ensureCompute(name: string, provider: string): void {
+async function ensureCompute(name: string, provider: string): Promise<void> {
   if (await app.computes.get(name)) return;
   await app.computes.create({ name, provider, config: {} });
 }
@@ -98,7 +98,7 @@ describe("resolveSessionCompute", async () => {
   });
 
   it("resolves local compute by default", async () => {
-    const id = seedSession();
+    const id = await seedSession();
     const resolved = await resolveSessionCompute(app, id);
     expect(resolved).not.toBeNull();
     expect(resolved!.kind).toBe("local");
@@ -106,38 +106,38 @@ describe("resolveSessionCompute", async () => {
   });
 
   it("resolves firecracker compute from compute_name prefix", async () => {
-    ensureCompute("firecracker-test", "firecracker");
+    await ensureCompute("firecracker-test", "firecracker");
     const fake = new FakeSnapshotCompute();
     app.registerCompute(fake);
-    const id = seedSession("firecracker-test");
+    const id = await seedSession("firecracker-test");
     const resolved = await resolveSessionCompute(app, id);
     expect(resolved).not.toBeNull();
     expect(resolved!.kind).toBe("firecracker");
   });
 
   it("resolves ec2 compute from compute_name prefix", async () => {
-    const id = seedSession("ec2-large");
+    const id = await seedSession("ec2-large");
     const resolved = await resolveSessionCompute(app, id);
     expect(resolved).not.toBeNull();
     expect(resolved!.kind).toBe("ec2");
   });
 
   it("resolves k8s-kata compute from compute_name prefix", async () => {
-    const id = seedSession("k8s-kata-1");
+    const id = await seedSession("k8s-kata-1");
     const resolved = await resolveSessionCompute(app, id);
     expect(resolved).not.toBeNull();
     expect(resolved!.kind).toBe("k8s-kata");
   });
 
   it("resolves k8s compute from compute_name prefix", async () => {
-    const id = seedSession("k8s-default");
+    const id = await seedSession("k8s-default");
     const resolved = await resolveSessionCompute(app, id);
     expect(resolved).not.toBeNull();
     expect(resolved!.kind).toBe("k8s");
   });
 
   it("includes compute_handle metadata from session config", async () => {
-    const id = seedSession();
+    const id = await seedSession();
     await app.sessions.update(id, {
       config: { compute_handle: { instanceId: "i-abc" } },
     });
@@ -152,18 +152,18 @@ describe("resolveSessionCompute", async () => {
 describe("pauseWithSnapshot", async () => {
   let fake: FakeSnapshotCompute;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     fake = new FakeSnapshotCompute();
     fake.snapshotError = null;
     fake.restoreError = null;
     fake.snapshotCalls = 0;
     fake.restoreCalls = 0;
     app.registerCompute(fake);
-    ensureCompute("firecracker-snap", "firecracker");
+    await ensureCompute("firecracker-snap", "firecracker");
   });
 
   it("snapshots + persists + marks session blocked", async () => {
-    const id = seedSession("firecracker-snap");
+    const id = await seedSession("firecracker-snap");
     const result = await pauseWithSnapshot(app, id, { reason: "test pause" });
 
     expect(result.ok).toBe(true);
@@ -181,7 +181,7 @@ describe("pauseWithSnapshot", async () => {
   });
 
   it("defaults reason to 'User paused'", async () => {
-    const id = seedSession("firecracker-snap");
+    const id = await seedSession("firecracker-snap");
     await pauseWithSnapshot(app, id);
     expect((await app.sessions.get(id))!.breakpoint_reason).toBe("User paused");
   });
@@ -193,7 +193,7 @@ describe("pauseWithSnapshot", async () => {
   });
 
   it("returns notSupported for non-snapshot compute", async () => {
-    const id = seedSession(); // local compute
+    const id = await seedSession(); // local compute
     const result = await pauseWithSnapshot(app, id);
     expect(result.ok).toBe(false);
     expect(result.notSupported).toBe(true);
@@ -201,7 +201,7 @@ describe("pauseWithSnapshot", async () => {
 
   it("returns error when compute.snapshot() throws generic error", async () => {
     fake.snapshotError = new Error("VM crashed");
-    const id = seedSession("firecracker-snap");
+    const id = await seedSession("firecracker-snap");
     const result = await pauseWithSnapshot(app, id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("VM crashed");
@@ -210,14 +210,14 @@ describe("pauseWithSnapshot", async () => {
 
   it("returns notSupported when compute.snapshot() throws NotSupportedError", async () => {
     fake.snapshotError = new NotSupportedError("firecracker", "snapshot");
-    const id = seedSession("firecracker-snap");
+    const id = await seedSession("firecracker-snap");
     const result = await pauseWithSnapshot(app, id);
     expect(result.ok).toBe(false);
     expect(result.notSupported).toBe(true);
   });
 
   it("logs session_paused event with snapshot data", async () => {
-    const id = seedSession("firecracker-snap");
+    const id = await seedSession("firecracker-snap");
     const result = await pauseWithSnapshot(app, id, { reason: "deploy" });
     const evts = await app.events.list(id, { type: "session_paused" });
     expect(evts.length).toBeGreaterThanOrEqual(1);
@@ -233,18 +233,18 @@ describe("pauseWithSnapshot", async () => {
 describe("resumeFromSnapshot", async () => {
   let fake: FakeSnapshotCompute;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     fake = new FakeSnapshotCompute();
     fake.snapshotError = null;
     fake.restoreError = null;
     fake.snapshotCalls = 0;
     fake.restoreCalls = 0;
     app.registerCompute(fake);
-    ensureCompute("firecracker-res", "firecracker");
+    await ensureCompute("firecracker-res", "firecracker");
   });
 
   it("restores from session's last_snapshot_id", async () => {
-    const id = seedSession("firecracker-res");
+    const id = await seedSession("firecracker-res");
     const pauseResult = await pauseWithSnapshot(app, id);
     expect(pauseResult.ok).toBe(true);
 
@@ -259,7 +259,7 @@ describe("resumeFromSnapshot", async () => {
   });
 
   it("accepts explicit snapshotId", async () => {
-    const id = seedSession("firecracker-res");
+    const id = await seedSession("firecracker-res");
     const pauseResult = await pauseWithSnapshot(app, id);
 
     const result = await resumeFromSnapshot(app, id, { snapshotId: pauseResult.snapshot!.id });
@@ -268,7 +268,7 @@ describe("resumeFromSnapshot", async () => {
   });
 
   it("falls back to latest snapshot from store when no last_snapshot_id", async () => {
-    const id = seedSession("firecracker-res");
+    const id = await seedSession("firecracker-res");
     const pauseResult = await pauseWithSnapshot(app, id);
 
     // Clear last_snapshot_id from config
@@ -286,14 +286,14 @@ describe("resumeFromSnapshot", async () => {
   });
 
   it("returns error when no snapshot available", async () => {
-    const id = seedSession("firecracker-res");
+    const id = await seedSession("firecracker-res");
     const result = await resumeFromSnapshot(app, id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("No snapshot available");
   });
 
   it("returns error when compute.restore() throws generic error", async () => {
-    const id = seedSession("firecracker-res");
+    const id = await seedSession("firecracker-res");
     await pauseWithSnapshot(app, id);
     fake.restoreError = new Error("disk full");
     const result = await resumeFromSnapshot(app, id);
@@ -302,7 +302,7 @@ describe("resumeFromSnapshot", async () => {
   });
 
   it("returns notSupported when compute.restore() throws NotSupportedError", async () => {
-    const id = seedSession("firecracker-res");
+    const id = await seedSession("firecracker-res");
     await pauseWithSnapshot(app, id);
     fake.restoreError = new NotSupportedError("firecracker", "restore");
     const result = await resumeFromSnapshot(app, id);
@@ -311,7 +311,7 @@ describe("resumeFromSnapshot", async () => {
   });
 
   it("returns notSupported when referenced compute lacks restore capability", async () => {
-    const id = seedSession(); // local compute (no snapshot support)
+    const id = await seedSession(); // local compute (no snapshot support)
 
     // Manually save a snapshot referencing "local" compute kind
     const blob = new ReadableStream<Uint8Array>({
@@ -330,7 +330,7 @@ describe("resumeFromSnapshot", async () => {
   });
 
   it("logs session_resumed event with snapshot data", async () => {
-    const id = seedSession("firecracker-res");
+    const id = await seedSession("firecracker-res");
     await pauseWithSnapshot(app, id);
     const result = await resumeFromSnapshot(app, id);
     expect(result.ok).toBe(true);
@@ -343,7 +343,7 @@ describe("resumeFromSnapshot", async () => {
   });
 
   it("round-trips pause + resume preserving snapshot metadata", async () => {
-    const id = seedSession("firecracker-res");
+    const id = await seedSession("firecracker-res");
     const pauseResult = await pauseWithSnapshot(app, id, { reason: "round-trip" });
     expect(pauseResult.snapshot!.metadata).toEqual({ memFilePath: "/tmp/m", stateFilePath: "/tmp/s" });
 

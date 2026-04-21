@@ -12,7 +12,7 @@ const { getCtx } = withTestContext();
 
 describe("recipe use", async () => {
   it("creates a session from a recipe with defaults", async () => {
-    const recipe = getApp().recipes.get("quick-fix")!;
+    const recipe = (await getApp().recipes.get("quick-fix"))!;
     expect(recipe).not.toBeNull();
 
     const instance = instantiateRecipe(recipe, { repo: "/tmp/test", summary: "test fix" });
@@ -31,7 +31,7 @@ describe("recipe use", async () => {
   });
 
   it("creates a session with overridden values", async () => {
-    const recipe = getApp().recipes.get("code-review")!;
+    const recipe = (await getApp().recipes.get("code-review"))!;
     expect(recipe).not.toBeNull();
 
     const instance = instantiateRecipe(recipe, { repo: "/tmp/myrepo", summary: "Custom review task" });
@@ -48,7 +48,7 @@ describe("recipe use", async () => {
   });
 
   it("falls back to recipe description when no summary provided", async () => {
-    const recipe = getApp().recipes.get("quick-fix")!;
+    const recipe = (await getApp().recipes.get("quick-fix"))!;
     const instance = instantiateRecipe(recipe, { repo: "/tmp/test" });
     const session = await startSession(getApp(), {
       summary: instance.summary ?? recipe.description,
@@ -60,7 +60,7 @@ describe("recipe use", async () => {
   });
 
   it("passes agent from recipe instance to startSession", async () => {
-    const recipe = getApp().recipes.get("quick-fix")!;
+    const recipe = (await getApp().recipes.get("quick-fix"))!;
     expect(recipe).not.toBeNull();
 
     const instance = instantiateRecipe(recipe, { repo: "/tmp/test", summary: "test agent" });
@@ -74,7 +74,7 @@ describe("recipe use", async () => {
     });
 
     // Agent should be set from the recipe (or null if recipe has no agent)
-    const fetched = getApp().sessions.get(session.id)!;
+    const fetched = (await getApp().sessions.get(session.id))!;
     if (recipe.agent) {
       expect(fetched.agent).toBe(recipe.agent);
     } else {
@@ -90,7 +90,7 @@ describe("recipe use", async () => {
       agent: "worker",
     });
 
-    const fetched = getApp().sessions.get(session.id)!;
+    const fetched = (await getApp().sessions.get(session.id))!;
     expect(fetched.agent).toBe("worker");
   });
 
@@ -101,7 +101,7 @@ describe("recipe use", async () => {
       flow: "bare",
     });
 
-    const fetched = getApp().sessions.get(session.id)!;
+    const fetched = (await getApp().sessions.get(session.id))!;
     expect(fetched.agent).toBeNull();
   });
 });

@@ -50,7 +50,7 @@ describe("dispatch compute: worktree creation", async () => {
     // Create an initial commit so the worktree can branch
     execFileSync("git", ["-C", repoDir, "commit", "--allow-empty", "-m", "init"], { stdio: "pipe" });
 
-    const session = getApp().sessions.create({ summary: "worktree-test", repo: repoDir, workdir: repoDir });
+    const session = await getApp().sessions.create({ summary: "worktree-test", repo: repoDir, workdir: repoDir });
 
     // Simulate what launchAgentTmux checks:
     // isLocal = no compute or compute.provider === "local"
@@ -70,7 +70,7 @@ describe("dispatch compute: worktree creation", async () => {
   it("does NOT create worktree for EC2 compute", async () => {
     // Register an EC2 compute in the store
     await app.computes.create({ name: "my-ec2", provider: "ec2", config: { ip: "1.2.3.4" } });
-    const session = getApp().sessions.create({ summary: "ec2-test", compute_name: "my-ec2" });
+    const session = await getApp().sessions.create({ summary: "ec2-test", compute_name: "my-ec2" });
 
     const compute = await app.computes.get(session.compute_name!);
     expect(compute).not.toBeNull();
@@ -89,7 +89,7 @@ describe("dispatch compute: worktree creation", async () => {
     execFileSync("git", ["init", repoDir], { stdio: "pipe" });
     execFileSync("git", ["-C", repoDir, "commit", "--allow-empty", "-m", "init"], { stdio: "pipe" });
 
-    const session = getApp().sessions.create({
+    const session = await getApp().sessions.create({
       summary: "no-worktree-test",
       repo: repoDir,
       workdir: repoDir,
@@ -109,11 +109,11 @@ describe("dispatch compute: worktree creation", async () => {
 // ── Hook and channel config writing ──────────────────────────────────────────
 
 describe("dispatch compute: config file writing", () => {
-  it("writes .claude/settings.local.json (hooks config) to the working directory", () => {
+  it("writes .claude/settings.local.json (hooks config) to the working directory", async () => {
     const workdir = join(app.config.arkDir, "workdir-hooks");
     mkdirSync(workdir, { recursive: true });
 
-    const session = getApp().sessions.create({ summary: "hooks-config-test" });
+    const session = await getApp().sessions.create({ summary: "hooks-config-test" });
     const conductorUrl = "http://localhost:19100";
 
     const settingsPath = claude.writeSettings(session.id, conductorUrl, workdir);
@@ -144,11 +144,11 @@ describe("dispatch compute: config file writing", () => {
     expect(stopHook.hooks[0].command).toContain(conductorUrl);
   });
 
-  it("writes .mcp.json (channel config) to the working directory", () => {
+  it("writes .mcp.json (channel config) to the working directory", async () => {
     const workdir = join(app.config.arkDir, "workdir-mcp");
     mkdirSync(workdir, { recursive: true });
 
-    const session = getApp().sessions.create({ summary: "mcp-config-test" });
+    const session = await getApp().sessions.create({ summary: "mcp-config-test" });
     const channelPort = 19250;
 
     const mcpPath = claude.writeChannelConfig(session.id, "work", channelPort, workdir);
@@ -163,11 +163,11 @@ describe("dispatch compute: config file writing", () => {
     expect(channelConfig).toBeTruthy();
   });
 
-  it("hooks config: PreToolUse is sync, all others are async", () => {
+  it("hooks config: PreToolUse is sync, all others are async", async () => {
     const workdir = join(app.config.arkDir, "workdir-async-hooks");
     mkdirSync(workdir, { recursive: true });
 
-    const session = getApp().sessions.create({ summary: "async-hooks-test" });
+    const session = await getApp().sessions.create({ summary: "async-hooks-test" });
     claude.writeSettings(session.id, "http://localhost:19100", workdir);
 
     const settingsPath = join(workdir, ".claude", "settings.local.json");
@@ -186,11 +186,11 @@ describe("dispatch compute: config file writing", () => {
     }
   });
 
-  it("writeSettings is idempotent (can be called twice)", () => {
+  it("writeSettings is idempotent (can be called twice)", async () => {
     const workdir = join(app.config.arkDir, "workdir-idempotent");
     mkdirSync(workdir, { recursive: true });
 
-    const session = getApp().sessions.create({ summary: "idempotent-test" });
+    const session = await getApp().sessions.create({ summary: "idempotent-test" });
     const url = "http://localhost:19100";
 
     claude.writeSettings(session.id, url, workdir);
@@ -208,24 +208,24 @@ describe("dispatch compute: config file writing", () => {
 // ── Session defaults at creation ─────────────────────────────────────────────
 
 describe("dispatch compute: session creation defaults", async () => {
-  it("session starts with no session_id (tmux name)", () => {
-    const session = getApp().sessions.create({ summary: "defaults-test" });
+  it("session starts with no session_id (tmux name)", async () => {
+    const session = await getApp().sessions.create({ summary: "defaults-test" });
     expect(session.session_id).toBeNull();
   });
 
-  it("session starts with no claude_session_id", () => {
-    const session = getApp().sessions.create({ summary: "defaults-test" });
+  it("session starts with no claude_session_id", async () => {
+    const session = await getApp().sessions.create({ summary: "defaults-test" });
     expect(session.claude_session_id).toBeNull();
   });
 
   it("session stores compute_name when specified", async () => {
     await app.computes.create({ name: "test-compute", provider: "ec2" });
-    const session = getApp().sessions.create({ summary: "compute-name-test", compute_name: "test-compute" });
+    const session = await getApp().sessions.create({ summary: "compute-name-test", compute_name: "test-compute" });
     expect(session.compute_name).toBe("test-compute");
   });
 
-  it("session workdir is stored correctly", () => {
-    const session = getApp().sessions.create({ summary: "workdir-test", workdir: "/tmp/my-project" });
+  it("session workdir is stored correctly", async () => {
+    const session = await getApp().sessions.create({ summary: "workdir-test", workdir: "/tmp/my-project" });
     expect(session.workdir).toBe("/tmp/my-project");
   });
 });

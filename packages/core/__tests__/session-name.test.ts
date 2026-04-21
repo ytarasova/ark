@@ -82,7 +82,7 @@ describe("session name in core (E2E)", async () => {
       flow: "bare",
     });
 
-    const stored = getApp().sessions.get(session.id)!;
+    const stored = (await getApp().sessions.get(session.id))!;
     expect(stored.summary).toBe("my test session");
   });
 
@@ -92,14 +92,14 @@ describe("session name in core (E2E)", async () => {
       flow: "bare",
     });
 
-    const stored = getApp().sessions.get(session.id)!;
+    const stored = (await getApp().sessions.get(session.id))!;
     expect(stored.summary).toBe("fix: auth module (v2)");
   });
 
   it("stores empty summary as null", async () => {
     const session = await startSession(app, { flow: "bare" });
 
-    const stored = getApp().sessions.get(session.id)!;
+    const stored = (await getApp().sessions.get(session.id))!;
     expect(stored.summary).toBeNull();
   });
 
@@ -110,7 +110,7 @@ describe("session name in core (E2E)", async () => {
       flow: "bare",
     });
 
-    const stored = getApp().sessions.get(session.id)!;
+    const stored = (await getApp().sessions.get(session.id))!;
     expect(stored.summary).toBe(longName);
     expect(stored.summary!.length).toBe(200);
   });

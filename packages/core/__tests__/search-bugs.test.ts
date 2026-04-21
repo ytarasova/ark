@@ -40,7 +40,7 @@ describe("indexTranscripts transaction safety", async () => {
     const count1 = await indexTranscripts(getApp(), { transcriptsDir });
     expect(count1).toBe(2);
 
-    const stats1 = getIndexStats(getApp());
+    const stats1 = await getIndexStats(getApp());
     expect(stats1.entries).toBe(2);
   });
 
@@ -64,7 +64,7 @@ describe("indexTranscripts transaction safety", async () => {
 
     // Data should be committed and queryable
     const db = getApp().db;
-    const row = db.prepare("SELECT COUNT(*) as c FROM transcript_index").get() as { c: number } | undefined;
+    const row = (await db.prepare("SELECT COUNT(*) as c FROM transcript_index").get()) as { c: number } | undefined;
     expect(row.c).toBeGreaterThan(0);
   });
 });
@@ -72,16 +72,16 @@ describe("indexTranscripts transaction safety", async () => {
 // ── ftsTableExists ──────────────────────────────────────────────────────────
 
 describe("ftsTableExists", () => {
-  it("returns true when transcript_index table exists", () => {
+  it("returns true when transcript_index table exists", async () => {
     // The test context creates the schema including the FTS5 table
-    expect(ftsTableExists(getApp())).toBe(true);
+    expect(await ftsTableExists(getApp())).toBe(true);
   });
 
-  it("returns false when table does not exist", () => {
+  it("returns false when table does not exist", async () => {
     // Drop the table and check
     const db = getApp().db;
-    db.exec("DROP TABLE IF EXISTS transcript_index");
-    expect(ftsTableExists(getApp())).toBe(false);
+    await db.exec("DROP TABLE IF EXISTS transcript_index");
+    expect(await ftsTableExists(getApp())).toBe(false);
   });
 });
 

@@ -76,9 +76,7 @@ export class LedgerRepository {
 
   async load(conductorId: string): Promise<Ledger> {
     const rows = (await this.db
-      .prepare(
-        "SELECT * FROM ledger_entries WHERE conductor_id = ? AND tenant_id = ? ORDER BY created_at ASC, id ASC",
-      )
+      .prepare("SELECT * FROM ledger_entries WHERE conductor_id = ? AND tenant_id = ? ORDER BY created_at ASC, id ASC")
       .all(conductorId, this.tenantId)) as LedgerEntryRow[];
     const entries = rows.map(rowToEntry);
     const stallCount = entries.filter((e) => e.type === "stall").length;
@@ -128,9 +126,7 @@ export class LedgerRepository {
     updates: Partial<Pick<LedgerEntry, "type" | "content" | "status" | "sessionId">>,
   ): Promise<void> {
     const existing = (await this.db
-      .prepare(
-        "SELECT * FROM ledger_entries WHERE id = ? AND conductor_id = ? AND tenant_id = ?",
-      )
+      .prepare("SELECT * FROM ledger_entries WHERE id = ? AND conductor_id = ? AND tenant_id = ?")
       .get(entryId, conductorId, this.tenantId)) as LedgerEntryRow | undefined;
     if (!existing) return;
     const merged: LedgerEntryRow = {
@@ -179,9 +175,7 @@ export class LedgerRepository {
     if (!stalled) return false;
 
     const stallCountRow = (await this.db
-      .prepare(
-        "SELECT COUNT(*) AS c FROM ledger_entries WHERE conductor_id = ? AND tenant_id = ? AND type = 'stall'",
-      )
+      .prepare("SELECT COUNT(*) AS c FROM ledger_entries WHERE conductor_id = ? AND tenant_id = ? AND type = 'stall'")
       .get(conductorId, this.tenantId)) as { c: number };
     if (stallCountRow.c === 0) {
       await this.addEntry(conductorId, "stall", `No progress for ${thresholdMinutes} minutes`);
@@ -195,9 +189,7 @@ export class LedgerRepository {
     if (ledger.entries.length === 0) return "";
 
     const facts = ledger.entries.filter((e) => e.type === "fact").map((e) => `- ${e.content}`);
-    const plan = ledger.entries
-      .filter((e) => e.type === "plan_step")
-      .map((e) => `- [${e.status}] ${e.content}`);
+    const plan = ledger.entries.filter((e) => e.type === "plan_step").map((e) => `- [${e.status}] ${e.content}`);
     const recent = ledger.entries.slice(-5).map((e) => `- [${e.type}] ${e.content}`);
 
     let out = "\n## Task Ledger\n";

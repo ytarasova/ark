@@ -21,8 +21,8 @@ beforeEach(async () => {
 });
 
 describe("buildContext", async () => {
-  it("returns empty package for empty store", () => {
-    const ctx = buildContext(store, "fix the login bug");
+  it("returns empty package for empty store", async () => {
+    const ctx = await buildContext(store, "fix the login bug");
     expect(ctx.files).toEqual([]);
     expect(ctx.memories).toEqual([]);
     expect(ctx.sessions).toEqual([]);
@@ -46,7 +46,7 @@ describe("buildContext", async () => {
       metadata: { importance: 0.5, scope: "global" },
     });
 
-    const ctx = buildContext(store, "fix authentication token issue");
+    const ctx = await buildContext(store, "fix authentication token issue");
     expect(ctx.memories.length).toBeGreaterThanOrEqual(1);
     const authMemory = ctx.memories.find((m) => m.content.includes("authentication token"));
     expect(authMemory).not.toBeUndefined();
@@ -68,7 +68,7 @@ describe("buildContext", async () => {
     });
     await store.addEdge(fileA, fileB, "imports");
 
-    const ctx = buildContext(store, "update auth", { files: ["src/auth.ts"] });
+    const ctx = await buildContext(store, "update auth", { files: ["src/auth.ts"] });
     // Should include src/session.ts as a neighbor of src/auth.ts
     const sessionFile = ctx.files.find((f) => f.path === "src/session.ts");
     expect(sessionFile).not.toBeUndefined();
@@ -90,7 +90,7 @@ describe("buildContext", async () => {
       metadata: { outcome: "success", files_changed: ["src/login.ts"] },
     });
 
-    const ctx = buildContext(store, "fix login bug", { sessionId: "s-current" });
+    const ctx = await buildContext(store, "fix login bug", { sessionId: "s-current" });
     const sessionIds = ctx.sessions.map((s) => s.id);
     expect(sessionIds).not.toContain("s-current");
     // Past session may or may not be found depending on search match, but current should never appear
@@ -117,7 +117,7 @@ describe("buildContext", async () => {
     await store.addEdge("file:src/b.ts", "file:src/utils.ts", "imports");
     await store.addEdge("file:src/utils.ts", "session:s-old", "modified_by");
 
-    const ctx = buildContext(store, "update utility functions");
+    const ctx = await buildContext(store, "update utility functions");
     const utilsFile = ctx.files.find((f) => f.path === "src/utils.ts");
     expect(utilsFile).not.toBeUndefined();
     expect(utilsFile!.language).toBe("typescript");
@@ -149,7 +149,7 @@ describe("buildContext", async () => {
       metadata: { importance: 0.6, scope: "global" },
     });
 
-    const ctx = buildContext(store, "test memory importance");
+    const ctx = await buildContext(store, "test memory importance");
     expect(ctx.memories.length).toBeGreaterThanOrEqual(2);
     // Verify sorted by importance descending
     for (let i = 1; i < ctx.memories.length; i++) {
@@ -169,7 +169,7 @@ describe("buildContext", async () => {
       });
     }
 
-    const ctx = buildContext(store, "bulk test content number", { limit: 5 });
+    const ctx = await buildContext(store, "bulk test content number", { limit: 5 });
     expect(ctx.memories.length).toBeLessThanOrEqual(5);
   });
 
@@ -181,7 +181,7 @@ describe("buildContext", async () => {
       content: "Tests must run sequentially to avoid port collisions",
     });
 
-    const ctx = buildContext(store, "run tests sequentially");
+    const ctx = await buildContext(store, "run tests sequentially");
     const found = ctx.learnings.find((l) => l.title === "Sequential Testing Required");
     expect(found).not.toBeUndefined();
     expect(found!.description).toContain("port collisions");

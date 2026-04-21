@@ -418,12 +418,7 @@ export class Conductor {
 
     if (result.newStatus) {
       try {
-        await app.ledger.addEntry(
-          "default",
-          "progress",
-          `Session ${sessionId} status: ${result.newStatus}`,
-          sessionId,
-        );
+        await app.ledger.addEntry("default", "progress", `Session ${sessionId} status: ${result.newStatus}`, sessionId);
       } catch {
         logDebug("conductor", "skip ledger on error");
       }

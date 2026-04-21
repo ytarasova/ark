@@ -102,17 +102,17 @@ describe("messaging handlers", async () => {
     const sessionId = await createSession("markread-test");
 
     // Add agent messages (only agent messages count as unread)
-    app.messages.send(sessionId, "agent", "msg 1", "text");
-    app.messages.send(sessionId, "agent", "msg 2", "text");
+    await app.messages.send(sessionId, "agent", "msg 1", "text");
+    await app.messages.send(sessionId, "agent", "msg 2", "text");
 
-    expect(app.messages.unreadCount(sessionId)).toBe(2);
+    expect(await app.messages.unreadCount(sessionId)).toBe(2);
 
     // Mark read via RPC
     const res = await router.dispatch(createRequest(1, "message/markRead", { sessionId }));
     const result = (res as JsonRpcResponse).result as Record<string, any>;
     expect(result.ok).toBe(true);
 
-    expect(app.messages.unreadCount(sessionId)).toBe(0);
+    expect(await app.messages.unreadCount(sessionId)).toBe(0);
   });
 
   it("session/messages returns empty array for session with no messages", async () => {

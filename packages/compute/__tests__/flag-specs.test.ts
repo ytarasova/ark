@@ -138,9 +138,12 @@ describe("k8s flag spec", () => {
     ]);
   });
 
-  it("displaySummary falls back to defaults when config is empty", () => {
+  it("displaySummary renders no lines when config is empty (no silent defaults)", () => {
+    // Upstream intentionally removed default Namespace/Image so a misconfigured
+    // compute target fails at create time rather than provisioning into the wrong
+    // cluster. See commit 91217e89.
     const lines = k8sFlagSpec.displaySummary({}, {});
-    expect(lines).toEqual(["  Namespace:  ark", "  Image:      ubuntu:22.04"]);
+    expect(lines).toEqual([]);
   });
 });
 

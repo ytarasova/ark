@@ -102,18 +102,10 @@ export interface ComputeBootstrapCapability {
  */
 export interface MigrationsCapability {
   readonly dialect: "sqlite" | "postgres";
-  apply(
-    db: import("../database/index.js").IDatabase,
-    opts?: { targetVersion?: number },
-  ): Promise<void>;
-  status(
-    db: import("../database/index.js").IDatabase,
-  ): Promise<import("../migrations/types.js").MigrationStatus>;
+  apply(db: import("../database/index.js").IDatabase, opts?: { targetVersion?: number }): Promise<void>;
+  status(db: import("../database/index.js").IDatabase): Promise<import("../migrations/types.js").MigrationStatus>;
   /** Phase 1: rejects with "not implemented". Stubbed so the CLI compiles. */
-  down(
-    db: import("../database/index.js").IDatabase,
-    opts: { targetVersion: number },
-  ): Promise<never>;
+  down(db: import("../database/index.js").IDatabase, opts: { targetVersion: number }): Promise<never>;
 }
 
 /**
@@ -137,17 +129,13 @@ export interface DatabaseMode {
  * `app.ts` can compute it once at boot (before the container is built and
  * `buildAppMode` runs) and hand the same object to `buildAppMode`.
  */
-export function resolveDatabaseMode(config: {
-  databaseUrl?: string;
-  database?: { url?: string };
-}): DatabaseMode {
+export function resolveDatabaseMode(config: { databaseUrl?: string; database?: { url?: string } }): DatabaseMode {
   const raw = config.database?.url ?? config.databaseUrl ?? null;
   // Normalise empty strings to null so callers get a consistent "no URL"
   // signal -- otherwise `!!url` passes on "" and `startsWith` returns false,
   // but `url` is then still "" which is a footgun for downstream loggers.
   const url = raw && raw.length > 0 ? raw : null;
-  const isPostgres =
-    !!url && (url.startsWith("postgres://") || url.startsWith("postgresql://"));
+  const isPostgres = !!url && (url.startsWith("postgres://") || url.startsWith("postgresql://"));
   return { dialect: isPostgres ? "postgres" : "sqlite", url };
 }
 
@@ -177,9 +165,7 @@ export interface TenantResolverInput {
   validateToken: (token: string) => Promise<{ tenantId: string } | null>;
 }
 
-export type TenantResolverResult =
-  | { ok: true; tenantId: string }
-  | { ok: false; status: number; error: string };
+export type TenantResolverResult = { ok: true; tenantId: string } | { ok: false; status: number; error: string };
 
 // ── AppMode contract ───────────────────────────────────────────────────────
 

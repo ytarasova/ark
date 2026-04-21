@@ -88,7 +88,7 @@ describe("session/fan-out handler", async () => {
     expect(result.ok).toBe(true);
     const childIds = result.childIds as string[];
 
-    const summaries = childIds.map(async (id) => (await app.sessions.get(id))?.summary);
+    const summaries = await Promise.all(childIds.map(async (id) => (await app.sessions.get(id))?.summary));
     expect(summaries).toContain("first task");
     expect(summaries).toContain("second task");
   });

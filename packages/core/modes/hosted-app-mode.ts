@@ -8,12 +8,7 @@
  * with a consistent `RpcError` via the shared wrapper.
  */
 
-import type {
-  AppMode,
-  ComputeBootstrapCapability,
-  DatabaseMode,
-  TenantResolverCapability,
-} from "./app-mode.js";
+import type { AppMode, ComputeBootstrapCapability, DatabaseMode, TenantResolverCapability } from "./app-mode.js";
 import { resolveBearerAuth } from "./app-mode.js";
 import { buildMigrationsCapability } from "./migrations-capability.js";
 

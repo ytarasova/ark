@@ -39,12 +39,12 @@ function writeUserFlow(name: string, def: Record<string, unknown>): void {
   writeFileSync(join(dir, `${name}.yaml`), YAML.stringify(def));
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   // Clean user flows dir so each test starts fresh
   rmSync(flowDir(), { recursive: true, force: true });
   // Clean templates
-  for (const t of app.computeTemplates.list()) {
-    app.computeTemplates.delete(t.name);
+  for (const t of await app.computeTemplates.list()) {
+    await app.computeTemplates.delete(t.name);
   }
 });
 
@@ -97,28 +97,28 @@ describe("StageDefinition compute_template field", () => {
 // ── resolveComputeForStage ─────────────────────────────────────────────────
 
 describe("resolveComputeForStage", async () => {
-  it("returns null when stageDef is null", () => {
-    const result = resolveComputeForStage(app, null, "s-test");
+  it("returns null when stageDef is null", async () => {
+    const result = await resolveComputeForStage(app, null, "s-test");
     expect(result).toBeNull();
   });
 
-  it("returns null when stage has no compute_template", () => {
+  it("returns null when stage has no compute_template", async () => {
     const stageDef = { name: "work", gate: "auto" as const };
-    const result = resolveComputeForStage(app, stageDef, "s-test");
+    const result = await resolveComputeForStage(app, stageDef, "s-test");
     expect(result).toBeNull();
   });
 
-  it("returns null when template is not found in DB or config", () => {
+  it("returns null when template is not found in DB or config", async () => {
     const logs: string[] = [];
     const stageDef = { name: "work", gate: "auto" as const, compute_template: "nonexistent" };
-    const result = resolveComputeForStage(app, stageDef, "s-test", (m) => logs.push(m));
+    const result = await resolveComputeForStage(app, stageDef, "s-test", (m) => logs.push(m));
     expect(result).toBeNull();
     expect(logs.some((l) => l.includes("not found"))).toBe(true);
   });
 
   it("provisions compute from DB template when no existing compute", async () => {
     // Create a template in DB
-    app.computeTemplates.create({
+    await app.computeTemplates.create({
       name: "fast-docker",
       provider: "docker",
       config: { image: "node:20" },
@@ -128,7 +128,7 @@ describe("resolveComputeForStage", async () => {
     const stageDef = { name: "implement", gate: "auto" as const, compute_template: "fast-docker" };
     const logs: string[] = [];
 
-    const result = resolveComputeForStage(app, stageDef, session.id, (m) => logs.push(m));
+    const result = await resolveComputeForStage(app, stageDef, session.id, (m) => logs.push(m));
     expect(result).toBe("fast-docker");
 
     // Verify compute was created
@@ -148,7 +148,7 @@ describe("resolveComputeForStage", async () => {
 
   it("reuses existing compute when it matches template name", async () => {
     // Create template and a matching compute
-    app.computeTemplates.create({
+    await app.computeTemplates.create({
       name: "existing-compute",
       provider: "ec2",
       config: { size: "xl" },
@@ -159,7 +159,7 @@ describe("resolveComputeForStage", async () => {
     const stageDef = { name: "work", gate: "auto" as const, compute_template: "existing-compute" };
     const logs: string[] = [];
 
-    const result = resolveComputeForStage(app, stageDef, session.id, (m) => logs.push(m));
+    const result = await resolveComputeForStage(app, stageDef, session.id, (m) => logs.push(m));
     expect(result).toBe("existing-compute");
     expect(logs.some((l) => l.includes("existing compute"))).toBe(true);
 
@@ -179,7 +179,7 @@ describe("resolveComputeForStage", async () => {
     const session = await app.sessions.create({ summary: "config-test" });
     const stageDef = { name: "build", gate: "auto" as const, compute_template: "config-tmpl" };
 
-    const result = resolveComputeForStage(app, stageDef, session.id);
+    const result = await resolveComputeForStage(app, stageDef, session.id);
     expect(result).toBe("config-tmpl");
 
     // Verify compute was created from config template

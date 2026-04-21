@@ -47,20 +47,20 @@ function makeGhOutput(overrides: Record<string, any> = {}): string {
   });
 }
 
-function createReviewSession(
+async function createReviewSession(
   opts: { pr_url?: string; status?: string; flow?: string; stage?: string; config?: Record<string, any> } = {},
-): store.Session {
-  const session = getApp().sessions.create({
+): Promise<any> {
+  const session = await getApp().sessions.create({
     summary: "test pr poller",
     flow: opts.flow ?? "review-flow",
   });
-  getApp().sessions.update(session.id, {
+  await getApp().sessions.update(session.id, {
     pr_url: opts.pr_url ?? "https://github.com/org/repo/pull/42",
     status: opts.status ?? "running",
     stage: opts.stage ?? "review",
     config: opts.config ?? {},
   });
-  return getApp().sessions.get(session.id)!;
+  return (await getApp().sessions.get(session.id))!;
 }
 
 beforeEach(() => {
@@ -91,21 +91,21 @@ beforeEach(() => {
 
 describe("pollPRReviews", async () => {
   it("skips sessions without pr_url", async () => {
-    const session = getApp().sessions.create({ summary: "no pr", flow: "review-flow" });
-    getApp().sessions.update(session.id, { status: "running", stage: "review" });
+    const session = await getApp().sessions.create({ summary: "no pr", flow: "review-flow" });
+    await getApp().sessions.update(session.id, { status: "running", stage: "review" });
     // No pr_url set
 
     await pollPRReviews(getApp());
 
     // Should not have created any pr_ events
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const prEvents = events.filter((e) => e.type.startsWith("pr_"));
     expect(prEvents).toHaveLength(0);
   });
 
   it("skips sessions not in review-gated stage", async () => {
-    const session = getApp().sessions.create({ summary: "wrong stage", flow: "review-flow" });
-    getApp().sessions.update(session.id, {
+    const session = await getApp().sessions.create({ summary: "wrong stage", flow: "review-flow" });
+    await getApp().sessions.update(session.id, {
       pr_url: "https://github.com/org/repo/pull/99",
       status: "running",
       stage: "implement", // auto gate, not review
@@ -113,13 +113,13 @@ describe("pollPRReviews", async () => {
 
     await pollPRReviews(getApp());
 
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const prEvents = events.filter((e) => e.type.startsWith("pr_"));
     expect(prEvents).toHaveLength(0);
   });
 
   it("respects 60-second cooldown", async () => {
-    const session = createReviewSession({
+    const session = await createReviewSession({
       config: {
         last_review_check: new Date().toISOString(), // just checked
       },
@@ -135,7 +135,7 @@ describe("pollPRReviews", async () => {
     await pollPRReviews(getApp());
 
     // Should have been skipped due to cooldown - no pr_approved event
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const approvals = events.filter((e) => e.type === "pr_approved");
     expect(approvals).toHaveLength(0);
   });
@@ -145,7 +145,7 @@ describe("pollPRReviews", async () => {
 
 describe("checkSessionPR", async () => {
   it("detects new approval and logs pr_approved event", async () => {
-    const session = createReviewSession();
+    const session = await createReviewSession();
 
     execFileResult = {
       stdout: makeGhOutput({
@@ -156,7 +156,7 @@ describe("checkSessionPR", async () => {
 
     await checkSessionPR(getApp(), session);
 
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const approvals = events.filter((e) => e.type === "pr_approved");
     expect(approvals).toHaveLength(1);
 
@@ -165,7 +165,7 @@ describe("checkSessionPR", async () => {
   });
 
   it("detects changes_requested and stores feedback message", async () => {
-    const session = createReviewSession();
+    const session = await createReviewSession();
 
     execFileResult = {
       stdout: makeGhOutput({
@@ -184,49 +184,49 @@ describe("checkSessionPR", async () => {
     await checkSessionPR(getApp(), session);
 
     // Should have logged pr_review_feedback event
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const feedback = events.filter((e) => e.type === "pr_review_feedback");
     expect(feedback).toHaveLength(1);
 
     // Should have stored a message
-    const messages = getApp().messages.list(session.id);
+    const messages = await getApp().messages.list(session.id);
     const systemMsgs = messages.filter((m) => m.role === "system");
     expect(systemMsgs.length).toBeGreaterThanOrEqual(1);
     expect(systemMsgs[systemMsgs.length - 1].content).toContain("Fix the error handling");
   });
 
   it("handles gh CLI errors gracefully", async () => {
-    const session = createReviewSession();
+    const session = await createReviewSession();
     execFileShouldThrow = true;
 
     // Should not throw
     await checkSessionPR(getApp(), session);
 
     // No events should have been created
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const prEvents = events.filter((e) => e.type.startsWith("pr_"));
     expect(prEvents).toHaveLength(0);
   });
 
   it("handles empty reviews array", async () => {
-    const session = createReviewSession();
+    const session = await createReviewSession();
     execFileResult = { stdout: makeGhOutput({ reviews: [] }), stderr: "" };
 
     await checkSessionPR(getApp(), session);
 
     // Only timestamp update, no review events
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const prEvents = events.filter((e) => e.type.startsWith("pr_"));
     expect(prEvents).toHaveLength(0);
   });
 
   it("logs pr_status event when PR is merged", async () => {
-    const session = createReviewSession();
+    const session = await createReviewSession();
     execFileResult = { stdout: makeGhOutput({ state: "MERGED", reviews: [] }), stderr: "" };
 
     await checkSessionPR(getApp(), session);
 
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const statusEvents = events.filter((e) => e.type === "pr_status");
     expect(statusEvents).toHaveLength(1);
 
@@ -235,7 +235,7 @@ describe("checkSessionPR", async () => {
   });
 
   it("skips already-seen reviews based on review_count", async () => {
-    const session = createReviewSession({
+    const session = await createReviewSession({
       config: {
         review_count: 1,
         last_review_time: "2026-03-27T11:00:00Z",
@@ -253,7 +253,7 @@ describe("checkSessionPR", async () => {
     await checkSessionPR(getApp(), session);
 
     // Should not create pr_approved because review_count hasn't increased
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const approvals = events.filter((e) => e.type === "pr_approved");
     expect(approvals).toHaveLength(0);
   });
@@ -299,7 +299,7 @@ describe("fetchPRReviews", async () => {
 
 describe("processReviewFeedback", async () => {
   it("skips when no new reviews detected", async () => {
-    const session = createReviewSession();
+    const session = await createReviewSession();
     const config = { review_count: 1, last_review_time: "2026-03-27T12:00:00Z" };
     const data = {
       title: "PR",
@@ -310,13 +310,13 @@ describe("processReviewFeedback", async () => {
 
     await processReviewFeedback(getApp(), session, data, config);
 
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const prEvents = events.filter((e) => e.type.startsWith("pr_"));
     expect(prEvents).toHaveLength(0);
   });
 
   it("logs pr_approved event for new approval", async () => {
-    const session = createReviewSession();
+    const session = await createReviewSession();
     const config = { review_count: 0, last_review_time: "" };
     const data = {
       title: "PR",
@@ -327,13 +327,13 @@ describe("processReviewFeedback", async () => {
 
     await processReviewFeedback(getApp(), session, data, config);
 
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const approvals = events.filter((e) => e.type === "pr_approved");
     expect(approvals).toHaveLength(1);
   });
 
   it("stores feedback message for changes_requested", async () => {
-    const session = createReviewSession({ status: "blocked" });
+    const session = await createReviewSession({ status: "blocked" });
     const config = { review_count: 0, last_review_time: "" };
     const data = {
       title: "Fix bug",
@@ -351,18 +351,18 @@ describe("processReviewFeedback", async () => {
 
     await processReviewFeedback(getApp(), session, data, config);
 
-    const events = getApp().events.list(session.id);
+    const events = await getApp().events.list(session.id);
     const feedback = events.filter((e) => e.type === "pr_review_feedback");
     expect(feedback).toHaveLength(1);
 
     // Should have stored a message
-    const messages = getApp().messages.list(session.id);
+    const messages = await getApp().messages.list(session.id);
     const systemMsgs = messages.filter((m) => m.role === "system");
     expect(systemMsgs.length).toBeGreaterThanOrEqual(1);
   });
 
   it("updates session config with review count", async () => {
-    const session = createReviewSession();
+    const session = await createReviewSession();
     const config = { review_count: 0, last_review_time: "" };
     const data = {
       title: "PR",
@@ -373,7 +373,7 @@ describe("processReviewFeedback", async () => {
 
     await processReviewFeedback(getApp(), session, data, config);
 
-    const updated = getApp().sessions.get(session.id)!;
+    const updated = (await getApp().sessions.get(session.id))!;
     const updatedConfig = updated.config as Record<string, any>;
     expect(updatedConfig.review_count).toBe(1);
   });

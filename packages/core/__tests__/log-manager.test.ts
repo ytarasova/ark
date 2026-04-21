@@ -40,33 +40,33 @@ describe("log manager", () => {
 });
 
 describe("cleanupLogs", () => {
-  it("returns zeros when log directory does not exist", () => {
-    const result = cleanupLogs(getApp());
+  it("returns zeros when log directory does not exist", async () => {
+    const result = await cleanupLogs(getApp());
     expect(result).toEqual({ truncated: 0, removed: 0 });
   });
 
-  it("removes orphaned log files for sessions that no longer exist", () => {
+  it("removes orphaned log files for sessions that no longer exist", async () => {
     const dir = logDir(getApp());
     mkdirSync(dir, { recursive: true });
 
     // Create a session so we know its ID format
-    const session = getApp().sessions.create({ summary: "keep me" });
+    const session = await getApp().sessions.create({ summary: "keep me" });
 
     // Write a log for the real session and a fake one
     writeFileSync(join(dir, `ark-${session.id}.log`), "real log");
     writeFileSync(join(dir, `ark-s-deadbeef.log`), "orphan log");
 
-    const result = cleanupLogs(getApp(), { removeOrphans: true });
+    const result = await cleanupLogs(getApp(), { removeOrphans: true });
     expect(result.removed).toBe(1);
     expect(existsSync(join(dir, `ark-${session.id}.log`))).toBe(true);
     expect(existsSync(join(dir, `ark-s-deadbeef.log`))).toBe(false);
   });
 
-  it("truncates oversized log files", () => {
+  it("truncates oversized log files", async () => {
     const dir = logDir(getApp());
     mkdirSync(dir, { recursive: true });
 
-    const session = getApp().sessions.create({ summary: "large log" });
+    const session = await getApp().sessions.create({ summary: "large log" });
     const logPath = join(dir, `ark-${session.id}.log`);
 
     // Create a file that's over 1MB (use small maxSizeMb for testing)
@@ -74,7 +74,7 @@ describe("cleanupLogs", () => {
     writeFileSync(logPath, bigContent);
 
     // Use tiny maxSizeMb so the file counts as oversized
-    const result = cleanupLogs(getApp(), { maxSizeMb: 0.001, maxLines: 100, removeOrphans: false });
+    const result = await cleanupLogs(getApp(), { maxSizeMb: 0.001, maxLines: 100, removeOrphans: false });
     expect(result.truncated).toBe(1);
 
     const after = readFileSync(logPath, "utf-8");

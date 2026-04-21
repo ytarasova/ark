@@ -12,36 +12,36 @@ describe("multi-instance coordination", () => {
     cleanups = [];
   });
 
-  it("registerInstance creates a heartbeat entry", () => {
-    const inst = registerInstance(getApp(), "test-1");
+  it("registerInstance creates a heartbeat entry", async () => {
+    const inst = await registerInstance(getApp(), "test-1");
     cleanups.push(inst.stop);
-    expect(activeInstanceCount(getApp())).toBe(1);
+    expect(await activeInstanceCount(getApp())).toBe(1);
   });
 
-  it("first registered instance is primary", () => {
-    const inst1 = registerInstance(getApp(), "inst-a");
+  it("first registered instance is primary", async () => {
+    const inst1 = await registerInstance(getApp(), "inst-a");
     cleanups.push(inst1.stop);
-    const inst2 = registerInstance(getApp(), "inst-b");
+    const inst2 = await registerInstance(getApp(), "inst-b");
     cleanups.push(inst2.stop);
-    expect(inst1.isPrimary()).toBe(true);
-    expect(inst2.isPrimary()).toBe(false);
+    expect(await inst1.isPrimary()).toBe(true);
+    expect(await inst2.isPrimary()).toBe(false);
   });
 
-  it("stop removes the instance", () => {
-    const inst = registerInstance(getApp(), "inst-stop");
+  it("stop removes the instance", async () => {
+    const inst = await registerInstance(getApp(), "inst-stop");
     inst.stop();
-    expect(activeInstanceCount(getApp())).toBe(0);
+    expect(await activeInstanceCount(getApp())).toBe(0);
   });
 
-  it("multiple instances are counted", () => {
-    const a = registerInstance(getApp(), "a");
-    const b = registerInstance(getApp(), "b");
-    const c = registerInstance(getApp(), "c");
+  it("multiple instances are counted", async () => {
+    const a = await registerInstance(getApp(), "a");
+    const b = await registerInstance(getApp(), "b");
+    const c = await registerInstance(getApp(), "c");
     cleanups.push(a.stop, b.stop, c.stop);
-    expect(activeInstanceCount(getApp())).toBe(3);
+    expect(await activeInstanceCount(getApp())).toBe(3);
   });
 
-  it("activeInstanceCount returns 0 when no instances", () => {
-    expect(activeInstanceCount(getApp())).toBe(0);
+  it("activeInstanceCount returns 0 when no instances", async () => {
+    expect(await activeInstanceCount(getApp())).toBe(0);
   });
 });

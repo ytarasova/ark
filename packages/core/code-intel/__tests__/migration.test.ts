@@ -46,7 +46,7 @@ describe("MigrationRunner", async () => {
   it("seeds the default tenant after migrate", async () => {
     const db = newDb();
     await new MigrationRunner(db, "sqlite").migrate();
-    const tenants = (await db.prepare("SELECT * FROM code_intel_tenants")).all() as any[];
+    const tenants = (await db.prepare("SELECT * FROM code_intel_tenants").all()) as any[];
     expect(tenants.length).toBe(1);
     expect(tenants[0].slug).toBe("default");
     await db.close();

@@ -59,7 +59,7 @@ describe("applyReport error with on_failure retry", async () => {
     const session = await app.sessions.create({ summary: "retry test", flow: "quick" });
     await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
-    const result = applyReport(app, session.id, {
+    const result = await applyReport(app, session.id, {
       type: "error",
       stage: "implement",
       error: "Tests failed",
@@ -77,7 +77,7 @@ describe("applyReport error with on_failure retry", async () => {
     const session = await app.sessions.create({ summary: "no retry test", flow: "quick" });
     await app.sessions.update(session.id, { status: "running", stage: "verify" });
 
-    const result = applyReport(app, session.id, {
+    const result = await applyReport(app, session.id, {
       type: "error",
       stage: "verify",
       error: "Verify failed",
@@ -94,7 +94,7 @@ describe("applyReport error with on_failure retry", async () => {
     const session = await app.sessions.create({ summary: "bare test", flow: "bare" });
     await app.sessions.update(session.id, { status: "running", stage: "work" });
 
-    const result = applyReport(app, session.id, {
+    const result = await applyReport(app, session.id, {
       type: "error",
       stage: "work",
       error: "Something broke",
@@ -109,7 +109,7 @@ describe("applyReport error with on_failure retry", async () => {
     const session = await app.sessions.create({ summary: "progress test", flow: "quick" });
     await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
-    const result = applyReport(app, session.id, {
+    const result = await applyReport(app, session.id, {
       type: "progress",
       stage: "implement",
       message: "Working on it",
@@ -128,7 +128,7 @@ describe("applyHookStatus failure with on_failure retry", async () => {
     await app.sessions.update(session.id, { status: "running", stage: "implement" });
     const fresh = await app.sessions.get(session.id)!;
 
-    const result = applyHookStatus(app, fresh, "StopFailure", {
+    const result = await applyHookStatus(app, fresh, "StopFailure", {
       error: "Agent crashed",
     });
 
@@ -143,7 +143,7 @@ describe("applyHookStatus failure with on_failure retry", async () => {
     await app.sessions.update(session.id, { status: "running", stage: "verify" });
     const fresh = await app.sessions.get(session.id)!;
 
-    const result = applyHookStatus(app, fresh, "StopFailure", {
+    const result = await applyHookStatus(app, fresh, "StopFailure", {
       error: "Agent crashed",
     });
 
@@ -157,7 +157,7 @@ describe("applyHookStatus failure with on_failure retry", async () => {
     await app.sessions.update(session.id, { status: "ready", stage: "implement" });
     const fresh = await app.sessions.get(session.id)!;
 
-    const result = applyHookStatus(app, fresh, "SessionStart", {});
+    const result = await applyHookStatus(app, fresh, "SessionStart", {});
 
     expect(result.newStatus).toBe("running");
     expect(result.shouldRetry).toBeFalsy();
