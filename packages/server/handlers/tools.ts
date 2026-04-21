@@ -47,6 +47,15 @@ export function registerToolsHandlers(router: Router, app: AppContext): void {
         if (projectRoot) core.removeCommand(projectRoot, name as string);
         break;
       case "claude-skill": {
+        // claude-skill files live under the server process's `~/.claude/skills`
+        // (or cwd-relative equivalent). That's single-user / local-only by
+        // construction: in hosted control-plane mode there is no per-tenant
+        // filesystem view on the server, so this RPC either no-ops (wrong
+        // arkDir) or deletes files on the shared container. Gate it on the
+        // `fsCapability` presence check -- it's only populated in local mode.
+        if (!app.mode.fsCapability) {
+          throw new Error("tools/delete kind=claude-skill is not available in hosted mode");
+        }
         if (source && source !== "builtin") {
           if (typeof source !== "string" || !isSafeClaudeSkillPath(source)) {
             throw new Error("Invalid claude-skill source path");

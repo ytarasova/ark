@@ -48,6 +48,7 @@ describe.skipIf(!hasDocker || !hasKey)("TensorZero integration", () => {
 
   test("real API call through TensorZero", async () => {
     manager = new TensorZeroManager({
+      configDir: "/tmp/ark-tz-integration-test",
       anthropicKey: process.env.ANTHROPIC_API_KEY,
     });
 
