@@ -129,24 +129,32 @@ describe("resolveComputeForStage", async () => {
     const logs: string[] = [];
 
     const result = await resolveComputeForStage(app, stageDef, session.id, (m) => logs.push(m));
-    expect(result).toBe("fast-docker");
+    // Upstream adc10203 clones templates with a session-suffixed name so the
+    // GC can tear them down per-session. The resolved name is the clone, not
+    // the source template.
+    expect(result).toMatch(/^fast-docker-/);
 
-    // Verify compute was created
-    const compute = await app.computes.get("fast-docker");
-    expect(compute).not.toBeNull();
-    expect(compute!.provider).toBe("docker");
+    // Verify the clone was created with the template's provider
+    const clone = await app.computes.get(result!);
+    expect(clone).not.toBeNull();
+    expect(clone!.provider).toBe("docker");
 
     // Verify event was logged
     const events = await app.events.list(session.id);
-    const provisionEvent = events.find((e) => e.type === "compute_provisioned_from_template");
+    const provisionEvent = events.find((e) => e.type === "compute_cloned_from_template");
     expect(provisionEvent).toBeDefined();
     expect(provisionEvent!.data?.template).toBe("fast-docker");
 
-    // Clean up
-    await app.computes.delete("fast-docker");
+    // Clean up the clone
+    await app.computes.delete(result!);
   });
 
-  it("reuses existing compute when it matches template name", async () => {
+  // Upstream adc10203 unified compute + templates onto one table with a single
+  // `name` PK, so a concrete compute and a template can't share a name. The
+  // "reuse existing concrete compute" path therefore no longer applies --
+  // templates always clone. Re-enable if the compute PK is widened or the two
+  // row kinds get separated again.
+  it.skip("reuses existing compute when it matches template name", async () => {
     // Create template and a matching compute
     await app.computeTemplates.create({
       name: "existing-compute",
@@ -165,7 +173,7 @@ describe("resolveComputeForStage", async () => {
 
     // Verify no new provision event (reused existing)
     const events = await app.events.list(session.id);
-    const provisionEvent = events.find((e) => e.type === "compute_provisioned_from_template");
+    const provisionEvent = events.find((e) => e.type === "compute_cloned_from_template");
     expect(provisionEvent).toBeUndefined();
 
     await app.computes.delete("existing-compute");
@@ -180,16 +188,17 @@ describe("resolveComputeForStage", async () => {
     const stageDef = { name: "build", gate: "auto" as const, compute_template: "config-tmpl" };
 
     const result = await resolveComputeForStage(app, stageDef, session.id);
-    expect(result).toBe("config-tmpl");
+    // Same session-suffixed clone semantics as above (upstream adc10203).
+    expect(result).toMatch(/^config-tmpl-/);
 
     // Verify compute was created from config template
-    const compute = await app.computes.get("config-tmpl");
+    const compute = await app.computes.get(result!);
     expect(compute).not.toBeNull();
     expect(compute!.provider).toBe("docker");
 
     // Restore config
     app.config.computeTemplates = originalTemplates;
-    await app.computes.delete("config-tmpl");
+    await app.computes.delete(result!);
   });
 });
 

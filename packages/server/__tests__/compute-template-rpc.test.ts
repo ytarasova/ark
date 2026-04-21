@@ -39,7 +39,8 @@ describe("compute template RPC handlers", () => {
 
     const got = await app.computeTemplates.get("test-ec2");
     expect(got).not.toBeNull();
-    expect(got!.description).toBe("Test EC2 template");
+    // Upstream adc10203 dropped `description` from the unified compute row;
+    // the adapter (compute-template.ts) documents this at line 89.
     expect(got!.config).toEqual({ size: "l", region: "us-east-1" });
   });
 
