@@ -79,6 +79,19 @@ export interface HostCommandCapability {
   dockerAction(container: string, action: "stop" | "restart"): Promise<void>;
 }
 
+/**
+ * Default compute targets to seed at first DB init. Local-mode bootstrap
+ * inserts a `local` row (single-user laptop semantics: agents spawn via
+ * tmux on the same host). Hosted-mode bootstrap inserts nothing -- the
+ * operator registers a real compute target (k8s / docker / ec2 / firecracker)
+ * after onboarding. Hosted MUST NOT silently get a `local` row because
+ * "local" inside a control-plane pod means "spawn agents inside the pod
+ * itself" which has no isolation and competes with the control plane.
+ */
+export interface ComputeBootstrapCapability {
+  seed(db: import("../database/index.js").IDatabase): void;
+}
+
 // ── AppMode contract ───────────────────────────────────────────────────────
 
 /**
@@ -95,6 +108,7 @@ export interface AppMode {
   readonly repoMapCapability: RepoMapCapability | null;
   readonly ftsRebuildCapability: FtsRebuildCapability | null;
   readonly hostCommandCapability: HostCommandCapability | null;
+  readonly computeBootstrap: ComputeBootstrapCapability;
 }
 
 // ── Factory (the ONE remaining mode conditional) ───────────────────────────
@@ -118,7 +132,9 @@ export function buildAppMode(config: ArkConfig, app?: AppContext): AppMode {
   if (isHosted) {
     return buildHostedAppMode();
   }
-  return buildLocalAppMode(app);
+  const dialect: "sqlite" | "postgres" =
+    typeof url === "string" && (url.startsWith("postgres://") || url.startsWith("postgresql://")) ? "postgres" : "sqlite";
+  return buildLocalAppMode(app, dialect);
 }
 
 export { buildLocalAppMode, buildHostedAppMode };

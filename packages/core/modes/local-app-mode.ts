@@ -210,7 +210,19 @@ function makeHostCommandCapability(): HostCommandCapability {
  * can run before `AppContext.boot()` wires the knowledge/db cradle entries
  * (tests + container-building callers).
  */
-export function buildLocalAppMode(app?: AppContext): AppMode {
+function makeLocalComputeBootstrap(dialect: "sqlite" | "postgres"): ComputeBootstrapCapability {
+  return {
+    seed(db) {
+      // Local mode: agents run on the same host as ark via tmux. Seed the
+      // canonical `local` compute target so a fresh laptop install works
+      // without any operator action.
+      if (dialect === "postgres") seedLocalComputePostgres(db);
+      else seedLocalCompute(db);
+    },
+  };
+}
+
+export function buildLocalAppMode(app?: AppContext, dialect: "sqlite" | "postgres" = "sqlite"): AppMode {
   const fsCapability = makeFsCapability();
   const mcpDirCapability = makeMcpDirCapability();
   const repoMapCapability = makeRepoMapCapability();
@@ -225,5 +237,6 @@ export function buildLocalAppMode(app?: AppContext): AppMode {
     repoMapCapability,
     ftsRebuildCapability,
     hostCommandCapability,
+    computeBootstrap: makeLocalComputeBootstrap(dialect),
   };
 }

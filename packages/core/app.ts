@@ -27,7 +27,7 @@ import type { ComputeProvider } from "../compute/types.js";
 import type { Compute as NewCompute, Runtime as NewRuntime, ComputeKind, RuntimeKind } from "../compute/core/types.js";
 import type { ComputePool } from "../compute/core/pool/types.js";
 import type { SnapshotStore } from "../compute/core/snapshot-store.js";
-import { initSchema as initRepoSchema, seedLocalCompute } from "./repositories/schema.js";
+import { initSchema as initRepoSchema } from "./repositories/schema.js";
 import type { Compute, Session, ComputeProviderName } from "../types/index.js";
 import { track } from "./observability/telemetry.js";
 import { setLogArkDir } from "./observability/structured-log.js";
@@ -195,13 +195,17 @@ export class AppContext {
     const dbUrl = this.config.databaseUrl;
     const isPostgres = !!(dbUrl && (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://")));
     if (isPostgres) {
-      const { initPostgresSchema, seedLocalComputePostgres } = await import("./repositories/schema-postgres.js");
+      const { initPostgresSchema } = await import("./repositories/schema-postgres.js");
       initPostgresSchema(db);
-      seedLocalComputePostgres(db);
     } else {
       initRepoSchema(db);
-      seedLocalCompute(db);
     }
+    // Compute seeding is polymorphic via AppMode -- local mode seeds the
+    // canonical `local` row, hosted mode is a no-op (operator registers
+    // real targets after onboarding). The container hasn't been built yet
+    // here; we resolve AppMode directly from config.
+    const { buildAppMode } = await import("./modes/app-mode.js");
+    buildAppMode(this.config).computeBootstrap.seed(db);
   }
 
   private _seedComputeTemplates(db: IDatabase): void {

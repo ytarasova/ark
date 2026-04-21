@@ -8,7 +8,19 @@
  * with a consistent `RpcError` via the shared wrapper.
  */
 
-import type { AppMode } from "./app-mode.js";
+import type { AppMode, ComputeBootstrapCapability } from "./app-mode.js";
+
+/**
+ * Hosted compute bootstrap is intentionally a no-op. The operator
+ * registers real compute targets (k8s / docker / ec2 / firecracker) post-
+ * onboarding via `ark compute add`. We never silently seed a `local` row
+ * because "local" inside a control-plane pod means agents would spawn in
+ * the control-plane container itself -- no isolation, competes with the
+ * control plane for resources.
+ */
+function makeNoopComputeBootstrap(): ComputeBootstrapCapability {
+  return { seed: () => undefined };
+}
 
 export function buildHostedAppMode(): AppMode {
   return {
@@ -19,5 +31,6 @@ export function buildHostedAppMode(): AppMode {
     repoMapCapability: null,
     ftsRebuildCapability: null,
     hostCommandCapability: null,
+    computeBootstrap: makeNoopComputeBootstrap(),
   };
 }
