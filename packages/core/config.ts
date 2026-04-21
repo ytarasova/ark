@@ -310,7 +310,14 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
   // RDS-managed credentials arrive as separate secret keys and shell-side
   // URL composition mishandles special chars in the password.
   const dbAssembled = assembleDatabaseUrlFromParts(process.env);
-  const databaseUrl = overrides.databaseUrl ?? merged.databaseUrl ?? process.env.DATABASE_URL ?? dbAssembled;
+  // Note: empty string is treated as "not set" (some k8s configmap paths
+  // inject DATABASE_URL="" which would otherwise win the ?? chain).
+  const blankToUndef = (v: string | undefined): string | undefined => (v && v.length > 0 ? v : undefined);
+  const databaseUrl =
+    blankToUndef(overrides.databaseUrl) ??
+    blankToUndef(merged.databaseUrl) ??
+    blankToUndef(process.env.DATABASE_URL) ??
+    dbAssembled;
   const database: DatabaseConfig = { url: databaseUrl };
 
   const storage: StorageConfig = {
