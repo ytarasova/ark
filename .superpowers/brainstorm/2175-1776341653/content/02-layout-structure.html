@@ -1,0 +1,214 @@
+<h2>Layout Structure</h2>
+<p class="subtitle">How should the main application shell be organized? This determines navigation, information density, and workflow.</p>
+
+<div class="cards" style="display:flex; flex-direction:column; gap:24px;">
+
+  <!-- Layout A: Icon Rail + Master-Detail -->
+  <div class="card" data-choice="icon-rail" onclick="toggleSelect(this)" style="border-radius:12px; overflow:hidden; border:1px solid rgba(124,106,239,0.2);">
+    <div class="card-image" style="background:#0C0C14; padding:20px; min-height:200px;">
+      <div style="display:flex; gap:0; height:180px; border-radius:8px; overflow:hidden; border:1px solid #252540;">
+        <!-- Icon rail -->
+        <div style="width:48px; background:#0A0A12; border-right:1px solid #252540; padding:10px 0; display:flex; flex-direction:column; align-items:center; gap:8px;">
+          <div style="width:26px; height:26px; border-radius:6px; background:linear-gradient(135deg, #7C6AEF, #06B6D4);"></div>
+          <div style="width:4px; height:4px; border-radius:50%; background:#252540; margin:2px 0;"></div>
+          <div style="width:22px; height:22px; border-radius:5px; background:#7C6AEF; opacity:0.2; position:relative;"><div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:12px;height:2px;background:#7C6AEF;opacity:0.6;"></div></div>
+          <div style="width:22px; height:22px; border-radius:5px; background:#1E1E30; position:relative;"><div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:10px;height:10px;border:1.5px solid #7878A0;border-radius:50%;"></div></div>
+          <div style="width:22px; height:22px; border-radius:5px; background:#1E1E30;"></div>
+          <div style="width:22px; height:22px; border-radius:5px; background:#1E1E30;"></div>
+          <div style="flex:1;"></div>
+          <div style="width:22px; height:22px; border-radius:5px; background:#1E1E30;"></div>
+        </div>
+        <!-- List panel -->
+        <div style="width:220px; background:#0F0F18; border-right:1px solid #252540; padding:8px;">
+          <div style="padding:4px 8px; margin-bottom:6px;">
+            <div style="background:#14141E; border:1px solid #252540; border-radius:6px; padding:5px 8px; font-size:10px; color:#7878A0;">Search sessions...</div>
+          </div>
+          <div style="padding:6px 8px; background:#1E1E30; border-radius:6px; margin-bottom:3px; display:flex; align-items:center; gap:6px;">
+            <div style="width:6px; height:6px; border-radius:50%; background:#34D399; box-shadow:0 0 4px rgba(52,211,153,0.4);"></div>
+            <div>
+              <div style="font-size:11px; color:#E4E4ED; font-family:monospace;">s-a1b2</div>
+              <div style="font-size:9px; color:#7878A0;">implementer -- 2m ago</div>
+            </div>
+            <div style="margin-left:auto; font-size:9px; color:#7C6AEF;">$0.82</div>
+          </div>
+          <div style="padding:6px 8px; border-radius:6px; margin-bottom:3px; display:flex; align-items:center; gap:6px;">
+            <div style="width:6px; height:6px; border-radius:50%; background:#FBBF24;"></div>
+            <div>
+              <div style="font-size:11px; color:#E4E4ED; font-family:monospace;">s-c3d4</div>
+              <div style="font-size:9px; color:#7878A0;">reviewer -- 8m ago</div>
+            </div>
+            <div style="margin-left:auto; font-size:9px; color:#7C6AEF;">$0.34</div>
+          </div>
+          <div style="padding:6px 8px; border-radius:6px; margin-bottom:3px; display:flex; align-items:center; gap:6px;">
+            <div style="width:6px; height:6px; border-radius:50%; background:#60A5FA;"></div>
+            <div>
+              <div style="font-size:11px; color:#E4E4ED; font-family:monospace;">s-e5f6</div>
+              <div style="font-size:9px; color:#7878A0;">planner -- 1h ago</div>
+            </div>
+            <div style="margin-left:auto; font-size:9px; color:#7C6AEF;">$1.05</div>
+          </div>
+        </div>
+        <!-- Detail panel -->
+        <div style="flex:1; background:#0C0C14; padding:12px;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+            <div style="width:8px; height:8px; border-radius:50%; background:#34D399; box-shadow:0 0 6px rgba(52,211,153,0.5);"></div>
+            <span style="font-size:13px; color:#E4E4ED; font-weight:600;">s-a1b2</span>
+            <span style="font-size:10px; color:#7878A0; background:#1E1E30; padding:2px 6px; border-radius:4px;">autonomous-sdlc</span>
+            <span style="font-size:10px; color:#7C6AEF; margin-left:auto;">$0.82</span>
+          </div>
+          <!-- DAG pipeline -->
+          <div style="display:flex; align-items:center; gap:4px; margin-bottom:12px; padding:8px; background:#14141E; border-radius:6px; border:1px solid #252540;">
+            <div style="padding:3px 8px; background:#34D399; color:#0C0C14; border-radius:4px; font-size:9px; font-weight:600;">plan</div>
+            <div style="width:16px; height:1px; background:#252540;"></div>
+            <div style="padding:3px 8px; background:#7C6AEF; color:white; border-radius:4px; font-size:9px; font-weight:600;">implement</div>
+            <div style="width:16px; height:1px; background:#252540;"></div>
+            <div style="padding:3px 8px; background:#1E1E30; color:#7878A0; border-radius:4px; font-size:9px;">verify</div>
+            <div style="width:16px; height:1px; background:#252540;"></div>
+            <div style="padding:3px 8px; background:#1E1E30; color:#7878A0; border-radius:4px; font-size:9px;">review</div>
+          </div>
+          <!-- Tabs -->
+          <div style="display:flex; gap:0; border-bottom:1px solid #252540; margin-bottom:8px;">
+            <div style="padding:4px 10px; font-size:10px; color:#7C6AEF; border-bottom:2px solid #7C6AEF;">Conversation</div>
+            <div style="padding:4px 10px; font-size:10px; color:#7878A0;">Terminal</div>
+            <div style="padding:4px 10px; font-size:10px; color:#7878A0;">Events</div>
+            <div style="padding:4px 10px; font-size:10px; color:#7878A0;">Diff</div>
+          </div>
+          <div style="background:#14141E; border-radius:6px; padding:8px; font-size:10px; color:#7878A0; font-family:monospace; line-height:1.5;">
+            <span style="color:#34D399;">agent</span> Analyzing codebase...<br>
+            <span style="color:#06B6D4;">tool</span> Read packages/core/app.ts<br>
+            <span style="color:#34D399;">agent</span> Found 3 files to modify
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body" style="background:#14141E; padding:16px; border-top:1px solid #252540;">
+      <h3 style="color:#E4E4ED; margin:0 0 4px;">A. Icon Rail + Master-Detail (Recommended)</h3>
+      <p style="color:#7878A0; font-size:13px; margin:0; line-height:1.5;">Narrow icon sidebar (48px) + resizable list panel + detail view. Like Linear, Cursor, VS Code. Maximizes horizontal space for the detail panel. List panel collapses for full-width detail. Cmd+K for everything else.</p>
+    </div>
+  </div>
+
+  <!-- Layout B: Full Sidebar + Content -->
+  <div class="card" data-choice="full-sidebar" onclick="toggleSelect(this)" style="border-radius:12px; overflow:hidden; border:1px solid rgba(124,106,239,0.2);">
+    <div class="card-image" style="background:#0C0C14; padding:20px; min-height:200px;">
+      <div style="display:flex; gap:0; height:180px; border-radius:8px; overflow:hidden; border:1px solid #252540;">
+        <!-- Full sidebar -->
+        <div style="width:200px; background:#0A0A12; border-right:1px solid #252540; padding:10px;">
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:12px; padding:4px;">
+            <div style="width:22px; height:22px; border-radius:5px; background:linear-gradient(135deg, #7C6AEF, #06B6D4);"></div>
+            <span style="font-size:12px; color:#E4E4ED; font-weight:600;">Ark</span>
+          </div>
+          <div style="font-size:9px; color:#7878A0; text-transform:uppercase; letter-spacing:0.5px; padding:4px 6px; margin-bottom:4px;">Navigation</div>
+          <div style="padding:5px 8px; background:#1E1E30; border-radius:5px; margin-bottom:2px; font-size:11px; color:#7C6AEF; display:flex; align-items:center; gap:6px;">
+            <div style="width:3px; height:14px; background:#7C6AEF; border-radius:2px;"></div>
+            Sessions
+          </div>
+          <div style="padding:5px 8px; font-size:11px; color:#7878A0; margin-bottom:2px;">Dashboard</div>
+          <div style="padding:5px 8px; font-size:11px; color:#7878A0; margin-bottom:2px;">Resources</div>
+          <div style="padding:5px 8px; font-size:11px; color:#7878A0; margin-bottom:2px;">Knowledge</div>
+          <div style="padding:5px 8px; font-size:11px; color:#7878A0; margin-bottom:2px;">Settings</div>
+          <div style="flex:1;"></div>
+          <div style="margin-top:8px; padding:6px; background:#14141E; border-radius:5px; border:1px solid #252540;">
+            <div style="display:flex; align-items:center; gap:4px;">
+              <div style="width:6px; height:6px; border-radius:50%; background:#34D399;"></div>
+              <span style="font-size:9px; color:#7878A0;">Daemon healthy</span>
+            </div>
+          </div>
+        </div>
+        <!-- Content area -->
+        <div style="flex:1; background:#0C0C14; padding:12px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+            <span style="font-size:14px; color:#E4E4ED; font-weight:600;">Sessions</span>
+            <div style="display:flex; gap:6px;">
+              <div style="padding:3px 8px; background:#1E1E30; border-radius:4px; font-size:10px; color:#7878A0;">Filter</div>
+              <div style="padding:3px 8px; background:#7C6AEF; border-radius:4px; font-size:10px; color:white;">+ New</div>
+            </div>
+          </div>
+          <!-- Table -->
+          <div style="border:1px solid #252540; border-radius:6px; overflow:hidden;">
+            <div style="display:flex; padding:6px 10px; background:#14141E; border-bottom:1px solid #252540; font-size:9px; color:#7878A0; text-transform:uppercase;">
+              <span style="width:80px;">ID</span>
+              <span style="flex:1;">Summary</span>
+              <span style="width:60px;">Agent</span>
+              <span style="width:50px;">Cost</span>
+            </div>
+            <div style="display:flex; padding:6px 10px; border-bottom:1px solid #252540; align-items:center;">
+              <span style="width:80px; font-size:11px; color:#E4E4ED; font-family:monospace;">s-a1b2</span>
+              <span style="flex:1; font-size:11px; color:#7878A0;">Add auth middleware</span>
+              <span style="width:60px; font-size:10px; color:#7878A0;">impl</span>
+              <span style="width:50px; font-size:10px; color:#7C6AEF;">$0.82</span>
+            </div>
+            <div style="display:flex; padding:6px 10px; border-bottom:1px solid #252540; align-items:center;">
+              <span style="width:80px; font-size:11px; color:#E4E4ED; font-family:monospace;">s-c3d4</span>
+              <span style="flex:1; font-size:11px; color:#7878A0;">Fix router tests</span>
+              <span style="width:60px; font-size:10px; color:#7878A0;">review</span>
+              <span style="width:50px; font-size:10px; color:#7C6AEF;">$0.34</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body" style="background:#14141E; padding:16px; border-top:1px solid #252540;">
+      <h3 style="color:#E4E4ED; margin:0 0 4px;">B. Full Sidebar + Content</h3>
+      <p style="color:#7878A0; font-size:13px; margin:0; line-height:1.5;">Traditional 200px sidebar with labels + full content area. Current Ark layout (improved). Familiar, discoverable for new users. Uses more horizontal space on navigation. Click-to-navigate between pages.</p>
+    </div>
+  </div>
+
+  <!-- Layout C: Hybrid (Icon Rail + Expandable) -->
+  <div class="card" data-choice="hybrid-rail" onclick="toggleSelect(this)" style="border-radius:12px; overflow:hidden; border:1px solid rgba(124,106,239,0.2);">
+    <div class="card-image" style="background:#0C0C14; padding:20px; min-height:200px;">
+      <div style="display:flex; gap:0; height:180px; border-radius:8px; overflow:hidden; border:1px solid #252540;">
+        <!-- Icon rail (default state) -->
+        <div style="width:48px; background:#0A0A12; border-right:1px solid #252540; padding:10px 0; display:flex; flex-direction:column; align-items:center; gap:8px; position:relative;">
+          <div style="width:26px; height:26px; border-radius:6px; background:linear-gradient(135deg, #7C6AEF, #06B6D4);"></div>
+          <div style="width:4px; height:4px; border-radius:50%; background:#252540; margin:2px 0;"></div>
+          <div style="width:22px; height:22px; border-radius:5px; background:#7C6AEF; opacity:0.2;"></div>
+          <div style="width:22px; height:22px; border-radius:5px; background:#1E1E30;"></div>
+          <div style="width:22px; height:22px; border-radius:5px; background:#1E1E30;"></div>
+          <div style="flex:1;"></div>
+          <div style="width:22px; height:22px; border-radius:5px; background:#1E1E30;"></div>
+        </div>
+        <!-- Expanded flyout (showing hover state) -->
+        <div style="width:160px; background:#0F0F18; border-right:1px solid #252540; padding:10px; position:relative;">
+          <div style="position:absolute; top:4px; right:4px; font-size:8px; color:#7878A0; background:#1E1E30; padding:1px 4px; border-radius:3px;">hover/pin</div>
+          <div style="font-size:9px; color:#7878A0; text-transform:uppercase; letter-spacing:0.5px; padding:2px 0; margin-bottom:6px; margin-top:12px;">Sessions</div>
+          <div style="padding:4px 6px; background:#1E1E30; border-radius:4px; margin-bottom:2px; font-size:10px; color:#7C6AEF;">Active (3)</div>
+          <div style="padding:4px 6px; font-size:10px; color:#7878A0; margin-bottom:2px;">Completed (12)</div>
+          <div style="padding:4px 6px; font-size:10px; color:#7878A0; margin-bottom:2px;">All Sessions</div>
+          <div style="font-size:9px; color:#7878A0; text-transform:uppercase; letter-spacing:0.5px; padding:2px 0; margin-top:8px; margin-bottom:4px;">Resources</div>
+          <div style="padding:4px 6px; font-size:10px; color:#7878A0;">Agents, Flows...</div>
+        </div>
+        <!-- Content -->
+        <div style="flex:1; background:#0C0C14; padding:12px;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+            <div style="width:8px; height:8px; border-radius:50%; background:#34D399; box-shadow:0 0 6px rgba(52,211,153,0.5);"></div>
+            <span style="font-size:13px; color:#E4E4ED; font-weight:600;">s-a1b2</span>
+            <span style="font-size:10px; color:#7878A0; background:#1E1E30; padding:2px 6px; border-radius:4px;">autonomous-sdlc</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:4px; margin-bottom:10px; padding:6px; background:#14141E; border-radius:6px; border:1px solid #252540;">
+            <div style="padding:2px 6px; background:#34D399; color:#0C0C14; border-radius:3px; font-size:8px; font-weight:600;">plan</div>
+            <div style="width:12px; height:1px; background:#252540;"></div>
+            <div style="padding:2px 6px; background:#7C6AEF; color:white; border-radius:3px; font-size:8px; font-weight:600;">impl</div>
+            <div style="width:12px; height:1px; background:#252540;"></div>
+            <div style="padding:2px 6px; background:#1E1E30; color:#7878A0; border-radius:3px; font-size:8px;">verify</div>
+          </div>
+          <div style="background:#14141E; border-radius:6px; padding:8px; font-size:10px; color:#7878A0; font-family:monospace; line-height:1.5; flex:1;">
+            <span style="color:#34D399;">agent</span> Analyzing...<br>
+            <span style="color:#06B6D4;">tool</span> Read app.ts
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body" style="background:#14141E; padding:16px; border-top:1px solid #252540;">
+      <h3 style="color:#E4E4ED; margin:0 0 4px;">C. Hybrid Rail (Icon + Flyout)</h3>
+      <p style="color:#7878A0; font-size:13px; margin:0; line-height:1.5;">Icon rail by default, expands to labeled sidebar on hover or pin. Best of both worlds -- compact when focused, discoverable when exploring. Like JetBrains IDEs or Slack's recent redesign. Slightly more complex to implement.</p>
+    </div>
+  </div>
+
+</div>
+
+<div style="margin-top:20px; padding:16px; background:rgba(124,106,239,0.06); border:1px solid rgba(124,106,239,0.15); border-radius:8px;">
+  <h3 style="margin:0 0 8px; font-size:14px;">Key context from research</h3>
+  <p style="font-size:13px; margin:0; line-height:1.5; opacity:0.8;">
+    Every top competitor (Cursor 3, Windsurf 2.0, Linear, Devin) uses a narrow rail or icon sidebar. The "Agent Command Center" pattern needs maximum horizontal space for session detail (conversation, terminal, diff, DAG). The current Ark sidebar has 12 items -- research recommends consolidating to 7 (merge History into Sessions, group Agents/Flows/Tools into Resources, merge Memory into Knowledge, move Schedules to Settings).
+  </p>
+</div>

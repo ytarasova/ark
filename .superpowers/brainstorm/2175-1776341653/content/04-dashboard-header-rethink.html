@@ -1,0 +1,173 @@
+<h2>Rethinking the Dashboard Header</h2>
+<p class="subtitle">Instead of KPI tiles, how should the top of the dashboard communicate status? Click to select.</p>
+
+<div class="cards" style="display:flex; flex-direction:column; gap:24px;">
+
+  <!-- Option A: Status Line -->
+  <div class="card" data-choice="status-line" onclick="toggleSelect(this)" style="border-radius:12px; overflow:hidden; border:1px solid rgba(124,106,239,0.2);">
+    <div class="card-image" style="background:#0C0C14; padding:20px; min-height:120px;">
+      <div style="border-radius:8px; overflow:hidden; border:1px solid #252540; background:#0C0C14;">
+        <!-- Minimal status line -->
+        <div style="padding:12px 16px; display:flex; align-items:center; gap:12px; border-bottom:1px solid #252540;">
+          <span style="font-size:15px; color:#E4E4ED; font-weight:600;">Sessions</span>
+          <!-- Status counts as filter chips -->
+          <div style="display:flex; gap:6px; margin-left:8px;">
+            <div style="display:flex; align-items:center; gap:4px; padding:3px 8px; background:rgba(52,211,153,0.08); border:1px solid rgba(52,211,153,0.15); border-radius:5px;">
+              <div style="width:5px; height:5px; border-radius:50%; background:#34D399; box-shadow:0 0 4px rgba(52,211,153,0.4);"></div>
+              <span style="font-size:11px; color:#34D399; font-weight:500;">7 running</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:4px; padding:3px 8px; background:rgba(251,191,36,0.08); border:1px solid rgba(251,191,36,0.15); border-radius:5px;">
+              <div style="width:5px; height:5px; border-radius:50%; background:#FBBF24;"></div>
+              <span style="font-size:11px; color:#FBBF24; font-weight:500;">2 waiting</span>
+            </div>
+          </div>
+          <div style="margin-left:auto; display:flex; align-items:center; gap:10px;">
+            <span style="font-size:11px; color:#7878A0;">$12.40 today</span>
+            <div style="padding:4px 10px; background:#7C6AEF; border-radius:5px; font-size:11px; color:white; font-weight:500;">+ New</div>
+          </div>
+        </div>
+        <!-- Content below -->
+        <div style="padding:12px 16px;">
+          <div style="padding:8px 10px; background:#14141E; border:1px solid #252540; border-radius:6px; margin-bottom:6px; display:flex; align-items:center; gap:8px;">
+            <div style="width:6px; height:6px; border-radius:50%; background:#34D399; box-shadow:0 0 4px rgba(52,211,153,0.4);"></div>
+            <span style="font-size:11px; color:#E4E4ED; font-family:monospace;">s-a1b2</span>
+            <span style="font-size:10px; color:#7878A0;">Add auth middleware</span>
+            <div style="display:flex; gap:2px; margin-left:auto; width:60px;">
+              <div style="flex:1; height:3px; background:#34D399; border-radius:2px;"></div>
+              <div style="flex:1; height:3px; background:#7C6AEF; border-radius:2px;"></div>
+              <div style="flex:1; height:3px; background:#252540; border-radius:2px;"></div>
+              <div style="flex:1; height:3px; background:#252540; border-radius:2px;"></div>
+            </div>
+            <span style="font-size:10px; color:#7C6AEF;">$0.82</span>
+          </div>
+          <div style="padding:8px 10px; background:#14141E; border:1px solid #252540; border-radius:6px; display:flex; align-items:center; gap:8px;">
+            <div style="width:6px; height:6px; border-radius:50%; background:#FBBF24;"></div>
+            <span style="font-size:11px; color:#E4E4ED; font-family:monospace;">s-c3d4</span>
+            <span style="font-size:10px; color:#7878A0;">Review router PR</span>
+            <div style="display:flex; gap:2px; margin-left:auto; width:60px;">
+              <div style="flex:1; height:3px; background:#34D399; border-radius:2px;"></div>
+              <div style="flex:1; height:3px; background:#FBBF24; border-radius:2px;"></div>
+              <div style="flex:1; height:3px; background:#252540; border-radius:2px;"></div>
+            </div>
+            <span style="font-size:10px; color:#7C6AEF;">$0.34</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body" style="background:#14141E; padding:16px; border-top:1px solid #252540;">
+      <h3 style="color:#E4E4ED; margin:0 0 4px;">A. Status Chips in Header (Recommended)</h3>
+      <p style="color:#7878A0; font-size:13px; margin:0; line-height:1.5;">Status counts become clickable filter chips in the page header. "7 running" and "2 waiting" are both info and navigation -- click to filter. Cost is a quiet number on the right. Zero wasted vertical space. Linear-inspired.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Contextual Summary -->
+  <div class="card" data-choice="contextual-summary" onclick="toggleSelect(this)" style="border-radius:12px; overflow:hidden; border:1px solid rgba(124,106,239,0.2);">
+    <div class="card-image" style="background:#0C0C14; padding:20px; min-height:120px;">
+      <div style="border-radius:8px; overflow:hidden; border:1px solid #252540; background:#0C0C14;">
+        <!-- Natural language summary -->
+        <div style="padding:14px 16px; border-bottom:1px solid #252540;">
+          <div style="display:flex; align-items:baseline; gap:6px;">
+            <span style="font-size:14px; color:#E4E4ED; line-height:1.5;">
+              <span style="font-weight:600;">7 agents running</span><span style="color:#7878A0;">,</span>
+              <span style="color:#FBBF24;">2 waiting for input</span><span style="color:#7878A0;">.</span>
+              <span style="color:#7878A0; font-size:12px;">$12.40 spent today</span>
+              <span style="color:#7878A0; font-size:12px; opacity:0.5;">-- 94% success rate this week</span>
+            </span>
+            <div style="margin-left:auto; flex-shrink:0; padding:4px 10px; background:#7C6AEF; border-radius:5px; font-size:11px; color:white; font-weight:500;">+ New</div>
+          </div>
+        </div>
+        <!-- Content below -->
+        <div style="padding:12px 16px;">
+          <div style="padding:8px 10px; background:#14141E; border:1px solid #252540; border-radius:6px; margin-bottom:6px; display:flex; align-items:center; gap:8px;">
+            <div style="width:6px; height:6px; border-radius:50%; background:#34D399; box-shadow:0 0 4px rgba(52,211,153,0.4);"></div>
+            <span style="font-size:11px; color:#E4E4ED; font-family:monospace;">s-a1b2</span>
+            <span style="font-size:10px; color:#7878A0;">Add auth middleware</span>
+            <div style="display:flex; gap:2px; margin-left:auto; width:60px;">
+              <div style="flex:1; height:3px; background:#34D399; border-radius:2px;"></div>
+              <div style="flex:1; height:3px; background:#7C6AEF; border-radius:2px;"></div>
+              <div style="flex:1; height:3px; background:#252540; border-radius:2px;"></div>
+              <div style="flex:1; height:3px; background:#252540; border-radius:2px;"></div>
+            </div>
+            <span style="font-size:10px; color:#7C6AEF;">$0.82</span>
+          </div>
+          <div style="padding:8px 10px; background:#14141E; border:1px solid #252540; border-radius:6px; display:flex; align-items:center; gap:8px;">
+            <div style="width:6px; height:6px; border-radius:50%; background:#FBBF24;"></div>
+            <span style="font-size:11px; color:#E4E4ED; font-family:monospace;">s-c3d4</span>
+            <span style="font-size:10px; color:#7878A0;">Review router PR</span>
+            <div style="display:flex; gap:2px; margin-left:auto; width:60px;">
+              <div style="flex:1; height:3px; background:#34D399; border-radius:2px;"></div>
+              <div style="flex:1; height:3px; background:#FBBF24; border-radius:2px;"></div>
+              <div style="flex:1; height:3px; background:#252540; border-radius:2px;"></div>
+            </div>
+            <span style="font-size:10px; color:#7C6AEF;">$0.34</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body" style="background:#14141E; padding:16px; border-top:1px solid #252540;">
+      <h3 style="color:#E4E4ED; margin:0 0 4px;">B. Natural Language Summary</h3>
+      <p style="color:#7878A0; font-size:13px; margin:0; line-height:1.5;">One line of prose: "7 agents running, 2 waiting for input. $12.40 today." Reads like a status report. Less structured, more human. Information degrades gracefully -- secondary stats fade in opacity. Unique among competitors.</p>
+    </div>
+  </div>
+
+  <!-- Option C: No Header, Stats in Sidebar -->
+  <div class="card" data-choice="sidebar-stats" onclick="toggleSelect(this)" style="border-radius:12px; overflow:hidden; border:1px solid rgba(124,106,239,0.2);">
+    <div class="card-image" style="background:#0C0C14; padding:20px; min-height:120px;">
+      <div style="display:flex; gap:0; border-radius:8px; overflow:hidden; border:1px solid #252540;">
+        <!-- Icon rail with stats at bottom -->
+        <div style="width:48px; background:#0A0A12; border-right:1px solid #252540; padding:8px 0; display:flex; flex-direction:column; align-items:center; gap:8px;">
+          <div style="width:26px; height:26px; border-radius:6px; background:linear-gradient(135deg, #7C6AEF, #06B6D4);"></div>
+          <div style="width:4px; height:4px; border-radius:50%; background:#252540; margin:1px 0;"></div>
+          <div style="width:22px; height:22px; border-radius:5px; background:#7C6AEF; opacity:0.2;"></div>
+          <div style="width:22px; height:22px; border-radius:5px; background:#1E1E30;"></div>
+          <div style="flex:1;"></div>
+          <!-- Stats in rail bottom -->
+          <div style="display:flex; flex-direction:column; align-items:center; gap:6px; padding:6px 0; border-top:1px solid #252540; width:100%;">
+            <div style="text-align:center;">
+              <div style="font-size:13px; color:#34D399; font-weight:700; line-height:1;">7</div>
+              <div style="width:5px; height:5px; border-radius:50%; background:#34D399; margin:2px auto 0; box-shadow:0 0 4px rgba(52,211,153,0.3);"></div>
+            </div>
+            <div style="text-align:center;">
+              <div style="font-size:11px; color:#7878A0; font-weight:500; line-height:1;">$12</div>
+            </div>
+          </div>
+        </div>
+        <!-- Content - no header, just list -->
+        <div style="flex:1; background:#0C0C14; padding:12px;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+            <span style="font-size:15px; color:#E4E4ED; font-weight:600;">Sessions</span>
+            <div style="margin-left:auto; padding:4px 10px; background:#7C6AEF; border-radius:5px; font-size:11px; color:white;">+ New</div>
+          </div>
+          <div style="padding:8px 10px; background:#14141E; border:1px solid #252540; border-radius:6px; margin-bottom:6px; display:flex; align-items:center; gap:8px;">
+            <div style="width:6px; height:6px; border-radius:50%; background:#34D399; box-shadow:0 0 4px rgba(52,211,153,0.4);"></div>
+            <span style="font-size:11px; color:#E4E4ED; font-family:monospace;">s-a1b2</span>
+            <span style="font-size:10px; color:#7878A0;">Add auth middleware</span>
+            <div style="display:flex; gap:2px; margin-left:auto; width:60px;">
+              <div style="flex:1; height:3px; background:#34D399; border-radius:2px;"></div>
+              <div style="flex:1; height:3px; background:#7C6AEF; border-radius:2px;"></div>
+              <div style="flex:1; height:3px; background:#252540; border-radius:2px;"></div>
+              <div style="flex:1; height:3px; background:#252540; border-radius:2px;"></div>
+            </div>
+            <span style="font-size:10px; color:#7C6AEF;">$0.82</span>
+          </div>
+          <div style="padding:8px 10px; background:#14141E; border:1px solid #252540; border-radius:6px; display:flex; align-items:center; gap:8px;">
+            <div style="width:6px; height:6px; border-radius:50%; background:#FBBF24;"></div>
+            <span style="font-size:11px; color:#E4E4ED; font-family:monospace;">s-c3d4</span>
+            <span style="font-size:10px; color:#7878A0;">Review router PR</span>
+            <div style="display:flex; gap:2px; margin-left:auto; width:60px;">
+              <div style="flex:1; height:3px; background:#34D399; border-radius:2px;"></div>
+              <div style="flex:1; height:3px; background:#FBBF24; border-radius:2px;"></div>
+              <div style="flex:1; height:3px; background:#252540; border-radius:2px;"></div>
+            </div>
+            <span style="font-size:10px; color:#7C6AEF;">$0.34</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body" style="background:#14141E; padding:16px; border-top:1px solid #252540;">
+      <h3 style="color:#E4E4ED; margin:0 0 4px;">C. No Header -- Stats in Rail</h3>
+      <p style="color:#7878A0; font-size:13px; margin:0; line-height:1.5;">Kill the header entirely. Active count and spend live at the bottom of the icon rail as tiny glanceable numbers. Content area is 100% sessions from pixel one. Maximum density. Most radical option.</p>
+    </div>
+  </div>
+
+</div>
