@@ -12,6 +12,61 @@ export type ComputeKindName = "local" | "firecracker" | "ec2" | "k8s" | "k8s-kat
  */
 export type RuntimeKindName = "direct" | "docker" | "compose" | "devcontainer" | "firecracker-in-container";
 
+/**
+ * Lifecycle classification for a compute kind.
+ *
+ * - `persistent`: the compute target points at long-lived infrastructure (a
+ *   host, a VM, a fleet). The DB row models real state -- `status` is
+ *   meaningful, sessions reuse the same target, deleting the row implies
+ *   tearing down infrastructure.
+ *
+ * - `template`: the compute target is just a config blueprint (which cluster,
+ *   which namespace, which image). The DB row carries no infrastructure state
+ *   -- every session spawns its own pod / container / microVM and tears it
+ *   down on cleanup. The "row" itself can be ephemeral and is safe to
+ *   garbage-collect when no sessions reference it.
+ *
+ * Local + EC2 + remote-arkd are persistent. Docker/compose/devcontainer/k8s/
+ * k8s-kata/firecracker are templates -- their per-session workload (container,
+ * pod, microVM) is the real lifecycle, not the target row.
+ */
+export type ComputeLifecycle = "persistent" | "template";
+
+/** Lifecycle for each compute kind. Drives target-row GC + status semantics. */
+export const COMPUTE_KIND_LIFECYCLE: Record<ComputeKindName, ComputeLifecycle> = {
+  local: "persistent",
+  ec2: "persistent",
+  firecracker: "template",
+  k8s: "template",
+  "k8s-kata": "template",
+};
+
+/** Lifecycle for each runtime kind. Used when the compute kind is `local`. */
+export const RUNTIME_KIND_LIFECYCLE: Record<RuntimeKindName, ComputeLifecycle> = {
+  direct: "persistent", // runs on the host
+  docker: "template", // container per session
+  compose: "template", // compose project per session
+  devcontainer: "template", // container per session
+  "firecracker-in-container": "template", // microVM per session
+};
+
+/**
+ * Resolve the effective lifecycle for a (compute, runtime) pair.
+ *
+ * Rule: a target is `persistent` only when both axes are persistent.
+ * - local + direct -> persistent (the host)
+ * - local + docker -> template (container per session)
+ * - ec2 + direct -> persistent (the VM)
+ * - k8s + direct -> template (pod per session)
+ *
+ * Used by repositories + scheduler to decide whether the compute row should
+ * stick around after the last referencing session ends.
+ */
+export function effectiveLifecycle(compute: ComputeKindName, runtime: RuntimeKindName): ComputeLifecycle {
+  if (COMPUTE_KIND_LIFECYCLE[compute] === "template") return "template";
+  return RUNTIME_KIND_LIFECYCLE[runtime];
+}
+
 export interface LocalComputeConfig {
   [key: string]: unknown;
 }

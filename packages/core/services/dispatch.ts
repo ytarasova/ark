@@ -42,6 +42,18 @@ export async function resolveComputeForStage(
   sessionId: string,
   log: (msg: string) => void = () => {},
 ): Promise<string | null> {
+  // Direct compute reference takes precedence over template lookup.
+  // Use this when you want to point a stage at an already-provisioned
+  // long-lived target (e.g. a shared EC2 fleet member).
+  if (stageDef?.compute) {
+    const existing = await app.computes.get(stageDef.compute);
+    if (!existing) {
+      log(`Stage compute '${stageDef.compute}' not found, falling back to session default`);
+      return null;
+    }
+    return stageDef.compute;
+  }
+
   if (!stageDef?.compute_template) return null;
 
   const templateName = stageDef.compute_template;

@@ -72,6 +72,25 @@ export interface StageDefinition {
   /** Scripts that must pass before stage completion. */
   verify?: string[];
   /**
+   * Per-stage compute target.
+   *
+   * Two flavours, mutually exclusive:
+   * - `compute`: name of an existing compute target (ref). The stage
+   *   dispatches onto that target as-is. Best for shared, long-lived
+   *   targets (`local`, `ec2`).
+   * - `compute_template`: name of a `ComputeTemplate`. The dispatcher
+   *   provisions a fresh compute row from the template if one doesn't
+   *   already exist with that name. For template-lifecycle kinds
+   *   (k8s, docker, firecracker, ...) the row is auto-cleaned when no
+   *   sessions reference it anymore.
+   *
+   * Either field overrides the session's default compute for the
+   * duration of this stage. Switching between stages is a real
+   * handoff: cleanupSession on the prior compute, launch on the new.
+   */
+  compute?: string;
+  compute_template?: string;
+  /**
    * Runtime isolation mode for this stage.
    * - "fresh" (default): each stage gets a fresh runtime -- no --resume from prior stage.
    *   Context is passed structurally via task prompt (PLAN.md, git log, events).

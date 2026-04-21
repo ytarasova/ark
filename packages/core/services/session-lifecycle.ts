@@ -370,6 +370,15 @@ export async function stop(
   // Observability: track session stop
   recordEvent({ type: "session_end", sessionId, data: { status: "stopped" } });
 
+  // GC any template-lifecycle compute the session was using (k8s, docker,
+  // firecracker, ...). Persistent computes (local, ec2) are kept around.
+  try {
+    const { garbageCollectComputeIfTemplate } = await import("./compute-lifecycle.js");
+    await garbageCollectComputeIfTemplate(app, session.compute_name);
+  } catch (e: any) {
+    logDebug("session", `compute gc on stop ${sessionId}: ${e?.message ?? e}`);
+  }
+
   emitStageSpanEnd(sessionId, { status: "stopped" });
   emitSessionSpanEnd(sessionId, { status: "stopped" });
   flushSpans();

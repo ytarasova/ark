@@ -168,6 +168,13 @@ export async function advance(
         cost_usd: agg.cost,
         turns: s?.config?.turns as number | undefined,
       });
+      // GC template-lifecycle compute now that the session is done.
+      try {
+        const { garbageCollectComputeIfTemplate } = await import("./compute-lifecycle.js");
+        await garbageCollectComputeIfTemplate(app, s?.compute_name);
+      } catch {
+        logDebug("session", "compute gc on complete -- best-effort");
+      }
       flushSpans();
       return { ok: true, message: "Flow completed (graph-flow)" };
     }
@@ -203,6 +210,13 @@ export async function advance(
       cost_usd: agg.cost,
       turns: s?.config?.turns as number | undefined,
     });
+    // GC template-lifecycle compute now that the session is done.
+    try {
+      const { garbageCollectComputeIfTemplate } = await import("./compute-lifecycle.js");
+      await garbageCollectComputeIfTemplate(app, s?.compute_name);
+    } catch {
+      logDebug("session", "compute gc on complete -- best-effort");
+    }
     flushSpans();
 
     // Extract skills from completed session transcript
