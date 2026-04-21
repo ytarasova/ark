@@ -27,7 +27,6 @@ import type { ComputeProvider } from "../compute/types.js";
 import type { Compute as NewCompute, Runtime as NewRuntime, ComputeKind, RuntimeKind } from "../compute/core/types.js";
 import type { ComputePool } from "../compute/core/pool/types.js";
 import type { SnapshotStore } from "../compute/core/snapshot-store.js";
-import { initSchema as initRepoSchema } from "./repositories/schema.js";
 import type { Compute, Session, ComputeProviderName } from "../types/index.js";
 import { track } from "./observability/telemetry.js";
 import { setLogArkDir } from "./observability/structured-log.js";
@@ -192,20 +191,17 @@ export class AppContext {
   }
 
   private async _initSchema(db: IDatabase): Promise<void> {
-    const dbUrl = this.config.databaseUrl;
-    const isPostgres = !!(dbUrl && (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://")));
-    if (isPostgres) {
-      const { initPostgresSchema } = await import("./repositories/schema-postgres.js");
-      initPostgresSchema(db);
-    } else {
-      initRepoSchema(db);
-    }
-    // Compute seeding is polymorphic via AppMode -- local mode seeds the
-    // canonical `local` row, hosted mode is a no-op (operator registers
-    // real targets after onboarding). The container hasn't been built yet
-    // here; we resolve AppMode directly from config.
+    // Schema bootstrap + ongoing migrations both flow through AppMode.migrations.
+    // The capability is dialect-bound at construction; the runner records
+    // every applied version in `ark_schema_migrations`. Backwards compat for
+    // pre-migration installs (laptop SQLite + the running pai-risk-mlops
+    // Postgres) is handled inside the runner: if the apply log is empty but
+    // the canonical legacy `compute` table exists, 001_initial is recorded
+    // as already-applied so its body doesn't re-run.
     const { buildAppMode } = await import("./modes/app-mode.js");
-    buildAppMode(this.config).computeBootstrap.seed(db);
+    const mode = buildAppMode(this.config);
+    mode.migrations.apply(db);
+    mode.computeBootstrap.seed(db);
   }
 
   private _seedComputeTemplates(db: IDatabase): void {

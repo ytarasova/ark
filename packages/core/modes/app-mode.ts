@@ -92,6 +92,22 @@ export interface ComputeBootstrapCapability {
   seed(db: import("../database/index.js").IDatabase): void;
 }
 
+/**
+ * Schema migrations capability. Always non-null (every mode has migrations).
+ * The polymorphic surface here is the bound dialect: local mode is usually
+ * sqlite (laptop default) but flips to postgres if a `DATABASE_URL` is set;
+ * hosted mode is postgres-only by definition. Downstream callers
+ * (AppContext.boot, the `ark db` CLI) read `app.mode.migrations.*` and
+ * never branch on dialect themselves.
+ */
+export interface MigrationsCapability {
+  readonly dialect: "sqlite" | "postgres";
+  apply(db: import("../database/index.js").IDatabase, opts?: { targetVersion?: number }): void;
+  status(db: import("../database/index.js").IDatabase): import("../migrations/types.js").MigrationStatus;
+  /** Phase 1: throws "not implemented". Stubbed so the CLI compiles. */
+  down(db: import("../database/index.js").IDatabase, opts: { targetVersion: number }): never;
+}
+
 // ── AppMode contract ───────────────────────────────────────────────────────
 
 /**
@@ -109,6 +125,7 @@ export interface AppMode {
   readonly ftsRebuildCapability: FtsRebuildCapability | null;
   readonly hostCommandCapability: HostCommandCapability | null;
   readonly computeBootstrap: ComputeBootstrapCapability;
+  readonly migrations: MigrationsCapability;
 }
 
 // ── Factory (the ONE remaining mode conditional) ───────────────────────────
@@ -133,7 +150,9 @@ export function buildAppMode(config: ArkConfig, app?: AppContext): AppMode {
     return buildHostedAppMode();
   }
   const dialect: "sqlite" | "postgres" =
-    typeof url === "string" && (url.startsWith("postgres://") || url.startsWith("postgresql://")) ? "postgres" : "sqlite";
+    typeof url === "string" && (url.startsWith("postgres://") || url.startsWith("postgresql://"))
+      ? "postgres"
+      : "sqlite";
   return buildLocalAppMode(app, dialect);
 }
 

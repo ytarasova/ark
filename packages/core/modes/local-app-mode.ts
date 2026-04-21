@@ -33,6 +33,7 @@ import type {
 } from "./app-mode.js";
 import { seedLocalCompute } from "../repositories/schema.js";
 import { seedLocalComputePostgres } from "../repositories/schema-postgres.js";
+import { buildMigrationsCapability } from "./migrations-capability.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -241,5 +242,6 @@ export function buildLocalAppMode(app?: AppContext, dialect: "sqlite" | "postgre
     ftsRebuildCapability,
     hostCommandCapability,
     computeBootstrap: makeLocalComputeBootstrap(dialect),
+    migrations: buildMigrationsCapability(dialect),
   };
 }

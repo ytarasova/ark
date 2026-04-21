@@ -9,6 +9,7 @@
  */
 
 import type { AppMode, ComputeBootstrapCapability } from "./app-mode.js";
+import { buildMigrationsCapability } from "./migrations-capability.js";
 
 /**
  * Hosted compute bootstrap is intentionally a no-op. The operator
@@ -32,5 +33,6 @@ export function buildHostedAppMode(): AppMode {
     ftsRebuildCapability: null,
     hostCommandCapability: null,
     computeBootstrap: makeNoopComputeBootstrap(),
+    migrations: buildMigrationsCapability("postgres"),
   };
 }
