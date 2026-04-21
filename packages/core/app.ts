@@ -40,6 +40,7 @@ import type {
   MessageRepository,
   TodoRepository,
   ArtifactRepository,
+  FlowStateRepository,
 } from "./repositories/index.js";
 import { ComputeTemplateRepository as ComputeTemplateRepositoryCtor } from "./repositories/index.js";
 import type { SessionService, ComputeService, HistoryService } from "./services/index.js";
@@ -255,6 +256,9 @@ export class AppContext {
   }
   get artifacts(): ArtifactRepository {
     return this._resolve("artifacts");
+  }
+  get flowStates(): FlowStateRepository {
+    return this._resolve("flowStates");
   }
 
   /** API key manager for multi-tenant auth. Available after boot. */

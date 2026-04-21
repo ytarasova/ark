@@ -183,6 +183,23 @@ export function initPostgresSchema(db: IDatabase): void {
 
   db.exec(`CREATE INDEX IF NOT EXISTS idx_todos_session ON todos(session_id)`);
 
+  // Flow state: DAG orchestration state (completed/skipped/current stage, per-stage
+  // results). One row per session. Mirrors the SQLite definition in schema.ts.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS flow_state (
+      session_id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL DEFAULT 'default',
+      flow_name TEXT NOT NULL DEFAULT '',
+      completed_stages TEXT NOT NULL DEFAULT '[]',
+      skipped_stages TEXT NOT NULL DEFAULT '[]',
+      current_stage TEXT,
+      stage_results TEXT NOT NULL DEFAULT '{}',
+      started_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_flow_state_tenant ON flow_state(tenant_id)`);
+
   // Schedules table
   db.exec(`
     CREATE TABLE IF NOT EXISTS schedules (
@@ -239,6 +256,7 @@ export function initPostgresSchema(db: IDatabase): void {
   safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_messages_tenant ON messages(tenant_id)`);
   safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_todos_tenant ON todos(tenant_id)`);
   safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_groups_tenant ON groups(tenant_id)`);
+  safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_flow_state_tenant ON flow_state(tenant_id)`);
   safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_schedules_tenant ON schedules(tenant_id)`);
   safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_compute_pools_tenant ON compute_pools(tenant_id)`);
 

@@ -3,7 +3,6 @@ import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import { AppContext } from "../app.js";
 import { advance } from "../services/session-orchestration.js";
-import { markStageCompleted, loadFlowState } from "../state/flow-state.js";
 import { clearApp, getApp, setApp } from "./test-helpers.js";
 
 let app: AppContext;
@@ -137,7 +136,7 @@ describe("Parallel DAG advance via depends_on", () => {
     expect(updated!.status).toBe("ready");
 
     // Flow state should show plan as completed
-    const flowState = loadFlowState(app, s.id);
+    const flowState = app.flowStates.load(s.id);
     expect(flowState).not.toBeNull();
     expect(flowState!.completedStages).toContain("plan");
   });
@@ -147,7 +146,7 @@ describe("Parallel DAG advance via depends_on", () => {
     app.sessions.update(s.id, { stage: "implement", status: "ready" });
 
     // Mark plan as completed in flow state (it ran before implement)
-    markStageCompleted(app, s.id, "plan");
+    app.flowStates.markStageCompleted(s.id, "plan");
 
     const result = await advance(app, s.id, true);
     expect(result.ok).toBe(true);
@@ -166,8 +165,8 @@ describe("Parallel DAG advance via depends_on", () => {
     app.sessions.update(s.id, { stage: "test", status: "ready" });
 
     // Mark plan and implement as completed in flow state
-    markStageCompleted(app, s.id, "plan");
-    markStageCompleted(app, s.id, "implement");
+    app.flowStates.markStageCompleted(s.id, "plan");
+    app.flowStates.markStageCompleted(s.id, "implement");
 
     const result = await advance(app, s.id, true);
     expect(result.ok).toBe(true);
@@ -182,9 +181,9 @@ describe("Parallel DAG advance via depends_on", () => {
     app.sessions.update(s.id, { stage: "integrate", status: "ready" });
 
     // Mark all preceding stages as completed
-    markStageCompleted(app, s.id, "plan");
-    markStageCompleted(app, s.id, "implement");
-    markStageCompleted(app, s.id, "test");
+    app.flowStates.markStageCompleted(s.id, "plan");
+    app.flowStates.markStageCompleted(s.id, "implement");
+    app.flowStates.markStageCompleted(s.id, "test");
 
     const result = await advance(app, s.id, true);
     expect(result.ok).toBe(true);

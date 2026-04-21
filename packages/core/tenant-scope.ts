@@ -17,6 +17,7 @@ import {
   MessageRepository,
   TodoRepository,
   ArtifactRepository,
+  FlowStateRepository,
 } from "./repositories/index.js";
 import { KnowledgeStore } from "./knowledge/store.js";
 import { DbResourceStore } from "./stores/db-resource-store.js";
@@ -38,6 +39,8 @@ export function buildTenantScope(parent: AppContext, tenantId: string): AppConte
   scopedTodos.setTenant(tenantId);
   const scopedArtifacts = new ArtifactRepository(db);
   scopedArtifacts.setTenant(tenantId);
+  const scopedFlowStates = new FlowStateRepository(db);
+  scopedFlowStates.setTenant(tenantId);
   const scopedKnowledge = new KnowledgeStore(db);
   scopedKnowledge.setTenant(tenantId);
   const scopedComputeTemplates = new ComputeTemplateRepository(db);
@@ -53,6 +56,7 @@ export function buildTenantScope(parent: AppContext, tenantId: string): AppConte
   Object.defineProperty(scoped, "messages", { get: () => scopedMessages, configurable: true });
   Object.defineProperty(scoped, "todos", { get: () => scopedTodos, configurable: true });
   Object.defineProperty(scoped, "artifacts", { get: () => scopedArtifacts, configurable: true });
+  Object.defineProperty(scoped, "flowStates", { get: () => scopedFlowStates, configurable: true });
   Object.defineProperty(scoped, "knowledge", { get: () => scopedKnowledge, configurable: true });
   Object.defineProperty(scoped, "usageRecorder", { get: () => scopedUsage, configurable: true });
 

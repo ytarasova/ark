@@ -447,16 +447,9 @@ export {
   type TerminationContext,
 } from "./termination.js";
 
-// Flow state persistence
-export {
-  saveFlowState,
-  loadFlowState,
-  markStageCompleted,
-  setCurrentStage,
-  isStageCompleted,
-  deleteFlowState,
-  type FlowState,
-} from "./state/flow-state.js";
+// Flow state persistence -- moved to FlowStateRepository (see repositories/flow-state.ts).
+// Callers: `app.flowStates.*` instead of the old free functions.
+export { FlowStateRepository, type FlowState, type StageResult } from "./repositories/flow-state.js";
 
 // Cross-session memory (migrated to KnowledgeStore -- old file-based memory removed)
 // remember, recall, forget, listMemories, clearMemories, formatMemoriesForPrompt removed -- use app.knowledge directly

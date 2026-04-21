@@ -10,7 +10,6 @@ import type { Session } from "../../types/index.js";
 import * as flow from "../state/flow.js";
 import { saveCheckpoint } from "../session/checkpoint.js";
 import { parseGraphFlow, getSuccessors, resolveNextStages, computeSkippedStages } from "../state/graph-flow.js";
-import { markStageCompleted, setCurrentStage, markStagesSkipped, loadFlowState } from "../state/flow-state.js";
 import { logDebug, logError } from "../observability/structured-log.js";
 import { recordEvent } from "../observability.js";
 import { emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, flushSpans } from "../observability/otlp.js";
@@ -47,7 +46,7 @@ export async function advance(
     const hasDependsOn = flowDef?.stages?.some((s) => s.depends_on?.length > 0);
     if (flowDef && (flowDef.edges?.length > 0 || hasDependsOn)) {
       const graphFlow = parseGraphFlow(flowDef);
-      const flowState = loadFlowState(app, sessionId);
+      const flowState = app.flowStates.load(sessionId);
       const completedStages = flowState?.completedStages ?? [];
       const skippedStages = flowState?.skippedStages ?? [];
 
@@ -57,7 +56,7 @@ export async function advance(
       if (readyStages.length > 0) {
         // Mark current stage completed
         try {
-          markStageCompleted(app, sessionId, stage);
+          app.flowStates.markStageCompleted(sessionId, stage);
         } catch {
           logDebug("session", "flow-state persistence is best-effort -- stage still advances");
         }
@@ -68,7 +67,7 @@ export async function advance(
           const newSkipped = computeSkippedStages(graphFlow, stage, readyStages, skippedStages);
           if (newSkipped.length > skippedStages.length) {
             try {
-              markStagesSkipped(app, sessionId, newSkipped);
+              app.flowStates.markStagesSkipped(sessionId, newSkipped);
             } catch {
               logDebug("session", "flow-state persistence is best-effort -- stage still advances");
             }
@@ -79,7 +78,7 @@ export async function advance(
         // picked up on subsequent advance() calls if the flow has parallel branches)
         const graphNextStage = readyStages[0];
         try {
-          setCurrentStage(app, sessionId, graphNextStage, flowName);
+          app.flowStates.setCurrentStage(sessionId, graphNextStage, flowName);
         } catch {
           logDebug("session", "flow-state persistence is best-effort -- stage still advances");
         }
@@ -131,7 +130,7 @@ export async function advance(
       if (allSuccessors.length > 0) {
         // Successors exist but aren't ready (join barriers) -- mark completed and wait
         try {
-          markStageCompleted(app, sessionId, stage);
+          app.flowStates.markStageCompleted(sessionId, stage);
         } catch {
           logDebug("session", "flow-state persistence is best-effort -- stage still advances");
         }
@@ -146,7 +145,7 @@ export async function advance(
 
       // Terminal node -- flow complete
       try {
-        markStageCompleted(app, sessionId, stage);
+        app.flowStates.markStageCompleted(sessionId, stage);
       } catch {
         logDebug("session", "flow-state persistence is best-effort -- stage still advances");
       }
@@ -179,7 +178,7 @@ export async function advance(
   if (!nextStage) {
     // Flow complete -- persist final stage completion
     try {
-      markStageCompleted(app, sessionId, stage, outcome ? { outcome } : undefined);
+      app.flowStates.markStageCompleted(sessionId, stage, outcome ? { outcome } : undefined);
     } catch {
       logDebug("session", "flow-state persistence is best-effort -- stage still advances");
     }
@@ -223,12 +222,12 @@ export async function advance(
 
   // Persist flow state: mark completed + set next
   try {
-    markStageCompleted(app, sessionId, stage, outcome ? { outcome } : undefined);
+    app.flowStates.markStageCompleted(sessionId, stage, outcome ? { outcome } : undefined);
   } catch {
     logDebug("session", "flow-state persistence is best-effort -- stage still advances");
   }
   try {
-    setCurrentStage(app, sessionId, nextStage, flowName);
+    app.flowStates.setCurrentStage(sessionId, nextStage, flowName);
   } catch {
     logDebug("session", "flow-state persistence is best-effort -- stage still advances");
   }

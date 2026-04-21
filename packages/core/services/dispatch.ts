@@ -19,7 +19,6 @@ import type { AppContext } from "../app.js";
 import * as flow from "../state/flow.js";
 import * as agentRegistry from "../agent/agent.js";
 import { saveCheckpoint } from "../session/checkpoint.js";
-import { setCurrentStage } from "../state/flow-state.js";
 import { logDebug } from "../observability/structured-log.js";
 import { recordEvent } from "../observability.js";
 import { track } from "../observability/telemetry.js";
@@ -402,7 +401,7 @@ export async function dispatch(
 
   // Persist flow state: mark current stage
   try {
-    setCurrentStage(app, sessionId, session.stage!, session.flow);
+    app.flowStates.setCurrentStage(sessionId, session.stage!, session.flow);
   } catch {
     logDebug("session", "skip flow-state on error");
   }
