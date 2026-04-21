@@ -45,11 +45,11 @@ async function cleanZombieSessions(app: AppContext): Promise<number> {
 
 export function registerResourceHandlers(router: Router, app: AppContext): void {
   router.handle("agent/list", async () => {
-    return { agents: app.agents.list(resolveProjectRoot()) };
+    return { agents: await app.agents.list(resolveProjectRoot()) };
   });
   router.handle("agent/read", async (p) => {
     const { name } = extract<AgentReadParams>(p, ["name"]);
-    const agent = app.agents.get(name, resolveProjectRoot());
+    const agent = await app.agents.get(name, resolveProjectRoot());
     if (!agent) throw new Error(`Agent '${name}' not found`);
     return { agent };
   });
@@ -64,7 +64,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const params = extract<Partial<AgentDefinition> & { name: string; scope?: Scope }>(p, ["name"]);
     const { scope, ...rest } = params;
     const projectRoot = resolveProjectRoot();
-    const existing = app.agents.get(params.name, projectRoot);
+    const existing = await app.agents.get(params.name, projectRoot);
     if (existing && existing._source !== "builtin") {
       throw new Error(`Agent '${params.name}' already exists. Use agent/update to modify it.`);
     }
@@ -86,7 +86,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
       ...(rest.task_delivery ? { task_delivery: rest.task_delivery } : {}),
     };
     const resolvedScope = resolveScope(scope, null, projectRoot);
-    app.agents.save(agent.name, agent, resolvedScope, projectArg(resolvedScope, projectRoot));
+    await app.agents.save(agent.name, agent, resolvedScope, projectArg(resolvedScope, projectRoot));
     return { ok: true, name: agent.name, scope: resolvedScope };
   });
 
@@ -94,30 +94,30 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const params = extract<Partial<AgentDefinition> & { name: string; scope?: Scope }>(p, ["name"]);
     const { scope, ...rest } = params;
     const projectRoot = resolveProjectRoot();
-    const existing = app.agents.get(params.name, projectRoot);
+    const existing = await app.agents.get(params.name, projectRoot);
     if (!existing) throw new Error(`Agent '${params.name}' not found`);
     guardBuiltin(existing, "Agent", params.name, "edit");
     const merged: AgentDefinition = { ...existing, ...rest, name: params.name };
     const resolvedScope = resolveScope(scope, existing, projectRoot);
-    app.agents.save(merged.name, merged, resolvedScope, projectArg(resolvedScope, projectRoot));
+    await app.agents.save(merged.name, merged, resolvedScope, projectArg(resolvedScope, projectRoot));
     return { ok: true, name: merged.name, scope: resolvedScope };
   });
 
   router.handle("agent/delete", async (p) => {
     const { name, scope } = extract<{ name: string; scope?: Scope }>(p, ["name"]);
     const projectRoot = resolveProjectRoot();
-    const existing = app.agents.get(name, projectRoot);
+    const existing = await app.agents.get(name, projectRoot);
     if (!existing) throw new Error(`Agent '${name}' not found`);
     guardBuiltin(existing, "Agent", name, "delete");
     const resolvedScope = resolveScope(scope, existing, projectRoot);
-    const ok = app.agents.delete(name, resolvedScope, projectArg(resolvedScope, projectRoot));
+    const ok = await app.agents.delete(name, resolvedScope, projectArg(resolvedScope, projectRoot));
     return { ok };
   });
 
-  router.handle("flow/list", async () => ({ flows: app.flows.list() }));
+  router.handle("flow/list", async () => ({ flows: await app.flows.list() }));
   router.handle("flow/read", async (p) => {
     const { name } = extract<FlowReadParams>(p, ["name"]);
-    const flow = app.flows.get(name);
+    const flow = await app.flows.get(name);
     if (!flow) throw new Error(`Flow '${name}' not found`);
     return { flow };
   });
@@ -141,7 +141,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     if (!Array.isArray(params.stages) || params.stages.length === 0) {
       throw new Error("flow/create requires at least one stage");
     }
-    const summary = app.flows.list().find((f) => f.name === params.name);
+    const summary = (await app.flows.list()).find((f) => f.name === params.name);
     if (summary && summary.source !== "builtin") {
       throw new Error(`Flow '${params.name}' already exists.`);
     }
@@ -153,24 +153,24 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
       description: params.description,
       stages: params.stages,
     } as unknown as Parameters<typeof app.flows.save>[1];
-    app.flows.save(params.name, flow, params.scope ?? "global");
+    await app.flows.save(params.name, flow, params.scope ?? "global");
     return { ok: true, name: params.name };
   });
 
   router.handle("flow/delete", async (p) => {
     const { name, scope } = extract<{ name: string; scope?: Scope }>(p, ["name"]);
-    const summary = app.flows.list().find((f) => f.name === name);
+    const summary = (await app.flows.list()).find((f) => f.name === name);
     if (!summary) throw new Error(`Flow '${name}' not found`);
     // Flow summaries use `source` (not `_source`); adapt to the shared guard.
     guardBuiltin({ _source: summary.source }, "Flow", name, "delete");
-    const ok = app.flows.delete(name, scope ?? "global");
+    const ok = await app.flows.delete(name, scope ?? "global");
     return { ok };
   });
 
-  router.handle("skill/list", async () => ({ skills: app.skills.list() }));
+  router.handle("skill/list", async () => ({ skills: await app.skills.list() }));
   router.handle("skill/read", async (p) => {
     const { name } = extract<SkillReadParams>(p, ["name"]);
-    return { skill: app.skills.get(name) };
+    return { skill: await app.skills.get(name) };
   });
 
   /**
@@ -202,24 +202,24 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const ok = app.skills.delete(name, resolvedScope, projectArg(resolvedScope, projectRoot));
     return { ok };
   });
-  router.handle("runtime/list", async () => ({ runtimes: app.runtimes.list() }));
+  router.handle("runtime/list", async () => ({ runtimes: await app.runtimes.list() }));
   router.handle("runtime/read", async (p) => {
     const { name } = extract<RuntimeReadParams>(p, ["name"]);
-    const runtime = app.runtimes.get(name);
+    const runtime = await app.runtimes.get(name);
     if (!runtime) throw new Error(`Runtime '${name}' not found`);
     return { runtime };
   });
-  router.handle("recipe/list", async () => ({ recipes: app.recipes.list() }));
+  router.handle("recipe/list", async () => ({ recipes: await app.recipes.list() }));
   router.handle("recipe/read", async (p) => {
     const { name } = extract<RecipeReadParams>(p, ["name"]);
-    const recipe = app.recipes.get(name);
+    const recipe = await app.recipes.get(name);
     if (!recipe) throw new Error(`Recipe '${name}' not found`);
     return { recipe };
   });
 
   router.handle("recipe/use", async (p) => {
     const { name, variables } = extract<RecipeUseParams>(p, ["name"]);
-    const recipe = app.recipes.get(name);
+    const recipe = await app.recipes.get(name);
     if (!recipe) throw new Error(`Recipe '${name}' not found`);
     const instance = instantiateRecipe(recipe, (variables ?? {}) as Record<string, string>);
     const session = await app.sessionService.start(instance);
@@ -236,7 +236,16 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const ok = app.recipes.delete(name, resolvedScope, projectArg(resolvedScope, projectRoot));
     return { ok };
   });
-  router.handle("compute/list", async () => ({ targets: await app.computes.list() }));
+  router.handle("compute/list", async (p) => {
+    // `include` filters between concrete targets and template blueprints.
+    // Default "all" preserves the pre-unification behaviour.
+    const { include } = extract<{ include?: "all" | "concrete" | "template" }>(p ?? {}, []);
+    let targets;
+    if (include === "template") targets = await app.computes.listTemplates();
+    else if (include === "concrete") targets = await app.computes.listConcrete();
+    else targets = await app.computes.list();
+    return { targets };
+  });
   router.handle("compute/create", async (p) => {
     // Accept either legacy `{provider}` or new `{compute, runtime}`.
     // When only `provider` is given the repo derives the pair via
@@ -248,12 +257,16 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
       compute: computeKind,
       runtime: runtimeKind,
       config,
+      is_template,
+      cloned_from,
     } = extract<{
       name: string;
       provider?: import("../../types/index.js").ComputeProviderName;
       compute?: import("../../types/index.js").ComputeKindName;
       runtime?: import("../../types/index.js").RuntimeKindName;
       config?: Partial<import("../../types/index.js").ComputeConfig>;
+      is_template?: boolean;
+      cloned_from?: string;
     }>(p, ["name"]);
 
     let effectiveProvider = provider;
@@ -297,6 +310,8 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
       compute: computeKind,
       runtime: runtimeKind,
       config,
+      is_template,
+      cloned_from,
     });
     return { compute };
   });
@@ -358,12 +373,61 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const compute = await app.computes.get(name);
     if (!compute) throw new Error("Compute not found");
     const { getProvider } = await import("../../compute/index.js");
+
+    // Template provision: clone the template into a named concrete row,
+    // then provision the clone. This mirrors the session auto-clone path
+    // (see resolveComputeForStage in core/services/dispatch.ts) but triggered
+    // manually by the user so they get a long-lived instance they can attach
+    // to outside of any session context.
+    if (compute.is_template) {
+      const cloneName = `${compute.name}-${Date.now().toString(36)}`;
+      await app.computes.create({
+        name: cloneName,
+        provider: compute.provider,
+        compute: compute.compute_kind,
+        runtime: compute.runtime_kind,
+        config: JSON.parse(JSON.stringify(compute.config ?? {})),
+        is_template: false,
+        cloned_from: compute.name,
+      });
+      const clone = (await app.computes.get(cloneName))!;
+      const provider = getProvider(clone.provider);
+      if (!provider) throw new Error(`Provider '${clone.provider}' not found`);
+      await app.computes.update(clone.name, { status: "provisioning" });
+      try {
+        // Provision validates the environment (namespace exists, config
+        // sane), then Start brings up the real instance pod / container /
+        // VM. Template provision without Start would leave a clone row
+        // with no backing infra, which defeats the purpose of manual
+        // provision.
+        await provider.provision(clone);
+        await provider.start(clone);
+        // provider.start sets status=running; re-read to be safe.
+        const started = (await app.computes.get(clone.name))!;
+        return { ok: true, name: cloneName, cloned_from: compute.name, status: started.status };
+      } catch (e: any) {
+        // Record the failure so the row doesn't sit forever at
+        // "provisioning" with no actions. User can Destroy from the UI
+        // or retry Provision on the template.
+        await app.computes.update(clone.name, { status: "failed" });
+        throw new RpcError(
+          `Failed to provision clone '${cloneName}' from template '${compute.name}': ${e?.message ?? e}`,
+          ErrorCodes.INTERNAL_ERROR,
+        );
+      }
+    }
+
     const provider = getProvider(compute.provider);
     if (!provider) throw new Error(`Provider '${compute.provider}' not found`);
     await app.computes.update(compute.name, { status: "provisioning" });
-    await provider.provision(compute);
-    await app.computes.update(compute.name, { status: "running" });
-    return { ok: true };
+    try {
+      await provider.provision(compute);
+      await app.computes.update(compute.name, { status: "running" });
+      return { ok: true, name: compute.name };
+    } catch (e: any) {
+      await app.computes.update(compute.name, { status: "failed" });
+      throw new RpcError(`Failed to provision '${compute.name}': ${e?.message ?? e}`, ErrorCodes.INTERNAL_ERROR);
+    }
   });
   router.handle("compute/stop-instance", async (p) => {
     const { name } = extract<ComputeNameParams>(p, ["name"]);

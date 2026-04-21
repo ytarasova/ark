@@ -497,9 +497,21 @@ export class ArkClient {
     return this.rpc("recipe/delete", { name, scope });
   }
 
-  async computeList(): Promise<Compute[]> {
-    const { targets } = await this.rpc<ComputeListResult>("compute/list");
+  async computeList(opts?: { include?: "all" | "concrete" | "template" }): Promise<Compute[]> {
+    const { targets } = await this.rpc<ComputeListResult>("compute/list", opts ?? {});
     return targets;
+  }
+
+  /**
+   * Discover k8s contexts (and optionally namespaces) from the server's
+   * kubeconfig. Powers interactive pickers in the CLI and web UI.
+   */
+  async k8sDiscover(opts?: { kubeconfig?: string; includeNamespaces?: boolean }): Promise<{
+    contexts: Array<{ name: string; cluster?: string; user?: string }>;
+    current: string;
+    namespacesByContext?: Record<string, string[]>;
+  }> {
+    return this.rpc("k8s/discover", opts ?? {});
   }
 
   async computeCreate(opts: Record<string, unknown>): Promise<Compute> {

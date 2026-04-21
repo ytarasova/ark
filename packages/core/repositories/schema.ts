@@ -70,6 +70,8 @@ export async function initSchema(db: IDatabase): Promise<void> {
       runtime_kind TEXT NOT NULL DEFAULT 'direct',
       status TEXT NOT NULL DEFAULT 'stopped',
       config TEXT DEFAULT '{}',
+      is_template INTEGER NOT NULL DEFAULT 0,
+      cloned_from TEXT,
       tenant_id TEXT NOT NULL DEFAULT 'default',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL

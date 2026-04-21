@@ -26,6 +26,9 @@ const ComputePage = lazy(() => import("./pages/ComputePage.js").then((m) => ({ d
 const SchedulesPage = lazy(() => import("./pages/SchedulesPage.js").then((m) => ({ default: m.SchedulesPage })));
 const MemoryPage = lazy(() => import("./pages/MemoryPage.js").then((m) => ({ default: m.MemoryPage })));
 const CostsPage = lazy(() => import("./pages/CostsPage.js").then((m) => ({ default: m.CostsPage })));
+const IntegrationsPage = lazy(() =>
+  import("./pages/IntegrationsPage.js").then((m) => ({ default: m.IntegrationsPage })),
+);
 const SettingsPage = lazy(() => import("./pages/SettingsPage.js").then((m) => ({ default: m.SettingsPage })));
 const LoginPage = lazy(() => import("./pages/LoginPage.js").then((m) => ({ default: m.LoginPage })));
 const DesignPreviewPage = lazy(() =>
@@ -169,6 +172,7 @@ function App() {
               daemonStatus={daemonStatus}
               initialSelectedId={subId}
               onSelectedChange={setSubId}
+              onToast={showToast}
             />
           )}
           {view === "schedules" && (
@@ -185,6 +189,16 @@ function App() {
           )}
           {view === "costs" && (
             <CostsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />
+          )}
+          {view === "integrations" && (
+            <IntegrationsPage
+              view={view}
+              onNavigate={onNavigate}
+              readOnly={readOnly}
+              daemonStatus={daemonStatus}
+              initialTab={subId}
+              onTabChange={setSubId}
+            />
           )}
           {view === "settings" && (
             <SettingsPage view={view} onNavigate={onNavigate} readOnly={readOnly} daemonStatus={daemonStatus} />

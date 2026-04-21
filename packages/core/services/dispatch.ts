@@ -31,10 +31,24 @@ import { sessionAsVars, buildTaskWithHandoff, extractSubtasks } from "./task-bui
 import { indexRepoForDispatch, injectKnowledgeContext, injectRepoMap } from "./dispatch-context.js";
 
 /**
- * Resolve compute for a stage that specifies a compute_template.
- * Looks up the template from DB, then config. If a matching compute
- * already exists (named "<template>"), reuses it; otherwise provisions one.
- * Returns the compute name to use, or null if no template specified / not found.
+ * Resolve compute for a stage that references a named compute target.
+ *
+ * After the unification of compute targets and templates into a single
+ * table, the resolution path is uniform regardless of which axis the
+ * stage used:
+ *
+ *   - `stageDef.compute` -- modern reference.
+ *   - `stageDef.compute_template` -- legacy reference, preserved so old
+ *     flow YAMLs keep working. Resolved identically to `compute`.
+ *
+ * Behavior:
+ *   - If the named row is not found -> fall through to config-defined
+ *     templates (legacy convenience), then return null (session default).
+ *   - If the row is a template (`is_template: true`) -> CLONE it into a
+ *     fresh per-session concrete row named `<template>-<sessionId8>`,
+ *     with `cloned_from = <template>`. GC prunes the clone when the
+ *     session reaches a terminal state.
+ *   - If the row is concrete -> return its name as-is.
  */
 export async function resolveComputeForStage(
   app: AppContext,
@@ -42,61 +56,83 @@ export async function resolveComputeForStage(
   sessionId: string,
   log: (msg: string) => void = () => {},
 ): Promise<string | null> {
-  // Direct compute reference takes precedence over template lookup.
-  // Use this when you want to point a stage at an already-provisioned
-  // long-lived target (e.g. a shared EC2 fleet member).
-  if (stageDef?.compute) {
-    const existing = await app.computes.get(stageDef.compute);
-    if (!existing) {
-      log(`Stage compute '${stageDef.compute}' not found, falling back to session default`);
-      return null;
-    }
-    return stageDef.compute;
-  }
+  const ref = stageDef?.compute ?? stageDef?.compute_template;
+  if (!ref) return null;
 
-  if (!stageDef?.compute_template) return null;
+  const existing = await app.computes.get(ref);
 
-  const templateName = stageDef.compute_template;
-
-  // Resolve template: DB first, then config
-  let tmpl = await app.computeTemplates.get(templateName);
-  if (!tmpl) {
-    const cfgTmpl = (app.config.computeTemplates ?? []).find((t) => t.name === templateName);
+  if (!existing) {
+    // Fallback: config-defined template catalog lets users declare
+    // templates in ~/.ark/config.yaml without hitting the DB. Seed a
+    // fresh template row from config, then clone it below.
+    const cfgTmpl = (app.config.computeTemplates ?? []).find((t) => t.name === ref);
     if (cfgTmpl) {
-      tmpl = {
+      log(`Seeding template '${ref}' from config`);
+      await app.computes.create({
         name: cfgTmpl.name,
-        description: cfgTmpl.description,
         provider: cfgTmpl.provider as import("../../types/index.js").ComputeProviderName,
         config: cfgTmpl.config,
-      };
+        is_template: true,
+      });
+      return cloneTemplate(app, cfgTmpl.name, sessionId, log);
     }
-  }
-
-  if (!tmpl) {
-    log(`Compute template '${templateName}' not found, using session default`);
+    log(`Stage compute '${ref}' not found, falling back to session default`);
     return null;
   }
 
-  // Check if a compute with the template name already exists
-  const existing = await app.computes.get(templateName);
-  if (existing) {
-    log(`Using existing compute '${templateName}' from template`);
+  if (existing.is_template) {
+    return cloneTemplate(app, existing.name, sessionId, log);
+  }
+
+  // Concrete target -- use directly, no cloning.
+  return existing.name;
+}
+
+/**
+ * Clone a template row into a per-session concrete row. Inherits provider,
+ * compute_kind, runtime_kind and a deep copy of the template's config so
+ * per-session mutations (e.g. an assigned pod IP) don't leak back.
+ */
+async function cloneTemplate(
+  app: AppContext,
+  templateName: string,
+  sessionId: string,
+  log: (msg: string) => void,
+): Promise<string> {
+  const tmpl = await app.computes.get(templateName);
+  if (!tmpl) {
+    // Shouldn't happen -- caller already checked -- but be defensive.
+    log(`Template '${templateName}' disappeared before clone`);
     return templateName;
   }
 
-  // Provision a new compute from the template
-  log(`Provisioning compute '${templateName}' from template`);
-  await app.computes.create({
-    name: templateName,
-    provider: tmpl.provider,
-    config: tmpl.config,
-  });
-  await app.events.log(sessionId, "compute_provisioned_from_template", {
-    actor: "system",
-    data: { template: templateName, provider: tmpl.provider },
-  });
+  const cloneName = `${templateName}-${sessionId.slice(0, 8)}`;
 
-  return templateName;
+  // Idempotent: if a prior dispatch for this session already cloned the
+  // template (e.g. on resume), reuse the existing clone.
+  const existingClone = await app.computes.get(cloneName);
+  if (existingClone) {
+    log(`Reusing existing clone '${cloneName}' of template '${templateName}'`);
+    return cloneName;
+  }
+
+  log(`Cloning template '${templateName}' into '${cloneName}' for session ${sessionId}`);
+  await app.computes.create({
+    name: cloneName,
+    provider: tmpl.provider,
+    compute: tmpl.compute_kind,
+    runtime: tmpl.runtime_kind,
+    // Deep-copy via JSON round-trip so later per-session mutations don't
+    // leak back into the template row.
+    config: JSON.parse(JSON.stringify(tmpl.config ?? {})),
+    is_template: false,
+    cloned_from: templateName,
+  });
+  await app.events.log(sessionId, "compute_cloned_from_template", {
+    actor: "system",
+    data: { template: templateName, clone: cloneName, provider: tmpl.provider },
+  });
+  return cloneName;
 }
 
 /** Hosted-mode dispatch: delegate to the tenant-aware scheduler + remote arkd launch. */

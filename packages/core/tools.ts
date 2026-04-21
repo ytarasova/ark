@@ -109,8 +109,9 @@ function discoverContext(projectDir: string): ToolEntry[] {
   ];
 }
 
-function discoverArkSkills(app: AppContext, projectDir?: string): ToolEntry[] {
-  return app.skills.list(projectDir).map((s) => ({
+async function discoverArkSkills(app: AppContext, projectDir?: string): Promise<ToolEntry[]> {
+  const skills = await app.skills.list(projectDir);
+  return skills.map((s) => ({
     kind: "ark-skill" as const,
     name: s.name,
     description: s.description ?? "",
@@ -118,8 +119,9 @@ function discoverArkSkills(app: AppContext, projectDir?: string): ToolEntry[] {
   }));
 }
 
-function discoverArkRecipes(app: AppContext, projectDir?: string): ToolEntry[] {
-  return app.recipes.list(projectDir).map((r) => ({
+async function discoverArkRecipes(app: AppContext, projectDir?: string): Promise<ToolEntry[]> {
+  const recipes = await app.recipes.list(projectDir);
+  return recipes.map((r) => ({
     kind: "ark-recipe" as const,
     name: r.name,
     description: r.description ?? "",
@@ -133,7 +135,7 @@ function discoverArkRecipes(app: AppContext, projectDir?: string): ToolEntry[] {
  * Discover ALL tool types from a project directory.
  * Returns a unified ToolEntry[] sorted by kind then name.
  */
-export function discoverTools(projectDir?: string, app?: AppContext): ToolEntry[] {
+export async function discoverTools(projectDir?: string, app?: AppContext): Promise<ToolEntry[]> {
   const entries: ToolEntry[] = [];
 
   if (projectDir) {
@@ -144,8 +146,8 @@ export function discoverTools(projectDir?: string, app?: AppContext): ToolEntry[
   }
 
   if (app) {
-    entries.push(...discoverArkSkills(app, projectDir));
-    entries.push(...discoverArkRecipes(app, projectDir));
+    entries.push(...(await discoverArkSkills(app, projectDir)));
+    entries.push(...(await discoverArkRecipes(app, projectDir)));
   }
 
   // Sort by kind then name

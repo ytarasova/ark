@@ -4,6 +4,7 @@ import { join, dirname } from "path";
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { homedir } from "os";
 import { execFileSync } from "child_process";
+import { createInterface } from "readline";
 import { getProvider, allFlagSpecs, getFlagSpec } from "../../compute/index.js";
 import type { ProviderFlagOption } from "../../compute/index.js";
 import { getArkClient } from "./_shared.js";
@@ -11,6 +12,73 @@ import { ComputePoolManager } from "../../core/compute/pool.js";
 import type { ComputeProviderName } from "../../types/index.js";
 import { logDebug } from "../../core/observability/structured-log.js";
 import type { AppContext } from "../../core/app.js";
+
+/**
+ * Minimal raw-readline prompt. Returns the trimmed user input or the
+ * `fallback` when the user just hits enter. Respects `--no-prompt` and
+ * non-TTY invocations by returning `fallback` without blocking.
+ */
+async function prompt(question: string, fallback: string, allowed?: string[]): Promise<string> {
+  if (!process.stdin.isTTY || process.env.ARK_NO_PROMPT === "1") return fallback;
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return await new Promise<string>((resolve) => {
+      rl.question(question, (raw: string) => {
+        const trimmed = (raw ?? "").trim();
+        if (!trimmed) return resolve(fallback);
+        if (allowed && allowed.length && !allowed.includes(trimmed)) return resolve(fallback);
+        resolve(trimmed);
+      });
+    });
+  } finally {
+    rl.close();
+  }
+}
+
+/**
+ * Walk the user through the required k8s target fields when the caller
+ * omitted them. No-op on a non-TTY. Mutates `opts` in place with the
+ * picked context / namespace / image.
+ */
+async function promptK8sIfNeeded(opts: Record<string, any>): Promise<void> {
+  if (opts.noPrompt) return;
+  if (!process.stdin.isTTY) return;
+  const needsContext = !opts.context;
+  const needsNamespace = !opts.namespace;
+  const needsImage = !opts.image;
+  if (!needsContext && !needsNamespace && !needsImage) return;
+
+  let contexts: Array<{ name: string }> = [];
+  let currentContext = "";
+  if (needsContext) {
+    try {
+      const ark = await getArkClient();
+      const discovery = await ark.k8sDiscover();
+      contexts = (discovery?.contexts ?? []) as Array<{ name: string }>;
+      currentContext = (discovery?.current ?? "") as string;
+      if (contexts.length) {
+        console.log(chalk.bold("\nAvailable k8s contexts:"));
+        contexts.forEach((c, i) =>
+          console.log(`  ${i + 1}) ${c.name}${c.name === currentContext ? " (current)" : ""}`),
+        );
+      }
+    } catch (e: any) {
+      console.log(chalk.dim(`(k8s/discover unavailable: ${e.message}) -- enter context manually`));
+    }
+    const ctx = await prompt(
+      `Context [${currentContext || "enter name"}]: `,
+      currentContext || "",
+      contexts.length ? contexts.map((c) => c.name) : undefined,
+    );
+    if (ctx) opts.context = ctx;
+  }
+  if (needsNamespace) {
+    opts.namespace = await prompt("Namespace [ark]: ", "ark");
+  }
+  if (needsImage) {
+    opts.image = await prompt("Image [ghcr.io/ytarasova/ark:latest]: ", "ghcr.io/ytarasova/ark:latest");
+  }
+}
 
 /**
  * Apply every registered provider's Commander options to `create`, de-duped
@@ -59,7 +127,7 @@ export function registerComputeCommands(program: Command, app: AppContext) {
 
   const createCmd = computeCmd
     .command("create")
-    .description("Create a new compute resource")
+    .description("Create a new compute resource (concrete target or reusable template)")
     .argument("<name>", "Compute name")
     // Two-axis flags:
     .option("--compute <kind>", "Compute kind (local, firecracker, ec2, k8s, k8s-kata)")
@@ -68,7 +136,10 @@ export function registerComputeCommands(program: Command, app: AppContext) {
     .option(
       "--provider <type>",
       "[deprecated] Provider type (local, docker, ec2, k8s, k8s-kata). Use --compute + --runtime.",
-    );
+    )
+    // Unified-model: template vs concrete target is now just a flag.
+    .option("--template", "Create a reusable template (blueprint) instead of a concrete compute target")
+    .option("--no-prompt", "Skip interactive prompts (fail if required fields are missing)");
 
   // Per-provider flags come from the flag-spec registry; each provider owns
   // its own knobs via `packages/compute/flag-specs/*.ts`. Adding a new
@@ -104,10 +175,19 @@ export function registerComputeCommands(program: Command, app: AppContext) {
       opts.provider = pairToProvider({ compute: newCompute as any, runtime: newRuntime as any }) ?? newCompute;
     }
 
-    if (opts.provider === "local" && !opts.fromTemplate && !newCompute) {
+    // Templates don't need the "local is auto-created" guard -- a local
+    // template is fine, it'll never be provisioned, only cloned from.
+    if (!opts.template && opts.provider === "local" && !opts.fromTemplate && !newCompute) {
       console.log(chalk.red("Local compute is auto-created. Use 'ec2' or 'docker' provider, or --from-template."));
       return;
     }
+
+    // K8s interactive prompts when the user omitted required fields.
+    // Skip on non-TTY and when --no-prompt is passed.
+    if ((opts.provider === "k8s" || opts.provider === "k8s-kata" || newCompute === "k8s") && !opts.fromTemplate) {
+      await promptK8sIfNeeded(opts);
+    }
+
     try {
       const ark = await getArkClient();
 
@@ -147,13 +227,19 @@ export function registerComputeCommands(program: Command, app: AppContext) {
         ...(newCompute ? { compute: newCompute } : {}),
         ...(newRuntime ? { runtime: newRuntime } : {}),
         config,
+        ...(opts.template ? { is_template: true } : {}),
       } as any);
 
-      console.log(chalk.green(`Compute '${compute.name}' created`));
+      // The kind-label is the most important thing a user sees -- make it
+      // unambiguous whether they just made a template or a concrete target.
+      const ck = (compute as any).compute_kind ?? "-";
+      const rk = (compute as any).runtime_kind ?? "-";
+      const kindLabel = opts.template ? "TEMPLATE" : "COMPUTE";
+      console.log(chalk.green(`Created ${kindLabel} '${compute.name}' (${ck}/${rk})`));
       console.log(`  Provider: ${compute.provider}`);
       if ((compute as any).compute_kind || (compute as any).runtime_kind) {
-        console.log(`  Compute:  ${(compute as any).compute_kind ?? "-"}`);
-        console.log(`  Runtime:  ${(compute as any).runtime_kind ?? "-"}`);
+        console.log(`  Compute:  ${ck}`);
+        console.log(`  Runtime:  ${rk}`);
       }
       console.log(`  Status:   ${compute.status}`);
 
@@ -281,22 +367,28 @@ export function registerComputeCommands(program: Command, app: AppContext) {
 
   computeCmd
     .command("list")
-    .description("List all compute")
-    .action(async () => {
+    .description("List compute targets and templates")
+    .option("--templates-only", "Only list templates (reusable config blueprints)")
+    .option("--concrete-only", "Only list concrete compute targets")
+    .action(async (opts) => {
       const ark = await getArkClient();
-      const computes = await ark.computeList();
+      const include = opts.templatesOnly ? "template" : opts.concreteOnly ? "concrete" : "all";
+      const computes = (await ark.computeList({ include })) as Array<Record<string, any>>;
       if (!computes.length) {
         console.log(chalk.dim("No compute. Create one: ark compute create <name> --compute local --runtime direct"));
         return;
       }
       console.log(
-        `  ${"NAME".padEnd(20)} ${"COMPUTE".padEnd(12)} ${"RUNTIME".padEnd(12)} ${"PROVIDER".padEnd(10)} ${"STATUS".padEnd(14)} IP`,
+        `  ${"NAME".padEnd(20)} ${"KIND".padEnd(9)} ${"COMPUTE".padEnd(12)} ${"RUNTIME".padEnd(12)} ${"PROVIDER".padEnd(10)} ${"STATUS".padEnd(14)} IP`,
       );
       for (const h of computes) {
-        const ip = (h.config as { ip?: string }).ip ?? "-";
-        const ck = String((h as any).compute_kind ?? "-").padEnd(12);
-        const rk = String((h as any).runtime_kind ?? "-").padEnd(12);
-        console.log(`  ${h.name.padEnd(20)} ${ck} ${rk} ${h.provider.padEnd(10)} ${h.status.padEnd(14)} ${ip}`);
+        const ip = (h.config as { ip?: string })?.ip ?? "-";
+        const ck = String(h.compute_kind ?? "-").padEnd(12);
+        const rk = String(h.runtime_kind ?? "-").padEnd(12);
+        const kind = (h.is_template ? "template" : "compute").padEnd(9);
+        console.log(
+          `  ${String(h.name).padEnd(20)} ${kind} ${ck} ${rk} ${String(h.provider).padEnd(10)} ${String(h.status).padEnd(14)} ${ip}`,
+        );
       }
     });
 
@@ -608,7 +700,7 @@ export function registerComputeCommands(program: Command, app: AppContext) {
 
   template
     .command("create")
-    .description("Create a compute template")
+    .description("Create a compute template (convenience alias for 'compute create --template')")
     .argument("<name>", "Template name")
     .option("--provider <type>", "Provider type", "ec2")
     .option("--description <desc>", "Description")
@@ -628,14 +720,19 @@ export function registerComputeCommands(program: Command, app: AppContext) {
         if (opts.image) config.image = opts.image;
         if (opts.namespace) config.namespace = opts.namespace;
 
-        app.computeTemplates.create({
+        // Route through the unified RPC so templates and concrete targets
+        // stay in lockstep (same tenant policies, same k8s validation).
+        const ark = await getArkClient();
+        const compute = await ark.computeCreate({
           name,
-          description: opts.description,
           provider: opts.provider,
           config,
-        });
+          is_template: true,
+        } as any);
 
-        console.log(chalk.green(`Template '${name}' created`));
+        const ck = (compute as any).compute_kind ?? "-";
+        const rk = (compute as any).runtime_kind ?? "-";
+        console.log(chalk.green(`Created TEMPLATE '${name}' (${ck}/${rk})`));
         console.log(`  Provider: ${opts.provider}`);
         for (const [k, v] of Object.entries(config)) {
           console.log(`  ${k}: ${v}`);

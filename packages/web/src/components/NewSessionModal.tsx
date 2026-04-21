@@ -25,6 +25,8 @@ interface ComputeInfo {
   name: string;
   type?: string;
   provider?: string;
+  status?: string;
+  is_template?: boolean;
 }
 
 interface RecentRepo {
@@ -169,18 +171,34 @@ function ComputeDropdown({
   const [open, setOpen] = useState(false);
   const current = computes.find((c) => c.name === selected);
 
+  // Only dispatchable rows: templates (clone-on-dispatch) and running
+  // concrete targets. A stopped / failed / destroyed concrete has no live
+  // infrastructure to accept the session, so showing it would just let the
+  // user pick something that immediately errors.
+  const dispatchable = computes.filter((c) => c.is_template || c.status === "running");
+
+  const KindBadge = ({ c }: { c: ComputeInfo }) => (
+    <span
+      className={cn(
+        "text-[9px] px-1.5 py-[1px] rounded-full font-mono uppercase tracking-wider",
+        c.is_template ? "bg-[var(--primary)]/15 text-[var(--primary)]" : "bg-[var(--running)]/15 text-[var(--running)]",
+      )}
+    >
+      {c.is_template ? "Template" : "Running"}
+    </span>
+  );
+
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         <button type="button" className={triggerClass}>
           <Monitor size={14} className="text-[var(--fg-muted)] shrink-0 mr-2" />
-          <span className="truncate text-left flex-1">
+          <span className="truncate text-left flex-1 flex items-center gap-2">
             {current ? (
               <>
                 <span className="font-medium">{current.name}</span>
-                {current.provider && (
-                  <span className="text-[var(--fg-muted)] ml-1.5 text-[12px]">{current.provider}</span>
-                )}
+                <KindBadge c={current} />
+                {current.provider && <span className="text-[var(--fg-muted)] text-[12px]">{current.provider}</span>}
               </>
             ) : (
               <span className="text-[var(--fg-muted)]">Select compute...</span>
@@ -191,7 +209,7 @@ function ComputeDropdown({
       </Popover.Trigger>
       <Popover.Portal>
         <Popover.Content sideOffset={4} align="start" className={popoverContentClass}>
-          {computes.map((c) => (
+          {dispatchable.map((c) => (
             <button
               key={c.name}
               type="button"
@@ -209,15 +227,20 @@ function ComputeDropdown({
                 {selected === c.name && <Check size={14} className="text-[var(--primary)]" />}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-[13px] font-medium text-[var(--fg)]">{c.name}</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[13px] font-medium text-[var(--fg)]">{c.name}</span>
+                  <KindBadge c={c} />
+                </div>
                 {(c.provider || c.type) && (
                   <div className="text-[11px] text-[var(--fg-muted)]">{c.provider || c.type}</div>
                 )}
               </div>
             </button>
           ))}
-          {computes.length === 0 && (
-            <div className="px-3 py-4 text-[12px] text-[var(--fg-muted)] text-center">No compute targets</div>
+          {dispatchable.length === 0 && (
+            <div className="px-3 py-4 text-[12px] text-[var(--fg-muted)] text-center">
+              No dispatchable computes. Start a concrete target or create a template first.
+            </div>
           )}
         </Popover.Content>
       </Popover.Portal>

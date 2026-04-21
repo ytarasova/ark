@@ -12,6 +12,7 @@ interface ComputePageProps {
   daemonStatus?: DaemonStatus | null;
   initialSelectedId?: string | null;
   onSelectedChange?: (id: string | null) => void;
+  onToast?: (msg: string, type: string) => void;
 }
 
 export function ComputePage({
@@ -21,6 +22,7 @@ export function ComputePage({
   daemonStatus,
   initialSelectedId,
   onSelectedChange,
+  onToast,
 }: ComputePageProps) {
   const [showNew, setShowNew] = useState(false);
 
@@ -43,6 +45,7 @@ export function ComputePage({
           onNavigate={onNavigate}
           initialSelectedName={initialSelectedId}
           onSelectedChange={onSelectedChange}
+          onToast={onToast}
         />
       </PageShell>
     </Layout>

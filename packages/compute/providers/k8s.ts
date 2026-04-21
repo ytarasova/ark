@@ -120,6 +120,15 @@ export class K8sProvider implements ComputeProvider {
     return `ark-${session.id}`;
   }
 
+  /**
+   * The name of the long-lived instance pod backing a concrete compute row.
+   * Separate from session-scoped pods (`ark-<sessionId>`) so Start / Stop
+   * on the compute only touches the instance, leaving session pods alone.
+   */
+  protected instancePodName(compute: Compute): string {
+    return `ark-compute-${compute.name}`;
+  }
+
   async provision(compute: Compute): Promise<void> {
     // Validate K8s connectivity
     const api = await this.getApi(compute);
@@ -190,12 +199,95 @@ export class K8sProvider implements ComputeProvider {
     await this.killAgent(compute, session);
   }
 
+  /**
+   * Start the long-lived instance pod for this compute target.
+   *
+   * Historically this just flipped `status=running` in the DB without
+   * creating any actual infrastructure, which left the UI showing "running"
+   * for a compute with zero pods behind it. Now it creates an
+   * `ark-compute-<name>` pod with the configured image + resources, running
+   * `sleep infinity` as a placeholder keep-alive command. Sessions still
+   * spawn their own per-session pods via `launch()`; the instance pod is
+   * separate and only exists to back the "concrete compute target" model.
+   */
   async start(compute: Compute): Promise<void> {
-    this.app!.computes.update(compute.name, { status: "running" });
+    const api = await this.getApi(compute);
+    const cfg = compute.config as K8sConfig;
+    const ns = cfg.namespace;
+    const name = this.instancePodName(compute);
+
+    // Ensure namespace exists -- provision() usually handles this but Start
+    // may be called fresh on a row created directly via `ark compute create`.
+    try {
+      await api.readNamespace({ name: ns });
+    } catch {
+      await api.createNamespace({ body: { metadata: { name: ns } } });
+    }
+
+    // If the pod already exists (user clicked Start twice, or a previous
+    // Start raced), leave it alone -- idempotent by design.
+    try {
+      await api.readNamespacedPod({ name, namespace: ns });
+      await this.app!.computes.update(compute.name, { status: "running" });
+      return;
+    } catch {
+      // fall through to create
+    }
+
+    const pod = {
+      metadata: {
+        name,
+        namespace: ns,
+        labels: {
+          "ark.dev/compute": compute.name,
+          "ark.dev/role": "instance",
+        },
+      },
+      spec: {
+        restartPolicy: "Always",
+        ...(cfg.runtimeClassName ? { runtimeClassName: cfg.runtimeClassName } : {}),
+        ...(cfg.serviceAccount ? { serviceAccountName: cfg.serviceAccount } : {}),
+        containers: [
+          {
+            name: "instance",
+            image: cfg.image,
+            // Keep-alive placeholder. Sessions exec into the pod (or the
+            // session path creates its own pod) when they need to do work.
+            // A future version can replace this with an arkd entrypoint.
+            command: ["/bin/sh", "-c", "sleep infinity"],
+            resources: cfg.resources
+              ? {
+                  requests: { cpu: cfg.resources.cpu, memory: cfg.resources.memory },
+                  limits: { cpu: cfg.resources.cpu, memory: cfg.resources.memory },
+                }
+              : undefined,
+          },
+        ],
+      },
+    };
+
+    await api.createNamespacedPod({ namespace: ns, body: pod });
+    await this.app!.computes.update(compute.name, { status: "running" });
   }
 
   async stop(compute: Compute): Promise<void> {
-    // Delete all ark pods in namespace
+    // Delete only the instance pod -- session pods are managed separately
+    // via cleanupSession and must not be interrupted when a user stops the
+    // compute target (stopping also wouldn't make sense mid-session).
+    const api = await this.getApi(compute);
+    const cfg = compute.config as K8sConfig;
+    const ns = cfg.namespace;
+    try {
+      await api.deleteNamespacedPod({ name: this.instancePodName(compute), namespace: ns });
+    } catch {
+      logDebug("compute", "instance pod may already be gone");
+    }
+    await this.app!.computes.update(compute.name, { status: "stopped" });
+  }
+
+  async destroy(compute: Compute): Promise<void> {
+    // Destroy is broader: tear down the instance AND any lingering session
+    // pods so the row can be deleted without leaving orphans behind.
     const api = await this.getApi(compute);
     const cfg = compute.config as K8sConfig;
     const ns = cfg.namespace;
@@ -207,12 +299,7 @@ export class K8sProvider implements ComputeProvider {
     } catch {
       logDebug("compute", "namespace may not exist yet");
     }
-    this.app!.computes.update(compute.name, { status: "stopped" });
-  }
-
-  async destroy(compute: Compute): Promise<void> {
-    await this.stop(compute);
-    this.app!.computes.update(compute.name, { status: "destroyed" });
+    await this.app!.computes.update(compute.name, { status: "destroyed" });
   }
 
   async attach(_compute: Compute, _session: Session): Promise<void> {

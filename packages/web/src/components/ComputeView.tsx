@@ -17,6 +17,7 @@ interface ComputeViewProps {
   onNavigate?: (view: string, subId?: string) => void;
   initialSelectedName?: string | null;
   onSelectedChange?: (name: string | null) => void;
+  onToast?: (msg: string, type: string) => void;
 }
 
 const MAX_HISTORY = 60;
@@ -27,6 +28,7 @@ export function ComputeView({
   onNavigate,
   initialSelectedName,
   onSelectedChange,
+  onToast,
 }: ComputeViewProps) {
   const queryClient = useQueryClient();
   const { data: computes = [] } = useComputeQuery();
@@ -38,7 +40,6 @@ export function ComputeView({
     setSelectedInternal(item);
     onSelectedChange?.(item ? item.name || item.id || null : null);
   };
-  const [actionMsg, setActionMsg] = useState<{ text: string; type: string } | null>(null);
   const [snapshot, setSnapshot] = useState<ComputeSnapshot | null>(null);
   const [sessions, setSessions] = useState<any[]>([]);
   const [metricsState, setMetricsState] = useState<"loading" | "loaded" | "error">("loading");
@@ -112,9 +113,14 @@ export function ComputeView({
     15000,
   );
 
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
+
   async function handleAction(action: string) {
     if (!selected) return;
+    if (pendingAction) return; // block double-clicks while one is in flight
     const name = selected.name || selected.id;
+    const actionLabel = action.charAt(0).toUpperCase() + action.slice(1);
+    setPendingAction(action);
     try {
       let res: any;
       switch (action) {
@@ -131,18 +137,33 @@ export function ComputeView({
           res = await api.destroyCompute(name);
           break;
         default:
+          setPendingAction(null);
           return;
       }
       if (res.ok !== false) {
-        setActionMsg({ text: action + " successful", type: "success" });
-        queryClient.invalidateQueries({ queryKey: ["compute"] });
+        onToast?.(`${actionLabel} succeeded for '${name}'`, "success");
+        // After destroy, the row is gone -- clear the selection so the user
+        // doesn't stare at a 404 panel.
+        if (action === "destroy") {
+          setSelected(null);
+        }
+        // For provision on a template, the server returns the clone name.
+        // Navigate the user straight to the new concrete row so they can
+        // watch it come up.
+        if (action === "provision" && res?.name && res.name !== name) {
+          onToast?.(`Cloned '${name}' into '${res.name}'`, "success");
+          onSelectedChange?.(res.name);
+        }
+        await queryClient.invalidateQueries({ queryKey: ["compute"] });
+        loadSnapshot();
       } else {
-        setActionMsg({ text: res.message || "Action failed", type: "error" });
+        onToast?.(res.message || `${actionLabel} failed`, "error");
       }
     } catch (err: any) {
-      setActionMsg({ text: err.message || "Action failed", type: "error" });
+      onToast?.(err?.message || `${actionLabel} failed`, "error");
+    } finally {
+      setPendingAction(null);
     }
-    setTimeout(() => setActionMsg(null), 3000);
   }
 
   async function handleCreate(form: any) {
@@ -151,20 +172,27 @@ export function ComputeView({
       if (form.size) config.size = form.size;
       if (form.region) config.region = form.region;
       // Send compute + runtime axes. Provider is omitted -- the server
-      // derives it via pairToProvider for back-compat reads.
+      // derives it via pairToProvider for back-compat reads. is_template
+      // rides on the same RPC -- templates and concrete targets use the
+      // same create surface.
       await api.createCompute({
         name: form.name,
         compute: form.compute,
         runtime: form.runtime,
         config,
+        ...(form.is_template ? { is_template: true } : {}),
       } as any);
       onCloseCreate?.();
       queryClient.invalidateQueries({ queryKey: ["compute"] });
     } catch (err: any) {
-      setActionMsg({ text: err.message || "Failed to create compute", type: "error" });
-      setTimeout(() => setActionMsg(null), 3000);
+      onToast?.(err?.message || "Failed to create compute", "error");
     }
   }
+
+  // Filter: concrete | template. Default shows concrete -- templates are a
+  // less-common secondary view that the user opts into explicitly.
+  const [listFilter, setListFilter] = useState<"concrete" | "template">("concrete");
+  const visibleComputes = computes.filter((c: any) => (listFilter === "template" ? !!c.is_template : !c.is_template));
 
   if (!computes.length && !showCreate) {
     return (
@@ -181,7 +209,29 @@ export function ComputeView({
     <>
       <div className="grid grid-cols-[260px_1fr] overflow-hidden h-full">
         <div className="border-r border-border overflow-y-auto" role="listbox" aria-label="Compute targets">
-          {computes.map((c: any) => (
+          {/* Filter bar: computes | templates. No "All" -- showing both in
+              a flat list was confusing given they share a table but answer
+              different questions. */}
+          <div className="flex gap-1 px-3 py-2 border-b border-border/50 text-[11px]">
+            {(["concrete", "template"] as const).map((f) => (
+              <button
+                key={f}
+                type="button"
+                role="tab"
+                aria-selected={listFilter === f}
+                onClick={() => setListFilter(f)}
+                className={cn(
+                  "px-2 py-1 rounded transition-colors",
+                  listFilter === f
+                    ? "bg-accent text-foreground font-semibold"
+                    : "text-muted-foreground hover:bg-accent/40",
+                )}
+              >
+                {f === "concrete" ? "Computes" : "Templates"}
+              </button>
+            ))}
+          </div>
+          {visibleComputes.map((c: any) => (
             <div
               key={c.name || c.id}
               role="option"
@@ -202,6 +252,15 @@ export function ComputeView({
                   className={cn("inline-block w-2 h-2 rounded-full shrink-0", statusDotColor(c.status || "unknown"))}
                 />
                 <span className="text-foreground truncate">{c.name || c.id}</span>
+                {/* Tiny pill: TEMPLATE vs COMPUTE. Users should never wonder
+                    which they clicked on. Styled to match the existing
+                    Badge component so the page reads consistently. */}
+                <Badge
+                  variant={c.is_template ? "outline" : "secondary"}
+                  className="text-[9px] shrink-0 uppercase tracking-wider"
+                >
+                  {c.is_template ? "template" : "compute"}
+                </Badge>
               </div>
               <Badge variant="secondary" className="text-[10px] shrink-0 ml-2">
                 {/* Prefer compute_kind + runtime_kind; fall back to the
@@ -223,7 +282,7 @@ export function ComputeView({
               metricHistory={metricHistory}
               sessions={sessions}
               onAction={handleAction}
-              actionMsg={actionMsg}
+              pendingAction={pendingAction}
               metricsState={metricsState}
               onRetryMetrics={loadSnapshot}
               onNavigateToSession={(sessionId) => onNavigate?.("sessions", sessionId)}

@@ -52,15 +52,35 @@ export function DashboardView({
   if (summaryQuery.isError) {
     const err: any = summaryQuery.error;
     return (
-      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-        Failed to load dashboard: {err?.message ?? "unknown error"}
+      <div className="flex items-center justify-center h-full p-8">
+        <div className="max-w-md text-center">
+          <AlertCircle size={24} className="text-[var(--failed)] mx-auto mb-3 opacity-80" />
+          <p className="text-sm font-medium text-foreground mb-1">Couldn't load the dashboard</p>
+          <p className="text-[12px] text-muted-foreground">{err?.message ?? "Unknown error"}</p>
+        </div>
       </div>
     );
   }
 
   if (!data) {
+    // Skeleton matches the real dashboard's top-row shape (4 stat cards +
+    // a wide panel) so the layout doesn't jump when data arrives. Plain
+    // text on an empty viewport was the worst possible placeholder.
     return (
-      <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Loading dashboard...</div>
+      <div className="p-6 space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-lg border border-border bg-secondary/30 h-24 animate-pulse"
+              aria-hidden="true"
+            />
+          ))}
+        </div>
+        <div className="rounded-lg border border-border bg-secondary/30 h-64 animate-pulse" aria-hidden="true" />
+        <div className="rounded-lg border border-border bg-secondary/30 h-40 animate-pulse" aria-hidden="true" />
+        <span className="sr-only">Loading dashboard</span>
+      </div>
     );
   }
 
