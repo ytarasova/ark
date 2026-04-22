@@ -518,6 +518,30 @@ What sage (or a human via CLI/Web UI) can do while an agent-sdk session is mid-r
 
 ---
 
+### Task A4: TrueFoundry gateway auth + Bedrock-compat proxy -- SHIPPED 2026-04-22
+
+TrueFoundry's API gateway routes through AWS Bedrock. The Anthropic Agent SDK binary (v2.1.117+) includes a `context_management` field in its POST body and normalizes model slugs by stripping provider prefixes -- both of which Bedrock rejects. A4 adds three layers of glue so `launch.ts` works transparently with the TF gateway:
+
+**What was shipped:**
+
+1. **`ANTHROPIC_CUSTOM_HEADERS` in `runtimes/agent-sdk.yaml` secrets list** -- allows `Authorization: Bearer <TF_API_KEY>` to be injected into the SDK subprocess env. The binary reads this env var and adds the header to every API request.
+
+2. **Bedrock-compat proxy in `launch.ts`** -- auto-activated when `ANTHROPIC_API_KEY === "dummy"` and `ANTHROPIC_CUSTOM_HEADERS` contains `Authorization:` (or `ARK_BEDROCK_COMPAT=1`). A `Bun.serve()` proxy on an OS-assigned ephemeral port:
+   - Strips `context_management` from POST bodies (Bedrock rejects it as an unknown field).
+   - Drops hop-by-hop headers (`host`, `connection`, `content-length`, `transfer-encoding`) so the TF gateway sees the correct `Host` for routing -- the binary sends `host: localhost:<proxyPort>` which caused 404s before this fix.
+   - Forwards all other headers verbatim (including `authorization`, `anthropic-version`, `x-api-key`, etc.).
+   - Uses `tls: { rejectUnauthorized: false }` to accept TF's internal self-signed cert.
+
+3. **Full provider slug passed as `sdkOptions.model`** -- the binary normalizes short slugs like `claude-sonnet-4-6` by stripping `pi-agentic/` before the API call, so TF's Bedrock endpoint can't route it. When `bedrockCompat` is active, `launch.ts` expands short names: `claude-sonnet-4-6` -> `pi-agentic/global.anthropic.claude-sonnet-4-6` (and passes the full slug as `--model` to the binary).
+
+4. **Makefile targets** -- `make agent-sdk-secrets` (populates the local secret store from `.env`), `make smoke-agent-sdk` (CLI-driven end-to-end smoke against TF).
+
+5. **`.env.example`** -- documents `TRUEFOUNDRY_AGENT_SDK_MODEL` for custom model override.
+
+**Verified end-to-end:** `runAgentSdkLaunch({ model: "claude-sonnet-4-6", ... })` with TF env vars produces `RESULT: false None` (success) in the transcript. The binary uses the full slug `pi-agentic/global.anthropic.claude-sonnet-4-6`, the proxy strips `context_management`, and TF returns 200.
+
+---
+
 ## Part B — Generic git actions + RPC contract doc
 
 Arc exposes the building blocks; sage composes her flow at runtime via `flow/create`. We don't ship a sage-specific flow file in the repo.
