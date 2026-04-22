@@ -64,6 +64,36 @@ describe("ConnectorRegistry", () => {
     const reg = createDefaultConnectorRegistry();
     expect(reg.resolveContextConnectors(["pi-sage", "jira"])).toHaveLength(0);
   });
+
+  test("resolveMcpEntries picks up connectors that omit the legacy kind field", () => {
+    const reg = new ConnectorRegistry();
+    // Surfaces ARE the discriminator -- no `kind`, just an `mcp` surface.
+    reg.register({
+      name: "kindless-mcp",
+      status: "full",
+      label: "Kindless MCP",
+      mcp: { configName: "kindless-mcp" },
+    });
+    const entries = reg.resolveMcpEntries(["kindless-mcp"]);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].entry).toBe("kindless-mcp");
+    expect(entries[0].fromConnector).toBe("kindless-mcp");
+  });
+
+  test("resolveContextConnectors picks up connectors that omit the legacy kind field", () => {
+    const reg = new ConnectorRegistry();
+    reg.register({
+      name: "kindless-ctx",
+      status: "full",
+      label: "Kindless ctx",
+      context: {
+        async build() {
+          return "prefill";
+        },
+      },
+    });
+    expect(reg.resolveContextConnectors(["kindless-ctx"]).map((c) => c.name)).toEqual(["kindless-ctx"]);
+  });
 });
 
 describe("ConnectorRegistry surface accessors (Wave 0)", () => {

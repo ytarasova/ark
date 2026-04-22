@@ -51,7 +51,7 @@ export class ConnectorRegistry {
     const out: ConnectorMcpEntry[] = [];
     for (const name of names) {
       const c = this.get(name);
-      if (!c || c.kind !== "mcp" || !c.mcp) continue;
+      if (!c?.mcp) continue;
       // Prefer configName (lookup in shipped mcp-configs) -- fall back to inline.
       if (c.mcp.configName) {
         out.push({ entry: c.mcp.configName, fromConnector: c.name });
@@ -72,7 +72,7 @@ export class ConnectorRegistry {
     const out: Connector[] = [];
     for (const name of names) {
       const c = this.get(name);
-      if (c?.kind === "context") out.push(c);
+      if (c?.context) out.push(c);
     }
     return out;
   }
