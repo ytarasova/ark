@@ -132,15 +132,21 @@ function ProcessDetail({
       {/* Info grid */}
       <div className="grid grid-cols-[90px_1fr] gap-y-2 gap-x-3 text-[12px]">
         <span className="text-muted-foreground">PID</span>
-        <span className="font-mono text-foreground">{process.pid}</span>
+        <span className="text-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">{process.pid}</span>
 
         <span className="text-muted-foreground">CPU%</span>
-        <span className="font-mono font-semibold" style={{ color: pctColor(parseFloat(process.cpu) || 0) }}>
+        <span
+          className="font-semibold tabular-nums font-[family-name:var(--font-mono-ui)]"
+          style={{ color: pctColor(parseFloat(process.cpu) || 0) }}
+        >
           {process.cpu}%
         </span>
 
         <span className="text-muted-foreground">MEM%</span>
-        <span className="font-mono font-semibold" style={{ color: pctColor(parseFloat(process.mem) || 0) }}>
+        <span
+          className="font-semibold tabular-nums font-[family-name:var(--font-mono-ui)]"
+          style={{ color: pctColor(parseFloat(process.mem) || 0) }}
+        >
           {process.mem}%
         </span>
 
@@ -259,10 +265,14 @@ function DockerDetail({ container, onClose }: { container: DockerContainer; onCl
         <span className="font-mono text-muted-foreground">{imageTag}</span>
 
         <span className="text-muted-foreground">CPU</span>
-        <span className="font-mono font-semibold text-foreground">{container.cpu}</span>
+        <span className="font-semibold text-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+          {container.cpu}
+        </span>
 
         <span className="text-muted-foreground">Memory</span>
-        <span className="font-mono font-semibold text-foreground">{container.memory}</span>
+        <span className="font-semibold text-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+          {container.memory}
+        </span>
 
         {container.project && (
           <>
@@ -356,12 +366,18 @@ function TmuxDetail({
         <span className="font-mono text-foreground">{session.mode || "-"}</span>
 
         <span className="text-muted-foreground">CPU%</span>
-        <span className="font-mono font-semibold" style={{ color: pctColor(session.cpu) }}>
+        <span
+          className="font-semibold tabular-nums font-[family-name:var(--font-mono-ui)]"
+          style={{ color: pctColor(session.cpu) }}
+        >
           {session.cpu.toFixed(1)}%
         </span>
 
         <span className="text-muted-foreground">MEM%</span>
-        <span className="font-mono font-semibold" style={{ color: pctColor(session.mem) }}>
+        <span
+          className="font-semibold tabular-nums font-[family-name:var(--font-mono-ui)]"
+          style={{ color: pctColor(session.mem) }}
+        >
           {session.mem.toFixed(1)}%
         </span>
 
@@ -427,7 +443,7 @@ export function ComputeDrawer({ item, onClose, onNavigateToSession }: ComputeDra
             <Dialog.Close asChild>
               <button
                 type="button"
-                className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer bg-transparent border-none p-1 rounded-md hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                className="text-muted-foreground hover:text-foreground transition-colors duration-150 ease-[cubic-bezier(0.32,0.72,0,1)] cursor-pointer bg-transparent border-none p-1 rounded-md hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
                 aria-label="Close drawer"
               >
                 <X size={16} />

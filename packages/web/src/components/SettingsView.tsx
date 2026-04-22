@@ -4,6 +4,9 @@ import { Moon, Sun, Monitor, Palette } from "lucide-react";
 import { useTheme } from "../themes/ThemeProvider.js";
 import type { ThemeName, ColorMode } from "../themes/tokens.js";
 
+// Theme swatch accents are literal hex samples of each theme's --primary token.
+// These are identity colors (one per theme) rendered as a preview swatch, not
+// runtime status colors -- documented exception to the "no raw hex" rule.
 const THEME_OPTIONS: {
   id: ThemeName;
   label: string;
@@ -86,7 +89,7 @@ export function SettingsView() {
                 key={opt.id}
                 onClick={() => setThemeName(opt.id)}
                 className={cn(
-                  "cursor-pointer p-3 transition-all",
+                  "cursor-pointer p-3 transition-colors duration-150 ease-[cubic-bezier(0.32,0.72,0,1)]",
                   isSelected ? "ring-2 ring-primary border-primary" : "hover:border-ring hover:bg-accent",
                 )}
               >
@@ -120,7 +123,7 @@ export function SettingsView() {
                 key={opt.id}
                 onClick={() => handleModeChange(opt.id)}
                 className={cn(
-                  "cursor-pointer p-3 transition-all",
+                  "cursor-pointer p-3 transition-colors duration-150 ease-[cubic-bezier(0.32,0.72,0,1)]",
                   isSelected ? "ring-2 ring-primary border-primary" : "hover:border-ring hover:bg-accent",
                 )}
               >
@@ -148,7 +151,9 @@ export function SettingsView() {
           <div className="space-y-2.5">
             <div className="flex items-center justify-between">
               <span className="text-[13px] text-muted-foreground">Version</span>
-              <span className="text-[13px] text-foreground font-mono">v0.10.0</span>
+              <span className="text-[13px] text-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+                v0.10.0
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-[13px] text-muted-foreground">Runtime</span>
@@ -160,7 +165,7 @@ export function SettingsView() {
                 href="https://ytarasova.github.io/ark/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[13px] text-primary hover:underline"
+                className="text-[13px] text-primary hover:underline transition-colors duration-150 ease-[cubic-bezier(0.32,0.72,0,1)]"
               >
                 Docs
               </a>

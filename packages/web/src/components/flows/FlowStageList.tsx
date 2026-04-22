@@ -31,9 +31,17 @@ export function FlowStageList({ stages }: FlowStageListProps) {
           const stageType = typeof s !== "string" ? s.type : null;
 
           return (
-            <div key={i} className="border border-border/50 rounded-lg p-3 bg-[var(--bg-code)]/50">
+            <div className="border border-border rounded-lg p-3 bg-[var(--bg-card)]" key={i}>
               <div className="flex items-center gap-2 mb-1.5">
-                <span className="text-[10px] font-mono text-muted-foreground w-5">{i + 1}</span>
+                <span
+                  className="text-[10px] text-muted-foreground w-5"
+                  style={{
+                    fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace',
+                    fontVariantNumeric: "tabular-nums",
+                  }}
+                >
+                  {i + 1}
+                </span>
                 <span className="text-[13px] font-semibold text-foreground">{stageName}</span>
                 <Badge variant={GATE_VARIANT[gate] || "success"} className="text-[10px]">
                   {gate}

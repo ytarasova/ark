@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Plus } from "lucide-react";
 import { Layout } from "../components/Layout.js";
 import { PageShell } from "../components/PageShell.js";
 import { ScheduleView } from "../components/ScheduleView.js";
@@ -23,7 +24,8 @@ export function SchedulesPage({ view, onNavigate, readOnly, daemonStatus }: Sche
         headerRight={
           !readOnly ? (
             <Button size="sm" onClick={() => setShowNew(true)}>
-              + New Schedule
+              <Plus size={14} />
+              New Schedule
             </Button>
           ) : undefined
         }

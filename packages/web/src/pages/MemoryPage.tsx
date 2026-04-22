@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Plus } from "lucide-react";
 import { Layout } from "../components/Layout.js";
 import { PageShell } from "../components/PageShell.js";
 import { MemoryView } from "../components/MemoryView.js";
@@ -25,7 +26,8 @@ export function MemoryPage({ view, onNavigate, readOnly, daemonStatus, onToast }
         headerRight={
           !readOnly ? (
             <Button size="sm" onClick={() => setAddCounter((c) => c + 1)}>
-              + Add Memory
+              <Plus size={14} />
+              Add Memory
             </Button>
           ) : undefined
         }

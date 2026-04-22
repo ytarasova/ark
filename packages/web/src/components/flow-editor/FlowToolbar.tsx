@@ -6,6 +6,7 @@
  */
 
 import { memo, useState, useCallback, useRef } from "react";
+import { AlertCircle, Check, X } from "lucide-react";
 import YAML from "yaml";
 import type { FlowDefinition, FlowStageDefinition, FlowEdgeDefinition } from "../pipeline/types.js";
 
@@ -97,11 +98,13 @@ function FlowToolbarComponent({
           <span
             style={{
               fontSize: 12,
-              fontFamily: '"JetBrains Mono", monospace',
+              fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace',
+              fontVariantNumeric: "tabular-nums",
               color: "var(--primary)",
               padding: "3px 10px",
-              background: "rgba(124, 106, 239, 0.12)",
-              borderRadius: 4,
+              background: "var(--bg-hover)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-sm)",
             }}
           >
             {flowName}
@@ -112,7 +115,8 @@ function FlowToolbarComponent({
             style={{
               display: "flex",
               background: "var(--background)",
-              borderRadius: 5,
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-sm)",
               padding: 2,
               gap: 2,
               marginLeft: 16,
@@ -149,7 +153,11 @@ function FlowToolbarComponent({
           className={`flow-validation-bar ${validationMsg.isError ? "invalid" : "valid"}`}
           style={{ position: "fixed", bottom: 16, left: "50%", transform: "translateX(-50%)", zIndex: 50 }}
         >
-          <span>{validationMsg.isError ? "!" : "\u2713"}</span>
+          {validationMsg.isError ? (
+            <AlertCircle size={14} aria-hidden="true" />
+          ) : (
+            <Check size={14} aria-hidden="true" />
+          )}
           <span>{validationMsg.text}</span>
         </div>
       )}
@@ -160,7 +168,7 @@ function FlowToolbarComponent({
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0, 0, 0, 0.6)",
+            background: "var(--bg-overlay, rgba(0, 0, 0, 0.6))",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -170,13 +178,13 @@ function FlowToolbarComponent({
         >
           <div
             style={{
-              background: "var(--card)",
+              background: "var(--bg-popover, var(--card))",
               border: "1px solid var(--border)",
-              borderRadius: 8,
+              borderRadius: "var(--radius-lg)",
               width: 600,
               maxHeight: "80vh",
               overflow: "hidden",
-              boxShadow: "0 16px 48px rgba(0, 0, 0, 0.5)",
+              boxShadow: "0 4px 16px rgba(0, 0, 0, 0.3)",
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -192,17 +200,21 @@ function FlowToolbarComponent({
               <span style={{ fontSize: 13, fontWeight: 600 }}>Export YAML -- {flowName}</span>
               <button
                 onClick={() => setShowYaml(false)}
+                aria-label="Close"
                 style={{
-                  fontSize: 11,
-                  color: "var(--muted-foreground)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "var(--fg-muted, var(--muted-foreground))",
                   background: "none",
                   border: "none",
                   cursor: "pointer",
-                  padding: "4px 8px",
-                  borderRadius: 3,
+                  padding: 4,
+                  borderRadius: "var(--radius-sm)",
+                  transition: "color 150ms cubic-bezier(0.32, 0.72, 0, 1)",
                 }}
               >
-                Close
+                <X size={14} aria-hidden="true" />
               </button>
             </div>
             <div style={{ padding: 16, overflowY: "auto", maxHeight: "60vh" }}>
@@ -224,18 +236,14 @@ function ToolbarButton({
   onClick: () => void;
   variant?: "success" | "danger";
 }) {
-  let bg = "var(--secondary)";
-  let color = "var(--muted-foreground)";
-  let borderColor = "var(--border)";
+  const bg = "var(--bg-card, var(--secondary))";
+  let color = "var(--fg-muted, var(--muted-foreground))";
+  const borderColor = "var(--border)";
 
   if (variant === "success") {
-    bg = "rgba(52, 211, 153, 0.12)";
     color = "var(--completed)";
-    borderColor = "rgba(52, 211, 153, 0.3)";
   } else if (variant === "danger") {
-    bg = "rgba(248, 113, 113, 0.12)";
     color = "var(--failed)";
-    borderColor = "rgba(248, 113, 113, 0.3)";
   }
 
   return (
@@ -250,6 +258,7 @@ function ToolbarButton({
         background: bg,
         color,
         cursor: "pointer",
+        transition: "background-color 150ms cubic-bezier(0.32, 0.72, 0, 1), color 150ms cubic-bezier(0.32, 0.72, 0, 1)",
       }}
     >
       {label}
@@ -265,11 +274,12 @@ function ModeButton({ label, active, onClick }: { label: string; active: boolean
         fontSize: 11,
         padding: "4px 12px",
         border: "none",
-        borderRadius: 4,
+        borderRadius: "var(--radius-sm)",
         background: active ? "var(--primary)" : "none",
-        color: active ? "#fff" : "var(--muted-foreground)",
+        color: active ? "var(--primary-foreground, var(--fg))" : "var(--fg-muted, var(--muted-foreground))",
         cursor: onClick ? "pointer" : "default",
         fontWeight: 500,
+        transition: "background-color 150ms cubic-bezier(0.32, 0.72, 0, 1), color 150ms cubic-bezier(0.32, 0.72, 0, 1)",
       }}
     >
       {label}

@@ -20,13 +20,36 @@ export function AgentDetailPanel({ agent, onEdit, onDelete, actionMsg }: AgentDe
         </h3>
         <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
           <span className="text-muted-foreground">Model</span>
-          <span className="text-card-foreground font-mono">{agent.model || "-"}</span>
+          <span
+            className="text-card-foreground"
+            style={{ fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace' }}
+          >
+            {agent.model || "-"}
+          </span>
           <span className="text-muted-foreground">Max Turns</span>
-          <span className="text-card-foreground font-mono">{agent.max_turns ?? "-"}</span>
+          <span
+            className="text-card-foreground"
+            style={{
+              fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace',
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
+            {agent.max_turns ?? "-"}
+          </span>
           <span className="text-muted-foreground">Permission</span>
-          <span className="text-card-foreground font-mono">{agent.permission_mode || "-"}</span>
+          <span
+            className="text-card-foreground"
+            style={{ fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace' }}
+          >
+            {agent.permission_mode || "-"}
+          </span>
           <span className="text-muted-foreground">Runtime</span>
-          <span className="text-card-foreground font-mono">{agent.runtime || "claude-code"}</span>
+          <span
+            className="text-card-foreground"
+            style={{ fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace' }}
+          >
+            {agent.runtime || "claude-code"}
+          </span>
         </div>
       </div>
       {agent.skills && agent.skills.length > 0 && (

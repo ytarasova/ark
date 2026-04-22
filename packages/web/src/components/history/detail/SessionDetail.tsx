@@ -43,7 +43,9 @@ export function RecentSessionDetail({ selected, onSelectSession }: RecentSession
           {selected.updated_at && (
             <>
               <span className="text-muted-foreground">Updated</span>
-              <span className="text-card-foreground font-mono">{relTime(selected.updated_at)}</span>
+              <span className="text-card-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+                {relTime(selected.updated_at)}
+              </span>
             </>
           )}
         </div>
@@ -70,9 +72,13 @@ export function SearchSessionDetail({ selected, onSelectSession }: SearchSession
         <Badge variant="outline" className="text-[10px]">
           {selected.source || "session"}
         </Badge>
-        <span className="text-[12px] text-muted-foreground font-mono">{selected.sessionId || ""}</span>
+        <span className="text-[12px] text-muted-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+          {selected.sessionId || ""}
+        </span>
         {selected.timestamp && (
-          <span className="text-[11px] text-muted-foreground/60 font-mono">{relTime(selected.timestamp)}</span>
+          <span className="text-[11px] text-muted-foreground/60 tabular-nums font-[family-name:var(--font-mono-ui)]">
+            {relTime(selected.timestamp)}
+          </span>
         )}
       </div>
       {selected.match && (

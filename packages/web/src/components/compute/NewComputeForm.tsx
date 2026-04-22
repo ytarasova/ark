@@ -173,7 +173,7 @@ export function NewComputeForm({
               aria-selected={kind === "compute"}
               onClick={() => setKind("compute")}
               className={cn(
-                "px-3 py-1.5 text-[12px] transition-colors",
+                "px-3 py-1.5 text-[12px] transition-colors duration-150 ease-[cubic-bezier(0.32,0.72,0,1)]",
                 kind === "compute" ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/40",
               )}
             >
@@ -185,7 +185,7 @@ export function NewComputeForm({
               aria-selected={kind === "template"}
               onClick={() => setKind("template")}
               className={cn(
-                "px-3 py-1.5 text-[12px] transition-colors border-l border-border",
+                "px-3 py-1.5 text-[12px] transition-colors duration-150 ease-[cubic-bezier(0.32,0.72,0,1)] border-l border-border",
                 kind === "template" ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/40",
               )}
             >

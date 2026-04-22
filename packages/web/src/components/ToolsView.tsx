@@ -82,11 +82,26 @@ export function ToolsView({ activeTab = "skills", onTabChange: _onTabChange }: T
                   </h3>
                   <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
                     <span className="text-muted-foreground">Flow</span>
-                    <span className="text-card-foreground font-mono">{selected.flow || "-"}</span>
+                    <span
+                      className="text-card-foreground"
+                      style={{ fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace' }}
+                    >
+                      {selected.flow || "-"}
+                    </span>
                     <span className="text-muted-foreground">Agent</span>
-                    <span className="text-card-foreground font-mono">{selected.agent || "-"}</span>
+                    <span
+                      className="text-card-foreground"
+                      style={{ fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace' }}
+                    >
+                      {selected.agent || "-"}
+                    </span>
                     <span className="text-muted-foreground">Repo</span>
-                    <span className="text-card-foreground font-mono">{selected.repo || "-"}</span>
+                    <span
+                      className="text-card-foreground"
+                      style={{ fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace' }}
+                    >
+                      {selected.repo || "-"}
+                    </span>
                   </div>
                 </div>
                 {selected.variables && Array.isArray(selected.variables) && selected.variables.length > 0 && (

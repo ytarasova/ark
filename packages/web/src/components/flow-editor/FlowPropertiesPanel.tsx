@@ -5,6 +5,7 @@
  */
 
 import { useState, useCallback, useEffect } from "react";
+import { ArrowRight, X } from "lucide-react";
 import type { FlowStageDefinition } from "../pipeline/types.js";
 import { RichSelect } from "../ui/RichSelect.js";
 
@@ -107,7 +108,16 @@ export function FlowPropertiesPanel({
 
       {/* Gate */}
       <PropSection label="Gate">
-        <div style={{ display: "flex", gap: 2, background: "var(--background)", borderRadius: 5, padding: 2 }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 2,
+            background: "var(--background)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-sm)",
+            padding: 2,
+          }}
+        >
           {GATE_OPTIONS.map((g) => {
             const isActive = localStage.gate === g;
             const activeColor =
@@ -123,11 +133,13 @@ export function FlowPropertiesPanel({
                   fontSize: 11,
                   padding: "5px 8px",
                   border: "none",
-                  borderRadius: 4,
+                  borderRadius: "var(--radius-sm)",
                   background: isActive ? activeColor : "none",
-                  color: isActive ? "#fff" : "var(--muted-foreground)",
+                  color: isActive ? "var(--primary-foreground, var(--fg))" : "var(--fg-muted, var(--muted-foreground))",
                   cursor: readOnly ? "default" : "pointer",
                   fontWeight: 500,
+                  transition:
+                    "background-color 150ms cubic-bezier(0.32, 0.72, 0, 1), color 150ms cubic-bezier(0.32, 0.72, 0, 1)",
                 }}
               >
                 {g.charAt(0).toUpperCase() + g.slice(1)}
@@ -160,10 +172,10 @@ export function FlowPropertiesPanel({
             width: "100%",
             padding: "6px 10px",
             fontSize: 11,
-            fontFamily: '"JetBrains Mono", monospace',
+            fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)',
             background: "var(--background)",
             border: "1px solid var(--border)",
-            borderRadius: 5,
+            borderRadius: "var(--radius-sm)",
             color: "var(--foreground)",
             outline: "none",
             resize: "vertical",
@@ -202,15 +214,19 @@ export function FlowPropertiesPanel({
                   flex: 1,
                   padding: "4px 8px",
                   fontSize: 11,
-                  fontFamily: '"JetBrains Mono", monospace',
+                  fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace',
                   background: "var(--background)",
                   border: "1px solid var(--border)",
-                  borderRadius: 4,
+                  borderRadius: "var(--radius-sm)",
                   color: "var(--foreground)",
                   outline: "none",
                 }}
               />
-              <span style={{ color: "var(--muted-foreground)", fontSize: 11, flexShrink: 0 }}>-&gt;</span>
+              <ArrowRight
+                size={12}
+                aria-hidden="true"
+                style={{ color: "var(--fg-muted, var(--muted-foreground))", flexShrink: 0 }}
+              />
               <input
                 value={target}
                 readOnly={readOnly}
@@ -223,31 +239,35 @@ export function FlowPropertiesPanel({
                   flex: 1,
                   padding: "4px 8px",
                   fontSize: 11,
-                  fontFamily: '"JetBrains Mono", monospace',
+                  fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace',
                   background: "var(--background)",
                   border: "1px solid var(--border)",
-                  borderRadius: 4,
+                  borderRadius: "var(--radius-sm)",
                   color: "var(--foreground)",
                   outline: "none",
                 }}
               />
               {!readOnly && (
                 <button
+                  aria-label="Remove outcome route"
                   onClick={() => {
                     const newOutcomes = { ...outcomes };
                     delete newOutcomes[label];
                     update({ on_outcome: newOutcomes });
                   }}
                   style={{
-                    fontSize: 10,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                     color: "var(--failed)",
                     background: "none",
                     border: "none",
                     cursor: "pointer",
-                    padding: "2px 4px",
+                    padding: 2,
+                    borderRadius: "var(--radius-sm)",
                   }}
                 >
-                  x
+                  <X size={12} aria-hidden="true" />
                 </button>
               )}
             </div>
@@ -263,10 +283,11 @@ export function FlowPropertiesPanel({
                 color: "var(--primary)",
                 background: "none",
                 border: "1px dashed var(--border)",
-                borderRadius: 4,
+                borderRadius: "var(--radius-sm)",
                 padding: "4px 10px",
                 cursor: "pointer",
                 width: "100%",
+                transition: "border-color 150ms cubic-bezier(0.32, 0.72, 0, 1)",
               }}
             >
               + Add outcome route
@@ -286,10 +307,10 @@ export function FlowPropertiesPanel({
             width: "100%",
             padding: "6px 10px",
             fontSize: 11,
-            fontFamily: '"JetBrains Mono", monospace',
+            fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)',
             background: "var(--background)",
             border: "1px solid var(--border)",
-            borderRadius: 5,
+            borderRadius: "var(--radius-sm)",
             color: "var(--foreground)",
             outline: "none",
             resize: "vertical",
@@ -308,12 +329,13 @@ export function FlowPropertiesPanel({
               fontSize: 11,
               fontWeight: 500,
               padding: "5px 12px",
-              borderRadius: 5,
-              border: "1px solid rgba(248, 113, 113, 0.3)",
-              background: "rgba(248, 113, 113, 0.12)",
-              color: "#f87171",
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid var(--border)",
+              background: "transparent",
+              color: "var(--failed)",
               cursor: "pointer",
               width: "100%",
+              transition: "background-color 150ms cubic-bezier(0.32, 0.72, 0, 1)",
             }}
           >
             Delete Stage
@@ -366,10 +388,10 @@ function PropInput({
         width: "100%",
         padding: "6px 10px",
         fontSize: 12,
-        fontFamily: '"JetBrains Mono", monospace',
+        fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace',
         background: "var(--background)",
         border: "1px solid var(--border)",
-        borderRadius: 5,
+        borderRadius: "var(--radius-sm)",
         color: "var(--foreground)",
         outline: "none",
       }}

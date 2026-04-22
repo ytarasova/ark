@@ -15,21 +15,46 @@ export function RuntimeDetailPanel({ runtime }: RuntimeDetailPanelProps) {
         </h3>
         <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
           <span className="text-muted-foreground">Type</span>
-          <span className="text-card-foreground font-mono">{runtime.type || "-"}</span>
+          <span
+            className="text-card-foreground"
+            style={{ fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace' }}
+          >
+            {runtime.type || "-"}
+          </span>
           <span className="text-muted-foreground">Default Model</span>
-          <span className="text-card-foreground font-mono">{runtime.default_model || "-"}</span>
+          <span
+            className="text-card-foreground"
+            style={{ fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace' }}
+          >
+            {runtime.default_model || "-"}
+          </span>
           <span className="text-muted-foreground">Source</span>
-          <span className="text-card-foreground font-mono">{runtime._source || "builtin"}</span>
+          <span
+            className="text-card-foreground"
+            style={{ fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace' }}
+          >
+            {runtime._source || "builtin"}
+          </span>
           {runtime.permission_mode && (
             <>
               <span className="text-muted-foreground">Permission</span>
-              <span className="text-card-foreground font-mono">{runtime.permission_mode}</span>
+              <span
+                className="text-card-foreground"
+                style={{ fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace' }}
+              >
+                {runtime.permission_mode}
+              </span>
             </>
           )}
           {runtime.task_delivery && (
             <>
               <span className="text-muted-foreground">Task Delivery</span>
-              <span className="text-card-foreground font-mono">{runtime.task_delivery}</span>
+              <span
+                className="text-card-foreground"
+                style={{ fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace' }}
+              >
+                {runtime.task_delivery}
+              </span>
             </>
           )}
         </div>
@@ -47,12 +72,17 @@ export function RuntimeDetailPanel({ runtime }: RuntimeDetailPanelProps) {
       {runtime.models && runtime.models.length > 0 && (
         <div className="mb-4">
           <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">
-            Models ({runtime.models.length})
+            Models (<span style={{ fontVariantNumeric: "tabular-nums" }}>{runtime.models.length}</span>)
           </h3>
           <div className="grid grid-cols-[100px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
             {runtime.models.map((m: any) => (
               <React.Fragment key={m.id}>
-                <span className="text-card-foreground font-mono">{m.id}</span>
+                <span
+                  className="text-card-foreground"
+                  style={{ fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace' }}
+                >
+                  {m.id}
+                </span>
                 <span className="text-muted-foreground">{m.label}</span>
               </React.Fragment>
             ))}

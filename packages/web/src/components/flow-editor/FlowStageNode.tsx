@@ -7,6 +7,7 @@
 
 import { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { ArrowRight } from "lucide-react";
 import type { FlowStageDefinition } from "../pipeline/types.js";
 
 export interface FlowStageNodeData extends Record<string, unknown> {
@@ -115,7 +116,13 @@ function FlowStageNodeComponent({ data, selected }: NodeProps) {
             {Object.entries(stage.on_outcome).map(([label, target]) => (
               <div key={label} className="flow-editor-outcome">
                 <span className="flow-editor-outcome-label">{label}</span>
-                <span className="flow-editor-outcome-arrow">-&gt;</span>
+                <span
+                  className="flow-editor-outcome-arrow"
+                  aria-hidden="true"
+                  style={{ display: "inline-flex", alignItems: "center" }}
+                >
+                  <ArrowRight size={10} />
+                </span>
                 <span className="flow-editor-outcome-target">{target}</span>
               </div>
             ))}

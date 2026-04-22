@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { X } from "lucide-react";
 import { Button } from "../ui/button.js";
 import { Input } from "../ui/input.js";
 import { RichSelect } from "../ui/RichSelect.js";
@@ -111,8 +112,14 @@ export function FlowForm({ onClose, onSubmit, agents }: FlowFormProps) {
                   }))}
                 />
               </div>
-              <Button type="button" size="xs" variant="destructive" onClick={() => removeStage(i)}>
-                x
+              <Button
+                type="button"
+                size="xs"
+                variant="destructive"
+                aria-label="Remove stage"
+                onClick={() => removeStage(i)}
+              >
+                <X size={12} aria-hidden="true" />
               </Button>
             </div>
           ))}

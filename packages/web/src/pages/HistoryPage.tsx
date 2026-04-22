@@ -28,7 +28,8 @@ export function HistoryPage({ view, onNavigate, readOnly, daemonStatus }: Histor
                 key={m}
                 onClick={() => setHistoryMode(m)}
                 className={cn(
-                  "px-3 py-1 text-xs font-medium rounded-md transition-colors inline-flex items-center gap-1.5",
+                  "px-3 py-1 text-[12px] font-medium rounded-md inline-flex items-center gap-1.5",
+                  "transition-colors duration-150 ease-[cubic-bezier(0.32,0.72,0,1)]",
                   historyMode === m ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground",
                 )}
               >

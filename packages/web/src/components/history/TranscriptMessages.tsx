@@ -81,7 +81,11 @@ export function TranscriptMessages({ sessionId }: { sessionId: string }) {
               >
                 {t.role}
               </span>
-              {t.timestamp && <span className="text-[10px] text-muted-foreground">{relTime(t.timestamp)}</span>}
+              {t.timestamp && (
+                <span className="text-[10px] text-muted-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+                  {relTime(t.timestamp)}
+                </span>
+              )}
             </div>
             <div className="whitespace-pre-wrap break-words">
               {(t.content || "").slice(0, 500)}

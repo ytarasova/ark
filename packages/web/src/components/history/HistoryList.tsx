@@ -60,11 +60,11 @@ function SessionsTab({
         </div>
         {searched && (
           <div className="flex items-center justify-between mt-1">
-            <span className="text-muted-foreground text-[10px] font-mono">
+            <span className="text-muted-foreground text-[10px] tabular-nums font-[family-name:var(--font-mono-ui)]">
               {allResults.length} result{allResults.length !== 1 ? "s" : ""}
             </span>
             <button
-              className="text-[10px] text-muted-foreground hover:text-foreground"
+              className="text-[10px] text-muted-foreground hover:text-foreground transition-colors duration-150 ease-[cubic-bezier(0.32,0.72,0,1)]"
               onClick={handleClear}
               aria-label="Clear search results"
             >
@@ -97,7 +97,7 @@ function SessionsTab({
             <div
               key={s.id}
               className={cn(
-                "flex flex-col px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors",
+                "flex flex-col px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors duration-150 ease-[cubic-bezier(0.32,0.72,0,1)]",
                 "hover:bg-accent",
                 selected?.id === s.id &&
                   selectedType === "session" &&
@@ -110,7 +110,7 @@ function SessionsTab({
                 <StatusDot status={s.status} />
                 <span className="text-[12px] text-foreground truncate leading-snug">{s.summary || s.id}</span>
               </div>
-              <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground font-mono">
+              <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
                 <span>{s.id}</span>
                 <span className="flex-1" />
                 <span className="shrink-0">{relTime(s.updated_at)}</span>
@@ -137,7 +137,7 @@ function SessionsTab({
             <div
               key={`s-${i}`}
               className={cn(
-                "flex flex-col px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors",
+                "flex flex-col px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors duration-150 ease-[cubic-bezier(0.32,0.72,0,1)]",
                 "hover:bg-accent",
                 selected === r && selectedType === "session" && "bg-accent border-l-2 border-l-primary",
               )}
@@ -151,7 +151,7 @@ function SessionsTab({
                   {r.match ? String(r.match).slice(0, 50) : r.sessionId || ""}
                 </span>
               </div>
-              <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground font-mono">
+              <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
                 <span>{r.sessionId || ""}</span>
                 <span className="flex-1" />
                 {r.timestamp && <span className="shrink-0">{relTime(r.timestamp)}</span>}
@@ -171,7 +171,7 @@ function SessionsTab({
             <div
               key={`t-${i}`}
               className={cn(
-                "flex flex-col px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors",
+                "flex flex-col px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors duration-150 ease-[cubic-bezier(0.32,0.72,0,1)]",
                 "hover:bg-accent",
                 selected === r && selectedType === "transcript" && "bg-accent border-l-2 border-l-primary",
               )}
@@ -219,7 +219,7 @@ function TranscriptsTab({
         </div>
         <button
           className={cn(
-            "flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded",
+            "flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors duration-150 ease-[cubic-bezier(0.32,0.72,0,1)] px-1.5 py-0.5 rounded-[6px]",
             refreshing && "opacity-50 pointer-events-none",
           )}
           onClick={handleRefresh}
@@ -273,7 +273,7 @@ function TranscriptsTab({
             {cs.summary && (
               <span className="text-[11px] text-muted-foreground mt-0.5 truncate pl-[18px]">{cs.summary}</span>
             )}
-            <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground font-mono pl-[18px]">
+            <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground tabular-nums font-[family-name:var(--font-mono-ui)] pl-[18px]">
               {cs.messageCount != null && (
                 <span>
                   {cs.messageCount} msg{cs.messageCount !== 1 ? "s" : ""}

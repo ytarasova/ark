@@ -134,7 +134,15 @@ function TriggerTestPanel({ trigger, onClose }: { trigger: any; onClose: () => v
                   <Badge variant={result.fired ? "success" : "warning"}>{String(!!result.fired)}</Badge>
                 </div>
                 {result.sessionId && (
-                  <div className="font-mono text-[11px] text-[var(--fg)]">session: {result.sessionId}</div>
+                  <div
+                    className="text-[11px] text-[var(--fg)]"
+                    style={{
+                      fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace',
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    session: {result.sessionId}
+                  </div>
                 )}
                 {result.dryRun && <Badge variant="secondary">dry-run</Badge>}
                 {result.message && <div className="text-[var(--fg-muted)]">{result.message}</div>}
@@ -219,10 +227,20 @@ function TriggersTab({ readOnly }: { readOnly: boolean }) {
               className="border-b border-[var(--border)]/60 hover:bg-[var(--bg-hover)] transition-colors"
               data-testid={`trigger-row-${t.name}`}
             >
-              <td className="py-2 font-mono text-[12px] text-[var(--fg)]">{t.name}</td>
+              <td
+                className="py-2 text-[12px] text-[var(--fg)]"
+                style={{ fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace' }}
+              >
+                {t.name}
+              </td>
               <td className="py-2 text-[var(--fg)]">{t.source}</td>
               <td className="py-2 text-[var(--fg-muted)]">{t.event ?? "*"}</td>
-              <td className="py-2 font-mono text-[12px] text-[var(--fg)]">{t.flow}</td>
+              <td
+                className="py-2 text-[12px] text-[var(--fg)]"
+                style={{ fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace' }}
+              >
+                {t.flow}
+              </td>
               <td className="py-2">
                 <Badge variant="secondary">{t.kind ?? "webhook"}</Badge>
               </td>
@@ -303,7 +321,12 @@ function ConnectorsTab() {
                 className="border-b border-[var(--border)]/60 hover:bg-[var(--bg-hover)] transition-colors"
                 data-testid={`connector-row-${c.name}`}
               >
-                <td className="py-2 font-mono text-[12px] text-[var(--fg)]">{c.name}</td>
+                <td
+                  className="py-2 text-[12px] text-[var(--fg)]"
+                  style={{ fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace' }}
+                >
+                  {c.name}
+                </td>
                 <td className="py-2">
                   <Badge variant="secondary">{c.kind}</Badge>
                 </td>
@@ -313,7 +336,10 @@ function ConnectorsTab() {
                 <td className="py-2 text-[12px] text-[var(--fg-muted)]">
                   {c.auth ? (c.auth.envVar ?? c.auth.secretsKey ?? c.auth.kind) : "none"}
                 </td>
-                <td className="py-2 font-mono text-[11px] text-[var(--fg-muted)]">
+                <td
+                  className="py-2 text-[11px] text-[var(--fg-muted)]"
+                  style={{ fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace' }}
+                >
                   {c.mcp?.configPath
                     ? c.mcp.configPath
                     : c.mcp?.hasInline
@@ -378,9 +404,17 @@ function IntegrationsTab() {
               className="border-b border-[var(--border)]/60 hover:bg-[var(--bg-hover)] transition-colors"
               data-testid={`integration-row-${i.name}`}
             >
-              <td className="py-2 font-mono text-[12px] text-[var(--fg)]">
+              <td
+                className="py-2 text-[12px] text-[var(--fg)]"
+                style={{ fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace' }}
+              >
                 {i.name}
-                <div className="text-[11px] text-[var(--fg-muted)] font-normal">{i.label}</div>
+                <div
+                  className="text-[11px] text-[var(--fg-muted)] font-normal"
+                  style={{ fontFamily: "var(--font-sans, inherit)" }}
+                >
+                  {i.label}
+                </div>
               </td>
               <td className="py-2">
                 {i.has_trigger ? (

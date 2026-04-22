@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Plus } from "lucide-react";
 import { Layout } from "../components/Layout.js";
 import { PageShell } from "../components/PageShell.js";
 import { ComputeView } from "../components/ComputeView.js";
@@ -34,7 +35,8 @@ export function ComputePage({
         headerRight={
           !readOnly ? (
             <Button size="sm" onClick={() => setShowNew(true)}>
-              + New Compute
+              <Plus size={14} />
+              New Compute
             </Button>
           ) : undefined
         }

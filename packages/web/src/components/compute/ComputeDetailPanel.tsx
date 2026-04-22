@@ -132,7 +132,10 @@ export function ComputeDetailPanel({
               </CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3">
-              <div className="text-2xl font-mono font-bold" style={{ color: pctColor(m.cpu) }}>
+              <div
+                className="text-2xl font-bold tabular-nums font-[family-name:var(--font-mono-ui)]"
+                style={{ color: pctColor(m.cpu) }}
+              >
                 {m.cpu}%
               </div>
               <MetricSparkline
@@ -185,7 +188,9 @@ export function ComputeDetailPanel({
               </CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3">
-              <div className="text-lg font-mono font-semibold text-foreground">{m.uptime || "-"}</div>
+              <div className="text-lg font-semibold text-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+                {m.uptime || "-"}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -214,7 +219,7 @@ export function ComputeDetailPanel({
                 {snapshot.sessions.map((s) => (
                   <tr
                     key={s.name}
-                    className="border-t border-border/50 hover:bg-accent/30 transition-colors cursor-pointer"
+                    className="border-t border-border/50 hover:bg-accent/30 transition-colors duration-150 ease-[cubic-bezier(0.32,0.72,0,1)] cursor-pointer"
                     onClick={() => setDrawerItem({ kind: "tmux", tmux: s })}
                   >
                     <td className="px-3 py-1.5 font-mono text-foreground">{s.name}</td>
@@ -224,8 +229,12 @@ export function ComputeDetailPanel({
                       </Badge>
                     </td>
                     <td className="px-3 py-1.5 text-muted-foreground">{s.mode}</td>
-                    <td className="px-3 py-1.5 text-right font-mono text-foreground">{s.cpu.toFixed(1)}</td>
-                    <td className="px-3 py-1.5 text-right font-mono text-foreground">{s.mem.toFixed(1)}</td>
+                    <td className="px-3 py-1.5 text-right text-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+                      {s.cpu.toFixed(1)}
+                    </td>
+                    <td className="px-3 py-1.5 text-right text-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+                      {s.mem.toFixed(1)}
+                    </td>
                     <td
                       className="px-3 py-1.5 font-mono text-muted-foreground truncate max-w-[200px]"
                       title={s.projectPath}
@@ -258,8 +267,13 @@ export function ComputeDetailPanel({
               </thead>
               <tbody>
                 {computeSessions.map((s: any) => (
-                  <tr key={s.session_id} className="border-t border-border/50 hover:bg-accent/30 transition-colors">
-                    <td className="px-3 py-1.5 font-mono text-foreground">{s.session_id}</td>
+                  <tr
+                    key={s.session_id}
+                    className="border-t border-border/50 hover:bg-accent/30 transition-colors duration-150 ease-[cubic-bezier(0.32,0.72,0,1)]"
+                  >
+                    <td className="px-3 py-1.5 text-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+                      {s.session_id}
+                    </td>
                     <td className="px-3 py-1.5 text-foreground truncate max-w-[250px]">{s.summary || "-"}</td>
                     <td className="px-3 py-1.5">
                       <span className="flex items-center gap-1.5">
@@ -296,32 +310,44 @@ export function ComputeDetailPanel({
                 {arkProcs.map((p) => (
                   <tr
                     key={p.pid}
-                    className="border-t border-border/50 hover:bg-accent/30 transition-colors cursor-pointer"
+                    className="border-t border-border/50 hover:bg-accent/30 transition-colors duration-150 ease-[cubic-bezier(0.32,0.72,0,1)] cursor-pointer"
                     onClick={() => setDrawerItem({ kind: "process", process: p })}
                   >
-                    <td className="px-3 py-1.5 font-mono text-muted-foreground">{p.pid}</td>
+                    <td className="px-3 py-1.5 text-muted-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+                      {p.pid}
+                    </td>
                     <td className="px-3 py-1.5 font-mono text-foreground truncate max-w-[350px]" title={p.command}>
                       {p.command.length > 80 ? p.command.slice(0, 80) + "..." : p.command}
                     </td>
-                    <td className="px-3 py-1.5 text-right font-mono text-foreground">{p.cpu}</td>
-                    <td className="px-3 py-1.5 text-right font-mono text-foreground">{p.mem}</td>
+                    <td className="px-3 py-1.5 text-right text-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+                      {p.cpu}
+                    </td>
+                    <td className="px-3 py-1.5 text-right text-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+                      {p.mem}
+                    </td>
                   </tr>
                 ))}
                 {otherProcs.map((p) => (
                   <tr
                     key={p.pid}
-                    className="border-t border-border/50 hover:bg-accent/30 transition-colors cursor-pointer bg-secondary/10"
+                    className="border-t border-border/50 hover:bg-accent/30 transition-colors duration-150 ease-[cubic-bezier(0.32,0.72,0,1)] cursor-pointer bg-secondary/10"
                     onClick={() => setDrawerItem({ kind: "process", process: p })}
                   >
-                    <td className="px-3 py-1.5 font-mono text-muted-foreground">{p.pid}</td>
+                    <td className="px-3 py-1.5 text-muted-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+                      {p.pid}
+                    </td>
                     <td
                       className="px-3 py-1.5 font-mono text-muted-foreground truncate max-w-[350px]"
                       title={p.command}
                     >
                       {p.command.length > 80 ? p.command.slice(0, 80) + "..." : p.command}
                     </td>
-                    <td className="px-3 py-1.5 text-right font-mono text-muted-foreground">{p.cpu}</td>
-                    <td className="px-3 py-1.5 text-right font-mono text-muted-foreground">{p.mem}</td>
+                    <td className="px-3 py-1.5 text-right text-muted-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+                      {p.cpu}
+                    </td>
+                    <td className="px-3 py-1.5 text-right text-muted-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+                      {p.mem}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -351,13 +377,17 @@ export function ComputeDetailPanel({
                 {snapshot.docker.map((c) => (
                   <tr
                     key={c.name}
-                    className="border-t border-border/50 hover:bg-accent/30 transition-colors cursor-pointer"
+                    className="border-t border-border/50 hover:bg-accent/30 transition-colors duration-150 ease-[cubic-bezier(0.32,0.72,0,1)] cursor-pointer"
                     onClick={() => setDrawerItem({ kind: "docker", docker: c })}
                   >
                     <td className="px-3 py-1.5 font-mono text-foreground">{c.name}</td>
                     <td className="px-3 py-1.5 font-mono text-muted-foreground truncate max-w-[200px]">{c.image}</td>
-                    <td className="px-3 py-1.5 text-right font-mono text-foreground">{c.cpu}</td>
-                    <td className="px-3 py-1.5 text-right font-mono text-foreground">{c.memory}</td>
+                    <td className="px-3 py-1.5 text-right text-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+                      {c.cpu}
+                    </td>
+                    <td className="px-3 py-1.5 text-right text-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+                      {c.memory}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -411,13 +441,17 @@ export function ComputeDetailPanel({
           {compute.config?.hourlyRate != null && (
             <>
               <span className="text-muted-foreground">Hourly Rate</span>
-              <span className="text-card-foreground font-mono">${compute.config.hourlyRate}/hr</span>
+              <span className="text-card-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+                ${compute.config.hourlyRate}/hr
+              </span>
             </>
           )}
           {compute.created_at && (
             <>
               <span className="text-muted-foreground">Created</span>
-              <span className="text-card-foreground">{new Date(compute.created_at).toLocaleString()}</span>
+              <span className="text-card-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+                {new Date(compute.created_at).toLocaleString()}
+              </span>
             </>
           )}
         </div>

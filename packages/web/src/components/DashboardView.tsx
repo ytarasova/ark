@@ -82,8 +82,7 @@ function DashboardErrorState({ error, onRetry }: { error: unknown; onRetry: () =
         <div className="text-xs text-[var(--fg-muted)] max-w-md">
           {unreachable ? (
             <>
-              Tried{" "}
-              <code className="font-[family-name:var(--font-mono)] text-[11px]">{base}/api/rpc</code> and got no
+              Tried <code className="font-[family-name:var(--font-mono)] text-[11px]">{base}/api/rpc</code> and got no
               response. Is <code className="font-[family-name:var(--font-mono)] text-[11px]">make dev</code> running?
             </>
           ) : (
@@ -168,7 +167,9 @@ function toRow(s: any): RowSession {
 }
 
 function RecentRow({ s, onSelect }: { s: RowSession; onSelect?: (id: string) => void }) {
-  const statusClass = ["running", "waiting", "completed", "failed", "stopped"].includes(s.status) ? s.status : "stopped";
+  const statusClass = ["running", "waiting", "completed", "failed", "stopped"].includes(s.status)
+    ? s.status
+    : "stopped";
   return (
     <div
       role="button"
@@ -211,9 +212,7 @@ export function DashboardView({
     const waitingSessions = rows.filter((s) => s.status === "waiting" || s.status === "blocked");
     const failedSessions = rows.filter((s) => s.status === "failed");
     // Recent activity = most-recently-updated across all non-archived sessions.
-    const recentRows = [...rows]
-      .sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? ""))
-      .slice(0, 6);
+    const recentRows = [...rows].sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? "")).slice(0, 6);
     return { running, waitingSessions, failedSessions, recentRows };
   }, [sessions]);
 

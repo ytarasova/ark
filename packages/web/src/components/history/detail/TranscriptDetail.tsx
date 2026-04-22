@@ -27,7 +27,9 @@ export function ClaudeTranscriptDetail({ cs }: ClaudeTranscriptDetailProps) {
         <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2">Details</h3>
         <div className="grid grid-cols-[120px_1fr] gap-y-1.5 gap-x-3 text-[13px]">
           <span className="text-muted-foreground">Session ID</span>
-          <span className="text-card-foreground font-mono text-[12px] break-all">{cs.sessionId}</span>
+          <span className="text-card-foreground text-[12px] break-all tabular-nums font-[family-name:var(--font-mono-ui)]">
+            {cs.sessionId}
+          </span>
           {cs.project && (
             <>
               <span className="text-muted-foreground">Project</span>
@@ -49,19 +51,25 @@ export function ClaudeTranscriptDetail({ cs }: ClaudeTranscriptDetailProps) {
           {cs.messageCount != null && (
             <>
               <span className="text-muted-foreground">Messages</span>
-              <span className="text-card-foreground">{cs.messageCount}</span>
+              <span className="text-card-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+                {cs.messageCount}
+              </span>
             </>
           )}
           {(cs.lastActivity || cs.timestamp) && (
             <>
               <span className="text-muted-foreground">Last Activity</span>
-              <span className="text-card-foreground font-mono">{relTime(cs.lastActivity || cs.timestamp)}</span>
+              <span className="text-card-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+                {relTime(cs.lastActivity || cs.timestamp)}
+              </span>
             </>
           )}
           {cs.timestamp && (
             <>
               <span className="text-muted-foreground">Created</span>
-              <span className="text-card-foreground font-mono">{relTime(cs.timestamp)}</span>
+              <span className="text-card-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
+                {relTime(cs.timestamp)}
+              </span>
             </>
           )}
         </div>
@@ -93,7 +101,11 @@ export function SearchTranscriptDetail({ r, onSelectSession }: SearchTranscriptD
           {r.matchLine || r.match || String(r.content || "")}
         </div>
       </div>
-      {r.lineNumber && <div className="text-[10px] text-muted-foreground/50 font-mono">line {r.lineNumber}</div>}
+      {r.lineNumber && (
+        <div className="text-[10px] text-muted-foreground/50 tabular-nums font-[family-name:var(--font-mono-ui)]">
+          line {r.lineNumber}
+        </div>
+      )}
       {onSelectSession && r.sessionId && (
         <Button size="sm" variant="outline" className="mt-3" onClick={() => onSelectSession(r.sessionId)}>
           View in Sessions
