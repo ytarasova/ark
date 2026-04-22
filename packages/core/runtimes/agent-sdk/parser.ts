@@ -10,19 +10,27 @@
  *
  * Identification: we scan the tracks dir looking for a transcript whose
  * first "system" message has info.cwd matching the session workdir.
- * Falls back to returning the most-recently-modified transcript under
- * that workdir if no cwd annotation is present.
+ * Matches transcripts by the `system` init line's `info.cwd` field.
+ * No cwd annotation -> no match.
  *
  * Usage is extracted from the terminal "result" message (cumulative totals).
  * All other message types (system, partial_assistant, hook_*, status, etc.)
  * are ignored -- they stay in the JSONL for observability.
  */
 
-import { existsSync, readFileSync, readdirSync, statSync } from "fs";
+import { existsSync, readFileSync, readdirSync, statSync, realpathSync } from "fs";
 import { join, resolve } from "path";
 import { homedir } from "os";
 import type { TranscriptParser, ParseResult, FindOpts } from "../transcript-parser.js";
 import { logDebug } from "../../observability/structured-log.js";
+
+function normalizePath(p: string): string {
+  try {
+    return realpathSync(resolve(p));
+  } catch {
+    return resolve(p);
+  }
+}
 
 type SdkLine =
   | { type: "user"; message: { content: Array<any> } }
@@ -61,12 +69,8 @@ export class AgentSdkParser implements TranscriptParser {
   constructor(private tracksDir: string = join(homedir(), ".ark", "tracks")) {}
 
   parse(transcriptPath: string): AgentSdkParseResult {
-    const empty: AgentSdkParseResult = {
-      usage: { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0 },
-      cost_usd: 0,
-      num_turns: 0,
-      stop_reason: null,
-    };
+    const usage = { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0 };
+    const empty: AgentSdkParseResult = { usage, cost_usd: 0, num_turns: 0, stop_reason: null };
 
     if (!existsSync(transcriptPath)) return empty;
 
@@ -80,7 +84,6 @@ export class AgentSdkParser implements TranscriptParser {
     let cost_usd = 0;
     let num_turns = 0;
     let stop_reason: string | null = null;
-    const usage = { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0 };
 
     for (const raw of content.split("\n")) {
       if (!raw.trim()) continue;
@@ -102,6 +105,8 @@ export class AgentSdkParser implements TranscriptParser {
         cost_usd = r.total_cost_usd ?? 0;
         num_turns = r.num_turns ?? 0;
         stop_reason = r.stop_reason ?? null;
+        // A result line is terminal -- anything after it is noise.
+        break;
       }
     }
 
@@ -111,14 +116,14 @@ export class AgentSdkParser implements TranscriptParser {
   /**
    * Scan tracksDir for session subdirectories containing a transcript.jsonl
    * whose first "system" line has info.cwd matching opts.workdir.
-   * Falls back to the most-recently-modified match when no cwd annotation
-   * is present.
+   * Matches transcripts by the `system` init line's `info.cwd` field.
+   * No cwd annotation -> no match.
    */
   findForSession(opts: FindOpts): string | null {
     if (!opts.workdir || opts.workdir.trim() === "") return null;
     if (!existsSync(this.tracksDir)) return null;
 
-    const targetCwd = resolve(opts.workdir);
+    const targetCwd = normalizePath(opts.workdir);
     const startMs = opts.startTime?.getTime();
 
     const candidates: Array<{ path: string; mtime: number }> = [];
@@ -153,7 +158,7 @@ export class AgentSdkParser implements TranscriptParser {
         const entry = JSON.parse(firstLine);
         // The system init message written by the executor carries cwd in info.cwd
         if (entry.type === "system" && typeof entry.info?.cwd === "string") {
-          if (resolve(entry.info.cwd) === targetCwd) return path;
+          if (normalizePath(entry.info.cwd) === targetCwd) return path;
         }
       } catch {
         logDebug("session", "agent-sdk parser: skip unreadable transcript");

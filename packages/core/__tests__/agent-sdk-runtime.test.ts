@@ -6,7 +6,7 @@
  */
 
 import { test, expect, describe, beforeAll, afterAll } from "bun:test";
-import { mkdirSync, writeFileSync, rmSync } from "fs";
+import { mkdirSync, writeFileSync, rmSync, symlinkSync, existsSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { AgentSdkParser } from "../runtimes/agent-sdk/parser.js";
@@ -101,6 +101,39 @@ test("returns zero usage for a missing file", () => {
   expect(parsed.stop_reason).toBeNull();
 });
 
+test("stops at first result line -- a second result does not overwrite the first", () => {
+  const path = writeTranscript("sess-double-result", [
+    { type: "user", message: { content: [{ type: "text", text: "go" }] } },
+    {
+      type: "result",
+      is_error: false,
+      num_turns: 1,
+      duration_ms: 100,
+      total_cost_usd: 0.001,
+      usage: { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+      stop_reason: "end_turn",
+      result: "first",
+    },
+    // A second result line (e.g. corrupted or resumed session) should be ignored.
+    {
+      type: "result",
+      is_error: false,
+      num_turns: 99,
+      duration_ms: 999,
+      total_cost_usd: 9.99,
+      usage: { input_tokens: 9999, output_tokens: 8888, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+      stop_reason: "max_tokens",
+      result: "second",
+    },
+  ]);
+  const parsed = new AgentSdkParser().parse(path);
+  // Must reflect the first result line only.
+  expect(parsed.num_turns).toBe(1);
+  expect(parsed.cost_usd).toBeCloseTo(0.001);
+  expect(parsed.usage.input_tokens).toBe(10);
+  expect(parsed.stop_reason).toBe("end_turn");
+});
+
 test("skips malformed lines without crashing", () => {
   const sessionDir = join(TRACKS_DIR, "sess-malformed");
   mkdirSync(sessionDir, { recursive: true });
@@ -161,5 +194,36 @@ describe("AgentSdkParser.findForSession", () => {
     const parser = new AgentSdkParser(TRACKS_DIR);
     const found = parser.findForSession({ workdir: "/tmp/ark-no-such-workdir-xyz" });
     expect(found).toBeNull();
+  });
+
+  test("matches when workdir is a symlink pointing to the real path stored in the transcript", () => {
+    // Create a real directory and a symlink pointing to it.
+    const realDir = join(TEST_DIR, "real-workdir-symlink-test");
+    const symlinkDir = join(TEST_DIR, "symlink-workdir");
+    mkdirSync(realDir, { recursive: true });
+    // Remove any stale symlink from a previous run.
+    if (existsSync(symlinkDir)) rmSync(symlinkDir, { recursive: true, force: true });
+    symlinkSync(realDir, symlinkDir);
+
+    // Transcript stores the real path in info.cwd.
+    const path = writeTranscript("sess-symlink-match", [
+      { type: "system", subtype: "init", info: { cwd: realDir } },
+      {
+        type: "result",
+        is_error: false,
+        num_turns: 1,
+        duration_ms: 100,
+        total_cost_usd: 0.001,
+        usage: { input_tokens: 5, output_tokens: 3, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+        stop_reason: "end_turn",
+        result: "done",
+      },
+    ]);
+
+    // The caller passes the symlink path; the parser must resolve both sides and still match.
+    const parser = new AgentSdkParser(TRACKS_DIR);
+    const found = parser.findForSession({ workdir: symlinkDir });
+    expect(found).not.toBeNull();
+    expect(found).toBe(path);
   });
 });
