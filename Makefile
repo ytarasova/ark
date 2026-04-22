@@ -141,65 +141,6 @@ claude-tfy: ## Claude Code -> TrueFoundry (direct; --continue unless CLAUDE_CONT
 	    exec claude $(CLAUDE_DANGEROUSLY_SKIP_FLAGS) $(CLAUDE_CONTINUE_FLAGS) $(ARGS); \
 	  fi
 
-# ── Agent SDK smoke tests (TrueFoundry) ──────────────────────────────────────
-# One-off wiring of TrueFoundry secrets into Ark's secret store, then a live
-# smoke run of the agent-sdk runtime against a tmp worktree.
-#
-# Auth pattern: ANTHROPIC_BASE_URL=<TF URL>, ANTHROPIC_API_KEY=dummy,
-# ANTHROPIC_CUSTOM_HEADERS="Authorization: Bearer <TF key>",
-# ANTHROPIC_AUTH_TOKEN must NOT be set (TF gateway ignores it / it confuses auth).
-
-TRUEFOUNDRY_AGENT_SDK_MODEL_DEFAULT := pi-agentic/global.anthropic.claude-sonnet-4-6
-
-agent-sdk-secrets: ## Load TrueFoundry creds from .env into Ark's secret store for agent-sdk runtime
-	@set -e; \
-	if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
-	test -n "$$TRUEFOUNDRY_API_KEY" || { echo "Set TRUEFOUNDRY_API_KEY in .env"; exit 1; }; \
-	tfy_base="$$TRUEFOUNDRY_ANTHROPIC_BASE_URL"; \
-	if [ -z "$$tfy_base" ]; then tfy_base="$$TRUEFOUNDRY_API_BASE"; fi; \
-	test -n "$$tfy_base" || { echo "Set TRUEFOUNDRY_ANTHROPIC_BASE_URL or TRUEFOUNDRY_API_BASE in .env"; exit 1; }; \
-	./ark secrets set ANTHROPIC_API_KEY <<< "dummy" > /dev/null; \
-	./ark secrets set ANTHROPIC_BASE_URL <<< "$$tfy_base" > /dev/null; \
-	./ark secrets set ANTHROPIC_CUSTOM_HEADERS <<< "Authorization: Bearer $$TRUEFOUNDRY_API_KEY" > /dev/null; \
-	echo "agent-sdk secrets set (TrueFoundry)."
-
-smoke-agent-sdk: agent-sdk-secrets ## Live smoke: run a real agent-sdk session against TrueFoundry
-	@set -e; \
-	if [ -f .env ]; then set -a && . ./.env && set +a; fi; \
-	model="$$TRUEFOUNDRY_AGENT_SDK_MODEL"; \
-	if [ -z "$$model" ]; then model="$(TRUEFOUNDRY_AGENT_SDK_MODEL_DEFAULT)"; fi; \
-	tmpdir=$$(mktemp -d); \
-	cd "$$tmpdir" && git init -q && echo "# smoke" > README.md && git add -A && git -c user.email=smoke@ark -c user.name=smoke commit -q -m seed; \
-	cd - > /dev/null; \
-	echo "Smoke worktree: $$tmpdir"; \
-	echo "Model: $$model"; \
-	session_id=$$(./ark session start \
-	  --runtime agent-sdk \
-	  --model "$$model" \
-	  --flow bare \
-	  --repo "$$tmpdir" \
-	  --summary "Create a file called hello.txt with the single line hello from agent-sdk smoke. Then print its contents with the Read tool. Nothing else." \
-	  2>&1 | grep -oE 'Session [a-zA-Z0-9-]+' | head -1 | awk '{print $$2}'); \
-	if [ -z "$$session_id" ]; then echo "ERROR: could not capture session id"; exit 1; fi; \
-	echo "Session: $$session_id"; \
-	echo "Waiting for terminal state (max 180s)..."; \
-	i=0; \
-	while [ $$i -lt 36 ]; do \
-	  status=$$(./ark session show "$$session_id" 2>/dev/null | grep 'Status:' | awk '{print $$2}'); \
-	  echo "  [$$i] status=$$status"; \
-	  case "$$status" in completed|failed|blocked|archived) break;; esac; \
-	  i=$$((i+1)); \
-	  sleep 5; \
-	done; \
-	echo "---"; \
-	./ark session show "$$session_id"; \
-	echo "---"; \
-	echo "Worktree contents:"; \
-	ls -la "$$tmpdir"
-
-smoke-agent-sdk-clean: ## Remove the last smoke worktree (manual cleanup)
-	@echo "Run: rm -rf /tmp/tmp.XXXX  (path printed by make smoke-agent-sdk)"
-
 self: ## Dispatch full SDLC (plan->implement->review->PR) against THIS repo
 	@test -n "$(TASK)" || (echo 'Usage: make self TASK="<description>"'; exit 1)
 	./ark session start --recipe self-dogfood --summary "$(TASK)" --dispatch
