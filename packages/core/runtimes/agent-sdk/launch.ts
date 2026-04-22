@@ -471,24 +471,29 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
   const baseURL = process.env.ANTHROPIC_BASE_URL;
   const customHeaders = process.env.ANTHROPIC_CUSTOM_HEADERS;
 
-  // TrueFoundry / AWS-Bedrock compat proxy ---------------------------------
-  // The TF gateway routes through AWS Bedrock which rejects extra fields
-  // (e.g. `context_management`) that the Claude binary includes in its requests.
-  // When ARK_BEDROCK_COMPAT=1 (set by the executor for TF sessions), we start a
-  // local Bun HTTP proxy that strips those fields before forwarding to TF.
-  // The proxy also writes a temp CLAUDE_CONFIG_DIR/settings.json with
-  // modelOverrides so the binary sends the full provider-qualified model slug
-  // (e.g. "pi-agentic/global.anthropic.claude-sonnet-4-6") rather than the short
-  // name that TF Bedrock can't route.
+  // Gateway wire-format compat -------------------------------------------------
+  // ARK_COMPAT is a comma-separated list of compat modes set by the executor
+  // from the runtime's declared `compat:` field. No heuristics: callers opt in
+  // explicitly via the runtime YAML.
+  //
+  // `bedrock` mode -- for gateways that transcode to AWS Bedrock (TrueFoundry,
+  // direct Bedrock proxies). Bedrock rejects several fields the Claude binary
+  // includes (e.g. `context_management`) and SNI-routes on Host, so we start a
+  // local Bun proxy that (a) strips those fields from request bodies,
+  // (b) drops the Host / hop-by-hop headers so fetch sets them correctly for
+  // the upstream, (c) expands short model slugs (e.g. `claude-sonnet-4-6`) to
+  // the full provider-qualified form the gateway expects.
+  const compatModes = new Set(
+    (process.env.ARK_COMPAT ?? "")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter((s) => s.length > 0),
+  );
+
   let proxyServer: ReturnType<typeof Bun.serve> | undefined;
   let effectiveBaseURL = baseURL;
   let effectiveModel = model;
-  // Enable bedrock-compat proxy when ARK_BEDROCK_COMPAT=1 is explicitly set,
-  // OR when ANTHROPIC_API_KEY is the sentinel "dummy" value indicating a
-  // custom-auth gateway (TrueFoundry) is in use -- those gateways route through
-  // AWS Bedrock which rejects extended API fields like context_management.
-  const bedrockCompat =
-    process.env.ARK_BEDROCK_COMPAT === "1" || (apiKey === "dummy" && !!customHeaders?.includes("Authorization:"));
+  const bedrockCompat = compatModes.has("bedrock");
 
   if (bedrockCompat && baseURL) {
     // Fields that AWS Bedrock (via TF gateway) does not accept.

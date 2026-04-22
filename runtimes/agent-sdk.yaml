@@ -1,5 +1,5 @@
 name: agent-sdk
-description: "Anthropic Agent SDK (in-process, TrueFoundry-routed)"
+description: "Anthropic Agent SDK (in-process, direct or gateway-routed)"
 type: agent-sdk
 models:
   - id: opus
@@ -14,6 +14,19 @@ secrets:
   - ANTHROPIC_API_KEY
   - ANTHROPIC_BASE_URL
   - ANTHROPIC_CUSTOM_HEADERS
+# Gateway wire-format compatibility modes. Empty by default (direct Anthropic
+# API works out of the box). Enable as needed when routing through a gateway
+# that doesn't accept the SDK's native wire shape.
+#
+# Available modes:
+#   bedrock - for gateways that transcode to AWS Bedrock (TrueFoundry AI gateway,
+#             direct AWS Bedrock proxies). Starts an in-process proxy on an
+#             ephemeral port that (a) strips fields Bedrock rejects such as
+#             `context_management`, (b) rewrites the Host header so gateway
+#             SNI routing works, (c) expands short model slugs like
+#             `claude-sonnet-4-6` to their full provider path (e.g.
+#             `pi-agentic/global.anthropic.claude-sonnet-4-6`).
+compat: []
 billing:
   mode: api
   transcript_parser: agent-sdk

@@ -101,6 +101,15 @@ export const agentSdkExecutor: Executor = {
     // Tenant ID for multi-tenant conductor routing
     if (session.tenant_id) arkEnv.ARK_TENANT_ID = session.tenant_id;
 
+    // Propagate runtime compat modes (e.g. `bedrock`) as a comma-separated
+    // ARK_COMPAT env var. launch.ts reads this to enable gateway-specific
+    // wire-format rewrites without any heuristic guessing.
+    const runtimeDef = await app.runtimes?.get?.(opts.agent.runtime ?? "agent-sdk");
+    const compat = Array.isArray((runtimeDef as { compat?: unknown })?.compat)
+      ? ((runtimeDef as { compat: string[] }).compat.filter((c) => typeof c === "string" && c.length > 0))
+      : [];
+    if (compat.length > 0) arkEnv.ARK_COMPAT = compat.join(",");
+
     // opts.env carries secrets resolved by StageSecretResolver
     // (ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL per agent-sdk.yaml secrets block)
     // as well as tenant-level claude auth from materializeClaudeAuth.
