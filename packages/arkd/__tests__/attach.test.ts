@@ -163,4 +163,21 @@ describe("attach endpoints", () => {
     const { status } = await post<any>("/agent/attach/close", { streamHandle: "" });
     expect(status).toBe(500);
   });
+
+  it("/agent/attach/stream returns 400 without handle param", async () => {
+    const resp = await fetch(`${BASE}/agent/attach/stream`);
+    expect(resp.status).toBe(400);
+  });
+
+  it("/agent/attach/stream returns 404 for unknown handle", async () => {
+    const resp = await fetch(`${BASE}/agent/attach/stream?handle=no-such-handle`);
+    expect(resp.status).toBe(404);
+  });
+
+  // Note: /agent/attach/stream wire-level behaviour (chunked byte delivery,
+  // fifo lifecycle) is covered by packages/server/__tests__/terminal-ws.test.ts,
+  // which exercises the end-to-end server-daemon -> arkd -> fifo -> WS path
+  // with a real tmux pane. We intentionally don't duplicate that here because
+  // a raw fifo can't be probed without a writer without deadlocking on Bun's
+  // ReadStream semantics.
 });

@@ -122,6 +122,24 @@ export class ArkdClient {
     return this.post("/agent/attach/close", req);
   }
 
+  /**
+   * Open the chunked byte stream for an attach handle. Returns the raw
+   * `Response` so callers can pipe the body directly. The response stays
+   * open until the handle is closed or the server tears it down.
+   *
+   * Throws if the server returns a non-2xx.
+   */
+  async attachStream(streamHandle: string): Promise<Response> {
+    const resp = await fetch(`${this.baseUrl}/agent/attach/stream?handle=${encodeURIComponent(streamHandle)}`, {
+      headers: this.authHeaders(),
+    });
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => "");
+      throw new ArkdClientError(`arkd /agent/attach/stream: ${body || resp.statusText}`, undefined, resp.status);
+    }
+    return resp;
+  }
+
   // ── System ────────────────────────────────────────────────────────────────
 
   async health(): Promise<HealthRes> {

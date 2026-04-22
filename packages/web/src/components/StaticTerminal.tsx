@@ -4,8 +4,8 @@
  *
  * Column detection strategy:
  *   1. Use the explicit `cols` prop when provided. `session.pty_cols` /
- *      `pty_rows` are observed on the first client resize (terminal-bridge),
- *      so the replay renders at the same width the live agent saw.
+ *      `pty_rows` are observed on the first resize from the live terminal
+ *      panel, so the replay renders at the same width the live agent saw.
  *   2. Otherwise fall back to auto-detection -- widest line after ANSI strip,
  *      floored at 120. This covers sessions that never got a live client
  *      (CLI-only dispatches) and pre-observation rows still NULL in the DB.

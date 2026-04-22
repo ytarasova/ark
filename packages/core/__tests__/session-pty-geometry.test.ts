@@ -5,11 +5,9 @@
  * pinned the live agent to 120 cols regardless of the real web viewport,
  * which meant cursor-position escapes landed in the wrong cells when the
  * browser was wider/narrower. Today pty_cols / pty_rows are *observed* (the
- * terminal bridge writes them on the first client resize -- see
- * packages/core/hosted/terminal-bridge.ts), not prescribed. They start NULL
+ * live terminal panel's first resize event), not prescribed. They start NULL
  * on freshly created sessions and get populated once a real client connects.
- * These tests only cover the repo round-trip; the write path is covered in
- * packages/core/__tests__/terminal-bridge-geometry.test.ts.
+ * These tests only cover the repo round-trip.
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";

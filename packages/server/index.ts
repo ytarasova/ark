@@ -8,6 +8,8 @@ import {
   type TenantContext,
   type MaterializeOptions,
 } from "../core/auth/context.js";
+import { ArkdClient } from "../arkd/client.js";
+import { DEFAULT_ARKD_URL } from "../core/constants.js";
 
 export interface ServerConnection {
   id: string;
@@ -198,7 +200,8 @@ export class ArkServer {
         sessionId: string;
         tmuxName: string;
         streamHandle: string | null;
-        cleanup?: () => void;
+        arkdClient: ArkdClient | null;
+        streamAbort: AbortController | null;
       }
     >();
     const server = Bun.serve<WsData, never>({
@@ -257,30 +260,23 @@ export class ArkServer {
           // ── Terminal-attach route ────────────────────────────────────────
           if (upgradeData.kind === "terminal") {
             const { sessionId, tmuxName } = upgradeData;
-            terminalMetadata.set(ws, { sessionId, tmuxName, streamHandle: null });
+            terminalMetadata.set(ws, {
+              sessionId,
+              tmuxName,
+              streamHandle: null,
+              arkdClient: null,
+              streamAbort: null,
+            });
             try {
-              const bridge = await self.startTerminalBridgeLocal(ws, tmuxName);
-              if (!bridge) {
-                ws.send(JSON.stringify({ type: "error", message: "tmux session not found" }));
-                ws.close();
-                return;
-              }
-              const meta = terminalMetadata.get(ws);
-              if (meta) {
-                meta.streamHandle = bridge.streamHandle;
-                meta.cleanup = bridge.cleanup;
-              }
-              ws.send(
-                JSON.stringify({
-                  type: "connected",
-                  sessionId,
-                  streamHandle: bridge.streamHandle,
-                  initialBuffer: bridge.initialBuffer,
-                }),
-              );
+              if (!app) throw new Error("terminal route requires AppContext");
+              await self.startTerminalBridgeArkd(app, ws, sessionId, tmuxName, terminalMetadata);
             } catch (err: any) {
               ws.send(JSON.stringify({ type: "error", message: err?.message ?? "attach failed" }));
-              ws.close();
+              try {
+                ws.close();
+              } catch {
+                /* already closed */
+              }
             }
             return;
           }
@@ -348,11 +344,19 @@ export class ArkServer {
           const upgradeData = (ws.data ?? {}) as WsData;
           if (upgradeData.kind === "terminal") {
             const meta = terminalMetadata.get(ws);
-            if (meta?.cleanup) {
+            if (meta) {
+              // Abort the outbound stream first so the read loop exits, then
+              // fire-and-forget the remote close call. Swallow errors so
+              // browsers reloading the page don't spam the daemon logs.
               try {
-                meta.cleanup();
+                meta.streamAbort?.abort();
               } catch {
-                /* best effort */
+                /* ignore */
+              }
+              if (meta.arkdClient && meta.streamHandle) {
+                meta.arkdClient
+                  .attachClose({ streamHandle: meta.streamHandle })
+                  .catch(() => logDebug("web", "arkd attachClose failed (session likely already gone)"));
               }
             }
             terminalMetadata.delete(ws);
@@ -368,44 +372,82 @@ export class ArkServer {
   }
 
   /**
-   * Start a terminal bridge for a WebSocket. For the local-MVP this spawns
-   * `script tmux attach-session` just like the hosted web bridge does; remote
-   * arkd-to-arkd proxying is deferred (see #396 follow-up).
+   * Arkd-backed terminal bridge. Resolves the session's compute, gets the
+   * arkd URL via `provider.getArkdUrl(compute)`, opens an attach handle via
+   * `/agent/attach/open`, streams pane bytes back via `/agent/attach/stream`
+   * (HTTP chunked), and forwards keystrokes / resizes via `/agent/attach/
+   * input` and `/agent/attach/resize`. On WS close, `/agent/attach/close`
+   * tears the fifo + pipe-pane down.
    *
-   * Returns the stream handle and initial pane capture on success so the
-   * caller can send the `connected` envelope to the client. Returns null when
-   * the tmux session is not running.
+   * Works uniformly for local, ec2, k8s, firecracker -- any provider with a
+   * running arkd. Sessions backed by the legacy non-arkd LocalProvider fall
+   * back to DEFAULT_ARKD_URL (the local daemon on :19300) since that's where
+   * the tmux pane lives in single-host mode.
    */
-  private async startTerminalBridgeLocal(
+  private async startTerminalBridgeArkd(
+    app: import("../core/app.js").AppContext,
     ws: import("bun").ServerWebSocket<unknown>,
+    sessionId: string,
     tmuxName: string,
-  ): Promise<{ streamHandle: string; initialBuffer: string; cleanup: () => void } | null> {
-    const tmux = await import("../core/infra/tmux.js");
-    if (!tmux.sessionExists(tmuxName)) return null;
+    metadata: WeakMap<
+      object,
+      {
+        sessionId: string;
+        tmuxName: string;
+        streamHandle: string | null;
+        arkdClient: ArkdClient | null;
+        streamAbort: AbortController | null;
+      }
+    >,
+  ): Promise<void> {
+    // Resolve the session + compute + provider, then the arkd URL.
+    const session = await app.sessions.get(sessionId);
+    if (!session) throw new Error("session not found");
 
-    // Initial capture so the client can paint without waiting for keystrokes.
-    const initialBuffer = await tmux.capturePaneAsync(tmuxName, { lines: 500, ansi: true });
+    const { arkdUrl, token } = await resolveArkdForSession(app, session);
+    const arkdClient = new ArkdClient(arkdUrl, token ? { token } : undefined);
 
-    // Spawn `script tmux attach-session` to allocate a pseudo-terminal and
-    // bridge it to the WebSocket. This is the same approach the hosted web
-    // bridge uses; we keep it here so the local daemon stays self-contained.
-    const { spawn } = await import("bun");
-    const tmuxBin = tmux.tmuxBin();
-    const cmd =
-      process.platform === "darwin"
-        ? ["script", "-q", "/dev/null", tmuxBin, "attach-session", "-t", tmuxName]
-        : ["script", "-q", "-c", `${tmuxBin} attach-session -t ${tmuxName}`, "/dev/null"];
+    // Open the attach handle. arkd returns the initial capture + a stream
+    // handle we then pipe into the WebSocket as binary frames.
+    const opened = await arkdClient.attachOpen({ sessionName: tmuxName });
+    if (!opened.ok) throw new Error("arkd refused attachOpen");
 
-    const proc = spawn({ cmd, stdin: "pipe", stdout: "pipe", stderr: "pipe" });
-    let alive = true;
+    const meta = metadata.get(ws);
+    if (meta) {
+      meta.streamHandle = opened.streamHandle;
+      meta.arkdClient = arkdClient;
+    }
+
+    // Tell the browser we're live and hand it the initial pane paint.
+    ws.send(
+      JSON.stringify({
+        type: "connected",
+        sessionId,
+        streamHandle: opened.streamHandle,
+        initialBuffer: opened.initialBuffer,
+      }),
+    );
+
+    // Pipe the chunked byte stream to the WebSocket. AbortController lets
+    // the close handler tear this down cleanly.
+    const abort = new AbortController();
+    if (meta) meta.streamAbort = abort;
 
     (async () => {
+      let streamResp: Response | null = null;
       try {
-        const reader = proc.stdout.getReader();
-        while (alive) {
+        streamResp = await fetch(`${arkdUrl}/agent/attach/stream?handle=${encodeURIComponent(opened.streamHandle)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          signal: abort.signal,
+        });
+        if (!streamResp.ok || !streamResp.body) {
+          throw new Error(`arkd stream returned ${streamResp.status}`);
+        }
+        const reader = streamResp.body.getReader();
+        while (!abort.signal.aborted) {
           const { value, done } = await reader.read();
           if (done) break;
-          if (value && alive) {
+          if (value && value.byteLength > 0) {
             try {
               ws.sendBinary(value);
             } catch {
@@ -413,10 +455,16 @@ export class ArkServer {
             }
           }
         }
-      } catch {
-        /* read error */
+      } catch (err: any) {
+        if (!abort.signal.aborted) {
+          logDebug("web", `arkd attach stream error: ${err?.message ?? err}`);
+        }
       } finally {
-        alive = false;
+        try {
+          ws.send(JSON.stringify({ type: "disconnected" }));
+        } catch {
+          /* already closed */
+        }
         try {
           ws.close();
         } catch {
@@ -424,107 +472,99 @@ export class ArkServer {
         }
       }
     })();
-
-    // Drain stderr so the pipe doesn't block.
-    (async () => {
-      try {
-        const reader = proc.stderr.getReader();
-        while (true) {
-          const { done } = await reader.read();
-          if (done) break;
-        }
-      } catch {
-        /* ignore */
-      }
-    })();
-
-    proc.exited.then(() => {
-      alive = false;
-      try {
-        ws.send(JSON.stringify({ type: "disconnected" }));
-        ws.close();
-      } catch {
-        /* already closed */
-      }
-    });
-
-    const streamHandle = `ws-attach-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const cleanup = () => {
-      alive = false;
-      try {
-        proc.kill();
-      } catch {
-        /* already dead */
-      }
-    };
-
-    // Store proc on the ws so input messages can write to stdin.
-    (ws as any).__terminalProc = proc;
-
-    return { streamHandle, initialBuffer, cleanup };
   }
 
-  /** Dispatch an incoming terminal message to the underlying PTY process. */
+  /**
+   * Dispatch an incoming terminal-WS message to the arkd attach endpoints.
+   * JSON text messages drive resize; binary / raw text drives input.
+   */
   private async handleTerminalMessage(
     ws: import("bun").ServerWebSocket<unknown>,
     data: string | Buffer | ArrayBuffer | Uint8Array,
-    _metadata: WeakMap<object, { sessionId: string; tmuxName: string; streamHandle: string | null }>,
+    metadata: WeakMap<
+      object,
+      {
+        sessionId: string;
+        tmuxName: string;
+        streamHandle: string | null;
+        arkdClient: ArkdClient | null;
+        streamAbort: AbortController | null;
+      }
+    >,
   ): Promise<void> {
-    const proc = (ws as any).__terminalProc as import("bun").Subprocess | undefined;
-    if (!proc) return;
+    const meta = metadata.get(ws);
+    if (!meta || !meta.arkdClient) return;
+    const { arkdClient, tmuxName } = meta;
 
-    // JSON envelope: { type: "resize", cols, rows } or { type: "input", data }
+    // JSON envelope handling.
     if (typeof data === "string") {
-      let handled = false;
       try {
         const msg = JSON.parse(data);
-        if (msg && msg.type === "resize" && Number.isFinite(msg.cols) && Number.isFinite(msg.rows)) {
-          const tmux = await import("../core/infra/tmux.js");
-          const tmuxBin = tmux.tmuxBin();
-          const upgradeData = (ws.data ?? {}) as { tmuxName?: string };
-          const tmuxName = upgradeData.tmuxName;
-          if (tmuxName) {
-            const cols = Math.max(1, Math.min(1000, Math.trunc(msg.cols)));
-            const rows = Math.max(1, Math.min(1000, Math.trunc(msg.rows)));
-            try {
-              const { spawn } = await import("bun");
-              const resizeProc = spawn({
-                cmd: [tmuxBin, "resize-window", "-t", tmuxName, "-x", String(cols), "-y", String(rows)],
-                stdout: "pipe",
-                stderr: "pipe",
-              });
-              resizeProc.exited.catch(() => {
-                /* best effort */
-              });
-            } catch {
-              /* resize is best-effort */
-            }
-          }
-          handled = true;
-        } else if (msg && msg.type === "input" && typeof msg.data === "string") {
-          const sink = proc.stdin as unknown as { write(s: string): number; flush(): void };
-          sink.write(msg.data);
-          sink.flush();
-          handled = true;
+        if (msg?.type === "resize" && Number.isFinite(msg.cols) && Number.isFinite(msg.rows)) {
+          const cols = Math.max(1, Math.min(1000, Math.trunc(msg.cols)));
+          const rows = Math.max(1, Math.min(1000, Math.trunc(msg.rows)));
+          await arkdClient.attachResize({ sessionName: tmuxName, cols, rows }).catch((err) => {
+            logDebug("web", `arkd attachResize failed: ${err?.message ?? err}`);
+          });
+          return;
+        }
+        if (msg?.type === "input" && typeof msg.data === "string") {
+          await arkdClient.attachInput({ sessionName: tmuxName, data: msg.data }).catch((err) => {
+            logDebug("web", `arkd attachInput failed: ${err?.message ?? err}`);
+          });
+          return;
         }
       } catch {
-        /* not JSON */
+        // Fall through to raw-text input.
       }
-      if (!handled) {
-        // Raw text input fallback.
-        const sink = proc.stdin as unknown as { write(s: string): number; flush(): void };
-        sink.write(data);
-        sink.flush();
-      }
+      await arkdClient.attachInput({ sessionName: tmuxName, data }).catch((err) => {
+        logDebug("web", `arkd attachInput failed: ${err?.message ?? err}`);
+      });
       return;
     }
 
-    // Binary input -- raw keystrokes
+    // Binary input: decode to utf-8 and send via send-keys -l (literal).
     const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : (data as Uint8Array);
-    const sink = proc.stdin as unknown as { write(b: Uint8Array): number; flush(): void };
-    sink.write(bytes);
-    sink.flush();
+    const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+    await arkdClient.attachInput({ sessionName: tmuxName, data: text }).catch((err) => {
+      logDebug("web", `arkd attachInput failed: ${err?.message ?? err}`);
+    });
   }
+}
+
+/**
+ * Resolve the arkd URL (+ auth token if the provider supplies one) for a
+ * session. For modern providers with `getArkdUrl`, we use the provider's
+ * URL. Legacy local sessions fall back to ARK_ARKD_URL / the compiled-in
+ * default since the tmux pane lives on the same host as the daemon. Token
+ * plumbing: arkd is configured with a shared token at boot (ARK_ARKD_TOKEN);
+ * we forward the daemon's own env to remote arkd instances.
+ *
+ * The env var is re-read on every call (instead of using the imported
+ * DEFAULT_ARKD_URL constant) so tests that boot a local arkd on a random
+ * port can point the bridge at it without module-cache gymnastics.
+ */
+async function resolveArkdForSession(
+  app: import("../core/app.js").AppContext,
+  session: { compute_name?: string | null },
+): Promise<{ arkdUrl: string; token: string | null }> {
+  const token = process.env.ARK_ARKD_TOKEN ?? null;
+  const fallback = process.env.ARK_ARKD_URL || DEFAULT_ARKD_URL;
+
+  if (!session.compute_name) {
+    return { arkdUrl: fallback, token };
+  }
+  const compute = await app.computes.get(session.compute_name);
+  if (!compute) return { arkdUrl: fallback, token };
+  const provider = app.getProvider(compute.provider);
+  if (provider?.getArkdUrl) {
+    try {
+      return { arkdUrl: provider.getArkdUrl(compute), token };
+    } catch (err: any) {
+      logDebug("web", `provider.getArkdUrl threw: ${err?.message ?? err}; falling back to default`);
+    }
+  }
+  return { arkdUrl: fallback, token };
 }
 
 export { Router } from "./router.js";

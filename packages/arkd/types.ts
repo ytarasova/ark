@@ -154,6 +154,21 @@ export interface AgentAttachCloseRes {
   ok: boolean;
 }
 
+/**
+ * Stream live pane bytes for an open attach handle. Served as an HTTP chunked
+ * response -- bytes from `tmux pipe-pane` are piped to the response body as
+ * they arrive. The stream closes when the handle is closed via
+ * /agent/attach/close, when the tmux session ends, or when the client
+ * disconnects.
+ *
+ * The endpoint lives on the same arkd instance that owns the tmux session;
+ * the server daemon's /terminal/:sessionId WS proxy relays bytes from this
+ * stream back to the browser.
+ */
+export interface AgentAttachStreamReq {
+  streamHandle: string;
+}
+
 // ── System ──────────────────────────────────────────────────────────────────
 
 export interface MetricsRes {

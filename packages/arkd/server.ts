@@ -6,7 +6,12 @@
  */
 
 declare const Bun: {
-  serve(options: { port: number; hostname: string; fetch(req: Request): Promise<Response> | Response }): {
+  serve(options: {
+    port: number;
+    hostname: string;
+    fetch(req: Request): Promise<Response> | Response;
+    idleTimeout?: number;
+  }): {
     stop(): void;
   };
   spawn(opts: {
@@ -28,10 +33,10 @@ declare const Bun: {
   };
 };
 
-import { readFile, writeFile, stat, mkdir, readdir } from "fs/promises";
-import { writeFileSync, mkdirSync, existsSync } from "fs";
+import { readFile, writeFile, stat, mkdir, readdir, unlink } from "fs/promises";
+import { writeFileSync, mkdirSync, existsSync, createReadStream } from "fs";
 import { join, resolve, sep } from "path";
-import { hostname, platform, uptime, totalmem, freemem, cpus, homedir } from "os";
+import { hostname, platform, uptime, totalmem, freemem, cpus, homedir, tmpdir } from "os";
 import { timingSafeEqual } from "crypto";
 import { DEFAULT_CHANNEL_BASE_URL } from "../core/constants.js";
 import type {
@@ -296,6 +301,9 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
   const server = Bun.serve({
     port,
     hostname: bindHost,
+    // Long-lived streams (e.g. /agent/attach/stream) stay open indefinitely
+    // until the client disconnects. 0 disables the default 10s idle timeout.
+    idleTimeout: 0,
     async fetch(req) {
       const url = new URL(req.url);
       const path = url.pathname;
@@ -452,6 +460,18 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
           const body = (await req.json()) as AgentAttachCloseReq;
           const result = await agentAttachClose(body);
           return json(result);
+        }
+
+        // ── Agent: attach-stream (chunked pane output) ───────────────
+        //
+        // The server daemon's /terminal/:sessionId WS proxy hits this
+        // endpoint once per session to pick up the live byte stream. Held
+        // open indefinitely (chunked), closes when the WS proxy disconnects
+        // or agentAttachClose tears the fifo down.
+        if (req.method === "GET" && path === "/agent/attach/stream") {
+          const streamHandle = url.searchParams.get("handle");
+          if (!streamHandle) return json({ error: "handle query param required" }, 400);
+          return agentAttachStreamResponse(streamHandle);
         }
 
         // ── Ports: probe ──────────────────────────────────────────────
@@ -775,12 +795,28 @@ async function agentCapture(req: AgentCaptureReq): Promise<AgentCaptureRes> {
 // ── Terminal attach (live) ───────────────────────────────────────────────────
 
 /**
- * Terminal attach sessions are tracked in-process by a short opaque handle.
- * The WS proxy on the server daemon opens one per WebSocket connection and
- * relays Input/Resize/Close calls back to arkd. Local MVP only -- a remote
- * arkd-to-arkd transport is deferred (see #396 follow-up).
+ * An open attach handle backs one client WebSocket connection.
+ *
+ * The server daemon's /terminal/:sessionId WS proxy opens one handle per
+ * browser tab. Live pane bytes are streamed via `tmux pipe-pane` to a named
+ * fifo; the /agent/attach/stream endpoint opens the fifo and pipes it to the
+ * HTTP response body. Input / resize calls hit /agent/attach/{input,resize}.
+ * /agent/attach/close tears the fifo down.
+ *
+ * The fifo lives under `tmpdir()/arkd-attach-<random>.fifo` so multiple
+ * concurrent attachers on the same host don't collide. Each open handle
+ * owns exactly one fifo; a single tmux pane can be attached by multiple
+ * clients, each with their own handle + fifo.
  */
-const attachStreams = new Map<string, { sessionName: string; openedAt: number }>();
+interface AttachHandle {
+  sessionName: string;
+  fifoPath: string;
+  openedAt: number;
+  /** Resolves when the client-side stream closes. The stream endpoint awaits this to tear pipe-pane down cleanly. */
+  closed: boolean;
+}
+
+const attachStreams = new Map<string, AttachHandle>();
 let attachCounter = 0;
 
 async function agentAttachOpen(req: AgentAttachOpenReq): Promise<AgentAttachOpenRes> {
@@ -797,8 +833,40 @@ async function agentAttachOpen(req: AgentAttachOpenReq): Promise<AgentAttachOpen
   const initialBuffer = (await readStream(capture.stdout)).trimEnd();
   await capture.exited;
 
+  // Allocate a fifo for live pane bytes. Random suffix is ample entropy since
+  // the value never leaves this host and the fifo is unlinked on close.
+  const suffix = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  const fifoPath = join(tmpdir(), `arkd-attach-${suffix}.fifo`);
+
+  // mkfifo; fall back to "touch" on platforms missing mkfifo (shouldn't
+  // happen on linux/darwin but we still guard so startArkd never throws at
+  // runtime in a weird env).
+  try {
+    const mk = Bun.spawn({ cmd: ["mkfifo", fifoPath], stdout: "pipe", stderr: "pipe" });
+    const code = await mk.exited;
+    if (code !== 0) throw new Error(`mkfifo exited ${code}`);
+  } catch (e: any) {
+    throw new Error(`failed to create fifo: ${e?.message ?? e}`);
+  }
+
+  // Start tmux pipe-pane writing to the fifo. `-O` means open the file for
+  // append; `tmux pipe-pane` runs the command as a shell so we can use `cat
+  // > fifo` to keep the writer alive until pipe-pane is turned off. Using
+  // a shell redirect is safe here because fifoPath is machine-generated.
+  const pipeProc = Bun.spawn({
+    cmd: ["tmux", "pipe-pane", "-t", req.sessionName, "-O", `cat >> ${fifoPath}`],
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  await pipeProc.exited;
+
   const streamHandle = `attach-${Date.now()}-${++attachCounter}`;
-  attachStreams.set(streamHandle, { sessionName: req.sessionName, openedAt: Date.now() });
+  attachStreams.set(streamHandle, {
+    sessionName: req.sessionName,
+    fifoPath,
+    openedAt: Date.now(),
+    closed: false,
+  });
   return { ok: true, streamHandle, initialBuffer };
 }
 
@@ -839,8 +907,99 @@ async function agentAttachClose(req: AgentAttachCloseReq): Promise<AgentAttachCl
   if (typeof req.streamHandle !== "string" || req.streamHandle.length === 0) {
     throw new Error("streamHandle required");
   }
+  const handle = attachStreams.get(req.streamHandle);
   attachStreams.delete(req.streamHandle);
+  if (handle) {
+    handle.closed = true;
+    // Stop pipe-pane and unlink the fifo. Errors are swallowed because close
+    // must be idempotent; the tmux pane may already be gone.
+    try {
+      const stopProc = Bun.spawn({
+        cmd: ["tmux", "pipe-pane", "-t", handle.sessionName],
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      await stopProc.exited;
+    } catch {
+      /* tmux session may already be dead */
+    }
+    try {
+      await unlink(handle.fifoPath);
+    } catch {
+      /* already gone */
+    }
+  }
   return { ok: true };
+}
+
+/**
+ * Stream live pane bytes for an open attach handle. Returns an HTTP chunked
+ * response that emits bytes from the fifo until the caller disconnects, the
+ * handle is closed, or the tmux session ends.
+ *
+ * We open the fifo lazily (on first request) rather than in agentAttachOpen
+ * because opening a fifo for read blocks until a writer appears, and the
+ * writer (tmux pipe-pane) only starts emitting bytes when there's activity
+ * in the pane. Nothing reads until the WS proxy asks for bytes.
+ */
+function agentAttachStreamResponse(streamHandle: string): Response {
+  const handle = attachStreams.get(streamHandle);
+  if (!handle) {
+    return json({ error: "stream handle not found" }, 404);
+  }
+  const { fifoPath } = handle;
+  if (!existsSync(fifoPath)) {
+    return json({ error: "fifo missing" }, 410);
+  }
+
+  // Use a Node createReadStream to tail the fifo -- Bun.file(fifoPath) stream
+  // terminates on EOF, which on a fifo means the writer temporarily has no
+  // data. We want to keep the response open across quiet periods, so use
+  // `createReadStream` which keeps the fd open.
+  const nodeStream = createReadStream(fifoPath);
+
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      nodeStream.on("data", (chunk: Buffer | string) => {
+        try {
+          const bytes = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
+          controller.enqueue(new Uint8Array(bytes));
+        } catch {
+          /* controller closed */
+        }
+      });
+      nodeStream.on("end", () => {
+        try {
+          controller.close();
+        } catch {
+          /* already closed */
+        }
+      });
+      nodeStream.on("error", () => {
+        try {
+          controller.close();
+        } catch {
+          /* already closed */
+        }
+      });
+    },
+    cancel() {
+      try {
+        nodeStream.close();
+      } catch {
+        /* best effort */
+      }
+    },
+  });
+
+  return new Response(body, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/octet-stream",
+      "Cache-Control": "no-store",
+      "X-Accel-Buffering": "no",
+    },
+  });
 }
 
 async function isTmuxRunning(sessionName: string): Promise<boolean> {

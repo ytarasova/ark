@@ -2,13 +2,14 @@
  * /terminal/:sessionId WebSocket route tests.
  *
  * The server daemon exposes a dedicated WS route for live terminal attach.
- * This test validates:
+ * The route proxies through arkd's /agent/attach/* endpoints; we boot a real
+ * arkd on a random port and point DEFAULT_ARKD_URL at it so the bridge has
+ * somewhere to land.
+ *
+ * Asserts:
  *   - tenant ownership check rejects unknown session ids
  *   - sessions without a tmux pane are refused
  *   - a valid session gets a `connected` envelope with an initial buffer
- *
- * We don't exercise the raw input path end-to-end here -- the arkd-level
- * attach endpoints are covered by packages/arkd/__tests__/attach.test.ts.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
@@ -18,15 +19,27 @@ import { registerAllHandlers } from "../register.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
 import { execFileSync } from "child_process";
 import { tmuxBin } from "../../core/infra/tmux.js";
+import { startArkd } from "../../arkd/server.js";
 
 let app: AppContext;
 let server: ArkServer;
 let ws: { stop(): void };
+let arkd: { stop(): void };
 let port: number;
+let arkdPort: number;
 let baseWs: string;
 const spawnedTmuxSessions: string[] = [];
+let prevArkdUrl: string | undefined;
 
 beforeAll(async () => {
+  // Boot a real arkd on a random port so the bridge has a daemon to call.
+  // Point DEFAULT_ARKD_URL at it via env so resolveArkdForSession picks it
+  // up when the session has no compute_name (local fallback path).
+  arkdPort = await allocatePort();
+  prevArkdUrl = process.env.ARK_ARKD_URL;
+  process.env.ARK_ARKD_URL = `http://localhost:${arkdPort}`;
+  arkd = startArkd(arkdPort, { quiet: true });
+
   app = await AppContext.forTestAsync();
   await app.boot();
   server = new ArkServer();
@@ -47,6 +60,9 @@ afterAll(async () => {
     }
   }
   ws?.stop();
+  arkd?.stop();
+  if (prevArkdUrl === undefined) delete process.env.ARK_ARKD_URL;
+  else process.env.ARK_ARKD_URL = prevArkdUrl;
   await app?.shutdown();
 });
 
