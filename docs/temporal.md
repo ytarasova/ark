@@ -2,7 +2,9 @@
 
 > Status: **design-only**. Nothing in this document is implemented. Phase 0 delivers only the design + a Bun-compat spike + a local Temporal cluster. Phases 1--6 are tracked as GitHub issues (see "Migration sequence" at the bottom).
 >
-> Authoritative source of the existing orchestrator: `packages/core/state/flow.ts` + `packages/core/services/*-orchestration.ts` (decomposed set: `session-lifecycle.ts`, `stage-orchestrator.ts`, `task-builder.ts`, `workspace-service.ts`, `agent-launcher.ts`, `session-output.ts`).
+> **Scope: hosted (control-plane) mode only.** Local mode keeps its bespoke state machine permanently — the simpler abstraction is correct for laptops. Temporal is the scale-out story for the multi-tenant hosted deployment. Mode is discriminated through the existing `AppMode` capability pattern; callers read `app.mode.orchestrator.*` and never branch on whether Temporal is behind it.
+>
+> Authoritative source of the existing orchestrator (stays put in local mode): `packages/core/state/flow.ts` + `packages/core/services/*-orchestration.ts` (decomposed set: `session-lifecycle.ts`, `stage-orchestrator.ts`, `task-builder.ts`, `workspace-service.ts`, `agent-launcher.ts`, `session-output.ts`).
 
 ## Why Temporal
 
