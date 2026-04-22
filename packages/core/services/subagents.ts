@@ -82,8 +82,6 @@ export async function spawnParallelSubagents(
     }
   }
 
-  // Break cycle between subagents.ts and dispatch.ts via dynamic import.
-  const { dispatch } = await import("./dispatch.js");
   // TODO(follow-up): add retry strategy + observable dispatch status for
   // subagents. Today we log + persist a dispatch_failed event on the child
   // session so the parent flow (and operators tailing events) can see which
@@ -92,7 +90,7 @@ export async function spawnParallelSubagents(
   await Promise.allSettled(
     ids.map(async (id) => {
       try {
-        await dispatch(app, id);
+        await app.dispatchService.dispatch(id);
       } catch (err) {
         logWarn("session", `subagents: dispatch failed for child session (parent=${parentId}, child=${id})`, {
           parentId,

@@ -1,24 +1,61 @@
 /**
- * StageAdvanceService -- thin class wrapper over the legacy free-function
- * `advance()`. Exists so callers can write `app.stageAdvance.advance(id)`
- * without worrying about whether the class-based refactor has landed.
+ * StageAdvanceService -- stage advancement, completion, and agent handoff.
+ *
+ * Composes three internal classes over a shared `StageAdvanceDeps`
+ * cradle-slice. No AppContext field. No getApp(). Every dependency is
+ * either a narrow repository/store or a callback wired at DI time.
+ *
+ * Access via the DI container: `app.stageAdvance.X`. The old free-function
+ * module (`services/stage-advance.ts`) has been retired; every caller now
+ * uses the class through AppContext.
  */
 
-import type { AppContext } from "../../app.js";
-import { advance, handoff } from "../stage-advance.js";
-import { executeAction as executeActionFree } from "../actions/index.js";
+import { StageAdvancer } from "./advance.js";
+import { StageCompleter } from "./complete.js";
+import { StageHandoffer } from "./handoff.js";
+import { TranscriptParser } from "./transcript-parse.js";
+import type { IdempotencyCapable, StageAdvanceDeps, StageOpResult } from "./types.js";
 
-export { advance, handoff } from "../stage-advance.js";
+export type { StageAdvanceDeps, IdempotencyCapable, StageOpResult } from "./types.js";
 
 export class StageAdvanceService {
-  constructor(private readonly app: AppContext) {}
-  advance(sessionId: string, force?: boolean, outcome?: string): Promise<{ ok: boolean; message: string }> {
-    return advance(this.app, sessionId, force, outcome);
+  private readonly advancer: StageAdvancer;
+  private readonly completer: StageCompleter;
+  private readonly handoffer: StageHandoffer;
+  private readonly transcriptParser: TranscriptParser;
+  private readonly deps: StageAdvanceDeps;
+
+  constructor(deps: StageAdvanceDeps) {
+    this.deps = deps;
+    this.transcriptParser = new TranscriptParser(deps);
+    this.advancer = new StageAdvancer(deps);
+    this.completer = new StageCompleter(deps, this.advancer, this.transcriptParser);
+    this.handoffer = new StageHandoffer(deps);
   }
-  handoff(sessionId: string, toAgent: string, instructions?: string): Promise<{ ok: boolean; message: string }> {
-    return handoff(this.app, sessionId, toAgent, instructions);
+
+  advance(sessionId: string, force?: boolean, outcome?: string, opts?: IdempotencyCapable): Promise<StageOpResult> {
+    return this.advancer.advance(sessionId, force, outcome, opts);
   }
-  executeAction(sessionId: string, action: string): Promise<{ ok: boolean; message: string }> {
-    return executeActionFree(this.app, sessionId, action);
+
+  complete(sessionId: string, opts?: { force?: boolean } & IdempotencyCapable): Promise<StageOpResult> {
+    return this.completer.complete(sessionId, opts);
+  }
+
+  handoff(
+    sessionId: string,
+    toAgent: string,
+    instructions?: string,
+    opts?: IdempotencyCapable,
+  ): Promise<StageOpResult> {
+    return this.handoffer.handoff(sessionId, toAgent, instructions, opts);
+  }
+
+  /**
+   * Dispatch the named action for `sessionId`. Delegated to the action
+   * registry via the wired `executeAction` callback so callers can reach
+   * actions through `app.stageAdvance.executeAction(...)`.
+   */
+  executeAction(sessionId: string, action: string, opts?: IdempotencyCapable): Promise<StageOpResult> {
+    return this.deps.executeAction(sessionId, action, opts);
   }
 }

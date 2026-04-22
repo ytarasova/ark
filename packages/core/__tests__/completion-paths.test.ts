@@ -14,7 +14,6 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll } from "bun:test";
 import { AppContext } from "../app.js";
 import { startConductor } from "../conductor/conductor.js";
-import { advance } from "../services/stage-advance.js";
 import type { OutboundMessage } from "../conductor/channel-types.js";
 
 const TEST_PORT = 19197;
@@ -89,7 +88,7 @@ describe("Manual completion path (bare flow)", async () => {
     const session = await app.sessions.create({ summary: "manual advance test", flow: "bare" });
     await app.sessions.update(session.id, { status: "running", stage: "work" });
 
-    const advResult = await advance(app, session.id);
+    const advResult = await app.stageAdvance.advance(session.id);
     expect(advResult.ok).toBe(false);
     expect(advResult.message).toContain("manual gate");
   });
@@ -98,7 +97,7 @@ describe("Manual completion path (bare flow)", async () => {
     const session = await app.sessions.create({ summary: "manual force test", flow: "bare" });
     await app.sessions.update(session.id, { status: "running", stage: "work" });
 
-    const advResult = await advance(app, session.id, true);
+    const advResult = await app.stageAdvance.advance(session.id, true);
     expect(advResult.ok).toBe(true);
     expect(advResult.message).toContain("completed");
 
@@ -138,7 +137,7 @@ describe("Manual completion path (bare flow)", async () => {
     expect(msgs[0].type).toBe("completed");
 
     // Step 2: Human forces advance
-    const advResult = await advance(app, session.id, true);
+    const advResult = await app.stageAdvance.advance(session.id, true);
     expect(advResult.ok).toBe(true);
 
     // Step 3: Session should be completed (bare flow has only one stage)
@@ -174,7 +173,7 @@ describe("Auto completion path (quick flow)", async () => {
     const session = await app.sessions.create({ summary: "auto advance test", flow: "quick" });
     await app.sessions.update(session.id, { status: "ready", stage: "implement" });
 
-    const advResult = await advance(app, session.id);
+    const advResult = await app.stageAdvance.advance(session.id);
     expect(advResult.ok).toBe(true);
 
     const updated = await app.sessions.get(session.id);
@@ -188,7 +187,7 @@ describe("Auto completion path (quick flow)", async () => {
     // merge is the last stage in quick flow
     await app.sessions.update(session.id, { status: "ready", stage: "merge" });
 
-    const advResult = await advance(app, session.id);
+    const advResult = await app.stageAdvance.advance(session.id);
     expect(advResult.ok).toBe(true);
     expect(advResult.message).toContain("completed");
 
@@ -216,7 +215,7 @@ describe("Auto completion path (quick flow)", async () => {
 
     // Step 2: Auto-advance (conductor would trigger this because shouldAdvance=true)
     expect(result.shouldAdvance).toBe(true);
-    const advResult = await advance(app, session.id);
+    const advResult = await app.stageAdvance.advance(session.id);
     expect(advResult.ok).toBe(true);
 
     // Step 3: Session should be at next stage
@@ -239,7 +238,7 @@ describe("Auto completion path (quick flow)", async () => {
       commits: [],
     });
     await app.sessions.update(session.id, r1.updates);
-    await advance(app, session.id);
+    await app.stageAdvance.advance(session.id);
 
     // Now at verify stage -- simulate verify completion
     await app.sessions.update(session.id, { status: "running" });
@@ -252,7 +251,7 @@ describe("Auto completion path (quick flow)", async () => {
       commits: [],
     });
     await app.sessions.update(session.id, r2.updates);
-    await advance(app, session.id);
+    await app.stageAdvance.advance(session.id);
 
     // Now at pr stage -- simulate pr completion
     await app.sessions.update(session.id, { status: "running" });
@@ -265,7 +264,7 @@ describe("Auto completion path (quick flow)", async () => {
       commits: [],
     });
     await app.sessions.update(session.id, r3.updates);
-    await advance(app, session.id);
+    await app.stageAdvance.advance(session.id);
 
     // Now at merge stage -- simulate merge completion
     await app.sessions.update(session.id, { status: "running" });
@@ -278,7 +277,7 @@ describe("Auto completion path (quick flow)", async () => {
       commits: [],
     });
     await app.sessions.update(session.id, r4.updates);
-    const finalAdv = await advance(app, session.id);
+    const finalAdv = await app.stageAdvance.advance(session.id);
 
     // Session should now be completed (merge is last stage)
     expect(finalAdv.ok).toBe(true);

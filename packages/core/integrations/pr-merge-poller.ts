@@ -104,8 +104,7 @@ export async function checkSessionMerge(app: AppContext, session: Session, opts?
     });
 
     // Advance past the merge stage -- advance() will see no next stage and mark session completed
-    const { advance } = await import("../services/stage-advance.js");
-    await advance(app, session.id, true);
+    await app.stageAdvance.advance(session.id, true);
     return;
   }
 

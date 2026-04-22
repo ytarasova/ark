@@ -20,7 +20,6 @@
 
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { AppContext } from "../../app.js";
-import { advance, complete, handoff } from "../stage-advance.js";
 import { executeAction } from "../actions/index.js";
 
 let app: AppContext;
@@ -67,12 +66,12 @@ describe("advance() idempotency", async () => {
     const session = await app.sessions.create({ summary: "no-key", flow: "idem-advance-baseline" });
     await app.sessions.update(session.id, { status: "ready", stage: "s1" });
 
-    const first = await advance(app, session.id, true);
+    const first = await app.stageAdvance.advance(session.id, true);
     expect(first.ok).toBe(true);
     const afterFirst = (await app.sessions.get(session.id))!;
     expect(afterFirst.stage).toBe("s2");
 
-    const second = await advance(app, session.id, true);
+    const second = await app.stageAdvance.advance(session.id, true);
     expect(second.ok).toBe(true);
     const afterSecond = (await app.sessions.get(session.id))!;
     expect(afterSecond.stage).toBe("s3");
@@ -94,21 +93,21 @@ describe("advance() idempotency", async () => {
     await app.sessions.update(session.id, { status: "ready", stage: "s1" });
 
     const key = "workflow-A/attempt-1";
-    const first = await advance(app, session.id, true, undefined, { idempotencyKey: key });
+    const first = await app.stageAdvance.advance(session.id, true, undefined, { idempotencyKey: key });
     expect(first.ok).toBe(true);
     const afterFirst = (await app.sessions.get(session.id))!;
     expect(afterFirst.stage).toBe("s2"); // advanced exactly once
     expect(await countLedgerRows(session.id, "advance")).toBe(1);
 
     // Replay -- body MUST NOT fire. If it did we'd be on s3.
-    const second = await advance(app, session.id, true, undefined, { idempotencyKey: key });
+    const second = await app.stageAdvance.advance(session.id, true, undefined, { idempotencyKey: key });
     expect(second).toEqual(first);
     const afterSecond = (await app.sessions.get(session.id))!;
     expect(afterSecond.stage).toBe("s2"); // unchanged -- this is the point
     expect(await countLedgerRows(session.id, "advance")).toBe(1);
 
     // Different key = body runs again.
-    const third = await advance(app, session.id, true, undefined, { idempotencyKey: "workflow-A/attempt-2" });
+    const third = await app.stageAdvance.advance(session.id, true, undefined, { idempotencyKey: "workflow-A/attempt-2" });
     expect(third.ok).toBe(true);
     const afterThird = (await app.sessions.get(session.id))!;
     expect(afterThird.stage).toBe("s3");
@@ -131,7 +130,7 @@ describe("complete() idempotency", async () => {
     await app.sessions.update(session.id, { status: "ready", stage: "s1" });
 
     const key = "complete-key-xyz";
-    const first = await complete(app, session.id, { force: true, idempotencyKey: key });
+    const first = await app.stageAdvance.complete(session.id, { force: true, idempotencyKey: key });
     expect(first.ok).toBe(true);
     const afterFirst = (await app.sessions.get(session.id))!;
     expect(afterFirst.stage).toBe("s2"); // complete cascades via internal advance()
@@ -140,7 +139,7 @@ describe("complete() idempotency", async () => {
     expect(await countLedgerRows(session.id, "complete")).toBe(1);
 
     // Replay -- body MUST NOT run; no new `stage_completed` event; stage unchanged.
-    const second = await complete(app, session.id, { force: true, idempotencyKey: key });
+    const second = await app.stageAdvance.complete(session.id, { force: true, idempotencyKey: key });
     expect(second).toEqual(first);
     const afterSecond = (await app.sessions.get(session.id))!;
     expect(afterSecond.stage).toBe("s2");
@@ -163,7 +162,7 @@ describe("handoff() idempotency", async () => {
     // may fail in the test harness (no runtime / agent), but the ledger
     // records whatever result the body returns, and we only assert on no-op
     // replay behavior -- not dispatch success.
-    const first = await handoff(app, session.id, "reviewer", "please review", { idempotencyKey: key });
+    const first = await app.stageAdvance.handoff(session.id, "reviewer", "please review", { idempotencyKey: key });
     const countSessionsAfterFirst = (await app.sessions.list()).length;
     // cloneSession may have created 0 or 1 new rows depending on dispatch
     // success; we just need the delta from the first call to match the ledger.
@@ -171,7 +170,7 @@ describe("handoff() idempotency", async () => {
     expect(await countLedgerRows(session.id, "handoff")).toBe(1);
 
     // Replay -- body MUST NOT run; no NEW session rows created.
-    const second = await handoff(app, session.id, "reviewer", "please review", { idempotencyKey: key });
+    const second = await app.stageAdvance.handoff(session.id, "reviewer", "please review", { idempotencyKey: key });
     expect(second).toEqual(first);
     const countSessionsAfterSecond = (await app.sessions.list()).length;
     expect(countSessionsAfterSecond - countSessionsAfterFirst).toBe(0);

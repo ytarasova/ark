@@ -542,20 +542,18 @@ export class SessionService {
 
   /**
    * Dispatch a session: resolve agent, build task, launch executor.
-   * Delegates to session.ts dispatch() which owns tmux/executor/flow logic.
+   * Delegates to the DispatchService which owns tmux/executor/flow logic.
    */
   async dispatch(id: string, opts?: { onLog?: (msg: string) => void }): Promise<SessionOpResult> {
-    const { dispatch: legacyDispatch } = await import("./dispatch.js");
-    return legacyDispatch(this.app, id, opts);
+    return this.app.dispatchService.dispatch(id, opts);
   }
 
   /**
    * Advance a session to the next flow stage.
-   * Delegates to session.ts advance() which owns gate evaluation and flow progression.
+   * Delegates to the StageAdvanceService which owns gate evaluation and flow progression.
    */
   async advance(id: string, force?: boolean): Promise<SessionOpResult> {
-    const { advance: legacyAdvance } = await import("./stage-advance.js");
-    return legacyAdvance(this.app, id, force);
+    return this.app.stageAdvance.advance(id, force);
   }
 
   /**
@@ -632,8 +630,7 @@ export class SessionService {
    * Handoff: clone session to a different agent and dispatch.
    */
   async handoff(id: string, agent: string, instructions?: string): Promise<SessionOpResult> {
-    const { handoff: legacyHandoff } = await import("./stage-advance.js");
-    return legacyHandoff(this.app, id, agent, instructions);
+    return this.app.stageAdvance.handoff(id, agent, instructions);
   }
 
   /**

@@ -289,10 +289,9 @@ describe("orchestration uses app.launcher", async () => {
         stage: "work",
       });
 
-      const { resume } = await import("../../services/dispatch.js");
       // Resume will try to kill the old session, then re-dispatch
       // Re-dispatch may fail (no agent configured), but kill should happen first
-      await resume(app, session.id);
+      await app.dispatchService.resume(session.id);
 
       expect(killCalled).toBe(true);
     } finally {

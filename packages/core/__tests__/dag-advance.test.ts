@@ -2,7 +2,6 @@ import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import { AppContext } from "../app.js";
-import { advance } from "../services/stage-advance.js";
 import { clearApp, getApp, setApp } from "./test-helpers.js";
 
 let app: AppContext;
@@ -77,7 +76,7 @@ describe("DAG-based advance", async () => {
     const s = await app.sessions.create({ summary: "Test DAG advance", flow: "test-dag" });
     await app.sessions.update(s.id, { stage: "plan", status: "ready" });
 
-    const result = await advance(app, s.id, true); // force=true to bypass gate
+    const result = await app.stageAdvance.advance(s.id, true); // force=true to bypass gate
     expect(result.ok).toBe(true);
 
     const updated = await app.sessions.get(s.id);
@@ -93,7 +92,7 @@ describe("DAG-based advance", async () => {
     await app.events.log(s.id, "stage_advance", { actor: "system", data: { from: "plan", to: "implement" } });
     await app.events.log(s.id, "stage_advance", { actor: "system", data: { from: "implement", to: "review" } });
 
-    const result = await advance(app, s.id, true); // force=true to bypass gate
+    const result = await app.stageAdvance.advance(s.id, true); // force=true to bypass gate
     expect(result.ok).toBe(true);
 
     const updated = await app.sessions.get(s.id);
@@ -104,7 +103,7 @@ describe("DAG-based advance", async () => {
     const s = await app.sessions.create({ summary: "Test linear quick flow", flow: "quick" });
     await app.sessions.update(s.id, { stage: "implement", status: "ready" });
 
-    const result = await advance(app, s.id, true);
+    const result = await app.stageAdvance.advance(s.id, true);
     expect(result.ok).toBe(true);
     const updated = await app.sessions.get(s.id);
     // implement -> verify is the next stage in quick flow
@@ -115,7 +114,7 @@ describe("DAG-based advance", async () => {
     const s = await app.sessions.create({ summary: "Test linear completion", flow: "quick" });
     await app.sessions.update(s.id, { stage: "merge", status: "ready" });
 
-    const result = await advance(app, s.id, true);
+    const result = await app.stageAdvance.advance(s.id, true);
     expect(result.ok).toBe(true);
     const updated = await app.sessions.get(s.id);
     expect(updated!.status).toBe("completed");
@@ -127,7 +126,7 @@ describe("Parallel DAG advance via depends_on", async () => {
     const s = await app.sessions.create({ summary: "Test parallel DAG", flow: "test-dag-parallel" });
     await app.sessions.update(s.id, { stage: "plan", status: "ready" });
 
-    const result = await advance(app, s.id, true);
+    const result = await app.stageAdvance.advance(s.id, true);
     expect(result.ok).toBe(true);
 
     const updated = await app.sessions.get(s.id);
@@ -148,7 +147,7 @@ describe("Parallel DAG advance via depends_on", async () => {
     // Mark plan as completed in flow state (it ran before implement)
     await app.flowStates.markStageCompleted(s.id, "plan");
 
-    const result = await advance(app, s.id, true);
+    const result = await app.stageAdvance.advance(s.id, true);
     expect(result.ok).toBe(true);
 
     const updated = await app.sessions.get(s.id);
@@ -168,7 +167,7 @@ describe("Parallel DAG advance via depends_on", async () => {
     await app.flowStates.markStageCompleted(s.id, "plan");
     await app.flowStates.markStageCompleted(s.id, "implement");
 
-    const result = await advance(app, s.id, true);
+    const result = await app.stageAdvance.advance(s.id, true);
     expect(result.ok).toBe(true);
 
     const updated = await app.sessions.get(s.id);
@@ -185,7 +184,7 @@ describe("Parallel DAG advance via depends_on", async () => {
     await app.flowStates.markStageCompleted(s.id, "implement");
     await app.flowStates.markStageCompleted(s.id, "test");
 
-    const result = await advance(app, s.id, true);
+    const result = await app.stageAdvance.advance(s.id, true);
     expect(result.ok).toBe(true);
 
     const updated = await app.sessions.get(s.id);

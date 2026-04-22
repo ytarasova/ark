@@ -16,7 +16,6 @@ import { join } from "path";
 import YAML from "yaml";
 import { AppContext } from "../app.js";
 import { getStage, getStages } from "../state/flow.js";
-import { resolveComputeForStage } from "../services/dispatch.js";
 
 let app: AppContext;
 
@@ -98,20 +97,20 @@ describe("StageDefinition compute_template field", () => {
 
 describe("resolveComputeForStage", async () => {
   it("returns null when stageDef is null", async () => {
-    const result = await resolveComputeForStage(app, null, "s-test");
+    const result = await app.dispatchService.resolveComputeForStage(null, "s-test");
     expect(result).toBeNull();
   });
 
   it("returns null when stage has no compute_template", async () => {
     const stageDef = { name: "work", gate: "auto" as const };
-    const result = await resolveComputeForStage(app, stageDef, "s-test");
+    const result = await app.dispatchService.resolveComputeForStage(stageDef, "s-test");
     expect(result).toBeNull();
   });
 
   it("returns null when template is not found in DB or config", async () => {
     const logs: string[] = [];
     const stageDef = { name: "work", gate: "auto" as const, compute_template: "nonexistent" };
-    const result = await resolveComputeForStage(app, stageDef, "s-test", (m) => logs.push(m));
+    const result = await app.dispatchService.resolveComputeForStage(stageDef, "s-test", (m) => logs.push(m));
     expect(result).toBeNull();
     expect(logs.some((l) => l.includes("not found"))).toBe(true);
   });
@@ -128,7 +127,7 @@ describe("resolveComputeForStage", async () => {
     const stageDef = { name: "implement", gate: "auto" as const, compute_template: "fast-docker" };
     const logs: string[] = [];
 
-    const result = await resolveComputeForStage(app, stageDef, session.id, (m) => logs.push(m));
+    const result = await app.dispatchService.resolveComputeForStage(stageDef, session.id, (m) => logs.push(m));
     // Upstream adc10203 clones templates with a session-suffixed name so the
     // GC can tear them down per-session. The resolved name is the clone, not
     // the source template.
@@ -157,7 +156,7 @@ describe("resolveComputeForStage", async () => {
     const session = await app.sessions.create({ summary: "config-test" });
     const stageDef = { name: "build", gate: "auto" as const, compute_template: "config-tmpl" };
 
-    const result = await resolveComputeForStage(app, stageDef, session.id);
+    const result = await app.dispatchService.resolveComputeForStage(stageDef, session.id);
     // Same session-suffixed clone semantics as above (upstream adc10203).
     expect(result).toMatch(/^config-tmpl-/);
 

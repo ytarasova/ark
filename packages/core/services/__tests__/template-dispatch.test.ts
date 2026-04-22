@@ -9,7 +9,6 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext } from "../../app.js";
-import { resolveComputeForStage } from "../dispatch.js";
 import { garbageCollectComputeIfTemplate } from "../compute-lifecycle.js";
 
 let app: AppContext;
@@ -37,7 +36,7 @@ describe("resolveComputeForStage + template cloning", () => {
     const sessionId = "abcdef1234567890";
     const stageDef = { compute: "k8s-tmpl" } as any;
 
-    const resolved = await resolveComputeForStage(app, stageDef, sessionId);
+    const resolved = await app.dispatchService.resolveComputeForStage(stageDef, sessionId);
     // Clone name is `<template>-<first 8 of sessionId>`.
     expect(resolved).toBe("k8s-tmpl-abcdef12");
 
@@ -61,7 +60,7 @@ describe("resolveComputeForStage + template cloning", () => {
     });
     const sessionId = "abcdef1234567890";
     const stageDef = { compute: "shared-ec2" } as any;
-    const resolved = await resolveComputeForStage(app, stageDef, sessionId);
+    const resolved = await app.dispatchService.resolveComputeForStage(stageDef, sessionId);
     expect(resolved).toBe("shared-ec2");
 
     // No clone was created.
@@ -80,7 +79,7 @@ describe("resolveComputeForStage + template cloning", () => {
     const sessionId = "fedcba0987654321";
     const stageDef = { compute_template: "legacy-tmpl" } as any;
 
-    const resolved = await resolveComputeForStage(app, stageDef, sessionId);
+    const resolved = await app.dispatchService.resolveComputeForStage(stageDef, sessionId);
     expect(resolved).toBe("legacy-tmpl-fedcba09");
 
     const clone = await app.computes.get("legacy-tmpl-fedcba09");
@@ -89,7 +88,7 @@ describe("resolveComputeForStage + template cloning", () => {
 
   it("returns null when the named row is not found", async () => {
     const stageDef = { compute: "does-not-exist" } as any;
-    const resolved = await resolveComputeForStage(app, stageDef, "abcdef1234567890");
+    const resolved = await app.dispatchService.resolveComputeForStage(stageDef, "abcdef1234567890");
     expect(resolved).toBeNull();
   });
 
@@ -103,7 +102,7 @@ describe("resolveComputeForStage + template cloning", () => {
     });
 
     const sessionId = "1111222233334444";
-    const resolved = await resolveComputeForStage(app, { compute: "k8s-tmpl2" } as any, sessionId);
+    const resolved = await app.dispatchService.resolveComputeForStage({ compute: "k8s-tmpl2" } as any, sessionId);
     expect(resolved).toBe("k8s-tmpl2-11112222");
 
     // Tie the clone to a session, then drive it to terminal.

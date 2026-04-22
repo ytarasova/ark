@@ -14,7 +14,6 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { AppContext } from "../app.js";
-import { complete } from "../services/stage-advance.js";
 import { startConductor } from "../conductor/conductor.js";
 
 let app: AppContext;
@@ -372,7 +371,7 @@ describe("complete() with verification", async () => {
     const session = await app.sessions.create({ summary: "complete block test", flow: "quick" });
     await app.sessions.update(session.id, { status: "running", stage: "implement", workdir });
 
-    const result = await complete(app, session.id);
+    const result = await app.stageAdvance.complete(session.id);
 
     expect(result.ok).toBe(false);
     expect(result.message).toContain("Verification failed");
@@ -387,7 +386,7 @@ describe("complete() with verification", async () => {
     await app.sessions.update(session.id, { status: "running", stage: "implement" });
     await app.todos.add(session.id, "Must complete this first");
 
-    const result = await complete(app, session.id);
+    const result = await app.stageAdvance.complete(session.id);
 
     expect(result.ok).toBe(false);
     expect(result.message).toContain("Verification failed");
@@ -400,7 +399,7 @@ describe("complete() with verification", async () => {
     await app.sessions.update(session.id, { status: "running", stage: "implement", workdir });
     await app.todos.add(session.id, "Pending todo");
 
-    const result = await complete(app, session.id, { force: true });
+    const result = await app.stageAdvance.complete(session.id, { force: true });
 
     expect(result.ok).toBe(true);
 
@@ -414,7 +413,7 @@ describe("complete() with verification", async () => {
     const session = await app.sessions.create({ summary: "complete pass test", flow: "quick" });
     await app.sessions.update(session.id, { status: "running", stage: "implement", workdir });
 
-    const result = await complete(app, session.id);
+    const result = await app.stageAdvance.complete(session.id);
 
     expect(result.ok).toBe(true);
 
@@ -427,7 +426,7 @@ describe("complete() with verification", async () => {
     const session = await app.sessions.create({ summary: "complete event test", flow: "quick" });
     await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
-    await complete(app, session.id);
+    await app.stageAdvance.complete(session.id);
 
     const events = await app.events.list(session.id);
     const completed = events.find((e) => e.type === "stage_completed");

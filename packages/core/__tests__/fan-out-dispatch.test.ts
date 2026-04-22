@@ -4,7 +4,6 @@ import { join } from "path";
 
 setDefaultTimeout(15_000);
 import { fanOut, checkAutoJoin, joinFork } from "../services/fork-join.js";
-import { dispatch } from "../services/dispatch.js";
 import { extractSubtasks } from "../services/task-builder.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";
@@ -102,7 +101,7 @@ describe("dispatch with fan_out stage", async () => {
     const parent = await app.sessions.create({ summary: "Test dispatch fan-out", flow: "fan-out" });
     await app.sessions.update(parent.id, { stage: "execute", status: "ready" });
 
-    const result = await dispatch(app, parent.id);
+    const result = await app.dispatchService.dispatch(parent.id);
     expect(result.ok).toBe(true);
 
     const updated = await app.sessions.get(parent.id);
@@ -124,7 +123,7 @@ describe("dispatch with fan_out stage", async () => {
     const parent = await app.sessions.create({ summary: "Fork group test", flow: "fan-out" });
     await app.sessions.update(parent.id, { stage: "execute", status: "ready" });
 
-    await dispatch(app, parent.id);
+    await app.dispatchService.dispatch(parent.id);
 
     const updated = (await app.sessions.get(parent.id))!;
     const children = await app.sessions.getChildren(parent.id);

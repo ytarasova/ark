@@ -1,6 +1,5 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../app.js";
-import { dispatch } from "../services/dispatch.js";
 
 let app: AppContext;
 beforeAll(async () => {
@@ -18,7 +17,7 @@ describe("dispatch fan_out stage", async () => {
     const parent = await app.sessions.create({ summary: "Test fan-out", flow: "fan-out" });
     await app.sessions.update(parent.id, { stage: "execute", status: "ready" });
 
-    const result = await dispatch(app, parent.id);
+    const result = await app.dispatchService.dispatch(parent.id);
     expect(result.ok).toBe(true);
 
     const updated = await app.sessions.get(parent.id);

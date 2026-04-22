@@ -20,7 +20,6 @@ declare const Bun: {
 
 import type { Session } from "../../types/index.js";
 import type { AppContext } from "../app.js";
-import { dispatch } from "../services/dispatch.js";
 import { createWorktreePR } from "../services/worktree/index.js";
 import { eventBus } from "../hooks.js";
 import type { OutboundMessage } from "./channel-types.js";
@@ -117,7 +116,7 @@ export class Conductor {
                   compute_name: sched.compute_name ?? undefined,
                   group_name: sched.group_name ?? undefined,
                 });
-                await dispatch(this.app, s.id);
+                await this.app.dispatchService.dispatch(s.id);
                 await updateScheduleLastRun(this.app, sched.id);
                 await this.app.events.log(s.id, "scheduled_dispatch", {
                   actor: "scheduler",
@@ -369,7 +368,7 @@ export class Conductor {
         eventBus.emit("hook_status", sessionId, {
           data: { event, status: "ready", retry: true, ...payload } as Record<string, unknown>,
         });
-        dispatch(app, sessionId).catch((err) => {
+        app.dispatchService.dispatch(sessionId).catch((err) => {
           logError("conductor", `on_failure retry dispatch (hook) failed for ${sessionId}: ${err?.message ?? err}`);
         });
         return Response.json({ status: "ok", mapped: "retry" });
@@ -939,7 +938,7 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
     });
     if (retryResult.ok) {
       logInfo("conductor", `on_failure retry triggered for ${sessionId}: ${retryResult.message}`);
-      dispatch(app, sessionId).catch((err) => {
+      app.dispatchService.dispatch(sessionId).catch((err) => {
         logError("conductor", `on_failure retry dispatch failed for ${sessionId}: ${err?.message ?? err}`);
       });
       return;

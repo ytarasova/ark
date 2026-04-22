@@ -17,7 +17,6 @@ import { join } from "path";
 import YAML from "yaml";
 
 import { renderReworkPrompt } from "../services/session/index.js";
-import { advance } from "../services/stage-advance.js";
 import { withTestContext, getApp } from "./test-helpers.js";
 
 withTestContext();
@@ -301,6 +300,6 @@ describe("review gate integration", async () => {
     expect((await getApp().sessions.get(session.id))!.stage).toBe("ship");
 
     // Safety: advance past the final auto gate to confirm the flow finished cleanly.
-    await advance(getApp(), session.id, true);
+    await getApp().stageAdvance.advance(session.id, true);
   });
 });

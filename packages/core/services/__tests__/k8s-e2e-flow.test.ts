@@ -23,7 +23,6 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../../app.js";
-import { dispatch } from "../dispatch.js";
 
 const CLUSTER = process.env.E2E_K8S_CLUSTER;
 const NAMESPACE = process.env.E2E_K8S_NAMESPACE ?? "ark";
@@ -129,7 +128,7 @@ describe("k8s e2e flow (live cluster)", () => {
     // Kick dispatch explicitly -- the `forTestAsync` AppContext doesn't
     // register the default session_created listener the hosted server
     // does, so we drive the same code path directly.
-    const kicked = await dispatch(app, sessionId);
+    const kicked = await app.dispatchService.dispatch(sessionId);
     expect(kicked.ok).toBe(true);
 
     const { session: finalSession, timedOut } = await app.sessionLifecycle.waitForCompletion(sessionId, {
@@ -357,7 +356,7 @@ describe("k8s e2e flow -- session pod + agent stage (live cluster + live claude)
     expect(session.stage).toBe("work");
     expect(session.status).toBe("ready");
 
-    const kicked = await dispatch(app, sessionId);
+    const kicked = await app.dispatchService.dispatch(sessionId);
     expect(kicked.ok).toBe(true);
 
     // 90 s budget: pod schedule (~10 s) + image pull (skip if warm) +
