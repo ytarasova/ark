@@ -1,88 +1,44 @@
 /**
  * Messaging bridge for conductor notifications.
- * Supports Telegram and Slack for remote monitoring and control.
+ * Supports Slack (webhook) and email (SMTP) for remote monitoring.
  */
 
 import type { Session } from "../../types/index.js";
 import type { AppContext } from "../app.js";
 
-/** Telegram getUpdates API response shape. */
-interface TelegramResponse {
-  ok: boolean;
-  result?: Array<{
-    update_id: number;
-    message?: { text?: string };
-  }>;
-}
-
 // ── Types ───────────────────────────────────────────────────────────────
 
 export interface BridgeConfig {
-  telegram?: {
-    botToken: string;
-    chatId: string;
-  };
   slack?: {
     webhookUrl: string;
   };
-  discord?: {
-    webhookUrl: string;
+  email?: {
+    /** SMTP host (e.g. "smtp.gmail.com", "smtp-mail.outlook.com"). */
+    host: string;
+    port: number;
+    /** Whether to use STARTTLS/implicit TLS. Matches nodemailer's `secure` field. */
+    secure?: boolean;
+    auth?: {
+      user: string;
+      pass: string;
+    };
+    /** Envelope sender (From: header). */
+    from: string;
+    /** Recipient list for notifications. */
+    to: string | string[];
   };
 }
 
 export interface BridgeMessage {
   text: string;
-  source: "telegram" | "slack" | "discord" | "system";
+  source: "slack" | "email" | "system";
 }
 
 type MessageHandler = (msg: BridgeMessage) => void | Promise<void>;
 
-// ── Telegram ────────────────────────────────────────────────────────────
-
-async function sendTelegram(token: string, chatId: string, text: string): Promise<boolean> {
-  try {
-    const url = `https://api.telegram.org/bot${token}/sendMessage`;
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text,
-        parse_mode: "Markdown",
-      }),
-    });
-    return resp.ok;
-  } catch (e: any) {
-    console.error("bridge: telegram send failed:", e?.message ?? e);
-    return false;
-  }
-}
-
-async function pollTelegram(token: string, onMessage: (text: string) => void, signal: AbortSignal): Promise<void> {
-  let offset = 0;
-  const url = `https://api.telegram.org/bot${token}/getUpdates`;
-
-  while (!signal.aborted) {
-    try {
-      const resp = await fetch(`${url}?offset=${offset}&timeout=30`, { signal });
-      if (!resp.ok) {
-        await Bun.sleep(5000);
-        continue;
-      }
-
-      const data = (await resp.json()) as TelegramResponse;
-      for (const update of data.result ?? []) {
-        offset = update.update_id + 1;
-        const text = update.message?.text;
-        if (text) onMessage(text);
-      }
-    } catch (e: any) {
-      if (signal.aborted) return;
-      console.error("bridge: telegram poll error:", e?.message ?? e);
-      await Bun.sleep(5000);
-    }
-  }
-}
+// 10s cap is enough for a healthy slack webhook or SMTP handshake; beyond
+// that the caller would rather see a dropped notification than a stall.
+const NOTIFY_TIMEOUT_MS = 10_000;
 
 // ── Slack ────────────────────────────────────────────────────────────────
 
@@ -92,6 +48,7 @@ async function sendSlack(webhookUrl: string, text: string): Promise<boolean> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
+      signal: AbortSignal.timeout(NOTIFY_TIMEOUT_MS),
     });
     return resp.ok;
   } catch (e: any) {
@@ -100,18 +57,33 @@ async function sendSlack(webhookUrl: string, text: string): Promise<boolean> {
   }
 }
 
-// ── Discord ─────────────────────────────────────────────────────────
+// ── Email (SMTP via nodemailer) ──────────────────────────────────────────
 
-async function sendDiscord(webhookUrl: string, text: string): Promise<boolean> {
+async function sendEmail(cfg: NonNullable<BridgeConfig["email"]>, text: string): Promise<boolean> {
   try {
-    const resp = await fetch(webhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: text }),
+    // Late import so the nodemailer module graph only loads when email is
+    // actually configured -- keeps the control-plane cold-start cheap.
+    const { createTransport } = await import("nodemailer");
+    const transport = createTransport({
+      host: cfg.host,
+      port: cfg.port,
+      secure: cfg.secure ?? cfg.port === 465,
+      auth: cfg.auth,
+      connectionTimeout: NOTIFY_TIMEOUT_MS,
+      greetingTimeout: NOTIFY_TIMEOUT_MS,
+      socketTimeout: NOTIFY_TIMEOUT_MS,
     });
-    return resp.ok;
+    const subject = text.split("\n")[0].slice(0, 120);
+    await transport.sendMail({
+      from: cfg.from,
+      to: cfg.to,
+      subject,
+      text,
+    });
+    transport.close();
+    return true;
   } catch (e: any) {
-    console.error("bridge: discord send failed:", e?.message ?? e);
+    console.error("bridge: email send failed:", e?.message ?? e);
     return false;
   }
 }
@@ -121,13 +93,18 @@ async function sendDiscord(webhookUrl: string, text: string): Promise<boolean> {
 export class Bridge {
   private config: BridgeConfig;
   private handlers: MessageHandler[] = [];
-  private abortController: AbortController | null = null;
+  private running = false;
 
   constructor(config: BridgeConfig) {
     this.config = config;
   }
 
-  /** Register a handler for incoming messages. */
+  /**
+   * Register a handler for incoming messages. Neither slack nor email offer
+   * a bidirectional inbound channel in this bridge, so handlers fire only
+   * for programmatic `system` messages today. Kept so callers can wire one
+   * uniform listener and not care which channels are live.
+   */
   onMessage(handler: MessageHandler): void {
     this.handlers.push(handler);
   }
@@ -135,17 +112,12 @@ export class Bridge {
   /** Send a notification to all configured platforms. */
   async notify(text: string): Promise<void> {
     const promises: Promise<boolean>[] = [];
-
-    if (this.config.telegram) {
-      promises.push(sendTelegram(this.config.telegram.botToken, this.config.telegram.chatId, text));
-    }
     if (this.config.slack) {
       promises.push(sendSlack(this.config.slack.webhookUrl, text));
     }
-    if (this.config.discord) {
-      promises.push(sendDiscord(this.config.discord.webhookUrl, text));
+    if (this.config.email) {
+      promises.push(sendEmail(this.config.email, text));
     }
-
     await Promise.allSettled(promises);
   }
 
@@ -158,14 +130,14 @@ export class Bridge {
         : toStatus === "waiting"
           ? "\u{1F7E1}"
           : toStatus === "completed"
-            ? "\u2705"
+            ? "✅"
             : toStatus === "failed"
               ? "\u{1F534}"
               : toStatus === "stopped"
-                ? "\u23F9"
-                : "\u26AA";
+                ? "⏹"
+                : "⚪";
 
-    await this.notify(`${emoji} *${name}*: ${fromStatus} \u2192 ${toStatus}`);
+    await this.notify(`${emoji} *${name}*: ${fromStatus} → ${toStatus}`);
   }
 
   /** Send a summary of all session statuses. */
@@ -187,35 +159,19 @@ export class Bridge {
     await this.notify(`\u{1F4CA} *Status summary:* ${parts.join(", ")} (${sessions.length} total)`);
   }
 
-  /** Start listening for incoming messages (Telegram polling). */
+  /** Start the bridge. No inbound listeners today -- kept for API symmetry. */
   start(): void {
-    if (this.abortController) return;
-    this.abortController = new AbortController();
-
-    if (this.config.telegram) {
-      pollTelegram(
-        this.config.telegram.botToken,
-        (text) => {
-          const msg: BridgeMessage = { text, source: "telegram" };
-          for (const handler of this.handlers) {
-            try {
-              handler(msg);
-            } catch (e: any) {
-              console.error("bridge: handler error:", e?.message ?? e);
-            }
-          }
-        },
-        this.abortController.signal,
-      );
-    }
+    this.running = true;
   }
 
-  /** Stop listening. */
+  /** Stop the bridge. */
   stop(): void {
-    if (this.abortController) {
-      this.abortController.abort();
-      this.abortController = null;
-    }
+    this.running = false;
+  }
+
+  /** Test hook -- is the bridge currently running? */
+  isRunning(): boolean {
+    return this.running;
   }
 }
 
@@ -244,8 +200,6 @@ export function loadBridgeConfig(arkDir?: string): BridgeConfig | null {
 export function createBridge(arkDir?: string): Bridge | null {
   const config = loadBridgeConfig(arkDir);
   if (!config) return null;
-  if (!config.telegram && !config.slack && !config.discord) return null;
-
   const bridge = new Bridge(config);
   bridge.start();
   return bridge;

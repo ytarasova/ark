@@ -7,7 +7,7 @@
  *   - conductor/status     read-only "is the conductor running" probe
  *   - conductor/learnings  list learning nodes from the knowledge graph
  *   - conductor/learn      record / increment a learning (promotes at >=3)
- *   - conductor/bridge     start the local messaging bridge (telegram/slack)
+ *   - conductor/bridge     start the local messaging bridge (slack/email)
  *   - conductor/notify     send a one-shot message via the bridge
  *
  * Tenant scoping: every read/write goes through the tenant-scoped
@@ -95,7 +95,7 @@ export function registerConductorHandlers(router: Router, app: AppContext): void
   });
 
   // ── Bridge ────────────────────────────────────────────────────────────────
-  // Bridge ops drive outbound HTTP against Telegram/Slack/Discord using a
+  // Bridge ops drive outbound delivery (Slack webhook + SMTP email) via a
   // config file at `~/.ark/bridge.json`. They are daemon-side-by-nature:
   // starting a bridge binds a polling loop to the daemon process, and
   // `conductor/notify` sends a one-shot message without leaving a live loop.

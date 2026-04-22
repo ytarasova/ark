@@ -749,7 +749,14 @@ export function removeChannelConfig(workdir: string): void {
   }
 
   if (config.mcpServers && typeof config.mcpServers === "object") {
-    delete config.mcpServers["ark-channel"];
+    // Remove every entry ark auto-injected via writeChannelConfig so the
+    // .mcp.json ends up in the same state it was in before dispatch. If we
+    // only scrub `ark-channel`, a laptop with `codebase-memory-mcp` installed
+    // leaves a `codebase-memory` entry behind and the file never gets
+    // cleaned up.
+    for (const name of ["ark-channel", "codebase-memory", "ark-code-intel"]) {
+      delete config.mcpServers[name];
+    }
     if (Object.keys(config.mcpServers).length === 0) delete config.mcpServers;
   }
 

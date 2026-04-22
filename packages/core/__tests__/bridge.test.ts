@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test";
 import { Bridge } from "../integrations/bridge.js";
-import type { BridgeConfig, BridgeMessage } from "../integrations/bridge.js";
+import type { BridgeMessage } from "../integrations/bridge.js";
 import { withTestContext, mockSession } from "./test-helpers.js";
 
 withTestContext();
@@ -22,15 +22,12 @@ describe("Bridge", async () => {
 
   it("notify does nothing without config", async () => {
     const bridge = new Bridge({});
-    // Should not throw
     await bridge.notify("test message");
   });
 
   it("notifySessionStatus formats correctly", async () => {
-    // Mock to capture the notification text
     let sentText = "";
     const bridge = new Bridge({});
-    // Override notify to capture text
     bridge.notify = async (text: string) => {
       sentText = text;
     };
@@ -41,7 +38,7 @@ describe("Bridge", async () => {
       "running",
     );
     expect(sentText).toContain("My task");
-    expect(sentText).toContain("pending \u2192 running");
+    expect(sentText).toContain("pending → running");
   });
 
   it("notifySessionStatus uses id when no summary", async () => {
@@ -53,29 +50,28 @@ describe("Bridge", async () => {
 
     await bridge.notifySessionStatus(mockSession({ id: "s-42", status: "failed" }), "running", "failed");
     expect(sentText).toContain("s-42");
-    expect(sentText).toContain("running \u2192 failed");
+    expect(sentText).toContain("running → failed");
   });
 
   it("start and stop without config is safe", () => {
     const bridge = new Bridge({});
     bridge.start();
     bridge.stop();
-    // Should not throw
   });
 
   it("stop is idempotent", () => {
     const bridge = new Bridge({});
     bridge.stop();
     bridge.stop();
-    // Should not throw
   });
 
   it("start is idempotent", () => {
     const bridge = new Bridge({
-      telegram: { botToken: "fake", chatId: "123" },
+      slack: { webhookUrl: "https://example.invalid/webhook" },
     });
     bridge.start();
-    bridge.start(); // second call should be a no-op
+    bridge.start();
+    expect(bridge.isRunning()).toBe(true);
     bridge.stop();
   });
 });
@@ -91,20 +87,20 @@ describe("Bridge status notifications", async () => {
     const statuses = [
       { to: "running", emoji: "\u{1F7E2}" },
       { to: "waiting", emoji: "\u{1F7E1}" },
-      { to: "completed", emoji: "\u2705" },
+      { to: "completed", emoji: "✅" },
       { to: "failed", emoji: "\u{1F534}" },
-      { to: "stopped", emoji: "\u23F9" },
-      { to: "unknown", emoji: "\u26AA" },
+      { to: "stopped", emoji: "⏹" },
+      { to: "unknown", emoji: "⚪" },
     ];
 
-    for (const { to, emoji } of statuses) {
+    for (const { to } of statuses) {
       await bridge.notifySessionStatus(mockSession({ id: "s-1", status: to }), "prev", to);
     }
 
     expect(texts.length).toBe(6);
     for (let i = 0; i < statuses.length; i++) {
       expect(texts[i]).toContain(statuses[i].emoji);
-      expect(texts[i]).toContain(`prev \u2192 ${statuses[i].to}`);
+      expect(texts[i]).toContain(`prev → ${statuses[i].to}`);
     }
   });
 
@@ -122,20 +118,14 @@ describe("Bridge status notifications", async () => {
 });
 
 describe("Bridge config", () => {
-  it("loadBridgeConfig returns null for missing file", () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { loadBridgeConfig } = require("../integrations/bridge.js");
-    // The default ARK_DIR won't have bridge.json unless user created it
-    // This test is safe because we check the function doesn't throw
+  it("loadBridgeConfig returns null for missing file", async () => {
+    const { loadBridgeConfig } = await import("../integrations/bridge.js");
     const config = loadBridgeConfig();
-    // Either null (no file) or valid config (if user has one)
     expect(config === null || typeof config === "object").toBe(true);
   });
 
-  it("createBridge returns null without config", () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { createBridge } = require("../integrations/bridge.js");
-    // Same as above -- depends on whether ~/.ark/bridge.json exists
+  it("createBridge returns null without config", async () => {
+    const { createBridge } = await import("../integrations/bridge.js");
     const bridge = createBridge();
     expect(bridge === null || typeof bridge === "object").toBe(true);
     if (bridge) bridge.stop();
@@ -154,35 +144,33 @@ describe("Bridge handler invocation", async () => {
       results.push(`h2:${msg.text}`);
     });
 
-    // Directly simulate -- we can't trigger pollTelegram in tests
-    // but we can verify the handler registration pattern
+    // No inbound source today -- registration is the only thing we can
+    // reliably assert without a mocked transport.
     expect(results).toHaveLength(0);
   });
 
-  it("notify with both telegram and slack config attempts both", async () => {
-    // This will fail network calls but should not throw
+  it("notify with slack and email config attempts both", async () => {
     const bridge = new Bridge({
-      telegram: { botToken: "invalid-token", chatId: "123" },
-      slack: { webhookUrl: "https://invalid.example.com/webhook" },
+      slack: { webhookUrl: "https://example.invalid/webhook" },
+      email: {
+        host: "127.0.0.1",
+        port: 2525,
+        from: "ark@example.invalid",
+        to: "ops@example.invalid",
+      },
     });
-
-    // Should not throw -- errors are caught internally
     await bridge.notify("test");
   }, 15_000);
 
-  it("notify with discord config does not throw", async () => {
+  it("notify with email-only config does not throw", async () => {
     const bridge = new Bridge({
-      discord: { webhookUrl: "https://invalid.example.com/webhook" },
+      email: {
+        host: "127.0.0.1",
+        port: 2525,
+        from: "ark@example.invalid",
+        to: "ops@example.invalid",
+      },
     });
     await bridge.notify("test");
-  });
-
-  it("notify with all three platforms does not throw", async () => {
-    const bridge = new Bridge({
-      telegram: { botToken: "invalid-token", chatId: "123" },
-      slack: { webhookUrl: "https://invalid.example.com/webhook" },
-      discord: { webhookUrl: "https://invalid.example.com/webhook" },
-    });
-    await bridge.notify("test");
-  });
+  }, 15_000);
 });

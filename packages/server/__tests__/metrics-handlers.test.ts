@@ -166,6 +166,9 @@ describe("compute/kill-process + docker actions (validation only)", async () => 
     const res = err(
       await router.dispatch(createRequest(1, "compute/docker-action", { container: "c1", action: "blowup" })),
     );
-    expect(res.message).toContain("stop or restart");
+    // Zod's v4 enum error uses quoted-and-alternated form. Assert on the
+    // allowed values rather than the specific prose so the test survives
+    // future Zod upgrades that tweak wording again.
+    expect(res.message).toMatch(/stop.*restart|restart.*stop/);
   });
 });

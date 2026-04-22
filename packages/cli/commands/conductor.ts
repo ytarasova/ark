@@ -86,7 +86,7 @@ export function registerConductorCommands(program: Command) {
 
   conductorCmd
     .command("bridge")
-    .description("Start the messaging bridge (Telegram/Slack) on the daemon")
+    .description("Start the messaging bridge (Slack/email) on the daemon")
     .action(async () => {
       const ark = await getArkClient();
       const result = await ark.conductorBridge();
@@ -97,8 +97,15 @@ export function registerConductorCommands(program: Command) {
           chalk.dim(
             JSON.stringify(
               {
-                telegram: { botToken: "123:ABC...", chatId: "12345" },
                 slack: { webhookUrl: "https://hooks.slack.com/services/..." },
+                email: {
+                  host: "smtp.gmail.com",
+                  port: 587,
+                  secure: false,
+                  auth: { user: "ark@example.com", pass: "app-password" },
+                  from: "Ark <ark@example.com>",
+                  to: "ops@example.com",
+                },
               },
               null,
               2,
