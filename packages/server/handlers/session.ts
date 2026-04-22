@@ -38,7 +38,9 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     // `startSession` emits `session_created` before returning; the default
     // dispatcher listener (registered above) kicks the background launcher.
     const { startSession } = await import("../../core/services/session-lifecycle.js");
-    const session = await startSession(app, opts);
+    const session = await startSession(app, opts, {
+      onCreated: (id) => app.sessionService.emitSessionCreated(id),
+    });
     notify("session/created", { session });
     return { session };
   });

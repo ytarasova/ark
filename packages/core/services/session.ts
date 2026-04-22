@@ -598,7 +598,9 @@ export class SessionService {
   async fork(id: string, name?: string): Promise<SessionOpResult> {
     const { forkSession } = await import("./session-lifecycle.js");
     // session.ts has a narrower local SessionOpResult (no `message` on success)
-    return forkSession(this.app, id, name) as unknown as SessionOpResult;
+    return forkSession(this.app, id, name, {
+      onCreated: (sid) => this.emitSessionCreated(sid),
+    }) as unknown as SessionOpResult;
   }
 
   /**
@@ -606,7 +608,9 @@ export class SessionService {
    */
   async clone(id: string, name?: string): Promise<SessionOpResult> {
     const { cloneSession } = await import("./session-lifecycle.js");
-    return cloneSession(this.app, id, name) as unknown as SessionOpResult;
+    return cloneSession(this.app, id, name, {
+      onCreated: (sid) => this.emitSessionCreated(sid),
+    }) as unknown as SessionOpResult;
   }
 
   /**

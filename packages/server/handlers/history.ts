@@ -22,11 +22,15 @@ export function registerHistoryHandlers(router: Router, app: AppContext): void {
 
   router.handle("history/import", async (p) => {
     const { claudeSessionId, name, repo } = extract<HistoryImportParams>(p, []);
-    const session = await startSession(app, {
-      summary: name ?? "import",
-      repo: repo ?? ".",
-      flow: "bare",
-    });
+    const session = await startSession(
+      app,
+      {
+        summary: name ?? "import",
+        repo: repo ?? ".",
+        flow: "bare",
+      },
+      { onCreated: (id) => app.sessionService.emitSessionCreated(id) },
+    );
     if (claudeSessionId) {
       await app.sessions.update(session.id, { claude_session_id: claudeSessionId });
     }

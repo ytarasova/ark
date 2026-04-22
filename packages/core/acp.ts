@@ -30,12 +30,16 @@ export async function handleAcpRequest(app: AppContext, req: AcpRequest): Promis
     switch (req.method) {
       case "session/create": {
         const p = req.params ?? {};
-        const session = await startSession(app, {
-          summary: p.summary as string,
-          repo: p.repo as string,
-          flow: p.flow as string,
-          workdir: p.workdir as string,
-        });
+        const session = await startSession(
+          app,
+          {
+            summary: p.summary as string,
+            repo: p.repo as string,
+            flow: p.flow as string,
+            workdir: p.workdir as string,
+          },
+          { onCreated: (id) => app.sessionService.emitSessionCreated(id) },
+        );
         return { jsonrpc: "2.0", result: { sessionId: session.id, status: session.status }, id };
       }
 

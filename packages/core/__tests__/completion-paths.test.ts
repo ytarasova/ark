@@ -72,7 +72,7 @@ describe("Manual completion path (bare flow)", async () => {
       commits: ["abc123"],
     };
 
-    const result = applyReport(app, session.id, report);
+    const result = await applyReport(app, session.id, report);
 
     // Manual gate: shouldAdvance must be false/undefined
     expect(result.shouldAdvance).toBeFalsy();
@@ -120,7 +120,7 @@ describe("Manual completion path (bare flow)", async () => {
       filesChanged: [],
       commits: [],
     };
-    const result = applyReport(app, session.id, report);
+    const result = await applyReport(app, session.id, report);
 
     // Apply updates (conductor would do this)
     if (Object.keys(result.updates).length > 0) {
@@ -164,7 +164,7 @@ describe("Auto completion path (quick flow)", async () => {
       commits: ["def456"],
     };
 
-    const result = applyReport(app, session.id, report);
+    const result = await applyReport(app, session.id, report);
 
     expect(result.shouldAdvance).toBe(true);
     expect(result.shouldAutoDispatch).toBe(true);
@@ -210,7 +210,7 @@ describe("Auto completion path (quick flow)", async () => {
       filesChanged: ["src/feature.ts"],
       commits: ["ghi789"],
     };
-    const result = applyReport(app, session.id, report);
+    const result = await applyReport(app, session.id, report);
 
     // Apply updates (conductor would do this)
     await app.sessions.update(session.id, result.updates);
@@ -231,7 +231,7 @@ describe("Auto completion path (quick flow)", async () => {
     await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
     // Simulate implement stage completion
-    const r1 = applyReport(app, session.id, {
+    const r1 = await applyReport(app, session.id, {
       type: "completed",
       sessionId: session.id,
       stage: "implement",
@@ -244,7 +244,7 @@ describe("Auto completion path (quick flow)", async () => {
 
     // Now at verify stage -- simulate verify completion
     await app.sessions.update(session.id, { status: "running" });
-    const r2 = applyReport(app, session.id, {
+    const r2 = await applyReport(app, session.id, {
       type: "completed",
       sessionId: session.id,
       stage: "verify",
@@ -257,7 +257,7 @@ describe("Auto completion path (quick flow)", async () => {
 
     // Now at pr stage -- simulate pr completion
     await app.sessions.update(session.id, { status: "running" });
-    const r3 = applyReport(app, session.id, {
+    const r3 = await applyReport(app, session.id, {
       type: "completed",
       sessionId: session.id,
       stage: "pr",
@@ -270,7 +270,7 @@ describe("Auto completion path (quick flow)", async () => {
 
     // Now at merge stage -- simulate merge completion
     await app.sessions.update(session.id, { status: "running" });
-    const r4 = applyReport(app, session.id, {
+    const r4 = await applyReport(app, session.id, {
       type: "completed",
       sessionId: session.id,
       stage: "merge",
@@ -297,7 +297,7 @@ describe("Hook fallback path (SessionEnd)", async () => {
     await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
     const freshSession = (await app.sessions.get(session.id))!;
-    const result = applyHookStatus(app, freshSession, "SessionEnd", {});
+    const result = await applyHookStatus(app, freshSession, "SessionEnd", {});
 
     expect(result.newStatus).toBe("ready");
     expect(result.updates?.status).toBe("ready");
@@ -309,7 +309,7 @@ describe("Hook fallback path (SessionEnd)", async () => {
     await app.sessions.update(session.id, { status: "running", stage: "work" });
 
     const freshSession = (await app.sessions.get(session.id))!;
-    const result = applyHookStatus(app, freshSession, "SessionEnd", {});
+    const result = await applyHookStatus(app, freshSession, "SessionEnd", {});
 
     // Manual gate: SessionEnd maps to "running" (not "completed")
     expect(result.newStatus).toBe("running");
@@ -321,7 +321,7 @@ describe("Hook fallback path (SessionEnd)", async () => {
     await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
     const freshSession = (await app.sessions.get(session.id))!;
-    const result = applyHookStatus(app, freshSession, "StopFailure", {
+    const result = await applyHookStatus(app, freshSession, "StopFailure", {
       error: "agent crashed",
     });
 
@@ -335,7 +335,7 @@ describe("Hook fallback path (SessionEnd)", async () => {
     await app.sessions.update(session.id, { status: "running", stage: "work" });
 
     const freshSession = (await app.sessions.get(session.id))!;
-    const result = applyHookStatus(app, freshSession, "StopFailure", {
+    const result = await applyHookStatus(app, freshSession, "StopFailure", {
       error: "auth failed",
     });
 
@@ -348,7 +348,7 @@ describe("Hook fallback path (SessionEnd)", async () => {
     await app.sessions.update(session.id, { status: "completed", stage: "implement" });
 
     const freshSession = (await app.sessions.get(session.id))!;
-    const result = applyHookStatus(app, freshSession, "SessionEnd", {});
+    const result = await applyHookStatus(app, freshSession, "SessionEnd", {});
 
     // Auto-gate SessionEnd maps to "ready", but guard blocks overriding "completed"
     expect(result.newStatus).toBeUndefined();
@@ -359,7 +359,7 @@ describe("Hook fallback path (SessionEnd)", async () => {
     await app.sessions.update(session.id, { status: "stopped", stage: "implement" });
 
     const freshSession = (await app.sessions.get(session.id))!;
-    const result = applyHookStatus(app, freshSession, "SessionEnd", {});
+    const result = await applyHookStatus(app, freshSession, "SessionEnd", {});
 
     // Should be no-op -- session was manually stopped
     expect(result.newStatus).toBeUndefined();
@@ -370,7 +370,7 @@ describe("Hook fallback path (SessionEnd)", async () => {
     await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
     const freshSession = (await app.sessions.get(session.id))!;
-    const result = applyHookStatus(app, freshSession, "SessionEnd", { reason: "task_complete" });
+    const result = await applyHookStatus(app, freshSession, "SessionEnd", { reason: "task_complete" });
 
     expect(result.events).toBeTruthy();
     expect(result.events!.length).toBeGreaterThanOrEqual(1);

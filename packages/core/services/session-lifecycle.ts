@@ -64,6 +64,25 @@ function resolveGitHubUrl(dir?: string | null): string | null {
   }
 }
 
+/**
+ * Lifecycle hooks invoked by startSession/forkSession/cloneSession after the
+ * session row is persisted. The `onCreated` callback is the opt-in broadcast
+ * point: callers that want the default-dispatcher listener to auto-kick pass
+ * `{ onCreated: (id) => sessionService.emitSessionCreated(id) }`. Callers that
+ * dispatch explicitly (conductor, cli/exec, stage-advance, issue-poller) or
+ * don't want dispatch at all (tests) omit it.
+ *
+ * Why this lives as a caller-supplied hook instead of a self-call into
+ * `app.sessionService.emitSessionCreated`: a service delegating to a function
+ * that turns around and calls back into the same service is a cycle that
+ * breaks the `AppMode.orchestrator` capability contract (Temporal-backed
+ * activities have no `sessionService` to reach back into). See RF-4 in
+ * docs/orchestrator-refactor-plan.md.
+ */
+export interface LifecycleHooks {
+  onCreated?: (sessionId: string) => void;
+}
+
 export async function startSession(
   app: AppContext,
   opts: {
@@ -87,6 +106,7 @@ export async function startSession(
     inputs?: { files?: Record<string, string>; params?: Record<string, string> };
     attachments?: Array<{ name: string; content: string; type: string }>;
   },
+  hooks?: LifecycleHooks,
 ): Promise<Session> {
   const repoDir = opts.workdir ?? opts.repo;
   const repoConfig = repoDir ? loadRepoConfig(repoDir) : {};
@@ -218,8 +238,10 @@ export async function startSession(
   // persisted -- if we emit earlier (as we used to) the listener's dispatch
   // call sees `stage: null` and bails with "No current stage", which left
   // action-only flows wedged at `status: ready` until an RPC
-  // `session/advance` came in manually.
-  app.sessionService.emitSessionCreated(session.id);
+  // `session/advance` came in manually. The broadcast is opt-in per caller
+  // (see LifecycleHooks): handlers/acp/triggers pass the bridge; conductor,
+  // cli/exec, issue-poller, stage-advance dispatch explicitly and omit it.
+  hooks?.onCreated?.(session.id);
 
   return (await app.sessions.get(session.id))!;
 }
@@ -684,7 +706,12 @@ export async function rejectReviewGate(
 /**
  * Fork: shallow copy - same compute, repo, flow, group. Fresh session, no resume.
  */
-export async function forkSession(app: AppContext, sessionId: string, newName?: string): Promise<SessionOpResult> {
+export async function forkSession(
+  app: AppContext,
+  sessionId: string,
+  newName?: string,
+  hooks?: LifecycleHooks,
+): Promise<SessionOpResult> {
   const original = await app.sessions.get(sessionId);
   if (!original) return { ok: false, message: `Session ${sessionId} not found` };
 
@@ -710,7 +737,7 @@ export async function forkSession(app: AppContext, sessionId: string, newName?: 
     data: { forked_from: sessionId },
   });
 
-  app.sessionService.emitSessionCreated(fork.id);
+  hooks?.onCreated?.(fork.id);
   return { ok: true, sessionId: fork.id };
 }
 
@@ -718,7 +745,12 @@ export async function forkSession(app: AppContext, sessionId: string, newName?: 
  * Clone: deep copy - same as fork PLUS claude_session_id for --resume.
  * The new session will resume the same Claude conversation.
  */
-export async function cloneSession(app: AppContext, sessionId: string, newName?: string): Promise<SessionOpResult> {
+export async function cloneSession(
+  app: AppContext,
+  sessionId: string,
+  newName?: string,
+  hooks?: LifecycleHooks,
+): Promise<SessionOpResult> {
   const original = await app.sessions.get(sessionId);
   if (!original) return { ok: false, message: `Session ${sessionId} not found` };
 
@@ -745,7 +777,7 @@ export async function cloneSession(app: AppContext, sessionId: string, newName?:
     data: { cloned_from: sessionId, claude_session_id: original.claude_session_id },
   });
 
-  app.sessionService.emitSessionCreated(clone.id);
+  hooks?.onCreated?.(clone.id);
   return { ok: true, sessionId: clone.id };
 }
 
