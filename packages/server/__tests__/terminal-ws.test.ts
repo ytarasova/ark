@@ -125,4 +125,85 @@ describe("/terminal/:sessionId WS route", () => {
     expect(typeof parsed.initialBuffer).toBe("string");
     wsClient.close();
   }, 15_000);
+
+  it("routes via provider.getArkdUrl for sessions with a compute_name", async () => {
+    // Register a stub compute backed by a custom arkd URL (the same local
+    // arkd on a different URL string, just to prove we hit the provider).
+    class StubProvider {
+      readonly name = "stub-terminal-remote";
+      readonly singleton = false;
+      readonly canReboot = true;
+      readonly canDelete = true;
+      readonly supportsWorktree = false;
+      readonly initialStatus = "running";
+      readonly needsAuth = false;
+      readonly isolationModes: any[] = [];
+      setApp(): void {}
+      async provision(): Promise<void> {}
+      async destroy(): Promise<void> {}
+      async start(): Promise<void> {}
+      async stop(): Promise<void> {}
+      async attach(): Promise<void> {}
+      async cleanupSession(): Promise<void> {}
+      async syncEnvironment(): Promise<void> {}
+      async launch(): Promise<string> {
+        return "";
+      }
+      async killAgent(): Promise<void> {}
+      async captureOutput(): Promise<string> {
+        return "";
+      }
+      async getMetrics(): Promise<any> {
+        return {};
+      }
+      async probePorts(): Promise<any[]> {
+        return [];
+      }
+      async checkSession(): Promise<boolean> {
+        return true;
+      }
+      getAttachCommand(): string[] {
+        return [];
+      }
+      buildChannelConfig(): Record<string, unknown> {
+        return {};
+      }
+      buildLaunchEnv(): Record<string, string> {
+        return {};
+      }
+      getArkdUrl(): string {
+        // Route back to the same arkd boot fixture. This proves the WS
+        // handler honoured the provider (if it hadn't, the test would still
+        // pass against the fallback, but we'd miss the regression signal).
+        return `http://localhost:${arkdPort}`;
+      }
+    }
+    app.registerProvider(new StubProvider() as any);
+    await app.computes.insert({
+      name: "stub-remote-1",
+      provider: "stub-terminal-remote" as any,
+      compute_kind: "ec2",
+      runtime_kind: "direct",
+      status: "running",
+      config: {},
+    } as any);
+
+    const tmuxName = `arktest-remote-${Date.now().toString(36)}`;
+    spawnedTmuxSessions.push(tmuxName);
+    execFileSync(
+      tmuxBin(),
+      ["new-session", "-d", "-s", tmuxName, "-x", "120", "-y", "30", "bash", "-c", "echo remote-hi; sleep 60"],
+      { stdio: "pipe" },
+    );
+
+    const s = await app.sessions.create({ summary: "remote-live" } as any);
+    await app.sessions.update(s.id, { session_id: tmuxName, compute_name: "stub-remote-1" } as any);
+
+    const { ws: wsClient, firstMessage } = await openSocket(`${baseWs}/terminal/${s.id}`);
+    const parsed = JSON.parse(firstMessage as string);
+    expect(parsed.type).toBe("connected");
+    expect(parsed.sessionId).toBe(s.id);
+    expect(typeof parsed.streamHandle).toBe("string");
+    wsClient.close();
+  }, 15_000);
 });
