@@ -14,7 +14,6 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { AppContext } from "../app.js";
-import { runVerification } from "../services/session-lifecycle.js";
 import * as flow from "../state/flow.js";
 
 let app: AppContext;
@@ -173,7 +172,7 @@ describe("verify stage quality gate enforcement", async () => {
     const session = await app.sessions.create({ summary: "qg output test", flow: "autonomous-sdlc" });
     await app.sessions.update(session.id, { status: "ready", stage: "verify", workdir });
 
-    const result = await runVerification(app, session.id);
+    const result = await app.sessionLifecycle.runVerification(session.id);
 
     expect(result.ok).toBe(false);
     expect(result.scriptResults).toHaveLength(1);
@@ -186,7 +185,7 @@ describe("verify stage quality gate enforcement", async () => {
     const session = await app.sessions.create({ summary: "qg partial fail", flow: "autonomous-sdlc" });
     await app.sessions.update(session.id, { status: "ready", stage: "verify", workdir });
 
-    const result = await runVerification(app, session.id);
+    const result = await app.sessionLifecycle.runVerification(session.id);
 
     expect(result.ok).toBe(false);
     expect(result.scriptResults).toHaveLength(3);

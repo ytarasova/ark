@@ -1,6 +1,5 @@
 import { describe, it, expect } from "bun:test";
 import { buildReplay } from "../session/replay.js";
-import { startSession } from "../services/session-lifecycle.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";
 
@@ -14,7 +13,7 @@ describe("buildReplay", async () => {
   });
 
   it("returns steps in chronological order", async () => {
-    const session = await startSession(getApp(), { summary: "test replay", flow: "default" });
+    const session = await getApp().sessionLifecycle.start({ summary: "test replay", flow: "default" });
     await getApp().events.log(session.id, "stage_ready", { stage: "plan", data: { stage: "plan" } });
     await getApp().events.log(session.id, "stage_started", {
       stage: "plan",
@@ -43,7 +42,7 @@ describe("buildReplay", async () => {
   });
 
   it("steps have elapsed time formatted as HH:MM:SS", async () => {
-    const session = await startSession(getApp(), { summary: "elapsed test" });
+    const session = await getApp().sessionLifecycle.start({ summary: "elapsed test" });
     const steps = await buildReplay(getApp(), session.id);
     expect(steps.length).toBeGreaterThan(0);
     // First step should be near 00:00:00

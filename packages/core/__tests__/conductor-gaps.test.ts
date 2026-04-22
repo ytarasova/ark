@@ -7,7 +7,6 @@ import { describe, it, expect } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { withTestContext } from "./test-helpers.js";
-import { interrupt, runVerification } from "../services/session-lifecycle.js";
 import { worktreeDiff, createWorktreePR, mergeWorktreePR } from "../services/worktree/index.js";
 import { executeAction } from "../services/actions/index.js";
 import { getStageDefinition } from "../state/flow.js";
@@ -20,7 +19,7 @@ withTestContext();
 
 describe("interrupt(getApp())", async () => {
   it("returns error for non-existent session", async () => {
-    const result = await interrupt(getApp(), "s-nonexistent");
+    const result = await getApp().sessionLifecycle.interrupt("s-nonexistent");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
   });
@@ -29,7 +28,7 @@ describe("interrupt(getApp())", async () => {
     const session = await getApp().sessions.create({ summary: "interrupt-not-running" });
     await getApp().sessions.update(session.id, { status: "pending" });
 
-    const result = await interrupt(getApp(), session.id);
+    const result = await getApp().sessionLifecycle.interrupt(session.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not running");
   });
@@ -38,13 +37,13 @@ describe("interrupt(getApp())", async () => {
     const session = await getApp().sessions.create({ summary: "interrupt-no-tmux" });
     await getApp().sessions.update(session.id, { status: "running", session_id: null });
 
-    const result = await interrupt(getApp(), session.id);
+    const result = await getApp().sessionLifecycle.interrupt(session.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("No tmux session");
   });
 
-  it("is exported as a function", () => {
-    expect(typeof interrupt).toBe("function");
+  it("is exposed on the SessionLifecycle service", () => {
+    expect(typeof getApp().sessionLifecycle.interrupt).toBe("function");
   });
 });
 
@@ -303,7 +302,7 @@ describe("runVerification(getApp())", async () => {
   it("returns ok when no todos and no verify scripts", async () => {
     const session = await getApp().sessions.create({ summary: "verify-clean" });
 
-    const result = await runVerification(getApp(), session.id);
+    const result = await getApp().sessionLifecycle.runVerification(session.id);
     expect(result.ok).toBe(true);
     expect(result.todosResolved).toBe(true);
     expect(result.pendingTodos).toHaveLength(0);
@@ -315,7 +314,7 @@ describe("runVerification(getApp())", async () => {
     const session = await getApp().sessions.create({ summary: "verify-todos" });
     await getApp().todos.add(session.id, "Must do this");
 
-    const result = await runVerification(getApp(), session.id);
+    const result = await getApp().sessionLifecycle.runVerification(session.id);
     expect(result.ok).toBe(false);
     expect(result.todosResolved).toBe(false);
     expect(result.pendingTodos).toHaveLength(1);
@@ -326,7 +325,7 @@ describe("runVerification(getApp())", async () => {
     await getApp().todos.add(session.id, "Fix the bug");
     await getApp().todos.add(session.id, "Add tests");
 
-    const result = await runVerification(getApp(), session.id);
+    const result = await getApp().sessionLifecycle.runVerification(session.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("Fix the bug");
     expect(result.message).toContain("Add tests");
@@ -334,7 +333,7 @@ describe("runVerification(getApp())", async () => {
   });
 
   it("returns error for non-existent session", async () => {
-    const result = await runVerification(getApp(), "s-nonexistent");
+    const result = await getApp().sessionLifecycle.runVerification("s-nonexistent");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
   });
@@ -344,7 +343,7 @@ describe("runVerification(getApp())", async () => {
     const t1 = await getApp().todos.add(session.id, "Already done");
     await getApp().todos.toggle(t1.id);
 
-    const result = await runVerification(getApp(), session.id);
+    const result = await getApp().sessionLifecycle.runVerification(session.id);
     expect(result.ok).toBe(true);
     expect(result.todosResolved).toBe(true);
     expect(result.pendingTodos).toHaveLength(0);
@@ -370,7 +369,7 @@ describe("runVerification(getApp())", async () => {
     await getApp().sessions.update(session.id, { stage: "only" });
 
     const calls: Array<{ script: string; cwd: string | undefined }> = [];
-    const result = await runVerification(getApp(), session.id, {
+    const result = await getApp().sessionLifecycle.runVerification(session.id, {
       runScript: async (script, opts) => {
         calls.push({ script, cwd: opts.cwd });
         if (script === "good") return { stdout: "ok\n", stderr: "" };
@@ -407,7 +406,7 @@ describe("runVerification(getApp())", async () => {
     });
     await getApp().sessions.update(session.id, { stage: "only" });
 
-    const result = await runVerification(getApp(), session.id, {
+    const result = await getApp().sessionLifecycle.runVerification(session.id, {
       runScript: async () => ({ stdout: "", stderr: "" }),
     });
     expect(result.ok).toBe(true);
@@ -477,12 +476,10 @@ describe("RepoConfig verify field", () => {
 
 describe("archive(getApp()) and restore(getApp())", async () => {
   it("archive sets status to archived", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { archive } = require("../services/session-lifecycle.js");
     const session = await getApp().sessions.create({ summary: "archive-test" });
     await getApp().sessions.update(session.id, { status: "completed" });
 
-    const result = await archive(getApp(), session.id);
+    const result = await getApp().sessionLifecycle.archive(session.id);
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Session archived");
 
@@ -491,21 +488,17 @@ describe("archive(getApp()) and restore(getApp())", async () => {
   });
 
   it("archive returns error for non-existent session", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { archive } = require("../services/session-lifecycle.js");
-    const result = await archive(getApp(), "s-nonexistent");
+    const result = await getApp().sessionLifecycle.archive("s-nonexistent");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
   });
 
   it("restore sets status to stopped", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { archive, restore } = require("../services/session-lifecycle.js");
     const session = await getApp().sessions.create({ summary: "restore-test" });
     await getApp().sessions.update(session.id, { status: "completed" });
-    await archive(getApp(), session.id);
+    await getApp().sessionLifecycle.archive(session.id);
 
-    const result = await restore(getApp(), session.id);
+    const result = await getApp().sessionLifecycle.restore(session.id);
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Session restored");
 
@@ -514,22 +507,18 @@ describe("archive(getApp()) and restore(getApp())", async () => {
   });
 
   it("restore returns error when not archived", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { restore } = require("../services/session-lifecycle.js");
     const session = await getApp().sessions.create({ summary: "restore-not-archived" });
     await getApp().sessions.update(session.id, { status: "completed" });
 
-    const result = await restore(getApp(), session.id);
+    const result = await getApp().sessionLifecycle.restore(session.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not archived");
   });
 
   it("archived sessions excluded from default list", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { archive } = require("../services/session-lifecycle.js");
     const session = await getApp().sessions.create({ summary: "archive-list-test" });
     await getApp().sessions.update(session.id, { status: "completed" });
-    await archive(getApp(), session.id);
+    await getApp().sessionLifecycle.archive(session.id);
 
     // Default list should not include archived
     const defaultList = await getApp().sessions.list();

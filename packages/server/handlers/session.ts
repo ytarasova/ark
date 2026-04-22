@@ -35,10 +35,9 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     // every caller (CLI, web, tests) to remember the second call or live with
     // a session stuck at status=ready until the conductor's 60s poll tick.
     //
-    // `startSession` emits `session_created` before returning; the default
+    // `start()` emits `session_created` before returning; the default
     // dispatcher listener (registered above) kicks the background launcher.
-    const { startSession } = await import("../../core/services/session-lifecycle.js");
-    const session = await startSession(app, opts, {
+    const session = await app.sessionLifecycle.start(opts, {
       onCreated: (id) => app.sessionService.emitSessionCreated(id),
     });
     notify("session/created", { session });
@@ -417,8 +416,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
 
   router.handle("verify/run", async (params) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
-    const { runVerification } = await import("../../core/services/session-lifecycle.js");
-    return runVerification(app, sessionId);
+    return app.sessionLifecycle.runVerification(sessionId);
   });
 
   // ── Export ─────────────────────────────────────────────────────────────

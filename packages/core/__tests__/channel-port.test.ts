@@ -1,5 +1,4 @@
 import { describe, it, expect } from "bun:test";
-import { startSession } from "../services/session-lifecycle.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";
 
@@ -37,7 +36,12 @@ describe("isChannelPortAvailable", async () => {
   });
 
   it("returns false when a running session uses the port", async () => {
-    const session = await startSession(getApp(), { summary: "port-test", repo: "test", flow: "bare", workdir: "/tmp" });
+    const session = await getApp().sessionLifecycle.start({
+      summary: "port-test",
+      repo: "test",
+      flow: "bare",
+      workdir: "/tmp",
+    });
     const port = getApp().sessions.channelPort(session.id);
     // startSession creates a session with status 'pending', update to 'running'
 
@@ -46,7 +50,7 @@ describe("isChannelPortAvailable", async () => {
   });
 
   it("returns true when excludeSessionId matches the running session", async () => {
-    const session = await startSession(getApp(), {
+    const session = await getApp().sessionLifecycle.start({
       summary: "port-exclude",
       repo: "test",
       flow: "bare",

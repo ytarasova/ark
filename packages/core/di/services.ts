@@ -25,10 +25,9 @@ import type { StatusPollerRegistry } from "../executors/status-poller.js";
 import { SessionService, ComputeService, HistoryService } from "../services/index.js";
 import { SessionHooks } from "../services/session-hooks/index.js";
 import { SessionLifecycle } from "../services/session/index.js";
-import { advance } from "../services/stage-advance.js";
-import { dispatch } from "../services/dispatch.js";
+import { DispatchService } from "../services/dispatch/index.js";
+import { StageAdvanceService } from "../services/stage-advance/index.js";
 import { getOutput } from "../services/session-output.js";
-import { executeAction } from "../services/actions/index.js";
 import { removeSessionWorktree } from "../services/worktree/index.js";
 import { deletePerSessionCredsSecret } from "../services/dispatch-claude-auth.js";
 import { garbageCollectComputeIfTemplate } from "../services/compute-lifecycle.js";
@@ -38,9 +37,9 @@ import * as flow from "../state/flow.js";
 /**
  * Register the core services.
  *
- * SessionService is the only one that depends on AppContext (for legacy
- * session-orchestration delegation). The AppContext is registered in the
- * container before services so `app` resolves successfully.
+ * Every registration is a singleton. `app: AppContext` is registered in
+ * `AppContext.constructor()` so `c.app` is always resolvable by the time
+ * these factories run.
  */
 export function registerServices(container: AppContainer): void {
   container.register({
@@ -59,10 +58,6 @@ export function registerServices(container: AppContainer): void {
       lifetime: Lifetime.SINGLETON,
     }),
 
-    // SessionHooks composes three appliers (hook-status, report, handoff)
-    // over a narrow Deps slice. Callbacks wrap still-AppContext-taking
-    // helpers (advance/dispatch/runVerification/...); they'll be replaced
-    // with typed class methods as those migrations land.
     sessionHooks: asFunction(
       (c: {
         sessions: SessionRepository;
@@ -82,11 +77,11 @@ export function registerServices(container: AppContainer): void {
           flows: c.flows,
           usageRecorder: c.usageRecorder,
           transcriptParsers: c.transcriptParsers,
-          advance: (id, force, outcome) => advance(c.app, id, force, outcome),
+          advance: (id, force, outcome) => c.app.stageAdvance.advance(id, force, outcome),
           dispatch: async (id) => {
-            await dispatch(c.app, id);
+            await c.app.dispatchService.dispatch(id);
           },
-          executeAction: (id, action) => executeAction(c.app, id, action),
+          executeAction: (id, action) => c.app.stageAdvance.executeAction(id, action),
           runVerification: (id) => c.app.sessionLifecycle.runVerification(id),
           recordSessionUsage: (session, usage, provider, source) =>
             c.app.sessionLifecycle.recordSessionUsage(session, usage, provider, source),
@@ -97,11 +92,6 @@ export function registerServices(container: AppContainer): void {
       { lifetime: Lifetime.SINGLETON },
     ),
 
-    // SessionLifecycle composes five appliers (create, terminate, suspend,
-    // fork-clone, review) over a narrow Deps slice. Callbacks wrap helpers
-    // that still take AppContext (workspace removal, creds teardown,
-    // compute GC, provider resolution, dispatch, advance); those fold away
-    // once their own migrations land.
     sessionLifecycle: asFunction(
       (c: {
         sessions: SessionRepository;
@@ -124,21 +114,33 @@ export function registerServices(container: AppContainer): void {
           computes: c.computes,
           flows: c.flows,
           runtimes: c.runtimes,
-          codeIntel: c.app.codeIntel,
+          getCodeIntel: () => c.app.codeIntel,
           config: c.config,
           usageRecorder: c.usageRecorder,
-          launcher: c.app.launcher,
+          getLauncher: () => c.app.launcher,
           statusPollers: c.statusPollers,
-          dispatch: (id) => dispatch(c.app, id),
+          dispatch: (id) => c.app.dispatchService.dispatch(id),
           removeWorktree: (session) => removeSessionWorktree(c.app, session),
           deleteCredsSecret: (session, compute) => deletePerSessionCredsSecret(c.app, session, compute),
           gcComputeIfTemplate: (computeName) => garbageCollectComputeIfTemplate(c.app, computeName ?? null),
           resolveProvider: (session) => c.app.resolveProvider(session),
           resolveComputeTarget: (session) => c.app.resolveComputeTarget(session),
-          advance: (id, force) => advance(c.app, id, force),
+          advance: (id, force) => c.app.stageAdvance.advance(id, force),
           provisionWorkspaceWorkdir: (session, ws, opts) => provisionWorkspaceWorkdir(c.app, session, ws as any, opts),
         }),
       { lifetime: Lifetime.SINGLETON },
     ),
+
+    // DispatchService + StageAdvanceService are thin class wrappers over the
+    // legacy `dispatch()` / `advance()` free functions. They exist so callers
+    // can write `app.dispatchService.dispatch(id)` while the bigger
+    // class-based refactor lands. Each holds a single AppContext handle.
+    dispatchService: asFunction((c: { app: AppContext }) => new DispatchService(c.app), {
+      lifetime: Lifetime.SINGLETON,
+    }),
+
+    stageAdvance: asFunction((c: { app: AppContext }) => new StageAdvanceService(c.app), {
+      lifetime: Lifetime.SINGLETON,
+    }),
   });
 }

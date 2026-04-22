@@ -9,19 +9,9 @@ import type { OutboundMessage } from "../../conductor/channel-types.js";
 import { HookStatusApplier } from "./hook-status.js";
 import { ReportApplier } from "./report.js";
 import { HandoffMediator } from "./handoff.js";
-import type {
-  HookStatusResult,
-  ReportResult,
-  StageHandoffResult,
-  SessionHooksDeps,
-} from "./types.js";
+import type { HookStatusResult, ReportResult, StageHandoffResult, SessionHooksDeps } from "./types.js";
 
-export type {
-  HookStatusResult,
-  ReportResult,
-  StageHandoffResult,
-  SessionHooksDeps,
-} from "./types.js";
+export type { HookStatusResult, ReportResult, StageHandoffResult, SessionHooksDeps } from "./types.js";
 export { parseOnFailure } from "./types.js";
 
 export class SessionHooks {

@@ -11,7 +11,6 @@ import { mkdtempSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { AppContext } from "../app.js";
-import { startSession } from "../services/session-lifecycle.js";
 
 let app: AppContext;
 beforeAll(async () => {
@@ -39,7 +38,7 @@ describe("repo-scoped config E2E", async () => {
     const repoDir = mkdtempSync(join(tmpdir(), "ark-e2e-repo-"));
     writeFileSync(join(repoDir, ".ark.yaml"), "flow: bare\ngroup: team-alpha\n");
 
-    const session = await startSession(app, {
+    const session = await app.sessionLifecycle.start({
       summary: "e2e-repo-config-basic",
       workdir: repoDir,
     });
@@ -53,7 +52,7 @@ describe("repo-scoped config E2E", async () => {
     const repoDir = mkdtempSync(join(tmpdir(), "ark-e2e-repo-"));
     writeFileSync(join(repoDir, ".ark.yaml"), "flow: bare\ngroup: config-group\ncompute: config-compute\n");
 
-    const session = await startSession(app, {
+    const session = await app.sessionLifecycle.start({
       summary: "e2e-repo-config-override",
       workdir: repoDir,
       flow: "bare",
@@ -68,7 +67,7 @@ describe("repo-scoped config E2E", async () => {
   it("no config file means defaults are used", async () => {
     const repoDir = mkdtempSync(join(tmpdir(), "ark-e2e-repo-empty-"));
 
-    const session = await startSession(app, {
+    const session = await app.sessionLifecycle.start({
       summary: "e2e-repo-config-none",
       workdir: repoDir,
     });
@@ -84,7 +83,7 @@ describe("repo-scoped config E2E", async () => {
     const repoDir = mkdtempSync(join(tmpdir(), "ark-e2e-repo-fallback-"));
     writeFileSync(join(repoDir, ".ark.yaml"), "group: from-repo\n");
 
-    const session = await startSession(app, {
+    const session = await app.sessionLifecycle.start({
       summary: "e2e-repo-config-fallback",
       repo: repoDir,
     });
@@ -97,7 +96,7 @@ describe("repo-scoped config E2E", async () => {
     const repoDir = mkdtempSync(join(tmpdir(), "ark-e2e-repo-yml-"));
     writeFileSync(join(repoDir, ".ark.yml"), "flow: bare\n");
 
-    const session = await startSession(app, {
+    const session = await app.sessionLifecycle.start({
       summary: "e2e-repo-config-yml",
       workdir: repoDir,
     });
@@ -110,7 +109,7 @@ describe("repo-scoped config E2E", async () => {
     const repoDir = mkdtempSync(join(tmpdir(), "ark-e2e-repo-bad-"));
     writeFileSync(join(repoDir, ".ark.yaml"), "{{{{invalid");
 
-    const session = await startSession(app, {
+    const session = await app.sessionLifecycle.start({
       summary: "e2e-repo-config-bad-yaml",
       workdir: repoDir,
     });

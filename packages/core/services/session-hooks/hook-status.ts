@@ -235,10 +235,7 @@ export class HookStatusApplier {
         if (parser) {
           const { usage } = parser.parse(transcriptPath);
           const total =
-            usage.input_tokens +
-            usage.output_tokens +
-            (usage.cache_read_tokens ?? 0) +
-            (usage.cache_write_tokens ?? 0);
+            usage.input_tokens + usage.output_tokens + (usage.cache_read_tokens ?? 0) + (usage.cache_write_tokens ?? 0);
           if (total > 0) {
             recordSessionUsage(session, usage, "anthropic", "transcript");
           }

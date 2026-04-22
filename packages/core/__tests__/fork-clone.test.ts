@@ -3,7 +3,6 @@
  */
 
 import { describe, it, expect } from "bun:test";
-import { forkSession, cloneSession } from "../services/session-lifecycle.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";
 
@@ -19,7 +18,7 @@ describe("forkSession (shallow)", () => {
       group_name: "my-group",
     });
 
-    const result = await forkSession(getApp(), original.id);
+    const result = await getApp().sessionLifecycle.fork(original.id);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
@@ -37,7 +36,7 @@ describe("forkSession (shallow)", () => {
     const original = await getApp().sessions.create({ summary: "has-claude" });
     await getApp().sessions.update(original.id, { claude_session_id: "claude-abc-123" });
 
-    const result = await forkSession(getApp(), original.id);
+    const result = await getApp().sessionLifecycle.fork(original.id);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
@@ -47,20 +46,20 @@ describe("forkSession (shallow)", () => {
 
   it("auto-generates unique name when no new name given", async () => {
     const original = await getApp().sessions.create({ summary: "my-task" });
-    const result = await forkSession(getApp(), original.id);
+    const result = await getApp().sessionLifecycle.fork(original.id);
     if (!result.ok) return;
     expect((await getApp().sessions.get(result.sessionId))!.summary).toBe("my-task (fork)");
   });
 
   it("uses provided name", async () => {
     const original = await getApp().sessions.create({ summary: "my-task" });
-    const result = await forkSession(getApp(), original.id, "new-name");
+    const result = await getApp().sessionLifecycle.fork(original.id, "new-name");
     if (!result.ok) return;
     expect((await getApp().sessions.get(result.sessionId))!.summary).toBe("new-name");
   });
 
   it("returns ok: false for nonexistent session", async () => {
-    const result = await forkSession(getApp(), "s-nonexistent");
+    const result = await getApp().sessionLifecycle.fork("s-nonexistent");
     expect(result.ok).toBe(false);
   });
 });
@@ -75,7 +74,7 @@ describe("cloneSession (deep)", () => {
       group_name: "my-group",
     });
 
-    const result = await cloneSession(getApp(), original.id);
+    const result = await getApp().sessionLifecycle.clone(original.id);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
@@ -92,7 +91,7 @@ describe("cloneSession (deep)", () => {
     const original = await getApp().sessions.create({ summary: "has-claude" });
     await getApp().sessions.update(original.id, { claude_session_id: "claude-abc-123" });
 
-    const result = await cloneSession(getApp(), original.id);
+    const result = await getApp().sessionLifecycle.clone(original.id);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
@@ -101,7 +100,7 @@ describe("cloneSession (deep)", () => {
   });
 
   it("returns ok: false for nonexistent session", async () => {
-    const result = await cloneSession(getApp(), "s-nonexistent");
+    const result = await getApp().sessionLifecycle.clone("s-nonexistent");
     expect(result.ok).toBe(false);
   });
 });

@@ -255,25 +255,10 @@ export async function rebaseOntoBase(
  * Finish a worktree session: merge branch into target, remove worktree, delete session.
  * Aborts safely on merge conflict without losing work.
  *
- * NOTE: This function has a forward dependency on deleteSessionAsync from session-lifecycle.
- * It is injected at runtime to avoid circular imports.
+ * Pulls lifecycle ops (deleteSession, stop, runVerification) straight off
+ * `app.sessionLifecycle` so there is no circular-import trick and no global
+ * injection step required.
  */
-let _deleteSessionAsync: ((app: AppContext, sessionId: string) => Promise<{ ok: boolean; message: string }>) | null =
-  null;
-let _stop:
-  | ((app: AppContext, sessionId: string, opts?: { force?: boolean }) => Promise<{ ok: boolean; message: string }>)
-  | null = null;
-let _runVerification: ((app: AppContext, sessionId: string) => Promise<any>) | null = null;
-
-export function injectWorktreeDeps(deps: {
-  deleteSessionAsync: typeof _deleteSessionAsync;
-  stop: typeof _stop;
-  runVerification: typeof _runVerification;
-}): void {
-  _deleteSessionAsync = deps.deleteSessionAsync;
-  _stop = deps.stop;
-  _runVerification = deps.runVerification;
-}
 
 export async function finishWorktree(
   app: AppContext,
@@ -298,8 +283,8 @@ export async function finishWorktree(
     };
 
   // Verify before finishing (unless force)
-  if (!opts?.force && _runVerification) {
-    const verify = await _runVerification(app, sessionId);
+  if (!opts?.force) {
+    const verify = await app.sessionLifecycle.runVerification(sessionId);
     if (!verify.ok) {
       return { ok: false, message: `Cannot finish: verification failed:\n${verify.message}` };
     }
@@ -327,8 +312,8 @@ export async function finishWorktree(
   const targetBranch = opts?.into ?? DEFAULT_BASE_BRANCH;
 
   // 1. Stop the session if running
-  if (!["completed", "failed", "stopped", "pending"].includes(session.status) && _stop) {
-    await _stop(app, sessionId);
+  if (!["completed", "failed", "stopped", "pending"].includes(session.status)) {
+    await app.sessionLifecycle.stop(sessionId);
   }
 
   // 1b. Create PR instead of merging locally if requested
@@ -348,7 +333,7 @@ export async function finishWorktree(
         logError("session", `finishWorktree: remove worktree failed: ${e?.message ?? e}`);
       }
     }
-    if (_deleteSessionAsync) await _deleteSessionAsync(app, sessionId);
+    await app.sessionLifecycle.deleteSession(sessionId);
     await app.events.log(sessionId, "worktree_finished", {
       actor: "user",
       data: { branch, targetBranch, merged: false, pr: true },
@@ -413,7 +398,7 @@ export async function finishWorktree(
   }
 
   // 5. Delete the session
-  if (_deleteSessionAsync) await _deleteSessionAsync(app, sessionId);
+  await app.sessionLifecycle.deleteSession(sessionId);
 
   const mergeMsg = opts?.noMerge ? "skipped merge" : `merged ${branch} -> ${targetBranch}`;
   await app.events.log(sessionId, "worktree_finished", {

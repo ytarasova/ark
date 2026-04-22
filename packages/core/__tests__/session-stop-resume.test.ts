@@ -4,7 +4,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { stop } from "../services/session-lifecycle.js";
 import { AppContext } from "../app.js";
 import { clearApp, getApp, setApp } from "./test-helpers.js";
 
@@ -26,7 +25,7 @@ describe("session stop", async () => {
     const session = await getApp().sessions.create({ summary: "stop-test" });
     await getApp().sessions.update(session.id, { status: "running", stage: "work" });
 
-    const result = await stop(app, session.id);
+    const result = await app.sessionLifecycle.stop(session.id);
     expect(result.ok).toBe(true);
 
     const updated = (await getApp().sessions.get(session.id))!;
@@ -42,7 +41,7 @@ describe("session stop", async () => {
       claude_session_id: "uuid-to-preserve",
     });
 
-    await stop(app, session.id);
+    await app.sessionLifecycle.stop(session.id);
 
     const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.claude_session_id).toBe("uuid-to-preserve");
@@ -56,7 +55,7 @@ describe("session stop", async () => {
       session_id: "ark-s-abc123",
     });
 
-    await stop(app, session.id);
+    await app.sessionLifecycle.stop(session.id);
 
     const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.session_id).toBeNull();
@@ -70,7 +69,7 @@ describe("session stop", async () => {
       error: "some previous error",
     });
 
-    await stop(app, session.id);
+    await app.sessionLifecycle.stop(session.id);
 
     const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.error).toBeNull();
@@ -80,13 +79,13 @@ describe("session stop", async () => {
     const session = await getApp().sessions.create({ summary: "stop-msg" });
     await getApp().sessions.update(session.id, { status: "running", stage: "work" });
 
-    const result = await stop(app, session.id);
+    const result = await app.sessionLifecycle.stop(session.id);
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Session stopped");
   });
 
   it("returns ok: false for nonexistent session", async () => {
-    const result = await stop(app, "s-nonexistent");
+    const result = await app.sessionLifecycle.stop("s-nonexistent");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
   });
@@ -95,7 +94,7 @@ describe("session stop", async () => {
     const session = await getApp().sessions.create({ summary: "stop-ready" });
     await getApp().sessions.update(session.id, { status: "ready", stage: "work" });
 
-    const result = await stop(app, session.id);
+    const result = await app.sessionLifecycle.stop(session.id);
     expect(result.ok).toBe(true);
 
     const updated = (await getApp().sessions.get(session.id))!;
@@ -106,7 +105,7 @@ describe("session stop", async () => {
     const session = await getApp().sessions.create({ summary: "stop-blocked" });
     await getApp().sessions.update(session.id, { status: "blocked", stage: "work" });
 
-    const result = await stop(app, session.id);
+    const result = await app.sessionLifecycle.stop(session.id);
     expect(result.ok).toBe(true);
 
     const updated = (await getApp().sessions.get(session.id))!;
@@ -122,7 +121,7 @@ describe("session stop", async () => {
       workdir: "/tmp/worktree",
     });
 
-    await stop(app, session.id);
+    await app.sessionLifecycle.stop(session.id);
 
     const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.summary).toBe("preserve-fields");
@@ -142,7 +141,7 @@ describe("session stop", async () => {
       error: "old error",
     });
 
-    await stop(app, session.id);
+    await app.sessionLifecycle.stop(session.id);
 
     const updated = (await getApp().sessions.get(session.id))!;
     expect(updated.status).toBe("stopped");
@@ -182,7 +181,7 @@ describe("session resume", async () => {
   it("stopped session can transition to ready via updateSession", async () => {
     const session = await getApp().sessions.create({ summary: "resume-ready" });
     await getApp().sessions.update(session.id, { status: "running", stage: "work" });
-    await stop(app, session.id);
+    await app.sessionLifecycle.stop(session.id);
 
     // Simulate what resume does (without dispatch)
     await getApp().sessions.update(session.id, {
@@ -202,7 +201,7 @@ describe("session resume", async () => {
   it("stop then ready transition preserves stage", async () => {
     const session = await getApp().sessions.create({ summary: "stage-preserve" });
     await getApp().sessions.update(session.id, { status: "running", stage: "deploy" });
-    await stop(app, session.id);
+    await app.sessionLifecycle.stop(session.id);
 
     await getApp().sessions.update(session.id, { status: "ready" });
 

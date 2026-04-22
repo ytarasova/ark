@@ -19,8 +19,18 @@ export class HandoffMediator {
     sessionId: string,
     opts?: { autoDispatch?: boolean; source?: string; outcome?: string },
   ): Promise<StageHandoffResult> {
-    const { sessions, events, messages, todos, getStage, getStageAction, advance, dispatch, executeAction, runVerification } =
-      this.deps;
+    const {
+      sessions,
+      events,
+      messages,
+      todos,
+      getStage,
+      getStageAction,
+      advance,
+      dispatch,
+      executeAction,
+      runVerification,
+    } = this.deps;
 
     const autoDispatch = opts?.autoDispatch ?? true;
     const source = opts?.source ?? "unknown";
@@ -158,10 +168,7 @@ export class HandoffMediator {
     };
   }
 
-  async retryWithContext(
-    sessionId: string,
-    opts?: { maxRetries?: number },
-  ): Promise<{ ok: boolean; message: string }> {
+  async retryWithContext(sessionId: string, opts?: { maxRetries?: number }): Promise<{ ok: boolean; message: string }> {
     const { sessions, events } = this.deps;
     const s = await sessions.get(sessionId);
     if (!s) return { ok: false, message: "Session not found" };

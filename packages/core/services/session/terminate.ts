@@ -75,7 +75,7 @@ export class SessionTerminator {
       await p.cleanupSession(c, session);
     });
     if (!stopped && session.session_id) {
-      await d.launcher.kill(session.session_id);
+      await d.getLauncher().kill(session.session_id);
     }
 
     await this.withComputeTarget(session, `stop ${sessionId}: shutdown runtime`, async (target, c) => {
@@ -147,7 +147,7 @@ export class SessionTerminator {
       await p.cleanupSession(c, session);
     });
     if (!handled && session.session_id) {
-      await d.launcher.kill(session.session_id);
+      await d.getLauncher().kill(session.session_id);
     }
 
     if (session.workdir) {

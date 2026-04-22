@@ -14,7 +14,6 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { AppContext } from "../app.js";
-import { runVerification } from "../services/session-lifecycle.js";
 import { complete } from "../services/stage-advance.js";
 import { startConductor } from "../conductor/conductor.js";
 
@@ -50,7 +49,7 @@ describe("verify scripts from repo config (.ark.yaml)", async () => {
     const session = await app.sessions.create({ summary: "verify pass test", flow: "quick" });
     await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
 
-    const result = await runVerification(app, session.id);
+    const result = await app.sessionLifecycle.runVerification(session.id);
 
     expect(result.ok).toBe(true);
     expect(result.todosResolved).toBe(true);
@@ -64,7 +63,7 @@ describe("verify scripts from repo config (.ark.yaml)", async () => {
     const session = await app.sessions.create({ summary: "verify fail test", flow: "quick" });
     await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
 
-    const result = await runVerification(app, session.id);
+    const result = await app.sessionLifecycle.runVerification(session.id);
 
     expect(result.ok).toBe(false);
     expect(result.scriptResults).toHaveLength(1);
@@ -77,7 +76,7 @@ describe("verify scripts from repo config (.ark.yaml)", async () => {
     const session = await app.sessions.create({ summary: "partial fail test", flow: "quick" });
     await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
 
-    const result = await runVerification(app, session.id);
+    const result = await app.sessionLifecycle.runVerification(session.id);
 
     expect(result.ok).toBe(false);
     expect(result.scriptResults).toHaveLength(3);
@@ -91,7 +90,7 @@ describe("verify scripts from repo config (.ark.yaml)", async () => {
     const session = await app.sessions.create({ summary: "output capture test", flow: "quick" });
     await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
 
-    const result = await runVerification(app, session.id);
+    const result = await app.sessionLifecycle.runVerification(session.id);
 
     expect(result.ok).toBe(true);
     expect(result.scriptResults[0].output).toContain("hello-from-verify");
@@ -102,7 +101,7 @@ describe("verify scripts from repo config (.ark.yaml)", async () => {
     const session = await app.sessions.create({ summary: "stderr capture test", flow: "quick" });
     await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
 
-    const result = await runVerification(app, session.id);
+    const result = await app.sessionLifecycle.runVerification(session.id);
 
     expect(result.ok).toBe(false);
     expect(result.scriptResults[0].output).toContain("error-output");
@@ -144,7 +143,7 @@ describe("verify scripts from flow stage definition", async () => {
     });
     await app.sessions.update(session.id, { status: "ready", stage: "work", workdir });
 
-    const result = await runVerification(app, session.id);
+    const result = await app.sessionLifecycle.runVerification(session.id);
 
     // Stage verify ("true") should take precedence over repo config ("exit 1")
     expect(result.ok).toBe(true);
@@ -162,7 +161,7 @@ describe("todos block stage validation", async () => {
     await app.sessions.update(session.id, { status: "ready", stage: "implement" });
     await app.todos.add(session.id, "Fix the failing test");
 
-    const result = await runVerification(app, session.id);
+    const result = await app.sessionLifecycle.runVerification(session.id);
 
     expect(result.ok).toBe(false);
     expect(result.todosResolved).toBe(false);
@@ -176,7 +175,7 @@ describe("todos block stage validation", async () => {
     await app.todos.add(session.id, "Write unit tests");
     await app.todos.add(session.id, "Update documentation");
 
-    const result = await runVerification(app, session.id);
+    const result = await app.sessionLifecycle.runVerification(session.id);
 
     expect(result.ok).toBe(false);
     expect(result.pendingTodos).toHaveLength(3);
@@ -192,7 +191,7 @@ describe("todos block stage validation", async () => {
     const t1 = await app.todos.add(session.id, "Already done task");
     await app.todos.toggle(t1.id);
 
-    const result = await runVerification(app, session.id);
+    const result = await app.sessionLifecycle.runVerification(session.id);
 
     expect(result.ok).toBe(true);
     expect(result.todosResolved).toBe(true);
@@ -206,7 +205,7 @@ describe("todos block stage validation", async () => {
     await app.todos.toggle(t1.id);
     await app.todos.add(session.id, "Still pending");
 
-    const result = await runVerification(app, session.id);
+    const result = await app.sessionLifecycle.runVerification(session.id);
 
     expect(result.ok).toBe(false);
     expect(result.pendingTodos).toEqual(["Still pending"]);
@@ -223,7 +222,7 @@ describe("combined todo + verify script validation", async () => {
     const t = await app.todos.add(session.id, "Completed task");
     await app.todos.toggle(t.id);
 
-    const result = await runVerification(app, session.id);
+    const result = await app.sessionLifecycle.runVerification(session.id);
 
     expect(result.ok).toBe(true);
     expect(result.todosResolved).toBe(true);
@@ -236,7 +235,7 @@ describe("combined todo + verify script validation", async () => {
     await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
     await app.todos.add(session.id, "Not done yet");
 
-    const result = await runVerification(app, session.id);
+    const result = await app.sessionLifecycle.runVerification(session.id);
 
     expect(result.ok).toBe(false);
     expect(result.todosResolved).toBe(false);
@@ -251,7 +250,7 @@ describe("combined todo + verify script validation", async () => {
     const t = await app.todos.add(session.id, "All done");
     await app.todos.toggle(t.id);
 
-    const result = await runVerification(app, session.id);
+    const result = await app.sessionLifecycle.runVerification(session.id);
 
     expect(result.ok).toBe(false);
     expect(result.todosResolved).toBe(true);
@@ -265,7 +264,7 @@ describe("combined todo + verify script validation", async () => {
     await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
     await app.todos.add(session.id, "Unfinished work");
 
-    const result = await runVerification(app, session.id);
+    const result = await app.sessionLifecycle.runVerification(session.id);
 
     expect(result.ok).toBe(false);
     expect(result.todosResolved).toBe(false);
@@ -703,7 +702,7 @@ describe("stage validation edge cases", async () => {
     const session = await app.sessions.create({ summary: "no gates test", flow: "quick" });
     await app.sessions.update(session.id, { status: "ready", stage: "implement" });
 
-    const result = await runVerification(app, session.id);
+    const result = await app.sessionLifecycle.runVerification(session.id);
 
     expect(result.ok).toBe(true);
     expect(result.scriptResults).toHaveLength(0);
@@ -714,13 +713,13 @@ describe("stage validation edge cases", async () => {
     const session = await app.sessions.create({ summary: "no workdir test", flow: "quick" });
     await app.sessions.update(session.id, { status: "ready", stage: "implement" });
 
-    const result = await runVerification(app, session.id);
+    const result = await app.sessionLifecycle.runVerification(session.id);
 
     expect(result.ok).toBe(true);
   });
 
   it("nonexistent session returns error from runVerification", async () => {
-    const result = await runVerification(app, "s-does-not-exist");
+    const result = await app.sessionLifecycle.runVerification("s-does-not-exist");
 
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
@@ -735,7 +734,7 @@ describe("stage validation edge cases", async () => {
     const session = await app.sessions.create({ summary: "workdir context test", flow: "quick" });
     await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir: dir });
 
-    const result = await runVerification(app, session.id);
+    const result = await app.sessionLifecycle.runVerification(session.id);
 
     expect(result.ok).toBe(true);
     expect(result.scriptResults[0].output).toContain("found-it");
@@ -747,7 +746,7 @@ describe("stage validation edge cases", async () => {
     const t = await app.todos.add(session.id, "Will be deleted");
     await app.todos.delete(t.id);
 
-    const result = await runVerification(app, session.id);
+    const result = await app.sessionLifecycle.runVerification(session.id);
 
     expect(result.ok).toBe(true);
     expect(result.todosResolved).toBe(true);
@@ -761,12 +760,12 @@ describe("stage validation edge cases", async () => {
     await app.todos.add(session.id, "Task 3");
 
     // Before clearing: blocked
-    expect((await runVerification(app, session.id)).ok).toBe(false);
+    expect((await app.sessionLifecycle.runVerification(session.id)).ok).toBe(false);
 
     // Clear all
     await app.todos.deleteForSession(session.id);
 
     // After clearing: passes
-    expect((await runVerification(app, session.id)).ok).toBe(true);
+    expect((await app.sessionLifecycle.runVerification(session.id)).ok).toBe(true);
   });
 });

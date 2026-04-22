@@ -29,8 +29,6 @@ import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { fetchAnalysis, type SageAnalysis } from "../../core/integrations/sage-analysis.js";
-import { startSession } from "../../core/services/session-lifecycle.js";
-import { dispatch } from "../../core/services/dispatch.js";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 
@@ -97,7 +95,7 @@ export function registerSageHandlers(router: Router, app: AppContext): void {
     writeFileSync(analysisPath, JSON.stringify(analysis, null, 2), "utf-8");
 
     const summary = `sage:${analysis.jira_id}`;
-    const session = await startSession(scoped, {
+    const session = await scoped.sessionLifecycle.start({
       ticket: analysis.jira_id,
       summary,
       repo: repo ?? ".",
@@ -110,7 +108,7 @@ export function registerSageHandlers(router: Router, app: AppContext): void {
       config: runtime ? { runtime_override: runtime } : undefined,
     });
 
-    const result = await dispatch(scoped, session.id);
+    const result = await scoped.dispatchService.dispatch(session.id);
     if (!result.ok) {
       return {
         ok: false,

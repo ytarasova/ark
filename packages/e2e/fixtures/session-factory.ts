@@ -1,4 +1,3 @@
-import { startSession } from "../../core/services/session-lifecycle.js";
 import { killSession } from "../../core/infra/tmux.js";
 import type { E2EEnv } from "./app.js";
 
@@ -14,7 +13,7 @@ interface CreateOpts {
 
 export function createTestSession(env: E2EEnv, opts: CreateOpts = {}) {
   const app = env.app;
-  const session = startSession(app, {
+  const session = app.sessionLifecycle.start({
     summary: opts.summary ?? `e2e-${Date.now()}`,
     repo: opts.repo ?? env.workdir,
     flow: opts.flow ?? "bare",

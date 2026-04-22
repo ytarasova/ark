@@ -73,12 +73,7 @@ async function channelDeliver(req: ChannelDeliverReq): Promise<ChannelDeliverRes
 
 export async function handleChannelRoutes(req: Request, path: string, ctx: RouteCtx): Promise<Response | null> {
   // ── Channel: report (agent → conductor via arkd) ─────────────
-  if (
-    req.method === "POST" &&
-    path.startsWith("/channel/") &&
-    !path.endsWith("/relay") &&
-    !path.endsWith("/deliver")
-  ) {
+  if (req.method === "POST" && path.startsWith("/channel/") && !path.endsWith("/relay") && !path.endsWith("/deliver")) {
     const sessionId = path.split("/")[2]!;
     const report = (await req.json()) as Record<string, unknown>;
     const tenantId = req.headers.get("x-ark-tenant-id") ?? req.headers.get("X-Ark-Tenant-Id");

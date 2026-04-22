@@ -17,14 +17,7 @@ import type {
   AgentCaptureReq,
   AgentCaptureRes,
 } from "../types.js";
-import {
-  json,
-  readStream,
-  requireSafeTmuxName,
-  SAFE_TMUX_NAME_RE,
-  type BunLike,
-  type RouteCtx,
-} from "../internal.js";
+import { json, readStream, requireSafeTmuxName, SAFE_TMUX_NAME_RE, type BunLike, type RouteCtx } from "../internal.js";
 
 async function agentLaunch(req: AgentLaunchReq): Promise<AgentLaunchRes> {
   const Bun = (globalThis as unknown as { Bun: BunLike }).Bun;

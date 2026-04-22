@@ -29,11 +29,7 @@ const DEFAULT_REWORK_PROMPT = "Rework required. Reviewer said: {{rejection_reaso
  * Render the rework prompt template. Uses the standard Nunjucks template
  * engine; `{{rejection_reason}}` is injected alongside the session vars.
  */
-export function renderReworkPrompt(
-  template: string,
-  reason: string,
-  sessionVars: Record<string, string>,
-): string {
+export function renderReworkPrompt(template: string, reason: string, sessionVars: Record<string, string>): string {
   const merged: Record<string, string> = { ...sessionVars, rejection_reason: reason };
   return substituteVars(template, merged);
 }
@@ -82,8 +78,7 @@ export class SessionReviewer {
     const ok = todosResolved && allScriptsPassed;
 
     const parts: string[] = [];
-    if (!todosResolved)
-      parts.push(`${pending.length} unresolved todo(s): ${pending.map((t) => t.content).join(", ")}`);
+    if (!todosResolved) parts.push(`${pending.length} unresolved todo(s): ${pending.map((t) => t.content).join(", ")}`);
     for (const r of scriptResults) {
       if (!r.passed) parts.push(`verify failed: ${r.script}\n${r.output}`);
     }

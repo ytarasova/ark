@@ -3,18 +3,17 @@
  * interrupt, wait, verify, review-gate. Composes four internal classes over
  * a shared `SessionLifecycleDeps` cradle-slice.
  *
- * Replaces the old free-function module `session-lifecycle.ts`. The barrel
- * at that path now re-exports free-function wrappers that call through to
- * `app.sessionLifecycle.*` for back-compat with the 30+ callers that
- * haven't been migrated to constructor-injected deps yet.
+ * Access via the DI container: `app.sessionLifecycle.X`. The old free-function
+ * barrel (`session-lifecycle.ts`) has been retired; every caller now uses the
+ * class through AppContext.
  */
 
 import type { Session } from "../../../types/index.js";
-import { SessionCreator, resolveGitHubUrl } from "./create.js";
+import { SessionCreator } from "./create.js";
 import { SessionTerminator } from "./terminate.js";
 import { SessionSuspender } from "./suspend.js";
 import { SessionForker } from "./fork-clone.js";
-import { SessionReviewer, renderReworkPrompt } from "./review.js";
+import { SessionReviewer } from "./review.js";
 import type {
   LifecycleHooks,
   SessionLifecycleDeps,
@@ -135,10 +134,3 @@ export class SessionLifecycle {
     return this.reviewer.reject(sessionId, reason, dispatchOverride);
   }
 }
-
-// Static exports for callers that haven't migrated to the class yet.
-// Re-exported here so `session-lifecycle.ts` can keep its surface stable.
-export { resolveGitHubUrl as _resolveGitHubUrl, renderReworkPrompt as _renderReworkPrompt };
-// (named default re-exports above satisfy named imports elsewhere)
-void resolveGitHubUrl;
-void renderReworkPrompt;

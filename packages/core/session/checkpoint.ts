@@ -103,7 +103,10 @@ export async function findOrphanedSessions(deps: Pick<CheckpointDeps, "sessions"
  * 3. Preserve claude_session_id for --resume on next dispatch
  * 4. Log recovery event
  */
-export async function recoverSession(deps: CheckpointDeps, sessionId: string): Promise<{ ok: boolean; message: string }> {
+export async function recoverSession(
+  deps: CheckpointDeps,
+  sessionId: string,
+): Promise<{ ok: boolean; message: string }> {
   const session = await deps.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 

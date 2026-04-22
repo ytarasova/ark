@@ -15,7 +15,6 @@ import { recordEvent } from "../observability.js";
 import { emitSessionSpanEnd, emitStageSpanStart, emitStageSpanEnd, flushSpans } from "../observability/otlp.js";
 import { loadRepoConfig } from "../repo-config.js";
 
-import { recordSessionUsage, runVerification, cloneSession } from "./session-lifecycle.js";
 import { capturePlanMdIfPresent } from "./plan-artifact.js";
 import { withIdempotency } from "./idempotency.js";
 
@@ -349,7 +348,7 @@ async function completeImpl(
     const hasScripts = (stageVerify ?? repoVerify ?? []).length > 0;
 
     if (hasTodos || hasScripts) {
-      const verify = await runVerification(app, sessionId);
+      const verify = await app.sessionLifecycle.runVerification(sessionId);
       if (!verify.ok) {
         return { ok: false, message: `Verification failed:\n${verify.message}` };
       }
@@ -406,7 +405,7 @@ function parseNonClaudeTranscript(app: AppContext, session: Session): void {
     const result = parser.parse(transcriptPath);
     if (result.usage.input_tokens > 0 || result.usage.output_tokens > 0) {
       const provider = parserKind === "codex" ? "openai" : parserKind === "gemini" ? "google" : parserKind;
-      recordSessionUsage(app, session, result.usage, provider, "transcript");
+      app.sessionLifecycle.recordSessionUsage(session, result.usage, provider, "transcript");
     }
   } catch (e: any) {
     logError("session", "non-Claude transcript parsing failed", {
@@ -427,7 +426,7 @@ export async function handoff(
     app.db,
     { sessionId, stage: null, opKind: "handoff", idempotencyKey: opts?.idempotencyKey },
     async () => {
-      const result = await cloneSession(app, sessionId, instructions);
+      const result = await app.sessionLifecycle.clone(sessionId, instructions);
       if (!result.ok) return { ok: false, message: (result as { ok: false; message: string }).message };
 
       await app.events.log(result.sessionId, "session_handoff", {

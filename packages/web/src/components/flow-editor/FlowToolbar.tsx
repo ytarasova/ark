@@ -344,9 +344,10 @@ function parseYaml(text: string): FlowDefinition | null {
       on_outcome:
         s.on_outcome && typeof s.on_outcome === "object"
           ? (Object.fromEntries(
-              Object.entries(s.on_outcome as Record<string, unknown>).filter(
-                ([, v]) => typeof v === "string",
-              ) as [string, string][],
+              Object.entries(s.on_outcome as Record<string, unknown>).filter(([, v]) => typeof v === "string") as [
+                string,
+                string,
+              ][],
             ) as Record<string, string>)
           : undefined,
     };

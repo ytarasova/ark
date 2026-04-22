@@ -36,7 +36,12 @@ function FlowDAG({ selected }: { selected: any }) {
   );
 }
 
-export function FlowsView({ showCreate = false, onCloseCreate, initialSelectedName, onSelectedChange }: FlowsViewProps) {
+export function FlowsView({
+  showCreate = false,
+  onCloseCreate,
+  initialSelectedName,
+  onSelectedChange,
+}: FlowsViewProps) {
   const queryClient = useQueryClient();
   const { data: flows = [] } = useFlowsQuery();
   const { data: agents = [] } = useAgentsQuery();

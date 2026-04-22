@@ -4,8 +4,6 @@
  */
 
 import readline from "readline";
-import { startSession, stop, deleteSessionAsync } from "./services/session-lifecycle.js";
-import { resume } from "./services/dispatch.js";
 import { getOutput, send } from "./services/session-output.js";
 import type { AppContext } from "./app.js";
 
@@ -30,8 +28,7 @@ export async function handleAcpRequest(app: AppContext, req: AcpRequest): Promis
     switch (req.method) {
       case "session/create": {
         const p = req.params ?? {};
-        const session = await startSession(
-          app,
+        const session = await app.sessionLifecycle.start(
           {
             summary: p.summary as string,
             repo: p.repo as string,
@@ -45,19 +42,19 @@ export async function handleAcpRequest(app: AppContext, req: AcpRequest): Promis
 
       case "session/stop": {
         const sessionId = req.params?.sessionId as string;
-        await stop(app, sessionId);
+        await app.sessionLifecycle.stop(sessionId);
         return { jsonrpc: "2.0", result: { ok: true }, id };
       }
 
       case "session/restart": {
         const sessionId = req.params?.sessionId as string;
-        await resume(app, sessionId);
+        await app.dispatchService.resume(sessionId);
         return { jsonrpc: "2.0", result: { ok: true }, id };
       }
 
       case "session/delete": {
         const sessionId = req.params?.sessionId as string;
-        const result = await deleteSessionAsync(app, sessionId);
+        const result = await app.sessionLifecycle.deleteSession(sessionId);
         return { jsonrpc: "2.0", result, id };
       }
 

@@ -1,6 +1,5 @@
 import { type Command } from "commander";
 import chalk from "chalk";
-import { runVerification } from "../../../core/services/session-lifecycle.js";
 import { getArkClient, getInProcessApp } from "../../app-client.js";
 import { formatBytes } from "../../helpers.js";
 
@@ -82,7 +81,7 @@ export function registerLifecycleCommands(session: Command) {
       if (!opts.force) {
         // Run verification first
         const app = await getInProcessApp();
-        const result = await runVerification(app, id);
+        const result = await app.sessionLifecycle.runVerification(id);
         if (!result.ok) {
           console.log(chalk.red("Verification failed:"));
           console.log(chalk.red(result.message));
@@ -246,7 +245,7 @@ export function registerLifecycleCommands(session: Command) {
     .action(async (id) => {
       console.log(chalk.dim("Running verification..."));
       const app = await getInProcessApp();
-      const result = await runVerification(app, id);
+      const result = await app.sessionLifecycle.runVerification(id);
       if (result.ok) {
         console.log(chalk.green("Verification passed"));
       } else {

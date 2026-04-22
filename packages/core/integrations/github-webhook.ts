@@ -5,8 +5,6 @@
 
 import type { AppContext } from "../app.js";
 
-import { dispatch } from "../services/dispatch.js";
-
 export interface IssueWebhookPayload {
   action: string; // "labeled", "opened", "edited"
   issue: {
@@ -74,7 +72,7 @@ export async function handleIssueWebhook(
   // Auto-dispatch if configured
   if (config.autoDispatch) {
     try {
-      await dispatch(app, session.id);
+      await app.dispatchService.dispatch(session.id);
     } catch (e: any) {
       return { ok: true, sessionId: session.id, message: `Session created but dispatch failed: ${e.message}` };
     }

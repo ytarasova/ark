@@ -101,15 +101,18 @@ export interface SessionLifecycleDeps {
   flows: FlowStore;
   runtimes: RuntimeStore;
 
-  // Code-intel (workspace resolution on start)
-  codeIntel: CodeIntelStore;
+  // Code-intel (workspace resolution on start). Resolved lazily -- tests
+  // swap the backing store via `AppContext.codeIntel` getter, so we must
+  // not snapshot the instance at container-resolve time.
+  getCodeIntel: () => CodeIntelStore;
 
   // Config + usage recording
   config: ArkConfig;
   usageRecorder: UsageRecorder;
 
-  // Launchers + pollers (process teardown)
-  launcher: SessionLauncher;
+  // Launcher + status-poller registry. Launcher resolved lazily so tests
+  // that call `app.setLauncher(stub)` see the replacement.
+  getLauncher: () => SessionLauncher;
   statusPollers: StatusPollerRegistry;
 
   // Callbacks for helpers that still take AppContext.

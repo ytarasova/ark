@@ -21,6 +21,6 @@ export {
   cleanupWorktrees,
 } from "./setup.js";
 
-export { worktreeDiff, rebaseOntoBase, finishWorktree, injectWorktreeDeps } from "./git-ops.js";
+export { worktreeDiff, rebaseOntoBase, finishWorktree } from "./git-ops.js";
 
 export { createWorktreePR, mergeWorktreePR } from "./pr.js";

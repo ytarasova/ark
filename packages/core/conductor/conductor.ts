@@ -20,19 +20,8 @@ declare const Bun: {
 
 import type { Session } from "../../types/index.js";
 import type { AppContext } from "../app.js";
-// Namespace-style import for session orchestration -- constructed from the
-// focused service modules. Kept as a `session` object so the rest of this
-// file (which RF-1 will rewrite) can continue using `session.dispatch` etc.
-import { startSession, stop, cleanupOnTerminal } from "../services/session-lifecycle.js";
 import { dispatch } from "../services/dispatch.js";
 import { createWorktreePR } from "../services/worktree/index.js";
-const session = {
-  startSession,
-  stop,
-  cleanupOnTerminal,
-  dispatch,
-  createWorktreePR,
-};
 import { eventBus } from "../hooks.js";
 import type { OutboundMessage } from "./channel-types.js";
 import { getProvider } from "../../compute/index.js";
@@ -120,7 +109,7 @@ export class Conductor {
                   continue;
               }
               await safeAsync(`scheduled dispatch for ${sched.id}`, async () => {
-                const s = await session.startSession(this.app, {
+                const s = await this.app.sessionLifecycle.start({
                   summary: sched.summary ?? `Scheduled: ${sched.id}`,
                   repo: sched.repo ?? undefined,
                   workdir: sched.workdir ?? undefined,
@@ -128,7 +117,7 @@ export class Conductor {
                   compute_name: sched.compute_name ?? undefined,
                   group_name: sched.group_name ?? undefined,
                 });
-                await session.dispatch(this.app, s.id);
+                await dispatch(this.app, s.id);
                 await updateScheduleLastRun(this.app, sched.id);
                 await this.app.events.log(s.id, "scheduled_dispatch", {
                   actor: "scheduler",
@@ -380,7 +369,7 @@ export class Conductor {
         eventBus.emit("hook_status", sessionId, {
           data: { event, status: "ready", retry: true, ...payload } as Record<string, unknown>,
         });
-        session.dispatch(app, sessionId).catch((err) => {
+        dispatch(app, sessionId).catch((err) => {
           logError("conductor", `on_failure retry dispatch (hook) failed for ${sessionId}: ${err?.message ?? err}`);
         });
         return Response.json({ status: "ok", mapped: "retry" });
@@ -395,7 +384,7 @@ export class Conductor {
       });
 
       if (result.newStatus === "completed" || result.newStatus === "failed") {
-        await session.cleanupOnTerminal(app, sessionId);
+        await app.sessionLifecycle.cleanupOnTerminal(sessionId);
         emitStageSpanEnd(sessionId, { status: result.newStatus });
         emitSessionSpanEnd(sessionId, { status: result.newStatus });
         flushSpans();
@@ -537,7 +526,7 @@ export class Conductor {
       healthFetcher,
       onRevert,
       onStop: async (id) => {
-        await session.stop(this.app, id);
+        await this.app.sessionLifecycle.stop(id);
       },
     }).catch((e) => logError("conductor", `rollback watcher error: ${e}`));
 
@@ -950,7 +939,7 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
     });
     if (retryResult.ok) {
       logInfo("conductor", `on_failure retry triggered for ${sessionId}: ${retryResult.message}`);
-      session.dispatch(app, sessionId).catch((err) => {
+      dispatch(app, sessionId).catch((err) => {
         logError("conductor", `on_failure retry dispatch failed for ${sessionId}: ${err?.message ?? err}`);
       });
       return;
@@ -1011,7 +1000,7 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
 
       if (autoPR) {
         await safeAsync(`auto-pr: ${sessionId}`, async () => {
-          const prResult = await session.createWorktreePR(app, sessionId, {
+          const prResult = await createWorktreePR(app, sessionId, {
             title: s.summary ?? undefined,
           });
           if (prResult.ok && prResult.pr_url) {

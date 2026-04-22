@@ -29,7 +29,7 @@ export class SessionSuspender {
     if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
     if (session.session_id) {
-      await d.launcher.kill(session.session_id);
+      await d.getLauncher().kill(session.session_id);
     }
 
     await d.sessions.update(sessionId, { status: "archived", session_id: null });
@@ -65,7 +65,7 @@ export class SessionSuspender {
     }
     if (!session.session_id) return { ok: false, message: "No tmux session" };
 
-    await d.launcher.sendKeys(session.session_id, "C-c");
+    await d.getLauncher().sendKeys(session.session_id, "C-c");
 
     await d.sessions.update(sessionId, { status: "waiting" });
     await d.events.log(sessionId, "session_interrupted", {

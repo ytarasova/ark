@@ -91,8 +91,7 @@ export class SessionService {
     // orchestration for full cleanup (tmux kill, provider cleanup, hooks removal)
     if (session.session_id) {
       try {
-        const { stop: orchStop } = await import("./session-lifecycle.js");
-        return orchStop(this.app, id, opts);
+        return await this.app.sessionLifecycle.stop(id, opts);
       } catch {
         logDebug("session", "AppContext not available (e.g. unit tests) -- fall through to local stop");
       }
@@ -139,11 +138,10 @@ export class SessionService {
       throw err;
     }
     if (all.length === 0) return;
-    const { stop: orchStop } = await import("./session-lifecycle.js");
     for (const s of all) {
       if (s.session_id) {
         try {
-          await orchStop(this.app, s.id, { force: true });
+          await this.app.sessionLifecycle.stop(s.id, { force: true });
         } catch (err: any) {
           logDebug("session", `stopAll: ${s.id}: ${err?.message ?? err}`);
         }
@@ -494,26 +492,21 @@ export class SessionService {
    * Delegates to session-orchestration.ts interrupt().
    */
   async interrupt(id: string): Promise<SessionOpResult> {
-    const { interrupt: legacyInterrupt } = await import("./session-lifecycle.js");
-    return legacyInterrupt(this.app, id);
+    return this.app.sessionLifecycle.interrupt(id);
   }
 
   /**
    * Archive a session for later reference.
-   * Delegates to session-orchestration.ts archive().
    */
   async archive(id: string): Promise<SessionOpResult> {
-    const { archive: legacyArchive } = await import("./session-lifecycle.js");
-    return legacyArchive(this.app, id);
+    return this.app.sessionLifecycle.archive(id);
   }
 
   /**
    * Restore an archived session back to stopped.
-   * Delegates to session-orchestration.ts restore().
    */
   async restore(id: string): Promise<SessionOpResult> {
-    const { restore: legacyRestore } = await import("./session-lifecycle.js");
-    return legacyRestore(this.app, id);
+    return this.app.sessionLifecycle.restore(id);
   }
 
   /**
@@ -588,17 +581,15 @@ export class SessionService {
     id: string,
     opts?: { timeoutMs?: number; pollMs?: number; onStatus?: (status: string) => void },
   ): Promise<{ session: Session | null; timedOut: boolean }> {
-    const { waitForCompletion: legacyWait } = await import("./session-lifecycle.js");
-    return legacyWait(this.app, id, opts);
+    return this.app.sessionLifecycle.waitForCompletion(id, opts);
   }
 
   /**
    * Fork a session: create a new session from the same point in the flow.
    */
   async fork(id: string, name?: string): Promise<SessionOpResult> {
-    const { forkSession } = await import("./session-lifecycle.js");
     // session.ts has a narrower local SessionOpResult (no `message` on success)
-    return forkSession(this.app, id, name, {
+    return this.app.sessionLifecycle.fork(id, name, {
       onCreated: (sid) => this.emitSessionCreated(sid),
     }) as unknown as SessionOpResult;
   }
@@ -607,8 +598,7 @@ export class SessionService {
    * Clone a session: deep copy including claude_session_id for --resume.
    */
   async clone(id: string, name?: string): Promise<SessionOpResult> {
-    const { cloneSession } = await import("./session-lifecycle.js");
-    return cloneSession(this.app, id, name, {
+    return this.app.sessionLifecycle.clone(id, name, {
       onCreated: (sid) => this.emitSessionCreated(sid),
     }) as unknown as SessionOpResult;
   }

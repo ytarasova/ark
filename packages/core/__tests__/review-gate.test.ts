@@ -8,7 +8,6 @@ import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
 
-import { startSession } from "../services/session-lifecycle.js";
 import { advance } from "../services/stage-advance.js";
 import { approveReviewGate } from "../services/review-gate.js";
 import { evaluateGate } from "../state/flow.js";
@@ -42,7 +41,7 @@ describe("approveReviewGate", async () => {
       ],
     });
 
-    const session = await startSession(getApp(), { flow: "pr-flow", summary: "test review gate" });
+    const session = await getApp().sessionLifecycle.start({ flow: "pr-flow", summary: "test review gate" });
     // startSession puts us at stage "code" -- advance past auto gate to "wait-review"
     const adv = await advance(getApp(), session.id, true);
     expect(adv.ok).toBe(true);
@@ -80,7 +79,7 @@ describe("approveReviewGate", async () => {
       ],
     });
 
-    const session = await startSession(getApp(), { flow: "rev-evt", summary: "event test" });
+    const session = await getApp().sessionLifecycle.start({ flow: "rev-evt", summary: "event test" });
     await approveReviewGate(getApp(), session.id);
 
     const events = await getApp().events.list(session.id, { type: "review_approved" });
@@ -102,7 +101,7 @@ describe("review gate blocking", async () => {
       ],
     });
 
-    const session = await startSession(getApp(), { flow: "block-flow", summary: "block test" });
+    const session = await getApp().sessionLifecycle.start({ flow: "block-flow", summary: "block test" });
     expect(session.stage).toBe("review-stage");
 
     // Gate blocks

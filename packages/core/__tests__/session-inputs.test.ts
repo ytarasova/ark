@@ -6,7 +6,6 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../app.js";
-import { startSession } from "../services/session-lifecycle.js";
 import { buildSessionVars, substituteVars } from "../template.js";
 
 let app: AppContext;
@@ -22,7 +21,7 @@ afterAll(async () => {
 
 describe("session inputs plumbing", async () => {
   it("persists inputs.files + inputs.params into session.config.inputs", async () => {
-    const session = await startSession(app, {
+    const session = await app.sessionLifecycle.start({
       summary: "inputs-test",
       repo: ".",
       flow: "bare",
@@ -41,13 +40,13 @@ describe("session inputs plumbing", async () => {
   });
 
   it("omits inputs when none supplied (no empty bag in config)", async () => {
-    const session = await startSession(app, { summary: "no-inputs", repo: ".", flow: "bare" });
+    const session = await app.sessionLifecycle.start({ summary: "no-inputs", repo: ".", flow: "bare" });
     const config = session.config as Record<string, unknown>;
     expect(config.inputs).toBeUndefined();
   });
 
   it("buildSessionVars + substituteVars resolve {{inputs.files.X}} / {{inputs.params.X}}", async () => {
-    const session = await startSession(app, {
+    const session = await app.sessionLifecycle.start({
       summary: "template-test",
       repo: ".",
       flow: "bare",
