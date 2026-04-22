@@ -14,8 +14,9 @@
  * Native arkd forwarding (POSTing to conductor /hooks/status) is added in A3b.
  */
 
-import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { appendFileSync, mkdirSync, readFileSync } from "fs";
+import { dirname, join } from "path";
+import type { Options } from "@anthropic-ai/claude-agent-sdk";
 
 export interface RunAgentSdkLaunchOpts {
   sessionId: string;
@@ -44,60 +45,29 @@ export interface RunAgentSdkLaunchResult {
 }
 
 /**
- * Core loop: iterate SDKMessages (real or injected), write each to
- * `<sessionDir>/transcript.jsonl`, return exit metadata.
- *
- * The prompt is read from `opts.promptFile` so the file is always read
- * before building any options, even in tests (keeps the testable surface
- * honest about the real contract).
+ * Parse an environment variable as a finite number.
+ * Returns undefined if the variable is absent, empty, or not a finite number.
+ * Logs to stderr when a value is present but invalid.
  */
-export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<RunAgentSdkLaunchResult> {
-  const { sessionDir, worktree, promptFile, model, maxTurns, maxBudgetUsd, systemAppend } = opts;
-
-  const prompt = readFileSync(promptFile, "utf8");
-  const transcriptPath = join(sessionDir, "transcript.jsonl");
-  mkdirSync(dirname(transcriptPath), { recursive: true });
-
-  function writeLine(obj: unknown): void {
-    appendFileSync(transcriptPath, JSON.stringify(obj) + "\n");
+function optionalNumber(name: string): number | undefined {
+  const raw = process.env[name];
+  if (raw === undefined || raw === "") return undefined;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) {
+    console.error(`[agent-sdk launch] invalid ${name}=${raw}, ignoring`);
+    return undefined;
   }
+  return n;
+}
 
-  // Resolve the stream -- real SDK or injected test iterable.
-  let stream: AsyncIterable<unknown>;
-  if (opts.stream !== undefined) {
-    stream = opts.stream;
-  } else {
-    // Dynamic import keeps the SDK binary out of test imports.
-    const { query } = await import("@anthropic-ai/claude-agent-sdk");
-
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    const baseURL = process.env.ANTHROPIC_BASE_URL;
-
-    const sdkOptions: import("@anthropic-ai/claude-agent-sdk").Options = {
-      cwd: worktree,
-      env: {
-        ...process.env,
-        ANTHROPIC_API_KEY: apiKey,
-        ...(baseURL ? { ANTHROPIC_BASE_URL: baseURL } : {}),
-      } as Record<string, string | undefined>,
-      allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
-      permissionMode: "bypassPermissions",
-      allowDangerouslySkipPermissions: true,
-      executable: "bun",
-      model,
-      maxTurns,
-      maxBudgetUsd,
-      systemPrompt: systemAppend ? { type: "preset", preset: "claude_code", append: systemAppend } : undefined,
-    };
-
-    const abort = new AbortController();
-    process.on("SIGTERM", () => abort.abort());
-    process.on("SIGINT", () => abort.abort());
-    sdkOptions.abortController = abort;
-
-    stream = query({ prompt, options: sdkOptions });
-  }
-
+/**
+ * Drain a message stream: write each message to transcript.jsonl and return
+ * exit metadata. Shared by both the injected-stream path and the real-SDK path.
+ */
+async function drainStream(
+  stream: AsyncIterable<unknown>,
+  writeLine: (obj: unknown) => void,
+): Promise<RunAgentSdkLaunchResult> {
   let sawResult = false;
   let exitCode = 0;
 
@@ -124,7 +94,69 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
   return { exitCode, sawResult };
 }
 
-// ── Entry point ──────────────────────────────────────────────────────────────
+/**
+ * Core loop: iterate SDKMessages (real or injected), write each to
+ * `<sessionDir>/transcript.jsonl`, return exit metadata.
+ *
+ * The prompt is read from `opts.promptFile` so the file is always read
+ * before building any options, even in tests (keeps the testable surface
+ * honest about the real contract).
+ */
+export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<RunAgentSdkLaunchResult> {
+  const { sessionDir, worktree, promptFile, model, maxTurns, maxBudgetUsd, systemAppend } = opts;
+
+  const prompt = readFileSync(promptFile, "utf8");
+  const transcriptPath = join(sessionDir, "transcript.jsonl");
+  mkdirSync(dirname(transcriptPath), { recursive: true });
+
+  function writeLine(obj: unknown): void {
+    appendFileSync(transcriptPath, JSON.stringify(obj) + "\n");
+  }
+
+  // Injected-stream path (tests): skip the real SDK entirely.
+  if (opts.stream !== undefined) {
+    return drainStream(opts.stream, writeLine);
+  }
+
+  // Real-SDK path: dynamic import keeps the SDK binary out of test imports.
+  const { query } = await import("@anthropic-ai/claude-agent-sdk");
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const baseURL = process.env.ANTHROPIC_BASE_URL;
+
+  const sdkOptions: Options = {
+    cwd: worktree,
+    env: {
+      ...process.env,
+      ...(apiKey ? { ANTHROPIC_API_KEY: apiKey } : {}),
+      ...(baseURL ? { ANTHROPIC_BASE_URL: baseURL } : {}),
+    } as Record<string, string | undefined>,
+    allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+    permissionMode: "bypassPermissions",
+    allowDangerouslySkipPermissions: true,
+    executable: "bun",
+    model,
+    maxTurns,
+    maxBudgetUsd,
+    systemPrompt: systemAppend ? { type: "preset", preset: "claude_code", append: systemAppend } : undefined,
+  };
+
+  const abort = new AbortController();
+  const onSigterm = () => abort.abort();
+  const onSigint = () => abort.abort();
+  process.on("SIGTERM", onSigterm);
+  process.on("SIGINT", onSigint);
+  sdkOptions.abortController = abort;
+
+  try {
+    return await drainStream(query({ prompt, options: sdkOptions }), writeLine);
+  } finally {
+    process.off("SIGTERM", onSigterm);
+    process.off("SIGINT", onSigint);
+  }
+}
+
+// -- Entry point --------------------------------------------------------------
 // Only runs when executed directly (bun launch.ts / compiled binary).
 // Tests import `runAgentSdkLaunch` directly without hitting this block.
 
@@ -151,8 +183,8 @@ async function main(): Promise<void> {
   }
 
   const model = process.env.ARK_MODEL;
-  const maxTurns = process.env.ARK_MAX_TURNS ? Number(process.env.ARK_MAX_TURNS) : undefined;
-  const maxBudgetUsd = process.env.ARK_MAX_BUDGET_USD ? Number(process.env.ARK_MAX_BUDGET_USD) : undefined;
+  const maxTurns = optionalNumber("ARK_MAX_TURNS");
+  const maxBudgetUsd = optionalNumber("ARK_MAX_BUDGET_USD");
   const systemAppend = process.env.ARK_SYSTEM_PROMPT_APPEND;
 
   const result = await runAgentSdkLaunch({

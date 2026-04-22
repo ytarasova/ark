@@ -6,7 +6,7 @@
  */
 
 import { test, expect } from "bun:test";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runAgentSdkLaunch } from "../runtimes/agent-sdk/launch.js";
@@ -187,4 +187,19 @@ test("reads prompt from promptFile and includes it in processing", async () => {
 
   expect(result.exitCode).toBe(0);
   expect(capturedPromptLength).toBeGreaterThan(0);
+});
+
+test("throws when promptFile is missing (no transcript written)", async () => {
+  const dir = makeTmpDir();
+  await expect(
+    runAgentSdkLaunch({
+      sessionId: "s",
+      sessionDir: dir,
+      worktree: "/tmp",
+      promptFile: join(dir, "nonexistent.txt"),
+      stream: (async function* () {})(),
+    }),
+  ).rejects.toThrow();
+  // verify transcript.jsonl was not created
+  expect(existsSync(join(dir, "transcript.jsonl"))).toBe(false);
 });
