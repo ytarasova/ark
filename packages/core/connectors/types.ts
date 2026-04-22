@@ -23,8 +23,30 @@
  */
 
 import type { AppContext } from "../app.js";
+import type { NormalizedEvent } from "../triggers/types.js";
 
 export type ConnectorKind = "mcp" | "rest" | "context";
+
+/** Implementation maturity. Same enum as TriggerSource for consistency. */
+export type ConnectorStatus = "full" | "scaffolded" | "stub";
+
+/**
+ * API surface -- an opaque factory returning a typed client. For ticket
+ * systems the client IS a TicketProvider; for figma / slack-web-api it's a
+ * per-connector shape. Consumers cast to the expected surface.
+ */
+export type ApiFactory<T = unknown> = () => T;
+
+/**
+ * Webhook surface -- verify + normalize for inbound HTTP events that do NOT
+ * flow through an `ApiSurface` (ticket providers carry their webhook inside
+ * `TicketProvider.normalizeWebhook / verifySignature`; this slot is for
+ * non-ticket connectors, e.g. pi-sage event webhooks).
+ */
+export interface WebhookSurface {
+  verify(req: { headers: Headers; body: string }, secret: string | null): Promise<boolean>;
+  normalize(req: { headers: Headers; body: string }): Promise<NormalizedEvent>;
+}
 
 /**
  * Reference to an authentication descriptor. Today the registry resolves
@@ -56,6 +78,9 @@ export interface ConnectorMcpConfig {
   inline?: Record<string, unknown>;
 }
 
+/** Historical alias -- prefer `McpSurface` in new code. */
+export type McpSurface = ConnectorMcpConfig;
+
 export interface ConnectorRestConfig {
   baseUrl: string;
   auth?: AuthRef;
@@ -71,20 +96,30 @@ export interface ConnectorContextConfig {
   build: (ctx: { app: AppContext; sessionOpts: Record<string, unknown> }) => Promise<string>;
 }
 
-export interface Connector {
+export interface Connector<A = unknown> {
   /** Unique connector name -- maps 1:1 to `connectors:` entries in flows. */
   name: string;
-  kind: ConnectorKind;
+  /**
+   * Legacy surface discriminator. Optional in the new shape -- surfaces ARE
+   * the discriminator. Existing definitions still set this; new definitions
+   * may omit it. Scheduled for removal in Wave 4 of the connectors-closure
+   * plan.
+   */
+  kind?: ConnectorKind;
   /** Maturity. Same enum as TriggerSource for consistency. */
-  status: "full" | "scaffolded" | "stub";
+  status: ConnectorStatus;
   /** Human-readable label. */
   label: string;
   /** Optional connector-level auth descriptor. */
   auth?: AuthRef;
-  /** For kind="mcp" connectors. */
+  /** Returns a fresh client; tenant-scoping happens inside the factory. */
+  api?: ApiFactory<A>;
+  /** MCP surface -- merges into the session's mcp_servers at dispatch. */
   mcp?: ConnectorMcpConfig;
   /** For kind="rest" connectors. */
   rest?: ConnectorRestConfig;
+  /** Webhook surface -- verify + normalize inbound HTTP events. */
+  webhook?: WebhookSurface;
   /** For kind="context" connectors. */
   context?: ConnectorContextConfig;
 }

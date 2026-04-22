@@ -5,10 +5,14 @@
 export type {
   Connector,
   ConnectorKind,
+  ConnectorStatus,
   ConnectorMcpConfig,
   ConnectorRestConfig,
   ConnectorContextConfig,
   ConnectorMcpEntry,
+  ApiFactory,
+  WebhookSurface,
+  McpSurface,
   AuthRef,
 } from "./types.js";
 

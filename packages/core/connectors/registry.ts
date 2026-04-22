@@ -5,7 +5,7 @@
  * seeds with every shipped connector definition under `./definitions/`.
  */
 
-import type { Connector, ConnectorMcpEntry } from "./types.js";
+import type { Connector, ConnectorMcpEntry, WebhookSurface } from "./types.js";
 import { piSageConnector } from "./definitions/pi-sage.js";
 import { jiraConnector } from "./definitions/jira.js";
 import { githubConnector } from "./definitions/github.js";
@@ -26,6 +26,19 @@ export class ConnectorRegistry {
 
   list(): Connector[] {
     return [...this.connectors.values()];
+  }
+
+  /** Invoke the api factory and return a typed client, or null if absent. */
+  api<T = unknown>(name: string): T | null {
+    const c = this.get(name);
+    if (!c?.api) return null;
+    return c.api() as T;
+  }
+
+  /** Return the webhook surface, or null if absent. */
+  webhook(name: string): WebhookSurface | null {
+    const c = this.get(name);
+    return c?.webhook ?? null;
   }
 
   /**

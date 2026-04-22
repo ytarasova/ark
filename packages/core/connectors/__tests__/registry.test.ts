@@ -66,6 +66,35 @@ describe("ConnectorRegistry", () => {
   });
 });
 
+describe("ConnectorRegistry surface accessors (Wave 0)", () => {
+  test("api() returns null for a connector without an api factory", () => {
+    const reg = createDefaultConnectorRegistry();
+    expect(reg.api("pi-sage")).toBeNull();
+  });
+
+  test("api() invokes the factory and returns the client", () => {
+    const reg = new ConnectorRegistry();
+    let factoryCalls = 0;
+    const fakeClient = { hello: "world" };
+    reg.register({
+      name: "custom",
+      label: "Custom",
+      status: "full",
+      api: () => {
+        factoryCalls++;
+        return fakeClient;
+      },
+    });
+    expect(reg.api<typeof fakeClient>("custom")).toBe(fakeClient);
+    expect(factoryCalls).toBe(1);
+  });
+
+  test("webhook() returns null when a connector has no webhook slot", () => {
+    const reg = createDefaultConnectorRegistry();
+    expect(reg.webhook("jira")).toBeNull();
+  });
+});
+
 describe("connector definitions ship the expected configs", () => {
   test("pi-sage maps to mcp-configs/pi-sage.json", () => {
     expect(piSageConnector.mcp?.configName).toBe("pi-sage");
