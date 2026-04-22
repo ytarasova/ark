@@ -52,11 +52,26 @@ type SdkLine =
     }
   | { type: string; [k: string]: unknown };
 
+export interface ParsedToolCall {
+  id: string;
+  name: string;
+  input: unknown;
+  output?: string;
+  is_error?: boolean;
+}
+
+export interface ParsedMessage {
+  role: "user" | "assistant";
+  text: string;
+}
+
 /** Extended ParseResult carrying agent-sdk-specific fields. */
 export interface AgentSdkParseResult extends ParseResult {
   cost_usd: number;
   num_turns: number;
   stop_reason: string | null;
+  messages: ParsedMessage[];
+  toolCalls: ParsedToolCall[];
 }
 
 export class AgentSdkParser implements TranscriptParser {
@@ -70,7 +85,14 @@ export class AgentSdkParser implements TranscriptParser {
 
   parse(transcriptPath: string): AgentSdkParseResult {
     const usage = { input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0 };
-    const empty: AgentSdkParseResult = { usage, cost_usd: 0, num_turns: 0, stop_reason: null };
+    const empty: AgentSdkParseResult = {
+      usage,
+      cost_usd: 0,
+      num_turns: 0,
+      stop_reason: null,
+      messages: [],
+      toolCalls: [],
+    };
 
     if (!existsSync(transcriptPath)) return empty;
 
@@ -84,6 +106,8 @@ export class AgentSdkParser implements TranscriptParser {
     let cost_usd = 0;
     let num_turns = 0;
     let stop_reason: string | null = null;
+    const messages: ParsedMessage[] = [];
+    const toolCalls: ParsedToolCall[] = [];
 
     for (const raw of content.split("\n")) {
       if (!raw.trim()) continue;
@@ -108,9 +132,33 @@ export class AgentSdkParser implements TranscriptParser {
         // A result line is terminal -- anything after it is noise.
         break;
       }
+
+      if (line.type === "user" || line.type === "assistant") {
+        const role = line.type as "user" | "assistant";
+        const blocks: Array<any> = line.message?.content ?? [];
+        for (const block of blocks) {
+          if (block.type === "text") {
+            messages.push({ role, text: block.text });
+          } else if (block.type === "tool_use") {
+            toolCalls.push({ id: block.id, name: block.name, input: block.input });
+          } else if (block.type === "tool_result") {
+            const rawContent = block.content;
+            const output: string = Array.isArray(rawContent) ? JSON.stringify(rawContent) : String(rawContent ?? "");
+            const existing = toolCalls.find((tc) => tc.id === block.tool_use_id);
+            if (existing) {
+              existing.output = output;
+              existing.is_error = block.is_error;
+            } else {
+              // Orphan result -- no matching tool_use seen yet; keep data.
+              toolCalls.push({ id: block.tool_use_id, name: "", input: null, output, is_error: block.is_error });
+            }
+          }
+          // Unknown block types are silently skipped.
+        }
+      }
     }
 
-    return { usage, cost_usd, num_turns, stop_reason, transcript_path: transcriptPath };
+    return { usage, cost_usd, num_turns, stop_reason, messages, toolCalls, transcript_path: transcriptPath };
   }
 
   /**

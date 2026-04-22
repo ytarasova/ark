@@ -227,3 +227,159 @@ describe("AgentSdkParser.findForSession", () => {
     expect(found).toBe(path);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Message + tool-call extraction tests
+// ---------------------------------------------------------------------------
+
+describe("AgentSdkParser -- messages and toolCalls extraction", () => {
+  test("extracts text messages from user and assistant blocks in order", () => {
+    const path = writeTranscript("sess-messages-order", [
+      { type: "user", message: { content: [{ type: "text", text: "hi" }] } },
+      {
+        type: "assistant",
+        message: {
+          content: [
+            { type: "text", text: "thinking..." },
+            { type: "tool_use", id: "t1", name: "Read", input: { path: "a.ts" } },
+          ],
+        },
+      },
+      {
+        type: "user",
+        message: { content: [{ type: "tool_result", tool_use_id: "t1", content: "data", is_error: false }] },
+      },
+      { type: "assistant", message: { content: [{ type: "text", text: "done" }] } },
+      {
+        type: "result",
+        is_error: false,
+        num_turns: 2,
+        duration_ms: 100,
+        total_cost_usd: 0.001,
+        usage: { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+        stop_reason: "end_turn",
+        result: "done",
+      },
+    ]);
+    const parsed = new AgentSdkParser().parse(path);
+    expect(parsed.messages).toEqual([
+      { role: "user", text: "hi" },
+      { role: "assistant", text: "thinking..." },
+      { role: "assistant", text: "done" },
+    ]);
+  });
+
+  test("extracts tool calls with matching results", () => {
+    const path = writeTranscript("sess-tool-calls-match", [
+      {
+        type: "assistant",
+        message: {
+          content: [{ type: "tool_use", id: "t1", name: "Read", input: { path: "a" } }],
+        },
+      },
+      {
+        type: "user",
+        message: { content: [{ type: "tool_result", tool_use_id: "t1", content: "data", is_error: false }] },
+      },
+      {
+        type: "result",
+        is_error: false,
+        num_turns: 1,
+        duration_ms: 50,
+        total_cost_usd: 0.0001,
+        usage: { input_tokens: 5, output_tokens: 2, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+        stop_reason: "end_turn",
+        result: "ok",
+      },
+    ]);
+    const parsed = new AgentSdkParser().parse(path);
+    expect(parsed.toolCalls).toEqual([
+      { id: "t1", name: "Read", input: { path: "a" }, output: "data", is_error: false },
+    ]);
+  });
+
+  test("tool_result without matching tool_use is kept as orphan", () => {
+    const path = writeTranscript("sess-orphan-result", [
+      {
+        type: "user",
+        message: { content: [{ type: "tool_result", tool_use_id: "orphan-1", content: "mystery", is_error: false }] },
+      },
+      {
+        type: "result",
+        is_error: false,
+        num_turns: 1,
+        duration_ms: 50,
+        total_cost_usd: 0.0001,
+        usage: { input_tokens: 5, output_tokens: 2, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+        stop_reason: "end_turn",
+        result: "ok",
+      },
+    ]);
+    const parsed = new AgentSdkParser().parse(path);
+    expect(parsed.toolCalls).toHaveLength(1);
+    expect(parsed.toolCalls[0].id).toBe("orphan-1");
+    expect(parsed.toolCalls[0].name).toBe("");
+    expect(parsed.toolCalls[0].input).toBeNull();
+    expect(parsed.toolCalls[0].output).toBe("mystery");
+  });
+
+  test("tool_result.content that is an array is json-stringified", () => {
+    const content = [{ type: "text", text: "x" }];
+    const path = writeTranscript("sess-array-content", [
+      {
+        type: "assistant",
+        message: { content: [{ type: "tool_use", id: "t2", name: "Bash", input: {} }] },
+      },
+      {
+        type: "user",
+        message: { content: [{ type: "tool_result", tool_use_id: "t2", content, is_error: false }] },
+      },
+      {
+        type: "result",
+        is_error: false,
+        num_turns: 1,
+        duration_ms: 50,
+        total_cost_usd: 0.0001,
+        usage: { input_tokens: 5, output_tokens: 2, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+        stop_reason: "end_turn",
+        result: "ok",
+      },
+    ]);
+    const parsed = new AgentSdkParser().parse(path);
+    expect(parsed.toolCalls[0].output).toBe('[{"type":"text","text":"x"}]');
+  });
+
+  test("skips blocks with unknown types without throwing", () => {
+    const path = writeTranscript("sess-unknown-block-types", [
+      {
+        type: "assistant",
+        message: {
+          content: [
+            { type: "thinking", text: "inner monologue..." },
+            { type: "text", text: "visible output" },
+          ],
+        },
+      },
+      {
+        type: "result",
+        is_error: false,
+        num_turns: 1,
+        duration_ms: 50,
+        total_cost_usd: 0.0001,
+        usage: { input_tokens: 5, output_tokens: 2, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+        stop_reason: "end_turn",
+        result: "ok",
+      },
+    ]);
+    // Should not throw, and only the text block should appear in messages.
+    const parsed = new AgentSdkParser().parse(path);
+    expect(parsed.messages).toEqual([{ role: "assistant", text: "visible output" }]);
+    expect(parsed.toolCalls).toEqual([]);
+  });
+
+  test("empty transcript yields empty messages and toolCalls arrays", () => {
+    const parsed = new AgentSdkParser().parse(join(TEST_DIR, "nonexistent-for-empty.jsonl"));
+    expect(parsed.messages).toEqual([]);
+    expect(parsed.toolCalls).toEqual([]);
+  });
+});
