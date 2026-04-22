@@ -37,7 +37,7 @@ import { join } from "path";
 const DEFAULT_SAGE_URL = "https://pi-team.mypaytm.com/sage";
 
 function resolveTenantApp(app: AppContext, ctx: { tenantId?: string | null }): AppContext {
-  const tenantId = ctx.tenantId ?? app.tenantId ?? app.config.authSection?.defaultTenant ?? null;
+  const tenantId = ctx.tenantId ?? app.tenantId ?? app.config.authSection.defaultTenant;
   return tenantId ? app.forTenant(tenantId) : app;
 }
 

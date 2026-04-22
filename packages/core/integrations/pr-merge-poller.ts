@@ -84,7 +84,7 @@ export async function pollPRMerges(app: AppContext, opts?: MergePollerOptions): 
  * Check a single session's PR merge status and take appropriate action.
  */
 export async function checkSessionMerge(app: AppContext, session: Session, opts?: MergePollerOptions): Promise<void> {
-  const config = (session.config ?? {}) as Record<string, any>;
+  const config = session.config as Record<string, any>;
   const ghExec = opts?.ghExec ?? _ghExec;
 
   const data = await fetchPRState(session.pr_url!, ghExec);

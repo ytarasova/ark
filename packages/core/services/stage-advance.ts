@@ -83,7 +83,7 @@ async function advanceImpl(
       const skippedStages = flowState?.skippedStages ?? [];
 
       // Resolve next stages with conditional routing and join barrier awareness
-      const readyStages = resolveNextStages(graphFlow, stage, session.config ?? {}, completedStages, skippedStages);
+      const readyStages = resolveNextStages(graphFlow, stage, session.config, completedStages, skippedStages);
 
       if (readyStages.length > 0) {
         // Mark current stage completed
@@ -158,7 +158,7 @@ async function advanceImpl(
 
       // No ready stages -- check if this is because join barriers aren't met
       // or because we've reached a terminal node
-      const allSuccessors = getSuccessors(graphFlow, stage, session.config ?? {});
+      const allSuccessors = getSuccessors(graphFlow, stage, session.config);
       if (allSuccessors.length > 0) {
         // Successors exist but aren't ready (join barriers) -- mark completed and wait
         try {

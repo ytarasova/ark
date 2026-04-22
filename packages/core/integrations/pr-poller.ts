@@ -191,7 +191,7 @@ export async function pollPRReviews(app: AppContext, opts?: PRPollerOptions): Pr
  * Check a single session's PR for new review activity.
  */
 export async function checkSessionPR(app: AppContext, session: Session, opts?: PRPollerOptions): Promise<void> {
-  const config = (session.config ?? {}) as Record<string, any>;
+  const config = session.config as Record<string, any>;
   const ghExec = opts?.ghExec ?? _ghExec;
 
   const data = await fetchPRReviews(session.pr_url!, ghExec);

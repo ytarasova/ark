@@ -50,7 +50,7 @@ export async function saveCheckpoint(app: AppContext, sessionId: string): Promis
 
 /** Get the latest checkpoint for a session. */
 export async function getCheckpoint(app: AppContext, sessionId: string): Promise<Checkpoint | null> {
-  const events = (await app.events.list(sessionId, { type: "checkpoint" })) ?? [];
+  const events = await app.events.list(sessionId, { type: "checkpoint" });
   if (events.length === 0) return null;
 
   const latest = events[events.length - 1];
@@ -59,7 +59,7 @@ export async function getCheckpoint(app: AppContext, sessionId: string): Promise
 
 /** List all checkpoints for a session, oldest first. */
 export async function listCheckpoints(app: AppContext, sessionId: string): Promise<Checkpoint[]> {
-  const events = (await app.events.list(sessionId, { type: "checkpoint" })) ?? [];
+  const events = await app.events.list(sessionId, { type: "checkpoint" });
   return events.map((e) => eventToCheckpoint(sessionId, e));
 }
 

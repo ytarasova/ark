@@ -29,7 +29,7 @@ import type { AppContext } from "../../core/app.js";
 import { syncCosts, getAllSessionCosts } from "../../core/observability/costs.js";
 
 function resolveTenantApp(app: AppContext, ctx: { tenantId?: string | null }): AppContext {
-  const tenantId = ctx.tenantId ?? app.tenantId ?? app.config.authSection?.defaultTenant ?? null;
+  const tenantId = ctx.tenantId ?? app.tenantId ?? app.config.authSection.defaultTenant;
   return tenantId ? app.forTenant(tenantId) : app;
 }
 

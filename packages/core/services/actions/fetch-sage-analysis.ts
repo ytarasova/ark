@@ -22,7 +22,7 @@ export const fetchSageAnalysisAction: ActionHandler = {
   name: "fetch_sage_analysis",
   async execute(app, session, action, _opts) {
     const sessionId = session.id;
-    const config = (session.config ?? {}) as Record<string, any>;
+    const config = session.config as Record<string, any>;
     const inputs = (config.inputs ?? {}) as Record<string, any>;
     const params = (inputs.params ?? {}) as Record<string, string>;
     const files = (inputs.files ?? {}) as Record<string, string>;

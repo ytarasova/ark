@@ -88,7 +88,7 @@ export async function evaluateSession(app: AppContext, session: Session): Promis
 
   const tokenCost = (await app.usageRecorder.getSessionCost(session.id)).cost;
 
-  const config = (session.config ?? {}) as Record<string, unknown>;
+  const config = session.config as Record<string, unknown>;
   const filesChanged = Array.isArray(config.filesChanged) ? config.filesChanged.length : 0;
   const runtime = typeof config.runtime_override === "string" ? config.runtime_override : "claude";
   const model = typeof config.model === "string" ? config.model : "unknown";

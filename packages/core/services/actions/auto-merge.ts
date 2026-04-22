@@ -24,7 +24,7 @@ export const autoMergeAction: ActionHandler = {
       status: "waiting",
       breakpoint_reason: "Waiting for CI checks to pass and PR to merge",
       config: {
-        ...(session.config ?? {}),
+        ...session.config,
         merge_queued_at: new Date().toISOString(),
       },
     });

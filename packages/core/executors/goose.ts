@@ -139,7 +139,7 @@ export const gooseExecutor: Executor = {
     // `{{ticket}}`, `{{summary}}`, `{{workdir}}`, etc. User-supplied
     // `session.config.inputs.params` overlays on top so dispatch-form values
     // (e.g. `--param jira_key=IN-1234`) reach the recipe.
-    const sessionInputs = (session.config as Record<string, unknown> | undefined)?.inputs as
+    const sessionInputs = (session.config as Record<string, unknown>).inputs as
       | { params?: Record<string, string> }
       | undefined;
     const recipeParams: Record<string, string> = {

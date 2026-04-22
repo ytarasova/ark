@@ -30,7 +30,7 @@ import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import type { TenantContext } from "../../core/auth/context.js";
 
 function scoped(app: AppContext, ctx: TenantContext): AppContext {
-  const tenantId = ctx.tenantId ?? app.tenantId ?? app.config.authSection?.defaultTenant ?? "default";
+  const tenantId = ctx.tenantId ?? app.tenantId ?? app.config.authSection.defaultTenant ?? "default";
   return app.forTenant(tenantId);
 }
 

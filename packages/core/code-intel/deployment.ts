@@ -28,7 +28,7 @@ export function buildDeployment(app: AppContext): Deployment {
   const storeBackend = app.mode.database.dialect;
 
   const vendorResolver = new FilesystemVendorResolver();
-  const arkDir = app.config.arkDir ?? app.config.dirs?.ark ?? process.cwd();
+  const arkDir = app.config.arkDir;
   return {
     mode,
     storeBackend,

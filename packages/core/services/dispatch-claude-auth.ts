@@ -66,7 +66,7 @@ export async function materializeClaudeAuthForDispatch(
     k8sApiFactory?: (cfg: Record<string, unknown>) => Promise<K8sSecretsApi>;
   },
 ): Promise<ClaudeAuthMaterialization> {
-  const tenantId = session.tenant_id ?? app.config.authSection?.defaultTenant ?? "default";
+  const tenantId = session.tenant_id ?? app.config.authSection.defaultTenant ?? "default";
   const auth = new TenantClaudeAuthManager(app.db);
   const binding = await auth.get(tenantId);
   if (!binding) return EMPTY;

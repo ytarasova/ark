@@ -52,12 +52,7 @@ import { logDebug, logError, logInfo, logWarn } from "../observability/structure
 import { sendOSNotification } from "../notify.js";
 import { watchMergedPR, type RollbackConfig } from "../integrations/rollback.js";
 import { emitStageSpanEnd, emitSessionSpanEnd, flushSpans } from "../observability/otlp.js";
-import {
-  DEFAULT_CONDUCTOR_PORT,
-  DEFAULT_CONDUCTOR_HOST,
-  DEFAULT_CHANNEL_BASE_URL,
-  DEFAULT_ROUTER_URL,
-} from "../constants.js";
+import { DEFAULT_CONDUCTOR_PORT, DEFAULT_CONDUCTOR_HOST, DEFAULT_CHANNEL_BASE_URL } from "../constants.js";
 
 const DEFAULT_PORT = DEFAULT_CONDUCTOR_PORT;
 
@@ -720,7 +715,7 @@ export class Conductor {
    * Used for the arkd -> conductor -> router proxy chain.
    */
   private async proxyToRouter(req: Request, path: string): Promise<Response> {
-    const routerUrl = this.app.config.router?.url ?? DEFAULT_ROUTER_URL;
+    const routerUrl = this.app.config.router.url;
     try {
       const headers: Record<string, string> = {};
       for (const key of ["content-type", "authorization", "accept"]) {

@@ -26,13 +26,13 @@ export class RouterLauncher {
 
   async start(): Promise<void> {
     if (this.opts.skip) return;
-    if (!this.config.router?.enabled || !this.config.router.autoStart) return;
+    if (!this.config.router.enabled || !this.config.router.autoStart) return;
 
     await safeAsync("boot: start router", async () => {
       const { loadRouterConfig, startRouter } = await import("../../router/index.js");
       const routerConfig = loadRouterConfig({
-        port: parseInt(this.config.router!.url.split(":").pop() ?? "8430", 10),
-        policy: this.config.router!.policy,
+        port: parseInt(this.config.router.url.split(":").pop() ?? "8430", 10),
+        policy: this.config.router.policy,
       });
       if (routerConfig.providers.length === 0) return;
 

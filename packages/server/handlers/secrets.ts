@@ -30,7 +30,7 @@ function resolveTenantId(app: AppContext, ctx: TenantContext): string {
   // token (hosted) or the default-tenant config (local). Fall through to
   // the legacy `app.tenantId` view + config default to preserve behavior
   // for any caller that still reaches the handler without a ctx.
-  return ctx.tenantId ?? app.tenantId ?? app.config.authSection?.defaultTenant ?? "default";
+  return ctx.tenantId ?? app.tenantId ?? app.config.authSection.defaultTenant ?? "default";
 }
 
 function wrapNameError(err: unknown): RpcError {
