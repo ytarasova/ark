@@ -99,6 +99,8 @@ export class AppContext {
   private _drizzle: DrizzleClient | null = null;
   private _codeIntel: CodeIntelStore | null = null;
   private _deployment: Deployment | null = null;
+  /** Orphan sweeper interval handle -- null in test profile or before boot. */
+  private _orphanSweeperInterval: ReturnType<typeof setInterval> | null = null;
   private _hostedServices: {
     workerRegistry?: WorkerRegistry;
     scheduler?: SessionScheduler;
@@ -178,6 +180,18 @@ export class AppContext {
     this._codeIntel = CodeIntelStoreCtor.fromApp(this);
     await this._codeIntel.migrate();
 
+    // Orphan PID sweeper -- runs every 5 minutes in non-test profiles.
+    // Tests call sweepOrphans(app) directly; scheduling it during tests causes
+    // sporadic interference across AppContext lifetimes.
+    if (this.config.profile !== "test") {
+      const { sweepOrphans } = await import("./services/session/orphan-sweeper.js");
+      const { logError } = await import("./observability/structured-log.js");
+      this._orphanSweeperInterval = setInterval(
+        () => sweepOrphans(this).catch((err) => logError("orphan-sweeper", `sweep error: ${err?.message ?? err}`)),
+        5 * 60 * 1000,
+      );
+    }
+
     track("app_boot");
     this.phase = "ready";
   }
@@ -186,6 +200,13 @@ export class AppContext {
     if (this.phase === "stopped" || this.phase === "shutting_down") return;
     const wasBooted = this.phase === "ready";
     this.phase = "shutting_down";
+
+    // Cancel the orphan sweeper before tearing down the container so we don't
+    // fire a sweep against a half-torn-down AppContext.
+    if (this._orphanSweeperInterval) {
+      clearInterval(this._orphanSweeperInterval);
+      this._orphanSweeperInterval = null;
+    }
 
     if (wasBooted) {
       // container.dispose() walks every registered disposer in reverse

@@ -488,8 +488,8 @@ End-to-end "is the agent done, and how do we tear it down cleanly." Every agent-
 | Scenario | Detection | Response |
 |---|---|---|
 | Agent hangs (no `result`) | `maxTurns` / `maxBudgetUsd` fire in the SDK → emits error `result` | normal error path |
-| SDK subprocess crashes | `query()` throws → `launch.ts` catch block writes error sentinel, exits 1 | conductor transitions via StopFailure hook already posted; or D2 orphan sweeper if hook not sent |
-| `launch.ts` SIGKILL'd (OOM etc.) | no hook posted; compute adapter sees non-zero exit | D2 sweeper detects session `running` with dead PID, marks `failed` with reason `orphaned`, cleanup |
+| SDK subprocess crashes | `query()` throws → `launch.ts` catch block writes error sentinel, exits 1 | conductor transitions via StopFailure hook already posted; or D2 orphan sweeper if hook not sent -- **implemented** |
+| `launch.ts` SIGKILL'd (OOM etc.) | no hook posted; compute adapter sees non-zero exit | D2 sweeper detects session `running` with dead PID, marks `failed` with reason `orphaned`, cleanup -- **implemented** |
 | Network partition to conductor | hook POST fails → `console.error`, loop continues | transcript.jsonl still canonical; process exit still propagates; conductor reconciles from event log |
 | `session/stop` by sage | compute adapter SIGTERMs `launch.ts` | AbortController aborts `query()`; launch writes abort sentinel, posts StopFailure, exits 1 |
 
@@ -946,9 +946,19 @@ git add docs/integrations/sage.md
 git commit -m "docs(integrations): document session/retry-stage"
 ```
 
-### Task D2: Terminal-state cleanup (no dangling state)
+### Task D2: Terminal-state cleanup (no dangling state) -- SHIPPED
 
 **Files:**
+- Created: `packages/core/services/session/cleanup.ts` -- `cleanupSession()` helper (worktree removal + `session_cleaned` event, idempotent)
+- Created: `packages/core/services/session/orphan-sweeper.ts` -- `sweepOrphans()`, runs every 5 min via `setInterval` in non-test profiles
+- Modified: `packages/core/app.ts` -- registers/cancels sweeper interval in `boot()`/`shutdown()`
+- Modified: `packages/core/conductor/conductor.ts` -- calls `cleanupSession` after `cleanupOnTerminal` for `completed`/`failed`
+- Modified: `packages/core/services/session/terminate.ts` -- emits `session_cleaned` after `removeWorktree` in the `stop()` path
+- Created: `packages/core/__tests__/session-cleanup.test.ts` -- 6 tests, all pass
+
+**Note on retention policy:** transcripts and event logs are kept indefinitely (no 24h GC). 24h GC is deferred to phase 2.
+
+**Files original spec:**
 - Possibly modify: session-lifecycle terminator path (find via grep below)
 - Possibly create: `packages/core/services/session/cleanup.ts`
 - Test: `packages/core/__tests__/session-cleanup.test.ts`
@@ -963,7 +973,7 @@ Cleanup triggers: session enters `completed`, `failed`, `stopped`, or is detecte
 
 Retention policy: keep the transcript + events log for 24h after cleanup for post-mortem / cost audits. Then GC.
 
-- [ ] **Step 1: Find existing cleanup hooks**
+- [x] **Step 1: Find existing cleanup hooks**
 
 ```
 grep -rn "terminat\|cleanup\|worktree remove\|dangling" packages/core/services packages/core/state | grep -v __tests__ | head -40
@@ -971,7 +981,7 @@ grep -rn "terminat\|cleanup\|worktree remove\|dangling" packages/core/services p
 
 If there's an existing `onSessionTerminal` hook or `terminator` path, extend it. Otherwise create `packages/core/services/session/cleanup.ts` that subscribes to the session state-transition bus and runs on entry to terminal states.
 
-- [ ] **Step 2: Implement cleanup logic**
+- [x] **Step 2: Implement cleanup logic**
 
 ```ts
 // packages/core/services/session/cleanup.ts
@@ -1002,13 +1012,13 @@ async function tryGitWorktreeRemove(path: string): Promise<boolean> {
 }
 ```
 
-- [ ] **Step 3: Wire into terminal-state transitions**
+- [x] **Step 3: Wire into terminal-state transitions**
 
 Hook `cleanupSession` into every path that drives a session to `completed`, `failed`, or `stopped`. In the orchestration code, find the places that set `status = "completed" | "failed" | "stopped"` and call `cleanupSession(app, session)` after the update.
 
 Also add an orphan sweeper: a periodic task (every 5m) that looks for sessions in `running` state whose tracked process is dead — mark them `failed` with reason `orphaned` and run cleanup.
 
-- [ ] **Step 4: Tests**
+- [x] **Step 4: Tests**
 
 ```ts
 // packages/core/__tests__/session-cleanup.test.ts
@@ -1024,7 +1034,7 @@ test("orphaned session is swept and cleaned", async () => {
 Run: `make test-file F=packages/core/__tests__/session-cleanup.test.ts`
 Expected: all three pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add packages/core/services/session/cleanup.ts packages/core/services/ packages/core/__tests__/session-cleanup.test.ts

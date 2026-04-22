@@ -115,6 +115,13 @@ export class SessionTerminator {
 
     await d.removeWorktree(session);
 
+    // Emit session_cleaned for the stopped path (worktree was just removed above).
+    // The event acts as an idempotency guard so a later cleanupSession call is a no-op.
+    await d.events.log(sessionId, "session_cleaned", {
+      actor: "system",
+      data: { worktree_path: null, worktree_removed: true, via: "stop" },
+    });
+
     await d.sessions.update(sessionId, { status: "stopped", error: null, session_id: null });
     await d.events.log(sessionId, "session_stopped", {
       stage: session.stage,

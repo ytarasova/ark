@@ -384,6 +384,17 @@ export class Conductor {
 
       if (result.newStatus === "completed" || result.newStatus === "failed") {
         await app.sessionLifecycle.cleanupOnTerminal(sessionId);
+
+        // Worktree removal + session_cleaned event (idempotent; safe to call
+        // here without transactional coupling -- cleanup is external state only).
+        try {
+          const { cleanupSession } = await import("../services/session/cleanup.js");
+          const sessionForCleanup = await app.sessions.get(sessionId);
+          if (sessionForCleanup) await cleanupSession(app, sessionForCleanup);
+        } catch (err: any) {
+          logDebug("conductor", `session cleanup non-fatal: ${err?.message ?? err}`);
+        }
+
         emitStageSpanEnd(sessionId, { status: result.newStatus });
         emitSessionSpanEnd(sessionId, { status: result.newStatus });
         flushSpans();
