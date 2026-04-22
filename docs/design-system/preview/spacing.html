@@ -1,0 +1,39 @@
+<!doctype html><html class="midnight-circuit dark"><head>
+<meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+.row1 { display:flex; gap:10px; align-items:flex-end; margin-bottom:16px; }
+.bar { background: var(--primary); border-radius:3px; width:24px; display:flex; align-items:flex-end; justify-content:center; color:#fff; font: 500 9px var(--font-mono-ui); padding-bottom: 3px; }
+.bar.neutral { background: var(--bg-hover); color: var(--fg-muted); }
+.stack-row { display:flex; gap:14px; align-items:center; margin-top: 12px; padding: 12px; background: var(--bg-card); border:1px solid var(--border); border-radius:8px; }
+.sp-label { font:500 10px/14px var(--font-mono-ui); color: var(--fg-muted); text-transform:uppercase; letter-spacing:0.04em; width: 60px; }
+.sp-row { display:flex; gap: 4px; }
+.sp-block { background: var(--primary-subtle); border:1px solid var(--primary); border-radius:2px; height:18px; }
+</style></head><body><div class="card">
+<div class="row1">
+  <div class="bar neutral" style="height:16px">4</div>
+  <div class="bar neutral" style="height:32px">8</div>
+  <div class="bar" style="height:48px">12</div>
+  <div class="bar" style="height:64px">16</div>
+  <div class="bar" style="height:80px">20</div>
+  <div class="bar" style="height:96px">24</div>
+  <div class="bar" style="height:128px">32</div>
+  <div class="bar neutral" style="height:160px">48</div>
+  <div class="bar neutral" style="height:192px">64</div>
+  <div style="flex:1; text-align:right; font:400 11px/16px var(--font-mono-ui); color: var(--fg-muted);">4px baseline · preferred: 8 · 12 · 16 · 24</div>
+</div>
+<div class="stack-row">
+  <span class="sp-label">gap-2</span>
+  <div class="sp-row"><div class="sp-block" style="width:40px"></div><div class="sp-block" style="width:40px"></div><div class="sp-block" style="width:40px"></div></div>
+  <span style="font:400 10px var(--font-mono-ui); color: var(--fg-muted); margin-left:auto">8px · dense list rows</span>
+</div>
+<div class="stack-row">
+  <span class="sp-label">gap-4</span>
+  <div class="sp-row" style="gap:16px"><div class="sp-block" style="width:36px"></div><div class="sp-block" style="width:36px"></div><div class="sp-block" style="width:36px"></div></div>
+  <span style="font:400 10px var(--font-mono-ui); color: var(--fg-muted); margin-left:auto">16px · card padding</span>
+</div>
+<div class="stack-row">
+  <span class="sp-label">gap-6</span>
+  <div class="sp-row" style="gap:24px"><div class="sp-block" style="width:32px"></div><div class="sp-block" style="width:32px"></div><div class="sp-block" style="width:32px"></div></div>
+  <span style="font:400 10px var(--font-mono-ui); color: var(--fg-muted); margin-left:auto">24px · section spacing</span>
+</div>
+</div></body></html>

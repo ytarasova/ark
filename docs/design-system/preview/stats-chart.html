@@ -1,0 +1,200 @@
+<!doctype html><html class="midnight-circuit dark"><head>
+<meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+body { padding: 16px; }
+.card { gap: 12px; }
+
+/* ── Stat cards ─ raised tangible slabs ─ */
+.stat-row { display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; }
+.stat {
+  position: relative;
+  background: linear-gradient(180deg, rgba(255,255,255,.035) 0%, rgba(255,255,255,0) 30%, rgba(0,0,0,.15) 100%), var(--bg-card);
+  border: 1px solid var(--border);
+  border-top-color: rgba(255,255,255,.08);
+  border-bottom-color: rgba(0,0,0,.5);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 3px;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.05) inset,
+    0 -1px 0 rgba(0,0,0,.4) inset,
+    0 1px 2px rgba(0,0,0,.45),
+    0 6px 14px -4px rgba(0,0,0,.4);
+}
+.stat .lab {
+  font: 500 9.5px var(--font-mono-ui);
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  display: flex; align-items: center; gap: 5px;
+}
+.stat .lab .pip { width: 5px; height: 5px; border-radius: 99px; background: var(--primary); box-shadow: 0 0 5px rgba(107,89,222,.6); }
+.stat .val {
+  font: 600 20px/1.2 var(--font-sans);
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.015em;
+  text-shadow: 0 1px 0 rgba(0,0,0,.4);
+}
+.stat .delta {
+  font: 500 10px var(--font-mono-ui);
+  color: #34d399;
+  display: inline-flex; align-items: center; gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+.stat .delta.down { color: #f87171; }
+.stat .delta .arw { font-size: 9px; opacity: 0.85; }
+
+/* ── Chart panel ─ raised, with inset well for the bars ─ */
+.chart {
+  position: relative;
+  background: linear-gradient(180deg, rgba(255,255,255,.035) 0%, rgba(255,255,255,0) 25%, rgba(0,0,0,.15) 100%), var(--bg-card);
+  border: 1px solid var(--border);
+  border-top-color: rgba(255,255,255,.08);
+  border-bottom-color: rgba(0,0,0,.5);
+  border-radius: 9px;
+  padding: 12px 14px 10px;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.05) inset,
+    0 -1px 0 rgba(0,0,0,.4) inset,
+    0 1px 2px rgba(0,0,0,.45),
+    0 10px 22px -6px rgba(0,0,0,.4);
+}
+.chart .head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 10px;
+}
+.chart .head .ttl {
+  font: 500 10px var(--font-mono-ui);
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.chart .head .now {
+  font: 600 13px var(--font-sans);
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.chart .head .now em { color: var(--fg-faint); font-style: normal; font-weight: 400; font-size: 11px; margin-left: 4px; font-family: var(--font-mono-ui); }
+
+/* inset well: sunken container for the bars */
+.well {
+  position: relative;
+  height: 92px;
+  padding: 6px 4px 4px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(0,0,0,.35) 0%, rgba(0,0,0,.1) 100%);
+  box-shadow:
+    0 2px 4px rgba(0,0,0,.5) inset,
+    0 1px 0 rgba(255,255,255,.03);
+  overflow: hidden;
+}
+.well::before {
+  /* faint horizontal grid lines */
+  content: '';
+  position: absolute; inset: 0;
+  background-image: linear-gradient(180deg, transparent 24%, rgba(255,255,255,.02) 25%, transparent 26%,
+                                            transparent 49%, rgba(255,255,255,.02) 50%, transparent 51%,
+                                            transparent 74%, rgba(255,255,255,.02) 75%, transparent 76%);
+  pointer-events: none;
+}
+
+.bars { display: flex; gap: 4px; align-items: flex-end; height: 100%; position: relative; z-index: 1; }
+.bar {
+  flex: 1;
+  border-radius: 2px 2px 0 0;
+  background: linear-gradient(180deg, #8b7aff 0%, var(--primary) 60%, #5a48c9 100%);
+  box-shadow:
+    0 -1px 0 rgba(255,255,255,.15) inset,
+    0 1px 1px rgba(0,0,0,.4),
+    0 0 8px rgba(107,89,222,.2);
+  opacity: 0.9;
+  position: relative;
+}
+.bar.peak {
+  background: linear-gradient(180deg, #a78bfa 0%, #8b7aff 60%, var(--primary) 100%);
+  opacity: 1;
+  box-shadow:
+    0 -1px 0 rgba(255,255,255,.25) inset,
+    0 1px 1px rgba(0,0,0,.4),
+    0 0 14px rgba(167,139,250,.5);
+}
+/* subtle pulse on the peak */
+.bar.peak::after {
+  content: '';
+  position: absolute; top: -5px; left: 50%; transform: translateX(-50%);
+  width: 4px; height: 4px; border-radius: 99px;
+  background: #a78bfa;
+  box-shadow: 0 0 8px #a78bfa;
+}
+
+/* x-axis labels */
+.xax {
+  display: flex; gap: 4px;
+  margin-top: 5px;
+  font: 500 9px var(--font-mono-ui);
+  color: var(--fg-faint);
+  letter-spacing: 0.05em;
+}
+.xax span { flex: 1; text-align: center; }
+.xax span.hl { color: var(--fg); }
+</style></head><body>
+
+<div class="card">
+
+  <div class="stat-row">
+    <div class="stat">
+      <span class="lab"><span class="pip"></span>Active</span>
+      <span class="val">12</span>
+      <span class="delta"><span class="arw">▲</span>+3 since 10am</span>
+    </div>
+    <div class="stat">
+      <span class="lab"><span class="pip" style="background:#60a5fa; box-shadow:0 0 5px rgba(96,165,250,.6)"></span>Tokens · 24h</span>
+      <span class="val">18.4M</span>
+      <span class="delta"><span class="arw">▲</span>+14% vs yest</span>
+    </div>
+    <div class="stat">
+      <span class="lab"><span class="pip" style="background:#fbbf24; box-shadow:0 0 5px rgba(251,191,36,.6)"></span>Cost · 24h</span>
+      <span class="val">$47.82</span>
+      <span class="delta down"><span class="arw">▲</span>+$12 vs yest</span>
+    </div>
+    <div class="stat">
+      <span class="lab"><span class="pip" style="background:#34d399; box-shadow:0 0 5px rgba(52,211,153,.6)"></span>Avg dispatch</span>
+      <span class="val">03:12</span>
+      <span class="delta"><span class="arw">▼</span>-22s</span>
+    </div>
+  </div>
+
+  <div class="chart">
+    <div class="head">
+      <span class="ttl">Cost · last 14 days</span>
+      <span class="now">$47.82 <em>today</em></span>
+    </div>
+    <div class="well">
+      <div class="bars">
+        <div class="bar" style="height:30%"></div>
+        <div class="bar" style="height:45%"></div>
+        <div class="bar" style="height:38%"></div>
+        <div class="bar" style="height:52%"></div>
+        <div class="bar" style="height:48%"></div>
+        <div class="bar" style="height:60%"></div>
+        <div class="bar" style="height:42%"></div>
+        <div class="bar" style="height:55%"></div>
+        <div class="bar" style="height:70%"></div>
+        <div class="bar" style="height:62%"></div>
+        <div class="bar" style="height:58%"></div>
+        <div class="bar" style="height:75%"></div>
+        <div class="bar" style="height:68%"></div>
+        <div class="bar peak" style="height:92%"></div>
+      </div>
+    </div>
+    <div class="xax">
+      <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+      <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span class="hl">Today</span>
+    </div>
+  </div>
+
+</div>
+
+</body></html>

@@ -1,0 +1,165 @@
+<!doctype html><html class="midnight-circuit dark"><head>
+<meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+body { padding: 20px; font-family: var(--font-sans); }
+.card { gap: 18px; }
+.row { display: grid; grid-template-columns: 120px 1fr; gap: 14px; align-items: center; }
+.row .lab { font: 500 10px var(--font-mono-ui); color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.ctrls { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; }
+
+/* ─ Checkbox ─ */
+.cb {
+  display: inline-flex; align-items: center; gap: 8px;
+  font: 500 12px var(--font-sans); color: var(--fg);
+  cursor: pointer;
+}
+.cb .box {
+  width: 14px; height: 14px; border-radius: 4px;
+  background: #0a0a12;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(0,0,0,.5) inset;
+  display: grid; place-items: center;
+  transition: background 120ms, border-color 120ms;
+}
+.cb .box svg { width: 10px; height: 10px; stroke: var(--primary-fg); fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+.cb.on .box {
+  background: var(--primary);
+  border-color: rgba(0,0,0,.25);
+  box-shadow: 0 1px 2px rgba(0,0,0,.25);
+}
+.cb.on .box svg { opacity: 1; }
+.cb.indet .box {
+  background: var(--primary);
+  border-color: rgba(0,0,0,.25);
+}
+.cb.indet .box::after {
+  content: ''; width: 7px; height: 2px; border-radius: 1px; background: var(--primary-fg);
+}
+.cb.disabled { opacity: 0.4; cursor: not-allowed; }
+.cb .hint { font: 400 10px var(--font-mono-ui); color: var(--fg-faint); margin-left: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* ─ Radio ─ */
+.rb {
+  display: inline-flex; align-items: center; gap: 8px;
+  font: 500 12px var(--font-sans); color: var(--fg);
+  cursor: pointer;
+}
+.rb .dot {
+  width: 14px; height: 14px; border-radius: 99px;
+  background: #0a0a12;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(0,0,0,.5) inset;
+  display: grid; place-items: center;
+}
+.rb .dot::after { content: ''; width: 6px; height: 6px; border-radius: 99px; background: var(--primary); box-shadow: 0 0 6px rgba(107,89,222,.5); opacity: 0; transition: opacity 120ms; }
+.rb.on .dot { border-color: rgba(107,89,222,.5); }
+.rb.on .dot::after { opacity: 1; }
+
+/* ─ Toggle ─ */
+.tg {
+  display: inline-flex; align-items: center; gap: 8px;
+  font: 500 12px var(--font-sans); color: var(--fg);
+  cursor: pointer;
+}
+.tg .track {
+  display: inline-block;
+  width: 28px; height: 16px; border-radius: 99px;
+  background: #0a0a12; border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(0,0,0,.5) inset;
+  position: relative;
+  vertical-align: middle;
+  transition: background 120ms, border-color 120ms;
+  flex-shrink: 0;
+}
+.tg .track::after {
+  content: ''; position: absolute; top: 50%; left: 1px;
+  width: 12px; height: 12px; border-radius: 99px;
+  background: linear-gradient(180deg, #e4e4ed 0%, #c4c4d0 100%);
+  box-shadow: 0 1px 2px rgba(0,0,0,.5), 0 0.5px 0 rgba(255,255,255,.3) inset;
+  transform: translateY(-50%);
+  transition: left 120ms;
+}
+.tg.on .track {
+  background: var(--primary);
+  border-color: rgba(0,0,0,.25);
+  box-shadow: 0 1px 2px rgba(0,0,0,.25);
+}
+.tg.on .track::after { left: 13px; }
+.tg .hint { font: 400 10px var(--font-mono-ui); color: var(--fg-faint); margin-left: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* ─ Segment ─ */
+.seg {
+  display: inline-flex; padding: 2px;
+  background: linear-gradient(180deg, rgba(0,0,0,.2) 0%, rgba(0,0,0,.05) 100%), var(--bg-code);
+  border: 1px solid var(--border); border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.3) inset;
+}
+.seg .s {
+  padding: 4px 11px; border-radius: 4px;
+  font: 500 11px var(--font-mono-ui); color: var(--fg-muted);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: color 120ms, background 120ms;
+}
+.seg .s:hover { color: var(--fg); }
+.seg .s.on {
+  background: #1e1e30;
+  color: var(--fg);
+  box-shadow: 0 1px 2px rgba(0,0,0,.2);
+}
+.seg .s .badge {
+  margin-left: 5px;
+  display: inline-grid; place-items: center;
+  height: 14px; min-width: 14px; padding: 0 4px; border-radius: 99px;
+  background: var(--primary); color: var(--primary-fg);
+  font: 600 9px var(--font-mono-ui);
+}
+</style></head>
+<body>
+<div class="card">
+
+  <div class="row"><span class="lab">checkbox</span>
+    <div class="ctrls">
+      <label class="cb"><span class="box"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>Off</label>
+      <label class="cb on"><span class="box"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>On</label>
+      <label class="cb indet"><span class="box"></span>Partial<span class="hint">3 of 5</span></label>
+      <label class="cb disabled"><span class="box"></span>Disabled</label>
+    </div>
+  </div>
+
+  <div class="row"><span class="lab">radio</span>
+    <div class="ctrls">
+      <label class="rb"><span class="dot"></span>claude</label>
+      <label class="rb on"><span class="dot"></span>codex</label>
+      <label class="rb"><span class="dot"></span>gemini</label>
+      <label class="rb"><span class="dot"></span>goose</label>
+    </div>
+  </div>
+
+  <div class="row"><span class="lab">toggle</span>
+    <div class="ctrls">
+      <label class="tg"><span class="track"></span>auto-rebase</label>
+      <label class="tg on"><span class="track"></span>auto-approve<span class="hint">risky</span></label>
+      <label class="tg on"><span class="track"></span>codegraph</label>
+    </div>
+  </div>
+
+  <div class="row"><span class="lab">segment</span>
+    <div class="seg">
+      <span class="s on">Active<span class="badge">3</span></span>
+      <span class="s">Queued<span class="badge">1</span></span>
+      <span class="s">Done</span>
+      <span class="s">All</span>
+    </div>
+  </div>
+
+  <div class="row"><span class="lab">segment · sm</span>
+    <div class="seg" style="font-size:10px">
+      <span class="s on">stream</span>
+      <span class="s">raw</span>
+      <span class="s">json</span>
+    </div>
+  </div>
+
+</div>
+</body></html>

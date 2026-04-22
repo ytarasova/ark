@@ -1,0 +1,522 @@
+<!doctype html><html class="midnight-circuit dark"><head>
+<meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+body {
+  padding: 0; height: 440px; overflow:hidden; font-family: var(--font-sans);
+  background: var(--bg);
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,.022) 1px, transparent 0),
+    radial-gradient(ellipse 60% 40% at 80% 0%, rgba(107,89,222,.08), transparent 60%);
+  background-size: 14px 14px, 100% 100%;
+}
+.frame { height:100%; display:grid; grid-template-columns: 52px 268px 1fr; }
+
+/* ── sidebar (icon rail) ─────────────────────────────── */
+.side {
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  display:flex; flex-direction:column; position: relative;
+}
+.brand { height: 40px; display:flex; align-items:center; justify-content:center; position:relative; border-bottom: 1px solid rgba(255,255,255,.03); }
+.brand .logo {
+  width: 30px; height: 30px; border-radius: 7px;
+  background: var(--primary);
+  display:grid; place-items:center;
+  font: 800 14px var(--font-sans); color:#fff; letter-spacing:-0.05em;
+  border: 1px solid rgba(0,0,0,.25);
+  box-shadow: 0 1px 2px rgba(0,0,0,.25);
+}
+.brand .dot { position:absolute; top:8px; right:9px; width:6px; height:6px; border-radius:99px; background:#34d399; box-shadow: 0 0 6px rgba(52,211,153,.8); animation: glow 2.5s ease-in-out infinite; }
+@keyframes glow { 0%,100% { opacity:1 } 50% { opacity:.55 } }
+
+.nav { flex:1; padding: 6px 0; display:flex; flex-direction:column; align-items:center; gap:2px; min-height: 0; overflow-y: auto; scrollbar-width: none; }
+.nav::-webkit-scrollbar { display: none; }
+.nav a {
+  position:relative;
+  width: 40px; height: 32px; border-radius: 7px;
+  display:flex; align-items:center; justify-content:center;
+  color: var(--fg-muted); text-decoration:none;
+  transition: color 120ms, background 120ms;
+}
+.nav a svg { opacity: 0.75; }
+.nav a:hover { color: var(--fg); background: rgba(255,255,255,.04); }
+.nav a:hover svg { opacity: 1; }
+.nav a .badge {
+  position:absolute; top:2px; right:5px;
+  min-width:13px; height:13px; padding:0 3px; border-radius:99px;
+  background: var(--primary);
+  color:#fff; font:600 9px var(--font-mono-ui);
+  display:grid; place-items:center;
+}
+.nav a .kbd { display:none; }
+.nav a.on {
+  color: var(--fg);
+  background: rgba(107,89,222,.12);
+  box-shadow: 0 0 0 1px rgba(107,89,222,.3);
+}
+.nav a.on::before {
+  content:''; position:absolute; left:-6px; top:8px; bottom:8px; width:2.5px;
+  background: var(--primary); border-radius: 0 3px 3px 0;
+  box-shadow: 0 0 6px rgba(107,89,222,.6);
+}
+.nav a.on svg { opacity:1; color: var(--primary); }
+.nav a .tip, .settings a .tip {
+  position:absolute; left: calc(100% + 10px); top:50%; transform: translateY(-50%);
+  padding: 4px 8px; border-radius:5px;
+  background: #26263c; color: var(--fg);
+  font: 500 11px var(--font-sans); white-space:nowrap;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 12px rgba(0,0,0,.5);
+  opacity:0; pointer-events:none; z-index:100;
+  display:flex; align-items:center; gap:6px;
+}
+.nav a .tip kbd, .settings a .tip kbd {
+  padding: 1px 4px; border-radius:3px; background: rgba(0,0,0,.3);
+  font: 500 10px var(--font-mono-ui); color: var(--fg-muted);
+  border: 1px solid var(--border);
+}
+.nav a:hover .tip, .settings a:hover .tip { opacity:1; }
+.settings a { position: relative; width: 32px; height: 28px; border-radius: 6px; display:grid; place-items:center; color: var(--fg-muted); text-decoration: none; transition: color 120ms, background 120ms; }
+.settings a:hover { color: var(--fg); background: rgba(255,255,255,.04); }
+.nav-sep { width: 28px; height: 1px; background: rgba(255,255,255,.05); margin: 4px auto; }
+.settings { padding: 2px 0; display:flex; flex-direction:column; align-items:center; gap: 2px; border-top:1px solid rgba(255,255,255,.04); flex-shrink: 0; }
+.avatar-btn {
+  width: 26px; height: 26px; margin: 3px 0; border-radius: 99px;
+  background: var(--primary);
+  display:grid; place-items:center;
+  font: 600 10px var(--font-mono-ui); color:#fff;
+  border: 1px solid rgba(0,0,0,.25);
+  box-shadow: 0 1px 2px rgba(0,0,0,.2);
+}
+.foot {
+  height: 18px; display:flex; align-items:center; justify-content:center;
+  font: 400 9px var(--font-mono-ui); color: var(--fg-faint);
+  border-top: 1px solid rgba(255,255,255,.04);
+  background: rgba(0,0,0,.2);
+  flex-shrink: 0;
+}
+.foot .net { display:flex; align-items:center; gap:3px; }
+.foot .net i { width:4px; height:4px; border-radius:99px; background:#34d399; box-shadow: 0 0 3px #34d399; }
+
+/* ── session list ────────────────────────────────────── */
+.list {
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+  display:flex; flex-direction:column;
+}
+.list-hd {
+  height: 44px; padding: 0 14px;
+  display:flex; align-items:center; gap:8px;
+  border-bottom: 1px solid var(--border);
+}
+.list-hd h2 { margin:0; font: 600 13px var(--font-sans); color: var(--fg); letter-spacing:-0.01em; }
+.list-hd .count { font: 500 10px var(--font-mono-ui); color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.list-hd .spacer { flex:1; }
+.list-hd .new {
+  height:24px; padding: 0 9px; border-radius:5px;
+  background: var(--primary);
+  color:#fff; font:600 11px var(--font-sans);
+  display:inline-flex; align-items:center; gap:4px;
+  border: 1px solid rgba(0,0,0,.25);
+  box-shadow: 0 1px 2px rgba(0,0,0,.25);
+}
+
+.filter { padding: 8px 12px 4px; display:flex; gap:4px; }
+.filter span { font: 500 10px var(--font-mono-ui); color: var(--fg-muted); padding: 3px 7px; border-radius: 99px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.04em; }
+.filter span.on { background: var(--primary-subtle); color: var(--primary); }
+
+.sessions { flex:1; padding: 4px 8px; display:flex; flex-direction:column; gap:2px; overflow:hidden; }
+.s {
+  padding: 9px 12px 9px 10px; border-radius: 7px;
+  display:flex; flex-direction:column; gap:5px;
+  border: 1px solid transparent; cursor:pointer; position: relative;
+}
+.s:hover { background: rgba(255,255,255,.015); }
+.s.on {
+  background: var(--bg-card);
+  border-color: rgba(107,89,222,.5);
+  box-shadow: 0 1px 2px rgba(0,0,0,.2);
+}
+.s .tr { display:flex; align-items:center; gap:8px; min-width:0; }
+.s .t { font: 500 12.5px var(--font-sans); color: var(--fg); flex:1; letter-spacing: -0.005em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.s .t-time { font: 400 10px var(--font-mono-ui); color: var(--fg-faint); flex-shrink:0; }
+.s .meta { display:flex; align-items:center; gap:8px; font: 400 10px var(--font-mono-ui); color: var(--fg-muted); }
+.s .rt { display:inline-flex; align-items:center; gap:3px; }
+.s .pdot { width:5px; height:5px; border-radius:99px; }
+.s .lane { height: 3px; border-radius: 99px; background: var(--border); overflow: hidden; position: relative; }
+.s .lane i { display:block; height:100%; border-radius:99px; position: relative; overflow: hidden; }
+.s .lane i.running { background: linear-gradient(90deg, #60a5fa, #a78bfa); }
+.s .lane i.running::after { content:''; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.5), transparent); transform: translateX(-100%); animation: shimmer 1.8s ease-in-out infinite; }
+@keyframes shimmer { 0% { transform: translateX(-100%) } 100% { transform: translateX(200%) } }
+
+/* 24h activity sparkline under session title */
+.spark { height: 10px; display: flex; align-items: flex-end; gap: 1px; opacity: 0.45; }
+.spark i { width: 2px; background: var(--fg-muted); border-radius: 1px; }
+.s.on .spark { opacity: 1; }
+.s.on .spark i { background: var(--primary); }
+.s .unread {
+  position:absolute; top:0; bottom:0; left:0; width: 3px;
+  background: linear-gradient(180deg, transparent, var(--primary) 25%, var(--primary) 75%, transparent);
+  border-radius: 3px;
+  box-shadow: 0 0 8px rgba(107,89,222,.5);
+}
+
+/* ── main pane (session detail) ─────────────────────── */
+.main { display:flex; flex-direction:column; overflow:hidden; background: var(--bg); }
+.main-hd {
+  height: 44px; padding: 0 18px;
+  display:flex; align-items:center; gap:10px;
+  border-bottom: 1px solid var(--border);
+}
+.bc { font: 400 11px var(--font-mono-ui); color: var(--fg-muted); display:flex; align-items:center; gap:6px; }
+.bc .sep { opacity: 0.4; }
+.bc .cur { color: var(--fg); }
+.main-hd .st-chip {
+  margin-left: auto;
+  display:inline-flex; align-items:center; gap:5px;
+  padding: 3px 9px; border-radius: 99px;
+  background: rgba(96,165,250,.1);
+  border: 1px solid rgba(96,165,250,.25);
+  color: #7dbbff;
+  font:600 10px var(--font-mono-ui); text-transform: uppercase; letter-spacing: 0.06em;
+}
+.main-hd .st-chip i { width:5px; height:5px; border-radius:99px; background:#60a5fa; box-shadow: 0 0 6px #60a5fa; animation: glow 1.4s ease-in-out infinite; }
+.main-hd .ticker { margin-left: auto; display: flex; align-items: center; gap: 12px; font: 500 10px var(--font-mono-ui); color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.main-hd .ticker .v { color: var(--fg); font-variant-numeric: tabular-nums; font-weight: 600; }
+.main-hd .ticker .bump { animation: bump 1.8s ease-in-out infinite; }
+@keyframes bump { 0%, 80%, 100% { opacity: 1 } 85% { opacity: 0.4 } }
+.main-hd .icon-btn { width: 26px; height: 26px; border-radius: 5px; display: grid; place-items: center; color: var(--fg-muted); cursor: pointer; }
+.main-hd .icon-btn:hover { background: var(--bg-hover); color: var(--fg); }
+
+.sub-hd { padding: 10px 18px 0; display:flex; flex-direction:column; gap:10px; }
+.sub-hd h1 { margin:0; font: 600 17px/1.25 var(--font-sans); color: var(--fg); letter-spacing:-0.015em; }
+.kv-row { display:flex; gap: 18px; font: 400 11px var(--font-mono-ui); }
+.kv-row .kv { display:flex; gap:6px; align-items:center; color: var(--fg-muted); }
+.kv-row .kv b { color: var(--fg); font-weight: 500; }
+
+.tabs {
+  padding: 10px 18px 0; display:flex; gap: 2px;
+  border-bottom:1px solid var(--border); margin-top: 12px;
+}
+.tabs span { font:500 12px var(--font-sans); color:var(--fg-muted); padding: 6px 10px; border-bottom:2px solid transparent; margin-bottom:-1px; cursor:pointer; }
+.tabs .on { color: var(--fg); border-color: var(--primary); }
+
+.body { flex:1; padding: 14px 18px; overflow: hidden; display:grid; grid-template-columns: 1fr 220px; gap: 14px; position: relative; }
+.body::after { content: ''; position: absolute; left: 18px; right: 18px; bottom: 0; height: 36px; background: linear-gradient(180deg, transparent, var(--bg)); pointer-events: none; }
+
+/* Minimap strip on the far-right edge of the stream */
+.stream { position: relative; }
+.minimap { position: absolute; top: 0; right: -6px; bottom: 0; width: 3px; display: flex; flex-direction: column; gap: 2px; padding: 2px 0; }
+.minimap i { flex: 1; border-radius: 1px; }
+.minimap i.done { background: rgba(52,211,153,.4); }
+.minimap i.run { background: #60a5fa; box-shadow: 0 0 4px #60a5fa; }
+.minimap i.pend { background: #252540; }
+
+/* stream column */
+.stream { display:flex; flex-direction:column; gap: 8px; overflow: hidden; }
+.turn { display:flex; gap: 10px; }
+.turn .gut { width: 18px; display:flex; flex-direction:column; align-items:center; gap:4px; padding-top: 3px; flex-shrink: 0; }
+.turn .node { width: 8px; height: 8px; border-radius: 99px; border: 1.5px solid var(--fg-muted); background: var(--bg); flex-shrink: 0; }
+.turn .node.done { background: #34d399; border-color: #34d399; box-shadow: 0 0 0 3px rgba(52,211,153,.12); }
+.turn .node.run { background: #60a5fa; border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(96,165,250,.18); animation: glow 1.6s ease-in-out infinite; }
+.turn .rail { flex:1; width:1.5px; background: var(--border); border-radius:1px; }
+.turn .body-b { flex:1; min-width: 0; display:flex; flex-direction:column; gap: 4px; padding-bottom: 4px; }
+.turn .who { display:flex; align-items:baseline; gap: 6px; font: 500 11px var(--font-mono-ui); color: var(--fg); min-width: 0; }
+.turn .who .ag { color: var(--primary); flex-shrink: 0; }
+.turn .who .ph { color: var(--fg-muted); font-weight: 400; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.turn .who .t { color: var(--fg-faint); font-weight: 400; margin-left: auto; flex-shrink: 0; }
+.turn .msg { font: 400 12px/1.5 var(--font-sans); color: var(--fg-dim, var(--fg-muted)); }
+.turn .tool {
+  font: 400 11px/1.55 var(--font-mono); color: var(--fg-muted);
+  background: var(--bg-code);
+  border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,.2);
+}
+.turn .tool .thd {
+  padding: 5px 8px; display: flex; align-items: center; gap: 8px;
+  font: 500 10px var(--font-mono-ui); color: var(--fg-muted);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+  background: #1a1a28;
+}
+.turn .tool .thd .op { color: var(--primary); }
+.turn .tool .thd .path { color: var(--fg); font-family: var(--font-mono); text-transform: none; letter-spacing: 0; font-weight: 400; }
+.turn .tool .thd .sp { flex: 1; }
+.turn .tool .thd .meta { color: var(--fg-faint); font-family: var(--font-mono); text-transform: none; letter-spacing: 0; font-weight: 400; }
+.turn .tool .body-c { display: grid; grid-template-columns: 26px 1fr; }
+.turn .tool .gut-c { background: var(--bg); color: var(--fg-faint); font: 400 10px/17px var(--font-mono); text-align: right; padding: 5px 6px; user-select: none; border-right: 1px solid var(--border); }
+.turn .tool .code { padding: 5px 8px; font: 400 11px/17px var(--font-mono); overflow: hidden; }
+.turn .tool .code .add { background: rgba(52,211,153,.08); color: #6ee7b7; display: block; margin: 0 -8px; padding: 0 8px; border-left: 2px solid #34d399; }
+.turn .tool .code .kw { color: #c4b5fd; }
+.turn .tool .code .str { color: #86dbe4; }
+.turn .tool .code .fn { color: #fbbf24; }
+.turn .tool .code .cm { color: var(--fg-faint); }
+.turn .tool.shell { font: 400 11px/1.55 var(--font-mono); }
+.turn .tool.shell .code { padding: 6px 8px; }
+.turn .tool.shell .code .p { color: var(--primary); }
+.turn .tool.shell .code .ok { color: #34d399; }
+.live-indicator { display:flex; align-items:center; gap:6px; font: 500 11px var(--font-mono-ui); color: var(--primary); padding-left: 32px; margin-top: -2px; }
+.live-indicator i { width:6px; height:6px; border-radius:99px; background: var(--primary); animation: glow 1s ease-in-out infinite; }
+
+/* side rail: flow mini-viz + cost */
+.rail-col { display:flex; flex-direction:column; gap: 10px; overflow:hidden; }
+.panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 11px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.2);
+}
+.panel h3 { margin: 0 0 8px; font: 600 10px var(--font-mono-ui); color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.05em; display: flex; justify-content: space-between; }
+.panel h3 em { font-style: normal; color: var(--fg-faint); font-weight: 400; }
+
+/* stages vertical */
+.stages { display:flex; flex-direction:column; gap: 6px; }
+.stage { display:flex; align-items:center; gap:8px; font: 500 11px var(--font-sans); color: var(--fg); }
+.stage .pd { width: 7px; height: 7px; border-radius: 99px; flex-shrink: 0; }
+.stage .pd.done { background: #34d399; }
+.stage .pd.run { background: #60a5fa; box-shadow: 0 0 6px #60a5fa; animation: glow 1.6s ease-in-out infinite; }
+.stage .pd.wait { background: #fbbf24; }
+.stage .pd.pend { background: var(--border); }
+.stage .lb { flex: 1; }
+.stage .ty { font: 400 10px var(--font-mono-ui); color: var(--fg-faint); }
+.stage.muted .lb { color: var(--fg-muted); }
+
+.cost-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+.cost-grid .k { font: 400 10px var(--font-mono-ui); color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.cost-grid .v { font: 600 13px var(--font-mono); color: var(--fg); letter-spacing: -0.01em; margin-top: 1px; }
+.cost-grid .sub { font: 400 9px var(--font-mono-ui); color: var(--fg-faint); }
+
+svg.ic { width:15px; height:15px; stroke: currentColor; fill:none; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; }
+</style></head><body>
+
+<div class="frame">
+
+  <!-- SIDEBAR -->
+  <aside class="side">
+    <div class="brand">
+      <div class="logo">a</div>
+      <span class="dot" title="Conductor + arkd online"></span>
+    </div>
+
+    <nav class="nav">
+      <a class="on" href="#">
+        <svg class="ic" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        <span class="badge">3</span>
+        <span class="tip">Sessions <kbd>S</kbd></span>
+      </a>
+      <a href="#">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M12 8V4H8"/><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M2 14h2M20 14h2M15 13v2M9 13v2"/></svg>
+        <span class="tip">Agents <kbd>A</kbd></span>
+      </a>
+      <a href="#">
+        <svg class="ic" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        <span class="tip">Flows <kbd>F</kbd></span>
+      </a>
+      <a href="#">
+        <svg class="ic" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <span class="tip">Compute <kbd>C</kbd></span>
+      </a>
+      <a href="#">
+        <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span class="tip">History <kbd>H</kbd></span>
+      </a>
+      <div class="nav-sep"></div>
+      <a href="#">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        <span class="tip">Knowledge <kbd>M</kbd></span>
+      </a>
+      <a href="#">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        <span class="tip">Tools <kbd>T</kbd></span>
+      </a>
+      <a href="#">
+        <svg class="ic" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        <span class="tip">Costs <kbd>$</kbd></span>
+      </a>
+    </nav>
+
+    <div class="settings">
+      <a href="#">
+        <svg class="ic" viewBox="0 0 24 24"><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/><circle cx="12" cy="12" r="3"/></svg>
+        <span class="tip">Settings <kbd>,</kbd></span>
+      </a>
+      <div class="avatar-btn" title="me@ark.dev">JD</div>
+    </div>
+    <div class="foot">
+      <span class="net"><i></i>18ms</span>
+    </div>
+  </aside>
+
+  <!-- SESSION LIST -->
+  <section class="list">
+    <div class="list-hd">
+      <h2>Sessions</h2>
+      <span class="count">12</span>
+      <span class="spacer"></span>
+      <span class="new"><svg class="ic" viewBox="0 0 24 24" style="width:12px;height:12px;stroke-width:2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New</span>
+    </div>
+    <div class="filter">
+      <span class="on">Active 3</span>
+      <span>Queued 1</span>
+      <span>All</span>
+    </div>
+
+    <div class="sessions">
+      <div class="s on">
+        <span class="unread"></span>
+        <div class="tr">
+          <div class="t">Add OAuth to settings page</div>
+          <span class="t-time">02:47</span>
+        </div>
+        <div class="meta">
+          <span class="rt"><span class="pdot" style="background:#60a5fa; box-shadow:0 0 5px #60a5fa"></span>running</span>
+          <span>autonomous-sdlc</span>
+          <span class="rt"><svg class="ic" viewBox="0 0 24 24" style="width:10px;height:10px;opacity:.7"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>claude</span>
+        </div>
+        <div class="spark"><i style="height:20%"></i><i style="height:40%"></i><i style="height:30%"></i><i style="height:65%"></i><i style="height:85%"></i><i style="height:55%"></i><i style="height:70%"></i><i style="height:95%"></i><i style="height:75%"></i><i style="height:100%"></i><i style="height:60%"></i><i style="height:80%"></i></div>
+        <div class="lane"><i class="running" style="width:68%"></i></div>
+      </div>
+
+      <div class="s">
+        <div class="tr">
+          <div class="t">Refactor session store</div>
+          <span class="t-time">18m</span>
+        </div>
+        <div class="meta">
+          <span class="rt"><span class="pdot" style="background:#34d399"></span>completed</span>
+          <span>quick-fix</span>
+          <span>codex</span>
+        </div>
+        <div class="spark"><i style="height:30%"></i><i style="height:50%"></i><i style="height:40%"></i><i style="height:70%"></i><i style="height:60%"></i><i style="height:45%"></i><i style="height:55%"></i><i style="height:40%"></i><i style="height:30%"></i><i style="height:20%"></i><i style="height:15%"></i><i style="height:10%"></i></div>
+        <div class="lane"><i style="width:100%; background: #34d399"></i></div>
+      </div>
+
+      <div class="s">
+        <span class="unread" style="background:#fbbf24; box-shadow:0 0 6px rgba(251,191,36,.6)"></span>
+        <div class="tr">
+          <div class="t">Fix flaky e2e test</div>
+          <span class="t-time">03:21</span>
+        </div>
+        <div class="meta">
+          <span class="rt"><span class="pdot" style="background:#fbbf24"></span>waiting · verifier gate</span>
+        </div>
+        <div class="lane"><i style="width:60%; background: #fbbf24"></i></div>
+      </div>
+
+      <div class="s">
+        <div class="tr">
+          <div class="t">Migrate drizzle schema 010</div>
+          <span class="t-time">1h</span>
+        </div>
+        <div class="meta">
+          <span class="rt"><span class="pdot" style="background:#f87171; box-shadow:0 0 5px rgba(248,113,113,.6)"></span>failed</span>
+          <span>fan-out · 3 workers</span>
+        </div>
+        <div class="lane"><i style="width:42%; background: #f87171"></i></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MAIN: session detail -->
+  <main class="main">
+    <div class="main-hd">
+      <div class="bc">
+        <span>ark</span><span class="sep">/</span>
+        <span>sessions</span><span class="sep">/</span>
+        <span class="cur">s-4f8a2c</span>
+      </div>
+      <span class="st-chip"><i></i>Running</span>
+      <div class="ticker">
+        <span><span class="v bump">150k</span> tok</span>
+        <span><span class="v">$0.84</span></span>
+        <span><span class="v">02:47</span></span>
+      </div>
+      <span class="icon-btn" title="Stop"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><rect x="6" y="6" width="12" height="12" rx="1"/></svg></span>
+      <span class="icon-btn" title="More"><svg class="ic" viewBox="0 0 24 24" style="width:14px;height:14px"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg></span>
+    </div>
+
+    <div class="sub-hd">
+      <h1>Add OAuth to settings page</h1>
+      <div class="kv-row">
+        <div class="kv">repo <b>~/code/ark</b></div>
+        <div class="kv">branch <b>feat/oauth-settings</b></div>
+        <div class="kv">flow <b>autonomous-sdlc</b></div>
+        <div class="kv">started <b>10:29:58</b></div>
+      </div>
+    </div>
+
+    <div class="tabs"><span class="on">Transcript</span><span>Flow</span><span>Diff</span><span>Files</span><span>Cost</span><span>Knowledge</span></div>
+
+    <div class="body">
+      <div class="stream">
+        <div class="turn">
+          <div class="gut"><span class="node done"></span><span class="rail"></span></div>
+          <div class="body-b">
+            <div class="who"><span class="ag">plan-auditor</span><span class="ph">approved spec</span><span class="t">10:30:41</span></div>
+            <div class="msg">Spec covers happy path and revoked-token edge case. Ready for implementer.</div>
+          </div>
+        </div>
+
+        <div class="turn">
+          <div class="gut"><span class="node done"></span><span class="rail"></span></div>
+          <div class="body-b">
+            <div class="who"><span class="ag">implementer</span><span class="ph">step 3/6 · edit</span><span class="t">10:32:47</span></div>
+            <div class="tool">
+              <div class="thd"><span class="op">Edit</span><span class="path">packages/core/src/auth.ts</span><span class="sp"></span><span class="meta">+2 −0</span></div>
+              <div class="body-c">
+                <div class="gut-c">41<br>42<br>43</div>
+                <div class="code"><span class="cm">// add oauth provider</span><br><span class="add"><span class="kw">import</span> { OAuthProvider } <span class="kw">from</span> <span class="str">'./oauth'</span>;</span><span class="add"><span class="kw">const</span> <span class="fn">provider</span> = <span class="kw">new</span> OAuthProvider(config);</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="turn">
+          <div class="gut"><span class="node run"></span><span class="rail"></span></div>
+          <div class="body-b">
+            <div class="who"><span class="ag">implementer</span><span class="ph">step 4/6 · bash</span><span class="t">10:33:12</span></div>
+            <div class="tool shell">
+              <div class="thd"><span class="op">Bash</span><span class="path">bun test packages/core</span><span class="sp"></span><span class="meta">running…</span></div>
+              <div class="code"><span class="p">$</span> bun test packages/core<br><span class="cm">bun test v1.1.30</span><br><span class="ok">✓</span> auth.test.ts <span class="cm">(12 pass)</span><br><span class="ok">✓</span> oauth.test.ts <span class="cm">(8 pass)</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="live-indicator"><i></i>streaming…</div>
+
+        <div class="minimap">
+          <i class="done"></i><i class="done"></i><i class="done"></i>
+          <i class="run"></i><i class="run"></i>
+          <i class="pend"></i><i class="pend"></i><i class="pend"></i>
+        </div>
+      </div>
+
+      <!-- right rail -->
+      <div class="rail-col">
+        <div class="panel">
+          <h3>Flow <em>4/6</em></h3>
+          <div class="stages">
+            <div class="stage muted"><span class="pd done"></span><span class="lb">intake</span><span class="ty">00:14</span></div>
+            <div class="stage muted"><span class="pd done"></span><span class="lb">spec-planner</span><span class="ty">01:22</span></div>
+            <div class="stage muted"><span class="pd done"></span><span class="lb">plan-auditor</span><span class="ty">00:41</span></div>
+            <div class="stage"><span class="pd run"></span><span class="lb">implementer</span><span class="ty">02:47</span></div>
+            <div class="stage muted"><span class="pd pend"></span><span class="lb">verifier</span><span class="ty">queued</span></div>
+            <div class="stage muted"><span class="pd pend"></span><span class="lb">reviewer</span><span class="ty">queued</span></div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Cost <em>live</em></h3>
+          <div class="cost-grid">
+            <div><div class="k">Tokens in</div><div class="v">128.4k</div><div class="sub">claude · sonnet 4</div></div>
+            <div><div class="k">Tokens out</div><div class="v">21.9k</div><div class="sub">3 tool calls</div></div>
+            <div><div class="k">Spend</div><div class="v">$0.84</div><div class="sub">cap: $5.00</div></div>
+            <div><div class="k">Worker</div><div class="v" style="font-size:11px">ec2-04</div><div class="sub">t3.medium</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+</body></html>

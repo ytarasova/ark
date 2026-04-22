@@ -1,0 +1,277 @@
+<!doctype html>
+<html class="midnight-circuit dark" lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ark Design System</title>
+  <link rel="icon" href="assets/ark-icon.png">
+  <link rel="stylesheet" href="colors_and_type.css">
+  <style>
+    html, body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-sans);
+      font-size: var(--type-body-size);
+      line-height: var(--type-body-lh);
+      min-height: 100vh;
+    }
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { color: var(--primary-hover); }
+    .shell { max-width: 1200px; margin: 0 auto; padding: 48px 32px; }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 32px;
+      margin-bottom: 32px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .brand img { width: 32px; height: 32px; border-radius: 6px; }
+    .brand h1 {
+      font-size: var(--type-title-size);
+      line-height: var(--type-title-lh);
+      font-weight: var(--type-title-weight);
+      letter-spacing: var(--type-title-tracking);
+      margin: 0;
+    }
+    .lead {
+      font-size: var(--type-heading-size);
+      line-height: var(--type-heading-lh);
+      color: var(--fg-muted);
+      max-width: 780px;
+    }
+    nav.back {
+      font-size: var(--type-caption-size);
+      line-height: var(--type-caption-lh);
+      color: var(--fg-muted);
+      font-family: var(--font-mono-ui);
+      margin-bottom: 16px;
+    }
+    section { margin-bottom: 48px; }
+    h2 {
+      font-size: var(--type-heading-size);
+      line-height: var(--type-heading-lh);
+      font-weight: var(--type-heading-weight);
+      letter-spacing: var(--type-heading-tracking);
+      margin: 0 0 16px 0;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-light);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 12px;
+    }
+    .tile {
+      display: block;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      color: var(--fg);
+      transition: background 150ms cubic-bezier(0.32, 0.72, 0, 1);
+    }
+    .tile:hover { background: var(--bg-hover); color: var(--fg); }
+    .tile h3 {
+      margin: 0 0 4px 0;
+      font-size: var(--type-body-size);
+      line-height: var(--type-body-lh);
+      font-weight: var(--type-body-med-weight);
+    }
+    .tile p {
+      margin: 0;
+      font-size: var(--type-caption-size);
+      line-height: var(--type-caption-lh);
+      color: var(--fg-muted);
+    }
+    .tile .path {
+      margin-top: 8px;
+      font-family: var(--font-mono-ui);
+      font-size: var(--type-micro-size);
+      color: var(--fg-subtle);
+    }
+    .feature {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 24px;
+    }
+    .feature-text h3 {
+      margin: 0 0 4px 0;
+      font-size: var(--type-body-size);
+      line-height: var(--type-body-lh);
+      font-weight: var(--type-body-med-weight);
+    }
+    .feature-text p {
+      margin: 0;
+      font-size: var(--type-caption-size);
+      line-height: var(--type-caption-lh);
+      color: var(--fg-muted);
+    }
+    .button {
+      display: inline-block;
+      background: var(--primary);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: var(--type-label-size);
+      line-height: var(--type-label-lh);
+      font-weight: var(--type-label-weight);
+      border: 0;
+    }
+    .button:hover { background: var(--primary-hover); color: white; }
+    .theme-switch {
+      display: flex;
+      gap: 4px;
+      font-family: var(--font-mono-ui);
+      font-size: var(--type-micro-size);
+    }
+    .theme-switch button {
+      background: var(--bg-card);
+      color: var(--fg);
+      border: 1px solid var(--border);
+      padding: 4px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      font: inherit;
+    }
+    .theme-switch button:hover { background: var(--bg-hover); }
+    .theme-switch button.active { background: var(--primary); color: white; border-color: var(--primary); }
+    footer {
+      margin-top: 64px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border-light);
+      font-size: var(--type-caption-size);
+      color: var(--fg-subtle);
+      font-family: var(--font-mono-ui);
+    }
+    footer a { color: var(--fg-muted); }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <nav class="back"><a href="../">&lt; Back to Ark docs</a></nav>
+    <header>
+      <div class="brand">
+        <img src="assets/ark-icon.png" alt="Ark logo">
+        <h1>Ark Design System</h1>
+      </div>
+      <p class="lead">The visual language of Ark. Six theme variants (three palettes × light/dark), typography, spacing, radii, iconography, and component gallery. Built from the <code>packages/web</code> source of <a href="https://github.com/ytarasova/ark">ytarasova/ark</a>.</p>
+      <div class="theme-switch" style="margin-top:16px">
+        <button data-theme="midnight-circuit dark" class="active">midnight dark</button>
+        <button data-theme="midnight-circuit light">midnight light</button>
+        <button data-theme="arctic-slate dark">arctic dark</button>
+        <button data-theme="arctic-slate light">arctic light</button>
+        <button data-theme="warm-obsidian dark">warm dark</button>
+        <button data-theme="warm-obsidian light">warm light</button>
+      </div>
+    </header>
+
+    <section>
+      <div class="feature">
+        <div class="feature-text">
+          <h3>App showcase</h3>
+          <p>The full dashboard mock running the midnight-circuit theme. Session list, detail view, flow DAG, live transcript.</p>
+        </div>
+        <a class="button" href="design-midnight-circuit.html">Open showcase</a>
+      </div>
+      <div class="feature">
+        <div class="feature-text">
+          <h3>Design system reference</h3>
+          <p>Full brand + voice + visual foundations. Read before contributing UI.</p>
+        </div>
+        <a class="button" href="README.md">Read README</a>
+      </div>
+    </section>
+
+    <section>
+      <h2>Color</h2>
+      <div class="grid">
+        <a class="tile" href="preview/colors-primary.html"><h3>Primary</h3><p>The brand indigo ramp.</p><div class="path">preview/colors-primary.html</div></a>
+        <a class="tile" href="preview/colors-semantic.html"><h3>Semantic</h3><p>Status + diff + system colors.</p><div class="path">preview/colors-semantic.html</div></a>
+        <a class="tile" href="preview/colors-themes.html"><h3>Themes</h3><p>All six theme variants side by side.</p><div class="path">preview/colors-themes.html</div></a>
+      </div>
+    </section>
+
+    <section>
+      <h2>Typography + spacing</h2>
+      <div class="grid">
+        <a class="tile" href="preview/type-fonts.html"><h3>Fonts</h3><p>Inter + JetBrains Mono + Geist Mono.</p><div class="path">preview/type-fonts.html</div></a>
+        <a class="tile" href="preview/type-scale.html"><h3>Scale</h3><p>Nine-step semantic scale, 13px base.</p><div class="path">preview/type-scale.html</div></a>
+        <a class="tile" href="preview/spacing.html"><h3>Spacing</h3><p>4px baseline, 9 steps.</p><div class="path">preview/spacing.html</div></a>
+        <a class="tile" href="preview/radii-shadows.html"><h3>Radii + shadows</h3><p>6/8/12 radius, minimal shadows.</p><div class="path">preview/radii-shadows.html</div></a>
+      </div>
+    </section>
+
+    <section>
+      <h2>Brand + iconography</h2>
+      <div class="grid">
+        <a class="tile" href="preview/brand-lockup.html"><h3>Brand lockup</h3><p>Logo + wordmark variants.</p><div class="path">preview/brand-lockup.html</div></a>
+        <a class="tile" href="preview/icons.html"><h3>Icons</h3><p>Lucide set, 16px / 14px dense.</p><div class="path">preview/icons.html</div></a>
+      </div>
+    </section>
+
+    <section>
+      <h2>Core components</h2>
+      <div class="grid">
+        <a class="tile" href="preview/buttons.html"><h3>Buttons</h3><p>Primary, secondary, ghost, destructive.</p><div class="path">preview/buttons.html</div></a>
+        <a class="tile" href="preview/badges.html"><h3>Badges</h3><p>Status pills + runtime tags.</p><div class="path">preview/badges.html</div></a>
+        <a class="tile" href="preview/cards-session.html"><h3>Session cards</h3><p>List-row + feature-card variants.</p><div class="path">preview/cards-session.html</div></a>
+      </div>
+    </section>
+
+    <section>
+      <h2>Forms</h2>
+      <div class="grid">
+        <a class="tile" href="preview/form-inputs.html"><h3>All inputs</h3><p>Composite gallery.</p><div class="path">preview/form-inputs.html</div></a>
+        <a class="tile" href="preview/form-input-text.html"><h3>Text input</h3><p>Single-line + label.</p><div class="path">preview/form-input-text.html</div></a>
+        <a class="tile" href="preview/form-input-textarea.html"><h3>Textarea</h3><p>Multi-line input.</p><div class="path">preview/form-input-textarea.html</div></a>
+        <a class="tile" href="preview/form-input-select.html"><h3>Select</h3><p>Dropdown.</p><div class="path">preview/form-input-select.html</div></a>
+        <a class="tile" href="preview/form-input-states.html"><h3>Input states</h3><p>Default / focus / error / disabled.</p><div class="path">preview/form-input-states.html</div></a>
+        <a class="tile" href="preview/form-checkbox-radio.html"><h3>Check / radio</h3><p>Boolean + exclusive controls.</p><div class="path">preview/form-checkbox-radio.html</div></a>
+      </div>
+    </section>
+
+    <section>
+      <h2>App chrome + data viz</h2>
+      <div class="grid">
+        <a class="tile" href="preview/app-chrome.html"><h3>App chrome</h3><p>3-column shell: rail + list + main.</p><div class="path">preview/app-chrome.html</div></a>
+        <a class="tile" href="preview/chrome-sidebar.html"><h3>Sidebar</h3><p>Icon rail navigation.</p><div class="path">preview/chrome-sidebar.html</div></a>
+        <a class="tile" href="preview/chrome-session-list.html"><h3>Session list</h3><p>Middle-column list of sessions.</p><div class="path">preview/chrome-session-list.html</div></a>
+        <a class="tile" href="preview/chrome-session-header.html"><h3>Session header</h3><p>Top-of-detail breadcrumb + actions.</p><div class="path">preview/chrome-session-header.html</div></a>
+        <a class="tile" href="preview/chrome-tool-block.html"><h3>Tool-call block</h3><p>Inline tool invocation in transcript.</p><div class="path">preview/chrome-tool-block.html</div></a>
+        <a class="tile" href="preview/flow-dag.html"><h3>Flow DAG</h3><p>Pipeline visualization.</p><div class="path">preview/flow-dag.html</div></a>
+        <a class="tile" href="preview/code-diff.html"><h3>Diff</h3><p>Add / remove transcripts.</p><div class="path">preview/code-diff.html</div></a>
+        <a class="tile" href="preview/stats-chart.html"><h3>Stats chart</h3><p>Cost + token sparkline.</p><div class="path">preview/stats-chart.html</div></a>
+      </div>
+    </section>
+
+    <footer>
+      Generated from <a href="https://github.com/ytarasova/ark/tree/main/docs/design-system">docs/design-system</a>.
+      Source of truth: <code>packages/web/src/themes/</code> + <code>packages/web/src/components/ui/</code>.
+    </footer>
+  </div>
+
+  <script>
+    const root = document.documentElement;
+    const buttons = document.querySelectorAll('.theme-switch button');
+    buttons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const cls = btn.dataset.theme;
+        root.className = cls;
+        buttons.forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>

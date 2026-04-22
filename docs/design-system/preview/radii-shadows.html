@@ -1,0 +1,30 @@
+<!doctype html><html class="midnight-circuit dark"><head>
+<meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+.radii-row { display:flex; gap:14px; align-items:flex-end; margin-bottom: 18px; }
+.rd { width: 88px; height: 72px; background: var(--bg-card); border: 1px solid var(--border); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; }
+.rd .t { font:500 11px/14px var(--font-mono-ui); color: var(--fg); }
+.rd .v { font:400 10px/14px var(--font-mono-ui); color: var(--fg-muted); }
+.shadow-row { display:flex; gap:14px; }
+.sh { flex:1; aspect-ratio: 2.4; background: var(--bg-popover); border: 1px solid var(--border); border-radius: 8px; display:flex; align-items:center; justify-content:center; font: 500 11px var(--font-mono-ui); color: var(--fg-muted); }
+.sh-modal { box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+.glow-box { display:flex; align-items:center; gap:8px; font:400 11px var(--font-mono-ui); color: var(--fg-muted); padding:10px 12px; background: var(--bg-card); border:1px solid var(--border); border-radius:6px; }
+.dot { width:8px; height:8px; border-radius:99px; }
+</style></head><body><div class="card">
+<div class="radii-row">
+  <div class="rd" style="border-radius:6px"><span class="t">sm</span><span class="v">6px</span></div>
+  <div class="rd" style="border-radius:8px"><span class="t">md</span><span class="v">8px</span></div>
+  <div class="rd" style="border-radius:12px"><span class="t">lg</span><span class="v">12px</span></div>
+  <div class="rd" style="border-radius:99px; width:120px"><span class="t">pill · status only</span><span class="v">99px</span></div>
+  <div style="flex:1; text-align:right; font:400 10px var(--font-mono-ui); color: var(--fg-muted);">no 2/16/24 · borders carry hierarchy, not shadows</div>
+</div>
+<div class="shadow-row" style="margin-bottom:14px">
+  <div class="sh">card · no shadow · border only</div>
+  <div class="sh sh-modal">popover · 0 4 16 · rgba(0,0,0,.3)</div>
+</div>
+<div style="display:flex; gap:12px">
+  <div class="glow-box"><span class="dot" style="background:#60a5fa; box-shadow: 0 0 8px rgba(96,165,250,.6)"></span>running · glow 8px</div>
+  <div class="glow-box"><span class="dot" style="background:#f87171; box-shadow: 0 0 8px rgba(248,113,113,.5)"></span>failed · glow 8px</div>
+  <div class="glow-box"><span class="dot" style="background:#34d399"></span>completed · no glow</div>
+</div>
+</div></body></html>

@@ -1,0 +1,147 @@
+<!doctype html><html class="midnight-circuit dark"><head>
+<meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+body { padding: 20px; font-family: var(--font-sans); }
+.card { gap: 16px; }
+.row { display: grid; grid-template-columns: 120px 1fr; gap: 14px; align-items: center; }
+.row .lab { font: 500 10px var(--font-mono-ui); color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* Shared input surface — inset/recessed, not raised */
+.input {
+  display: flex; align-items: center; gap: 8px;
+  height: 32px; padding: 0 11px;
+  border-radius: 6px;
+  background: #0a0a12;
+  border: 1px solid var(--border);
+  box-shadow:
+    0 1px 2px rgba(0,0,0,.5) inset,
+    0 1px 0 rgba(255,255,255,.02);
+  transition: border-color 120ms, box-shadow 120ms, background 120ms;
+}
+.input:hover {
+  border-color: #33334d;
+  background: #0d0d18;
+}
+.input > input {
+  flex: 1; min-width: 0;
+  appearance: none; border: 0; outline: none; background: transparent;
+  font: 500 12px var(--font-sans); color: var(--fg); letter-spacing: -0.005em;
+}
+.input > input::placeholder { color: var(--fg-faint); }
+.input .adorn {
+  font: 500 10px var(--font-mono-ui); color: var(--fg-faint);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.input .adorn.lead { padding-right: 8px; margin-right: 2px; border-right: 1px solid var(--border); }
+.input .adorn svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
+.input.focused {
+  border-color: var(--primary);
+  background: #0d0d18;
+  box-shadow:
+    0 1px 2px rgba(0,0,0,.5) inset,
+    0 0 0 3px rgba(107,89,222,.18);
+}
+.input.focused > input { caret-color: var(--primary); }
+.input.invalid {
+  border-color: #f87171;
+  box-shadow:
+    0 1px 2px rgba(0,0,0,.5) inset,
+    0 0 0 3px rgba(248,113,113,.12);
+}
+.input.disabled { opacity: 0.5; cursor: not-allowed; }
+.input.disabled > input { pointer-events: none; }
+
+/* REPL underline variant (terminal-style) */
+.input-underline {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 2px 7px;
+  border-bottom: 1px solid var(--border);
+  transition: border-color 120ms;
+}
+.input-underline.focused { border-bottom-color: var(--primary); }
+.input-underline .prompt { font: 500 13px var(--font-mono); color: var(--primary); user-select: none; }
+.input-underline input {
+  flex: 1; appearance: none; border: 0; outline: none; background: transparent;
+  font: 500 14px var(--font-mono); color: var(--fg); letter-spacing: -0.005em;
+}
+.input-underline input::placeholder { color: var(--fg-faint); }
+
+.err { font: 500 10px var(--font-mono-ui); color: #f87171; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+.ok-chip {
+  width: 20px; height: 20px; border-radius: 99px;
+  background: rgba(52,211,153,.18); color: #34d399;
+  display: grid; place-items: center;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+.ok-chip svg { width: 12px !important; height: 12px !important; stroke: currentColor; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; display: block; }
+</style></head>
+<body>
+<div class="card">
+
+  <div class="row"><span class="lab">default</span>
+    <label class="input">
+      <input placeholder="session title…">
+    </label>
+  </div>
+
+  <div class="row"><span class="lab">filled</span>
+    <label class="input">
+      <input value="add-oauth-to-settings-page">
+    </label>
+  </div>
+
+  <div class="row"><span class="lab">focused</span>
+    <label class="input focused">
+      <input value="add-oauth-to-set">
+    </label>
+  </div>
+
+  <div class="row"><span class="lab">w/ leading</span>
+    <label class="input">
+      <span class="adorn lead">slug://</span>
+      <input value="add-oauth">
+    </label>
+  </div>
+
+  <div class="row"><span class="lab">w/ validate</span>
+    <label class="input focused">
+      <span class="adorn lead">❯</span>
+      <input value="add-oauth-to-settings-page">
+      <span class="ok-chip"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+    </label>
+  </div>
+
+  <div class="row"><span class="lab">invalid</span>
+    <div>
+      <label class="input invalid">
+        <input value="Has Spaces & Caps">
+      </label>
+      <div class="err">slug contains invalid characters</div>
+    </div>
+  </div>
+
+  <div class="row"><span class="lab">disabled</span>
+    <label class="input disabled">
+      <input value="read-only-session" disabled>
+    </label>
+  </div>
+
+  <div class="row"><span class="lab">underline</span>
+    <div class="input-underline focused">
+      <span class="prompt">❯</span>
+      <input value="ark dispatch --flow quick">
+    </div>
+  </div>
+
+  <div class="row"><span class="lab">underline empty</span>
+    <div class="input-underline">
+      <span class="prompt">$</span>
+      <input placeholder="ark ...">
+    </div>
+  </div>
+
+</div>
+</body></html>

@@ -1,0 +1,35 @@
+<!doctype html><html class="midnight-circuit dark"><head>
+<meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+.grid { display:grid; grid-template-columns: repeat(8, 1fr); gap:18px; justify-items:center; align-items:center; }
+.ic { display:flex; flex-direction:column; align-items:center; gap:6px; }
+.ic svg { width: 22px; height: 22px; stroke: var(--fg); fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.ic .n { font: 400 10px var(--font-mono-ui); color: var(--fg-muted); }
+.head { font: 500 10px/14px var(--font-mono-ui); color: var(--fg-muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:10px; }
+.section { margin-bottom:16px; }
+</style></head><body><div class="card">
+<div class="section"><div class="head">Navigation · status</div>
+<div class="grid">
+  <div class="ic"><svg viewBox="0 0 24 24"><path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10"/></svg><span class="n">Home</span></div>
+  <div class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg><span class="n">Dashboard</span></div>
+  <div class="ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><span class="n">Search</span></div>
+  <div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="n">Settings</span></div>
+  <div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg><span class="n">running</span></div>
+  <div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="9 12 11 14 15 10"/></svg><span class="n">completed</span></div>
+  <div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg><span class="n">failed</span></div>
+  <div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg><span class="n">Clock</span></div>
+</div>
+</div>
+<div class="section"><div class="head">Sessions · files · compute</div>
+<div class="grid">
+  <div class="ic"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg><span class="n">Play</span></div>
+  <div class="ic"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14"/></svg><span class="n">Stop</span></div>
+  <div class="ic"><svg viewBox="0 0 24 24"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg><span class="n">Fork</span></div>
+  <div class="ic"><svg viewBox="0 0 24 24"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"/></svg><span class="n">Refresh</span></div>
+  <div class="ic"><svg viewBox="0 0 24 24"><path d="M21 7v14H3V3h10"/><path d="M16 2l6 6-10 10H6v-6z"/></svg><span class="n">FileText</span></div>
+  <div class="ic"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="6" rx="1"/><rect x="2" y="14" width="20" height="6" rx="1"/><line x1="6" y1="7" x2="6" y2="7"/><line x1="6" y1="17" x2="6" y2="17"/></svg><span class="n">Server</span></div>
+  <div class="ic"><svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg><span class="n">Terminal</span></div>
+  <div class="ic"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="10" r="1"/><circle cx="15" cy="10" r="1"/><path d="M8 16h8"/></svg><span class="n">Bot</span></div>
+</div>
+</div>
+</div></body></html>

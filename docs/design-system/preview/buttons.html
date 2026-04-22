@@ -1,0 +1,84 @@
+<!doctype html><html class="midnight-circuit dark"><head>
+<meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+body { padding: 18px 20px; }
+.row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; padding:8px 0; }
+
+.btn {
+  display:inline-flex; align-items:center; gap:6px;
+  height:32px; padding:0 13px;
+  border-radius:6px;
+  font: 500 12px var(--font-sans);
+  letter-spacing: -0.005em;
+  border: 1px solid transparent;
+  cursor:pointer;
+  transition: background 120ms, border-color 120ms, filter 120ms, transform 80ms;
+}
+
+/* primary — flat fill, whisper of shadow */
+.btn-primary {
+  background: var(--primary);
+  color: var(--primary-fg);
+  border-color: rgba(0,0,0,.25);
+  box-shadow: 0 1px 2px rgba(0,0,0,.25);
+}
+.btn-primary:hover { background: #7d6be8; }
+.btn-primary:active { background: #5f4ed0; }
+
+/* secondary — flat matte */
+.btn-secondary {
+  background: #1e1e30;
+  color: var(--fg);
+  border-color: var(--border);
+  box-shadow: 0 1px 2px rgba(0,0,0,.2);
+}
+.btn-secondary:hover { background: #24243a; border-color: var(--border-light); }
+.btn-secondary:active { background: #1a1a28; }
+
+/* ghost */
+.btn-ghost {
+  background: transparent; color: var(--fg-muted);
+}
+.btn-ghost:hover { color: var(--fg); background: var(--bg-hover); }
+
+/* danger — outlined, warm tinted */
+.btn-danger {
+  background: rgba(248,113,113,.06);
+  color: #f87171;
+  border-color: rgba(248,113,113,.35);
+  box-shadow: 0 1px 2px rgba(0,0,0,.2);
+}
+.btn-danger:hover { background: rgba(248,113,113,.12); border-color: rgba(248,113,113,.55); }
+
+.btn-sm { height: 26px; padding: 0 11px; font-size: 11px; }
+.btn-icon { width:32px; padding:0; justify-content:center; }
+.btn-sm.btn-icon { width: 26px; }
+
+.lab { width: 80px; font: 500 10px var(--font-mono-ui); color: var(--fg-muted); text-transform:uppercase; letter-spacing:0.05em; }
+svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+</style></head><body><div class="card">
+
+<div class="row"><span class="lab">primary</span>
+  <button class="btn btn-primary"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>Dispatch</button>
+  <button class="btn btn-primary">Create session</button>
+  <button class="btn btn-primary btn-sm">Save</button>
+</div>
+
+<div class="row"><span class="lab">secondary</span>
+  <button class="btn btn-secondary"><svg viewBox="0 0 24 24"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>Fork</button>
+  <button class="btn btn-secondary">Export</button>
+  <button class="btn btn-secondary btn-sm">Cancel</button>
+</div>
+
+<div class="row"><span class="lab">ghost</span>
+  <button class="btn btn-ghost">Stop</button>
+  <button class="btn btn-ghost">Resume</button>
+  <button class="btn btn-ghost btn-icon"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
+</div>
+
+<div class="row"><span class="lab">danger</span>
+  <button class="btn btn-danger">Delete session</button>
+  <button class="btn btn-danger btn-sm">Kill worker</button>
+</div>
+
+</div></body></html>

@@ -1,0 +1,138 @@
+<!doctype html><html class="midnight-circuit dark"><head>
+<meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+body { padding: 16px; }
+
+.card-demo {
+  position: relative;
+  background: linear-gradient(180deg, rgba(255,255,255,.025) 0%, rgba(255,255,255,0) 25%, rgba(0,0,0,.15) 100%), var(--bg-card);
+  border: 1px solid var(--border);
+  border-top-color: rgba(255,255,255,.07);
+  border-bottom-color: rgba(0,0,0,.5);
+  border-radius: 9px;
+  padding:13px 14px;
+  display:flex; flex-direction:column; gap:9px;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.04) inset,
+    0 -1px 0 rgba(0,0,0,.4) inset,
+    0 1px 2px rgba(0,0,0,.4),
+    0 8px 18px -4px rgba(0,0,0,.4);
+}
+.card-demo.active {
+  border-color: rgba(107,89,222,.45);
+  border-top-color: rgba(147,130,255,.55);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.06) inset,
+    0 -1px 0 rgba(0,0,0,.4) inset,
+    0 0 0 3px rgba(107,89,222,.1),
+    0 2px 4px rgba(0,0,0,.4),
+    0 12px 28px -6px rgba(107,89,222,.2);
+}
+.card-demo.active::before {
+  content: ''; position: absolute; left: 0; top: 14px; bottom: 14px; width: 2px;
+  background: linear-gradient(180deg, #a78bfa, var(--primary));
+  border-radius: 0 2px 2px 0;
+  box-shadow: 0 0 8px rgba(107,89,222,.6);
+}
+
+.head { display:flex; align-items:center; justify-content:space-between; }
+.id { font:500 10px/1 var(--font-mono-ui); color: var(--fg-faint); letter-spacing: 0.03em; }
+.title { font: 600 14px/19px var(--font-sans); color: var(--fg); letter-spacing:-0.01em; }
+
+.meta-row { display:flex; gap:12px; font: 400 11px/1.4 var(--font-mono-ui); color: var(--fg-muted); align-items:center; }
+.meta-row .num { color: var(--fg); font-variant-numeric: tabular-nums; }
+.meta-row .sp { flex: 1; }
+
+/* Inset progress rail with glowing fill */
+.progress {
+  position:relative; height:4px;
+  background: linear-gradient(180deg, rgba(0,0,0,.4), rgba(0,0,0,.2));
+  border-radius:99px; overflow:hidden;
+  box-shadow: 0 1px 1px rgba(0,0,0,.5) inset, 0 1px 0 rgba(255,255,255,.03);
+}
+.progress .fill {
+  position:absolute; top:0; left:0; height:100%;
+  background: linear-gradient(90deg, #8b7aff, var(--primary));
+  border-radius:99px;
+  box-shadow: 0 0 8px rgba(107,89,222,.6), 0 1px 0 rgba(255,255,255,.15) inset;
+}
+.progress .fill.ok { background: linear-gradient(90deg, #34d399, #22b07e); box-shadow: 0 0 8px rgba(52,211,153,.5), 0 1px 0 rgba(255,255,255,.15) inset; }
+
+/* Pills match badges.html */
+.badge {
+  display:inline-flex; align-items:center; gap:5px;
+  height:20px; padding:0 8px;
+  border-radius:99px;
+  font:500 10.5px/1 var(--font-sans);
+  border:1px solid transparent;
+  box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 1px 2px rgba(0,0,0,.3);
+}
+.dot { width:5px; height:5px; border-radius:99px; }
+.running { background: linear-gradient(180deg, rgba(96,165,250,.18), rgba(96,165,250,.06)); color:#7dbbff; border-color: rgba(96,165,250,.35); }
+.completed { background: linear-gradient(180deg, rgba(52,211,153,.15), rgba(52,211,153,.04)); color:#34d399; border-color: rgba(52,211,153,.32); }
+
+.rt {
+  font:500 9.5px/1 var(--font-mono-ui);
+  background: linear-gradient(180deg, #252540, #1a1a2d);
+  color: var(--fg);
+  border:1px solid var(--border);
+  border-top-color: rgba(255,255,255,.08);
+  padding: 3px 7px; border-radius:4px;
+  text-transform:uppercase; letter-spacing:.05em;
+  box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 1px 2px rgba(0,0,0,.3);
+}
+.tags { display:flex; gap:5px; }
+
+.ava { display: inline-flex; align-items: center; gap: -4px; }
+.ava .av {
+  width: 18px; height: 18px; border-radius: 99px;
+  background: linear-gradient(135deg, #6b59de, #a78bfa);
+  border: 1.5px solid var(--bg-card);
+  display: grid; place-items: center;
+  font: 600 8.5px var(--font-mono-ui); color: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,.5);
+  margin-left: -5px;
+}
+.ava .av:first-child { margin-left: 0; }
+.ava .av.alt { background: linear-gradient(135deg, #34d399, #0d9488); }
+</style></head><body><div class="card">
+
+<div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px">
+
+  <div class="card-demo active">
+    <div class="head">
+      <span class="badge running"><span class="dot" style="background:#60a5fa; box-shadow:0 0 5px rgba(96,165,250,.7)"></span>running</span>
+      <span class="id">s-4f8a2c</span>
+    </div>
+    <div class="title">Add OAuth to the settings page</div>
+    <div class="meta-row"><span>implementer · step 4/6</span><span class="sp"></span><span class="ava"><span class="av">YT</span></span></div>
+    <div class="progress"><div class="fill" style="width:62%"></div></div>
+    <div class="meta-row">
+      <span class="num">02:47</span>
+      <span class="num">284K tok</span>
+      <span class="num">$0.42</span>
+      <span class="sp"></span>
+      <div class="tags"><span class="rt">claude</span><span class="rt">ec2</span></div>
+    </div>
+  </div>
+
+  <div class="card-demo">
+    <div class="head">
+      <span class="badge completed"><span class="dot" style="background:#34d399"></span>completed</span>
+      <span class="id">s-2d1e4a</span>
+    </div>
+    <div class="title">Refactor session store to use drizzle</div>
+    <div class="meta-row"><span>closed 18m ago · +2 PRs</span><span class="sp"></span><span class="ava"><span class="av alt">MK</span><span class="av">YT</span></span></div>
+    <div class="progress"><div class="fill ok" style="width:100%"></div></div>
+    <div class="meta-row">
+      <span class="num">14:32</span>
+      <span class="num">1.2M tok</span>
+      <span class="num">$1.84</span>
+      <span class="sp"></span>
+      <div class="tags"><span class="rt">codex</span><span class="rt">local</span></div>
+    </div>
+  </div>
+
+</div>
+
+</div></body></html>

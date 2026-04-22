@@ -1,0 +1,209 @@
+<!doctype html><html class="midnight-circuit dark"><head>
+<meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+body { padding: 14px; background: var(--bg); margin: 0; }
+
+.card-wrap {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px 14px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 18px -6px rgba(0,0,0,.4);
+}
+
+.hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 10px; }
+.hd .t { font: 600 12px var(--font-sans); color: var(--fg); white-space: nowrap; }
+.hd .t .meta { color: var(--fg-faint); font-weight: 400; margin-left: 6px; font-family: var(--font-mono-ui); font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; }
+.legend { display: flex; gap: 10px; font: 500 9px var(--font-mono-ui); color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
+.legend span { display: inline-flex; align-items: center; gap: 4px; }
+.legend i { width: 6px; height: 6px; border-radius: 99px; display: inline-block; }
+
+/* Sunken board */
+.board {
+  position: relative;
+  border-radius: 8px;
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 40%, rgba(107,89,222,.05), transparent 70%),
+    linear-gradient(180deg, rgba(0,0,0,.3) 0%, rgba(0,0,0,0) 30%),
+    #0c0c18;
+  border: 1px solid rgba(0,0,0,.5);
+  box-shadow: 0 2px 5px rgba(0,0,0,.55) inset;
+  overflow: hidden;
+}
+.board::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image: radial-gradient(rgba(255,255,255,.04) 1px, transparent 1px);
+  background-size: 14px 14px;
+  background-position: 7px 7px;
+  mask-image: radial-gradient(ellipse 90% 80% at 50% 50%, #000 55%, transparent 100%);
+  pointer-events: none;
+}
+
+svg.dag { display: block; width: 100%; height: auto; position: relative; z-index: 1; }
+
+/* Node content */
+.node {
+  width: 100%; height: 100%;
+  border-radius: 8px;
+  box-sizing: border-box;
+  padding: 9px 11px;
+  display: flex; flex-direction: column; justify-content: center; gap: 4px;
+  font-family: var(--font-sans);
+  overflow: hidden;
+}
+.node .s {
+  font: 600 9px var(--font-mono-ui);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  display: flex; align-items: center; gap: 5px;
+  white-space: nowrap; overflow: hidden;
+}
+.node .s i { width: 5px; height: 5px; border-radius: 99px; display: inline-block; flex-shrink: 0; }
+.node .s .sep { opacity: 0.3; }
+.node .t { font: 600 13.5px var(--font-sans); color: var(--fg); letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.node .bar { margin-top: 4px; height: 2px; border-radius: 99px; background: rgba(0,0,0,.5); overflow: hidden; }
+.node .bar i { display: block; height: 100%; background: linear-gradient(90deg, #60a5fa, #a78bfa); border-radius: 99px; box-shadow: 0 0 6px rgba(96,165,250,.5); }
+
+.node.done {
+  background:
+    linear-gradient(180deg, rgba(52,211,153,.14) 0%, rgba(52,211,153,.05) 100%);
+  border: 1px solid rgba(52,211,153,.38);
+  box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 1px 2px rgba(0,0,0,.4);
+}
+.node.done .s { color: #6ee7b7; }
+.node.done .s i { background: #34d399; box-shadow: 0 0 5px rgba(52,211,153,.6); }
+
+.node.run {
+  background:
+    linear-gradient(180deg, rgba(96,165,250,.22) 0%, rgba(96,165,250,.08) 100%);
+  border: 1px solid rgba(96,165,250,.55);
+  box-shadow:
+    0 0 0 3px rgba(96,165,250,.08),
+    0 1px 0 rgba(255,255,255,.06) inset,
+    0 1px 2px rgba(0,0,0,.4),
+    0 6px 14px -4px rgba(96,165,250,.3);
+}
+.node.run .s { color: #93c5fd; }
+.node.run .s i { background: #60a5fa; box-shadow: 0 0 8px #60a5fa; animation: pulse 1.4s ease-in-out infinite; }
+
+.node.pend {
+  background: rgba(255,255,255,.02);
+  border: 1px dashed #33334d;
+}
+.node.pend .s { color: var(--fg-muted); }
+.node.pend .s i { background: #3a3a54; }
+.node.pend .t { color: var(--fg-muted); }
+
+@keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.4 } }
+@keyframes dash { to { stroke-dashoffset: -16; } }
+
+/* Edges */
+.edge { fill: none; stroke-linecap: round; stroke-width: 1.75; }
+.edge.done { stroke: #34d399; opacity: 0.75; }
+.edge.run { stroke: #60a5fa; stroke-dasharray: 6 6; animation: dash 0.8s linear infinite; filter: drop-shadow(0 0 3px rgba(96,165,250,.7)); }
+.edge.pend { stroke: #3a3a54; stroke-dasharray: 4 4; }
+.edge-halo { fill: none; stroke: #60a5fa; stroke-width: 6; opacity: 0.1; filter: blur(3px); }
+
+.arrowhead-done { fill: #34d399; opacity: 0.85; }
+.arrowhead-run { fill: #60a5fa; filter: drop-shadow(0 0 3px rgba(96,165,250,.8)); }
+.arrowhead-pend { fill: #3a3a54; }
+
+/* Junction pip */
+.pip-run { fill: #0c0c18; stroke: #60a5fa; stroke-width: 2; filter: drop-shadow(0 0 3px rgba(96,165,250,.6)); }
+</style></head>
+<body>
+
+<div class="card-wrap">
+  <div class="hd">
+    <span class="t">Flow · autonomous-sdlc<span class="meta">s-4f8a2c · 4/6</span></span>
+    <div class="legend">
+      <span><i style="background:#34d399"></i>done</span>
+      <span><i style="background:#60a5fa"></i>running</span>
+      <span><i style="background:#3a3a54"></i>pending</span>
+    </div>
+  </div>
+
+  <div class="board">
+    <!--
+      viewBox 860×260. Nodes 150×60 main chain, 176×68 for running node.
+      Generous spacing: ~44px horizontal gap between neighbors; arrows run edge-to-edge.
+      Arrow marker refX=9 so the tip lands exactly at the endpoint.
+
+      Layout (x = left, y = top):
+        intake       x=20,  y=100
+        spec-planner x=214, y=100
+        plan-auditor x=408, y=100
+        plan-auditor right edge = 558. Fan-out split at x=610.
+        implementer  x=660, y=26    (upper, running, 176×68)
+        verifier     x=660, y=174   (lower, pending, 176×60)
+    -->
+    <svg class="dag" viewBox="0 0 860 260" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <marker id="ah-done" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" class="arrowhead-done"/>
+        </marker>
+        <marker id="ah-run" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" class="arrowhead-run"/>
+        </marker>
+        <marker id="ah-pend" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" class="arrowhead-pend"/>
+        </marker>
+      </defs>
+
+      <!-- ============ EDGES ============ -->
+
+      <!-- intake → spec-planner : from x=170 (src edge=170) all the way to x=213 (1px before dst) -->
+      <path class="edge done" d="M 170 130 L 213 130" marker-end="url(#ah-done)"/>
+
+      <!-- spec-planner → plan-auditor : 364 → 407 -->
+      <path class="edge done" d="M 364 130 L 407 130" marker-end="url(#ah-done)"/>
+
+      <!-- Fan-out from plan-auditor right edge (x=558) → upper/lower nodes -->
+      <!-- Running halo (upper branch) -->
+      <path class="edge-halo" d="M 558 130 C 610 130, 610 60, 659 60"/>
+      <!-- Running branch → implementer left-mid (660,60) -->
+      <path class="edge run" d="M 558 130 C 610 130, 610 60, 659 60" marker-end="url(#ah-run)"/>
+      <!-- Pending branch → verifier left-mid (660,204) -->
+      <path class="edge pend" d="M 558 130 C 610 130, 610 204, 659 204" marker-end="url(#ah-pend)"/>
+
+      <!-- ============ NODES ============ -->
+      <foreignObject x="20" y="100" width="150" height="60">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="node done">
+          <div class="s"><i></i>done<span class="sep">·</span>14s</div>
+          <div class="t">intake</div>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="214" y="100" width="150" height="60">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="node done">
+          <div class="s"><i></i>done<span class="sep">·</span>1:22<span class="sep">·</span>claude</div>
+          <div class="t">spec-planner</div>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="408" y="100" width="150" height="60">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="node done">
+          <div class="s"><i></i>done<span class="sep">·</span>41s<span class="sep">·</span>codex</div>
+          <div class="t">plan-auditor</div>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="660" y="26" width="180" height="68">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="node run">
+          <div class="s"><i></i>running<span class="sep">·</span>4/6<span class="sep">·</span>claude</div>
+          <div class="t">implementer</div>
+          <div class="bar"><i style="width:66%"></i></div>
+        </div>
+      </foreignObject>
+
+      <foreignObject x="660" y="174" width="180" height="60">
+        <div xmlns="http://www.w3.org/1999/xhtml" class="node pend">
+          <div class="s"><i></i>queued<span class="sep">·</span>claude</div>
+          <div class="t">verifier</div>
+        </div>
+      </foreignObject>
+    </svg>
+  </div>
+</div>
+
+</body></html>

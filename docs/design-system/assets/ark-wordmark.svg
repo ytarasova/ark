@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 64" width="240" height="64">
+  <defs>
+    <linearGradient id="arkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6b8ef8"></stop>
+      <stop offset="100%" stop-color="#b49ef2"></stop>
+    </linearGradient>
+  </defs>
+  
+  <path d="M 8 52 L 28 12 L 48 52 L 42 52 L 36.5 40 L 19.5 40 L 14 52 Z M 22 34 L 34 34 L 28 21 Z" fill="url(#arkGrad)"></path>
+  
+  <text x="60" y="44" font-family="Inter, system-ui, sans-serif" font-size="32" font-weight="700" letter-spacing="-0.02em" fill="currentColor">ark</text>
+</svg>

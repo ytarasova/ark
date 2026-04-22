@@ -1,0 +1,211 @@
+<!doctype html><html class="midnight-circuit dark"><head>
+<meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+body { padding: 18px 20px; font-family: var(--font-sans); }
+.card { gap: 14px; }
+
+/* ── labels: identical language to lab in buttons.html ── */
+.lab {
+  font: 500 10px var(--font-mono-ui);
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex; align-items: center; gap: 6px;
+}
+.lab .req { color: var(--primary); }
+.lab .sp { flex: 1; }
+.lab .hint { color: var(--fg-faint); text-transform: none; letter-spacing: 0; font-family: var(--font-mono); }
+.lab .hint kbd { padding: 0 4px; border-radius: 3px; border: 1px solid var(--border); background: var(--bg-hover); color: var(--fg-muted); font-family: inherit; font-size: 10px; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+
+/* ── the ONE input surface: same recipe as .btn-secondary ────── */
+.input {
+  display: flex; align-items: center; gap: 8px;
+  min-height: 32px; padding: 0 11px;
+  border-radius: 6px;
+  background: #0a0a12;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  box-shadow:
+    0 1px 2px rgba(0,0,0,.5) inset,
+    0 1px 0 rgba(255,255,255,.02);
+  transition: border-color 120ms, box-shadow 120ms, background 120ms;
+}
+.input:hover { border-color: #33334d; background: #0d0d18; }
+.input:focus-within {
+  border-color: var(--primary);
+  background: #0d0d18;
+  box-shadow:
+    0 1px 2px rgba(0,0,0,.5) inset,
+    0 0 0 3px rgba(107,89,222,.18);
+}
+.input > input {
+  flex: 1; min-width: 0;
+  appearance: none; border: 0; outline: none; background: transparent;
+  font: 500 12px var(--font-sans);
+  color: var(--fg);
+  letter-spacing: -0.005em;
+  padding: 0; height: 30px;
+}
+.input > input::placeholder { color: var(--fg-faint); }
+.input .adorn {
+  font: 500 10px var(--font-mono-ui);
+  color: var(--fg-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.input .adorn.lead { padding-right: 8px; margin-right: 2px; border-right: 1px solid var(--border); }
+.input .adorn.trail { margin-left: auto; }
+.input .adorn svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.input .adorn .ok {
+  width: 12px; height: 12px; border-radius: 99px;
+  background: rgba(52,211,153,.15); color: #34d399;
+  display: grid; place-items: center;
+  font: bold 8px var(--font-mono); 
+}
+
+/* select variant — adds chevron */
+.input.select > .val {
+  flex: 1; min-width: 0;
+  font: 500 12px var(--font-sans);
+  color: var(--fg);
+  letter-spacing: -0.005em;
+  display: flex; align-items: baseline; gap: 8px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.input.select .val em {
+  font-style: normal;
+  color: var(--fg-faint);
+  font: 400 10px var(--font-mono-ui);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.input.select .chev { color: var(--fg-muted); flex-shrink: 0; }
+.input.select { cursor: pointer; }
+
+/* triptych: three .input.select in a grid */
+.trip { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.trip .input { min-height: 44px; padding: 6px 11px; align-items: flex-start; flex-direction: column; gap: 2px; justify-content: center; }
+.trip .input .k { font: 500 9px var(--font-mono-ui); color: var(--fg-faint); text-transform: uppercase; letter-spacing: 0.08em; }
+.trip .input .v { font: 500 12px var(--font-sans); color: var(--fg); letter-spacing: -0.005em; display: flex; align-items: center; gap: 6px; width: 100%; }
+.trip .input .v .pip { width: 6px; height: 6px; border-radius: 99px; background: #34d399; box-shadow: 0 0 4px rgba(52,211,153,.5); flex-shrink: 0; }
+.trip .input .v .chev { margin-left: auto; color: var(--fg-muted); font: 500 11px var(--font-mono); }
+
+/* textarea — same surface, taller, stacked */
+.input.textarea {
+  align-items: stretch;
+  flex-direction: column;
+  padding: 9px 11px;
+  gap: 0;
+  min-height: auto;
+}
+.input.textarea .body {
+  outline: none;
+  font: 500 12px/1.55 var(--font-sans);
+  color: var(--fg);
+  letter-spacing: -0.005em;
+  min-height: 56px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.input.textarea .body::placeholder { color: var(--fg-faint); }
+.input.textarea .body .mention {
+  color: var(--primary);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  padding: 0 2px;
+  border-radius: 3px;
+  background: rgba(107,89,222,.12);
+}
+.input.textarea .body .caret { display:inline-block; width: 1.5px; height: 13px; background: var(--primary); vertical-align: -2px; margin-left: 1px; animation: blink 1s step-end infinite; }
+@keyframes blink { 50% { opacity: 0 } }
+
+.input.textarea .foot {
+  display: flex; align-items: center; gap: 8px;
+  margin: 8px -11px -9px; /* bleed to edges */
+  padding: 6px 11px;
+  border-top: 1px solid var(--border);
+  font: 500 10px var(--font-mono-ui);
+  color: var(--fg-faint);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: rgba(0,0,0,.15);
+  border-radius: 0 0 6px 6px;
+}
+.input.textarea .foot .chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 6px; border-radius: 4px;
+  background: var(--bg-hover); color: var(--fg-muted);
+  text-transform: none; letter-spacing: 0; font-family: var(--font-mono);
+  font-size: 10px; font-weight: 500;
+  border: 1px solid var(--border);
+}
+.input.textarea .foot .sp { flex: 1; }
+.input.textarea .foot .count { color: var(--fg-muted); font-variant-numeric: tabular-nums; font-family: var(--font-mono); text-transform: none; letter-spacing: 0; }
+.input.textarea .foot .count b { color: var(--fg); font-weight: 500; }
+
+/* row helper for 2-up */
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+</style></head>
+
+<body>
+<div class="card">
+
+  <!-- Session title -->
+  <div class="field">
+    <div class="lab"><span>session title</span><span class="req">●</span><span class="sp"></span><span class="hint">auto-slug · <kbd>tab</kbd></span></div>
+    <label class="input">
+      <span class="adorn lead">❯</span>
+      <input value="add-oauth-to-settings-page">
+      <span class="adorn trail"><span class="ok">✓</span>slug-ok</span>
+    </label>
+  </div>
+
+  <!-- Flow select -->
+  <div class="field">
+    <div class="lab"><span>flow</span><span class="req">●</span><span class="sp"></span><span class="hint"><kbd>⌘K</kbd> pick</span></div>
+    <div class="input select" tabindex="0">
+      <span class="adorn lead">flow://</span>
+      <span class="val">autonomous-sdlc<em>6 stages · v2</em></span>
+      <span class="chev">▾</span>
+    </div>
+  </div>
+
+  <!-- Dispatch target triptych -->
+  <div class="field">
+    <div class="lab"><span>dispatch target</span><span class="sp"></span><span class="hint">3 free · <kbd>⇧⌘C</kbd></span></div>
+    <div class="trip">
+      <div class="input select" tabindex="0">
+        <span class="k">agent</span>
+        <span class="v">implementer<span class="chev">▾</span></span>
+      </div>
+      <div class="input select" tabindex="0">
+        <span class="k">runtime</span>
+        <span class="v">claude 4.5<span class="chev">▾</span></span>
+      </div>
+      <div class="input select" tabindex="0">
+        <span class="k">compute</span>
+        <span class="v"><span class="pip"></span>ec2-04<span class="chev">▾</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Task textarea -->
+  <div class="field">
+    <div class="lab"><span>task</span><span class="req">●</span><span class="sp"></span><span class="hint"><kbd>@</kbd> reference · <kbd>⌘↵</kbd> dispatch</span></div>
+    <div class="input textarea">
+      <div class="body" contenteditable="true" spellcheck="false">Add OAuth to <span class="mention">@auth.ts</span> following <span class="mention">@docs/auth.md</span>.
+Handle revoked tokens; emit <span class="mention">@session.auth_ch</span><span class="caret"></span></div>
+      <div class="foot">
+        <span class="chip">2 refs</span>
+        <span class="chip">1 attach</span>
+        <span class="sp"></span>
+        <span class="count"><b>248</b> / 2000 tok</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body></html>

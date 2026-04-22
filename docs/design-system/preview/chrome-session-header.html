@@ -1,0 +1,269 @@
+<!doctype html><html class="midnight-circuit dark"><head>
+<meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+body { padding: 20px; font-family: var(--font-sans); }
+.card { gap: 18px; }
+.lab { font: 500 10px var(--font-mono-ui); color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: -4px; }
+
+.header {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0,0,0,.3);
+}
+
+/* top row — breadcrumb/title + actions */
+.h-top {
+  padding: 14px 16px 12px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid var(--border-light);
+}
+.h-id { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.breadcrumb {
+  display: flex; align-items: center; gap: 6px;
+  font: 500 10px var(--font-mono-ui); color: var(--fg-faint);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.breadcrumb a { color: var(--fg-faint); text-decoration: none; }
+.breadcrumb a:hover { color: var(--fg-muted); }
+.breadcrumb .sep { opacity: 0.5; }
+.h-title {
+  font: 600 17px var(--font-sans); color: var(--fg);
+  letter-spacing: -0.015em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.h-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.h-actions .ico {
+  width: 30px; height: 28px; border-radius: 6px;
+  display: grid; place-items: center;
+  color: var(--fg); cursor: pointer;
+  background: #1e1e30;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(0,0,0,.2);
+  transition: background 120ms, color 120ms, border-color 120ms;
+  position: relative;
+}
+.h-actions .ico:hover { background: #24243a; border-color: #33334d; }
+.h-actions .ico svg {
+  width: 14px; height: 14px;
+  stroke: currentColor; fill: none;
+  stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;
+  display: block;
+}
+.h-actions .ico:hover::after {
+  content: attr(data-tip);
+  position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  background: var(--bg-popover); border: 1px solid var(--border); border-radius: 4px;
+  padding: 3px 7px;
+  font: 500 10px var(--font-mono-ui); color: var(--fg);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  white-space: nowrap; z-index: 10;
+  box-shadow: 0 4px 12px rgba(0,0,0,.5);
+  pointer-events: none;
+}
+.h-actions .sep-v { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
+.h-actions .btn-primary {
+  height: 28px; padding: 0 12px; border-radius: 6px;
+  background: var(--primary);
+  color: var(--primary-fg);
+  border: 1px solid rgba(0,0,0,.25);
+  box-shadow: 0 1px 2px rgba(0,0,0,.25);
+  font: 600 11px var(--font-mono-ui);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.h-actions .btn-primary:hover { background: #7d6be8; }
+.h-actions .btn-secondary {
+  height: 28px; padding: 0 11px; border-radius: 6px;
+  background: #1e1e30;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(0,0,0,.2);
+  font: 600 11px var(--font-mono-ui);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.h-actions .btn-secondary:hover { background: #24243a; border-color: var(--border-light); }
+
+/* meta strip — status lives here now */
+.h-meta {
+  padding: 8px 16px;
+  display: flex; align-items: center; gap: 14px;
+  font: 500 10px var(--font-mono-ui);
+  color: var(--fg-muted);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  background: rgba(0,0,0,.18);
+  border-bottom: 1px solid var(--border-light);
+}
+.status-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 9px 3px 8px; border-radius: 99px;
+  background: rgba(96,165,250,.1); color: var(--running);
+  border: 1px solid rgba(96,165,250,.25);
+  font: 600 10px var(--font-mono-ui); letter-spacing: 0.06em; text-transform: uppercase;
+  flex-shrink: 0;
+}
+.status-pill .dot {
+  width: 6px; height: 6px; border-radius: 99px; background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+  animation: pulse 1.6s ease-out infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.5 } }
+
+.h-meta .k { color: var(--fg-faint); margin-right: 6px; }
+.h-meta .v { color: var(--fg); }
+.h-meta .v.mono { font-family: var(--font-mono); letter-spacing: 0; text-transform: none; }
+.h-meta .v.link { color: var(--primary); cursor: pointer; text-transform: none; font-family: var(--font-mono); letter-spacing: 0; }
+.h-meta .v .pip { display: inline-block; width: 6px; height: 6px; border-radius: 99px; background: #34d399; margin-right: 5px; vertical-align: middle; box-shadow: 0 0 4px rgba(52,211,153,.5); }
+.h-meta .sep { opacity: 0.35; }
+.h-meta .sp { flex: 1; }
+.h-meta .cost {
+  font-family: var(--font-mono); letter-spacing: 0; text-transform: none;
+  color: var(--fg);
+}
+
+/* tabs */
+.tabs {
+  padding: 0 14px;
+  display: flex; align-items: flex-end; gap: 0;
+  overflow-x: auto;
+  height: 36px;
+}
+.tabs .tab {
+  padding: 10px 14px;
+  font: 500 12px var(--font-sans); color: var(--fg-muted);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  display: flex; align-items: center; gap: 7px;
+  white-space: nowrap;
+  transition: color 120ms, border-color 120ms;
+}
+.tabs .tab:hover { color: var(--fg); }
+.tabs .tab.on {
+  color: var(--fg);
+  border-bottom-color: var(--primary);
+}
+.tabs .tab .count {
+  font: 500 10px var(--font-mono-ui);
+  color: var(--fg-faint);
+  padding: 1px 5px; border-radius: 99px;
+  background: var(--bg-hover);
+}
+.tabs .tab.on .count { color: var(--primary); background: rgba(107,89,222,.15); }
+.tabs .tab .dot {
+  width: 5px; height: 5px; border-radius: 99px;
+  background: var(--failed);
+}
+
+/* status variants */
+.header.failed .status-pill { background: rgba(248,113,113,.12); color: var(--failed); border-color: rgba(248,113,113,.3); }
+.header.completed .status-pill { background: rgba(52,211,153,.1); color: var(--completed); border-color: rgba(52,211,153,.25); }
+.header.completed .status-pill .dot { animation: none; }
+</style></head>
+<body>
+<div class="card">
+
+  <div class="lab">Running session</div>
+  <div class="header">
+    <div class="h-top">
+      <div class="h-id">
+        <div class="breadcrumb">
+          <a>ark</a><span class="sep">/</span><a>sessions</a>
+        </div>
+        <div class="h-title">add-oauth-to-settings-page</div>
+      </div>
+      <div class="h-actions">
+        <button class="ico" data-tip="copy id"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+        <button class="ico" data-tip="view logs"><svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></button>
+        <span class="sep-v"></span>
+        <button class="btn-secondary">pause</button>
+        <button class="btn-primary">approve ↵</button>
+      </div>
+    </div>
+    <div class="h-meta">
+      <span class="status-pill"><span class="dot"></span>running · implement</span>
+      <span><span class="k">flow</span><span class="v">autonomous-sdlc</span></span>
+      <span class="sep">·</span>
+      <span><span class="k">agent</span><span class="v">claude-sonnet-4.5</span></span>
+      <span class="sep">·</span>
+      <span><span class="k">compute</span><span class="v"><span class="pip"></span>ec2-04</span></span>
+      <span class="sp"></span>
+      <span class="cost">48.2k tok · $0.73 · 12m 04s</span>
+    </div>
+    <div class="tabs">
+      <div class="tab on">Conversation<span class="count">32</span></div>
+      <div class="tab">Diff<span class="count">+184 −92</span></div>
+      <div class="tab">Files<span class="count">7</span></div>
+      <div class="tab">Flow</div>
+      <div class="tab">Logs<span class="dot"></span></div>
+      <div class="tab">Events</div>
+    </div>
+  </div>
+
+  <div class="lab">Completed / merged</div>
+  <div class="header completed">
+    <div class="h-top">
+      <div class="h-id">
+        <div class="breadcrumb">
+          <a>ark</a><span class="sep">/</span><a>sessions</a>
+        </div>
+        <div class="h-title">fix-telemetry-flush-timing</div>
+      </div>
+      <div class="h-actions">
+        <button class="ico" data-tip="copy id"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+        <span class="sep-v"></span>
+        <button class="btn-secondary">archive</button>
+        <button class="btn-secondary">fork</button>
+      </div>
+    </div>
+    <div class="h-meta">
+      <span class="status-pill"><span class="dot"></span>merged</span>
+      <span><span class="k">pr</span><span class="v link">#374</span></span>
+      <span class="sep">·</span>
+      <span><span class="k">commit</span><span class="v mono">a3c4f12</span></span>
+      <span class="sep">·</span>
+      <span><span class="k">agent</span><span class="v">claude-sonnet-4.5</span></span>
+      <span class="sp"></span>
+      <span class="cost">34.1k tok · $0.52 · 8m 42s</span>
+    </div>
+    <div class="tabs">
+      <div class="tab">Conversation<span class="count">24</span></div>
+      <div class="tab on">Diff<span class="count">+184 −92</span></div>
+      <div class="tab">Files<span class="count">7</span></div>
+      <div class="tab">Flow</div>
+      <div class="tab">Logs</div>
+    </div>
+  </div>
+
+  <div class="lab">Failed</div>
+  <div class="header failed">
+    <div class="h-top">
+      <div class="h-id">
+        <div class="breadcrumb">
+          <a>ark</a><span class="sep">/</span><a>sessions</a>
+        </div>
+        <div class="h-title">add-circuit-breaker-to-llm-router</div>
+      </div>
+      <div class="h-actions">
+        <button class="btn-secondary">view error</button>
+        <button class="btn-primary">retry ↻</button>
+      </div>
+    </div>
+    <div class="h-meta">
+      <span class="status-pill"><span class="dot"></span>failed · arkd</span>
+      <span><span class="k">err</span><span class="v mono" style="color:var(--failed)">EADDRINUSE :19300</span></span>
+      <span class="sep">·</span>
+      <span><span class="k">stage</span><span class="v">plan</span></span>
+      <span class="sp"></span>
+      <span class="cost">8.4k tok · $0.11 · 42s</span>
+    </div>
+  </div>
+
+</div>
+</body></html>
