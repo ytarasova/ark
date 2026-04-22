@@ -138,7 +138,7 @@ export function PipelineViewer({
           type: MarkerType.ArrowClosed,
           width: 16,
           height: 16,
-          color: active ? "var(--primary)" : taken ? "#34d399" : "var(--border)",
+          color: active ? "var(--primary)" : taken ? "var(--completed)" : "var(--border)",
         },
         animated: active,
       };
@@ -157,10 +157,10 @@ export function PipelineViewer({
       className="pipeline-flow-container"
       style={{
         width: "100%",
-        borderRadius: 8,
+        borderRadius: "var(--radius-md)",
         overflow: "hidden",
         border: "1px solid var(--border)",
-        background: "var(--card)",
+        background: "var(--bg-card)",
       }}
     >
       {/* Header */}
@@ -175,17 +175,15 @@ export function PipelineViewer({
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {sessionName && (
-              <span style={{ fontSize: 14, fontWeight: 600, color: "var(--foreground)" }}>{sessionName}</span>
-            )}
+            {sessionName && <span style={{ fontSize: 14, fontWeight: 600, color: "var(--fg)" }}>{sessionName}</span>}
             {flowName && (
               <span
                 style={{
                   fontSize: 10,
                   fontWeight: 600,
                   padding: "2px 8px",
-                  borderRadius: 4,
-                  background: "rgba(124, 106, 239, 0.12)",
+                  borderRadius: "var(--radius-sm)",
+                  background: "var(--primary-subtle)",
                   color: "var(--primary)",
                   textTransform: "uppercase",
                   letterSpacing: "0.04em",
@@ -202,8 +200,9 @@ export function PipelineViewer({
                 alignItems: "center",
                 gap: 8,
                 fontSize: 11,
-                color: "var(--muted-foreground)",
-                fontFamily: '"JetBrains Mono", monospace',
+                color: "var(--fg-muted)",
+                fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace',
+                fontVariantNumeric: "tabular-nums",
               }}
             >
               {totalDuration && <span>{totalDuration}</span>}
@@ -212,10 +211,11 @@ export function PipelineViewer({
                   style={{
                     fontSize: 10,
                     padding: "2px 8px",
-                    borderRadius: 4,
+                    borderRadius: "var(--radius-sm)",
                     background: "rgba(52, 211, 153, 0.12)",
-                    color: "#34d399",
-                    fontFamily: '"JetBrains Mono", monospace',
+                    color: "var(--completed)",
+                    fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace',
+                    fontVariantNumeric: "tabular-nums",
                   }}
                 >
                   ${totalCost.toFixed(2)}
@@ -281,15 +281,15 @@ export function PipelineViewer({
           padding: "10px 20px",
           borderTop: "1px solid var(--border)",
           fontSize: 10,
-          color: "var(--muted-foreground)",
+          color: "var(--fg-muted)",
           opacity: 0.7,
         }}
       >
-        <LegendItem color="#34d399" label="Completed" />
+        <LegendItem color="var(--completed)" label="Completed" />
         <LegendItem color="var(--primary)" label="Running" />
         <LegendItem color="var(--border)" label="Pending" />
-        <LegendItem color="#f87171" label="Failed" />
-        <LegendItem color="#fbbf24" label="Waiting" />
+        <LegendItem color="var(--failed)" label="Failed" />
+        <LegendItem color="var(--waiting)" label="Waiting" />
       </div>
     </div>
   );

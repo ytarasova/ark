@@ -181,7 +181,7 @@ function SessionCard({
           <span
             className={cn(
               "min-w-[18px] h-[18px] rounded-full",
-              "bg-red-500 text-white text-[10px] font-bold leading-none",
+              "bg-[var(--failed)] text-[var(--primary-fg)] font-[family-name:var(--font-mono-ui)] text-[10px] font-semibold leading-none tabular-nums",
               "flex items-center justify-center px-1 shrink-0",
             )}
             aria-label={`${session.unreadCount} unread`}

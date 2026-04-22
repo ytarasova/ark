@@ -64,9 +64,7 @@ export interface RecordUsageCb {
   ): void;
 }
 export interface SessionCloneCb {
-  (sessionId: string, newName?: string): Promise<
-    { ok: true; sessionId: string } | { ok: false; message: string }
-  >;
+  (sessionId: string, newName?: string): Promise<{ ok: true; sessionId: string } | { ok: false; message: string }>;
 }
 export interface CapturePlanMdCb {
   (session: Session): Promise<void>;

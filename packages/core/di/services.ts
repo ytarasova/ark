@@ -31,10 +31,7 @@ import { StageAdvanceService } from "../services/stage-advance/index.js";
 import { executeAction } from "../services/actions/index.js";
 import { getOutput } from "../services/session-output.js";
 import { removeSessionWorktree } from "../services/worktree/index.js";
-import {
-  deletePerSessionCredsSecret,
-  materializeClaudeAuthForDispatch,
-} from "../services/dispatch-claude-auth.js";
+import { deletePerSessionCredsSecret, materializeClaudeAuthForDispatch } from "../services/dispatch-claude-auth.js";
 import { garbageCollectComputeIfTemplate } from "../services/compute-lifecycle.js";
 import { capturePlanMdIfPresent } from "../services/plan-artifact.js";
 import { saveCheckpoint } from "../session/checkpoint.js";
@@ -280,8 +277,7 @@ export function registerServices(container: AppContainer): void {
               logDebug("session", "skill extraction is best-effort");
             }
           },
-          saveCheckpoint: (sessionId) =>
-            saveCheckpoint({ sessions: c.sessions, events: c.events }, sessionId),
+          saveCheckpoint: (sessionId) => saveCheckpoint({ sessions: c.sessions, events: c.events }, sessionId),
           getStage: (flowName, stageName) => flow.getStage(c.app, flowName, stageName),
           getStageAction: (flowName, stageName) => flow.getStageAction(c.app, flowName, stageName),
           resolveNextStage: (flowName, stage, outcome) => flow.resolveNextStage(c.app, flowName, stage, outcome),

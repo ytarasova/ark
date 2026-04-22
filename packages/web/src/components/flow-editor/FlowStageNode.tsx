@@ -84,8 +84,8 @@ function FlowStageNodeComponent({ data, selected }: NodeProps) {
           <div
             style={{
               fontSize: 9,
-              fontFamily: '"JetBrains Mono", monospace',
-              color: "#22d3ee",
+              fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace',
+              color: "var(--running)",
               marginTop: 4,
               paddingTop: 4,
               borderTop: "1px solid var(--border)",
@@ -100,8 +100,8 @@ function FlowStageNodeComponent({ data, selected }: NodeProps) {
           <div
             style={{
               fontSize: 9,
-              fontFamily: '"JetBrains Mono", monospace',
-              color: "#fbbf24",
+              fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace',
+              color: "var(--waiting)",
               marginTop: 2,
             }}
           >

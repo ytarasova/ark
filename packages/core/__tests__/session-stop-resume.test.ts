@@ -156,17 +156,17 @@ describe("session resume", async () => {
   // so we test the status changes and guard clauses rather than full dispatch.
 
   it("resume(app) is exported as a function", async () => {
-        expect(typeof app.dispatchService.resume).toBe("function");
+    expect(typeof app.dispatchService.resume).toBe("function");
   });
 
   it("resume returns ok: false for nonexistent session", async () => {
-        const result = await app.dispatchService.resume("s-nonexistent");
+    const result = await app.dispatchService.resume("s-nonexistent");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
   });
 
   it("resume allows completed sessions to restart", async () => {
-        const session = await getApp().sessions.create({ summary: "completed-test" });
+    const session = await getApp().sessions.create({ summary: "completed-test" });
     await getApp().sessions.update(session.id, { status: "completed", stage: "work" });
 
     const result = await app.dispatchService.resume(session.id);

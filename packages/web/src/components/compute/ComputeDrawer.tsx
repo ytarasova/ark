@@ -408,7 +408,7 @@ export function ComputeDrawer({ item, onClose, onNavigateToSession }: ComputeDra
       <Dialog.Portal>
         <Dialog.Overlay
           className={cn(
-            "fixed inset-0 z-40 bg-black/40 transition-opacity duration-200",
+            "fixed inset-0 z-40 bg-[var(--bg-overlay)] transition-opacity duration-200",
             "data-[state=open]:opacity-100 data-[state=closed]:opacity-0",
           )}
         />

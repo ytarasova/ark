@@ -212,7 +212,12 @@ export function FlowEditor({ flow, onChange, readOnly: initialReadOnly = false, 
             type: MarkerType.ArrowClosed,
             width: 16,
             height: 16,
-            color: edgeType === "conditional" ? "#fbbf24" : edgeType === "loopback" ? "#22d3ee" : "var(--border)",
+            color:
+              edgeType === "conditional"
+                ? "var(--waiting)"
+                : edgeType === "loopback"
+                  ? "var(--running)"
+                  : "var(--border)",
           },
         };
       }),

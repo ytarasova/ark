@@ -50,7 +50,7 @@ export function ConfirmDialog({
             className={cn(
               "gap-1.5",
               danger &&
-                "bg-[var(--failed)] text-white hover:bg-[var(--failed)]/85 border-[var(--failed)] hover:border-[var(--failed)]",
+                "bg-[var(--failed)] text-[var(--primary-fg)] hover:bg-[var(--failed)]/85 border-[var(--failed)] hover:border-[var(--failed)]",
             )}
           >
             {loading && <Loader2 className="animate-spin" size={12} />}

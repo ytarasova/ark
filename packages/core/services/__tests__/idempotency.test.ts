@@ -107,7 +107,9 @@ describe("advance() idempotency", async () => {
     expect(await countLedgerRows(session.id, "advance")).toBe(1);
 
     // Different key = body runs again.
-    const third = await app.stageAdvance.advance(session.id, true, undefined, { idempotencyKey: "workflow-A/attempt-2" });
+    const third = await app.stageAdvance.advance(session.id, true, undefined, {
+      idempotencyKey: "workflow-A/attempt-2",
+    });
     expect(third.ok).toBe(true);
     const afterThird = (await app.sessions.get(session.id))!;
     expect(afterThird.stage).toBe("s3");

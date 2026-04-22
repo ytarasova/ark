@@ -47,11 +47,11 @@ function FlowEdgeLabelComponent({
   let opacity = 1;
 
   if (edgeType === "conditional") {
-    stroke = "#fbbf24";
+    stroke = "var(--waiting)";
     strokeDasharray = "6 3";
     opacity = 0.6;
   } else if (edgeType === "loopback") {
-    stroke = "#22d3ee";
+    stroke = "var(--running)";
     strokeDasharray = "4 3";
     opacity = 0.5;
   }
@@ -114,12 +114,12 @@ function FlowEdgeLabelComponent({
                 onKeyDown={handleKeyDown}
                 style={{
                   fontSize: 9,
-                  fontFamily: '"JetBrains Mono", monospace',
-                  background: "var(--background)",
+                  fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace',
+                  background: "var(--bg-input)",
                   border: "1px solid var(--primary)",
-                  borderRadius: 3,
+                  borderRadius: "var(--radius-sm)",
                   padding: "2px 6px",
-                  color: "var(--foreground)",
+                  color: "var(--fg)",
                   outline: "none",
                   minWidth: 60,
                 }}
@@ -128,16 +128,16 @@ function FlowEdgeLabelComponent({
               <span
                 style={{
                   fontSize: 9,
-                  fontFamily: '"JetBrains Mono", monospace',
+                  fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace',
                   color:
                     edgeType === "loopback"
-                      ? "#22d3ee"
+                      ? "var(--running)"
                       : edgeType === "conditional"
-                        ? "#fbbf24"
-                        : "var(--muted-foreground)",
-                  background: "var(--background)",
+                        ? "var(--waiting)"
+                        : "var(--fg-muted)",
+                  background: "var(--bg-card)",
                   padding: "1px 6px",
-                  borderRadius: 3,
+                  borderRadius: "var(--radius-sm)",
                   whiteSpace: "nowrap",
                   cursor: readOnly ? "default" : "text",
                 }}

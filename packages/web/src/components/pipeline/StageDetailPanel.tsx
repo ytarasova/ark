@@ -16,11 +16,11 @@ export interface StageDetailPanelProps {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  completed: "#34d399",
+  completed: "var(--completed)",
   running: "var(--primary)",
-  failed: "#f87171",
-  waiting: "#fbbf24",
-  pending: "var(--muted-foreground)",
+  failed: "var(--failed)",
+  waiting: "var(--waiting)",
+  pending: "var(--fg-muted)",
 };
 
 function formatDuration(ms: number | null): string {
@@ -39,15 +39,15 @@ function formatTokens(count: { input: number; output: number } | null): string {
 }
 
 function StageDetailPanelComponent({ stage, detail, onViewConversation, onClose }: StageDetailPanelProps) {
-  const statusColor = STATUS_COLORS[stage.status] || "var(--muted-foreground)";
+  const statusColor = STATUS_COLORS[stage.status] || "var(--fg-muted)";
 
   return (
     <div
       className="pipeline-detail-panel"
       style={{
-        background: "var(--background)",
+        background: "var(--bg-card)",
         border: "1px solid var(--border)",
-        borderRadius: 8,
+        borderRadius: "var(--radius-md)",
         margin: "0 20px 16px",
         padding: "16px 20px",
       }}
@@ -61,12 +61,12 @@ function StageDetailPanelComponent({ stage, detail, onViewConversation, onClose 
           onClick={onClose}
           style={{
             fontSize: 11,
-            color: "var(--muted-foreground)",
+            color: "var(--fg-muted)",
             cursor: "pointer",
             background: "none",
             border: "none",
             padding: "2px 6px",
-            borderRadius: 3,
+            borderRadius: "var(--radius-sm)",
           }}
         >
           Close
@@ -79,7 +79,7 @@ function StageDetailPanelComponent({ stage, detail, onViewConversation, onClose 
           <span
             style={{
               fontFamily: "inherit",
-              color: "var(--foreground)",
+              color: "var(--fg)",
               lineHeight: 1.6,
             }}
           >
@@ -97,11 +97,11 @@ function StageDetailPanelComponent({ stage, detail, onViewConversation, onClose 
                 key={i}
                 style={{
                   fontSize: 10,
-                  fontFamily: '"JetBrains Mono", monospace',
+                  fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace',
                   padding: "2px 8px",
-                  borderRadius: 4,
-                  background: "var(--secondary)",
-                  color: "var(--muted-foreground)",
+                  borderRadius: "var(--radius-sm)",
+                  background: "var(--bg-hover)",
+                  color: "var(--fg-muted)",
                 }}
               >
                 {t.name}
@@ -121,11 +121,11 @@ function StageDetailPanelComponent({ stage, detail, onViewConversation, onClose 
                 key={i}
                 style={{
                   fontSize: 10,
-                  fontFamily: '"JetBrains Mono", monospace',
+                  fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace',
                   padding: "2px 8px",
-                  borderRadius: 4,
-                  background: "var(--secondary)",
-                  color: "var(--muted-foreground)",
+                  borderRadius: "var(--radius-sm)",
+                  background: "var(--bg-hover)",
+                  color: "var(--fg-muted)",
                 }}
               >
                 {t.name}({t.count})
@@ -137,7 +137,14 @@ function StageDetailPanelComponent({ stage, detail, onViewConversation, onClose 
 
       {/* Duration */}
       <DetailRow label="Duration">
-        <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 11, color: "var(--foreground)" }}>
+        <span
+          style={{
+            fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace',
+            fontSize: 11,
+            color: "var(--fg)",
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
           {formatDuration(stage.duration)}
         </span>
       </DetailRow>
@@ -145,7 +152,14 @@ function StageDetailPanelComponent({ stage, detail, onViewConversation, onClose 
       {/* Tokens */}
       {(detail?.tokenCount || stage.tokenCount) && (
         <DetailRow label="Tokens">
-          <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 11, color: "var(--foreground)" }}>
+          <span
+            style={{
+              fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace',
+              fontSize: 11,
+              color: "var(--fg)",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
             {formatTokens(detail?.tokenCount || stage.tokenCount)}
           </span>
         </DetailRow>
@@ -154,7 +168,14 @@ function StageDetailPanelComponent({ stage, detail, onViewConversation, onClose 
       {/* Cost */}
       {(detail?.cost !== undefined || stage.cost !== null) && (
         <DetailRow label="Cost">
-          <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 11, color: "#34d399" }}>
+          <span
+            style={{
+              fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace',
+              fontSize: 11,
+              color: "var(--completed)",
+              fontVariantNumeric: "tabular-nums",
+            }}
+          >
             ${(detail?.cost ?? stage.cost ?? 0).toFixed(2)}
           </span>
         </DetailRow>
@@ -163,7 +184,13 @@ function StageDetailPanelComponent({ stage, detail, onViewConversation, onClose 
       {/* On failure */}
       {stage.on_failure && (
         <DetailRow label="On failure">
-          <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 11, color: "#fbbf24" }}>
+          <span
+            style={{
+              fontFamily: 'var(--font-mono-ui, "Geist Mono"), "JetBrains Mono", monospace',
+              fontSize: 11,
+              color: "var(--waiting)",
+            }}
+          >
             {stage.on_failure}
           </span>
         </DetailRow>
@@ -172,7 +199,7 @@ function StageDetailPanelComponent({ stage, detail, onViewConversation, onClose 
       {/* Review findings */}
       {detail?.reviewFindings && detail.reviewFindings.length > 0 && (
         <DetailRow label="Findings">
-          <div style={{ fontSize: 11, color: "var(--foreground)", lineHeight: 1.6 }}>
+          <div style={{ fontSize: 11, color: "var(--fg)", lineHeight: 1.6 }}>
             {detail.reviewFindings.map((f, i) => (
               <div key={i}>- {f}</div>
             ))}

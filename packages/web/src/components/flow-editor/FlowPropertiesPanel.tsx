@@ -110,7 +110,8 @@ export function FlowPropertiesPanel({
         <div style={{ display: "flex", gap: 2, background: "var(--background)", borderRadius: 5, padding: 2 }}>
           {GATE_OPTIONS.map((g) => {
             const isActive = localStage.gate === g;
-            const activeColor = g === "auto" ? "#34d399" : g === "manual" ? "#fbbf24" : "#60a5fa";
+            const activeColor =
+              g === "auto" ? "var(--completed)" : g === "manual" ? "var(--waiting)" : "var(--running)";
             return (
               <button
                 key={g}
@@ -239,7 +240,7 @@ export function FlowPropertiesPanel({
                   }}
                   style={{
                     fontSize: 10,
-                    color: "#f87171",
+                    color: "var(--failed)",
                     background: "none",
                     border: "none",
                     cursor: "pointer",

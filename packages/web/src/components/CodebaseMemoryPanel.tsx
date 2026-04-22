@@ -60,9 +60,9 @@ export function CodebaseMemoryPanel() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {status.available ? (
-            <CheckCircle2 size={16} className="text-green-500" />
+            <CheckCircle2 size={16} className="text-[var(--completed)]" />
           ) : (
-            <AlertCircle size={16} className="text-amber-500" />
+            <AlertCircle size={16} className="text-[var(--waiting)]" />
           )}
           <h3 className="text-sm font-semibold">codebase-memory-mcp</h3>
         </div>

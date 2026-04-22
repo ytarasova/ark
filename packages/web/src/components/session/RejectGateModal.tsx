@@ -21,12 +21,12 @@ export function RejectGateModal({ reason, submitting, onReasonChange, onCancel, 
       role="dialog"
       aria-modal="true"
       aria-labelledby="reject-gate-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--bg-overlay)]"
       onKeyDown={(e) => {
         if (e.key === "Escape") onCancel();
       }}
     >
-      <div className="w-[480px] max-w-[90vw] rounded-[var(--radius-lg)] bg-[var(--bg)] border border-[var(--border)] shadow-xl p-5">
+      <div className="w-[480px] max-w-[90vw] rounded-[var(--radius-lg)] bg-[var(--bg-popover)] border border-[var(--border)] shadow-[0_4px_16px_rgba(0,0,0,0.3)] p-5">
         <h2 id="reject-gate-title" className="text-[14px] font-semibold text-[var(--fg)] mb-2">
           Reject and request rework
         </h2>

@@ -25,19 +25,35 @@ export interface IconRailProps extends React.ComponentProps<"nav"> {
  * Icons for sessions/agents/flows/compute/costs + settings at bottom.
  */
 /** Derive a status dot color + tooltip from daemon probe results. */
-function getDaemonDot(ds: DaemonStatus | null | undefined): { color: string; title: string; status: string } {
-  if (!ds) return { color: "bg-gray-500/40", title: "Checking daemons...", status: "loading" };
+function getDaemonDot(ds: DaemonStatus | null | undefined): {
+  color: string;
+  glow: string;
+  title: string;
+  status: string;
+} {
+  if (!ds) return { color: "bg-[var(--stopped)]", glow: "", title: "Checking daemons...", status: "loading" };
   const { conductor, arkd } = ds;
   if (conductor.online && arkd.online)
-    return { color: "bg-green-500", title: "Conductor and arkd online", status: "online" };
+    return {
+      color: "bg-[var(--running)]",
+      glow: "shadow-[var(--running-glow)] animate-[glow-pulse_2.5s_ease-in-out_infinite]",
+      title: "Conductor and arkd online",
+      status: "online",
+    };
   if (conductor.online || arkd.online) {
     return {
-      color: "bg-yellow-500",
+      color: "bg-[var(--waiting)]",
+      glow: "",
       title: `${conductor.online ? "Conductor" : "arkd"} online, ${conductor.online ? "arkd" : "conductor"} offline`,
       status: "partial",
     };
   }
-  return { color: "bg-red-500", title: "Daemon offline -- run: ark server daemon start", status: "offline" };
+  return {
+    color: "bg-[var(--failed)]",
+    glow: "shadow-[var(--failed-glow)]",
+    title: "Daemon offline -- run: ark server daemon start",
+    status: "offline",
+  };
 }
 
 export function IconRail({
@@ -87,6 +103,7 @@ export function IconRail({
             className={cn(
               "absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[var(--bg-sidebar)]",
               dot.color,
+              dot.glow,
             )}
             title={dot.title}
           />
@@ -138,7 +155,7 @@ function RailButton({
       {/* Unread dot */}
       {item.badge != null && item.badge > 0 && (
         <span
-          className="absolute top-0.5 right-1 w-2 h-2 rounded-full bg-red-500 animate-pulse"
+          className="absolute top-0.5 right-1 w-2 h-2 rounded-full bg-[var(--failed)] shadow-[var(--failed-glow)] animate-pulse"
           aria-label="has unread messages"
         />
       )}

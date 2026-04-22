@@ -230,11 +230,11 @@ function ToolbarButton({
 
   if (variant === "success") {
     bg = "rgba(52, 211, 153, 0.12)";
-    color = "#34d399";
+    color = "var(--completed)";
     borderColor = "rgba(52, 211, 153, 0.3)";
   } else if (variant === "danger") {
     bg = "rgba(248, 113, 113, 0.12)";
-    color = "#f87171";
+    color = "var(--failed)";
     borderColor = "rgba(248, 113, 113, 0.3)";
   }
 
@@ -245,7 +245,7 @@ function ToolbarButton({
         fontSize: 11,
         fontWeight: 500,
         padding: "5px 12px",
-        borderRadius: 5,
+        borderRadius: "var(--radius-sm)",
         border: `1px solid ${borderColor}`,
         background: bg,
         color,

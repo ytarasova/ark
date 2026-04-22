@@ -108,10 +108,10 @@ function PipelineFanoutGroupComponent({ workers, isExpanded, onToggle, workerDet
                           : "var(--secondary)",
                     color:
                       w.status === "completed"
-                        ? "#34d399"
+                        ? "var(--completed)"
                         : w.status === "running"
                           ? "var(--primary)"
-                          : "var(--muted-foreground)",
+                          : "var(--fg-muted)",
                   }}
                 >
                   {w.status}
@@ -150,7 +150,7 @@ function PipelineFanoutGroupComponent({ workers, isExpanded, onToggle, workerDet
                   style={{
                     fontSize: 10,
                     fontFamily: '"JetBrains Mono", monospace',
-                    color: w.status === "running" ? "var(--primary)" : "#34d399",
+                    color: w.status === "running" ? "var(--primary)" : "var(--completed)",
                     marginTop: 6,
                   }}
                 >

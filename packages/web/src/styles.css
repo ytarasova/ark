@@ -6,6 +6,9 @@
    Fallback defaults below use midnight-circuit dark tokens. */
 
 :root {
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  --font-mono-ui: "Geist Mono", "JetBrains Mono", "SF Mono", ui-monospace, monospace;
   --bg: #0c0c14;
   --bg-card: #14141e;
   --bg-popover: #18182a;
@@ -106,6 +109,7 @@
 
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  --font-mono-ui: "Geist Mono", "JetBrains Mono", "SF Mono", ui-monospace, monospace;
 }
 
 @layer base {
@@ -118,6 +122,9 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1.5;
   }
   html,
   body {
@@ -126,6 +133,7 @@
     margin: 0;
     overflow: hidden;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 

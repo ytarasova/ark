@@ -21,11 +21,11 @@ export function Modal({ open, onClose, title, className, children }: ModalProps)
   return (
     <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60" />
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-[var(--bg-overlay)]" />
         <Dialog.Content
           className={cn(
             "fixed top-1/2 left-1/2 z-50 -translate-x-1/2 -translate-y-1/2",
-            "flex max-h-[85vh] w-[min(560px,90vw)] flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl",
+            "flex max-h-[85vh] w-[min(560px,90vw)] flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--bg-popover)] shadow-[0_4px_16px_rgba(0,0,0,0.3)]",
             "focus:outline-none",
             className,
           )}
