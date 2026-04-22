@@ -68,7 +68,7 @@ export function RejectGateModal({ reason, submitting, onReasonChange, onCancel, 
             disabled={!canSubmit}
             className={cn(
               "h-7 px-3 rounded-[var(--radius-sm)] text-[11px] font-medium",
-              "border border-[var(--failed)] bg-[var(--failed)] text-white",
+              "border border-[var(--failed)] bg-[var(--failed)] text-[var(--primary-fg)]",
               "hover:opacity-90 transition-opacity cursor-pointer",
               "disabled:opacity-50 disabled:cursor-not-allowed",
               "flex items-center gap-1",

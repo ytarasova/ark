@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Check, X, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "../../lib/utils.js";
 
 export interface ToolCallRowProps extends React.ComponentProps<"div"> {
@@ -27,16 +28,18 @@ export function ToolCallRow({ icon, label, duration, status = "done", detail, cl
           "hover:bg-[var(--bg-hover)] transition-colors duration-150",
         )}
       >
-        <span className="text-[10px] text-[var(--fg-muted)] w-3.5 text-center shrink-0">
-          {icon ?? (expanded ? "\u25BC" : "\u25B6")}
+        <span className="text-[var(--fg-muted)] w-3.5 shrink-0 inline-flex items-center justify-center">
+          {icon ?? (expanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />)}
         </span>
         <span className="flex-1 truncate">{label}</span>
         {duration && (
-          <span className="text-[10px] text-[var(--fg-muted)] font-[family-name:var(--font-mono-ui)]">{duration}</span>
+          <span className="text-[10px] text-[var(--fg-muted)] font-[family-name:var(--font-mono-ui)] tabular-nums">
+            {duration}
+          </span>
         )}
-        {status === "done" && <span className="text-[11px] text-[var(--running)]">&#10003;</span>}
+        {status === "done" && <Check size={11} className="text-[var(--running)]" />}
         {status === "running" && <span className="text-[11px] text-[var(--primary)]">...</span>}
-        {status === "error" && <span className="text-[11px] text-[var(--failed)]">&#10007;</span>}
+        {status === "error" && <X size={11} className="text-[var(--failed)]" />}
       </button>
       {expanded && detail && (
         <div className="pl-[22px] pr-2 py-1 text-[12px] font-[family-name:var(--font-mono)] text-[var(--fg-muted)] leading-[1.6]">

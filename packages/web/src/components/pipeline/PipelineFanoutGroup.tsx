@@ -6,6 +6,7 @@
  */
 
 import { memo, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import type { PipelineStage, ToolCallDetail } from "./types.js";
 
 interface WorkerDetail {
@@ -141,7 +142,10 @@ function PipelineFanoutGroupComponent({ workers, isExpanded, onToggle, workerDet
                   }}
                 >
                   {w.toolCalls.map((t, i) => (
-                    <div key={i}>&gt; {t.name}</div>
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <ChevronRight size={9} aria-hidden style={{ opacity: 0.6, flexShrink: 0 }} />
+                      {t.name}
+                    </div>
                   ))}
                 </div>
               )}

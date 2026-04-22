@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import { cn } from "../../lib/utils.js";
 import type { StageProgress } from "./StageProgressBar.js";
 
@@ -53,9 +54,7 @@ export function StagePipeline({ stages, selectedStage, onStageClick, className, 
             {s.name}
           </button>
           {i < stages.length - 1 && (
-            <span className="text-[var(--fg-muted)] text-[10px] px-[1px]" aria-hidden>
-              &gt;
-            </span>
+            <ChevronRight size={10} className="text-[var(--fg-muted)] px-[1px]" aria-hidden />
           )}
         </span>
       ))}

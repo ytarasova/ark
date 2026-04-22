@@ -71,7 +71,7 @@ function DashboardErrorState({ error, onRetry }: { error: unknown; onRetry: () =
   const message = (error as { message?: string })?.message ?? "unknown error";
 
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-3 px-6 text-center">
+    <div className="flex flex-col items-center justify-center flex-1 w-full h-full gap-3 px-6 text-center">
       <div className="rounded-full bg-[var(--bg-hover)] p-3 text-[var(--fg-muted)]">
         {unreachable ? <PlugZap className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
       </div>

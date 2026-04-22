@@ -147,7 +147,7 @@ export function SessionListPanel({
           <Button
             size="sm"
             variant="default"
-            className="h-7 px-2.5 text-[12px] font-medium bg-[var(--primary)] text-white hover:bg-[var(--primary-hover)] gap-1"
+            className="h-7 px-2.5 text-[12px] font-medium bg-[var(--primary)] text-[var(--primary-fg)] hover:bg-[var(--primary-hover)] gap-1"
             onClick={onNewSession}
             title="New session (n)"
           >

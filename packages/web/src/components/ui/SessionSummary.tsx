@@ -1,3 +1,4 @@
+import { ArrowRight } from "lucide-react";
 import { cn } from "../../lib/utils.js";
 
 export interface SessionSummaryProps extends React.ComponentProps<"div"> {
@@ -51,7 +52,7 @@ export function SessionSummary({
             "text-[12px] text-[var(--primary)] hover:underline",
           )}
         >
-          &rarr; {prLink.label}
+          <ArrowRight size={12} /> {prLink.label}
         </a>
       )}
     </div>

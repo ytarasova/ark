@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Check, X } from "lucide-react";
 import { cn } from "../lib/utils.js";
 
 export function Toast({ message, type, onDone }: { message: string; type: string; onDone: () => void }) {
@@ -37,9 +38,9 @@ export function Toast({ message, type, onDone }: { message: string; type: string
         isLong ? "max-w-[420px]" : "max-w-[340px]",
       )}
     >
-      <span className="shrink-0 mt-px">
-        {type === "success" && <span className="text-[var(--running)] font-bold">{"\u2713"}</span>}
-        {type === "error" && <span className="text-[var(--failed)] font-bold">{"\u2717"}</span>}
+      <span className="shrink-0 mt-0.5 inline-flex items-center">
+        {type === "success" && <Check size={14} className="text-[var(--running)]" strokeWidth={2.5} />}
+        {type === "error" && <X size={14} className="text-[var(--failed)]" strokeWidth={2.5} />}
       </span>
       <span className="whitespace-pre-wrap break-words leading-snug flex-1">{message}</span>
       {type === "error" && isLong && (
