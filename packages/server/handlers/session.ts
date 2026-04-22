@@ -1,3 +1,5 @@
+import { promises as fsPromises } from "fs";
+import { join } from "path";
 import { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
@@ -516,5 +518,40 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const { buildReplay } = await import("../../core/session/replay.js");
     const steps = await buildReplay(app, sessionId);
     return { steps };
+  });
+
+  // ── Mid-session intervention (agent-sdk) ─────────────────────────────────
+  //
+  // Appends a user message to `<sessionDir>/interventions.jsonl`. A running
+  // agent-sdk launch.ts tails that file and pushes each line into its prompt
+  // queue so the agent picks up the correction on its next turn.
+  //
+  // Do NOT route through deliverToChannel -- agent-sdk has no channel port.
+  // File-tail is the transport.
+
+  router.handle("session/inject", async (params) => {
+    const { sessionId, content } = extract<{ sessionId: string; content: string }>(params, ["sessionId", "content"]);
+
+    const s = await app.sessions.get(sessionId);
+    if (!s) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
+    if (s.status !== "running") {
+      return { ok: false, message: `session not running (status=${s.status})` };
+    }
+
+    const sessionDir = join(app.config.tracksDir, sessionId);
+    const interventionPath = join(sessionDir, "interventions.jsonl");
+    const line = JSON.stringify({ role: "user", content, ts: Date.now() }) + "\n";
+
+    // mkdirSync is not needed -- agent-sdk executor always creates sessionDir at
+    // dispatch time. Use promises.mkdir with recursive as a belt-and-braces guard.
+    await fsPromises.mkdir(sessionDir, { recursive: true });
+    await fsPromises.appendFile(interventionPath, line, "utf8");
+
+    await app.events.log(sessionId, "session_injected", {
+      actor: "user",
+      data: { content_preview: content.slice(0, 80) },
+    });
+
+    return { ok: true };
   });
 }

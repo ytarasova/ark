@@ -19,6 +19,50 @@
 import { appendFileSync, mkdirSync, readFileSync } from "fs";
 import { dirname, join } from "path";
 import type { Options } from "@anthropic-ai/claude-agent-sdk";
+import { startInterventionTail } from "./intervention-tail.js";
+
+/**
+ * SDK user message shape accepted by the Anthropic Agent SDK when passing an
+ * AsyncIterable as the `prompt` option.
+ */
+export type SDKUserMessage = {
+  type: "user";
+  message: { role: "user"; content: string | Array<{ type: "text"; text: string }> };
+};
+
+// ---------------------------------------------------------------------------
+// PromptQueue -- AsyncIterable<SDKUserMessage> backed by a bounded queue.
+// push() enqueues a message; close() signals the end of the sequence.
+// ---------------------------------------------------------------------------
+
+class PromptQueue implements AsyncIterable<SDKUserMessage> {
+  private pending: SDKUserMessage[] = [];
+  private resolvers: Array<(msg: IteratorResult<SDKUserMessage>) => void> = [];
+  private closed = false;
+
+  push(content: string): void {
+    const msg: SDKUserMessage = { type: "user", message: { role: "user", content } };
+    const resolver = this.resolvers.shift();
+    if (resolver) resolver({ value: msg, done: false });
+    else this.pending.push(msg);
+  }
+
+  close(): void {
+    this.closed = true;
+    for (const r of this.resolvers) r({ value: undefined as any, done: true });
+    this.resolvers = [];
+  }
+
+  [Symbol.asyncIterator](): AsyncIterator<SDKUserMessage> {
+    return {
+      next: () => {
+        if (this.pending.length > 0) return Promise.resolve({ value: this.pending.shift()!, done: false });
+        if (this.closed) return Promise.resolve({ value: undefined as any, done: true });
+        return new Promise((resolve) => this.resolvers.push(resolve));
+      },
+    };
+  }
+}
 
 export interface RunAgentSdkLaunchOpts {
   sessionId: string;
@@ -37,8 +81,15 @@ export interface RunAgentSdkLaunchOpts {
    * Injection point for tests. When provided this iterable is iterated
    * instead of calling the real SDK `query()`. The real query() is imported
    * lazily so tests that inject a stream never load the SDK binary.
+   * The prompt queue is bypassed entirely -- the injected stream is used as-is.
    */
   stream?: AsyncIterable<unknown>;
+  /**
+   * Alternative injection point for tests that need to drive the prompt queue.
+   * When provided, `streamFactory(queue)` is called with the PromptQueue and
+   * must return the AsyncIterable<unknown> to drain. Ignored when `stream` is set.
+   */
+  streamFactory?: (prompt: AsyncIterable<SDKUserMessage>) => AsyncIterable<unknown>;
   /**
    * Conductor base URL (e.g. "http://localhost:19100"). When undefined,
    * hook forwarding is skipped entirely. In production, read from
@@ -275,11 +326,17 @@ async function drainStream(
  * The prompt is read from `opts.promptFile` so the file is always read
  * before building any options, even in tests (keeps the testable surface
  * honest about the real contract).
+ *
+ * When neither `stream` nor `streamFactory` is injected (production path),
+ * a `PromptQueue` is built, the prompt-file content is pushed as the first
+ * message, and `<sessionDir>/interventions.jsonl` is tailed. Any line
+ * written to that file by `session/inject` is forwarded into the queue so
+ * the agent picks it up on its next turn without restarting.
  */
 export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<RunAgentSdkLaunchResult> {
   const { sessionId, sessionDir, worktree, promptFile, model, maxTurns, maxBudgetUsd, systemAppend } = opts;
 
-  const prompt = readFileSync(promptFile, "utf8");
+  const promptText = readFileSync(promptFile, "utf8");
   const transcriptPath = join(sessionDir, "transcript.jsonl");
   mkdirSync(dirname(transcriptPath), { recursive: true });
 
@@ -294,9 +351,30 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
     fetchFn: opts.fetchFn,
   };
 
-  // Injected-stream path (tests): skip the real SDK entirely.
+  // Legacy injected-stream path (existing tests): skip the real SDK and the
+  // queue entirely. The stream is used exactly as before.
   if (opts.stream !== undefined) {
     return drainStream(opts.stream, writeLine, forwardDeps);
+  }
+
+  // Build a PromptQueue so the agent can receive mid-session interventions.
+  const queue = new PromptQueue();
+  queue.push(promptText);
+
+  // streamFactory path: test injects a factory that receives the queue.
+  if (opts.streamFactory !== undefined) {
+    const interventionPath = join(sessionDir, "interventions.jsonl");
+    const stopTail = startInterventionTail({
+      path: interventionPath,
+      onMessage: (content) => queue.push(content),
+      onError: (err) => console.error(`[agent-sdk launch] intervention tail error: ${err.message}`),
+    });
+    try {
+      return await drainStream(opts.streamFactory(queue), writeLine, forwardDeps);
+    } finally {
+      stopTail();
+      queue.close();
+    }
   }
 
   // Real-SDK path: dynamic import keeps the SDK binary out of test imports.
@@ -329,11 +407,20 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
   process.on("SIGINT", onSigint);
   sdkOptions.abortController = abort;
 
+  const interventionPath = join(sessionDir, "interventions.jsonl");
+  const stopTail = startInterventionTail({
+    path: interventionPath,
+    onMessage: (content) => queue.push(content),
+    onError: (err) => console.error(`[agent-sdk launch] intervention tail error: ${err.message}`),
+  });
+
   try {
-    return await drainStream(query({ prompt, options: sdkOptions }), writeLine, forwardDeps);
+    return await drainStream(query({ prompt: queue, options: sdkOptions }), writeLine, forwardDeps);
   } finally {
     process.off("SIGTERM", onSigterm);
     process.off("SIGINT", onSigint);
+    stopTail();
+    queue.close();
   }
 }
 

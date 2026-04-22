@@ -501,18 +501,13 @@ What sage (or a human via CLI/Web UI) can do while an agent-sdk session is mid-r
 
 | Lever | Use case | Mechanism | Phase |
 |---|---|---|---|
-| Streaming-input push | "Actually, edit Y instead of X" mid-flight | `prompt` is an `AsyncIterable<SDKUserMessage>` backed by a queue; caller pushes a new user message, SDK picks it up next turn | Phase 2 (Task D1 Pattern A) |
+| Streaming-input push | "Actually, edit Y instead of X" mid-flight | `prompt` is an `AsyncIterable<SDKUserMessage>` backed by a queue; caller pushes a new user message, SDK picks it up next turn. **Shipped (D1):** `launch.ts` uses `PromptQueue`; `launch.ts` tails `<sessionDir>/interventions.jsonl`; `session/inject` RPC writes to that file. | Phase 1 -- DONE |
 | `canUseTool` callback | Approve/deny every tool call interactively | Remove `bypassPermissions` from runtime YAML; route the callback through arkd → conductor → user; return `{ behavior: "allow" \| "deny", ... }` | Phase 3 |
 | `AskUserQuestion` tool | Agent asks multi-choice clarifying questions | Same `canUseTool` path; `toolName === "AskUserQuestion"`; surface questions to user; return `{ behavior: "allow", updatedInput: { questions, answers } }` | Phase 3 |
 | Graceful cancel (`session/stop`) | Stop cleanly | Compute adapter SIGTERMs `launch.ts`; AbortController aborts `query()`; launch posts `StopFailure`, exits 1 | Phase 1 (wired today) |
 | Hard kill | SIGTERM ignored | SIGKILL the launch PID; D2 orphan sweeper marks session `failed` within 5 min | Phase 1 (works today) |
 
-**Architecture gap for streaming-input push (Phase 2):** data flow today is one-way (`launch.ts` → arkd → conductor). Inbound delivery to a running agent requires a back-channel. Two options:
-
-- **arkd `/channel/{sessionId}/deliver` → local port per session.** Cleanest, uses existing `ChannelDeliverReq` shape. Costs one TCP listener per running agent.
-- **File-tail IPC via `<sessionDir>/interventions.jsonl`.** `launch.ts` tails it alongside its main loop and shoves each line into its prompt queue. Single-box only but zero-network — recommend starting here.
-
-Pick one at Phase 2 start. Both need `launch.ts` to switch from string-prompt to queue-prompt; that is the unlock for D1 Pattern A.
+**Streaming-input push is shipped (D1, 2026-04-22).** Architecture: file-tail IPC via `<sessionDir>/interventions.jsonl`. `launch.ts` tails that file alongside its main loop and pushes each line into its `PromptQueue`; the queue is passed as `prompt` to `query()`. The caller (sage, CLI, Web UI) calls `session/inject { sessionId, content }` over conductor RPC (port 19100), which appends `{"role":"user","content":"...","ts":<ms>}\n` to the file. Transport is zero-network (single-box local disk). Multi-box phase-2 option: arkd `/channel/{sessionId}/deliver`, which uses the existing `ChannelDeliverReq` shape but costs one TCP listener per running agent.
 
 **SDK compatibility note.** Enabling `options.includePartialMessages: true` for live token streaming is **incompatible with `options.maxThinkingTokens`** — when thinking is enabled the SDK does not emit `stream_event` partial messages, only complete ones. If we later add partial-message forwarding for live web-UI rendering, disable thinking, or gate it on a runtime flag.
 

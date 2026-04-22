@@ -6,10 +6,11 @@
  */
 
 import { test, expect } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runAgentSdkLaunch } from "../runtimes/agent-sdk/launch.js";
+import type { SDKUserMessage } from "../runtimes/agent-sdk/launch.js";
 
 function makeTmpDir(): string {
   return mkdtempSync(join(tmpdir(), "agent-sdk-launch-"));
@@ -626,6 +627,67 @@ test("PostToolUse with array content is JSON-stringified", async () => {
 // ---------------------------------------------------------------------------
 // A3b ordering guarantee: transition-driving hook is always last
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// D1: mid-session intervention via interventions.jsonl + streamFactory
+// ---------------------------------------------------------------------------
+
+test("picks up mid-session intervention from interventions.jsonl", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agent-sdk-intervene-"));
+  const promptFile = join(dir, "prompt.txt");
+  writeFileSync(promptFile, "initial");
+
+  const promptMessages: SDKUserMessage[] = [];
+
+  async function* fakeStream(prompt: AsyncIterable<SDKUserMessage>) {
+    const iter = prompt[Symbol.asyncIterator]();
+
+    // Read first message (the seed prompt).
+    const first = await iter.next();
+    if (!first.done) promptMessages.push(first.value);
+
+    // Simulate sage writing an intervention while the agent is mid-turn.
+    appendFileSync(
+      join(dir, "interventions.jsonl"),
+      JSON.stringify({ role: "user", content: "also do X", ts: Date.now() }) + "\n",
+    );
+
+    // Read second message (the intervention).
+    const second = await iter.next();
+    if (!second.done) promptMessages.push(second.value);
+
+    yield {
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      total_cost_usd: 0,
+      num_turns: 2,
+      usage: { input_tokens: 1, output_tokens: 1 },
+      stop_reason: "end_turn",
+      result: "ok",
+      duration_ms: 1,
+      duration_api_ms: 1,
+      uuid: "u",
+      session_id: "s",
+      modelUsage: {},
+      permission_denials: [],
+    } as any;
+  }
+
+  const result = await runAgentSdkLaunch({
+    sessionId: "s1",
+    sessionDir: dir,
+    worktree: "/tmp",
+    promptFile,
+    streamFactory: (prompt) => fakeStream(prompt as AsyncIterable<SDKUserMessage>),
+  });
+
+  expect(result.exitCode).toBe(0);
+  expect(result.sawResult).toBe(true);
+  expect(promptMessages).toHaveLength(2);
+  expect(promptMessages[0].message.content).toBe("initial");
+  expect(promptMessages[1].message.content).toBe("also do X");
+});
 
 test("transition-driving hook (SessionEnd/StopFailure) is always the final hook for a result message", async () => {
   // Verify for a success result: Stop comes before SessionEnd
