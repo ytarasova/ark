@@ -23,6 +23,7 @@ export function registerStartCommands(session: Command) {
     .option("--claude-session <id>", "Create from an existing Claude Code session (use 'ark claude list' to find IDs)")
     .option("--recipe <name>", "Create session from a recipe template")
     .option("--runtime <name>", "Override agent runtime (e.g. codex, gemini, claude)")
+    .option("-m, --model <model>", "Override model for all stages (e.g. haiku, sonnet, opus, or a full provider slug)")
     .option(
       "--with-mcp <name>",
       "Mount an additional MCP server into the session (repeatable). Resolves against shipped mcp-configs/<name>.json or an inline path.",
@@ -124,10 +125,13 @@ export function registerStartCommands(session: Command) {
         }
       }
 
-      // Handle --runtime: store runtime override in session config
+      // Handle --runtime / --model: store overrides in session config
       let sessionConfig: Record<string, unknown> | undefined;
       if (opts.runtime) {
         sessionConfig = { ...sessionConfig, runtime_override: opts.runtime };
+      }
+      if (opts.model) {
+        sessionConfig = { ...sessionConfig, model_override: opts.model };
       }
 
       // Handle --remote-repo: use git URL as repo, no local path needed
@@ -223,6 +227,7 @@ export function registerStartCommands(session: Command) {
       console.log(`  Stage:    ${s.stage ?? "-"}`);
       if (workdir) console.log(`  Workdir:  ${workdir}`);
       if (opts.runtime) console.log(`  Runtime:  ${opts.runtime}`);
+      if (opts.model) console.log(`  Model:    ${opts.model}`);
 
       // Server handler now dispatches the first-stage agent atomically. Re-read
       // the session so --attach picks up the now-populated session_id.
