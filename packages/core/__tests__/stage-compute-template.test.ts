@@ -149,36 +149,6 @@ describe("resolveComputeForStage", async () => {
     await app.computes.delete(result!);
   });
 
-  // Upstream adc10203 unified compute + templates onto one table with a single
-  // `name` PK, so a concrete compute and a template can't share a name. The
-  // "reuse existing concrete compute" path therefore no longer applies --
-  // templates always clone. Re-enable if the compute PK is widened or the two
-  // row kinds get separated again.
-  it.skip("reuses existing compute when it matches template name", async () => {
-    // Create template and a matching compute
-    await app.computeTemplates.create({
-      name: "existing-compute",
-      provider: "ec2",
-      config: { size: "xl" },
-    });
-    await app.computeService.create({ name: "existing-compute", provider: "ec2", config: { size: "xl" } });
-
-    const session = await app.sessions.create({ summary: "reuse-test" });
-    const stageDef = { name: "work", gate: "auto" as const, compute_template: "existing-compute" };
-    const logs: string[] = [];
-
-    const result = await resolveComputeForStage(app, stageDef, session.id, (m) => logs.push(m));
-    expect(result).toBe("existing-compute");
-    expect(logs.some((l) => l.includes("existing compute"))).toBe(true);
-
-    // Verify no new provision event (reused existing)
-    const events = await app.events.list(session.id);
-    const provisionEvent = events.find((e) => e.type === "compute_cloned_from_template");
-    expect(provisionEvent).toBeUndefined();
-
-    await app.computes.delete("existing-compute");
-  });
-
   it("resolves template from config when not in DB", async () => {
     // Temporarily add to config
     const originalTemplates = app.config.computeTemplates;

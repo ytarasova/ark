@@ -132,7 +132,6 @@ export const claudeCodeExecutor: Executor = {
       claudeArgs,
       mcpConfigPath,
       prevClaudeSessionId: opts.prevClaudeSessionId ?? session.claude_session_id,
-      sessionName: opts.sessionName ?? session.summary ?? session.id,
       env: launchEnv,
       initialPrompt: opts.initialPrompt,
     });

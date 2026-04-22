@@ -819,11 +819,6 @@ export function removeSettings(workdir: string): void {
   }
 }
 
-/** @deprecated Use writeSettings instead */
-export const writeHooksConfig = writeSettings;
-/** @deprecated Use removeSettings instead */
-export const removeHooksConfig = removeSettings;
-
 // ── Launcher script ─────────────────────────────────────────────────────────
 
 export interface LauncherOpts {
@@ -832,10 +827,6 @@ export interface LauncherOpts {
   mcpConfigPath: string;
   claudeSessionId?: string;
   prevClaudeSessionId?: string | null;
-  /** @deprecated The `--remote-control` flag was removed (it spammed the host workspace
-   *  with session breadcrumbs without producing anything the dashboard uses). Kept on
-   *  the opts type only so existing callers compile; the value is now ignored. */
-  sessionName?: string;
   /** Environment variables to export before launching Claude */
   env?: Record<string, string>;
   /** Initial prompt passed as positional arg -- triggers immediate processing */
