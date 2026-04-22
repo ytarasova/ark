@@ -483,22 +483,31 @@ export function registerSessionCommands(program: Command) {
     .command("attach")
     .description("Attach to a running agent session")
     .argument("<id>")
-    .action(async (id) => {
+    .option("--print-only", "Print the attach command instead of running it")
+    .action(async (id, opts) => {
+      // Resolve the attach command via the RPC. The server returns
+      // attachable:false for completed/failed/archived/not-yet-dispatched
+      // sessions so we can surface a friendly message instead of trying to
+      // spawn `tmux attach` against a pane that doesn't exist.
       const ark = await getArkClient();
-      const { session: s } = await ark.sessionRead(id);
-      if (!s) {
-        console.log(chalk.red("Not found"));
+      let res: { command: string; displayHint: string; attachable: boolean; reason?: string };
+      try {
+        res = await ark.sessionAttachCommand(id);
+      } catch (e: any) {
+        console.error(chalk.red(e?.message ?? `Session ${id} not found`));
+        process.exit(1);
+      }
+      if (!res.attachable) {
+        console.error(chalk.red(res.reason ?? "Session is not attachable."));
+        console.error(chalk.dim("Try `ark session resume` if the agent needs to be relaunched."));
+        process.exit(1);
+      }
+      if (opts.printOnly) {
+        // Machine-friendly: stdout so it can be piped / captured.
+        process.stdout.write(res.command + "\n");
         return;
       }
-      if (!s.session_id) {
-        // Sessions now dispatch at start/fork/clone/spawn time. If there's
-        // still no tmux session after that, it failed to launch -- `session
-        // resume` is the right tool for restarting.
-        console.log(chalk.red("Session is not running. Try `ark session resume`."));
-        return;
-      }
-      const cmd = core.attachCommand(s.session_id);
-      execSync(cmd, { stdio: "inherit" });
+      execSync(res.command, { stdio: "inherit" });
     });
 
   session

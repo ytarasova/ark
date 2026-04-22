@@ -115,6 +115,12 @@ export class SessionClient {
     return this.rpc<SessionReadResult>("session/read", { sessionId, include });
   }
 
+  async sessionAttachCommand(
+    sessionId: string,
+  ): Promise<{ command: string; displayHint: string; attachable: boolean; reason?: string }> {
+    return this.rpc("session/attach-command", { sessionId });
+  }
+
   // ── Queries ─────────────────────────────────────────────────────────────────
 
   async sessionEvents(sessionId: string, limit?: number): Promise<Event[]> {
