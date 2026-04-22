@@ -1,8 +1,25 @@
 # Orchestrator refactor plan — `AppMode.orchestrator`
 
-**Status:** design. Written 2026-04-21 after the "Temporal is hosted-only" scope correction. Counterpart to `docs/temporal.md`.
+**Status:** design. Written 2026-04-21 after the "Temporal is hosted-only" scope correction + "fix the DI anti-pattern" correction. Counterpart to `docs/temporal.md`.
 
 **Goal:** one polymorphic capability slot so callers never branch on mode. Local mode keeps its bespoke state machine forever; hosted mode gets Temporal. Same pattern as `AppMode.database`, `AppMode.secrets`, `AppMode.tenantResolver`.
+
+## 0. The DI problem we're also fixing
+
+Today's orchestration functions have the signature `dispatch(app, sessionId, opts)`, `advance(app, sessionId, ...)`, `startSession(app, opts)`. That's not DI — it's the **service-locator-as-argument** anti-pattern. The function receives a kitchen-sink `AppContext` and plucks `app.sessions`, `app.computes`, `app.events`, `app.computeService`, `app.flows`, `app.agents` etc. out of it. The dependency graph is invisible until you read every line of the function body.
+
+Awilix is already wired in Ark (`packages/core/container.ts` defines the `Cradle`; repositories + services are registered). The orchestration layer just doesn't use it.
+
+Consequences the capability refactor needs to fix — not just paper over:
+
+1. **The capability interface would inherit the anti-pattern** if `LocalOrchestrator` takes `app` and delegates via `dispatch(this.app, id)`. That's wrapping the problem, not fixing it.
+2. **Temporal activities can't take AppContext as input.** Activity inputs are serialized to Temporal history (JSON). Passing an AppContext is a non-starter. Activities need narrow deps injected at worker construction time.
+3. **Testability.** Every orchestration test today must build a full AppContext. Narrow deps + injection lets tests mock only what the function actually uses.
+4. **The `No global state` memory rule** (*pass all state as arguments, no ARK_DIR() or getApp() from utility functions*) is meant to prevent exactly this — but an opaque `app` arg satisfies the letter and violates the spirit.
+
+Fix: **migrate orchestration from module-level functions taking `app` to injectable classes with explicit constructor-injected dependencies.** The Awilix container is already there; register them and let the cradle resolve the graph.
+
+This makes the capability refactor slightly bigger but the payoff is real — we finally get typed, explicit dependency graphs across the hottest piece of code in Ark.
 
 ---
 
@@ -123,49 +140,114 @@ These stay on `SessionService`; they are local concerns or read-only facades:
 
 ---
 
-## 3. `LocalOrchestrator` implementation
+## 3. `LocalOrchestrator` implementation — properly DI'd
+
+Not a thin wrapper over kitchen-sink functions. A class with **explicit constructor-injected dependencies** resolved by Awilix.
 
 `packages/core/modes/orchestrators/local.ts`:
 
 ```ts
-import type { AppContext } from "../../app.js";
-import * as dispatchFns from "../../services/dispatch.js";
-import * as stageAdvance from "../../services/stage-advance.js";
-import * as forkJoin from "../../services/fork-join.js";
-import * as subagents from "../../services/subagents.js";
-import * as lifecycle from "../../services/session-lifecycle.js";
-import * as hooks from "../../services/session-hooks.js";
+import type {
+  SessionRepository, ComputeRepository, EventRepository,
+  MessageRepository, TodoRepository, ArtifactRepository,
+  FlowStateRepository,
+} from "../../repositories/index.js";
+import type { ComputeService } from "../../services/compute.js";
+import type { FlowStore, AgentStore } from "../../stores/index.js";
+import type { SessionDispatcher } from "../../services/session-dispatcher.js";
+import type { StageAdvancer } from "../../services/stage-advancer.js";
+import type { ForkJoiner } from "../../services/fork-joiner.js";
+import type { SubagentSpawner } from "../../services/subagent-spawner.js";
+import type { SessionLifecycle } from "../../services/session-lifecycle-class.js";
+import type { ReviewGateHooks } from "../../services/review-gate-hooks.js";
+
+export interface LocalOrchestratorDeps {
+  dispatcher: SessionDispatcher;
+  advancer: StageAdvancer;
+  forkJoiner: ForkJoiner;
+  subagentSpawner: SubagentSpawner;
+  lifecycle: SessionLifecycle;
+  gates: ReviewGateHooks;
+}
 
 export class LocalOrchestrator implements OrchestratorCapability {
-  constructor(private readonly app: AppContext) {}
+  constructor(private readonly deps: LocalOrchestratorDeps) {}
 
-  async createSession(opts) { return lifecycle.startSession(this.app, opts); }
-  async dispatch(id, opts) { return dispatchFns.dispatch(this.app, id, opts); }
-  async advance(id, opts) { return stageAdvance.advance(this.app, id, opts?.force ?? false, opts?.outcome); }
-  async stop(id, opts) { return lifecycle.stopSession(this.app, id, opts); }
-  async resume(id, opts) { return dispatchFns.resume(this.app, id, opts); }
-  async pause(id, reason) { return lifecycle.pauseSession(this.app, id, reason); }
-  async interrupt(id) { return lifecycle.interruptSession(this.app, id); }
-  async complete(id) { return stageAdvance.complete(this.app, id); }
-  async send(id, msg) { return lifecycle.sendMessage(this.app, id, msg); }
-  async approveReviewGate(id) { return hooks.approveReviewGate(this.app, id); }
-  async rejectReviewGate(id, reason) { return hooks.rejectReviewGate(this.app, id, reason); }
-  async handoff(id, agent, instr) { return stageAdvance.handoff(this.app, id, agent, instr); }
-  async spawn(parentId, opts) { return subagents.spawn(this.app, parentId, opts); }
-  async fanOut(id, opts) { return forkJoin.fanOut(this.app, id, opts); }
+  async createSession(opts) { return this.deps.lifecycle.start(opts); }
+  async dispatch(id, opts) { return this.deps.dispatcher.dispatch(id, opts); }
+  async advance(id, opts) { return this.deps.advancer.advance(id, opts); }
+  async complete(id) { return this.deps.advancer.complete(id); }
+  async stop(id, opts) { return this.deps.lifecycle.stop(id, opts); }
+  async resume(id, opts) { return this.deps.dispatcher.resume(id, opts); }
+  async pause(id, reason) { return this.deps.lifecycle.pause(id, reason); }
+  async interrupt(id) { return this.deps.lifecycle.interrupt(id); }
+  async send(id, msg) { return this.deps.lifecycle.send(id, msg); }
+  async approveReviewGate(id) { return this.deps.gates.approve(id); }
+  async rejectReviewGate(id, reason) { return this.deps.gates.reject(id, reason); }
+  async handoff(id, agent, instr) { return this.deps.advancer.handoff(id, agent, instr); }
+  async spawn(parentId, opts) { return this.deps.subagentSpawner.spawn(parentId, opts); }
+  async fanOut(id, opts) { return this.deps.forkJoiner.fanOut(id, opts); }
 }
 ```
 
-**Zero rewrites.** Thin delegation wrapping existing functions. Because functions already take `app` as an explicit first argument, there's no hidden ambient-state coupling to untangle.
+The orchestrator is a ~60-line dispatcher. The real work lives in the injectable classes, each with its **own** narrow deps:
 
-Wiring: `buildLocalAppMode(app)` registers `mode.orchestrator = new LocalOrchestrator(app)`.
+```ts
+export interface SessionDispatcherDeps {
+  sessions: SessionRepository;
+  computes: ComputeRepository;
+  events: EventRepository;
+  compute: ComputeService;
+  flows: FlowStore;
+  agents: AgentStore;
+  // only what dispatch() actually reads — no "app"
+}
 
-`SessionService` changes:
+export class SessionDispatcher {
+  constructor(private readonly deps: SessionDispatcherDeps) {}
+
+  async dispatch(sessionId: string, opts?: DispatchOpts): Promise<OpResult> {
+    const session = await this.deps.sessions.get(sessionId);
+    // ... existing dispatch.ts logic, but reads via this.deps.X instead of app.X
+  }
+
+  async resume(sessionId: string, opts?: ResumeOpts): Promise<OpResult> { /* ... */ }
+}
+```
+
+### Awilix wiring
+
+```ts
+// packages/core/di/orchestration.ts
+export function registerOrchestration(container: AppContainer): void {
+  container.register({
+    dispatcher: asClass(SessionDispatcher).singleton(),
+    advancer: asClass(StageAdvancer).singleton(),
+    forkJoiner: asClass(ForkJoiner).singleton(),
+    subagentSpawner: asClass(SubagentSpawner).singleton(),
+    sessionLifecycle: asClass(SessionLifecycle).singleton(),
+    reviewGateHooks: asClass(ReviewGateHooks).singleton(),
+    orchestrator: asFunction((c) => new LocalOrchestrator({
+      dispatcher: c.dispatcher,
+      advancer: c.advancer,
+      forkJoiner: c.forkJoiner,
+      subagentSpawner: c.subagentSpawner,
+      lifecycle: c.sessionLifecycle,
+      gates: c.reviewGateHooks,
+    })).singleton(),
+  });
+}
+```
+
+Each orchestration class gets a tiny `*Deps` interface that Awilix resolves from the `Cradle`. No module imports `AppContext`; no function takes `app`. The dependency graph is the Cradle interface; it's explicit, compile-checked, and mockable field-by-field in tests.
+
+### SessionService changes
+
 ```diff
 - async dispatch(id, opts) { return dispatchFns.dispatch(this._app, id, opts); }
 + async dispatch(id, opts) { return this._app.mode.orchestrator.dispatch(id, opts); }
 ```
-One diff per execution method. Lifecycle + read methods untouched.
+Same as before — one diff per execution method. But the `_app.mode.orchestrator` now resolves to the DI-properly-composed `LocalOrchestrator`, not a wrapper around `_app`.
 
 ---
 
@@ -218,7 +300,7 @@ Inside the workflow, activities wrap the same functions `LocalOrchestrator` call
 
 ## 5. Refactors needed before the capability can land
 
-All small. Numbered for independent issue filing.
+**R1–R8 are small prep work.** **R9–R14 are the DI migration** — the meat of the refactor. Each is independently shippable.
 
 ### R1. Consolidate `approveReviewGate` / `rejectReviewGate` onto SessionService (S)
 Two top-level functions in `session-orchestration.ts` — fold them onto SessionService so the capability surface matches the service surface. Handlers that call the functions today get migrated to the method call.
@@ -246,17 +328,48 @@ Today these are inferred from function signatures. Promote to the shared types p
 ### R8. `dispatch.dispatch()` return: surface whether a stage actually started vs was already running (S)
 Today it returns `{ok: true, message: "Already running (...)"}` when idempotency kicks in. Temporal needs to know the distinction (did I spawn a workflow or not?). Add an `outcome: 'started' | 'already_running' | 'action_completed' | 'blocked'` discriminator.
 
+### R9. Extract `SessionDispatcher` class (M)
+Convert `packages/core/services/dispatch.ts` (`dispatch()` + `resume()` + `resolveComputeForStage()`) into `class SessionDispatcher` with explicit `SessionDispatcherDeps` (`sessions`, `computes`, `events`, `compute`, `flows`, `agents`, `hookRunner`). Function bodies move into methods unchanged; all `app.X` access becomes `this.deps.X`. Register in the Awilix container. All call sites move from `dispatch(app, id)` to `app.cradle.dispatcher.dispatch(id)`.
+
+### R10. Extract `StageAdvancer` class (M)
+Same treatment for `packages/core/services/stage-advance.ts` (`advance`, `complete`, `handoff`) with `StageAdvancerDeps` (`sessions`, `events`, `flows`, `dispatcher`).
+
+### R11. Extract `ForkJoiner` class (M)
+`packages/core/services/fork-join.ts` → `ForkJoiner` with `ForkJoinerDeps` (`sessions`, `events`, `dispatcher`, `subagentSpawner`).
+
+### R12. Extract `SubagentSpawner` class (M)
+`packages/core/services/subagents.ts` → `SubagentSpawner` with `SubagentSpawnerDeps` (`sessions`, `events`, `dispatcher`, `flows`).
+
+### R13. Extract `SessionLifecycle` class (L)
+`packages/core/services/session-lifecycle.ts` is the biggest surface. Splits into `SessionLifecycle` (start/stop/pause/resume-state/interrupt/send) with `SessionLifecycleDeps` (`sessions`, `events`, `messages`, `compute`, `eventBus`). This is the largest of the DI refactors — the lifecycle file is ~500 LOC and has the most call sites. Could be split further into `SessionStarter` + `SessionStopper` + `SessionCommunicator` if that helps reviewability.
+
+### R14. Extract `ReviewGateHooks` class (S)
+Fold `approveReviewGate` + `rejectReviewGate` from `session-orchestration.ts` (currently top-level functions — see R1) into `class ReviewGateHooks` with `ReviewGateHooksDeps` (`sessions`, `events`, `dispatcher`, `advancer`).
+
+### Migration pattern per R9–R14
+
+For each:
+1. Copy the module into a new `class X` keeping all function bodies identical except `app.*` → `this.deps.*`.
+2. Register the class in `packages/core/di/orchestration.ts`.
+3. Add an adapter: the OLD function stays, with signature `dispatch(app, id, opts)`, but its body is just `return app.cradle.dispatcher.dispatch(id, opts)`. Zero-friction bridging.
+4. Update high-confidence call sites to the new form. Leave low-confidence ones on the adapter.
+5. When no callers of the OLD function remain, delete the adapter.
+
+This pattern keeps each PR small + mergeable in isolation.
+
 ---
 
 ## 6. Ordered implementation sequence
 
-1. **R1–R8 refactors** land as independent PRs. Each is small + merge-independent. Unblocks Phase 2.
-2. **Capability interface lands** in `packages/core/modes/orchestrator.ts`. Wired into `AppMode` type + `buildLocalAppMode` + `buildHostedAppMode` (hosted stub for now).
-3. **`LocalOrchestrator` class** lands with the thin delegation. `SessionService` methods rewired through `app.mode.orchestrator.*`.
-4. **Test gate**: full `make test` passes with zero behavioral change — the capability is a pure introduction. Run all existing orchestration tests.
-5. **Commit + deploy** local mode with the capability seam in place. No hosted behavior change yet.
-6. **`TemporalOrchestrator` lands** (Phase 2 as re-scoped in #369). First workflow covers the simplest action-stage flow. Hosted integration test via `make dev-temporal`.
-7. **Activity catalog buildout** moves to Phase 3 (#370).
+1. **R1–R8 refactors** land as independent PRs. Small surface prep. Unblocks the DI migration.
+2. **R9–R14 DI migration lands** as independent PRs per extracted class. Each class ships with: class + `*Deps` interface + Awilix registration + back-compat adapter. No behavioral change per PR; tested in isolation.
+3. **Back-compat adapters deleted** once all call sites migrate — one small PR per removed adapter.
+4. **Capability interface lands** in `packages/core/modes/orchestrator.ts`. Wired into `AppMode` type + `buildLocalAppMode` + `buildHostedAppMode` (hosted stub for now).
+5. **`LocalOrchestrator` class** lands with the properly-DI'd delegation. `SessionService` methods rewired through `app.mode.orchestrator.*`.
+6. **Test gate**: full `make test` passes with zero behavioral change — the capability is a pure introduction. Run all existing orchestration tests with the DI'd classes underneath.
+7. **Commit + deploy** local mode with the capability seam + proper DI in place. No hosted behavior change yet.
+8. **`TemporalOrchestrator` lands** (Phase 2 as re-scoped in #369). First workflow covers the simplest action-stage flow. Activities receive narrow deps from the Awilix worker-scoped container (same pattern: no AppContext inside activities). Hosted integration test via `make dev-temporal`.
+9. **Activity catalog buildout** moves to Phase 3 (#370), now trivial because the activities just call into the DI'd classes via their typed narrow interfaces.
 
 ---
 
