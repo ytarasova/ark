@@ -105,7 +105,12 @@ export function TabPanels(props: TabPanelsProps) {
           bottomRef={bottomRef}
         />
       )}
-      {activeTab === "terminal" && (
+      {/*
+        Terminal tab stays mounted across tab switches so xterm scrollback +
+        viewport position survive -- only the live socket releases. We hide
+        the container via display:none when another tab is active.
+      */}
+      <div style={{ display: activeTab === "terminal" ? "contents" : "none" }} data-testid="terminal-tab-wrapper">
         <TerminalTab
           sessionId={session?.id ?? ""}
           output={output}
@@ -114,7 +119,7 @@ export function TabPanels(props: TabPanelsProps) {
           isActive={isActive}
           tabActive={activeTab === "terminal"}
         />
-      )}
+      </div>
       {activeTab === "events" && (
         <EventTimeline
           events={timelineEvents}

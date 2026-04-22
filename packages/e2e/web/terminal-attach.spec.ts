@@ -66,3 +66,35 @@ test("Terminal tab renders attach command panel for a fresh session", async () =
     await expect(unavailable).toContainText(/session/i);
   }
 });
+
+test("Live terminal pill renders a status + exposes the Retry button on failure", async () => {
+  // Create a session but don't launch any tmux pane, so the WS will fail
+  // to open -- that's the state we want to observe the reconnect pill in.
+  const data = await ws.rpc("session/start", {
+    summary: "Terminal attach reconnect e2e",
+    repo: ws.env.workdir,
+    flow: "bare",
+  });
+  const id: string = data.session.id;
+
+  await page.reload();
+  await page.waitForSelector("nav", { timeout: 30_000 });
+  await page.click('nav button:has-text("Sessions")');
+  await page.locator(`text=${id}`).first().click();
+
+  await expect(page.locator('button[role="tab"]:has-text("Terminal")')).toBeVisible({ timeout: 10_000 });
+  await page.locator('button[role="tab"]:has-text("Terminal")').click();
+
+  // The live-terminal status pill renders regardless of success -- either
+  // the socket connects and we see "Live", or it fails and we see a
+  // connecting/reconnecting/error label.
+  const statusPill = page.locator('[data-testid="live-terminal-status"]');
+  await expect(statusPill).toBeVisible({ timeout: 15_000 });
+  const text = await statusPill.innerText();
+  expect(text.length).toBeGreaterThan(0);
+
+  // Disconnect or Retry should be reachable depending on state.
+  const retryBtn = page.locator('[data-testid="live-terminal-retry"]');
+  const disconnectBtn = page.locator('[data-testid="live-terminal-disconnect"]');
+  await expect(retryBtn.or(disconnectBtn).first()).toBeVisible({ timeout: 15_000 });
+});

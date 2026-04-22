@@ -56,8 +56,9 @@ afterEach(() => {
   (globalThis as any).WebSocket = originalWS;
 });
 
-function Harness(props: { sessionId: string; enabled: boolean }) {
-  useTerminalSocket({ sessionId: props.sessionId, enabled: props.enabled });
+function Harness(props: { sessionId: string; enabled: boolean; onResult?: (r: any) => void }) {
+  const result = useTerminalSocket({ sessionId: props.sessionId, enabled: props.enabled });
+  props.onResult?.(result);
   return React.createElement("span", { "data-kind": "probe" }, "ok");
 }
 
@@ -72,5 +73,39 @@ describe("useTerminalSocket", () => {
     const out = renderToString(React.createElement(Harness, { sessionId: "s-2", enabled: true }));
     // SSR path: the hook's effect doesn't run, the hook should still produce a stable render.
     expect(out).toContain("ok");
+  });
+
+  test("exposes disconnect + retry + reconnectAttempt + maxReconnectAttempts in the initial result", () => {
+    let capturedResult: any = null;
+    renderToString(
+      React.createElement(Harness, {
+        sessionId: "s-3",
+        enabled: false,
+        onResult: (r) => (capturedResult = r),
+      }),
+    );
+    expect(capturedResult).toBeTruthy();
+    expect(capturedResult.status).toBe("idle");
+    expect(capturedResult.reconnectAttempt).toBe(0);
+    // The reconnect policy from the spec: max 4 attempts.
+    expect(capturedResult.maxReconnectAttempts).toBe(4);
+    expect(typeof capturedResult.disconnect).toBe("function");
+    expect(typeof capturedResult.retry).toBe("function");
+    expect(typeof capturedResult.sendInput).toBe("function");
+    expect(typeof capturedResult.sendResize).toBe("function");
+  });
+
+  test("disconnect is a stable no-op while idle", () => {
+    let capturedResult: any = null;
+    renderToString(
+      React.createElement(Harness, {
+        sessionId: "s-4",
+        enabled: false,
+        onResult: (r) => (capturedResult = r),
+      }),
+    );
+    // Calling disconnect on an idle socket must not throw or open a WS.
+    expect(() => capturedResult.disconnect()).not.toThrow();
+    expect(FakeWebSocket.instances.length).toBe(0);
   });
 });

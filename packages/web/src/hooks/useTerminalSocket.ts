@@ -13,13 +13,14 @@
  *     - binary: raw keystrokes
  *     - JSON text: { type: "resize", cols, rows }
  *
- * Reconnect: up to 3 attempts with 1 s backoff before surfacing an error
- * status; the caller renders a Retry button that resets the attempt counter.
+ * Reconnect policy: exponential backoff 1s -> 2s -> 4s -> 8s, max 4 attempts,
+ * then the status transitions to `error` and the consumer is expected to
+ * render a Retry button. User-initiated disconnect bypasses auto-reconnect.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type TerminalStatus = "idle" | "connecting" | "connected" | "disconnected" | "error";
+export type TerminalStatus = "idle" | "connecting" | "connected" | "reconnecting" | "disconnected" | "error";
 
 export interface UseTerminalSocketOptions {
   /** Session id (not tmux name). The server daemon resolves tmux name via the DB. */
@@ -37,16 +38,23 @@ export interface UseTerminalSocketOptions {
 export interface UseTerminalSocketResult {
   status: TerminalStatus;
   errorMessage: string | null;
+  /** 1-based attempt number while status === "reconnecting"; 0 otherwise. */
+  reconnectAttempt: number;
+  /** Max attempts before giving up. Exposed for UI status rendering. */
+  maxReconnectAttempts: number;
   /** Send raw keystrokes (binary). No-op while not connected. */
   sendInput: (bytes: Uint8Array | string) => void;
   /** Send a resize envelope. No-op while not connected. */
   sendResize: (cols: number, rows: number) => void;
-  /** Reset the attempt counter and reconnect. */
+  /** User-initiated reconnect. Resets the attempt counter. */
   retry: () => void;
+  /** User-initiated disconnect. No auto-reconnect; stays in `disconnected` until retry(). */
+  disconnect: () => void;
 }
 
-const MAX_RECONNECT_ATTEMPTS = 3;
-const RECONNECT_BACKOFF_MS = 1000;
+const MAX_RECONNECT_ATTEMPTS = 4;
+/** Exponential backoff schedule: 1s, 2s, 4s, 8s. Indexed by (attempt - 1). */
+const RECONNECT_BACKOFF_MS = [1000, 2000, 4000, 8000] as const;
 
 function defaultWsBase(): string {
   if (typeof window === "undefined") return "";
@@ -60,6 +68,7 @@ export function useTerminalSocket(opts: UseTerminalSocketOptions): UseTerminalSo
   const { sessionId, enabled, wsBaseUrl, onData, onInitialBuffer } = opts;
   const [status, setStatus] = useState<TerminalStatus>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
   const attemptsRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -89,7 +98,14 @@ export function useTerminalSocket(opts: UseTerminalSocketOptions): UseTerminalSo
   const connect = useCallback(() => {
     if (!enabled || typeof window === "undefined") return;
     manualCloseRef.current = false;
-    setStatus("connecting");
+
+    // First attempt is "connecting"; retries show as "reconnecting N/4".
+    if (attemptsRef.current === 0) {
+      setStatus("connecting");
+    } else {
+      setStatus("reconnecting");
+      setReconnectAttempt(attemptsRef.current);
+    }
     setErrorMessage(null);
 
     const base = wsBaseUrl ?? defaultWsBase();
@@ -114,6 +130,7 @@ export function useTerminalSocket(opts: UseTerminalSocketOptions): UseTerminalSo
           const msg = JSON.parse(event.data);
           if (msg.type === "connected") {
             attemptsRef.current = 0;
+            setReconnectAttempt(0);
             setStatus("connected");
             if (typeof msg.initialBuffer === "string" && msg.initialBuffer.length > 0) {
               onInitialBufferRef.current?.(msg.initialBuffer);
@@ -147,19 +164,29 @@ export function useTerminalSocket(opts: UseTerminalSocketOptions): UseTerminalSo
     };
 
     ws.onerror = () => {
-      setStatus("error");
+      // Keep the status machine driven by onclose; onerror fires moments
+      // before onclose on most browsers and the close handler owns the
+      // retry logic.
       setErrorMessage((prev) => prev ?? "WebSocket connection failed");
     };
 
     ws.onclose = () => {
       if (manualCloseRef.current) return;
-      if (attemptsRef.current >= MAX_RECONNECT_ATTEMPTS - 1) {
+      if (attemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
         setStatus("error");
         setErrorMessage((prev) => prev ?? "Disconnected after retries");
         return;
       }
+      // Schedule the next attempt. attemptsRef.current counts *prior*
+      // attempts; index into the backoff schedule by that value so the first
+      // retry waits 1s.
+      const backoff =
+        RECONNECT_BACKOFF_MS[Math.min(attemptsRef.current, RECONNECT_BACKOFF_MS.length - 1)] ??
+        RECONNECT_BACKOFF_MS[RECONNECT_BACKOFF_MS.length - 1];
       attemptsRef.current += 1;
-      reconnectTimerRef.current = setTimeout(() => connect(), RECONNECT_BACKOFF_MS);
+      setStatus("reconnecting");
+      setReconnectAttempt(attemptsRef.current);
+      reconnectTimerRef.current = setTimeout(() => connect(), backoff);
     };
   }, [enabled, sessionId, wsBaseUrl]);
 
@@ -167,9 +194,11 @@ export function useTerminalSocket(opts: UseTerminalSocketOptions): UseTerminalSo
     if (!enabled) {
       closeSocket();
       setStatus("idle");
+      setReconnectAttempt(0);
       return;
     }
     attemptsRef.current = 0;
+    setReconnectAttempt(0);
     connect();
     return () => {
       closeSocket();
@@ -195,8 +224,25 @@ export function useTerminalSocket(opts: UseTerminalSocketOptions): UseTerminalSo
   const retry = useCallback(() => {
     closeSocket();
     attemptsRef.current = 0;
+    setReconnectAttempt(0);
     connect();
   }, [closeSocket, connect]);
 
-  return { status, errorMessage, sendInput, sendResize, retry };
+  const disconnect = useCallback(() => {
+    closeSocket();
+    setStatus("disconnected");
+    setErrorMessage(null);
+    setReconnectAttempt(0);
+  }, [closeSocket]);
+
+  return {
+    status,
+    errorMessage,
+    reconnectAttempt,
+    maxReconnectAttempts: MAX_RECONNECT_ATTEMPTS,
+    sendInput,
+    sendResize,
+    retry,
+    disconnect,
+  };
 }
