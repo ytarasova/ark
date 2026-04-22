@@ -369,6 +369,32 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     if (!compute) throw new RpcError("Compute not found", ErrorCodes.SESSION_NOT_FOUND);
     return { compute };
   });
+  /**
+   * Return authoritative capability flags for a compute target, sourced
+   * straight from the provider instance. UI consumers query this so the
+   * Reboot / Destroy / Auth-prompt buttons are driven by provider metadata
+   * instead of hardcoded `provider === "local"` checks. See P1-1 in
+   * docs/2026-04-21-architectural-audit-hardcoded-rules.md.
+   */
+  router.handle("compute/capabilities", async (p) => {
+    const { name } = extract<ComputeNameParams>(p, ["name"]);
+    const compute = await app.computes.get(name);
+    if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
+    const provider = app.getProvider(compute.provider);
+    if (!provider) throw new RpcError(`Unknown provider: ${compute.provider}`, ErrorCodes.NOT_FOUND);
+    return {
+      capabilities: {
+        provider: provider.name,
+        singleton: provider.singleton ?? false,
+        canReboot: provider.canReboot,
+        canDelete: provider.canDelete,
+        needsAuth: provider.needsAuth,
+        supportsWorktree: provider.supportsWorktree,
+        initialStatus: provider.initialStatus,
+        isolationModes: provider.isolationModes,
+      },
+    };
+  });
   router.handle("compute/provision", async (p) => {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
@@ -474,10 +500,18 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   router.handle("compute/destroy", async (p) => {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
-    if (!compute) throw new Error("Compute not found");
+    if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
     const { getProvider } = await import("../../compute/index.js");
     const provider = getProvider(compute.provider);
-    if (!provider) throw new Error(`Provider '${compute.provider}' not found`);
+    if (!provider) throw new RpcError(`Unknown provider: ${compute.provider}`, ErrorCodes.NOT_FOUND);
+    // Capability-driven guard: reject destroy up front when the provider
+    // declares canDelete=false, instead of relying on the provider's
+    // `destroy()` to throw. Keeps the error surface clean (server refused
+    // vs. runtime failure) and matches what the UI can now query via
+    // `compute/capabilities`.
+    if (!provider.canDelete) {
+      throw new RpcError(`Provider '${provider.name}' does not support destroy`, ErrorCodes.UNSUPPORTED);
+    }
     await provider.destroy(compute);
     // destroy cascades to the DB row. There is no "destroyed but still
     // listed" state -- if a user asks for destroy, they want it gone.
@@ -494,10 +528,24 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   router.handle("compute/reboot", async (p) => {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
-    if (!compute) throw new Error("Compute not found");
+    if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
     const { getProvider } = await import("../../compute/index.js");
     const provider = getProvider(compute.provider);
-    if (!provider?.reboot) throw new Error("Provider does not support reboot");
+    if (!provider) throw new RpcError(`Unknown provider: ${compute.provider}`, ErrorCodes.NOT_FOUND);
+    // Capability-driven guard: consult provider.canReboot explicitly rather
+    // than relying on method presence (a provider might define `reboot()`
+    // that simply throws NotSupported). Matches the flag the UI queries via
+    // `compute/capabilities`.
+    if (!provider.canReboot) {
+      throw new RpcError(`Provider '${provider.name}' does not support reboot`, ErrorCodes.UNSUPPORTED);
+    }
+    if (!provider.reboot) {
+      // canReboot=true but no method wired -- treat as a provider bug.
+      throw new RpcError(
+        `Provider '${provider.name}' declares canReboot but has no reboot() implementation`,
+        ErrorCodes.INTERNAL_ERROR,
+      );
+    }
     await provider.reboot(compute);
     return { ok: true };
   });

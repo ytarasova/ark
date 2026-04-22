@@ -50,6 +50,8 @@ export const ErrorCodes = {
   GATE_NOT_PENDING: -32004,
   OVERLOADED: -32005,
   FORBIDDEN: -32006,
+  NOT_FOUND: -32007,
+  UNSUPPORTED: -32008,
 } as const;
 
 // ── Constructors ────────────────────────────────────────────────────────────

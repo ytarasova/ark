@@ -190,6 +190,37 @@ export interface ComputeCleanZombiesResult {
   cleaned: number;
 }
 
+/**
+ * Shape of an isolation-mode descriptor as exposed over the wire. Mirrors
+ * `IsolationMode` in `packages/compute/types.ts`; duplicated here to avoid a
+ * cross-package import cycle into the compute layer.
+ */
+export interface ComputeIsolationMode {
+  value: string;
+  label: string;
+}
+
+/**
+ * Authoritative capability flags for a compute target, read from the
+ * provider instance. Returned by `compute/capabilities`. The UI uses this
+ * to decide which action buttons to render (reboot, destroy, ...) instead
+ * of hardcoding provider-name checks.
+ */
+export interface ComputeCapabilities {
+  provider: string;
+  singleton: boolean;
+  canReboot: boolean;
+  canDelete: boolean;
+  needsAuth: boolean;
+  supportsWorktree: boolean;
+  initialStatus: string;
+  isolationModes: ComputeIsolationMode[];
+}
+
+export interface ComputeCapabilitiesResult {
+  capabilities: ComputeCapabilities;
+}
+
 // ── Resources ───────────────────────────────────────────────────────────────
 
 export interface AgentListResult {

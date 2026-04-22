@@ -327,6 +327,30 @@ export type ComputeReadRequest = z.infer<typeof computeReadRequest>;
 export const computeReadResponse = z.object({ compute: computeSchema });
 export type ComputeReadResponse = z.infer<typeof computeReadResponse>;
 
+// ── compute/capabilities ────────────────────────────────────────────────────
+
+export const computeCapabilitiesRequest = z.object({ name: z.string().min(1) });
+export type ComputeCapabilitiesRequest = z.infer<typeof computeCapabilitiesRequest>;
+
+const computeIsolationModeSchema = z.object({
+  value: z.string(),
+  label: z.string(),
+});
+
+const computeCapabilitiesSchema = z.object({
+  provider: z.string(),
+  singleton: z.boolean(),
+  canReboot: z.boolean(),
+  canDelete: z.boolean(),
+  needsAuth: z.boolean(),
+  supportsWorktree: z.boolean(),
+  initialStatus: z.string(),
+  isolationModes: z.array(computeIsolationModeSchema),
+});
+
+export const computeCapabilitiesResponse = z.object({ capabilities: computeCapabilitiesSchema });
+export type ComputeCapabilitiesResponse = z.infer<typeof computeCapabilitiesResponse>;
+
 // ── flow/list ───────────────────────────────────────────────────────────────
 
 export const flowListRequest = z.object({}).loose();
@@ -1713,6 +1737,7 @@ export const rpcMethodSchemas: Record<string, RpcMethodSchemas> = {
   "compute/list": { request: computeListRequest, response: computeListResponse },
   "compute/create": { request: computeCreateRequest, response: computeCreateResponse },
   "compute/read": { request: computeReadRequest, response: computeReadResponse },
+  "compute/capabilities": { request: computeCapabilitiesRequest, response: computeCapabilitiesResponse },
   "flow/list": { request: flowListRequest, response: flowListResponse },
   "flow/read": { request: flowReadRequest, response: flowReadResponse },
   "agent/list": { request: agentListRequest, response: agentListResponse },
