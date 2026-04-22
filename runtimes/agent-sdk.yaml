@@ -13,6 +13,7 @@ permission_mode: bypassPermissions
 secrets:
   - ANTHROPIC_API_KEY
   - ANTHROPIC_BASE_URL
+  - ANTHROPIC_CUSTOM_HEADERS
 billing:
   mode: api
   transcript_parser: agent-sdk

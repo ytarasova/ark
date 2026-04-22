@@ -469,19 +469,130 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   const baseURL = process.env.ANTHROPIC_BASE_URL;
+  const customHeaders = process.env.ANTHROPIC_CUSTOM_HEADERS;
+
+  // TrueFoundry / AWS-Bedrock compat proxy ---------------------------------
+  // The TF gateway routes through AWS Bedrock which rejects extra fields
+  // (e.g. `context_management`) that the Claude binary includes in its requests.
+  // When ARK_BEDROCK_COMPAT=1 (set by the executor for TF sessions), we start a
+  // local Bun HTTP proxy that strips those fields before forwarding to TF.
+  // The proxy also writes a temp CLAUDE_CONFIG_DIR/settings.json with
+  // modelOverrides so the binary sends the full provider-qualified model slug
+  // (e.g. "pi-agentic/global.anthropic.claude-sonnet-4-6") rather than the short
+  // name that TF Bedrock can't route.
+  let proxyServer: ReturnType<typeof Bun.serve> | undefined;
+  let effectiveBaseURL = baseURL;
+  let effectiveModel = model;
+  // Enable bedrock-compat proxy when ARK_BEDROCK_COMPAT=1 is explicitly set,
+  // OR when ANTHROPIC_API_KEY is the sentinel "dummy" value indicating a
+  // custom-auth gateway (TrueFoundry) is in use -- those gateways route through
+  // AWS Bedrock which rejects extended API fields like context_management.
+  const bedrockCompat =
+    process.env.ARK_BEDROCK_COMPAT === "1" || (apiKey === "dummy" && !!customHeaders?.includes("Authorization:"));
+
+  if (bedrockCompat && baseURL) {
+    // Fields that AWS Bedrock (via TF gateway) does not accept.
+    const BEDROCK_STRIP_FIELDS = new Set(["context_management"]);
+
+    // Resolve the forward URL once. The proxy receives requests at /v1/messages
+    // and forwards to <baseURL>/v1/messages.
+    const forwardBase = baseURL.endsWith("/") ? baseURL.slice(0, -1) : baseURL;
+
+    proxyServer = Bun.serve({
+      port: 0, // OS-assigned ephemeral port
+      async fetch(req) {
+        const url = new URL(req.url);
+        const targetUrl = `${forwardBase}${url.pathname}${url.search}`;
+
+        // Clone headers for forwarding. Remove hop-by-hop and routing headers
+        // that must not be forwarded verbatim: the binary sends "host: localhost:<proxyPort>"
+        // which causes TF's gateway to 404 (it routes on the Host header).
+        // Let fetch set the correct host for the upstream URL.
+        const SKIP_HEADERS = new Set(["host", "connection", "content-length", "transfer-encoding"]);
+        const headers: Record<string, string> = {};
+        req.headers.forEach((v, k) => {
+          if (!SKIP_HEADERS.has(k)) headers[k] = v;
+        });
+
+        let body: string | undefined;
+        if (req.method !== "GET" && req.method !== "HEAD") {
+          const raw = await req.text();
+          if (raw && headers["content-type"]?.includes("application/json")) {
+            try {
+              const parsed = JSON.parse(raw);
+              for (const field of BEDROCK_STRIP_FIELDS) {
+                if (field in parsed) {
+                  delete parsed[field];
+                }
+              }
+              body = JSON.stringify(parsed);
+            } catch {
+              body = raw; // non-JSON: forward as-is
+            }
+          } else {
+            body = raw;
+          }
+        }
+
+        let upstream: Response;
+        try {
+          upstream = await fetch(targetUrl, {
+            method: req.method,
+            headers,
+            body,
+            // Allow self-signed or SAN-mismatch certs for internal TF gateways.
+            tls: { rejectUnauthorized: false } as any,
+          });
+        } catch (err: any) {
+          const msg = err?.message ?? String(err);
+          console.error(`[agent-sdk launch] proxy fetch error for ${targetUrl}: ${msg}`);
+          return new Response(JSON.stringify({ error: msg }), {
+            status: 502,
+            headers: { "content-type": "application/json" },
+          });
+        }
+
+        return new Response(upstream.body, {
+          status: upstream.status,
+          headers: upstream.headers,
+        });
+      },
+    });
+
+    effectiveBaseURL = `http://localhost:${proxyServer.port}`;
+    console.error(`[agent-sdk launch] Bedrock-compat proxy started on port ${proxyServer.port}`);
+
+    // The Claude binary normalizes short model slugs (e.g. strips "pi-agentic/" prefix)
+    // before the API call, so TF's Bedrock routing can't find the right model.
+    // Pass the full provider-qualified slug directly via sdkOptions.model so the binary
+    // receives "--model pi-agentic/global.anthropic.claude-sonnet-4-6" as a CLI arg
+    // and sends that slug verbatim in the request body.
+    //
+    // If model is already a short name (no "/"), default to the TF Bedrock slug.
+    // Callers can override by setting the full slug in ARK_AGENT_SDK_MODEL or via
+    // the session's runtime config.
+    if (model && !model.includes("/")) {
+      effectiveModel = `pi-agentic/global.anthropic.${model}`;
+      console.error(`[agent-sdk launch] Bedrock-compat: expanding model ${model} -> ${effectiveModel}`);
+    } else if (!model) {
+      effectiveModel = "pi-agentic/global.anthropic.claude-sonnet-4-6";
+      console.error(`[agent-sdk launch] Bedrock-compat: using default model ${effectiveModel}`);
+    }
+  }
 
   const sdkOptions: Options = {
     cwd: worktree,
     env: {
       ...process.env,
       ...(apiKey ? { ANTHROPIC_API_KEY: apiKey } : {}),
-      ...(baseURL ? { ANTHROPIC_BASE_URL: baseURL } : {}),
+      ...(effectiveBaseURL ? { ANTHROPIC_BASE_URL: effectiveBaseURL } : {}),
+      ...(customHeaders ? { ANTHROPIC_CUSTOM_HEADERS: customHeaders } : {}),
     } as Record<string, string | undefined>,
     allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
     permissionMode: "bypassPermissions",
     allowDangerouslySkipPermissions: true,
     executable: "bun",
-    model,
+    model: effectiveModel,
     maxTurns,
     maxBudgetUsd,
     systemPrompt: systemAppend ? { type: "preset", preset: "claude_code", append: systemAppend } : undefined,
@@ -545,6 +656,9 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
     process.off("SIGINT", onSigint);
     stopTail();
     queue.close();
+    if (proxyServer) {
+      proxyServer.stop(true);
+    }
   }
 }
 
