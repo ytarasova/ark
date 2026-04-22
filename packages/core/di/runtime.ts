@@ -28,6 +28,7 @@ import { TranscriptParserRegistry } from "../runtimes/transcript-parser.js";
 import { ClaudeTranscriptParser } from "../runtimes/claude/parser.js";
 import { CodexTranscriptParser } from "../runtimes/codex/parser.js";
 import { GeminiTranscriptParser } from "../runtimes/gemini/parser.js";
+import { AgentSdkParser } from "../runtimes/agent-sdk/parser.js";
 import { createPluginRegistry } from "../plugins/registry.js";
 import { FsSnapshotStore } from "../../compute/core/snapshot-store-fs.js";
 import type { SessionRepository } from "../repositories/session.js";
@@ -73,7 +74,7 @@ export function registerRuntime(container: AppContainer): void {
     ),
 
     transcriptParsers: asFunction(
-      (_c: { sessions: SessionRepository }) => {
+      (_c: { sessions: SessionRepository; config: ArkConfig }) => {
         const registry = new TranscriptParserRegistry();
         // PR 3 of the async-DB refactor (option b from the hand-off):
         //
@@ -108,6 +109,7 @@ export function registerRuntime(container: AppContainer): void {
         registry.register(new ClaudeTranscriptParser(undefined, (_workdir) => null));
         registry.register(new CodexTranscriptParser());
         registry.register(new GeminiTranscriptParser());
+        registry.register(new AgentSdkParser(_c.config.tracksDir));
         return registry;
       },
       { lifetime: Lifetime.SINGLETON },
