@@ -226,7 +226,7 @@ describe("tenant scoping", async () => {
   describe("compute", async () => {
     it("compute records are tenant-scoped", async () => {
       const scoped = app.forTenant("compute-tenant");
-      await scoped.computes.create({ name: "my-compute" });
+      await scoped.computeService.create({ name: "my-compute" });
 
       // Same tenant sees it
       const found = await scoped.computes.get("my-compute");
@@ -245,7 +245,7 @@ describe("tenant scoping", async () => {
       const defaultCount = defaultComputes.length;
 
       const scoped = app.forTenant("list-compute-tenant");
-      await scoped.computes.create({ name: "tenant-compute" });
+      await scoped.computeService.create({ name: "tenant-compute" });
 
       expect((await scoped.computes.list()).length).toBe(1);
       expect((await app.computes.list()).length).toBe(defaultCount);

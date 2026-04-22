@@ -87,7 +87,7 @@ async function seedSession(computeName?: string): Promise<string> {
 
 async function ensureCompute(name: string, provider: string): Promise<void> {
   if (await app.computes.get(name)) return;
-  await app.computes.create({ name, provider, config: {} });
+  await app.computeService.create({ name, provider, config: {} });
 }
 
 // ── resolveSessionCompute ─────────────────────────────────────────────────

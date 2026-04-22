@@ -32,9 +32,10 @@ export function registerServices(container: AppContainer): void {
       { lifetime: Lifetime.SINGLETON },
     ),
 
-    computeService: asFunction((c: { computes: ComputeRepository }) => new ComputeService(c.computes), {
-      lifetime: Lifetime.SINGLETON,
-    }),
+    computeService: asFunction(
+      (c: { computes: ComputeRepository; app: AppContext }) => new ComputeService(c.computes, c.app),
+      { lifetime: Lifetime.SINGLETON },
+    ),
 
     historyService: asFunction((c: { db: DatabaseAdapter }) => new HistoryService(c.db), {
       lifetime: Lifetime.SINGLETON,

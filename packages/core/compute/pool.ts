@@ -135,7 +135,7 @@ export class ComputePoolManager {
     // Create a new compute in the pool
     const idx = poolComputes.length + 1;
     const computeName = `${poolName}-${idx}`;
-    const compute = await this.app.computes.create({
+    const compute = await this.app.computeService.create({
       name: computeName,
       provider: pool.provider as ComputeProviderName,
       config: { ...pool.config, pool: poolName },

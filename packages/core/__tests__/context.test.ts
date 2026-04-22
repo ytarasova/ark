@@ -75,7 +75,7 @@ describe("Store context isolation", async () => {
   });
 
   it("compute CRUD works in isolated context", async () => {
-    await getApp().computes.create({ name: "test-ec2", provider: "ec2", config: { size: "m" } });
+    await getApp().computeService.create({ name: "test-ec2", provider: "ec2", config: { size: "m" } });
     const compute = await getApp().computes.get("test-ec2");
     expect(compute).not.toBeNull();
     expect(compute!.provider).toBe("ec2");

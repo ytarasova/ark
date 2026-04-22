@@ -177,7 +177,7 @@ describe("rowToSession round-trip via DB", () => {
 
 describe("rowToCompute via DB", () => {
   it("parses config JSON on getCompute", async () => {
-    const compute = await getApp().computes.create({
+    const compute = await getApp().computeService.create({
       name: "test-compute-1",
       provider: "docker",
       config: { instanceType: "t3.large", region: "us-east-1" },
@@ -190,13 +190,13 @@ describe("rowToCompute via DB", () => {
   });
 
   it("returns empty object for empty config", async () => {
-    const compute = await getApp().computes.create({ name: "test-compute-2", provider: "docker" });
+    const compute = await getApp().computeService.create({ name: "test-compute-2", provider: "docker" });
     const fetched = await getApp().computes.get("test-compute-2");
     expect(fetched!.config).toEqual({});
   });
 
   it("updateCompute preserves config as parsed object", async () => {
-    await getApp().computes.create({ name: "test-compute-3", provider: "docker", config: { a: 1 } });
+    await getApp().computeService.create({ name: "test-compute-3", provider: "docker", config: { a: 1 } });
     await getApp().computes.update("test-compute-3", { config: { a: 1, b: 2 } });
 
     const fetched = await getApp().computes.get("test-compute-3");

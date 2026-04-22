@@ -43,7 +43,7 @@ describe("session-lifecycle compute/runtime dispatch", async () => {
     // resolveComputeTarget fallback) still honour the provider when the
     // columns were never explicitly set -- but for defaults-only rows we
     // get the schema defaults, which is the documented migration contract.
-    const created = await app.computes.create({
+    const created = await app.computeService.create({
       name: "legacy-via-provider",
       provider: "docker",
     });
@@ -80,7 +80,7 @@ describe("session-lifecycle compute/runtime dispatch", async () => {
   });
 
   it("round-trips compute_kind + runtime_kind on a new row", async () => {
-    const created = await app.computes.create({
+    const created = await app.computeService.create({
       name: "cr-test-docker",
       compute: "local",
       runtime: "docker",

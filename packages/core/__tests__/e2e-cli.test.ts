@@ -58,7 +58,7 @@ describe("CLI: compute lifecycle", async () => {
     const app = getApp();
     const name = `test-e2e-compute-${Date.now()}`;
     testComputes.push(name);
-    await app.computes.create({ name, provider: "ec2" });
+    await app.computeService.create({ name, provider: "ec2" });
     const compute = await app.computes.get(name);
     expect(compute).not.toBeNull();
     expect(compute!.provider).toBe("ec2");
@@ -69,7 +69,7 @@ describe("CLI: compute lifecycle", async () => {
     const app = getApp();
     const name = `test-e2e-list-${Date.now()}`;
     testComputes.push(name);
-    await app.computes.create({ name, provider: "ec2" });
+    await app.computeService.create({ name, provider: "ec2" });
     const computes = await app.computes.list();
     expect(computes.some((c) => c.name === name)).toBe(true);
   });
@@ -78,7 +78,7 @@ describe("CLI: compute lifecycle", async () => {
     const app = getApp();
     const name = `test-e2e-status-${Date.now()}`;
     testComputes.push(name);
-    await app.computes.create({ name, provider: "ec2" });
+    await app.computeService.create({ name, provider: "ec2" });
     const compute = await app.computes.get(name);
     expect(compute).not.toBeNull();
     expect(compute!.name).toBe(name);
@@ -90,7 +90,7 @@ describe("CLI: compute lifecycle", async () => {
     const app = getApp();
     const name = `test-e2e-update-${Date.now()}`;
     testComputes.push(name);
-    await app.computes.create({ name, provider: "ec2" });
+    await app.computeService.create({ name, provider: "ec2" });
     await app.computes.mergeConfig(name, { foo: "bar" });
     const compute = await app.computes.get(name);
     expect(compute!.config.foo).toBe("bar");
@@ -102,7 +102,7 @@ describe("CLI: compute lifecycle", async () => {
     // createCompute for local should exist in a test context
     const name = `test-running-${Date.now()}`;
     testComputes.push(name);
-    await app.computes.create({ name, provider: "docker" });
+    await app.computeService.create({ name, provider: "docker" });
     await app.computes.update(name, { status: "running" });
     // Attempting to destroy a running compute goes through provider.destroy()
     // first; the repo-level delete is unguarded and we only assert status here.
@@ -113,7 +113,7 @@ describe("CLI: compute lifecycle", async () => {
   it("deletes a stopped compute", async () => {
     const app = getApp();
     const name = `test-e2e-del-${Date.now()}`;
-    await app.computes.create({ name, provider: "ec2" });
+    await app.computeService.create({ name, provider: "ec2" });
     await app.computes.delete(name);
     expect(await app.computes.get(name)).toBeNull();
   });

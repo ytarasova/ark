@@ -76,7 +76,7 @@ describe("Docker arkd-sidecar e2e", async () => {
       const provider = new LocalDockerProvider();
       provider.setApp(app);
 
-      await app.computes.create({ name: COMPUTE_NAME, provider: "docker" });
+      await app.computeService.create({ name: COMPUTE_NAME, provider: "docker" });
       let compute = await app.computes.get(COMPUTE_NAME)!;
       expect(compute.status).toBe("stopped");
 

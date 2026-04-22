@@ -73,7 +73,7 @@ class StubK8sApi implements K8sSecretsApi {
 }
 
 async function setupK8sCompute(name = "k8s-target"): Promise<void> {
-  await app.computes.create({
+  await app.computeService.create({
     name,
     provider: "k8s",
     compute: "k8s",
@@ -206,7 +206,7 @@ describe("materializeClaudeAuthForDispatch", () => {
   });
 
   it("skips Secret creation on non-k8s compute even when blob is bound", async () => {
-    await app.computes.create({
+    await app.computeService.create({
       name: "docker-target",
       provider: "docker",
       compute: "local",

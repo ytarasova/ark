@@ -75,15 +75,20 @@ describe("E2E Compute: Remote compute provider resolution", () => {
 
   it("creates a remote compute and stores its config", async () => {
     const name = `test-remote-resolve-${Date.now()}`;
-    const compute = await getApp().computes.create({
+    // "ec2" is the registered RemoteWorktreeProvider. The earlier string
+    // "ec2-worktree" was not a registered provider name; the old repo layer
+    // accepted any string for the provider column, but ComputeService now
+    // rejects unknown providers because it resolves them through the
+    // registry to pull initialStatus / singleton / canDelete flags.
+    const compute = await getApp().computeService.create({
       name,
-      provider: "ec2-worktree",
+      provider: "ec2",
       config: { size: "m", region: "us-east-1" },
     });
     computeNames.push(name);
 
     expect(compute.name).toBe(name);
-    expect(compute.provider).toBe("ec2-worktree");
+    expect(compute.provider).toBe("ec2");
     expect(compute.status).toBe("stopped");
     expect(compute.config.size).toBe("m");
     expect(compute.config.region).toBe("us-east-1");
@@ -100,7 +105,7 @@ describe("E2E Compute: Docker compute provider resolution", () => {
 
   it("creates a Docker compute and resolves its provider", async () => {
     const name = `test-docker-resolve-${Date.now()}`;
-    const compute = await getApp().computes.create({
+    const compute = await getApp().computeService.create({
       name,
       provider: "docker",
       config: { image: "ubuntu:22.04", memory: "4g" },
@@ -306,7 +311,7 @@ describe("E2E Compute: mergeComputeConfig", () => {
 
   it("merges config keys without overwriting existing ones", async () => {
     const name = `test-merge-cfg-${Date.now()}`;
-    await getApp().computes.create({
+    await getApp().computeService.create({
       name,
       provider: "docker",
       config: { existing: "value", count: 42 },

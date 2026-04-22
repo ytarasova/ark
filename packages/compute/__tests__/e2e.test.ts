@@ -281,7 +281,7 @@ describe("E2E: Compute to provider resolution flow", () => {
     // Use the auto-created "local" compute and create an ec2 compute
     const localCompute = (await getApp().computes.get("local"))!;
     expect(localCompute).not.toBeNull();
-    const ec2Compute = await getApp().computes.create({ name: "my-ec2", provider: "ec2" });
+    const ec2Compute = await getApp().computeService.create({ name: "my-ec2", provider: "ec2" });
     computeNames.push("my-ec2");
 
     expect(localCompute.provider).toBe("local");

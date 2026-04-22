@@ -23,6 +23,7 @@ import {
 import { KnowledgeStore } from "./knowledge/store.js";
 import { DbResourceStore } from "./stores/db-resource-store.js";
 import { UsageRecorder } from "./observability/usage.js";
+import { ComputeService } from "./services/compute.js";
 
 export function buildTenantScope(parent: AppContext, tenantId: string): AppContext {
   const scoped = Object.create(parent) as AppContext;
@@ -51,9 +52,16 @@ export function buildTenantScope(parent: AppContext, tenantId: string): AppConte
   const scopedUsage = new UsageRecorder(db, parent.pricing);
   scopedUsage.setTenant(tenantId);
 
+  // Tenant-scoped ComputeService bound to the scoped `computes` repo. Without
+  // this, callers reaching for `scoped.computeService.create(...)` would hit
+  // the root container's service (default tenant) even though the caller
+  // expects tenant-scoped writes.
+  const scopedComputeService = new ComputeService(scopedComputes, parent);
+
   Object.defineProperty(scoped, "tenantId", { get: () => tenantId, configurable: true });
   Object.defineProperty(scoped, "sessions", { get: () => scopedSessions, configurable: true });
   Object.defineProperty(scoped, "computes", { get: () => scopedComputes, configurable: true });
+  Object.defineProperty(scoped, "computeService", { get: () => scopedComputeService, configurable: true });
   Object.defineProperty(scoped, "computeTemplates", { get: () => scopedComputeTemplates, configurable: true });
   Object.defineProperty(scoped, "events", { get: () => scopedEvents, configurable: true });
   Object.defineProperty(scoped, "messages", { get: () => scopedMessages, configurable: true });

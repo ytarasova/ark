@@ -26,25 +26,47 @@ beforeEach(async () => {
 
 describe("ComputeRepository unified is_template model", () => {
   it("defaults is_template to false when not specified", async () => {
-    const c = await repo.create({ name: "plain-ec2", provider: "ec2" });
+    const c = await repo.insert({
+      name: "plain-ec2",
+      provider: "ec2",
+      compute_kind: "ec2",
+      runtime_kind: "direct",
+      status: "stopped",
+    });
     expect(c.is_template).toBe(false);
     expect(c.cloned_from).toBeNull();
   });
 
   it("persists is_template: true when specified", async () => {
-    const c = await repo.create({ name: "tmpl-k8s", compute: "k8s", runtime: "direct", is_template: true });
+    const c = await repo.insert({
+      name: "tmpl-k8s",
+      provider: "k8s",
+      compute_kind: "k8s",
+      runtime_kind: "direct",
+      status: "stopped",
+      is_template: true,
+    });
     expect(c.is_template).toBe(true);
 
     const reread = await repo.get("tmpl-k8s");
     expect(reread?.is_template).toBe(true);
   });
 
-  it("persists cloned_from through create + read", async () => {
-    await repo.create({ name: "tmpl", compute: "k8s", runtime: "direct", is_template: true });
-    const clone = await repo.create({
+  it("persists cloned_from through insert + read", async () => {
+    await repo.insert({
+      name: "tmpl",
+      provider: "k8s",
+      compute_kind: "k8s",
+      runtime_kind: "direct",
+      status: "stopped",
+      is_template: true,
+    });
+    const clone = await repo.insert({
       name: "tmpl-session1",
-      compute: "k8s",
-      runtime: "direct",
+      provider: "k8s",
+      compute_kind: "k8s",
+      runtime_kind: "direct",
+      status: "stopped",
       cloned_from: "tmpl",
     });
     expect(clone.cloned_from).toBe("tmpl");
@@ -55,9 +77,29 @@ describe("ComputeRepository unified is_template model", () => {
   });
 
   it("listTemplates returns only template rows", async () => {
-    await repo.create({ name: "concrete-a", provider: "ec2" });
-    await repo.create({ name: "tmpl-a", provider: "docker", is_template: true });
-    await repo.create({ name: "tmpl-b", compute: "k8s", runtime: "direct", is_template: true });
+    await repo.insert({
+      name: "concrete-a",
+      provider: "ec2",
+      compute_kind: "ec2",
+      runtime_kind: "direct",
+      status: "stopped",
+    });
+    await repo.insert({
+      name: "tmpl-a",
+      provider: "docker",
+      compute_kind: "local",
+      runtime_kind: "docker",
+      status: "stopped",
+      is_template: true,
+    });
+    await repo.insert({
+      name: "tmpl-b",
+      provider: "k8s",
+      compute_kind: "k8s",
+      runtime_kind: "direct",
+      status: "stopped",
+      is_template: true,
+    });
 
     const templates = await repo.listTemplates();
     const names = templates.map((t) => t.name).sort();
@@ -66,8 +108,21 @@ describe("ComputeRepository unified is_template model", () => {
   });
 
   it("listConcrete returns only non-template rows", async () => {
-    await repo.create({ name: "concrete-a", provider: "ec2" });
-    await repo.create({ name: "tmpl-a", provider: "docker", is_template: true });
+    await repo.insert({
+      name: "concrete-a",
+      provider: "ec2",
+      compute_kind: "ec2",
+      runtime_kind: "direct",
+      status: "stopped",
+    });
+    await repo.insert({
+      name: "tmpl-a",
+      provider: "docker",
+      compute_kind: "local",
+      runtime_kind: "docker",
+      status: "stopped",
+      is_template: true,
+    });
 
     const concrete = await repo.listConcrete();
     // "local" is seeded and not a template. "concrete-a" is ours.
@@ -78,8 +133,21 @@ describe("ComputeRepository unified is_template model", () => {
   });
 
   it("list() (no filter) returns both templates and concrete rows", async () => {
-    await repo.create({ name: "concrete-a", provider: "ec2" });
-    await repo.create({ name: "tmpl-a", provider: "docker", is_template: true });
+    await repo.insert({
+      name: "concrete-a",
+      provider: "ec2",
+      compute_kind: "ec2",
+      runtime_kind: "direct",
+      status: "stopped",
+    });
+    await repo.insert({
+      name: "tmpl-a",
+      provider: "docker",
+      compute_kind: "local",
+      runtime_kind: "docker",
+      status: "stopped",
+      is_template: true,
+    });
 
     const all = await repo.list();
     const names = all.map((c) => c.name);

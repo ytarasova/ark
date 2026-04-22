@@ -7,12 +7,12 @@ withTestContext();
 describe("compute CRUD", () => {
   it("rejects creating a second local compute (singleton)", async () => {
     // "local" is auto-seeded -- creating another with provider=local must throw
-    await expect(getApp().computes.create({ name: "my-laptop" })).rejects.toThrow(/singleton/);
-    await expect(getApp().computes.create({ name: "my-laptop", provider: "local" })).rejects.toThrow(/singleton/);
+    await expect(getApp().computeService.create({ name: "my-laptop" })).rejects.toThrow(/singleton/);
+    await expect(getApp().computeService.create({ name: "my-laptop", provider: "local" })).rejects.toThrow(/singleton/);
   });
 
   it("creates a non-local compute as stopped by default", async () => {
-    const compute = await getApp().computes.create({
+    const compute = await getApp().computeService.create({
       name: "docker-1",
       provider: "docker",
       config: { image: "ubuntu:22.04", memory: "4g" },
@@ -24,7 +24,7 @@ describe("compute CRUD", () => {
   });
 
   it("retrieves a compute by name", async () => {
-    await getApp().computes.create({ name: "fetch-me", provider: "ec2" });
+    await getApp().computeService.create({ name: "fetch-me", provider: "ec2" });
     const compute = await getApp().computes.get("fetch-me");
     expect(compute).not.toBeNull();
     expect(compute!.name).toBe("fetch-me");
@@ -37,26 +37,26 @@ describe("compute CRUD", () => {
   });
 
   it("lists all computes", async () => {
-    await getApp().computes.create({ name: "h1", provider: "docker" });
-    await getApp().computes.create({ name: "h2", provider: "docker" });
-    await getApp().computes.create({ name: "h3", provider: "docker" });
+    await getApp().computeService.create({ name: "h1", provider: "docker" });
+    await getApp().computeService.create({ name: "h2", provider: "docker" });
+    await getApp().computeService.create({ name: "h3", provider: "docker" });
     const computes = await getApp().computes.list();
     // +1 for the auto-created "local" compute from seedLocalCompute()
     expect(computes.length).toBe(4);
   });
 
   it("filters by provider", async () => {
-    await getApp().computes.create({ name: "docker-1", provider: "docker" });
-    await getApp().computes.create({ name: "docker-2", provider: "docker" });
-    await getApp().computes.create({ name: "ec2-1", provider: "ec2" });
+    await getApp().computeService.create({ name: "docker-1", provider: "docker" });
+    await getApp().computeService.create({ name: "docker-2", provider: "docker" });
+    await getApp().computeService.create({ name: "ec2-1", provider: "ec2" });
     const computes = await getApp().computes.list({ provider: "docker" });
     expect(computes.length).toBe(2);
     expect(computes.every((h) => h.provider === "docker")).toBe(true);
   });
 
   it("filters by status", async () => {
-    await getApp().computes.create({ name: "a", provider: "ec2" }); // ec2 defaults to stopped
-    await getApp().computes.create({ name: "b", provider: "ec2" });
+    await getApp().computeService.create({ name: "a", provider: "ec2" }); // ec2 defaults to stopped
+    await getApp().computeService.create({ name: "b", provider: "ec2" });
     await getApp().computes.update("b", { status: "running" });
     const running = await getApp().computes.list({ status: "running" });
     // "local" is auto-created as running + "b" was set to running
@@ -65,7 +65,7 @@ describe("compute CRUD", () => {
   });
 
   it("updates compute fields including config as JSON", async () => {
-    await getApp().computes.create({ name: "up", provider: "docker" });
+    await getApp().computeService.create({ name: "up", provider: "docker" });
     const updated = await getApp().computes.update("up", {
       status: "running",
       config: { port: 3000 },
@@ -76,7 +76,7 @@ describe("compute CRUD", () => {
   });
 
   it("deletes a compute", async () => {
-    await getApp().computes.create({ name: "del-me", provider: "docker" });
+    await getApp().computeService.create({ name: "del-me", provider: "docker" });
     expect(await getApp().computes.delete("del-me")).toBe(true);
     expect(await getApp().computes.get("del-me")).toBeNull();
   });
@@ -86,8 +86,8 @@ describe("compute CRUD", () => {
   });
 
   it("throws on duplicate compute name", async () => {
-    await getApp().computes.create({ name: "dup", provider: "docker" });
-    await expect(getApp().computes.create({ name: "dup", provider: "docker" })).rejects.toThrow();
+    await getApp().computeService.create({ name: "dup", provider: "docker" });
+    await expect(getApp().computeService.create({ name: "dup", provider: "docker" })).rejects.toThrow();
   });
 
   it("returns null when updating a non-existent compute", async () => {
@@ -96,7 +96,7 @@ describe("compute CRUD", () => {
   });
 
   it("silently ignores updates to name and created_at", async () => {
-    await getApp().computes.create({ name: "immut", provider: "docker" });
+    await getApp().computeService.create({ name: "immut", provider: "docker" });
     const updated = await getApp().computes.update("immut", {
       name: "renamed" as unknown,
       created_at: "2000-01-01T00:00:00.000Z",
@@ -109,7 +109,7 @@ describe("compute CRUD", () => {
   });
 
   it("updates updated_at even with empty fields object", async () => {
-    const compute = await getApp().computes.create({ name: "dev", provider: "docker" });
+    const compute = await getApp().computeService.create({ name: "dev", provider: "docker" });
     const originalUpdatedAt = compute.updated_at;
 
     // Small delay to ensure timestamp differs
@@ -127,9 +127,9 @@ describe("compute CRUD", () => {
   });
 
   it("filters by both provider and status", async () => {
-    await getApp().computes.create({ name: "a", provider: "ec2" });
-    await getApp().computes.create({ name: "b", provider: "ec2" });
-    await getApp().computes.create({ name: "c", provider: "docker" });
+    await getApp().computeService.create({ name: "a", provider: "ec2" });
+    await getApp().computeService.create({ name: "b", provider: "ec2" });
+    await getApp().computeService.create({ name: "c", provider: "docker" });
     await getApp().computes.update("b", { status: "running" });
 
     const results = await getApp().computes.list({ provider: "ec2", status: "running" });
@@ -138,7 +138,7 @@ describe("compute CRUD", () => {
   });
 
   it("keeps created_at constant while updated_at changes on update", async () => {
-    const compute = await getApp().computes.create({ name: "ts-check", provider: "docker" });
+    const compute = await getApp().computeService.create({ name: "ts-check", provider: "docker" });
     const originalCreatedAt = compute.created_at;
     const originalUpdatedAt = compute.updated_at;
 
@@ -154,7 +154,7 @@ describe("compute CRUD", () => {
   });
 
   it("replaces config entirely instead of merging", async () => {
-    await getApp().computes.create({
+    await getApp().computeService.create({
       name: "cfg",
       provider: "docker",
       config: { a: 1, b: 2, c: 3 },
@@ -175,7 +175,7 @@ describe("compute CRUD", () => {
         tags: [i, i + 1, i + 2],
       };
     }
-    const compute = await getApp().computes.create({ name: "big-cfg", provider: "docker", config: bigConfig });
+    const compute = await getApp().computeService.create({ name: "big-cfg", provider: "docker", config: bigConfig });
     expect(compute.config).toEqual(bigConfig);
     expect(Object.keys(compute.config).length).toBe(100);
 

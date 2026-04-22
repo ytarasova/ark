@@ -59,7 +59,7 @@ describe("compute/capabilities", () => {
   });
 
   it("returns flags for a docker compute that allow deletion but not reboot", async () => {
-    await app.computes.create({
+    await app.computeService.create({
       name: "cap-docker-1",
       provider: "docker",
       config: {},

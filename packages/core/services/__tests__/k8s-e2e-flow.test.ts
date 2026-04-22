@@ -61,7 +61,7 @@ describe("k8s e2e flow (live cluster)", () => {
     // Template compute. The server usually validates `context/namespace/image`
     // at create time via the k8s guard in `resource.ts`; here we go straight
     // through the repository so the test doesn't need the full RPC layer.
-    await app.computes.create({
+    await app.computeService.create({
       name: templateName,
       compute: "k8s",
       runtime: "direct",
@@ -98,7 +98,7 @@ describe("k8s e2e flow (live cluster)", () => {
     // then provision + start to bring up the instance pod.
     cloneName = `${templateName}-${Math.random().toString(36).slice(2, 8)}`;
     const tmpl = (await app.computes.get(templateName))!;
-    await app.computes.create({
+    await app.computeService.create({
       name: cloneName,
       provider: tmpl.provider,
       compute: tmpl.compute_kind,
@@ -241,7 +241,7 @@ describe("k8s e2e flow -- session pod + agent stage (live cluster + live claude)
     } as never);
 
     // Template compute.
-    await app.computes.create({
+    await app.computeService.create({
       name: templateName,
       compute: "k8s",
       runtime: "direct",
@@ -326,7 +326,7 @@ describe("k8s e2e flow -- session pod + agent stage (live cluster + live claude)
 
     cloneName = `${templateName}-${Math.random().toString(36).slice(2, 8)}`;
     const tmpl = (await app.computes.get(templateName))!;
-    await app.computes.create({
+    await app.computeService.create({
       name: cloneName,
       provider: tmpl.provider,
       compute: tmpl.compute_kind,

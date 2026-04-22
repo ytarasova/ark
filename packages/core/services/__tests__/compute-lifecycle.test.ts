@@ -34,7 +34,7 @@ describe("garbageCollectComputeIfTemplate", () => {
   });
 
   it("gc's template-lifecycle (k8s) compute when no sessions reference it", async () => {
-    await app.computes.create({
+    await app.computeService.create({
       name: "test-k8s",
       compute: "k8s",
       runtime: "direct",
@@ -48,7 +48,7 @@ describe("garbageCollectComputeIfTemplate", () => {
   });
 
   it("skips gc when a live session still references the compute", async () => {
-    await app.computes.create({
+    await app.computeService.create({
       name: "busy-k8s",
       compute: "k8s",
       runtime: "direct",
@@ -70,7 +70,7 @@ describe("garbageCollectComputeIfTemplate", () => {
   });
 
   it("gc's after the referencing session reaches a terminal state", async () => {
-    await app.computes.create({
+    await app.computeService.create({
       name: "ephemeral-k8s",
       compute: "k8s",
       runtime: "direct",
@@ -92,7 +92,7 @@ describe("garbageCollectComputeIfTemplate", () => {
   });
 
   it("local + docker (template runtime over persistent kind) gets gc'd", async () => {
-    await app.computes.create({
+    await app.computeService.create({
       name: "local-docker",
       compute: "local",
       runtime: "docker",
@@ -107,7 +107,7 @@ describe("garbageCollectComputeIfTemplate", () => {
     // EC2 + direct is persistent -- would normally be skipped. But the
     // `cloned_from` flag marks this row as an ephemeral clone produced by
     // the dispatcher, so GC should remove it regardless of lifecycle.
-    await app.computes.create({
+    await app.computeService.create({
       name: "ec2-clone",
       compute: "ec2",
       runtime: "direct",
@@ -123,7 +123,7 @@ describe("garbageCollectComputeIfTemplate", () => {
     // A user-provisioned EC2 box (no clone marker) should stick around
     // across session boundaries -- that's the whole point of persistent
     // infra. GC must leave it alone.
-    await app.computes.create({
+    await app.computeService.create({
       name: "ec2-persistent",
       compute: "ec2",
       runtime: "direct",

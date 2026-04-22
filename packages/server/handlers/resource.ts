@@ -305,7 +305,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
       }
     }
 
-    const compute = await app.computes.create({
+    const compute = await app.computeService.create({
       name,
       provider: effectiveProvider,
       compute: computeKind,
@@ -408,7 +408,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     // to outside of any session context.
     if (compute.is_template) {
       const cloneName = `${compute.name}-${Date.now().toString(36)}`;
-      await app.computes.create({
+      await app.computeService.create({
         name: cloneName,
         provider: compute.provider,
         compute: compute.compute_kind,

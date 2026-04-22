@@ -126,7 +126,7 @@ export class SessionScheduler {
 
     // Create compute record
     const computeName = `${tenantId}-${provider}-${Date.now()}`;
-    await this.app.computes.create({
+    await this.app.computeService.create({
       name: computeName,
       provider: provider as ComputeProviderName,
       config: poolRef.config ?? {},

@@ -69,11 +69,16 @@ export class ComputeTemplateRepository {
     const provider = (template.provider ?? "local") as ComputeProviderName;
     const pair = providerToPair(provider);
 
-    await this.inner.create({
+    // Templates are blueprints, not concrete instances, so they're exempt
+    // from the singleton rule and the provider-driven initialStatus. Write
+    // directly via `insert` rather than routing through `ComputeService`,
+    // which would look up a provider this adapter doesn't need.
+    await this.inner.insert({
       name: template.name,
       provider,
-      compute: pair.compute as ComputeKindName,
-      runtime: pair.runtime as RuntimeKindName,
+      compute_kind: pair.compute as ComputeKindName,
+      runtime_kind: pair.runtime as RuntimeKindName,
+      status: "stopped",
       config: cfg,
       is_template: true,
     });

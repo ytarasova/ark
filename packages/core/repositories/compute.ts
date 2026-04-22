@@ -9,10 +9,28 @@ import type {
   ComputeKindName,
   RuntimeKindName,
   ComputeConfig,
-  CreateComputeOpts,
 } from "../../types/index.js";
-import { providerToPair, pairToProvider } from "../../compute/adapters/provider-map.js";
+import { providerToPair } from "../../compute/adapters/provider-map.js";
 import { now } from "../util/time.js";
+
+// -- Insert contract ------------------------------------------------------
+
+/**
+ * Input to {@link ComputeRepository.insert}. A fully-resolved row: no
+ * defaults, no rules, no kind inference. Callers (typically `ComputeService`)
+ * are expected to apply domain rules (singleton, initialStatus, ...) before
+ * reaching the repo layer.
+ */
+export interface InsertComputeRow {
+  name: string;
+  provider: ComputeProviderName;
+  compute_kind: ComputeKindName;
+  runtime_kind: RuntimeKindName;
+  status: ComputeStatus;
+  config?: Partial<ComputeConfig>;
+  is_template?: boolean;
+  cloned_from?: string | null;
+}
 
 // -- Row type (config stored as JSON string) ------------------------------
 
@@ -59,11 +77,18 @@ function rowToCompute(row: DrizzleSelectCompute): Compute {
   } as Compute;
 }
 
-// Providers that allow only one compute instance per tenant.
-const SINGLETON_PROVIDERS = new Set(["local"]);
-
 // -- Repository -----------------------------------------------------------
 
+/**
+ * ComputeRepository -- dialect-parameterized persistence for compute rows.
+ *
+ * This layer is intentionally dumb: no domain rules (singleton, canDelete,
+ * initialStatus) are enforced here. Those rules belong to `ComputeService`,
+ * which consults the provider registry and then calls `insert` / `delete`
+ * with fully-resolved inputs. Keeping the repo free of rule logic lets the
+ * hosted (ControlPlane) store be swapped in without re-implementing every
+ * rule above the storage boundary.
+ */
 export class ComputeRepository {
   private tenantId: string = "default";
   private _d: DrizzleClient | null = null;
@@ -82,57 +107,55 @@ export class ComputeRepository {
     return this.tenantId;
   }
 
-  async create(opts: CreateComputeOpts): Promise<Compute> {
+  /**
+   * Dumb write: persist the row as given, with no rule enforcement.
+   * Caller is responsible for resolving provider/compute/runtime kinds and
+   * computing initial status via the provider registry.
+   */
+  async insert(row: InsertComputeRow): Promise<Compute> {
     const ts = now();
-
-    let provider = opts.provider;
-    if (!provider && opts.compute && opts.runtime) {
-      provider = (pairToProvider({ compute: opts.compute, runtime: opts.runtime }) ?? opts.compute) as any;
-    }
-    provider = provider ?? "local";
-
-    if (SINGLETON_PROVIDERS.has(provider) && !opts.is_template && !opts.cloned_from) {
-      const d = this.d();
-      const c = d.schema.compute;
-      // NOT is_template compiled across dialects: SQLite stores 0/1 integer,
-      // Postgres stores boolean. `eq(c.isTemplate, false as any)` works for
-      // both because drizzle's codec maps `false` -> 0 on SQLite.
-      const rows = await (d.db as any)
-        .select({ name: c.name })
-        .from(c)
-        .where(and(eq(c.provider, provider), eq(c.tenantId, this.tenantId), eq(c.isTemplate, false as any)))
-        .limit(1);
-      const existing = (rows as Array<{ name: string }>)[0];
-      if (existing) {
-        throw new Error(`Provider '${provider}' is a singleton -- compute '${existing.name}' already exists`);
-      }
-    }
-
-    const initialStatus: ComputeStatus = provider === "local" ? "running" : "stopped";
-
-    const fallback = providerToPair(provider);
-    const computeKind = (opts.compute ?? fallback.compute) as ComputeKindName;
-    const runtimeKind = (opts.runtime ?? fallback.runtime) as RuntimeKindName;
-
-    const isTemplate = !!opts.is_template;
-    const clonedFrom = opts.cloned_from ?? null;
-
     const d = this.d();
     await (d.db as any).insert(d.schema.compute).values({
-      name: opts.name,
-      provider,
-      computeKind,
-      runtimeKind,
-      status: initialStatus,
-      config: JSON.stringify(opts.config ?? {}),
-      isTemplate: isTemplate as any,
-      clonedFrom,
+      name: row.name,
+      provider: row.provider,
+      computeKind: row.compute_kind,
+      runtimeKind: row.runtime_kind,
+      status: row.status,
+      config: JSON.stringify(row.config ?? {}),
+      isTemplate: !!row.is_template as any,
+      clonedFrom: row.cloned_from ?? null,
       tenantId: this.tenantId,
       createdAt: ts,
       updatedAt: ts,
     });
+    return (await this.get(row.name))!;
+  }
 
-    return (await this.get(opts.name))!;
+  /**
+   * Single-row lookup by provider name. Used by `ComputeService` to enforce
+   * the singleton rule. `excludeTemplates` skips rows where `is_template`
+   * is true (templates are blueprints, not concrete instances).
+   */
+  async findByProvider(
+    providerName: ComputeProviderName,
+    opts?: { excludeTemplates?: boolean },
+  ): Promise<Compute | null> {
+    const d = this.d();
+    const c = d.schema.compute;
+    const conditions: any[] = [eq(c.provider, providerName), eq(c.tenantId, this.tenantId)];
+    if (opts?.excludeTemplates) {
+      // NOT is_template compiled across dialects: SQLite stores 0/1 integer,
+      // Postgres stores boolean. `eq(c.isTemplate, false as any)` works for
+      // both because drizzle's codec maps `false` -> 0 on SQLite.
+      conditions.push(eq(c.isTemplate, false as any));
+    }
+    const rows = await (d.db as any)
+      .select()
+      .from(c)
+      .where(and(...conditions))
+      .limit(1);
+    const row = (rows as DrizzleSelectCompute[])[0];
+    return row ? rowToCompute(row) : null;
   }
 
   async get(name: string): Promise<Compute | null> {
@@ -210,7 +233,6 @@ export class ComputeRepository {
   }
 
   async delete(name: string): Promise<boolean> {
-    if (name === "local") return false;
     const d = this.d();
     const c = d.schema.compute;
     const res = await (d.db as any).delete(c).where(and(eq(c.name, name), eq(c.tenantId, this.tenantId)));

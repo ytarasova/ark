@@ -26,7 +26,7 @@ afterEach(async () => {
 describe("resolveComputeForStage + template cloning", () => {
   it("clones a template row into a per-session concrete row", async () => {
     // Seed a template.
-    await app.computes.create({
+    await app.computeService.create({
       name: "k8s-tmpl",
       compute: "k8s",
       runtime: "direct",
@@ -54,7 +54,7 @@ describe("resolveComputeForStage + template cloning", () => {
   });
 
   it("returns concrete compute name as-is (no cloning)", async () => {
-    await app.computes.create({
+    await app.computeService.create({
       name: "shared-ec2",
       provider: "ec2",
       config: {},
@@ -70,7 +70,7 @@ describe("resolveComputeForStage + template cloning", () => {
   });
 
   it("legacy compute_template field resolves through the same path", async () => {
-    await app.computes.create({
+    await app.computeService.create({
       name: "legacy-tmpl",
       compute: "k8s",
       runtime: "direct",
@@ -94,7 +94,7 @@ describe("resolveComputeForStage + template cloning", () => {
   });
 
   it("GC prunes the clone when the session completes; template is preserved", async () => {
-    await app.computes.create({
+    await app.computeService.create({
       name: "k8s-tmpl2",
       compute: "k8s",
       runtime: "direct",

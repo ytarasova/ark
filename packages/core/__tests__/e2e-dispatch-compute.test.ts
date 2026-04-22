@@ -69,7 +69,7 @@ describe("dispatch compute: worktree creation", async () => {
 
   it("does NOT create worktree for EC2 compute", async () => {
     // Register an EC2 compute in the store
-    await app.computes.create({ name: "my-ec2", provider: "ec2", config: { ip: "1.2.3.4" } });
+    await app.computeService.create({ name: "my-ec2", provider: "ec2", config: { ip: "1.2.3.4" } });
     const session = await getApp().sessions.create({ summary: "ec2-test", compute_name: "my-ec2" });
 
     const compute = await app.computes.get(session.compute_name!);
@@ -219,7 +219,7 @@ describe("dispatch compute: session creation defaults", async () => {
   });
 
   it("session stores compute_name when specified", async () => {
-    await app.computes.create({ name: "test-compute", provider: "ec2" });
+    await app.computeService.create({ name: "test-compute", provider: "ec2" });
     const session = await getApp().sessions.create({ summary: "compute-name-test", compute_name: "test-compute" });
     expect(session.compute_name).toBe("test-compute");
   });

@@ -42,7 +42,7 @@ describe("SessionScheduler with tenant policies", async () => {
     });
 
     // Create a compute record with ec2 provider
-    await app.computes.create({
+    await app.computeService.create({
       name: "ec2-box",
       provider: "ec2" as any,
       config: {},

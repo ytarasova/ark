@@ -84,7 +84,7 @@ class FakeSnapshotCompute implements Compute {
 /** Create a compute row if it doesn't already exist. */
 function ensureCompute(ctx: AppContext, name: string, provider: string): void {
   if (ctx.computes.get(name)) return;
-  ctx.computes.create({ name, provider, config: {} });
+  ctx.computeService.create({ name, provider, config: {} });
 }
 
 async function startSession(opts: Record<string, unknown> = {}): Promise<string> {

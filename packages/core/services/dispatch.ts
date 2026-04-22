@@ -111,7 +111,7 @@ export async function resolveComputeForStage(
     const cfgTmpl = (app.config.computeTemplates ?? []).find((t) => t.name === ref);
     if (cfgTmpl) {
       log(`Seeding template '${ref}' from config`);
-      await app.computes.create({
+      await app.computeService.create({
         name: cfgTmpl.name,
         provider: cfgTmpl.provider as import("../../types/index.js").ComputeProviderName,
         config: cfgTmpl.config,
@@ -160,7 +160,7 @@ async function cloneTemplate(
   }
 
   log(`Cloning template '${templateName}' into '${cloneName}' for session ${sessionId}`);
-  await app.computes.create({
+  await app.computeService.create({
     name: cloneName,
     provider: tmpl.provider,
     compute: tmpl.compute_kind,

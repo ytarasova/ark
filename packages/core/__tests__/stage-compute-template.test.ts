@@ -161,7 +161,7 @@ describe("resolveComputeForStage", async () => {
       provider: "ec2",
       config: { size: "xl" },
     });
-    await app.computes.create({ name: "existing-compute", provider: "ec2", config: { size: "xl" } });
+    await app.computeService.create({ name: "existing-compute", provider: "ec2", config: { size: "xl" } });
 
     const session = await app.sessions.create({ summary: "reuse-test" });
     const stageDef = { name: "work", gate: "auto" as const, compute_template: "existing-compute" };

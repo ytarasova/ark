@@ -22,6 +22,7 @@ export class ComputeProvidersBoot {
         new compute.LocalDockerProvider(),
         new compute.LocalDevcontainerProvider(),
         new compute.LocalFirecrackerProvider(),
+        new compute.RemoteWorktreeProvider(),
         new compute.RemoteDockerProvider(),
         new compute.RemoteDevcontainerProvider(),
         new compute.RemoteFirecrackerProvider(),
