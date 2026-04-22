@@ -21,6 +21,8 @@ import type {
   SessionArchiveResponse,
   SessionRestoreRequest,
   SessionRestoreResponse,
+  SessionAttachCommandRequest,
+  SessionAttachCommandResponse,
   SessionOutputRequest,
   SessionOutputResponse,
   SessionRecordingRequest,
@@ -293,6 +295,10 @@ export const api = {
     rpc<SessionArchiveResponse>("session/archive", { sessionId: id } satisfies SessionArchiveRequest),
   restore: (id: string) =>
     rpc<SessionRestoreResponse>("session/restore", { sessionId: id } satisfies SessionRestoreRequest),
+  getAttachCommand: (id: string) =>
+    rpc<SessionAttachCommandResponse>("session/attach-command", {
+      sessionId: id,
+    } satisfies SessionAttachCommandRequest),
 
   // ── Sessions (extended) ──────────────────────────────────────────────────
   getOutput: (id: string) =>

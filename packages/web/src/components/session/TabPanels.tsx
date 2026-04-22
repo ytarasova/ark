@@ -106,7 +106,14 @@ export function TabPanels(props: TabPanelsProps) {
         />
       )}
       {activeTab === "terminal" && (
-        <TerminalTab output={output} cols={session?.pty_cols} rows={session?.pty_rows} isActive={isActive} />
+        <TerminalTab
+          sessionId={session?.id ?? ""}
+          output={output}
+          cols={session?.pty_cols}
+          rows={session?.pty_rows}
+          isActive={isActive}
+          tabActive={activeTab === "terminal"}
+        />
       )}
       {activeTab === "events" && (
         <EventTimeline
