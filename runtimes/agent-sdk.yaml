@@ -1,0 +1,18 @@
+name: agent-sdk
+description: "Anthropic Agent SDK (in-process, TrueFoundry-routed)"
+type: agent-sdk
+models:
+  - id: opus
+    label: "Claude Opus 4.7"
+  - id: sonnet
+    label: "Claude Sonnet 4.6"
+  - id: haiku
+    label: "Claude Haiku 4.5"
+default_model: sonnet
+permission_mode: bypassPermissions
+secrets:
+  - ANTHROPIC_API_KEY
+  - ANTHROPIC_BASE_URL
+billing:
+  mode: api
+  transcript_parser: agent-sdk
