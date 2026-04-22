@@ -36,6 +36,11 @@ export interface SessionListProps extends React.ComponentProps<"div"> {
   filterChips?: React.ReactNode;
 }
 
+/**
+ * Left-hand sessions list panel. Classes `.list-panel`, `.list-header`,
+ * `.session-card*` live in `packages/web/src/styles.css` and mirror the
+ * showcase at `/tmp/ark-design-v2/packages/web/design-midnight-circuit.html`.
+ */
 export function SessionList({
   sessions,
   selectedId,
@@ -57,11 +62,10 @@ export function SessionList({
   }, [searchOpen]);
 
   return (
-    <div className={cn("flex flex-col overflow-hidden", className)} {...props}>
-      {/* Header */}
-      <div className="px-4 pt-4 pb-1 shrink-0">
-        <div className="flex items-center justify-between mb-2.5">
-          <h2 className="text-[18px] font-semibold text-[var(--fg)]">Sessions</h2>
+    <div className={cn("list-panel", className)} {...props}>
+      <div className="list-header">
+        <div className="list-header-row">
+          <h2 className="list-title">Sessions</h2>
           <div className="flex items-center gap-1">
             {onSearchChange && (
               <button
@@ -73,7 +77,7 @@ export function SessionList({
                 className={cn(
                   "h-6 w-6 flex items-center justify-center rounded",
                   "text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-hover)]",
-                  "transition-colors duration-150",
+                  "transition-colors duration-150 bg-transparent border-none p-0",
                   searchOpen && "text-[var(--fg)] bg-[var(--bg-hover)]",
                 )}
                 title="Search (/ )"
@@ -85,7 +89,6 @@ export function SessionList({
           </div>
         </div>
 
-        {/* Search -- expandable */}
         {onSearchChange && searchOpen && (
           <div className="mb-2">
             <input
@@ -103,7 +106,7 @@ export function SessionList({
               aria-label="Search sessions"
               className={cn(
                 "w-full h-[28px] rounded-[var(--radius-sm)] border border-[var(--border)]",
-                "bg-[var(--bg-input,transparent)] px-2.5 text-[12px] text-[var(--fg)] outline-none",
+                "bg-[var(--bg-input)] px-2.5 text-[12px] text-[var(--fg)] outline-none",
                 "placeholder:text-[var(--fg-faint)] focus:border-[var(--primary)]",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]",
                 "transition-colors duration-150",
@@ -112,12 +115,10 @@ export function SessionList({
           </div>
         )}
 
-        {/* Filter chips -- horizontal scroll, no wrap */}
         {filterChips && <div className="mb-2.5">{filterChips}</div>}
       </div>
 
-      {/* Session list */}
-      <div className="flex-1 overflow-y-auto px-2 pb-2">
+      <div className="list-sessions">
         {sessions.map((s) => (
           <SessionCard
             key={s.id}
@@ -128,6 +129,9 @@ export function SessionList({
             onDelete={onDelete}
           />
         ))}
+        {sessions.length === 0 && (
+          <div className="px-3 py-8 text-center text-[12px] text-[var(--fg-muted)]">No sessions yet</div>
+        )}
       </div>
     </div>
   );
@@ -151,7 +155,7 @@ function SessionCard({
   onDelete?: (id: string) => void;
 }) {
   const iconBtnClass = cn(
-    "h-5 w-5 inline-flex items-center justify-center rounded shrink-0",
+    "h-5 w-5 inline-flex items-center justify-center rounded shrink-0 bg-transparent border-none",
     "text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-hover)]",
     "opacity-0 group-hover:opacity-100 transition-opacity",
   );
@@ -166,21 +170,15 @@ function SessionCard({
           onSelect(session.id);
         }
       }}
-      className={cn(
-        "group flex flex-col gap-1 w-full text-left px-2 py-3 rounded-[var(--radius-sm)]",
-        "cursor-pointer border-l-[3px] border-transparent min-h-[52px] justify-center",
-        "hover:bg-[var(--bg-hover)] transition-colors duration-150",
-        selected && "bg-[var(--primary-subtle)] border-l-[var(--primary)]",
-      )}
+      className={cn("session-card group", selected && "active")}
     >
-      {/* Top row: dot + id + unread badge + time + hover actions */}
-      <div className="flex items-center gap-1.5">
+      <div className="session-card-top">
         <StatusDot status={session.status} size="md" />
-        <span className="font-[family-name:var(--font-mono-ui)] text-[12px] text-[var(--fg-muted)]">{session.id}</span>
+        <span className="session-card-id">{session.id}</span>
         {session.unreadCount != null && session.unreadCount > 0 && (
           <span
             className={cn(
-              "min-w-[18px] h-[18px] rounded-full",
+              "min-w-[18px] h-[18px] rounded-full ml-0.5",
               "bg-[var(--failed)] text-[var(--primary-fg)] font-[family-name:var(--font-mono-ui)] text-[10px] font-semibold leading-none tabular-nums",
               "flex items-center justify-center px-1 shrink-0",
             )}
@@ -189,7 +187,7 @@ function SessionCard({
             {session.unreadCount > 99 ? "99+" : session.unreadCount}
           </span>
         )}
-        <span className="text-[11px] text-[var(--fg-muted)] ml-auto">{session.relativeTime}</span>
+        <span className="session-card-time">{session.relativeTime}</span>
         {onArchive && (
           <button
             type="button"
@@ -220,18 +218,12 @@ function SessionCard({
         )}
       </div>
 
-      {/* Summary */}
-      <div className="text-[14px] font-medium truncate pl-[13px]">{session.summary}</div>
+      <div className="session-card-summary">{session.summary}</div>
 
-      {/* Bottom row: pipeline + agent + cost */}
-      <div className="flex items-center gap-1.5 pl-[13px]">
+      <div className="session-card-bottom">
         <StageProgressBar stages={session.stages} />
-        <span className="font-[family-name:var(--font-mono-ui)] text-[11px] text-[var(--fg-muted)]">
-          {session.agentName}
-        </span>
-        <span className="font-[family-name:var(--font-mono-ui)] text-[11px] text-[var(--fg-muted)]">
-          {session.cost}
-        </span>
+        <span className="session-card-agent">{session.agentName}</span>
+        {session.cost && <span className="session-card-cost">{session.cost}</span>}
       </div>
     </div>
   );

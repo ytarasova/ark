@@ -1,54 +1,25 @@
+import { useMemo } from "react";
 import { fmtCost, relTime } from "../util.js";
 import { cn } from "../lib/utils.js";
-import { AlertCircle, CheckCircle2, Clock, RotateCcw, Eye, PlugZap } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, PlugZap, RotateCcw } from "lucide-react";
 import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
 import { useDashboardSummaryQuery, useRunningSessionsQuery } from "../hooks/useDashboardQuery.js";
 import { Button } from "./ui/button.js";
 
 /**
- * `fetch()` throws a TypeError with the literal message "Failed to fetch" when
- * the network layer rejects the request (server down, DNS fail, CORS before
- * response, etc). Distinguishing this from a real RPC error lets us show an
- * actionable "API unreachable" hint instead of the raw browser message.
+ * Dashboard -- "Fleet overview" of the sessions surface.
+ *
+ * Visual target: /tmp/ark-design-v2/packages/web/design-midnight-circuit.html
+ * and /tmp/ark-design-v2/ui_kits/web/DashboardPage.jsx. Real-data hooks are
+ * preserved; this is a render-layer rewrite.
+ *
+ * Layout, top to bottom:
+ *   1. Heading row -- "Fleet overview" title + "updated Ns ago" stamp.
+ *   2. Four stat tiles -- Active / Total / Tokens 24h / Cost 24h.
+ *   3. Budget banner (only when a daily/weekly/monthly budget is set).
+ *   4. Attention sections (only when there are waiting / failed sessions).
+ *   5. Recent activity card -- up to 6 rows of recent running-or-latest sessions.
  */
-function isNetworkUnreachable(err: unknown): boolean {
-  if (!err) return false;
-  const msg = (err as { message?: string }).message ?? "";
-  return err instanceof TypeError || msg.includes("Failed to fetch") || msg.includes("NetworkError");
-}
-
-function DashboardErrorState({ error, onRetry }: { error: unknown; onRetry: () => void }) {
-  const unreachable = isNetworkUnreachable(error);
-  const base = typeof window !== "undefined" ? window.location.origin : "";
-  const message = (error as { message?: string })?.message ?? "unknown error";
-
-  return (
-    <div className="flex flex-col items-center justify-center h-full gap-3 px-6 text-center">
-      <div className="rounded-full bg-muted p-3 text-muted-foreground">
-        {unreachable ? <PlugZap className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
-      </div>
-      <div className="space-y-1">
-        <div className="text-sm font-medium">
-          {unreachable ? "Can't reach the Ark API" : "Dashboard request failed"}
-        </div>
-        <div className="text-xs text-muted-foreground max-w-md">
-          {unreachable ? (
-            <>
-              Tried <code className="font-mono">{base}/api/rpc</code> and got no response. Is{" "}
-              <code className="font-mono">make dev</code> running?
-            </>
-          ) : (
-            message
-          )}
-        </div>
-      </div>
-      <Button variant="outline" size="sm" onClick={onRetry} className="gap-1.5">
-        <RotateCcw className="h-3.5 w-3.5" />
-        Retry
-      </Button>
-    </div>
-  );
-}
 
 interface DashboardData {
   counts: Record<string, number>;
@@ -84,6 +55,145 @@ interface DashboardViewProps {
   daemonStatus?: DaemonStatus | null;
 }
 
+/** `fetch()` throws a TypeError with "Failed to fetch" when the network layer
+ * rejects outright (server down, DNS fail, CORS pre-response). Distinguishing
+ * this from a real RPC error lets us show an actionable "API unreachable" hint
+ * instead of the raw browser message. */
+function isNetworkUnreachable(err: unknown): boolean {
+  if (!err) return false;
+  const msg = (err as { message?: string }).message ?? "";
+  return err instanceof TypeError || msg.includes("Failed to fetch") || msg.includes("NetworkError");
+}
+
+function DashboardErrorState({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+  const unreachable = isNetworkUnreachable(error);
+  const base = typeof window !== "undefined" ? window.location.origin : "";
+  const message = (error as { message?: string })?.message ?? "unknown error";
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-3 px-6 text-center">
+      <div className="rounded-full bg-[var(--bg-hover)] p-3 text-[var(--fg-muted)]">
+        {unreachable ? <PlugZap className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+      </div>
+      <div className="space-y-1">
+        <div className="text-sm font-medium text-[var(--fg)]">
+          {unreachable ? "Can't reach the Ark API" : "Dashboard request failed"}
+        </div>
+        <div className="text-xs text-[var(--fg-muted)] max-w-md">
+          {unreachable ? (
+            <>
+              Tried{" "}
+              <code className="font-[family-name:var(--font-mono)] text-[11px]">{base}/api/rpc</code> and got no
+              response. Is <code className="font-[family-name:var(--font-mono)] text-[11px]">make dev</code> running?
+            </>
+          ) : (
+            message
+          )}
+        </div>
+      </div>
+      <Button variant="outline" size="sm" onClick={onRetry} className="gap-1.5">
+        <RotateCcw className="h-3.5 w-3.5" />
+        Retry
+      </Button>
+    </div>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  delta,
+  deltaTone = "neutral",
+}: {
+  label: string;
+  value: string | number;
+  delta?: string;
+  deltaTone?: "good" | "bad" | "neutral";
+}) {
+  return (
+    <div className="stat-tile">
+      <span className="stat-tile-label">{label}</span>
+      <span className="stat-tile-value">{value}</span>
+      {delta && <span className={cn("stat-tile-delta", deltaTone)}>{delta}</span>}
+    </div>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="dashboard-root">
+      <div className="dashboard-inner">
+        <div className="dashboard-heading">
+          <h1 className="dashboard-title">Fleet overview</h1>
+          <span className="dashboard-updated">updating...</span>
+        </div>
+        <div className="dashboard-grid">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="stat-tile skeleton-shimmer" aria-hidden="true" style={{ height: 76 }} />
+          ))}
+        </div>
+        <div className="dashboard-card skeleton-shimmer" style={{ height: 240 }} aria-hidden="true" />
+        <span className="sr-only">Loading dashboard</span>
+      </div>
+    </div>
+  );
+}
+
+/** Normalize a raw session row to the fields we render in the dashboard rows. */
+type RowSession = {
+  id: string;
+  status: string;
+  summary: string;
+  agent: string;
+  cost?: number;
+  updated_at?: string;
+  created_at?: string;
+  stage?: string;
+  error?: string;
+};
+
+function toRow(s: any): RowSession {
+  const id = s.session_id || s.id;
+  return {
+    id,
+    status: s.status || "stopped",
+    summary: s.summary || id,
+    agent: s.agent || "--",
+    cost: typeof s.cost === "number" ? s.cost : undefined,
+    updated_at: s.updated_at,
+    created_at: s.created_at,
+    stage: s.stage,
+    error: s.error,
+  };
+}
+
+function RecentRow({ s, onSelect }: { s: RowSession; onSelect?: (id: string) => void }) {
+  const statusClass = ["running", "waiting", "completed", "failed", "stopped"].includes(s.status) ? s.status : "stopped";
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelect?.(s.id)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect?.(s.id);
+        }
+      }}
+      className="dashboard-row"
+    >
+      <div className="flex items-center gap-2">
+        <span className={cn("status-dot-sm", statusClass)} aria-hidden="true" />
+        <span className="session-card-id">{s.id}</span>
+      </div>
+      <div className="dashboard-row-summary">{s.summary}</div>
+      <div className="dashboard-row-agent">{s.agent}</div>
+      <div className="dashboard-row-cost">{s.cost != null ? fmtCost(s.cost) : ""}</div>
+      <div className="dashboard-row-time">{relTime(s.updated_at || s.created_at)}</div>
+    </div>
+  );
+}
+
 export function DashboardView({
   onNavigate: _onNavigate,
   onSelectSession,
@@ -93,39 +203,27 @@ export function DashboardView({
   const summaryQuery = useDashboardSummaryQuery();
   const sessionsQuery = useRunningSessionsQuery();
   const data = summaryQuery.data as DashboardData | undefined;
-  const sessions = sessionsQuery.data ?? [];
+  const sessions = sessionsQuery.data;
+
+  const { running, waitingSessions, failedSessions, recentRows } = useMemo(() => {
+    const rows = ((sessions ?? []) as any[]).map(toRow);
+    const running = rows.filter((s) => s.status === "running").length;
+    const waitingSessions = rows.filter((s) => s.status === "waiting" || s.status === "blocked");
+    const failedSessions = rows.filter((s) => s.status === "failed");
+    // Recent activity = most-recently-updated across all non-archived sessions.
+    const recentRows = [...rows]
+      .sort((a, b) => (b.updated_at ?? "").localeCompare(a.updated_at ?? ""))
+      .slice(0, 6);
+    return { running, waitingSessions, failedSessions, recentRows };
+  }, [sessions]);
 
   if (summaryQuery.isError) {
     return <DashboardErrorState error={summaryQuery.error} onRetry={() => summaryQuery.refetch()} />;
   }
+  if (!data) return <DashboardSkeleton />;
 
-  if (!data) {
-    // Skeleton matches the real dashboard's top-row shape (4 stat cards +
-    // a wide panel) so the layout doesn't jump when data arrives. Plain
-    // text on an empty viewport was the worst possible placeholder.
-    return (
-      <div className="p-6 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div
-              key={i}
-              className="rounded-lg border border-border bg-secondary/30 h-24 animate-pulse"
-              aria-hidden="true"
-            />
-          ))}
-        </div>
-        <div className="rounded-lg border border-border bg-secondary/30 h-64 animate-pulse" aria-hidden="true" />
-        <div className="rounded-lg border border-border bg-secondary/30 h-40 animate-pulse" aria-hidden="true" />
-        <span className="sr-only">Loading dashboard</span>
-      </div>
-    );
-  }
-
-  const { costs } = data;
-
-  const waitingSessions = sessions.filter((s: any) => s.status === "waiting" || s.status === "blocked");
-  const failedSessions = sessions.filter((s: any) => s.status === "failed");
-  const needsAttention = waitingSessions.length > 0 || failedSessions.length > 0;
+  const { counts, costs } = data;
+  const totalSessions = Object.values(counts || {}).reduce((a, b) => a + (b || 0), 0);
 
   const budget = costs.budget?.daily?.limit
     ? costs.budget.daily
@@ -136,149 +234,97 @@ export function DashboardView({
         : null;
   const hasBudgetWarning = budget && (budget.warning || budget.exceeded);
 
+  const needsAttention = waitingSessions.length > 0 || failedSessions.length > 0;
+  const dataUpdatedMs = summaryQuery.dataUpdatedAt;
+  const updatedLabel = dataUpdatedMs ? relTime(new Date(dataUpdatedMs).toISOString()) : "just now";
+
   return (
-    <div className="flex flex-col h-full overflow-y-auto">
-      <div className="w-full px-6 py-8 flex flex-col gap-6">
-        {/* Budget warning */}
+    <div className="dashboard-root">
+      <div className="dashboard-inner">
+        <div className="dashboard-heading">
+          <h1 className="dashboard-title">Fleet overview</h1>
+          <span className="dashboard-updated">updated {updatedLabel}</span>
+        </div>
+
+        <div className="dashboard-grid">
+          <StatTile label="Active" value={running} />
+          <StatTile label="Total" value={totalSessions} />
+          <StatTile label="Cost today" value={fmtCost(costs.today || 0)} />
+          <StatTile label="Cost 7d" value={fmtCost(costs.week || 0)} />
+        </div>
+
         {hasBudgetWarning && budget && (
-          <div
-            className={cn(
-              "rounded-lg border px-4 py-3",
-              budget.exceeded
-                ? "border-[var(--failed)]/30 bg-[var(--failed)]/5"
-                : "border-[var(--waiting)]/30 bg-[var(--waiting)]/5",
-            )}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span
-                className={cn(
-                  "text-[12px] font-medium",
-                  budget.exceeded ? "text-[var(--failed)]" : "text-[var(--waiting)]",
-                )}
-              >
+          <div className="budget-banner">
+            <div className="budget-banner-row">
+              <span className={cn("budget-banner-label", budget.exceeded ? "exceeded" : "warning")}>
                 {budget.exceeded ? "Budget exceeded" : "Budget warning"}
               </span>
-              <span className="text-[11px] font-mono text-muted-foreground">
+              <span className="budget-banner-amount">
                 {fmtCost(budget.spent)} / {fmtCost(budget.limit)}
               </span>
             </div>
-            <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+            <div className="budget-banner-track">
               <div
-                className={cn(
-                  "h-full rounded-full transition-all",
-                  budget.exceeded ? "bg-[var(--failed)]" : "bg-[var(--waiting)]",
-                )}
+                className={cn("budget-banner-fill", budget.exceeded ? "exceeded" : "warning")}
                 style={{ width: Math.min(100, budget.pct) + "%" }}
               />
             </div>
           </div>
         )}
 
-        {/* All clear */}
-        {!needsAttention && !hasBudgetWarning && (
-          <div className="flex items-center justify-center py-12">
-            <div className="flex items-center gap-2.5 text-[14px] text-muted-foreground">
-              <CheckCircle2 size={18} className="text-[var(--running)] opacity-70" />
-              All clear -- no sessions need your attention
-            </div>
-          </div>
-        )}
-
-        {/* Waiting sessions */}
         {waitingSessions.length > 0 && (
-          <div>
-            <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--waiting)] mb-2 flex items-center gap-1.5">
-              <Clock size={12} />
-              Waiting for input ({waitingSessions.length})
+          <section>
+            <h3 className="dashboard-section-title">
+              <Clock size={13} className="text-[var(--waiting)]" />
+              Waiting for input
+              <span className="section-count">({waitingSessions.length})</span>
             </h3>
-            <div className="border border-border rounded-lg divide-y divide-border/50 overflow-hidden">
-              {waitingSessions.slice(0, 10).map((s) => (
-                <div
-                  key={s.session_id || s.id}
-                  className="flex items-center justify-between px-4 py-2.5 hover:bg-accent transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] text-foreground truncate">{s.summary || s.session_id || s.id}</div>
-                    <div className="text-[11px] text-muted-foreground font-mono mt-0.5">
-                      {s.agent || "agent"} -- {s.stage || "running"}
-                    </div>
-                  </div>
-                  <div className="flex gap-1.5 shrink-0 ml-3">
-                    <button
-                      type="button"
-                      onClick={() => onSelectSession?.(s.session_id || s.id)}
-                      aria-label="Review waiting session"
-                      className={cn(
-                        "h-6 px-2 rounded text-[10px] font-medium",
-                        "border border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-fg)]",
-                        "hover:opacity-90 transition-opacity cursor-pointer",
-                        "flex items-center gap-1",
-                      )}
-                    >
-                      <Eye size={10} /> Review
-                    </button>
-                  </div>
-                </div>
+            <div className="dashboard-card">
+              {waitingSessions.slice(0, 6).map((s) => (
+                <RecentRow key={s.id} s={s} onSelect={onSelectSession} />
               ))}
             </div>
-          </div>
+          </section>
         )}
 
-        {/* Failed sessions */}
         {failedSessions.length > 0 && (
-          <div>
-            <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--failed)] mb-2 flex items-center gap-1.5">
-              <AlertCircle size={12} />
-              Failed ({failedSessions.length})
+          <section>
+            <h3 className="dashboard-section-title">
+              <AlertCircle size={13} className="text-[var(--failed)]" />
+              Failed
+              <span className="section-count">({failedSessions.length})</span>
             </h3>
-            <div className="overflow-hidden">
-              {failedSessions.slice(0, 10).map((s) => (
-                <div
-                  key={s.session_id || s.id}
-                  className="flex items-center gap-3 px-3 py-2 border-l-2 border-l-[var(--failed)] border-b border-b-[var(--border)] hover:bg-[var(--bg-hover)] transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] text-foreground truncate">{s.summary || s.session_id || s.id}</div>
-                    {(s.error || s.stage) && (
-                      <div className="text-[11px] text-muted-foreground truncate mt-0.5">{s.error || s.stage}</div>
-                    )}
-                  </div>
-                  <span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">
-                    {relTime(s.updated_at || s.created_at)}
-                  </span>
-                  <div className="flex gap-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => onSelectSession?.(s.session_id || s.id)}
-                      aria-label="View failed session"
-                      className={cn(
-                        "h-5 px-1.5 rounded text-[10px] font-medium",
-                        "border border-border bg-transparent text-foreground",
-                        "hover:bg-accent transition-colors cursor-pointer",
-                        "flex items-center gap-0.5",
-                      )}
-                    >
-                      <Eye size={9} /> View
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onSelectSession?.(s.session_id || s.id)}
-                      aria-label="Restart failed session"
-                      className={cn(
-                        "h-5 px-1.5 rounded text-[10px] font-medium",
-                        "border border-[var(--running)] bg-transparent text-[var(--running)]",
-                        "hover:bg-[var(--diff-add-bg)] transition-colors cursor-pointer",
-                        "flex items-center gap-0.5",
-                      )}
-                    >
-                      <RotateCcw size={9} /> Restart
-                    </button>
-                  </div>
-                </div>
+            <div className="dashboard-card">
+              {failedSessions.slice(0, 6).map((s) => (
+                <RecentRow key={s.id} s={s} onSelect={onSelectSession} />
               ))}
             </div>
-          </div>
+          </section>
         )}
+
+        <section>
+          <h3 className="dashboard-section-title">Recent activity</h3>
+          {recentRows.length === 0 ? (
+            <div className="dashboard-card">
+              <div className="dashboard-empty">
+                {!needsAttention ? (
+                  <>
+                    <CheckCircle2 size={16} className="text-[var(--running)] opacity-70" />
+                    No sessions yet. Press n to start one.
+                  </>
+                ) : (
+                  <>No recent activity</>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="dashboard-card">
+              {recentRows.map((s) => (
+                <RecentRow key={s.id} s={s} onSelect={onSelectSession} />
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );

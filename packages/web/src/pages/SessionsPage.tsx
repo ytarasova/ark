@@ -262,7 +262,7 @@ export function SessionsPage({
           <NewSessionModal onClose={() => setShowNew(false)} onSubmit={handleNewSession} />
         </div>
       ) : selectedId ? (
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="detail-panel flex-1 flex flex-col min-w-0 overflow-hidden">
           <div className="shrink-0 px-4 pt-2 flex items-center justify-between">
             <button
               type="button"

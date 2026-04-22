@@ -156,7 +156,6 @@ export function SessionListPanel({
           </Button>
         ) : undefined
       }
-      className="w-[300px] min-w-[300px] border-r border-[var(--border)]"
     />
   );
 }
