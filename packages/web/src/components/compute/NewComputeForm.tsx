@@ -8,6 +8,7 @@ import { Button } from "../ui/button.js";
 import { Input } from "../ui/input.js";
 import { cn } from "../../lib/utils.js";
 import { RichSelect } from "../ui/RichSelect.js";
+import { effectiveLifecycle, type ComputeKindName, type RuntimeKindName } from "../../../../types/compute.js";
 
 // Surface both compute + runtime axes. Static defaults render while the
 // server reply is in flight; the queries below overwrite with the live list.
@@ -114,12 +115,10 @@ export function NewComputeForm({
   const size = watch("size");
   const selectedTemplate = watch("selectedTemplate");
 
-  // Lifecycle classification (mirror of packages/types/compute.ts).
   // Template-lifecycle pairs can only exist as templates -- they have no
   // persistent infrastructure, so a "concrete" row would be nonsense.
-  const TEMPLATE_COMPUTE_KINDS = new Set(["k8s", "k8s-kata", "firecracker"]);
-  const TEMPLATE_RUNTIME_KINDS = new Set(["docker", "compose", "devcontainer", "firecracker-in-container"]);
-  const isTemplateLifecycle = TEMPLATE_COMPUTE_KINDS.has(compute) || TEMPLATE_RUNTIME_KINDS.has(runtime);
+  // Source of truth: packages/types/compute.ts.
+  const isTemplateLifecycle = effectiveLifecycle(compute as ComputeKindName, runtime as RuntimeKindName) === "template";
 
   // Keep templateConfig in a ref-style state via watch / setValue -- we
   // stash the chosen template's config object and hand it over on submit.
