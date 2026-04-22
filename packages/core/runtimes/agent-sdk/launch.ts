@@ -141,8 +141,7 @@ function messageToHooks(msg: unknown, arkSessionId: string): Array<Record<string
   }
 
   if (type === "result") {
-    const base: Record<string, unknown> = {
-      hook_event_name: "Stop",
+    const costFields: Record<string, unknown> = {
       session_id: arkSessionId,
       total_cost_usd: m.total_cost_usd,
       usage: m.usage,
@@ -150,13 +149,29 @@ function messageToHooks(msg: unknown, arkSessionId: string): Array<Record<string
       duration_ms: m.duration_ms,
       stop_reason: m.stop_reason,
     };
+
+    const stop: Record<string, unknown> = { hook_event_name: "Stop", ...costFields };
     if (m.is_error) {
-      base.is_error = true;
-      base.subtype = m.subtype;
-      base.error = m.error;
-      base.errors = m.errors;
+      stop.is_error = true;
+      stop.subtype = m.subtype;
+      stop.error = m.error;
+      stop.errors = m.errors;
     }
-    return [base];
+
+    // Emit a second hook that drives the conductor state transition.
+    // Stop alone is not in statusMap, so sessions would stay "running" forever
+    // without SessionEnd or StopFailure following it.
+    const transitionHook: Record<string, unknown> = { ...costFields };
+    if (m.is_error) {
+      transitionHook.hook_event_name = "StopFailure";
+      transitionHook.error = m.error ?? String((m.errors as unknown[])?.[0] ?? "agent error");
+      transitionHook.subtype = m.subtype;
+      transitionHook.errors = m.errors;
+    } else {
+      transitionHook.hook_event_name = "SessionEnd";
+    }
+
+    return [stop, transitionHook];
   }
 
   // stream_event, assistant-text-only, compact_boundary, and anything else: skip

@@ -267,8 +267,8 @@ test("forwards SessionStart on system/init", async () => {
     fetchFn: makeFakeFetch(calls),
   });
 
-  // SessionStart + Stop
-  expect(calls.length).toBe(2);
+  // SessionStart + Stop + SessionEnd
+  expect(calls.length).toBe(3);
   expect(calls[0].url).toContain("/hooks/status?session=ark-sess-1");
   expect(calls[0].method).toBe("POST");
   expect(calls[0].body).toMatchObject({
@@ -279,6 +279,12 @@ test("forwards SessionStart on system/init", async () => {
   });
   expect(calls[1].body).toMatchObject({
     hook_event_name: "Stop",
+    session_id: "ark-sess-1",
+    total_cost_usd: 0.001,
+    num_turns: 1,
+  });
+  expect(calls[2].body).toMatchObject({
+    hook_event_name: "SessionEnd",
     session_id: "ark-sess-1",
     total_cost_usd: 0.001,
     num_turns: 1,
@@ -330,8 +336,8 @@ test("forwards PreToolUse and PostToolUse for a tool call", async () => {
     fetchFn: makeFakeFetch(calls),
   });
 
-  // PreToolUse, PostToolUse, Stop
-  expect(calls.length).toBe(3);
+  // PreToolUse, PostToolUse, Stop, SessionEnd
+  expect(calls.length).toBe(4);
   expect(calls[0].body).toMatchObject({
     hook_event_name: "PreToolUse",
     session_id: "ark-sess-2",
@@ -347,6 +353,7 @@ test("forwards PreToolUse and PostToolUse for a tool call", async () => {
     is_error: false,
   });
   expect(calls[2].body).toMatchObject({ hook_event_name: "Stop" });
+  expect(calls[3].body).toMatchObject({ hook_event_name: "SessionEnd" });
 });
 
 test("forwards one PreToolUse per tool_use block when multiple in same assistant message", async () => {
@@ -389,14 +396,15 @@ test("forwards one PreToolUse per tool_use block when multiple in same assistant
     fetchFn: makeFakeFetch(calls),
   });
 
-  // Two PreToolUse hooks + Stop = 3 total
-  expect(calls.length).toBe(3);
+  // Two PreToolUse hooks + Stop + SessionEnd = 4 total
+  expect(calls.length).toBe(4);
   expect(calls[0].body).toMatchObject({ hook_event_name: "PreToolUse", tool_name: "Read", tool_use_id: "ta" });
   expect(calls[1].body).toMatchObject({ hook_event_name: "PreToolUse", tool_name: "Glob", tool_use_id: "tb" });
   expect(calls[2].body).toMatchObject({ hook_event_name: "Stop" });
+  expect(calls[3].body).toMatchObject({ hook_event_name: "SessionEnd" });
 });
 
-test("forwards Stop with is_error=true and error details when result is an error", async () => {
+test("forwards Stop then StopFailure with error details when result is an error", async () => {
   const calls: FetchCall[] = [];
   const dir = makeTmpDir();
   const promptFile = join(dir, "prompt.txt");
@@ -427,7 +435,8 @@ test("forwards Stop with is_error=true and error details when result is an error
     fetchFn: makeFakeFetch(calls),
   });
 
-  expect(calls.length).toBe(1);
+  // Stop (observability) then StopFailure (drives state transition to "failed")
+  expect(calls.length).toBe(2);
   expect(calls[0].body).toMatchObject({
     hook_event_name: "Stop",
     session_id: "ark-sess-4",
@@ -436,6 +445,16 @@ test("forwards Stop with is_error=true and error details when result is an error
     errors: ["budget exceeded"],
     total_cost_usd: 1.5,
   });
+  expect(calls[1].body).toMatchObject({
+    hook_event_name: "StopFailure",
+    session_id: "ark-sess-4",
+    subtype: "error_max_budget_usd",
+    errors: ["budget exceeded"],
+    total_cost_usd: 1.5,
+    num_turns: 5,
+  });
+  expect(typeof calls[1].body.error).toBe("string");
+  expect(calls[1].body.error).toBeTruthy();
 });
 
 test("skips forwarding when conductorUrl is undefined", async () => {
@@ -551,8 +570,10 @@ test("includes Authorization header when authToken is provided", async () => {
     fetchFn: makeFakeFetch(calls),
   });
 
-  expect(calls.length).toBe(1);
+  // Stop + SessionEnd = 2 calls; auth header present on all
+  expect(calls.length).toBe(2);
   expect(calls[0].headers["Authorization"]).toBe("Bearer my-secret-token");
+  expect(calls[1].headers["Authorization"]).toBe("Bearer my-secret-token");
 });
 
 test("PostToolUse with array content is JSON-stringified", async () => {
@@ -594,8 +615,95 @@ test("PostToolUse with array content is JSON-stringified", async () => {
     fetchFn: makeFakeFetch(calls),
   });
 
-  // PostToolUse + Stop
-  expect(calls.length).toBe(2);
+  // PostToolUse + Stop + SessionEnd
+  expect(calls.length).toBe(3);
   expect(calls[0].body).toMatchObject({ hook_event_name: "PostToolUse", tool_use_id: "tc" });
   expect(calls[0].body.tool_result_content).toBe(JSON.stringify(arrayContent));
+  expect(calls[1].body).toMatchObject({ hook_event_name: "Stop" });
+  expect(calls[2].body).toMatchObject({ hook_event_name: "SessionEnd" });
+});
+
+// ---------------------------------------------------------------------------
+// A3b ordering guarantee: transition-driving hook is always last
+// ---------------------------------------------------------------------------
+
+test("transition-driving hook (SessionEnd/StopFailure) is always the final hook for a result message", async () => {
+  // Verify for a success result: Stop comes before SessionEnd
+  const successCalls: FetchCall[] = [];
+  const dir1 = makeTmpDir();
+  const promptFile1 = join(dir1, "prompt.txt");
+  writeFileSync(promptFile1, "hi");
+
+  async function* successStream() {
+    yield {
+      type: "assistant",
+      message: { content: [{ type: "tool_use", id: "u1", name: "Bash", input: { command: "ls" } }] },
+    } as any;
+    yield {
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      total_cost_usd: 0.005,
+      num_turns: 2,
+      usage: { input_tokens: 10, output_tokens: 5 },
+      stop_reason: "end_turn",
+      result: "ok",
+      duration_ms: 200,
+      duration_api_ms: 190,
+    } as any;
+  }
+
+  await runAgentSdkLaunch({
+    sessionId: "ark-sess-order-ok",
+    sessionDir: dir1,
+    worktree: "/tmp",
+    promptFile: promptFile1,
+    stream: successStream(),
+    conductorUrl: "http://c:19100",
+    fetchFn: makeFakeFetch(successCalls),
+  });
+
+  // Last hook must be the state-transition driver
+  const lastSuccess = successCalls[successCalls.length - 1];
+  expect(lastSuccess.body.hook_event_name).toBe("SessionEnd");
+  // Stop must appear immediately before SessionEnd
+  const secondLast = successCalls[successCalls.length - 2];
+  expect(secondLast.body.hook_event_name).toBe("Stop");
+
+  // Verify for an error result: StopFailure is last
+  const errorCalls: FetchCall[] = [];
+  const dir2 = makeTmpDir();
+  const promptFile2 = join(dir2, "prompt.txt");
+  writeFileSync(promptFile2, "hi");
+
+  async function* errorStream() {
+    yield {
+      type: "result",
+      subtype: "error_during_execution",
+      is_error: true,
+      total_cost_usd: 0.001,
+      num_turns: 1,
+      usage: { input_tokens: 5, output_tokens: 0 },
+      stop_reason: null,
+      error: "execution failed",
+      errors: ["execution failed"],
+      duration_ms: 50,
+      duration_api_ms: 45,
+    } as any;
+  }
+
+  await runAgentSdkLaunch({
+    sessionId: "ark-sess-order-err",
+    sessionDir: dir2,
+    worktree: "/tmp",
+    promptFile: promptFile2,
+    stream: errorStream(),
+    conductorUrl: "http://c:19100",
+    fetchFn: makeFakeFetch(errorCalls),
+  });
+
+  const lastError = errorCalls[errorCalls.length - 1];
+  expect(lastError.body.hook_event_name).toBe("StopFailure");
+  const secondLastError = errorCalls[errorCalls.length - 2];
+  expect(secondLastError.body.hook_event_name).toBe("Stop");
 });
