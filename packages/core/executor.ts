@@ -74,6 +74,11 @@ export interface Executor {
   name: string;
   launch(opts: LaunchOpts): Promise<LaunchResult>;
   kill(handle: string): Promise<void>;
+  /**
+   * Hard-terminate a tracked process with SIGKILL -- no grace period.
+   * Optional: executors that don't implement it fall back to `kill(handle)`.
+   */
+  terminate?(handle: string): Promise<void>;
   status(handle: string): Promise<ExecutorStatus>;
   send(handle: string, message: string): Promise<void>;
   capture(handle: string, lines?: number): Promise<string>;

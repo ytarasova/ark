@@ -85,11 +85,13 @@ export interface RunAgentSdkLaunchOpts {
    */
   stream?: AsyncIterable<unknown>;
   /**
-   * Alternative injection point for tests that need to drive the prompt queue.
-   * When provided, `streamFactory(queue)` is called with the PromptQueue and
-   * must return the AsyncIterable<unknown> to drain. Ignored when `stream` is set.
+   * Alternative injection point for tests that need to drive the prompt queue
+   * and optionally the resume flow. When provided, `streamFactory(queue, options)`
+   * is called each iteration with the PromptQueue and the current SDK options
+   * (which includes `resume` on iterations after an interrupt). Ignored when
+   * `stream` is set.
    */
-  streamFactory?: (prompt: AsyncIterable<SDKUserMessage>) => AsyncIterable<unknown>;
+  streamFactory?: (prompt: AsyncIterable<SDKUserMessage>, options: Record<string, unknown>) => AsyncIterable<unknown>;
   /**
    * Conductor base URL (e.g. "http://localhost:19100"). When undefined,
    * hook forwarding is skipped entirely. In production, read from
@@ -282,21 +284,48 @@ function optionalNumber(name: string): number | undefined {
   return n;
 }
 
+type StreamOutcome = "completed" | "interrupted" | "aborted";
+
+interface DrainResult {
+  outcome: StreamOutcome;
+  sawResult: boolean;
+  exitCode: number;
+  /** SDK session ID captured from the first `system/init` message. */
+  sdkSessionId?: string;
+}
+
 /**
  * Drain a message stream: write each message to transcript.jsonl, forward
- * hook payloads to the conductor, and return exit metadata. Shared by both
- * the injected-stream path and the real-SDK path.
+ * hook payloads to the conductor, and return exit metadata plus the SDK
+ * session ID captured from the first `system/init` message.
+ *
+ * Returns `outcome: "interrupted"` when the abort controller fires due to a
+ * control-interrupt signal (written via `session/interrupt`). The caller's
+ * outer loop uses this to resume with `options.resume = sdkSessionId`.
+ *
+ * Returns `outcome: "aborted"` for SIGTERM/SIGINT aborts or unhandled errors.
+ * Returns `outcome: "completed"` when a `result` message arrives normally.
  */
 async function drainStream(
   stream: AsyncIterable<unknown>,
   writeLine: (obj: unknown) => void,
   forwardDeps: ForwardDeps,
-): Promise<RunAgentSdkLaunchResult> {
+  signal?: AbortSignal,
+  interruptFlag?: { fired: boolean },
+): Promise<DrainResult> {
   let sawResult = false;
   let exitCode = 0;
+  let sdkSessionId: string | undefined;
+  let outcome: StreamOutcome = "completed";
 
   try {
     for await (const message of stream) {
+      // Capture SDK session ID from the first system/init message.
+      const m = message as Record<string, unknown>;
+      if (m.type === "system" && (m.subtype as string | undefined) === "init" && !sdkSessionId) {
+        sdkSessionId = m.session_id as string | undefined;
+      }
+
       writeLine(message);
       await forwardToConductor(message, forwardDeps);
       const msg = message as { type?: string; is_error?: boolean };
@@ -306,18 +335,34 @@ async function drainStream(
       }
     }
   } catch (err: unknown) {
+    // When the abort fires (SIGTERM, SIGINT, or interrupt signal), the SDK
+    // iterator throws with AbortError or similar. Check the interrupt flag to
+    // distinguish a user-requested interrupt from a hard abort.
+    if (interruptFlag?.fired) {
+      outcome = "interrupted";
+      // Do not write an error line -- the session continues in the next turn.
+      return { outcome, sawResult, exitCode: 0, sdkSessionId };
+    }
+    if (signal?.aborted) {
+      outcome = "aborted";
+      // Do not write an error line -- caller decided to abort, not an agent failure.
+      return { outcome, sawResult, exitCode: 1, sdkSessionId };
+    }
     const e = err as { message?: string } | null;
     writeLine({ type: "error", source: "launch", message: String(e?.message ?? err) });
     exitCode = 1;
   }
 
-  if (!sawResult && exitCode === 0) {
+  if (!sawResult && exitCode === 0 && outcome === "completed") {
     writeLine({ type: "error", source: "launch", message: "stream ended without result message" });
     exitCode = 1;
   }
 
-  return { exitCode, sawResult };
+  return { outcome, sawResult, exitCode, sdkSessionId };
 }
+
+// Maximum number of interrupt-resume cycles before giving up.
+const MAX_INTERRUPTS = 20;
 
 /**
  * Core loop: iterate SDKMessages (real or injected), write each to
@@ -332,6 +377,11 @@ async function drainStream(
  * message, and `<sessionDir>/interventions.jsonl` is tailed. Any line
  * written to that file by `session/inject` is forwarded into the queue so
  * the agent picks it up on its next turn without restarting.
+ *
+ * When a `control: "interrupt"` line is detected in the intervention file,
+ * the current SDK query is aborted and a new one is started with
+ * `options.resume = <sdkSessionId>` so the SDK restores conversation history
+ * and the agent sees the correction as the next user message.
  */
 export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<RunAgentSdkLaunchResult> {
   const { sessionId, sessionDir, worktree, promptFile, model, maxTurns, maxBudgetUsd, systemAppend } = opts;
@@ -354,7 +404,8 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
   // Legacy injected-stream path (existing tests): skip the real SDK and the
   // queue entirely. The stream is used exactly as before.
   if (opts.stream !== undefined) {
-    return drainStream(opts.stream, writeLine, forwardDeps);
+    const dr = await drainStream(opts.stream, writeLine, forwardDeps);
+    return { exitCode: dr.exitCode, sawResult: dr.sawResult };
   }
 
   // Build a PromptQueue so the agent can receive mid-session interventions.
@@ -362,15 +413,51 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
   queue.push(promptText);
 
   // streamFactory path: test injects a factory that receives the queue.
+  // Supports the interrupt-resume loop for tests that verify the D3 flow.
   if (opts.streamFactory !== undefined) {
     const interventionPath = join(sessionDir, "interventions.jsonl");
+
+    // Mutable holder so the intervention tail always calls abort() on the
+    // *current* iteration's controller, even as it changes across resumes.
+    const abortHolder = { ref: new AbortController() };
+    const interruptFlag = { fired: false };
+
     const stopTail = startInterventionTail({
       path: interventionPath,
       onMessage: (content) => queue.push(content),
+      onInterrupt: () => {
+        interruptFlag.fired = true;
+        abortHolder.ref.abort();
+      },
       onError: (err) => console.error(`[agent-sdk launch] intervention tail error: ${err.message}`),
     });
+
+    let sdkSessionId: string | undefined;
+    let attempt = 0;
+
     try {
-      return await drainStream(opts.streamFactory(queue), writeLine, forwardDeps);
+      while (true) {
+        attempt++;
+        abortHolder.ref = new AbortController();
+        interruptFlag.fired = false;
+
+        const iterOptions: Record<string, unknown> = {};
+        if (sdkSessionId) iterOptions.resume = sdkSessionId;
+
+        const stream = opts.streamFactory(queue, iterOptions);
+        const dr = await drainStream(stream, writeLine, forwardDeps, abortHolder.ref.signal, interruptFlag);
+
+        if (dr.sdkSessionId && !sdkSessionId) {
+          sdkSessionId = dr.sdkSessionId;
+        }
+
+        if (dr.outcome === "interrupted" && attempt < MAX_INTERRUPTS) {
+          // Loop -- start a new query with options.resume = sdkSessionId.
+          continue;
+        }
+
+        return { exitCode: dr.exitCode, sawResult: dr.sawResult };
+      }
     } finally {
       stopTail();
       queue.close();
@@ -400,22 +487,59 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
     systemPrompt: systemAppend ? { type: "preset", preset: "claude_code", append: systemAppend } : undefined,
   };
 
-  const abort = new AbortController();
-  const onSigterm = () => abort.abort();
-  const onSigint = () => abort.abort();
+  // Mutable abort holder so the intervention tail always sees the current controller.
+  const abortHolder = { ref: new AbortController() };
+  const interruptFlag = { fired: false };
+
+  const onSigterm = () => abortHolder.ref.abort();
+  const onSigint = () => abortHolder.ref.abort();
   process.on("SIGTERM", onSigterm);
   process.on("SIGINT", onSigint);
-  sdkOptions.abortController = abort;
 
   const interventionPath = join(sessionDir, "interventions.jsonl");
   const stopTail = startInterventionTail({
     path: interventionPath,
     onMessage: (content) => queue.push(content),
+    onInterrupt: () => {
+      interruptFlag.fired = true;
+      abortHolder.ref.abort();
+    },
     onError: (err) => console.error(`[agent-sdk launch] intervention tail error: ${err.message}`),
   });
 
+  let sdkSessionId: string | undefined;
+  let attempt = 0;
+
   try {
-    return await drainStream(query({ prompt: queue, options: sdkOptions }), writeLine, forwardDeps);
+    while (true) {
+      attempt++;
+      abortHolder.ref = new AbortController();
+      interruptFlag.fired = false;
+      sdkOptions.abortController = abortHolder.ref;
+
+      if (sdkSessionId) {
+        (sdkOptions as Record<string, unknown>).resume = sdkSessionId;
+      }
+
+      const stream = query({ prompt: queue, options: sdkOptions });
+      const dr = await drainStream(stream, writeLine, forwardDeps, abortHolder.ref.signal, interruptFlag);
+
+      if (dr.sdkSessionId && !sdkSessionId) {
+        sdkSessionId = dr.sdkSessionId;
+      }
+
+      // SIGTERM/SIGINT abort -- surface hard abort to caller.
+      if (dr.outcome === "aborted") {
+        return { exitCode: 1, sawResult: dr.sawResult };
+      }
+
+      if (dr.outcome === "interrupted" && attempt < MAX_INTERRUPTS) {
+        // Loop -- start a new query with options.resume = sdkSessionId.
+        continue;
+      }
+
+      return { exitCode: dr.exitCode, sawResult: dr.sawResult };
+    }
   } finally {
     process.off("SIGTERM", onSigterm);
     process.off("SIGINT", onSigint);

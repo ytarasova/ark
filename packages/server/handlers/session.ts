@@ -341,12 +341,96 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     return { ...result, snapshot: null, notSupported: true };
   });
 
-  router.handle("session/interrupt", async (params, notify) => {
-    const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
-    const result = await app.sessionService.interrupt(sessionId);
-    const session = await app.sessions.get(sessionId);
-    if (session) notify("session/updated", { session });
+  router.handle("session/interrupt", async (params) => {
+    const { sessionId, content } = extract<{ sessionId: string; content: string }>(params, ["sessionId", "content"]);
+
+    const s = await app.sessions.get(sessionId);
+    if (!s) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
+    if (s.status !== "running") {
+      return { ok: false, message: `session not running (status=${s.status})` };
+    }
+
+    // Agent-sdk sessions use file-tail IPC via interventions.jsonl.
+    // Writing control:"interrupt" causes launch.ts to abort the current turn
+    // and resume with options.resume = <sdkSessionId>. The content is pushed
+    // into the prompt queue as the correction message for the next turn.
+    const executorName = (s.config as Record<string, unknown> | null)?.launch_executor as string | undefined;
+    if (executorName === "agent-sdk") {
+      const sessionDir = join(app.config.tracksDir, sessionId);
+      const interventionPath = join(sessionDir, "interventions.jsonl");
+      await fsPromises.mkdir(sessionDir, { recursive: true });
+      const line = JSON.stringify({ role: "user", content, control: "interrupt", ts: Date.now() }) + "\n";
+      await fsPromises.appendFile(interventionPath, line, "utf8");
+
+      await app.events.log(sessionId, "session_interrupted", {
+        actor: "user",
+        data: { content_preview: content.slice(0, 80) },
+      });
+
+      return { ok: true };
+    }
+
+    // Non-agent-sdk sessions: fall back to the tmux C-c interrupt.
+    const result = await app.sessionLifecycle.interrupt(sessionId);
     return result;
+  });
+
+  // ── session/kill -- hard terminate, no grace ──────────────────────────────
+  //
+  // Goes straight to SIGKILL (skips the SIGTERM grace that session/stop uses).
+  // Marks session `failed` with reason `killed` and runs D2 cleanup
+  // synchronously so post-conditions are reliable for the caller.
+
+  router.handle("session/kill", async (params, notify) => {
+    const { sessionId } = extract<{ sessionId: string }>(params, ["sessionId"]);
+
+    const s = await app.sessions.get(sessionId);
+    if (!s) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
+
+    const terminalStatuses = ["completed", "failed", "archived", "stopped"];
+    if (terminalStatuses.includes(s.status)) {
+      return { ok: false, message: `session already terminal (status=${s.status})` };
+    }
+
+    // Find the executor handle and call terminate (SIGKILL-first).
+    const handle = s.session_id;
+    if (handle) {
+      const { getExecutor } = await import("../../core/executor.js");
+      const executorName = (s.config as Record<string, unknown> | null)?.launch_executor as string | undefined;
+      const executor = executorName ? getExecutor(executorName) : undefined;
+
+      if (executor) {
+        if (executor.terminate) {
+          await executor.terminate(handle);
+        } else {
+          await executor.kill(handle);
+        }
+      }
+    }
+
+    // Mark session failed with reason "killed".
+    await app.sessions.update(sessionId, {
+      status: "failed",
+      error: "killed",
+      session_id: null,
+    } as Partial<import("../../types/index.js").Session>);
+
+    await app.events.log(sessionId, "session_killed", {
+      actor: "user",
+      data: { handle: handle ?? null },
+    });
+
+    // Run D2 cleanup synchronously so the caller can rely on post-conditions.
+    const updated = (await app.sessions.get(sessionId))!;
+    if (updated) {
+      const { cleanupSession } = await import("../../core/services/session/cleanup.js");
+      await cleanupSession(app, updated);
+    }
+
+    const final = await app.sessions.get(sessionId);
+    if (final) notify("session/updated", { session: final });
+
+    return { ok: true, terminated_at: Date.now(), cleaned_up: true };
   });
 
   router.handle("session/archive", async (params, notify) => {

@@ -1,11 +1,14 @@
 /**
- * Tests for the session/inject RPC handler.
+ * Tests for the session/inject and session/interrupt RPC handlers.
  *
  * Exercises:
  *  - inject on a running session writes to <sessionDir>/interventions.jsonl
  *  - inject on a non-running session returns { ok: false }
  *  - inject on an unknown session throws SESSION_NOT_FOUND
  *  - session_injected event is logged with a truncated content_preview
+ *  - interrupt on an agent-sdk running session writes control:"interrupt" line
+ *  - interrupt on a non-running session returns { ok: false }
+ *  - interrupt on an unknown session throws SESSION_NOT_FOUND
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
@@ -127,5 +130,97 @@ describe("session/inject", () => {
     expect(typeof preview).toBe("string");
     expect(preview.length).toBeLessThanOrEqual(80);
     expect(preview).toBe("A".repeat(80));
+  });
+});
+
+describe("session/interrupt", () => {
+  it("writes a control:interrupt line to interventions.jsonl for an agent-sdk running session", async () => {
+    const session = await app.sessions.create({
+      summary: "interrupt test",
+      workdir: app.config.arkDir,
+      flow: "bare",
+    });
+    await app.sessions.update(session.id, {
+      status: "running",
+      config: { launch_executor: "agent-sdk" },
+    } as any);
+
+    const sessionDir = join(app.config.tracksDir, session.id);
+    mkdirSync(sessionDir, { recursive: true });
+
+    const req = createRequest(10, "session/interrupt", {
+      sessionId: session.id,
+      content: "stop, do X instead",
+    });
+    const res = await router.dispatch(req);
+    const result = (res as JsonRpcResponse).result as Record<string, unknown>;
+
+    expect(result.ok).toBe(true);
+
+    const interventionPath = join(sessionDir, "interventions.jsonl");
+    const raw = readFileSync(interventionPath, "utf8").trim();
+    const line = JSON.parse(raw);
+    expect(line.role).toBe("user");
+    expect(line.content).toBe("stop, do X instead");
+    expect(line.control).toBe("interrupt");
+    expect(typeof line.ts).toBe("number");
+  });
+
+  it("logs a session_interrupted event", async () => {
+    const session = await app.sessions.create({
+      summary: "interrupt event test",
+      workdir: app.config.arkDir,
+      flow: "bare",
+    });
+    await app.sessions.update(session.id, {
+      status: "running",
+      config: { launch_executor: "agent-sdk" },
+    } as any);
+
+    const sessionDir = join(app.config.tracksDir, session.id);
+    mkdirSync(sessionDir, { recursive: true });
+
+    const req = createRequest(11, "session/interrupt", {
+      sessionId: session.id,
+      content: "B".repeat(200),
+    });
+    await router.dispatch(req);
+
+    const events = await app.events.list(session.id);
+    const ev = events.find((e: any) => e.type === "session_interrupted");
+    expect(ev).toBeDefined();
+    const preview = (ev as any).data?.content_preview;
+    expect(typeof preview).toBe("string");
+    expect(preview.length).toBeLessThanOrEqual(80);
+  });
+
+  it("returns { ok: false } when session is not running", async () => {
+    const session = await app.sessions.create({
+      summary: "interrupt not-running",
+      workdir: app.config.arkDir,
+      flow: "bare",
+    });
+    await app.sessions.update(session.id, { status: "completed" });
+
+    const req = createRequest(12, "session/interrupt", {
+      sessionId: session.id,
+      content: "too late",
+    });
+    const res = await router.dispatch(req);
+    const result = (res as JsonRpcResponse).result as Record<string, unknown>;
+
+    expect(result.ok).toBe(false);
+    expect(result.message as string).toContain("not running");
+  });
+
+  it("throws SESSION_NOT_FOUND for an unknown sessionId", async () => {
+    const req = createRequest(13, "session/interrupt", {
+      sessionId: "s-unknown-xyz",
+      content: "hello",
+    });
+    const res = await router.dispatch(req);
+    const err = (res as JsonRpcError).error;
+    expect(err).toBeDefined();
+    expect(err.code).toBe(-32002);
   });
 });

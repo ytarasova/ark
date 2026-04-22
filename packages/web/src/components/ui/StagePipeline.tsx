@@ -53,9 +53,7 @@ export function StagePipeline({ stages, selectedStage, onStageClick, className, 
           >
             {s.name}
           </button>
-          {i < stages.length - 1 && (
-            <ChevronRight size={10} className="text-[var(--fg-muted)] px-[1px]" aria-hidden />
-          )}
+          {i < stages.length - 1 && <ChevronRight size={10} className="text-[var(--fg-muted)] px-[1px]" aria-hidden />}
         </span>
       ))}
     </div>

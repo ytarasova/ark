@@ -17,11 +17,17 @@ import type { FSWatcher } from "fs";
 export interface InterventionTailOpts {
   path: string;
   onMessage: (content: string) => void;
+  /**
+   * Called when a line with `control: "interrupt"` is detected. The content
+   * is also passed to `onMessage` so the correction reaches the prompt queue.
+   * The callback should abort the current SDK query iteration.
+   */
+  onInterrupt?: () => void;
   onError?: (err: Error) => void;
 }
 
 export function startInterventionTail(opts: InterventionTailOpts): () => void {
-  const { path, onMessage, onError } = opts;
+  const { path, onMessage, onInterrupt, onError } = opts;
 
   let stopped = false;
   let offset = 0;
@@ -67,9 +73,14 @@ export function startInterventionTail(opts: InterventionTailOpts): () => void {
       const trimmed = line.trim();
       if (!trimmed) continue;
       try {
-        const parsed = JSON.parse(trimmed) as { content?: unknown };
+        const parsed = JSON.parse(trimmed) as { content?: unknown; control?: unknown };
         if (typeof parsed.content === "string") {
           onMessage(parsed.content);
+        }
+        // Fire the interrupt callback after pushing the content so the
+        // correction is already in the queue when the abort fires.
+        if (parsed.control === "interrupt" && onInterrupt) {
+          onInterrupt();
         }
       } catch (err) {
         if (onError) onError(err instanceof Error ? err : new Error(String(err)));

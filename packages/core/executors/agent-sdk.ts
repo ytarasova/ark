@@ -169,6 +169,20 @@ export const agentSdkExecutor: Executor = {
     }, 1000);
   },
 
+  /**
+   * Hard-terminate with SIGKILL -- no SIGTERM grace period. Used by
+   * `session/kill` which requires immediate termination. Awaits process exit
+   * so the caller can rely on the process being gone when this returns.
+   */
+  async terminate(handle: string): Promise<void> {
+    const tracked = processes.get(handle);
+    if (!tracked || tracked.exited) return;
+    tracked.proc.kill("SIGKILL");
+    // Await the actual process exit so the caller sees a clean post-condition.
+    await tracked.proc.exited;
+    processes.delete(handle);
+  },
+
   async status(handle: string): Promise<ExecutorStatus> {
     const tracked = processes.get(handle);
     if (!tracked) return { state: "not_found" };

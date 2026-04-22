@@ -763,11 +763,37 @@ export type SessionPauseResponse = z.infer<typeof sessionPauseResponse>;
 
 // ── session/interrupt ───────────────────────────────────────────────────────
 
-export const sessionInterruptRequest = sessionIdParams;
+export const sessionInterruptRequest = z
+  .object({
+    sessionId: z.string().min(1),
+    /** Correction message to inject as the next user turn after aborting. */
+    content: z.string(),
+  })
+  .loose();
 export type SessionInterruptRequest = z.infer<typeof sessionInterruptRequest>;
 
-export const sessionInterruptResponse = sessionOpResult;
+export const sessionInterruptResponse = z
+  .object({
+    ok: z.boolean(),
+    message: z.string().optional(),
+  })
+  .loose();
 export type SessionInterruptResponse = z.infer<typeof sessionInterruptResponse>;
+
+// ── session/kill ─────────────────────────────────────────────────────────────
+
+export const sessionKillRequest = sessionIdParams;
+export type SessionKillRequest = z.infer<typeof sessionKillRequest>;
+
+export const sessionKillResponse = z
+  .object({
+    ok: z.boolean(),
+    message: z.string().optional(),
+    terminated_at: z.number().optional(),
+    cleaned_up: z.boolean().optional(),
+  })
+  .loose();
+export type SessionKillResponse = z.infer<typeof sessionKillResponse>;
 
 // ── session/complete ────────────────────────────────────────────────────────
 
@@ -1781,6 +1807,7 @@ export const rpcMethodSchemas: Record<string, RpcMethodSchemas> = {
   "session/clone": { request: sessionCloneRequest, response: sessionCloneResponse },
   "session/pause": { request: sessionPauseRequest, response: sessionPauseResponse },
   "session/interrupt": { request: sessionInterruptRequest, response: sessionInterruptResponse },
+  "session/kill": { request: sessionKillRequest, response: sessionKillResponse },
   "session/complete": { request: sessionCompleteRequest, response: sessionCompleteResponse },
   "session/spawn": { request: sessionSpawnRequest, response: sessionSpawnResponse },
   "session/unread-counts": { request: sessionUnreadCountsRequest, response: sessionUnreadCountsResponse },
