@@ -14,7 +14,6 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext } from "../app.js";
-import { mediateStageHandoff } from "../services/session-hooks.js";
 import { executeAction } from "../services/actions/index.js";
 import { waitFor } from "./test-helpers.js";
 
@@ -47,7 +46,7 @@ describe("action stage chaining", async () => {
     await app.sessions.update(session.id, { status: "ready", stage: "work" });
 
     // Handoff from work -> finish (action:close)
-    const result = await mediateStageHandoff(app, session.id, {
+    const result = await app.sessionHooks.mediateStageHandoff(session.id, {
       autoDispatch: true,
       source: "test",
     });
@@ -87,7 +86,7 @@ describe("action stage chaining", async () => {
     await app.sessions.update(session.id, { status: "ready", stage: "work" });
 
     // Handoff from work -> step1 (action:close)
-    const result = await mediateStageHandoff(app, session.id, {
+    const result = await app.sessionHooks.mediateStageHandoff(session.id, {
       autoDispatch: true,
       source: "test",
     });
@@ -127,7 +126,7 @@ describe("action stage chaining", async () => {
     await app.sessions.update(session.id, { status: "ready", stage: "work" });
 
     // Handoff from work -> pr (action:create_pr, will fail)
-    const result = await mediateStageHandoff(app, session.id, {
+    const result = await app.sessionHooks.mediateStageHandoff(session.id, {
       autoDispatch: true,
       source: "test",
     });
@@ -170,7 +169,7 @@ describe("action stage chaining", async () => {
     await app.sessions.update(session.id, { status: "ready", stage: "work1" });
 
     // Handoff from work1 -> middle (action:close)
-    const result = await mediateStageHandoff(app, session.id, {
+    const result = await app.sessionHooks.mediateStageHandoff(session.id, {
       autoDispatch: true,
       source: "test",
     });
@@ -205,8 +204,6 @@ describe("action stage chaining", async () => {
     // because the default session_created listener only kicks dispatch
     // once. The fix routes action stages through executeAction +
     // mediateStageHandoff so a single-action flow can auto-complete.
-    const { dispatch } = await import("../services/dispatch.js");
-
     app.flows.save("test-action-first", {
       name: "test-action-first",
       stages: [{ name: "only", action: "close", gate: "auto" }],
@@ -215,7 +212,7 @@ describe("action stage chaining", async () => {
     const session = await app.sessions.create({ summary: "action-first test", flow: "test-action-first" });
     await app.sessions.update(session.id, { status: "ready", stage: "only" });
 
-    const result = await dispatch(app, session.id);
+    const result = await app.dispatchService.dispatch(session.id);
     expect(result.ok).toBe(true);
 
     await waitFor(

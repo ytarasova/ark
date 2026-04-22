@@ -1,0 +1,159 @@
+<!doctype html><html class="midnight-circuit dark"><head>
+<meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+body { padding: 20px; font-family: var(--font-sans); }
+.card { gap: 16px; }
+.row { display: grid; grid-template-columns: 120px 1fr; gap: 14px; align-items: flex-start; }
+.row .lab { font: 500 10px var(--font-mono-ui); color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.05em; padding-top: 9px; }
+
+.input {
+  display: flex; align-items: center; gap: 8px;
+  height: 32px; padding: 0 11px;
+  border-radius: 6px;
+  background: #0a0a12;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(0,0,0,.5) inset, 0 1px 0 rgba(255,255,255,.02);
+  cursor: pointer;
+  transition: border-color 120ms, background 120ms, box-shadow 120ms;
+}
+.input:hover { border-color: #33334d; background: #0d0d18; }
+.input.focused, .input.open {
+  border-color: var(--primary);
+  background: #0d0d18;
+  box-shadow: 0 1px 2px rgba(0,0,0,.5) inset, 0 0 0 3px rgba(107,89,222,.18);
+}
+.input .adorn.lead {
+  font: 500 10px var(--font-mono-ui); color: var(--fg-faint);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  padding-right: 8px; border-right: 1px solid var(--border);
+}
+.input .val {
+  flex: 1; min-width: 0;
+  font: 500 12px var(--font-sans); color: var(--fg); letter-spacing: -0.005em;
+  display: flex; align-items: baseline; gap: 8px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.input .val em {
+  font-style: normal; color: var(--fg-faint);
+  font: 400 10px var(--font-mono-ui); text-transform: uppercase; letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.input .val .pip { width: 6px; height: 6px; border-radius: 99px; background: #34d399; box-shadow: 0 0 4px rgba(52,211,153,.5); flex-shrink: 0; }
+.input .val.placeholder { color: var(--fg-faint); font-weight: 400; }
+.input .chev { color: var(--fg-muted); font: 500 12px var(--font-mono); flex-shrink: 0; }
+.input.disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Open popover */
+.popover {
+  margin-top: 6px;
+  background: var(--bg-popover);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 8px 20px -4px rgba(0,0,0,.5), 0 2px 4px rgba(0,0,0,.4);
+  overflow: hidden;
+}
+.popover .search {
+  padding: 8px 11px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+  font: 500 12px var(--font-sans);
+  color: var(--fg-faint);
+}
+.popover .search svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+.popover .opt {
+  padding: 7px 11px;
+  display: flex; align-items: center; gap: 8px;
+  font: 500 12px var(--font-sans); color: var(--fg);
+  cursor: pointer;
+}
+.popover .opt:hover { background: var(--bg-hover); }
+.popover .opt.on {
+  background: rgba(107,89,222,.12);
+  color: var(--fg);
+  border-left: 2px solid var(--primary);
+  padding-left: 9px;
+}
+.popover .opt .kv { font: 400 10px var(--font-mono-ui); color: var(--fg-faint); margin-left: auto; text-transform: uppercase; letter-spacing: 0.04em; }
+.popover .opt .pip { width: 6px; height: 6px; border-radius: 99px; background: #34d399; box-shadow: 0 0 4px rgba(52,211,153,.5); }
+.popover .opt .ico-check { color: var(--primary); margin-left: auto; }
+.popover .opt .ico-check svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2.5; }
+.popover .sec {
+  padding: 4px 11px;
+  font: 500 9px var(--font-mono-ui); color: var(--fg-faint);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  background: rgba(0,0,0,.15);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.popover .sec:first-child { border-top: 0; }
+</style></head>
+<body>
+<div class="card">
+
+  <div class="row"><span class="lab">default</span>
+    <div class="input">
+      <span class="val placeholder">select a flow…</span>
+      <span class="chev">▾</span>
+    </div>
+  </div>
+
+  <div class="row"><span class="lab">with lead</span>
+    <div class="input">
+      <span class="adorn lead">flow://</span>
+      <span class="val">autonomous-sdlc<em>6 stages · v2</em></span>
+      <span class="chev">▾</span>
+    </div>
+  </div>
+
+  <div class="row"><span class="lab">focused</span>
+    <div class="input focused">
+      <span class="adorn lead">flow://</span>
+      <span class="val">autonomous-sdlc<em>6 stages · v2</em></span>
+      <span class="chev">▾</span>
+    </div>
+  </div>
+
+  <div class="row"><span class="lab">disabled</span>
+    <div class="input disabled">
+      <span class="adorn lead">flow://</span>
+      <span class="val">autonomous-sdlc</span>
+      <span class="chev">▾</span>
+    </div>
+  </div>
+
+  <div class="row"><span class="lab">with status</span>
+    <div class="input">
+      <span class="adorn lead">compute</span>
+      <span class="val"><span class="pip"></span>ec2-04<em>us-west-2</em></span>
+      <span class="chev">▾</span>
+    </div>
+  </div>
+
+  <div class="row"><span class="lab">open</span>
+    <div>
+      <div class="input open">
+        <span class="adorn lead">flow://</span>
+        <span class="val">autonomous-sdlc<em>6 stages · v2</em></span>
+        <span class="chev">▴</span>
+      </div>
+      <div class="popover">
+        <div class="search">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <span>search flows…</span>
+        </div>
+        <div class="sec">Core</div>
+        <div class="opt on">
+          autonomous-sdlc
+          <span class="ico-check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+        </div>
+        <div class="opt">quick <span class="kv">2 stages · v4</span></div>
+        <div class="opt">fan-out <span class="kv">dynamic</span></div>
+        <div class="sec">User</div>
+        <div class="opt">review-loop <span class="kv">3 stages · v1</span></div>
+        <div class="opt">spec-only <span class="kv">1 stage · v2</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body></html>

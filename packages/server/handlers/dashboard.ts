@@ -100,7 +100,7 @@ export function registerDashboardHandlers(router: Router, app: AppContext): void
     // System health: conductor is online if we got here
     const system = {
       conductor: true,
-      router: app.config.router?.enabled ?? false,
+      router: app.config.router.enabled,
     };
 
     // Active compute count

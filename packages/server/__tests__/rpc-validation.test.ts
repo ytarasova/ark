@@ -255,6 +255,427 @@ const fixtures: Record<string, MethodFixture> = {
     invalidRequest: [] as unknown as Record<string, unknown>,
     sampleResponse: { nodes: 0, edges: 0, by_node_type: {}, by_edge_type: {} },
   },
+  "todo/list": {
+    validRequest: { sessionId: "s-1" },
+    invalidRequest: {},
+    sampleResponse: { todos: [sampleTodo] },
+  },
+  "todo/delete": {
+    validRequest: { id: 1 },
+    invalidRequest: { id: "one" },
+    sampleResponse: { ok: true },
+  },
+  "verify/run": {
+    validRequest: { sessionId: "s-1" },
+    invalidRequest: {},
+    sampleResponse: { ok: true, todosResolved: true, pendingTodos: [], scriptResults: [] },
+  },
+  "session/output": {
+    validRequest: { sessionId: "s-1", lines: 100 },
+    invalidRequest: { sessionId: "" },
+    sampleResponse: { output: "" },
+  },
+  "session/recording": {
+    validRequest: { sessionId: "s-1" },
+    invalidRequest: {},
+    sampleResponse: { ok: true, output: null },
+  },
+  "session/events": {
+    validRequest: { sessionId: "s-1", limit: 10 },
+    invalidRequest: { sessionId: 1 },
+    sampleResponse: { events: [] },
+  },
+  "session/messages": {
+    validRequest: { sessionId: "s-1", limit: 10 },
+    invalidRequest: { sessionId: 1 },
+    sampleResponse: { messages: [] },
+  },
+  "session/export-data": {
+    validRequest: { sessionId: "s-1" },
+    invalidRequest: {},
+    sampleResponse: { version: 1, exportedAt: new Date().toISOString(), session: {}, events: [] },
+  },
+  "session/import": {
+    validRequest: { version: 1, session: { summary: "test" } },
+    invalidRequest: {},
+    sampleResponse: { ok: true, sessionId: "s-1" },
+  },
+  "session/resume": {
+    validRequest: { sessionId: "s-1" },
+    invalidRequest: {},
+    sampleResponse: { ok: true },
+  },
+  "session/clone": {
+    validRequest: { sessionId: "s-1" },
+    invalidRequest: {},
+    sampleResponse: { session: sampleSession },
+  },
+  "session/pause": {
+    validRequest: { sessionId: "s-1" },
+    invalidRequest: {},
+    sampleResponse: { ok: true },
+  },
+  "session/interrupt": {
+    validRequest: { sessionId: "s-1" },
+    invalidRequest: {},
+    sampleResponse: sampleSessionOpResult,
+  },
+  "session/complete": {
+    validRequest: { sessionId: "s-1" },
+    invalidRequest: {},
+    sampleResponse: sampleSessionOpResult,
+  },
+  "session/spawn": {
+    validRequest: { sessionId: "s-1", task: "do it" },
+    invalidRequest: { sessionId: "s-1" },
+    sampleResponse: { ok: true },
+  },
+  "session/unread-counts": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { counts: {} },
+  },
+  "session/conversation": {
+    validRequest: { sessionId: "s-1" },
+    invalidRequest: {},
+    sampleResponse: { turns: [] },
+  },
+  "message/send": {
+    validRequest: { sessionId: "s-1", content: "hi" },
+    invalidRequest: { sessionId: "s-1" },
+    sampleResponse: sampleSessionOpResult,
+  },
+  "message/markRead": {
+    validRequest: { sessionId: "s-1" },
+    invalidRequest: {},
+    sampleResponse: { ok: true },
+  },
+  "gate/approve": {
+    validRequest: { sessionId: "s-1" },
+    invalidRequest: {},
+    sampleResponse: { ok: true },
+  },
+  "gate/reject": {
+    validRequest: { sessionId: "s-1", reason: "nope" },
+    invalidRequest: { sessionId: "s-1" },
+    sampleResponse: { ok: true },
+  },
+  "costs/session": {
+    validRequest: { sessionId: "s-1" },
+    invalidRequest: {},
+    sampleResponse: {
+      cost: 0,
+      input_tokens: 0,
+      output_tokens: 0,
+      cache_read_tokens: 0,
+      cache_write_tokens: 0,
+      total_tokens: 0,
+    },
+  },
+  "cost/export": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { csv: "" },
+  },
+  "search/sessions": {
+    validRequest: { query: "foo" },
+    invalidRequest: {},
+    sampleResponse: { sessions: [], transcripts: [] },
+  },
+  "search/global": {
+    validRequest: { query: "foo" },
+    invalidRequest: {},
+    sampleResponse: [],
+  },
+  "history/list": {
+    validRequest: { limit: 10 },
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { items: [] },
+  },
+  "history/refresh-and-index": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { ok: true, sessionCount: 0, indexCount: 0, items: [] },
+  },
+  "history/rebuild-fts": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { ok: true },
+  },
+  "status/get": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { total: 0, byStatus: {} },
+  },
+  "daemon/status": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: {
+      conductor: { online: true, url: "http://localhost" },
+      arkd: { online: false, url: "http://localhost" },
+      router: { online: false },
+    },
+  },
+  "group/list": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { groups: [] },
+  },
+  "config/get": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { hotkeys: {}, theme: {}, profile: {}, mode: "local", hosted: false },
+  },
+  "profile/list": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { profiles: [] },
+  },
+  "profile/create": {
+    validRequest: { name: "p1" },
+    invalidRequest: {},
+    sampleResponse: { profile: { name: "p1" } },
+  },
+  "profile/delete": {
+    validRequest: { name: "p1" },
+    invalidRequest: {},
+    sampleResponse: { ok: true },
+  },
+  "tools/list": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { tools: [] },
+  },
+  "mcp/attach-by-dir": {
+    validRequest: { dir: "/tmp", name: "srv", config: {} },
+    invalidRequest: { dir: "/tmp", name: "srv" },
+    sampleResponse: { ok: true },
+  },
+  "mcp/detach-by-dir": {
+    validRequest: { dir: "/tmp", name: "srv" },
+    invalidRequest: { dir: "/tmp" },
+    sampleResponse: { ok: true },
+  },
+  "skill/save": {
+    validRequest: { name: "s1" },
+    invalidRequest: {},
+    sampleResponse: { ok: true, name: "s1" },
+  },
+  "skill/delete": {
+    validRequest: { name: "s1" },
+    invalidRequest: {},
+    sampleResponse: { ok: true },
+  },
+  "recipe/list": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { recipes: [] },
+  },
+  "recipe/delete": {
+    validRequest: { name: "r1" },
+    invalidRequest: {},
+    sampleResponse: { ok: true },
+  },
+  "runtime/list": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { runtimes: [] },
+  },
+  "runtime/read": {
+    validRequest: { name: "claude" },
+    invalidRequest: {},
+    sampleResponse: { runtime: { name: "claude", type: "cli" } },
+  },
+  "agent/create": {
+    validRequest: { name: "a1" },
+    invalidRequest: {},
+    sampleResponse: { ok: true, name: "a1" },
+  },
+  "agent/update": {
+    validRequest: { name: "a1" },
+    invalidRequest: {},
+    sampleResponse: { ok: true, name: "a1" },
+  },
+  "agent/delete": {
+    validRequest: { name: "a1" },
+    invalidRequest: {},
+    sampleResponse: { ok: true },
+  },
+  "flow/create": {
+    validRequest: { name: "f1", stages: [{ name: "code" }] },
+    invalidRequest: { name: "f1" },
+    sampleResponse: { ok: true, name: "f1" },
+  },
+  "flow/delete": {
+    validRequest: { name: "f1" },
+    invalidRequest: {},
+    sampleResponse: { ok: true },
+  },
+  "worktree/list": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { worktrees: [] },
+  },
+  "worktree/diff": {
+    validRequest: { sessionId: "s-1" },
+    invalidRequest: {},
+    sampleResponse: {},
+  },
+  "worktree/finish": {
+    validRequest: { sessionId: "s-1" },
+    invalidRequest: {},
+    sampleResponse: sampleSessionOpResult,
+  },
+  "worktree/create-pr": {
+    validRequest: { sessionId: "s-1" },
+    invalidRequest: {},
+    sampleResponse: { ok: true },
+  },
+  "worktree/cleanup": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { ok: true },
+  },
+  "learning/list": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { learnings: [] },
+  },
+  "learning/add": {
+    validRequest: { title: "t", description: "d" },
+    invalidRequest: {},
+    sampleResponse: {
+      ok: true,
+      learning: { title: "t", description: "d", recurrence: 1, lastSeen: new Date().toISOString() },
+      promoted: false,
+    },
+  },
+  "memory/list": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { memories: [] },
+  },
+  "memory/recall": {
+    validRequest: { query: "foo" },
+    invalidRequest: {},
+    sampleResponse: { results: [] },
+  },
+  "memory/add": {
+    validRequest: { content: "c" },
+    invalidRequest: {},
+    sampleResponse: {
+      memory: {
+        id: "m1",
+        content: "c",
+        tags: [],
+        scope: "global",
+        importance: 1,
+        createdAt: new Date().toISOString(),
+        accessedAt: new Date().toISOString(),
+        accessCount: 0,
+      },
+    },
+  },
+  "memory/forget": {
+    validRequest: { id: "m1" },
+    invalidRequest: {},
+    sampleResponse: { ok: true },
+  },
+  "knowledge/ingest": {
+    validRequest: { path: "/tmp/x" },
+    invalidRequest: {},
+    sampleResponse: { ok: true },
+  },
+  "knowledge/search": {
+    validRequest: { query: "foo" },
+    invalidRequest: {},
+    sampleResponse: { results: [] },
+  },
+  "knowledge/index": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { ok: true },
+  },
+  "knowledge/export": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { ok: true },
+  },
+  "knowledge/import": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { ok: true },
+  },
+  "schedule/delete": {
+    validRequest: { id: "sch-1" },
+    invalidRequest: {},
+    sampleResponse: { ok: true },
+  },
+  "schedule/enable": {
+    validRequest: { id: "sch-1" },
+    invalidRequest: {},
+    sampleResponse: { ok: true },
+  },
+  "schedule/disable": {
+    validRequest: { id: "sch-1" },
+    invalidRequest: {},
+    sampleResponse: { ok: true },
+  },
+  "compute/provision": {
+    validRequest: { name: "devbox" },
+    invalidRequest: {},
+    sampleResponse: { ok: true },
+  },
+  "compute/start-instance": {
+    validRequest: { name: "devbox" },
+    invalidRequest: {},
+    sampleResponse: { ok: true },
+  },
+  "compute/stop-instance": {
+    validRequest: { name: "devbox" },
+    invalidRequest: {},
+    sampleResponse: { ok: true },
+  },
+  "compute/destroy": {
+    validRequest: { name: "devbox" },
+    invalidRequest: {},
+    sampleResponse: { ok: true },
+  },
+  "metrics/snapshot": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { snapshot: null },
+  },
+  "compute/kill-process": {
+    validRequest: { pid: 123 },
+    invalidRequest: {},
+    sampleResponse: { ok: true },
+  },
+  "compute/docker-logs": {
+    validRequest: { container: "c1" },
+    invalidRequest: {},
+    sampleResponse: { logs: "" },
+  },
+  "compute/docker-action": {
+    validRequest: { container: "c1", action: "stop" },
+    invalidRequest: { container: "c1", action: "blow-up" },
+    sampleResponse: { ok: true },
+  },
+  "compute/template/list": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { templates: [] },
+  },
+  "repo-map/get": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: {},
+  },
+  "fs/list-dir": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: { cwd: "/tmp", parent: null, home: "/home/u", entries: [] },
+  },
 };
 
 describe("RPC boundary validation", async () => {

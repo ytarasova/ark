@@ -1,7 +1,7 @@
 /**
  * Deny-path tests for P1-3: attachment path traversal.
  *
- * The `safeAttachmentName` helper in packages/core/services/workspace-service.ts
+ * The `safeAttachmentName` helper in packages/core/services/worktree/setup.ts
  * is the single sanitization choke-point for user-controlled attachment names.
  * These tests assert that every known traversal payload throws, and that safe
  * names round-trip untouched.
@@ -10,7 +10,7 @@
 import { describe, test, expect } from "bun:test";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { safeAttachmentName } from "../../../core/services/workspace-service.js";
+import { safeAttachmentName } from "../../../core/services/worktree/index.js";
 
 const ROOT = join(import.meta.dir, "..", "..", "..", "..");
 
@@ -78,8 +78,8 @@ describe("safeAttachmentName -- accepts safe leaf names", () => {
   });
 });
 
-describe("workspace-service wires the helper into the attachment write path", () => {
-  const src = readFileSync(join(ROOT, "packages/core/services/workspace-service.ts"), "utf-8");
+describe("worktree setup wires the helper into the attachment write path", () => {
+  const src = readFileSync(join(ROOT, "packages/core/services/worktree/setup.ts"), "utf-8");
 
   test("export exists", () => {
     expect(src).toMatch(/export function safeAttachmentName/);

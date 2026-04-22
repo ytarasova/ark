@@ -1,6 +1,5 @@
 import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
-import * as session from "../services/session-hooks.js";
 import { getApp } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
@@ -10,7 +9,7 @@ describe("fail-loopback", () => {
     const s = await getApp().sessions.create({ summary: "test", flow: "bare" });
     await getApp().sessions.update(s.id, { status: "failed", error: "Test failed: expected 3 got 4", stage: "work" });
 
-    const result = await session.retryWithContext(getApp(), s.id);
+    const result = await getApp().sessionHooks.retryWithContext(s.id);
     expect(result.ok).toBe(true);
 
     const updated = (await getApp().sessions.get(s.id))!;
@@ -21,7 +20,7 @@ describe("fail-loopback", () => {
     const s = await getApp().sessions.create({ summary: "test", flow: "bare" });
     await getApp().sessions.update(s.id, { status: "failed", error: "Something broke", stage: "work" });
 
-    await session.retryWithContext(getApp(), s.id);
+    await getApp().sessionHooks.retryWithContext(s.id);
 
     const events = await getApp().events.list(s.id);
     const retryEvent = events.find((e) => e.type === "retry_with_context");
@@ -39,7 +38,7 @@ describe("fail-loopback", () => {
     }
     await getApp().sessions.update(s.id, { status: "failed", error: "still broken" });
 
-    const result = await session.retryWithContext(getApp(), s.id, { maxRetries: 3 });
+    const result = await getApp().sessionHooks.retryWithContext(s.id, { maxRetries: 3 });
     expect(result.ok).toBe(false);
     expect(result.message).toContain("Max retries");
   });
@@ -48,7 +47,7 @@ describe("fail-loopback", () => {
     const s = await getApp().sessions.create({ summary: "test", flow: "bare" });
     await getApp().sessions.update(s.id, { status: "running" });
 
-    const result = await session.retryWithContext(getApp(), s.id);
+    const result = await getApp().sessionHooks.retryWithContext(s.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not in failed state");
   });

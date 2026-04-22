@@ -22,8 +22,17 @@ export function registerMetricsHandlers(router: Router, app: AppContext): void {
     if (!compute) return { snapshot: null };
     const provider = getProvider(compute.provider);
     if (!provider?.getMetrics) return { snapshot: null };
-    const snapshot = await provider.getMetrics(compute);
-    return { snapshot };
+    try {
+      const snapshot = await provider.getMetrics(compute);
+      return { snapshot };
+    } catch {
+      // arkd sidecar transiently unreachable (container restarting, daemon
+      // not booted in a test harness, etc). The dashboard polls this endpoint
+      // every few seconds -- a 500 would redden the UI for no actionable
+      // reason. Returning `snapshot: null` lets the UI render its empty
+      // state and recover on the next tick.
+      return { snapshot: null };
+    }
   });
 
   router.handle("costs/read", async () => {

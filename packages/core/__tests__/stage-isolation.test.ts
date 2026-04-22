@@ -21,8 +21,6 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext } from "../app.js";
-import { advance } from "../services/stage-advance.js";
-import { mediateStageHandoff } from "../services/session-hooks.js";
 
 let app: AppContext;
 
@@ -50,7 +48,7 @@ describe("stage isolation: fresh runtime per stage", async () => {
       session_id: "ark-s-tmux-handle",
     });
 
-    const result = await advance(app, session.id);
+    const result = await app.stageAdvance.advance(session.id);
     expect(result.ok).toBe(true);
 
     const updated = await app.sessions.get(session.id);
@@ -70,7 +68,7 @@ describe("stage isolation: fresh runtime per stage", async () => {
       session_id: "ark-s-old-tmux",
     });
 
-    const result = await advance(app, session.id);
+    const result = await app.stageAdvance.advance(session.id);
     expect(result.ok).toBe(true);
 
     const updated = await app.sessions.get(session.id);
@@ -88,7 +86,7 @@ describe("stage isolation: fresh runtime per stage", async () => {
     });
 
     // Stage 1 -> 2: implement -> verify
-    const r1 = await advance(app, session.id);
+    const r1 = await app.stageAdvance.advance(session.id);
     expect(r1.ok).toBe(true);
     let s = await app.sessions.get(session.id);
     expect(s?.stage).toBe("verify");
@@ -102,7 +100,7 @@ describe("stage isolation: fresh runtime per stage", async () => {
     });
 
     // Stage 2 -> 3: verify -> pr
-    const r2 = await advance(app, session.id);
+    const r2 = await app.stageAdvance.advance(session.id);
     expect(r2.ok).toBe(true);
     s = await app.sessions.get(session.id);
     expect(s?.stage).toBe("pr");
@@ -119,7 +117,7 @@ describe("stage isolation: fresh runtime per stage", async () => {
       claude_session_id: "final-session-id",
     });
 
-    const result = await advance(app, session.id);
+    const result = await app.stageAdvance.advance(session.id);
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Flow completed");
 
@@ -141,7 +139,7 @@ describe("stage isolation: observability", async () => {
       claude_session_id: "obs-session",
     });
 
-    await advance(app, session.id);
+    await app.stageAdvance.advance(session.id);
 
     const events = await app.events.list(session.id);
     const stageReady = events.find((e) => e.type === "stage_ready");
@@ -164,7 +162,7 @@ describe("stage isolation: mediateStageHandoff integration", async () => {
       session_id: "pre-handoff-tmux",
     });
 
-    const result = await mediateStageHandoff(app, session.id, {
+    const result = await app.sessionHooks.mediateStageHandoff(session.id, {
       autoDispatch: false,
       source: "test",
     });
@@ -192,7 +190,7 @@ describe("stage isolation: mediateStageHandoff integration", async () => {
     // Advance through all stages
     const stages = ["implement", "verify", "pr"];
     for (const fromStage of stages) {
-      const r = await mediateStageHandoff(app, session.id, {
+      const r = await app.sessionHooks.mediateStageHandoff(session.id, {
         autoDispatch: false,
         source: "test",
       });
@@ -212,7 +210,7 @@ describe("stage isolation: mediateStageHandoff integration", async () => {
     }
 
     // Final advance: merge -> completed
-    const final = await mediateStageHandoff(app, session.id, {
+    const final = await app.sessionHooks.mediateStageHandoff(session.id, {
       autoDispatch: false,
       source: "test",
     });
@@ -246,7 +244,7 @@ describe("stage isolation: continue mode", async () => {
     });
 
     // plan -> refine (isolation=continue): should preserve claude_session_id
-    const r1 = await advance(app, session.id);
+    const r1 = await app.stageAdvance.advance(session.id);
     expect(r1.ok).toBe(true);
 
     let updated = await app.sessions.get(session.id);
@@ -262,7 +260,7 @@ describe("stage isolation: continue mode", async () => {
     });
 
     // refine -> implement (isolation=fresh by default): should clear claude_session_id
-    const r2 = await advance(app, session.id);
+    const r2 = await app.stageAdvance.advance(session.id);
     expect(r2.ok).toBe(true);
 
     updated = await app.sessions.get(session.id);
@@ -289,7 +287,7 @@ describe("stage isolation: continue mode", async () => {
       claude_session_id: "draft-session",
     });
 
-    await advance(app, session.id);
+    await app.stageAdvance.advance(session.id);
 
     const events = await app.events.list(session.id);
     const stageReady = events.find((e) => e.type === "stage_ready");

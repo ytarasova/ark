@@ -71,7 +71,7 @@ export function collectMcpEntries(
   try {
     const applied = (opts.flowConnectors ?? []).concat(opts.sessionConnectors ?? []);
     if (applied.length) {
-      const cfg = (session.config ?? {}) as Record<string, unknown>;
+      const cfg = session.config as Record<string, unknown>;
       const next = { ...cfg, applied_connectors: applied };
       app.sessions.update(session.id, { config: next });
     }

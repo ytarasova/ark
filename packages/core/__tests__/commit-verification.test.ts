@@ -18,7 +18,6 @@ import { mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { AppContext } from "../app.js";
-import { applyReport, applyHookStatus } from "../services/session-hooks.js";
 import type { OutboundMessage } from "../conductor/channel-types.js";
 
 let app: AppContext;
@@ -74,7 +73,7 @@ describe("Commit verification: uncommitted changes", async () => {
     writeFileSync(join(gitDir, "feature.ts"), "export const x = 1;");
     execFileSync("git", ["add", "feature.ts"], { cwd: gitDir });
 
-    const result = await applyReport(app, session.id, makeReport(session.id, "implement"));
+    const result = await app.sessionHooks.applyReport(session.id, makeReport(session.id, "implement"));
 
     // Should reject -- staged but uncommitted changes
     expect(result.shouldAdvance).toBeFalsy();
@@ -103,7 +102,7 @@ describe("Commit verification: uncommitted changes", async () => {
     // Modify the tracked file without committing
     writeFileSync(join(gitDir, "existing.ts"), "export const v = 2; // changed");
 
-    const result = await applyReport(app, session.id, makeReport(session.id, "implement"));
+    const result = await app.sessionHooks.applyReport(session.id, makeReport(session.id, "implement"));
 
     // Should reject -- modified tracked file not committed
     expect(result.shouldAdvance).toBeFalsy();
@@ -132,7 +131,7 @@ describe("Commit verification: uncommitted changes", async () => {
     // Create an untracked file (e.g. build artifact)
     writeFileSync(join(gitDir, "temp.log"), "build output");
 
-    const result = await applyReport(app, session.id, makeReport(session.id, "implement"));
+    const result = await app.sessionHooks.applyReport(session.id, makeReport(session.id, "implement"));
 
     // Should allow -- untracked files don't count
     expect(result.shouldAdvance).toBe(true);
@@ -158,7 +157,7 @@ describe("Commit verification: uncommitted changes", async () => {
       branch: "test-branch",
     });
 
-    const result = await applyReport(app, session.id, makeReport(session.id, "implement"));
+    const result = await app.sessionHooks.applyReport(session.id, makeReport(session.id, "implement"));
 
     // Should allow -- clean working tree, commits exist
     expect(result.shouldAdvance).toBe(true);
@@ -174,7 +173,7 @@ describe("Commit verification: sessions without workdir", async () => {
     const session = await app.sessions.create({ summary: "no workdir test", flow: "quick" });
     await app.sessions.update(session.id, { status: "running", stage: "implement" });
 
-    const result = await applyReport(app, session.id, makeReport(session.id, "implement"));
+    const result = await app.sessionHooks.applyReport(session.id, makeReport(session.id, "implement"));
 
     // Should allow -- no workdir means no git checks
     expect(result.shouldAdvance).toBe(true);
@@ -189,7 +188,7 @@ describe("Commit verification: sessions without workdir", async () => {
       workdir: "/tmp/some-dir",
     });
 
-    const result = await applyReport(app, session.id, makeReport(session.id, "implement"));
+    const result = await app.sessionHooks.applyReport(session.id, makeReport(session.id, "implement"));
 
     // Should allow -- no branch means no git checks
     expect(result.shouldAdvance).toBe(true);
@@ -215,7 +214,7 @@ describe("Commit verification: rejection events", async () => {
     writeFileSync(join(gitDir, "b.ts"), "const b = 2;");
     execFileSync("git", ["add", "a.ts", "b.ts"], { cwd: gitDir });
 
-    const result = await applyReport(app, session.id, makeReport(session.id, "implement"));
+    const result = await app.sessionHooks.applyReport(session.id, makeReport(session.id, "implement"));
 
     // Should have completion_rejected event with file info
     const rejectionEvent = result.logEvents!.find((e) => e.type === "completion_rejected");
@@ -237,7 +236,7 @@ describe("Commit verification: rejection events", async () => {
     writeFileSync(join(gitDir, "dirty.ts"), "const x = 1;");
     execFileSync("git", ["add", "dirty.ts"], { cwd: gitDir });
 
-    const result = await applyReport(app, session.id, makeReport(session.id, "implement"));
+    const result = await app.sessionHooks.applyReport(session.id, makeReport(session.id, "implement"));
 
     // session_id should NOT be set to null -- agent must stay alive to finish
     expect(result.updates.session_id).toBeUndefined();
@@ -258,8 +257,7 @@ describe("Commit verification: rejection events", async () => {
     writeFileSync(join(gitDir, "dirty.ts"), "const x = 1;");
     execFileSync("git", ["add", "dirty.ts"], { cwd: gitDir });
 
-    const result = await applyReport(
-      app,
+    const result = await app.sessionHooks.applyReport(
       session.id,
       makeReport(session.id, "implement", {
         summary: "My work summary",
@@ -280,7 +278,7 @@ describe("Commit verification: manual gate interaction", async () => {
     const session = await app.sessions.create({ summary: "manual gate test", flow: "bare" });
     await app.sessions.update(session.id, { status: "running", stage: "work" });
 
-    const result = await applyReport(app, session.id, makeReport(session.id, "work"));
+    const result = await app.sessionHooks.applyReport(session.id, makeReport(session.id, "work"));
 
     // Manual gate: no shouldAdvance, no commit check needed
     expect(result.shouldAdvance).toBeFalsy();
@@ -310,7 +308,7 @@ describe("Per-stage commit verification via stage_start_sha", async () => {
     });
     await app.sessions.mergeConfig(session.id, { stage_start_sha: headSha });
 
-    const result = await applyReport(app, session.id, makeReport(session.id, "implement"));
+    const result = await app.sessionHooks.applyReport(session.id, makeReport(session.id, "implement"));
 
     // Should reject -- HEAD == stage_start_sha means no commits this stage
     expect(result.shouldAdvance).toBeFalsy();
@@ -343,7 +341,7 @@ describe("Per-stage commit verification via stage_start_sha", async () => {
     });
     await app.sessions.mergeConfig(session.id, { stage_start_sha: startSha });
 
-    const result = await applyReport(app, session.id, makeReport(session.id, "implement"));
+    const result = await app.sessionHooks.applyReport(session.id, makeReport(session.id, "implement"));
 
     // Should allow -- HEAD differs from stage_start_sha
     expect(result.shouldAdvance).toBe(true);
@@ -380,7 +378,7 @@ describe("Per-stage commit verification via stage_start_sha", async () => {
     });
     await app.sessions.mergeConfig(session.id, { stage_start_sha: startSha });
 
-    const result = await applyReport(app, session.id, makeReport(session.id, "implement"));
+    const result = await app.sessionHooks.applyReport(session.id, makeReport(session.id, "implement"));
 
     // Should reject -- no commits since stage_start_sha despite prior-stage commits existing
     expect(result.shouldAdvance).toBeFalsy();
@@ -404,7 +402,7 @@ describe("Per-stage commit verification via stage_start_sha", async () => {
     });
     await app.sessions.mergeConfig(session.id, { stage_start_sha: headSha });
 
-    const result = await applyReport(app, session.id, makeReport(session.id, "implement"));
+    const result = await app.sessionHooks.applyReport(session.id, makeReport(session.id, "implement"));
 
     const rejectionEvent = result.logEvents!.find((e) => e.type === "completion_rejected");
     expect(rejectionEvent).toBeTruthy();
@@ -430,7 +428,7 @@ describe("Per-stage commit verification via stage_start_sha", async () => {
     });
     // Deliberately NOT setting stage_start_sha
 
-    const result = await applyReport(app, session.id, makeReport(session.id, "implement"));
+    const result = await app.sessionHooks.applyReport(session.id, makeReport(session.id, "implement"));
 
     // Fallback to origin/main..HEAD will fail (no remote) but catch allows continuation
     // So this should pass through to uncommitted check (which passes since tree is clean)
@@ -460,7 +458,7 @@ describe("Per-stage commit verification in applyHookStatus (SessionEnd)", async 
     // Re-fetch session to include merged config
     const freshSession = await app.sessions.get(session.id)!;
 
-    const result = await applyHookStatus(app, freshSession, "SessionEnd", {});
+    const result = await app.sessionHooks.applyHookStatus(freshSession, "SessionEnd", {});
 
     // Should NOT advance -- no commits since stage_start_sha
     expect(result.shouldAdvance).toBeFalsy();
@@ -492,7 +490,7 @@ describe("Per-stage commit verification in applyHookStatus (SessionEnd)", async 
 
     const freshSession = await app.sessions.get(session.id)!;
 
-    const result = await applyHookStatus(app, freshSession, "SessionEnd", {});
+    const result = await app.sessionHooks.applyHookStatus(freshSession, "SessionEnd", {});
 
     // Should advance -- commits exist since stage_start_sha
     expect(result.shouldAdvance).toBe(true);
@@ -520,7 +518,7 @@ describe("Per-stage commit verification in applyHookStatus (SessionEnd)", async 
 
     const freshSession = await app.sessions.get(session.id)!;
 
-    const result = await applyHookStatus(app, freshSession, "SessionEnd", {});
+    const result = await app.sessionHooks.applyHookStatus(freshSession, "SessionEnd", {});
 
     // Fallback to origin/main..HEAD will fail (no remote), catch allows (hasNewCommits = true)
     expect(result.shouldAdvance).toBe(true);

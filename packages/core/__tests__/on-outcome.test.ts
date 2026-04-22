@@ -16,8 +16,6 @@ import { join } from "path";
 import YAML from "yaml";
 import { getStage, getNextStage, resolveNextStage, validateDAG, type StageDefinition } from "../state/flow.js";
 import { AppContext } from "../app.js";
-import { applyReport } from "../services/session-hooks.js";
-import { advance } from "../services/stage-advance.js";
 
 let app: AppContext;
 
@@ -184,7 +182,7 @@ describe("applyReport outcome extraction", async () => {
     const session = await app.sessions.create({ summary: "Test outcome", flow: "outcome-report-flow" });
     await app.sessions.update(session.id, { status: "running", stage: "review", agent: "reviewer" });
 
-    const result = await applyReport(app, session.id, {
+    const result = await app.sessionHooks.applyReport(session.id, {
       type: "completed",
       stage: "review",
       summary: "Review done",
@@ -206,7 +204,7 @@ describe("applyReport outcome extraction", async () => {
     const session = await app.sessions.create({ summary: "Test no outcome", flow: "outcome-no-report" });
     await app.sessions.update(session.id, { status: "running", stage: "build", agent: "builder" });
 
-    const result = await applyReport(app, session.id, {
+    const result = await app.sessionHooks.applyReport(session.id, {
       type: "completed",
       stage: "build",
       summary: "Build done",
@@ -233,7 +231,7 @@ describe("advance with outcome routing", async () => {
     await app.sessions.update(session.id, { status: "running", stage: "review", agent: "reviewer" });
 
     // Advance with outcome "approved" -- should go to "deploy" (skipping "revise")
-    const result = await advance(app, session.id, true, "approved");
+    const result = await app.stageAdvance.advance(session.id, true, "approved");
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Advanced to deploy");
 
@@ -255,7 +253,7 @@ describe("advance with outcome routing", async () => {
     await app.sessions.update(session.id, { status: "running", stage: "review", agent: "reviewer" });
 
     // Advance with outcome "rejected" -- should go to "revise"
-    const result = await advance(app, session.id, true, "rejected");
+    const result = await app.stageAdvance.advance(session.id, true, "rejected");
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Advanced to revise");
 
@@ -277,7 +275,7 @@ describe("advance with outcome routing", async () => {
     await app.sessions.update(session.id, { status: "running", stage: "review", agent: "reviewer" });
 
     // Advance without outcome -- should go to linear next ("revise")
-    const result = await advance(app, session.id, true);
+    const result = await app.stageAdvance.advance(session.id, true);
     expect(result.ok).toBe(true);
     expect(result.message).toBe("Advanced to revise");
 

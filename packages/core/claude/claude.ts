@@ -749,7 +749,14 @@ export function removeChannelConfig(workdir: string): void {
   }
 
   if (config.mcpServers && typeof config.mcpServers === "object") {
-    delete config.mcpServers["ark-channel"];
+    // Remove every entry ark auto-injected via writeChannelConfig so the
+    // .mcp.json ends up in the same state it was in before dispatch. If we
+    // only scrub `ark-channel`, a laptop with `codebase-memory-mcp` installed
+    // leaves a `codebase-memory` entry behind and the file never gets
+    // cleaned up.
+    for (const name of ["ark-channel", "codebase-memory", "ark-code-intel"]) {
+      delete config.mcpServers[name];
+    }
     if (Object.keys(config.mcpServers).length === 0) delete config.mcpServers;
   }
 
@@ -812,11 +819,6 @@ export function removeSettings(workdir: string): void {
   }
 }
 
-/** @deprecated Use writeSettings instead */
-export const writeHooksConfig = writeSettings;
-/** @deprecated Use removeSettings instead */
-export const removeHooksConfig = removeSettings;
-
 // ── Launcher script ─────────────────────────────────────────────────────────
 
 export interface LauncherOpts {
@@ -825,10 +827,6 @@ export interface LauncherOpts {
   mcpConfigPath: string;
   claudeSessionId?: string;
   prevClaudeSessionId?: string | null;
-  /** @deprecated The `--remote-control` flag was removed (it spammed the host workspace
-   *  with session breadcrumbs without producing anything the dashboard uses). Kept on
-   *  the opts type only so existing callers compile; the value is now ignored. */
-  sessionName?: string;
   /** Environment variables to export before launching Claude */
   env?: Record<string, string>;
   /** Initial prompt passed as positional arg -- triggers immediate processing */

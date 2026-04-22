@@ -4,7 +4,7 @@
  * Owner: session bounded context.
  *
  * Replaces ad-hoc spawn / execFile / Bun.spawn calls scattered through
- * `session-lifecycle.ts`, `stage-orchestrator.ts`, and `workspace-service.ts`.
+ * `session-lifecycle.ts`, `stage-orchestrator.ts`, and `services/worktree/*`.
  *
  * Local binding: `LocalProcessRunner` (thin wrapper around Bun.spawn).
  * Control-plane binding: `RemoteProcessRunner` (SSH via the existing pool).

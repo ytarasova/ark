@@ -48,7 +48,7 @@ export async function startHostedServer(config: ArkConfig): Promise<{
 
   // Start web server
   const { startWebServer } = await import("./web.js");
-  const webServer = startWebServer(app, { port: config.ports?.web });
+  const webServer = startWebServer(app, { port: config.ports.web });
 
   // Start worker health checker (prune stale workers every 60s)
   const healthInterval = setInterval(() => {
@@ -56,7 +56,7 @@ export async function startHostedServer(config: ArkConfig): Promise<{
   }, 60_000);
 
   // Start LLM router if configured
-  if (config.router?.enabled) {
+  if (config.router.enabled) {
     try {
       const { startRouter } = await import("../../router/server.js");
       startRouter(config.router as unknown as import("../../router/types.js").RouterConfig);

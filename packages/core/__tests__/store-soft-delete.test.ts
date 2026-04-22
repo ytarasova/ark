@@ -79,13 +79,11 @@ describe("soft delete", () => {
   });
 });
 
-import { deleteSessionAsync, undeleteSessionAsync } from "../services/session-lifecycle.js";
-
-describe("deleteSessionAsync with soft delete", async () => {
+describe("sessionLifecycle.deleteSession with soft delete", async () => {
   it("soft-deletes instead of hard-deleting", async () => {
     const s = await getApp().sessions.create({ summary: "soft-kill" });
     await getApp().sessions.update(s.id, { status: "running" });
-    const result = await deleteSessionAsync(getApp(), s.id);
+    const result = await getApp().sessionLifecycle.deleteSession(s.id);
     expect(result.ok).toBe(true);
     const after = await getApp().sessions.get(s.id);
     expect(after).not.toBeNull();
@@ -93,19 +91,19 @@ describe("deleteSessionAsync with soft delete", async () => {
   });
 });
 
-describe("undeleteSessionAsync", async () => {
+describe("sessionLifecycle.undeleteSession", async () => {
   it("restores a soft-deleted session", async () => {
     const s = await getApp().sessions.create({ summary: "restore" });
     await getApp().sessions.update(s.id, { status: "stopped" });
-    await deleteSessionAsync(getApp(), s.id);
-    const result = await undeleteSessionAsync(getApp(), s.id);
+    await getApp().sessionLifecycle.deleteSession(s.id);
+    const result = await getApp().sessionLifecycle.undeleteSession(s.id);
     expect(result.ok).toBe(true);
     const after = await getApp().sessions.get(s.id);
     expect(after!.status).toBe("stopped");
   });
 
   it("fails for non-existent session", async () => {
-    const result = await undeleteSessionAsync(getApp(), "nope");
+    const result = await getApp().sessionLifecycle.undeleteSession("nope");
     expect(result.ok).toBe(false);
   });
 });
@@ -176,18 +174,18 @@ describe("soft delete edge cases", async () => {
     expect(after.config._deleted_at).toBeUndefined();
   });
 
-  it("undeleteSessionAsync returns error message for non-deleted session", async () => {
+  it("sessionLifecycle.undeleteSession returns error message for non-deleted session", async () => {
     const s = await getApp().sessions.create({ summary: "not-deleted-async" });
     await getApp().sessions.update(s.id, { status: "running" });
-    const result = await undeleteSessionAsync(getApp(), s.id);
+    const result = await getApp().sessionLifecycle.undeleteSession(s.id);
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found or not deleted");
   });
 
-  it("deleteSessionAsync logs session_deleted event", async () => {
+  it("sessionLifecycle.deleteSession logs session_deleted event", async () => {
     const s = await getApp().sessions.create({ summary: "event-check" });
     await getApp().sessions.update(s.id, { status: "pending" });
-    await deleteSessionAsync(getApp(), s.id);
+    await getApp().sessionLifecycle.deleteSession(s.id);
     const events = await getApp().events.list(s.id);
     expect(events.some((e) => e.type === "session_deleted")).toBe(true);
   });

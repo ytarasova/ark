@@ -1,5 +1,5 @@
 import type { ActionHandler } from "./types.js";
-import { mergeWorktreePR } from "../workspace-service.js";
+import { mergeWorktreePR } from "../worktree/index.js";
 
 /**
  * `auto_merge` -- queue the session's PR for merge via `gh pr merge --auto`.
@@ -24,7 +24,7 @@ export const autoMergeAction: ActionHandler = {
       status: "waiting",
       breakpoint_reason: "Waiting for CI checks to pass and PR to merge",
       config: {
-        ...(session.config ?? {}),
+        ...session.config,
         merge_queued_at: new Date().toISOString(),
       },
     });

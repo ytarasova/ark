@@ -34,7 +34,7 @@ export const claudeCodeExecutor: Executor = {
     const provider = getProvider(compute?.provider ?? "local");
 
     // Setup worktree + trust (dynamic import to avoid circular dependency)
-    const { setupSessionWorktree } = await import("../services/workspace-service.js");
+    const { setupSessionWorktree } = await import("../services/worktree/index.js");
     const effectiveWorkdir = await setupSessionWorktree(app, session, compute, provider, log);
 
     // Determine conductor URL based on compute type
@@ -132,7 +132,6 @@ export const claudeCodeExecutor: Executor = {
       claudeArgs,
       mcpConfigPath,
       prevClaudeSessionId: opts.prevClaudeSessionId ?? session.claude_session_id,
-      sessionName: opts.sessionName ?? session.summary ?? session.id,
       env: launchEnv,
       initialPrompt: opts.initialPrompt,
     });

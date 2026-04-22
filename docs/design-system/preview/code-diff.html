@@ -1,0 +1,118 @@
+<!doctype html><html class="midnight-circuit dark"><head>
+<meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+body { padding: 16px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* ── Framed code panel ─ raised with a chrome header + sunken well ─ */
+.frame {
+  position: relative;
+  background: linear-gradient(180deg, rgba(255,255,255,.04) 0%, rgba(255,255,255,0) 20%, rgba(0,0,0,.15) 100%), var(--bg-card);
+  border: 1px solid var(--border);
+  border-top-color: rgba(255,255,255,.08);
+  border-bottom-color: rgba(0,0,0,.5);
+  border-radius: 9px;
+  overflow: hidden;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,.05) inset,
+    0 -1px 0 rgba(0,0,0,.45) inset,
+    0 1px 2px rgba(0,0,0,.45),
+    0 10px 22px -6px rgba(0,0,0,.4);
+}
+
+.frame .chrome {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px;
+  background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(0,0,0,.1));
+  border-bottom: 1px solid var(--border);
+  font: 500 10.5px var(--font-mono-ui);
+  color: var(--fg-muted);
+}
+.frame .chrome .tab {
+  display: inline-flex; align-items: center; gap: 5px;
+  color: var(--fg);
+  background: linear-gradient(180deg, #1f1f35, #181829);
+  border: 1px solid var(--border);
+  border-top-color: rgba(255,255,255,.08);
+  border-radius: 4px;
+  padding: 3px 7px;
+  box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 1px 2px rgba(0,0,0,.3);
+}
+.frame .chrome .meta { margin-left: auto; font-size: 9.5px; color: var(--fg-faint); letter-spacing: 0.05em; text-transform: uppercase; }
+.frame .chrome .meta b { color: var(--fg-muted); font-weight: 500; }
+
+/* the code surface itself ─ slightly sunken */
+.frame pre {
+  margin: 0;
+  font: 400 11px/18px var(--font-mono);
+  padding: 10px 12px;
+  color: var(--fg);
+  background: linear-gradient(180deg, rgba(0,0,0,.2) 0%, rgba(0,0,0,0) 6%), var(--bg-code);
+  box-shadow: 0 2px 4px rgba(0,0,0,.35) inset;
+  white-space: pre; overflow: hidden;
+}
+.frame pre .line { display: block; padding-left: 6px; position: relative; }
+
+/* diff line backgrounds with subtle gradient + left indicator */
+.frame pre .add { background: linear-gradient(90deg, rgba(52,211,153,.15) 0%, rgba(52,211,153,.03) 100%); color: #34d399; box-shadow: inset 2px 0 0 #34d399; }
+.frame pre .rm  { background: linear-gradient(90deg, rgba(248,113,113,.15) 0%, rgba(248,113,113,.03) 100%); color: #f87171; box-shadow: inset 2px 0 0 #f87171; }
+
+.cmt { color: var(--fg-muted); }
+.str { color: #86dbe4; }
+.num { color: #fbbf24; }
+.kw { color: var(--primary); }
+.fn { color: #60a5fa; }
+
+.term-dot { width: 6px; height: 6px; border-radius: 99px; }
+.term-dot.r { background: #f87171; box-shadow: 0 0 3px rgba(248,113,113,.6); }
+.term-dot.y { background: #fbbf24; box-shadow: 0 0 3px rgba(251,191,36,.6); }
+.term-dot.g { background: #34d399; box-shadow: 0 0 3px rgba(52,211,153,.6); }
+
+/* running pill inside terminal */
+.run-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 1px 6px; border-radius: 99px;
+  background: linear-gradient(180deg, rgba(96,165,250,.2), rgba(96,165,250,.08));
+  color: #7dbbff;
+  border: 1px solid rgba(96,165,250,.35);
+  font: 500 10px var(--font-mono-ui); text-transform: uppercase; letter-spacing: 0.05em;
+}
+.run-pill .d { width: 5px; height: 5px; border-radius: 99px; background: #60a5fa; box-shadow: 0 0 5px #60a5fa; }
+</style></head><body>
+
+<div class="grid">
+
+  <!-- Terminal -->
+  <div class="frame">
+    <div class="chrome">
+      <span class="term-dot r"></span><span class="term-dot y"></span><span class="term-dot g"></span>
+      <span class="tab">zsh · ark</span>
+      <span class="meta">ec2-worker-04 · <b>claude</b></span>
+    </div>
+<pre><span class="line"><span style="color:var(--primary)">❯</span> ark session start --recipe <span class="str">quick-fix</span> --dispatch</span>
+<span class="line"><span class="cmt"># session-4f8a2c created in .worktrees/4f8a2c</span></span>
+<span class="line"><span class="cmt"># dispatched on ec2-worker-04 (claude, t3.medium)</span></span>
+<span class="line"><span class="run-pill"><span class="d"></span>running</span> <span class="cmt">02:47 · 284K tok · $0.42</span></span>
+<span class="line">  <span class="cmt">↳ implementer: step 4/6 · editing</span> <span class="fn">auth.ts</span></span></pre>
+  </div>
+
+  <!-- Diff -->
+  <div class="frame">
+    <div class="chrome">
+      <span class="term-dot r"></span><span class="term-dot y"></span><span class="term-dot g"></span>
+      <span class="tab">diff · auth.ts</span>
+      <span class="meta"><b style="color:#34d399">+12</b> <b style="color:#f87171">−4</b></span>
+    </div>
+<pre><span class="line"><span class="cmt">  packages/core/src/auth.ts</span></span>
+<span class="line">  <span class="kw">export</span> <span class="kw">async</span> <span class="kw">function</span> <span class="fn">login</span>(</span>
+<span class="line rm">-   email: <span class="kw">string</span>,</span>
+<span class="line rm">-   password: <span class="kw">string</span></span>
+<span class="line add">+   credentials: Credentials,</span>
+<span class="line add">+   opts: LoginOptions = {}</span>
+<span class="line">  ) {</span>
+<span class="line">    <span class="kw">const</span> user = <span class="kw">await</span> <span class="fn">verify</span>(...);</span></pre>
+  </div>
+
+</div>
+
+</body></html>

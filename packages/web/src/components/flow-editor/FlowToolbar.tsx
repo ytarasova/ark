@@ -6,7 +6,8 @@
  */
 
 import { memo, useState, useCallback, useRef } from "react";
-import type { FlowDefinition } from "../pipeline/types.js";
+import YAML from "yaml";
+import type { FlowDefinition, FlowStageDefinition, FlowEdgeDefinition } from "../pipeline/types.js";
 
 export interface FlowToolbarProps {
   flowName: string;
@@ -277,128 +278,98 @@ function ModeButton({ label, active, onClick }: { label: string; active: boolean
 }
 
 /**
- * Generate YAML string from a flow definition.
- * Simple serializer -- no external YAML library needed.
+ * Serialize a flow definition to YAML. Omits nullish / empty fields
+ * so round-trips stay clean.
  */
 function generateYaml(flow: FlowDefinition): string {
-  const lines: string[] = [];
-  lines.push(`name: ${flow.name}`);
-  if (flow.description) lines.push(`description: "${flow.description}"`);
-  lines.push("");
-  lines.push("stages:");
-  for (const s of flow.stages) {
-    lines.push(`  - name: ${s.name}`);
-    if (s.agent) lines.push(`    agent: ${s.agent}`);
-    if (s.action) lines.push(`    action: ${s.action}`);
-    lines.push(`    gate: ${s.gate}`);
-    if (s.on_failure) lines.push(`    on_failure: "${s.on_failure}"`);
-    if (s.verify && s.verify.length > 0) {
-      lines.push("    verify:");
-      for (const v of s.verify) lines.push(`      - "${v}"`);
-    }
-    if (s.task) {
-      lines.push("    task: |");
-      for (const line of s.task.split("\n")) {
-        lines.push(`      ${line}`);
-      }
-    }
-    if (s.on_outcome && Object.keys(s.on_outcome).length > 0) {
-      lines.push("    on_outcome:");
-      for (const [label, target] of Object.entries(s.on_outcome)) {
-        lines.push(`      ${label}: ${target}`);
-      }
-    }
-    lines.push("");
-  }
+  const doc: Record<string, unknown> = { name: flow.name };
+  if (flow.description) doc.description = flow.description;
+  doc.stages = flow.stages.map((s) => {
+    const stage: Record<string, unknown> = { name: s.name };
+    if (s.agent) stage.agent = s.agent;
+    if (s.action) stage.action = s.action;
+    if (s.type) stage.type = s.type;
+    stage.gate = s.gate;
+    if (s.task) stage.task = s.task;
+    if (s.depends_on && s.depends_on.length > 0) stage.depends_on = s.depends_on;
+    if (s.on_failure) stage.on_failure = s.on_failure;
+    if (s.verify && s.verify.length > 0) stage.verify = s.verify;
+    if (s.optional) stage.optional = s.optional;
+    if (s.on_outcome && Object.keys(s.on_outcome).length > 0) stage.on_outcome = s.on_outcome;
+    return stage;
+  });
   if (flow.edges.length > 0) {
-    lines.push("edges:");
-    for (const e of flow.edges) {
-      lines.push(`  - from: ${e.from}`);
-      lines.push(`    to: ${e.to}`);
-      if (e.condition) lines.push(`    condition: "${e.condition}"`);
-      if (e.label) lines.push(`    label: ${e.label}`);
-    }
+    doc.edges = flow.edges.map((e) => {
+      const edge: Record<string, unknown> = { from: e.from, to: e.to };
+      if (e.condition) edge.condition = e.condition;
+      if (e.label) edge.label = e.label;
+      return edge;
+    });
   }
-  return lines.join("\n");
+  return YAML.stringify(doc);
 }
 
 /**
- * Minimal YAML parser for flow definitions.
- * Handles the subset of YAML used by Ark flow files.
+ * Parse YAML text into a FlowDefinition. Returns null when the input
+ * is malformed or missing the required `name` field. Callers wrap
+ * this in a try/catch anyway -- we additionally swallow YAML parse
+ * errors here so behavior matches the previous placeholder.
  */
 function parseYaml(text: string): FlowDefinition | null {
-  // This is a placeholder -- in production, use a proper YAML parser.
-  // For now, try to parse simple key-value YAML.
+  let parsed: unknown;
   try {
-    const lines = text.split("\n");
-    const flow: FlowDefinition = { name: "", description: "", stages: [], edges: [] };
-
-    let section = "";
-    let currentStage: any = null;
-    let currentEdge: any = null;
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#")) continue;
-
-      if (trimmed.startsWith("name:") && !section) {
-        flow.name = trimmed.replace("name:", "").trim().replace(/"/g, "");
-      } else if (trimmed.startsWith("description:") && !section) {
-        flow.description = trimmed.replace("description:", "").trim().replace(/"/g, "");
-      } else if (trimmed === "stages:") {
-        section = "stages";
-      } else if (trimmed === "edges:") {
-        if (currentStage) {
-          flow.stages.push(currentStage);
-          currentStage = null;
-        }
-        section = "edges";
-      } else if (section === "stages") {
-        if (trimmed.startsWith("- name:")) {
-          if (currentStage) flow.stages.push(currentStage);
-          currentStage = {
-            name: trimmed.replace("- name:", "").trim(),
-            agent: null,
-            action: null,
-            type: null,
-            gate: "auto",
-            task: null,
-            depends_on: [],
-            on_failure: null,
-            verify: [],
-            optional: false,
-          };
-        } else if (currentStage) {
-          if (trimmed.startsWith("agent:")) currentStage.agent = trimmed.replace("agent:", "").trim();
-          else if (trimmed.startsWith("action:")) currentStage.action = trimmed.replace("action:", "").trim();
-          else if (trimmed.startsWith("gate:")) currentStage.gate = trimmed.replace("gate:", "").trim();
-          else if (trimmed.startsWith("on_failure:"))
-            currentStage.on_failure = trimmed.replace("on_failure:", "").trim().replace(/"/g, "");
-        }
-      } else if (section === "edges") {
-        if (trimmed.startsWith("- from:")) {
-          if (currentEdge) flow.edges.push(currentEdge);
-          currentEdge = {
-            from: trimmed.replace("- from:", "").trim(),
-            to: "",
-            condition: null,
-            label: null,
-          };
-        } else if (currentEdge) {
-          if (trimmed.startsWith("to:")) currentEdge.to = trimmed.replace("to:", "").trim();
-          else if (trimmed.startsWith("condition:"))
-            currentEdge.condition = trimmed.replace("condition:", "").trim().replace(/"/g, "");
-          else if (trimmed.startsWith("label:")) currentEdge.label = trimmed.replace("label:", "").trim();
-        }
-      }
-    }
-    if (currentStage) flow.stages.push(currentStage);
-    if (currentEdge) flow.edges.push(currentEdge);
-
-    return flow.name ? flow : null;
+    parsed = YAML.parse(text);
   } catch {
     return null;
   }
+  if (!parsed || typeof parsed !== "object") return null;
+  const obj = parsed as Record<string, unknown>;
+  const name = typeof obj.name === "string" ? obj.name : "";
+  if (!name) return null;
+
+  const rawStages = Array.isArray(obj.stages) ? obj.stages : [];
+  const stages: FlowStageDefinition[] = rawStages.map((raw) => {
+    const s = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+    return {
+      name: typeof s.name === "string" ? s.name : "",
+      agent: typeof s.agent === "string" ? s.agent : null,
+      action: typeof s.action === "string" ? s.action : null,
+      type: typeof s.type === "string" ? s.type : null,
+      gate: typeof s.gate === "string" ? s.gate : "auto",
+      task: typeof s.task === "string" ? s.task : null,
+      depends_on: Array.isArray(s.depends_on) ? s.depends_on.filter((v): v is string => typeof v === "string") : [],
+      on_failure: typeof s.on_failure === "string" ? s.on_failure : null,
+      verify: Array.isArray(s.verify) ? s.verify.filter((v): v is string => typeof v === "string") : [],
+      optional: s.optional === true,
+      on_outcome:
+        s.on_outcome && typeof s.on_outcome === "object"
+          ? (Object.fromEntries(
+              Object.entries(s.on_outcome as Record<string, unknown>).filter(([, v]) => typeof v === "string") as [
+                string,
+                string,
+              ][],
+            ) as Record<string, string>)
+          : undefined,
+    };
+  });
+
+  const rawEdges = Array.isArray(obj.edges) ? obj.edges : [];
+  const edges: FlowEdgeDefinition[] = rawEdges.map((raw) => {
+    const e = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+    return {
+      from: typeof e.from === "string" ? e.from : "",
+      to: typeof e.to === "string" ? e.to : "",
+      condition: typeof e.condition === "string" ? e.condition : null,
+      label: typeof e.label === "string" ? e.label : null,
+    };
+  });
+
+  return {
+    name,
+    description: typeof obj.description === "string" ? obj.description : "",
+    stages,
+    edges,
+  };
 }
 
 export const FlowToolbar = memo(FlowToolbarComponent);

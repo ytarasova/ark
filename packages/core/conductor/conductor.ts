@@ -20,24 +20,7 @@ declare const Bun: {
 
 import type { Session } from "../../types/index.js";
 import type { AppContext } from "../app.js";
-// Namespace-style import for session orchestration -- constructed from the
-// focused service modules. Kept as a `session` object so the rest of this
-// file (which RF-1 will rewrite) can continue using `session.dispatch` etc.
-import { startSession, stop, cleanupOnTerminal } from "../services/session-lifecycle.js";
-import { dispatch } from "../services/dispatch.js";
-import { applyHookStatus, applyReport, mediateStageHandoff, retryWithContext } from "../services/session-hooks.js";
-import { createWorktreePR } from "../services/workspace-service.js";
-const session = {
-  startSession,
-  stop,
-  cleanupOnTerminal,
-  dispatch,
-  applyHookStatus,
-  applyReport,
-  mediateStageHandoff,
-  retryWithContext,
-  createWorktreePR,
-};
+import { createWorktreePR } from "../services/worktree/index.js";
 import { eventBus } from "../hooks.js";
 import type { OutboundMessage } from "./channel-types.js";
 import { getProvider } from "../../compute/index.js";
@@ -52,12 +35,7 @@ import { logDebug, logError, logInfo, logWarn } from "../observability/structure
 import { sendOSNotification } from "../notify.js";
 import { watchMergedPR, type RollbackConfig } from "../integrations/rollback.js";
 import { emitStageSpanEnd, emitSessionSpanEnd, flushSpans } from "../observability/otlp.js";
-import {
-  DEFAULT_CONDUCTOR_PORT,
-  DEFAULT_CONDUCTOR_HOST,
-  DEFAULT_CHANNEL_BASE_URL,
-  DEFAULT_ROUTER_URL,
-} from "../constants.js";
+import { DEFAULT_CONDUCTOR_PORT, DEFAULT_CONDUCTOR_HOST, DEFAULT_CHANNEL_BASE_URL } from "../constants.js";
 
 const DEFAULT_PORT = DEFAULT_CONDUCTOR_PORT;
 
@@ -130,7 +108,7 @@ export class Conductor {
                   continue;
               }
               await safeAsync(`scheduled dispatch for ${sched.id}`, async () => {
-                const s = await session.startSession(this.app, {
+                const s = await this.app.sessionLifecycle.start({
                   summary: sched.summary ?? `Scheduled: ${sched.id}`,
                   repo: sched.repo ?? undefined,
                   workdir: sched.workdir ?? undefined,
@@ -138,7 +116,7 @@ export class Conductor {
                   compute_name: sched.compute_name ?? undefined,
                   group_name: sched.group_name ?? undefined,
                 });
-                await session.dispatch(this.app, s.id);
+                await this.app.dispatchService.dispatch(s.id);
                 await updateScheduleLastRun(this.app, sched.id);
                 await this.app.events.log(s.id, "scheduled_dispatch", {
                   actor: "scheduler",
@@ -363,7 +341,7 @@ export class Conductor {
     }
 
     // Delegate business logic to session.ts
-    const result = await session.applyHookStatus(app, s, event, payload);
+    const result = await app.sessionHooks.applyHookStatus(s, event, payload);
 
     // Apply events
     for (const evt of result.events ?? []) {
@@ -382,7 +360,7 @@ export class Conductor {
 
     // On-failure retry loop
     if (result.shouldRetry && result.newStatus === "failed") {
-      const retryResult = await session.retryWithContext(app, sessionId, {
+      const retryResult = await app.sessionHooks.retryWithContext(sessionId, {
         maxRetries: result.retryMaxRetries,
       });
       if (retryResult.ok) {
@@ -390,7 +368,7 @@ export class Conductor {
         eventBus.emit("hook_status", sessionId, {
           data: { event, status: "ready", retry: true, ...payload } as Record<string, unknown>,
         });
-        session.dispatch(app, sessionId).catch((err) => {
+        app.dispatchService.dispatch(sessionId).catch((err) => {
           logError("conductor", `on_failure retry dispatch (hook) failed for ${sessionId}: ${err?.message ?? err}`);
         });
         return Response.json({ status: "ok", mapped: "retry" });
@@ -405,7 +383,7 @@ export class Conductor {
       });
 
       if (result.newStatus === "completed" || result.newStatus === "failed") {
-        await session.cleanupOnTerminal(app, sessionId);
+        await app.sessionLifecycle.cleanupOnTerminal(sessionId);
         emitStageSpanEnd(sessionId, { status: result.newStatus });
         emitSessionSpanEnd(sessionId, { status: result.newStatus });
         flushSpans();
@@ -421,7 +399,7 @@ export class Conductor {
     }
 
     if (result.shouldAdvance) {
-      await session.mediateStageHandoff(app, sessionId, {
+      await app.sessionHooks.mediateStageHandoff(sessionId, {
         autoDispatch: result.shouldAutoDispatch,
         source: "hook_status",
       });
@@ -547,7 +525,7 @@ export class Conductor {
       healthFetcher,
       onRevert,
       onStop: async (id) => {
-        await session.stop(this.app, id);
+        await this.app.sessionLifecycle.stop(id);
       },
     }).catch((e) => logError("conductor", `rollback watcher error: ${e}`));
 
@@ -720,7 +698,7 @@ export class Conductor {
    * Used for the arkd -> conductor -> router proxy chain.
    */
   private async proxyToRouter(req: Request, path: string): Promise<Response> {
-    const routerUrl = this.app.config.router?.url ?? DEFAULT_ROUTER_URL;
+    const routerUrl = this.app.config.router.url;
     try {
       const headers: Record<string, string> = {};
       for (const key of ["content-type", "authorization", "accept"]) {
@@ -888,7 +866,7 @@ async function recoverStuckSessions(app: AppContext): Promise<void> {
         data: { action: "advance", reason: "agent exited with commits" },
       });
       try {
-        await session.mediateStageHandoff(app, s.id, {
+        await app.sessionHooks.mediateStageHandoff(s.id, {
           autoDispatch: true,
           source: "stuck_recovery",
         });
@@ -913,7 +891,7 @@ async function recoverStuckSessions(app: AppContext): Promise<void> {
 // ── Report handling ─────────────────────────────────────────────────────────
 
 async function handleReport(app: AppContext, sessionId: string, report: OutboundMessage): Promise<void> {
-  const result = await session.applyReport(app, sessionId, report);
+  const result = await app.sessionHooks.applyReport(sessionId, report);
 
   for (const evt of result.logEvents ?? []) {
     await app.events.log(sessionId, evt.type, evt.opts);
@@ -933,7 +911,7 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
 
   if (result.shouldAdvance) {
     try {
-      const handoff = await session.mediateStageHandoff(app, sessionId, {
+      const handoff = await app.sessionHooks.mediateStageHandoff(sessionId, {
         autoDispatch: result.shouldAutoDispatch,
         source: "channel_report",
         outcome: result.outcome,
@@ -955,12 +933,12 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
   }
 
   if (result.shouldRetry) {
-    const retryResult = await session.retryWithContext(app, sessionId, {
+    const retryResult = await app.sessionHooks.retryWithContext(sessionId, {
       maxRetries: result.retryMaxRetries,
     });
     if (retryResult.ok) {
       logInfo("conductor", `on_failure retry triggered for ${sessionId}: ${retryResult.message}`);
-      session.dispatch(app, sessionId).catch((err) => {
+      app.dispatchService.dispatch(sessionId).catch((err) => {
         logError("conductor", `on_failure retry dispatch failed for ${sessionId}: ${err?.message ?? err}`);
       });
       return;
@@ -1021,7 +999,7 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
 
       if (autoPR) {
         await safeAsync(`auto-pr: ${sessionId}`, async () => {
-          const prResult = await session.createWorktreePR(app, sessionId, {
+          const prResult = await createWorktreePR(app, sessionId, {
             title: s.summary ?? undefined,
           });
           if (prResult.ok && prResult.pr_url) {

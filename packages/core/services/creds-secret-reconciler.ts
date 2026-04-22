@@ -152,7 +152,7 @@ async function reconcileOneCluster(app: AppContext, target: ClusterTarget, resul
       await tryDelete(api, namespace, secretName, clusterName, result, "session missing");
       continue;
     }
-    if (TERMINAL_STATES.has(session.status ?? "")) {
+    if (TERMINAL_STATES.has(session.status)) {
       await tryDelete(api, namespace, secretName, clusterName, result, `session ${session.status}`);
       continue;
     }

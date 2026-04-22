@@ -1,0 +1,41 @@
+<!doctype html><html class="midnight-circuit dark"><head>
+<meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+.cols { display:grid; grid-template-columns: 1fr 1fr; gap:16px; }
+.col-pane { background: var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:14px; }
+.pane-head { font: 500 10px/14px var(--font-mono-ui); color: var(--fg-muted); text-transform:uppercase; letter-spacing:0.04em; margin-bottom:10px; }
+.big { font: 600 28px/1 var(--font-sans); color: var(--fg); }
+.big-mono { font: 400 22px/1 var(--font-mono); color: var(--fg); }
+.alt { font: 500 22px/1 var(--font-mono-ui); color: var(--fg); }
+.glyphs { font: 400 13px/20px var(--font-sans); color: var(--fg-muted); margin-top:10px; }
+.glyphs-mono { font: 400 12px/18px var(--font-mono); color: var(--fg-muted); margin-top:10px; }
+.num { font-variant-numeric: tabular-nums; color: var(--fg); }
+</style></head><body><div class="card">
+<div class="cols">
+  <div class="col-pane">
+    <div class="pane-head">Inter · Sans · UI + Prose</div>
+    <div class="big">Aa Gg 0123</div>
+    <div class="glyphs">The orchestration layer for AI coding agents. Weights 300·400·500·600·700. Tabular: <span class="num">1,284,032 tokens · $4.18</span></div>
+  </div>
+  <div class="col-pane">
+    <div class="pane-head">JetBrains Mono · Code + Transcripts</div>
+    <div class="big-mono">Aa Gg 0123</div>
+    <div class="glyphs-mono">$ ark session start --recipe quick-fix<br>→ worker-04 · running · 00:02:47</div>
+  </div>
+</div>
+<div class="cols" style="margin-top:14px;">
+  <div class="col-pane">
+    <div class="pane-head">Geist Mono · Numeric UI chrome</div>
+    <div class="alt">session-4f8a2c · 03:12</div>
+    <div class="glyphs-mono">IDs · timestamps · counts · budgets</div>
+  </div>
+  <div class="col-pane">
+    <div class="pane-head">Stack fallbacks</div>
+    <div style="font: 400 11px/18px var(--font-mono-ui); color: var(--fg-muted);">
+      --font-sans: Inter, -apple-system, BlinkMacSystemFont, system-ui, sans-serif<br>
+      --font-mono: JetBrains Mono, SF Mono, ui-monospace, monospace<br>
+      --font-mono-ui: Geist Mono, JetBrains Mono, ui-monospace
+    </div>
+  </div>
+</div>
+</div></body></html>

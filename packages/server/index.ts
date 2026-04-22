@@ -69,8 +69,8 @@ export class ArkServer {
    */
   attachAuth(app: import("../core/app.js").AppContext): void {
     this.auth = {
-      requireToken: app.config.authSection?.requireToken ?? false,
-      defaultTenant: app.config.authSection?.defaultTenant ?? null,
+      requireToken: app.config.authSection.requireToken,
+      defaultTenant: app.config.authSection.defaultTenant,
       apiKeys: app.apiKeys,
     };
   }

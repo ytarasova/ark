@@ -149,6 +149,8 @@ function App() {
               daemonStatus={daemonStatus}
               initialSelectedId={subId}
               onSelectedChange={setSubId}
+              tab={tab}
+              onTabChange={setTab}
             />
           )}
           {view === "tools" && (

@@ -1,0 +1,145 @@
+<!doctype html><html class="midnight-circuit dark"><head>
+<meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+body { padding: 20px; font-family: var(--font-sans); }
+.card { gap: 16px; }
+.row { display: grid; grid-template-columns: 120px 1fr; gap: 14px; align-items: flex-start; }
+.row .lab { font: 500 10px var(--font-mono-ui); color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.05em; padding-top: 9px; }
+
+.composer {
+  border-radius: 8px;
+  background: #0a0a12;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(0,0,0,.5) inset, 0 1px 0 rgba(255,255,255,.02);
+  overflow: hidden;
+  transition: border-color 120ms, box-shadow 120ms;
+}
+.composer.focused {
+  border-color: var(--primary);
+  box-shadow: 0 1px 2px rgba(0,0,0,.5) inset, 0 0 0 3px rgba(107,89,222,.15);
+}
+.composer .ta {
+  padding: 10px 12px; min-height: 56px;
+  font: 500 13px var(--font-sans); color: var(--fg); line-height: 20px;
+  white-space: pre-wrap;
+}
+.composer .ta.placeholder { color: var(--fg-faint); font-weight: 400; }
+.composer .tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 6px 1px 5px; border-radius: 4px;
+  background: rgba(107,89,222,.16); color: #b8acff;
+  font: 500 12px var(--font-mono-ui); letter-spacing: 0;
+  border: 1px solid rgba(107,89,222,.3);
+}
+.composer .foot {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 8px 6px 10px;
+  border-top: 1px solid var(--border);
+  background: rgba(0,0,0,.15);
+}
+.composer .foot .seg {
+  display: inline-flex; padding: 2px;
+  background: var(--bg-code);
+  border: 1px solid var(--border); border-radius: 5px;
+}
+.composer .foot .seg .s {
+  padding: 2px 7px; border-radius: 3px;
+  font: 500 10px var(--font-mono-ui); color: var(--fg-muted);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.composer .foot .seg .s.on {
+  background: linear-gradient(180deg, #25253a 0%, #1e1e30 100%);
+  color: var(--fg);
+  box-shadow: 0 1px 0 rgba(255,255,255,.04) inset;
+}
+.composer .foot .attach {
+  display: inline-flex; align-items: center; gap: 5px;
+  font: 500 10px var(--font-mono-ui); color: var(--fg-faint);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 3px 7px; border-radius: 5px;
+  border: 1px dashed var(--border);
+  cursor: pointer;
+}
+.composer .foot .attach svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 1.75; }
+.composer .foot .spacer { flex: 1; }
+.composer .foot .hint { font: 400 10px var(--font-mono-ui); color: var(--fg-faint); text-transform: uppercase; letter-spacing: 0.05em; }
+.composer .foot .hint kbd {
+  display: inline-flex; align-items: center; height: 16px; padding: 0 4px;
+  border: 1px solid var(--border); background: var(--bg-code);
+  border-radius: 3px; color: var(--fg-muted);
+  font: 500 10px var(--font-mono); line-height: 1; margin: 0 1px;
+}
+.composer .foot .send {
+  height: 24px; padding: 0 11px;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #7d6be8 0%, var(--primary) 100%);
+  color: var(--primary-fg);
+  border: 1px solid rgba(0,0,0,.3);
+  box-shadow: 0 1px 0 rgba(255,255,255,.12) inset, 0 1px 2px rgba(107,89,222,.4);
+  font: 600 11px var(--font-mono-ui);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer;
+}
+.composer .foot .send .caret { font: 500 10px var(--font-mono); opacity: 0.8; }
+.composer.disabled { opacity: 0.5; }
+.composer.disabled .send { filter: grayscale(.5); }
+
+.count { font: 400 10px var(--font-mono-ui); color: var(--fg-faint); margin-right: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+.count.over { color: #f87171; }
+</style></head>
+<body>
+<div class="card">
+
+  <div class="row"><span class="lab">empty</span>
+    <div class="composer">
+      <div class="ta placeholder">describe the change. @-mention files, #-mention sessions.</div>
+      <div class="foot">
+        <div class="seg"><span class="s on">ask</span><span class="s">plan</span><span class="s">dispatch</span></div>
+        <span class="attach"><svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>attach</span>
+        <span class="spacer"></span>
+        <span class="hint"><kbd>⌘</kbd><kbd>↵</kbd> to send</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="row"><span class="lab">focused</span>
+    <div class="composer focused">
+      <div class="ta">Refactor the auth module so <span class="tag">@packages/core/auth.ts</span> no longer imports from the router. Use the new DI container in <span class="tag">@app.ts</span>.</div>
+      <div class="foot">
+        <div class="seg"><span class="s">ask</span><span class="s on">plan</span><span class="s">dispatch</span></div>
+        <span class="attach"><svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>2 files</span>
+        <span class="spacer"></span>
+        <span class="count">184 / 4000</span>
+        <button class="send">send<span class="caret">↵</span></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="row"><span class="lab">over limit</span>
+    <div class="composer">
+      <div class="ta">Long prompt continues here and has been truncated for display. Long prompt continues here and has been truncated for display. Long prompt continues here…</div>
+      <div class="foot">
+        <div class="seg"><span class="s on">ask</span><span class="s">plan</span><span class="s">dispatch</span></div>
+        <span class="spacer"></span>
+        <span class="count over">4231 / 4000</span>
+        <button class="send" disabled style="opacity:.4">send<span class="caret">↵</span></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="row"><span class="lab">streaming</span>
+    <div class="composer disabled">
+      <div class="ta placeholder">agent is responding…</div>
+      <div class="foot">
+        <div class="seg"><span class="s on">ask</span><span class="s">plan</span><span class="s">dispatch</span></div>
+        <span class="spacer"></span>
+        <span class="hint">streaming · 1.2k tokens</span>
+        <button class="send" style="background:#2a2a40;color:var(--fg-muted);box-shadow:none">stop ⎋</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body></html>

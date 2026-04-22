@@ -22,8 +22,8 @@ export {
 export type { Session, Event, Compute, Message } from "../types/index.js";
 
 // Session orchestration types -- re-exported from the focused service modules.
-export type { HookStatusResult, ReportResult } from "./services/session-hooks.js";
-export type { SessionOpResult } from "./services/session-lifecycle.js";
+export type { HookStatusResult, ReportResult } from "./services/session-hooks/index.js";
+export type { SessionOpResult } from "./services/session/types.js";
 
 // Flow
 export * from "./state/flow.js";

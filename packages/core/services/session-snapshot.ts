@@ -70,10 +70,7 @@ export async function resolveSessionCompute(
   // Derive a handle from the session row. Real handles are minted by
   // `compute.provision()` during dispatch; this reconstructs one with the
   // same (kind, name) pair plus any handle-meta we persisted on the session.
-  const meta = ((session.config as Record<string, unknown> | undefined)?.compute_handle ?? {}) as Record<
-    string,
-    unknown
-  >;
+  const meta = ((session.config as Record<string, unknown>).compute_handle ?? {}) as Record<string, unknown>;
   return { kind, handle: { kind, name, meta } };
 }
 
@@ -151,7 +148,7 @@ export async function pauseWithSnapshot(
   // Step 3: mark session paused + record the snapshot id in session.config
   // so `resume` can find it without a separate table.
   const mergedConfig = {
-    ...(session.config as Record<string, unknown> | undefined),
+    ...(session.config as Record<string, unknown>),
     last_snapshot_id: ref.id,
     last_snapshot_at: ref.createdAt,
   };
@@ -191,7 +188,7 @@ export async function resumeFromSnapshot(
   // Pick the snapshot id: explicit > session.last_snapshot_id > latest for session.
   let snapshotId = opts?.snapshotId;
   if (!snapshotId) {
-    const cfg = (session.config ?? {}) as Record<string, unknown>;
+    const cfg = session.config as Record<string, unknown>;
     if (typeof cfg.last_snapshot_id === "string") snapshotId = cfg.last_snapshot_id;
   }
   if (!snapshotId) {

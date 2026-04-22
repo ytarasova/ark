@@ -28,7 +28,9 @@ function parseHash(): RouteState {
   let view = parts[0];
   if (view === "dashboard") view = "sessions"; // redirect legacy dashboard URL
   if (!VALID_VIEWS.has(view)) return { view: "sessions", subId: null, tab: null };
-  const subId = parts[1] || null;
+  // Empty string between slashes (e.g. #/agents//runtimes) is treated as a
+  // missing subId. This lets views carry a tab without a selected item.
+  const subId = parts[1] ? parts[1] : null;
   const tab = parts[2] || null;
   return { view, subId, tab };
 }
@@ -38,6 +40,9 @@ function writeHash(view: string, subId?: string | null, tab?: string | null) {
   if (subId) {
     hash += `/${subId}`;
     if (tab) hash += `/${tab}`;
+  } else if (tab) {
+    // Allow a tab without a subId -- render as `#/view//tab`.
+    hash += `//${tab}`;
   }
   if (window.location.hash !== hash) {
     window.location.hash = hash;
@@ -72,7 +77,6 @@ export function useHashRouter() {
 
   const setTab = useCallback((tab: string | null) => {
     setRoute((prev) => {
-      if (!prev.subId) return prev;
       writeHash(prev.view, prev.subId, tab);
       return { ...prev, tab };
     });

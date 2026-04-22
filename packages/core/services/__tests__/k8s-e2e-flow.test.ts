@@ -23,8 +23,6 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../../app.js";
-import { startSession, waitForCompletion } from "../session-lifecycle.js";
-import { dispatch } from "../dispatch.js";
 
 const CLUSTER = process.env.E2E_K8S_CLUSTER;
 const NAMESPACE = process.env.E2E_K8S_NAMESPACE ?? "ark";
@@ -116,7 +114,7 @@ describe("k8s e2e flow (live cluster)", () => {
   });
 
   it("starts a session on e2e-noop and reaches status=completed", async () => {
-    const session = await startSession(app, {
+    const session = await app.sessionLifecycle.start({
       summary: "e2e-noop test",
       flow: "e2e-noop",
       repo: "/tmp",
@@ -130,10 +128,10 @@ describe("k8s e2e flow (live cluster)", () => {
     // Kick dispatch explicitly -- the `forTestAsync` AppContext doesn't
     // register the default session_created listener the hosted server
     // does, so we drive the same code path directly.
-    const kicked = await dispatch(app, sessionId);
+    const kicked = await app.dispatchService.dispatch(sessionId);
     expect(kicked.ok).toBe(true);
 
-    const { session: finalSession, timedOut } = await waitForCompletion(app, sessionId, {
+    const { session: finalSession, timedOut } = await app.sessionLifecycle.waitForCompletion(sessionId, {
       timeoutMs: 60_000,
       pollMs: 500,
     });
@@ -347,7 +345,7 @@ describe("k8s e2e flow -- session pod + agent stage (live cluster + live claude)
   });
 
   it("runs the agent stage to completed inside the session pod", async () => {
-    const session = await startSession(app, {
+    const session = await app.sessionLifecycle.start({
       summary: "e2e-noop-agent test",
       flow: "e2e-noop-agent",
       repo: "/tmp",
@@ -358,14 +356,14 @@ describe("k8s e2e flow -- session pod + agent stage (live cluster + live claude)
     expect(session.stage).toBe("work");
     expect(session.status).toBe("ready");
 
-    const kicked = await dispatch(app, sessionId);
+    const kicked = await app.dispatchService.dispatch(sessionId);
     expect(kicked.ok).toBe(true);
 
     // 90 s budget: pod schedule (~10 s) + image pull (skip if warm) +
     // claude haiku round-trip (~15 s) + launcher teardown. On a cold cluster
     // with a large image pull this may need to be bumped, but the test
     // target is specifically the warm-cluster iteration loop.
-    const { session: finalSession, timedOut } = await waitForCompletion(app, sessionId, {
+    const { session: finalSession, timedOut } = await app.sessionLifecycle.waitForCompletion(sessionId, {
       timeoutMs: 90_000,
       pollMs: 1000,
     });

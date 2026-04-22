@@ -8,7 +8,6 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext } from "../app.js";
-import { startSession } from "../services/session-lifecycle.js";
 import { setApp, clearApp, getApp } from "./test-helpers.js";
 
 /** Same sanitization regex as in NewSessionForm.tsx submit */
@@ -77,7 +76,7 @@ describe("session name sanitization", () => {
 
 describe("session name in core (E2E)", async () => {
   it("stores name with spaces as-is in the DB", async () => {
-    const session = await startSession(app, {
+    const session = await app.sessionLifecycle.start({
       summary: "my test session",
       flow: "bare",
     });
@@ -87,7 +86,7 @@ describe("session name in core (E2E)", async () => {
   });
 
   it("stores name with special characters as-is in the DB", async () => {
-    const session = await startSession(app, {
+    const session = await app.sessionLifecycle.start({
       summary: "fix: auth module (v2)",
       flow: "bare",
     });
@@ -97,7 +96,7 @@ describe("session name in core (E2E)", async () => {
   });
 
   it("stores empty summary as null", async () => {
-    const session = await startSession(app, { flow: "bare" });
+    const session = await app.sessionLifecycle.start({ flow: "bare" });
 
     const stored = (await getApp().sessions.get(session.id))!;
     expect(stored.summary).toBeNull();
@@ -105,7 +104,7 @@ describe("session name in core (E2E)", async () => {
 
   it("stores long names without truncation in core", async () => {
     const longName = "a".repeat(200);
-    const session = await startSession(app, {
+    const session = await app.sessionLifecycle.start({
       summary: longName,
       flow: "bare",
     });

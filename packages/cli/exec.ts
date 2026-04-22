@@ -1,8 +1,6 @@
 import chalk from "chalk";
 import { resolve } from "path";
 import { existsSync, statSync } from "fs";
-import { startSession, waitForCompletion } from "../core/services/session-lifecycle.js";
-import { dispatch } from "../core/services/dispatch.js";
 import { DEFAULT_TENANT_ID } from "../core/code-intel/constants.js";
 import type { AppContext } from "../core/app.js";
 
@@ -118,7 +116,7 @@ export async function execSession(app: AppContext, opts: ExecOpts): Promise<numb
 
   // Create session
   log(`Creating session: ${summary}`);
-  const session = await startSession(app, {
+  const session = await app.sessionLifecycle.start({
     ticket: opts.ticket,
     summary,
     repo,
@@ -132,7 +130,7 @@ export async function execSession(app: AppContext, opts: ExecOpts): Promise<numb
 
   // Dispatch
   log(`Dispatching ${session.id}...`);
-  const result = await dispatch(app, session.id);
+  const result = await app.dispatchService.dispatch(session.id);
   if (!result.ok) {
     if (output === "json") {
       console.log(JSON.stringify({ status: "error", message: result.message, sessionId: session.id }));
@@ -145,7 +143,7 @@ export async function execSession(app: AppContext, opts: ExecOpts): Promise<numb
 
   // Wait
   const timeoutMs = (opts.timeout ?? 0) * 1000;
-  const { session: final, timedOut } = await waitForCompletion(app, session.id, {
+  const { session: final, timedOut } = await app.sessionLifecycle.waitForCompletion(session.id, {
     timeoutMs,
     pollMs: 5000,
     onStatus: (status) => log(`  Status: ${status}`),

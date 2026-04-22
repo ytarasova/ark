@@ -1,5 +1,4 @@
 import { describe, it, expect } from "bun:test";
-import { dispatch } from "../services/dispatch.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";
 
@@ -8,16 +7,16 @@ withTestContext();
 describe("session compute dispatch", async () => {
   it("dispatch is an async function that returns a Promise", async () => {
     // dispatch should be a function
-    expect(typeof dispatch).toBe("function");
+    expect(typeof getApp().dispatchService.dispatch).toBe("function");
 
     // Calling dispatch with a nonexistent session should return a Promise
-    const resultPromise = dispatch(getApp(), "nonexistent-id");
+    const resultPromise = getApp().dispatchService.dispatch("nonexistent-id");
     expect(resultPromise).toBeInstanceOf(Promise);
     await resultPromise;
   });
 
   it("dispatch resolves with ok: false for nonexistent session", async () => {
-    const result = await dispatch(getApp(), "nonexistent-id");
+    const result = await getApp().dispatchService.dispatch("nonexistent-id");
     expect(result.ok).toBe(false);
     expect(result.message).toContain("not found");
   });
@@ -26,7 +25,7 @@ describe("session compute dispatch", async () => {
     // Create a session with no flow stage set up
     const session = await getApp().sessions.create({ summary: "test-no-stage" });
     // Session starts with status 'pending' and no stage
-    const result = await dispatch(getApp(), session.id);
+    const result = await getApp().dispatchService.dispatch(session.id);
     expect(result.ok).toBe(false);
   });
 });

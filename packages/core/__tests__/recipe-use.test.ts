@@ -5,7 +5,6 @@
 import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
 import { instantiateRecipe } from "../agent/recipe.js";
-import { startSession } from "../services/session-lifecycle.js";
 import { getApp } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
@@ -16,7 +15,7 @@ describe("recipe use", async () => {
     expect(recipe).not.toBeNull();
 
     const instance = instantiateRecipe(recipe, { repo: "/tmp/test", summary: "test fix" });
-    const session = await startSession(getApp(), {
+    const session = await getApp().sessionLifecycle.start({
       summary: instance.summary ?? recipe.description,
       repo: instance.repo,
       flow: instance.flow,
@@ -35,7 +34,7 @@ describe("recipe use", async () => {
     expect(recipe).not.toBeNull();
 
     const instance = instantiateRecipe(recipe, { repo: "/tmp/myrepo", summary: "Custom review task" });
-    const session = await startSession(getApp(), {
+    const session = await getApp().sessionLifecycle.start({
       summary: instance.summary ?? recipe.description,
       repo: instance.repo,
       flow: instance.flow,
@@ -50,7 +49,7 @@ describe("recipe use", async () => {
   it("falls back to recipe description when no summary provided", async () => {
     const recipe = (await getApp().recipes.get("quick-fix"))!;
     const instance = instantiateRecipe(recipe, { repo: "/tmp/test" });
-    const session = await startSession(getApp(), {
+    const session = await getApp().sessionLifecycle.start({
       summary: instance.summary ?? recipe.description,
       repo: instance.repo,
       flow: instance.flow,
@@ -59,12 +58,12 @@ describe("recipe use", async () => {
     expect(session.summary).toBe(recipe.description);
   });
 
-  it("passes agent from recipe instance to startSession", async () => {
+  it("passes agent from recipe instance to sessionLifecycle.start", async () => {
     const recipe = (await getApp().recipes.get("quick-fix"))!;
     expect(recipe).not.toBeNull();
 
     const instance = instantiateRecipe(recipe, { repo: "/tmp/test", summary: "test agent" });
-    const session = await startSession(getApp(), {
+    const session = await getApp().sessionLifecycle.start({
       summary: instance.summary ?? recipe.description,
       repo: instance.repo,
       flow: instance.flow,
@@ -82,8 +81,8 @@ describe("recipe use", async () => {
     }
   });
 
-  it("startSession with explicit agent sets it on the session", async () => {
-    const session = await startSession(getApp(), {
+  it("sessionLifecycle.start with explicit agent sets it on the session", async () => {
+    const session = await getApp().sessionLifecycle.start({
       summary: "test-agent-param",
       repo: "/tmp/test",
       flow: "bare",
@@ -94,8 +93,8 @@ describe("recipe use", async () => {
     expect(fetched.agent).toBe("worker");
   });
 
-  it("startSession without agent leaves it null", async () => {
-    const session = await startSession(getApp(), {
+  it("sessionLifecycle.start without agent leaves it null", async () => {
+    const session = await getApp().sessionLifecycle.start({
       summary: "test-no-agent",
       repo: "/tmp/test",
       flow: "bare",

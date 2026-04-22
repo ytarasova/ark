@@ -4,7 +4,7 @@
  * Owner: workspace bounded context.
  *
  * Isolates the domain from direct `fs` / `child_process` / `git` calls. Today
- * `packages/core/services/workspace-service.ts` spawns shells and writes files
+ * `packages/core/services/worktree/*` spawns shells and writes files
  * inline; every one of those operations becomes a method on this port.
  *
  * Local binding: `LocalWorkspace` (wraps existing free functions).

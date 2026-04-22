@@ -74,7 +74,7 @@ export function formatTaskHeader(app: AppContext, session: Session, stage: strin
  * Supports both shapes during the migration window: pre-upload entries carry
  * inline `content`, post-upload entries carry `locator`. After the first
  * dispatch every session row ends up with locators (see
- * `materializeAttachments` in workspace-service.ts).
+ * `materializeAttachments` in worktree/setup.ts).
  */
 async function renderAttachmentsBlock(app: AppContext, session: Session): Promise<string[]> {
   const attachments = (session.config as any)?.attachments as

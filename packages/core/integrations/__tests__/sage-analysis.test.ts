@@ -6,7 +6,6 @@ import { pathToFileURL } from "url";
 
 import { AppContext } from "../../app.js";
 import { fetchAnalysis, buildStreamSubtasks, type SageAnalysis } from "../sage-analysis.js";
-import { startSession } from "../../services/session-lifecycle.js";
 import { getStages } from "../../state/flow.js";
 import { extractSubtasks } from "../../services/task-builder.js";
 
@@ -128,7 +127,7 @@ describe("from-sage-analysis flow", async () => {
       bytes,
     );
 
-    const session = await startSession(app, {
+    const session = await app.sessionLifecycle.start({
       summary: "sage:IN-18342",
       flow: "from-sage-analysis",
       inputs: {
@@ -145,7 +144,7 @@ describe("from-sage-analysis flow", async () => {
   });
 
   test("extractSubtasks falls back to default when analysis_json is missing", async () => {
-    const session = await startSession(app, {
+    const session = await app.sessionLifecycle.start({
       summary: "no-analysis",
       flow: "from-sage-analysis",
     });

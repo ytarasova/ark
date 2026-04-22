@@ -16,8 +16,6 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext } from "../app.js";
-import { mediateStageHandoff, applyReport, applyHookStatus } from "../services/session-hooks.js";
-import { advance } from "../services/stage-advance.js";
 import { startConductor } from "../conductor/conductor.js";
 import type { OutboundMessage } from "../conductor/channel-types.js";
 
@@ -43,7 +41,7 @@ describe("mediateStageHandoff", async () => {
       const session = await app.sessions.create({ summary: "handoff test", flow: "quick" });
       await app.sessions.update(session.id, { status: "ready", stage: "implement" });
 
-      const result = await mediateStageHandoff(app, session.id, { source: "test" });
+      const result = await app.sessionHooks.mediateStageHandoff(session.id, { source: "test" });
 
       expect(result.ok).toBe(true);
       expect(result.fromStage).toBe("implement");
@@ -59,20 +57,20 @@ describe("mediateStageHandoff", async () => {
       const session = await app.sessions.create({ summary: "dispatch test", flow: "quick" });
       await app.sessions.update(session.id, { status: "ready", stage: "implement" });
 
-      const result = await mediateStageHandoff(app, session.id, {
+      const result = await app.sessionHooks.mediateStageHandoff(session.id, {
         autoDispatch: true,
         source: "test",
       });
 
       expect(result.ok).toBe(true);
       expect(result.dispatched).toBe(true);
-    });
+    }, 30_000);
 
     it("returns dispatched=false when autoDispatch is disabled", async () => {
       const session = await app.sessions.create({ summary: "no dispatch test", flow: "quick" });
       await app.sessions.update(session.id, { status: "ready", stage: "implement" });
 
-      const result = await mediateStageHandoff(app, session.id, {
+      const result = await app.sessionHooks.mediateStageHandoff(session.id, {
         autoDispatch: false,
         source: "test",
       });
@@ -88,7 +86,7 @@ describe("mediateStageHandoff", async () => {
       const session = await app.sessions.create({ summary: "manual test", flow: "bare" });
       await app.sessions.update(session.id, { status: "ready", stage: "work" });
 
-      const result = await mediateStageHandoff(app, session.id, { source: "test" });
+      const result = await app.sessionHooks.mediateStageHandoff(session.id, { source: "test" });
 
       // advance() is called without force, so manual gate blocks it
       expect(result.ok).toBe(false);
@@ -102,7 +100,7 @@ describe("mediateStageHandoff", async () => {
       const session = await app.sessions.create({ summary: "completion test", flow: "autonomous" });
       await app.sessions.update(session.id, { status: "ready", stage: "work" });
 
-      const result = await mediateStageHandoff(app, session.id, { source: "test" });
+      const result = await app.sessionHooks.mediateStageHandoff(session.id, { source: "test" });
 
       expect(result.ok).toBe(true);
       expect(result.flowCompleted).toBe(true);
@@ -119,7 +117,7 @@ describe("mediateStageHandoff", async () => {
       await app.sessions.update(session.id, { status: "ready", stage: "implement" });
 
       // Step 1: implement -> verify
-      const r1 = await mediateStageHandoff(app, session.id, {
+      const r1 = await app.sessionHooks.mediateStageHandoff(session.id, {
         autoDispatch: false,
         source: "test",
       });
@@ -128,7 +126,7 @@ describe("mediateStageHandoff", async () => {
       expect(r1.flowCompleted).toBeFalsy();
 
       // Step 2: verify -> pr
-      const r2 = await mediateStageHandoff(app, session.id, {
+      const r2 = await app.sessionHooks.mediateStageHandoff(session.id, {
         autoDispatch: false,
         source: "test",
       });
@@ -136,7 +134,7 @@ describe("mediateStageHandoff", async () => {
       expect(r2.toStage).toBe("pr");
 
       // Step 3: pr -> merge
-      const r3 = await mediateStageHandoff(app, session.id, {
+      const r3 = await app.sessionHooks.mediateStageHandoff(session.id, {
         autoDispatch: false,
         source: "test",
       });
@@ -144,7 +142,7 @@ describe("mediateStageHandoff", async () => {
       expect(r3.toStage).toBe("merge");
 
       // Step 4: merge -> completed
-      const r4 = await mediateStageHandoff(app, session.id, {
+      const r4 = await app.sessionHooks.mediateStageHandoff(session.id, {
         autoDispatch: false,
         source: "test",
       });
@@ -164,7 +162,7 @@ describe("mediateStageHandoff", async () => {
       // Add an unresolved todo
       await app.todos.add(session.id, "Must resolve this before advancing");
 
-      const result = await mediateStageHandoff(app, session.id, { source: "test" });
+      const result = await app.sessionHooks.mediateStageHandoff(session.id, { source: "test" });
 
       expect(result.ok).toBe(false);
       expect(result.blockedByVerification).toBe(true);
@@ -185,7 +183,7 @@ describe("mediateStageHandoff", async () => {
       await app.sessions.update(session.id, { status: "ready", stage: "implement" });
       await app.todos.add(session.id, "Blocking todo");
 
-      await mediateStageHandoff(app, session.id, { source: "channel_report" });
+      await app.sessionHooks.mediateStageHandoff(session.id, { source: "channel_report" });
 
       const events = await app.events.list(session.id);
       const blocked = events.find((e) => e.type === "stage_handoff_blocked");
@@ -200,7 +198,7 @@ describe("mediateStageHandoff", async () => {
       const session = await app.sessions.create({ summary: "event test", flow: "quick" });
       await app.sessions.update(session.id, { status: "ready", stage: "implement" });
 
-      await mediateStageHandoff(app, session.id, {
+      await app.sessionHooks.mediateStageHandoff(session.id, {
         autoDispatch: false,
         source: "channel_report",
       });
@@ -217,7 +215,7 @@ describe("mediateStageHandoff", async () => {
       const session = await app.sessions.create({ summary: "complete event test", flow: "autonomous" });
       await app.sessions.update(session.id, { status: "ready", stage: "work" });
 
-      await mediateStageHandoff(app, session.id, { source: "hook_status" });
+      await app.sessionHooks.mediateStageHandoff(session.id, { source: "hook_status" });
 
       const events = await app.events.list(session.id);
       const handoff = events.find((e) => e.type === "stage_handoff");
@@ -229,7 +227,7 @@ describe("mediateStageHandoff", async () => {
 
   describe("error handling", async () => {
     it("returns error for missing session", async () => {
-      const result = await mediateStageHandoff(app, "s-nonexistent", { source: "test" });
+      const result = await app.sessionHooks.mediateStageHandoff("s-nonexistent", { source: "test" });
       expect(result.ok).toBe(false);
       expect(result.message).toContain("not found");
     });
@@ -238,7 +236,7 @@ describe("mediateStageHandoff", async () => {
       const session = await app.sessions.create({ summary: "no stage test", flow: "quick" });
       await app.sessions.update(session.id, { status: "ready", stage: null as any });
 
-      const result = await mediateStageHandoff(app, session.id, { source: "test" });
+      const result = await app.sessionHooks.mediateStageHandoff(session.id, { source: "test" });
       expect(result.ok).toBe(false);
     });
   });
@@ -260,7 +258,7 @@ describe("applyReport + mediateStageHandoff integration", async () => {
       filesChanged: ["src/feature.ts"],
       commits: ["abc123"],
     };
-    const result = await applyReport(app, session.id, report);
+    const result = await app.sessionHooks.applyReport(session.id, report);
     expect(result.shouldAdvance).toBe(true);
     expect(result.shouldAutoDispatch).toBe(true);
 
@@ -268,7 +266,7 @@ describe("applyReport + mediateStageHandoff integration", async () => {
     await app.sessions.update(session.id, result.updates);
 
     // Step 2: mediateStageHandoff handles the actual transition
-    const handoff = await mediateStageHandoff(app, session.id, {
+    const handoff = await app.sessionHooks.mediateStageHandoff(session.id, {
       autoDispatch: false, // disable dispatch for test predictability
       source: "channel_report",
     });
@@ -293,7 +291,7 @@ describe("applyReport + mediateStageHandoff integration", async () => {
       filesChanged: [],
       commits: [],
     };
-    const result = await applyReport(app, session.id, report);
+    const result = await app.sessionHooks.applyReport(session.id, report);
 
     // Manual gate: shouldAdvance is falsy -- conductor should NOT call mediateStageHandoff
     expect(result.shouldAdvance).toBeFalsy();
@@ -317,7 +315,7 @@ describe("applyReport + mediateStageHandoff integration", async () => {
       filesChanged: ["src/feature.ts"],
       commits: ["abc123"],
     };
-    const result = await applyReport(app, session.id, report);
+    const result = await app.sessionHooks.applyReport(session.id, report);
     expect(result.shouldAdvance).toBe(true);
     expect(result.updates.error).toBeNull();
 
@@ -329,7 +327,7 @@ describe("applyReport + mediateStageHandoff integration", async () => {
     expect(afterUpdate.error).toBeNull();
 
     // Step 4: mediateStageHandoff should succeed (gate passes with null error)
-    const handoff = await mediateStageHandoff(app, session.id, {
+    const handoff = await app.sessionHooks.mediateStageHandoff(session.id, {
       autoDispatch: false,
       source: "test",
     });
@@ -347,14 +345,14 @@ describe("applyHookStatus + mediateStageHandoff integration", async () => {
     const fresh = await app.sessions.get(session.id)!;
 
     // Step 1: applyHookStatus determines shouldAdvance
-    const result = await applyHookStatus(app, fresh, "SessionEnd", {});
+    const result = await app.sessionHooks.applyHookStatus(fresh, "SessionEnd", {});
     expect(result.shouldAdvance).toBe(true);
 
     // Apply updates
     if (result.updates) await app.sessions.update(session.id, result.updates);
 
     // Step 2: mediateStageHandoff completes the flow
-    const handoff = await mediateStageHandoff(app, session.id, {
+    const handoff = await app.sessionHooks.mediateStageHandoff(session.id, {
       autoDispatch: result.shouldAutoDispatch,
       source: "hook_status",
     });

@@ -3,13 +3,19 @@
   "last_completed_stage": 4,
   "verify_result": "PASS WITH WARNINGS",
   "critical_failures": 0,
-  "warnings": 2,
-  "verify_report_path": "/Users/yana/Projects/ark/.workflow/verify-report.md",
-  "timestamp": "2026-04-17T00:00:00Z",
+  "warnings": 3,
+  "verify_report_path": "/Users/paytmlabs/Projects/ark/.workflow/verify-report.md",
+  "timestamp": "2026-04-22T00:00:00Z",
   "test_results": {
     "total": 144,
     "passed": 144,
     "failed": 0,
-    "note": "Targeted run of all branch-added web tests + e2e-session-lifecycle. terminal-display.test.ts fixed (11/11 pass)."
+    "note": "From prior run 2026-04-17. Worktree s-h33osnwveh was deleted before this verification pass; test re-execution not possible."
+  },
+  "handoff_test": {
+    "session": "s-h33osnwveh",
+    "worktree_available": false,
+    "bash_functional": false,
+    "fallback": "prior_run_state"
   }
 }

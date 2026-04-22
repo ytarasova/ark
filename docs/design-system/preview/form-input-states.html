@@ -1,0 +1,141 @@
+<!doctype html><html class="midnight-circuit dark"><head>
+<meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+body { padding: 20px; font-family: var(--font-sans); }
+.card { gap: 14px; }
+.row { display: grid; grid-template-columns: 120px 1fr; gap: 14px; align-items: center; }
+.row .lab { font: 500 10px var(--font-mono-ui); color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+.input {
+  display: flex; align-items: center; gap: 8px;
+  height: 32px; padding: 0 11px;
+  border-radius: 6px;
+  background: #0a0a12;
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(0,0,0,.5) inset, 0 1px 0 rgba(255,255,255,.02);
+  position: relative; overflow: hidden;
+  transition: border-color 120ms, background 120ms, box-shadow 120ms;
+}
+.input > input {
+  flex: 1; min-width: 0;
+  appearance: none; border: 0; outline: none; background: transparent;
+  font: 500 12px var(--font-sans); color: var(--fg); letter-spacing: -0.005em;
+}
+.input > input::placeholder { color: var(--fg-faint); }
+.input .adorn {
+  font: 500 10px var(--font-mono-ui); color: var(--fg-faint);
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+
+.input.hover { border-color: #33334d; background: #0d0d18; }
+.input.focus {
+  border-color: var(--primary);
+  background: #0d0d18;
+  box-shadow: 0 1px 2px rgba(0,0,0,.5) inset, 0 0 0 3px rgba(107,89,222,.18);
+}
+.input.valid {
+  border-color: rgba(52,211,153,.5);
+}
+.input.valid .chk { color: #34d399; }
+.input.chk svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2.5; }
+.input.error {
+  border-color: #f87171;
+  box-shadow: 0 1px 2px rgba(0,0,0,.5) inset, 0 0 0 3px rgba(248,113,113,.12);
+}
+.input.error .chk { color: #f87171; }
+.input.warn {
+  border-color: #fbbf24;
+}
+.input.warn .chk { color: #fbbf24; }
+.input.disabled { opacity: 0.45; }
+.input.disabled > input { cursor: not-allowed; }
+.input.readonly { background: rgba(0,0,0,.15); border-style: dashed; }
+.input.loading::after {
+  content: '';
+  position: absolute; bottom: -1px; left: -30%;
+  width: 30%; height: 1.5px;
+  background: linear-gradient(90deg, transparent, var(--primary), transparent);
+  animation: ds-slide-right 1.2s linear infinite;
+}
+
+.chk { display: inline-grid; place-items: center; flex-shrink: 0; }
+.spin {
+  width: 12px; height: 12px; border-radius: 99px;
+  border: 1.5px solid var(--border); border-top-color: var(--primary);
+  animation: spin 700ms linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.hint { font: 400 10px var(--font-mono-ui); color: var(--fg-faint); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 4px; padding-left: 2px; }
+.hint.err { color: #f87171; }
+.hint.ok { color: #34d399; }
+.hint.warn { color: #fbbf24; }
+</style></head>
+<body>
+<div class="card">
+
+  <div class="row"><span class="lab">default</span>
+    <label class="input"><input placeholder="my-new-session"></label>
+  </div>
+
+  <div class="row"><span class="lab">hover</span>
+    <label class="input hover"><input value="my-new-session"></label>
+  </div>
+
+  <div class="row"><span class="lab">focus</span>
+    <label class="input focus"><input value="my-new-session|"></label>
+  </div>
+
+  <div class="row"><span class="lab">loading</span>
+    <div>
+      <label class="input loading">
+        <input value="add-oauth-to-settings-page" readonly>
+        <span class="chk"><span class="spin"></span></span>
+      </label>
+      <div class="hint">checking uniqueness…</div>
+    </div>
+  </div>
+
+  <div class="row"><span class="lab">valid</span>
+    <div>
+      <label class="input valid">
+        <input value="add-oauth-to-settings-page">
+        <span class="chk chk svg"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></span>
+      </label>
+      <div class="hint ok">slug is available</div>
+    </div>
+  </div>
+
+  <div class="row"><span class="lab">warning</span>
+    <div>
+      <label class="input warn">
+        <input value="a-very-long-slug-that-is-pushing-limits-here">
+        <span class="chk"><svg viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+      </label>
+      <div class="hint warn">slug is longer than recommended (40 chars)</div>
+    </div>
+  </div>
+
+  <div class="row"><span class="lab">error</span>
+    <div>
+      <label class="input error">
+        <input value="Has Spaces & Caps">
+        <span class="chk"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></span>
+      </label>
+      <div class="hint err">must be lowercase, hyphens only</div>
+    </div>
+  </div>
+
+  <div class="row"><span class="lab">disabled</span>
+    <label class="input disabled"><input value="read-only-session" disabled></label>
+  </div>
+
+  <div class="row"><span class="lab">read-only</span>
+    <label class="input readonly">
+      <span class="adorn">id</span>
+      <input value="sess_01K7XMF8PZ9A" readonly>
+    </label>
+  </div>
+
+</div>
+</body></html>

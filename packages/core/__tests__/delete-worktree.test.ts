@@ -6,7 +6,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, existsSync, writeFileSync } from "fs";
 import { join } from "path";
-import { deleteSessionAsync } from "../services/session-lifecycle.js";
 import { AppContext } from "../app.js";
 import { clearApp, getApp, setApp } from "./test-helpers.js";
 
@@ -23,7 +22,7 @@ afterEach(async () => {
   clearApp();
 });
 
-describe("deleteSessionAsync worktree cleanup", async () => {
+describe("sessionLifecycle.deleteSession worktree cleanup", async () => {
   it("removes worktree directory when session is deleted", async () => {
     const session = await getApp().sessions.create({ summary: "wt-cleanup-test", repo: "/tmp/fake-repo" });
     const wtPath = join(getApp().config.worktreesDir, session.id);
@@ -33,7 +32,7 @@ describe("deleteSessionAsync worktree cleanup", async () => {
     writeFileSync(join(wtPath, "dummy.txt"), "test");
     expect(existsSync(wtPath)).toBe(true);
 
-    await deleteSessionAsync(app, session.id);
+    await app.sessionLifecycle.deleteSession(session.id);
 
     expect(existsSync(wtPath)).toBe(false);
     // Soft-delete: session still exists in DB with status "deleting"
@@ -48,7 +47,7 @@ describe("deleteSessionAsync worktree cleanup", async () => {
 
     expect(existsSync(wtPath)).toBe(false);
 
-    const result = await deleteSessionAsync(app, session.id);
+    const result = await app.sessionLifecycle.deleteSession(session.id);
     expect(result.ok).toBe(true);
     // Soft-delete: session still exists in DB with status "deleting"
     const after = await getApp().sessions.get(session.id);
@@ -63,7 +62,7 @@ describe("deleteSessionAsync worktree cleanup", async () => {
     // Create a worktree dir but session has no repo -- should still delete
     mkdirSync(wtPath, { recursive: true });
 
-    const result = await deleteSessionAsync(app, session.id);
+    const result = await app.sessionLifecycle.deleteSession(session.id);
     expect(result.ok).toBe(true);
     // Soft-delete: session still exists in DB with status "deleting"
     const after = await getApp().sessions.get(session.id);

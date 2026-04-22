@@ -92,11 +92,7 @@ export async function createSessionFromIssue(
 
   if (await issueAlreadyTracked(app, ticket)) return null;
 
-  // Lazy import to avoid circular deps (same pattern as pr-poller.ts)
-  const { startSession } = await import("../services/session-lifecycle.js");
-  const { dispatch } = await import("../services/dispatch.js");
-
-  const session = await startSession(app, {
+  const session = await app.sessionLifecycle.start({
     ticket,
     summary: issue.title,
     config: {
@@ -117,7 +113,7 @@ export async function createSessionFromIssue(
 
   if (opts?.autoDispatch) {
     await safeAsync(`issue-poller: dispatch ${session.id}`, async () => {
-      await dispatch(app, session.id);
+      await app.dispatchService.dispatch(session.id);
     });
   }
 

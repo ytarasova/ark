@@ -51,9 +51,9 @@ export async function fork(
   });
 
   if (opts?.dispatch !== false) {
-    // Dynamic import avoids cycle with dispatch.ts (which calls fork via dispatchFork).
-    const { dispatch } = await import("./dispatch.js");
-    await dispatch(app, child.id);
+    // Route through app.dispatchService so the DI-wired DispatchService
+    // handles the nested dispatch (previously a dynamic-import cycle-breaker).
+    await app.dispatchService.dispatch(child.id);
   }
   return { ok: true, sessionId: child.id };
 }
@@ -75,8 +75,7 @@ export async function joinFork(
 
   await app.events.log(parentId, "fork_joined", { actor: "user", data: { children: children.length } });
   await app.sessions.update(parentId, { status: "ready", fork_group: null });
-  const { advance } = await import("./stage-advance.js");
-  return await advance(app, parentId, true);
+  return await app.stageAdvance.advance(parentId, true);
 }
 
 /**
@@ -108,8 +107,7 @@ export async function checkAutoJoin(app: AppContext, childSessionId: string): Pr
     data: { children: children.length, failed: failed.length },
   });
   await app.sessions.update(parent.id, { status: "ready", fork_group: null });
-  const { advance } = await import("./stage-advance.js");
-  await advance(app, parent.id, true);
+  await app.stageAdvance.advance(parent.id, true);
   return true;
 }
 

@@ -31,7 +31,7 @@ import type { TenantContext } from "../../core/auth/context.js";
 import { DEFAULT_TENANT_ID } from "../../core/code-intel/constants.js";
 
 async function resolveTenantId(app: AppContext, ctx: TenantContext): Promise<string> {
-  const slug = ctx.tenantId ?? app.tenantId ?? app.config.authSection?.defaultTenant ?? null;
+  const slug = ctx.tenantId ?? app.tenantId ?? app.config.authSection.defaultTenant;
   if (slug) {
     const found = await app.codeIntel.getTenantBySlug(slug);
     if (found) return found.id;

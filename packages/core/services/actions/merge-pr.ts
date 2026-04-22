@@ -1,5 +1,5 @@
 import type { ActionHandler } from "./types.js";
-import { finishWorktree } from "../workspace-service.js";
+import { finishWorktree } from "../worktree/index.js";
 
 /**
  * `merge_pr` (alias: `merge`) -- force-merge the session's worktree PR. Differs

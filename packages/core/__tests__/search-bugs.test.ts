@@ -40,7 +40,7 @@ describe("indexTranscripts transaction safety", async () => {
     const count1 = await indexTranscripts(getApp(), { transcriptsDir });
     expect(count1).toBe(2);
 
-    const stats1 = getIndexStats(getApp());
+    const stats1 = await getIndexStats(getApp());
     expect(stats1.entries).toBe(2);
   });
 
@@ -64,8 +64,8 @@ describe("indexTranscripts transaction safety", async () => {
 
     // Data should be committed and queryable
     const db = getApp().db;
-    const row = db.prepare("SELECT COUNT(*) as c FROM transcript_index").get() as { c: number } | undefined;
-    expect(row.c).toBeGreaterThan(0);
+    const row = (await db.prepare("SELECT COUNT(*) as c FROM transcript_index").get()) as { c: number } | undefined;
+    expect(row!.c).toBeGreaterThan(0);
   });
 });
 

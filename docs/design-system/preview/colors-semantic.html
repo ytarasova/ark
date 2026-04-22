@@ -1,0 +1,34 @@
+<!doctype html><html class="midnight-circuit dark"><head>
+<meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+.grid { display:grid; grid-template-columns: repeat(5, 1fr); gap:10px; }
+.cell { border-radius:10px; border:1px solid var(--border); padding:10px; display:flex; flex-direction:column; gap:8px; }
+.cell .head { display:flex; justify-content:space-between; align-items:baseline; }
+.cell .tok { font: 500 11px/14px var(--font-mono-ui); color: var(--fg); }
+.cell .val { font: 400 10px/14px var(--font-mono-ui); color: var(--fg-muted); }
+.cell .preview { height:32px; border-radius:6px; border:1px solid var(--border); }
+.title { font:600 12px/16px var(--font-sans); color: var(--fg); margin-bottom:2px; }
+.section { margin-bottom:10px; }
+</style></head>
+<body><div class="card">
+<div class="section">
+<div class="title">Surfaces · midnight-circuit / dark</div>
+<div class="grid">
+  <div class="cell"><div class="head"><span class="tok">--bg-sidebar</span></div><div class="preview" style="background:#0a0a12"></div><span class="val">#0a0a12</span></div>
+  <div class="cell"><div class="head"><span class="tok">--bg</span></div><div class="preview" style="background:#0c0c14"></div><span class="val">#0c0c14</span></div>
+  <div class="cell"><div class="head"><span class="tok">--bg-card</span></div><div class="preview" style="background:#14141e"></div><span class="val">#14141e</span></div>
+  <div class="cell"><div class="head"><span class="tok">--bg-hover</span></div><div class="preview" style="background:#1e1e30"></div><span class="val">#1e1e30</span></div>
+  <div class="cell"><div class="head"><span class="tok">--bg-popover</span></div><div class="preview" style="background:#18182a"></div><span class="val">#18182a</span></div>
+</div>
+</div>
+<div class="section">
+<div class="title">Foreground · text colors</div>
+<div class="grid">
+  <div class="cell"><div class="head"><span class="tok">--fg</span></div><div class="preview" style="background:#e4e4ed"></div><span class="val">#e4e4ed</span></div>
+  <div class="cell"><div class="head"><span class="tok">--fg-muted</span></div><div class="preview" style="background:#7878a0"></div><span class="val">#7878a0</span></div>
+  <div class="cell"><div class="head"><span class="tok">--fg-faint</span></div><div class="preview" style="background:#8080a8"></div><span class="val">#8080a8</span></div>
+  <div class="cell"><div class="head"><span class="tok">--primary</span></div><div class="preview" style="background:#6b59de"></div><span class="val">#6b59de</span></div>
+  <div class="cell"><div class="head"><span class="tok">--border</span></div><div class="preview" style="background:#252540"></div><span class="val">#252540</span></div>
+</div>
+</div>
+</div></body></html>

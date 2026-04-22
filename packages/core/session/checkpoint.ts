@@ -7,7 +7,8 @@
  */
 
 import type { Session, Event } from "../../types/index.js";
-import type { AppContext } from "../app.js";
+import type { SessionRepository } from "../repositories/session.js";
+import type { EventRepository } from "../repositories/event.js";
 import * as tmux from "../infra/tmux.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -24,11 +25,17 @@ export interface Checkpoint {
   data: Record<string, unknown>;
 }
 
+/** Narrow deps for the checkpoint functions -- just what they touch. */
+export interface CheckpointDeps {
+  sessions: SessionRepository;
+  events: EventRepository;
+}
+
 // ── Save / Load ────────────────────────────────────────────────────────────
 
 /** Save a checkpoint for a session. Stores full state snapshot as a checkpoint event. */
-export async function saveCheckpoint(app: AppContext, sessionId: string): Promise<void> {
-  const session = await app.sessions.get(sessionId);
+export async function saveCheckpoint(deps: CheckpointDeps, sessionId: string): Promise<void> {
+  const session = await deps.sessions.get(sessionId);
   if (!session) return;
 
   const data: Record<string, unknown> = {
@@ -45,12 +52,12 @@ export async function saveCheckpoint(app: AppContext, sessionId: string): Promis
     config: session.config,
   };
 
-  await app.events.log(sessionId, "checkpoint", { stage: session.stage ?? undefined, actor: "system", data });
+  await deps.events.log(sessionId, "checkpoint", { stage: session.stage ?? undefined, actor: "system", data });
 }
 
 /** Get the latest checkpoint for a session. */
-export async function getCheckpoint(app: AppContext, sessionId: string): Promise<Checkpoint | null> {
-  const events = (await app.events.list(sessionId, { type: "checkpoint" })) ?? [];
+export async function getCheckpoint(deps: CheckpointDeps, sessionId: string): Promise<Checkpoint | null> {
+  const events = await deps.events.list(sessionId, { type: "checkpoint" });
   if (events.length === 0) return null;
 
   const latest = events[events.length - 1];
@@ -58,8 +65,8 @@ export async function getCheckpoint(app: AppContext, sessionId: string): Promise
 }
 
 /** List all checkpoints for a session, oldest first. */
-export async function listCheckpoints(app: AppContext, sessionId: string): Promise<Checkpoint[]> {
-  const events = (await app.events.list(sessionId, { type: "checkpoint" })) ?? [];
+export async function listCheckpoints(deps: CheckpointDeps, sessionId: string): Promise<Checkpoint[]> {
+  const events = await deps.events.list(sessionId, { type: "checkpoint" });
   return events.map((e) => eventToCheckpoint(sessionId, e));
 }
 
@@ -70,9 +77,9 @@ export async function listCheckpoints(app: AppContext, sessionId: string): Promi
  * A session is orphaned if its status is "running" or "waiting" but its
  * tmux session no longer exists.
  */
-export async function findOrphanedSessions(app: AppContext): Promise<Session[]> {
-  const running = await app.sessions.list({ status: "running" });
-  const waiting = await app.sessions.list({ status: "waiting" });
+export async function findOrphanedSessions(deps: Pick<CheckpointDeps, "sessions">): Promise<Session[]> {
+  const running = await deps.sessions.list({ status: "running" });
+  const waiting = await deps.sessions.list({ status: "waiting" });
   const candidates = [...running, ...waiting];
 
   return candidates.filter((session) => {
@@ -96,11 +103,14 @@ export async function findOrphanedSessions(app: AppContext): Promise<Session[]> 
  * 3. Preserve claude_session_id for --resume on next dispatch
  * 4. Log recovery event
  */
-export async function recoverSession(app: AppContext, sessionId: string): Promise<{ ok: boolean; message: string }> {
-  const session = await app.sessions.get(sessionId);
+export async function recoverSession(
+  deps: CheckpointDeps,
+  sessionId: string,
+): Promise<{ ok: boolean; message: string }> {
+  const session = await deps.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
-  const checkpoint = await getCheckpoint(app, sessionId);
+  const checkpoint = await getCheckpoint(deps, sessionId);
 
   // Build recovery fields
   const updates: Partial<Session> = {
@@ -120,9 +130,9 @@ export async function recoverSession(app: AppContext, sessionId: string): Promis
     updates.claude_session_id = claudeId;
   }
 
-  await app.sessions.update(sessionId, updates);
+  await deps.sessions.update(sessionId, updates);
 
-  await app.events.log(sessionId, "session_recovered", {
+  await deps.events.log(sessionId, "session_recovered", {
     stage: updates.stage ?? session.stage ?? undefined,
     actor: "system",
     data: {

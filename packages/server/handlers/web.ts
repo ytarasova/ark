@@ -16,10 +16,10 @@ import { getHotkeys } from "../../core/hotkeys.js";
 import { getThemeMode } from "../../core/theme.js";
 import { getAllSessionCosts, exportCostsCsv } from "../../core/observability/costs.js";
 import { getActiveProfile } from "../../core/state/profiles.js";
-import { cleanupWorktrees } from "../../core/services/workspace-service.js";
+import { cleanupWorktrees } from "../../core/services/worktree/index.js";
 import { exportSession } from "../../core/session/share.js";
 import { generateOpenApiSpec } from "../../core/openapi.js";
-import { DEFAULT_CONDUCTOR_URL, DEFAULT_ARKD_URL } from "../../core/constants.js";
+import { DEFAULT_ARKD_URL } from "../../core/constants.js";
 
 /** Probe a URL's /health endpoint with a short timeout. Returns true if reachable. */
 async function probeHealth(baseUrl: string, timeoutMs = 2000): Promise<boolean> {
@@ -47,7 +47,7 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
 
   // ── Daemon auto-detection ────────────────────────────────────────────────
   router.handle("daemon/status", async () => {
-    const conductorUrl = app.config.conductorUrl ?? DEFAULT_CONDUCTOR_URL;
+    const conductorUrl = app.config.conductorUrl;
     const arkdUrl = process.env.ARK_ARKD_URL || DEFAULT_ARKD_URL;
 
     const [conductor, arkd] = await Promise.all([probeHealth(conductorUrl), probeHealth(arkdUrl)]);
@@ -55,7 +55,7 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
     return {
       conductor: { online: conductor, url: conductorUrl },
       arkd: { online: arkd, url: arkdUrl },
-      router: { online: app.config.router?.enabled ?? false },
+      router: { online: app.config.router.enabled },
     };
   });
 
