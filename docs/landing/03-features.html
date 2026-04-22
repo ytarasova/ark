@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en" class="midnight-circuit dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ark — Features</title>
+  <link rel="stylesheet" href="../_docs.css" />
+</head>
+<body data-root="../" data-nav="home">
+
+<div data-slot="topbar"></div>
+
+<section class="section">
+  <div class="section-head">
+    <div class="eyebrow">built for long-running agents</div>
+    <h2>Everything an agent needs,<br>none of the orchestration pain.</h2>
+    <p>Ark treats coding agents as first-class citizens — with isolated compute, shared memory, and a control plane that's actually opinionated about the SDLC.</p>
+  </div>
+  <div class="features">
+    <div class="feature">
+      <div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><path d="M9.7 9.7 6.4 17.6M14.3 9.7l3.3-2.9"/></svg></div>
+      <h3>DAG-based SDLC flows</h3>
+      <p>Compose plan → spec → implement → test → ship nodes as code. Branch, retry, gate on human review.</p>
+    </div>
+    <div class="feature">
+      <div class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/></svg></div>
+      <h3>11 compute providers</h3>
+      <p>local, docker, devcontainer, firecracker, EC2, E2B, k8s, kata-containers. Same API, any substrate.</p>
+    </div>
+    <div class="feature">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M5 8h14"/><path d="M5 16h14"/></svg></div>
+      <h3>Multi-runtime</h3>
+      <p>Claude Code, Codex, Gemini CLI, Goose. Swap runtimes per node, or A/B test two on the same task.</p>
+    </div>
+    <div class="feature">
+      <div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
+      <h3>Knowledge graph</h3>
+      <p>Code-graph extraction lets agents query call sites, type dependencies, and prior diffs — not just grep.</p>
+    </div>
+    <div class="feature">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="m3 12 4-4 4 4 6-6 4 4"/><path d="M21 14v6H3v-2"/></svg></div>
+      <h3>LLM router</h3>
+      <p>OpenAI-compatible proxy with 3 policies and circuit breakers. Route by cost, latency, or model affinity.</p>
+    </div>
+    <div class="feature">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+      <h3>Multi-tenant control plane</h3>
+      <p>Tenants, tokens, audit — ready for teams. Postgres-backed for production, SQLite for local.</p>
+    </div>
+  </div>
+</section>
+
+<script src="../_docs.js"></script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en" class="midnight-circuit dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ark — Preview</title>
+  <link rel="stylesheet" href="../_docs.css" />
+</head>
+<body data-root="../" data-nav="home">
+
+<div data-slot="topbar"></div>
+
+<div class="preview-wrap" style="padding-top: 72px;">
+  <div class="preview-card">
+    <div class="hd">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div class="file">~/projects/my-app</div>
+      <div class="sp" style="flex:1"></div>
+      <span style="color:var(--doc-fg-muted)">ark run autonomous-sdlc</span>
+    </div>
+    <pre><code><span class="c"># Launch an autonomous SDLC flow against a feature request</span>
+<span class="prompt">$</span> ark run autonomous-sdlc <span class="s">"add rate limiting to /api/messages"</span>
+
+  ◆ <span class="k">session</span>   <span class="n">ses_01hnr8x9m4</span>   <span style="color:var(--primary)">● running</span>
+  ◇ <span class="k">compute</span>   ec2-spot / us-west-2 / arkd:19300
+  ◇ <span class="k">runtime</span>   claude-code <span style="color:var(--doc-fg-muted)">(via router:balanced)</span>
+
+  ├─ <span style="color:#34d399">✓</span> plan          <span class="c">// 4 subtasks identified</span>
+  ├─ <span style="color:#34d399">✓</span> spec          <span class="c">// api contract updated</span>
+  ├─ <span style="color:#60a5fa">▸</span> implement     <span class="c">// editing packages/server/middleware/…</span>
+  │   └─ <span style="color:#fbbf24">◌</span> waiting on review gate
+  └─ <span style="color:#7878a0">◌</span> test + ship   <span class="c">// pending implement</span>
+</code></pre>
+  </div>
+</div>
+
+<script src="../_docs.js"></script>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en" class="midnight-circuit dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Compute targets — Ark</title>
+  <link rel="stylesheet" href="../_docs.css" />
+</head>
+<body data-root="../" data-nav="guide" data-page="compute">
+
+<div data-slot="topbar"></div>
+
+<div class="shell">
+  <aside class="sidebar" data-auto></aside>
+
+  <main class="content">
+    <h1>Compute targets</h1>
+    <p class="lede">Ark dispatches sessions as a <strong>(compute, runtime)</strong> pair. Both axes are pluggable — same <code>ComputeTarget</code> interface, different substrate.</p>
+
+    <h2 id="providers">Providers at a glance</h2>
+    <table>
+      <thead><tr><th>Provider</th><th>Cold start</th><th>Best for</th></tr></thead>
+      <tbody>
+        <tr><td><code>local</code></td><td>instant</td><td>day-to-day work</td></tr>
+        <tr><td><code>docker</code></td><td>~3s</td><td>isolation, reproducibility</td></tr>
+        <tr><td><code>devcontainer</code></td><td>~10s</td><td>team-standard envs</td></tr>
+        <tr><td><code>firecracker</code></td><td>~500ms</td><td>high-trust sandbox</td></tr>
+        <tr><td><code>ec2</code></td><td>~30s</td><td>bursty batch work</td></tr>
+        <tr><td><code>ec2-warm</code></td><td>~2s</td><td>pooled, fast-to-start</td></tr>
+        <tr><td><code>e2b</code></td><td>~1s</td><td>cloud sandbox, zero infra</td></tr>
+        <tr><td><code>k8s</code></td><td>~5s</td><td>existing k8s fleet</td></tr>
+        <tr><td><code>k8s-kata</code></td><td>~8s</td><td>hardened isolation</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="pick">Pick a target per run</h2>
+<pre><code><span class="prompt">$</span> ark new <span class="s">"explore"</span> --compute local
+<span class="prompt">$</span> ark run flow    --compute ec2-warm
+<span class="prompt">$</span> ark run flow    --compute k8s,runtime=devcontainer</code></pre>
+
+    <h2 id="pools">Warm pools</h2>
+    <p>Configure <code>ec2-warm</code> to keep N instances pre-booted. Pool state is cached in <code>~/.ark/compute-pool.db</code>.</p>
+<pre><code><span class="c"># ~/.ark/config.yaml</span>
+<span class="k">compute</span>:
+  <span class="n">ec2-warm</span>:
+    region: us-west-2
+    instance_type: c7g.xlarge
+    pool_size: 4
+    idle_ttl: 10m</code></pre>
+
+    <h2 id="byo">BYO provider</h2>
+    <p>Drop a TypeScript module in <code>packages/compute/adapters/</code> implementing <code>Compute</code> + <code>Runtime</code>. It's dispatched by <code>(compute_kind, runtime_kind)</code> — no core changes needed.</p>
+
+    <div class="page-foot">
+      <a href="#">Edit this page on GitHub →</a>
+      <div class="sp"></div>
+      <div class="pager">
+        <a class="next" href="guide-router.html"><small>NEXT</small><span>LLM router →</span></a>
+      </div>
+    </div>
+  </main>
+
+  <aside class="toc">
+    <div class="title">On this page</div>
+    <a href="#providers" class="on">Providers at a glance</a>
+    <a href="#pick">Pick a target per run</a>
+    <a href="#pools">Warm pools</a>
+    <a href="#byo">BYO provider</a>
+  </aside>
+</div>
+
+<script src="../_docs.js?v=2"></script>
+</body>
+</html>

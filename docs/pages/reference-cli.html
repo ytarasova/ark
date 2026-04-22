@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en" class="midnight-circuit dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CLI reference — Ark</title>
+  <link rel="stylesheet" href="../_docs.css" />
+</head>
+<body data-root="../" data-nav="reference" data-page="cli">
+
+<div data-slot="topbar"></div>
+
+<div class="shell">
+  <aside class="sidebar" data-auto></aside>
+
+  <main class="content">
+    <h1>CLI reference</h1>
+    <p class="lede">Every <code>ark</code> command, in one place. Flags shown with short + long forms; env vars in the <strong>Config</strong> page.</p>
+
+    <h2 id="sessions">Sessions</h2>
+    <table>
+      <thead><tr><th>Command</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>ark new &lt;prompt&gt;</code></td><td>Spawn a new session in the current repo</td></tr>
+        <tr><td><code>ark ls</code></td><td>List sessions (add <code>--all</code> for stopped)</td></tr>
+        <tr><td><code>ark attach &lt;id&gt;</code></td><td>Attach to a session's tmux window</td></tr>
+        <tr><td><code>ark tail &lt;id&gt;</code></td><td>Stream the event log</td></tr>
+        <tr><td><code>ark pause &lt;id&gt;</code></td><td>Pause without releasing compute</td></tr>
+        <tr><td><code>ark stop &lt;id&gt;</code></td><td>Terminate session &amp; release compute</td></tr>
+        <tr><td><code>ark branch &lt;id&gt;@&lt;event&gt;</code></td><td>Fork from a checkpoint</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="flows">Flows</h2>
+    <table>
+      <tbody>
+        <tr><td><code>ark run &lt;flow&gt; &lt;input&gt;</code></td><td>Execute a flow</td></tr>
+        <tr><td><code>ark flow ls</code></td><td>List available flows</td></tr>
+        <tr><td><code>ark flow show &lt;name&gt;</code></td><td>Print a flow's DAG</td></tr>
+        <tr><td><code>ark approve &lt;flow&gt;#&lt;node&gt;</code></td><td>Release a human gate</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="dev">Dev &amp; infra</h2>
+    <table>
+      <tbody>
+        <tr><td><code>ark dev</code></td><td>Start API + web dashboard + daemon</td></tr>
+        <tr><td><code>ark daemon start|stop|status</code></td><td>Manage the server daemon</td></tr>
+        <tr><td><code>ark router stats</code></td><td>LLM backend health &amp; latency</td></tr>
+        <tr><td><code>ark gc</code></td><td>Prune stopped sessions older than 7d</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="global">Global flags</h2>
+    <table>
+      <tbody>
+        <tr><td><code>--compute &lt;target&gt;</code></td><td>Override compute provider for this run</td></tr>
+        <tr><td><code>--runtime &lt;name&gt;</code></td><td>Agent runtime (claude, codex, gemini, goose)</td></tr>
+        <tr><td><code>--router &lt;policy&gt;</code></td><td>LLM router policy</td></tr>
+        <tr><td><code>--tenant &lt;id&gt;</code></td><td>Tenant scope (control-plane only)</td></tr>
+        <tr><td><code>--json</code></td><td>Machine-readable output</td></tr>
+        <tr><td><code>-v, --verbose</code></td><td>Show debug logs</td></tr>
+      </tbody>
+    </table>
+
+    <div class="page-foot">
+      <a href="#">Edit this page on GitHub →</a>
+      <div class="sp"></div>
+      <div class="pager">
+        <a class="next" href="reference-config.html"><small>NEXT</small><span>Config reference →</span></a>
+      </div>
+    </div>
+  </main>
+
+  <aside class="toc">
+    <div class="title">On this page</div>
+    <a href="#sessions" class="on">Sessions</a>
+    <a href="#flows">Flows</a>
+    <a href="#dev">Dev &amp; infra</a>
+    <a href="#global">Global flags</a>
+  </aside>
+</div>
+
+<script src="../_docs.js?v=2"></script>
+</body>
+</html>

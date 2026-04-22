@@ -8,6 +8,7 @@ dist/
 !packages/desktop/main.js
 !packages/desktop/preload.js
 !eslint.config.js
+!docs/**/*.js
 .env
 .litellm/
 .worktrees/

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en" class="midnight-circuit dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ark — Hero</title>
+  <link rel="stylesheet" href="../_docs.css" />
+  <style>
+    .hero-grid {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(var(--doc-border-soft) 1px, transparent 1px),
+        linear-gradient(90deg, var(--doc-border-soft) 1px, transparent 1px);
+      background-size: 56px 56px;
+      mask-image: radial-gradient(ellipse 60% 50% at 50% 30%, #000 30%, transparent 70%);
+      opacity: .5; pointer-events: none;
+    }
+  </style>
+</head>
+<body data-root="../" data-nav="home">
+
+<div data-slot="topbar"></div>
+
+<section class="hero">
+  <div class="hero-grid"></div>
+  <div class="eyebrow">◆ autonomous agent ecosystem</div>
+  <h1>DAG-driven <em>AI coding agents</em>,<br>orchestrated across any compute.</h1>
+  <p>Ark runs Claude Code, Codex, Gemini CLI, and Goose against your repo through a DAG of SDLC flows — backed by 11 compute providers, a knowledge graph, and an LLM router.</p>
+  <div class="cta">
+    <a class="btn btn-primary" href="../pages/quickstart.html">
+      Start in 2 minutes
+      <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+    </a>
+    <a class="btn btn-secondary" href="#install">
+      <svg viewBox="0 0 24 24"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><path d="M7 11l5 5 5-5"/><path d="M12 4v12"/></svg>
+      Install
+    </a>
+  </div>
+
+  <div class="install-strip" id="install">
+    <code>
+      <span class="dollar">$</span>
+      curl -fsSL ark.run/install | bash
+      <span class="copy" onclick="this.textContent='Copied';setTimeout(()=>this.textContent='Copy',1400)">Copy</span>
+    </code>
+  </div>
+</section>
+
+<script src="../_docs.js"></script>
+</body>
+</html>

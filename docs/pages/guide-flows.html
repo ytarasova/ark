@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en" class="midnight-circuit dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flows &amp; DAGs — Ark</title>
+  <link rel="stylesheet" href="../_docs.css" />
+</head>
+<body data-root="../" data-nav="guide" data-page="flows">
+
+<div data-slot="topbar"></div>
+
+<div class="shell">
+  <aside class="sidebar" data-auto></aside>
+
+  <main class="content">
+    <h1>Flows &amp; DAGs</h1>
+    <p class="lede">Compose multi-agent pipelines as YAML. Branch, retry, gate on human review — all declarative.</p>
+
+    <h2 id="anatomy">Anatomy of a flow</h2>
+    <p>A flow is a named DAG. Each node specifies an <em>agent</em>, a <em>runtime</em>, optional <em>dependencies</em>, and optional <em>gates</em>:</p>
+<pre><code><span class="k">name</span>: triage
+<span class="k">version</span>: 1
+
+<span class="k">inputs</span>:
+  <span class="n">issue_url</span>: { type: string, required: true }
+
+<span class="k">nodes</span>:
+  <span class="n">classify</span>:
+    agent: issue-triager
+    runtime: claude
+    inputs:
+      url: <span class="s">"{{inputs.issue_url}}"</span>
+
+  <span class="n">reproduce</span>:
+    agent: repro-builder
+    runtime: codex
+    needs: [classify]
+    <span class="c">// only run if classify tagged it a bug</span>
+    when: <span class="s">"{{classify.tags | includes('bug')}}"</span>
+
+  <span class="n">fix</span>:
+    agent: fixer
+    runtime: claude
+    needs: [reproduce]
+    gate: human-review</code></pre>
+
+    <h2 id="inputs">Inputs &amp; outputs</h2>
+    <p>Flows take typed inputs and expose each node's output as <code>{{&lt;node&gt;.&lt;field&gt;}}</code>. Templating uses Nunjucks.</p>
+
+    <h2 id="gates">Human gates</h2>
+    <p>A node with <code>gate: human-review</code> pauses the flow after it completes and waits for approval in the dashboard or via <code>ark approve &lt;flow&gt;#&lt;node&gt;</code>.</p>
+
+    <h2 id="fanout">Fan-out, fan-in</h2>
+<pre><code><span class="k">nodes</span>:
+  <span class="n">plan</span>: { agent: planner, runtime: claude }
+
+  <span class="n">implement</span>:
+    agent: coder
+    runtime: claude
+    needs: [plan]
+    for_each: <span class="s">"{{plan.subtasks}}"</span>   <span class="c">// fan-out</span>
+
+  <span class="n">merge</span>:
+    agent: merger
+    runtime: claude
+    needs: [implement]            <span class="c">// fan-in</span></code></pre>
+
+    <h2 id="retry">Retry &amp; recovery</h2>
+    <p>Every node can specify <code>retries: N</code> and an optional <code>on_reject</code> prompt that's templated with failure context and fed back to the agent.</p>
+
+    <div class="page-foot">
+      <a href="#">Edit this page on GitHub →</a>
+      <div class="sp"></div>
+      <div class="pager">
+        <a class="next" href="guide-compute.html"><small>NEXT</small><span>Compute targets →</span></a>
+      </div>
+    </div>
+  </main>
+
+  <aside class="toc">
+    <div class="title">On this page</div>
+    <a href="#anatomy" class="on">Anatomy of a flow</a>
+    <a href="#inputs">Inputs &amp; outputs</a>
+    <a href="#gates">Human gates</a>
+    <a href="#fanout">Fan-out, fan-in</a>
+    <a href="#retry">Retry &amp; recovery</a>
+  </aside>
+</div>
+
+<script src="../_docs.js?v=2"></script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en" class="midnight-circuit dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sessions — Ark</title>
+  <link rel="stylesheet" href="../_docs.css" />
+</head>
+<body data-root="../" data-nav="guide" data-page="sessions">
+
+<div data-slot="topbar"></div>
+
+<div class="shell">
+  <aside class="sidebar" data-auto></aside>
+
+  <main class="content">
+    <h1>Sessions</h1>
+    <p class="lede">Everything you can do with a running agent — spawn, attach, pause, branch, snapshot, stop.</p>
+
+    <h2 id="spawn">Spawn a session</h2>
+<pre><code><span class="prompt">$</span> ark new <span class="s">"refactor auth middleware"</span> \
+    --runtime claude \
+    --compute ec2-warm \
+    --branch feature/auth-refactor</code></pre>
+
+    <h2 id="attach">Attach &amp; detach</h2>
+    <p><code>ark attach &lt;id&gt;</code> joins the tmux window; <kbd>Ctrl-B</kbd> <kbd>D</kbd> detaches without killing it. The session keeps running.</p>
+
+    <h2 id="events">Event stream</h2>
+    <p>Tail the session's event stream as newline-delimited JSON:</p>
+<pre><code><span class="prompt">$</span> ark tail ses_01hnr8x9m4 --format json
+<span class="c">{"t":"tool.call","tool":"str_replace","path":"auth.ts"}</span>
+<span class="c">{"t":"tool.result","ok":true}</span>
+<span class="c">{"t":"message","role":"assistant","content":"edited auth.ts"}</span></code></pre>
+
+    <h2 id="branch">Branch from a checkpoint</h2>
+    <p>Every tool call creates an implicit checkpoint. Fork a session from any checkpoint to explore an alternative:</p>
+<pre><code><span class="prompt">$</span> ark branch ses_01hnr8x9m4@12 <span class="s">"try PostgreSQL instead"</span>
+  ◆ branched: ses_01hnr8x9m4 → ses_01hnr91k2a (at event #12)</code></pre>
+
+    <h2 id="stop">Stop &amp; clean up</h2>
+<pre><code><span class="prompt">$</span> ark stop ses_01hnr8x9m4           <span class="c"># graceful</span>
+<span class="prompt">$</span> ark stop ses_01hnr8x9m4 --force   <span class="c"># SIGKILL the whole tmux window</span>
+<span class="prompt">$</span> ark gc                             <span class="c"># prune stopped sessions older than 7d</span></code></pre>
+
+    <div class="note warn"><div class="i">!</div><div>On <code>ec2-*</code> providers, stopping a session releases the VM. Use <code>ark pause</code> to keep the VM warm for 10 minutes.</div></div>
+
+    <div class="page-foot">
+      <a href="#">Edit this page on GitHub →</a>
+      <div class="sp"></div>
+      <div class="pager">
+        <a class="next" href="guide-flows.html"><small>NEXT</small><span>Flows &amp; DAGs →</span></a>
+      </div>
+    </div>
+  </main>
+
+  <aside class="toc">
+    <div class="title">On this page</div>
+    <a href="#spawn" class="on">Spawn a session</a>
+    <a href="#attach">Attach &amp; detach</a>
+    <a href="#events">Event stream</a>
+    <a href="#branch">Branch from a checkpoint</a>
+    <a href="#stop">Stop &amp; clean up</a>
+  </aside>
+</div>
+
+<script src="../_docs.js?v=2"></script>
+</body>
+</html>

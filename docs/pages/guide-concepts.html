@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en" class="midnight-circuit dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Core concepts — Ark</title>
+  <link rel="stylesheet" href="../_docs.css" />
+</head>
+<body data-root="../" data-nav="guide" data-page="concepts">
+
+<div data-slot="topbar"></div>
+
+<div class="shell">
+  <aside class="sidebar" data-auto></aside>
+
+  <main class="content">
+    <h1>Core concepts</h1>
+    <p class="lede">Four primitives power everything in Ark: <strong>sessions</strong>, <strong>flows</strong>, <strong>agents</strong>, and <strong>compute targets</strong>. Learn what each does and how they compose.</p>
+
+    <h2 id="session">Session</h2>
+    <p>A <strong>session</strong> is one agent process working against one repo on one compute target. It has a unique id, a tmux window, an <code>arkd</code> handle, and an event stream you can tail.</p>
+    <div class="pre-label">lifecycle</div>
+<pre><code><span class="c">provisioning → booting → running → (paused)? → completed | failed | stopped</span></code></pre>
+    <p>Sessions are cheap to spawn and persist beyond your shell. Your terminal attaches and detaches; the session runs in the background until it exits or you stop it.</p>
+
+    <h2 id="flow">Flow</h2>
+    <p>A <strong>flow</strong> is a DAG of <em>nodes</em>, each of which boots its own session. The built-in <code>autonomous-sdlc</code> flow has five nodes: <code>plan</code>, <code>spec</code>, <code>implement</code>, <code>test</code>, <code>ship</code>. Edges declare dependencies and optional review gates.</p>
+    <div class="pre-label">flows/autonomous-sdlc.yaml</div>
+<pre><code><span class="k">name</span>: autonomous-sdlc
+<span class="k">version</span>: 3
+
+<span class="k">nodes</span>:
+  <span class="n">plan</span>:      { agent: planner,  runtime: claude }
+  <span class="n">spec</span>:      { agent: speccer,  runtime: claude,  needs: [plan] }
+  <span class="n">implement</span>: { agent: coder,    runtime: claude,  needs: [spec] }
+  <span class="n">test</span>:      { agent: tester,   runtime: codex,   needs: [implement] }
+  <span class="n">ship</span>:      { agent: releaser, runtime: claude,  needs: [test],
+              gate: human-review }</code></pre>
+
+    <h2 id="agent">Agent</h2>
+    <p>An <strong>agent</strong> is a YAML persona — system prompt, tool permissions, output contract. Agents are runtime-agnostic: the same <code>coder</code> agent runs under Claude Code today and Gemini CLI tomorrow.</p>
+    <p>See <a href="guide-flows.html">Flows &amp; DAGs</a> for how nodes pick an agent + runtime pair.</p>
+
+    <h2 id="compute">Compute target</h2>
+    <p>A <strong>compute target</strong> = <em>(compute_kind, runtime_kind)</em>. Same agent, different substrate:</p>
+    <table>
+      <thead><tr><th>Compute kind</th><th>Runtime kind</th><th>Where it runs</th></tr></thead>
+      <tbody>
+        <tr><td><code>local</code></td><td><code>direct</code></td><td>tmux on your box</td></tr>
+        <tr><td><code>local</code></td><td><code>docker</code></td><td>local container</td></tr>
+        <tr><td><code>ec2</code></td><td><code>devcontainer</code></td><td>spot VM, <code>.devcontainer.json</code></td></tr>
+        <tr><td><code>k8s</code></td><td><code>kata</code></td><td>hardened pod</td></tr>
+      </tbody>
+    </table>
+
+    <div class="page-foot">
+      <a href="#">Edit this page on GitHub →</a>
+      <div class="sp"></div>
+      <div class="pager">
+        <a class="next" href="guide-sessions.html"><small>NEXT</small><span>Sessions →</span></a>
+      </div>
+    </div>
+  </main>
+
+  <aside class="toc">
+    <div class="title">On this page</div>
+    <a href="#session" class="on">Session</a>
+    <a href="#flow">Flow</a>
+    <a href="#agent">Agent</a>
+    <a href="#compute">Compute target</a>
+  </aside>
+</div>
+
+<script src="../_docs.js?v=2"></script>
+</body>
+</html>

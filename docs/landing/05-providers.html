@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en" class="midnight-circuit dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ark — Providers</title>
+  <link rel="stylesheet" href="../_docs.css" />
+</head>
+<body data-root="../" data-nav="home">
+
+<div data-slot="topbar"></div>
+
+<section class="section">
+  <div class="section-head">
+    <div class="eyebrow">compute providers</div>
+    <h2>Run anywhere.<br>Switch substrates in one line.</h2>
+    <p>Every provider implements the same <code style="font-family:var(--font-mono);font-size:15px;background:var(--doc-surface-2);padding:2px 6px;border-radius:4px">ComputeTarget</code> interface — plan a session locally, ship it to EC2, run validation on k8s.</p>
+  </div>
+  <div class="providers">
+    <div class="prov"><div class="name">local</div><div class="desc">tmux on your box</div></div>
+    <div class="prov"><div class="name">docker</div><div class="desc">container per session</div></div>
+    <div class="prov"><div class="name">devcontainer</div><div class="desc">.devcontainer.json</div></div>
+    <div class="prov"><div class="name">firecracker</div><div class="desc">microVM</div></div>
+    <div class="prov"><div class="name">ec2</div><div class="desc">on-demand / spot</div></div>
+    <div class="prov"><div class="name">ec2-warm</div><div class="desc">pre-warmed pool</div></div>
+    <div class="prov"><div class="name">e2b</div><div class="desc">sandboxed cloud</div></div>
+    <div class="prov"><div class="name">k8s</div><div class="desc">pod per session</div></div>
+    <div class="prov"><div class="name">k8s-kata</div><div class="desc">hardened runtime</div></div>
+    <div class="prov"><div class="name">lambda</div><div class="desc">short-lived tasks</div></div>
+    <div class="prov"><div class="name">fly</div><div class="desc">edge VMs</div></div>
+    <div class="prov"><div class="name">custom</div><div class="desc">BYO provider</div></div>
+  </div>
+</section>
+
+<style>
+  .providers { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; max-width: 780px; margin: 32px auto 0; }
+  .providers .prov { padding: 14px 8px; border-radius: 8px; border: 1px solid var(--doc-border); background: var(--doc-surface); text-align: center; transition: border-color 150ms; }
+  .providers .prov:hover { border-color: var(--primary); }
+  .providers .prov .name { font: 600 12px var(--font-mono-ui); color: var(--doc-fg-strong); }
+  .providers .prov .desc { font: 400 10px var(--font-sans); color: var(--doc-fg-muted); margin-top: 3px; }
+  @media (max-width: 720px) { .providers { grid-template-columns: repeat(2, 1fr); } }
+</style>
+
+<script src="../_docs.js"></script>
+</body>
+</html>

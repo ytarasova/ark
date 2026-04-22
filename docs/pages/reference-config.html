@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en" class="midnight-circuit dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Config reference — Ark</title>
+  <link rel="stylesheet" href="../_docs.css" />
+</head>
+<body data-root="../" data-nav="reference" data-page="config">
+
+<div data-slot="topbar"></div>
+
+<div class="shell">
+  <aside class="sidebar" data-auto></aside>
+
+  <main class="content">
+    <h1>Config reference</h1>
+    <p class="lede">Ark resolves config from five layers (highest precedence first): programmatic &gt; CLI flags &gt; <code>ARK_*</code> env vars &gt; <code>~/.ark/config.yaml</code> &gt; profile defaults.</p>
+
+    <h2 id="profiles">Profiles</h2>
+    <p>Set with <code>ARK_PROFILE</code> or auto-detected:</p>
+    <ul>
+      <li><code>local</code> — default, SQLite storage, no auth</li>
+      <li><code>control-plane</code> — Postgres, required auth, multi-tenant</li>
+      <li><code>test</code> — ephemeral arkDir + random ports per call</li>
+    </ul>
+
+    <h2 id="envvars">Environment variables</h2>
+    <table>
+      <thead><tr><th>Env var</th><th>Field</th><th>Default</th></tr></thead>
+      <tbody>
+        <tr><td><code>ARK_PROFILE</code></td><td><code>profile</code></td><td>heuristic</td></tr>
+        <tr><td><code>ARK_DIR</code></td><td><code>dirs.ark</code></td><td><code>~/.ark</code></td></tr>
+        <tr><td><code>ARK_CONDUCTOR_PORT</code></td><td><code>ports.conductor</code></td><td>19100</td></tr>
+        <tr><td><code>ARK_ARKD_PORT</code></td><td><code>ports.arkd</code></td><td>19300</td></tr>
+        <tr><td><code>ARK_SERVER_PORT</code></td><td><code>ports.server</code></td><td>19400</td></tr>
+        <tr><td><code>ARK_WEB_PORT</code></td><td><code>ports.web</code></td><td>8420</td></tr>
+        <tr><td><code>ARK_CHANNEL_BASE_PORT</code></td><td><code>channels.basePort</code></td><td>19200</td></tr>
+        <tr><td><code>ARK_LOG_LEVEL</code></td><td><code>observability.logLevel</code></td><td>info</td></tr>
+        <tr><td><code>ARK_AUTH_REQUIRE_TOKEN</code></td><td><code>auth.requireToken</code></td><td>false</td></tr>
+        <tr><td><code>DATABASE_URL</code></td><td><code>database.url</code></td><td>— (SQLite)</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="yaml">YAML format</h2>
+<pre><code><span class="c"># top-level defaults apply to every profile</span>
+<span class="k">ports</span>:
+  <span class="n">conductor</span>: 19100
+  <span class="n">arkd</span>: 19300
+<span class="k">channels</span>:
+  <span class="n">basePort</span>: 19200
+  <span class="n">range</span>: 10000
+<span class="k">observability</span>:
+  <span class="n">logLevel</span>: info
+
+<span class="c"># profile overlays merge on top of the top level</span>
+<span class="k">profiles</span>:
+  <span class="n">control-plane</span>:
+    <span class="k">auth</span>:
+      <span class="n">requireToken</span>: true
+  <span class="n">test</span>: {}</code></pre>
+
+    <h2 id="ports">Port map</h2>
+    <table>
+      <thead><tr><th>Port</th><th>Service</th></tr></thead>
+      <tbody>
+        <tr><td>8420</td><td>web dashboard / router</td></tr>
+        <tr><td>19100</td><td>conductor</td></tr>
+        <tr><td>19200–29199</td><td>per-session channels</td></tr>
+        <tr><td>19300</td><td>arkd daemon</td></tr>
+        <tr><td>19400</td><td>server daemon WS</td></tr>
+      </tbody>
+    </table>
+
+    <div class="note warn"><div class="i">!</div><div>Never hardcode ports. Use <code>app.config.ports.*</code> or <code>allocatePort()</code> in tests.</div></div>
+
+    <div class="page-foot">
+      <a href="#">Edit this page on GitHub →</a>
+      <div class="sp"></div>
+    </div>
+  </main>
+
+  <aside class="toc">
+    <div class="title">On this page</div>
+    <a href="#profiles" class="on">Profiles</a>
+    <a href="#envvars">Environment variables</a>
+    <a href="#yaml">YAML format</a>
+    <a href="#ports">Port map</a>
+  </aside>
+</div>
+
+<script src="../_docs.js?v=2"></script>
+</body>
+</html>

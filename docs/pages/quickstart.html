@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en" class="midnight-circuit dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quick start — Ark</title>
+  <link rel="stylesheet" href="../_docs.css" />
+</head>
+<body data-root="../" data-nav="quickstart" data-page="quickstart">
+
+<div data-slot="topbar"></div>
+
+<div class="shell">
+  <aside class="sidebar" data-auto></aside>
+
+  <main class="content">
+    <h1>Quick start</h1>
+    <p class="lede">Install Ark, launch your first agent session, and watch a DAG flow complete — in about two minutes.</p>
+
+    <h2 id="prereq">Prerequisites</h2>
+    <p>Ark is Bun-only and uses tmux to multiplex agent processes. Before you install:</p>
+    <ul>
+      <li><strong>Bun</strong> ≥ 1.1 — <code>curl -fsSL bun.sh/install | bash</code></li>
+      <li><strong>tmux</strong> ≥ 3.2 — <code>brew install tmux</code> or your package manager</li>
+      <li>At least one agent runtime: <strong>Claude Code</strong>, <strong>Codex</strong>, <strong>Gemini CLI</strong>, or <strong>Goose</strong></li>
+    </ul>
+    <div class="note info"><div class="i">i</div><div>Ark won't fall back if tmux is missing — check <code>tmux -V</code> before installing.</div></div>
+
+    <h2 id="install">Install</h2>
+    <p>The one-liner links <code>ark</code> into <code>/usr/local/bin</code> and runs <code>bun install</code>:</p>
+    <div class="pre-label">bash</div>
+<pre><code><span class="prompt">$</span> curl -fsSL ark.run/install | bash
+<span class="c">› downloading ark-v0.9.1-darwin-arm64…</span>
+<span class="c">› bun install (147 packages)</span>
+<span class="c">› linked ark → /usr/local/bin/ark</span>
+<span class="c">› ~/.ark/ initialized</span>
+
+installed. try: <span class="k">ark --help</span></code></pre>
+
+    <p>Or, from source:</p>
+    <div class="pre-label">bash</div>
+<pre><code><span class="prompt">$</span> git clone https://github.com/ark-run/ark &amp;&amp; cd ark
+<span class="prompt">$</span> make install</code></pre>
+
+    <h2 id="first-session">Your first session</h2>
+    <p>A <strong>session</strong> is one agent working against one repo on one compute target. Kick one off inline:</p>
+    <div class="pre-label">bash</div>
+<pre><code><span class="prompt">$</span> cd ~/projects/my-app
+<span class="prompt">$</span> ark new <span class="s">"explain the auth middleware"</span> --runtime claude
+
+  ◆ <span class="k">session</span>   ses_01hnr8x9m4
+  ◇ <span class="k">compute</span>   local
+  ◇ <span class="k">runtime</span>   claude-code
+
+attaching… <span class="c">(ctrl-b d to detach)</span></code></pre>
+    <p>Ark boots <code>arkd</code> inside a tmux window, spawns the runtime, and streams output to your terminal. Detach whenever — the session keeps running.</p>
+
+    <div class="note tip"><div class="i">✦</div><div>Use <code>ark ls</code> to list running sessions, <code>ark attach &lt;id&gt;</code> to re-attach, <code>ark stop &lt;id&gt;</code> to terminate.</div></div>
+
+    <h2 id="flow">Run a flow</h2>
+    <p>Flows are DAGs of agent tasks. The built-in <code>autonomous-sdlc</code> flow plans, specs, implements, tests, and prepares a PR:</p>
+    <div class="pre-label">bash</div>
+<pre><code><span class="prompt">$</span> ark run autonomous-sdlc <span class="s">"add rate limiting to /api/messages"</span> \
+    --compute ec2-warm \
+    --router balanced
+
+  ◆ flow  autonomous-sdlc (v3)
+  ├─ <span style="color:#34d399">✓</span> plan          <span class="c">4 subtasks</span>
+  ├─ <span style="color:#34d399">✓</span> spec          <span class="c">api contract v2</span>
+  ├─ <span style="color:#60a5fa">▸</span> implement     <span class="c">editing middleware/rate.ts</span>
+  └─ <span style="color:#7878a0">◌</span> test + ship
+</code></pre>
+    <p>Each node runs in its own session, with shared context via the knowledge graph. You can <a href="guide-flows.html">define your own flows</a> in YAML.</p>
+
+    <h2 id="dashboard">Open the dashboard</h2>
+    <p>The web dashboard gives you a live view of sessions, flows, and agent transcripts:</p>
+    <div class="pre-label">bash</div>
+<pre><code><span class="prompt">$</span> ark dev
+<span class="c">› api    :8420</span>
+<span class="c">› web    :5173  (Vite HMR)</span>
+<span class="c">› daemon :19400 (auto-started)</span>
+
+open http://localhost:5173</code></pre>
+
+    <div class="note warn"><div class="i">!</div><div>On first run, the dashboard asks which theme + workspace to use. Your pick persists in <code>~/.ark/config.yaml</code>.</div></div>
+
+    <h2 id="next">Where next</h2>
+    <table>
+      <thead><tr><th>If you want to…</th><th>Read</th></tr></thead>
+      <tbody>
+        <tr><td>Understand sessions, flows, and agents</td><td><a href="guide-concepts.html">Core concepts</a></td></tr>
+        <tr><td>Run on EC2, Docker, or k8s</td><td><a href="guide-compute.html">Compute targets</a></td></tr>
+        <tr><td>Route LLM calls by cost or latency</td><td><a href="guide-router.html">LLM router</a></td></tr>
+        <tr><td>See every CLI flag and env var</td><td><a href="reference-cli.html">CLI reference</a></td></tr>
+      </tbody>
+    </table>
+
+    <div class="page-foot">
+      <a href="#">Edit this page on GitHub →</a>
+      <div class="sp"></div>
+      <div class="pager">
+        <a class="next" href="guide-concepts.html">
+          <small>NEXT</small>
+          <span>Core concepts →</span>
+        </a>
+      </div>
+    </div>
+  </main>
+
+  <aside class="toc">
+    <div class="title">On this page</div>
+    <a href="#prereq">Prerequisites</a>
+    <a href="#install" class="on">Install</a>
+    <a href="#first-session">Your first session</a>
+    <a href="#flow">Run a flow</a>
+    <a href="#dashboard">Open the dashboard</a>
+    <a href="#next">Where next</a>
+  </aside>
+</div>
+
+<script src="../_docs.js?v=2"></script>
+</body>
+</html>

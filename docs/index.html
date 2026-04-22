@@ -1,510 +1,178 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="en" class="midnight-circuit dark">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Ark - Autonomous Agent Ecosystem</title>
-  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ark — Autonomous agent ecosystem</title>
+  <link rel="stylesheet" href="_docs.css" />
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap');
-
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #0a0e17;
-      color: #e2e8f0;
-      min-height: 100vh;
-      overflow-x: hidden;
+    .hero-grid {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(var(--doc-border-soft) 1px, transparent 1px),
+        linear-gradient(90deg, var(--doc-border-soft) 1px, transparent 1px);
+      background-size: 56px 56px;
+      mask-image: radial-gradient(ellipse 60% 50% at 50% 30%, #000 30%, transparent 70%);
+      opacity: .5; pointer-events: none;
     }
-
-    /* Subtle animated gradient background */
-    body::before {
-      content: '';
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background:
-        radial-gradient(ellipse 80% 50% at 20% 40%, rgba(56, 189, 248, 0.08), transparent),
-        radial-gradient(ellipse 60% 40% at 80% 20%, rgba(139, 92, 246, 0.06), transparent),
-        radial-gradient(ellipse 50% 60% at 50% 80%, rgba(16, 185, 129, 0.05), transparent);
-      z-index: -1;
-      animation: glow 20s ease-in-out infinite alternate;
+    .flow-diagram {
+      display: grid; grid-template-columns: 1fr 40px 1fr 40px 1fr;
+      align-items: center; gap: 0; padding: 28px 24px;
+      background: var(--doc-surface); border: 1px solid var(--doc-border);
+      border-radius: 12px; max-width: 760px; margin: 36px auto 0;
     }
-
-    @keyframes glow {
-      0% { opacity: 0.7; }
-      100% { opacity: 1; }
+    .flow-diagram .node {
+      padding: 14px 12px; border-radius: 8px;
+      background: var(--doc-surface-2); border: 1px solid var(--doc-border);
+      text-align: center;
     }
-
-    .container {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 3rem 2rem 4rem;
+    .flow-diagram .node .n-label {
+      font: 500 10px var(--font-mono-ui); color: var(--doc-fg-muted);
+      text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px;
     }
-
-    /* Top nav */
-    .top-nav {
-      display: flex;
-      justify-content: flex-end;
-      gap: 1.5rem;
-      margin-bottom: 3rem;
+    .flow-diagram .node .n-name {
+      font: 600 14px var(--font-sans); color: var(--doc-fg-strong);
     }
-
-    .top-nav a {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.85rem;
-      color: #94a3b8;
-      text-decoration: none;
-      transition: color 0.15s;
-    }
-
-    .top-nav a:hover {
-      color: #38bdf8;
-    }
-
-    /* Header */
-    .logo {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 4.5rem;
-      font-weight: 700;
-      letter-spacing: -0.04em;
-      background: linear-gradient(135deg, #38bdf8, #818cf8, #a78bfa);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-      margin-bottom: 0.75rem;
-    }
-
-    .tagline {
-      font-size: 1.25rem;
-      color: #94a3b8;
-      line-height: 1.6;
-      max-width: 500px;
-    }
-
-    .tagline strong {
-      color: #cbd5e1;
-      font-weight: 600;
-    }
-
-    /* Feature pills */
-    .features {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin: 2rem 0 3rem;
-    }
-
-    .pill {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.75rem;
-      font-weight: 500;
-      padding: 0.35rem 0.75rem;
-      border-radius: 100px;
-      background: rgba(56, 189, 248, 0.08);
-      border: 1px solid rgba(56, 189, 248, 0.15);
-      color: #7dd3fc;
-    }
-
-    .pill.green {
-      background: rgba(16, 185, 129, 0.08);
-      border-color: rgba(16, 185, 129, 0.15);
-      color: #6ee7b7;
-    }
-
-    .pill.purple {
-      background: rgba(139, 92, 246, 0.08);
-      border-color: rgba(139, 92, 246, 0.15);
-      color: #c4b5fd;
-    }
-
-    /* Install boxes */
-    .install-section {
-      margin: 2.5rem 0;
-    }
-
-    .install-section h2 {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.8rem;
-      font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: #64748b;
-      margin-bottom: 0.75rem;
-    }
-
-    .code-box {
-      position: relative;
-      background: #111827;
-      border: 1px solid #1e293b;
-      border-radius: 12px;
-      padding: 1.25rem 1.5rem;
-      margin-bottom: 1rem;
-      overflow-x: auto;
-      transition: border-color 0.2s;
-    }
-
-    .code-box:hover {
-      border-color: #334155;
-    }
-
-    .code-box code {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.9rem;
-      color: #a5f3fc;
-      line-height: 1.6;
-    }
-
-    .code-box .prompt {
-      color: #6366f1;
-      user-select: none;
-    }
-
-    .code-box .comment {
-      color: #475569;
-    }
-
-    .copy-btn {
-      position: absolute;
-      top: 0.75rem;
-      right: 0.75rem;
-      background: #1e293b;
-      border: 1px solid #334155;
-      border-radius: 6px;
-      color: #94a3b8;
-      font-size: 0.75rem;
-      padding: 0.3rem 0.6rem;
-      cursor: pointer;
-      font-family: 'Inter', sans-serif;
-      transition: all 0.15s;
-    }
-
-    .copy-btn:hover {
-      background: #334155;
-      color: #e2e8f0;
-    }
-
-    /* Divider */
-    .divider {
-      border: none;
-      height: 1px;
-      background: linear-gradient(to right, transparent, #1e293b, transparent);
-      margin: 3rem 0;
-    }
-
-    /* What you get section */
-    .what-you-get h2 {
-      font-size: 1.5rem;
-      font-weight: 600;
-      margin-bottom: 1.5rem;
-      color: #f1f5f9;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-    }
-
-    @media (max-width: 600px) {
-      .grid { grid-template-columns: 1fr; }
-      .logo { font-size: 3rem; }
-    }
-
-    .card {
-      background: rgba(17, 24, 39, 0.6);
-      border: 1px solid #1e293b;
-      border-radius: 12px;
-      padding: 1.25rem;
-      transition: border-color 0.2s, transform 0.2s;
-    }
-
-    .card:hover {
-      border-color: #334155;
-      transform: translateY(-1px);
-    }
-
-    .card .icon {
-      font-size: 1.5rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .card h3 {
-      font-size: 0.95rem;
-      font-weight: 600;
-      color: #e2e8f0;
-      margin-bottom: 0.35rem;
-    }
-
-    .card p {
-      font-size: 0.85rem;
-      color: #94a3b8;
-      line-height: 1.5;
-    }
-
-    /* Footer */
-    .footer {
-      margin-top: 4rem;
-      padding-top: 2rem;
-      border-top: 1px solid #1e293b;
-      display: flex;
-      justify-content: center;
-      gap: 2rem;
-      flex-wrap: wrap;
-    }
-
-    .footer a {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.85rem;
-      color: #64748b;
-      text-decoration: none;
-      transition: color 0.15s;
-    }
-
-    .footer a:hover {
-      color: #38bdf8;
-    }
-
-    /* Requirements note */
-    .requirements {
-      margin-top: 1.5rem;
-      padding: 1rem 1.25rem;
-      background: rgba(250, 204, 21, 0.04);
-      border: 1px solid rgba(250, 204, 21, 0.1);
-      border-radius: 10px;
-      font-size: 0.85rem;
-      color: #94a3b8;
-    }
-
-    .requirements strong {
-      color: #fbbf24;
-      font-weight: 500;
-    }
+    .flow-diagram .node.primary { background: var(--primary-subtle); border-color: rgba(107,89,222,.3); }
+    .flow-diagram .node.primary .n-label { color: var(--primary); }
+    .flow-diagram .arrow { display: flex; align-items: center; justify-content: center; color: var(--doc-fg-muted); }
+    .flow-diagram .arrow svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+    .providers { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; max-width: 780px; margin: 32px auto 0; }
+    .providers .prov { padding: 14px 8px; border-radius: 8px; border: 1px solid var(--doc-border); background: var(--doc-surface); text-align: center; transition: border-color 150ms; }
+    .providers .prov:hover { border-color: var(--primary); }
+    .providers .prov .name { font: 600 12px var(--font-mono-ui); color: var(--doc-fg-strong); }
+    .providers .prov .desc { font: 400 10px var(--font-sans); color: var(--doc-fg-muted); margin-top: 3px; }
+    @media (max-width: 720px) { .providers { grid-template-columns: repeat(2, 1fr); } .flow-diagram { grid-template-columns: 1fr; } .flow-diagram .arrow { transform: rotate(90deg); } }
   </style>
 </head>
-<body>
-  <div class="container">
-    <nav class="top-nav">
-      <a href="quickstart.html">Quick Start</a>
-      <a href="concepts.html">Concepts</a>
-      <a href="web.html">Web Dashboard</a>
-      <a href="cli.html">CLI Reference</a>
-      <a href="configuration.html">Configuration</a>
-      <a href="compute.html">Compute</a>
-      <a href="howto-knowledge.html">Knowledge</a>
-      <a href="howto-costs.html">Costs</a>
-      <a href="design-system/">Design</a>
-      <a href="roadmap.html">Roadmap</a>
-      <a href="comparison-goose.html">vs Goose</a>
-      <a href="architecture.html">Architecture</a>
-      <a href="router.html">Router</a>
-      <a href="api-reference.html">API</a>
-      <a href="development.html">Dev Guide</a>
-      <a href="https://github.com/ytarasova/ark">GitHub</a>
-    </nav>
-    <div class="logo">ark</div>
-    <p class="tagline">
-      <strong>Autonomous agent ecosystem.</strong><br>
-      Orchestrate AI coding agents through DAG-based SDLC flows with 11 compute providers.
-    </p>
+<body data-root="" data-nav="home">
 
-    <div class="features">
-      <span class="pill">DAG flow engine</span>
-      <span class="pill green">knowledge graph</span>
-      <span class="pill purple">LLM router</span>
-      <span class="pill">5 runtimes</span>
-      <span class="pill green">12 agents</span>
-      <span class="pill purple">11 compute providers</span>
-      <span class="pill">compute templates</span>
-      <span class="pill green">TensorZero gateway</span>
-      <span class="pill purple">multi-tenant control plane</span>
-      <span class="pill">billing modes</span>
-      <span class="pill green">web UI + desktop</span>
-      <span class="pill purple">fan-out / auto-join</span>
-      <span class="pill">cost tracking</span>
-      <span class="pill green">Helm chart</span>
-      <span class="pill purple">remote client mode</span>
+<div data-slot="topbar"></div>
+
+<!-- hero -->
+<section class="hero">
+  <div class="hero-grid"></div>
+  <div class="eyebrow">◆ autonomous agent ecosystem</div>
+  <h1>DAG-driven <em>AI coding agents</em>,<br>orchestrated across any compute.</h1>
+  <p>Ark runs Claude Code, Codex, Gemini CLI, and Goose against your repo through a DAG of SDLC flows — backed by 11 compute providers, a knowledge graph, and an LLM router.</p>
+  <div class="cta">
+    <a class="btn btn-primary" href="pages/quickstart.html">
+      Start in 2 minutes
+      <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+    </a>
+    <a class="btn btn-secondary" href="#install">
+      <svg viewBox="0 0 24 24"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><path d="M7 11l5 5 5-5"/><path d="M12 4v12"/></svg>
+      Install
+    </a>
+  </div>
+  <div class="install-strip" id="install">
+    <code>
+      <span class="dollar">$</span>
+      curl -fsSL ark.run/install | bash
+      <span class="copy" onclick="this.textContent='Copied';setTimeout(()=>this.textContent='Copy',1400)">Copy</span>
+    </code>
+  </div>
+</section>
+
+<!-- preview -->
+<div class="preview-wrap">
+  <div class="preview-card">
+    <div class="hd">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div class="file">~/projects/my-app</div>
+      <div class="sp" style="flex:1"></div>
+      <span style="color:var(--doc-fg-muted)">ark run autonomous-sdlc</span>
     </div>
+    <pre><code><span class="c"># Launch an autonomous SDLC flow against a feature request</span>
+<span class="prompt">$</span> ark run autonomous-sdlc <span class="s">"add rate limiting to /api/messages"</span>
 
-    <div class="install-section">
-      <h2>Install</h2>
-      <div class="code-box">
-        <button class="copy-btn" onclick="copy(this, 'curl -fsSL https://ytarasova.github.io/ark/install.sh | bash')">Copy</button>
-        <code><span class="prompt">$</span> curl -fsSL https://ytarasova.github.io/ark/install.sh | bash</code>
-      </div>
+  ◆ <span class="k">session</span>   <span class="n">ses_01hnr8x9m4</span>   <span style="color:var(--primary)">● running</span>
+  ◇ <span class="k">compute</span>   ec2-spot / us-west-2 / arkd:19300
+  ◇ <span class="k">runtime</span>   claude-code <span style="color:var(--doc-fg-muted)">(via router:balanced)</span>
 
-      <div class="code-box">
-        <button class="copy-btn" onclick="copy(this, 'curl -fsSL https://ytarasova.github.io/ark/install.sh | ARK_VERSION=v0.1.0 bash')">Copy</button>
-        <code>
-          <span class="comment"># Pin to a specific version</span><br>
-          <span class="prompt">$</span> curl -fsSL https://ytarasova.github.io/ark/install.sh | ARK_VERSION=v0.1.0 bash
-        </code>
-      </div>
+  ├─ <span style="color:#34d399">✓</span> plan          <span class="c">// 4 subtasks identified</span>
+  ├─ <span style="color:#34d399">✓</span> spec          <span class="c">// api contract updated</span>
+  ├─ <span style="color:#60a5fa">▸</span> implement     <span class="c">// editing packages/server/middleware/…</span>
+  │   └─ <span style="color:#fbbf24">◌</span> waiting on review gate
+  └─ <span style="color:#7878a0">◌</span> test + ship   <span class="c">// pending implement</span>
+</code></pre>
+  </div>
+</div>
+
+<!-- features -->
+<section class="section">
+  <div class="section-head">
+    <div class="eyebrow">built for long-running agents</div>
+    <h2>Everything an agent needs,<br>none of the orchestration pain.</h2>
+    <p>Ark treats coding agents as first-class citizens — with isolated compute, shared memory, and a control plane that's actually opinionated about the SDLC.</p>
+  </div>
+  <div class="features">
+    <div class="feature">
+      <div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><path d="M9.7 9.7 6.4 17.6M14.3 9.7l3.3-2.9"/></svg></div>
+      <h3>DAG-based SDLC flows</h3>
+      <p>Compose plan → spec → implement → test → ship nodes as code. Branch, retry, gate on human review.</p>
     </div>
-
-    <div class="install-section">
-      <h2>Quick Start</h2>
-      <div class="code-box">
-        <button class="copy-btn" onclick="copy(this, 'ark web')">Copy</button>
-        <code>
-          <span class="prompt">$</span> ark web<span class="comment">              # web dashboard</span><br>
-          <span class="prompt">$</span> ark exec --repo . --summary "Fix auth bug"<br>
-          <span class="prompt">$</span> ark search "authentication"
-        </code>
-      </div>
+    <div class="feature">
+      <div class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/></svg></div>
+      <h3>11 compute providers</h3>
+      <p>local, docker, devcontainer, firecracker, EC2, E2B, k8s, kata-containers. Same API, any substrate.</p>
     </div>
-
-    <div class="requirements">
-      <strong>Self-contained:</strong> macOS or Linux (arm64/x64). The installer ships a tarball that bundles ark + tmux + codegraph + tensorzero. No system dependencies beyond <code>git</code>.
+    <div class="feature">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M5 8h14"/><path d="M5 16h14"/></svg></div>
+      <h3>Multi-runtime</h3>
+      <p>Claude Code, Codex, Gemini CLI, Goose. Swap runtimes per node, or A/B test two on the same task.</p>
     </div>
-
-    <hr class="divider">
-
-    <div class="what-you-get">
-      <h2>What you get</h2>
-      <div class="grid">
-        <div class="card">
-          <div class="icon">&#9881;</div>
-          <h3>DAG Flow Engine</h3>
-          <p>YAML-defined SDLC pipelines: intake, plan, audit, execute, verify, close, retro. Fan-out, auto-join, verification gates.</p>
-        </div>
-        <div class="card">
-          <div class="icon">&#9000;</div>
-          <h3>Web + Desktop</h3>
-          <p>Web dashboard with cost charts and Electron desktop app. Live agent output over SSE.</p>
-        </div>
-        <div class="card">
-          <div class="icon">&#9889;</div>
-          <h3>11 Compute Providers</h3>
-          <p>Local, Docker, DevContainer, Firecracker, EC2, EC2+Docker/DevContainer/Firecracker, E2B sandboxes, Kubernetes, and K8s with Kata Containers.</p>
-        </div>
-        <div class="card">
-          <div class="icon">&#128269;</div>
-          <h3>Knowledge Graph</h3>
-          <p>Unified knowledge across codebase, sessions, memories, and learnings. ops-codegraph indexing, 33 languages via tree-sitter.</p>
-        </div>
-        <div class="card">
-          <div class="icon">&#128274;</div>
-          <h3>Multi-Runtime + Billing Modes</h3>
-          <p>5 runtimes (Claude, Claude Max, Codex, Gemini, Goose). 12 specialized agents. API or subscription billing, per-runtime cost tracking.</p>
-        </div>
-        <div class="card">
-          <div class="icon">&#128295;</div>
-          <h3>Compute Templates</h3>
-          <p>Named presets for compute creation. One YAML entry spins up any provider with pinned size/region/image.</p>
-        </div>
-        <div class="card">
-          <div class="icon">&#128640;</div>
-          <h3>TensorZero Gateway</h3>
-          <p>Optional Rust-based OpenAI-compatible gateway. Auto-started by the router for circuit breakers, fallbacks, and observability.</p>
-        </div>
-        <div class="card">
-          <div class="icon">&#128232;</div>
-          <h3>Multi-Tenant Control Plane</h3>
-          <p>Hosted mode with API keys, tenant policies, integration enforcement (router_required, auto_index_required), worker registry, Helm chart.</p>
-        </div>
-      </div>
+    <div class="feature">
+      <div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
+      <h3>Knowledge graph</h3>
+      <p>Code-graph extraction lets agents query call sites, type dependencies, and prior diffs — not just grep.</p>
     </div>
-
-    <hr class="divider">
-
-    <div class="what-you-get">
-      <h2>Documentation</h2>
-      <div class="grid">
-        <a href="quickstart.html" class="card" style="text-decoration:none">
-          <h3>Quick Start</h3>
-          <p>Install, create your first session, and launch the web UI in under 2 minutes.</p>
-        </a>
-        <a href="concepts.html" class="card" style="text-decoration:none">
-          <h3>Core Concepts</h3>
-          <p>Flows, agents, stages, gates, autonomy, channels, and the conductor.</p>
-        </a>
-        <a href="web.html" class="card" style="text-decoration:none">
-          <h3>Web Dashboard</h3>
-          <p>Browser-based dashboard with SSE live updates and desktop app.</p>
-        </a>
-        <a href="cli.html" class="card" style="text-decoration:none">
-          <h3>CLI Reference</h3>
-          <p>Every command, flag, and option documented.</p>
-        </a>
-        <a href="workflows.html" class="card" style="text-decoration:none">
-          <h3>Workflows</h3>
-          <p>Flows, agents, skills, recipes, executors, and verification gates.</p>
-        </a>
-        <a href="configuration.html" class="card" style="text-decoration:none">
-          <h3>Configuration</h3>
-          <p>config.yaml, hotkeys, budgets, OTLP, repo config, and environment variables.</p>
-        </a>
-        <a href="compute.html" class="card" style="text-decoration:none">
-          <h3>Compute Providers</h3>
-          <p>Local, Docker, EC2, E2B, Kubernetes -- setup and operations.</p>
-        </a>
-        <a href="advanced.html" class="card" style="text-decoration:none">
-          <h3>Advanced Features</h3>
-          <p>Memory, search, guardrails, worktrees, OTLP, and more.</p>
-        </a>
-        <a href="agents-reference.html" class="card" style="text-decoration:none">
-          <h3>Agents Reference</h3>
-          <p>All builtin agents, YAML fields, template variables, and CLI agents.</p>
-        </a>
-        <a href="flows-reference.html" class="card" style="text-decoration:none">
-          <h3>Flows Reference</h3>
-          <p>All builtin flows, stage fields, gate types, and DAG scheduling.</p>
-        </a>
-        <a href="skills-reference.html" class="card" style="text-decoration:none">
-          <h3>Skills Reference</h3>
-          <p>Reusable prompt fragments, three-tier resolution, and CLI commands.</p>
-        </a>
-        <a href="recipes-reference.html" class="card" style="text-decoration:none">
-          <h3>Recipes Reference</h3>
-          <p>Session templates, builtin recipes, variables, and custom recipe creation.</p>
-        </a>
-        <a href="runtimes-reference.html" class="card" style="text-decoration:none">
-          <h3>Runtimes Reference</h3>
-          <p>Claude, Claude Max, Codex, Gemini, Goose -- billing modes, transcript parsers, and custom runtimes.</p>
-        </a>
-        <a href="router.html" class="card" style="text-decoration:none">
-          <h3>LLM Router</h3>
-          <p>Policy-based routing across providers with circuit breakers, sticky sessions, and TensorZero integration.</p>
-        </a>
-        <a href="api-reference.html" class="card" style="text-decoration:none">
-          <h3>API Reference</h3>
-          <p>JSON-RPC 2.0 protocol, 80+ methods, ArkClient, remote mode, and authentication.</p>
-        </a>
-        <a href="environment.html" class="card" style="text-decoration:none">
-          <h3>Environment</h3>
-          <p>Environment variables, data locations, port assignments, and three-tier resolution.</p>
-        </a>
-        <a href="development.html" class="card" style="text-decoration:none">
-          <h3>Contributing</h3>
-          <p>Dev setup, project structure, testing patterns, code style, and building.</p>
-        </a>
-        <a href="troubleshooting.html" class="card" style="text-decoration:none">
-          <h3>Troubleshooting</h3>
-          <p>Common issues, diagnostic tools, and solutions for sessions, compute, web UI, and router.</p>
-        </a>
-        <a href="design-system/" class="card" style="text-decoration:none">
-          <h3>Design System</h3>
-          <p>Colors, typography, iconography, components. Six theme variants and an interactive showcase.</p>
-        </a>
-      </div>
+    <div class="feature">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="m3 12 4-4 4 4 6-6 4 4"/><path d="M21 14v6H3v-2"/></svg></div>
+      <h3>LLM router</h3>
+      <p>OpenAI-compatible proxy with 3 policies and circuit breakers. Route by cost, latency, or model affinity.</p>
     </div>
-
-    <div class="footer">
-      <a href="https://github.com/ytarasova/ark">GitHub</a>
-      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
-      <a href="https://github.com/ytarasova/ark/issues">Issues</a>
-      <a href="quickstart.html">Docs</a>
+    <div class="feature">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+      <h3>Multi-tenant control plane</h3>
+      <p>Tenants, tokens, audit — ready for teams. Postgres-backed for production, SQLite for local.</p>
     </div>
   </div>
 
-  <script>
-    function copy(btn, text) {
-      navigator.clipboard.writeText(text).then(() => {
-        btn.textContent = 'Copied!';
-        setTimeout(() => btn.textContent = 'Copy', 1500);
-      });
-    }
-  </script>
+  <div class="flow-diagram">
+    <div class="node primary"><div class="n-label">conductor</div><div class="n-name">:19100</div></div>
+    <div class="arrow"><svg viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></div>
+    <div class="node"><div class="n-label">arkd daemon</div><div class="n-name">:19300</div></div>
+    <div class="arrow"><svg viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></div>
+    <div class="node"><div class="n-label">agent runtime</div><div class="n-name">claude · codex · …</div></div>
+  </div>
+</section>
+
+<!-- providers -->
+<section class="section" style="padding-top: 0;">
+  <div class="section-head">
+    <div class="eyebrow">compute providers</div>
+    <h2>Run anywhere.<br>Switch substrates in one line.</h2>
+    <p>Every provider implements the same <code style="font-family:var(--font-mono);font-size:15px;background:var(--doc-surface-2);padding:2px 6px;border-radius:4px">ComputeTarget</code> interface — plan a session locally, ship it to EC2, run validation on k8s.</p>
+  </div>
+  <div class="providers">
+    <div class="prov"><div class="name">local</div><div class="desc">tmux on your box</div></div>
+    <div class="prov"><div class="name">docker</div><div class="desc">container per session</div></div>
+    <div class="prov"><div class="name">devcontainer</div><div class="desc">.devcontainer.json</div></div>
+    <div class="prov"><div class="name">firecracker</div><div class="desc">microVM</div></div>
+    <div class="prov"><div class="name">ec2</div><div class="desc">on-demand / spot</div></div>
+    <div class="prov"><div class="name">ec2-warm</div><div class="desc">pre-warmed pool</div></div>
+    <div class="prov"><div class="name">e2b</div><div class="desc">sandboxed cloud</div></div>
+    <div class="prov"><div class="name">k8s</div><div class="desc">pod per session</div></div>
+    <div class="prov"><div class="name">k8s-kata</div><div class="desc">hardened runtime</div></div>
+    <div class="prov"><div class="name">lambda</div><div class="desc">short-lived tasks</div></div>
+    <div class="prov"><div class="name">fly</div><div class="desc">edge VMs</div></div>
+    <div class="prov"><div class="name">custom</div><div class="desc">BYO provider</div></div>
+  </div>
+</section>
+
+<div data-slot="footer"></div>
+
+<script src="_docs.js"></script>
 </body>
 </html>

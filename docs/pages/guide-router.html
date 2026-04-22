@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en" class="midnight-circuit dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LLM router — Ark</title>
+  <link rel="stylesheet" href="../_docs.css" />
+</head>
+<body data-root="../" data-nav="guide" data-page="router">
+
+<div data-slot="topbar"></div>
+
+<div class="shell">
+  <aside class="sidebar" data-auto></aside>
+
+  <main class="content">
+    <h1>LLM router</h1>
+    <p class="lede">OpenAI-compatible proxy with three built-in policies and per-provider circuit breakers. Route any agent's calls by cost, latency, or model affinity.</p>
+
+    <h2 id="how">How it works</h2>
+    <p>Agent runtimes point at <code>http://localhost:8420/v1</code> instead of a model provider. The router picks a backend per request based on the active policy, then transparently proxies the response.</p>
+    <div class="note info"><div class="i">i</div><div>The router is enabled by default in <code>ark dev</code>. Disable with <code>--no-router</code>.</div></div>
+
+    <h2 id="policies">Policies</h2>
+    <table>
+      <thead><tr><th>Policy</th><th>Chooses by</th></tr></thead>
+      <tbody>
+        <tr><td><code>cheapest</code></td><td>lowest $/1k tokens that satisfies the model class</td></tr>
+        <tr><td><code>fastest</code></td><td>lowest observed p50 latency in the last 5 min</td></tr>
+        <tr><td><code>balanced</code></td><td>weighted mix of cost, latency, and error rate</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="config">Configure</h2>
+<pre><code><span class="c"># ~/.ark/config.yaml</span>
+<span class="k">router</span>:
+  <span class="k">policy</span>: balanced
+  <span class="k">backends</span>:
+    - name: anthropic
+      model_class: [sonnet, haiku]
+      weight: 1.0
+    - name: openai
+      model_class: [gpt-4, gpt-4-mini]
+      weight: 0.6
+    - name: self-hosted
+      url: http://gpu-box:8000
+      model_class: [llama-3]</code></pre>
+
+    <h2 id="breakers">Circuit breakers</h2>
+    <p>Each backend has a breaker that trips after <strong>5 consecutive 5xx errors</strong> or a <strong>p99 latency &gt; 30s</strong> for 60 seconds. Tripped backends cool down for <strong>2 minutes</strong>, then retry one request to recover.</p>
+
+    <h2 id="inspect">Inspect</h2>
+<pre><code><span class="prompt">$</span> ark router stats
+  backend       p50     p99    errs  state
+  anthropic     780ms   4.2s    0%   ● up
+  openai        620ms   3.1s    2%   ● up
+  self-hosted   1.9s   12.4s   18%   ○ half-open</code></pre>
+
+    <div class="page-foot">
+      <a href="#">Edit this page on GitHub →</a>
+      <div class="sp"></div>
+      <div class="pager">
+        <a class="next" href="reference-cli.html"><small>NEXT</small><span>CLI reference →</span></a>
+      </div>
+    </div>
+  </main>
+
+  <aside class="toc">
+    <div class="title">On this page</div>
+    <a href="#how" class="on">How it works</a>
+    <a href="#policies">Policies</a>
+    <a href="#config">Configure</a>
+    <a href="#breakers">Circuit breakers</a>
+    <a href="#inspect">Inspect</a>
+  </aside>
+</div>
+
+<script src="../_docs.js?v=2"></script>
+</body>
+</html>
