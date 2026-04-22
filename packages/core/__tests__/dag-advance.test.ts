@@ -2,7 +2,7 @@ import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import { AppContext } from "../app.js";
-import { advance } from "../services/session-orchestration.js";
+import { advance } from "../services/stage-advance.js";
 import { clearApp, getApp, setApp } from "./test-helpers.js";
 
 let app: AppContext;

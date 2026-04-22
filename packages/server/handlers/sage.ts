@@ -29,7 +29,8 @@ import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { fetchAnalysis, type SageAnalysis } from "../../core/integrations/sage-analysis.js";
-import { startSession, dispatch } from "../../core/services/session-orchestration.js";
+import { startSession } from "../../core/services/session-lifecycle.js";
+import { dispatch } from "../../core/services/dispatch.js";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 

@@ -1,12 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../app.js";
-import {
-  fanOut,
-  checkAutoJoin,
-  spawnSubagent,
-  spawnParallelSubagents,
-  joinFork,
-} from "../services/session-orchestration.js";
+import { fanOut, checkAutoJoin, joinFork } from "../services/fork-join.js";
+import { spawnSubagent, spawnParallelSubagents } from "../services/subagents.js";
 
 let app: AppContext;
 beforeAll(async () => {

@@ -8,7 +8,7 @@ import { mergeWorktreePR } from "../workspace-service.js";
  */
 export const autoMergeAction: ActionHandler = {
   name: "auto_merge",
-  async execute(app, session, action) {
+  async execute(app, session, action, _opts) {
     const sessionId = session.id;
     const result = await mergeWorktreePR(app, sessionId);
     if (!result.ok) return result;

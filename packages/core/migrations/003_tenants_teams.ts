@@ -24,7 +24,7 @@
  *     outside the runner.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import type { MigrationApplyContext } from "./types.js";
 import { applySqliteTenantsTeams } from "./003_tenants_teams_sqlite.js";
 import { applyPostgresTenantsTeams } from "./003_tenants_teams_postgres.js";
@@ -48,7 +48,7 @@ export async function up(ctx: MigrationApplyContext): Promise<void> {
  * yet on an extremely fresh DB (the runner creates it, but `up()` could in
  * theory be called from a test or tool that doesn't).
  */
-async function alreadyApplied(db: IDatabase): Promise<boolean> {
+async function alreadyApplied(db: DatabaseAdapter): Promise<boolean> {
   try {
     const row = (await db
       .prepare(`SELECT 1 AS present FROM ${MIGRATIONS_TABLE} WHERE version >= ? LIMIT 1`)

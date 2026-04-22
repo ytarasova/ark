@@ -6,18 +6,18 @@
  * added -- `deleted_by` is audit metadata, not a lookup key.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { logDebug } from "../observability/structured-log.js";
 
 const TABLES = ["tenants", "users", "teams", "memberships"] as const;
 
-export async function applyPostgresDeletedBy(db: IDatabase): Promise<void> {
+export async function applyPostgresDeletedBy(db: DatabaseAdapter): Promise<void> {
   for (const table of TABLES) {
     await trySql(db, `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS deleted_by TEXT`);
   }
 }
 
-async function trySql(db: IDatabase, sql: string): Promise<void> {
+async function trySql(db: DatabaseAdapter, sql: string): Promise<void> {
   try {
     await db.exec(sql);
   } catch {

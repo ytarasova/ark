@@ -16,7 +16,8 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext } from "../app.js";
-import { mediateStageHandoff, applyReport, applyHookStatus, advance } from "../services/session-orchestration.js";
+import { mediateStageHandoff, applyReport, applyHookStatus } from "../services/session-hooks.js";
+import { advance } from "../services/stage-advance.js";
 import { startConductor } from "../conductor/conductor.js";
 import type { OutboundMessage } from "../conductor/channel-types.js";
 

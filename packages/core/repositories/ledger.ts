@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { now } from "../util/time.js";
 
 export type LedgerEntryType = "fact" | "hypothesis" | "plan_step" | "progress" | "stall";
@@ -65,7 +65,7 @@ function rowToEntry(row: LedgerEntryRow): LedgerEntry {
 export class LedgerRepository {
   private tenantId: string = "default";
 
-  constructor(private db: IDatabase) {}
+  constructor(private db: DatabaseAdapter) {}
 
   setTenant(tenantId: string): void {
     this.tenantId = tenantId;

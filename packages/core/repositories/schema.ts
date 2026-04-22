@@ -1,8 +1,8 @@
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { initPoolSchema } from "../compute/pool.js";
 import { logDebug } from "../observability/structured-log.js";
 
-export async function initSchema(db: IDatabase): Promise<void> {
+export async function initSchema(db: DatabaseAdapter): Promise<void> {
   await db.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
@@ -293,6 +293,9 @@ export async function initSchema(db: IDatabase): Promise<void> {
   // Session artifacts table (queryable artifact tracking)
   await initArtifactSchema(db);
 
+  // stage_operations table -- idempotency ledger for advance/complete/handoff/executeAction.
+  await initStageOperationsSchema(db);
+
   // --- BEGIN agent-F: tenant_claude_auth ---
   // Tenant-level claude auth binding: exactly one of api_key / subscription_blob
   // per tenant. `secret_ref` is the name of the secret (or blob) in the
@@ -335,7 +338,7 @@ export async function initSchema(db: IDatabase): Promise<void> {
   // --- END agent-G ---
 }
 
-export async function initKnowledgeSchema(db: IDatabase): Promise<void> {
+export async function initKnowledgeSchema(db: DatabaseAdapter): Promise<void> {
   await safeExec(
     db,
     `
@@ -374,7 +377,7 @@ export async function initKnowledgeSchema(db: IDatabase): Promise<void> {
   await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_edges_relation ON knowledge_edges(relation)");
 }
 
-export async function initUsageSchema(db: IDatabase): Promise<void> {
+export async function initUsageSchema(db: DatabaseAdapter): Promise<void> {
   await safeExec(
     db,
     `
@@ -406,7 +409,7 @@ export async function initUsageSchema(db: IDatabase): Promise<void> {
   await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_usage_created ON usage_records(created_at)");
 }
 
-export async function initArtifactSchema(db: IDatabase): Promise<void> {
+export async function initArtifactSchema(db: DatabaseAdapter): Promise<void> {
   await safeExec(
     db,
     `
@@ -426,8 +429,37 @@ export async function initArtifactSchema(db: IDatabase): Promise<void> {
   await safeExec(db, "CREATE INDEX IF NOT EXISTS idx_artifacts_tenant ON session_artifacts(tenant_id)");
 }
 
-/** Execute a SQL statement, swallowing errors (for best-effort idempotent init). */
-async function safeExec(db: IDatabase, sql: string): Promise<void> {
+/**
+ * stage_operations -- idempotency key ledger for side-effectful orchestration
+ * calls (advance, complete, handoff, executeAction). See migration 010 and
+ * services/idempotency.ts. Defined here so fresh installs that run
+ * `initSchema` get the table even before the migration runner executes.
+ */
+export async function initStageOperationsSchema(db: DatabaseAdapter): Promise<void> {
+  await safeExec(
+    db,
+    `
+    CREATE TABLE IF NOT EXISTS stage_operations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL,
+      stage TEXT NOT NULL DEFAULT '',
+      op_kind TEXT NOT NULL,
+      idempotency_key TEXT NOT NULL,
+      result_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `,
+  );
+  await safeExec(
+    db,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_stage_operations_unique
+       ON stage_operations(session_id, stage, op_kind, idempotency_key)`,
+  );
+  await safeExec(db, `CREATE INDEX IF NOT EXISTS idx_stage_operations_session ON stage_operations(session_id)`);
+}
+
+/** Run the SQL statement, swallowing errors (for best-effort idempotent init). */
+async function safeExec(db: DatabaseAdapter, sql: string): Promise<void> {
   try {
     await db.exec(sql);
   } catch {
@@ -435,7 +467,7 @@ async function safeExec(db: IDatabase, sql: string): Promise<void> {
   }
 }
 
-export async function seedLocalCompute(db: IDatabase): Promise<void> {
+export async function seedLocalCompute(db: DatabaseAdapter): Promise<void> {
   const ts = new Date().toISOString();
   await db
     .prepare(

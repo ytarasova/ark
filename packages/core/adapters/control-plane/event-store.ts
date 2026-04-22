@@ -2,19 +2,19 @@
  * ControlPlaneEventStore adapter.
  *
  * Hosted Postgres-backed EventRepository. The repository itself is SQL-agnostic
- * via `IDatabase`, so the implementation is identical to `LocalEventStore`;
- * the distinction lives in which `IDatabase` is injected at the composition root.
+ * via `DatabaseAdapter`, so the implementation is identical to `LocalEventStore`;
+ * the distinction lives in which `DatabaseAdapter` is injected at the composition root.
  */
 
 import type { EventStore, EventLogOpts, EventListOpts } from "../../ports/event-store.js";
 import type { Event } from "../../../types/index.js";
 import { EventRepository } from "../../repositories/event.js";
-import type { IDatabase } from "../../database/index.js";
+import type { DatabaseAdapter } from "../../database/index.js";
 
 export class ControlPlaneEventStore implements EventStore {
   private repo: EventRepository;
 
-  constructor(db: IDatabase) {
+  constructor(db: DatabaseAdapter) {
     this.repo = new EventRepository(db);
   }
 

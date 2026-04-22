@@ -6,10 +6,10 @@
  * tenant_policies has none.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { logDebug } from "../observability/structured-log.js";
 
-export async function applyPostgresTenantClaudeAuth(db: IDatabase): Promise<void> {
+export async function applyPostgresTenantClaudeAuth(db: DatabaseAdapter): Promise<void> {
   await trySql(
     db,
     `CREATE TABLE IF NOT EXISTS tenant_claude_auth (
@@ -22,7 +22,7 @@ export async function applyPostgresTenantClaudeAuth(db: IDatabase): Promise<void
   );
 }
 
-async function trySql(db: IDatabase, sql: string): Promise<void> {
+async function trySql(db: DatabaseAdapter, sql: string): Promise<void> {
   try {
     await db.exec(sql);
   } catch {

@@ -8,10 +8,10 @@
  * module inlines its DDL.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { initPostgresSchema } from "../repositories/schema-postgres.js";
 
-export async function applyPostgresInitial(db: IDatabase): Promise<void> {
+export async function applyPostgresInitial(db: DatabaseAdapter): Promise<void> {
   // initPostgresSchema is idempotent (CREATE TABLE IF NOT EXISTS) -- safe to
   // invoke from a migration body even though the runner already gates by
   // version.

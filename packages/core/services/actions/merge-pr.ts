@@ -8,7 +8,7 @@ import { finishWorktree } from "../workspace-service.js";
 export const mergePrAction: ActionHandler = {
   name: "merge_pr",
   aliases: ["merge"],
-  async execute(app, session, action) {
+  async execute(app, session, action, _opts) {
     const result = await finishWorktree(app, session.id, { force: true });
     if (result.ok) {
       await app.events.log(session.id, "action_executed", {

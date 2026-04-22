@@ -6,13 +6,13 @@
 import { describe, it, expect } from "bun:test";
 import { Database } from "bun:sqlite";
 import { BunSqliteAdapter } from "../../database/sqlite.js";
-import type { IDatabase } from "../../database/index.js";
+import type { DatabaseAdapter } from "../../database/index.js";
 import { MigrationRunner } from "../../migrations/runner.js";
 import { TenantClaudeAuthManager } from "../tenant-claude-auth.js";
 
 const PRAGMA_FK_ON = "PRAGMA foreign_keys = ON";
 
-async function freshDb(): Promise<IDatabase> {
+async function freshDb(): Promise<DatabaseAdapter> {
   const raw = new Database(":memory:");
   // Enable FKs for parity with production -- bun:sqlite defaults to off.
   (raw as { exec(sql: string): void }).exec(PRAGMA_FK_ON);

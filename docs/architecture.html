@@ -132,7 +132,7 @@
           <text class="box-item" x="750" y="266" text-anchor="middle">channel relay</text>
 
           <rect class="box" x="640" y="288" width="220" height="82" rx="8"/>
-          <text class="box-title" x="750" y="312" text-anchor="middle">IDatabase</text>
+          <text class="box-title" x="750" y="312" text-anchor="middle">DatabaseAdapter</text>
           <text class="box-item" x="750" y="332" text-anchor="middle">SQLite (local)</text>
           <text class="box-item" x="750" y="350" text-anchor="middle">Postgres (hosted)</text>
 
@@ -266,7 +266,7 @@
       <h2>Core components</h2>
       <ul>
         <li><strong>AppContext</strong> -- central root, built on an Awilix DI container. Wires repositories, services, stores, knowledge, conductor, and config. Created at CLI startup (without conductor) or server daemon startup (with conductor).</li>
-        <li><strong>IDatabase abstraction</strong> -- <code>database.ts</code> defines the interface, <code>database-sqlite.ts</code> implements it for <code>bun:sqlite</code> (local), <code>database-postgres.ts</code> implements it for PostgreSQL (hosted). All repositories and stores use <code>IDatabase</code>, never raw bun:sqlite.</li>
+        <li><strong>DatabaseAdapter abstraction</strong> -- <code>database.ts</code> defines the interface, <code>database-sqlite.ts</code> implements it for <code>bun:sqlite</code> (local), <code>database-postgres.ts</code> implements it for PostgreSQL (hosted). All repositories and stores use <code>DatabaseAdapter</code>, never raw bun:sqlite.</li>
         <li><strong>Repositories</strong> -- SQL CRUD behind typed classes: <code>SessionRepository</code>, <code>ComputeRepository</code>, <code>ComputeTemplateRepository</code>, <code>EventRepository</code>, <code>MessageRepository</code>, <code>TodoRepository</code>. Column whitelists prevent injection. Accessed via <code>app.sessions</code>, <code>app.computes</code>, etc.</li>
         <li><strong>Services</strong> -- <code>SessionService</code> (lifecycle facade), <code>ComputeService</code>, <code>HistoryService</code>, and <code>session-orchestration.ts</code> for dispatch, advance, fork, clone, spawn, fan-out, handoff, worktree ops, and report handling. Every orchestration function takes <code>app: AppContext</code> as its first argument -- no global state.</li>
         <li><strong>Stores</strong> -- Resource stores with three-tier file resolution (<code>builtin</code> &gt; <code>global</code> &gt; <code>project</code>): <code>FlowStore</code>, <code>SkillStore</code>, <code>AgentStore</code>, <code>RecipeStore</code>, <code>RuntimeStore</code>. Hosted mode swaps in <code>DbResourceStore</code> which reads from the tenant-scoped <code>resource_definitions</code> table.</li>
@@ -389,7 +389,7 @@
       <h2>Key decisions</h2>
       <ul>
         <li><strong>Dependency injection over globals</strong> -- AppContext is the root; every function takes it explicitly. No <code>getApp()</code> calls in new code.</li>
-        <li><strong>IDatabase abstraction</strong> -- same repositories and stores for SQLite (local) and Postgres (hosted). No ORM.</li>
+        <li><strong>DatabaseAdapter abstraction</strong> -- same repositories and stores for SQLite (local) and Postgres (hosted). No ORM.</li>
         <li><strong>Polymorphism for parsers and executors</strong> -- runtime-specific behavior lives in dedicated classes registered on AppContext.</li>
         <li><strong>ArkD as universal daemon</strong> -- one HTTP API for every compute target. No SSH, no platform-specific transport.</li>
         <li><strong>MCP socket pooling</strong> -- share MCP processes across sessions, unix sockets, 85-90% memory reduction.</li>

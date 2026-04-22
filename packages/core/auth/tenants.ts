@@ -20,7 +20,7 @@
  * row attributes the upstream actor rather than NULL.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { randomBytes } from "crypto";
 import { TenantRepository, type ListOptions, type TenantRow, type TenantStatus } from "../repositories/tenants.js";
 export type { ListOptions } from "../repositories/tenants.js";
@@ -45,7 +45,7 @@ export class TenantManager {
   private _teams: TeamRepository;
   private _memberships: MembershipRepository;
 
-  constructor(private db: IDatabase) {
+  constructor(private db: DatabaseAdapter) {
     this._repo = new TenantRepository(db);
     this._teams = new TeamRepository(db);
     this._memberships = new MembershipRepository(db);

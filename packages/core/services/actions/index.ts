@@ -4,15 +4,16 @@
  * exporting an `ActionHandler` and add it to `ACTIONS` below.
  */
 
-import type { ActionHandler, ActionResult } from "./types.js";
+import type { ActionHandler, ActionOpts, ActionResult } from "./types.js";
 import { createPrAction } from "./create-pr.js";
 import { mergePrAction } from "./merge-pr.js";
 import { autoMergeAction } from "./auto-merge.js";
 import { closeAction } from "./close.js";
 import { fetchSageAnalysisAction } from "./fetch-sage-analysis.js";
 import type { AppContext } from "../../app.js";
+import { withIdempotency } from "../idempotency.js";
 
-export type { ActionHandler, ActionResult } from "./types.js";
+export type { ActionHandler, ActionOpts, ActionResult } from "./types.js";
 
 const ACTIONS: readonly ActionHandler[] = [
   createPrAction,
@@ -45,13 +46,25 @@ export function listActions(): string[] {
  * Dispatch the named action for `sessionId`. Returns a result with the
  * standard `{ok, message}` shape. Unknown actions log a `action_skipped`
  * event and return `ok: true` to preserve the prior switch's behaviour.
+ *
+ * When `opts.idempotencyKey` is set, the dispatch is keyed in
+ * `stage_operations` under `op_kind = "action:<name>"` so at-least-once
+ * retries (Temporal) no-op and return the cached result. Action handlers
+ * themselves stay single-purpose -- the wrapper owns the ledger.
  */
-export async function executeAction(app: AppContext, sessionId: string, action: string): Promise<ActionResult> {
+export async function executeAction(
+  app: AppContext,
+  sessionId: string,
+  action: string,
+  opts?: ActionOpts,
+): Promise<ActionResult> {
   const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: "Session not found" };
 
   const handler = ACTION_INDEX.get(action);
   if (!handler) {
+    // Unknown actions short-circuit before the ledger so every retry still
+    // logs `action_skipped` with the same payload (cheap, helps debugging).
     await app.events.log(sessionId, "action_skipped", {
       stage: session.stage ?? undefined,
       actor: "system",
@@ -59,5 +72,13 @@ export async function executeAction(app: AppContext, sessionId: string, action: 
     });
     return { ok: true, message: `Action '${action}' skipped (unknown)` };
   }
-  return handler.execute(app, session, action);
+
+  // Key on the canonical action name so aliases don't create two ledger
+  // rows for the same logical operation.
+  const opKind = `action:${handler.name}` as const;
+  return withIdempotency(
+    app.db,
+    { sessionId, stage: session.stage ?? null, opKind, idempotencyKey: opts?.idempotencyKey },
+    () => handler.execute(app, session, action, opts),
+  );
 }

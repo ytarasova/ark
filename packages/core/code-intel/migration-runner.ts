@@ -9,11 +9,11 @@
  * dialect upstream; the migration modules only drive when + which script
  * applies.
  *
- * Every method is async because IDatabase is async (PR 1 of the async-DB
+ * Every method is async because DatabaseAdapter is async (PR 1 of the async-DB
  * refactor). The body is otherwise unchanged.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import * as migration001 from "./migrations/001_initial_schema.js";
 import * as migration002 from "./migrations/002_workspaces.js";
 import * as migration003 from "./migrations/003_platform_docs.js";
@@ -22,7 +22,7 @@ import { TABLE as MIGRATIONS_TABLE } from "./schema/schema-migrations.js";
 export interface Migration {
   version: number;
   name: string;
-  up(ctx: { db: IDatabase; dialect: "sqlite" | "postgres" }): Promise<void>;
+  up(ctx: { db: DatabaseAdapter; dialect: "sqlite" | "postgres" }): Promise<void>;
 }
 
 const MIGRATIONS: ReadonlyArray<Migration> = [
@@ -44,7 +44,7 @@ export interface MigrationStatus {
 
 export class MigrationRunner {
   constructor(
-    private readonly db: IDatabase,
+    private readonly db: DatabaseAdapter,
     private readonly dialect: "sqlite" | "postgres",
   ) {}
 

@@ -91,7 +91,7 @@ export class SessionService {
     // orchestration for full cleanup (tmux kill, provider cleanup, hooks removal)
     if (session.session_id) {
       try {
-        const { stop: orchStop } = await import("./session-orchestration.js");
+        const { stop: orchStop } = await import("./session-lifecycle.js");
         return orchStop(this.app, id, opts);
       } catch {
         logDebug("session", "AppContext not available (e.g. unit tests) -- fall through to local stop");
@@ -139,7 +139,7 @@ export class SessionService {
       throw err;
     }
     if (all.length === 0) return;
-    const { stop: orchStop } = await import("./session-orchestration.js");
+    const { stop: orchStop } = await import("./session-lifecycle.js");
     for (const s of all) {
       if (s.session_id) {
         try {
@@ -494,7 +494,7 @@ export class SessionService {
    * Delegates to session-orchestration.ts interrupt().
    */
   async interrupt(id: string): Promise<SessionOpResult> {
-    const { interrupt: legacyInterrupt } = await import("./session-orchestration.js");
+    const { interrupt: legacyInterrupt } = await import("./session-lifecycle.js");
     return legacyInterrupt(this.app, id);
   }
 
@@ -503,7 +503,7 @@ export class SessionService {
    * Delegates to session-orchestration.ts archive().
    */
   async archive(id: string): Promise<SessionOpResult> {
-    const { archive: legacyArchive } = await import("./session-orchestration.js");
+    const { archive: legacyArchive } = await import("./session-lifecycle.js");
     return legacyArchive(this.app, id);
   }
 
@@ -512,7 +512,7 @@ export class SessionService {
    * Delegates to session-orchestration.ts restore().
    */
   async restore(id: string): Promise<SessionOpResult> {
-    const { restore: legacyRestore } = await import("./session-orchestration.js");
+    const { restore: legacyRestore } = await import("./session-lifecycle.js");
     return legacyRestore(this.app, id);
   }
 
@@ -552,7 +552,7 @@ export class SessionService {
    * Delegates to session.ts dispatch() which owns tmux/executor/flow logic.
    */
   async dispatch(id: string, opts?: { onLog?: (msg: string) => void }): Promise<SessionOpResult> {
-    const { dispatch: legacyDispatch } = await import("./session-orchestration.js");
+    const { dispatch: legacyDispatch } = await import("./dispatch.js");
     return legacyDispatch(this.app, id, opts);
   }
 
@@ -561,7 +561,7 @@ export class SessionService {
    * Delegates to session.ts advance() which owns gate evaluation and flow progression.
    */
   async advance(id: string, force?: boolean): Promise<SessionOpResult> {
-    const { advance: legacyAdvance } = await import("./session-orchestration.js");
+    const { advance: legacyAdvance } = await import("./stage-advance.js");
     return legacyAdvance(this.app, id, force);
   }
 
@@ -569,7 +569,7 @@ export class SessionService {
    * Get captured output from a running session's tmux pane.
    */
   async getOutput(id: string, opts?: { lines?: number; ansi?: boolean }): Promise<string> {
-    const { getOutput: legacyGetOutput } = await import("./session-orchestration.js");
+    const { getOutput: legacyGetOutput } = await import("./session-output.js");
     return legacyGetOutput(this.app, id, opts);
   }
 
@@ -577,7 +577,7 @@ export class SessionService {
    * Send a message to a running session's tmux pane.
    */
   async send(id: string, message: string): Promise<SessionOpResult> {
-    const { send: legacySend } = await import("./session-orchestration.js");
+    const { send: legacySend } = await import("./session-output.js");
     return legacySend(this.app, id, message);
   }
 
@@ -588,7 +588,7 @@ export class SessionService {
     id: string,
     opts?: { timeoutMs?: number; pollMs?: number; onStatus?: (status: string) => void },
   ): Promise<{ session: Session | null; timedOut: boolean }> {
-    const { waitForCompletion: legacyWait } = await import("./session-orchestration.js");
+    const { waitForCompletion: legacyWait } = await import("./session-lifecycle.js");
     return legacyWait(this.app, id, opts);
   }
 
@@ -596,7 +596,7 @@ export class SessionService {
    * Fork a session: create a new session from the same point in the flow.
    */
   async fork(id: string, name?: string): Promise<SessionOpResult> {
-    const { forkSession } = await import("./session-orchestration.js");
+    const { forkSession } = await import("./session-lifecycle.js");
     // session.ts has a narrower local SessionOpResult (no `message` on success)
     return forkSession(this.app, id, name) as unknown as SessionOpResult;
   }
@@ -605,7 +605,7 @@ export class SessionService {
    * Clone a session: deep copy including claude_session_id for --resume.
    */
   async clone(id: string, name?: string): Promise<SessionOpResult> {
-    const { cloneSession } = await import("./session-orchestration.js");
+    const { cloneSession } = await import("./session-lifecycle.js");
     return cloneSession(this.app, id, name) as unknown as SessionOpResult;
   }
 
@@ -622,7 +622,7 @@ export class SessionService {
       extensions?: string[];
     },
   ): Promise<SessionOpResult> {
-    const { spawnSubagent } = await import("./session-orchestration.js");
+    const { spawnSubagent } = await import("./subagents.js");
     return spawnSubagent(this.app, parentId, opts);
   }
 
@@ -630,7 +630,7 @@ export class SessionService {
    * Fan-out: create parallel child sessions from a parent.
    */
   async fanOut(sessionId: string, opts: { tasks: Array<{ summary: string; agent?: string; flow?: string }> }) {
-    const { fanOut } = await import("./session-orchestration.js");
+    const { fanOut } = await import("./fork-join.js");
     return fanOut(this.app, sessionId, opts);
   }
 
@@ -638,7 +638,7 @@ export class SessionService {
    * Handoff: clone session to a different agent and dispatch.
    */
   async handoff(id: string, agent: string, instructions?: string): Promise<SessionOpResult> {
-    const { handoff: legacyHandoff } = await import("./session-orchestration.js");
+    const { handoff: legacyHandoff } = await import("./stage-advance.js");
     return legacyHandoff(this.app, id, agent, instructions);
   }
 
@@ -646,7 +646,7 @@ export class SessionService {
    * Get a diff summary for a session's worktree branch vs its base branch.
    */
   async worktreeDiff(id: string, opts?: { base?: string }): Promise<any> {
-    const { worktreeDiff: legacyDiff } = await import("./session-orchestration.js");
+    const { worktreeDiff: legacyDiff } = await import("./workspace-service.js");
     return legacyDiff(this.app, id, opts);
   }
 
@@ -662,7 +662,7 @@ export class SessionService {
       createPR?: boolean;
     },
   ): Promise<SessionOpResult> {
-    const { finishWorktree: legacyFinish } = await import("./session-orchestration.js");
+    const { finishWorktree: legacyFinish } = await import("./workspace-service.js");
     return legacyFinish(this.app, id, opts);
   }
 
@@ -670,7 +670,7 @@ export class SessionService {
    * Rebase a session's branch onto the base branch.
    */
   async rebaseOntoBase(id: string, opts?: { base?: string }): Promise<SessionOpResult> {
-    const { rebaseOntoBase: legacyRebase } = await import("./session-orchestration.js");
+    const { rebaseOntoBase: legacyRebase } = await import("./workspace-service.js");
     return legacyRebase(this.app, id, opts);
   }
 
@@ -681,7 +681,7 @@ export class SessionService {
     id: string,
     opts?: { title?: string; body?: string; base?: string; draft?: boolean },
   ): Promise<SessionOpResult & { pr_url?: string }> {
-    const { createWorktreePR: legacyCreatePR } = await import("./session-orchestration.js");
+    const { createWorktreePR: legacyCreatePR } = await import("./workspace-service.js");
     return legacyCreatePR(this.app, id, opts);
   }
 
@@ -689,7 +689,7 @@ export class SessionService {
    * Join forked children back into parent session.
    */
   async join(parentId: string, force?: boolean): Promise<SessionOpResult> {
-    const { joinFork } = await import("./session-orchestration.js");
+    const { joinFork } = await import("./fork-join.js");
     return joinFork(this.app, parentId, force);
   }
 
@@ -697,7 +697,7 @@ export class SessionService {
    * Approve a review gate and force-advance past it.
    */
   async approveReviewGate(id: string): Promise<SessionOpResult> {
-    const { approveReviewGate: legacyApprove } = await import("./session-orchestration.js");
+    const { approveReviewGate: legacyApprove } = await import("./review-gate.js");
     return legacyApprove(this.app, id);
   }
 
@@ -708,9 +708,9 @@ export class SessionService {
    * exceeded, the session is marked failed instead.
    */
   async rejectReviewGate(id: string, reason: string): Promise<SessionOpResult> {
-    const { rejectReviewGate: legacyReject } = await import("./session-orchestration.js");
+    const { rejectReviewGate: legacyReject } = await import("./review-gate.js");
     const r = await legacyReject(this.app, id, reason ?? "");
-    // session-orchestration returns { ok, message } without sessionId; widen to SessionOpResult.
+    // review-gate returns { ok, message } without sessionId; widen to SessionOpResult.
     return { ...r, sessionId: id } as SessionOpResult;
   }
 

@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
-import { stop } from "../services/session-orchestration.js";
+import { stop } from "../services/session-lifecycle.js";
 import { AppContext } from "../app.js";
 import { clearApp, getApp, setApp } from "./test-helpers.js";
 

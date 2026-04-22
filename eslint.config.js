@@ -40,6 +40,16 @@ export default [
       "no-console": ["warn", { allow: ["warn", "error"] }],
       // No empty catch blocks
       "no-empty": ["error", { allowEmptyCatch: false }],
+      // Ban I-prefixed interfaces and type aliases (Hungarian notation).
+      // Prefer descriptive names like DatabaseAdapter over IDatabase.
+      "@typescript-eslint/naming-convention": ["error", {
+        selector: ["interface", "typeAlias"],
+        format: null,
+        custom: {
+          regex: "^I[A-Z]",
+          match: false,
+        },
+      }],
     },
   },
   {

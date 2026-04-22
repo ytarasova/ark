@@ -7,7 +7,7 @@
  * in SQLite and provides validation helpers used by the scheduler.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { logInfo, logDebug } from "../observability/structured-log.js";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -58,7 +58,7 @@ const DEFAULT_POLICY: Omit<TenantComputePolicy, "tenant_id"> = {
 export class TenantPolicyManager {
   private _initialized: Promise<void> | null = null;
 
-  constructor(private db: IDatabase) {}
+  constructor(private db: DatabaseAdapter) {}
 
   /**
    * Lazily ensure the schema exists. Replaces the (now-async) constructor

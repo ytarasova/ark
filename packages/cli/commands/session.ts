@@ -5,7 +5,7 @@ import { existsSync } from "fs";
 import { execSync } from "child_process";
 import * as core from "../../core/index.js";
 import { SESSION_STATUSES } from "../../types/index.js";
-import { runVerification } from "../../core/services/session-orchestration.js";
+import { runVerification } from "../../core/services/session-lifecycle.js";
 import { getArkClient, getInProcessApp } from "../app-client.js";
 import { sanitizeSummary, formatBytes } from "../helpers.js";
 import { logDebug } from "../../core/observability/structured-log.js";

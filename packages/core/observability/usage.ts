@@ -5,7 +5,7 @@
  * into the `usage_records` table. Provides grouped summaries and daily trends.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import type { PricingRegistry, TokenUsage } from "./pricing.js";
 
 export interface UsageRecord {
@@ -61,7 +61,7 @@ export class UsageRecorder {
   private tenantId: string = "default";
 
   constructor(
-    private db: IDatabase,
+    private db: DatabaseAdapter,
     private pricing: PricingRegistry,
   ) {}
 

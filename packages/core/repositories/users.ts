@@ -6,7 +6,7 @@
  * from the pre-cutover hand-rolled SQL version.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { drizzleFromIDatabase } from "../drizzle/from-idb.js";
 import type { DrizzleClient } from "../drizzle/client.js";
 import { and, asc, eq, isNull } from "drizzle-orm";
@@ -53,7 +53,7 @@ function toPublic(row: DrizzleSelectUser): UserRow {
 export class UserRepository {
   private _d: DrizzleClient | null = null;
 
-  constructor(private db: IDatabase) {}
+  constructor(private db: DatabaseAdapter) {}
 
   private d(): DrizzleClient {
     if (!this._d) this._d = drizzleFromIDatabase(this.db);

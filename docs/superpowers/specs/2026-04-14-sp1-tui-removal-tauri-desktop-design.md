@@ -302,7 +302,7 @@ New file: `packages/core/repositories/share.ts`
 
 ```typescript
 export class ShareRepository {
-  constructor(private db: IDatabase) {}
+  constructor(private db: DatabaseAdapter) {}
 
   create(sessionId: string, tenantId: string, createdBy?: string, expiresAt?: number): SessionShare
   get(shareId: string): SessionShare | null

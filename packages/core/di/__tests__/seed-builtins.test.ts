@@ -4,7 +4,7 @@
  * We avoid standing up a full hosted AppContext (the hosted AppMode pins the
  * migration runner to postgres and we want this test to run against an
  * in-memory sqlite). Instead, we wire a minimal harness:
- *   - a sqlite-backed IDatabase with the `resource_definitions` table created
+ *   - a sqlite-backed DatabaseAdapter with the `resource_definitions` table created
  *     directly via `initResourceDefinitionsTable()`,
  *   - a handful of real `DbResourceStore` instances (one per kind),
  *   - a thin object that quacks like AppContext to the seeder.

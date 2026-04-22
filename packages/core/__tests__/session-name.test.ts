@@ -8,7 +8,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext } from "../app.js";
-import { startSession } from "../services/session-orchestration.js";
+import { startSession } from "../services/session-lifecycle.js";
 import { setApp, clearApp, getApp } from "./test-helpers.js";
 
 /** Same sanitization regex as in NewSessionForm.tsx submit */

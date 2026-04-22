@@ -19,10 +19,10 @@
  * index as the sole uniqueness guard.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { logDebug } from "../observability/structured-log.js";
 
-export async function applyPostgresSoftDelete(db: IDatabase): Promise<void> {
+export async function applyPostgresSoftDelete(db: DatabaseAdapter): Promise<void> {
   await addColumn(db, "tenants");
   await addColumn(db, "users");
   await addColumn(db, "teams");
@@ -44,7 +44,7 @@ export async function applyPostgresSoftDelete(db: IDatabase): Promise<void> {
   }
 }
 
-async function addColumn(db: IDatabase, table: string): Promise<void> {
+async function addColumn(db: DatabaseAdapter, table: string): Promise<void> {
   await trySql(db, "ALTER TABLE " + table + " ADD COLUMN IF NOT EXISTS deleted_at TEXT");
 }
 
@@ -54,7 +54,7 @@ async function addColumn(db: IDatabase, table: string): Promise<void> {
  * inline UNIQUE clauses (e.g. `teams_tenant_id_slug_key`); rather than
  * hardcoding those names we resolve them via information_schema.
  */
-async function dropUniqueConstraints(db: IDatabase, table: string, cols: string[]): Promise<void> {
+async function dropUniqueConstraints(db: DatabaseAdapter, table: string, cols: string[]): Promise<void> {
   try {
     const rows = (await db
       .prepare(
@@ -82,7 +82,7 @@ async function dropUniqueConstraints(db: IDatabase, table: string, cols: string[
   }
 }
 
-async function trySql(db: IDatabase, sql: string): Promise<void> {
+async function trySql(db: DatabaseAdapter, sql: string): Promise<void> {
   try {
     await db.exec(sql);
   } catch {

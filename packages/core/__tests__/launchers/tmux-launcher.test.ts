@@ -158,7 +158,7 @@ describe("orchestration uses app.launcher", async () => {
       const session = await app.sessions.create({ summary: "interrupt-test" });
       await app.sessions.update(session.id, { status: "running", session_id: "ark-int-test" });
 
-      const { interrupt } = await import("../../services/session-orchestration.js");
+      const { interrupt } = await import("../../services/session-lifecycle.js");
       const result = await interrupt(app, session.id);
 
       expect(result.ok).toBe(true);
@@ -190,7 +190,7 @@ describe("orchestration uses app.launcher", async () => {
       const session = await app.sessions.create({ summary: "archive-kill-test" });
       await app.sessions.update(session.id, { status: "running", session_id: "ark-archive-kill" });
 
-      const { archive } = await import("../../services/session-orchestration.js");
+      const { archive } = await import("../../services/session-lifecycle.js");
       const result = await archive(app, session.id);
 
       expect(result.ok).toBe(true);
@@ -226,7 +226,7 @@ describe("orchestration uses app.launcher", async () => {
       // Set session_id with unknown compute -- so withProvider returns false
       await app.sessions.update(session.id, { status: "running", session_id: "ark-delete-kill" });
 
-      const { deleteSessionAsync } = await import("../../services/session-orchestration.js");
+      const { deleteSessionAsync } = await import("../../services/session-lifecycle.js");
       const result = await deleteSessionAsync(app, session.id);
 
       expect(result.ok).toBe(true);
@@ -259,7 +259,7 @@ describe("orchestration uses app.launcher", async () => {
       // Set session_id with unknown compute -- so withProvider returns false
       await app.sessions.update(session.id, { status: "running", session_id: "ark-stop-kill" });
 
-      const { stop } = await import("../../services/session-orchestration.js");
+      const { stop } = await import("../../services/session-lifecycle.js");
       const result = await stop(app, session.id);
 
       expect(result.ok).toBe(true);
@@ -293,7 +293,7 @@ describe("orchestration uses app.launcher", async () => {
         stage: "work",
       });
 
-      const { resume } = await import("../../services/session-orchestration.js");
+      const { resume } = await import("../../services/dispatch.js");
       // Resume will try to kill the old session, then re-dispatch
       // Re-dispatch may fail (no agent configured), but kill should happen first
       await resume(app, session.id);

@@ -18,15 +18,12 @@ import { evaluateTermination, parseTermination, type TerminationContext } from "
 import { loadRepoConfig } from "../repo-config.js";
 import { safeAsync } from "../safe.js";
 
-// Cross-module imports from session-orchestration.ts (one-way dependency -- no circular)
-import {
-  advance,
-  runVerification,
-  dispatch,
-  getOutput,
-  executeAction,
-  recordSessionUsage,
-} from "./session-orchestration.js";
+// Cross-module imports from sibling service modules (one-way dependency -- no circular).
+import { advance } from "./stage-advance.js";
+import { runVerification, recordSessionUsage } from "./session-lifecycle.js";
+import { dispatch } from "./dispatch.js";
+import { getOutput } from "./session-output.js";
+import { executeAction } from "./actions/index.js";
 
 // ── Hook status logic ─────────────────────────────────────────────────────────
 

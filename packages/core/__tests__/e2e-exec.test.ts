@@ -10,7 +10,7 @@ import { describe, it, expect, afterEach, beforeAll, afterAll } from "bun:test";
 import { execFileSync } from "child_process";
 import { join } from "path";
 import { AppContext } from "../app.js";
-import { startSession, waitForCompletion } from "../services/session-orchestration.js";
+import { startSession, waitForCompletion } from "../services/session-lifecycle.js";
 import { clearApp, getApp, setApp } from "./test-helpers.js";
 
 const ROOT = join(import.meta.dir, "..", "..", "..");

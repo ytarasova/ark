@@ -14,7 +14,8 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll } from "bun:test";
 import { AppContext } from "../app.js";
 import { startConductor } from "../conductor/conductor.js";
-import { applyReport, applyHookStatus, advance } from "../services/session-orchestration.js";
+import { applyReport, applyHookStatus } from "../services/session-hooks.js";
+import { advance } from "../services/stage-advance.js";
 import type { OutboundMessage } from "../conductor/channel-types.js";
 
 const TEST_PORT = 19197;
@@ -495,7 +496,7 @@ describe("Conductor channel report delivery", async () => {
 describe("Regression: complete() must advance flow (not leave status=ready)", async () => {
   it("SessionService.complete() + advance() on single-stage flow (bare) reaches 'completed'", async () => {
     // Use startSession (orchestration) to properly wire stage/flow like production
-    const { startSession } = await import("../services/session-orchestration.js");
+    const { startSession } = await import("../services/session-lifecycle.js");
     const session = await startSession(app, { summary: "svc complete bare", flow: "bare" });
     await app.sessions.update(session.id, { status: "running" });
 
@@ -513,7 +514,7 @@ describe("Regression: complete() must advance flow (not leave status=ready)", as
   });
 
   it("SessionService.complete() + advance() on multi-stage flow (quick) advances to next stage", async () => {
-    const { startSession } = await import("../services/session-orchestration.js");
+    const { startSession } = await import("../services/session-lifecycle.js");
     const session = await startSession(app, { summary: "svc complete quick", flow: "quick" });
     // startSession sets stage to "implement" for quick flow
     await app.sessions.update(session.id, { status: "running" });
@@ -531,7 +532,7 @@ describe("Regression: complete() must advance flow (not leave status=ready)", as
   });
 
   it("RPC session/complete handler advances bare flow to 'completed'", async () => {
-    const { startSession } = await import("../services/session-orchestration.js");
+    const { startSession } = await import("../services/session-lifecycle.js");
     const session = await startSession(app, { summary: "rpc complete bare", flow: "bare" });
     await app.sessions.update(session.id, { status: "running" });
 
@@ -554,7 +555,7 @@ describe("Regression: complete() must advance flow (not leave status=ready)", as
   });
 
   it("RPC session/complete handler advances quick flow to next stage", async () => {
-    const { startSession } = await import("../services/session-orchestration.js");
+    const { startSession } = await import("../services/session-lifecycle.js");
     const session = await startSession(app, { summary: "rpc complete quick", flow: "quick" });
     await app.sessions.update(session.id, { status: "running" });
 

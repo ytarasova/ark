@@ -6,7 +6,7 @@ import { pathToFileURL } from "url";
 
 import { AppContext } from "../../app.js";
 import { fetchAnalysis, buildStreamSubtasks, type SageAnalysis } from "../sage-analysis.js";
-import { startSession } from "../../services/session-orchestration.js";
+import { startSession } from "../../services/session-lifecycle.js";
 import { getStages } from "../../state/flow.js";
 import { extractSubtasks } from "../../services/task-builder.js";
 

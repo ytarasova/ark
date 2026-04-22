@@ -8,10 +8,10 @@
  * Called from app.ts when a Postgres database URL is configured.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { logDebug } from "../observability/structured-log.js";
 
-export async function initPostgresSchema(db: IDatabase): Promise<void> {
+export async function initPostgresSchema(db: DatabaseAdapter): Promise<void> {
   // Sessions table
   await db.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
@@ -440,9 +440,32 @@ export async function initPostgresSchema(db: IDatabase): Promise<void> {
   );
   await safeDdl(db, "ALTER TABLE tenant_policies ADD COLUMN IF NOT EXISTS compute_config_yaml TEXT");
   // --- END agent-G ---
+
+  // stage_operations -- idempotency ledger. See migration 010 and
+  // services/idempotency.ts for usage semantics.
+  await safeDdl(
+    db,
+    `
+    CREATE TABLE IF NOT EXISTS stage_operations (
+      id BIGSERIAL PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      stage TEXT NOT NULL DEFAULT '',
+      op_kind TEXT NOT NULL,
+      idempotency_key TEXT NOT NULL,
+      result_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )
+  `,
+  );
+  await safeDdl(
+    db,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_stage_operations_unique
+       ON stage_operations(session_id, stage, op_kind, idempotency_key)`,
+  );
+  await safeDdl(db, `CREATE INDEX IF NOT EXISTS idx_stage_operations_session ON stage_operations(session_id)`);
 }
 
-export async function seedLocalComputePostgres(db: IDatabase): Promise<void> {
+export async function seedLocalComputePostgres(db: DatabaseAdapter): Promise<void> {
   const ts = new Date().toISOString();
   await db
     .prepare(
@@ -456,7 +479,7 @@ export async function seedLocalComputePostgres(db: IDatabase): Promise<void> {
 }
 
 /** Run a DDL statement, ignoring errors (for idempotent migrations). */
-async function safeDdl(db: IDatabase, sql: string): Promise<void> {
+async function safeDdl(db: DatabaseAdapter, sql: string): Promise<void> {
   try {
     await db.exec(sql);
   } catch {

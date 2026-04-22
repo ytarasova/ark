@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { startSession } from "../services/session-orchestration.js";
+import { startSession } from "../services/session-lifecycle.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";
 

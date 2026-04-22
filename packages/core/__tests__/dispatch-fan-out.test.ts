@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../app.js";
-import { dispatch } from "../services/session-orchestration.js";
+import { dispatch } from "../services/dispatch.js";
 
 let app: AppContext;
 beforeAll(async () => {

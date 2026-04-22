@@ -8,12 +8,12 @@
  * Local mode uses file-backed stores. Control plane uses this.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import YAML from "yaml";
 
 // ── Schema ─────────────────────────────────────────────────────────────────
 
-export async function initResourceDefinitionsTable(db: IDatabase): Promise<void> {
+export async function initResourceDefinitionsTable(db: DatabaseAdapter): Promise<void> {
   await db.exec(`
     CREATE TABLE IF NOT EXISTS resource_definitions (
       name TEXT NOT NULL,
@@ -55,7 +55,7 @@ export class DbResourceStore<T extends { name: string }> {
   private syncCache: Map<string, T | null> = new Map();
 
   constructor(
-    private db: IDatabase,
+    private db: DatabaseAdapter,
     private kind: ResourceKind,
     private defaults: Omit<T, "name">,
   ) {}

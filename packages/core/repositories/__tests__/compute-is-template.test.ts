@@ -10,11 +10,11 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 import { Database } from "bun:sqlite";
 import { BunSqliteAdapter } from "../../database/sqlite.js";
-import type { IDatabase } from "../../database.js";
+import type { DatabaseAdapter } from "../../database.js";
 import { ComputeRepository } from "../compute.js";
 import { initSchema, seedLocalCompute } from "../schema.js";
 
-let db: IDatabase;
+let db: DatabaseAdapter;
 let repo: ComputeRepository;
 
 beforeEach(async () => {

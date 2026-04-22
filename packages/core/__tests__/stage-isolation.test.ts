@@ -21,7 +21,8 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext } from "../app.js";
-import { advance, mediateStageHandoff } from "../services/session-orchestration.js";
+import { advance } from "../services/stage-advance.js";
+import { mediateStageHandoff } from "../services/session-hooks.js";
 
 let app: AppContext;
 

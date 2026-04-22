@@ -14,7 +14,7 @@ import { mkdirSync, writeFileSync, existsSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { AppContext } from "../app.js";
-import { rebaseOntoBase } from "../services/session-orchestration.js";
+import { rebaseOntoBase } from "../services/workspace-service.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
@@ -227,7 +227,7 @@ describe("createWorktreePR auto-rebase integration", async () => {
 
     // createWorktreePR will fail at push (no real remote with gh), but we can
     // verify the commit hasn't changed (no rebase happened)
-    const { createWorktreePR } = await import("../services/session-orchestration.js");
+    const { createWorktreePR } = await import("../services/workspace-service.js");
     await createWorktreePR(app, session.id, { base: "main" });
 
     // PR creation will fail (no gh auth in tests), but rebase should NOT have happened
@@ -256,7 +256,7 @@ describe("createWorktreePR auto-rebase integration", async () => {
 
     const commitBefore = git(work, "rev-parse", "HEAD");
 
-    const { createWorktreePR } = await import("../services/session-orchestration.js");
+    const { createWorktreePR } = await import("../services/workspace-service.js");
     // Will fail at push/gh but rebase should happen first
     await createWorktreePR(app, session.id, { base: "main" });
 

@@ -7,7 +7,7 @@
  * hand-rolled SQL path for the moment; see DRIZZLE_CUTOVER_STATUS for the
  * sequencing of the per-repo rewrites.
  *
- * Both drivers reuse the SAME underlying clients the existing `IDatabase`
+ * Both drivers reuse the SAME underlying clients the existing `DatabaseAdapter`
  * adapters already own:
  *   - SQLite: the `bun:sqlite` `Database` instance
  *   - Postgres: the `postgres.js` client created by `PostgresAdapter`

@@ -16,7 +16,7 @@ import { join } from "path";
 import YAML from "yaml";
 import { AppContext } from "../app.js";
 import { getStage, getStages } from "../state/flow.js";
-import { resolveComputeForStage } from "../services/session-orchestration.js";
+import { resolveComputeForStage } from "../services/dispatch.js";
 
 let app: AppContext;
 

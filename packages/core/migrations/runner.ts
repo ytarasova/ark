@@ -15,10 +15,10 @@
  * Phase 1 does not implement rollback; `down()` throws. The interface is
  * stubbed so callers (CLI) compile against a stable shape.
  *
- * Every method is async because IDatabase is async.
+ * Every method is async because DatabaseAdapter is async.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import type {
   Migration,
   MigrationApplyContext,
@@ -32,7 +32,7 @@ export const MIGRATIONS_TABLE = "ark_schema_migrations";
 
 export class MigrationRunner {
   constructor(
-    private readonly db: IDatabase,
+    private readonly db: DatabaseAdapter,
     private readonly dialect: MigrationDialect,
     private readonly migrations: ReadonlyArray<Migration> = MIGRATIONS,
   ) {}

@@ -11,7 +11,7 @@
  * `ComputeTemplate` shape and translates to/from the unified `Compute` row.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import type {
   ComputeTemplate,
   ComputeProviderName,
@@ -39,7 +39,7 @@ function computeToTemplate(c: {
 export class ComputeTemplateRepository {
   private inner: ComputeRepository;
 
-  constructor(db: IDatabase) {
+  constructor(db: DatabaseAdapter) {
     this.inner = new ComputeRepository(db);
   }
 

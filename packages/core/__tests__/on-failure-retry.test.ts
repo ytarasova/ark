@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { applyReport, applyHookStatus, parseOnFailure, retryWithContext } from "../services/session-orchestration.js";
+import { applyReport, applyHookStatus, parseOnFailure, retryWithContext } from "../services/session-hooks.js";
 import { startConductor } from "../conductor/conductor.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";

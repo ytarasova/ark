@@ -1,4 +1,4 @@
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import type { KnowledgeNode, KnowledgeEdge, NodeType, EdgeRelation } from "./types.js";
 import { randomUUID } from "crypto";
 
@@ -26,7 +26,7 @@ interface EdgeRow {
 export class KnowledgeStore {
   private tenantId: string = "default";
 
-  constructor(private db: IDatabase) {}
+  constructor(private db: DatabaseAdapter) {}
 
   setTenant(tenantId: string): void {
     this.tenantId = tenantId;

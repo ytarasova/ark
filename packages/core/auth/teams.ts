@@ -7,7 +7,7 @@
  * policies live in `tenant_policies`, not here.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { randomBytes } from "crypto";
 import { TeamRepository, type ListOptions, type TeamRow } from "../repositories/teams.js";
 import {
@@ -41,7 +41,7 @@ export class TeamManager {
   private _teams: TeamRepository;
   private _memberships: MembershipRepository;
 
-  constructor(private db: IDatabase) {
+  constructor(private db: DatabaseAdapter) {
     this._teams = new TeamRepository(db);
     this._memberships = new MembershipRepository(db);
   }

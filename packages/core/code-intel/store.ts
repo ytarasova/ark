@@ -6,17 +6,17 @@
  * run that produced them. `beginIndexingRun()` + `finalizeIndexingRun()`
  * bracket a reindex and soft-delete previous active rows atomically.
  *
- * The store depends only on `IDatabase`, which abstracts bun:sqlite and
+ * The store depends only on `DatabaseAdapter`, which abstracts bun:sqlite and
  * Postgres. Dialect-specific SQL is kept in one shared place (this file)
  * because Wave 1 queries are simple; richer queries move to per-dialect
  * modules when they diverge.
  *
- * Every method is async: PR 1 of the async-DB refactor flipped IDatabase
+ * Every method is async: PR 1 of the async-DB refactor flipped DatabaseAdapter
  * to async, and this store passes the calls straight through.
  */
 
 import type { AppContext } from "../app.js";
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { randomUUID } from "crypto";
 import { MigrationRunner } from "./migration-runner.js";
 import { DEFAULT_TENANT_ID } from "./constants.js";
@@ -280,7 +280,7 @@ export class CodeIntelStore {
   private readonly runner: MigrationRunner;
 
   constructor(
-    private readonly db: IDatabase,
+    private readonly db: DatabaseAdapter,
     opts: CodeIntelStoreOptions = {},
   ) {
     this.dialect = opts.dialect ?? "sqlite";

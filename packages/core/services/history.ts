@@ -5,7 +5,7 @@
  * Full transcript indexing integration will be added in a later pass.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 
 export interface HistorySearchResult {
   sessionId: string;
@@ -24,7 +24,7 @@ interface HistoryRow {
 }
 
 export class HistoryService {
-  constructor(private db: IDatabase) {}
+  constructor(private db: DatabaseAdapter) {}
 
   /**
    * Search sessions by metadata (ticket, summary, repo, id).

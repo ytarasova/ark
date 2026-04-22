@@ -1,7 +1,7 @@
 /**
- * PostgresAdapter -- wraps postgres.js to implement IDatabase.
+ * PostgresAdapter -- wraps postgres.js to implement DatabaseAdapter.
  *
- * postgres.js is fully async and so is IDatabase. Every method here is
+ * postgres.js is fully async and so is DatabaseAdapter. Every method here is
  * a thin awaiter around `this.sql.unsafe(...)` (or, for transactions,
  * `this.sql.begin(...)`). The previous synchronous facade busy-looped
  * on `Bun.sleepSync(1)` waiting for the postgres.js promise to settle,
@@ -20,7 +20,7 @@
  */
 
 import postgres from "postgres";
-import type { IDatabase, IStatement } from "./types.js";
+import type { DatabaseAdapter, PreparedStatement } from "./types.js";
 
 const createPostgres = postgres as unknown as (url: string, opts?: Record<string, unknown>) => any;
 
@@ -78,7 +78,7 @@ function sqliteToPostgres(sql: string): string {
  * Async statement bound to a PostgresAdapter connection. Each I/O method
  * returns a Promise -- there is no synchronous bridge anymore.
  */
-class PostgresStatement implements IStatement {
+class PostgresStatement implements PreparedStatement {
   private pgSql: string;
 
   constructor(
@@ -115,7 +115,7 @@ class PostgresStatement implements IStatement {
 
 // -- PostgresAdapter --------------------------------------------------------
 
-export class PostgresAdapter implements IDatabase {
+export class PostgresAdapter implements DatabaseAdapter {
   private sql: any;
 
   constructor(connectionString: string) {
@@ -126,7 +126,7 @@ export class PostgresAdapter implements IDatabase {
     });
   }
 
-  prepare(query: string): IStatement {
+  prepare(query: string): PreparedStatement {
     return new PostgresStatement(this.sql, query);
   }
 

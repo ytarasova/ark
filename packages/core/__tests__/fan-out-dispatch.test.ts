@@ -3,7 +3,9 @@ import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 
 setDefaultTimeout(15_000);
-import { fanOut, checkAutoJoin, joinFork, dispatch, extractSubtasks } from "../services/session-orchestration.js";
+import { fanOut, checkAutoJoin, joinFork } from "../services/fork-join.js";
+import { dispatch } from "../services/dispatch.js";
+import { extractSubtasks } from "../services/task-builder.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";
 

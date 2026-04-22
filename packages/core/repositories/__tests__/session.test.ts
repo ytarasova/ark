@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 import { Database } from "bun:sqlite";
 import { BunSqliteAdapter } from "../../database/sqlite.js";
-import type { IDatabase } from "../../database.js";
+import type { DatabaseAdapter } from "../../database.js";
 import { SessionRepository } from "../session.js";
 import { initSchema } from "../schema.js";
 import type { SessionStatus, SessionConfig } from "../../../types/index.js";
 import { SESSION_STATUSES } from "../../../types/index.js";
 
-let db: IDatabase;
+let db: DatabaseAdapter;
 let repo: SessionRepository;
 
 beforeEach(async () => {

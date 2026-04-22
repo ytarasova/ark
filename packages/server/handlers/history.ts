@@ -10,7 +10,7 @@ import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import * as core from "../../core/index.js";
-import { startSession } from "../../core/services/session-orchestration.js";
+import { startSession } from "../../core/services/session-lifecycle.js";
 import type { HistoryListParams, HistoryImportParams, HistorySearchParams } from "../../types/index.js";
 
 export function registerHistoryHandlers(router: Router, app: AppContext): void {

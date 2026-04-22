@@ -1,4 +1,4 @@
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { drizzleFromIDatabase } from "../drizzle/from-idb.js";
 import type { DrizzleClient } from "../drizzle/client.js";
 import { and, desc, eq, ne, sql } from "drizzle-orm";
@@ -68,7 +68,7 @@ export class ComputeRepository {
   private tenantId: string = "default";
   private _d: DrizzleClient | null = null;
 
-  constructor(private db: IDatabase) {}
+  constructor(private db: DatabaseAdapter) {}
 
   private d(): DrizzleClient {
     if (!this._d) this._d = drizzleFromIDatabase(this.db);
@@ -218,7 +218,7 @@ export class ComputeRepository {
   }
 
   async mergeConfig(name: string, patch: Partial<ComputeConfig>): Promise<Compute | null> {
-    // Stay inside IDatabase.transaction for SQL portability. Inside the
+    // Stay inside DatabaseAdapter.transaction for SQL portability. Inside the
     // transaction we read with drizzle (both drivers share the same raw
     // connection for SQLite; Postgres uses its pool but pg is serializable
     // on the row we're touching so the race window stays narrow).

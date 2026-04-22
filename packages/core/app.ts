@@ -13,7 +13,7 @@
 
 import { Database } from "bun:sqlite";
 import { mkdirSync, rmSync, existsSync, mkdtempSync } from "fs";
-import type { IDatabase } from "./database/index.js";
+import type { DatabaseAdapter } from "./database/index.js";
 import { BunSqliteAdapter } from "./database/index.js";
 import { buildSqliteDrizzle, buildPostgresDrizzle, type DrizzleClient } from "./drizzle/index.js";
 import { join } from "path";
@@ -218,7 +218,7 @@ export class AppContext {
     setProfilesArkDir(this.config.arkDir);
   }
 
-  private async _openDatabase(): Promise<IDatabase> {
+  private async _openDatabase(): Promise<DatabaseAdapter> {
     // `this.mode` lazily builds a `preBootMode` when the container isn't up
     // yet -- safe at boot-time because `buildAppMode` is a pure function of
     // config. All downstream dialect decisions read `mode.database.dialect`
@@ -240,7 +240,7 @@ export class AppContext {
     return new BunSqliteAdapter(rawDb);
   }
 
-  private async _initSchema(db: IDatabase): Promise<void> {
+  private async _initSchema(db: DatabaseAdapter): Promise<void> {
     // Schema bootstrap + ongoing migrations both flow through AppMode.migrations.
     // The capability is dialect-bound at construction; the runner records
     // every applied version in `ark_schema_migrations`. Backwards compat for
@@ -252,7 +252,7 @@ export class AppContext {
     await this.mode.computeBootstrap.seed(db);
   }
 
-  private async _seedComputeTemplates(db: IDatabase): Promise<void> {
+  private async _seedComputeTemplates(db: DatabaseAdapter): Promise<void> {
     if (!this.config.computeTemplates?.length) return;
     const tmplRepo = new ComputeTemplateRepositoryCtor(db);
     for (const tmpl of this.config.computeTemplates) {
@@ -274,7 +274,7 @@ export class AppContext {
     return this.config.arkDir;
   }
 
-  get db(): IDatabase {
+  get db(): DatabaseAdapter {
     return this._resolve("db");
   }
 

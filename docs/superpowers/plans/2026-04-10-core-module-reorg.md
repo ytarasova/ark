@@ -21,7 +21,7 @@ packages/core/
   index.ts                      -- Barrel exports (stays at root)
 
   database/
-    types.ts                    -- IDatabase, IStatement interfaces
+    types.ts                    -- DatabaseAdapter, PreparedStatement interfaces
     sqlite.ts                   -- BunSqliteAdapter
     postgres.ts                 -- PostgresAdapter
 

@@ -5,7 +5,7 @@ import { getApp } from "./test-helpers.js";
 withTestContext();
 
 // Import dynamically to avoid circular dep issues
-const session = await import("../services/session-orchestration.js");
+const session = await import("../services/subagents.js");
 
 describe("spawnSubagent", () => {
   it("creates a child session with parent reference", async () => {

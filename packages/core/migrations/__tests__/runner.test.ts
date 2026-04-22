@@ -9,11 +9,11 @@
 import { describe, it, expect } from "bun:test";
 import { Database } from "bun:sqlite";
 import { BunSqliteAdapter } from "../../database/sqlite.js";
-import type { IDatabase } from "../../database/index.js";
+import type { DatabaseAdapter } from "../../database/index.js";
 import { MigrationRunner, MIGRATIONS_TABLE } from "../runner.js";
 import type { Migration } from "../types.js";
 
-function freshSqlite(): IDatabase {
+function freshSqlite(): DatabaseAdapter {
   return new BunSqliteAdapter(new Database(":memory:"));
 }
 

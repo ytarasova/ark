@@ -20,7 +20,7 @@ import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { asValue } from "awilix";
 import { Database } from "bun:sqlite";
 import { BunSqliteAdapter } from "../../database/sqlite.js";
-import type { IDatabase } from "../../database.js";
+import type { DatabaseAdapter } from "../../database.js";
 import { AppContext } from "../../app.js";
 import { SessionService } from "../session.js";
 import { SessionRepository } from "../../repositories/session.js";
@@ -584,7 +584,7 @@ describe("SessionService", async () => {
   // the test touches more than one repository.
 
   describe("pure unit construction (no container)", async () => {
-    let pureDb: IDatabase;
+    let pureDb: DatabaseAdapter;
     let pureSvc: SessionService;
 
     beforeEach(async () => {

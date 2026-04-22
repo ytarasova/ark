@@ -4,7 +4,9 @@
  */
 
 import readline from "readline";
-import { startSession, stop, resume, deleteSessionAsync, getOutput, send } from "./services/session-orchestration.js";
+import { startSession, stop, deleteSessionAsync } from "./services/session-lifecycle.js";
+import { resume } from "./services/dispatch.js";
+import { getOutput, send } from "./services/session-output.js";
 import type { AppContext } from "./app.js";
 
 export interface AcpRequest {

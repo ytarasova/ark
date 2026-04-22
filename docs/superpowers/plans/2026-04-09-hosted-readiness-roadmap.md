@@ -130,9 +130,9 @@ ark router costs                           # Per-model cost breakdown
 
 Swap SQLite for Postgres without touching business logic.
 
-- [ ] `IDatabase` interface (prepare, exec, transaction, close)
-- [ ] `BunSqliteAdapter` implements IDatabase (local mode)
-- [ ] Update all repos to use IDatabase
+- [ ] `DatabaseAdapter` interface (prepare, exec, transaction, close)
+- [ ] `BunSqliteAdapter` implements DatabaseAdapter (local mode)
+- [ ] Update all repos to use DatabaseAdapter
 - [ ] `config.databaseUrl` -- sqlite:// or postgres://
 - [ ] Versioned schema migrations
 

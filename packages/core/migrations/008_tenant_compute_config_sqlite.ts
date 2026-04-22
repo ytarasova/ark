@@ -7,10 +7,10 @@
  * path) is a no-op instead of an error.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { logDebug } from "../observability/structured-log.js";
 
-export async function applySqliteTenantComputeConfig(db: IDatabase): Promise<void> {
+export async function applySqliteTenantComputeConfig(db: DatabaseAdapter): Promise<void> {
   // Make sure the parent table exists. Agent B / legacy code creates this
   // table lazily via TenantPolicyManager; in a pure-migration install the
   // row may not be in place yet.
@@ -35,7 +35,7 @@ export async function applySqliteTenantComputeConfig(db: IDatabase): Promise<voi
   await trySql(db, "ALTER TABLE tenant_policies ADD COLUMN compute_config_yaml TEXT");
 }
 
-async function hasColumn(db: IDatabase, table: string, column: string): Promise<boolean> {
+async function hasColumn(db: DatabaseAdapter, table: string, column: string): Promise<boolean> {
   try {
     const rows = (await db.prepare(`PRAGMA table_info(${table})`).all()) as Array<{ name: string }>;
     return rows.some((r) => r.name === column);
@@ -44,7 +44,7 @@ async function hasColumn(db: IDatabase, table: string, column: string): Promise<
   }
 }
 
-async function trySql(db: IDatabase, sql: string): Promise<void> {
+async function trySql(db: DatabaseAdapter, sql: string): Promise<void> {
   try {
     await db.exec(sql);
   } catch {

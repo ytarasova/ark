@@ -109,7 +109,7 @@ export async function processReviewFeedback(
 
     // Advance the review gate
     try {
-      const { approveReviewGate } = await import("../services/session-orchestration.js");
+      const { approveReviewGate } = await import("../services/review-gate.js");
       await approveReviewGate(app, session.id);
     } catch {
       logDebug("bridge", "gate may already be advanced");

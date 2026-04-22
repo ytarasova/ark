@@ -83,7 +83,7 @@ const svc = getApp().container.resolve("sessionService");
 
    ```ts
    container.register({
-     myService: asFunction((c: { db: IDatabase; sessions: SessionRepository }) => new MyService(c.db, c.sessions), {
+     myService: asFunction((c: { db: DatabaseAdapter; sessions: SessionRepository }) => new MyService(c.db, c.sessions), {
        lifetime: Lifetime.SINGLETON,
      }),
    });

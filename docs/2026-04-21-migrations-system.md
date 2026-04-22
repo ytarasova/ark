@@ -90,9 +90,9 @@ A new `migrationsCapability` is added to `AppMode`:
 ```ts
 export interface MigrationsCapability {
   readonly dialect: "sqlite" | "postgres";
-  apply(db: IDatabase, opts?: { targetVersion?: number }): void;
-  status(db: IDatabase): MigrationStatus;
-  down(db: IDatabase, opts: { targetVersion: number }): never; // stub for Phase 1
+  apply(db: DatabaseAdapter, opts?: { targetVersion?: number }): void;
+  status(db: DatabaseAdapter): MigrationStatus;
+  down(db: DatabaseAdapter, opts: { targetVersion: number }): never; // stub for Phase 1
 }
 ```
 

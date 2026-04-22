@@ -10,7 +10,10 @@
 
 import { describe, it, expect, afterEach, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../app.js";
-import { startSession, dispatch, stop, resume, complete, getOutput } from "../services/session-orchestration.js";
+import { startSession, stop } from "../services/session-lifecycle.js";
+import { dispatch, resume } from "../services/dispatch.js";
+import { complete } from "../services/stage-advance.js";
+import { getOutput } from "../services/session-output.js";
 import { sessionExists, killSession } from "../infra/tmux.js";
 import { snapshotArkTmuxSessions, killNewArkTmuxSessions } from "./test-helpers.js";
 

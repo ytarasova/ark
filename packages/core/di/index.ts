@@ -20,7 +20,7 @@ import { asValue } from "awilix";
 import type { AppContainer, AppBootOptions } from "../container.js";
 import { createAppContainer } from "../container.js";
 import type { ArkConfig } from "../config.js";
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import type { AppContext } from "../app.js";
 import { registerDatabase, registerRepositories, registerResourceStores } from "./persistence.js";
 import { registerServices } from "./services.js";
@@ -45,7 +45,7 @@ export { registerAppMode } from "./mode.js";
 export function buildContainer(opts: {
   app: AppContext;
   config: ArkConfig;
-  db: IDatabase;
+  db: DatabaseAdapter;
   bootOptions?: AppBootOptions;
 }): AppContainer {
   const container = createAppContainer();

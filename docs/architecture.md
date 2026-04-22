@@ -268,7 +268,7 @@ Ark is deployed in two modes with the same binary and the same code paths. The `
 
 The same codebase handles both modes through two mechanisms:
 
-1. **DB adapter swap.** `AppContext` constructor reads `config.databaseUrl`. If it starts with `postgres://`, it instantiates `PostgresAdapter`, otherwise `BunSqliteAdapter`. Both implement `IDatabase`. All repositories and stores depend only on `IDatabase`.
+1. **DB adapter swap.** `AppContext` constructor reads `config.databaseUrl`. If it starts with `postgres://`, it instantiates `PostgresAdapter`, otherwise `BunSqliteAdapter`. Both implement `DatabaseAdapter`. All repositories and stores depend only on `DatabaseAdapter`.
 
 2. **Tenant scoping via `forTenant(id)`.** `AppContext.forTenant(tenantId)` returns a scoped view of the context. It uses `Object.defineProperty` overrides to wrap each repository and store with `setTenant(tenantId)` so every SQL call is automatically filtered. In local mode this is a no-op (tenant is always `"default"`); in hosted mode every request from the auth middleware is scoped to the caller's tenant.
 
@@ -321,17 +321,17 @@ class AppContext {
 
 CLI creates it with `skipConductor: true`. The server daemon and hosted mode start the conductor. Tests use `AppContext.forTest()` which creates a temp dir and isolated DB.
 
-### 3.2 IDatabase abstraction (`packages/core/database/`)
+### 3.2 DatabaseAdapter abstraction (`packages/core/database/`)
 
 Interface that lets the same repositories work on SQLite or Postgres.
 
 | File | Purpose |
 |---|---|
-| `database.ts` | `IDatabase` interface + `SqlStatement` + `SqlResult` |
+| `database.ts` | `DatabaseAdapter` interface + `SqlStatement` + `SqlResult` |
 | `database-sqlite.ts` | `BunSqliteAdapter` wrapping `bun:sqlite` |
 | `database-postgres.ts` | `PostgresAdapter` wrapping `pg` pool |
 
-All repositories and stores depend only on `IDatabase`, never on `bun:sqlite` or `pg` directly. Schema init is per-adapter (`initSchema()` runs dialect-appropriate SQL).
+All repositories and stores depend only on `DatabaseAdapter`, never on `bun:sqlite` or `pg` directly. Schema init is per-adapter (`initSchema()` runs dialect-appropriate SQL).
 
 ### 3.3 Repositories (`packages/core/repositories/`)
 
@@ -1126,7 +1126,7 @@ In hosted mode, the `resource_definitions`, `sessions`, `knowledge`, `usage_reco
 
 - **Awilix DI over module-level `getApp()`.** Every service and orchestration function takes `app: AppContext` as its first argument. Eliminated 225 `getApp()` calls and made test isolation trivial (`AppContext.forTest()`).
 
-- **`IDatabase` abstraction.** SQLite for local, Postgres for hosted, same repositories. No ORM. Raw SQL with column whitelists. Same code paths run in both modes.
+- **`DatabaseAdapter` abstraction.** SQLite for local, Postgres for hosted, same repositories. No ORM. Raw SQL with column whitelists. Same code paths run in both modes.
 
 - **Polymorphism over switch statements.** `TranscriptParserRegistry`, `ExecutorRegistry`, `ComputeProviderRegistry`, `DbResourceStore` vs `FileResourceStore` -- everything swappable via registration, not `if runtime === "claude"` branches.
 

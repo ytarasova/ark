@@ -219,7 +219,10 @@ async function materializeAttachments(app: AppContext, session: Session, workdir
   if (changed) {
     // Replace the inline-content entries with locator-only entries so the
     // next dispatch + the web UI both see the same durable reference.
-    app.sessions.mergeConfig(session.id, { attachments: rewritten });
+    // Must await: under Temporal semantics the activity can return before
+    // the DB write lands, leaving the next dispatch to read the old inline
+    // content. Bun resolves synchronously today but that's incidental.
+    await app.sessions.mergeConfig(session.id, { attachments: rewritten });
   }
 }
 
@@ -463,8 +466,12 @@ export async function worktreeDiff(
         }
       }
 
-      // Save current hashes as reviewed
-      app.sessions.mergeConfig(sessionId, { reviewed_files: fileHashes });
+      // Save current hashes as reviewed. Must await: under Temporal
+      // semantics the activity can return before the DB write lands, so the
+      // next worktreeDiff would read stale hashes and mis-report
+      // modifiedSinceReview. Bun resolves synchronously today but that's
+      // incidental.
+      await app.sessions.mergeConfig(sessionId, { reviewed_files: fileHashes });
     } catch {
       logDebug("session", "re-review tracking is best-effort");
     }

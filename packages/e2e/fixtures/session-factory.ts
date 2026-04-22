@@ -1,4 +1,4 @@
-import { startSession } from "../../core/services/session-orchestration.js";
+import { startSession } from "../../core/services/session-lifecycle.js";
 import { killSession } from "../../core/infra/tmux.js";
 import type { E2EEnv } from "./app.js";
 

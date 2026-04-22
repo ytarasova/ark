@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, existsSync, writeFileSync } from "fs";
 import { join } from "path";
-import { deleteSessionAsync } from "../services/session-orchestration.js";
+import { deleteSessionAsync } from "../services/session-lifecycle.js";
 import { AppContext } from "../app.js";
 import { clearApp, getApp, setApp } from "./test-helpers.js";
 

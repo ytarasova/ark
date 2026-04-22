@@ -13,10 +13,10 @@
  * never re-ran initPostgresSchema, so this keeps the INSERT below safe.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { logDebug } from "../observability/structured-log.js";
 
-export async function applyPostgresTenantsTeams(db: IDatabase): Promise<void> {
+export async function applyPostgresTenantsTeams(db: DatabaseAdapter): Promise<void> {
   await db.exec(`
     CREATE TABLE IF NOT EXISTS tenants (
       id TEXT PRIMARY KEY,
@@ -83,7 +83,7 @@ export async function applyPostgresTenantsTeams(db: IDatabase): Promise<void> {
   );
 }
 
-async function backfillFrom(db: IDatabase, table: string): Promise<void> {
+async function backfillFrom(db: DatabaseAdapter, table: string): Promise<void> {
   await tryRun(
     db,
     `INSERT INTO tenants (id, slug, name, status, created_at, updated_at)
@@ -94,7 +94,7 @@ async function backfillFrom(db: IDatabase, table: string): Promise<void> {
   );
 }
 
-async function tryRun(db: IDatabase, sql: string): Promise<void> {
+async function tryRun(db: DatabaseAdapter, sql: string): Promise<void> {
   try {
     await db.exec(sql);
   } catch {

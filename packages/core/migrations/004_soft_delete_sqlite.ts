@@ -20,10 +20,10 @@
  * re-ensuring the partial indexes (also IF NOT EXISTS).
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { logDebug } from "../observability/structured-log.js";
 
-export async function applySqliteSoftDelete(db: IDatabase): Promise<void> {
+export async function applySqliteSoftDelete(db: DatabaseAdapter): Promise<void> {
   // Table rebuilds DROP the old table; with foreign_keys = ON that would
   // cascade-delete dependent rows in teams/memberships. Turn FKs off for
   // the rebuild and re-enable afterwards. PRAGMA foreign_keys is a no-op
@@ -41,12 +41,12 @@ export async function applySqliteSoftDelete(db: IDatabase): Promise<void> {
   }
 }
 
-async function hasColumn(db: IDatabase, table: string, column: string): Promise<boolean> {
+async function hasColumn(db: DatabaseAdapter, table: string, column: string): Promise<boolean> {
   const rows = (await db.prepare(`PRAGMA table_info(${table})`).all()) as Array<{ name: string }>;
   return rows.some((r) => r.name === column);
 }
 
-async function rebuildTenantsIfNeeded(db: IDatabase): Promise<void> {
+async function rebuildTenantsIfNeeded(db: DatabaseAdapter): Promise<void> {
   if (await hasColumn(db, "tenants", "deleted_at")) return;
   await db.exec(`
     CREATE TABLE tenants_new (
@@ -68,7 +68,7 @@ async function rebuildTenantsIfNeeded(db: IDatabase): Promise<void> {
   await trySql(db, `CREATE INDEX IF NOT EXISTS idx_tenants_status ON tenants(status)`);
 }
 
-async function rebuildUsersIfNeeded(db: IDatabase): Promise<void> {
+async function rebuildUsersIfNeeded(db: DatabaseAdapter): Promise<void> {
   if (await hasColumn(db, "users", "deleted_at")) return;
   await db.exec(`
     CREATE TABLE users_new (
@@ -88,7 +88,7 @@ async function rebuildUsersIfNeeded(db: IDatabase): Promise<void> {
   await db.exec(`ALTER TABLE users_new RENAME TO users`);
 }
 
-async function rebuildTeamsIfNeeded(db: IDatabase): Promise<void> {
+async function rebuildTeamsIfNeeded(db: DatabaseAdapter): Promise<void> {
   if (await hasColumn(db, "teams", "deleted_at")) return;
   await db.exec(`
     CREATE TABLE teams_new (
@@ -111,7 +111,7 @@ async function rebuildTeamsIfNeeded(db: IDatabase): Promise<void> {
   await trySql(db, `CREATE INDEX IF NOT EXISTS idx_teams_tenant ON teams(tenant_id)`);
 }
 
-async function rebuildMembershipsIfNeeded(db: IDatabase): Promise<void> {
+async function rebuildMembershipsIfNeeded(db: DatabaseAdapter): Promise<void> {
   if (await hasColumn(db, "memberships", "deleted_at")) return;
   await db.exec(`
     CREATE TABLE memberships_new (
@@ -133,7 +133,7 @@ async function rebuildMembershipsIfNeeded(db: IDatabase): Promise<void> {
   await trySql(db, `CREATE INDEX IF NOT EXISTS idx_memberships_team ON memberships(team_id)`);
 }
 
-async function ensurePartialIndexes(db: IDatabase): Promise<void> {
+async function ensurePartialIndexes(db: DatabaseAdapter): Promise<void> {
   await trySql(db, `CREATE UNIQUE INDEX IF NOT EXISTS idx_tenants_slug_live ON tenants(slug) WHERE deleted_at IS NULL`);
   await trySql(db, `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_live ON users(email) WHERE deleted_at IS NULL`);
   await trySql(
@@ -148,7 +148,7 @@ async function ensurePartialIndexes(db: IDatabase): Promise<void> {
   );
 }
 
-async function trySql(db: IDatabase, sql: string): Promise<void> {
+async function trySql(db: DatabaseAdapter, sql: string): Promise<void> {
   try {
     await db.exec(sql);
   } catch {

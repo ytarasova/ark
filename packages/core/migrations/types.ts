@@ -11,12 +11,12 @@
  * has to implement it yet.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 
 export type MigrationDialect = "sqlite" | "postgres";
 
 export interface MigrationApplyContext {
-  db: IDatabase;
+  db: DatabaseAdapter;
   dialect: MigrationDialect;
 }
 
@@ -24,7 +24,7 @@ export interface Migration {
   version: number;
   name: string;
   /**
-   * Apply the migration body. Async because IDatabase is async; bodies
+   * Apply the migration body. Async because DatabaseAdapter is async; bodies
    * that don't await anything can still return a sync `void` and the
    * runner will await whatever is returned.
    */

@@ -3,7 +3,7 @@
  */
 
 // Database abstraction
-export type { IDatabase, IStatement } from "./database/index.js";
+export type { DatabaseAdapter, PreparedStatement } from "./database/index.js";
 export { BunSqliteAdapter } from "./database/index.js";
 
 // Re-exports
@@ -21,8 +21,9 @@ export {
 // Domain types (previously from store.ts, now from types/)
 export type { Session, Event, Compute, Message } from "../types/index.js";
 
-// Session orchestration types (import the functions directly from session-orchestration.js)
-export type { HookStatusResult, ReportResult, SessionOpResult } from "./services/session-orchestration.js";
+// Session orchestration types -- re-exported from the focused service modules.
+export type { HookStatusResult, ReportResult } from "./services/session-hooks.js";
+export type { SessionOpResult } from "./services/session-lifecycle.js";
 
 // Flow
 export * from "./state/flow.js";

@@ -103,7 +103,7 @@ export interface KnowledgeEdge {
 }
 
 export class KnowledgeGraph {
-  constructor(private db: IDatabase) {}
+  constructor(private db: DatabaseAdapter) {}
 
   addNode(node: KnowledgeNode): void;
   addEdge(edge: KnowledgeEdge): void;

@@ -114,7 +114,7 @@ recipes/     <span class="comment">8 recipe templates (YAML)</span></code></pre>
       <p>From bottom to top:</p>
       <ol>
         <li><code>packages/types/</code> -- Domain interfaces. No logic, no dependencies.</li>
-        <li><code>database.ts</code> / <code>database-sqlite.ts</code> / <code>database-postgres.ts</code> -- <code>IDatabase</code> abstraction.</li>
+        <li><code>database.ts</code> / <code>database-sqlite.ts</code> / <code>database-postgres.ts</code> -- <code>DatabaseAdapter</code> abstraction.</li>
         <li><code>repositories/</code> -- SQL CRUD behind typed classes. Column whitelists prevent injection.</li>
         <li><code>stores/</code> -- Resource stores with three-tier file resolution.</li>
         <li><code>services/session.ts</code> -- Lifecycle facade: start, stop, resume, complete, pause, delete.</li>
@@ -219,7 +219,7 @@ it(<span class="string">"creates a session"</span>, () => {
         <li>ES modules (<code>"type": "module"</code>) -- always use <code>.js</code> import extensions even in TypeScript</li>
         <li>React + Vite + Tailwind for Web and Desktop</li>
         <li>YAML for agent/flow/runtime/recipe definitions</li>
-        <li>SQLite for local, PostgreSQL for hosted mode (via <code>IDatabase</code> abstraction, no ORM)</li>
+        <li>SQLite for local, PostgreSQL for hosted mode (via <code>DatabaseAdapter</code> abstraction, no ORM)</li>
         <li>Never use em dashes (U+2014) -- use hyphens (-) or double dashes (--) instead</li>
       </ul>
 

@@ -7,10 +7,10 @@
  * The legacy table is NOT dropped -- kept one release as a safety net.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { logDebug } from "../observability/structured-log.js";
 
-export async function applySqliteComputeUnify(db: IDatabase): Promise<void> {
+export async function applySqliteComputeUnify(db: DatabaseAdapter): Promise<void> {
   // Add columns idempotently. SQLite has no ADD COLUMN IF NOT EXISTS, so
   // swallow the "duplicate column name" error that fires on re-runs.
   await tryRun(db, "ALTER TABLE compute ADD COLUMN is_template INTEGER NOT NULL DEFAULT 0");
@@ -38,7 +38,7 @@ export async function applySqliteComputeUnify(db: IDatabase): Promise<void> {
   );
 }
 
-async function tryRun(db: IDatabase, sql: string): Promise<void> {
+async function tryRun(db: DatabaseAdapter, sql: string): Promise<void> {
   try {
     await db.exec(sql);
   } catch {

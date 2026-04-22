@@ -17,12 +17,37 @@ import { loadRepoConfig } from "../repo-config.js";
 
 import { recordSessionUsage, runVerification, cloneSession } from "./session-lifecycle.js";
 import { capturePlanMdIfPresent } from "./plan-artifact.js";
+import { withIdempotency } from "./idempotency.js";
+
+/**
+ * Optional idempotency key accepted by advance/complete/handoff. When a caller
+ * (e.g. a Temporal activity with at-least-once delivery) passes the same key
+ * twice, the second call returns the cached result without running the body.
+ * Omitting the key preserves today's behavior exactly. See RF-8 / #388.
+ */
+export interface IdempotencyCapable {
+  idempotencyKey?: string;
+}
 
 export async function advance(
   app: AppContext,
   sessionId: string,
   force = false,
   outcome?: string,
+  opts?: IdempotencyCapable,
+): Promise<{ ok: boolean; message: string }> {
+  return withIdempotency(
+    app.db,
+    { sessionId, stage: null, opKind: "advance", idempotencyKey: opts?.idempotencyKey },
+    () => advanceImpl(app, sessionId, force, outcome),
+  );
+}
+
+async function advanceImpl(
+  app: AppContext,
+  sessionId: string,
+  force: boolean,
+  outcome: string | undefined,
 ): Promise<{ ok: boolean; message: string }> {
   const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
@@ -297,7 +322,19 @@ export async function advance(
 export async function complete(
   app: AppContext,
   sessionId: string,
-  opts?: { force?: boolean },
+  opts?: { force?: boolean } & IdempotencyCapable,
+): Promise<{ ok: boolean; message: string }> {
+  return withIdempotency(
+    app.db,
+    { sessionId, stage: null, opKind: "complete", idempotencyKey: opts?.idempotencyKey },
+    () => completeImpl(app, sessionId, opts),
+  );
+}
+
+async function completeImpl(
+  app: AppContext,
+  sessionId: string,
+  opts: ({ force?: boolean } & IdempotencyCapable) | undefined,
 ): Promise<{ ok: boolean; message: string }> {
   const session = await app.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
@@ -331,7 +368,10 @@ export async function complete(
   parseNonClaudeTranscript(app, session);
 
   await app.sessions.update(sessionId, { status: "ready", session_id: null });
-  return await advance(app, sessionId, true);
+  // Internal cascade -- the outer complete() already keyed on idempotencyKey,
+  // so we MUST NOT re-key advance() here or we'd collide with a caller that
+  // later replays advance() on its own. Run the body directly.
+  return await advanceImpl(app, sessionId, true, undefined);
 }
 
 /**
@@ -381,16 +421,23 @@ export async function handoff(
   sessionId: string,
   toAgent: string,
   instructions?: string,
+  opts?: IdempotencyCapable,
 ): Promise<{ ok: boolean; message: string }> {
-  const result = await cloneSession(app, sessionId, instructions);
-  if (!result.ok) return { ok: false, message: (result as { ok: false; message: string }).message };
+  return withIdempotency(
+    app.db,
+    { sessionId, stage: null, opKind: "handoff", idempotencyKey: opts?.idempotencyKey },
+    async () => {
+      const result = await cloneSession(app, sessionId, instructions);
+      if (!result.ok) return { ok: false, message: (result as { ok: false; message: string }).message };
 
-  await app.events.log(result.sessionId, "session_handoff", {
-    actor: "user",
-    data: { from_session: sessionId, to_agent: toAgent, instructions },
-  });
+      await app.events.log(result.sessionId, "session_handoff", {
+        actor: "user",
+        data: { from_session: sessionId, to_agent: toAgent, instructions },
+      });
 
-  // Dynamic import avoids a cycle with dispatch.ts.
-  const { dispatch } = await import("./dispatch.js");
-  return await dispatch(app, result.sessionId);
+      // Dynamic import avoids a cycle with dispatch.ts.
+      const { dispatch } = await import("./dispatch.js");
+      return await dispatch(app, result.sessionId);
+    },
+  );
 }

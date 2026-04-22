@@ -6,7 +6,7 @@
  */
 
 import { createHash, randomBytes } from "crypto";
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import type { TenantContext, ApiKey } from "../../types/index.js";
 import { now } from "../util/time.js";
 
@@ -47,7 +47,7 @@ function hashKey(key: string): string {
 // ── ApiKeyManager ────────────────────────────────────────────────────────────
 
 export class ApiKeyManager {
-  constructor(private db: IDatabase) {}
+  constructor(private db: DatabaseAdapter) {}
 
   /**
    * Create a new API key. Returns the plaintext key (only shown once) and

@@ -8,10 +8,10 @@
  * inlines its DDL.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { initSchema } from "../repositories/schema.js";
 
-export async function applySqliteInitial(db: IDatabase): Promise<void> {
+export async function applySqliteInitial(db: DatabaseAdapter): Promise<void> {
   // initSchema is idempotent (CREATE TABLE IF NOT EXISTS throughout) -- safe
   // to invoke from a migration body even though the runner already gates by
   // version.

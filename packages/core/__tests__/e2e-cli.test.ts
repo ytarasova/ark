@@ -8,7 +8,7 @@
 import { describe, it, expect, afterEach } from "bun:test";
 import { execFileSync } from "child_process";
 import { join } from "path";
-import { startSession } from "../services/session-orchestration.js";
+import { startSession } from "../services/session-lifecycle.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";
 

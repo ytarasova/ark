@@ -8,7 +8,7 @@ import type { ActionHandler } from "./types.js";
 export const closeAction: ActionHandler = {
   name: "close_ticket",
   aliases: ["close"],
-  async execute(app, session, action) {
+  async execute(app, session, action, _opts) {
     await app.events.log(session.id, "action_executed", {
       stage: session.stage ?? undefined,
       actor: "system",

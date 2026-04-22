@@ -12,7 +12,7 @@
  * exactly once.
  */
 
-import type { IDatabase } from "../../database/index.js";
+import type { DatabaseAdapter } from "../../database/index.js";
 import { randomUUID } from "crypto";
 import * as workspacesSchema from "../schema/workspaces.js";
 import { TABLE as WORKSPACES_TABLE } from "../schema/workspaces.js";
@@ -23,7 +23,7 @@ export const VERSION = 2;
 export const NAME = "workspaces";
 
 export interface MigrationApplyContext {
-  db: IDatabase;
+  db: DatabaseAdapter;
   dialect: "sqlite" | "postgres";
 }
 

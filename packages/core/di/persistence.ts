@@ -9,7 +9,7 @@
 import { asFunction, asValue, Lifetime } from "awilix";
 import { join } from "path";
 import type { AppContainer } from "../container.js";
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import type { ArkConfig } from "../config.js";
 import type { AppMode } from "../modes/app-mode.js";
 import { resolveStoreBaseDir } from "../install-paths.js";
@@ -33,7 +33,7 @@ import { KnowledgeStore } from "../knowledge/store.js";
  * opening it is async (SQLite vs Postgres) and must happen before schema init.
  * We register a disposer so `container.dispose()` closes the connection.
  */
-export function registerDatabase(container: AppContainer, db: IDatabase): void {
+export function registerDatabase(container: AppContainer, db: DatabaseAdapter): void {
   container.register({
     db: asValue(db),
   });
@@ -60,7 +60,7 @@ export function registerDatabase(container: AppContainer, db: IDatabase): void {
 export function registerRepositories(container: AppContainer): void {
   container.register({
     sessions: asFunction(
-      (c: { db: IDatabase; config: ArkConfig }) => {
+      (c: { db: DatabaseAdapter; config: ArkConfig }) => {
         const repo = new SessionRepository(c.db);
         repo.setChannelBounds(c.config.channels.basePort, c.config.channels.range);
         return repo;
@@ -68,21 +68,25 @@ export function registerRepositories(container: AppContainer): void {
       { lifetime: Lifetime.SINGLETON },
     ),
 
-    computes: asFunction((c: { db: IDatabase }) => new ComputeRepository(c.db), { lifetime: Lifetime.SINGLETON }),
+    computes: asFunction((c: { db: DatabaseAdapter }) => new ComputeRepository(c.db), { lifetime: Lifetime.SINGLETON }),
 
-    computeTemplates: asFunction((c: { db: IDatabase }) => new ComputeTemplateRepository(c.db), {
+    computeTemplates: asFunction((c: { db: DatabaseAdapter }) => new ComputeTemplateRepository(c.db), {
       lifetime: Lifetime.SINGLETON,
     }),
 
-    events: asFunction((c: { db: IDatabase }) => new EventRepository(c.db), { lifetime: Lifetime.SINGLETON }),
-    messages: asFunction((c: { db: IDatabase }) => new MessageRepository(c.db), { lifetime: Lifetime.SINGLETON }),
-    todos: asFunction((c: { db: IDatabase }) => new TodoRepository(c.db), { lifetime: Lifetime.SINGLETON }),
-    artifacts: asFunction((c: { db: IDatabase }) => new ArtifactRepository(c.db), { lifetime: Lifetime.SINGLETON }),
-    flowStates: asFunction((c: { db: IDatabase }) => new FlowStateRepository(c.db), { lifetime: Lifetime.SINGLETON }),
-    ledger: asFunction((c: { db: IDatabase }) => new LedgerRepository(c.db), { lifetime: Lifetime.SINGLETON }),
+    events: asFunction((c: { db: DatabaseAdapter }) => new EventRepository(c.db), { lifetime: Lifetime.SINGLETON }),
+    messages: asFunction((c: { db: DatabaseAdapter }) => new MessageRepository(c.db), { lifetime: Lifetime.SINGLETON }),
+    todos: asFunction((c: { db: DatabaseAdapter }) => new TodoRepository(c.db), { lifetime: Lifetime.SINGLETON }),
+    artifacts: asFunction((c: { db: DatabaseAdapter }) => new ArtifactRepository(c.db), {
+      lifetime: Lifetime.SINGLETON,
+    }),
+    flowStates: asFunction((c: { db: DatabaseAdapter }) => new FlowStateRepository(c.db), {
+      lifetime: Lifetime.SINGLETON,
+    }),
+    ledger: asFunction((c: { db: DatabaseAdapter }) => new LedgerRepository(c.db), { lifetime: Lifetime.SINGLETON }),
 
     // Knowledge graph is persistence-adjacent -- keep it here with the repos.
-    knowledge: asFunction((c: { db: IDatabase }) => new KnowledgeStore(c.db), { lifetime: Lifetime.SINGLETON }),
+    knowledge: asFunction((c: { db: DatabaseAdapter }) => new KnowledgeStore(c.db), { lifetime: Lifetime.SINGLETON }),
   });
 }
 
@@ -101,25 +105,25 @@ export function registerRepositories(container: AppContainer): void {
 export function registerResourceStores(container: AppContainer): void {
   container.register({
     flows: asFunction(
-      (c: { db: IDatabase; config: ArkConfig; mode: AppMode }) => makeFlowStore(c.db, c.config, c.mode),
+      (c: { db: DatabaseAdapter; config: ArkConfig; mode: AppMode }) => makeFlowStore(c.db, c.config, c.mode),
       {
         lifetime: Lifetime.SINGLETON,
       },
     ),
     skills: asFunction(
-      (c: { db: IDatabase; config: ArkConfig; mode: AppMode }) => makeSkillStore(c.db, c.config, c.mode),
+      (c: { db: DatabaseAdapter; config: ArkConfig; mode: AppMode }) => makeSkillStore(c.db, c.config, c.mode),
       { lifetime: Lifetime.SINGLETON },
     ),
     agents: asFunction(
-      (c: { db: IDatabase; config: ArkConfig; mode: AppMode }) => makeAgentStore(c.db, c.config, c.mode),
+      (c: { db: DatabaseAdapter; config: ArkConfig; mode: AppMode }) => makeAgentStore(c.db, c.config, c.mode),
       { lifetime: Lifetime.SINGLETON },
     ),
     recipes: asFunction(
-      (c: { db: IDatabase; config: ArkConfig; mode: AppMode }) => makeRecipeStore(c.db, c.config, c.mode),
+      (c: { db: DatabaseAdapter; config: ArkConfig; mode: AppMode }) => makeRecipeStore(c.db, c.config, c.mode),
       { lifetime: Lifetime.SINGLETON },
     ),
     runtimes: asFunction(
-      (c: { db: IDatabase; config: ArkConfig; mode: AppMode }) => makeRuntimeStore(c.db, c.config, c.mode),
+      (c: { db: DatabaseAdapter; config: ArkConfig; mode: AppMode }) => makeRuntimeStore(c.db, c.config, c.mode),
       { lifetime: Lifetime.SINGLETON },
     ),
   });
@@ -127,7 +131,7 @@ export function registerResourceStores(container: AppContainer): void {
 
 // ── Factory helpers ─────────────────────────────────────────────────────────
 
-function makeFlowStore(db: IDatabase, config: ArkConfig, mode: AppMode) {
+function makeFlowStore(db: DatabaseAdapter, config: ArkConfig, mode: AppMode) {
   if (mode.kind === "hosted") {
     initResourceDefinitionsTable(db);
     return new DbResourceStore(db, "flow", { stages: [] });
@@ -138,7 +142,7 @@ function makeFlowStore(db: IDatabase, config: ArkConfig, mode: AppMode) {
   });
 }
 
-function makeSkillStore(db: IDatabase, config: ArkConfig, mode: AppMode) {
+function makeSkillStore(db: DatabaseAdapter, config: ArkConfig, mode: AppMode) {
   if (mode.kind === "hosted") {
     initResourceDefinitionsTable(db);
     return new DbResourceStore(db, "skill", { description: "", content: "" });
@@ -149,7 +153,7 @@ function makeSkillStore(db: IDatabase, config: ArkConfig, mode: AppMode) {
   });
 }
 
-function makeAgentStore(db: IDatabase, config: ArkConfig, mode: AppMode) {
+function makeAgentStore(db: DatabaseAdapter, config: ArkConfig, mode: AppMode) {
   if (mode.kind === "hosted") {
     initResourceDefinitionsTable(db);
     return new DbResourceStore(db, "agent", {
@@ -172,7 +176,7 @@ function makeAgentStore(db: IDatabase, config: ArkConfig, mode: AppMode) {
   });
 }
 
-function makeRecipeStore(db: IDatabase, config: ArkConfig, mode: AppMode) {
+function makeRecipeStore(db: DatabaseAdapter, config: ArkConfig, mode: AppMode) {
   if (mode.kind === "hosted") {
     initResourceDefinitionsTable(db);
     return new DbResourceStore(db, "recipe", { description: "", flow: "default" });
@@ -183,7 +187,7 @@ function makeRecipeStore(db: IDatabase, config: ArkConfig, mode: AppMode) {
   });
 }
 
-function makeRuntimeStore(db: IDatabase, config: ArkConfig, mode: AppMode) {
+function makeRuntimeStore(db: DatabaseAdapter, config: ArkConfig, mode: AppMode) {
   if (mode.kind === "hosted") {
     initResourceDefinitionsTable(db);
     return new DbResourceStore(db, "runtime", { description: "", type: "cli-agent", command: [] });

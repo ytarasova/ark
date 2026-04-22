@@ -6,10 +6,10 @@
  * legacy `idx_api_keys_hash` non-unique lookup index is preserved.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { logDebug } from "../observability/structured-log.js";
 
-export async function applyPostgresApiKeysSoftDelete(db: IDatabase): Promise<void> {
+export async function applyPostgresApiKeysSoftDelete(db: DatabaseAdapter): Promise<void> {
   await trySql(db, "ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS deleted_at TEXT");
   await trySql(db, "ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS deleted_by TEXT");
   await trySql(
@@ -18,7 +18,7 @@ export async function applyPostgresApiKeysSoftDelete(db: IDatabase): Promise<voi
   );
 }
 
-async function trySql(db: IDatabase, sql: string): Promise<void> {
+async function trySql(db: DatabaseAdapter, sql: string): Promise<void> {
   try {
     await db.exec(sql);
   } catch {

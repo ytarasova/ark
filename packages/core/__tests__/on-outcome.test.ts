@@ -16,7 +16,8 @@ import { join } from "path";
 import YAML from "yaml";
 import { getStage, getNextStage, resolveNextStage, validateDAG, type StageDefinition } from "../state/flow.js";
 import { AppContext } from "../app.js";
-import { applyReport, advance } from "../services/session-orchestration.js";
+import { applyReport } from "../services/session-hooks.js";
+import { advance } from "../services/stage-advance.js";
 
 let app: AppContext;
 

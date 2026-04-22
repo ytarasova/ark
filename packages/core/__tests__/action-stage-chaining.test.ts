@@ -14,7 +14,8 @@
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext } from "../app.js";
-import { mediateStageHandoff, executeAction } from "../services/session-orchestration.js";
+import { mediateStageHandoff } from "../services/session-hooks.js";
+import { executeAction } from "../services/actions/index.js";
 import { waitFor } from "./test-helpers.js";
 
 let app: AppContext;
@@ -204,7 +205,7 @@ describe("action stage chaining", async () => {
     // because the default session_created listener only kicks dispatch
     // once. The fix routes action stages through executeAction +
     // mediateStageHandoff so a single-action flow can auto-complete.
-    const { dispatch } = await import("../services/session-orchestration.js");
+    const { dispatch } = await import("../services/dispatch.js");
 
     app.flows.save("test-action-first", {
       name: "test-action-first",

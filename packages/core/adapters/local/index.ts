@@ -60,7 +60,7 @@ export function buildLocalBindings(_cradle: BindingCradle): LocalBindings {
     sessionStore: new LocalSessionStore(),
     computeStore: new LocalComputeStore(),
     eventBus: new LocalEventBus(),
-    eventStore: new LocalEventStore((_cradle as { db: import("../../database/index.js").IDatabase }).db),
+    eventStore: new LocalEventStore((_cradle as { db: import("../../database/index.js").DatabaseAdapter }).db),
     workspace: new LocalWorkspace(),
     processRunner: new LocalProcessRunner(),
     clock: new SystemClock(),

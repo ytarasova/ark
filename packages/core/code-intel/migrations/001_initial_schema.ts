@@ -5,7 +5,7 @@
  * `INSERT OR IGNORE` (SQLite) / `ON CONFLICT DO NOTHING` (Postgres).
  */
 
-import type { IDatabase } from "../../database/index.js";
+import type { DatabaseAdapter } from "../../database/index.js";
 import { sqliteSchema, postgresSchema } from "../schema/index.js";
 import { TABLE as TENANTS_TABLE } from "../schema/tenants.js";
 import { DEFAULT_TENANT_ID } from "../constants.js";
@@ -14,7 +14,7 @@ export const VERSION = 1;
 export const NAME = "initial_schema";
 
 export interface MigrationApplyContext {
-  db: IDatabase;
+  db: DatabaseAdapter;
   dialect: "sqlite" | "postgres";
 }
 

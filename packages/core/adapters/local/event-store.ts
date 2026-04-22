@@ -8,12 +8,12 @@
 import type { EventStore, EventLogOpts, EventListOpts } from "../../ports/event-store.js";
 import type { Event } from "../../../types/index.js";
 import { EventRepository } from "../../repositories/event.js";
-import type { IDatabase } from "../../database/index.js";
+import type { DatabaseAdapter } from "../../database/index.js";
 
 export class LocalEventStore implements EventStore {
   private repo: EventRepository;
 
-  constructor(db: IDatabase) {
+  constructor(db: DatabaseAdapter) {
     this.repo = new EventRepository(db);
   }
 

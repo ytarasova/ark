@@ -6,10 +6,10 @@
  * pure-migration install.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { logDebug } from "../observability/structured-log.js";
 
-export async function applyPostgresTenantComputeConfig(db: IDatabase): Promise<void> {
+export async function applyPostgresTenantComputeConfig(db: DatabaseAdapter): Promise<void> {
   await runDdl(
     db,
     `CREATE TABLE IF NOT EXISTS tenant_policies (
@@ -26,7 +26,7 @@ export async function applyPostgresTenantComputeConfig(db: IDatabase): Promise<v
   await runDdl(db, "ALTER TABLE tenant_policies ADD COLUMN IF NOT EXISTS compute_config_yaml TEXT");
 }
 
-async function runDdl(db: IDatabase, sql: string): Promise<void> {
+async function runDdl(db: DatabaseAdapter, sql: string): Promise<void> {
   try {
     await db.exec(sql);
   } catch {

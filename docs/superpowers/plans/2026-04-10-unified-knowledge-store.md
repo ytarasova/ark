@@ -4,9 +4,9 @@
 
 **Goal:** Unify codebase structure, session history, memories, learnings, and skills into a single queryable knowledge graph. Agents get full context at dispatch -- code dependencies, past sessions, team knowledge -- without grep-ing.
 
-**Architecture:** Two SQL tables (`knowledge` nodes + `knowledge_edges`) in the existing DB via IDatabase. Axon (subprocess) indexes codebases. Memories and learnings migrate from flat files into the graph. MCP server exposes query tools to agents. Context package injected at dispatch time.
+**Architecture:** Two SQL tables (`knowledge` nodes + `knowledge_edges`) in the existing DB via DatabaseAdapter. Axon (subprocess) indexes codebases. Memories and learnings migrate from flat files into the graph. MCP server exposes query tools to agents. Context package injected at dispatch time.
 
-**Tech Stack:** TypeScript, Bun, SQLite/Postgres (via IDatabase), Axon (pip install axoniq), tree-sitter (via Axon)
+**Tech Stack:** TypeScript, Bun, SQLite/Postgres (via DatabaseAdapter), Axon (pip install axoniq), tree-sitter (via Axon)
 
 ---
 
@@ -176,11 +176,11 @@ Test: add/get/remove nodes, add/remove edges, neighbors traversal, search.
 
 ```ts
 // packages/core/knowledge/store.ts
-import type { IDatabase } from "../database.js";
+import type { DatabaseAdapter } from "../database.js";
 import type { KnowledgeNode, KnowledgeEdge, NodeType, EdgeRelation } from "./types.js";
 
 export class KnowledgeStore {
-  constructor(private db: IDatabase, private tenantId: string = "default") {}
+  constructor(private db: DatabaseAdapter, private tenantId: string = "default") {}
 
   setTenant(tenantId: string): void { this.tenantId = tenantId; }
 

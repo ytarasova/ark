@@ -18,14 +18,29 @@ export interface ActionResult {
   message: string;
 }
 
+/**
+ * Optional per-call options passed to action handlers. Today the only field
+ * is `idempotencyKey` (RF-8 / #388) -- set by callers that want at-most-once
+ * semantics under at-least-once activity retries (Temporal). Omit to preserve
+ * today's behavior exactly.
+ */
+export interface ActionOpts {
+  idempotencyKey?: string;
+}
+
 export interface ActionHandler {
   /** Stable action key matching the flow YAML `action:` value. */
   readonly name: string;
   /** Optional aliases (e.g. `merge` is an alias of `merge_pr`). */
   readonly aliases?: readonly string[];
   /**
-   * Execute the action. The handler is responsible for its own event logging
+   * Run the action. The handler is responsible for its own event logging
    * on success -- `executeAction` only handles the "unknown action" case.
+   *
+   * `opts.idempotencyKey` is threaded through by the executeAction dispatcher
+   * so individual handlers don't need to care about the ledger -- the dispatch
+   * wrapper deduplicates. Handlers may still inspect opts if they need
+   * per-action keys for internal sub-operations.
    */
-  execute(app: AppContext, session: Session, action: string): Promise<ActionResult>;
+  execute(app: AppContext, session: Session, action: string, opts?: ActionOpts): Promise<ActionResult>;
 }

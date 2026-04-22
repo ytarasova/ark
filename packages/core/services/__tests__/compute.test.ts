@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach, afterEach, mock } from "bun:test";
 import { asValue } from "awilix";
 import { Database } from "bun:sqlite";
 import { BunSqliteAdapter } from "../../database/sqlite.js";
-import type { IDatabase } from "../../database.js";
+import type { DatabaseAdapter } from "../../database.js";
 import { AppContext } from "../../app.js";
 import { ComputeService } from "../compute.js";
 import { ComputeRepository } from "../../repositories/compute.js";
@@ -155,7 +155,7 @@ describe("ComputeService", async () => {
   // ── Pure-unit construction (legacy, still supported) ──────────────────
 
   describe("pure unit construction (no container)", () => {
-    let pureDb: IDatabase;
+    let pureDb: DatabaseAdapter;
     let pureSvc: ComputeService;
 
     beforeEach(async () => {

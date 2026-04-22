@@ -10,17 +10,17 @@
 import { describe, it, expect } from "bun:test";
 import { Database } from "bun:sqlite";
 import { BunSqliteAdapter } from "../../database/sqlite.js";
-import type { IDatabase } from "../../database/types.js";
+import type { DatabaseAdapter } from "../../database/types.js";
 import { MigrationRunner } from "../runner.js";
 import { up as up005 } from "../005_deleted_by.js";
 
-async function freshDb(): Promise<IDatabase> {
+async function freshDb(): Promise<DatabaseAdapter> {
   const raw = new Database(":memory:");
   raw.exec("PRAGMA foreign_keys = ON");
   return new BunSqliteAdapter(raw);
 }
 
-async function hasColumn(db: IDatabase, table: string, column: string): Promise<boolean> {
+async function hasColumn(db: DatabaseAdapter, table: string, column: string): Promise<boolean> {
   const rows = (await db.prepare(`PRAGMA table_info(${table})`).all()) as Array<{ name: string }>;
   return rows.some((r) => r.name === column);
 }

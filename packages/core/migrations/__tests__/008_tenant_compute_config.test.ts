@@ -5,15 +5,15 @@
 import { describe, it, expect } from "bun:test";
 import { Database } from "bun:sqlite";
 import { BunSqliteAdapter } from "../../database/sqlite.js";
-import type { IDatabase } from "../../database/types.js";
+import type { DatabaseAdapter } from "../../database/types.js";
 import { MigrationRunner } from "../runner.js";
 import { up as up008, VERSION as V008 } from "../008_tenant_compute_config.js";
 
-async function freshDb(): Promise<IDatabase> {
+async function freshDb(): Promise<DatabaseAdapter> {
   return new BunSqliteAdapter(new Database(":memory:"));
 }
 
-async function hasColumn(db: IDatabase, table: string, column: string): Promise<boolean> {
+async function hasColumn(db: DatabaseAdapter, table: string, column: string): Promise<boolean> {
   const rows = (await db.prepare(`PRAGMA table_info(${table})`).all()) as Array<{ name: string }>;
   return rows.some((r) => r.name === column);
 }

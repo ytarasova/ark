@@ -7,10 +7,10 @@
  * NOT dropped -- kept one release as a safety net.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { logDebug } from "../observability/structured-log.js";
 
-export async function applyPostgresComputeUnify(db: IDatabase): Promise<void> {
+export async function applyPostgresComputeUnify(db: DatabaseAdapter): Promise<void> {
   await tryRun(db, `ALTER TABLE compute ADD COLUMN IF NOT EXISTS is_template BOOLEAN NOT NULL DEFAULT FALSE`);
   await tryRun(db, `ALTER TABLE compute ADD COLUMN IF NOT EXISTS cloned_from TEXT`);
 
@@ -35,7 +35,7 @@ export async function applyPostgresComputeUnify(db: IDatabase): Promise<void> {
   );
 }
 
-async function tryRun(db: IDatabase, sql: string): Promise<void> {
+async function tryRun(db: DatabaseAdapter, sql: string): Promise<void> {
   try {
     await db.exec(sql);
   } catch {

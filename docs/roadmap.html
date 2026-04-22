@@ -107,7 +107,7 @@
         </thead>
         <tbody>
           <tr><td>Awilix DI container</td><td><span class="pill done">done</span></td><td>All services, repos, stores resolve from AppContext. Zero <code>getApp()</code> in production code.</td></tr>
-          <tr><td>IDatabase abstraction</td><td><span class="pill done">done</span></td><td>SQLite adapter (local). Postgres adapter (hosted, sync-over-async -- see caveats).</td></tr>
+          <tr><td>DatabaseAdapter abstraction</td><td><span class="pill done">done</span></td><td>SQLite adapter (local). Postgres adapter (hosted, sync-over-async -- see caveats).</td></tr>
           <tr><td>Session orchestration</td><td><span class="pill done">done</span></td><td>Full lifecycle: start, dispatch, stop, resume, advance, complete, fork, clone, spawn, fan-out, handoff.</td></tr>
           <tr><td>DAG flow engine</td><td><span class="pill done">done</span></td><td><code>depends_on</code>, parallel stages, auto-join on child completion, branch merge with conflict detection.</td></tr>
           <tr><td>Knowledge graph</td><td><span class="pill done">done</span></td><td>Unified store (codebase + sessions + memories + learnings + skills). MCP tools. Context injection at dispatch. 79 tests.</td></tr>
@@ -137,7 +137,7 @@
         </thead>
         <tbody>
           <tr><td>LLM Router</td><td><span class="pill partial">partial</span></td><td>Full server with classifier, 3 policies, streaming, CLI. 30 unit tests. Never made a real provider API call.</td></tr>
-          <tr><td>Postgres adapter</td><td><span class="pill partial">partial</span></td><td>Implements <code>IDatabase</code>. Uses <code>Bun.sleepSync</code> spin loop. Never tested under concurrent load. Repos need async migration for real scale.</td></tr>
+          <tr><td>Postgres adapter</td><td><span class="pill partial">partial</span></td><td>Implements <code>DatabaseAdapter</code>. Uses <code>Bun.sleepSync</code> spin loop. Never tested under concurrent load. Repos need async migration for real scale.</td></tr>
           <tr><td>Redis SSE bus</td><td><span class="pill partial">partial</span></td><td><code>RedisSSEBus</code> implements <code>SSEBus</code> interface. Never tested against real Redis.</td></tr>
           <tr><td>Compute: K8s</td><td><span class="pill partial">partial</span></td><td><code>K8sProvider</code> + <code>KataProvider</code> with pod creation, kill, metrics. Never tested against real cluster.</td></tr>
           <tr><td>Compute: E2B</td><td><span class="pill partial">partial</span></td><td><code>E2BProvider</code> with sandbox creation. Never tested against real E2B API.</td></tr>
@@ -177,7 +177,7 @@
           <tr><td>Onboarding wizard</td><td><span class="pill not-built">not built</span></td><td>No first-run guided setup for new users.</td></tr>
           <tr><td>Docker image published</td><td><span class="pill not-built">not built</span></td><td>No image in any registry. Can't <code>docker pull ark</code>.</td></tr>
           <tr><td>CI/CD pipeline for Ark</td><td><span class="pill not-built">not built</span></td><td>GitHub Actions runs tests but doesn't build/publish artifacts.</td></tr>
-          <tr><td>Async Postgres repos</td><td><span class="pill not-built">not built</span></td><td>Repos use sync <code>IDatabase</code> methods. Postgres adapter uses <code>Bun.sleepSync</code> hack.</td></tr>
+          <tr><td>Async Postgres repos</td><td><span class="pill not-built">not built</span></td><td>Repos use sync <code>DatabaseAdapter</code> methods. Postgres adapter uses <code>Bun.sleepSync</code> hack.</td></tr>
           <tr><td>Higress gateway integration</td><td><span class="pill not-built">not built</span></td><td>Custom router works for dev. Enterprise needs CNCF-grade gateway.</td></tr>
           <tr><td>Knowledge graph visualization</td><td><span class="pill not-built">not built</span></td><td>No visual rendering of the graph in web UI.</td></tr>
           <tr><td>Live feed sidebar</td><td><span class="pill not-built">not built</span></td><td>No real-time event stream without leaving current view.</td></tr>
@@ -219,7 +219,7 @@
         </thead>
         <tbody>
           <tr><td>Research: Temporal vs alternatives for control plane</td><td>1 day</td><td>Deep dive needed</td></tr>
-          <tr><td>Design <code>WorkflowEngine</code> interface (local + hosted backends)</td><td>1 day</td><td>Like <code>IDatabase</code> pattern</td></tr>
+          <tr><td>Design <code>WorkflowEngine</code> interface (local + hosted backends)</td><td>1 day</td><td>Like <code>DatabaseAdapter</code> pattern</td></tr>
           <tr><td>Local backend: event-sourced from events table</td><td>2-3 days</td><td>SQLite, no extra deps</td></tr>
           <tr><td>Hosted backend: Temporal integration</td><td>3-5 days</td><td>Temporal SDK, Helm chart update</td></tr>
           <tr><td>Checkpoint/resume: "you were on turn 47" context</td><td>1-2 days</td><td>Per-turn event logging</td></tr>

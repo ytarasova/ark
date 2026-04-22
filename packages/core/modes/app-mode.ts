@@ -90,7 +90,7 @@ export interface HostCommandCapability {
  * itself" which has no isolation and competes with the control plane.
  */
 export interface ComputeBootstrapCapability {
-  seed(db: import("../database/index.js").IDatabase): Promise<void>;
+  seed(db: import("../database/index.js").DatabaseAdapter): Promise<void>;
 }
 
 /**
@@ -103,10 +103,10 @@ export interface ComputeBootstrapCapability {
  */
 export interface MigrationsCapability {
   readonly dialect: "sqlite" | "postgres";
-  apply(db: import("../database/index.js").IDatabase, opts?: { targetVersion?: number }): Promise<void>;
-  status(db: import("../database/index.js").IDatabase): Promise<import("../migrations/types.js").MigrationStatus>;
+  apply(db: import("../database/index.js").DatabaseAdapter, opts?: { targetVersion?: number }): Promise<void>;
+  status(db: import("../database/index.js").DatabaseAdapter): Promise<import("../migrations/types.js").MigrationStatus>;
   /** Phase 1: rejects with "not implemented". Stubbed so the CLI compiles. */
-  down(db: import("../database/index.js").IDatabase, opts: { targetVersion: number }): Promise<never>;
+  down(db: import("../database/index.js").DatabaseAdapter, opts: { targetVersion: number }): Promise<never>;
 }
 
 /**

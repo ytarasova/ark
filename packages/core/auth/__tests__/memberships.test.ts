@@ -1,14 +1,14 @@
 import { describe, it, expect } from "bun:test";
 import { Database } from "bun:sqlite";
 import { BunSqliteAdapter } from "../../database/sqlite.js";
-import type { IDatabase } from "../../database/index.js";
+import type { DatabaseAdapter } from "../../database/index.js";
 import { MigrationRunner } from "../../migrations/runner.js";
 import { TenantManager } from "../tenants.js";
 import { TeamManager } from "../teams.js";
 import { UserManager } from "../users.js";
 import { MembershipRepository } from "../../repositories/memberships.js";
 
-async function freshDb(): Promise<IDatabase> {
+async function freshDb(): Promise<DatabaseAdapter> {
   const db = new BunSqliteAdapter(new Database(":memory:"));
   await new MigrationRunner(db, "sqlite").apply();
   return db;

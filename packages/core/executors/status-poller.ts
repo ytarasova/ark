@@ -179,7 +179,7 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
           // Clear error before advancing so auto-gate doesn't reject
           await app.sessions.update(sessionId, { status: "ready", error: null });
           try {
-            const { mediateStageHandoff } = await import("../services/session-orchestration.js");
+            const { mediateStageHandoff } = await import("../services/session-hooks.js");
             await mediateStageHandoff(app, sessionId, {
               autoDispatch: true,
               source: "status_poller",

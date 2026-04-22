@@ -17,7 +17,7 @@ import { join } from "path";
 import YAML from "yaml";
 
 import { startSession, renderReworkPrompt, rejectReviewGate } from "../services/session-lifecycle.js";
-import { advance } from "../services/session-orchestration.js";
+import { advance } from "../services/stage-advance.js";
 import { withTestContext, getApp } from "./test-helpers.js";
 
 withTestContext();
@@ -283,7 +283,7 @@ describe("review gate integration", async () => {
     expect(afterReject.rework_prompt).toBe("redo: add tests");
 
     // Now approve (force-advance). Uses the real advance which does NOT touch tmux.
-    const { approveReviewGate } = await import("../services/session-orchestration.js");
+    const { approveReviewGate } = await import("../services/review-gate.js");
     const approve = await approveReviewGate(getApp(), session.id);
     expect(approve.ok).toBe(true);
     expect((await getApp().sessions.get(session.id))!.stage).toBe("ship");

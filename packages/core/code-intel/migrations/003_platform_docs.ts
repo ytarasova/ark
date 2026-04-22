@@ -12,7 +12,7 @@
  * demand via `ark code-intel docs regenerate`).
  */
 
-import type { IDatabase } from "../../database/index.js";
+import type { DatabaseAdapter } from "../../database/index.js";
 import * as platformDocsSchema from "../schema/platform-docs.js";
 import * as platformDocVersionsSchema from "../schema/platform-doc-versions.js";
 
@@ -20,7 +20,7 @@ export const VERSION = 3;
 export const NAME = "platform_docs";
 
 export interface MigrationApplyContext {
-  db: IDatabase;
+  db: DatabaseAdapter;
   dialect: "sqlite" | "postgres";
 }
 

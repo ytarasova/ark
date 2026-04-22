@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { AppContext } from "../app.js";
-import { fanOut, checkAutoJoin } from "../services/session-orchestration.js";
+import { fanOut, checkAutoJoin } from "../services/fork-join.js";
 
 let app: AppContext;
 beforeAll(async () => {

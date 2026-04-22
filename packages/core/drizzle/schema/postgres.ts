@@ -533,6 +533,28 @@ export const instanceHeartbeat = pgTable("instance_heartbeat", {
   lastHeartbeat: text("last_heartbeat").notNull(),
 });
 
+// ── stage_operations ──────────────────────────────────────────────────────
+//
+// Idempotency ledger for side-effectful orchestration calls. See migration 010
+// (#388 / RF-8) and `services/idempotency.ts`.
+
+export const stageOperations = pgTable(
+  "stage_operations",
+  {
+    id: serial("id").primaryKey(),
+    sessionId: text("session_id").notNull(),
+    stage: text("stage").notNull().default(""),
+    opKind: text("op_kind").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    resultJson: text("result_json").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (t) => ({
+    idxUnique: uniqueIndex("idx_stage_operations_unique").on(t.sessionId, t.stage, t.opKind, t.idempotencyKey),
+    idxSession: index("idx_stage_operations_session").on(t.sessionId),
+  }),
+);
+
 // ── ark_schema_migrations ─────────────────────────────────────────────────
 
 export const arkSchemaMigrations = pgTable("ark_schema_migrations", {

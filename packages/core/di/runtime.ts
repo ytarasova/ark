@@ -15,7 +15,7 @@
 import { asFunction, Lifetime } from "awilix";
 import { join } from "path";
 import type { AppContainer, AppBootOptions } from "../container.js";
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import type { ArkConfig } from "../config.js";
 import type { AppContext } from "../app.js";
 import type { PluginRegistry } from "../plugins/registry.js";
@@ -66,7 +66,7 @@ export function registerRuntime(container: AppContainer): void {
     ),
 
     usageRecorder: asFunction(
-      (c: { db: IDatabase; pricing: PricingRegistry }) => new UsageRecorderCtor(c.db, c.pricing),
+      (c: { db: DatabaseAdapter; pricing: PricingRegistry }) => new UsageRecorderCtor(c.db, c.pricing),
       {
         lifetime: Lifetime.SINGLETON,
       },

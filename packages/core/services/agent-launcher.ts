@@ -229,7 +229,11 @@ export async function _launchAgentTmux(
   claude.autoAcceptChannelPrompt(launchResult.handle);
   log("Delivering task...");
   claude.deliverTask(session.id, channelPort, task, stage);
-  app.sessions.update(session.id, { claude_session_id: claudeSessionId });
+  // Must await: under Temporal semantics this activity can return before
+  // the DB write lands, leaving the next dispatch without a
+  // claude_session_id to resume. Bun resolves synchronously today but
+  // that's incidental -- mirrors the awaited write on the remote path.
+  await app.sessions.update(session.id, { claude_session_id: claudeSessionId });
 
   return launchResult.handle;
 }

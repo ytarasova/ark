@@ -5,12 +5,12 @@
  *
  * State is persisted in a `workers` SQL table so it survives restarts.
  *
- * Every method is async because IDatabase is async. The constructor no
+ * Every method is async because DatabaseAdapter is async. The constructor no
  * longer performs DDL synchronously; instead, `ensureSchema()` runs lazily
  * on first use.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 
 export interface WorkerNode {
   id: string;
@@ -39,7 +39,7 @@ interface WorkerRow {
 export class WorkerRegistry {
   private _initialized: Promise<void> | null = null;
 
-  constructor(private db: IDatabase) {}
+  constructor(private db: DatabaseAdapter) {}
 
   private async ensureSchema(): Promise<void> {
     if (this._initialized) return this._initialized;

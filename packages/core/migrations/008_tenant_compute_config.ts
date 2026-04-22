@@ -12,7 +12,7 @@
  * safe to re-run.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import type { MigrationApplyContext } from "./types.js";
 import { applySqliteTenantComputeConfig } from "./008_tenant_compute_config_sqlite.js";
 import { applyPostgresTenantComputeConfig } from "./008_tenant_compute_config_postgres.js";
@@ -30,7 +30,7 @@ export async function up(ctx: MigrationApplyContext): Promise<void> {
   }
 }
 
-async function alreadyApplied(db: IDatabase): Promise<boolean> {
+async function alreadyApplied(db: DatabaseAdapter): Promise<boolean> {
   try {
     const row = (await db
       .prepare(`SELECT 1 AS present FROM ${MIGRATIONS_TABLE} WHERE version >= ? LIMIT 1`)

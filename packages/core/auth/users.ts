@@ -9,7 +9,7 @@
  * Mirrors `TenantPolicyManager`: lazy `ensureSchema()`, async end-to-end.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { UserRepository, type ListOptions, type UserRow } from "../repositories/users.js";
 import { MembershipRepository } from "../repositories/memberships.js";
 import { logDebug } from "../observability/structured-log.js";
@@ -29,7 +29,7 @@ export class UserManager {
   private _repo: UserRepository;
   private _memberships: MembershipRepository;
 
-  constructor(private db: IDatabase) {
+  constructor(private db: DatabaseAdapter) {
     this._repo = new UserRepository(db);
     this._memberships = new MembershipRepository(db);
   }

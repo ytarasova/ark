@@ -11,7 +11,7 @@ import { mkdtempSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { AppContext } from "../app.js";
-import { startSession } from "../services/session-orchestration.js";
+import { startSession } from "../services/session-lifecycle.js";
 
 let app: AppContext;
 beforeAll(async () => {

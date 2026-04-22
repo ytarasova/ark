@@ -20,7 +20,24 @@ declare const Bun: {
 
 import type { Session } from "../../types/index.js";
 import type { AppContext } from "../app.js";
-import * as session from "../services/session-orchestration.js";
+// Namespace-style import for session orchestration -- constructed from the
+// focused service modules. Kept as a `session` object so the rest of this
+// file (which RF-1 will rewrite) can continue using `session.dispatch` etc.
+import { startSession, stop, cleanupOnTerminal } from "../services/session-lifecycle.js";
+import { dispatch } from "../services/dispatch.js";
+import { applyHookStatus, applyReport, mediateStageHandoff, retryWithContext } from "../services/session-hooks.js";
+import { createWorktreePR } from "../services/workspace-service.js";
+const session = {
+  startSession,
+  stop,
+  cleanupOnTerminal,
+  dispatch,
+  applyHookStatus,
+  applyReport,
+  mediateStageHandoff,
+  retryWithContext,
+  createWorktreePR,
+};
 import { eventBus } from "../hooks.js";
 import type { OutboundMessage } from "./channel-types.js";
 import { getProvider } from "../../compute/index.js";

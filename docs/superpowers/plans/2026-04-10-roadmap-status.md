@@ -5,7 +5,7 @@
 | Item | Tests | Confidence |
 |------|-------|------------|
 | Awilix DI container | Yes | High |
-| IDatabase abstraction (SQLite adapter) | Yes | High |
+| DatabaseAdapter abstraction (SQLite adapter) | Yes | High |
 | Fan-out / DAG flows | Yes | High |
 | Auto-join on child completion | Yes | High |
 | Session launcher abstraction | Yes | High |

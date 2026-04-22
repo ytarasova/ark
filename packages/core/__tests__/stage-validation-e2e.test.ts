@@ -14,7 +14,9 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { AppContext } from "../app.js";
-import { mediateStageHandoff, runVerification, complete } from "../services/session-orchestration.js";
+import { mediateStageHandoff } from "../services/session-hooks.js";
+import { runVerification } from "../services/session-lifecycle.js";
+import { complete } from "../services/stage-advance.js";
 import { startConductor } from "../conductor/conductor.js";
 
 let app: AppContext;

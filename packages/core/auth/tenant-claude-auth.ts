@@ -21,7 +21,7 @@
  * those around for re-binding.
  */
 
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { logDebug } from "../observability/structured-log.js";
 import {
   TenantClaudeAuthRepository,
@@ -43,7 +43,7 @@ export class TenantClaudeAuthManager {
   private _initialized: Promise<void> | null = null;
   private _repo: TenantClaudeAuthRepository;
 
-  constructor(private db: IDatabase) {
+  constructor(private db: DatabaseAdapter) {
     this._repo = new TenantClaudeAuthRepository(db);
   }
 

@@ -1,23 +1,23 @@
 import { describe, it, expect } from "bun:test";
 import { Database } from "bun:sqlite";
 import { BunSqliteAdapter } from "../../database/sqlite.js";
-import type { IDatabase, IStatement } from "../../database/types.js";
+import type { DatabaseAdapter, PreparedStatement } from "../../database/types.js";
 import { MigrationRunner } from "../runner.js";
 import { up as up003, VERSION as V003 } from "../003_tenants_teams.js";
 
-async function freshDb(): Promise<IDatabase> {
+async function freshDb(): Promise<DatabaseAdapter> {
   return new BunSqliteAdapter(new Database(":memory:"));
 }
 
 /**
- * Wrap an IDatabase so every prepare() + run-ddl call is logged. Used to
+ * Wrap an DatabaseAdapter so every prepare() + run-ddl call is logged. Used to
  * assert that the 003 no-op guard really prevents backfill SELECTs on a
  * DB that already sits at version 3.
  */
-function withSqlSpy(inner: IDatabase): { db: IDatabase; seen: string[] } {
+function withSqlSpy(inner: DatabaseAdapter): { db: DatabaseAdapter; seen: string[] } {
   const seen: string[] = [];
-  const db: IDatabase = {
-    prepare(sql: string): IStatement {
+  const db: DatabaseAdapter = {
+    prepare(sql: string): PreparedStatement {
       seen.push(sql);
       return inner.prepare(sql);
     },

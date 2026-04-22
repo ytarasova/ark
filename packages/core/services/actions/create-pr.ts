@@ -14,7 +14,9 @@ const execFileAsync = promisify(execFile);
  */
 export const createPrAction: ActionHandler = {
   name: "create_pr",
-  async execute(app, session, action) {
+  // opts (incl. idempotencyKey) is handled by the executeAction wrapper in
+  // `actions/index.ts`; the handler only receives it for signature parity.
+  async execute(app, session, action, _opts) {
     const sessionId = session.id;
 
     // Skip if we already know about a PR

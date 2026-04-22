@@ -20,7 +20,7 @@ import { logInfo } from "../../observability/structured-log.js";
  */
 export const fetchSageAnalysisAction: ActionHandler = {
   name: "fetch_sage_analysis",
-  async execute(app, session, action) {
+  async execute(app, session, action, _opts) {
     const sessionId = session.id;
     const config = (session.config ?? {}) as Record<string, any>;
     const inputs = (config.inputs ?? {}) as Record<string, any>;

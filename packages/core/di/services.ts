@@ -9,7 +9,7 @@
 
 import { asFunction, Lifetime } from "awilix";
 import type { AppContainer } from "../container.js";
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import type { AppContext } from "../app.js";
 import type { SessionRepository } from "../repositories/session.js";
 import type { ComputeRepository } from "../repositories/compute.js";
@@ -36,6 +36,8 @@ export function registerServices(container: AppContainer): void {
       lifetime: Lifetime.SINGLETON,
     }),
 
-    historyService: asFunction((c: { db: IDatabase }) => new HistoryService(c.db), { lifetime: Lifetime.SINGLETON }),
+    historyService: asFunction((c: { db: DatabaseAdapter }) => new HistoryService(c.db), {
+      lifetime: Lifetime.SINGLETON,
+    }),
   });
 }

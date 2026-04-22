@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { Database } from "bun:sqlite";
 import { BunSqliteAdapter } from "../database/index.js";
-import type { IDatabase, IStatement } from "../database/index.js";
+import type { DatabaseAdapter, PreparedStatement } from "../database/index.js";
 
 describe("BunSqliteAdapter", () => {
   let adapter: BunSqliteAdapter;
@@ -14,8 +14,8 @@ describe("BunSqliteAdapter", () => {
     adapter.close();
   });
 
-  test("implements IDatabase interface", () => {
-    const db: IDatabase = adapter;
+  test("implements DatabaseAdapter interface", () => {
+    const db: DatabaseAdapter = adapter;
     expect(typeof db.prepare).toBe("function");
     expect(typeof db.exec).toBe("function");
     expect(typeof db.transaction).toBe("function");
@@ -36,8 +36,8 @@ describe("BunSqliteAdapter", () => {
     expect(row?.name).toBe("test_items");
   });
 
-  test("prepare returns IStatement", () => {
-    const stmt: IStatement = adapter.prepare("SELECT 1 as val");
+  test("prepare returns PreparedStatement", () => {
+    const stmt: PreparedStatement = adapter.prepare("SELECT 1 as val");
     expect(typeof stmt.run).toBe("function");
     expect(typeof stmt.get).toBe("function");
     expect(typeof stmt.all).toBe("function");

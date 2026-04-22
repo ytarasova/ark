@@ -2,7 +2,7 @@ import type { Command } from "commander";
 import chalk from "chalk";
 import { join } from "path";
 import { existsSync } from "fs";
-import { findOrphanedWorktrees, cleanupWorktrees } from "../../core/services/session-orchestration.js";
+import { findOrphanedWorktrees, cleanupWorktrees } from "../../core/services/workspace-service.js";
 import { getArkClient, getInProcessApp } from "../app-client.js";
 
 export function registerWorktreeCommands(program: Command) {

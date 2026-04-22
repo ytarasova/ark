@@ -8,7 +8,9 @@ import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
 
-import { startSession, advance, approveReviewGate } from "../services/session-orchestration.js";
+import { startSession } from "../services/session-lifecycle.js";
+import { advance } from "../services/stage-advance.js";
+import { approveReviewGate } from "../services/review-gate.js";
 import { evaluateGate } from "../state/flow.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";

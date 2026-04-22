@@ -5,7 +5,7 @@
 
 import type { AppContext } from "../app.js";
 
-import { dispatch } from "../services/session-orchestration.js";
+import { dispatch } from "../services/dispatch.js";
 
 export interface IssueWebhookPayload {
   action: string; // "labeled", "opened", "edited"

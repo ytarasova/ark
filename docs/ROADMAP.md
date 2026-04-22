@@ -249,7 +249,7 @@ The orchestration platform for AI-powered software development. Manages the full
 | Area | Details | Tests |
 |------|---------|-------|
 | **Awilix DI container** | All services/repos/stores resolve from AppContext. Zero `getApp()` in production code. | Yes |
-| **IDatabase abstraction** | SQLite adapter (local). Postgres adapter (hosted -- sync-over-async, see caveats). | Yes |
+| **DatabaseAdapter abstraction** | SQLite adapter (local). Postgres adapter (hosted -- sync-over-async, see caveats). | Yes |
 | **Session orchestration** | Full lifecycle: start, dispatch, stop, resume, advance, complete, fork, clone, spawn, fan-out, handoff. | Yes |
 | **DAG flow engine** | `depends_on`, parallel stages, auto-join on child completion, branch merge with conflict detection. DAG conditional routing (FlowEdge with `condition`), on_outcome branching, on_failure retry, topological sort, cycle detection, join barriers, skipped-stage computation. | Yes |
 | **Knowledge graph** | Unified store (codebase + sessions + memories + learnings + skills). MCP tools. Context injection at dispatch. Markdown export/import. Old systems (memory.ts, learnings.ts, hybrid-search.ts) deleted. | 79 tests |
@@ -316,7 +316,7 @@ The orchestration platform for AI-powered software development. Manages the full
 | Area | What exists | What's untested / missing | Risk |
 |------|------------|--------------------------|------|
 | **LLM Router** | Full server with classifier, 3 policies, streaming, CLI. 30 unit tests. | Never made a real API call. Anthropic adapter format untested against real Messages API. Streaming untested end-to-end. | High -- may not work in production |
-| **Postgres adapter** | `PostgresAdapter` implements `IDatabase`. SQL translator for SQLite→Postgres syntax. | Sync-over-async via `Bun.sleepSync` spin loop. Never tested under concurrent load. Repos need async migration for real scale. | High -- will bottleneck under load |
+| **Postgres adapter** | `PostgresAdapter` implements `DatabaseAdapter`. SQL translator for SQLite→Postgres syntax. | Sync-over-async via `Bun.sleepSync` spin loop. Never tested under concurrent load. Repos need async migration for real scale. | High -- will bottleneck under load |
 | **Redis SSE bus** | `RedisSSEBus` implements `SSEBus` interface. | Never tested against real Redis server. | Medium |
 | **Compute: K8s** | `K8sProvider` + `KataProvider` with pod creation, kill, metrics. | Never tested against real K8s cluster. API calls are untested. | High |
 | **Compute: E2B** | `E2BProvider` with sandbox creation. | Never tested against real E2B API. SDK calls untested. | High |
@@ -358,7 +358,7 @@ The orchestration platform for AI-powered software development. Manages the full
 | **Onboarding wizard** | No first-run guided setup for new users. | Mission Control gap analysis |
 | **Docker image published** | No image in any registry. Can't `docker pull ark`. | Deployment gap |
 | **CI/CD pipeline for Ark** | GitHub Actions runs tests but doesn't build/publish artifacts. | Deployment gap |
-| **Async Postgres repos** | Repos use sync IDatabase methods. Postgres adapter uses `Bun.sleepSync` hack. | Architecture gap |
+| **Async Postgres repos** | Repos use sync DatabaseAdapter methods. Postgres adapter uses `Bun.sleepSync` hack. | Architecture gap |
 | **Decoupled agent-compute architecture** | Three-phase progression: (1) now: agent CLI + repo on same box (1:1:1), (2) near: agent CLI on cheap box, repo on heavy box with arkd proxy between them, (3) target: serverless agent loop (durable workflow) + pooled repo compute via arkd tools. Phase 2 needs arkd-to-arkd tool proxying. Phase 3 needs conductor-hosted channels (currently MCP in tmux) and durable workflow engine. Enables: independent fleet scaling, compute hibernate/snapshot, multi-repo via N compute attachments, compute pooling. Session 1:N Agent 1:M Compute. | 2026-04-14 analysis |
 | **Compute lifecycle (hibernate/snapshot/restore)** | Compute targets should support hibernate (stop billing), snapshot (save state), restore (resume from snapshot). E2B already supports snapshots. EC2 has AMIs. Docker has checkpoint/CRIU. Firecracker has native snapshotting. Expose universally via ComputeProvider interface. | 2026-04-14 analysis |
 | **Higress gateway integration** | Custom router works for dev. Enterprise needs CNCF-grade gateway. | LLM Router research |
@@ -595,7 +595,7 @@ fixture uses Bun APIs that the Node Playwright runner can't parse.
 | Task | Effort | Notes |
 |------|--------|-------|
 | Research: Temporal vs alternatives for control plane | 1 day | Deep dive needed |
-| Design WorkflowEngine interface (local + hosted backends) | 1 day | Like IDatabase pattern |
+| Design WorkflowEngine interface (local + hosted backends) | 1 day | Like DatabaseAdapter pattern |
 | Local backend: event-sourced from events table | 2-3 days | SQLite, no extra deps |
 | Hosted backend: Temporal integration | 3-5 days | Temporal SDK, Helm chart update |
 | Checkpoint/resume: agent gets "you were on turn 47" context | 1-2 days | Needs per-turn event logging |

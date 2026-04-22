@@ -8,14 +8,8 @@
 import { describe, it, expect, setDefaultTimeout } from "bun:test";
 
 setDefaultTimeout(15_000);
-import {
-  fanOut,
-  joinFork,
-  fork,
-  spawnSubagent,
-  spawnParallelSubagents,
-  checkAutoJoin,
-} from "../services/session-orchestration.js";
+import { fanOut, joinFork, fork, checkAutoJoin } from "../services/fork-join.js";
+import { spawnSubagent, spawnParallelSubagents } from "../services/subagents.js";
 import { withTestContext, waitFor } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";
 

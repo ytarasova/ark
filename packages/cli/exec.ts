@@ -1,7 +1,8 @@
 import chalk from "chalk";
 import { resolve } from "path";
 import { existsSync, statSync } from "fs";
-import { startSession, dispatch, waitForCompletion } from "../core/services/session-orchestration.js";
+import { startSession, waitForCompletion } from "../core/services/session-lifecycle.js";
+import { dispatch } from "../core/services/dispatch.js";
 import { DEFAULT_TENANT_ID } from "../core/code-intel/constants.js";
 import type { AppContext } from "../core/app.js";
 

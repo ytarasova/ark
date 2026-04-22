@@ -1,4 +1,4 @@
-import type { IDatabase } from "../database/index.js";
+import type { DatabaseAdapter } from "../database/index.js";
 import { now } from "../util/time.js";
 
 export interface StageResult {
@@ -66,7 +66,7 @@ function parseJson<T>(value: string | null | undefined, fallback: T): T {
 export class FlowStateRepository {
   private tenantId: string = "default";
 
-  constructor(private db: IDatabase) {}
+  constructor(private db: DatabaseAdapter) {}
 
   setTenant(tenantId: string): void {
     this.tenantId = tenantId;
@@ -101,7 +101,7 @@ export class FlowStateRepository {
       started_at: state.startedAt,
       updated_at: ts,
     };
-    // Portable upsert: the IDatabase adapter handles SQLite vs Postgres parameter binding.
+    // Portable upsert: the DatabaseAdapter adapter handles SQLite vs Postgres parameter binding.
     await this.db
       .prepare(
         `INSERT INTO flow_state (

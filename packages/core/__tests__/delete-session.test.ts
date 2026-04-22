@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
 import { AppContext } from "../app.js";
-import { startSession, deleteSessionAsync } from "../services/session-orchestration.js";
+import { startSession, deleteSessionAsync } from "../services/session-lifecycle.js";
 import { writeSettings } from "../claude/claude.js";
 import { clearApp, getApp, setApp } from "./test-helpers.js";
 
