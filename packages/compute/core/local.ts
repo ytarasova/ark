@@ -49,7 +49,8 @@ export class LocalCompute implements Compute {
   }
 
   getArkdUrl(_h: ComputeHandle): string {
-    return `http://localhost:${this.app.config.ports.arkd}`;
+    const port = this.app?.config?.ports?.arkd ?? 19300;
+    return `http://localhost:${port}`;
   }
 
   async snapshot(_h: ComputeHandle): Promise<Snapshot> {

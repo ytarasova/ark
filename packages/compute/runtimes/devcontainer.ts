@@ -198,7 +198,7 @@ export class DevcontainerRuntime implements Runtime {
 
     await this.deps.createContainer(containerName, image, {
       extraVolumes: shape.mounts,
-      arkDir: this.app.config.arkDir,
+      arkDir: this.app?.config?.arkDir,
       workdir: ctx.workdir,
       arkSource: this.deps.resolveArkSourceRoot() ?? undefined,
       arkdHostPort,
@@ -387,7 +387,8 @@ export class DevcontainerRuntime implements Runtime {
   }
 
   private conductorUrl(): string {
-    return `http://localhost:${this.app.config.ports.conductor}`;
+    const port = this.app?.config?.ports?.conductor ?? this.app?.config?.conductorPort ?? 19100;
+    return `http://localhost:${port}`;
   }
 
   /** Deterministic name so repeated prepare/destroy cycles don't collide. */

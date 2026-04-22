@@ -171,7 +171,7 @@ export class DockerComposeRuntime implements Runtime {
     try {
       await (this.hooks.pullImage ?? pullImage)(image);
       await (this.hooks.createContainer ?? createContainer)(containerName, image, {
-        arkDir: this.app.config.dirs.ark,
+        arkDir: this.app?.config?.dirs?.ark,
         arkSource,
         workdir,
         arkdHostPort,
@@ -182,7 +182,7 @@ export class DockerComposeRuntime implements Runtime {
 
       await (this.hooks.bootstrapContainer ?? bootstrapContainer)(containerName, bootstrapOpts);
 
-      const conductorUrl = `http://host.docker.internal:${this.app.config.ports.conductor}`;
+      const conductorUrl = `http://host.docker.internal:${this.app?.config?.ports?.conductor ?? 19100}`;
       await (this.hooks.startArkdInContainer ?? startArkdInContainer)(containerName, conductorUrl);
       await (this.hooks.waitForArkdHealth ?? waitForArkdHealth)(arkdUrl, 30_000);
     } catch (err) {
@@ -284,7 +284,8 @@ export class DockerComposeRuntime implements Runtime {
   }
 
   private runtimeDir(handle: ComputeHandle): string {
-    return join(this.app.config.dirs.ark, "runtime", handle.name);
+    const arkDir = this.app?.config?.dirs?.ark ?? join(process.env.HOME ?? "/tmp", ".ark");
+    return join(arkDir, "runtime", handle.name);
   }
 
   private resolveSidecarImage(handle: ComputeHandle): string {

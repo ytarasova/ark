@@ -25,7 +25,7 @@ export interface RouterEnvOpts {
  * local and remote (EC2, k8s, Firecracker) compute targets.
  */
 export function buildRouterEnv(config: ArkConfig, opts: RouterEnvOpts): Record<string, string> {
-  if (!config.router.enabled) return {};
+  if (!config.router?.enabled) return {};
 
   const arkdUrl = `http://localhost:${DEFAULT_ARKD_PORT}`;
   const env: Record<string, string> = {};
