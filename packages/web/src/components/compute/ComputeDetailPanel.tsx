@@ -1,8 +1,10 @@
 import { useState, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "../../lib/utils.js";
 import { Badge } from "../ui/badge.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card.js";
 import { Cpu, HardDrive, MemoryStick, Clock, Container, Terminal, Activity } from "lucide-react";
+import { api } from "../../hooks/useApi.js";
 import { statusDotColor, pctColor, isArkProcess } from "./helpers.js";
 import { MetricBar } from "./MetricBar.js";
 import { MetricSparkline } from "./MetricSparkline.js";
@@ -35,14 +37,32 @@ export function ComputeDetailPanel({
   const [drawerItem, setDrawerItem] = useState<DrawerItem | null>(null);
   const closeDrawer = useCallback(() => setDrawerItem(null), []);
 
+  const computeName = compute.name || compute.id;
+  // Authoritative capability flags from the server. While this query is
+  // loading (or errored), `capabilities` is undefined -- ComputeActions
+  // hides the guarded buttons (Destroy, Reboot) until we know, which is
+  // the right default. The query runs for both concrete rows and template
+  // rows -- templates use `canDelete` to decide whether the Delete
+  // Template button renders.
+  const { data: capabilities } = useQuery({
+    queryKey: ["compute", "capabilities", computeName],
+    queryFn: () => api.getComputeCapabilities(computeName),
+    enabled: !!computeName,
+    staleTime: 60_000,
+  });
+
   const m = snapshot?.metrics;
   const arkProcs = (snapshot?.processes ?? []).filter((p) => isArkProcess(p.command));
   const otherProcs = (snapshot?.processes ?? []).filter((p) => !isArkProcess(p.command));
-  const computeSessions = sessions.filter(
-    (s) =>
-      s.compute_name === (compute.name || compute.id) ||
-      (!s.compute_name && (compute.provider === "local" || compute.type === "local")),
-  );
+  // Sessions explicitly dispatched to this compute, plus unattached ones
+  // (compute_name == null). The unattached bucket is a server-side gap --
+  // the dispatcher only writes `compute_name` when a stage resolves to a
+  // compute template (see packages/core/services/dispatch.ts around the
+  // `stageCompute` branch); sessions that run against the implicit local
+  // host never get attributed. Until that gap is fixed on the server,
+  // render them here rather than silently drop them, but don't pretend
+  // they belong to any specific provider.
+  const computeSessions = sessions.filter((s) => s.compute_name === computeName || s.compute_name == null);
 
   const isTemplate = !!compute.is_template;
 
@@ -66,19 +86,25 @@ export function ComputeDetailPanel({
         )}
       </div>
 
-      {/* Actions - hide for local provider */}
-      {compute.provider !== "local" && (
-        <div className="mb-5">
-          <ComputeActions compute={compute} onAction={onAction} pendingAction={pendingAction} />
-          {isTemplate && (
-            <p className="mt-3 text-[12px] text-muted-foreground leading-relaxed">
-              A reusable config blueprint. Sessions referencing this template auto-provision an isolated clone that's
-              torn down on cleanup. You can also Provision a clone manually -- it will bring up a real instance you can
-              attach to.
-            </p>
-          )}
-        </div>
-      )}
+      {/* Actions. ComputeActions itself gates each button on the provider's
+          capability flags (canDelete, canReboot) -- so the local provider
+          renders an empty action row instead of the old `provider !==
+          "local"` hardcode at this call site. */}
+      <div className="mb-5">
+        <ComputeActions
+          compute={compute}
+          capabilities={capabilities}
+          onAction={onAction}
+          pendingAction={pendingAction}
+        />
+        {isTemplate && (
+          <p className="mt-3 text-[12px] text-muted-foreground leading-relaxed">
+            A reusable config blueprint. Sessions referencing this template auto-provision an isolated clone that's torn
+            down on cleanup. You can also Provision a clone manually -- it will bring up a real instance you can attach
+            to.
+          </p>
+        )}
+      </div>
 
       {/* System Metrics Cards -- skip for templates (they have no runtime). */}
       {!isTemplate && metricsState === "loading" && !m && <MetricsSkeleton />}

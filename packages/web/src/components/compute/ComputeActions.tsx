@@ -1,5 +1,6 @@
 import { Loader2 } from "lucide-react";
 import { Button } from "../ui/button.js";
+import type { ComputeCapabilities } from "../../../../types/rpc.js";
 
 /**
  * Actions available on a compute row.
@@ -13,6 +14,15 @@ import { Button } from "../ui/button.js";
  *   / VM up, Stop brings it down without deleting the row, Destroy tears
  *   down both the infra and the row.
  *
+ * Capabilities are authoritative -- Destroy and Reboot only render when the
+ * provider advertises `canDelete` / `canReboot` via `compute/capabilities`.
+ * That's why (for example) the local provider -- which cannot be destroyed
+ * -- ends up with no destructive buttons without any name-based branching
+ * in this component. When capabilities are still loading or the RPC fails,
+ * the flags stay undefined and the guarded buttons stay hidden: a harmless
+ * default given that the server-side handlers also refuse unsupported
+ * actions with UNSUPPORTED (see Wave B).
+ *
  * While an action is in flight, `pendingAction` disables every button and
  * shows a spinner on the one that's running. Start/Provision/Stop can take
  * tens of seconds on k8s / ec2 -- firing a second action mid-flight is
@@ -20,10 +30,12 @@ import { Button } from "../ui/button.js";
  */
 export function ComputeActions({
   compute,
+  capabilities,
   onAction,
   pendingAction,
 }: {
   compute: any;
+  capabilities?: ComputeCapabilities;
   onAction: (action: string) => void;
   pendingAction?: string | null;
 }) {
@@ -68,12 +80,14 @@ export function ComputeActions({
     return (
       <div className="flex gap-1.5 flex-wrap">
         <ActionButton label="Provision" action="provision" ariaLabel="Provision instance from template" />
-        <ActionButton
-          label="Delete Template"
-          action="destroy"
-          variant="destructive"
-          ariaLabel="Delete compute template"
-        />
+        {capabilities?.canDelete && (
+          <ActionButton
+            label="Delete Template"
+            action="destroy"
+            variant="destructive"
+            ariaLabel="Delete compute template"
+          />
+        )}
       </div>
     );
   }
@@ -86,9 +100,17 @@ export function ComputeActions({
       {status === "running" && (
         <ActionButton label="Stop" action="stop" variant="outline" ariaLabel="Stop compute target" />
       )}
-      {/* Destroy is always available -- even (especially) for stuck
-          "provisioning" rows, so the user isn't trapped in a dead state. */}
-      <ActionButton label="Destroy" action="destroy" variant="destructive" ariaLabel="Destroy compute target" />
+      {capabilities?.canReboot && status === "running" && (
+        <ActionButton label="Reboot" action="reboot" variant="outline" ariaLabel="Reboot compute target" />
+      )}
+      {/* Destroy stays available across every runnable status -- even
+          (especially) stuck "provisioning" rows -- so the user isn't
+          trapped in a dead state. Still gated on the provider's
+          canDelete capability flag, which is how the local provider
+          (which cannot be destroyed) ends up without a Destroy button. */}
+      {capabilities?.canDelete && (
+        <ActionButton label="Destroy" action="destroy" variant="destructive" ariaLabel="Destroy compute target" />
+      )}
     </div>
   );
 }

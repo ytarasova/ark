@@ -61,6 +61,8 @@ import type {
   ComputeCreateResponse,
   ComputeReadRequest,
   ComputeReadResponse,
+  ComputeCapabilitiesRequest,
+  ComputeCapabilitiesResponse,
   ComputeProvisionRequest,
   ComputeProvisionResponse,
   ComputeStartInstanceRequest,
@@ -559,6 +561,10 @@ export const api = {
     rpc<ComputeCreateResponse>("compute/create", data).then((r) => ({ ok: true as const, compute: r.compute })),
   getComputeDetail: (name: string) =>
     rpc<ComputeReadResponse>("compute/read", { name } satisfies ComputeReadRequest).then((r) => r.compute),
+  getComputeCapabilities: (name: string) =>
+    rpc<ComputeCapabilitiesResponse>("compute/capabilities", { name } satisfies ComputeCapabilitiesRequest).then(
+      (r) => r.capabilities,
+    ),
   provisionCompute: (name: string) =>
     rpc<ComputeProvisionResponse>("compute/provision", { name } satisfies ComputeProvisionRequest),
   startCompute: (name: string) =>
