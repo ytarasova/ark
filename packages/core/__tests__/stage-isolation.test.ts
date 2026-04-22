@@ -22,7 +22,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext } from "../app.js";
 import { advance } from "../services/stage-advance.js";
-import { mediateStageHandoff } from "../services/session-hooks.js";
 
 let app: AppContext;
 
@@ -164,7 +163,7 @@ describe("stage isolation: mediateStageHandoff integration", async () => {
       session_id: "pre-handoff-tmux",
     });
 
-    const result = await mediateStageHandoff(app, session.id, {
+    const result = await app.sessionHooks.mediateStageHandoff(session.id, {
       autoDispatch: false,
       source: "test",
     });
@@ -192,7 +191,7 @@ describe("stage isolation: mediateStageHandoff integration", async () => {
     // Advance through all stages
     const stages = ["implement", "verify", "pr"];
     for (const fromStage of stages) {
-      const r = await mediateStageHandoff(app, session.id, {
+      const r = await app.sessionHooks.mediateStageHandoff(session.id, {
         autoDispatch: false,
         source: "test",
       });
@@ -212,7 +211,7 @@ describe("stage isolation: mediateStageHandoff integration", async () => {
     }
 
     // Final advance: merge -> completed
-    const final = await mediateStageHandoff(app, session.id, {
+    const final = await app.sessionHooks.mediateStageHandoff(session.id, {
       autoDispatch: false,
       source: "test",
     });

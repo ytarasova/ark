@@ -48,7 +48,6 @@ export class ClaudeDriver implements ToolDriver {
       mcpConfigPath: "",
       claudeSessionId: opts.sessionId,
       prevClaudeSessionId: opts.prevSessionId,
-      sessionName: opts.channelName,
       env: opts.env,
     });
     return { script: result.content, sessionId: result.claudeSessionId };

@@ -279,7 +279,6 @@ export async function dispatch(
   const earlyAction = flow.getStageAction(app, session.flow, stage);
   if (earlyAction.type === "action") {
     const { executeAction } = await import("./actions/index.js");
-    const { mediateStageHandoff } = await import("./session-hooks.js");
     const result = await executeAction(app, sessionId, earlyAction.action ?? "");
     if (!result.ok) {
       await app.sessions.update(sessionId, {
@@ -290,7 +289,7 @@ export async function dispatch(
     }
     const postAction = await app.sessions.get(sessionId);
     if (postAction?.status === "ready") {
-      await mediateStageHandoff(app, sessionId, { autoDispatch: true, source: "dispatch_action" });
+      await app.sessionHooks.mediateStageHandoff(sessionId, { autoDispatch: true, source: "dispatch_action" });
     }
     return { ok: true, message: `Executed action '${earlyAction.action}'` };
   }

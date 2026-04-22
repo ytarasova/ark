@@ -14,7 +14,6 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { AppContext } from "../app.js";
-import { mediateStageHandoff } from "../services/session-hooks.js";
 import { runVerification } from "../services/session-lifecycle.js";
 import { complete } from "../services/stage-advance.js";
 import { startConductor } from "../conductor/conductor.js";
@@ -284,7 +283,7 @@ describe("mediateStageHandoff with verify scripts", async () => {
     const session = await app.sessions.create({ summary: "handoff verify block", flow: "quick" });
     await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
 
-    const result = await mediateStageHandoff(app, session.id, {
+    const result = await app.sessionHooks.mediateStageHandoff(session.id, {
       autoDispatch: false,
       source: "test",
     });
@@ -303,7 +302,7 @@ describe("mediateStageHandoff with verify scripts", async () => {
     const session = await app.sessions.create({ summary: "handoff verify pass", flow: "quick" });
     await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
 
-    const result = await mediateStageHandoff(app, session.id, {
+    const result = await app.sessionHooks.mediateStageHandoff(session.id, {
       autoDispatch: false,
       source: "test",
     });
@@ -321,7 +320,7 @@ describe("mediateStageHandoff with verify scripts", async () => {
     const session = await app.sessions.create({ summary: "blocked event test", flow: "quick" });
     await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
 
-    await mediateStageHandoff(app, session.id, { source: "channel_report" });
+    await app.sessionHooks.mediateStageHandoff(session.id, { source: "channel_report" });
 
     const events = await app.events.list(session.id);
     const blocked = events.find((e) => e.type === "stage_handoff_blocked");
@@ -337,7 +336,7 @@ describe("mediateStageHandoff with verify scripts", async () => {
     const session = await app.sessions.create({ summary: "error msg test", flow: "quick" });
     await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
 
-    await mediateStageHandoff(app, session.id, { source: "test" });
+    await app.sessionHooks.mediateStageHandoff(session.id, { source: "test" });
 
     const msgs = await app.messages.list(session.id);
     const errorMsg = msgs.find((m) => m.content.includes("Advance blocked"));
@@ -352,7 +351,7 @@ describe("mediateStageHandoff with verify scripts", async () => {
     await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
     await app.todos.add(session.id, "Incomplete task");
 
-    const result = await mediateStageHandoff(app, session.id, {
+    const result = await app.sessionHooks.mediateStageHandoff(session.id, {
       autoDispatch: false,
       source: "test",
     });
@@ -448,7 +447,7 @@ describe("full verification lifecycle", async () => {
     // Step 1: Add a todo -- should block
     const todo = await app.todos.add(session.id, "Write tests for the feature");
 
-    const r1 = await mediateStageHandoff(app, session.id, {
+    const r1 = await app.sessionHooks.mediateStageHandoff(session.id, {
       autoDispatch: false,
       source: "test",
     });
@@ -464,7 +463,7 @@ describe("full verification lifecycle", async () => {
     await app.sessions.update(session.id, { status: "ready", breakpoint_reason: null });
 
     // Step 4: Retry handoff -- should succeed
-    const r2 = await mediateStageHandoff(app, session.id, {
+    const r2 = await app.sessionHooks.mediateStageHandoff(session.id, {
       autoDispatch: false,
       source: "test",
     });
@@ -483,7 +482,7 @@ describe("full verification lifecycle", async () => {
     await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir: dir });
 
     // Step 1: Script fails (DONE.txt doesn't exist yet)
-    const r1 = await mediateStageHandoff(app, session.id, {
+    const r1 = await app.sessionHooks.mediateStageHandoff(session.id, {
       autoDispatch: false,
       source: "test",
     });
@@ -495,7 +494,7 @@ describe("full verification lifecycle", async () => {
     await app.sessions.update(session.id, { status: "ready", breakpoint_reason: null });
 
     // Step 3: Retry handoff -- should succeed now
-    const r2 = await mediateStageHandoff(app, session.id, {
+    const r2 = await app.sessionHooks.mediateStageHandoff(session.id, {
       autoDispatch: false,
       source: "test",
     });
@@ -510,7 +509,7 @@ describe("full verification lifecycle", async () => {
     await app.sessions.update(session.id, { status: "ready", stage: "implement", workdir });
 
     // implement -> verify
-    const r1 = await mediateStageHandoff(app, session.id, {
+    const r1 = await app.sessionHooks.mediateStageHandoff(session.id, {
       autoDispatch: false,
       source: "test",
     });
@@ -518,7 +517,7 @@ describe("full verification lifecycle", async () => {
     expect(r1.toStage).toBe("verify");
 
     // verify -> pr
-    const r2 = await mediateStageHandoff(app, session.id, {
+    const r2 = await app.sessionHooks.mediateStageHandoff(session.id, {
       autoDispatch: false,
       source: "test",
     });

@@ -25,17 +25,12 @@ import type { AppContext } from "../app.js";
 // file (which RF-1 will rewrite) can continue using `session.dispatch` etc.
 import { startSession, stop, cleanupOnTerminal } from "../services/session-lifecycle.js";
 import { dispatch } from "../services/dispatch.js";
-import { applyHookStatus, applyReport, mediateStageHandoff, retryWithContext } from "../services/session-hooks.js";
 import { createWorktreePR } from "../services/workspace-service.js";
 const session = {
   startSession,
   stop,
   cleanupOnTerminal,
   dispatch,
-  applyHookStatus,
-  applyReport,
-  mediateStageHandoff,
-  retryWithContext,
   createWorktreePR,
 };
 import { eventBus } from "../hooks.js";
@@ -358,7 +353,7 @@ export class Conductor {
     }
 
     // Delegate business logic to session.ts
-    const result = await session.applyHookStatus(app, s, event, payload);
+    const result = await app.sessionHooks.applyHookStatus(s, event, payload);
 
     // Apply events
     for (const evt of result.events ?? []) {
@@ -377,7 +372,7 @@ export class Conductor {
 
     // On-failure retry loop
     if (result.shouldRetry && result.newStatus === "failed") {
-      const retryResult = await session.retryWithContext(app, sessionId, {
+      const retryResult = await app.sessionHooks.retryWithContext(sessionId, {
         maxRetries: result.retryMaxRetries,
       });
       if (retryResult.ok) {
@@ -416,7 +411,7 @@ export class Conductor {
     }
 
     if (result.shouldAdvance) {
-      await session.mediateStageHandoff(app, sessionId, {
+      await app.sessionHooks.mediateStageHandoff(sessionId, {
         autoDispatch: result.shouldAutoDispatch,
         source: "hook_status",
       });
@@ -883,7 +878,7 @@ async function recoverStuckSessions(app: AppContext): Promise<void> {
         data: { action: "advance", reason: "agent exited with commits" },
       });
       try {
-        await session.mediateStageHandoff(app, s.id, {
+        await app.sessionHooks.mediateStageHandoff(s.id, {
           autoDispatch: true,
           source: "stuck_recovery",
         });
@@ -908,7 +903,7 @@ async function recoverStuckSessions(app: AppContext): Promise<void> {
 // ── Report handling ─────────────────────────────────────────────────────────
 
 async function handleReport(app: AppContext, sessionId: string, report: OutboundMessage): Promise<void> {
-  const result = await session.applyReport(app, sessionId, report);
+  const result = await app.sessionHooks.applyReport(sessionId, report);
 
   for (const evt of result.logEvents ?? []) {
     await app.events.log(sessionId, evt.type, evt.opts);
@@ -928,7 +923,7 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
 
   if (result.shouldAdvance) {
     try {
-      const handoff = await session.mediateStageHandoff(app, sessionId, {
+      const handoff = await app.sessionHooks.mediateStageHandoff(sessionId, {
         autoDispatch: result.shouldAutoDispatch,
         source: "channel_report",
         outcome: result.outcome,
@@ -950,7 +945,7 @@ async function handleReport(app: AppContext, sessionId: string, report: Outbound
   }
 
   if (result.shouldRetry) {
-    const retryResult = await session.retryWithContext(app, sessionId, {
+    const retryResult = await app.sessionHooks.retryWithContext(sessionId, {
       maxRetries: result.retryMaxRetries,
     });
     if (retryResult.ok) {

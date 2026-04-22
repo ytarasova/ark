@@ -24,6 +24,7 @@ import type { StatusPollerRegistry } from "./executors/status-poller.js";
 import type { SessionService } from "./services/session.js";
 import type { ComputeService } from "./services/compute.js";
 import type { HistoryService } from "./services/history.js";
+import type { SessionHooks } from "./services/session-hooks/index.js";
 import type { FlowStore } from "./stores/flow-store.js";
 import type { SkillStore } from "./stores/skill-store.js";
 import type { AgentStore } from "./stores/agent-store.js";
@@ -106,6 +107,7 @@ export interface Cradle {
   sessionService: SessionService;
   computeService: ComputeService;
   historyService: HistoryService;
+  sessionHooks: SessionHooks;
 
   // Resource stores
   flows: FlowStore;

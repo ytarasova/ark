@@ -8,7 +8,6 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { applyReport, applyHookStatus } from "../services/session-hooks.js";
 import { startConductor } from "../conductor/conductor.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";
@@ -23,7 +22,7 @@ describe("applyReport auto-gate completion", async () => {
     const session = await app.sessions.create({ summary: "auto test", flow: "autonomous" });
     await app.sessions.update(session.id, { status: "running", stage: "work" });
 
-    const result = await applyReport(app, session.id, {
+    const result = await app.sessionHooks.applyReport(session.id, {
       type: "completed",
       stage: "work",
       summary: "Done",
@@ -44,7 +43,7 @@ describe("applyReport auto-gate completion", async () => {
       error: "previous failure from first attempt",
     });
 
-    const result = await applyReport(app, session.id, {
+    const result = await app.sessionHooks.applyReport(session.id, {
       type: "completed",
       stage: "work",
       summary: "Done on retry",
@@ -61,7 +60,7 @@ describe("applyReport auto-gate completion", async () => {
     const session = await app.sessions.create({ summary: "manual test", flow: "bare" });
     await app.sessions.update(session.id, { status: "running", stage: "work" });
 
-    const result = await applyReport(app, session.id, {
+    const result = await app.sessionHooks.applyReport(session.id, {
       type: "completed",
       stage: "work",
       summary: "Done",
@@ -81,7 +80,7 @@ describe("applyHookStatus SessionEnd auto-gate fallback", async () => {
     await app.sessions.update(session.id, { status: "running", stage: "work" });
     const fresh = (await app.sessions.get(session.id))!;
 
-    const result = await applyHookStatus(app, fresh, "SessionEnd", {});
+    const result = await app.sessionHooks.applyHookStatus(fresh, "SessionEnd", {});
 
     expect(result.shouldAdvance).toBe(true);
     expect(result.shouldAutoDispatch).toBe(true);
@@ -94,7 +93,7 @@ describe("applyHookStatus SessionEnd auto-gate fallback", async () => {
     await app.sessions.update(session.id, { status: "running", stage: "work" });
     const fresh = (await app.sessions.get(session.id))!;
 
-    const result = await applyHookStatus(app, fresh, "SessionEnd", {});
+    const result = await app.sessionHooks.applyHookStatus(fresh, "SessionEnd", {});
 
     expect(result.shouldAdvance).toBeFalsy();
     // Manual gate: session stays running
@@ -108,7 +107,7 @@ describe("applyHookStatus SessionEnd auto-gate fallback", async () => {
     await app.sessions.update(session.id, { status: "completed", stage: "work" });
     const fresh = (await app.sessions.get(session.id))!;
 
-    const result = await applyHookStatus(app, fresh, "SessionEnd", {});
+    const result = await app.sessionHooks.applyHookStatus(fresh, "SessionEnd", {});
 
     expect(result.shouldAdvance).toBeFalsy();
   });

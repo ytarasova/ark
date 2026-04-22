@@ -177,7 +177,6 @@ export async function _launchAgentTmux(
     claudeArgs,
     mcpConfigPath,
     prevClaudeSessionId: session.claude_session_id,
-    sessionName: session.summary ?? session.id,
     env: launchEnv,
   });
 

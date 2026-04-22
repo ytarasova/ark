@@ -8,7 +8,6 @@
 import { describe, test, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
 import { safeParseConfig } from "../util.js";
-import { applyReport } from "../services/session-hooks.js";
 import type { OutboundMessage } from "../conductor/channel-types.js";
 import { getApp } from "./test-helpers.js";
 
@@ -19,7 +18,7 @@ withTestContext();
 describe("applyReport", () => {
   test("returns empty result for nonexistent sessionId (no crash)", async () => {
     const report = { type: "completed", stage: "plan", summary: "done" } as unknown as OutboundMessage;
-    const result = await applyReport(getApp(), "s-nonexistent", report);
+    const result = await getApp().sessionHooks.applyReport("s-nonexistent", report);
     expect(result.updates).toEqual({});
     expect(result.logEvents).toEqual([]);
     expect(result.busEvents).toEqual([]);
@@ -29,7 +28,7 @@ describe("applyReport", () => {
     const session = await getApp().sessions.create({ summary: "test session" });
     await getApp().sessions.update(session.id, { status: "running", stage: "plan" });
     const report = { type: "progress", stage: "plan", message: "working..." } as unknown as OutboundMessage;
-    const result = await applyReport(getApp(), session.id, report);
+    const result = await getApp().sessionHooks.applyReport(session.id, report);
     // Should have log events and bus events
     expect(result.logEvents!.length).toBeGreaterThan(0);
     expect(result.busEvents!.length).toBeGreaterThan(0);
