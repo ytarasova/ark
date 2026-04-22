@@ -164,6 +164,7 @@ export class K8sProvider implements ComputeProvider {
     { value: "pod", label: "Kubernetes Pod" },
     { value: "kata", label: "Kata Container (Firecracker microVM)" },
   ];
+  readonly singleton = false;
   readonly canDelete = true;
   readonly canReboot = false;
   readonly supportsWorktree = false;

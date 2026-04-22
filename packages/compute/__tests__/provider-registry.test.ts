@@ -19,6 +19,7 @@ afterAll(async () => {
 const fakeProvider: ComputeProvider = {
   name: "fake",
   isolationModes: [],
+  singleton: false,
   canReboot: false,
   canDelete: false,
   supportsWorktree: false,

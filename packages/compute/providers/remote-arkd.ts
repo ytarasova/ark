@@ -47,6 +47,7 @@ interface RemoteConfig {
 // ── Shared remote base ──────────────────────────────────────────────────────
 
 abstract class RemoteArkdBase extends ArkdBackedProvider {
+  readonly singleton = false;
   readonly canReboot = true;
   readonly canDelete = true;
   readonly supportsWorktree = false;

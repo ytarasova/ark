@@ -42,6 +42,7 @@ async function waitForArkdReady(url: string, timeoutMs = 10_000): Promise<void> 
 class TestArkdProvider extends ArkdBackedProvider {
   readonly name = "test-arkd";
   readonly isolationModes: IsolationMode[] = [];
+  readonly singleton = false;
   readonly canReboot = false;
   readonly canDelete = false;
   readonly supportsWorktree = false;

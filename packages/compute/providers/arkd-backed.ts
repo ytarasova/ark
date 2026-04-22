@@ -25,6 +25,7 @@ import type {
 export abstract class ArkdBackedProvider implements ComputeProvider {
   abstract readonly name: string;
   abstract readonly isolationModes: IsolationMode[];
+  abstract readonly singleton: boolean;
   abstract readonly canReboot: boolean;
   abstract readonly canDelete: boolean;
   abstract readonly supportsWorktree: boolean;

@@ -97,6 +97,7 @@ async function assertDockerAvailable(): Promise<void> {
 export class DockerProvider implements ComputeProvider {
   readonly name = "docker";
   readonly isolationModes = [{ value: "container", label: "Docker container (isolated)" }];
+  readonly singleton = false;
   readonly canReboot = false;
   readonly canDelete = true;
   readonly supportsWorktree = false;

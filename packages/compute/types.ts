@@ -83,7 +83,11 @@ export interface ComputeProvider {
   syncEnvironment(compute: Compute, opts: SyncOpts): Promise<void>;
 
   // ── Capability flags ────────────────────────────────────────────────────
-  readonly singleton?: boolean;
+  //
+  // All non-optional: rules are driven off these flags in ComputeService,
+  // so a missing flag would silently fall back to `undefined`/falsy and
+  // skip the rule. Every provider must declare each flag explicitly.
+  readonly singleton: boolean;
   readonly canReboot: boolean;
   readonly canDelete: boolean;
   readonly supportsWorktree: boolean;

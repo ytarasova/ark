@@ -38,6 +38,11 @@ abstract class LocalArkdBase extends ArkdBackedProvider {
   readonly canReboot = false;
   readonly needsAuth = false;
 
+  // Concrete subclasses pick singleton: LocalWorktreeProvider is the one-per-
+  // tenant "local" compute, the others (docker, devcontainer, firecracker)
+  // allow multiple rows.
+  abstract readonly singleton: boolean;
+
   getArkdUrl(_compute: Compute): string {
     return DEFAULT_ARKD_URL;
   }
@@ -89,6 +94,7 @@ export class LocalWorktreeProvider extends LocalArkdBase {
     { value: "worktree", label: "Git worktree (isolated)" },
     { value: "inplace", label: "In-place (direct)" },
   ];
+  readonly singleton = true;
   readonly canDelete = false;
   readonly supportsWorktree = true;
   readonly initialStatus = "running";
@@ -154,6 +160,7 @@ export class LocalWorktreeProvider extends LocalArkdBase {
 export class LocalDockerProvider extends LocalArkdBase {
   readonly name = "docker";
   readonly isolationModes: IsolationMode[] = [{ value: "container", label: "Docker container (arkd sidecar)" }];
+  readonly singleton = false;
   readonly canDelete = true;
   readonly supportsWorktree = false;
   readonly initialStatus = "stopped";
@@ -288,6 +295,7 @@ export class LocalDockerProvider extends LocalArkdBase {
 export class LocalDevcontainerProvider extends LocalArkdBase {
   readonly name = "devcontainer";
   readonly isolationModes: IsolationMode[] = [{ value: "devcontainer", label: "Devcontainer (project-defined)" }];
+  readonly singleton = false;
   readonly canDelete = true;
   readonly supportsWorktree = false;
   readonly initialStatus = "stopped";
@@ -352,6 +360,7 @@ export class LocalDevcontainerProvider extends LocalArkdBase {
 export class LocalFirecrackerProvider extends LocalArkdBase {
   readonly name = "firecracker";
   readonly isolationModes: IsolationMode[] = [{ value: "microvm", label: "Firecracker microVM (hardware isolation)" }];
+  readonly singleton = false;
   readonly canDelete = true;
   readonly supportsWorktree = false;
   readonly initialStatus = "stopped";
