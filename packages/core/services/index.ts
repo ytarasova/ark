@@ -1,4 +1,4 @@
-// Side-effect import: wires cross-module deps for workspace-service.finishWorktree.
+// Side-effect import: wires cross-module deps for worktree.finishWorktree.
 // Must run before any caller invokes finishWorktree. See init.ts for details.
 import "./init.js";
 

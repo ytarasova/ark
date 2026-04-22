@@ -16,7 +16,7 @@ import { getHotkeys } from "../../core/hotkeys.js";
 import { getThemeMode } from "../../core/theme.js";
 import { getAllSessionCosts, exportCostsCsv } from "../../core/observability/costs.js";
 import { getActiveProfile } from "../../core/state/profiles.js";
-import { cleanupWorktrees } from "../../core/services/workspace-service.js";
+import { cleanupWorktrees } from "../../core/services/worktree/index.js";
 import { exportSession } from "../../core/session/share.js";
 import { generateOpenApiSpec } from "../../core/openapi.js";
 import { DEFAULT_ARKD_URL } from "../../core/constants.js";

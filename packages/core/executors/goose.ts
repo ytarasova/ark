@@ -121,7 +121,7 @@ export const gooseExecutor: Executor = {
     const compute = session.compute_name ? await app.computes.get(session.compute_name) : null;
     const { getProvider } = await import("../../compute/index.js");
     const provider = getProvider(compute?.provider ?? "local");
-    const { setupSessionWorktree } = await import("../services/workspace-service.js");
+    const { setupSessionWorktree } = await import("../services/worktree/index.js");
     const effectiveWorkdir = await setupSessionWorktree(app, session, compute, provider, log);
 
     // Conductor URL (devcontainer vs host)

@@ -25,7 +25,7 @@ import type { AppContext } from "../app.js";
 // file (which RF-1 will rewrite) can continue using `session.dispatch` etc.
 import { startSession, stop, cleanupOnTerminal } from "../services/session-lifecycle.js";
 import { dispatch } from "../services/dispatch.js";
-import { createWorktreePR } from "../services/workspace-service.js";
+import { createWorktreePR } from "../services/worktree/index.js";
 const session = {
   startSession,
   stop,

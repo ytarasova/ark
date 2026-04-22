@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, existsSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { copyWorktreeFiles, runWorktreeSetup } from "../services/workspace-service.js";
+import { copyWorktreeFiles, runWorktreeSetup } from "../services/worktree/index.js";
 
 let sourceDir: string;
 let worktreeDir: string;

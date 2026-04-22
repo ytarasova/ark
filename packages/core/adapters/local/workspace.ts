@@ -2,7 +2,7 @@
  * LocalWorkspace adapter -- stub.
  *
  * In Slice 1 this will wrap the existing free functions in
- * `services/workspace-service.ts`.
+ * `services/worktree/` (setup.ts, git-ops.ts, pr.ts).
  */
 
 import type {

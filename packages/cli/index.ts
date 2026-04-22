@@ -24,8 +24,8 @@ import * as core from "../core/index.js";
 import { VERSION } from "../core/version.js";
 import { closeArkClient, setRemoteServer, isRemoteMode, shutdownInProcessApp } from "./app-client.js";
 
-import { registerSessionCommands } from "./commands/session.js";
-import { registerComputeCommands } from "./commands/compute.js";
+import { registerSessionCommands } from "./commands/session/index.js";
+import { registerComputeCommands } from "./commands/compute/index.js";
 import { registerAgentCommands } from "./commands/agent.js";
 import { registerFlowCommands } from "./commands/flow.js";
 import { registerSkillCommands } from "./commands/skill.js";

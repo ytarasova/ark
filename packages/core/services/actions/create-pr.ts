@@ -2,7 +2,7 @@ import { promisify } from "util";
 import { execFile } from "child_process";
 
 import type { ActionHandler } from "./types.js";
-import { createWorktreePR } from "../workspace-service.js";
+import { createWorktreePR } from "../worktree/index.js";
 import { logInfo } from "../../observability/structured-log.js";
 
 const execFileAsync = promisify(execFile);

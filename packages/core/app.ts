@@ -46,6 +46,7 @@ import type {
 import { ComputeTemplateRepository as ComputeTemplateRepositoryCtor } from "./repositories/index.js";
 import type { SessionService, ComputeService, HistoryService } from "./services/index.js";
 import type { SessionHooks } from "./services/session-hooks/index.js";
+import type { SessionLifecycle } from "./services/session/index.js";
 import type { FlowStore, SkillStore, AgentStore, RecipeStore, RuntimeStore } from "./stores/index.js";
 import { buildTenantScope } from "./tenant-scope.js";
 import { ComputeRegistries } from "./compute-registries.js";
@@ -345,6 +346,9 @@ export class AppContext {
   }
   get sessionHooks(): SessionHooks {
     return this._resolve("sessionHooks");
+  }
+  get sessionLifecycle(): SessionLifecycle {
+    return this._resolve("sessionLifecycle");
   }
 
   // ── Resource stores ────────────────────────────────────────────────────

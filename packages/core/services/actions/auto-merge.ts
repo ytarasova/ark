@@ -1,5 +1,5 @@
 import type { ActionHandler } from "./types.js";
-import { mergeWorktreePR } from "../workspace-service.js";
+import { mergeWorktreePR } from "../worktree/index.js";
 
 /**
  * `auto_merge` -- queue the session's PR for merge via `gh pr merge --auto`.

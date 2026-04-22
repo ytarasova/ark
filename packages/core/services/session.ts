@@ -650,7 +650,7 @@ export class SessionService {
    * Get a diff summary for a session's worktree branch vs its base branch.
    */
   async worktreeDiff(id: string, opts?: { base?: string }): Promise<any> {
-    const { worktreeDiff: legacyDiff } = await import("./workspace-service.js");
+    const { worktreeDiff: legacyDiff } = await import("./worktree/index.js");
     return legacyDiff(this.app, id, opts);
   }
 
@@ -666,7 +666,7 @@ export class SessionService {
       createPR?: boolean;
     },
   ): Promise<SessionOpResult> {
-    const { finishWorktree: legacyFinish } = await import("./workspace-service.js");
+    const { finishWorktree: legacyFinish } = await import("./worktree/index.js");
     return legacyFinish(this.app, id, opts);
   }
 
@@ -674,7 +674,7 @@ export class SessionService {
    * Rebase a session's branch onto the base branch.
    */
   async rebaseOntoBase(id: string, opts?: { base?: string }): Promise<SessionOpResult> {
-    const { rebaseOntoBase: legacyRebase } = await import("./workspace-service.js");
+    const { rebaseOntoBase: legacyRebase } = await import("./worktree/index.js");
     return legacyRebase(this.app, id, opts);
   }
 
@@ -685,7 +685,7 @@ export class SessionService {
     id: string,
     opts?: { title?: string; body?: string; base?: string; draft?: boolean },
   ): Promise<SessionOpResult & { pr_url?: string }> {
-    const { createWorktreePR: legacyCreatePR } = await import("./workspace-service.js");
+    const { createWorktreePR: legacyCreatePR } = await import("./worktree/index.js");
     return legacyCreatePR(this.app, id, opts);
   }
 
