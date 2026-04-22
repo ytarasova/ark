@@ -66,7 +66,7 @@ describe("mediateStageHandoff", async () => {
 
       expect(result.ok).toBe(true);
       expect(result.dispatched).toBe(true);
-    });
+    }, 30_000);
 
     it("returns dispatched=false when autoDispatch is disabled", async () => {
       const session = await app.sessions.create({ summary: "no dispatch test", flow: "quick" });

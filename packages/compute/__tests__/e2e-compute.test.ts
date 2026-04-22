@@ -248,7 +248,7 @@ describe("E2E Compute: Local provider getMetrics", async () => {
     expect(Array.isArray(snapshot.sessions)).toBe(true);
     expect(Array.isArray(snapshot.processes)).toBe(true);
     expect(Array.isArray(snapshot.docker)).toBe(true);
-  }, 30_000);
+  }, 60_000);
 });
 
 // ── Test 5: Local provider probePorts with live server ──────────────────────

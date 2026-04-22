@@ -38,16 +38,22 @@ import type {
 
 export class ArkdClient {
   private token: string | null;
+  private requestTimeoutMs: number;
 
   constructor(
     private baseUrl: string,
-    opts?: { token?: string },
+    opts?: { token?: string; requestTimeoutMs?: number },
   ) {
     // Strip trailing slash
     if (this.baseUrl.endsWith("/")) {
       this.baseUrl = this.baseUrl.slice(0, -1);
     }
     this.token = opts?.token ?? process.env.ARK_ARKD_TOKEN ?? null;
+    // 30s covers `/snapshot` on a loaded macOS host (top + vm_stat + tmux +
+    // docker stats in parallel) without masking a genuinely gone daemon.
+    // Callers hitting `/health` or `/exec` normally return in <1s so the
+    // extra headroom costs nothing on the happy path.
+    this.requestTimeoutMs = opts?.requestTimeoutMs ?? 30_000;
   }
 
   // ── File operations ───────────────────────────────────────────────────────
@@ -148,6 +154,7 @@ export class ArkdClient {
       method: "POST",
       headers: { "Content-Type": "application/json", ...this.authHeaders() },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(this.requestTimeoutMs),
     });
     const data = await resp.json();
     if (!resp.ok) {
@@ -160,6 +167,7 @@ export class ArkdClient {
   private async get<Res>(path: string): Promise<Res> {
     const resp = await fetch(`${this.baseUrl}${path}`, {
       headers: this.authHeaders(),
+      signal: AbortSignal.timeout(this.requestTimeoutMs),
     });
     const data = await resp.json();
     if (!resp.ok) {

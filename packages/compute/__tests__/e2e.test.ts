@@ -129,7 +129,7 @@ describe("E2E: Full compute lifecycle", async () => {
     // Destroy and stop throw for local computes
     expect(provider!.destroy(compute!)).rejects.toThrow("Cannot destroy the local compute");
     expect(provider!.stop(compute!)).rejects.toThrow("Cannot stop the local compute");
-  }, 30_000);
+  }, 60_000);
 });
 
 // ── Test 2: Launch and probe a session ───────────────────────────────────────
@@ -205,7 +205,7 @@ describe("E2E: Launch and probe a session", async () => {
         /* already stopped */
       }
     }
-  });
+  }, 30_000);
 });
 
 // ── Test 3: arc.json -> port resolution -> probing ───────────────────────────

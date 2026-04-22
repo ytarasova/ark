@@ -112,44 +112,46 @@ async function getTmuxSessions(): Promise<ComputeSession[]> {
   const listOut = await run(tmuxBin(), ["list-sessions"]);
   if (!listOut) return [];
 
-  const sessions: ComputeSession[] = [];
+  // Resolve every session in parallel. A laptop that has accumulated a
+  // hundred stale ark-s-* sessions used to serialise 100 x (list-panes +
+  // ps + display-message) and blow past the snapshot timeout; fan-out
+  // keeps the whole call bounded by the slowest per-session probe.
+  const lines = listOut.split("\n").filter((l) => l.trim());
+  return Promise.all(
+    lines.map(async (line): Promise<ComputeSession | null> => {
+      const nameMatch = line.match(/^([^:]+):/);
+      if (!nameMatch) return null;
+      const name = nameMatch[1].trim();
+      const attached = line.includes("(attached)");
+      const status = attached ? "attached" : "detached";
 
-  for (const line of listOut.split("\n")) {
-    if (!line.trim()) continue;
-    const nameMatch = line.match(/^([^:]+):/);
-    if (!nameMatch) continue;
+      const panePid = await run(tmuxBin(), ["list-panes", "-t", name, "-F", "#{pane_pid}"]);
 
-    const name = nameMatch[1].trim();
-    const attached = line.includes("(attached)");
-    const status = attached ? "attached" : "detached";
+      let cpu = 0;
+      let mem = 0;
+      let mode = "unknown";
+      let projectPath = "";
 
-    const panePid = await run(tmuxBin(), ["list-panes", "-t", name, "-F", "#{pane_pid}"]);
-
-    let cpu = 0;
-    let mem = 0;
-    let mode = "unknown";
-    let projectPath = "";
-
-    if (panePid) {
-      const firstPid = parseInt(panePid.split("\n")[0].trim(), 10);
-      if (!isNaN(firstPid)) {
-        const tree = await getProcessTree(firstPid);
-        const agentProc = tree.children.find((c) => c.command.toLowerCase().includes("claude"));
-        if (agentProc) {
-          cpu = agentProc.cpu ?? 0;
-          mem = agentProc.mem ?? 0;
-          mode = agentProc.command.includes("dangerously") ? "development" : "normal";
+      if (panePid) {
+        const firstPid = parseInt(panePid.split("\n")[0].trim(), 10);
+        if (!isNaN(firstPid)) {
+          const [tree, paneDir] = await Promise.all([
+            getProcessTree(firstPid),
+            run(tmuxBin(), ["display-message", "-t", name, "-p", "#{pane_current_path}"]),
+          ]);
+          const agentProc = tree.children.find((c) => c.command.toLowerCase().includes("claude"));
+          if (agentProc) {
+            cpu = agentProc.cpu ?? 0;
+            mem = agentProc.mem ?? 0;
+            mode = agentProc.command.includes("dangerously") ? "development" : "normal";
+          }
+          if (paneDir) projectPath = paneDir;
         }
-
-        const paneDir = await run(tmuxBin(), ["display-message", "-t", name, "-p", "#{pane_current_path}"]);
-        if (paneDir) projectPath = paneDir;
       }
-    }
 
-    sessions.push({ name, status, mode, projectPath, cpu, mem });
-  }
-
-  return sessions;
+      return { name, status, mode, projectPath, cpu, mem };
+    }),
+  ).then((rs) => rs.filter((r): r is ComputeSession => r !== null));
 }
 
 // ── Top processes ───────────────────────────────────────────────────────────

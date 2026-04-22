@@ -288,6 +288,14 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
   const server = Bun.serve({
     port,
     hostname: bindHost,
+    // /snapshot shells out to `top -l 1`, `vm_stat`, `df`, `uptime`,
+    // `ps aux`, `tmux list-sessions`, and `docker stats --no-stream`; on a
+    // loaded macOS host these routinely stack past the Bun default 10s and
+    // trip `request timed out after 10 seconds`. The handler itself runs
+    // with its own timeouts (spawns bounded to a few seconds each), so a
+    // generous idle cap just lets the HTTP round-trip complete. 60s covers
+    // a cold laptop without masking a genuinely hung collector.
+    idleTimeout: 60,
     async fetch(req) {
       const url = new URL(req.url);
       const path = url.pathname;
