@@ -23,6 +23,14 @@ import type {
   AgentStatusRes,
   AgentCaptureReq,
   AgentCaptureRes,
+  AgentAttachOpenReq,
+  AgentAttachOpenRes,
+  AgentAttachInputReq,
+  AgentAttachInputRes,
+  AgentAttachResizeReq,
+  AgentAttachResizeRes,
+  AgentAttachCloseReq,
+  AgentAttachCloseRes,
   MetricsRes,
   ProbePortsRes,
   HealthRes,
@@ -94,6 +102,24 @@ export class ArkdClient {
 
   async captureOutput(req: AgentCaptureReq): Promise<AgentCaptureRes> {
     return this.post("/agent/capture", req);
+  }
+
+  // ── Terminal attach (live) ───────────────────────────────────────────────
+
+  async attachOpen(req: AgentAttachOpenReq): Promise<AgentAttachOpenRes> {
+    return this.post("/agent/attach/open", req);
+  }
+
+  async attachInput(req: AgentAttachInputReq): Promise<AgentAttachInputRes> {
+    return this.post("/agent/attach/input", req);
+  }
+
+  async attachResize(req: AgentAttachResizeReq): Promise<AgentAttachResizeRes> {
+    return this.post("/agent/attach/resize", req);
+  }
+
+  async attachClose(req: AgentAttachCloseReq): Promise<AgentAttachCloseRes> {
+    return this.post("/agent/attach/close", req);
   }
 
   // ── System ────────────────────────────────────────────────────────────────

@@ -56,6 +56,14 @@ import type {
   AgentStatusRes,
   AgentCaptureReq,
   AgentCaptureRes,
+  AgentAttachOpenReq,
+  AgentAttachOpenRes,
+  AgentAttachInputReq,
+  AgentAttachInputRes,
+  AgentAttachResizeReq,
+  AgentAttachResizeRes,
+  AgentAttachCloseReq,
+  AgentAttachCloseRes,
   MetricsRes,
   ProbePortsReq,
   ProbePortsRes,
@@ -418,6 +426,34 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
           return json(result);
         }
 
+        // ── Agent: attach-open ───────────────────────────────────────
+        if (req.method === "POST" && path === "/agent/attach/open") {
+          const body = (await req.json()) as AgentAttachOpenReq;
+          const result = await agentAttachOpen(body);
+          return json(result);
+        }
+
+        // ── Agent: attach-input ──────────────────────────────────────
+        if (req.method === "POST" && path === "/agent/attach/input") {
+          const body = (await req.json()) as AgentAttachInputReq;
+          const result = await agentAttachInput(body);
+          return json(result);
+        }
+
+        // ── Agent: attach-resize ─────────────────────────────────────
+        if (req.method === "POST" && path === "/agent/attach/resize") {
+          const body = (await req.json()) as AgentAttachResizeReq;
+          const result = await agentAttachResize(body);
+          return json(result);
+        }
+
+        // ── Agent: attach-close ──────────────────────────────────────
+        if (req.method === "POST" && path === "/agent/attach/close") {
+          const body = (await req.json()) as AgentAttachCloseReq;
+          const result = await agentAttachClose(body);
+          return json(result);
+        }
+
         // ── Ports: probe ──────────────────────────────────────────────
         if (req.method === "POST" && path === "/ports/probe") {
           const body = (await req.json()) as ProbePortsReq;
@@ -734,6 +770,77 @@ async function agentCapture(req: AgentCaptureReq): Promise<AgentCaptureRes> {
   const output = await readStream(proc.stdout);
   await proc.exited;
   return { output: output.trimEnd() };
+}
+
+// ── Terminal attach (live) ───────────────────────────────────────────────────
+
+/**
+ * Terminal attach sessions are tracked in-process by a short opaque handle.
+ * The WS proxy on the server daemon opens one per WebSocket connection and
+ * relays Input/Resize/Close calls back to arkd. Local MVP only -- a remote
+ * arkd-to-arkd transport is deferred (see #396 follow-up).
+ */
+const attachStreams = new Map<string, { sessionName: string; openedAt: number }>();
+let attachCounter = 0;
+
+async function agentAttachOpen(req: AgentAttachOpenReq): Promise<AgentAttachOpenRes> {
+  requireSafeTmuxName(req.sessionName);
+  if (!(await isTmuxRunning(req.sessionName))) {
+    throw new Error(`tmux session not running: ${req.sessionName}`);
+  }
+  // Capture the current pane so the caller can paint the UI immediately.
+  const capture = Bun.spawn({
+    cmd: ["tmux", "capture-pane", "-t", req.sessionName, "-p", "-e", "-J"],
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const initialBuffer = (await readStream(capture.stdout)).trimEnd();
+  await capture.exited;
+
+  const streamHandle = `attach-${Date.now()}-${++attachCounter}`;
+  attachStreams.set(streamHandle, { sessionName: req.sessionName, openedAt: Date.now() });
+  return { ok: true, streamHandle, initialBuffer };
+}
+
+async function agentAttachInput(req: AgentAttachInputReq): Promise<AgentAttachInputRes> {
+  requireSafeTmuxName(req.sessionName);
+  if (typeof req.data !== "string") {
+    throw new Error("data must be a string");
+  }
+  // `send-keys -l` passes data literally so escape sequences (arrows, Ctrl+C,
+  // bracketed paste markers) reach the pane untouched. Without -l tmux
+  // interprets things like "Enter" or "C-c" as key names.
+  const proc = Bun.spawn({
+    cmd: ["tmux", "send-keys", "-t", req.sessionName, "-l", req.data],
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  await proc.exited;
+  return { ok: true };
+}
+
+async function agentAttachResize(req: AgentAttachResizeReq): Promise<AgentAttachResizeRes> {
+  requireSafeTmuxName(req.sessionName);
+  const cols = Math.max(1, Math.min(1000, Math.trunc(Number(req.cols))));
+  const rows = Math.max(1, Math.min(1000, Math.trunc(Number(req.rows))));
+  if (!Number.isFinite(cols) || !Number.isFinite(rows)) {
+    throw new Error("cols and rows must be finite numbers");
+  }
+  const proc = Bun.spawn({
+    cmd: ["tmux", "resize-window", "-t", req.sessionName, "-x", String(cols), "-y", String(rows)],
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  await proc.exited;
+  return { ok: true };
+}
+
+async function agentAttachClose(req: AgentAttachCloseReq): Promise<AgentAttachCloseRes> {
+  if (typeof req.streamHandle !== "string" || req.streamHandle.length === 0) {
+    throw new Error("streamHandle required");
+  }
+  attachStreams.delete(req.streamHandle);
+  return { ok: true };
 }
 
 async function isTmuxRunning(sessionName: string): Promise<boolean> {

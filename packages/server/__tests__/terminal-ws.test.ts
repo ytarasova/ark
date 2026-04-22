@@ -1,0 +1,112 @@
+/**
+ * /terminal/:sessionId WebSocket route tests.
+ *
+ * The server daemon exposes a dedicated WS route for live terminal attach.
+ * This test validates:
+ *   - tenant ownership check rejects unknown session ids
+ *   - sessions without a tmux pane are refused
+ *   - a valid session gets a `connected` envelope with an initial buffer
+ *
+ * We don't exercise the raw input path end-to-end here -- the arkd-level
+ * attach endpoints are covered by packages/arkd/__tests__/attach.test.ts.
+ */
+
+import { describe, it, expect, beforeAll, afterAll } from "bun:test";
+import { AppContext } from "../../core/app.js";
+import { ArkServer } from "../index.js";
+import { registerAllHandlers } from "../register.js";
+import { allocatePort } from "../../core/config/port-allocator.js";
+import { execFileSync } from "child_process";
+import { tmuxBin } from "../../core/infra/tmux.js";
+
+let app: AppContext;
+let server: ArkServer;
+let ws: { stop(): void };
+let port: number;
+let baseWs: string;
+const spawnedTmuxSessions: string[] = [];
+
+beforeAll(async () => {
+  app = await AppContext.forTestAsync();
+  await app.boot();
+  server = new ArkServer();
+  // Skip requireInitialization so our tests don't have to run the handshake.
+  (server.router as any).requireInit = false;
+  registerAllHandlers(server.router, app);
+  port = await allocatePort();
+  baseWs = `ws://localhost:${port}`;
+  ws = server.startWebSocket(port, { app });
+});
+
+afterAll(async () => {
+  for (const name of spawnedTmuxSessions) {
+    try {
+      execFileSync(tmuxBin(), ["kill-session", "-t", name], { stdio: "pipe" });
+    } catch {
+      /* already gone */
+    }
+  }
+  ws?.stop();
+  await app?.shutdown();
+});
+
+function openSocket(url: string): Promise<{ ws: WebSocket; firstMessage: string | ArrayBuffer }> {
+  return new Promise((resolve, reject) => {
+    const socket = new WebSocket(url);
+    socket.binaryType = "arraybuffer";
+    socket.onopen = () => {
+      /* wait for first message */
+    };
+    socket.onmessage = (event) => {
+      resolve({ ws: socket, firstMessage: event.data as string | ArrayBuffer });
+    };
+    socket.onerror = (err) => reject(err);
+    socket.onclose = (event) => {
+      if (event.code !== 1000) {
+        reject(new Error(`WebSocket closed with code ${event.code}: ${event.reason}`));
+      }
+    };
+    setTimeout(() => reject(new Error("timeout waiting for first WS message")), 5000);
+  });
+}
+
+async function httpGet(path: string): Promise<Response> {
+  return fetch(`http://localhost:${port}${path}`);
+}
+
+describe("/terminal/:sessionId WS route", () => {
+  it("returns 404 for an unknown session id", async () => {
+    const resp = await httpGet("/terminal/nope-nonexistent");
+    expect(resp.status).toBe(404);
+  });
+
+  it("returns 409 when session exists but has no tmux pane", async () => {
+    const s = await app.sessions.create({ summary: "no-pane" } as any);
+    // session_id is null by default, so it has no pane.
+    const resp = await httpGet(`/terminal/${s.id}`);
+    expect(resp.status).toBe(409);
+  });
+
+  it("upgrades to WebSocket and sends a connected envelope with initialBuffer for a live pane", async () => {
+    // Spin up a real tmux session so the bridge has something to attach to.
+    const tmuxName = `arktest-${Date.now().toString(36)}`;
+    spawnedTmuxSessions.push(tmuxName);
+    execFileSync(
+      tmuxBin(),
+      ["new-session", "-d", "-s", tmuxName, "-x", "120", "-y", "30", "bash", "-c", "echo live-hi; sleep 60"],
+      { stdio: "pipe" },
+    );
+
+    const s = await app.sessions.create({ summary: "live" } as any);
+    await app.sessions.update(s.id, { session_id: tmuxName } as any);
+
+    const { ws: wsClient, firstMessage } = await openSocket(`${baseWs}/terminal/${s.id}`);
+    expect(typeof firstMessage).toBe("string");
+    const parsed = JSON.parse(firstMessage as string);
+    expect(parsed.type).toBe("connected");
+    expect(parsed.sessionId).toBe(s.id);
+    expect(typeof parsed.streamHandle).toBe("string");
+    expect(typeof parsed.initialBuffer).toBe("string");
+    wsClient.close();
+  }, 15_000);
+});

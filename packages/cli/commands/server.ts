@@ -70,7 +70,7 @@ export function registerServerCommands(program: Command) {
         await new Promise(() => {});
       } else {
         const port = parseInt(opts.port);
-        const ws = server.startWebSocket(port);
+        const ws = server.startWebSocket(port, { app: serverApp });
         console.log(`Ark server listening on ws://localhost:${port}`);
         process.on("SIGINT", () => {
           ws.stop();

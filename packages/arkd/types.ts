@@ -110,6 +110,50 @@ export interface AgentCaptureRes {
   output: string;
 }
 
+// ── Terminal attach (live) ──────────────────────────────────────────────────
+
+/**
+ * Open a live terminal stream for a tmux session. The response includes a
+ * streamHandle used to correlate subsequent Input/Resize/Close calls and an
+ * initial capture of the pane so the UI can render something before live
+ * output begins streaming.
+ */
+export interface AgentAttachOpenReq {
+  sessionName: string;
+}
+export interface AgentAttachOpenRes {
+  ok: boolean;
+  streamHandle: string;
+  initialBuffer: string;
+}
+
+/** Send input keystrokes to a tmux session. Uses `send-keys -l` so escape sequences pass through literally. */
+export interface AgentAttachInputReq {
+  sessionName: string;
+  data: string;
+}
+export interface AgentAttachInputRes {
+  ok: boolean;
+}
+
+/** Resize the tmux window to the given cols/rows. */
+export interface AgentAttachResizeReq {
+  sessionName: string;
+  cols: number;
+  rows: number;
+}
+export interface AgentAttachResizeRes {
+  ok: boolean;
+}
+
+/** Close a previously opened terminal stream. */
+export interface AgentAttachCloseReq {
+  streamHandle: string;
+}
+export interface AgentAttachCloseRes {
+  ok: boolean;
+}
+
 // ── System ──────────────────────────────────────────────────────────────────
 
 export interface MetricsRes {

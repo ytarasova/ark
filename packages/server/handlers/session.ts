@@ -360,6 +360,46 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     return result;
   });
 
+  // ── Session attach (CLI command string) ──────────────────────────────────
+  //
+  // Returns the shell command a user should run to attach to the tmux pane
+  // for `sessionId`, plus a short display hint for the UI. Sessions that
+  // aren't currently dispatched (no tmux pane, terminal states, missing)
+  // come back as `attachable: false` with a `reason` the UI shows instead.
+  router.handle("session/attach-command", async (params) => {
+    const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
+    const session = await app.sessions.get(sessionId);
+    if (!session) {
+      throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
+    }
+    const { attachCommand } = await import("../../core/infra/tmux.js");
+
+    // Sessions without a dispatched tmux pane have nothing to attach to.
+    if (!session.session_id) {
+      return {
+        command: "",
+        displayHint: "",
+        attachable: false,
+        reason: "Session has not been dispatched yet.",
+      };
+    }
+    if (session.status === "completed" || session.status === "failed" || session.status === "archived") {
+      return {
+        command: "",
+        displayHint: "",
+        attachable: false,
+        reason: `Session is ${session.status}; no live pane to attach to.`,
+      };
+    }
+
+    const command = attachCommand(session.session_id);
+    return {
+      command,
+      displayHint: "Paste this into a terminal on the host running ark:",
+      attachable: true,
+    };
+  });
+
   router.handle("worktree/diff", async (params) => {
     const { sessionId, base } = extract<{ sessionId: string; base?: string }>(params, ["sessionId"]);
     return app.sessionService.worktreeDiff(sessionId, { base });
