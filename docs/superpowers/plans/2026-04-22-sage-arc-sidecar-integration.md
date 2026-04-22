@@ -17,7 +17,7 @@
 
 ## What's net-new
 
-1. **Agent SDK runtime** (`type: agent-sdk`) — thin wrapper around Anthropic's first-party `@anthropic-ai/claude-agent-sdk`. The SDK bundles its own Claude Code native binary (optional per-platform deps like `@anthropic-ai/claude-agent-sdk-darwin-arm64`), supports Bun as the host runtime (`options.executable: "bun"`, auto-detected), and exposes built-in tools (`Read`/`Write`/`Edit`/`Bash`/`Glob`/`Grep`), permission modes, `cwd`, `systemPrompt`, `maxTurns`, `maxBudgetUsd`, hooks, and MCP servers — we consume those directly rather than reimplementing. Runs as a **plain child process** (our launch.ts), not inside tmux; arkd attaches to its stdout/stderr directly. The SDK internally spawns the CC binary as its own subprocess, but that's an implementation detail we don't manage.
+1. **Agent SDK runtime** (`type: agent-sdk`) — thin wrapper around Anthropic's first-party `@anthropic-ai/claude-agent-sdk`. The SDK bundles its own Claude Code native binary (optional per-platform deps like `@anthropic-ai/claude-agent-sdk-darwin-arm64`), supports Bun as the host runtime (`options.executable: "bun"`, auto-detected), and exposes built-in tools (`Read`/`Write`/`Edit`/`Bash`/`Glob`/`Grep`), permission modes, `cwd`, `systemPrompt`, `maxTurns`, `maxBudgetUsd`, hooks, and MCP servers — we consume those directly rather than reimplementing. Runs as a **plain child process** (our launch.ts), not inside tmux. **Native arkd wiring, not stdout scraping:** `launch.ts` is an arkd client — every `SDKMessage` is forwarded as a structured `channelReport` via `ArkdClient.channelReport(sessionId, ...)` (POST `/channel/{sessionId}` on arkd :19300), which arkd relays to the conductor for persistence in the events + messages tables. transcript.jsonl is written alongside for post-mortem / parser consumption, but arkd observability is real-time and does not require tmux, pane scraping, or hooks-over-HTTP indirection. The SDK internally spawns the CC binary as its own subprocess; we don't manage that.
 2. **Generic git primitives** — `git.clone-and-branch` + `git.commit-and-push` actions if not already present.
 3. **Delete the existing sage integration** — `integrations/sage-analysis.ts`, `fetch-sage-analysis` action, `pi-sage` trigger, `server/handlers/sage.ts`, `cli/commands/sage.ts`, `flows/definitions/from-sage-analysis.yaml`, and their registry entries.
 4. **TrueFoundry secret wiring** — `ANTHROPIC_API_KEY` + `ANTHROPIC_BASE_URL` in the local secret store.
@@ -177,8 +177,10 @@ The Agent SDK emits a union `SDKMessage` (assistant, user, result, system, parti
 
 Key fields we consume from `result`:
 ```
-total_cost_usd, usage, modelUsage, duration_ms, num_turns, is_error, stop_reason, result
+total_cost_usd, usage, modelUsage, duration_ms, num_turns, is_error, stop_reason, result, structured_output
 ```
+
+`structured_output` (optional) is populated by the SDK when the session was started with `options.outputFormat = { type: "json_schema", schema }` — the validated JSON matching the schema. The parser exposes it on `AgentSdkParseResult.structured_output?: unknown`. Sage consumes it via `session.stages[<execute>].outputs.structured_output` after a poll. When the agent cannot satisfy the schema within retry budget, the terminal result arrives with `subtype: "error_max_structured_output_retries"` and no `structured_output` — the parser reports `stop_reason` accordingly.
 
 - [ ] **Step 1: Failing test**
 
@@ -470,6 +472,50 @@ git add packages/core/runtimes/agent-sdk/launch.ts packages/core/services/agent-
 git commit -m "feat(compute): agent-sdk runtime wraps @anthropic-ai/claude-agent-sdk (plain process + arkd pipe attach)"
 ```
 
+### Completion lifecycle
+
+End-to-end "is the agent done, and how do we tear it down cleanly." Every agent-sdk session goes through this sequence:
+
+1. **SDK emits terminal `result` message.** The async iterator yields `{ type: "result", subtype, is_error, total_cost_usd, usage, ... }` — the SDK's own done signal. `subtype` is one of `success`, `error_max_turns`, `error_during_execution`, `error_max_budget_usd`, `error_max_structured_output_retries`. After `result` the iterator closes.
+2. **`launch.ts` handles it.** Sets `sawResult = true`, captures `is_error`, loop exits naturally when the iterator completes.
+3. **Conductor state transitions (A3b).** Before `launch.ts` exits, two hooks are POSTed to `/hooks/status`: first `Stop` (observability only), then `SessionEnd` (on success → `session.status = completed`) OR `StopFailure` (on error → `session.status = failed`). The conductor's `applyHookStatus` persists the event and flips the state.
+4. **`launch.ts` process exits.** `process.exit(0)` on success, `process.exit(1)` on error result / no result / SDK throw.
+5. **Compute adapter sees the exit.** `proc.exited` resolves with the code. The executor emits `process_exited` to the session event log and unregisters the PID.
+6. **Cleanup (Part D2).** Terminal state fires worktree rm + tmp gc. An orphan PID sweeper runs every 5 minutes as a belt-and-braces safety net.
+
+**Failure modes and their detectors:**
+
+| Scenario | Detection | Response |
+|---|---|---|
+| Agent hangs (no `result`) | `maxTurns` / `maxBudgetUsd` fire in the SDK → emits error `result` | normal error path |
+| SDK subprocess crashes | `query()` throws → `launch.ts` catch block writes error sentinel, exits 1 | conductor transitions via StopFailure hook already posted; or D2 orphan sweeper if hook not sent |
+| `launch.ts` SIGKILL'd (OOM etc.) | no hook posted; compute adapter sees non-zero exit | D2 sweeper detects session `running` with dead PID, marks `failed` with reason `orphaned`, cleanup |
+| Network partition to conductor | hook POST fails → `console.error`, loop continues | transcript.jsonl still canonical; process exit still propagates; conductor reconciles from event log |
+| `session/stop` by sage | compute adapter SIGTERMs `launch.ts` | AbortController aborts `query()`; launch writes abort sentinel, posts StopFailure, exits 1 |
+
+**Why redundant signals (hook + process-exit).** The conductor state transition (hook) and the process lifecycle (exit code) are independently observable. Either alone would work; both together means if the hook is lost the process-exit still tells us, and if the process hangs the hook still fires before we exit. Belt and braces — cheap given the code is already doing both.
+
+### Mid-session intervention
+
+What sage (or a human via CLI/Web UI) can do while an agent-sdk session is mid-run. Five levers, increasing in involvement:
+
+| Lever | Use case | Mechanism | Phase |
+|---|---|---|---|
+| Streaming-input push | "Actually, edit Y instead of X" mid-flight | `prompt` is an `AsyncIterable<SDKUserMessage>` backed by a queue; caller pushes a new user message, SDK picks it up next turn | Phase 2 (Task D1 Pattern A) |
+| `canUseTool` callback | Approve/deny every tool call interactively | Remove `bypassPermissions` from runtime YAML; route the callback through arkd → conductor → user; return `{ behavior: "allow" \| "deny", ... }` | Phase 3 |
+| `AskUserQuestion` tool | Agent asks multi-choice clarifying questions | Same `canUseTool` path; `toolName === "AskUserQuestion"`; surface questions to user; return `{ behavior: "allow", updatedInput: { questions, answers } }` | Phase 3 |
+| Graceful cancel (`session/stop`) | Stop cleanly | Compute adapter SIGTERMs `launch.ts`; AbortController aborts `query()`; launch posts `StopFailure`, exits 1 | Phase 1 (wired today) |
+| Hard kill | SIGTERM ignored | SIGKILL the launch PID; D2 orphan sweeper marks session `failed` within 5 min | Phase 1 (works today) |
+
+**Architecture gap for streaming-input push (Phase 2):** data flow today is one-way (`launch.ts` → arkd → conductor). Inbound delivery to a running agent requires a back-channel. Two options:
+
+- **arkd `/channel/{sessionId}/deliver` → local port per session.** Cleanest, uses existing `ChannelDeliverReq` shape. Costs one TCP listener per running agent.
+- **File-tail IPC via `<sessionDir>/interventions.jsonl`.** `launch.ts` tails it alongside its main loop and shoves each line into its prompt queue. Single-box only but zero-network — recommend starting here.
+
+Pick one at Phase 2 start. Both need `launch.ts` to switch from string-prompt to queue-prompt; that is the unlock for D1 Pattern A.
+
+**SDK compatibility note.** Enabling `options.includePartialMessages: true` for live token streaming is **incompatible with `options.maxThinkingTokens`** — when thinking is enabled the SDK does not emit `stream_event` partial messages, only complete ones. If we later add partial-message forwarding for live web-UI rendering, disable thinking, or gate it on a runtime flag.
+
 ---
 
 ## Part B — Generic git actions + RPC contract doc
@@ -624,6 +670,8 @@ And the child flow (register once, same way):
     target_branch:  { type: string, required: true }
     plan_md:        { type: string, required: true }
     ref:            { type: string, required: false }
+    output_schema:  { type: object, required: false }   # optional JSON Schema; sage gets typed data back via structured_output
+    max_budget_usd: { type: number, required: false }   # optional per-session spend cap enforced by the SDK
   stages:
     - name: prepare_worktree
       action: git.clone-and-branch
@@ -641,6 +689,8 @@ And the child flow (register once, same way):
       action: git.commit-and-push
       depends_on: [execute]
       on_success: done
+
+When `output_schema` is set, the executor passes it through as `options.outputFormat = { type: "json_schema", schema: <provided> }` on the SDK `query()` call. The agent's final `result` message carries `structured_output` matching the schema (or `subtype: "error_max_structured_output_retries"` if the agent can't satisfy it within the retry budget). Sage reads the validated object from the session response (`session.stages[execute].outputs.structured_output`) after polling.
 
 (Template-field syntax follows the Arc Nunjucks conventions — see `docs/templating.md`.)
 
@@ -824,9 +874,18 @@ Two related concerns: sage must be able to retry a failed stage (possibly with c
 
 ### Task D1: Retry a failed stage via RPC
 
+Two correction patterns, picked per case. The RPC surface is the same; the executor differs by whether the target session is running or failed.
+
+**Pattern A (preferred when session is still running): streaming-input correction.** The Agent SDK accepts an `AsyncIterable<{ type: "user", message: { ... } }>` as the `prompt` option. If we pass a queue instead of a string at session start, sage can push a corrective user message mid-run and the agent picks it up on the next turn without tearing down the SDK subprocess, worktree, or token cache. This is the preferred shape for "I told you to use sonnet but please switch to opus" or "stop editing X, edit Y instead" mid-flight.
+
+**Pattern B (when session has already terminated): stage reset + re-dispatch.** If the session already finished with `failed`, there is no running agent to push to — we must reset the failing stage and any downstream stages to `pending` and re-dispatch. This is what the RPC below primarily covers.
+
+Both live under the same RPC (`session/retry-stage`) — the implementation picks A or B based on current session status.
+
 **Files:**
 - Possibly modify: `packages/server/handlers/session.ts` (new handler or extend existing)
 - Possibly modify: `packages/core/services/session.ts` / session-orchestration to reset one stage to pending
+- Modify: `packages/core/runtimes/agent-sdk/launch.ts` — switch `prompt` from a string to an `AsyncIterable<SDKUserMessage>` backed by a bounded queue; expose an "inject message" hook for the executor to push correction messages in.
 - Test: `packages/core/__tests__/sage-rpc-contract.test.ts` (add retry case)
 
 - [ ] **Step 1: Find existing retry surface if any**
