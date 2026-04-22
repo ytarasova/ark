@@ -215,6 +215,41 @@ export function channelLaunchSpec(): { command: string; args: string[] } {
 }
 
 /**
+ * Return the command + args to spawn when launching the agent-sdk runtime
+ * as a child process. Mirrors the channelLaunchSpec pattern.
+ *
+ * Compiled binary:
+ *   command = execPath              (the ark binary itself)
+ *   args    = ["run-agent-sdk"]     (the `ark run-agent-sdk` subcommand)
+ *
+ * Dev mode:
+ *   command = execPath              (the bun runtime)
+ *   args    = [<repo>/packages/core/runtimes/agent-sdk/launch.ts]
+ *
+ * The launch script reads all context from ARK_* env vars -- callers do not
+ * need to pass additional positional arguments.
+ */
+export function agentSdkLaunchSpecWith(env: ResolveEnv): { command: string; args: string[] } {
+  if (isCompiledBinaryWith(env)) {
+    return { command: env.execPath, args: ["run-agent-sdk"] };
+  }
+  // Dev mode: bun <repo>/packages/core/runtimes/agent-sdk/launch.ts
+  const launchScript = join(
+    sourceRepoRootFrom(env.sourceUrl),
+    "packages",
+    "core",
+    "runtimes",
+    "agent-sdk",
+    "launch.ts",
+  );
+  return { command: env.execPath, args: [launchScript] };
+}
+
+export function agentSdkLaunchSpec(): { command: string; args: string[] } {
+  return agentSdkLaunchSpecWith(defaultEnv());
+}
+
+/**
  * Resolve the directory containing shipped MCP config stubs
  * (`mcp-configs/<name>.json`). Used to look up runtime-declared MCP entries
  * by short name (e.g. `mcp_servers: [pi-sage]`).

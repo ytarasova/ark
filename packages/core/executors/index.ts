@@ -20,11 +20,18 @@ import { claudeCodeExecutor } from "./claude-code.js";
 import { subprocessExecutor } from "./subprocess.js";
 import { cliAgentExecutor } from "./cli-agent.js";
 import { gooseExecutor } from "./goose.js";
+import { agentSdkExecutor } from "./agent-sdk.js";
 
-export { claudeCodeExecutor, subprocessExecutor, cliAgentExecutor, gooseExecutor };
+export { claudeCodeExecutor, subprocessExecutor, cliAgentExecutor, gooseExecutor, agentSdkExecutor };
 
 /** Built-in executors shipped with every Ark bundle. */
-export const builtinExecutors: Executor[] = [claudeCodeExecutor, subprocessExecutor, cliAgentExecutor, gooseExecutor];
+export const builtinExecutors: Executor[] = [
+  claudeCodeExecutor,
+  subprocessExecutor,
+  cliAgentExecutor,
+  gooseExecutor,
+  agentSdkExecutor,
+];
 
 /**
  * Discover and load user-provided executor plugins from
