@@ -361,6 +361,68 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     return result;
   });
 
+  // ── Session attach (CLI command string) ──────────────────────────────────
+  //
+  // Returns the shell command a user should run to attach to the tmux pane
+  // for `sessionId`, plus a short display hint for the UI. Sessions that
+  // aren't currently dispatched (no tmux pane, terminal states, missing)
+  // come back as `attachable: false` with a `reason` the UI shows instead.
+  //
+  // For remote compute targets (ec2, k8s, ...), we delegate to the provider's
+  // `getAttachCommand(compute, session)` so the returned string includes the
+  // SSH / kubectl prefix the user needs to run locally.
+  router.handle("session/attach-command", async (params) => {
+    const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
+    const session = await app.sessions.get(sessionId);
+    if (!session) {
+      throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
+    }
+
+    // Sessions without a dispatched tmux pane have nothing to attach to.
+    if (!session.session_id) {
+      return {
+        command: "",
+        displayHint: "",
+        attachable: false,
+        reason: "Session has not been dispatched yet.",
+      };
+    }
+    if (session.status === "completed" || session.status === "failed" || session.status === "archived") {
+      return {
+        command: "",
+        displayHint: "",
+        attachable: false,
+        reason: `Session is ${session.status}; no live pane to attach to.`,
+      };
+    }
+
+    // Provider-aware path: ask the compute's provider for the attach command.
+    // Local sessions (no compute_name) or providers that don't override get
+    // the plain `tmux attach -t <name>`.
+    let command = "";
+    let displayHint = "Paste this into a terminal on the host running ark:";
+    if (session.compute_name) {
+      const compute = await app.computes.get(session.compute_name);
+      if (compute) {
+        const provider = app.getProvider(compute.provider);
+        try {
+          const parts = provider?.getAttachCommand?.(compute, session) ?? [];
+          if (parts.length > 0) {
+            command = parts.join(" ");
+            displayHint = "Paste this into a terminal to attach to the remote compute:";
+          }
+        } catch {
+          /* fall through to the local fallback */
+        }
+      }
+    }
+    if (!command) {
+      const { attachCommand } = await import("../../core/infra/tmux.js");
+      command = attachCommand(session.session_id);
+    }
+    return { command, displayHint, attachable: true };
+  });
+
   router.handle("worktree/diff", async (params) => {
     const { sessionId, base } = extract<{ sessionId: string; base?: string }>(params, ["sessionId"]);
     return app.sessionService.worktreeDiff(sessionId, { base });

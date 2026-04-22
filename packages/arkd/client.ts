@@ -23,6 +23,14 @@ import type {
   AgentStatusRes,
   AgentCaptureReq,
   AgentCaptureRes,
+  AgentAttachOpenReq,
+  AgentAttachOpenRes,
+  AgentAttachInputReq,
+  AgentAttachInputRes,
+  AgentAttachResizeReq,
+  AgentAttachResizeRes,
+  AgentAttachCloseReq,
+  AgentAttachCloseRes,
   MetricsRes,
   ProbePortsRes,
   HealthRes,
@@ -100,6 +108,42 @@ export class ArkdClient {
 
   async captureOutput(req: AgentCaptureReq): Promise<AgentCaptureRes> {
     return this.post("/agent/capture", req);
+  }
+
+  // ── Terminal attach (live) ───────────────────────────────────────────────
+
+  async attachOpen(req: AgentAttachOpenReq): Promise<AgentAttachOpenRes> {
+    return this.post("/agent/attach/open", req);
+  }
+
+  async attachInput(req: AgentAttachInputReq): Promise<AgentAttachInputRes> {
+    return this.post("/agent/attach/input", req);
+  }
+
+  async attachResize(req: AgentAttachResizeReq): Promise<AgentAttachResizeRes> {
+    return this.post("/agent/attach/resize", req);
+  }
+
+  async attachClose(req: AgentAttachCloseReq): Promise<AgentAttachCloseRes> {
+    return this.post("/agent/attach/close", req);
+  }
+
+  /**
+   * Open the chunked byte stream for an attach handle. Returns the raw
+   * `Response` so callers can pipe the body directly. The response stays
+   * open until the handle is closed or the server tears it down.
+   *
+   * Throws if the server returns a non-2xx.
+   */
+  async attachStream(streamHandle: string): Promise<Response> {
+    const resp = await fetch(`${this.baseUrl}/agent/attach/stream?handle=${encodeURIComponent(streamHandle)}`, {
+      headers: this.authHeaders(),
+    });
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => "");
+      throw new ArkdClientError(`arkd /agent/attach/stream: ${body || resp.statusText}`, undefined, resp.status);
+    }
+    return resp;
   }
 
   // ── System ────────────────────────────────────────────────────────────────

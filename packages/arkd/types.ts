@@ -110,6 +110,65 @@ export interface AgentCaptureRes {
   output: string;
 }
 
+// ── Terminal attach (live) ──────────────────────────────────────────────────
+
+/**
+ * Open a live terminal stream for a tmux session. The response includes a
+ * streamHandle used to correlate subsequent Input/Resize/Close calls and an
+ * initial capture of the pane so the UI can render something before live
+ * output begins streaming.
+ */
+export interface AgentAttachOpenReq {
+  sessionName: string;
+}
+export interface AgentAttachOpenRes {
+  ok: boolean;
+  streamHandle: string;
+  initialBuffer: string;
+}
+
+/** Send input keystrokes to a tmux session. Uses `send-keys -l` so escape sequences pass through literally. */
+export interface AgentAttachInputReq {
+  sessionName: string;
+  data: string;
+}
+export interface AgentAttachInputRes {
+  ok: boolean;
+}
+
+/** Resize the tmux window to the given cols/rows. */
+export interface AgentAttachResizeReq {
+  sessionName: string;
+  cols: number;
+  rows: number;
+}
+export interface AgentAttachResizeRes {
+  ok: boolean;
+}
+
+/** Close a previously opened terminal stream. */
+export interface AgentAttachCloseReq {
+  streamHandle: string;
+}
+export interface AgentAttachCloseRes {
+  ok: boolean;
+}
+
+/**
+ * Stream live pane bytes for an open attach handle. Served as an HTTP chunked
+ * response -- bytes from `tmux pipe-pane` are piped to the response body as
+ * they arrive. The stream closes when the handle is closed via
+ * /agent/attach/close, when the tmux session ends, or when the client
+ * disconnects.
+ *
+ * The endpoint lives on the same arkd instance that owns the tmux session;
+ * the server daemon's /terminal/:sessionId WS proxy relays bytes from this
+ * stream back to the browser.
+ */
+export interface AgentAttachStreamReq {
+  streamHandle: string;
+}
+
 // ── System ──────────────────────────────────────────────────────────────────
 
 export interface MetricsRes {

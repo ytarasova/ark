@@ -8,9 +8,12 @@
  * Non-RPC endpoints:
  *   - GET  /api/health          Lightweight health probe (no auth, no DB)
  *   - GET  /api/events/stream   SSE for live session updates
- *   - WS   /api/terminal?session=<id>  WebSocket terminal bridge (xterm.js)
  *   - POST /api/webhooks/...    GitHub issue webhooks
  *   - GET  /*                   Static file serving (SPA)
+ *
+ * Live terminal attach for the Web UI runs on the server daemon's
+ * `/terminal/:sessionId` WS route (port 19400), proxied through arkd's
+ * `/agent/attach/*` endpoints. See packages/server/index.ts.
  */
 
 import { readFileSync, existsSync } from "fs";
@@ -31,12 +34,6 @@ import { type SSEBus, createSSEBus } from "./sse-bus.js";
 import { extractTenantContext, canWrite, type AuthConfig } from "../auth/index.js";
 import type { TenantContext } from "../../types/index.js";
 import { resolveWebDist } from "../install-paths.js";
-import {
-  startTerminalBridge,
-  handleTerminalInput,
-  cleanupTerminalBridge,
-  sanitizeSessionName,
-} from "./terminal-bridge.js";
 import { VERSION } from "../version.js";
 import { createHmac, timingSafeEqual } from "crypto";
 import { logInfo, logDebug } from "../observability/structured-log.js";
@@ -232,7 +229,7 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
   // ── Server ───────────────────────────────────────────────────────────────
   const server = Bun.serve({
     port,
-    async fetch(req, server) {
+    async fetch(req, _server) {
       const url = new URL(req.url);
 
       // CORS preflight
@@ -279,25 +276,9 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
       // Determine which app context to use for this request
       const requestApp = tenantCtx && tenantCtx.tenantId !== "default" ? app.forTenant(tenantCtx.tenantId) : app;
 
-      // WebSocket terminal bridge
-      if (url.pathname === "/api/terminal") {
-        if (readOnly) return new Response("Read-only mode", { status: 403 });
-        const sessionId = url.searchParams.get("session");
-        if (!sessionId) return new Response("Missing session param", { status: 400 });
-        // Sanitize sessionId to prevent command injection in tmux/script commands
-        try {
-          sanitizeSessionName(sessionId);
-        } catch {
-          return new Response("Invalid session ID", { status: 400 });
-        }
-        // Validate session exists
-        const session = await requestApp.sessions.get(sessionId);
-        if (!session) return new Response("Session not found", { status: 404 });
-        const tmuxName = `ark-${sessionId}`;
-        const upgraded = server.upgrade(req, { data: { sessionId, tmuxName } } as any);
-        if (upgraded) return undefined as any;
-        return new Response("WebSocket upgrade failed", { status: 500 });
-      }
+      // Live terminal attach moved to the server daemon's /terminal/:sessionId
+      // WS route (port 19400). The hosted web server no longer bridges a raw
+      // PTY; see packages/server/index.ts for the arkd-backed implementation.
 
       // SSE endpoint
       if (url.pathname === "/api/events/stream") {
@@ -460,33 +441,6 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
       }
 
       return new Response("Not Found", { status: 404, headers: CORS });
-    },
-    websocket: {
-      open(ws) {
-        const { sessionId, tmuxName } = ws.data as { sessionId: string; tmuxName: string };
-        const bridge = startTerminalBridge(ws, tmuxName, {
-          sessionId,
-          onGeometry: (id, cols, rows) => {
-            try {
-              app.sessions.update(id, { pty_cols: cols, pty_rows: rows });
-            } catch (e: any) {
-              logDebug("web", `pty_cols/rows persist failed for ${id}: ${e?.message ?? e}`);
-            }
-          },
-        });
-        if (bridge) {
-          ws.send(JSON.stringify({ type: "connected", sessionId }));
-        } else {
-          ws.send(JSON.stringify({ type: "error", message: "tmux session not found" }));
-          ws.close();
-        }
-      },
-      message(ws, data) {
-        handleTerminalInput(ws, data as any);
-      },
-      close(ws) {
-        cleanupTerminalBridge(ws);
-      },
     },
   });
 

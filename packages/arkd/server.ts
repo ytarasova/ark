@@ -34,6 +34,7 @@ import { handleAgentRoutes } from "./routes/agent.js";
 import { handleMetricsSnapshotRoutes } from "./routes/metrics-snapshot.js";
 import { handleChannelRoutes } from "./routes/channel.js";
 import { handleMiscRoutes } from "./routes/misc.js";
+import { handleAttachRoutes } from "./routes/attach.js";
 
 declare const Bun: BunLike;
 
@@ -155,14 +156,11 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
   const server = Bun.serve({
     port,
     hostname: bindHost,
-    // /snapshot shells out to `top -l 1`, `vm_stat`, `df`, `uptime`,
-    // `ps aux`, `tmux list-sessions`, and `docker stats --no-stream`; on a
-    // loaded macOS host these routinely stack past the Bun default 10s and
-    // trip `request timed out after 10 seconds`. The handler itself runs
-    // with its own timeouts (spawns bounded to a few seconds each), so a
-    // generous idle cap just lets the HTTP round-trip complete. 60s covers
-    // a cold laptop without masking a genuinely hung collector.
-    idleTimeout: 60,
+    // Long-lived streams (e.g. /agent/attach/stream) stay open indefinitely
+    // until the client disconnects. `idleTimeout: 0` disables Bun's default
+    // 10s cap, which also covers slow `/snapshot` calls on loaded macOS
+    // hosts where top + vm_stat + tmux + docker-stats stack past 10s.
+    idleTimeout: 0,
     async fetch(req) {
       const url = new URL(req.url);
       const path = url.pathname;
@@ -192,6 +190,11 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
 
         const execRes = await handleExecRoutes(req, path, ctx);
         if (execRes) return execRes;
+
+        // Attach routes must come before the generic agent routes so
+        // `/agent/attach/*` paths hit the live-attach handler first.
+        const attachRes = await handleAttachRoutes(req, path);
+        if (attachRes) return attachRes;
 
         const agentRes = await handleAgentRoutes(req, path, ctx);
         if (agentRes) return agentRes;

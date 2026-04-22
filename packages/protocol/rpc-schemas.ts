@@ -288,6 +288,24 @@ export type SessionRestoreRequest = z.infer<typeof sessionRestoreRequest>;
 export const sessionRestoreResponse = sessionOpResult;
 export type SessionRestoreResponse = z.infer<typeof sessionRestoreResponse>;
 
+// ── session/attach-command ──────────────────────────────────────────────────
+
+/**
+ * Returns the CLI command a user should run to attach to a session's tmux
+ * pane. Also flags whether the session is actually attachable: completed,
+ * failed, and not-yet-dispatched sessions have no tmux pane to attach to.
+ */
+export const sessionAttachCommandRequest = sessionIdParams;
+export type SessionAttachCommandRequest = z.infer<typeof sessionAttachCommandRequest>;
+
+export const sessionAttachCommandResponse = z.object({
+  command: z.string(),
+  displayHint: z.string(),
+  attachable: z.boolean(),
+  reason: z.string().optional(),
+});
+export type SessionAttachCommandResponse = z.infer<typeof sessionAttachCommandResponse>;
+
 // ── compute/list ────────────────────────────────────────────────────────────
 
 export const computeListRequest = z
@@ -1734,6 +1752,7 @@ export const rpcMethodSchemas: Record<string, RpcMethodSchemas> = {
   "session/advance": { request: sessionAdvanceRequest, response: sessionAdvanceResponse },
   "session/archive": { request: sessionArchiveRequest, response: sessionArchiveResponse },
   "session/restore": { request: sessionRestoreRequest, response: sessionRestoreResponse },
+  "session/attach-command": { request: sessionAttachCommandRequest, response: sessionAttachCommandResponse },
   "compute/list": { request: computeListRequest, response: computeListResponse },
   "compute/create": { request: computeCreateRequest, response: computeCreateResponse },
   "compute/read": { request: computeReadRequest, response: computeReadResponse },

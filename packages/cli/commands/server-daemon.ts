@@ -162,7 +162,7 @@ export function registerServerDaemonCommands(serverCmd: Command) {
       server.attachLifecycle(app);
       server.attachAuth(app);
 
-      const ws = server.startWebSocket(port);
+      const ws = server.startWebSocket(port, { app });
 
       writePidFile({ pid: process.pid, port, startedAt: new Date().toISOString() });
 

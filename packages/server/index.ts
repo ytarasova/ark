@@ -8,6 +8,8 @@ import {
   type TenantContext,
   type MaterializeOptions,
 } from "../core/auth/context.js";
+import { ArkdClient } from "../arkd/client.js";
+import { DEFAULT_ARKD_URL } from "../core/constants.js";
 
 export interface ServerConnection {
   id: string;
@@ -167,8 +169,22 @@ export class ArkServer {
   }
 
   /** Start WebSocket server on a port. Returns stop function. */
-  startWebSocket(port: number): { stop(): void } {
+  startWebSocket(port: number, opts?: { app?: import("../core/app.js").AppContext }): { stop(): void } {
     const self = this;
+    const app = opts?.app ?? null;
+    type TerminalData = {
+      kind: "terminal";
+      sessionId: string;
+      tmuxName: string;
+      authorizationHeader: string | null;
+      queryToken: string | null;
+    };
+    type RpcData = {
+      kind: "rpc";
+      authorizationHeader: string | null;
+      queryToken: string | null;
+    };
+    type WsData = RpcData | TerminalData;
     const wsMetadata = new WeakMap<
       object,
       {
@@ -178,16 +194,59 @@ export class ArkServer {
         queryToken: string | null;
       }
     >();
-    // Capture upgrade-time credentials via Bun's `data` channel on upgrade().
-    type WsData = { authorizationHeader: string | null; queryToken: string | null };
+    const terminalMetadata = new WeakMap<
+      object,
+      {
+        sessionId: string;
+        tmuxName: string;
+        streamHandle: string | null;
+        arkdClient: ArkdClient | null;
+        streamAbort: AbortController | null;
+      }
+    >();
     const server = Bun.serve<WsData, never>({
       port,
       hostname: "127.0.0.1",
-      fetch(req, server) {
+      async fetch(req, server) {
         const url = new URL(req.url, `http://localhost`);
         const authorizationHeader = req.headers.get("authorization");
         const queryToken = url.searchParams.get("token");
-        const data: WsData = { authorizationHeader, queryToken };
+
+        // /terminal/:sessionId -- dedicated terminal-attach WS route.
+        const terminalMatch = url.pathname.match(/^\/terminal\/([A-Za-z0-9_-]+)\/?$/);
+        if (terminalMatch) {
+          const sessionId = terminalMatch[1]!;
+          // Validate tenant ownership + attachability before upgrading. Without
+          // this, a caller who can reach the WS port can attach to any tmux
+          // pane on the host. We fail fast with an HTTP error so the client
+          // can surface a useful message rather than a bare close code.
+          if (!app) {
+            return new Response("Terminal route requires AppContext", { status: 503 });
+          }
+          const session = await app.sessions.get(sessionId);
+          if (!session) {
+            return new Response("Session not found", { status: 404 });
+          }
+          if (!session.session_id) {
+            return new Response("Session has no live tmux pane", { status: 409 });
+          }
+          // `session_id` was pre-validated by the tmux subsystem when the
+          // session was launched, but belt-and-braces check here too.
+          if (!/^[A-Za-z0-9_-]{1,64}$/.test(session.session_id)) {
+            return new Response("Invalid session name", { status: 400 });
+          }
+          const data: TerminalData = {
+            kind: "terminal",
+            sessionId,
+            tmuxName: session.session_id,
+            authorizationHeader,
+            queryToken,
+          };
+          if (server.upgrade(req, { data })) return;
+          return new Response("WebSocket upgrade failed", { status: 500 });
+        }
+
+        const data: RpcData = { kind: "rpc", authorizationHeader, queryToken };
         if (server.upgrade(req, { data })) return;
         if (url.pathname === "/health") {
           return Response.json({ status: "ok", pid: process.pid, uptime: process.uptime() });
@@ -195,13 +254,36 @@ export class ArkServer {
         return new Response("Ark Server -- connect via WebSocket", { status: 200 });
       },
       websocket: {
-        open(ws) {
+        async open(ws) {
+          const upgradeData = (ws.data ?? {}) as WsData;
+
+          // ── Terminal-attach route ────────────────────────────────────────
+          if (upgradeData.kind === "terminal") {
+            const { sessionId, tmuxName } = upgradeData;
+            terminalMetadata.set(ws, {
+              sessionId,
+              tmuxName,
+              streamHandle: null,
+              arkdClient: null,
+              streamAbort: null,
+            });
+            try {
+              if (!app) throw new Error("terminal route requires AppContext");
+              await self.startTerminalBridgeArkd(app, ws, sessionId, tmuxName, terminalMetadata);
+            } catch (err: any) {
+              ws.send(JSON.stringify({ type: "error", message: err?.message ?? "attach failed" }));
+              try {
+                ws.close();
+              } catch {
+                /* already closed */
+              }
+            }
+            return;
+          }
+
+          // ── JSON-RPC route (existing) ────────────────────────────────────
           const connId = `ws-${++self.connCounter}`;
           const handlers: ((msg: JsonRpcMessage) => void)[] = [];
-          const upgradeData = (ws.data ?? {}) as {
-            authorizationHeader?: string | null;
-            queryToken?: string | null;
-          };
           const authorizationHeader = upgradeData.authorizationHeader ?? null;
           const queryToken = upgradeData.queryToken ?? null;
 
@@ -240,7 +322,14 @@ export class ArkServer {
             }
           });
         },
-        message(ws, data) {
+        async message(ws, data) {
+          const upgradeData = (ws.data ?? {}) as WsData;
+
+          if (upgradeData.kind === "terminal") {
+            await self.handleTerminalMessage(ws, data, terminalMetadata);
+            return;
+          }
+
           try {
             const msg = parseMessage(
               typeof data === "string" ? data : new TextDecoder().decode(data as unknown as ArrayBuffer),
@@ -252,6 +341,27 @@ export class ArkServer {
           }
         },
         close(ws) {
+          const upgradeData = (ws.data ?? {}) as WsData;
+          if (upgradeData.kind === "terminal") {
+            const meta = terminalMetadata.get(ws);
+            if (meta) {
+              // Abort the outbound stream first so the read loop exits, then
+              // fire-and-forget the remote close call. Swallow errors so
+              // browsers reloading the page don't spam the daemon logs.
+              try {
+                meta.streamAbort?.abort();
+              } catch {
+                /* ignore */
+              }
+              if (meta.arkdClient && meta.streamHandle) {
+                meta.arkdClient
+                  .attachClose({ streamHandle: meta.streamHandle })
+                  .catch(() => logDebug("web", "arkd attachClose failed (session likely already gone)"));
+              }
+            }
+            terminalMetadata.delete(ws);
+            return;
+          }
           const meta = wsMetadata.get(ws);
           if (meta) self.connections.delete(meta.connId);
         },
@@ -260,6 +370,201 @@ export class ArkServer {
 
     return { stop: () => server.stop() };
   }
+
+  /**
+   * Arkd-backed terminal bridge. Resolves the session's compute, gets the
+   * arkd URL via `provider.getArkdUrl(compute)`, opens an attach handle via
+   * `/agent/attach/open`, streams pane bytes back via `/agent/attach/stream`
+   * (HTTP chunked), and forwards keystrokes / resizes via `/agent/attach/
+   * input` and `/agent/attach/resize`. On WS close, `/agent/attach/close`
+   * tears the fifo + pipe-pane down.
+   *
+   * Works uniformly for local, ec2, k8s, firecracker -- any provider with a
+   * running arkd. Sessions backed by the legacy non-arkd LocalProvider fall
+   * back to DEFAULT_ARKD_URL (the local daemon on :19300) since that's where
+   * the tmux pane lives in single-host mode.
+   */
+  private async startTerminalBridgeArkd(
+    app: import("../core/app.js").AppContext,
+    ws: import("bun").ServerWebSocket<unknown>,
+    sessionId: string,
+    tmuxName: string,
+    metadata: WeakMap<
+      object,
+      {
+        sessionId: string;
+        tmuxName: string;
+        streamHandle: string | null;
+        arkdClient: ArkdClient | null;
+        streamAbort: AbortController | null;
+      }
+    >,
+  ): Promise<void> {
+    // Resolve the session + compute + provider, then the arkd URL.
+    const session = await app.sessions.get(sessionId);
+    if (!session) throw new Error("session not found");
+
+    const { arkdUrl, token } = await resolveArkdForSession(app, session);
+    const arkdClient = new ArkdClient(arkdUrl, token ? { token } : undefined);
+
+    // Open the attach handle. arkd returns the initial capture + a stream
+    // handle we then pipe into the WebSocket as binary frames.
+    const opened = await arkdClient.attachOpen({ sessionName: tmuxName });
+    if (!opened.ok) throw new Error("arkd refused attachOpen");
+
+    const meta = metadata.get(ws);
+    if (meta) {
+      meta.streamHandle = opened.streamHandle;
+      meta.arkdClient = arkdClient;
+    }
+
+    // Tell the browser we're live and hand it the initial pane paint.
+    ws.send(
+      JSON.stringify({
+        type: "connected",
+        sessionId,
+        streamHandle: opened.streamHandle,
+        initialBuffer: opened.initialBuffer,
+      }),
+    );
+
+    // Pipe the chunked byte stream to the WebSocket. AbortController lets
+    // the close handler tear this down cleanly.
+    const abort = new AbortController();
+    if (meta) meta.streamAbort = abort;
+
+    (async () => {
+      let streamResp: Response | null = null;
+      try {
+        streamResp = await fetch(`${arkdUrl}/agent/attach/stream?handle=${encodeURIComponent(opened.streamHandle)}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          signal: abort.signal,
+        });
+        if (!streamResp.ok || !streamResp.body) {
+          throw new Error(`arkd stream returned ${streamResp.status}`);
+        }
+        const reader = streamResp.body.getReader();
+        while (!abort.signal.aborted) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (value && value.byteLength > 0) {
+            try {
+              ws.sendBinary(value);
+            } catch {
+              break;
+            }
+          }
+        }
+      } catch (err: any) {
+        if (!abort.signal.aborted) {
+          logDebug("web", `arkd attach stream error: ${err?.message ?? err}`);
+        }
+      } finally {
+        try {
+          ws.send(JSON.stringify({ type: "disconnected" }));
+        } catch {
+          /* already closed */
+        }
+        try {
+          ws.close();
+        } catch {
+          /* already closed */
+        }
+      }
+    })();
+  }
+
+  /**
+   * Dispatch an incoming terminal-WS message to the arkd attach endpoints.
+   * JSON text messages drive resize; binary / raw text drives input.
+   */
+  private async handleTerminalMessage(
+    ws: import("bun").ServerWebSocket<unknown>,
+    data: string | Buffer | ArrayBuffer | Uint8Array,
+    metadata: WeakMap<
+      object,
+      {
+        sessionId: string;
+        tmuxName: string;
+        streamHandle: string | null;
+        arkdClient: ArkdClient | null;
+        streamAbort: AbortController | null;
+      }
+    >,
+  ): Promise<void> {
+    const meta = metadata.get(ws);
+    if (!meta || !meta.arkdClient) return;
+    const { arkdClient, tmuxName } = meta;
+
+    // JSON envelope handling.
+    if (typeof data === "string") {
+      try {
+        const msg = JSON.parse(data);
+        if (msg?.type === "resize" && Number.isFinite(msg.cols) && Number.isFinite(msg.rows)) {
+          const cols = Math.max(1, Math.min(1000, Math.trunc(msg.cols)));
+          const rows = Math.max(1, Math.min(1000, Math.trunc(msg.rows)));
+          await arkdClient.attachResize({ sessionName: tmuxName, cols, rows }).catch((err) => {
+            logDebug("web", `arkd attachResize failed: ${err?.message ?? err}`);
+          });
+          return;
+        }
+        if (msg?.type === "input" && typeof msg.data === "string") {
+          await arkdClient.attachInput({ sessionName: tmuxName, data: msg.data }).catch((err) => {
+            logDebug("web", `arkd attachInput failed: ${err?.message ?? err}`);
+          });
+          return;
+        }
+      } catch {
+        // Fall through to raw-text input.
+      }
+      await arkdClient.attachInput({ sessionName: tmuxName, data }).catch((err) => {
+        logDebug("web", `arkd attachInput failed: ${err?.message ?? err}`);
+      });
+      return;
+    }
+
+    // Binary input: decode to utf-8 and send via send-keys -l (literal).
+    const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : (data as Uint8Array);
+    const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+    await arkdClient.attachInput({ sessionName: tmuxName, data: text }).catch((err) => {
+      logDebug("web", `arkd attachInput failed: ${err?.message ?? err}`);
+    });
+  }
+}
+
+/**
+ * Resolve the arkd URL (+ auth token if the provider supplies one) for a
+ * session. For modern providers with `getArkdUrl`, we use the provider's
+ * URL. Legacy local sessions fall back to ARK_ARKD_URL / the compiled-in
+ * default since the tmux pane lives on the same host as the daemon. Token
+ * plumbing: arkd is configured with a shared token at boot (ARK_ARKD_TOKEN);
+ * we forward the daemon's own env to remote arkd instances.
+ *
+ * The env var is re-read on every call (instead of using the imported
+ * DEFAULT_ARKD_URL constant) so tests that boot a local arkd on a random
+ * port can point the bridge at it without module-cache gymnastics.
+ */
+async function resolveArkdForSession(
+  app: import("../core/app.js").AppContext,
+  session: { compute_name?: string | null },
+): Promise<{ arkdUrl: string; token: string | null }> {
+  const token = process.env.ARK_ARKD_TOKEN ?? null;
+  const fallback = process.env.ARK_ARKD_URL || DEFAULT_ARKD_URL;
+
+  if (!session.compute_name) {
+    return { arkdUrl: fallback, token };
+  }
+  const compute = await app.computes.get(session.compute_name);
+  if (!compute) return { arkdUrl: fallback, token };
+  const provider = app.getProvider(compute.provider);
+  if (provider?.getArkdUrl) {
+    try {
+      return { arkdUrl: provider.getArkdUrl(compute), token };
+    } catch (err: any) {
+      logDebug("web", `provider.getArkdUrl threw: ${err?.message ?? err}; falling back to default`);
+    }
+  }
+  return { arkdUrl: fallback, token };
 }
 
 export { Router } from "./router.js";
