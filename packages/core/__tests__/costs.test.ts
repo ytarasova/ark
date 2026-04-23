@@ -1,10 +1,16 @@
 import { describe, it, expect } from "bun:test";
 import { calculateCost, formatCost, getSessionCost, getAllSessionCosts, checkBudget } from "../observability/costs.js";
-import type { TokenUsage } from "../observability/pricing.js";
+import { PricingRegistry, type TokenUsage } from "../observability/pricing.js";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";
 
 withTestContext();
+
+// Local registry used for the pure calculateCost() tests. Exercising the
+// standalone function no longer leans on a module-level singleton -- callers
+// pass the pricing registry through explicitly (the DI container wires the
+// same thing into the `pricing` singleton used by service code).
+const pricing = new PricingRegistry();
 
 // Helper: record usage for a session the same way the dispatch flow would
 function recordUsage(sessionId: string, model: string, u: Partial<TokenUsage>): void {
@@ -29,7 +35,7 @@ describe("calculateCost", () => {
       cache_read_tokens: 500_000,
       cache_write_tokens: 200_000,
     };
-    const cost = calculateCost(usage, "sonnet");
+    const cost = calculateCost(pricing, usage, "sonnet");
     // input: 1M * 3/1M = 3.00, output: 100K * 15/1M = 1.50
     // cacheRead: 500K * 0.30/1M = 0.15, cacheWrite: 200K * 3.75/1M = 0.75
     // Total: 5.40
@@ -43,20 +49,20 @@ describe("calculateCost", () => {
       cache_read_tokens: 0,
       cache_write_tokens: 0,
     };
-    const cost = calculateCost(usage, "opus");
+    const cost = calculateCost(pricing, usage, "opus");
     expect(cost).toBeCloseTo(2.25, 2);
   });
 
   it("calculates haiku cost correctly", () => {
     const usage: TokenUsage = { input_tokens: 1_000_000, output_tokens: 0 };
-    const cost = calculateCost(usage, "haiku");
+    const cost = calculateCost(pricing, usage, "haiku");
     expect(cost).toBeCloseTo(0.8, 2);
   });
 
   it("defaults to sonnet for unknown model", () => {
     const usage: TokenUsage = { input_tokens: 1_000_000, output_tokens: 0 };
-    expect(calculateCost(usage, "unknown")).toBeCloseTo(3.0, 2);
-    expect(calculateCost(usage, null)).toBeCloseTo(3.0, 2);
+    expect(calculateCost(pricing, usage, "unknown")).toBeCloseTo(3.0, 2);
+    expect(calculateCost(pricing, usage, null)).toBeCloseTo(3.0, 2);
   });
 });
 
@@ -112,7 +118,7 @@ describe("getAllSessionCosts", async () => {
 
 describe("calculateCost edge cases", () => {
   it("returns 0 for zero tokens", () => {
-    expect(calculateCost({ input_tokens: 0, output_tokens: 0 }, "opus")).toBe(0);
+    expect(calculateCost(pricing, { input_tokens: 0, output_tokens: 0 }, "opus")).toBe(0);
   });
 
   it("handles cache-only usage", () => {
@@ -122,14 +128,14 @@ describe("calculateCost edge cases", () => {
       cache_read_tokens: 1_000_000,
       cache_write_tokens: 500_000,
     };
-    const cost = calculateCost(usage, "sonnet");
+    const cost = calculateCost(pricing, usage, "sonnet");
     // cacheRead: 1M * 0.30/1M = 0.30, cacheWrite: 500K * 3.75/1M = 1.875
     expect(cost).toBeCloseTo(2.175, 2);
   });
 
   it("handles undefined model same as null", () => {
     const usage: TokenUsage = { input_tokens: 1_000_000, output_tokens: 0 };
-    expect(calculateCost(usage, undefined)).toBeCloseTo(calculateCost(usage, null), 10);
+    expect(calculateCost(pricing, usage, undefined)).toBeCloseTo(calculateCost(pricing, usage, null), 10);
   });
 });
 

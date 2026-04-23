@@ -45,6 +45,8 @@ import { SignalHandlers } from "../infra/signal-handlers.js";
 import { StaleStateDetector } from "../infra/stale-state-detector.js";
 import { SessionDrain } from "../infra/session-drain.js";
 import { StatusPollerRegistry } from "../executors/status-poller.js";
+import { TicketProviderRegistry } from "../tickets/registry.js";
+import { McpPool, registerMcpPool } from "../mcp-pool.js";
 
 /**
  * Register runtime singletons: pricing, usage recorder, transcript parsers,
@@ -224,6 +226,31 @@ export function registerRuntime(container: AppContainer): void {
         dispose: async (s) => {
           await s.stop();
         },
+      },
+    ),
+
+    // Ticket provider registry -- tenant-scoped Jira/GitHub/Linear bindings.
+    // Replaces the deleted module-level `_singleton` inside tickets/registry.ts.
+    ticketProviderRegistry: asFunction(() => new TicketProviderRegistry(), {
+      lifetime: Lifetime.SINGLETON,
+    }),
+
+    // MCP socket pool -- shares MCP server processes across sessions. Disposed
+    // via container.dispose() so every pooled child exits cleanly on shutdown.
+    // The socket directory is resolved from `config.dirs.ark` so concurrent
+    // ark processes don't collide on a shared /tmp path.
+    mcpPool: asFunction(
+      (c: { config: ArkConfig }) => {
+        const socketDir = join(c.config.arkDir, "mcp-sockets");
+        const pool = new McpPool(socketDir);
+        // Keep the back-compat `getMcpPool(socketDir)` cache in sync so older
+        // call sites share the container-managed instance.
+        registerMcpPool(socketDir, pool);
+        return pool;
+      },
+      {
+        lifetime: Lifetime.SINGLETON,
+        dispose: (pool: McpPool) => pool.stopAll(),
       },
     ),
 

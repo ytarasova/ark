@@ -57,6 +57,8 @@ import type { SessionDrain } from "./infra/session-drain.js";
 import type { WorkerRegistry } from "./hosted/worker-registry.js";
 import type { SessionScheduler } from "./hosted/scheduler.js";
 import type { TenantPolicyManager } from "./auth/index.js";
+import type { TicketProviderRegistry } from "./tickets/registry.js";
+import type { McpPool } from "./mcp-pool.js";
 
 /**
  * The cradle -- everything resolvable from the container.
@@ -157,6 +159,12 @@ export interface Cradle {
 
   // Status polling registry (per-AppContext; disposed on shutdown)
   statusPollers: StatusPollerRegistry;
+
+  // Ticket provider registry (tenant-scoped Jira/GitHub/Linear bindings)
+  ticketProviderRegistry: TicketProviderRegistry;
+
+  // MCP socket pool (shares MCP server processes across sessions)
+  mcpPool: McpPool;
 
   // Hosted-mode services (registered via setter; absent in local mode)
   workerRegistry?: WorkerRegistry;

@@ -12,16 +12,20 @@ import type { Session } from "../../types/index.js";
 import type { AppContext } from "../app.js";
 import { PricingRegistry } from "./pricing.js";
 
-// Shared registry instance for standalone function calls
-const _registry = new PricingRegistry();
-
 const DEFAULT_MODEL = "sonnet";
 
-/** Calculate cost in USD from token usage and model name. */
-export function calculateCost(usage: TokenUsage, model?: string | null): number {
+/**
+ * Calculate cost in USD from token usage and model name.
+ *
+ * Takes `pricing` explicitly (supplied via the DI container's `pricing`
+ * singleton) so tests can substitute a fresh registry and so the caller
+ * sees `refreshFromRemote()` updates the real container received at boot.
+ * Falls back to the default model when the supplied one is unknown.
+ */
+export function calculateCost(pricing: PricingRegistry, usage: TokenUsage, model?: string | null): number {
   const m = model ?? DEFAULT_MODEL;
-  const resolved = _registry.getPrice(m) ? m : DEFAULT_MODEL;
-  return _registry.calculateCost(resolved, usage);
+  const resolved = pricing.getPrice(m) ? m : DEFAULT_MODEL;
+  return pricing.calculateCost(resolved, usage);
 }
 
 /** Format cost as string: "$1.23" or "<$0.01" */

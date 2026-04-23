@@ -1,12 +1,10 @@
 import { type Command } from "commander";
 import chalk from "chalk";
 import { resolve } from "path";
-import { existsSync } from "fs";
 import { execSync } from "child_process";
 import * as core from "../../../core/index.js";
 import { getArkClient, getInProcessApp } from "../../app-client.js";
-import { sanitizeSummary } from "../../helpers.js";
-import { logDebug } from "../../../core/observability/structured-log.js";
+import { SessionStartService, SessionStartPlanError } from "../../services/session-start.js";
 
 export function registerStartCommands(session: Command) {
   session
@@ -75,161 +73,39 @@ export function registerStartCommands(session: Command) {
       }
 
       const ark = await getArkClient();
-      let workdir: string | undefined;
-      let repo = opts.repo;
-      if (repo) {
-        const rp = resolve(repo);
-        if (existsSync(rp)) {
-          workdir = rp;
-          repo = rp;
-        }
-      }
-
-      // Import from Claude session if specified
-      let claudeSessionId: string | undefined;
-      if (opts.claudeSession) {
-        const app = await getInProcessApp();
-        const cs = await core.getClaudeSession(app, opts.claudeSession);
-        if (!cs) {
-          console.log(
-            chalk.red(
-              `Claude session '${opts.claudeSession}' not found. Run 'ark claude list' to see available sessions.`,
-            ),
-          );
-          return;
-        }
-        claudeSessionId = cs.sessionId;
-        if (!opts.summary) opts.summary = cs.summary?.slice(0, 100) || `Imported from ${cs.sessionId.slice(0, 8)}`;
-        if (!repo) {
-          repo = cs.project;
-        }
-        if (!workdir) {
-          workdir = cs.project;
-        }
-        console.log(chalk.dim(`Importing Claude session ${cs.sessionId.slice(0, 8)} from ${cs.project}`));
-      }
-
-      // Load recipe defaults if specified (CLI flags override recipe values)
-      let recipeAgent: string | undefined;
-      if (opts.recipe) {
-        try {
-          const recipe = await ark.recipeRead(opts.recipe);
-          const instance = core.instantiateRecipe(recipe, {
-            ...(opts.summary ? { summary: opts.summary } : {}),
-            ...(opts.repo ? { repo: opts.repo } : {}),
-          });
-          if (!opts.summary && instance.summary) opts.summary = instance.summary;
-          if (!opts.summary) opts.summary = recipe.description;
-          if (!opts.flow || opts.flow === "default") opts.flow = instance.flow;
-          if (!opts.compute && instance.compute) opts.compute = instance.compute;
-          if (!opts.group && instance.group) opts.group = instance.group;
-          if (!repo && instance.repo) {
-            repo = instance.repo;
-          }
-          recipeAgent = instance.agent;
-          console.log(chalk.dim(`Using recipe '${recipe.name}' (${recipe._source})`));
-        } catch {
-          console.error(chalk.red(`Recipe not found: ${opts.recipe}`));
-          process.exit(1);
-        }
-      }
-
-      // Handle --runtime / --model: store overrides in session config
-      let sessionConfig: Record<string, unknown> | undefined;
-      if (opts.runtime) {
-        sessionConfig = { ...sessionConfig, runtime_override: opts.runtime };
-      }
-      if (opts.model) {
-        sessionConfig = { ...sessionConfig, model_override: opts.model };
-      }
-      if (typeof opts.maxBudget === "number" && Number.isFinite(opts.maxBudget)) {
-        sessionConfig = { ...sessionConfig, max_budget_usd: opts.maxBudget };
-      }
-
-      // Handle --remote-repo: use git URL as repo, no local path needed
-      if (opts.remoteRepo) {
-        if (!repo) {
-          // Extract repo name from git URL for display
-          const urlMatch = opts.remoteRepo.match(/\/([^/]+?)(?:\.git)?$/);
-          repo = urlMatch?.[1] ?? opts.remoteRepo;
-        }
-        sessionConfig = { ...sessionConfig, remoteRepo: opts.remoteRepo };
-        console.log(chalk.dim(`Remote repo: ${opts.remoteRepo}`));
-      }
-
-      // Sanitize session name: alphanumeric, dash, underscore only
-      const rawName = opts.summary ?? ticket ?? "";
-      const summary = sanitizeSummary(rawName);
-      if (summary !== rawName) console.log(`Note: session name sanitized to "${summary}"`);
-
-      // Collect generic session inputs (files + params) and validate against
-      // the flow's declared `inputs:` contract if present. Extra ad-hoc params
-      // are always allowed; only declared-required entries block dispatch.
-      const fileInputs: Record<string, string> = { ...(opts.file ?? {}) };
-      const paramInputs: Record<string, string> = { ...(opts.param ?? {}) };
-
-      try {
-        const flowDef = opts.flow ? await ark.flowRead(opts.flow) : null;
-        const declared = flowDef?.inputs;
-        if (declared) {
-          const missing: string[] = [];
-          for (const [role, def] of Object.entries(declared.files ?? {})) {
-            if (def?.required && !fileInputs[role]) missing.push(`--file ${role}=<path>`);
-          }
-          for (const [key, def] of Object.entries(declared.params ?? {})) {
-            if (def?.required && paramInputs[key] === undefined) {
-              if (def.default !== undefined) {
-                paramInputs[key] = def.default;
-              } else {
-                missing.push(`--param ${key}=<value>`);
-              }
-            } else if (paramInputs[key] === undefined && def?.default !== undefined) {
-              paramInputs[key] = def.default;
-            }
-            if (def?.pattern && paramInputs[key] !== undefined) {
-              const re = new RegExp(def.pattern);
-              if (!re.test(paramInputs[key])) {
-                console.error(chalk.red(`--param ${key}=${paramInputs[key]} does not match pattern ${def.pattern}`));
-                process.exit(1);
-              }
-            }
-          }
-          if (missing.length) {
-            console.error(chalk.red(`Flow '${opts.flow}' is missing required inputs:`));
-            for (const m of missing) console.error(`  ${m}`);
-            process.exit(1);
-          }
-        }
-      } catch {
-        logDebug("session", "flow/read may 404 for ad-hoc flows; fall through without validation.");
-      }
-
-      const inputs =
-        Object.keys(fileInputs).length || Object.keys(paramInputs).length
-          ? {
-              ...(Object.keys(fileInputs).length ? { files: fileInputs } : {}),
-              ...(Object.keys(paramInputs).length ? { params: paramInputs } : {}),
-            }
-          : undefined;
-
-      const s = await ark.sessionStart({
-        ticket,
-        summary,
-        repo,
-        ...(opts.branch ? { branch: opts.branch } : {}),
-        flow: opts.flow,
-        compute_name: opts.compute,
-        agent: recipeAgent,
-        workdir,
-        group_name: opts.group,
-        ...(sessionConfig ? { config: sessionConfig } : {}),
-        ...(inputs ? { inputs } : {}),
+      const planner = new SessionStartService({
+        client: {
+          recipeRead: (name) => ark.recipeRead(name),
+          flowRead: (name) => ark.flowRead(name),
+        },
+        getClaudeSession: async (id) => {
+          const app = await getInProcessApp();
+          return core.getClaudeSession(app, id);
+        },
       });
 
-      if (claudeSessionId) {
-        await ark.sessionUpdate(s.id, { claude_session_id: claudeSessionId });
+      let plan;
+      try {
+        plan = await planner.plan(ticket, opts);
+      } catch (err) {
+        if (err instanceof SessionStartPlanError) {
+          console.error(chalk.red(err.message));
+          process.exit(1);
+        }
+        throw err;
+      }
+
+      for (const note of plan.notes) {
+        if (note.kind === "warn") console.warn(chalk.yellow(note.message));
+        else console.log(chalk.dim(note.message));
+      }
+
+      const s = await ark.sessionStart(plan.request);
+
+      if (plan.claudeSessionId) {
+        await ark.sessionUpdate(s.id, { claude_session_id: plan.claudeSessionId });
         console.log(
-          chalk.dim(`  Bound to Claude session: ${claudeSessionId.slice(0, 8)} (will use --resume on dispatch)`),
+          chalk.dim(`  Bound to Claude session: ${plan.claudeSessionId.slice(0, 8)} (will use --resume on dispatch)`),
         );
       }
 
@@ -239,13 +115,13 @@ export function registerStartCommands(session: Command) {
       if (s.branch) console.log(`  Branch:   ${s.branch}`);
       console.log(`  Flow:     ${s.flow}`);
       console.log(`  Stage:    ${s.stage ?? "-"}`);
-      if (workdir) console.log(`  Workdir:  ${workdir}`);
+      if (plan.request.workdir) console.log(`  Workdir:  ${plan.request.workdir}`);
       if (opts.runtime) console.log(`  Runtime:  ${opts.runtime}`);
       if (opts.model) console.log(`  Model:    ${opts.model}`);
 
       // Server handler now dispatches the first-stage agent atomically. Re-read
       // the session so --attach picks up the now-populated session_id.
-      if (opts.attach) {
+      if (plan.attach) {
         const { session: ready } = await ark.sessionRead(s.id);
         if (ready?.session_id) {
           const attachCmd = core.attachCommand(ready.session_id);

@@ -152,17 +152,22 @@ export class TicketProviderRegistry {
   }
 }
 
-// ── Singleton helper (opt-in) ────────────────────────────────────────────────
+// ── Container-backed accessor (replaces the old module-level singleton) ─────
+//
+// Ticket registration is wired through the awilix container's
+// `ticketProviderRegistry` singleton (see `packages/core/di/runtime.ts`).
+// The former module-level `_singleton` is gone; back-compat callers pass
+// an AppContext and the accessor resolves from the container.
 
-let _singleton: TicketProviderRegistry | null = null;
+import type { AppContext } from "../app.js";
 
-/** Get (and lazily create) the process-wide registry. */
-export function getTicketProviderRegistry(): TicketProviderRegistry {
-  if (!_singleton) _singleton = new TicketProviderRegistry();
-  return _singleton;
-}
-
-/** Replace the singleton -- test-only. */
-export function setTicketProviderRegistry(reg: TicketProviderRegistry | null): void {
-  _singleton = reg;
+/**
+ * Resolve the process-wide registry from the DI container.
+ *
+ * Prefer `app.container.cradle.ticketProviderRegistry` at the call site if
+ * you already have it; this helper exists to keep older call sites working
+ * without plumbing the container every step of the way.
+ */
+export function getTicketProviderRegistry(app: AppContext): TicketProviderRegistry {
+  return app.container.cradle.ticketProviderRegistry;
 }

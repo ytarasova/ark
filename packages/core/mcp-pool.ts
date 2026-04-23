@@ -375,26 +375,47 @@ export function runMcpProxy(socketPath: string): void {
   });
 }
 
-// ── Singleton pool ──────────────────────────────────────────────────────
+// ── Pool accessor ───────────────────────────────────────────────────────
 //
-// One pool per process, keyed by its socket directory. Callers pass an
-// explicit dir so a hosted control-plane can isolate per-instance socket
-// filesystems. Dropping the arg-less `getMcpPool()` surface rules out the
-// /tmp hardcode that previously let concurrent ark processes on the same
-// host collide on socket filenames.
+// The McpPool used to be a module-level singleton cached by socket dir.
+// Its lifecycle now lives in the awilix container (see
+// `packages/core/di/runtime.ts#mcpPool`) so the pool is shared within an
+// AppContext and disposed along with it. A tiny cache keyed by socketDir
+// is kept for backwards compatibility with older call sites that resolve
+// the pool via socketDir alone (tests, `runMcpProxy`'s neighbours). New
+// code should resolve `app.container.cradle.mcpPool`.
 
-let _pool: McpPool | null = null;
+const _poolCache = new Map<string, McpPool>();
 
-/** Get or create the pool bound to `socketDir`. */
+/**
+ * Back-compat accessor -- returns the pool for the given socketDir,
+ * creating one if necessary. Prefer `app.container.cradle.mcpPool` in new
+ * code so lifecycle is container-managed.
+ */
 export function getMcpPool(socketDir: string): McpPool {
-  if (!_pool) _pool = new McpPool(socketDir);
-  return _pool;
+  let pool = _poolCache.get(socketDir);
+  if (!pool) {
+    pool = new McpPool(socketDir);
+    _poolCache.set(socketDir, pool);
+  }
+  return pool;
 }
 
-/** Destroy the global MCP pool. */
+/** Destroy every cached MCP pool. Safe to call multiple times. */
 export function destroyMcpPool(): void {
-  _pool?.stopAll();
-  _pool = null;
+  for (const p of _poolCache.values()) {
+    try {
+      p.stopAll();
+    } catch {
+      // pool may already be down
+    }
+  }
+  _poolCache.clear();
+}
+
+/** Register a pool created by DI into the back-compat cache. */
+export function registerMcpPool(socketDir: string, pool: McpPool): void {
+  _poolCache.set(socketDir, pool);
 }
 
 /** Discover existing pool sockets on disk in the given directory. */

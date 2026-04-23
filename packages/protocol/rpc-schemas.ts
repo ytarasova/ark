@@ -121,11 +121,77 @@ const computeSchema = z
 // are a dotted-key-safe k=v map. Both end up at `session.config.inputs` and
 // are reachable via `{inputs.files.<role>}` / `{inputs.params.<key>}`
 // through the shared template substitution pipeline.
+//
+// Shape validation only -- the "is this required key present?" contract is
+// flow-specific and lives in `validateSessionInputsAgainstFlow()` below,
+// called from the session/start handler after reading the flow definition.
 export const sessionInputsSchema = z.object({
-  files: z.record(z.string(), z.string()).optional(),
-  params: z.record(z.string(), z.string()).optional(),
+  files: z.record(z.string().min(1), z.string().min(1)).optional(),
+  params: z.record(z.string().min(1), z.string()).optional(),
 });
 export type SessionInputs = z.infer<typeof sessionInputsSchema>;
+
+/**
+ * Structural description of a declared flow input contract. Mirrors
+ * `types/flow.ts:FlowInputsSchema` but lives here so server handlers can
+ * validate without taking a dependency on the core flow store types.
+ */
+export interface DeclaredFlowInputs {
+  files?: Record<string, { required?: boolean; default?: string } | undefined>;
+  params?: Record<string, { required?: boolean; default?: string; pattern?: string } | undefined>;
+}
+
+/**
+ * Validate a session/start payload's `inputs` against a flow's declared
+ * contract. Applies declared defaults in place, checks required roles +
+ * keys, and validates regex patterns. Returns the list of human-readable
+ * problems (empty = success). Used server-side from the session/start
+ * handler; the CLI defers the "is this required?" question to the server.
+ */
+export function validateSessionInputsAgainstFlow(
+  payload: { inputs?: SessionInputs },
+  declared: DeclaredFlowInputs | null | undefined,
+): string[] {
+  const problems: string[] = [];
+  if (!declared) return problems;
+
+  const files: Record<string, string> = { ...(payload.inputs?.files ?? {}) };
+  const params: Record<string, string> = { ...(payload.inputs?.params ?? {}) };
+
+  for (const [role, def] of Object.entries(declared.files ?? {})) {
+    if (def?.required && !files[role]) problems.push(`missing required file input: ${role}`);
+  }
+  for (const [key, def] of Object.entries(declared.params ?? {})) {
+    if (params[key] === undefined) {
+      if (def?.default !== undefined) {
+        params[key] = def.default;
+      } else if (def?.required) {
+        problems.push(`missing required param input: ${key}`);
+        continue;
+      }
+    }
+    if (def?.pattern && params[key] !== undefined) {
+      let re: RegExp;
+      try {
+        re = new RegExp(def.pattern);
+      } catch {
+        problems.push(`param ${key} declared pattern is not a valid regex: ${def.pattern}`);
+        continue;
+      }
+      if (!re.test(params[key])) {
+        problems.push(`param ${key}=${params[key]} does not match pattern ${def.pattern}`);
+      }
+    }
+  }
+
+  // Apply defaults in place so the caller sees the fully-resolved inputs.
+  payload.inputs = {
+    ...(Object.keys(files).length ? { files } : {}),
+    ...(Object.keys(params).length ? { params } : {}),
+  };
+
+  return problems;
+}
 
 // ── input/upload ────────────────────────────────────────────────────────────
 // Persists bytes through the configured BlobStore (local disk or S3) and
