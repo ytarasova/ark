@@ -149,14 +149,6 @@ export class Conductor {
       );
     }
 
-    // Stuck session recovery -- check every 60 seconds for sessions stuck in
-    // "running" status whose agent process has exited.
-    const STUCK_POLL_INTERVAL_MS = 60_000;
-    this.timers.push(
-      setInterval(() => safeAsync("stuck session recovery", () => this.recoverStuckSessions()), STUCK_POLL_INTERVAL_MS),
-    );
-    safeAsync("stuck session recovery: initial", () => this.recoverStuckSessions());
-
     return {
       stop: () => this.stop(),
     };
@@ -730,19 +722,6 @@ export class Conductor {
     }
   }
 
-  // ── Stuck session recovery ───────────────────────────────────────────────
-
-  /**
-   * Recover sessions stuck in "running" status whose agent process has exited.
-   *
-   * This handles the case where:
-   * 1. Agent called report(completed) but arkd/conductor was down -- report lost
-   * 2. Status poller missed the exit (e.g. poller was stopped or conductor restarted)
-   * 3. Hook status (SessionEnd) was never delivered
-   */
-  private async recoverStuckSessions(): Promise<void> {
-    await recoverStuckSessions(this.app);
-  }
 }
 
 // ── Public entry points (thin wrappers over the Conductor class) ───────────
@@ -819,93 +798,6 @@ interface GitHubPRWebhookPayload {
     name?: string;
     owner?: { login?: string };
   };
-}
-
-// ── Stuck session recovery (module-level helper) ───────────────────────────
-
-/**
- * Recover sessions stuck in "running" status whose agent process has exited.
- * Exported so `Conductor.recoverStuckSessions` can stay a thin wrapper.
- */
-async function recoverStuckSessions(app: AppContext): Promise<void> {
-  const sessions = await app.sessions.list({ status: "running" });
-  const { getExecutor } = await import("../executor.js");
-  for (const s of sessions) {
-    if (!s.session_id) continue; // No agent handle -- skip
-
-    // Liveness check is delegated to the runtime's executor. Each executor
-    // knows what it actually launched (tmux pane, plain process, k8s pod, ...)
-    // and answers `running` only when the underlying agent is still alive.
-    // No conditional branching on runtime kind here.
-    const launchExecutor = (s.config as Record<string, unknown> | undefined)?.launch_executor as string | undefined;
-    const executor = launchExecutor ? getExecutor(launchExecutor) : undefined;
-    try {
-      const status = executor
-        ? await executor.status(s.session_id)
-        : await new ArkdClient("http://localhost:19300").agentStatus({ sessionName: s.session_id });
-      const isRunning = "running" in status ? status.running : status.state === "running";
-      if (isRunning) continue;
-    } catch {
-      continue;
-    }
-
-    logInfo("conductor", `recovering stuck session ${s.id} (agent ${s.session_id} exited)`);
-
-    let hasNewCommits = false;
-    if (s.workdir) {
-      try {
-        const { execFileSync } = await import("child_process");
-        const startSha = (s.config as any)?.stage_start_sha as string | undefined;
-        if (startSha) {
-          const headSha = execFileSync("git", ["rev-parse", "HEAD"], {
-            cwd: s.workdir,
-            encoding: "utf-8",
-            timeout: 5000,
-          }).trim();
-          hasNewCommits = headSha !== startSha;
-        } else {
-          const log = execFileSync("git", ["log", "--oneline", "origin/main..HEAD"], {
-            cwd: s.workdir,
-            encoding: "utf-8",
-            timeout: 5000,
-          }).trim();
-          hasNewCommits = !!log;
-        }
-      } catch {
-        hasNewCommits = true;
-      }
-    } else {
-      hasNewCommits = true;
-    }
-
-    if (hasNewCommits) {
-      await app.sessions.update(s.id, { status: "ready", error: null, session_id: null });
-      await app.events.log(s.id, "stuck_session_recovered", {
-        actor: "system",
-        stage: s.stage ?? undefined,
-        data: { action: "advance", reason: "agent exited with commits" },
-      });
-      try {
-        await app.sessionHooks.mediateStageHandoff(s.id, {
-          autoDispatch: true,
-          source: "stuck_recovery",
-        });
-      } catch (e: any) {
-        logError("conductor", `stuck recovery advance failed for ${s.id}: ${e?.message ?? e}`);
-      }
-    } else {
-      await app.sessions.update(s.id, {
-        status: "failed",
-        error: "Agent exited without committing any changes (recovered by conductor)",
-        session_id: null,
-      });
-      await app.events.log(s.id, "stuck_session_recovered", {
-        actor: "system",
-        stage: s.stage ?? undefined,
-        data: { action: "failed", reason: "agent exited without commits" },
-      });
-    }
-  }
 }
 
 // ── Report handling ─────────────────────────────────────────────────────────
