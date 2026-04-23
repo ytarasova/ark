@@ -28,26 +28,24 @@ export interface IconRailProps extends React.ComponentProps<"nav"> {
 }
 
 /**
- * Icon rail — rebuilt from `/tmp/ark-design-system/preview/app-chrome.html`.
+ * Icon rail -- rebuilt from `/tmp/ark-design-system/preview/chrome-sidebar.html`.
  *
- * Geometry:
- *   rail width       52px
- *   brand block      height 40px, logo 30x30 r7, primary fill, border
- *                    rgba(0,0,0,.25), shadow 0 1px 2px rgba(0,0,0,.25).
- *                    Live dot 6px at top-8/right-9, running-color, 2.5s glow.
- *   nav item         40x32 r7.   default fg-muted + svg opacity .75.
- *                    hover: fg + rgba(255,255,255,.04) bg.
- *                    active: fg + rgba(107,89,222,.12) bg + primary-color svg
- *                            + 0 0 0 1px rgba(107,89,222,.3) outline +
- *                            left-glow bar (2.5px × 16px).
- *   separator        28px × 1px, rgba(255,255,255,.05), my-4.
- *   settings row     32x28 r6.
- *   avatar           26x26 r99, primary fill, mono 10px initials.
- *   foot             18px, 9px mono-ui fg-faint, border-top 1/rgba255,04.
+ * Geometry (canonical per chrome-sidebar.html):
+ *   rail width       60px FIXED
+ *   brand block      36x36 r8, gradient-brand, mono 15px bold.
+ *                    Live dot 6px top-right, running-color, 2.5s glow.
+ *   nav item         36x36 r7. default fg-muted.
+ *                    hover: fg + bg-hover.
+ *                    active: fg + primary-subtle bg +
+ *                            left-glow bar (2px x (h-16px)).
+ *   separator        24px x 1px, var(--border), my-6.
+ *   icon glyph       18px, stroke 1.75, currentColor.
+ *   settings row     36x36 r7 (same as nav).
+ *   avatar           32x32 r99, amber->pink gradient, 12px mono initials,
+ *                    2px border bg-sidebar, presence dot 9px br.
+ *   foot             18px, 9px mono-ui fg-faint, border-top rgba255,04.
  *
- * Hover tooltips appear as 26px-tall pills to the right of each icon; the old
- * implementation relied on `<Tooltip>` from radix which added ms latency and
- * blocked the pixel-precise look. The preview uses native CSS positioning.
+ * Hover tooltips appear as pills to the right of each icon using native CSS.
  */
 function getDaemonDot(ds: DaemonStatus | null | undefined): {
   color: string;
@@ -98,9 +96,9 @@ export function IconRail({
   return (
     <nav
       className={cn(
-        "w-[52px] min-w-[52px] h-full",
+        "w-[60px] min-w-[60px] h-full",
         "bg-[var(--bg-sidebar)] border-r border-[var(--border)]",
-        "flex flex-col relative",
+        "flex flex-col items-center relative",
         className,
       )}
       aria-label="Main navigation"
@@ -108,27 +106,28 @@ export function IconRail({
     >
       {/* Brand block ----------------------------------------------------- */}
       {logo ?? (
-        <div className="relative h-[40px] flex items-center justify-center border-b border-[rgba(255,255,255,0.03)] drag-region">
+        <div className="relative w-full h-[56px] flex items-center justify-center drag-region shrink-0">
           <button
             type="button"
             data-testid="sidebar-brand"
             onClick={() => onSelect(items[0]?.id ?? "sessions")}
             aria-label="Home"
             className={cn(
-              "no-drag w-[30px] h-[30px] rounded-[7px] grid place-items-center cursor-pointer",
-              "bg-[var(--primary)] text-white",
-              "border border-[rgba(0,0,0,0.25)] shadow-[0_1px_2px_rgba(0,0,0,0.25)]",
-              "font-extrabold text-[14px] tracking-[-0.05em]",
+              "no-drag w-[36px] h-[36px] rounded-[8px] grid place-items-center cursor-pointer",
+              "bg-[var(--gradient-brand,var(--primary))] text-white",
+              "shadow-[0_2px_6px_rgba(107,89,222,0.4),inset_0_0_0_1px_rgba(255,255,255,0.1)]",
+              "font-bold text-[15px] font-[family-name:var(--font-mono-ui)]",
             )}
+            style={{ backgroundImage: "var(--gradient-brand)", backgroundColor: "var(--primary)" }}
           >
-            a
+            A
           </button>
           <span
             data-testid="daemon-status-dot"
             data-status={dot.status}
             title={dot.title}
             className={cn(
-              "absolute top-[8px] right-[9px] w-[6px] h-[6px] rounded-full",
+              "absolute top-[14px] right-[10px] w-[6px] h-[6px] rounded-full",
               dot.color,
               dot.glow,
               dot.status === "online" && "animate-[brandGlow_2.5s_ease-in-out_infinite]",
@@ -138,23 +137,26 @@ export function IconRail({
       )}
 
       {/* Nav items (scrollable) ------------------------------------------ */}
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden py-[6px] flex flex-col items-center gap-[2px] no-scrollbar">
+      <div className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden py-[4px] flex flex-col items-center gap-[4px] no-scrollbar">
         {items.map((item) => (
           <RailButton key={item.id} item={item} active={activeId === item.id} onSelect={onSelect} />
         ))}
       </div>
 
       {/* Settings + avatar (pinned bottom) -------------------------------- */}
-      <div className="flex flex-col items-center gap-[2px] py-[2px] border-t border-[rgba(255,255,255,0.04)] shrink-0">
-        {settingsItem && (
-          <RailButton item={settingsItem} active={activeId === settingsItem.id} onSelect={onSelect} settings />
-        )}
+      <div className="flex flex-col items-center gap-[4px] pb-[10px] pt-[6px] w-full border-t border-[rgba(255,255,255,0.04)] shrink-0">
+        {settingsItem && <RailButton item={settingsItem} active={activeId === settingsItem.id} onSelect={onSelect} />}
         {avatarInitials && (
           <div
-            className="w-[26px] h-[26px] my-[3px] rounded-full grid place-items-center border border-[rgba(0,0,0,0.25)] shadow-[0_1px_2px_rgba(0,0,0,0.2)] bg-[var(--primary)] text-white font-semibold text-[10px] font-[family-name:var(--font-mono-ui)]"
+            className="relative w-[32px] h-[32px] mt-[2px] rounded-full grid place-items-center border-[2px] border-[var(--bg-sidebar)] text-white font-semibold text-[12px] font-[family-name:var(--font-mono-ui)]"
+            style={{ backgroundImage: "linear-gradient(135deg, #f59e0b, #ec4899)" }}
             title={avatarInitials}
           >
             {avatarInitials}
+            <span
+              aria-hidden
+              className="absolute -bottom-[1px] -right-[1px] w-[9px] h-[9px] rounded-full bg-[var(--completed)] shadow-[0_0_0_2px_var(--bg-sidebar),0_0_4px_rgba(52,211,153,0.6)]"
+            />
           </div>
         )}
       </div>
@@ -189,12 +191,10 @@ function RailButton({
   item,
   active,
   onSelect,
-  settings,
 }: {
   item: IconRailItem;
   active: boolean;
   onSelect: (id: string) => void;
-  settings?: boolean;
 }) {
   return (
     <button
@@ -205,28 +205,23 @@ function RailButton({
       className={cn(
         "group relative flex items-center justify-center cursor-pointer",
         "bg-transparent border-0 text-[var(--fg-muted)] transition-colors duration-[120ms]",
-        settings ? "w-[32px] h-[28px] rounded-[6px]" : "w-[40px] h-[32px] rounded-[7px]",
-        "[&_svg]:w-[18px] [&_svg]:h-[18px] [&_svg]:opacity-[.75] [&_svg]:transition-opacity",
-        "hover:text-[var(--fg)] hover:bg-[rgba(255,255,255,0.04)] hover:[&_svg]:opacity-100",
-        active && [
-          "text-[var(--fg)]",
-          "bg-[rgba(107,89,222,0.12)]",
-          "shadow-[0_0_0_1px_rgba(107,89,222,0.3)]",
-          "[&_svg]:opacity-100 [&_svg]:!text-[var(--primary)]",
-        ],
+        "w-[36px] h-[36px] rounded-[7px]",
+        "[&_svg]:w-[18px] [&_svg]:h-[18px] [&_svg]:stroke-[1.75] [&_svg]:transition-colors",
+        "hover:text-[var(--fg)] hover:bg-[var(--bg-hover)]",
+        active && ["text-[var(--fg)]", "bg-[var(--primary-subtle)]"],
       )}
     >
       {active && (
         <span
           aria-hidden
-          className="absolute left-[-6px] top-[8px] bottom-[8px] w-[2.5px] rounded-r-[3px] bg-[var(--primary)] shadow-[0_0_6px_rgba(107,89,222,0.6)]"
+          className="absolute left-[-12px] top-[8px] bottom-[8px] w-[2px] rounded-r-[2px] bg-[var(--primary)] shadow-[0_0_6px_rgba(107,89,222,0.6)]"
         />
       )}
       {item.icon}
       {item.badge != null && item.badge > 0 && (
         <span
           aria-label={`${item.badge} unread`}
-          className="absolute top-[2px] right-[5px] min-w-[13px] h-[13px] px-[3px] rounded-full grid place-items-center bg-[var(--primary)] text-white text-[9px] font-semibold font-[family-name:var(--font-mono-ui)]"
+          className="absolute -top-[3px] -right-[4px] min-w-[15px] h-[15px] px-[4px] rounded-full grid place-items-center bg-[var(--primary)] text-white text-[9px] font-semibold font-[family-name:var(--font-mono-ui)] shadow-[0_0_0_2px_var(--bg-sidebar),0_1px_2px_rgba(0,0,0,0.4)]"
         >
           {item.badge > 99 ? "99+" : item.badge}
         </span>
