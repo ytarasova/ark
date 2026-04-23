@@ -28,6 +28,17 @@ export function sessionAsVars(session: Session): Record<string, unknown> {
   return rec;
 }
 
+/**
+ * Runtimes that mount the conductor's `ark-channel` MCP server, exposing the
+ * `report` tool. Today that's only the tmux-based claude runtime. The
+ * agent-sdk runtime signals progress/completion via SDK messages + hooks and
+ * does NOT have `report` -- telling it to call the tool yields hallucinated
+ * tool calls that fail.
+ */
+function runtimeHasReportTool(runtime: string | undefined): boolean {
+  return runtime === "claude" || runtime === "claude-max";
+}
+
 /** Build the task header: agent role, stage description, and reporting instructions. */
 export function formatTaskHeader(app: AppContext, session: Session, stage: string, agentName: string): string[] {
   const parts: string[] = [];
@@ -55,13 +66,27 @@ export function formatTaskHeader(app: AppContext, session: Session, stage: strin
     parts.push(`\nYou are the ${agentName} agent, running the '${stage}' stage.`);
   }
 
-  // Readiness + completion reporting
-  parts.push(
-    `\nWhen you start up, immediately call the \`report\` tool with type='progress' to announce you are online and ready for work.`,
-  );
-  parts.push(
-    `When you finish your work, call \`report\` with type='completed' and a concise summary of what you accomplished (files changed, tests added, key decisions). This summary is shown to the user in the dashboard.`,
-  );
+  // Runtime-scoped completion framing. Only runtimes that mount the conductor
+  // MCP (and thus expose the `report` tool) get the call-report instructions;
+  // agent-sdk signals status via SDK messages + hooks, so we tell it to just
+  // finish with a final assistant message. We look up the agent to find the
+  // effective runtime (accounting for --runtime overrides).
+  const projectRoot = agentRegistry.findProjectRoot(session.workdir || session.repo) ?? undefined;
+  const agent = app.agents.get(agentName, projectRoot);
+  const effectiveRuntime = session.runtime ?? agent?.runtime;
+
+  if (runtimeHasReportTool(effectiveRuntime)) {
+    parts.push(
+      `\nWhen you start up, immediately call the \`report\` tool with type='progress' to announce you are online and ready for work.`,
+    );
+    parts.push(
+      `When you finish your work, call \`report\` with type='completed' and a concise summary of what you accomplished (files changed, tests added, key decisions). This summary is shown to the user in the dashboard.`,
+    );
+  } else {
+    parts.push(
+      `\nWhen you finish, stop with a final assistant message that summarizes what you accomplished (files changed, tests added, key decisions). The UI picks up that summary automatically. Do not invent a "report" tool -- you don't have one.`,
+    );
+  }
 
   return parts;
 }
