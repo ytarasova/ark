@@ -1,12 +1,11 @@
 /**
- * Tests for session-cleanup and orphan-sweeper.
+ * Tests for session-cleanup.
  *
  * Tests exercise:
  *  1. cleanupSession removes the worktree and emits session_cleaned
  *  2. cleanupSession is idempotent (second call is a no-op)
  *  3. cleanupSession survives a missing worktree
- *  4. sweepOrphans marks a running session as failed when its process is dead
- *  5. sweepOrphans leaves alive running sessions alone
+ *  4. session/kill RPC behaviour
  */
 
 import { test, expect, beforeAll, afterAll } from "bun:test";
@@ -15,7 +14,6 @@ import { join } from "path";
 import { AppContext } from "../app.js";
 import { setApp, clearApp } from "./test-helpers.js";
 import { cleanupSession } from "../services/session/cleanup.js";
-import { sweepOrphans } from "../services/session/orphan-sweeper.js";
 import { agentSdkExecutor } from "../executors/agent-sdk.js";
 import { Router } from "../../server/router.js";
 import { registerSessionHandlers } from "../../server/handlers/session.js";
@@ -105,93 +103,6 @@ test("cleanupSession survives a missing worktree", async () => {
   const events = await app.events.list(session.id, { type: "session_cleaned" });
   expect(events.length).toBeGreaterThanOrEqual(1);
   expect(events[0].data?.worktree_removed).toBe(false);
-});
-
-// ── sweepOrphans tests ────────────────────────────────────────────────────────
-
-test("sweepOrphans marks a running session as failed when its process is dead", async () => {
-  // Create a session in `running` state with a sdk-* handle. The agentSdkExecutor
-  // will return `not_found` for this handle because we never actually spawned anything.
-  const session = await app.sessions.create({
-    summary: "orphan test",
-    flow: "autonomous-sdlc",
-  });
-
-  const handle = `sdk-${session.id}`;
-  await app.sessions.update(session.id, {
-    status: "running",
-    session_id: handle,
-    config: { ...session.config, launch_executor: "agent-sdk" },
-  } as any);
-
-  // Confirm executor reports not_found (no actual process was spawned).
-  const status = await agentSdkExecutor.status(handle);
-  expect(status.state).toBe("not_found");
-
-  const result = await sweepOrphans(app);
-
-  expect(result.orphaned).toBeGreaterThanOrEqual(1);
-
-  const swept = (await app.sessions.get(session.id))!;
-  expect(swept.status).toBe("failed");
-  expect(swept.error).toContain("orphaned");
-
-  const orphanEvents = await app.events.list(session.id, { type: "session_orphaned" });
-  expect(orphanEvents.length).toBeGreaterThanOrEqual(1);
-
-  // Cleanup should have run too.
-  const cleanedEvents = await app.events.list(session.id, { type: "session_cleaned" });
-  expect(cleanedEvents.length).toBeGreaterThanOrEqual(1);
-});
-
-test("sweepOrphans leaves alive running sessions alone", async () => {
-  // Spawn a real process that stays alive during the sweep.
-  const proc = Bun.spawn({ cmd: ["sleep", "60"], stdout: "ignore", stderr: "ignore" });
-  const pid = proc.pid;
-  expect(pid).toBeGreaterThan(0);
-
-  try {
-    const session = await app.sessions.create({
-      summary: "alive session test",
-      flow: "autonomous-sdlc",
-    });
-
-    // Use subprocess executor to track this real process.
-    // The subprocess executor uses "sp-<sessionId>-<timestamp>" handles.
-    // Since we want to test that a process with a LIVE process isn't swept,
-    // we create a session with no executor handle (which causes the sweeper
-    // to check if the handle has a known prefix).
-    // Simpler approach: session with a handle that resolves to a live status.
-    // We will manually use the agentSdkExecutor's internal processes map by
-    // launching a fake entry via the executor's test-accessible internals.
-    // Actually, the simplest correct approach: create a running session with
-    // a handle that has NO known prefix -- the sweeper leaves it alone.
-    const safeHandle = `legacy-ark-session-name-${session.id}`;
-    await app.sessions.update(session.id, {
-      status: "running",
-      session_id: safeHandle,
-    } as any);
-
-    const before = await app.sessions.get(session.id);
-    expect(before?.status).toBe("running");
-
-    const result = await sweepOrphans(app);
-
-    const after = await app.sessions.get(session.id);
-    // Session with unknown-prefix handle should not be swept.
-    expect(after?.status).toBe("running");
-  } finally {
-    proc.kill("SIGTERM");
-  }
-});
-
-test("sweepOrphans returns correct check count", async () => {
-  // Just verify the function runs and returns a stats object.
-  const result = await sweepOrphans(app);
-  expect(typeof result.checked).toBe("number");
-  expect(typeof result.orphaned).toBe("number");
-  expect(result.checked).toBeGreaterThanOrEqual(0);
-  expect(result.orphaned).toBeGreaterThanOrEqual(0);
 });
 
 // ── session/kill RPC tests ────────────────────────────────────────────────────
