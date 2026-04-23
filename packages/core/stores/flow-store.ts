@@ -25,6 +25,21 @@ export interface FlowStore {
   get(name: string): FlowDefinition | null;
   save(name: string, flow: FlowDefinition, scope?: "global" | "project"): void;
   delete(name: string, scope?: "global" | "project"): boolean;
+  /**
+   * Register an ephemeral in-memory flow definition by name. Only implemented
+   * by EphemeralFlowStore -- the file-backed store ignores this call (optional
+   * so existing store implementations do not need to be updated). Used by the
+   * for_each dispatcher to register inline flow objects before spawning child
+   * sessions, so downstream stage-lookup paths (getStage, getStageAction) can
+   * find the definition without any signature changes.
+   */
+  registerInline?(name: string, flow: FlowDefinition): void;
+  /**
+   * Remove a previously registered ephemeral flow. Called when the child
+   * session that owns the inline flow terminates (cleanup). No-op if the name
+   * is not registered or the store does not support ephemeral flows.
+   */
+  unregisterInline?(name: string): void;
 }
 
 // ── File-backed implementation ──────────────────────────────────────────────

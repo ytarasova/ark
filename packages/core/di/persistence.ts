@@ -24,7 +24,14 @@ import {
   FlowStateRepository,
   LedgerRepository,
 } from "../repositories/index.js";
-import { FileFlowStore, FileSkillStore, FileAgentStore, FileRecipeStore, FileRuntimeStore } from "../stores/index.js";
+import {
+  FileFlowStore,
+  FileSkillStore,
+  FileAgentStore,
+  FileRecipeStore,
+  FileRuntimeStore,
+  EphemeralFlowStore,
+} from "../stores/index.js";
 import { DbResourceStore, initResourceDefinitionsTable } from "../stores/db-resource-store.js";
 import { KnowledgeStore } from "../knowledge/store.js";
 
@@ -134,12 +141,14 @@ export function registerResourceStores(container: AppContainer): void {
 function makeFlowStore(db: DatabaseAdapter, config: ArkConfig, mode: AppMode) {
   if (mode.kind === "hosted") {
     initResourceDefinitionsTable(db);
-    return new DbResourceStore(db, "flow", { stages: [] });
+    return new EphemeralFlowStore(new DbResourceStore(db, "flow", { stages: [] }));
   }
-  return new FileFlowStore({
-    builtinDir: join(resolveStoreBaseDir(), "flows", "definitions"),
-    userDir: join(config.arkDir, "flows"),
-  });
+  return new EphemeralFlowStore(
+    new FileFlowStore({
+      builtinDir: join(resolveStoreBaseDir(), "flows", "definitions"),
+      userDir: join(config.arkDir, "flows"),
+    }),
+  );
 }
 
 function makeSkillStore(db: DatabaseAdapter, config: ArkConfig, mode: AppMode) {

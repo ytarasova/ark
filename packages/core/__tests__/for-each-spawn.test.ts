@@ -307,6 +307,54 @@ describe("for_each + mode:spawn -- on_iteration_failure: stop", () => {
   });
 });
 
+describe("for_each + mode:spawn -- inline flow object in spawn.flow", () => {
+  it("accepts an inline flow object and spawns children correctly", async () => {
+    const items = [{ idx: 0 }, { idx: 1 }];
+    const dispatchedIds: string[] = [];
+
+    const dispatcher = makeDispatcher(async (childId) => {
+      dispatchedIds.push(childId);
+      await app.sessions.update(childId, { status: "completed" });
+    });
+
+    const { id: parentId, vars } = await makeParentWithList(items);
+
+    // Use an inline flow object instead of a string name
+    const stage: StageDefinition = {
+      name: "per_repo",
+      for_each: "{{inputs.repos}}",
+      mode: "spawn",
+      iteration_var: "repo",
+      on_iteration_failure: "stop",
+      gate: "auto",
+      spawn: {
+        flow: {
+          name: "inline-tdd",
+          stages: [{ name: "code", gate: "auto", agent: "implementer", task: "Implement {{repo.x}}" }],
+        },
+        inputs: { val: "{{repo.idx}}" },
+      },
+    };
+
+    const result = await dispatcher.dispatchForEach(parentId, stage, vars);
+
+    expect(result.ok).toBe(true);
+    expect(dispatchedIds).toHaveLength(2);
+
+    const children = await app.sessions.getChildren(parentId);
+    expect(children).toHaveLength(2);
+
+    // Each child should reference its own synthetic inline flow name
+    for (const child of children) {
+      expect(child.flow).toMatch(/^inline-/);
+      // The inline flow should be findable in the store
+      const def = app.flows.get(child.flow);
+      expect(def).not.toBeNull();
+      expect(def!.stages[0].name).toBe("code");
+    }
+  });
+});
+
 describe("for_each + mode:spawn -- on_iteration_failure: continue", () => {
   it("continues after item 2 fails and spawns all remaining items", async () => {
     const items = [{ idx: 0 }, { idx: 1 }, { idx: 2 }, { idx: 3 }];

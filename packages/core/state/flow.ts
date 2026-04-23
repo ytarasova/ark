@@ -16,9 +16,28 @@ import { logDebug } from "../observability/structured-log.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
+/**
+ * Inline flow definition accepted in `spawn.flow` as an alternative to a
+ * string name lookup. Useful when an RPC or programmatic caller needs to
+ * dispatch a bespoke flow shape without pre-registering a YAML file on disk.
+ * Minimum required: `stages`. The `name` field defaults to "inline" if omitted.
+ */
+export interface InlineFlowSpec {
+  name?: string;
+  description?: string;
+  /** Inputs schema declaration (optional at this layer). */
+  inputs?: Record<string, unknown>;
+  stages: StageDefinition[];
+}
+
 export interface ForEachSpawnSpec {
-  /** Named flow to spawn for each iteration. */
-  flow: string;
+  /**
+   * Named flow (string -- looked up via app.flows.get) OR an inline flow
+   * definition object. Inline flows are registered in the ephemeral overlay
+   * on the flow store keyed as "inline-{childId}" so existing stage-lookup
+   * paths (getStage, getStageAction) see them without any signature changes.
+   */
+  flow: string | InlineFlowSpec;
   /**
    * Per-iteration override of the child session's `repo` field. When set, the
    * child session is created with this repo path/URL instead of inheriting the

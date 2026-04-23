@@ -15,7 +15,10 @@ export function registerStartCommands(session: Command) {
     .argument("[ticket]", "External ticket reference (Jira key, GitHub issue, etc.)")
     .option("-r, --repo <path>", "Repository path or name")
     .option("--remote-repo <url>", "Git URL to clone on compute target (no local repo needed)")
-    .option("-b, --branch <name>", "Deterministic branch name for the worktree (default: derived from --ticket/--summary or auto)")
+    .option(
+      "-b, --branch <name>",
+      "Deterministic branch name for the worktree (default: derived from --ticket/--summary or auto)",
+    )
     .option("-s, --summary <text>", "Task summary")
     .option("-p, --flow <name>", "Flow name", "default")
     .option("-c, --compute <name>", "Compute name")

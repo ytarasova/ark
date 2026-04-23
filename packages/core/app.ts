@@ -147,6 +147,13 @@ export class AppContext {
     this._container = buildContainer({ app: this, config: this.config, db, bootOptions: this.options });
     await this._container.cradle.lifecycle.start();
 
+    // Rehydrate ephemeral inline-flow definitions persisted in session config.
+    // When a child session is spawned with an inline flow object, the definition
+    // is written to session.config.inline_flow AND registered in the ephemeral
+    // overlay on app.flows. After a daemon restart the overlay is empty, so we
+    // scan all active sessions and re-register any inline_flow definitions here.
+    void this._rehydrateInlineFlows();
+
     // Hosted-mode only: on a fresh DB the `resource_definitions` table is empty,
     // so `agent/list` + friends return []. Seed the builtin YAMLs shipped with
     // the source tree (or install prefix) on every boot; the seeder is idempotent
@@ -213,6 +220,31 @@ export class AppContext {
   }
 
   // ── Boot helpers (pre-container bootstrap only) ──────────────────────
+
+  /**
+   * Rehydrate inline-flow definitions from persisted session config after a
+   * daemon restart. Sessions spawned with an inline flow store the definition
+   * under `config.inline_flow`; on restart the ephemeral overlay is empty so
+   * we scan active sessions and re-register any definitions found there.
+   *
+   * Best-effort: a failure here does not prevent boot from completing. If a
+   * session's inline flow cannot be rehydrated, stage lookups for that session
+   * will fail gracefully (flow not found) rather than crashing the daemon.
+   */
+  private async _rehydrateInlineFlows(): Promise<void> {
+    try {
+      const sessions = await this.sessions.list({ limit: 1000 });
+      for (const session of sessions) {
+        const inlineFlow = (session.config as Record<string, unknown> | null)?.inline_flow;
+        if (!inlineFlow || typeof inlineFlow !== "object") continue;
+        const def = inlineFlow as import("./state/flow.js").FlowDefinition;
+        if (!def.name || !Array.isArray(def.stages)) continue;
+        this.flows.registerInline?.(def.name, def);
+      }
+    } catch {
+      // Best-effort -- log nothing so tests don't see noise.
+    }
+  }
 
   private _initFilesystem(): void {
     for (const dir of [this.config.arkDir, this.config.tracksDir, this.config.worktreesDir, this.config.logDir]) {

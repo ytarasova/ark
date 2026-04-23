@@ -15,7 +15,8 @@
 import { randomUUID } from "crypto";
 
 import type { DispatchDeps, DispatchResult } from "./types.js";
-import type { StageDefinition } from "../../state/flow.js";
+import type { StageDefinition, InlineFlowSpec } from "../../state/flow.js";
+import type { FlowDefinition } from "../../state/flow.js";
 import { substituteVars } from "../../template.js";
 import { logDebug, logWarn } from "../../observability/structured-log.js";
 
@@ -155,10 +156,11 @@ export class ForEachDispatcher {
       return { ok: true, message: "for_each: empty list -- stage complete" };
     }
 
+    const flowLabel = typeof spawnSpec.flow === "string" ? spawnSpec.flow : (spawnSpec.flow.name ?? "inline");
     await this.deps.events.log(sessionId, "for_each_start", {
       stage: session.stage,
       actor: "system",
-      data: { total: items.length, flow: spawnSpec.flow, iterVar },
+      data: { total: items.length, flow: flowLabel, iterVar },
     });
 
     const forkGroup = randomUUID().slice(0, 8);
@@ -177,7 +179,7 @@ export class ForEachDispatcher {
       const resolvedBranch = spawnSpec.branch ? substituteVars(spawnSpec.branch, iterVars) : undefined;
       const resolvedWorkdir = spawnSpec.workdir ? substituteVars(spawnSpec.workdir, iterVars) : undefined;
 
-      // Spawn a child session for this iteration
+      // Spawn a child session for this iteration (string name or inline object)
       const spawnResult = await this.spawnChild(sessionId, forkGroup, spawnSpec.flow, resolvedInputs, i, {
         repo: resolvedRepo,
         branch: resolvedBranch,
@@ -203,7 +205,7 @@ export class ForEachDispatcher {
       await this.deps.events.log(sessionId, "for_each_iteration_start", {
         stage: session.stage,
         actor: "system",
-        data: { index: i, childId, flow: spawnSpec.flow, inputs: resolvedInputs },
+        data: { index: i, childId, flow: flowLabel, inputs: resolvedInputs },
       });
 
       // Dispatch the child
@@ -288,7 +290,7 @@ export class ForEachDispatcher {
   private async spawnChild(
     parentId: string,
     forkGroup: string,
-    flowName: string,
+    flowRef: string | InlineFlowSpec,
     inputs: Record<string, unknown>,
     index: number,
     overrides?: { repo?: string; branch?: string; workdir?: string },
@@ -296,9 +298,30 @@ export class ForEachDispatcher {
     const parent = await this.deps.sessions.get(parentId);
     if (!parent) return { ok: false, message: "Parent session not found" };
 
-    // Determine the first stage of the target flow
-    const flowDef = this.deps.flows.get(flowName);
-    if (!flowDef) return { ok: false, message: `Flow '${flowName}' not found` };
+    let flowDef: FlowDefinition | null;
+    let flowName: string;
+
+    if (typeof flowRef === "string") {
+      // Named flow -- look up from the store (file-backed or DB-backed).
+      flowName = flowRef;
+      flowDef = this.deps.flows.get(flowName);
+      if (!flowDef) return { ok: false, message: `Flow '${flowName}' not found` };
+    } else {
+      // Inline flow object. Validate minimum shape.
+      if (!flowRef.stages || flowRef.stages.length === 0) {
+        return { ok: false, message: "Inline flow must have at least one stage" };
+      }
+      // Build a FlowDefinition-compatible object from the inline spec.
+      // We defer assigning the synthetic name until we know the childId.
+      flowDef = {
+        name: flowRef.name ?? "inline",
+        description: flowRef.description,
+        stages: flowRef.stages,
+      } as FlowDefinition;
+      // Placeholder -- will be overwritten to "inline-{childId}" below.
+      flowName = flowRef.name ?? "inline";
+    }
+
     const firstStage = flowDef.stages[0]?.name ?? null;
 
     const summary = (inputs.summary as string | undefined) ?? `${flowName} iteration ${index}`;
@@ -309,12 +332,33 @@ export class ForEachDispatcher {
       // deterministic branch.
       repo: overrides?.repo ?? parent.repo ?? undefined,
       ...(overrides?.branch ? { branch: overrides.branch } : {}),
-      flow: flowName,
       compute_name: parent.compute_name || undefined,
       workdir: overrides?.workdir ?? parent.workdir ?? undefined,
       group_name: parent.group_name || undefined,
+      // `flow` is set after we know childId for inline flows. Inline flows also
+      // persist the definition under config.inline_flow for daemon-restart rehydration.
+      flow: flowName,
       config: { inputs, for_each_parent: parentId, for_each_index: index },
     });
+
+    // For inline flows: register under "inline-{childId}" so the existing
+    // getStage / getStageAction paths (which only know the flow name) can find
+    // the definition without any signature changes. Persist the definition on
+    // the session row so it survives daemon restart.
+    if (typeof flowRef !== "string") {
+      const syntheticName = `inline-${child.id}`;
+      flowName = syntheticName;
+      const finalDef: FlowDefinition = { ...flowDef, name: syntheticName };
+
+      // Register in the ephemeral overlay so lookups work immediately.
+      this.deps.flows.registerInline?.(syntheticName, finalDef);
+
+      // Update the child session's flow field and persist the definition.
+      await this.deps.sessions.update(child.id, {
+        flow: syntheticName,
+      });
+      await this.deps.sessions.mergeConfig(child.id, { inline_flow: finalDef });
+    }
 
     await this.deps.sessions.update(child.id, {
       parent_id: parentId,
