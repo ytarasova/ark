@@ -10,18 +10,26 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { startArkd } from "../../arkd/server.js";
+import { allocatePort } from "../../core/config/port-allocator.js";
 
-// Use a unique port to avoid collisions with other tests
-const TEST_PORT = 19360;
-const BASE = `http://localhost:${TEST_PORT}`;
+// Allocate ephemeral ports per-test-file so --concurrency 4 workers don't
+// collide. Bound lazily in beforeAll() since allocatePort() is async.
+let TEST_PORT: number;
+let UNUSED_PORT: number;
+let CONFIG_PORT: number;
+let BASE: string;
 
 // ── PID file helpers (re-implemented for testing) ─────────────────────────────
 
 let tempDir: string;
 
-beforeAll(() => {
+beforeAll(async () => {
   tempDir = join(tmpdir(), `ark-daemon-test-${Date.now()}`);
   mkdirSync(tempDir, { recursive: true });
+  TEST_PORT = await allocatePort();
+  UNUSED_PORT = await allocatePort();
+  CONFIG_PORT = await allocatePort();
+  BASE = `http://localhost:${TEST_PORT}`;
 });
 
 afterAll(() => {
@@ -176,15 +184,17 @@ describe("daemon start/stop lifecycle", async () => {
   });
 
   it("returns config from a running daemon", async () => {
-    const configPort = TEST_PORT + 2;
-    server = startArkd(configPort, { quiet: true, conductorUrl: "http://localhost:19100" });
+    // conductorUrl is never contacted; it's just a string we roundtrip
+    // through /config to verify startArkd persists it.
+    const mockConductorUrl = "http://conductor.mock.test:19100";
+    server = startArkd(CONFIG_PORT, { quiet: true, conductorUrl: mockConductorUrl });
 
-    const resp = await fetch(`http://localhost:${configPort}/config`);
+    const resp = await fetch(`http://localhost:${CONFIG_PORT}/config`);
     expect(resp.status).toBe(200);
 
     const data = (await resp.json()) as { ok: boolean; conductorUrl: string | null };
     expect(data.ok).toBe(true);
-    expect(data.conductorUrl).toBe("http://localhost:19100");
+    expect(data.conductorUrl).toBe(mockConductorUrl);
   });
 });
 
@@ -192,9 +202,10 @@ describe("daemon start/stop lifecycle", async () => {
 
 describe("daemon status detection", async () => {
   it("detects daemon is not running on unused port", async () => {
-    // Port 19361 should not have anything running
+    // Freshly-allocated ephemeral port with nothing bound.
+    const probePort = await allocatePort();
     try {
-      await fetch("http://localhost:19361/health", { signal: AbortSignal.timeout(500) });
+      await fetch(`http://localhost:${probePort}/health`, { signal: AbortSignal.timeout(500) });
       // If something is actually running there, skip this assertion
     } catch {
       // Expected - nothing running
@@ -203,9 +214,9 @@ describe("daemon status detection", async () => {
   });
 
   it("detects daemon is running after start", async () => {
-    const server = startArkd(TEST_PORT + 1, { quiet: true });
+    const server = startArkd(UNUSED_PORT, { quiet: true });
     try {
-      const resp = await fetch(`http://localhost:${TEST_PORT + 1}/health`, { signal: AbortSignal.timeout(2000) });
+      const resp = await fetch(`http://localhost:${UNUSED_PORT}/health`, { signal: AbortSignal.timeout(2000) });
       expect(resp.ok).toBe(true);
       const data = (await resp.json()) as { status: string };
       expect(data.status).toBe("ok");
