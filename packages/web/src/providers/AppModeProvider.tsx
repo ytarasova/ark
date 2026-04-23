@@ -43,13 +43,8 @@ const AppModeContext = createContext<AppModeContextValue | null>(null);
 export function AppModeProvider({ children }: { children: ReactNode }) {
   const { data, isLoading } = useServerConfig();
   const value = useMemo<AppModeContextValue>(() => {
-    // The server reports mode explicitly as `mode: "local" | "hosted"`. We
-    // also accept the legacy `hosted: boolean` for back-compat with servers
-    // that haven't shipped the new field yet.
-    const kind: AppModeKind =
-      (data as { mode?: AppModeKind })?.mode === "hosted" || (data as { hosted?: boolean })?.hosted
-        ? "hosted"
-        : "local";
+    // The server reports mode explicitly as `mode: "local" | "hosted"`.
+    const kind: AppModeKind = (data as { mode?: AppModeKind })?.mode === "hosted" ? "hosted" : "local";
     const binding: AppModeBinding = kind === "hosted" ? HostedBinding : LocalBinding;
     return { kind, binding, loading: isLoading };
   }, [data, isLoading]);
