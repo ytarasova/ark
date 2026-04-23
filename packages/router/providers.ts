@@ -18,6 +18,7 @@ import type {
   ChatCompletionChunk,
   CircuitBreakerState,
 } from "./types.js";
+import { fetchWithRetry } from "./retry.js";
 
 // ── Circuit Breaker ──────────────────────────────────────────────────────────
 
@@ -65,6 +66,12 @@ class CircuitBreaker {
 export class Provider {
   readonly config: ProviderConfig;
   readonly breaker: CircuitBreaker;
+  /**
+   * Sleep injection for deterministic tests. Production code uses setTimeout.
+   * Test code can swap this to a mock clock to exercise Retry-After without
+   * wall-clock delays.
+   */
+  sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   constructor(config: ProviderConfig) {
     this.config = config;
@@ -131,7 +138,7 @@ export class Provider {
     const body: Record<string, unknown> = { ...request, model: modelId, stream: false };
     delete body.routing;
 
-    const resp = await this.fetchWithTimeout(`${this.config.base_url}/v1/chat/completions`, {
+    const resp = await this.retryingFetch(`${this.config.base_url}/v1/chat/completions`, {
       method: "POST",
       headers: this.openaiHeaders(),
       body: JSON.stringify(body),
@@ -149,7 +156,7 @@ export class Provider {
     const body: Record<string, unknown> = { ...request, model: modelId, stream: true };
     delete body.routing;
 
-    const resp = await this.fetchWithTimeout(`${this.config.base_url}/v1/chat/completions`, {
+    const resp = await this.retryingFetch(`${this.config.base_url}/v1/chat/completions`, {
       method: "POST",
       headers: this.openaiHeaders(),
       body: JSON.stringify(body),
@@ -175,7 +182,7 @@ export class Provider {
   private async completeAnthropic(request: ChatCompletionRequest, modelId: string): Promise<ChatCompletionResponse> {
     const anthropicBody = this.toAnthropicRequest(request, modelId);
 
-    const resp = await this.fetchWithTimeout(`${this.config.base_url}/v1/messages`, {
+    const resp = await this.retryingFetch(`${this.config.base_url}/v1/messages`, {
       method: "POST",
       headers: this.anthropicHeaders(),
       body: JSON.stringify(anthropicBody),
@@ -193,7 +200,7 @@ export class Provider {
   private async *streamAnthropic(request: ChatCompletionRequest, modelId: string): AsyncGenerator<ChatCompletionChunk> {
     const anthropicBody = { ...this.toAnthropicRequest(request, modelId), stream: true };
 
-    const resp = await this.fetchWithTimeout(`${this.config.base_url}/v1/messages`, {
+    const resp = await this.retryingFetch(`${this.config.base_url}/v1/messages`, {
       method: "POST",
       headers: this.anthropicHeaders(),
       body: JSON.stringify(anthropicBody),
@@ -465,7 +472,7 @@ export class Provider {
     const geminiBody = this.toGeminiRequest(request);
     const url = `${this.config.base_url}/v1beta/models/${modelId}:generateContent?key=${this.config.api_key}`;
 
-    const resp = await this.fetchWithTimeout(url, {
+    const resp = await this.retryingFetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(geminiBody),
@@ -484,7 +491,7 @@ export class Provider {
     const geminiBody = this.toGeminiRequest(request);
     const url = `${this.config.base_url}/v1beta/models/${modelId}:streamGenerateContent?key=${this.config.api_key}&alt=sse`;
 
-    const resp = await this.fetchWithTimeout(url, {
+    const resp = await this.retryingFetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(geminiBody),
@@ -669,6 +676,19 @@ export class Provider {
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  // ── Fetch with retry (exponential backoff + jitter, honors Retry-After) ──
+
+  private retryingFetch(url: string, opts: RequestInit): Promise<Response> {
+    const retries = this.config.max_retries ?? 2;
+    return fetchWithRetry(() => this.fetchWithTimeout(url, opts), {
+      retries,
+      sleep: this.sleep,
+      onAttempt: ({ attempt, delayMs, reason }) => {
+        console.error(`[router] Retry ${attempt}/${retries} for ${this.config.name} after ${delayMs}ms (${reason})`);
+      },
+    });
   }
 }
 
