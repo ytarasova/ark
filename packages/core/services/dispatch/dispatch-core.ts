@@ -530,25 +530,27 @@ export class CoreDispatcher {
       data: { sub_stage: subStage.name, agent: agentName, session_id: tmuxName, model: agent.model },
     });
 
-    // Poll until the tmux session exits (agent finished).
+    // Poll until the agent process reaches a terminal state. Uses the
+    // executor's polymorphic status() interface rather than probing tmux
+    // directly -- agent-sdk (and other tmux-less runtimes) launch plain
+    // processes, so a tmux `has-session` check would falsely report the
+    // agent done on the first poll. executor.status(handle) returns
+    // "running"/"idle" while alive, "completed"/"failed" after exit, and
+    // "not_found" if the executor has no record (treated as done-but-
+    // already-cleaned).
     const INLINE_POLL_MS = 250;
     const INLINE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
     const deadline = Date.now() + INLINE_TIMEOUT_MS;
     let agentOk = false;
+    let agentExitOk = true;
     while (Date.now() < deadline) {
       await Bun.sleep(INLINE_POLL_MS);
-      // Check if tmux session still alive
-      let alive = false;
-      try {
-        execFileSync("tmux", ["has-session", "-t", tmuxName], { stdio: "pipe" });
-        alive = true;
-      } catch {
-        alive = false;
-      }
-      if (!alive) {
-        agentOk = true;
-        break;
-      }
+      const status = await executor.status(tmuxName);
+      if (status.state === "running" || status.state === "idle") continue;
+      // Terminal: completed / failed / not_found
+      agentOk = true;
+      if (status.state === "failed") agentExitOk = false;
+      break;
     }
 
     // Restore parent session to ready so the inline loop can continue.
@@ -556,6 +558,9 @@ export class CoreDispatcher {
 
     if (!agentOk) {
       return { ok: false, message: `Inline sub-stage '${subStage.name}' timed out after 30 minutes` };
+    }
+    if (!agentExitOk) {
+      return { ok: false, message: `Inline sub-stage '${subStage.name}' agent exited with error` };
     }
 
     return { ok: true, message: `sub-stage '${subStage.name}' complete` };
