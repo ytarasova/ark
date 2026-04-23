@@ -58,10 +58,10 @@ import type { PluginRegistry } from "./plugins/registry.js";
 import type { SessionLauncher } from "./session-launcher.js";
 import { TmuxLauncher } from "./launchers/tmux.js";
 import { NoopLauncher } from "./launchers/noop.js";
-import type { ApiKeyManager } from "./auth/index.js";
+import type { ApiKeyManager, TenantManager, TeamManager, UserManager, TenantPolicyManager } from "./auth/index.js";
+import type { TenantClaudeAuthManager } from "./auth/tenant-claude-auth.js";
 import type { WorkerRegistry } from "./hosted/worker-registry.js";
 import type { SessionScheduler } from "./hosted/scheduler.js";
-import type { TenantPolicyManager } from "./auth/index.js";
 import type { KnowledgeStore } from "./knowledge/store.js";
 import type { CodeIntelStore } from "./code-intel/store.js";
 import { CodeIntelStore as CodeIntelStoreCtor } from "./code-intel/store.js";
@@ -125,7 +125,9 @@ export class AppContext {
     this.phase = "booting";
 
     // Preconditions that must happen before the container can be built:
-    // filesystem, DB open, schema migration, compute-template seeding.
+    // filesystem, DB open, schema migration, and compute-template seeding.
+    // ApiKeyManager + the other auth managers are registered as singleton
+    // factories in `di/persistence.ts` and resolved lazily on first access.
     this._initFilesystem();
     const db = await this._openDatabase();
     await this._initSchema(db);
@@ -438,6 +440,26 @@ export class AppContext {
     return this._resolve("apiKeys");
   }
 
+  /** Tenant CRUD manager. Available after boot. */
+  get tenants(): TenantManager {
+    return this._resolve("tenants");
+  }
+
+  /** Team CRUD + membership manager. Available after boot. */
+  get teams(): TeamManager {
+    return this._resolve("teams");
+  }
+
+  /** User CRUD manager. Available after boot. */
+  get users(): UserManager {
+    return this._resolve("users");
+  }
+
+  /** Per-tenant Claude credential binding manager. Available after boot. */
+  get tenantClaudeAuth(): TenantClaudeAuthManager {
+    return this._resolve("tenantClaudeAuth");
+  }
+
   get sessionService(): SessionService {
     return this._resolve("sessionService");
   }
@@ -691,7 +713,11 @@ export class AppContext {
     }
   }
 
-  /** Tenant policy manager. Null in local mode, present in hosted mode. */
+  /**
+   * Tenant policy manager. Always available after boot (registered as a
+   * DI singleton in `di/persistence.ts`). The return type stays nullable
+   * for back-compat -- existing callers null-check this before use.
+   */
   get tenantPolicyManager(): TenantPolicyManager | null {
     try {
       return this._container.resolve("tenantPolicyManager") as TenantPolicyManager;

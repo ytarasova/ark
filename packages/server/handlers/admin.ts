@@ -23,18 +23,14 @@ import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { requireAdmin } from "../../core/auth/context.js";
-import {
-  TenantManager,
-  TeamManager,
-  UserManager,
-  type MembershipRole,
-  type TenantStatus,
-} from "../../core/auth/index.js";
+import type { MembershipRole, TenantStatus } from "../../core/auth/index.js";
 
 export function registerAdminHandlers(router: Router, app: AppContext): void {
-  const tenants = () => new TenantManager(app.db);
-  const teams = () => new TeamManager(app.db);
-  const users = () => new UserManager(app.db);
+  // Auth managers are singletons in the DI container -- resolve via
+  // the AppContext accessors instead of `new X(app.db)` on every request.
+  const tenants = () => app.tenants;
+  const teams = () => app.teams;
+  const users = () => app.users;
   const apiKeys = () => app.apiKeys;
 
   // ── Tenants ───────────────────────────────────────────────────────────

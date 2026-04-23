@@ -25,14 +25,24 @@ afterEach(async () => {
 });
 
 describe("registerHosted (DI-1)", async () => {
-  it("local mode: hosted services are NOT auto-registered", async () => {
+  it("local mode: workerRegistry + scheduler are NOT auto-registered", async () => {
     app = await AppContext.forTestAsync();
     await app.boot();
 
-    // No factory -- resolve throws, accessor wraps into "hosted mode only".
+    // No factory for the hosted-only pair -- resolve throws, accessor
+    // wraps into "hosted mode only".
     expect(() => app!.workerRegistry).toThrow("hosted mode only");
     expect(() => app!.scheduler).toThrow("hosted mode only");
-    expect(app!.tenantPolicyManager).toBeNull();
+  });
+
+  it("local mode: tenantPolicyManager IS registered (shared local + hosted)", async () => {
+    app = await AppContext.forTestAsync();
+    await app.boot();
+
+    // TenantPolicyManager is registered unconditionally so the local CLI
+    // + handlers can set / read policies against the SQLite DB.
+    expect(app.tenantPolicyManager).not.toBeNull();
+    expect(app.tenantPolicyManager).toBeInstanceOf(TenantPolicyManager);
   });
 
   it("local mode: test doubles via asValue override are resolvable", async () => {

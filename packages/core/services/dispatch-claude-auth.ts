@@ -25,7 +25,6 @@
 
 import type { AppContext } from "../app.js";
 import type { Session, Compute } from "../../types/index.js";
-import { TenantClaudeAuthManager } from "../auth/tenant-claude-auth.js";
 import { logDebug, logInfo, logWarn } from "../observability/structured-log.js";
 
 /** Shape returned back to dispatch so it can merge env + record what was created. */
@@ -67,8 +66,9 @@ export async function materializeClaudeAuthForDispatch(
   },
 ): Promise<ClaudeAuthMaterialization> {
   const tenantId = session.tenant_id ?? app.config.authSection.defaultTenant ?? "default";
-  const auth = new TenantClaudeAuthManager(app.db);
-  const binding = await auth.get(tenantId);
+  // TenantClaudeAuthManager is a DI singleton; resolve via the accessor
+  // instead of constructing per-dispatch.
+  const binding = await app.tenantClaudeAuth.get(tenantId);
   if (!binding) return EMPTY;
 
   if (binding.kind === "api_key") {

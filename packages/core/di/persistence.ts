@@ -24,6 +24,8 @@ import {
   FlowStateRepository,
   LedgerRepository,
 } from "../repositories/index.js";
+import { ApiKeyManager, TenantManager, TeamManager, UserManager, TenantPolicyManager } from "../auth/index.js";
+import { TenantClaudeAuthManager } from "../auth/tenant-claude-auth.js";
 import {
   FileFlowStore,
   FileSkillStore,
@@ -96,9 +98,28 @@ export function registerRepositories(container: AppContainer): void {
     // Knowledge graph is persistence-adjacent -- keep it here with the repos.
     knowledge: asFunction((c: { db: DatabaseAdapter }) => new KnowledgeStore(c.db), { lifetime: Lifetime.SINGLETON }),
 
-    // API key manager -- multi-tenant auth. Container-managed so tests can
-    // swap a double via `container.register({ apiKeys: asValue(fake) })`.
+    // Auth managers -- all six share the same shape: `new X(db)`. Registering
+    // them as singletons means handler bodies resolve via `app.container.cradle.X`
+    // (or the equivalent AppContext accessor) instead of `new X(app.db)` on
+    // every request. Tests can inject fakes via
+    // `container.register({ tenants: asValue(fake) })`.
+    //
+    // `tenantPolicyManager` is registered here (not in `di/hosted.ts`) so the
+    // local-mode CLI + handlers can still set / read tenant policies against
+    // the local SQLite DB -- useful for single-user installs that want to
+    // experiment with router / auto-index policies without spinning up the
+    // full hosted stack. `sessionScheduler` remains hosted-only because it
+    // depends on the WorkerRegistry.
     apiKeys: asFunction((c: { db: DatabaseAdapter }) => new ApiKeyManager(c.db), { lifetime: Lifetime.SINGLETON }),
+    tenants: asFunction((c: { db: DatabaseAdapter }) => new TenantManager(c.db), { lifetime: Lifetime.SINGLETON }),
+    teams: asFunction((c: { db: DatabaseAdapter }) => new TeamManager(c.db), { lifetime: Lifetime.SINGLETON }),
+    users: asFunction((c: { db: DatabaseAdapter }) => new UserManager(c.db), { lifetime: Lifetime.SINGLETON }),
+    tenantClaudeAuth: asFunction((c: { db: DatabaseAdapter }) => new TenantClaudeAuthManager(c.db), {
+      lifetime: Lifetime.SINGLETON,
+    }),
+    tenantPolicyManager: asFunction((c: { db: DatabaseAdapter }) => new TenantPolicyManager(c.db), {
+      lifetime: Lifetime.SINGLETON,
+    }),
   });
 }
 

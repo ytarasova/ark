@@ -22,10 +22,18 @@ import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { requireAdmin } from "../../core/auth/context.js";
-import { TenantPolicyManager, type ComputePoolRef, type TenantComputePolicy } from "../../core/auth/index.js";
+import type { ComputePoolRef, TenantComputePolicy, TenantPolicyManager } from "../../core/auth/index.js";
 
 export function registerAdminPolicyHandlers(router: Router, app: AppContext): void {
-  const policies = () => new TenantPolicyManager(app.db);
+  // TenantPolicyManager is registered as a DI singleton; `app.tenantPolicyManager`
+  // is non-null in both local + hosted modes. The accessor still typed as
+  // `TenantPolicyManager | null` for historical reasons -- assert here so the
+  // handler bodies don't all need to null-check it.
+  const policies = (): TenantPolicyManager => {
+    const pm = app.tenantPolicyManager;
+    if (!pm) throw new RpcError("TenantPolicyManager not available", ErrorCodes.INTERNAL_ERROR);
+    return pm;
+  };
 
   router.handle("admin/tenant/policy/list", async (_p, _notify, ctx) => {
     requireAdmin(ctx);

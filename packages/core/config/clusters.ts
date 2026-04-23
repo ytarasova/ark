@@ -182,10 +182,10 @@ export async function resolveEffectiveClusters(app: AppContext, tenantId: string
   let tenantOverlay: ClusterConfig[] = [];
 
   try {
-    // Lazy import to avoid a config -> auth -> config cycle.
-    const { TenantPolicyManager } = await import("../auth/tenant-policy.js");
-    const mgr = new TenantPolicyManager(app.db);
-    const yaml = await mgr.getComputeConfig(tenantId);
+    // TenantPolicyManager is DI-registered as a singleton; resolve via the
+    // AppContext accessor. Non-null in both local + hosted modes.
+    const mgr = app.tenantPolicyManager;
+    const yaml = mgr ? await mgr.getComputeConfig(tenantId) : null;
     if (yaml && yaml.trim().length > 0) {
       tenantOverlay = parseClustersYaml(yaml);
     }

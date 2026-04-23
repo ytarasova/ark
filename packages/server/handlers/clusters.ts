@@ -20,11 +20,16 @@ import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { requireAdmin } from "../../core/auth/context.js";
-import { TenantPolicyManager } from "../../core/auth/tenant-policy.js";
+import type { TenantPolicyManager } from "../../core/auth/index.js";
 import { parseClustersYaml, resolveEffectiveClusters } from "../../core/config/clusters.js";
 
 export function registerClusterHandlers(router: Router, app: AppContext): void {
-  const policies = () => new TenantPolicyManager(app.db);
+  // DI-registered singleton; non-null in both modes, see comment in admin-policy.ts.
+  const policies = (): TenantPolicyManager => {
+    const pm = app.tenantPolicyManager;
+    if (!pm) throw new RpcError("TenantPolicyManager not available", ErrorCodes.INTERNAL_ERROR);
+    return pm;
+  };
 
   router.handle("cluster/list", async (_p, _notify, ctx) => {
     const tenantId = ctx.tenantId ?? "default";

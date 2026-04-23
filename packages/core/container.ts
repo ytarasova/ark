@@ -57,7 +57,8 @@ import type { ComputeProvidersBoot } from "./infra/compute-providers-boot.js";
 import type { SessionDrain } from "./infra/session-drain.js";
 import type { WorkerRegistry } from "./hosted/worker-registry.js";
 import type { SessionScheduler } from "./hosted/scheduler.js";
-import type { TenantPolicyManager } from "./auth/index.js";
+import type { TenantPolicyManager, ApiKeyManager, TenantManager, TeamManager, UserManager } from "./auth/index.js";
+import type { TenantClaudeAuthManager } from "./auth/tenant-claude-auth.js";
 import type { TicketProviderRegistry } from "./tickets/registry.js";
 import type { McpPool } from "./mcp-pool.js";
 
@@ -170,10 +171,20 @@ export interface Cradle {
   // MCP socket pool (shares MCP server processes across sessions)
   mcpPool: McpPool;
 
-  // Hosted-mode services (registered via setter; absent in local mode)
+  // Hosted-mode services (registered via `di/hosted.ts` only when
+  // `mode.kind === "hosted"`; resolving in local mode throws and the
+  // AppContext accessors wrap that into "hosted mode only").
   workerRegistry?: WorkerRegistry;
   sessionScheduler?: SessionScheduler;
-  tenantPolicyManager?: TenantPolicyManager;
+
+  // Auth managers -- shared across local + hosted. Always present after
+  // boot because `registerRepositories` registers them unconditionally.
+  apiKeys: ApiKeyManager;
+  tenants: TenantManager;
+  teams: TeamManager;
+  users: UserManager;
+  tenantClaudeAuth: TenantClaudeAuthManager;
+  tenantPolicyManager: TenantPolicyManager;
 }
 
 export type AppContainer = AwilixContainer<Cradle>;
