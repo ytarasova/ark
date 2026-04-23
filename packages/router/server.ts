@@ -331,22 +331,27 @@ function handleStreamingRoute(
   feedback: FeedbackTracker,
   _model: any,
 ): Response {
-  const stream = new ReadableStream({
-    async start(controller) {
-      const encoder = new TextEncoder();
-      let firstChunk = true;
+  const iterator = dispatcher.dispatchStream(request, decision)[Symbol.asyncIterator]();
+  const encoder = new TextEncoder();
+  let firstChunk = true;
 
+  const stream = new ReadableStream({
+    // pull() gives the runtime back-pressure control: each call yields one
+    // chunk, so a slow HTTP consumer paces reads from the provider instead of
+    // letting us buffer everything in memory.
+    async pull(controller) {
       try {
-        for await (const chunk of dispatcher.dispatchStream(request, decision)) {
-          // Add routing metadata to the first chunk
-          if (firstChunk) {
-            (chunk as ChatCompletionChunk & { routing?: unknown }).routing = decision;
-            firstChunk = false;
-          }
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+        const { value, done } = await iterator.next();
+        if (done) {
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+          return;
         }
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-        controller.close();
+        if (firstChunk) {
+          (value as ChatCompletionChunk & { routing?: unknown }).routing = decision;
+          firstChunk = false;
+        }
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\n\n`));
       } catch (err) {
         feedback.logFailure(decision.selected_model, (err as Error).message);
         const errorChunk = {
@@ -355,6 +360,9 @@ function handleStreamingRoute(
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorChunk)}\n\n`));
         controller.close();
       }
+    },
+    async cancel() {
+      await iterator.return?.();
     },
   });
 
@@ -368,16 +376,19 @@ function handleStreamingRoute(
 }
 
 function handleStreamingPassthrough(request: ChatCompletionRequest, provider: any, modelId: string): Response {
-  const stream = new ReadableStream({
-    async start(controller) {
-      const encoder = new TextEncoder();
+  const iterator = provider.stream(request, modelId)[Symbol.asyncIterator]();
+  const encoder = new TextEncoder();
 
+  const stream = new ReadableStream({
+    async pull(controller) {
       try {
-        for await (const chunk of provider.stream(request, modelId)) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+        const { value, done } = await iterator.next();
+        if (done) {
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+          return;
         }
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-        controller.close();
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\n\n`));
       } catch (err) {
         const errorChunk = {
           error: { message: (err as Error).message, type: "stream_error" },
@@ -385,6 +396,9 @@ function handleStreamingPassthrough(request: ChatCompletionRequest, provider: an
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorChunk)}\n\n`));
         controller.close();
       }
+    },
+    async cancel() {
+      await iterator.return?.();
     },
   });
 
@@ -435,25 +449,27 @@ async function handleTensorZeroPassthrough(
  * Handle a streaming passthrough request through TensorZero.
  */
 function handleStreamingTZPassthrough(request: ChatCompletionRequest, tzDispatcher: TensorZeroDispatcher): Response {
-  const stream = new ReadableStream({
-    async start(controller) {
-      const encoder = new TextEncoder();
-      // Build a minimal routing decision for the stream helper
-      const passthroughDecision = {
-        selected_model: request.model,
-        selected_provider: "tensorzero",
-        reason: "passthrough",
-        alternatives_considered: [],
-        latency_ms: { classification: 0, routing: 0, total_overhead: 0 },
-        complexity: { score: 0, task_type: "passthrough", has_tools: false, estimated_difficulty: "simple" as const },
-      };
+  const passthroughDecision = {
+    selected_model: request.model,
+    selected_provider: "tensorzero",
+    reason: "passthrough",
+    alternatives_considered: [],
+    latency_ms: { classification: 0, routing: 0, total_overhead: 0 },
+    complexity: { score: 0, task_type: "passthrough", has_tools: false, estimated_difficulty: "simple" as const },
+  };
+  const iterator = tzDispatcher.stream(request, passthroughDecision)[Symbol.asyncIterator]();
+  const encoder = new TextEncoder();
 
+  const stream = new ReadableStream({
+    async pull(controller) {
       try {
-        for await (const chunk of tzDispatcher.stream(request, passthroughDecision)) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+        const { value, done } = await iterator.next();
+        if (done) {
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+          return;
         }
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-        controller.close();
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\n\n`));
       } catch (err) {
         const errorChunk = {
           error: { message: (err as Error).message, type: "stream_error" },
@@ -461,6 +477,9 @@ function handleStreamingTZPassthrough(request: ChatCompletionRequest, tzDispatch
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorChunk)}\n\n`));
         controller.close();
       }
+    },
+    async cancel() {
+      await iterator.return?.();
     },
   });
 
@@ -483,21 +502,24 @@ function handleStreamingTZ(
   feedback: FeedbackTracker,
   _model: any,
 ): Response {
-  const stream = new ReadableStream({
-    async start(controller) {
-      const encoder = new TextEncoder();
-      let firstChunk = true;
+  const iterator = tzDispatcher.stream(request, decision)[Symbol.asyncIterator]();
+  const encoder = new TextEncoder();
+  let firstChunk = true;
 
+  const stream = new ReadableStream({
+    async pull(controller) {
       try {
-        for await (const chunk of tzDispatcher.stream(request, decision)) {
-          if (firstChunk) {
-            (chunk as ChatCompletionChunk & { routing?: unknown }).routing = decision;
-            firstChunk = false;
-          }
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+        const { value, done } = await iterator.next();
+        if (done) {
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+          return;
         }
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-        controller.close();
+        if (firstChunk) {
+          (value as ChatCompletionChunk & { routing?: unknown }).routing = decision;
+          firstChunk = false;
+        }
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\n\n`));
       } catch (err) {
         feedback.logFailure(decision.selected_model, (err as Error).message);
         const errorChunk = {
@@ -506,6 +528,9 @@ function handleStreamingTZ(
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorChunk)}\n\n`));
         controller.close();
       }
+    },
+    async cancel() {
+      await iterator.return?.();
     },
   });
 
