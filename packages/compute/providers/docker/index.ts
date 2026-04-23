@@ -59,6 +59,45 @@ export function containerName(hostName: string): string {
   return `ark-${hostName}`;
 }
 
+// ── docker stats parsing ─────────────────────────────────────────────────────
+
+export interface DockerStatsRow {
+  name: string;
+  cpu: number;
+  memUsedGb: number;
+  memTotalGb: number;
+  memPct: number;
+  cpuRaw: string; // "1.23%"
+  memRaw: string; // "123.4MiB / 7.776GiB"
+}
+
+/**
+ * Parse `docker stats --no-stream --format "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}"`.
+ * Returns one row per non-empty line. Tolerant of malformed input (skips bad rows).
+ * Exported for unit tests; single-call collapse of the former two-query pattern.
+ */
+export function parseDockerStats(raw: string): DockerStatsRow[] {
+  const out: DockerStatsRow[] = [];
+  if (!raw) return out;
+  for (const line of raw.split("\n")) {
+    if (!line.trim()) continue;
+    const parts = line.split("\t");
+    if (parts.length < 4) continue;
+    const [name, cpuRaw, memRaw, memPctRaw] = parts;
+    const cpu = parseFloat(cpuRaw.replace("%", "")) || 0;
+    const memPct = parseFloat(memPctRaw.replace("%", "")) || 0;
+    let memUsedGb = 0;
+    let memTotalGb = 0;
+    const memMatch = memRaw.match(/([\d.]+)\s*(MiB|GiB|KiB)\s*\/\s*([\d.]+)\s*(MiB|GiB|KiB)/);
+    if (memMatch) {
+      memUsedGb = toGb(parseFloat(memMatch[1]), memMatch[2]);
+      memTotalGb = toGb(parseFloat(memMatch[3]), memMatch[4]);
+    }
+    out.push({ name: name.trim(), cpu, memUsedGb, memTotalGb, memPct, cpuRaw: cpuRaw.trim(), memRaw: memRaw.trim() });
+  }
+  return out;
+}
+
 /** Check if a port is listening on the local host. */
 async function checkHostPort(port: number): Promise<boolean> {
   try {
@@ -257,34 +296,21 @@ export class DockerProvider implements ComputeProvider {
   async getMetrics(compute: Compute): Promise<ComputeSnapshot> {
     const name = containerName(compute.name);
 
-    // Run all independent docker commands in parallel - non-blocking
-    const [statsOut, dfOut, startedAt, psOut, dockerStatsOut] = await Promise.all([
-      run("docker", ["stats", "--no-stream", "--format", "{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}", name]),
+    // Collapsed from the former two-call docker-stats pattern: one invocation
+    // returns name + cpu + memUsage + memPct, and we parse it once.
+    const [statsOut, dfOut, startedAt, psOut] = await Promise.all([
+      run("docker", ["stats", "--no-stream", "--format", "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}", name]),
       run("docker", ["exec", name, "df", "-h", "/"]),
       run("docker", ["inspect", "--format", "{{.State.StartedAt}}", name]),
       run("docker", ["exec", name, "ps", "aux"]),
-      run("docker", ["stats", "--no-stream", "--format", "{{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}", name]),
     ]);
 
-    // -- Container-level CPU / MEM from docker stats --
-    let cpu = 0;
-    let memUsedGb = 0;
-    let memTotalGb = 0;
-    let memPct = 0;
-
-    if (statsOut) {
-      const parts = statsOut.split("\t");
-      if (parts.length >= 3) {
-        cpu = parseFloat(parts[0].replace("%", "")) || 0;
-        memPct = parseFloat(parts[2].replace("%", "")) || 0;
-        // MemUsage looks like "123.4MiB / 7.776GiB"
-        const memMatch = parts[1].match(/([\d.]+)\s*(MiB|GiB|KiB)\s*\/\s*([\d.]+)\s*(MiB|GiB|KiB)/);
-        if (memMatch) {
-          memUsedGb = toGb(parseFloat(memMatch[1]), memMatch[2]);
-          memTotalGb = toGb(parseFloat(memMatch[3]), memMatch[4]);
-        }
-      }
-    }
+    const statsRows = parseDockerStats(statsOut);
+    const row = statsRows[0];
+    const cpu = row?.cpu ?? 0;
+    const memUsedGb = row?.memUsedGb ?? 0;
+    const memTotalGb = row?.memTotalGb ?? 0;
+    const memPct = row?.memPct ?? 0;
 
     // -- Disk usage inside the container --
     let diskPct = 0;
@@ -331,20 +357,15 @@ export class DockerProvider implements ComputeProvider {
       processes.splice(8); // keep top 8
     }
 
-    // -- Docker container info for the snapshot --
-    const docker: { name: string; cpu: string; memory: string; image: string; project: string }[] = [];
-    if (dockerStatsOut) {
-      for (const line of dockerStatsOut.split("\n").filter(Boolean)) {
-        const [cName, cCpu, cMemory] = line.split("\t");
-        docker.push({
-          name: cName?.trim() ?? "",
-          cpu: cCpu?.trim() ?? "",
-          memory: cMemory?.trim() ?? "",
-          image: ((compute.config as Record<string, unknown>).image as string) ?? "",
-          project: compute.name,
-        });
-      }
-    }
+    // -- Docker container info for the snapshot (reuses the single stats parse) --
+    const image = ((compute.config as Record<string, unknown>).image as string) ?? "";
+    const docker = statsRows.map((r) => ({
+      name: r.name,
+      cpu: r.cpuRaw,
+      memory: r.memRaw,
+      image,
+      project: compute.name,
+    }));
 
     const metrics: ComputeMetrics = {
       cpu,
