@@ -212,7 +212,7 @@ export type ApiClient = ReturnType<typeof makeApi>;
  * to `MockTransport` in tests) changes where all calls route with no globals.
  */
 export function makeApi(transport: WebTransport) {
-  const rpc = <T,>(method: string, params?: Record<string, unknown>): Promise<T> => transport.rpc<T>(method, params);
+  const rpc = <T>(method: string, params?: Record<string, unknown>): Promise<T> => transport.rpc<T>(method, params);
 
   return {
     // ── Sessions (Zod-typed) ──────────────────────────────────────────────────
@@ -311,8 +311,7 @@ export function makeApi(transport: WebTransport) {
         todo: r.todo,
       })),
     deleteTodo: (id: number) => rpc<TodoDeleteResponse>("todo/delete", { id } satisfies TodoDeleteRequest),
-    runVerification: (id: string) =>
-      rpc<VerifyRunResponse>("verify/run", { sessionId: id } satisfies VerifyRunRequest),
+    runVerification: (id: string) => rpc<VerifyRunResponse>("verify/run", { sessionId: id } satisfies VerifyRunRequest),
 
     // ── Costs ────────────────────────────────────────────────────────────────
     getCosts: () =>
@@ -325,8 +324,7 @@ export function makeApi(transport: WebTransport) {
     exportCosts: (format: string) => rpc<CostExportResponse>("cost/export", { format } satisfies CostExportRequest),
 
     // ── Search ───────────────────────────────────────────────────────────────
-    search: (q: string) =>
-      rpc<SearchSessionsResponse>("search/sessions", { query: q } satisfies SearchSessionsRequest),
+    search: (q: string) => rpc<SearchSessionsResponse>("search/sessions", { query: q } satisfies SearchSessionsRequest),
     searchGlobal: (q: string) => rpc<SearchGlobalResponse>("search/global", { query: q } satisfies SearchGlobalRequest),
 
     // ── History (Claude Code transcripts) ────────────────────────────────────
@@ -340,8 +338,7 @@ export function makeApi(transport: WebTransport) {
     rebuildHistory: () => rpc<HistoryRebuildFtsResponse>("history/rebuild-fts"),
 
     // ── Dashboard ────────────────────────────────────────────────────────────
-    getDashboardSummary: () =>
-      rpc<DashboardSummaryResponse>("dashboard/summary", {} satisfies DashboardSummaryRequest),
+    getDashboardSummary: () => rpc<DashboardSummaryResponse>("dashboard/summary", {} satisfies DashboardSummaryRequest),
 
     // ── System ───────────────────────────────────────────────────────────────
     getStatus: () => rpc<StatusGetResponse>("status/get"),

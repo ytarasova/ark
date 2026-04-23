@@ -115,7 +115,7 @@ export function SessionsPage({
       }
       return prev;
     });
-  }, [sessions]);
+  }, [api, sessions]);
 
   // Compute filtered sessions for keyboard navigation
   const filteredSessions = useMemo(() => {

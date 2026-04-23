@@ -41,22 +41,25 @@ export function FolderPickerModal({ initialPath, onSelect, onClose }: FolderPick
     }
   });
 
-  const load = useCallback((path: string | undefined) => {
-    setLoading(true);
-    setError(null);
-    api
-      .listDir(path)
-      .then((res) => {
-        setCwd(res.cwd);
-        setParent(res.parent);
-        setEntries(res.entries);
-        setPathInput(res.cwd);
-      })
-      .catch((err: Error) => {
-        setError(err.message || "Failed to list directory");
-      })
-      .finally(() => setLoading(false));
-  }, [api]);
+  const load = useCallback(
+    (path: string | undefined) => {
+      setLoading(true);
+      setError(null);
+      api
+        .listDir(path)
+        .then((res) => {
+          setCwd(res.cwd);
+          setParent(res.parent);
+          setEntries(res.entries);
+          setPathInput(res.cwd);
+        })
+        .catch((err: Error) => {
+          setError(err.message || "Failed to list directory");
+        })
+        .finally(() => setLoading(false));
+    },
+    [api],
+  );
 
   useEffect(() => {
     load(requestedPath);

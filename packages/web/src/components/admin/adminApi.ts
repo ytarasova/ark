@@ -13,7 +13,7 @@ import type { WebTransport } from "../../transport/types.js";
 import type { Tenant, Team, User, Membership, MembershipRole } from "./types.js";
 
 function makeAdminApi(transport: WebTransport) {
-  const rpc = <T,>(method: string, params?: Record<string, unknown>): Promise<T> => transport.rpc<T>(method, params);
+  const rpc = <T>(method: string, params?: Record<string, unknown>): Promise<T> => transport.rpc<T>(method, params);
 
   return {
     // Tenants

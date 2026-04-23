@@ -84,14 +84,4 @@ export class HttpTransport implements WebTransport {
       /* localStorage unavailable (private mode / sandbox) -- token stays in-memory only. */
     }
   }
-
-  /** Return the currently active bearer token, or `null` when unauthenticated. */
-  getToken(): string | null {
-    return this.token;
-  }
-
-  /** Expose the base URL. */
-  getBase(): string {
-    return this.base;
-  }
 }
