@@ -26,6 +26,7 @@ dist/
 ark-native
 packages/web/design-audit/
 packages/web/DESIGN-BRIEF.md
+.ui-audit/
 
 # Electron desktop app build output
 packages/desktop/out/
