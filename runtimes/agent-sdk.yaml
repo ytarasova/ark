@@ -38,3 +38,5 @@ billing:
 task_prompt: |
 
   When you finish, stop with a final assistant message that summarizes what you accomplished (files changed, tests added, key decisions). The UI picks up that summary automatically. Do not invent a "report" tool -- you don't have one.
+
+  If you need input from the user mid-run, call the `ask_user` tool with your question. Your next user message will contain their reply. Don't stop and wait -- call the tool and continue working on what you can, treating the reply as a normal user message when it arrives.

@@ -32,6 +32,7 @@ function resolveClaudeExecutable(): string | undefined {
 }
 import type { Options } from "@anthropic-ai/claude-agent-sdk";
 import { startInterventionTail } from "./intervention-tail.js";
+import { createAskUserMcpServer } from "./mcp-ask-user.js";
 
 /**
  * SDK user message shape accepted by the Anthropic Agent SDK when passing an
@@ -692,10 +693,24 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
   //   3. `claude` on PATH (dev workstations with npm-installed claude-code)
   const claudeExePath = resolveClaudeExecutable();
 
+  // Mount the ask_user MCP server so agents can ask mid-run questions as
+  // first-class conductor events (parity with the claude runtime's
+  // `report(question)` tool). Only when we can actually reach the conductor --
+  // tests skip this by leaving ARK_CONDUCTOR_URL unset.
+  const mcpServers: Record<string, ReturnType<typeof createAskUserMcpServer>> = {};
+  if (opts.conductorUrl) {
+    mcpServers["ark-ask-user"] = createAskUserMcpServer({
+      sessionId,
+      conductorUrl: opts.conductorUrl,
+      authToken: opts.authToken,
+      stage: process.env.ARK_STAGE ?? "",
+    });
+  }
+
   const sdkOptions: Options = {
     cwd: worktree,
     env: sdkEnv as Record<string, string | undefined>,
-    allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+    allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "mcp__ark-ask-user__ask_user"],
     permissionMode: "bypassPermissions",
     allowDangerouslySkipPermissions: true,
     executable: "bun",
@@ -704,6 +719,7 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
     maxBudgetUsd,
     systemPrompt: systemAppend ? { type: "preset", preset: "claude_code", append: systemAppend } : undefined,
     ...(claudeExePath ? { pathToClaudeCodeExecutable: claudeExePath } : {}),
+    ...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
   };
 
   // Mutable abort holder so the intervention tail always sees the current controller.
