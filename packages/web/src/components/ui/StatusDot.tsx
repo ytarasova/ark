@@ -41,12 +41,7 @@ export interface StatusDotProps extends React.ComponentProps<"span">, VariantPro
 export function StatusDot({ status, size, pulse, className, ...props }: StatusDotProps) {
   const showPulse = pulse && status === "running";
   return (
-    <span
-      role="status"
-      aria-label={status}
-      className={cn(dotVariants({ status, size }), className)}
-      {...props}
-    >
+    <span role="status" aria-label={status} className={cn(dotVariants({ status, size }), className)} {...props}>
       {showPulse && (
         <span
           aria-hidden

@@ -91,7 +91,11 @@ export function InputShell({ state = "default", leading, trailing, inputProps, c
       )}
       {...props}
     >
-      {leading && <span className="text-[var(--fg-faint)] text-[10px] font-medium uppercase tracking-[0.04em] shrink-0 font-[family-name:var(--font-mono-ui)]">{leading}</span>}
+      {leading && (
+        <span className="text-[var(--fg-faint)] text-[10px] font-medium uppercase tracking-[0.04em] shrink-0 font-[family-name:var(--font-mono-ui)]">
+          {leading}
+        </span>
+      )}
       <input
         {...inputProps}
         className={cn(

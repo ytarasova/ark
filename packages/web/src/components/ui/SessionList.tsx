@@ -253,11 +253,7 @@ function SessionCard({
         "border border-transparent",
         "transition-[background,border-color] duration-150",
         "hover:bg-[rgba(255,255,255,0.015)]",
-        selected && [
-          "bg-[var(--bg-card)]",
-          "border-[rgba(107,89,222,0.5)]",
-          "shadow-[0_1px_2px_rgba(0,0,0,0.2)]",
-        ],
+        selected && ["bg-[var(--bg-card)]", "border-[rgba(107,89,222,0.5)]", "shadow-[0_1px_2px_rgba(0,0,0,0.2)]"],
       )}
     >
       {/* unread marker (left edge) */}
@@ -330,20 +326,11 @@ function SessionCard({
 
       {/* Sparkline */}
       {session.sparkline && session.sparkline.length > 0 && (
-        <div
-          className={cn(
-            "flex items-end gap-[1px] h-[10px]",
-            selected ? "opacity-100" : "opacity-45",
-          )}
-          aria-hidden
-        >
+        <div className={cn("flex items-end gap-[1px] h-[10px]", selected ? "opacity-100" : "opacity-45")} aria-hidden>
           {session.sparkline.slice(0, 12).map((h, i) => (
             <span
               key={i}
-              className={cn(
-                "w-[2px] rounded-[1px]",
-                selected ? "bg-[var(--primary)]" : "bg-[var(--fg-muted)]",
-              )}
+              className={cn("w-[2px] rounded-[1px]", selected ? "bg-[var(--primary)]" : "bg-[var(--fg-muted)]")}
               style={{ height: `${Math.max(0, Math.min(1, h)) * 100}%` }}
             />
           ))}

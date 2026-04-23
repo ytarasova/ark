@@ -80,14 +80,7 @@ export function SessionLane({ percent, status, className, ...props }: SessionLan
             ? "var(--waiting)"
             : "var(--border)";
   return (
-    <div
-      className={cn(
-        "relative h-[3px] rounded-full overflow-hidden",
-        "bg-[var(--border)]",
-        className,
-      )}
-      {...props}
-    >
+    <div className={cn("relative h-[3px] rounded-full overflow-hidden", "bg-[var(--border)]", className)} {...props}>
       <div
         className="relative h-full rounded-full overflow-hidden"
         style={{ width: `${pct * 100}%`, background: fillBg }}

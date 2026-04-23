@@ -34,7 +34,12 @@ const BASE_NAV_ITEMS: IconRailItem[] = [
   { id: "costs", icon: <DollarSign size={15} strokeWidth={1.5} />, label: "Costs", shortcut: "$" },
 ];
 
-const SETTINGS_ITEM: IconRailItem = { id: "settings", icon: <Cog size={15} strokeWidth={1.5} />, label: "Settings", shortcut: "," };
+const SETTINGS_ITEM: IconRailItem = {
+  id: "settings",
+  icon: <Cog size={15} strokeWidth={1.5} />,
+  label: "Settings",
+  shortcut: ",",
+};
 
 const SHORTCUTS: Record<string, string> = {
   s: "sessions",

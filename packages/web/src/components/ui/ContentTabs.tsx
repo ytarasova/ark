@@ -49,11 +49,7 @@ export function ContentTabs({
     <div
       role="tablist"
       aria-label={ariaLabel}
-      className={cn(
-        "flex items-end gap-[2px] shrink-0",
-        "px-[18px] border-b border-[var(--border)]",
-        className,
-      )}
+      className={cn("flex items-end gap-[2px] shrink-0", "px-[18px] border-b border-[var(--border)]", className)}
       {...props}
     >
       {tabs.map((tab) => {

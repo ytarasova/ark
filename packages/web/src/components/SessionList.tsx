@@ -108,12 +108,24 @@ export function SessionListPanel({
 
   const filterChips = (
     <>
-      <FilterChip label={`Active ${totalActive}`} active={filter === "active"} onClick={() => onFilterChange(filter === "active" ? "all" : "active")} />
+      <FilterChip
+        label={`Active ${totalActive}`}
+        active={filter === "active"}
+        onClick={() => onFilterChange(filter === "active" ? "all" : "active")}
+      />
       {counts.completed > 0 && (
-        <FilterChip label={`Done ${counts.completed}`} active={filter === "completed"} onClick={() => onFilterChange(filter === "completed" ? "all" : "completed")} />
+        <FilterChip
+          label={`Done ${counts.completed}`}
+          active={filter === "completed"}
+          onClick={() => onFilterChange(filter === "completed" ? "all" : "completed")}
+        />
       )}
       {counts.failed > 0 && (
-        <FilterChip label={`Failed ${counts.failed}`} active={filter === "failed"} onClick={() => onFilterChange(filter === "failed" ? "all" : "failed")} />
+        <FilterChip
+          label={`Failed ${counts.failed}`}
+          active={filter === "failed"}
+          onClick={() => onFilterChange(filter === "failed" ? "all" : "failed")}
+        />
       )}
       <FilterChip label="All" active={filter === "all"} onClick={() => onFilterChange("all")} />
     </>

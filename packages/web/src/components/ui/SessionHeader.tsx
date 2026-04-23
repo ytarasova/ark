@@ -73,13 +73,7 @@ export function SessionHeader({
   const crumbs = breadcrumb ?? ["ark", "sessions"];
   const statusMeta = getStatusPillStyle(status);
   return (
-    <div
-      className={cn(
-        "shrink-0 flex flex-col border-b border-[var(--border)] bg-[var(--bg)]",
-        className,
-      )}
-      {...props}
-    >
+    <div className={cn("shrink-0 flex flex-col border-b border-[var(--border)] bg-[var(--bg)]", className)} {...props}>
       {/* ── Breadcrumb + status + ticker row (44px) ─────────────────── */}
       <div className="h-[44px] px-[18px] flex items-center gap-[10px]">
         <div className="font-[family-name:var(--font-mono-ui)] text-[11px] font-normal text-[var(--fg-muted)] flex items-center gap-[6px]">

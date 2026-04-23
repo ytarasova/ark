@@ -146,7 +146,9 @@ export function IconRail({
 
       {/* Settings + avatar (pinned bottom) -------------------------------- */}
       <div className="flex flex-col items-center gap-[2px] py-[2px] border-t border-[rgba(255,255,255,0.04)] shrink-0">
-        {settingsItem && <RailButton item={settingsItem} active={activeId === settingsItem.id} onSelect={onSelect} settings />}
+        {settingsItem && (
+          <RailButton item={settingsItem} active={activeId === settingsItem.id} onSelect={onSelect} settings />
+        )}
         {avatarInitials && (
           <div
             className="w-[26px] h-[26px] my-[3px] rounded-full grid place-items-center border border-[rgba(0,0,0,0.25)] shadow-[0_1px_2px_rgba(0,0,0,0.2)] bg-[var(--primary)] text-white font-semibold text-[10px] font-[family-name:var(--font-mono-ui)]"
@@ -203,9 +205,7 @@ function RailButton({
       className={cn(
         "group relative flex items-center justify-center cursor-pointer",
         "bg-transparent border-0 text-[var(--fg-muted)] transition-colors duration-[120ms]",
-        settings
-          ? "w-[32px] h-[28px] rounded-[6px]"
-          : "w-[40px] h-[32px] rounded-[7px]",
+        settings ? "w-[32px] h-[28px] rounded-[6px]" : "w-[40px] h-[32px] rounded-[7px]",
         "[&_svg]:w-[15px] [&_svg]:h-[15px] [&_svg]:opacity-[.75] [&_svg]:transition-opacity",
         "hover:text-[var(--fg)] hover:bg-[rgba(255,255,255,0.04)] hover:[&_svg]:opacity-100",
         active && [

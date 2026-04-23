@@ -62,7 +62,18 @@ export function ForEachRollup({
           {inflight > 0 && <span className="text-[var(--running)]"> · {inflight} in flight</span>}
         </span>
       </div>
-      <SessionLane percent={pct} status={inflight > 0 ? "running" : failed > 0 && completed < total ? "failed" : completed === total ? "completed" : "waiting"} />
+      <SessionLane
+        percent={pct}
+        status={
+          inflight > 0
+            ? "running"
+            : failed > 0 && completed < total
+              ? "failed"
+              : completed === total
+                ? "completed"
+                : "waiting"
+        }
+      />
 
       {iterations && iterations.length > 0 && (
         <div className="flex flex-col gap-[2px] max-h-[240px] overflow-y-auto -mx-[4px]">
@@ -82,9 +93,7 @@ export function ForEachRollup({
               )}
             >
               <span className="tabular-nums text-[var(--fg-faint)]">{String(it.index).padStart(2, "0")}</span>
-              <span className="min-w-0 truncate">
-                {it.label ?? it.sessionId ?? `iteration ${it.index}`}
-              </span>
+              <span className="min-w-0 truncate">{it.label ?? it.sessionId ?? `iteration ${it.index}`}</span>
               <span className="flex items-center gap-[6px] shrink-0">
                 {it.elapsed && <span className="tabular-nums">{it.elapsed}</span>}
                 {it.cost && <span className="tabular-nums">{it.cost}</span>}

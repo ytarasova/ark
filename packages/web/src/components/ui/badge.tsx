@@ -122,8 +122,7 @@ const tagChipVariants = cva(
     variants: {
       variant: {
         /** Runtime / compute: dark matte gradient + fg. */
-        default:
-          "bg-[linear-gradient(180deg,#222238_0%,#1a1a2b_100%)] text-[var(--fg)] border-[var(--border)]",
+        default: "bg-[linear-gradient(180deg,#222238_0%,#1a1a2b_100%)] text-[var(--fg)] border-[var(--border)]",
         /** Agent chip: purple gradient + lavender fg. */
         primary:
           "bg-[linear-gradient(180deg,rgba(139,122,255,0.25),rgba(107,89,222,0.12))] text-[#b0a3ff] border-[rgba(107,89,222,0.35)]",

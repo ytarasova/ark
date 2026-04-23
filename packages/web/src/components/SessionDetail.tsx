@@ -117,10 +117,12 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         runtime={session.runtime || session.agent_runtime}
         agent={session.agent}
         compute={session.compute_provider || session.compute_kind}
-        kvs={[
-          session.branch ? { k: "branch", v: session.branch, mono: true } : null,
-          session.flow ? { k: "flow", v: session.flow } : null,
-        ].filter(Boolean) as any}
+        kvs={
+          [
+            session.branch ? { k: "branch", v: session.branch, mono: true } : null,
+            session.flow ? { k: "flow", v: session.flow } : null,
+          ].filter(Boolean) as any
+        }
         tickers={
           d.cost?.cost != null
             ? [
@@ -153,9 +155,7 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
       {/* Phase 3: resume-from-checkpoint banner. Surfaces when the session
           has a stored for_each_checkpoint and isn't running. */}
       {session.config?.for_each_checkpoint && session.status !== "running" && (
-        <ResumeBanner
-          checkpoint={`iteration ${session.config.for_each_checkpoint.index ?? "?"}`}
-        />
+        <ResumeBanner checkpoint={`iteration ${session.config.for_each_checkpoint.index ?? "?"}`} />
       )}
 
       {/* Phase 3: per-session budget cap bar. */}
