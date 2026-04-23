@@ -79,7 +79,15 @@ export async function garbageCollectComputeIfTemplate(
   }
 
   try {
-    await app.computes.delete(computeName);
+    // P0-1: route through ComputeService so the canDelete guard runs for
+    // non-clone rows. Clones are ephemeral by construction and must be
+    // reapable even when the provider refuses user-initiated deletion,
+    // so use the narrow bypass forceDeleteClone() for them.
+    if (isClone) {
+      await app.computeService.forceDeleteClone(computeName);
+    } else {
+      await app.computeService.delete(computeName);
+    }
     const reason = isClone ? `cloned from '${compute.cloned_from}'` : `${compute.compute_kind}/${compute.runtime_kind}`;
     logInfo("compute-pool", `gc'd compute '${computeName}' (${reason}) -- no live sessions reference it`);
     return true;

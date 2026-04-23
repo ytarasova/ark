@@ -9,6 +9,54 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import { AppContext } from "../../app.js";
 import { garbageCollectComputeIfTemplate } from "../compute-lifecycle.js";
+import type { ComputeProvider } from "../../../compute/types.js";
+
+// A minimal provider stub used to exercise the `canDelete=false` branch in
+// the GC path. Registered under a unique name per test to avoid clobbering
+// the default registry entries (docker/local/k8s/...).
+function makeStubProvider(overrides: Partial<ComputeProvider> & { name: string }): ComputeProvider {
+  return {
+    isolationModes: [],
+    singleton: false,
+    canReboot: false,
+    canDelete: true,
+    supportsWorktree: false,
+    initialStatus: "stopped",
+    needsAuth: false,
+    provision: async () => {},
+    destroy: async () => {},
+    start: async () => {},
+    stop: async () => {},
+    launch: async () => "tmux-name",
+    attach: async () => {},
+    killAgent: async () => {},
+    captureOutput: async () => "",
+    cleanupSession: async () => {},
+    getMetrics: async () => ({
+      metrics: {
+        cpu: 0,
+        memUsedGb: 0,
+        memTotalGb: 0,
+        memPct: 0,
+        diskPct: 0,
+        netRxMb: 0,
+        netTxMb: 0,
+        uptime: "",
+        idleTicks: 0,
+      },
+      sessions: [],
+      processes: [],
+      docker: [],
+    }),
+    probePorts: async () => [],
+    syncEnvironment: async () => {},
+    checkSession: async () => false,
+    getAttachCommand: () => [],
+    buildChannelConfig: () => ({}),
+    buildLaunchEnv: () => ({}),
+    ...overrides,
+  };
+}
 
 let app: AppContext;
 
@@ -132,5 +180,69 @@ describe("garbageCollectComputeIfTemplate", () => {
     const gc = await garbageCollectComputeIfTemplate(app, "ec2-persistent");
     expect(gc).toBe(false);
     expect(await app.computes.get("ec2-persistent")).not.toBeNull();
+  });
+
+  // ── P0-1: GC must honour provider.canDelete for non-clone rows ──────────
+  //
+  // Before the P0-1 fix, GC called `app.computes.delete()` directly, skipping
+  // the `canDelete` guard installed in `ComputeService.delete()`. A row whose
+  // provider advertises `canDelete=false` was reaped anyway. The fix routes
+  // non-clone deletions through `ComputeService.delete()` and only clones
+  // bypass the guard via the narrow `forceDeleteClone()` helper.
+
+  it("does NOT gc a template-lifecycle row when provider.canDelete=false (non-clone)", async () => {
+    // Register a stub provider that's template-lifecycle (k8s+direct) but
+    // refuses deletion. This simulates a provider class that manages
+    // infrastructure externally -- deleting the row through GC would leak
+    // the external resource. The service-layer canDelete guard must kick in
+    // and the GC helper must swallow the resulting error and return false.
+    app.registerProvider(makeStubProvider({ name: "stub-nodelete", canDelete: false }));
+    await app.computeService.create({
+      name: "stub-row",
+      provider: "stub-nodelete" as any,
+      compute: "k8s",
+      runtime: "direct",
+      config: {},
+    });
+
+    const gc = await garbageCollectComputeIfTemplate(app, "stub-row");
+    expect(gc).toBe(false);
+    // Row must still exist: the canDelete=false guard protected it.
+    expect(await app.computes.get("stub-row")).not.toBeNull();
+  });
+
+  it("DOES gc a clone row even when provider.canDelete=false (force-delete bypass)", async () => {
+    // Contrast with the previous test: same provider (canDelete=false), but
+    // the row is a clone. Clones are ephemeral by construction -- the GC
+    // sweep uses `ComputeService.forceDeleteClone()` to bypass the guard
+    // for clone rows only. Non-clone rows still refuse deletion.
+    app.registerProvider(makeStubProvider({ name: "stub-nodelete-2", canDelete: false }));
+
+    // Template parent first (is_template exempts it from the singleton / GC
+    // paths so we can keep it around as a blueprint).
+    await app.computeService.create({
+      name: "stub-parent",
+      provider: "stub-nodelete-2" as any,
+      compute: "k8s",
+      runtime: "direct",
+      is_template: true,
+      config: {},
+    });
+    // Clone of the parent.
+    await app.computeService.create({
+      name: "stub-clone",
+      provider: "stub-nodelete-2" as any,
+      compute: "k8s",
+      runtime: "direct",
+      cloned_from: "stub-parent",
+      config: {},
+    });
+
+    const gc = await garbageCollectComputeIfTemplate(app, "stub-clone");
+    expect(gc).toBe(true);
+    expect(await app.computes.get("stub-clone")).toBeNull();
+    // Parent template is NOT touched by GC (is_template short-circuits the
+    // helper well before it gets anywhere near delete()).
+    expect(await app.computes.get("stub-parent")).not.toBeNull();
   });
 });

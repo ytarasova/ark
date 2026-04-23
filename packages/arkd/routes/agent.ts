@@ -6,7 +6,8 @@
  * shell command is spawned.
  */
 
-import { writeFile } from "fs/promises";
+import { writeFile, mkdir } from "fs/promises";
+import { join } from "path";
 import type {
   AgentLaunchReq,
   AgentLaunchRes,
@@ -19,7 +20,7 @@ import type {
 } from "../types.js";
 import { json, readStream, requireSafeTmuxName, SAFE_TMUX_NAME_RE, type BunLike, type RouteCtx } from "../internal.js";
 
-async function agentLaunch(req: AgentLaunchReq): Promise<AgentLaunchRes> {
+async function agentLaunch(req: AgentLaunchReq, ctx: RouteCtx): Promise<AgentLaunchRes> {
   const Bun = (globalThis as unknown as { Bun: BunLike }).Bun;
   if (typeof req.sessionName !== "string" || !SAFE_TMUX_NAME_RE.test(req.sessionName)) {
     throw new Error("invalid sessionName: must match [A-Za-z0-9_-]{1,64}");
@@ -27,8 +28,24 @@ async function agentLaunch(req: AgentLaunchReq): Promise<AgentLaunchRes> {
   if (typeof req.workdir !== "string" || req.workdir.includes("\0")) {
     throw new Error("invalid workdir");
   }
-  // Write launcher script to a temp file
-  const scriptPath = `/tmp/arkd-launcher-${req.sessionName}.sh`;
+  // P1-6: confine the caller-supplied workdir to the workspace root when
+  // confinement is enabled. In legacy unconfined mode this only validates
+  // the input type, preserving back-compat.
+  const workdir = ctx.confine(req.workdir);
+
+  // Launcher script path: in confined mode, keep the script inside the
+  // workspace (under .ark/launchers/) so it never lands in the shared /tmp
+  // namespace where any local user could race or clobber it. In legacy
+  // unconfined mode, preserve the historical /tmp path so single-user
+  // installs behave as before.
+  let scriptPath: string;
+  if (ctx.workspaceRoot) {
+    const launcherDir = join(ctx.workspaceRoot, ".ark", "launchers");
+    await mkdir(launcherDir, { recursive: true });
+    scriptPath = join(launcherDir, `${req.sessionName}.sh`);
+  } else {
+    scriptPath = `/tmp/arkd-launcher-${req.sessionName}.sh`;
+  }
   await writeFile(scriptPath, req.script, { mode: 0o755 });
 
   const proc = Bun.spawn({
@@ -43,7 +60,7 @@ async function agentLaunch(req: AgentLaunchReq): Promise<AgentLaunchRes> {
       "-y",
       "50",
       "-c",
-      req.workdir,
+      workdir,
       `bash ${scriptPath}`,
     ],
     stdout: "pipe",
@@ -104,10 +121,10 @@ async function isTmuxRunning(sessionName: string): Promise<boolean> {
   return code === 0;
 }
 
-export async function handleAgentRoutes(req: Request, path: string, _ctx: RouteCtx): Promise<Response | null> {
+export async function handleAgentRoutes(req: Request, path: string, ctx: RouteCtx): Promise<Response | null> {
   if (req.method === "POST" && path === "/agent/launch") {
     const body = (await req.json()) as AgentLaunchReq;
-    return json(await agentLaunch(body));
+    return json(await agentLaunch(body, ctx));
   }
   if (req.method === "POST" && path === "/agent/kill") {
     const body = (await req.json()) as AgentKillReq;

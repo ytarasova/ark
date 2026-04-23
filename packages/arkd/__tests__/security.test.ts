@@ -157,12 +157,14 @@ describe("ArkD exec command allowlist", async () => {
 // local-only / single-user deployments (tested elsewhere).
 
 describe("ArkD workspace confinement (P1-4)", async () => {
-  const CONFINE_PORT = 19372;
-  const CONFINE_BASE = `http://localhost:${CONFINE_PORT}`;
+  let CONFINE_PORT: number;
+  let CONFINE_BASE: string;
   let server: { stop(): void };
   let workspaceRoot: string;
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    CONFINE_PORT = await allocatePort();
+    CONFINE_BASE = `http://localhost:${CONFINE_PORT}`;
     workspaceRoot = mkdtempSync(join(tmpdir(), "arkd-confined-"));
     // Seed a readable file inside the root so happy-path tests have something
     // to read back without depending on the host filesystem.
@@ -276,5 +278,52 @@ describe("ArkD workspace confinement (P1-4)", async () => {
     // component, which is unique per `mkdtempSync` invocation.
     const lastSeg = workspaceRoot.split("/").filter(Boolean).pop()!;
     expect(data.stdout.trim()).toContain(lastSeg);
+  });
+
+  // ── P0-4: /codegraph/index confinement ──────────────────────────────
+  //
+  // /codegraph/index takes a `repoPath` from the request body and uses it
+  // for (a) Bun.spawn cwd and (b) SQLite DB open at `<repoPath>/.codegraph/graph.db`.
+  // Both sinks must reject a path that escapes the workspace root.
+
+  it("/codegraph/index rejects a path-traversal repoPath with 403", async () => {
+    const resp = await fetch(`${CONFINE_BASE}/codegraph/index`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repoPath: "../../etc" }),
+    });
+    expect(resp.status).toBe(403);
+    const data = (await resp.json()) as any;
+    expect(data.error).toMatch(/workspace/);
+  });
+
+  it("/codegraph/index rejects an absolute escape repoPath with 403", async () => {
+    const resp = await fetch(`${CONFINE_BASE}/codegraph/index`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ repoPath: "/etc" }),
+    });
+    expect(resp.status).toBe(403);
+  });
+
+  // ── P1-6: /agent/launch workdir confinement ─────────────────────────
+  //
+  // `workdir` is attacker-controllable and is passed verbatim to `tmux -c`.
+  // When confinement is on, a traversal workdir must be refused before we
+  // write any launcher script or invoke tmux.
+
+  it("/agent/launch rejects a path-traversal workdir with 403", async () => {
+    const resp = await fetch(`${CONFINE_BASE}/agent/launch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionName: "ark-confine-test",
+        script: "#!/bin/sh\ntrue\n",
+        workdir: "../../etc",
+      }),
+    });
+    expect(resp.status).toBe(403);
+    const data = (await resp.json()) as any;
+    expect(data.error).toMatch(/workspace/);
   });
 });

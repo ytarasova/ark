@@ -126,4 +126,28 @@ export class ComputeService {
     }
     return this.computes.delete(name);
   }
+
+  /**
+   * Garbage-collect a *clone* row even when the provider has `canDelete=false`.
+   *
+   * The `canDelete` guard on `delete()` exists to protect user-provisioned
+   * persistent infrastructure (e.g. the singleton "local" row, a manually
+   * provisioned EC2 box) from being removed through the regular lifecycle
+   * GC sweep. Clones -- rows with `cloned_from` set -- are ephemeral by
+   * construction: the dispatcher creates one per session and the row has
+   * no meaning once the session reaches a terminal state.
+   *
+   * This method refuses to bypass the guard unless the row actually is a
+   * clone. That asymmetry is deliberate: a caller that wants to remove a
+   * non-clone row must go through `delete()` and surface the
+   * `canDelete=false` error to the user.
+   */
+  async forceDeleteClone(name: string): Promise<boolean> {
+    const row = await this.computes.get(name);
+    if (!row) return false;
+    if (!row.cloned_from) {
+      throw new Error(`forceDeleteClone refused: '${name}' is not a clone (cloned_from is null)`);
+    }
+    return this.computes.delete(name);
+  }
 }

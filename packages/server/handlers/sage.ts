@@ -89,10 +89,17 @@ export function registerSageHandlers(router: Router, app: AppContext): void {
     // Materialise analysis JSON on disk so the flow can consume it via
     // inputs.files.analysis_json. Uses the daemon's arkDir (scoped apps
     // inherit config from the root, so this is always the daemon's dir).
-    const sageDir = join(scoped.config.arkDir, "sage");
-    mkdirSync(sageDir, { recursive: true });
+    //
+    // P1-5: segment the on-disk path per tenant so two tenants with the
+    // same jira_id don't stomp each other's analysis file. Bucket is the
+    // tenant id when scoped, else "_default" for single-tenant installs.
+    // File is created with 0o600 so it isn't world-readable -- analysis
+    // payloads can contain internal planning / ticket detail.
+    const tenantBucket = scoped.tenantId ?? "_default";
+    const sageDir = join(scoped.config.arkDir, "sage", tenantBucket);
+    mkdirSync(sageDir, { recursive: true, mode: 0o700 });
     const analysisPath = join(sageDir, `${analysis.jira_id}.analysis.json`);
-    writeFileSync(analysisPath, JSON.stringify(analysis, null, 2), "utf-8");
+    writeFileSync(analysisPath, JSON.stringify(analysis, null, 2), { mode: 0o600, encoding: "utf-8" });
 
     const summary = `sage:${analysis.jira_id}`;
     const session = await scoped.sessionLifecycle.start({

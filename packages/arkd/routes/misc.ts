@@ -11,10 +11,13 @@ import { join } from "path";
 import type { ConfigReq, ConfigRes } from "../types.js";
 import { json, type BunLike, type RouteCtx } from "../internal.js";
 
-async function handleCodegraph(req: Request): Promise<Response> {
+async function handleCodegraph(req: Request, ctx: RouteCtx): Promise<Response> {
   const Bun = (globalThis as unknown as { Bun: BunLike }).Bun;
   const body = (await req.json()) as { repoPath: string; incremental?: boolean };
-  const repoPath = body.repoPath;
+  // Confine the attacker-supplied repoPath to the workspace root (P0-4).
+  // When workspaceRoot is unset (legacy single-user mode) confine is a no-op
+  // after a type check, preserving back-compat.
+  const repoPath = ctx.confine(body.repoPath);
 
   // Find codegraph binary: node_modules/.bin -> PATH
   const { existsSync: existsSyncFs } = await import("fs");
@@ -89,7 +92,7 @@ async function proxyToCondutor(req: Request, conductorUrl: string | null, path: 
 
 export async function handleMiscRoutes(req: Request, path: string, ctx: RouteCtx): Promise<Response | null> {
   if (req.method === "POST" && path === "/codegraph/index") {
-    return handleCodegraph(req);
+    return handleCodegraph(req, ctx);
   }
 
   if (req.method === "POST" && path === "/config") {
