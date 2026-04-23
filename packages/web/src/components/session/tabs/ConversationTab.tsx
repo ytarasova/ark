@@ -5,6 +5,7 @@ import { UserMessage } from "../../ui/UserMessage.js";
 import { SystemEvent } from "../../ui/SystemEvent.js";
 import { ToolCallRow } from "../../ui/ToolCallRow.js";
 import { ToolCallFailed } from "../../ui/ToolCallFailed.js";
+import { ToolBlock } from "../tool-block/index.js";
 import { TypingIndicator } from "../../ui/TypingIndicator.js";
 import { SessionSummary } from "../../ui/SessionSummary.js";
 import { AttachedFiles } from "../AttachedFiles.js";
@@ -118,6 +119,20 @@ export function ConversationTab({
           );
         if (item.kind === "system") return <SystemEvent key={"s-" + i}>{item.content}</SystemEvent>;
         if (item.kind === "tool") {
+          if (item.toolName) {
+            const blockStatus = item.status === "running" ? "running" : item.status === "error" ? "err" : "ok";
+            return (
+              <ToolBlock
+                key={"t-" + i}
+                name={item.toolName}
+                input={item.toolInput}
+                output={item.toolOutput}
+                status={blockStatus}
+                durationMs={item.durationMs}
+                elapsed={item.duration}
+              />
+            );
+          }
           if (item.status === "error")
             return <ToolCallFailed key={"t-" + i} label={item.label} duration={item.duration} error={item.error} />;
           return <ToolCallRow key={"t-" + i} label={item.label} duration={item.duration} status={item.status} />;

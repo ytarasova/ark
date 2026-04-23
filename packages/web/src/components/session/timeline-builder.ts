@@ -174,24 +174,32 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
 
         if (hookEvent === "PreToolUse") {
           const toolName = hookData.tool_name || "tool";
+          const toolInput = hookData.tool_input || hookData.input;
           const inputSummary = formatToolInput(hookData);
           const label = inputSummary ? `${toolName}: ${inputSummary}` : toolName;
           const idx = items.length;
           items.push({
             kind: "tool",
+            toolName,
+            toolInput,
             label,
             timestamp: formatTime(item.created_at),
             status: "running" as const,
+            durationMs: undefined,
             stage: evStage,
           });
           pendingTools.set(toolName, idx);
         } else if (hookEvent === "PostToolUse") {
           const toolName = hookData.tool_name || "tool";
+          const toolInput = hookData.tool_input || hookData.input;
+          const toolOutput = hookData.tool_response || hookData.tool_output || hookData.output;
           const pendingIdx = pendingTools.get(toolName);
           if (pendingIdx !== undefined && items[pendingIdx]) {
             items[pendingIdx].status = "done";
+            items[pendingIdx].toolOutput = toolOutput;
             if (hookData.duration) {
               items[pendingIdx].duration = (hookData.duration / 1000).toFixed(1) + "s";
+              items[pendingIdx].durationMs = hookData.duration;
             }
             pendingTools.delete(toolName);
           } else {
@@ -199,10 +207,14 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
             const label = inputSummary ? `${toolName}: ${inputSummary}` : toolName;
             items.push({
               kind: "tool",
+              toolName,
+              toolInput,
+              toolOutput,
               label,
               timestamp: formatTime(item.created_at),
               status: "done" as const,
               duration: hookData.duration ? (hookData.duration / 1000).toFixed(1) + "s" : undefined,
+              durationMs: hookData.duration,
               stage: evStage,
             });
           }
