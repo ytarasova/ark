@@ -26,7 +26,7 @@ secrets:
 #             SNI routing works, (c) expands short model slugs like
 #             `claude-sonnet-4-6` to their full provider path (e.g.
 #             `pi-agentic/global.anthropic.claude-sonnet-4-6`).
-compat: []
+compat: [bedrock]
 billing:
   mode: api
   transcript_parser: agent-sdk
