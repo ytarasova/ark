@@ -15,7 +15,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, spyOn, mock } from "bun:test";
 import { join } from "path";
-import { mkdirSync, existsSync } from "fs";
+import { mkdirSync, existsSync, writeFileSync } from "fs";
 import { AppContext } from "../app.js";
 import { resolveAgentWithRuntime } from "../agent/agent.js";
 import { agentSdkExecutor } from "../executors/agent-sdk.js";
@@ -98,9 +98,100 @@ describe("agentSdkExecutor interface", () => {
     await agentSdkExecutor.kill("sdk-does-not-exist");
   });
 
-  it("capture returns empty string (no tmux pane)", async () => {
+  it("capture returns empty string for unknown handle (no tracked entry)", async () => {
     const out = await agentSdkExecutor.capture("sdk-does-not-exist", 20);
     expect(out).toBe("");
+  });
+});
+
+// ── capture(): reads transcript.jsonl + stdio.log when process is tracked ────
+
+describe("agentSdkExecutor.capture -- from tracked entry", () => {
+  /**
+   * We exercise capture() by launching with a mock spawn (so the TrackedSdkProcess
+   * entry is registered in the module-level map) and then writing transcript.jsonl
+   * and stdio.log into the resulting sessionDir before calling capture().
+   */
+  function makeFakeProc(exitCode = 0) {
+    const exited = Promise.resolve(exitCode);
+    return {
+      pid: 88888,
+      exitCode,
+      stdout: null,
+      stderr: null,
+      exited,
+      kill: mock(() => {}),
+    } as unknown as ReturnType<typeof Bun.spawn>;
+  }
+
+  it("returns formatted transcript lines + stdio section", async () => {
+    const session = await app.sessions.create({
+      summary: "capture test",
+      workdir: app.config.arkDir,
+      flow: "autonomous-sdlc",
+    });
+
+    const spawnSpy = spyOn(Bun, "spawn").mockImplementation((_opts: any) => makeFakeProc(0));
+
+    try {
+      const agent = {
+        name: "worker",
+        model: "claude-sonnet-4-6",
+        max_turns: 10,
+        system_prompt: "",
+        tools: [],
+        skills: [],
+        mcp_servers: [],
+        permission_mode: "bypassPermissions",
+        env: {},
+        runtime: "agent-sdk",
+        _resolved_runtime_type: "agent-sdk",
+      };
+
+      const result = await agentSdkExecutor.launch({
+        sessionId: session.id,
+        workdir: app.config.arkDir,
+        agent,
+        task: "capture test task",
+        env: { ANTHROPIC_API_KEY: "test" },
+        onLog: () => {},
+        app,
+      });
+
+      expect(result.ok).toBe(true);
+      const handle = result.handle;
+
+      // Write synthetic transcript.jsonl and stdio.log into the session dir
+      const sessionDir = join(app.config.tracksDir, session.id);
+      mkdirSync(sessionDir, { recursive: true });
+
+      const transcriptLines = [
+        JSON.stringify({ type: "system", subtype: "init", cwd: "/repo", model: "claude-sonnet-4-6", tools: ["Read"] }),
+        JSON.stringify({
+          type: "result",
+          subtype: "success",
+          is_error: false,
+          total_cost_usd: 0.0042,
+          num_turns: 2,
+          duration_ms: 6000,
+        }),
+      ];
+      writeFileSync(join(sessionDir, "transcript.jsonl"), transcriptLines.join("\n") + "\n");
+      writeFileSync(join(sessionDir, "stdio.log"), "[exec 2026-04-22T19:51:00Z] agent-sdk compat modes: (none)\n");
+
+      const output = await agentSdkExecutor.capture(handle, 80);
+
+      // Transcript lines should be formatted
+      expect(output).toContain("system/init");
+      expect(output).toContain("claude-sonnet-4-6");
+      expect(output).toContain("result/success");
+      expect(output).toContain("$0.0042");
+      // Stdio section should appear
+      expect(output).toContain("--- stdio ---");
+      expect(output).toContain("agent-sdk compat modes");
+    } finally {
+      spawnSpy.mockRestore();
+    }
   });
 });
 

@@ -1,6 +1,7 @@
 import { type Command, Option } from "commander";
 import chalk from "chalk";
 import { execSync } from "child_process";
+import { join } from "path";
 import * as core from "../../../core/index.js";
 import { SESSION_STATUSES } from "../../../types/index.js";
 import { getArkClient } from "../../app-client.js";
@@ -90,11 +91,60 @@ export function registerViewCommands(session: Command) {
     .argument("<id>")
     .option("--print-only", "Print the attach command instead of running it")
     .action(async (id, opts) => {
-      // Resolve the attach command via the RPC. The server returns
-      // attachable:false for completed/failed/archived/not-yet-dispatched
-      // sessions so we can surface a friendly message instead of trying to
-      // spawn `tmux attach` against a pane that doesn't exist.
       const ark = await getArkClient();
+
+      // Check if this is an agent-sdk session -- those have no tmux pane.
+      // Read the session to inspect config.launch_executor, then tail
+      // transcript.jsonl + stdio.log instead of spawning tmux attach.
+      let sessionData: any;
+      try {
+        const r = await ark.sessionRead(id);
+        sessionData = r.session;
+      } catch {
+        // Session may not exist; let sessionAttachCommand surface the error below.
+      }
+
+      const launchExecutor = (sessionData?.config as Record<string, unknown> | undefined)?.launch_executor;
+      if (launchExecutor === "agent-sdk") {
+        if (
+          sessionData?.status === "completed" ||
+          sessionData?.status === "failed" ||
+          sessionData?.status === "archived"
+        ) {
+          console.error(chalk.red(`Session is ${sessionData.status}; no live output stream.`));
+          console.error(chalk.dim("Use `ark session output <id>` to view the transcript."));
+          process.exit(1);
+        }
+
+        // Derive tracksDir from local config (same path the server uses).
+        const { loadConfig } = await import("../../../core/config.js");
+        const config = loadConfig();
+        const transcriptPath = join(config.tracksDir, id, "transcript.jsonl");
+        const stdioPath = join(config.tracksDir, id, "stdio.log");
+
+        if (opts.printOnly) {
+          process.stdout.write(`tail -n 200 -F ${transcriptPath} ${stdioPath}\n`);
+          return;
+        }
+
+        console.log(chalk.dim(`Attaching to agent-sdk session ${id} (Ctrl-C to detach)`));
+        console.log(chalk.dim(`Tailing: ${transcriptPath}`));
+
+        // Tail both files raw. Use `ark session output` for the pretty-formatted
+        // one-shot view; live formatted tailing is deferred to a future pass.
+        const proc = Bun.spawn({
+          cmd: ["tail", "-n", "200", "-F", transcriptPath, stdioPath],
+          stdout: "inherit",
+          stderr: "inherit",
+        });
+        await proc.exited;
+        return;
+      }
+
+      // Non-agent-sdk path: resolve the attach command via RPC. The server returns
+      // attachable:false for completed/failed/archived/not-yet-dispatched sessions
+      // so we can surface a friendly message instead of trying to spawn
+      // `tmux attach` against a pane that doesn't exist.
       let res: { command: string; displayHint: string; attachable: boolean; reason?: string };
       try {
         res = await ark.sessionAttachCommand(id);

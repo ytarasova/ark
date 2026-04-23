@@ -14,16 +14,19 @@
  *     immediately clear in logs that this is a subprocess, not a tmux session.
  */
 
-import { mkdirSync, appendFileSync } from "fs";
+import { mkdirSync, appendFileSync, readFileSync, existsSync } from "fs";
 import { join } from "path";
 
 import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../executor.js";
 import { agentSdkLaunchSpec } from "../install-paths.js";
+import { formatTranscriptLine } from "../runtimes/agent-sdk/format.js";
 
 interface TrackedSdkProcess {
   proc: ReturnType<typeof Bun.spawn>;
   exitCode: number | null;
   exited: boolean;
+  /** Absolute path to the session directory -- used by capture() to read transcript.jsonl + stdio.log. */
+  sessionDir: string;
 }
 
 // Module-level registry keyed by handle (`sdk-<sessionId>`).
@@ -49,11 +52,28 @@ export const agentSdkExecutor: Executor = {
 
   async launch(opts: LaunchOpts): Promise<LaunchResult> {
     const app = opts.app!;
-    const log = opts.onLog ?? (() => {});
     const session = await app.sessions.get(opts.sessionId);
     if (!session) {
       return { ok: false, handle: "", message: `Session ${opts.sessionId} not found` };
     }
+
+    // Ensure session directory exists early so the log tee can write to stdio.log
+    // before pipeToFile is wired up. We recreate it after worktree setup too, but
+    // we need it now to wire the log() tee correctly.
+    const sessionDir = join(app.config.tracksDir, session.id);
+    mkdirSync(sessionDir, { recursive: true });
+    const stdioPath = join(sessionDir, "stdio.log");
+
+    // Build a tee logger: every log() call goes to the upstream callback AND
+    // appends to <sessionDir>/stdio.log so it is visible via `ark session output`.
+    const log = (msg: string): void => {
+      if (opts.onLog) opts.onLog(msg);
+      try {
+        appendFileSync(stdioPath, `[exec ${new Date().toISOString()}] ${msg}\n`);
+      } catch {
+        // stdio.log may not be writable yet -- still called upstream log above.
+      }
+    };
 
     // Worktree setup
     const compute = session.compute_name ? await app.computes.get(session.compute_name) : null;
@@ -62,9 +82,8 @@ export const agentSdkExecutor: Executor = {
     const { setupSessionWorktree } = await import("../services/worktree/index.js");
     const effectiveWorkdir = await setupSessionWorktree(app, session, compute, provider, log);
 
-    // Ensure session directory exists and write task file
-    const sessionDir = join(app.config.tracksDir, session.id);
-    mkdirSync(sessionDir, { recursive: true });
+    // Ensure session directory exists (sessionDir already created above for log tee)
+    // and write task file.
     const promptFile = join(sessionDir, "task.txt");
 
     // Write the full task (includes handoff context + knowledge injection).
@@ -104,11 +123,18 @@ export const agentSdkExecutor: Executor = {
     // Propagate runtime compat modes (e.g. `bedrock`) as a comma-separated
     // ARK_COMPAT env var. launch.ts reads this to enable gateway-specific
     // wire-format rewrites without any heuristic guessing.
-    const runtimeDef = await app.runtimes?.get?.(opts.agent.runtime ?? "agent-sdk");
+    //
+    // Lookup is keyed by this executor's name ("agent-sdk") rather than
+    // opts.agent.runtime -- the agent definition's runtime field can carry the
+    // post-resolution kind ("claude-code" if the agent originally targeted CC
+    // and was re-routed via runtime_override), which would point at the wrong
+    // runtime YAML. The executor's own name is the authoritative key here.
+    const runtimeDef = await app.runtimes?.get?.("agent-sdk");
     const compat = Array.isArray((runtimeDef as { compat?: unknown })?.compat)
-      ? ((runtimeDef as { compat: string[] }).compat.filter((c) => typeof c === "string" && c.length > 0))
+      ? (runtimeDef as { compat: string[] }).compat.filter((c) => typeof c === "string" && c.length > 0)
       : [];
     if (compat.length > 0) arkEnv.ARK_COMPAT = compat.join(",");
+    log(`agent-sdk compat modes: ${compat.length > 0 ? compat.join(",") : "(none)"}`);
 
     // opts.env carries secrets resolved by StageSecretResolver
     // (ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL per agent-sdk.yaml secrets block)
@@ -135,14 +161,15 @@ export const agentSdkExecutor: Executor = {
       proc,
       exitCode: null,
       exited: false,
+      sessionDir,
     };
     processes.set(handle, tracked);
 
     // Pipe stdout + stderr to <sessionDir>/stdio.log for debugging.
     // Do NOT parse -- transcript.jsonl + conductor hooks are the canonical path.
-    const stdioLog = join(sessionDir, "stdio.log");
-    if (proc.stdout) pipeToFile(proc.stdout as ReadableStream<Uint8Array>, stdioLog);
-    if (proc.stderr) pipeToFile(proc.stderr as ReadableStream<Uint8Array>, stdioLog);
+    // stdioPath is already defined above (used by the log() tee).
+    if (proc.stdout) pipeToFile(proc.stdout as ReadableStream<Uint8Array>, stdioPath);
+    if (proc.stderr) pipeToFile(proc.stderr as ReadableStream<Uint8Array>, stdioPath);
 
     // Track exit asynchronously
     proc.exited.then((code) => {
@@ -205,9 +232,42 @@ export const agentSdkExecutor: Executor = {
     // All context is delivered via the prompt file before launch.
   },
 
-  async capture(_handle: string, _lines?: number): Promise<string> {
-    // No tmux pane to capture. Callers that need output should read stdio.log
-    // or transcript.jsonl directly from the session directory.
-    return "";
+  async capture(handle: string, lines = 80): Promise<string> {
+    const tracked = processes.get(handle);
+    // Resolve sessionDir: prefer live tracked entry, fall back to deriving from
+    // the handle for sessions that have already exited and been cleaned up.
+    // The handle is `sdk-<sessionId>` so we can derive a path if we have a
+    // tracksDir, but we don't have access to AppContext here. The tracked entry
+    // is always populated during and shortly after the session is running, which
+    // covers the primary use case (operator runs `ark session output` while the
+    // agent is active or just finished).
+    if (!tracked) return "";
+
+    const { sessionDir: sDir } = tracked;
+    const transcriptPath = join(sDir, "transcript.jsonl");
+    const stdioPath = join(sDir, "stdio.log");
+
+    const formatted: string[] = [];
+
+    if (existsSync(transcriptPath)) {
+      const all = readFileSync(transcriptPath, "utf8")
+        .split("\n")
+        .filter((l) => l.trim());
+      for (const line of all.slice(-lines)) {
+        formatted.push(formatTranscriptLine(line));
+      }
+    }
+
+    if (existsSync(stdioPath)) {
+      formatted.push("--- stdio ---");
+      const stdio = readFileSync(stdioPath, "utf8")
+        .split("\n")
+        .filter((l) => l.trim());
+      for (const line of stdio.slice(-Math.min(lines, 30))) {
+        formatted.push(line);
+      }
+    }
+
+    return formatted.join("\n");
   },
 };
