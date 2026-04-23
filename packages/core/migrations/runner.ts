@@ -46,7 +46,7 @@ export class MigrationRunner {
     // Postgres boot: take a session-level advisory lock so two instances
     // colliding at startup don't double-apply the same migration. The lock
     // key is a stable hash of a fixed string so every instance agrees. The
-    // lock is released in a `finally` — even if a migration throws, another
+    // lock is released in a `finally` -- even if a migration throws, another
     // booting instance must be able to retry after we exit.
     //
     // SQLite doesn't need this because bun:sqlite is process-local: the only
@@ -177,7 +177,7 @@ export class MigrationRunner {
 
   /**
    * Postgres session-level advisory lock held across the entire `apply()`
-   * loop. On SQLite this is a no-op — bun:sqlite is process-local, so the
+   * loop. On SQLite this is a no-op -- bun:sqlite is process-local, so the
    * only concurrent writers are inside one process and already serialized.
    *
    * Returns a `release()` function callers MUST invoke in a `finally`. The

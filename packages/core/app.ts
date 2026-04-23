@@ -391,7 +391,7 @@ export class AppContext {
 
   /**
    * Dialect-tagged drizzle client. Populated in `_openDatabase()`; available
-   * after `boot()` starts. Null before `_openDatabase()` runs (rare — tests
+   * after `boot()` starts. Null before `_openDatabase()` runs (rare -- tests
    * that construct AppContext without booting).
    *
    * This is the Phase-A foothold for the drizzle cutover: repositories are
