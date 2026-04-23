@@ -29,6 +29,38 @@ import type { ErrorInfo } from "./session/types.js";
 // the modal from this module; keep the symbol here so that import path holds.
 export { RejectGateModal } from "./session/RejectGateModal.js";
 
+/**
+ * Build the right-side ticker values for the 44px header strip:
+ *   `150K TOK   $0.84   02:47`
+ *
+ * The ticker always renders (even when cost is 0) so the strip stays
+ * visually balanced. Values fall back to a dash when we have no data.
+ */
+function buildHeaderTickers(session: any, cost: any): { label: string; value: string; bump?: boolean }[] {
+  const tokensIn = cost?.tokens_in;
+  const tokensOut = cost?.tokens_out;
+  const tokStr = fmtTokens(tokensIn, tokensOut);
+  const spendStr = cost?.cost != null ? fmtCost(cost.cost) : "$0.00";
+
+  const startMs = Date.parse(session.started_at || session.created_at || "");
+  const endMs = session.status === "running" ? Date.now() : Date.parse(session.ended_at || session.updated_at || "");
+  let elapsed = "--:--";
+  if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs >= startMs) {
+    const secs = Math.floor((endMs - startMs) / 1000);
+    const hh = Math.floor(secs / 3600);
+    const mm = Math.floor((secs % 3600) / 60);
+    const ss = secs % 60;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    elapsed = hh > 0 ? `${hh}:${pad(mm)}:${pad(ss)}` : `${pad(mm)}:${pad(ss)}`;
+  }
+
+  return [
+    { label: "tok", value: tokStr || "0", bump: true },
+    { label: "", value: spendStr, bump: true },
+    { label: "", value: elapsed, bump: session.status === "running" },
+  ];
+}
+
 interface SessionDetailProps {
   sessionId: string;
   onToast: (msg: string, type: string) => void;
@@ -123,14 +155,7 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
             session.flow ? { k: "flow", v: session.flow } : null,
           ].filter(Boolean) as any
         }
-        tickers={
-          d.cost?.cost != null
-            ? [
-                { label: "tok", value: fmtTokens(d.cost?.tokens_in, d.cost?.tokens_out), bump: true },
-                { label: "", value: fmtCost(d.cost.cost) },
-              ]
-            : undefined
-        }
+        tickers={buildHeaderTickers(session, d.cost)}
         cost={d.cost?.cost ? fmtCost(d.cost.cost) : undefined}
         actions={!readOnly ? headerActions : undefined}
         onCopyId={() => {

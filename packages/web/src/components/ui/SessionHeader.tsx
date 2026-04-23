@@ -50,14 +50,17 @@ export interface SessionHeaderProps extends React.ComponentProps<"div"> {
 
 /**
  * Session detail header -- rebuilt from
- * `/tmp/ark-design-system/preview/chrome-session-header.html`.
+ * `/tmp/ark-design-system/preview/chrome-session-header.html` + the
+ * user-06-desired-header-ticker reference.
  *
- * Two rows (tabs live in <ContentTabs> below):
- *   1. top-row  (padding 14px 16px 12px): breadcrumb + copyable id, title
- *               (17px/600/-0.015em), action icons + primary/secondary btns.
- *   2. meta-row (padding 8px 16px, bg rgba(0,0,0,.18)): animated status pill,
- *               LABELed blocks (flow / agent / compute / branch), right-aligned
- *               stats (tokens · $ · runtime).
+ * Three stacked rows (tabs live in <ContentTabs> below):
+ *   0. ticker   (44px, 0 18px): breadcrumb + copyable id on the left; the
+ *               animated status pill (CHIPPULSE) + ticker values (tokens,
+ *               spend, elapsed) on the right, each mono-ui 10px uppercase.
+ *   1. title    (padding 14px 18px 12px): summary (17px/600/-0.015em),
+ *               action icons + primary/secondary btns.
+ *   2. meta     (padding 8px 18px, bg rgba(0,0,0,.18)): LABELed blocks
+ *               (runtime / agent / compute / flow / branch).
  */
 export function SessionHeader({
   sessionId,
@@ -90,28 +93,86 @@ export function SessionHeader({
 
   return (
     <div className={cn("shrink-0 flex flex-col border-b border-[var(--border)] bg-[var(--bg)]", className)} {...props}>
-      {/* ── Top row: breadcrumb+id, title, action buttons ─────────── */}
-      <div className="px-[16px] pt-[14px] pb-[12px] flex items-center gap-[16px] border-b border-[var(--border-light)]">
-        <div className="flex-1 min-w-0 flex flex-col gap-[3px]">
-          <div className="flex items-center gap-[6px] font-[family-name:var(--font-mono-ui)] text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--fg-faint)]">
-            {crumbs.map((c, i) => (
-              <span key={`${c}-${i}`} className="flex items-center gap-[6px]">
-                <span className="hover:text-[var(--fg-muted)] transition-colors">{c}</span>
-                <span className="opacity-50">/</span>
+      {/* ── Ticker strip (44px): breadcrumb+id · status pill · stats ── */}
+      <div
+        className="h-[44px] shrink-0 px-[18px] flex items-center gap-[12px] border-b border-[var(--border)]"
+        style={{ background: "rgba(0,0,0,.22)" }}
+      >
+        <div className="flex items-center gap-[6px] min-w-0 flex-1 overflow-hidden font-[family-name:var(--font-mono-ui)] text-[11px] font-medium text-[var(--fg-faint)] tracking-[0.02em]">
+          {crumbs.map((c, i) => (
+            <span key={`${c}-${i}`} className="inline-flex items-center gap-[6px] shrink-0">
+              <span className="hover:text-[var(--fg-muted)] transition-colors">{c}</span>
+              <span className="opacity-40">/</span>
+            </span>
+          ))}
+          <button
+            type="button"
+            onClick={onCopyId}
+            title="Click to copy id"
+            className="bg-transparent border-0 p-0 text-[var(--fg)] hover:text-[var(--primary)] transition-colors cursor-pointer font-[family-name:var(--font-mono)] text-[11px] normal-case tracking-[0.02em] truncate"
+          >
+            {sessionId}
+          </button>
+        </div>
+
+        <span
+          className="inline-flex items-center gap-[6px] px-[10px] py-[3px] rounded-full shrink-0 border font-[family-name:var(--font-mono-ui)] text-[10px] font-semibold uppercase tracking-[0.08em]"
+          style={{
+            background: statusMeta.bg,
+            color: statusMeta.color,
+            borderColor: statusMeta.border,
+          }}
+        >
+          <i
+            aria-hidden
+            className="w-[6px] h-[6px] rounded-full"
+            style={{
+              background: "currentColor",
+              boxShadow: "0 0 6px currentColor",
+              animation: isRunning ? "chipPulse 1.6s ease-in-out infinite" : undefined,
+            }}
+          />
+          {status}
+        </span>
+
+        {tickers && tickers.length > 0 && (
+          <span className="inline-flex items-center gap-[12px] shrink-0">
+            {tickers.map((t, i) => (
+              <span
+                key={i}
+                className="inline-flex items-baseline gap-[4px] font-[family-name:var(--font-mono-ui)] text-[10px] uppercase tracking-[0.04em] text-[var(--fg-muted)]"
+              >
+                <span
+                  className={cn(
+                    "text-[var(--fg)] font-semibold tabular-nums normal-case tracking-normal",
+                    t.bump && isRunning && "bump",
+                  )}
+                >
+                  {t.value}
+                </span>
+                {t.label && <span>{t.label}</span>}
               </span>
             ))}
-            <button
-              type="button"
-              onClick={onCopyId}
-              title="Click to copy id"
-              className="bg-transparent border-0 p-0 text-[var(--fg-muted)] hover:text-[var(--primary)] transition-colors cursor-pointer font-[family-name:var(--font-mono)] text-[10px] normal-case tracking-[0.02em]"
-            >
-              {sessionId}
-            </button>
-          </div>
+          </span>
+        )}
+        {!tickers && cost && (
+          <span className="font-[family-name:var(--font-mono)] text-[11px] font-normal text-[var(--fg)] tabular-nums shrink-0">
+            {cost}
+          </span>
+        )}
+      </div>
+
+      {/* ── Title row: summary + action buttons ───────────────────── */}
+      <div className="px-[18px] pt-[14px] pb-[12px] flex items-center gap-[16px] border-b border-[var(--border-light)]">
+        <div className="flex-1 min-w-0">
           <h1 className="m-0 font-[family-name:var(--font-sans)] text-[17px] leading-[1.25] font-semibold text-[var(--fg)] tracking-[-0.015em] truncate">
             {summary}
           </h1>
+          {stageLabel && (
+            <div className="mt-[3px] font-[family-name:var(--font-mono-ui)] text-[10px] font-medium uppercase tracking-[0.06em] text-[var(--fg-muted)]">
+              {stageLabel}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-[6px] shrink-0">
@@ -134,77 +195,36 @@ export function SessionHeader({
         </div>
       </div>
 
-      {/* ── Meta strip: status pill · labeled blocks · stats ──────── */}
-      <div
-        className="px-[16px] py-[8px] flex items-center gap-[14px] flex-wrap border-b border-[var(--border-light)]"
-        style={{ background: "rgba(0,0,0,.18)" }}
-      >
-        <span
-          className="inline-flex items-center gap-[6px] px-[9px] py-[3px] rounded-full shrink-0 border font-[family-name:var(--font-mono-ui)] text-[10px] font-semibold uppercase tracking-[0.06em]"
-          style={{
-            background: statusMeta.bg,
-            color: statusMeta.color,
-            borderColor: statusMeta.border,
-          }}
+      {/* ── Meta strip: labeled blocks (runtime / agent / compute / …) ─ */}
+      {labeled.length > 0 && (
+        <div
+          className="px-[18px] py-[8px] flex items-center gap-[14px] flex-wrap border-b border-[var(--border-light)]"
+          style={{ background: "rgba(0,0,0,.18)" }}
         >
-          <i
-            aria-hidden
-            className="w-[6px] h-[6px] rounded-full"
-            style={{
-              background: "currentColor",
-              boxShadow: "0 0 6px currentColor",
-              animation: isRunning ? "chipPulse 1.6s ease-in-out infinite" : undefined,
-            }}
-          />
-          {stageLabel ?? status}
-        </span>
-
-        {labeled.map((kv, i) => (
-          <span
-            key={`${kv.k}-${i}`}
-            className="inline-flex items-center font-[family-name:var(--font-mono-ui)] text-[10px] font-medium uppercase tracking-[0.05em]"
-          >
-            <span className="text-[var(--fg-faint)] mr-[6px]">{kv.k}</span>
-            <b
-              className={cn(
-                "font-medium text-[11px] normal-case tracking-normal",
-                kv.error
-                  ? "text-[var(--failed)]"
-                  : kv.link
-                    ? "text-[var(--primary)] cursor-pointer"
-                    : "text-[var(--fg)]",
-                kv.mono && "font-[family-name:var(--font-mono)]",
-                !kv.mono && "font-[family-name:var(--font-mono-ui)]",
-              )}
+          {labeled.map((kv, i) => (
+            <span
+              key={`${kv.k}-${i}`}
+              className="inline-flex items-center font-[family-name:var(--font-mono-ui)] text-[10px] font-medium uppercase tracking-[0.05em]"
             >
-              {kv.v}
-            </b>
-          </span>
-        ))}
-
-        <span className="flex-1" />
-
-        {tickers && tickers.length > 0 && (
-          <span className="inline-flex items-center gap-[6px] font-[family-name:var(--font-mono)] text-[11px] font-normal text-[var(--fg)] tabular-nums normal-case tracking-normal">
-            {tickers.map((t, i) => (
-              <span key={i} className="inline-flex items-center gap-[4px]">
-                {i > 0 && (
-                  <span aria-hidden className="opacity-40">
-                    ·
-                  </span>
+              <span className="text-[var(--fg-faint)] mr-[6px]">{kv.k}</span>
+              <b
+                className={cn(
+                  "font-medium text-[11px] normal-case tracking-normal",
+                  kv.error
+                    ? "text-[var(--failed)]"
+                    : kv.link
+                      ? "text-[var(--primary)] cursor-pointer"
+                      : "text-[var(--fg)]",
+                  kv.mono && "font-[family-name:var(--font-mono)]",
+                  !kv.mono && "font-[family-name:var(--font-mono-ui)]",
                 )}
-                <span className={cn(t.bump && isRunning && "bump")}>{t.value}</span>
-                {t.label && <span className="text-[var(--fg-muted)]">{t.label}</span>}
-              </span>
-            ))}
-          </span>
-        )}
-        {!tickers && cost && (
-          <span className="font-[family-name:var(--font-mono)] text-[11px] font-normal text-[var(--fg)] tabular-nums">
-            {cost}
-          </span>
-        )}
-      </div>
+              >
+                {kv.v}
+              </b>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
