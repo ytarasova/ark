@@ -115,23 +115,30 @@ export function IconRail({
             className={cn(
               "no-drag w-[36px] h-[36px] rounded-[8px] grid place-items-center cursor-pointer",
               "bg-[var(--gradient-brand,var(--primary))] text-white",
-              "shadow-[0_2px_6px_rgba(107,89,222,0.4),inset_0_0_0_1px_rgba(255,255,255,0.1)]",
               "font-bold text-[15px] font-[family-name:var(--font-mono-ui)]",
+              "transition-[box-shadow] duration-300 ease-out",
+              // Status-driven backlight. Online pulses green, offline sits red, partial is amber.
+              dot.status === "online" &&
+                "shadow-[0_2px_6px_rgba(107,89,222,0.4),inset_0_0_0_1px_rgba(255,255,255,0.1),0_0_20px_2px_rgba(52,211,153,0.55)] animate-[brandBacklightOnline_2.8s_ease-in-out_infinite]",
+              dot.status === "offline" &&
+                "shadow-[0_2px_6px_rgba(107,89,222,0.4),inset_0_0_0_1px_rgba(255,255,255,0.1),0_0_22px_3px_rgba(248,113,113,0.6)] animate-[brandBacklightOffline_2.2s_ease-in-out_infinite]",
+              dot.status === "partial" &&
+                "shadow-[0_2px_6px_rgba(107,89,222,0.4),inset_0_0_0_1px_rgba(255,255,255,0.1),0_0_18px_2px_rgba(251,191,36,0.45)]",
+              dot.status === "loading" &&
+                "shadow-[0_2px_6px_rgba(107,89,222,0.4),inset_0_0_0_1px_rgba(255,255,255,0.1)]",
             )}
             style={{ backgroundImage: "var(--gradient-brand)", backgroundColor: "var(--primary)" }}
           >
             A
           </button>
+          {/* Status is carried by the tile backlight above (green=online, red=offline,
+              amber=partial). data-* attributes + title keep the a11y + testing hook. */}
           <span
             data-testid="daemon-status-dot"
             data-status={dot.status}
             title={dot.title}
-            className={cn(
-              "absolute top-[14px] right-[10px] w-[6px] h-[6px] rounded-full",
-              dot.color,
-              dot.glow,
-              dot.status === "online" && "animate-[brandGlow_2.5s_ease-in-out_infinite]",
-            )}
+            aria-label={dot.title}
+            className="sr-only"
           />
         </div>
       )}
