@@ -829,13 +829,22 @@ interface GitHubPRWebhookPayload {
  */
 async function recoverStuckSessions(app: AppContext): Promise<void> {
   const sessions = await app.sessions.list({ status: "running" });
+  const { getExecutor } = await import("../executor.js");
   for (const s of sessions) {
-    if (!s.session_id) continue; // No tmux handle -- skip
+    if (!s.session_id) continue; // No agent handle -- skip
 
+    // Liveness check is delegated to the runtime's executor. Each executor
+    // knows what it actually launched (tmux pane, plain process, k8s pod, ...)
+    // and answers `running` only when the underlying agent is still alive.
+    // No conditional branching on runtime kind here.
+    const launchExecutor = (s.config as Record<string, unknown> | undefined)?.launch_executor as string | undefined;
+    const executor = launchExecutor ? getExecutor(launchExecutor) : undefined;
     try {
-      const client = new ArkdClient("http://localhost:19300");
-      const status = await client.agentStatus({ sessionName: s.session_id });
-      if (status.running) continue;
+      const status = executor
+        ? await executor.status(s.session_id)
+        : await new ArkdClient("http://localhost:19300").agentStatus({ sessionName: s.session_id });
+      const isRunning = "running" in status ? status.running : status.state === "running";
+      if (isRunning) continue;
     } catch {
       continue;
     }
