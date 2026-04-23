@@ -22,21 +22,21 @@ interface LayoutProps {
 }
 
 const BASE_NAV_ITEMS: IconRailItem[] = [
-  { id: "sessions", icon: <Play size={15} strokeWidth={1.5} />, label: "Sessions", shortcut: "S" },
-  { id: "agents", icon: <Bot size={15} strokeWidth={1.5} />, label: "Agents", shortcut: "A" },
-  { id: "flows", icon: <Zap size={15} strokeWidth={1.5} />, label: "Flows", shortcut: "F" },
-  { id: "compute", icon: <Monitor size={15} strokeWidth={1.5} />, label: "Compute", shortcut: "C" },
-  { id: "history", icon: <Clock size={15} strokeWidth={1.5} />, label: "History", shortcut: "H" },
-  { id: "memory", icon: <BookOpen size={15} strokeWidth={1.5} />, label: "Knowledge", shortcut: "M" },
-  { id: "tools", icon: <Wrench size={15} strokeWidth={1.5} />, label: "Tools", shortcut: "T" },
-  { id: "schedules", icon: <Calendar size={15} strokeWidth={1.5} />, label: "Schedules" },
-  { id: "integrations", icon: <Plug size={15} strokeWidth={1.5} />, label: "Integrations", shortcut: "I" },
-  { id: "costs", icon: <DollarSign size={15} strokeWidth={1.5} />, label: "Costs", shortcut: "$" },
+  { id: "sessions", icon: <Play size={18} strokeWidth={1.5} />, label: "Sessions", shortcut: "S" },
+  { id: "agents", icon: <Bot size={18} strokeWidth={1.5} />, label: "Agents", shortcut: "A" },
+  { id: "flows", icon: <Zap size={18} strokeWidth={1.5} />, label: "Flows", shortcut: "F" },
+  { id: "compute", icon: <Monitor size={18} strokeWidth={1.5} />, label: "Compute", shortcut: "C" },
+  { id: "history", icon: <Clock size={18} strokeWidth={1.5} />, label: "History", shortcut: "H" },
+  { id: "memory", icon: <BookOpen size={18} strokeWidth={1.5} />, label: "Knowledge", shortcut: "M" },
+  { id: "tools", icon: <Wrench size={18} strokeWidth={1.5} />, label: "Tools", shortcut: "T" },
+  { id: "schedules", icon: <Calendar size={18} strokeWidth={1.5} />, label: "Schedules" },
+  { id: "integrations", icon: <Plug size={18} strokeWidth={1.5} />, label: "Integrations", shortcut: "I" },
+  { id: "costs", icon: <DollarSign size={18} strokeWidth={1.5} />, label: "Costs", shortcut: "$" },
 ];
 
 const SETTINGS_ITEM: IconRailItem = {
   id: "settings",
-  icon: <Cog size={15} strokeWidth={1.5} />,
+  icon: <Cog size={18} strokeWidth={1.5} />,
   label: "Settings",
   shortcut: ",",
 };

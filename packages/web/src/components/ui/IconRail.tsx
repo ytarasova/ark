@@ -206,7 +206,7 @@ function RailButton({
         "group relative flex items-center justify-center cursor-pointer",
         "bg-transparent border-0 text-[var(--fg-muted)] transition-colors duration-[120ms]",
         settings ? "w-[32px] h-[28px] rounded-[6px]" : "w-[40px] h-[32px] rounded-[7px]",
-        "[&_svg]:w-[15px] [&_svg]:h-[15px] [&_svg]:opacity-[.75] [&_svg]:transition-opacity",
+        "[&_svg]:w-[18px] [&_svg]:h-[18px] [&_svg]:opacity-[.75] [&_svg]:transition-opacity",
         "hover:text-[var(--fg)] hover:bg-[rgba(255,255,255,0.04)] hover:[&_svg]:opacity-100",
         active && [
           "text-[var(--fg)]",
