@@ -254,7 +254,11 @@ export class SessionRepository {
       flow: opts.flow ?? "default",
       agent: opts.agent ?? null,
       groupName: opts.group_name ?? null,
-      config: JSON.stringify(opts.config ?? {}),
+      config: JSON.stringify({
+        ...(opts.config ?? {}),
+        // Promote top-level max_budget_usd into config so dispatchers can read it.
+        ...(opts.max_budget_usd !== undefined ? { max_budget_usd: opts.max_budget_usd } : {}),
+      }),
       userId: opts.user_id ?? null,
       tenantId: this.tenantId,
       workspaceId: opts.workspace_id ?? null,

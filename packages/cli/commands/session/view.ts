@@ -83,6 +83,20 @@ export function registerViewCommands(session: Command) {
       if (s.workdir) console.log(`  Workdir:  ${s.workdir}`);
       if (s.error) console.log(chalk.red(`  Error:    ${s.error}`));
       if (s.breakpoint_reason) console.log(chalk.yellow(`  Waiting:  ${s.breakpoint_reason}`));
+
+      // Budget line: show usage and cap if either is present.
+      const budgetCap = (s.config?.max_budget_usd as number | undefined) ?? null;
+      const costUsed = (s.config?.cost_usd as number | undefined) ?? null;
+      if (budgetCap !== null || costUsed !== null) {
+        const usedStr = costUsed !== null ? `$${costUsed.toFixed(2)} used` : null;
+        const capStr = budgetCap !== null ? `$${budgetCap.toFixed(2)} cap` : null;
+        const pctStr =
+          budgetCap !== null && costUsed !== null
+            ? ` (${Math.min(100, Math.round((costUsed / budgetCap) * 100))}% used)`
+            : "";
+        const parts = [usedStr, capStr].filter(Boolean).join(" / ");
+        console.log(`  Budget:   ${parts}${pctStr}`);
+      }
     });
 
   session

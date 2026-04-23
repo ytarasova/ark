@@ -135,6 +135,13 @@ export interface CreateSessionOpts {
    * iterations targeting the same repo.
    */
   branch?: string;
+  /**
+   * Cumulative USD cost cap for this session. When set, for_each dispatchers
+   * check the sum of prior iteration costs before each iteration and halt with
+   * "budget exceeded" if the cap is reached. Stored in session.config.max_budget_usd
+   * (no migration needed -- uses the existing JSON config blob).
+   */
+  max_budget_usd?: number;
   flow?: string;
   agent?: string | null;
   compute_name?: string;

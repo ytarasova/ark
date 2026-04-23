@@ -23,6 +23,43 @@ import type { FlowDefinition } from "../../state/flow.js";
 import { substituteVars } from "../../template.js";
 import { logDebug, logWarn } from "../../observability/structured-log.js";
 
+// ── Budget helpers ────────────────────────────────────────────────────────────
+
+/**
+ * Sum the cost_usd reported in all hook_status events of type SessionEnd or
+ * StopFailure for the given session (and its children, if childIds are provided).
+ *
+ * Each hook_status event carries the hook payload in `data`: the relevant fields
+ * are `data.hook_event_name` (string) and `data.total_cost_usd` (number).
+ *
+ * Returns 0.0 when there are no matching events.
+ */
+async function sumPriorIterationCosts(
+  events: Pick<DispatchDeps["events"], "list">,
+  sessionId: string,
+  childIds?: string[],
+): Promise<number> {
+  const COST_HOOKS = new Set(["SessionEnd", "StopFailure"]);
+  let total = 0;
+
+  const trackIds = [sessionId, ...(childIds ?? [])];
+  for (const trackId of trackIds) {
+    const evts = await events.list(trackId, { type: "hook_status" });
+    for (const evt of evts) {
+      const data = evt.data as Record<string, unknown> | null;
+      if (!data) continue;
+      const hookName = data.hook_event_name as string | undefined;
+      if (!hookName || !COST_HOOKS.has(hookName)) continue;
+      const cost = data.total_cost_usd;
+      if (typeof cost === "number" && Number.isFinite(cost)) {
+        total += cost;
+      }
+    }
+  }
+
+  return total;
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
@@ -236,7 +273,32 @@ export class ForEachDispatcher {
     let succeeded = 0;
     let failedCount = 0;
 
+    // Cumulative budget cap set on the session (via session.config.max_budget_usd).
+    const sessionCap = (session.config?.max_budget_usd as number | undefined) ?? null;
+    // Collect child IDs spawned so far so we can sum their costs too.
+    const spawnedChildIds: string[] = [];
+
     for (let i = 0; i < items.length; i++) {
+      // -- Cumulative budget check (before spawning next iteration) --
+      if (sessionCap !== null) {
+        const cumulative = await sumPriorIterationCosts(this.deps.events, sessionId, spawnedChildIds);
+        if (cumulative >= sessionCap) {
+          await this.deps.events.log(sessionId, "for_each_budget_exceeded", {
+            stage: session.stage,
+            actor: "system",
+            data: { cumulative_cost_usd: cumulative, cap_usd: sessionCap, next_iteration: i },
+          });
+          await this.deps.sessions.update(sessionId, {
+            status: "failed",
+            error: `budget exceeded: $${cumulative.toFixed(4)} >= cap $${sessionCap}`,
+          });
+          return {
+            ok: false,
+            message: `for_each: budget exceeded at iteration ${i}: $${cumulative.toFixed(4)} >= cap $${sessionCap}`,
+          };
+        }
+      }
+
       const item = items[i];
       const iterVars = buildIterationVars(sessionVars, iterVar, item);
       const resolvedInputs = substituteInputs(spawnSpec.inputs, iterVars);
@@ -248,11 +310,17 @@ export class ForEachDispatcher {
       const resolvedBranch = spawnSpec.branch ? substituteVars(spawnSpec.branch, iterVars) : undefined;
       const resolvedWorkdir = spawnSpec.workdir ? substituteVars(spawnSpec.workdir, iterVars) : undefined;
 
+      // Effective per-iteration cap: stage-level max_budget_usd overrides the
+      // inherited session cap. This is set on the child session's config so the
+      // child's own for_each (if any) also respects it.
+      const iterBudget = stageDef.max_budget_usd ?? null;
+
       // Spawn a child session for this iteration (string name or inline object)
       const spawnResult = await this.spawnChild(sessionId, forkGroup, spawnSpec.flow, resolvedInputs, i, {
         repo: resolvedRepo,
         branch: resolvedBranch,
         workdir: resolvedWorkdir,
+        iterBudget,
       });
       if (!spawnResult.ok) {
         failedCount++;
@@ -270,6 +338,7 @@ export class ForEachDispatcher {
       }
 
       const childId = spawnResult.childId;
+      spawnedChildIds.push(childId);
 
       await this.deps.events.log(sessionId, "for_each_iteration_start", {
         stage: session.stage,
@@ -415,7 +484,30 @@ export class ForEachDispatcher {
     let succeeded = 0;
     let failedCount = 0;
 
+    // Cumulative budget cap set on the session (via session.config.max_budget_usd).
+    const sessionCap = (session.config?.max_budget_usd as number | undefined) ?? null;
+
     for (let i = 0; i < items.length; i++) {
+      // -- Cumulative budget check (before dispatching next iteration) --
+      if (sessionCap !== null) {
+        const cumulative = await sumPriorIterationCosts(this.deps.events, sessionId);
+        if (cumulative >= sessionCap) {
+          await this.deps.events.log(sessionId, "for_each_budget_exceeded", {
+            stage: session.stage,
+            actor: "system",
+            data: { cumulative_cost_usd: cumulative, cap_usd: sessionCap, next_iteration: i },
+          });
+          await this.deps.sessions.update(sessionId, {
+            status: "failed",
+            error: `budget exceeded: $${cumulative.toFixed(4)} >= cap $${sessionCap}`,
+          });
+          return {
+            ok: false,
+            message: `for_each: budget exceeded at iteration ${i}: $${cumulative.toFixed(4)} >= cap $${sessionCap}`,
+          };
+        }
+      }
+
       const item = items[i];
       const iterVars = buildIterationVars(sessionVars, iterVar, item);
 
@@ -429,7 +521,18 @@ export class ForEachDispatcher {
 
       for (const subStage of subStages) {
         // Substitute iteration vars into all string fields of the sub-stage.
+        // Propagate stage-level max_budget_usd to the resolved sub-stage if the
+        // sub-stage's inline agent does not already declare its own budget.
         const resolvedSubStage = substituteStageTemplates(subStage, iterVars);
+        if (
+          stageDef.max_budget_usd !== undefined &&
+          resolvedSubStage.agent &&
+          typeof resolvedSubStage.agent === "object"
+        ) {
+          if ((resolvedSubStage.agent as { max_budget_usd?: number }).max_budget_usd === undefined) {
+            (resolvedSubStage.agent as { max_budget_usd?: number }).max_budget_usd = stageDef.max_budget_usd;
+          }
+        }
 
         const subResult = await dispatchSubStage(sessionId, resolvedSubStage, iterVars);
 
@@ -494,7 +597,7 @@ export class ForEachDispatcher {
     flowRef: string | InlineFlowSpec,
     inputs: Record<string, unknown>,
     index: number,
-    overrides?: { repo?: string; branch?: string; workdir?: string },
+    overrides?: { repo?: string; branch?: string; workdir?: string; iterBudget?: number | null },
   ): Promise<{ ok: true; childId: string } | { ok: false; message: string }> {
     const parent = await this.deps.sessions.get(parentId);
     if (!parent) return { ok: false, message: "Parent session not found" };
@@ -539,7 +642,16 @@ export class ForEachDispatcher {
       // `flow` is set after we know childId for inline flows. Inline flows also
       // persist the definition under config.inline_flow for daemon-restart rehydration.
       flow: flowName,
-      config: { inputs, for_each_parent: parentId, for_each_index: index },
+      config: {
+        inputs,
+        for_each_parent: parentId,
+        for_each_index: index,
+        // Propagate stage-level per-iteration budget cap to child sessions so
+        // the child's own for_each dispatch (if any) also enforces it.
+        ...(overrides?.iterBudget !== undefined && overrides.iterBudget !== null
+          ? { max_budget_usd: overrides.iterBudget }
+          : {}),
+      },
     });
 
     // For inline flows: register under "inline-{childId}" so the existing

@@ -29,6 +29,11 @@ export function registerStartCommands(session: Command) {
     .option("--runtime <name>", "Override agent runtime (e.g. codex, gemini, claude)")
     .option("-m, --model <model>", "Override model for all stages (e.g. haiku, sonnet, opus, or a full provider slug)")
     .option(
+      "--max-budget <usd>",
+      "Cumulative cost cap for this session in USD. Halts for_each if exceeded.",
+      parseFloat,
+    )
+    .option(
       "--with-mcp <name>",
       "Mount an additional MCP server into the session (repeatable). Resolves against shipped mcp-configs/<name>.json or an inline path.",
       (value, prev: string[] = []) => [...prev, value],
@@ -136,6 +141,9 @@ export function registerStartCommands(session: Command) {
       }
       if (opts.model) {
         sessionConfig = { ...sessionConfig, model_override: opts.model };
+      }
+      if (typeof opts.maxBudget === "number" && Number.isFinite(opts.maxBudget)) {
+        sessionConfig = { ...sessionConfig, max_budget_usd: opts.maxBudget };
       }
 
       // Handle --remote-repo: use git URL as repo, no local path needed

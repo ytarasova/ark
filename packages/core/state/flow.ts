@@ -73,6 +73,8 @@ export interface InlineAgentSpec {
   runtime: string;
   model?: string;
   max_turns?: number;
+  /** Per-query USD budget cap. Passed as ARK_MAX_BUDGET_USD to the runtime launcher. */
+  max_budget_usd?: number;
   system_prompt: string;
   tools?: string[];
   mcp_servers?: (string | Record<string, unknown>)[];
@@ -169,6 +171,13 @@ export interface StageDefinition {
     prompt?: string;
     max_rejections?: number;
   };
+  /**
+   * Per-iteration USD budget cap for for_each stages. When set, this value is
+   * used as the effective ARK_MAX_BUDGET_USD for each inline sub-stage dispatch,
+   * or is propagated to child sessions (spawn mode) as their cumulative cap
+   * if the inline agent spec does not already declare max_budget_usd.
+   */
+  max_budget_usd?: number;
   // Fork-specific
   strategy?: string;
   max_parallel?: number;
