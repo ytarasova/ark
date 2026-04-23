@@ -13,15 +13,28 @@
  *   - Sequential only (no parallel knob).
  *   - Iteration variable substitution via Nunjucks / substituteVars.
  *   - on_iteration_failure: stop (default) | continue.
+ *
+ * Durability (P3.2):
+ *   Each loop writes a ForEachCheckpoint into session.config.for_each_checkpoint
+ *   before dispatching iteration i. On daemon restart, boot reconciliation
+ *   re-dispatches sessions with a checkpoint, and the dispatcher resumes from
+ *   the checkpoint instead of starting fresh.
+ *
+ *   Resume approach for "already completed" detection: we scan child sessions
+ *   with config.for_each_parent==parentId and build the completed set from
+ *   their actual DB status rather than maintaining a completed[] array in the
+ *   checkpoint. This is robust against the crash window between a child's
+ *   SessionEnd hook and the parent's checkpoint update -- if the child row
+ *   says "completed", the iteration is skipped regardless.
  */
 
 import { randomUUID } from "crypto";
 
 import type { DispatchDeps, DispatchResult } from "./types.js";
-import type { StageDefinition, InlineFlowSpec } from "../../state/flow.js";
+import type { StageDefinition, InlineFlowSpec, ForEachCheckpoint } from "../../state/flow.js";
 import type { FlowDefinition } from "../../state/flow.js";
 import { substituteVars } from "../../template.js";
-import { logDebug, logWarn } from "../../observability/structured-log.js";
+import { logDebug, logInfo, logWarn } from "../../observability/structured-log.js";
 
 // ── Budget helpers ────────────────────────────────────────────────────────────
 
@@ -58,6 +71,62 @@ async function sumPriorIterationCosts(
   }
 
   return total;
+}
+
+// ── Checkpoint helpers ────────────────────────────────────────────────────────
+
+/**
+ * Write (or update) the for_each checkpoint on the session config.
+ * This is always an await-before-side-effect write -- we persist the intent
+ * before we actually dispatch the iteration.
+ */
+async function writeCheckpoint(
+  sessions: Pick<DispatchDeps["sessions"], "mergeConfig">,
+  sessionId: string,
+  checkpoint: ForEachCheckpoint,
+): Promise<void> {
+  await sessions.mergeConfig(sessionId, { for_each_checkpoint: checkpoint } as any);
+}
+
+/**
+ * Clear the for_each checkpoint from session config (called when the loop exits
+ * -- either all iterations complete or on_iteration_failure halts the loop).
+ */
+async function clearCheckpoint(
+  sessions: Pick<DispatchDeps["sessions"], "mergeConfig">,
+  sessionId: string,
+): Promise<void> {
+  // mergeConfig shallow-merges, so set to null to clear.
+  await sessions.mergeConfig(sessionId, { for_each_checkpoint: null } as any);
+}
+
+/**
+ * Build the set of already-completed iteration indices for a spawn-mode loop
+ * by scanning child sessions directly.
+ *
+ * We look at all children with config.for_each_parent==parentId and
+ * config.for_each_index set to a number. A child whose status is "completed"
+ * is counted as done. This is more robust than reading checkpoint.completed
+ * because a daemon crash between the child's SessionEnd hook and the parent's
+ * checkpoint update would leave the checkpoint stale, but the child's status
+ * row is durable.
+ */
+async function buildCompletedSetFromChildren(
+  sessions: Pick<DispatchDeps["sessions"], "list">,
+  parentId: string,
+): Promise<Set<number>> {
+  const children = await sessions.list({ parent_id: parentId, limit: 500 } as any);
+  const done = new Set<number>();
+  for (const child of children) {
+    const cfg = child.config as Record<string, unknown> | null;
+    if (!cfg) continue;
+    const idx = cfg.for_each_index;
+    if (typeof idx !== "number") continue;
+    if (child.status === "completed") {
+      done.add(idx);
+    }
+  }
+  return done;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -215,15 +284,18 @@ export class ForEachDispatcher {
    * Execute a `for_each + mode:spawn` stage.
    *
    * Steps:
-   *   1. Resolve the list from the session's input vars using the `for_each` template.
-   *   2. For each item (sequentially):
-   *      a. Flatten item into iteration vars.
-   *      b. Substitute `spawn.inputs` templates.
-   *      c. Create a child session for the target flow.
-   *      d. Dispatch the child.
-   *      e. Wait for the child to reach a terminal state.
-   *      f. Handle failure per `on_iteration_failure`.
-   *   3. Return ok when the loop finishes (or stops on failure).
+   *   1. Check for an existing checkpoint (resume mode) or resolve the list fresh.
+   *   2. Write loop-enter checkpoint (durable before any iteration starts).
+   *   3. For each item (sequentially):
+   *      a. Skip already-completed iterations (resume mode: check child status).
+   *      b. Write in_flight checkpoint before dispatching.
+   *      c. Flatten item into iteration vars, substitute spawn.inputs templates.
+   *      d. Create + dispatch a child session.
+   *      e. Wait for child terminal state.
+   *      f. Clear in_flight from checkpoint.
+   *      g. Handle failure per `on_iteration_failure`.
+   *   4. Clear checkpoint on loop exit.
+   *   5. Return ok when the loop finishes (or stops on failure).
    */
   async dispatchForEachSpawn(
     sessionId: string,
@@ -243,14 +315,32 @@ export class ForEachDispatcher {
       return { ok: false, message: `Stage '${stageDef.name}' has for_each but no spawn spec` };
     }
 
-    // Resolve the list. The for_each expression may be a plain template like
-    // `{{repos}}` or `{{inputs.params.repos}}`. We evaluate it to a string
-    // and then parse as JSON (for arrays) or treat as a comma-separated list.
+    // ── Resume-or-fresh decision ─────────────────────────────────────────────
+    // Check for an existing checkpoint whose stage_name matches this stage.
+    // If found, use the checkpoint's items list and skip already-completed
+    // iterations (determined by scanning child session statuses).
+    const existingCp = (session.config as Record<string, unknown> | null)?.for_each_checkpoint as
+      | import("../../state/flow.js").ForEachCheckpoint
+      | null
+      | undefined;
+    const isResume = existingCp != null && existingCp.stage_name === stageDef.name;
+
     let items: unknown[];
-    try {
-      items = resolveForEachList(forEachExpr, sessionVars, session);
-    } catch (err: any) {
-      return { ok: false, message: `for_each: failed to resolve list: ${err.message}` };
+    if (isResume) {
+      // Use the checkpoint's captured list -- do not re-resolve the template.
+      items = existingCp.items;
+      logInfo("session", `for_each spawn: resuming stage '${stageDef.name}' from checkpoint`, {
+        sessionId,
+        total: items.length,
+        next_index: existingCp.next_index,
+      });
+    } else {
+      // Fresh start: resolve the list from session vars.
+      try {
+        items = resolveForEachList(forEachExpr, sessionVars, session);
+      } catch (err: any) {
+        return { ok: false, message: `for_each: failed to resolve list: ${err.message}` };
+      }
     }
 
     if (items.length === 0) {
@@ -259,15 +349,27 @@ export class ForEachDispatcher {
         actor: "system",
         data: { total: 0, succeeded: 0, failed: 0, note: "empty list -- no iterations" },
       });
+      await clearCheckpoint(this.deps.sessions, sessionId);
       return { ok: true, message: "for_each: empty list -- stage complete" };
     }
 
     const flowLabel = typeof spawnSpec.flow === "string" ? spawnSpec.flow : (spawnSpec.flow.name ?? "inline");
-    await this.deps.events.log(sessionId, "for_each_start", {
-      stage: session.stage,
-      actor: "system",
-      data: { total: items.length, flow: flowLabel, iterVar },
-    });
+
+    if (!isResume) {
+      // Fresh start: write loop-enter checkpoint BEFORE logging for_each_start
+      // so that even if we crash right after, the checkpoint is durable.
+      await writeCheckpoint(this.deps.sessions, sessionId, {
+        stage_name: stageDef.name,
+        total_items: items.length,
+        items,
+        next_index: 0,
+      });
+      await this.deps.events.log(sessionId, "for_each_start", {
+        stage: session.stage,
+        actor: "system",
+        data: { total: items.length, flow: flowLabel, iterVar },
+      });
+    }
 
     const forkGroup = randomUUID().slice(0, 8);
     let succeeded = 0;
@@ -278,7 +380,19 @@ export class ForEachDispatcher {
     // Collect child IDs spawned so far so we can sum their costs too.
     const spawnedChildIds: string[] = [];
 
+    // In resume mode, build the set of already-completed iterations from child
+    // session status (not from checkpoint.completed -- see module docstring).
+    const completedSet: Set<number> = isResume
+      ? await buildCompletedSetFromChildren(this.deps.sessions, sessionId)
+      : new Set<number>();
+
     for (let i = 0; i < items.length; i++) {
+      // Resume: skip iterations that are already confirmed complete.
+      if (completedSet.has(i)) {
+        succeeded++;
+        continue;
+      }
+
       // -- Cumulative budget check (before spawning next iteration) --
       if (sessionCap !== null) {
         const cumulative = await sumPriorIterationCosts(this.deps.events, sessionId, spawnedChildIds);
@@ -292,6 +406,7 @@ export class ForEachDispatcher {
             status: "failed",
             error: `budget exceeded: $${cumulative.toFixed(4)} >= cap $${sessionCap}`,
           });
+          await clearCheckpoint(this.deps.sessions, sessionId);
           return {
             ok: false,
             message: `for_each: budget exceeded at iteration ${i}: $${cumulative.toFixed(4)} >= cap $${sessionCap}`,
@@ -315,6 +430,21 @@ export class ForEachDispatcher {
       // child's own for_each (if any) also respects it.
       const iterBudget = stageDef.max_budget_usd ?? null;
 
+      // -- Write in_flight checkpoint BEFORE spawning. --
+      // next_index advances to i+1 so a restart after this write knows iteration
+      // i was at least attempted.
+      const currentSession = await this.deps.sessions.get(sessionId);
+      await writeCheckpoint(this.deps.sessions, sessionId, {
+        stage_name: stageDef.name,
+        total_items: items.length,
+        items,
+        next_index: i + 1,
+        in_flight: {
+          index: i,
+          started_at: new Date().toISOString(),
+        },
+      });
+
       // Spawn a child session for this iteration (string name or inline object)
       const spawnResult = await this.spawnChild(sessionId, forkGroup, spawnSpec.flow, resolvedInputs, i, {
         repo: resolvedRepo,
@@ -326,11 +456,12 @@ export class ForEachDispatcher {
         failedCount++;
         const msg = `for_each iteration ${i}: spawn failed: ${spawnResult.message}`;
         await this.deps.events.log(sessionId, "for_each_iteration_failed", {
-          stage: session.stage,
+          stage: (currentSession ?? session).stage,
           actor: "system",
           data: { index: i, item: JSON.stringify(item), reason: spawnResult.message },
         });
         if (onIterFailure === "stop") {
+          await clearCheckpoint(this.deps.sessions, sessionId);
           return { ok: false, message: msg };
         }
         logWarn("session", msg, { sessionId, iteration: i });
@@ -340,8 +471,21 @@ export class ForEachDispatcher {
       const childId = spawnResult.childId;
       spawnedChildIds.push(childId);
 
+      // Update in_flight with the child session id now that we have it.
+      await writeCheckpoint(this.deps.sessions, sessionId, {
+        stage_name: stageDef.name,
+        total_items: items.length,
+        items,
+        next_index: i + 1,
+        in_flight: {
+          index: i,
+          child_session_id: childId,
+          started_at: new Date().toISOString(),
+        },
+      });
+
       await this.deps.events.log(sessionId, "for_each_iteration_start", {
-        stage: session.stage,
+        stage: (currentSession ?? session).stage,
         actor: "system",
         data: { index: i, childId, flow: flowLabel, inputs: resolvedInputs },
       });
@@ -351,11 +495,12 @@ export class ForEachDispatcher {
       if (!dispatchResult.ok) {
         failedCount++;
         await this.deps.events.log(sessionId, "for_each_iteration_failed", {
-          stage: session.stage,
+          stage: (currentSession ?? session).stage,
           actor: "system",
           data: { index: i, childId, reason: `dispatch failed: ${dispatchResult.message}` },
         });
         if (onIterFailure === "stop") {
+          await clearCheckpoint(this.deps.sessions, sessionId);
           return { ok: false, message: `for_each iteration ${i}: dispatch failed: ${dispatchResult.message}` };
         }
         logWarn("session", `for_each iteration ${i}: dispatch failed`, { sessionId, childId, iteration: i });
@@ -365,14 +510,23 @@ export class ForEachDispatcher {
       // Wait for the child to reach a terminal state
       const terminalStatus = await this.waitForChild(childId);
 
+      // Clear in_flight AFTER child reaches terminal (whether ok or not).
+      await writeCheckpoint(this.deps.sessions, sessionId, {
+        stage_name: stageDef.name,
+        total_items: items.length,
+        items,
+        next_index: i + 1,
+      });
+
       if (terminalStatus === "failed") {
         failedCount++;
         await this.deps.events.log(sessionId, "for_each_iteration_failed", {
-          stage: session.stage,
+          stage: (currentSession ?? session).stage,
           actor: "system",
           data: { index: i, childId, reason: "child session failed" },
         });
         if (onIterFailure === "stop") {
+          await clearCheckpoint(this.deps.sessions, sessionId);
           return {
             ok: false,
             message: `for_each iteration ${i}: child session ${childId} failed`,
@@ -385,11 +539,12 @@ export class ForEachDispatcher {
       if (terminalStatus === "timeout") {
         failedCount++;
         await this.deps.events.log(sessionId, "for_each_iteration_failed", {
-          stage: session.stage,
+          stage: (currentSession ?? session).stage,
           actor: "system",
           data: { index: i, childId, reason: "child session timed out waiting for terminal state" },
         });
         if (onIterFailure === "stop") {
+          await clearCheckpoint(this.deps.sessions, sessionId);
           return {
             ok: false,
             message: `for_each iteration ${i}: child session ${childId} timed out`,
@@ -405,12 +560,15 @@ export class ForEachDispatcher {
 
       succeeded++;
       await this.deps.events.log(sessionId, "for_each_iteration_complete", {
-        stage: session.stage,
+        stage: (currentSession ?? session).stage,
         actor: "system",
         data: { index: i, childId, status: terminalStatus },
       });
       logDebug("session", `for_each iteration ${i}: complete`, { sessionId, childId });
     }
+
+    // All iterations done -- clear the checkpoint.
+    await clearCheckpoint(this.deps.sessions, sessionId);
 
     await this.deps.events.log(sessionId, "for_each_complete", {
       stage: session.stage,
@@ -432,10 +590,14 @@ export class ForEachDispatcher {
    * worktree is reused for all sub-stages.
    *
    * Steps per iteration:
-   *   1. Build iteration vars (base session vars + flattened iteration item).
-   *   2. For each sub-stage: substitute templates in task and agent fields.
-   *   3. Dispatch the resolved sub-stage via the injected `dispatchInlineSubStage` callback.
-   *   4. Apply on_iteration_failure policy on failure.
+   *   1. Check for an existing checkpoint (resume mode) or resolve the list fresh.
+   *   2. Write loop-enter checkpoint before first iteration.
+   *   3. Build iteration vars (base session vars + flattened iteration item).
+   *   4. Write in_flight checkpoint before dispatching each iteration.
+   *   5. For each sub-stage: substitute templates + dispatch via callback.
+   *   6. Clear in_flight after iteration terminal.
+   *   7. Apply on_iteration_failure policy on failure.
+   *   8. Clear checkpoint on loop exit.
    */
   async dispatchForEachInline(
     sessionId: string,
@@ -459,11 +621,27 @@ export class ForEachDispatcher {
       return { ok: false, message: `Stage '${stageDef.name}' has mode:inline but no stages defined` };
     }
 
+    // ── Resume-or-fresh decision (inline mode) ───────────────────────────────
+    const existingCp = (session.config as Record<string, unknown> | null)?.for_each_checkpoint as
+      | import("../../state/flow.js").ForEachCheckpoint
+      | null
+      | undefined;
+    const isResume = existingCp != null && existingCp.stage_name === stageDef.name;
+
     let items: unknown[];
-    try {
-      items = resolveForEachList(forEachExpr, sessionVars, session);
-    } catch (err: any) {
-      return { ok: false, message: `for_each: failed to resolve list: ${err.message}` };
+    if (isResume) {
+      items = existingCp.items;
+      logInfo("session", `for_each inline: resuming stage '${stageDef.name}' from checkpoint`, {
+        sessionId,
+        total: items.length,
+        next_index: existingCp.next_index,
+      });
+    } else {
+      try {
+        items = resolveForEachList(forEachExpr, sessionVars, session);
+      } catch (err: any) {
+        return { ok: false, message: `for_each: failed to resolve list: ${err.message}` };
+      }
     }
 
     if (items.length === 0) {
@@ -472,14 +650,24 @@ export class ForEachDispatcher {
         actor: "system",
         data: { total: 0, succeeded: 0, failed: 0, note: "empty list -- no iterations" },
       });
+      await clearCheckpoint(this.deps.sessions, sessionId);
       return { ok: true, message: "for_each: empty list -- stage complete" };
     }
 
-    await this.deps.events.log(sessionId, "for_each_start", {
-      stage: session.stage,
-      actor: "system",
-      data: { total: items.length, mode: "inline", iterVar, subStageCount: subStages.length },
-    });
+    if (!isResume) {
+      // Fresh start: write loop-enter checkpoint before for_each_start event.
+      await writeCheckpoint(this.deps.sessions, sessionId, {
+        stage_name: stageDef.name,
+        total_items: items.length,
+        items,
+        next_index: 0,
+      });
+      await this.deps.events.log(sessionId, "for_each_start", {
+        stage: session.stage,
+        actor: "system",
+        data: { total: items.length, mode: "inline", iterVar, subStageCount: subStages.length },
+      });
+    }
 
     let succeeded = 0;
     let failedCount = 0;
@@ -487,7 +675,16 @@ export class ForEachDispatcher {
     // Cumulative budget cap set on the session (via session.config.max_budget_usd).
     const sessionCap = (session.config?.max_budget_usd as number | undefined) ?? null;
 
-    for (let i = 0; i < items.length; i++) {
+    // In resume mode, determine which iterations are already done.
+    // For inline mode there are no child sessions, so we use next_index as the
+    // authoritative "already started" pointer. Iterations before next_index that
+    // completed successfully are counted as succeeded; the one at next_index-1
+    // might have been interrupted mid-sub-stage and is rerun from scratch.
+    const resumeStartIndex = isResume ? Math.max(0, existingCp!.next_index - 1) : 0;
+    const priorSucceeded = isResume ? resumeStartIndex : 0;
+    succeeded = priorSucceeded;
+
+    for (let i = isResume ? resumeStartIndex : 0; i < items.length; i++) {
       // -- Cumulative budget check (before dispatching next iteration) --
       if (sessionCap !== null) {
         const cumulative = await sumPriorIterationCosts(this.deps.events, sessionId);
@@ -501,6 +698,7 @@ export class ForEachDispatcher {
             status: "failed",
             error: `budget exceeded: $${cumulative.toFixed(4)} >= cap $${sessionCap}`,
           });
+          await clearCheckpoint(this.deps.sessions, sessionId);
           return {
             ok: false,
             message: `for_each: budget exceeded at iteration ${i}: $${cumulative.toFixed(4)} >= cap $${sessionCap}`,
@@ -510,6 +708,19 @@ export class ForEachDispatcher {
 
       const item = items[i];
       const iterVars = buildIterationVars(sessionVars, iterVar, item);
+
+      // Write in_flight checkpoint before this iteration's sub-stages.
+      await writeCheckpoint(this.deps.sessions, sessionId, {
+        stage_name: stageDef.name,
+        total_items: items.length,
+        items,
+        next_index: i + 1,
+        in_flight: {
+          index: i,
+          sub_stage_name: subStages[0]?.name,
+          started_at: new Date().toISOString(),
+        },
+      });
 
       await this.deps.events.log(sessionId, "for_each_iteration_start", {
         stage: session.stage,
@@ -558,9 +769,18 @@ export class ForEachDispatcher {
         });
       }
 
+      // Clear in_flight after iteration terminal (success or failure).
+      await writeCheckpoint(this.deps.sessions, sessionId, {
+        stage_name: stageDef.name,
+        total_items: items.length,
+        items,
+        next_index: i + 1,
+      });
+
       if (iterationFailed) {
         failedCount++;
         if (onIterFailure === "stop") {
+          await clearCheckpoint(this.deps.sessions, sessionId);
           return {
             ok: false,
             message: `for_each inline: iteration ${i} failed -- stopping`,
@@ -577,6 +797,9 @@ export class ForEachDispatcher {
       });
       logDebug("session", `for_each inline iteration ${i}: complete`, { sessionId });
     }
+
+    // All iterations done -- clear the checkpoint.
+    await clearCheckpoint(this.deps.sessions, sessionId);
 
     await this.deps.events.log(sessionId, "for_each_complete", {
       stage: session.stage,

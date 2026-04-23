@@ -30,6 +30,53 @@ export interface InlineFlowSpec {
   stages: StageDefinition[];
 }
 
+/**
+ * Durable checkpoint written to session.config.for_each_checkpoint while a
+ * for_each loop is mid-execution. Enables boot-time reconciliation to resume
+ * a loop from where it left off after a daemon restart.
+ *
+ * Write order (commit-before-side-effect):
+ *   1. Loop enter: write with next_index=0, items=<resolved>, completed=[].
+ *   2. Before iteration i: set in_flight={index:i, ...}, next_index=i+1.
+ *   3. After iteration i terminal: clear in_flight. Completed-set is derived
+ *      from child-session status on resume (see reconcile logic) rather than
+ *      maintained in this struct -- avoids the crash window between child
+ *      completion and parent checkpoint update.
+ *   4. Loop exit: checkpoint is deleted from session.config.
+ */
+export interface ForEachCheckpoint {
+  /** Name of the for_each stage this checkpoint belongs to. */
+  stage_name: string;
+  /** Total number of items in the resolved list. */
+  total_items: number;
+  /**
+   * The fully-resolved item list, captured at loop entry. Resume uses this
+   * list instead of re-resolving the for_each template so the list cannot
+   * drift if inputs change between crash and restart.
+   */
+  items: unknown[];
+  /**
+   * Index of the next iteration that has NOT yet been confirmed started.
+   * Written BEFORE dispatching iteration i, set to i+1.
+   */
+  next_index: number;
+  /**
+   * The iteration currently in-flight when the checkpoint was last written.
+   * Present while a child is being dispatched / polled; absent otherwise.
+   * On resume: if in_flight is set and the child session is not completed,
+   * that iteration is retried.
+   */
+  in_flight?: {
+    index: number;
+    /** child session id (spawn mode) */
+    child_session_id?: string;
+    /** sub-stage name (inline mode) */
+    sub_stage_name?: string;
+    /** ISO timestamp when this iteration started */
+    started_at: string;
+  };
+}
+
 export interface ForEachSpawnSpec {
   /**
    * Named flow (string -- looked up via app.flows.get) OR an inline flow

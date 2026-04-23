@@ -428,6 +428,38 @@ describe("for_each -- dispatcher switch routes mode:spawn (default) to spawn pat
   });
 });
 
+describe("for_each + mode:spawn -- checkpoint regression: writes and clears across 3-item happy path", () => {
+  it("checkpoint is populated at loop enter and cleared after all 3 iterations complete", async () => {
+    const items = [{ path: "/repo/a" }, { path: "/repo/b" }, { path: "/repo/c" }];
+    const { id: parentId, vars } = await makeParentWithList(items);
+
+    const checkpointsBefore: Array<Record<string, unknown> | null> = [];
+    const dispatcher = makeDispatcher(async (childId) => {
+      // Capture checkpoint right as each dispatch begins.
+      const session = await app.sessions.get(parentId);
+      const cp = (session?.config as Record<string, unknown> | null)?.for_each_checkpoint ?? null;
+      checkpointsBefore.push(cp as Record<string, unknown> | null);
+      await app.sessions.update(childId, { status: "completed" });
+    });
+
+    const result = await dispatcher.dispatchForEach(parentId, makeStage(), vars);
+    expect(result.ok).toBe(true);
+
+    // Checkpoint was present at all 3 iteration starts.
+    expect(checkpointsBefore).toHaveLength(3);
+    for (const cp of checkpointsBefore) {
+      expect(cp).not.toBeNull();
+      expect((cp as Record<string, unknown>).stage_name).toBe("per_repo");
+      expect((cp as Record<string, unknown>).total_items).toBe(3);
+    }
+
+    // Checkpoint is cleared after loop completes.
+    const finalSession = await app.sessions.get(parentId);
+    const finalCp = (finalSession?.config as Record<string, unknown> | null)?.for_each_checkpoint;
+    expect(finalCp == null).toBe(true);
+  });
+});
+
 describe("for_each + mode:spawn -- on_iteration_failure: continue", () => {
   it("continues after item 2 fails and spawns all remaining items", async () => {
     const items = [{ idx: 0 }, { idx: 1 }, { idx: 2 }, { idx: 3 }];

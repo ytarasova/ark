@@ -154,6 +154,11 @@ export class AppContext {
     // scan all active sessions and re-register any inline_flow definitions here.
     void this._rehydrateInlineFlows();
 
+    // Boot-time reconciliation of for_each sessions that were mid-loop when the
+    // daemon last stopped. Re-dispatches any running session whose config has a
+    // for_each_checkpoint so the loop resumes from where it left off.
+    void this._reconcileForEachSessions();
+
     // Hosted-mode only: on a fresh DB the `resource_definitions` table is empty,
     // so `agent/list` + friends return []. Seed the builtin YAMLs shipped with
     // the source tree (or install prefix) on every boot; the seeder is idempotent
@@ -220,6 +225,59 @@ export class AppContext {
   }
 
   // ── Boot helpers (pre-container bootstrap only) ──────────────────────
+
+  /**
+   * Boot-time reconciliation of for_each sessions that were mid-loop when
+   * the daemon last stopped.
+   *
+   * Scans all sessions with status=running that have a for_each_checkpoint in
+   * their config. For each such session, re-dispatches it so the ForEachDispatcher
+   * sees the checkpoint and resumes from where it left off (skipping completed
+   * iterations, retrying the in-flight one).
+   *
+   * Must run AFTER the container is booted (so dispatchService is available)
+   * but BEFORE the server accepts traffic (so no concurrent dispatches race
+   * with this reconciliation). Called as a void background task from boot()
+   * so an error here does not prevent the daemon from starting.
+   *
+   * Design choice: we re-dispatch the session directly, which sets it back to
+   * status=ready -> running. A concurrent incoming dispatch for the same session
+   * would be rejected by dispatch-core.ts ("Already running") so there is no
+   * double-dispatch hazard once the reconcile kick lands.
+   */
+  async _reconcileForEachSessions(): Promise<void> {
+    try {
+      const { logInfo: li, logError: le } = await import("./observability/structured-log.js");
+      const running = await this.sessions.list({ status: "running", limit: 500 });
+      for (const session of running) {
+        const cp = (session.config as Record<string, unknown> | null)?.for_each_checkpoint;
+        if (!cp || typeof cp !== "object") continue;
+        const cpTyped = cp as import("./state/flow.js").ForEachCheckpoint;
+
+        li(
+          "boot",
+          `reconciling for_each session ${session.id} stage '${cpTyped.stage_name}' ` +
+            `at iteration ${cpTyped.next_index}/${cpTyped.total_items}`,
+        );
+
+        // Reset session to ready so dispatch can proceed (it was left as running
+        // when the daemon crashed).
+        try {
+          await this.sessions.update(session.id, { status: "ready", session_id: null });
+          await this.dispatchService.dispatch(session.id);
+        } catch (err: any) {
+          le("boot", `reconcile for_each session ${session.id} failed: ${err?.message ?? err}`);
+        }
+      }
+    } catch (err: any) {
+      try {
+        const { logWarn: lw2 } = await import("./observability/structured-log.js");
+        lw2("boot", `_reconcileForEachSessions: scan failed: ${err?.message ?? err}`);
+      } catch {
+        // best-effort
+      }
+    }
+  }
 
   /**
    * Rehydrate inline-flow definitions from persisted session config after a
