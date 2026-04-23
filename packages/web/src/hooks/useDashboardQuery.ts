@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "./useApi.js";
+import { useApi } from "./useApi.js";
 
 /**
  * Dashboard summary + running sessions. Refetched every 5s -- matches the
@@ -7,6 +7,7 @@ import { api } from "./useApi.js";
  * via `refetchIntervalInBackground: false` (default).
  */
 export function useDashboardSummaryQuery() {
+  const api = useApi();
   return useQuery({
     queryKey: ["dashboard", "summary"],
     queryFn: api.getDashboardSummary,
@@ -15,6 +16,7 @@ export function useDashboardSummaryQuery() {
 }
 
 export function useRunningSessionsQuery() {
+  const api = useApi();
   return useQuery({
     queryKey: ["sessions", "running"],
     queryFn: () => api.getSessions({}),

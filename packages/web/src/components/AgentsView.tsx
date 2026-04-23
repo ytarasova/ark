@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Settings } from "lucide-react";
-import { api } from "../hooks/useApi.js";
+import { useApi } from "../hooks/useApi.js";
 import { useAgentsQuery } from "../hooks/useAgentQueries.js";
 import { useRuntimesQuery } from "../hooks/useRuntimeQueries.js";
 import { cn } from "../lib/utils.js";
@@ -28,6 +28,7 @@ export function AgentsView({
   subTab: controlledSubTab,
   onSubTabChange,
 }: AgentsViewProps) {
+  const api = useApi();
   const queryClient = useQueryClient();
   const { data: agents = [] } = useAgentsQuery();
   const { data: runtimes = [] } = useRuntimesQuery();

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "../ui/button.js";
-import { adminApi } from "./adminApi.js";
+import { useAdminApi } from "./adminApi.js";
 import type { User } from "./types.js";
 
 interface UsersTabProps {
@@ -8,6 +8,7 @@ interface UsersTabProps {
 }
 
 export function UsersTab({ onToast }: UsersTabProps) {
+  const adminApi = useAdminApi();
   const [users, setUsers] = useState<User[]>([]);
   const [showNew, setShowNew] = useState(false);
   const [email, setEmail] = useState("");
@@ -19,7 +20,7 @@ export function UsersTab({ onToast }: UsersTabProps) {
     } catch (e: any) {
       onToast?.(`Failed: ${e?.message}`, "error");
     }
-  }, [onToast]);
+  }, [adminApi, onToast]);
 
   useEffect(() => {
     refresh();

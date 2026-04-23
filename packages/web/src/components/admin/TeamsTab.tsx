@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "../ui/button.js";
-import { adminApi } from "./adminApi.js";
+import { useAdminApi } from "./adminApi.js";
 import type { Tenant, Team, Membership, MembershipRole } from "./types.js";
 
 const ROLES: MembershipRole[] = ["owner", "admin", "member", "viewer"];
@@ -10,6 +10,7 @@ interface TeamsTabProps {
 }
 
 export function TeamsTab({ onToast }: TeamsTabProps) {
+  const adminApi = useAdminApi();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [tenantId, setTenantId] = useState<string>("");
   const [teams, setTeams] = useState<Team[]>([]);
@@ -30,7 +31,7 @@ export function TeamsTab({ onToast }: TeamsTabProps) {
         setTenantId((prev) => (prev ? prev : (ts[0]?.id ?? "")));
       })
       .catch((e) => onToast?.(`Failed: ${e?.message}`, "error"));
-  }, [onToast]);
+  }, [adminApi, onToast]);
 
   const refreshTeams = useCallback(
     async (tid: string) => {
@@ -45,7 +46,7 @@ export function TeamsTab({ onToast }: TeamsTabProps) {
         onToast?.(`Failed: ${e?.message}`, "error");
       }
     },
-    [onToast],
+    [adminApi, onToast],
   );
 
   useEffect(() => {
@@ -64,7 +65,7 @@ export function TeamsTab({ onToast }: TeamsTabProps) {
     } catch (e: any) {
       onToast?.(`Failed: ${e?.message}`, "error");
     }
-  }, [selectedId, onToast]);
+  }, [adminApi, selectedId, onToast]);
 
   useEffect(() => {
     refreshMembers();

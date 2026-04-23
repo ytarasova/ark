@@ -1,8 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "./useApi.js";
+import { useApi } from "./useApi.js";
 
 /** Recent Ark sessions (newest first). Derived from the main `sessions` query. */
 export function useRecentSessionsQuery() {
+  const api = useApi();
   return useQuery({
     queryKey: ["sessions", "recent"],
     queryFn: async () => {
@@ -21,6 +22,7 @@ export function useRecentSessionsQuery() {
 
 /** Claude Code transcripts (history.list). */
 export function useClaudeSessionsQuery() {
+  const api = useApi();
   return useQuery({
     queryKey: ["history", "claude-sessions"],
     queryFn: () => api.getClaudeSessions().then((items) => (Array.isArray(items) ? items : [])),
@@ -29,6 +31,7 @@ export function useClaudeSessionsQuery() {
 
 /** Refresh-and-index mutation. Invalidates the transcripts list on success. */
 export function useRefreshHistoryMutation() {
+  const api = useApi();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => api.refreshHistory(),

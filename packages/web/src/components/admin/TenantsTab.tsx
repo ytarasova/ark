@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "../ui/button.js";
-import { adminApi } from "./adminApi.js";
+import { useAdminApi } from "./adminApi.js";
 import type { Tenant, Team } from "./types.js";
 
 interface TenantsTabProps {
@@ -12,6 +12,7 @@ interface TenantsTabProps {
  * Plain table; confirm dialogs on destructive actions.
  */
 export function TenantsTab({ onToast }: TenantsTabProps) {
+  const adminApi = useAdminApi();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [selected, setSelected] = useState<Tenant | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -25,7 +26,7 @@ export function TenantsTab({ onToast }: TenantsTabProps) {
     } catch (e: any) {
       onToast?.(`Failed to load tenants: ${e?.message}`, "error");
     }
-  }, [onToast]);
+  }, [adminApi, onToast]);
 
   useEffect(() => {
     refresh();
@@ -41,7 +42,7 @@ export function TenantsTab({ onToast }: TenantsTabProps) {
       .listTeams(selectedId)
       .then(setTeams)
       .catch(() => setTeams([]));
-  }, [selectedId]);
+  }, [adminApi, selectedId]);
 
   async function handleCreate() {
     if (!newSlug.trim() || !newName.trim()) return;

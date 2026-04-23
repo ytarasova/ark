@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { GitBranch } from "lucide-react";
-import { api } from "../hooks/useApi.js";
+import { useApi } from "../hooks/useApi.js";
 import { useAgentsQuery } from "../hooks/useAgentQueries.js";
 import { useFlowDetail, useFlowsQuery } from "../hooks/useFlowQueries.js";
 import { cn } from "../lib/utils.js";
@@ -42,6 +42,7 @@ export function FlowsView({
   initialSelectedName,
   onSelectedChange,
 }: FlowsViewProps) {
+  const api = useApi();
   const queryClient = useQueryClient();
   const { data: flows = [] } = useFlowsQuery();
   const { data: agents = [] } = useAgentsQuery();

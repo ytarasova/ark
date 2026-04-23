@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { api } from "../hooks/useApi.js";
+import { useApi } from "../hooks/useApi.js";
 import { useMemoriesQuery } from "../hooks/useMemoryQueries.js";
 import { cn } from "../lib/utils.js";
 import { Button } from "./ui/button.js";
@@ -15,6 +15,7 @@ interface MemoryViewProps {
 }
 
 export function MemoryView({ addRequested = 0, onToast }: MemoryViewProps) {
+  const api = useApi();
   const queryClient = useQueryClient();
   const { data: memories = [] } = useMemoriesQuery();
   const [search, setSearch] = useState("");

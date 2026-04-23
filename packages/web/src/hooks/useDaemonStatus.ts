@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { api } from "./useApi.js";
+import { useState, useEffect, useCallback } from "react";
+import { useApi } from "./useApi.js";
 import { useSmartPoll } from "./useSmartPoll.js";
 
 export interface DaemonStatus {
@@ -13,9 +13,10 @@ export interface DaemonStatus {
  * Returns null while loading, then the latest status.
  */
 export function useDaemonStatus(intervalMs = 15000): DaemonStatus | null {
+  const api = useApi();
   const [status, setStatus] = useState<DaemonStatus | null>(null);
 
-  const load = () => {
+  const load = useCallback(() => {
     api
       .getDaemonStatus()
       .then(setStatus)
@@ -27,11 +28,11 @@ export function useDaemonStatus(intervalMs = 15000): DaemonStatus | null {
           router: { online: false },
         });
       });
-  };
+  }, [api]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
   useSmartPoll(load, intervalMs);
 
   return status;

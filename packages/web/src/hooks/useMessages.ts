@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { api } from "./useApi.js";
+import { useApi } from "./useApi.js";
 
 interface Message {
   id: number;
@@ -25,6 +25,7 @@ interface UseMessagesResult {
 let optimisticId = -1;
 
 export function useMessages({ sessionId, enabled, pollMs = 2000 }: UseMessagesOpts): UseMessagesResult {
+  const api = useApi();
   const [messages, setMessages] = useState<Message[]>([]);
   const [sending, setSending] = useState(false);
   const activeRef = useRef(true);
@@ -65,7 +66,7 @@ export function useMessages({ sessionId, enabled, pollMs = 2000 }: UseMessagesOp
       // Polling loop (every pollMs). A single bad fetch (network blip, 5xx) is
       // self-healing -- the next tick will retry. Logging would spam the console.
     }
-  }, [sessionId]);
+  }, [api, sessionId]);
 
   // Initial fetch and poll
   useEffect(() => {
@@ -119,7 +120,7 @@ export function useMessages({ sessionId, enabled, pollMs = 2000 }: UseMessagesOp
         return { ok: false, message: err.message || "Send failed" };
       }
     },
-    [sessionId, fetchMessages],
+    [api, sessionId, fetchMessages],
   );
 
   return { messages, send, sending };

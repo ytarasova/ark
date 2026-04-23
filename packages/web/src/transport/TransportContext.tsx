@@ -1,39 +1,36 @@
-import React, { createContext, useContext, useEffect } from "react";
+import React, { createContext, useContext } from "react";
 import type { WebTransport } from "./types.js";
 import { HttpTransport } from "./HttpTransport.js";
-import { setTransport } from "../hooks/useApi.js";
 
 /**
  * Default transport -- plain HTTP to the same origin. Electron uses this too
  * because the desktop shell loads the SPA over `http://localhost:${port}`.
+ *
+ * This single instance is only used when a component reads the context
+ * without a surrounding `<TransportProvider>`. The app's production root
+ * always wraps in `<TransportProvider transport={new HttpTransport()}>`.
  */
 const defaultTransport: WebTransport = new HttpTransport();
 
 const TransportContext = createContext<WebTransport>(defaultTransport);
 
-/** Hook for components that want direct access to the transport. */
+/**
+ * Hook for components / hooks that need the transport directly (mostly SSE
+ * subscribers and terminal sockets). Most call sites should prefer `useApi()`
+ * from `hooks/useApi.ts`, which wraps `useTransport()` and returns a typed
+ * client surface.
+ */
 export function useTransport(): WebTransport {
   return useContext(TransportContext);
 }
 
 /**
- * TransportProvider wraps the tree and also updates the module-level transport
- * used by the `api.*` call surface in `useApi.ts`. The setter pattern avoids
- * touching all 26 `api.*` call sites just to adopt the interface.
+ * Pure-context transport provider. No side effects -- every `useTransport()`
+ * call reads directly from React context, so two sibling providers with
+ * different transports (e.g. in tests) stay fully isolated.
  */
 export function TransportProvider({ transport, children }: { transport?: WebTransport; children: React.ReactNode }) {
   const resolved = transport ?? defaultTransport;
-
-  // Sync the module-level transport so `api.*` calls route through the
-  // currently-provided transport (important for tests that inject MockTransport).
-  // useEffect fires on first mount + whenever `resolved` changes.
-  useEffect(() => {
-    setTransport(resolved);
-  }, [resolved]);
-
-  // Also set synchronously so that the first render's effects see the right transport.
-  setTransport(resolved);
-
   return <TransportContext.Provider value={resolved}>{children}</TransportContext.Provider>;
 }
 

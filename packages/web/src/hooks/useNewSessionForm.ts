@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "./useApi.js";
+import { useApi } from "./useApi.js";
 import { relTime, formatRepoName } from "../util.js";
 import { NewSessionSchema, type NewSessionFormValues } from "../components/session/new/schema.js";
 import type { FlowInfo, ComputeInfo, RecentRepo, AttachmentInfo } from "../components/session/new/types.js";
@@ -32,6 +32,7 @@ export function useNewSessionForm({
   onClose: () => void;
   onSubmit: (values: NewSessionFormValues) => void;
 }) {
+  const api = useApi();
   const { control, handleSubmit, watch, setValue, formState } = useForm<NewSessionFormValues>({
     resolver: zodResolver(NewSessionSchema),
     defaultValues: { summary: "", repo: ".", ticket: "", flow: "", compute: "" },

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "./useApi.js";
+import { useApi } from "./useApi.js";
 import { useSessionStream } from "./useSessionStream.js";
 import { useMessages } from "./useMessages.js";
 import {
@@ -35,6 +35,7 @@ export function useSessionDetail({
   initialTab?: string | null;
   onTabChange?: (tab: string | null) => void;
 }) {
+  const api = useApi();
   const {
     detail,
     todos,

@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { api } from "./useApi.js";
+import { useApi } from "./useApi.js";
 
 type Toast = (msg: string, type: string) => void;
 
@@ -21,6 +21,7 @@ export function useSessionActions({
   onToast: Toast;
   refetchDetail: () => void;
 }) {
+  const api = useApi();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const handleAction = useCallback(
@@ -62,7 +63,7 @@ export function useSessionActions({
         setActionLoading(null);
       }
     },
-    [sessionId, onToast, refetchDetail],
+    [api, sessionId, onToast, refetchDetail],
   );
 
   const handleGateApprove = useCallback(async () => {
@@ -80,7 +81,7 @@ export function useSessionActions({
     } finally {
       setActionLoading(null);
     }
-  }, [sessionId, onToast, refetchDetail]);
+  }, [api, sessionId, onToast, refetchDetail]);
 
   const handleGateReject = useCallback(
     async (reason: string): Promise<boolean> => {
@@ -106,7 +107,7 @@ export function useSessionActions({
         setActionLoading(null);
       }
     },
-    [sessionId, onToast, refetchDetail],
+    [api, sessionId, onToast, refetchDetail],
   );
 
   /**
@@ -137,7 +138,7 @@ export function useSessionActions({
         setActionLoading(null);
       }
     },
-    [sessionId, onToast, refetchDetail],
+    [api, sessionId, onToast, refetchDetail],
   );
 
   return { actionLoading, handleAction, handleGateApprove, handleGateReject, handleRestart };

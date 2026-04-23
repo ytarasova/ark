@@ -3,10 +3,16 @@ import type { WebTransport } from "./types.js";
 /**
  * Default production transport -- HTTP JSON-RPC + browser EventSource.
  *
- * The `rpc()` and SSE-URL bodies are lifted verbatim from the previous
- * inline implementations in `useApi.ts` and `useSse.ts` so behaviour
- * remains identical for all 26 existing `api.*` call sites.
+ * Token resolution precedence matches the previous behaviour in `App.tsx`:
+ *   1. explicit constructor `opts.token`
+ *   2. `?token=...` in `window.location.search`
+ *   3. `localStorage.getItem("ark-token")` (set by `LoginPage`)
+ *
+ * `setToken()` updates the bearer + persists to localStorage; the login flow
+ * calls it after a successful credential probe so subsequent RPCs see the key.
  */
+const TOKEN_STORAGE_KEY = "ark-token";
+
 export class HttpTransport implements WebTransport {
   private base: string;
   private token: string | null;
@@ -17,7 +23,22 @@ export class HttpTransport implements WebTransport {
     // where window is undefined. In the browser the defaults kick in.
     const hasWindow = typeof window !== "undefined";
     this.base = opts.base ?? (hasWindow ? window.location.origin : "");
-    this.token = opts.token ?? (hasWindow ? new URLSearchParams(window.location.search).get("token") : null);
+    if (opts.token !== undefined) {
+      this.token = opts.token;
+    } else if (hasWindow) {
+      const urlToken = new URLSearchParams(window.location.search).get("token");
+      if (urlToken) {
+        this.token = urlToken;
+      } else {
+        try {
+          this.token = window.localStorage?.getItem(TOKEN_STORAGE_KEY) ?? null;
+        } catch {
+          this.token = null;
+        }
+      }
+    } else {
+      this.token = null;
+    }
   }
 
   private authHeaders(): Record<string, string> {
@@ -49,7 +70,22 @@ export class HttpTransport implements WebTransport {
     return new EventSource(this.sseUrl(path));
   }
 
-  /** Expose the token for callers (e.g. fetchApi) that build non-RPC URLs. */
+  /**
+   * Persist + activate a new bearer token. Used by the login flow so
+   * subsequent RPCs go out authenticated without a full page reload.
+   */
+  setToken(token: string | null): void {
+    this.token = token;
+    if (typeof window === "undefined") return;
+    try {
+      if (token) window.localStorage?.setItem(TOKEN_STORAGE_KEY, token);
+      else window.localStorage?.removeItem(TOKEN_STORAGE_KEY);
+    } catch {
+      /* localStorage unavailable (private mode / sandbox) -- token stays in-memory only. */
+    }
+  }
+
+  /** Return the currently active bearer token, or `null` when unauthenticated. */
   getToken(): string | null {
     return this.token;
   }

@@ -7,7 +7,8 @@
  *   - `MockTransport` for unit tests (register per-method handlers).
  *
  * Kept deliberately small: all non-SSE RPC goes through `rpc()`; SSE goes
- * through `createEventSource()`.
+ * through `createEventSource()`; bearer-token rotation goes through
+ * `setToken()` (called by the login page after a successful probe).
  */
 export interface WebTransport {
   /** JSON-RPC call against the server's /api/rpc endpoint. */
@@ -16,4 +17,10 @@ export interface WebTransport {
   sseUrl(path: string): string;
   /** Construct an EventSource for the given SSE path. */
   createEventSource(path: string): EventSource;
+  /**
+   * Update (or clear) the bearer token used for subsequent RPCs.
+   * Implementations may persist the value (production `HttpTransport` writes
+   * to localStorage); `MockTransport` just remembers it for assertions.
+   */
+  setToken(token: string | null): void;
 }

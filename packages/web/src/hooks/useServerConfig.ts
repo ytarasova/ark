@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "./useApi.js";
+import { useApi } from "./useApi.js";
 
 export interface ServerConfig {
   hotkeys: unknown;
@@ -21,6 +21,7 @@ export interface ServerConfig {
  * hotkeys / theme / profile.
  */
 export function useServerConfig() {
+  const api = useApi();
   return useQuery<ServerConfig>({
     queryKey: ["config", "server"],
     queryFn: () => api.getConfig(),

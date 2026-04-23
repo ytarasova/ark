@@ -18,6 +18,9 @@ export class MockTransport implements WebTransport {
   private handlers = new Map<string, Handler>();
   private esFactory: ((path: string) => EventSource) | null = null;
 
+  /** Last token passed to setToken() -- exposed for login-flow assertions. */
+  public token: string | null = null;
+
   /** Record of every rpc() call -- useful for assertions. */
   public readonly calls: Array<{ method: string; params: Record<string, unknown> }> = [];
 
@@ -45,6 +48,10 @@ export class MockTransport implements WebTransport {
 
   sseUrl(path: string): string {
     return `mock://${path}`;
+  }
+
+  setToken(token: string | null): void {
+    this.token = token;
   }
 
   createEventSource(path: string): EventSource {

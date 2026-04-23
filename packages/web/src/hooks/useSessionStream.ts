@@ -26,7 +26,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef } from "react";
-import { api } from "./useApi.js";
+import { useApi } from "./useApi.js";
 
 const ACTIVE_STATES = new Set(["running", "waiting", "blocked", "pending", "ready"]);
 const TERMINAL_STATES = new Set(["completed", "stopped", "failed"]);
@@ -54,6 +54,7 @@ export interface SessionStream {
 }
 
 export function useSessionStream(sessionId: string): SessionStream {
+  const api = useApi();
   const qc = useQueryClient();
   const outputRef = useRef<HTMLDivElement>(null);
 

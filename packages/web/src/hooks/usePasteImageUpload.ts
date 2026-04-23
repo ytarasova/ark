@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { api } from "./useApi.js";
+import { useApi } from "./useApi.js";
 import type { InputsValue } from "../components/session/InputsSection.js";
 
 export interface UsePasteImageUploadOptions {
@@ -40,6 +40,7 @@ export interface UsePasteImageUploadOptions {
  * Returns a memoised `onPaste` handler to spread onto the target element.
  */
 export function usePasteImageUpload(opts: UsePasteImageUploadOptions) {
+  const api = useApi();
   const {
     inputs,
     onInputsChange,
@@ -78,7 +79,7 @@ export function usePasteImageUpload(opts: UsePasteImageUploadOptions) {
       onInputsChange({ ...inputs, files: { ...inputs.files, [role]: locator } });
       onUploaded?.(role, locator);
     },
-    [inputs, onInputsChange, onUploaded, onPreview, rolePrefix],
+    [api, inputs, onInputsChange, onUploaded, onPreview, rolePrefix],
   );
 
   const onPaste = useCallback(

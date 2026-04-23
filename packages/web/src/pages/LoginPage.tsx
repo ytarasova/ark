@@ -1,12 +1,24 @@
 import { useState } from "react";
 import { Button } from "../components/ui/button.js";
 import { Input } from "../components/ui/input.js";
+import { useTransport } from "../transport/TransportContext.js";
 
 interface LoginPageProps {
   onLogin: (token: string) => void;
 }
 
+/**
+ * Login page. Instead of its own `fetch("/api/rpc")` + `localStorage.setItem`,
+ * we route through the injected transport:
+ *   1. `setToken(key)` so the probe request goes out authenticated.
+ *   2. `rpc("session/list")` as a cheap auth-validation RPC.
+ *   3. On failure, clear the token and surface the error.
+ *
+ * Persistence (localStorage) is the transport's concern; the page just pokes
+ * the transport.
+ */
 export function LoginPage({ onLogin }: LoginPageProps) {
+  const transport = useTransport();
   const [key, setKey] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -19,30 +31,20 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     }
     setLoading(true);
     setError("");
+    transport.setToken(key);
     try {
-      const res = await fetch("/api/rpc", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${key}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "session/list", params: {} }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.error) {
-          setError("Invalid API key");
-        } else {
-          localStorage.setItem("ark-token", key);
-          onLogin(key);
-        }
-      } else if (res.status === 401) {
+      await transport.rpc("session/list", {});
+      onLogin(key);
+    } catch (err) {
+      transport.setToken(null);
+      const message = err instanceof Error ? err.message : "";
+      if (/auth|unauthor|401/i.test(message)) {
         setError("Invalid API key");
+      } else if (message) {
+        setError(message);
       } else {
-        setError(`Connection failed (HTTP ${res.status})`);
+        setError("Connection failed - is the server running?");
       }
-    } catch {
-      setError("Connection failed - is the server running?");
     } finally {
       setLoading(false);
     }
