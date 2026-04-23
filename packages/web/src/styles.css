@@ -228,6 +228,46 @@
     background-position: 200% 0;
   }
 }
+/* ---- Lane shimmer (session list `.lane.running`) ---- */
+@keyframes laneShimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+/* ---- Running pip pulse (chrome-session-list `.pip.running::after`) ---- */
+@keyframes pulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+/* ---- Status chip dot pulse (chrome-session-header) ---- */
+@keyframes chipPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+/* ---- Brand live dot glow (app-chrome sidebar brand) ---- */
+@keyframes brandGlow {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
 .skeleton-shimmer {
   background: linear-gradient(90deg, var(--bg-hover) 25%, var(--bg-card) 50%, var(--bg-hover) 75%);
   background-size: 200% 100%;

@@ -1,36 +1,44 @@
 import { cn } from "../../lib/utils.js";
 import type { SessionStatus } from "./StatusDot.js";
 
+/**
+ * FilterChip — rebuilt from the `.filter span` rule in app-chrome.html.
+ *
+ *   font     mono-ui 10px 500 UPPERCASE tracking 0.04em
+ *   padding  3px 7px
+ *   radius   full (99px)
+ *   default  fg-muted on transparent
+ *   on       primary-subtle bg + primary fg
+ */
 export interface FilterChipProps extends React.ComponentProps<"button"> {
-  status: SessionStatus;
-  count: number;
+  status?: SessionStatus;
+  count?: number;
+  label?: string;
   active?: boolean;
 }
 
-const STATUS_ACTIVE_CLASSES: Record<SessionStatus, string> = {
-  running: "border-transparent bg-[rgba(96,165,250,0.12)] text-[var(--running)]",
-  waiting: "border-transparent bg-[rgba(251,191,36,0.12)] text-[var(--waiting)]",
-  completed: "border-transparent bg-[rgba(52,211,153,0.12)] text-[var(--completed)]",
-  failed: "border-transparent bg-[rgba(248,113,113,0.12)] text-[var(--failed)]",
-  stopped: "border-transparent bg-[var(--bg-hover)] text-[var(--fg-muted)]",
-  pending: "border-transparent bg-[var(--bg-hover)] text-[var(--fg-muted)]",
-};
-
-export function FilterChip({ status, count, active = false, className, ...props }: FilterChipProps) {
+export function FilterChip({ status, count, label, active = false, className, children, ...props }: FilterChipProps) {
+  const content = children ?? (
+    <>
+      {label ?? status ?? ""}
+      {count != null && <span className="ml-1 opacity-80 tabular-nums">{count}</span>}
+    </>
+  );
   return (
     <button
       type="button"
       className={cn(
-        "inline-flex items-center gap-1 h-[22px] px-2 rounded-full text-[11px] font-medium",
-        "border border-[var(--border)] bg-transparent text-[var(--fg-muted)] cursor-pointer",
-        "hover:bg-[var(--bg-hover)] transition-colors duration-150",
-        "font-[var(--font-sans)]",
-        active && STATUS_ACTIVE_CLASSES[status],
+        "inline-flex items-center gap-1 px-[7px] py-[3px] rounded-full",
+        "font-[family-name:var(--font-mono-ui)] text-[10px] font-medium tracking-[0.04em] uppercase leading-[1.2]",
+        "border-0 bg-transparent cursor-pointer transition-colors duration-150",
+        "text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[rgba(255,255,255,0.03)]",
+        active && "bg-[var(--primary-subtle)] text-[var(--primary)]",
         className,
       )}
+      aria-pressed={active}
       {...props}
     >
-      {count} {status}
+      {content}
     </button>
   );
 }

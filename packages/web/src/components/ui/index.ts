@@ -1,10 +1,12 @@
 // Existing components
-export { Badge, badgeVariants } from "./badge.js";
+export { Badge, badgeVariants, StatusBadge, TagChip, AgentChip, RuntimeChip, ComputeChip } from "./badge.js";
+export type { StatusBadgeProps, StatusBadgeStatus, TagChipProps } from "./badge.js";
 export { RichSelect } from "./RichSelect.js";
 export type { RichSelectOption, RichSelectProps } from "./RichSelect.js";
 export { Button, buttonVariants } from "./button.js";
 export { Card, CardHeader, CardTitle, CardDescription, CardContent } from "./card.js";
-export { Input } from "./input.js";
+export { Input, InputShell } from "./input.js";
+export type { InputProps, InputShellProps } from "./input.js";
 export { Modal } from "./modal.js";
 export { Separator } from "./separator.js";
 
@@ -42,8 +44,8 @@ export { TypingIndicator } from "./TypingIndicator.js";
 export type { TypingIndicatorProps } from "./TypingIndicator.js";
 
 // Design system -- status
-export { StageProgressBar } from "./StageProgressBar.js";
-export type { StageProgress, StageProgressBarProps } from "./StageProgressBar.js";
+export { StageProgressBar, SessionLane } from "./StageProgressBar.js";
+export type { StageProgress, StageProgressBarProps, SessionLaneProps } from "./StageProgressBar.js";
 export { StagePipeline } from "./StagePipeline.js";
 export type { StagePipelineProps } from "./StagePipeline.js";
 export { StatusDot } from "./StatusDot.js";
