@@ -4,6 +4,19 @@ import { FilterChip } from "./ui/FilterChip.js";
 import type { SessionStatus } from "./ui/StatusDot.js";
 import { relTime, fmtCost } from "../util.js";
 
+/** Format token counts in the "48.2k" / "1.2M" style the design uses. */
+function fmtTokens(n?: number): string | undefined {
+  if (n == null || !Number.isFinite(n) || n <= 0) return undefined;
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(Math.round(n));
+}
+
+/** Compact, single-line error for the meta-row salmon pill. */
+function shortError(err: string): string {
+  return err.length > 40 ? err.slice(0, 37) + "…" : err;
+}
+
 interface SessionListProps {
   sessions: any[];
   selectedId: string | null;
@@ -90,19 +103,30 @@ export function SessionListPanel({
   // Map to UI format
   const items: SessionListItem[] = useMemo(
     () =>
-      filtered.map((s) => ({
-        id: s.id,
-        status: normalizeStatus(s.status),
-        summary: s.summary || s.id,
-        runtime: s.runtime || s.agent_runtime || undefined,
-        flow: s.pipeline || s.flow || undefined,
-        stageLabel: s.stage || undefined,
-        progress: computeProgress(s, flowStagesMap),
-        relativeTime: relTime(s.updated_at),
-        unreadCount: unreadCounts?.[s.id] ?? 0,
-        agentName: s.agent,
-        cost: s.cost != null ? fmtCost(s.cost) : undefined,
-      })),
+      filtered.map((s) => {
+        const totalTokens =
+          typeof s.tokens_total === "number"
+            ? s.tokens_total
+            : typeof s.tokens_in === "number" || typeof s.tokens_out === "number"
+              ? (s.tokens_in ?? 0) + (s.tokens_out ?? 0)
+              : undefined;
+        return {
+          id: s.id,
+          status: normalizeStatus(s.status),
+          summary: s.summary || s.id,
+          runtime: s.runtime || s.agent_runtime || undefined,
+          flow: s.pipeline || s.flow || undefined,
+          stageLabel: s.stage || undefined,
+          progress: computeProgress(s, flowStagesMap),
+          relativeTime: relTime(s.updated_at),
+          unreadCount: unreadCounts?.[s.id] ?? 0,
+          agentName: s.agent,
+          compute: s.compute_provider || s.compute_kind || undefined,
+          tokens: fmtTokens(totalTokens),
+          errorText: s.status === "failed" && s.error ? shortError(s.error) : undefined,
+          cost: s.cost != null ? fmtCost(s.cost) : undefined,
+        };
+      }),
     [filtered, flowStagesMap, unreadCounts],
   );
 
