@@ -471,6 +471,9 @@ export class ForEachDispatcher {
       const childId = spawnResult.childId;
       spawnedChildIds.push(childId);
 
+      // Record start time for per-iteration duration tracking.
+      const spawnIterStartMs = Date.now();
+
       // Update in_flight with the child session id now that we have it.
       await writeCheckpoint(this.deps.sessions, sessionId, {
         stage_name: stageDef.name,
@@ -509,6 +512,14 @@ export class ForEachDispatcher {
 
       // Wait for the child to reach a terminal state
       const terminalStatus = await this.waitForChild(childId);
+      const iterDurationMs = Date.now() - spawnIterStartMs;
+
+      // Compute per-iteration cost from the child's hook_status events.
+      const iterCostUsd = await sumPriorIterationCosts(this.deps.events, childId);
+
+      // Fetch child session to get num_turns from result if available.
+      const childSession = await this.deps.sessions.get(childId);
+      const childTurns = (childSession?.config as Record<string, unknown> | null)?.num_turns as number | undefined;
 
       // Clear in_flight AFTER child reaches terminal (whether ok or not).
       await writeCheckpoint(this.deps.sessions, sessionId, {
@@ -562,7 +573,14 @@ export class ForEachDispatcher {
       await this.deps.events.log(sessionId, "for_each_iteration_complete", {
         stage: (currentSession ?? session).stage,
         actor: "system",
-        data: { index: i, childId, status: terminalStatus },
+        data: {
+          index: i,
+          childId,
+          exit_status: "completed",
+          duration_ms: iterDurationMs,
+          cost_usd: iterCostUsd,
+          ...(childTurns !== undefined ? { turns: childTurns } : {}),
+        },
       });
       logDebug("session", `for_each iteration ${i}: complete`, { sessionId, childId });
     }
@@ -709,6 +727,11 @@ export class ForEachDispatcher {
       const item = items[i];
       const iterVars = buildIterationVars(sessionVars, iterVar, item);
 
+      // Record start time for per-iteration duration tracking.
+      const inlineIterStartMs = Date.now();
+      // Snapshot current cumulative cost so we can compute per-iteration delta.
+      const costBeforeIter = await sumPriorIterationCosts(this.deps.events, sessionId);
+
       // Write in_flight checkpoint before this iteration's sub-stages.
       await writeCheckpoint(this.deps.sessions, sessionId, {
         stage_name: stageDef.name,
@@ -769,6 +792,12 @@ export class ForEachDispatcher {
         });
       }
 
+      const inlineIterDurationMs = Date.now() - inlineIterStartMs;
+      // Compute cost delta for this iteration using timestamp-window approximation.
+      // Note: this can over-count if cost events from other sources overlap the window.
+      const costAfterIter = await sumPriorIterationCosts(this.deps.events, sessionId);
+      const inlineIterCostUsd = Math.max(0, costAfterIter - costBeforeIter);
+
       // Clear in_flight after iteration terminal (success or failure).
       await writeCheckpoint(this.deps.sessions, sessionId, {
         stage_name: stageDef.name,
@@ -793,7 +822,13 @@ export class ForEachDispatcher {
       await this.deps.events.log(sessionId, "for_each_iteration_complete", {
         stage: session.stage,
         actor: "system",
-        data: { index: i, mode: "inline" },
+        data: {
+          index: i,
+          mode: "inline",
+          exit_status: "completed",
+          duration_ms: inlineIterDurationMs,
+          cost_usd: inlineIterCostUsd,
+        },
       });
       logDebug("session", `for_each inline iteration ${i}: complete`, { sessionId });
     }

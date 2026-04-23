@@ -97,6 +97,104 @@ export function registerViewCommands(session: Command) {
         const parts = [usedStr, capStr].filter(Boolean).join(" / ");
         console.log(`  Budget:   ${parts}${pctStr}`);
       }
+
+      // for_each rollup block -- only shown when a checkpoint exists.
+      const checkpoint = s.config?.for_each_checkpoint as
+        | {
+            stage_name?: string;
+            total_items?: number;
+            next_index?: number;
+            in_flight?: { index?: number; child_session_id?: string; started_at?: string };
+          }
+        | null
+        | undefined;
+      if (checkpoint && typeof checkpoint === "object" && checkpoint.stage_name) {
+        const totalItems = checkpoint.total_items ?? 0;
+
+        // Fetch iteration-complete events to build rollup stats.
+        let iterEvents: Array<{ data: Record<string, unknown> | null; created_at: string }> = [];
+        try {
+          const allEvents = await ark.sessionEvents(id);
+          iterEvents = allEvents.filter((e: { type: string }) => e.type === "for_each_iteration_complete");
+        } catch {
+          // If events fetch fails, show what we have from checkpoint only.
+        }
+
+        const completedCount = iterEvents.length;
+        const pct = totalItems > 0 ? Math.round((completedCount / totalItems) * 100) : 0;
+        console.log(`  for_each: ${completedCount} of ${totalItems} iterations complete (${pct}%)`);
+
+        if (iterEvents.length > 0) {
+          // Sum cost and duration from enriched events.
+          let totalCostUsd = 0;
+          let totalDurationMs = 0;
+          let durationCount = 0;
+          for (const e of iterEvents) {
+            const d = (e.data ?? {}) as Record<string, unknown>;
+            if (typeof d.cost_usd === "number" && Number.isFinite(d.cost_usd)) {
+              totalCostUsd += d.cost_usd as number;
+            }
+            if (typeof d.duration_ms === "number" && Number.isFinite(d.duration_ms)) {
+              totalDurationMs += d.duration_ms as number;
+              durationCount++;
+            }
+          }
+
+          const avgMs = durationCount > 0 ? Math.round(totalDurationMs / durationCount) : null;
+          const avgStr =
+            avgMs !== null
+              ? avgMs >= 60000
+                ? `${Math.floor(avgMs / 60000)}m${Math.round((avgMs % 60000) / 1000)}s`
+                : `${Math.round(avgMs / 1000)}s`
+              : null;
+
+          const costStr = `$${totalCostUsd.toFixed(2)} used`;
+          const progressParts = [costStr, ...(avgStr !== null ? [`avg ${avgStr}/iteration`] : [])];
+          console.log(`  Progress: ${progressParts.join(", ")}`);
+
+          // Latest completed iteration.
+          const latestEvt = iterEvents[iterEvents.length - 1];
+          const latestData = (latestEvt?.data ?? {}) as Record<string, unknown>;
+          const latestIdx = latestData.index;
+          const latestDurMs = typeof latestData.duration_ms === "number" ? (latestData.duration_ms as number) : null;
+          const latestCost =
+            typeof latestData.cost_usd === "number" ? `$${(latestData.cost_usd as number).toFixed(2)}` : null;
+          const latestDurStr =
+            latestDurMs !== null
+              ? latestDurMs >= 60000
+                ? `${Math.floor(latestDurMs / 60000)}m${Math.round((latestDurMs % 60000) / 1000)}s`
+                : `${Math.round(latestDurMs / 1000)}s`
+              : null;
+          const latestParts = [`iteration ${latestIdx}`, latestDurStr, latestCost, latestData.exit_status as string]
+            .filter(Boolean)
+            .join(", ");
+          console.log(`  Latest:   ${latestParts}`);
+
+          // Budget line for for_each if cap is set (supplement the budget line above).
+          if (budgetCap !== null) {
+            const budgetPct = Math.min(100, Math.round((totalCostUsd / budgetCap) * 100));
+            console.log(`  Budget:   $${totalCostUsd.toFixed(2)} / $${budgetCap.toFixed(2)} (${budgetPct}%)`);
+          }
+        }
+
+        // In-flight iteration.
+        if (checkpoint.in_flight && typeof checkpoint.in_flight === "object") {
+          const inf = checkpoint.in_flight;
+          const infIdx = inf.index ?? "?";
+          const childRef = inf.child_session_id ? ` (child ${inf.child_session_id})` : "";
+          let agoStr = "";
+          if (inf.started_at) {
+            const startedMs = new Date(inf.started_at).getTime();
+            if (!isNaN(startedMs)) {
+              const elapsedMs = Date.now() - startedMs;
+              const elapsedMin = Math.floor(elapsedMs / 60000);
+              const elapsedSec = Math.round((elapsedMs % 60000) / 1000);
+              agoStr = elapsedMin > 0 ? ` (${elapsedMin}m${elapsedSec}s ago)` : ` (${elapsedSec}s ago)`;
+            }
+          }
+          console.log(`  In-flight: iteration ${infIdx}${agoStr}${childRef}`);
+        }
+      }
     });
 
   session
@@ -194,10 +292,68 @@ export function registerViewCommands(session: Command) {
     .command("events")
     .description("Show event history")
     .argument("<id>")
-    .action(async (id) => {
+    .option("--iteration <n>", "Filter to events for a specific for_each iteration (by index)")
+    .option("--summary", "Print one summary line per completed for_each iteration instead of individual events")
+    .action(async (id, opts) => {
       const ark = await getArkClient();
       const { formatEvent } = await import("../../helpers.js");
       const events = await ark.sessionEvents(id);
+
+      // --summary mode: print one line per completed for_each iteration.
+      if (opts.summary) {
+        const iterCompleteEvents = events.filter((e: { type: string }) => e.type === "for_each_iteration_complete");
+        const totalEvts = events.filter(
+          (e: { type: string }) => e.type === "for_each_start" || e.type === "for_each_complete",
+        );
+        // Try to get total_items from for_each_start or for_each_complete events.
+        const startEvt = totalEvts.find((e: { type: string }) => e.type === "for_each_start");
+        const total = (startEvt?.data as Record<string, unknown> | null | undefined)?.total ?? "?";
+
+        if (iterCompleteEvents.length === 0) {
+          console.log(chalk.dim("No completed for_each iterations found."));
+          return;
+        }
+
+        for (const e of iterCompleteEvents) {
+          const d = (e.data ?? {}) as Record<string, unknown>;
+          const idx = d.index ?? "?";
+          const exitStatus = (d.exit_status as string | undefined) ?? "completed";
+          const statusIcon = exitStatus === "completed" ? chalk.green("PASS") : chalk.red("FAIL");
+          const durationMs = typeof d.duration_ms === "number" ? (d.duration_ms as number) : null;
+          const durStr =
+            durationMs !== null
+              ? durationMs >= 60000
+                ? `${Math.floor(durationMs / 60000)}m${Math.round((durationMs % 60000) / 1000)}s`
+                : `${Math.round(durationMs / 1000)}s`
+              : null;
+          const costUsd = typeof d.cost_usd === "number" ? `$${(d.cost_usd as number).toFixed(2)}` : null;
+          const parts = [durStr, costUsd].filter(Boolean).join(", ");
+          const detailStr = parts ? ` - ${parts}` : "";
+          console.log(`  [${idx}/${total}] iteration ${idx}${detailStr} ${statusIcon}`);
+        }
+        return;
+      }
+
+      // --iteration <n> filter: show only events for that iteration index.
+      if (opts.iteration !== undefined) {
+        const iterN = Number(opts.iteration);
+        const filtered = events.filter((e: { type: string; data: Record<string, unknown> | null }) => {
+          const d = (e.data ?? {}) as Record<string, unknown>;
+          return typeof d.index === "number" && d.index === iterN;
+        });
+        if (filtered.length === 0) {
+          console.log(chalk.dim(`No events found for iteration ${iterN}.`));
+          return;
+        }
+        for (const e of filtered) {
+          const ts = e.created_at.slice(11, 16);
+          const msg = formatEvent(e.type, e.data ?? undefined);
+          console.log(`  ${chalk.dim(ts)}  ${msg}`);
+        }
+        return;
+      }
+
+      // Default: print all events.
       for (const e of events) {
         const ts = e.created_at.slice(11, 16);
         const msg = formatEvent(e.type, e.data ?? undefined);
