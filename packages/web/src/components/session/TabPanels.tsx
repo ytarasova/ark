@@ -3,6 +3,7 @@ import { tabButtonId, tabPanelId } from "../ui/ContentTabs.js";
 import { EventTimeline, type TimelineEvent } from "../ui/EventTimeline.js";
 import { TodoList, type TodoItem } from "../ui/TodoList.js";
 import type { DiffFile } from "../ui/DiffViewer.js";
+import type { StageProgress } from "../ui/StageProgressBar.js";
 import { ConversationTab } from "./tabs/ConversationTab.js";
 import { TerminalTab } from "./tabs/TerminalTab.js";
 import { DiffTab } from "./tabs/DiffTab.js";
@@ -45,6 +46,9 @@ interface TabPanelsProps {
   // Errors
   errorEvents: any[];
   onSelectError: (err: ErrorInfo) => void;
+
+  // Flow widget (Conversation tab right rail)
+  stages?: StageProgress[];
 }
 
 /**
@@ -77,6 +81,7 @@ export function TabPanels(props: TabPanelsProps) {
     onToggleTodo,
     errorEvents,
     onSelectError,
+    stages,
   } = props;
 
   return (
@@ -103,6 +108,7 @@ export function TabPanels(props: TabPanelsProps) {
           isActive={isActive}
           agentIsTyping={agentIsTyping}
           bottomRef={bottomRef}
+          stages={stages}
         />
       )}
       {/*

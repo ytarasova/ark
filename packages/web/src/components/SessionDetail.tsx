@@ -248,6 +248,7 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         onToggleTodo={handleToggleTodo}
         errorEvents={d.errorEvents}
         onSelectError={setSelectedError}
+        stages={d.stages}
       />
 
       {d.activeTab === "conversation" && (
