@@ -1190,7 +1190,6 @@ export const configGetResponse = z
     theme: z.unknown(),
     profile: z.unknown(),
     mode: z.string(),
-    hosted: z.boolean(),
   })
   .loose();
 export type ConfigGetResponse = z.infer<typeof configGetResponse>;

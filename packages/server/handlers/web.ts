@@ -76,14 +76,12 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
   // ── Config (combined hotkeys + theme + profile + mode) ───────────────────
   //
   // `mode` is authoritative: the frontend's AppModeProvider picks the binding
-  // off this field. `hosted` is kept for back-compat with old clients until we
-  // ship a breaking release; new clients should key off `mode` only.
+  // off this field.
   router.handle("config/get", async () => ({
     hotkeys: getHotkeys(),
     theme: getThemeMode(),
     profile: getActiveProfile(),
     mode: app.mode.kind,
-    hosted: app.mode.kind === "hosted",
   }));
 
   // ── Cost export ──────────────────────────────────────────────────────────

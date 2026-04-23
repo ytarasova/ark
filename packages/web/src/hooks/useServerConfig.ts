@@ -7,8 +7,6 @@ export interface ServerConfig {
   profile: unknown;
   /** Deployment mode, authoritative. */
   mode?: "local" | "hosted";
-  /** @deprecated Back-compat flag; new clients should key off `mode`. */
-  hosted?: boolean;
 }
 
 /**
