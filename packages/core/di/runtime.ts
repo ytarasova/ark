@@ -241,7 +241,7 @@ export function registerRuntime(container: AppContainer): void {
     // ark processes don't collide on a shared /tmp path.
     mcpPool: asFunction(
       (c: { config: ArkConfig }) => {
-        const socketDir = join(c.config.arkDir, "mcp-sockets");
+        const socketDir = join(c.config.dirs.ark, "mcp-sockets");
         const pool = new McpPool(socketDir);
         // Keep the back-compat `getMcpPool(socketDir)` cache in sync so older
         // call sites share the container-managed instance.

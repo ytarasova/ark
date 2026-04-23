@@ -102,8 +102,8 @@ describe("sage/analyze tenant segmentation (P1-5)", () => {
   it("writes the analysis JSON to a tenant-scoped path with 0o600 perms", async () => {
     // Dispatch sage/analyze under two different tenants. Both use the same
     // jira_id; without tenant segmentation they'd clobber each other.
-    const fixtureA = join(app.config.arkDir, "fixtures", "TEST-SHARED-A.json");
-    const fixtureB = join(app.config.arkDir, "fixtures", "TEST-SHARED-B.json");
+    const fixtureA = join(app.config.dirs.ark, "fixtures", "TEST-SHARED-A.json");
+    const fixtureB = join(app.config.dirs.ark, "fixtures", "TEST-SHARED-B.json");
     // Same jira_id on both fixtures -- this is the whole point of the test.
     writeFileSync(
       fixtureA,
@@ -139,8 +139,8 @@ describe("sage/analyze tenant segmentation (P1-5)", () => {
       ctxFor("tenant-b"),
     );
 
-    const pathA = join(app.config.arkDir, "sage", "tenant-a", "SHARED-1.analysis.json");
-    const pathB = join(app.config.arkDir, "sage", "tenant-b", "SHARED-1.analysis.json");
+    const pathA = join(app.config.dirs.ark, "sage", "tenant-a", "SHARED-1.analysis.json");
+    const pathB = join(app.config.dirs.ark, "sage", "tenant-b", "SHARED-1.analysis.json");
     expect(existsSync(pathA)).toBe(true);
     expect(existsSync(pathB)).toBe(true);
 

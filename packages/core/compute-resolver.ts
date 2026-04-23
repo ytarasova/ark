@@ -42,7 +42,7 @@ export async function resolveProvider(
   // ProviderRegistry is still keyed by legacy provider names.
   const { pairToProvider } = await import("../compute/adapters/provider-map.js");
   const providerKey =
-    pairToProvider({ compute: compute.compute_kind as string, runtime: compute.runtime_kind as string }) ??
+    pairToProvider({ compute: compute.compute_kind, runtime: compute.runtime_kind }) ??
     (compute.compute_kind as string);
   const provider = app.getProvider(providerKey as ComputeProviderName as string);
   return { provider: provider ?? null, compute };

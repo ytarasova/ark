@@ -26,7 +26,7 @@ beforeAll(async () => {
   await app.boot();
 
   // Seed two tenant-scoped trigger YAMLs on disk.
-  const triggersDir = join(app.config.arkDir, "triggers");
+  const triggersDir = join(app.config.dirs.ark, "triggers");
   for (const tenant of ["tenant-a", "tenant-b"]) {
     const dir = join(triggersDir, tenant);
     mkdirSync(dir, { recursive: true });

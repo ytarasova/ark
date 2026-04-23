@@ -36,7 +36,6 @@ import {
 } from "../stores/index.js";
 import { DbResourceStore, initResourceDefinitionsTable } from "../stores/db-resource-store.js";
 import { KnowledgeStore } from "../knowledge/store.js";
-import { ApiKeyManager } from "../auth/index.js";
 
 /**
  * Register the database under `db`. The DB is provided by the caller because
