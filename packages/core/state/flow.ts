@@ -19,7 +19,25 @@ import { logDebug } from "../observability/structured-log.js";
 export interface ForEachSpawnSpec {
   /** Named flow to spawn for each iteration. */
   flow: string;
-  /** Input map for the child session. Values may be Nunjucks templates. */
+  /**
+   * Per-iteration override of the child session's `repo` field. When set, the
+   * child session is created with this repo path/URL instead of inheriting the
+   * parent's. Templates resolve per-iteration (e.g. "{{repo.repo_path}}").
+   * Used by multi-repo for_each (one child per target repo).
+   */
+  repo?: string;
+  /**
+   * Per-iteration override of the child session's `branch` field. Combined with
+   * `repo`, lets each iteration target a deterministic branch on its own repo
+   * (e.g. "feature/pai-31080-pi-event-registry").
+   */
+  branch?: string;
+  /**
+   * Per-iteration override of the child session's `workdir` field. Rare;
+   * normally the worktree is auto-derived from `repo` + `branch`.
+   */
+  workdir?: string;
+  /** Input map for the child session's task vars. Values may be Nunjucks templates. */
   inputs: Record<string, unknown>;
 }
 

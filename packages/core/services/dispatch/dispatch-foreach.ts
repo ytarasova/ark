@@ -170,8 +170,19 @@ export class ForEachDispatcher {
       const iterVars = buildIterationVars(sessionVars, iterVar, item);
       const resolvedInputs = substituteInputs(spawnSpec.inputs, iterVars);
 
+      // Per-iteration overrides for session-row fields (repo / branch / workdir).
+      // Lets multi-repo for_each spawn each child against a different target repo
+      // on its own deterministic branch.
+      const resolvedRepo = spawnSpec.repo ? substituteVars(spawnSpec.repo, iterVars) : undefined;
+      const resolvedBranch = spawnSpec.branch ? substituteVars(spawnSpec.branch, iterVars) : undefined;
+      const resolvedWorkdir = spawnSpec.workdir ? substituteVars(spawnSpec.workdir, iterVars) : undefined;
+
       // Spawn a child session for this iteration
-      const spawnResult = await this.spawnChild(sessionId, forkGroup, spawnSpec.flow, resolvedInputs, i);
+      const spawnResult = await this.spawnChild(sessionId, forkGroup, spawnSpec.flow, resolvedInputs, i, {
+        repo: resolvedRepo,
+        branch: resolvedBranch,
+        workdir: resolvedWorkdir,
+      });
       if (!spawnResult.ok) {
         failedCount++;
         const msg = `for_each iteration ${i}: spawn failed: ${spawnResult.message}`;
@@ -280,6 +291,7 @@ export class ForEachDispatcher {
     flowName: string,
     inputs: Record<string, unknown>,
     index: number,
+    overrides?: { repo?: string; branch?: string; workdir?: string },
   ): Promise<{ ok: true; childId: string } | { ok: false; message: string }> {
     const parent = await this.deps.sessions.get(parentId);
     if (!parent) return { ok: false, message: "Parent session not found" };
@@ -292,10 +304,14 @@ export class ForEachDispatcher {
     const summary = (inputs.summary as string | undefined) ?? `${flowName} iteration ${index}`;
     const child = await this.deps.sessions.create({
       summary,
-      repo: parent.repo || undefined,
+      // Per-iteration overrides win over parent inheritance. Multi-repo for_each
+      // uses this to spawn each child against a different target repo on its own
+      // deterministic branch.
+      repo: overrides?.repo ?? parent.repo ?? undefined,
+      ...(overrides?.branch ? { branch: overrides.branch } : {}),
       flow: flowName,
       compute_name: parent.compute_name || undefined,
-      workdir: parent.workdir || undefined,
+      workdir: overrides?.workdir ?? parent.workdir ?? undefined,
       group_name: parent.group_name || undefined,
       config: { inputs, for_each_parent: parentId, for_each_index: index },
     });

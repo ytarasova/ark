@@ -214,6 +214,39 @@ describe("for_each + mode:spawn -- iteration variable substitution", () => {
     expect((child1!.config as any)?.inputs?.path).toBe("/home/user/beta");
   });
 
+  it("substitutes per-iteration repo + branch overrides into the child session row", async () => {
+    const items = [
+      { repo_path: "/Users/foo/Projects/pi-event-registry", branch: "feature/pai-test-1" },
+      { repo_path: "/Users/foo/Projects/pi-action-executor", branch: "feature/pai-test-2" },
+    ];
+
+    const dispatcher = makeDispatcher(async (childId) => {
+      await app.sessions.update(childId, { status: "completed" });
+    });
+
+    const { id: parentId, vars } = await makeParentWithList(items);
+    const stage = makeStage({
+      iteration_var: "repo",
+      spawn: {
+        flow: "bare",
+        repo: "{{repo.repo_path}}",
+        branch: "{{repo.branch}}",
+        inputs: { hint: "ignored" },
+      },
+    });
+
+    const result = await dispatcher.dispatchForEach(parentId, stage, vars);
+    expect(result.ok).toBe(true);
+
+    const children = await app.sessions.getChildren(parentId);
+    expect(children).toHaveLength(2);
+
+    const a = children.find((c) => c.repo === "/Users/foo/Projects/pi-event-registry");
+    const b = children.find((c) => c.repo === "/Users/foo/Projects/pi-action-executor");
+    expect(a?.branch).toBe("feature/pai-test-1");
+    expect(b?.branch).toBe("feature/pai-test-2");
+  });
+
   it("default iteration_var is 'item' when omitted", async () => {
     const items = [{ x: "value-a" }, { x: "value-b" }];
 
