@@ -53,7 +53,12 @@ export interface ChatCompletionRequest {
 }
 
 export interface RoutingOptions {
-  policy?: "quality" | "balanced" | "cost";
+  /**
+   * Routing policy identifier. The three shipped policies are "quality",
+   * "balanced", and "cost"; additional values are accepted and resolved
+   * against any custom policies the engine has registered.
+   */
+  policy?: string;
   quality_floor?: number; // 0-1, minimum quality threshold
   max_cost_per_token?: number;
   sticky_session_id?: string; // multi-turn session tracking

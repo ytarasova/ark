@@ -46,7 +46,33 @@ export { ProviderRegistry, Provider } from "./providers.js";
 export { classify, type ClassificationResult } from "./classifier.js";
 
 // Engine
-export { RoutingEngine } from "./engine.js";
+export { RoutingEngine, type RoutingEngineOptions } from "./engine.js";
+
+// Policies (strategy pattern -- register custom policies on the engine)
+export {
+  PolicyRegistry,
+  defaultPolicyRegistry,
+  QualityPolicy,
+  CostPolicy,
+  BalancedPolicy,
+  TierEscalator,
+  defaultTierEscalator,
+  cheapest,
+  highestQuality,
+  type PolicySelector,
+  type Tier,
+} from "./policies/index.js";
+
+// Provider adapters (strategy pattern -- register custom adapters on the registry)
+export {
+  ProviderAdapterRegistry,
+  defaultProviderAdapterRegistry,
+  OpenAIAdapter,
+  AnthropicAdapter,
+  GoogleAdapter,
+  type ProviderAdapter,
+  type AdapterRequest,
+} from "./adapters/index.js";
 
 // Dispatcher
 export { Dispatcher, TensorZeroDispatcher } from "./dispatch.js";
