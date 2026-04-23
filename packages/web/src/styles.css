@@ -190,6 +190,40 @@
   }
 }
 
+/* ---- Ticker bump (running stats in SessionHeader) ---- */
+@keyframes bump {
+  0%,
+  80%,
+  100% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 0.4;
+  }
+}
+.bump {
+  animation: bump 1.8s ease-in-out infinite;
+}
+
+/* ---- Live-typing caret blink (ChatInput) ---- */
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ---- Flow DAG connector "marching ants" (active edges only) ---- */
+@keyframes dash {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
+.dag-edge-active {
+  stroke-dasharray: 6 4;
+  stroke-dashoffset: 0;
+  animation: dash 0.8s linear infinite;
+}
+
 /* ---- Indeterminate progress bar ---- */
 @keyframes slideRight {
   0% {
