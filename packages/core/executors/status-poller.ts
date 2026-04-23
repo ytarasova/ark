@@ -94,7 +94,7 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
       // pane alive for post-mortem inspection, so executor.status() still
       // reports "running" -- we need this side-channel to flip the Ark
       // session to "failed". Bug 3 in the session-dispatch cascade.
-      const exitCode = readExitCodeSentinel(app.config.tracksDir, sessionId);
+      const exitCode = readExitCodeSentinel(app.config.dirs.tracks, sessionId);
       if (exitCode !== null) {
         stopStatusPoller(app, sessionId);
 
@@ -104,7 +104,7 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
         // Tail the stderr/log for a helpful reason, best-effort.
         let tail = "";
         try {
-          const stderrPath = join(app.config.tracksDir, sessionId, "stderr.log");
+          const stderrPath = join(app.config.dirs.tracks, sessionId, "stderr.log");
           if (existsSync(stderrPath)) {
             tail = readFileSync(stderrPath, "utf-8").split("\n").slice(-20).join("\n").trim();
           }

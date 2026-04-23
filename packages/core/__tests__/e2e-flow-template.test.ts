@@ -16,8 +16,8 @@ import { clearApp, getApp, setApp } from "./test-helpers.js";
 
 let app: AppContext;
 
-const flowDir = () => join(getApp().config.arkDir, "flows");
-const agentDir = () => join(getApp().config.arkDir, "agents");
+const flowDir = () => join(getApp().config.dirs.ark, "flows");
+const agentDir = () => join(getApp().config.dirs.ark, "agents");
 
 function writeFlowYaml(name: string, def: Record<string, unknown>): void {
   const dir = flowDir();

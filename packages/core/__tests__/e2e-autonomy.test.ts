@@ -19,7 +19,7 @@ import { clearApp, getApp, setApp } from "./test-helpers.js";
 
 let app: AppContext;
 
-const flowDir = () => join(getApp().config.arkDir, "flows");
+const flowDir = () => join(getApp().config.dirs.ark, "flows");
 
 function writeUserFlow(name: string, def: Record<string, unknown>): void {
   const dir = flowDir();
@@ -143,9 +143,9 @@ describe("E2E: buildArgs permission gating by autonomy", () => {
 
 describe("E2E: writeSettings writes permission deny rules", () => {
   it("read-only writes deny: ['Bash', 'Write', 'Edit'] to settings.local.json", () => {
-    writeSettings("s-e2e", "http://localhost:19100", app.config.arkDir, { autonomy: "read-only" });
+    writeSettings("s-e2e", "http://localhost:19100", app.config.dirs.ark, { autonomy: "read-only" });
 
-    const settingsPath = join(app.config.arkDir, ".claude", "settings.local.json");
+    const settingsPath = join(app.config.dirs.ark, ".claude", "settings.local.json");
     expect(existsSync(settingsPath)).toBe(true);
 
     const settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
@@ -156,36 +156,36 @@ describe("E2E: writeSettings writes permission deny rules", () => {
   });
 
   it("edit writes deny: ['Bash'] to settings.local.json", () => {
-    writeSettings("s-e2e", "http://localhost:19100", app.config.arkDir, { autonomy: "edit" });
+    writeSettings("s-e2e", "http://localhost:19100", app.config.dirs.ark, { autonomy: "edit" });
 
-    const settings = JSON.parse(readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"));
+    const settings = JSON.parse(readFileSync(join(app.config.dirs.ark, ".claude", "settings.local.json"), "utf-8"));
     expect(settings.permissions.deny).toEqual(["Bash"]);
   });
 
   it("full does NOT add permissions.deny", () => {
-    writeSettings("s-e2e", "http://localhost:19100", app.config.arkDir, { autonomy: "full" });
+    writeSettings("s-e2e", "http://localhost:19100", app.config.dirs.ark, { autonomy: "full" });
 
-    const settings = JSON.parse(readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"));
+    const settings = JSON.parse(readFileSync(join(app.config.dirs.ark, ".claude", "settings.local.json"), "utf-8"));
     expect(settings.permissions).toBeUndefined();
   });
 
   it("execute does NOT add permissions.deny", () => {
-    writeSettings("s-e2e", "http://localhost:19100", app.config.arkDir, { autonomy: "execute" });
+    writeSettings("s-e2e", "http://localhost:19100", app.config.dirs.ark, { autonomy: "execute" });
 
-    const settings = JSON.parse(readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"));
+    const settings = JSON.parse(readFileSync(join(app.config.dirs.ark, ".claude", "settings.local.json"), "utf-8"));
     expect(settings.permissions).toBeUndefined();
   });
 
   it("no autonomy does NOT add permissions.deny", () => {
-    writeSettings("s-e2e", "http://localhost:19100", app.config.arkDir);
+    writeSettings("s-e2e", "http://localhost:19100", app.config.dirs.ark);
 
-    const settings = JSON.parse(readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"));
+    const settings = JSON.parse(readFileSync(join(app.config.dirs.ark, ".claude", "settings.local.json"), "utf-8"));
     expect(settings.permissions).toBeUndefined();
   });
 
   it("edit preserves existing allow rules alongside new deny rules", () => {
     // Pre-populate settings with existing allow rules
-    const claudeDir = join(app.config.arkDir, ".claude");
+    const claudeDir = join(app.config.dirs.ark, ".claude");
     mkdirSync(claudeDir, { recursive: true });
     writeFileSync(
       join(claudeDir, "settings.local.json"),
@@ -194,7 +194,7 @@ describe("E2E: writeSettings writes permission deny rules", () => {
       }),
     );
 
-    writeSettings("s-e2e", "http://localhost:19100", app.config.arkDir, { autonomy: "edit" });
+    writeSettings("s-e2e", "http://localhost:19100", app.config.dirs.ark, { autonomy: "edit" });
 
     const settings = JSON.parse(readFileSync(join(claudeDir, "settings.local.json"), "utf-8"));
     expect(settings.permissions.allow).toEqual(["Read", "Glob"]);
@@ -203,11 +203,11 @@ describe("E2E: writeSettings writes permission deny rules", () => {
   });
 
   it("removeSettings cleans up hooks but does not crash", () => {
-    writeSettings("s-e2e", "http://localhost:19100", app.config.arkDir, { autonomy: "read-only" });
+    writeSettings("s-e2e", "http://localhost:19100", app.config.dirs.ark, { autonomy: "read-only" });
     // removeSettings should not throw
-    removeSettings(app.config.arkDir);
+    removeSettings(app.config.dirs.ark);
     // After removal, file should be deleted entirely (only ark content existed)
-    const settingsPath = join(app.config.arkDir, ".claude", "settings.local.json");
+    const settingsPath = join(app.config.dirs.ark, ".claude", "settings.local.json");
     expect(existsSync(settingsPath)).toBe(false);
   });
 });
@@ -291,12 +291,12 @@ describe("E2E: full autonomy pipeline", () => {
     const args0 = buildArgs({ autonomy: s0.autonomy });
     expect(args0).not.toContain("--dangerously-skip-permissions");
 
-    writeSettings("s-pipe-0", "http://localhost:19100", app.config.arkDir, { autonomy: s0.autonomy });
-    const settings0 = JSON.parse(readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"));
+    writeSettings("s-pipe-0", "http://localhost:19100", app.config.dirs.ark, { autonomy: s0.autonomy });
+    const settings0 = JSON.parse(readFileSync(join(app.config.dirs.ark, ".claude", "settings.local.json"), "utf-8"));
     expect(settings0.permissions.deny).toEqual(["Bash", "Write", "Edit"]);
 
     // Clean up for stage 1
-    rmSync(join(app.config.arkDir, ".claude"), { recursive: true, force: true });
+    rmSync(join(app.config.dirs.ark, ".claude"), { recursive: true, force: true });
 
     // Stage 1: full
     const s1 = flow!.stages[1];
@@ -306,8 +306,8 @@ describe("E2E: full autonomy pipeline", () => {
     const args1 = buildArgs({ autonomy: s1.autonomy });
     expect(args1).toContain("--dangerously-skip-permissions");
 
-    writeSettings("s-pipe-1", "http://localhost:19100", app.config.arkDir, { autonomy: s1.autonomy });
-    const settings1 = JSON.parse(readFileSync(join(app.config.arkDir, ".claude", "settings.local.json"), "utf-8"));
+    writeSettings("s-pipe-1", "http://localhost:19100", app.config.dirs.ark, { autonomy: s1.autonomy });
+    const settings1 = JSON.parse(readFileSync(join(app.config.dirs.ark, ".claude", "settings.local.json"), "utf-8"));
     expect(settings1.permissions).toBeUndefined();
   });
 });

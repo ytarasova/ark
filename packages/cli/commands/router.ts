@@ -55,7 +55,7 @@ export function registerRouterCommands(program: Command) {
         const { join } = await import("path");
         tzManager = new TensorZeroManager({
           port: tzPort,
-          configDir: arkConfig.tensorZero?.configDir ?? join(arkConfig.arkDir, "tensorzero"),
+          configDir: arkConfig.tensorZero?.configDir ?? join(arkConfig.dirs.ark, "tensorzero"),
           anthropicKey: process.env.ANTHROPIC_API_KEY,
           openaiKey: process.env.OPENAI_API_KEY,
           geminiKey: process.env.GEMINI_API_KEY,

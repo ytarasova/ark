@@ -29,7 +29,7 @@ afterAll(async () => {
 });
 
 /** Directory where flow.ts looks for user flows. */
-const flowDir = () => join(app.config.arkDir, "flows");
+const flowDir = () => join(app.config.dirs.ark, "flows");
 
 /** Write a YAML flow definition to the user flows directory. */
 function writeUserFlow(name: string, def: Record<string, unknown>): void {

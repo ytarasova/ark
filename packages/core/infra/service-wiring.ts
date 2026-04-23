@@ -31,7 +31,7 @@ export class ServiceWiring {
     }
 
     // fire-and-forget: plugin loading is best-effort, never blocks boot
-    loadPluginExecutors(this.app.config.arkDir, (msg) => logWarn("general", `[plugins] ${msg}`))
+    loadPluginExecutors(this.app.config.dirs.ark, (msg) => logWarn("general", `[plugins] ${msg}`))
       .then((plugins) => {
         for (const ex of plugins) {
           this.pluginRegistry.register({ kind: "executor", name: ex.name, impl: ex, source: "user" });

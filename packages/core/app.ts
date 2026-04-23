@@ -156,11 +156,15 @@ export class AppContext {
     // so `agent/list` + friends return []. Seed the builtin YAMLs shipped with
     // the source tree (or install prefix) on every boot; the seeder is idempotent
     // and leaves any user-authored override rows untouched.
+<<<<<<< HEAD
     //
     // Gate on `mode.kind` rather than `config.databaseUrl` -- modes layer
     // (packages/core/modes/app-mode.ts) explicitly forbids URL / `isHostedMode()`
     // sniffing so deployment-mode decisions flow through one canonical switch.
     if (this.mode.kind === "hosted") {
+=======
+    if (this.config.database.url) {
+>>>>>>> dbf609e3 (refactor(config): drop 7 deprecated flat config fields)
       const { seedBuiltinResources } = await import("./di/seed-builtins.js");
       await seedBuiltinResources(this);
     }
@@ -214,8 +218,8 @@ export class AppContext {
     }
 
     // Clean up temp directory (test mode)
-    if (this.options.cleanupOnShutdown && existsSync(this.config.arkDir)) {
-      rmSync(this.config.arkDir, { recursive: true, force: true });
+    if (this.options.cleanupOnShutdown && existsSync(this.config.dirs.ark)) {
+      rmSync(this.config.dirs.ark, { recursive: true, force: true });
     }
 
     this.phase = "stopped";
@@ -312,11 +316,16 @@ export class AppContext {
   }
 
   private _initFilesystem(): void {
-    for (const dir of [this.config.arkDir, this.config.tracksDir, this.config.worktreesDir, this.config.logDir]) {
+    for (const dir of [
+      this.config.dirs.ark,
+      this.config.dirs.tracks,
+      this.config.dirs.worktrees,
+      this.config.dirs.logs,
+    ]) {
       mkdirSync(dir, { recursive: true });
     }
-    setLogArkDir(this.config.arkDir);
-    setProfilesArkDir(this.config.arkDir);
+    setLogArkDir(this.config.dirs.ark);
+    setProfilesArkDir(this.config.dirs.ark);
   }
 
   private async _openDatabase(): Promise<DatabaseAdapter> {
@@ -377,9 +386,9 @@ export class AppContext {
 
   // ── Accessors (resolved from the DI container) ────────────────────────
 
-  /** Convenience shortcut for config.arkDir (used heavily in tests). */
+  /** Convenience shortcut for config.dirs.ark (used heavily in tests). */
   get arkDir(): string {
-    return this.config.arkDir;
+    return this.config.dirs.ark;
   }
 
   get db(): DatabaseAdapter {
@@ -827,7 +836,7 @@ export class AppContext {
   /** Synchronous test AppContext -- uses well-known ports (serial tests only). */
   static forTest(overrides?: Partial<ArkConfig>): AppContext {
     const tempDir = mkdtempSync(join(tmpdir(), "ark-test-"));
-    const config = loadConfig({ arkDir: tempDir, env: "test", ...overrides });
+    const config = loadConfig({ dirs: { ark: tempDir } as any, env: "test", ...overrides });
     const app = new AppContext(config, TEST_OPTIONS);
     app.setLauncher(new NoopLauncher());
     return app;

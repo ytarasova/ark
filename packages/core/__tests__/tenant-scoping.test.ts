@@ -261,8 +261,8 @@ describe("tenant scoping", async () => {
 
     it("preserves config", () => {
       const scoped = app.forTenant("config-check");
-      expect(scoped.config.arkDir).toBe(app.config.arkDir);
-      expect(scoped.config.conductorPort).toBe(app.config.conductorPort);
+      expect(scoped.config.dirs.ark).toBe(app.config.dirs.ark);
+      expect(scoped.config.ports.conductor).toBe(app.config.ports.conductor);
     });
 
     it("multiple forTenant calls create independent scopes", async () => {

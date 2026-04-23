@@ -41,13 +41,13 @@ describe("session/inject", () => {
     // Create a session and force it into running status.
     const session = await app.sessions.create({
       summary: "inject test",
-      workdir: app.config.arkDir,
+      workdir: app.config.dirs.ark,
       flow: "bare",
     });
     await app.sessions.update(session.id, { status: "running" });
 
     // Ensure sessionDir exists (normally created at dispatch; we do it here for the test).
-    const sessionDir = join(app.config.tracksDir, session.id);
+    const sessionDir = join(app.config.dirs.tracks, session.id);
     mkdirSync(sessionDir, { recursive: true });
 
     const req = createRequest(1, "session/inject", { sessionId: session.id, content: "please also fix the typo" });
@@ -68,7 +68,7 @@ describe("session/inject", () => {
   it("returns { ok: false } for a completed session", async () => {
     const session = await app.sessions.create({
       summary: "inject completed",
-      workdir: app.config.arkDir,
+      workdir: app.config.dirs.ark,
       flow: "bare",
     });
     await app.sessions.update(session.id, { status: "completed" });
@@ -85,7 +85,7 @@ describe("session/inject", () => {
   it("returns { ok: false } for a failed session", async () => {
     const session = await app.sessions.create({
       summary: "inject failed",
-      workdir: app.config.arkDir,
+      workdir: app.config.dirs.ark,
       flow: "bare",
     });
     await app.sessions.update(session.id, { status: "failed" });
@@ -110,12 +110,12 @@ describe("session/inject", () => {
   it("logs a session_injected event with a truncated content_preview", async () => {
     const session = await app.sessions.create({
       summary: "inject event test",
-      workdir: app.config.arkDir,
+      workdir: app.config.dirs.ark,
       flow: "bare",
     });
     await app.sessions.update(session.id, { status: "running" });
 
-    const sessionDir = join(app.config.tracksDir, session.id);
+    const sessionDir = join(app.config.dirs.tracks, session.id);
     mkdirSync(sessionDir, { recursive: true });
 
     const longContent = "A".repeat(200);
@@ -137,7 +137,7 @@ describe("session/interrupt", () => {
   it("writes a control:interrupt line to interventions.jsonl for an agent-sdk running session", async () => {
     const session = await app.sessions.create({
       summary: "interrupt test",
-      workdir: app.config.arkDir,
+      workdir: app.config.dirs.ark,
       flow: "bare",
     });
     await app.sessions.update(session.id, {
@@ -145,7 +145,7 @@ describe("session/interrupt", () => {
       config: { launch_executor: "agent-sdk" },
     } as any);
 
-    const sessionDir = join(app.config.tracksDir, session.id);
+    const sessionDir = join(app.config.dirs.tracks, session.id);
     mkdirSync(sessionDir, { recursive: true });
 
     const req = createRequest(10, "session/interrupt", {
@@ -169,7 +169,7 @@ describe("session/interrupt", () => {
   it("logs a session_interrupted event", async () => {
     const session = await app.sessions.create({
       summary: "interrupt event test",
-      workdir: app.config.arkDir,
+      workdir: app.config.dirs.ark,
       flow: "bare",
     });
     await app.sessions.update(session.id, {
@@ -177,7 +177,7 @@ describe("session/interrupt", () => {
       config: { launch_executor: "agent-sdk" },
     } as any);
 
-    const sessionDir = join(app.config.tracksDir, session.id);
+    const sessionDir = join(app.config.dirs.tracks, session.id);
     mkdirSync(sessionDir, { recursive: true });
 
     const req = createRequest(11, "session/interrupt", {
@@ -197,7 +197,7 @@ describe("session/interrupt", () => {
   it("returns { ok: false } when session is not running", async () => {
     const session = await app.sessions.create({
       summary: "interrupt not-running",
-      workdir: app.config.arkDir,
+      workdir: app.config.dirs.ark,
       flow: "bare",
     });
     await app.sessions.update(session.id, { status: "completed" });

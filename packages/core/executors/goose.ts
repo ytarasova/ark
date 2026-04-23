@@ -180,7 +180,7 @@ export const gooseExecutor: Executor = {
     };
 
     // Write env to a sourced file (avoids shell-quoting user values)
-    const trackDir = join(app.config.tracksDir, session.id);
+    const trackDir = join(app.config.dirs.tracks, session.id);
     mkdirSync(trackDir, { recursive: true });
     const envFile = join(trackDir, "env.sh");
     const envLines = Object.entries(mergedEnv)
@@ -196,12 +196,12 @@ export const gooseExecutor: Executor = {
     const cmdLine = `${envPrefix}cd ${shellQuote(effectiveWorkdir)} && ${quotedArgv}`;
 
     log("Launching goose in tmux...");
-    await tmux.createSessionAsync(tmuxName, cmdLine, { arkDir: app.config.arkDir });
+    await tmux.createSessionAsync(tmuxName, cmdLine, { arkDir: app.config.dirs.ark });
     const rootPid = await tmux.getPanePidAsync(tmuxName);
 
     // Start recording terminal output for post-session replay
-    const recPath = recordingPath(app.config.arkDir, session.id);
-    mkdirSync(join(app.config.arkDir, "recordings"), { recursive: true });
+    const recPath = recordingPath(app.config.dirs.ark, session.id);
+    mkdirSync(join(app.config.dirs.ark, "recordings"), { recursive: true });
     await tmux.pipePaneAsync(tmuxName, recPath);
 
     return { ok: true, handle: tmuxName, pid: rootPid ?? undefined };

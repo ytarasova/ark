@@ -16,7 +16,7 @@ import { getApp } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
 
-const flowDir = () => join(getApp().config.arkDir, "flows");
+const flowDir = () => join(getApp().config.dirs.ark, "flows");
 
 function writeUserFlow(name: string, def: Record<string, unknown>): void {
   const dir = flowDir();

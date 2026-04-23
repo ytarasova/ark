@@ -178,10 +178,10 @@ export function registerWorkspaceCommands(program: Command) {
         let arkDir: string;
         if (isRemoteMode()) {
           const { loadConfig } = await import("../../core/config.js");
-          arkDir = loadConfig().arkDir;
+          arkDir = loadConfig().dirs.ark;
         } else {
           const app = await getInProcessApp();
-          arkDir = app.config.arkDir;
+          arkDir = app.config.dirs.ark;
         }
         const written = setActiveWorkspaceInConfig(arkDir, ws.slug);
         console.log(chalk.green(`Active workspace set to '${ws.slug}' (${written})`));

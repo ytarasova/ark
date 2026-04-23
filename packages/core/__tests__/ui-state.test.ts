@@ -7,7 +7,7 @@ withTestContext();
 
 describe("UI state persistence", () => {
   it("loadUiState returns defaults when no file exists", () => {
-    const state = loadUiState(getApp().config.arkDir);
+    const state = loadUiState(getApp().config.dirs.ark);
     expect(state.activeTab).toBe(0);
     expect(state.selectedSessionId).toBeNull();
     expect(state.scrollOffset).toBe(0);
@@ -15,8 +15,8 @@ describe("UI state persistence", () => {
   });
 
   it("saveUiState and loadUiState round-trip", () => {
-    saveUiState({ activeTab: 3, selectedSessionId: "s-123" }, getApp().config.arkDir);
-    const loaded = loadUiState(getApp().config.arkDir);
+    saveUiState({ activeTab: 3, selectedSessionId: "s-123" }, getApp().config.dirs.ark);
+    const loaded = loadUiState(getApp().config.dirs.ark);
     expect(loaded.activeTab).toBe(3);
     expect(loaded.selectedSessionId).toBe("s-123");
     // Defaults preserved for unset fields
@@ -24,9 +24,9 @@ describe("UI state persistence", () => {
   });
 
   it("saveUiState merges with existing state", () => {
-    saveUiState({ activeTab: 2 }, getApp().config.arkDir);
-    saveUiState({ statusFilter: "running" }, getApp().config.arkDir);
-    const loaded = loadUiState(getApp().config.arkDir);
+    saveUiState({ activeTab: 2 }, getApp().config.dirs.ark);
+    saveUiState({ statusFilter: "running" }, getApp().config.dirs.ark);
+    const loaded = loadUiState(getApp().config.dirs.ark);
     expect(loaded.activeTab).toBe(2);
     expect(loaded.statusFilter).toBe("running");
   });
@@ -36,8 +36,8 @@ describe("UI state persistence", () => {
     const { writeFileSync } = require("fs");
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { join } = require("path");
-    writeFileSync(join(getApp().config.arkDir, "ui-state.json"), "not json{{{");
-    const state = loadUiState(getApp().config.arkDir);
+    writeFileSync(join(getApp().config.dirs.ark, "ui-state.json"), "not json{{{");
+    const state = loadUiState(getApp().config.dirs.ark);
     expect(state.activeTab).toBe(0); // defaults
   });
 });

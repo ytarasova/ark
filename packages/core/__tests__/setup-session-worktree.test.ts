@@ -41,7 +41,7 @@ beforeEach(async () => {
   await app.boot();
 
   // Set up a real git repo to serve as the "live" checkout.
-  repoDir = join(app.config.arkDir, "fake-live-repo");
+  repoDir = join(app.config.dirs.ark, "fake-live-repo");
   mkdirSync(repoDir, { recursive: true });
   execFileSync("git", ["init", repoDir], { stdio: "pipe" });
   execFileSync("git", ["-C", repoDir, "config", "user.email", "test@example.com"], { stdio: "pipe" });
@@ -77,7 +77,7 @@ describe("setupSessionWorktree -- worktree isolation", async () => {
     expect(resolve(effectiveWorkdir)).not.toBe(resolve(repoDir));
 
     // The worktree must be under ~/.ark/worktrees/<sessionId>/
-    const expectedWtDir = join(app.config.worktreesDir, session.id);
+    const expectedWtDir = join(app.config.dirs.worktrees, session.id);
     expect(canonical(effectiveWorkdir)).toBe(canonical(expectedWtDir));
     expect(existsSync(expectedWtDir)).toBe(true);
     expect(existsSync(join(expectedWtDir, ".git"))).toBe(true);
@@ -114,7 +114,7 @@ describe("setupSessionWorktree -- worktree isolation", async () => {
     const effectiveWorkdir = await setupSessionWorktree(app, session, null, provider);
 
     expect(effectiveWorkdir).not.toBe(repoDir);
-    const expectedWtDir = join(app.config.worktreesDir, session.id);
+    const expectedWtDir = join(app.config.dirs.worktrees, session.id);
     expect(canonical(effectiveWorkdir)).toBe(canonical(expectedWtDir));
   });
 
@@ -130,14 +130,14 @@ describe("setupSessionWorktree -- worktree isolation", async () => {
 
     // When worktree is explicitly disabled, we fall back to the resolved repo
     // source (the live checkout). No worktree directory is created.
-    const wtDir = join(app.config.worktreesDir, session.id);
+    const wtDir = join(app.config.dirs.worktrees, session.id);
     expect(existsSync(wtDir)).toBe(false);
     expect(canonical(effectiveWorkdir)).toBe(canonical(repoDir));
   });
 
   it("does NOT create a worktree when the resolved repo source is not a git repo", async () => {
     // Non-git directory -- same behaviour as before the fix: skip worktree.
-    const nonGitDir = join(app.config.arkDir, "not-a-repo");
+    const nonGitDir = join(app.config.dirs.ark, "not-a-repo");
     mkdirSync(nonGitDir, { recursive: true });
 
     const session = await app.sessions.create({
@@ -149,7 +149,7 @@ describe("setupSessionWorktree -- worktree isolation", async () => {
     const provider = getProvider("local") ?? undefined;
     const effectiveWorkdir = await setupSessionWorktree(app, session, null, provider);
 
-    const wtDir = join(app.config.worktreesDir, session.id);
+    const wtDir = join(app.config.dirs.worktrees, session.id);
     expect(existsSync(wtDir)).toBe(false);
     expect(resolve(effectiveWorkdir)).toBe(resolve(nonGitDir));
   });

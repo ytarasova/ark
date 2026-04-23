@@ -143,7 +143,7 @@ export async function appendPreviousStageContext(app: AppContext, session: Sessi
   parts.push(...(await renderAttachmentsBlock(app, session)));
 
   // Check for PLAN.md (BlobStore locator preferred, worktree FS fallback)
-  const wtDir = join(app.config.worktreesDir, session.id);
+  const wtDir = join(app.config.dirs.worktrees, session.id);
   const plan = await readPlanMd(app, session);
   if (plan !== null) {
     const trimmed = plan.length > 3000 ? plan.slice(0, 3000) + "\n... (truncated)" : plan;

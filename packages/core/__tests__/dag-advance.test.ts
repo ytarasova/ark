@@ -14,7 +14,7 @@ beforeAll(async () => {
   setApp(app);
 
   // Write a minimal DAG flow to the test ARK_DIR so flowUsesDAG() detects it
-  const flowsDir = join(getApp().config.arkDir, "flows");
+  const flowsDir = join(getApp().config.dirs.ark, "flows");
   mkdirSync(flowsDir, { recursive: true });
   dagFlowPath = join(flowsDir, "test-dag.yaml");
   writeFileSync(

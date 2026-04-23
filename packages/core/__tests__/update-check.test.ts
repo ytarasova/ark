@@ -23,14 +23,14 @@ describe("getCurrentVersion", () => {
 
 describe("checkForUpdate", async () => {
   it("returns null or a version string", async () => {
-    const result = await checkForUpdate(getApp().config.arkDir);
+    const result = await checkForUpdate(getApp().config.dirs.ark);
     // null = no update or network error, string = new version
     expect(result === null || typeof result === "string").toBe(true);
   });
 
   it("respects rate limiting from saved state", async () => {
     // Write a recent check state so it skips the network call
-    const statePath = join(getApp().config.arkDir, "update-check.json");
+    const statePath = join(getApp().config.dirs.ark, "update-check.json");
     const state = {
       lastCheck: new Date().toISOString(),
       latestVersion: getCurrentVersion(),
@@ -38,13 +38,13 @@ describe("checkForUpdate", async () => {
     };
     writeFileSync(statePath, JSON.stringify(state));
 
-    const result = await checkForUpdate(getApp().config.arkDir);
+    const result = await checkForUpdate(getApp().config.dirs.ark);
     // Same version as current = no update
     expect(result).toBeNull();
   });
 
   it("reports update when saved state has newer version", async () => {
-    const statePath = join(getApp().config.arkDir, "update-check.json");
+    const statePath = join(getApp().config.dirs.ark, "update-check.json");
     const state = {
       lastCheck: new Date().toISOString(),
       latestVersion: "99.99.99",
@@ -52,25 +52,25 @@ describe("checkForUpdate", async () => {
     };
     writeFileSync(statePath, JSON.stringify(state));
 
-    const result = await checkForUpdate(getApp().config.arkDir);
+    const result = await checkForUpdate(getApp().config.dirs.ark);
     expect(result).toBe("99.99.99");
   });
 
   it("handles corrupted state file gracefully", async () => {
-    const statePath = join(getApp().config.arkDir, "update-check.json");
+    const statePath = join(getApp().config.dirs.ark, "update-check.json");
     writeFileSync(statePath, "not-valid-json{{{");
 
     // Should not throw, just proceed with the check
-    const result = await checkForUpdate(getApp().config.arkDir);
+    const result = await checkForUpdate(getApp().config.dirs.ark);
     expect(result === null || typeof result === "string").toBe(true);
   });
 
   it("handles missing state file", async () => {
-    const statePath = join(getApp().config.arkDir, "update-check.json");
+    const statePath = join(getApp().config.dirs.ark, "update-check.json");
     expect(existsSync(statePath)).toBe(false);
 
     // Should not throw
-    const result = await checkForUpdate(getApp().config.arkDir);
+    const result = await checkForUpdate(getApp().config.dirs.ark);
     expect(result === null || typeof result === "string").toBe(true);
   });
 });

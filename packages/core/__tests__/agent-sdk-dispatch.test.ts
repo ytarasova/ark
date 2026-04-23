@@ -127,7 +127,7 @@ describe("agentSdkExecutor.capture -- from tracked entry", () => {
   it("returns formatted transcript lines + stdio section", async () => {
     const session = await app.sessions.create({
       summary: "capture test",
-      workdir: app.config.arkDir,
+      workdir: app.config.dirs.ark,
       flow: "autonomous-sdlc",
     });
 
@@ -150,7 +150,7 @@ describe("agentSdkExecutor.capture -- from tracked entry", () => {
 
       const result = await agentSdkExecutor.launch({
         sessionId: session.id,
-        workdir: app.config.arkDir,
+        workdir: app.config.dirs.ark,
         agent,
         task: "capture test task",
         env: { ANTHROPIC_API_KEY: "test" },
@@ -162,7 +162,7 @@ describe("agentSdkExecutor.capture -- from tracked entry", () => {
       const handle = result.handle;
 
       // Write synthetic transcript.jsonl and stdio.log into the session dir
-      const sessionDir = join(app.config.tracksDir, session.id);
+      const sessionDir = join(app.config.dirs.tracks, session.id);
       mkdirSync(sessionDir, { recursive: true });
 
       const transcriptLines = [
@@ -217,7 +217,7 @@ describe("agentSdkExecutor.launch -- spawn mechanics", () => {
   it("spawns a process (not a tmux session) and returns a sdk- handle", async () => {
     const session = await app.sessions.create({
       summary: "test dispatch",
-      workdir: app.config.arkDir,
+      workdir: app.config.dirs.ark,
       flow: "autonomous-sdlc",
     });
 
@@ -249,7 +249,7 @@ describe("agentSdkExecutor.launch -- spawn mechanics", () => {
 
       const result = await agentSdkExecutor.launch({
         sessionId: session.id,
-        workdir: app.config.arkDir,
+        workdir: app.config.dirs.ark,
         agent,
         task: "do something useful",
         env: { ANTHROPIC_API_KEY: "test-key" },
@@ -280,7 +280,7 @@ describe("agentSdkExecutor.launch -- spawn mechanics", () => {
   it("assembles ARK_* env vars correctly", async () => {
     const session = await app.sessions.create({
       summary: "env var test",
-      workdir: app.config.arkDir,
+      workdir: app.config.dirs.ark,
       flow: "autonomous-sdlc",
     });
 
@@ -308,7 +308,7 @@ describe("agentSdkExecutor.launch -- spawn mechanics", () => {
 
       await agentSdkExecutor.launch({
         sessionId: session.id,
-        workdir: app.config.arkDir,
+        workdir: app.config.dirs.ark,
         agent,
         task: "write tests",
         env: { ANTHROPIC_API_KEY: "sk-test-abc" },
@@ -338,7 +338,7 @@ describe("agentSdkExecutor.launch -- spawn mechanics", () => {
   it("writes task.txt (prompt file) to sessionDir before spawning", async () => {
     const session = await app.sessions.create({
       summary: "prompt file test",
-      workdir: app.config.arkDir,
+      workdir: app.config.dirs.ark,
       flow: "autonomous-sdlc",
     });
 
@@ -363,7 +363,7 @@ describe("agentSdkExecutor.launch -- spawn mechanics", () => {
 
       await agentSdkExecutor.launch({
         sessionId: session.id,
-        workdir: app.config.arkDir,
+        workdir: app.config.dirs.ark,
         agent,
         task,
         env: { ANTHROPIC_API_KEY: "test" },
@@ -371,7 +371,7 @@ describe("agentSdkExecutor.launch -- spawn mechanics", () => {
         app,
       });
 
-      const promptPath = join(app.config.tracksDir, session.id, "task.txt");
+      const promptPath = join(app.config.dirs.tracks, session.id, "task.txt");
       expect(existsSync(promptPath)).toBe(true);
 
       const { readFileSync } = await import("fs");
@@ -385,7 +385,7 @@ describe("agentSdkExecutor.launch -- spawn mechanics", () => {
   it("status reflects running state while process is alive", async () => {
     const session = await app.sessions.create({
       summary: "status test",
-      workdir: app.config.arkDir,
+      workdir: app.config.dirs.ark,
       flow: "autonomous-sdlc",
     });
 
@@ -425,7 +425,7 @@ describe("agentSdkExecutor.launch -- spawn mechanics", () => {
 
       const result = await agentSdkExecutor.launch({
         sessionId: session.id,
-        workdir: app.config.arkDir,
+        workdir: app.config.dirs.ark,
         agent,
         task: "check status",
         env: { ANTHROPIC_API_KEY: "test" },

@@ -28,7 +28,7 @@ export class TensorZeroLauncher {
       // data dir. TensorZeroManager throws on empty configDir now -- the
       // previous `$HOME`/`/tmp` fallback wrote provider API keys to
       // world-readable paths on container hosts.
-      const configDir = this.config.tensorZero!.configDir ?? join(this.config.arkDir, "tensorzero");
+      const configDir = this.config.tensorZero!.configDir ?? join(this.config.dirs.ark, "tensorzero");
       this.manager = new TensorZeroManager({
         port: this.config.tensorZero!.port,
         configDir,

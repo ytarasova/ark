@@ -19,7 +19,7 @@ export interface TensorZeroManagerOpts {
   port?: number;
   /**
    * Directory for `tensorzero.toml`. Required -- callers must supply an
-   * ark-controlled path (typically `app.config.arkDir`). The previous
+   * ark-controlled path (typically `app.config.dirs.ark`). The previous
    * fallback to `$HOME/.ark/tensorzero` or `/tmp/.ark/tensorzero` leaked
    * provider API keys into arbitrary host locations; in shared-host /
    * container deployments `/tmp` is world-readable and the container user

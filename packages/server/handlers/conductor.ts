@@ -14,7 +14,7 @@
  * `app.knowledge` via `resolveTenantApp(ctx)` so learnings stay isolated per
  * tenant. Bridge ops are host-local-by-nature (they read the local bridge
  * config on disk and drive outbound HTTP), so they always use the un-scoped
- * `app.config.arkDir`.
+ * `app.config.dirs.ark`.
  *
  * Local-by-nature carve-outs (kept out of this handler file):
  *   - `conductor start` -- starting the conductor is part of daemon boot, not
@@ -54,7 +54,7 @@ export function registerConductorHandlers(router: Router, app: AppContext): void
   // ── Status ────────────────────────────────────────────────────────────────
   router.handle("conductor/status", async (_p, _notify, _ctx) => {
     const running = app.conductor !== null;
-    const port = app.config.ports?.conductor ?? (app.config as any).conductorPort ?? 19100;
+    const port = app.config.ports?.conductor ?? 19100;
     return { running, port, pid: running ? process.pid : undefined };
   });
 
@@ -96,7 +96,7 @@ export function registerConductorHandlers(router: Router, app: AppContext): void
   // starting a bridge binds a polling loop to the daemon process, and
   // `conductor/notify` sends a one-shot message without leaving a live loop.
   router.handle("conductor/bridge", async (_p, _notify, _ctx) => {
-    const bridge = createBridge(app.config.arkDir);
+    const bridge = createBridge(app.config.dirs.ark);
     if (!bridge) {
       return { ok: false, running: false, message: "no bridge config found at ~/.ark/bridge.json" };
     }
@@ -118,7 +118,7 @@ export function registerConductorHandlers(router: Router, app: AppContext): void
 
   router.handle("conductor/notify", async (p, _notify, _ctx) => {
     const { message } = extract<{ message: string }>(p, ["message"]);
-    const bridge = createBridge(app.config.arkDir);
+    const bridge = createBridge(app.config.dirs.ark);
     if (!bridge) {
       return { ok: false, message: "no bridge config found at ~/.ark/bridge.json" };
     }

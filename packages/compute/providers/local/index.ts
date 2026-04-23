@@ -83,8 +83,8 @@ export class LocalProvider implements ComputeProvider {
   }
 
   async launch(_compute: Compute, _session: Session, opts: LaunchOpts): Promise<string> {
-    const launcher = tmux.writeLauncher(opts.tmuxName, opts.launcherContent, this.app.config.tracksDir);
-    await tmux.createSessionAsync(opts.tmuxName, `bash ${launcher}`, { arkDir: this.app.config.arkDir });
+    const launcher = tmux.writeLauncher(opts.tmuxName, opts.launcherContent, this.app.config.dirs.tracks);
+    await tmux.createSessionAsync(opts.tmuxName, `bash ${launcher}`, { arkDir: this.app.config.dirs.ark });
     return opts.tmuxName;
   }
 
@@ -104,7 +104,7 @@ export class LocalProvider implements ComputeProvider {
   }
 
   async cleanupSession(_compute: Compute, session: Session): Promise<void> {
-    const wtPath = join(this.app.config.worktreesDir, session.id);
+    const wtPath = join(this.app.config.dirs.worktrees, session.id);
     if (!existsSync(wtPath)) return;
 
     const repo = session.workdir ?? session.repo;

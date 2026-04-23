@@ -181,7 +181,7 @@ export class SessionTerminator {
 
     try {
       const { removeRecording } = await import("../../recordings.js");
-      removeRecording(d.config.arkDir, sessionId);
+      removeRecording(d.config.dirs.ark, sessionId);
     } catch {
       logInfo("session", "non-fatal");
     }

@@ -36,7 +36,7 @@ export function registerStorage(container: AppContainer): void {
           });
         }
         // Local disk: single tree under arkDir/blobs, tenant id = first path segment.
-        return new LocalDiskBlobStore(join(c.config.arkDir, "blobs"));
+        return new LocalDiskBlobStore(join(c.config.dirs.ark, "blobs"));
       },
       {
         lifetime: Lifetime.SINGLETON,

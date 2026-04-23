@@ -46,42 +46,42 @@ function waitFor(fn: () => boolean | Promise<boolean>, timeoutMs = 10000): Promi
 
 describe("readExitCodeSentinel", () => {
   it("returns null when the session directory does not exist", () => {
-    expect(readExitCodeSentinel(app.config.tracksDir, "s-missing")).toBeNull();
+    expect(readExitCodeSentinel(app.config.dirs.tracks, "s-missing")).toBeNull();
   });
 
   it("returns null when the file is empty", () => {
-    const dir = join(app.config.tracksDir, "s-empty");
+    const dir = join(app.config.dirs.tracks, "s-empty");
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "exit-code"), "");
-    expect(readExitCodeSentinel(app.config.tracksDir, "s-empty")).toBeNull();
+    expect(readExitCodeSentinel(app.config.dirs.tracks, "s-empty")).toBeNull();
   });
 
   it("returns null when the code is 0 (success)", () => {
-    const dir = join(app.config.tracksDir, "s-zero");
+    const dir = join(app.config.dirs.tracks, "s-zero");
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "exit-code"), "0\n");
-    expect(readExitCodeSentinel(app.config.tracksDir, "s-zero")).toBeNull();
+    expect(readExitCodeSentinel(app.config.dirs.tracks, "s-zero")).toBeNull();
   });
 
   it("returns the numeric exit code when non-zero", () => {
-    const dir = join(app.config.tracksDir, "s-err");
+    const dir = join(app.config.dirs.tracks, "s-err");
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "exit-code"), "42\n");
-    expect(readExitCodeSentinel(app.config.tracksDir, "s-err")).toBe(42);
+    expect(readExitCodeSentinel(app.config.dirs.tracks, "s-err")).toBe(42);
   });
 
   it("tolerates a trailing newline / whitespace", () => {
-    const dir = join(app.config.tracksDir, "s-ws");
+    const dir = join(app.config.dirs.tracks, "s-ws");
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "exit-code"), "  7  \n");
-    expect(readExitCodeSentinel(app.config.tracksDir, "s-ws")).toBe(7);
+    expect(readExitCodeSentinel(app.config.dirs.tracks, "s-ws")).toBe(7);
   });
 
   it("returns null when the file content is non-numeric garbage", () => {
-    const dir = join(app.config.tracksDir, "s-junk");
+    const dir = join(app.config.dirs.tracks, "s-junk");
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "exit-code"), "oops\n");
-    expect(readExitCodeSentinel(app.config.tracksDir, "s-junk")).toBeNull();
+    expect(readExitCodeSentinel(app.config.dirs.tracks, "s-junk")).toBeNull();
   });
 });
 
@@ -98,7 +98,7 @@ describe("status-poller with exit-code sentinel", async () => {
     });
 
     // Write the sentinel BEFORE starting the poller. tmux reports "alive".
-    const dir = join(app.config.tracksDir, session.id);
+    const dir = join(app.config.dirs.tracks, session.id);
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "exit-code"), "1\n");
 
@@ -159,7 +159,7 @@ describe("status-poller with exit-code sentinel", async () => {
       session_id: handle,
     });
 
-    const dir = join(app.config.tracksDir, session.id);
+    const dir = join(app.config.dirs.tracks, session.id);
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, "exit-code"), "0\n");
 
