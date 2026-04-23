@@ -671,6 +671,14 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
     delete sdkEnv.ANTHROPIC_AUTH_TOKEN;
   }
 
+  // The Agent SDK shells out to the Claude Code CLI (`cli.js`) as a subprocess.
+  // When ark runs as a bun-compile single-file bundle, `require.resolve("./cli.js")`
+  // fails because the SDK's own node_modules path isn't on disk -- the SDK code
+  // raises "Native CLI binary for <platform> not found". Resolve an explicit path
+  // via Bun.which() / PATH, matching what the preflight doctor check already
+  // requires. Env override lets deployments pin a specific version.
+  const claudeExePath = process.env.ARK_CLAUDE_EXECUTABLE_PATH ?? Bun.which("claude") ?? undefined;
+
   const sdkOptions: Options = {
     cwd: worktree,
     env: sdkEnv as Record<string, string | undefined>,
@@ -682,6 +690,7 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
     maxTurns,
     maxBudgetUsd,
     systemPrompt: systemAppend ? { type: "preset", preset: "claude_code", append: systemAppend } : undefined,
+    ...(claudeExePath ? { pathToClaudeCodeExecutable: claudeExePath } : {}),
   };
 
   // Mutable abort holder so the intervention tail always sees the current controller.
