@@ -11,6 +11,7 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import { getArkClient } from "../app-client.js";
+import { runAction } from "./_shared.js";
 
 export function registerClusterCommands(program: Command): void {
   const cluster = program.command("cluster").description("List Kubernetes clusters visible to this tenant");
@@ -20,7 +21,7 @@ export function registerClusterCommands(program: Command): void {
     .description("List effective clusters (system + tenant overrides)")
     .option("--json", "Output raw JSON")
     .action(async (opts) => {
-      try {
+      await runAction("cluster list", async () => {
         const ark = await getArkClient();
         const clusters = await ark.clusterList();
         if (opts.json) {
@@ -37,9 +38,6 @@ export function registerClusterCommands(program: Command): void {
             `  ${c.name.padEnd(24)} ${c.kind.padEnd(10)} ${(c.defaultNamespace ?? "-").padEnd(16)} ${c.apiEndpoint}`,
           );
         }
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e?.message ?? e}`));
-        process.exitCode = 1;
-      }
+      });
     });
 }

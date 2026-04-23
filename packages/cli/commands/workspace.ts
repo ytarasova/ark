@@ -30,6 +30,7 @@ import YAML from "yaml";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join, resolve } from "path";
 import { getArkClient, getInProcessApp, isRemoteMode } from "../app-client.js";
+import { runAction } from "./_shared.js";
 
 /**
  * Persist `active_workspace: <slug>` to `{arkDir}/config.yaml`, preserving
@@ -72,7 +73,7 @@ export function registerWorkspaceCommands(program: Command) {
           chalk.yellow("--tenant is no longer honored at the CLI; the daemon uses the caller's authenticated tenant."),
         );
       }
-      try {
+      await runAction("workspace create", async () => {
         const client = await getArkClient();
         const { workspace: created, created: wasCreated } = await client.workspaceCreate({
           slug,
@@ -84,10 +85,7 @@ export function registerWorkspaceCommands(program: Command) {
           return;
         }
         console.log(chalk.green(`Created workspace '${created.slug}' (${created.id.slice(0, 8)})`));
-      } catch (e: any) {
-        console.error(chalk.red(`Failed: ${e.message}`));
-        process.exitCode = 1;
-      }
+      });
     });
 
   // ── list ────────────────────────────────────────────────────────────────
@@ -102,7 +100,7 @@ export function registerWorkspaceCommands(program: Command) {
           chalk.yellow("--tenant is no longer honored at the CLI; the daemon uses the caller's authenticated tenant."),
         );
       }
-      try {
+      await runAction("workspace list", async () => {
         const client = await getArkClient();
         const { workspaces } = await client.workspaceList();
         if (opts.format === "yaml") {
@@ -120,10 +118,7 @@ export function registerWorkspaceCommands(program: Command) {
             )}`,
           );
         }
-      } catch (e: any) {
-        console.error(chalk.red(`Failed: ${e.message}`));
-        process.exitCode = 1;
-      }
+      });
     });
 
   // ── show ────────────────────────────────────────────────────────────────
@@ -139,7 +134,7 @@ export function registerWorkspaceCommands(program: Command) {
           chalk.yellow("--tenant is no longer honored at the CLI; the daemon uses the caller's authenticated tenant."),
         );
       }
-      try {
+      await runAction("workspace show", async () => {
         const client = await getArkClient();
         const { workspace: ws } = await client.workspaceGet(slug);
         if (opts.format === "yaml") {
@@ -155,10 +150,7 @@ export function registerWorkspaceCommands(program: Command) {
         for (const r of ws.repos) {
           console.log(`    ${chalk.cyan(r.id.slice(0, 8))} ${chalk.bold(r.name)} ${chalk.dim(r.repo_url)}`);
         }
-      } catch (e: any) {
-        console.error(chalk.red(`Failed: ${e.message}`));
-        process.exitCode = 1;
-      }
+      });
     });
 
   // ── use (local-by-nature) ───────────────────────────────────────────────
@@ -173,7 +165,7 @@ export function registerWorkspaceCommands(program: Command) {
           chalk.yellow("--tenant is no longer honored at the CLI; the daemon uses the caller's authenticated tenant."),
         );
       }
-      try {
+      await runAction("workspace use", async () => {
         // Verify the workspace exists via the daemon first -- this way we
         // don't write a stale slug into the local config when the caller
         // typo'd the name.
@@ -193,10 +185,7 @@ export function registerWorkspaceCommands(program: Command) {
         }
         const written = setActiveWorkspaceInConfig(arkDir, ws.slug);
         console.log(chalk.green(`Active workspace set to '${ws.slug}' (${written})`));
-      } catch (e: any) {
-        console.error(chalk.red(`Failed: ${e.message}`));
-        process.exitCode = 1;
-      }
+      });
     });
 
   // ── add-repo ────────────────────────────────────────────────────────────
@@ -212,7 +201,7 @@ export function registerWorkspaceCommands(program: Command) {
           chalk.yellow("--tenant is no longer honored at the CLI; the daemon uses the caller's authenticated tenant."),
         );
       }
-      try {
+      await runAction("workspace add-repo", async () => {
         const client = await getArkClient();
 
         // Try direct attach first -- if the repo already exists in the
@@ -243,10 +232,7 @@ export function registerWorkspaceCommands(program: Command) {
         console.log(
           chalk.green(`Attached '${created.name}' (${created.id.slice(0, 8)}) to workspace '${workspaceSlug}'`),
         );
-      } catch (e: any) {
-        console.error(chalk.red(`Failed: ${e.message}`));
-        process.exitCode = 1;
-      }
+      });
     });
 
   // ── remove-repo ─────────────────────────────────────────────────────────
@@ -262,7 +248,7 @@ export function registerWorkspaceCommands(program: Command) {
           chalk.yellow("--tenant is no longer honored at the CLI; the daemon uses the caller's authenticated tenant."),
         );
       }
-      try {
+      await runAction("workspace remove-repo", async () => {
         const client = await getArkClient();
         const result = await client.workspaceRemoveRepo({ slug: workspaceSlug, repo: repoArg });
         if (!result.detached) {
@@ -272,9 +258,6 @@ export function registerWorkspaceCommands(program: Command) {
           return;
         }
         console.log(chalk.green(`Detached '${repoArg}' from workspace '${workspaceSlug}'`));
-      } catch (e: any) {
-        console.error(chalk.red(`Failed: ${e.message}`));
-        process.exitCode = 1;
-      }
+      });
     });
 }

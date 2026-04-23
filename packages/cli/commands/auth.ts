@@ -4,6 +4,7 @@ import { execFileSync } from "child_process";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
 import { getArkClient } from "../app-client.js";
+import { runAction } from "./_shared.js";
 
 /**
  * Auth commands. API-key CRUD dispatches to `admin/apikey/*` over RPC so
@@ -88,7 +89,7 @@ export function registerAuthCommands(program: Command) {
         console.error(chalk.red(`Invalid role: ${role}. Must be admin, member, or viewer.`));
         process.exit(1);
       }
-      try {
+      await runAction("auth create-key", async () => {
         const ark = await getArkClient();
         const result = await ark.apiKeyCreate({
           tenant_id: opts.tenant,
@@ -104,10 +105,7 @@ export function registerAuthCommands(program: Command) {
         console.log(`  ${chalk.bold("Tenant:")} ${result.tenant_id}`);
         console.log();
         console.log(chalk.yellow("Save the key now -- it cannot be retrieved later."));
-      } catch (e: any) {
-        console.error(chalk.red(`Failed: ${e.message}`));
-        process.exit(1);
-      }
+      });
     });
 
   authCmd
@@ -115,7 +113,7 @@ export function registerAuthCommands(program: Command) {
     .description("List API keys")
     .option("--tenant <tenantId>", "Tenant ID", "default")
     .action(async (opts: any) => {
-      try {
+      await runAction("auth list-keys", async () => {
         const ark = await getArkClient();
         const keys = await ark.apiKeyList(opts.tenant);
         if (!keys.length) {
@@ -131,10 +129,7 @@ export function registerAuthCommands(program: Command) {
             `  ${k.id.padEnd(14)} ${k.name.padEnd(20)} ${k.role.padEnd(8)} created ${k.created_at.slice(0, 10)}${expires}${lastUsed}`,
           );
         }
-      } catch (e: any) {
-        console.error(chalk.red(`Failed: ${e.message}`));
-        process.exit(1);
-      }
+      });
     });
 
   authCmd
@@ -143,19 +138,16 @@ export function registerAuthCommands(program: Command) {
     .argument("<id>", "API key ID (e.g. ak-abcd1234)")
     .option("--tenant <tenantId>", "Scope to this tenant (safer in multi-tenant setups)")
     .action(async (id: string, opts: any) => {
-      try {
+      await runAction("auth revoke-key", async () => {
         const ark = await getArkClient();
         const ok = await ark.apiKeyRevoke(id, opts.tenant);
         if (ok) {
           console.log(chalk.green(`Revoked API key: ${id}`));
         } else {
           console.error(chalk.red(`API key not found: ${id}`));
-          process.exit(1);
+          process.exitCode = 1;
         }
-      } catch (e: any) {
-        console.error(chalk.red(`Failed: ${e.message}`));
-        process.exit(1);
-      }
+      });
     });
 
   authCmd
@@ -164,7 +156,7 @@ export function registerAuthCommands(program: Command) {
     .argument("<id>", "API key ID to rotate")
     .option("--tenant <tenantId>", "Scope to this tenant (safer in multi-tenant setups)")
     .action(async (id: string, opts: any) => {
-      try {
+      await runAction("auth rotate-key", async () => {
         const ark = await getArkClient();
         const result = await ark.apiKeyRotate(id, opts.tenant);
         console.log(chalk.green("API key rotated successfully."));
@@ -172,9 +164,6 @@ export function registerAuthCommands(program: Command) {
         console.log(`  ${chalk.bold("New key:")} ${result.key}`);
         console.log();
         console.log(chalk.yellow("Save the key now -- it cannot be retrieved later."));
-      } catch (e: any) {
-        console.error(chalk.red(`Failed: ${e.message}`));
-        process.exit(1);
-      }
+      });
     });
 }

@@ -16,6 +16,7 @@ import type { Command } from "commander";
 import chalk from "chalk";
 import { getArkClient } from "../app-client.js";
 import type { ArkClient } from "../../protocol/client.js";
+import { runAction } from "./_shared.js";
 
 type MembershipRole = "owner" | "admin" | "member" | "viewer";
 
@@ -35,7 +36,7 @@ export function registerTeamCommands(program: Command) {
     .requiredOption("--tenant <id>", "Tenant id or slug")
     .option("--json", "Output raw JSON")
     .action(async (opts) => {
-      try {
+      await runAction("team list", async () => {
         const ark = await getArkClient();
         const tenantId = await resolveTenantId(ark, opts.tenant);
         const teams = await ark.adminTeamList(tenantId);
@@ -51,9 +52,7 @@ export function registerTeamCommands(program: Command) {
         for (const t of teams) {
           console.log(`  ${t.id.padEnd(22)} ${t.slug.padEnd(18)} ${t.name.padEnd(24)} ${t.description ?? ""}`);
         }
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   team
@@ -65,7 +64,7 @@ export function registerTeamCommands(program: Command) {
     .option("--description <text>", "Description")
     .option("--json", "Output raw JSON")
     .action(async (slug, opts) => {
-      try {
+      await runAction("team create", async () => {
         const ark = await getArkClient();
         const tenantId = await resolveTenantId(ark, opts.tenant);
         const t = await ark.adminTeamCreate({
@@ -76,9 +75,7 @@ export function registerTeamCommands(program: Command) {
         });
         if (opts.json) console.log(JSON.stringify(t, null, 2));
         else console.log(chalk.green(`Team created: ${t.id} (slug=${t.slug}) in tenant '${tenantId}'`));
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   team
@@ -89,7 +86,7 @@ export function registerTeamCommands(program: Command) {
     .option("--name <name>", "New name")
     .option("--description <text>", "New description")
     .action(async (id, opts) => {
-      try {
+      await runAction("team update", async () => {
         const ark = await getArkClient();
         const t = await ark.adminTeamUpdate({
           id,
@@ -99,9 +96,7 @@ export function registerTeamCommands(program: Command) {
         });
         if (!t) console.log(chalk.red(`Team '${id}' not found`));
         else console.log(chalk.green(`Team updated: ${t.id}`));
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   team
@@ -109,13 +104,11 @@ export function registerTeamCommands(program: Command) {
     .description("Delete a team (cascades memberships)")
     .argument("<id>", "Team id")
     .action(async (id) => {
-      try {
+      await runAction("team delete", async () => {
         const ark = await getArkClient();
         const ok = await ark.adminTeamDelete(id);
         console.log(ok ? chalk.green(`Team deleted: ${id}`) : chalk.red("Delete failed"));
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   // ── Members sub-namespace ─────────────────────────────────────────────
@@ -128,7 +121,7 @@ export function registerTeamCommands(program: Command) {
     .argument("<team>", "Team id")
     .option("--json", "Output raw JSON")
     .action(async (teamId, opts) => {
-      try {
+      await runAction("team members list", async () => {
         const ark = await getArkClient();
         const rows = await ark.adminTeamMembersList(teamId);
         if (opts.json) {
@@ -143,9 +136,7 @@ export function registerTeamCommands(program: Command) {
         for (const m of rows) {
           console.log(`  ${m.email.padEnd(32)} ${m.role.padEnd(10)} ${m.created_at}`);
         }
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   members
@@ -155,7 +146,7 @@ export function registerTeamCommands(program: Command) {
     .argument("<userEmail>", "User email")
     .option("--role <role>", "owner | admin | member | viewer", "member")
     .action(async (teamId, userEmail, opts) => {
-      try {
+      await runAction("team members add", async () => {
         const ark = await getArkClient();
         const m = await ark.adminTeamMembersAdd({
           team_id: teamId,
@@ -163,9 +154,7 @@ export function registerTeamCommands(program: Command) {
           role: opts.role as MembershipRole,
         });
         console.log(chalk.green(`Added '${userEmail}' as ${m.role} to team '${teamId}'`));
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   members
@@ -174,13 +163,11 @@ export function registerTeamCommands(program: Command) {
     .argument("<team>", "Team id")
     .argument("<userEmail>", "User email")
     .action(async (teamId, userEmail) => {
-      try {
+      await runAction("team members remove", async () => {
         const ark = await getArkClient();
         const ok = await ark.adminTeamMembersRemove({ team_id: teamId, email: userEmail });
         console.log(ok ? chalk.green(`Removed '${userEmail}' from team '${teamId}'`) : chalk.red("Not a member"));
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   members
@@ -190,7 +177,7 @@ export function registerTeamCommands(program: Command) {
     .argument("<userEmail>", "User email")
     .argument("<role>", "owner | admin | member | viewer")
     .action(async (teamId, userEmail, role) => {
-      try {
+      await runAction("team members set-role", async () => {
         const ark = await getArkClient();
         const m = await ark.adminTeamMembersSetRole({
           team_id: teamId,
@@ -199,8 +186,6 @@ export function registerTeamCommands(program: Command) {
         });
         if (!m) console.log(chalk.red("Membership not found"));
         else console.log(chalk.green(`Updated '${userEmail}' to ${m.role} in team '${teamId}'`));
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 }

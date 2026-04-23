@@ -11,6 +11,7 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import { getArkClient } from "../app-client.js";
+import { runAction } from "./_shared.js";
 
 export function registerTenantCommands(program: Command) {
   const tenant = program.command("tenant").description("Manage tenant settings");
@@ -23,7 +24,7 @@ export function registerTenantCommands(program: Command) {
     .description("List all tenants")
     .option("--json", "Output raw JSON")
     .action(async (opts) => {
-      try {
+      await runAction("tenant list", async () => {
         const ark = await getArkClient();
         const rows = await ark.adminTenantList();
         if (opts.json) {
@@ -38,9 +39,7 @@ export function registerTenantCommands(program: Command) {
         for (const t of rows) {
           console.log(`  ${t.id.padEnd(22)} ${t.slug.padEnd(20)} ${t.name.padEnd(24)} ${t.status}`);
         }
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   tenant
@@ -50,14 +49,12 @@ export function registerTenantCommands(program: Command) {
     .option("--name <name>", "Human-readable name (defaults to slug)")
     .option("--json", "Output raw JSON")
     .action(async (slug, opts) => {
-      try {
+      await runAction("tenant create", async () => {
         const ark = await getArkClient();
         const t = await ark.adminTenantCreate({ slug, name: opts.name ?? slug });
         if (opts.json) console.log(JSON.stringify(t, null, 2));
         else console.log(chalk.green(`Tenant created: ${t.id} (slug=${t.slug})`));
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   tenant
@@ -68,7 +65,7 @@ export function registerTenantCommands(program: Command) {
     .option("--name <name>", "New name")
     .option("--status <status>", "active | suspended | archived")
     .action(async (id, opts) => {
-      try {
+      await runAction("tenant update", async () => {
         const ark = await getArkClient();
         const current = await ark.adminTenantGet(id);
         if (!current) {
@@ -82,9 +79,7 @@ export function registerTenantCommands(program: Command) {
           ...(opts.status ? { status: opts.status } : {}),
         });
         console.log(chalk.green(`Tenant updated: ${t?.id}`));
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   tenant
@@ -92,7 +87,7 @@ export function registerTenantCommands(program: Command) {
     .description("Delete a tenant (cascades teams + memberships, leaves sessions/computes behind)")
     .argument("<id>", "Tenant id or slug")
     .action(async (id) => {
-      try {
+      await runAction("tenant delete", async () => {
         const ark = await getArkClient();
         const current = await ark.adminTenantGet(id);
         if (!current) {
@@ -101,9 +96,7 @@ export function registerTenantCommands(program: Command) {
         }
         const ok = await ark.adminTenantDelete(current.id);
         console.log(ok ? chalk.green(`Tenant deleted: ${current.id}`) : chalk.red("Delete failed"));
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   tenant
@@ -111,7 +104,7 @@ export function registerTenantCommands(program: Command) {
     .description("Set tenant status to 'suspended'")
     .argument("<id>", "Tenant id or slug")
     .action(async (id) => {
-      try {
+      await runAction("tenant suspend", async () => {
         const ark = await getArkClient();
         const current = await ark.adminTenantGet(id);
         if (!current) {
@@ -120,9 +113,7 @@ export function registerTenantCommands(program: Command) {
         }
         await ark.adminTenantSetStatus(current.id, "suspended");
         console.log(chalk.yellow(`Tenant '${current.id}' suspended`));
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   tenant
@@ -130,7 +121,7 @@ export function registerTenantCommands(program: Command) {
     .description("Set tenant status to 'active'")
     .argument("<id>", "Tenant id or slug")
     .action(async (id) => {
-      try {
+      await runAction("tenant resume", async () => {
         const ark = await getArkClient();
         const current = await ark.adminTenantGet(id);
         if (!current) {
@@ -139,9 +130,7 @@ export function registerTenantCommands(program: Command) {
         }
         await ark.adminTenantSetStatus(current.id, "active");
         console.log(chalk.green(`Tenant '${current.id}' active`));
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   // ── Policy subcommands (RPC: admin/tenant/policy/*) ──────────────────
@@ -155,7 +144,7 @@ export function registerTenantCommands(program: Command) {
     .option("--max-sessions <n>", "Maximum concurrent sessions", "10")
     .option("--max-cost <usd>", "Maximum daily cost in USD")
     .action(async (tenantId, opts) => {
-      try {
+      await runAction("tenant policy set", async () => {
         const ark = await getArkClient();
         const allowedProviders = opts.providers
           ? opts.providers
@@ -179,9 +168,7 @@ export function registerTenantCommands(program: Command) {
         if (opts.maxCost) {
           console.log(`  Max daily cost:    $${opts.maxCost}`);
         }
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   policy
@@ -189,7 +176,7 @@ export function registerTenantCommands(program: Command) {
     .description("Get compute policy for a tenant")
     .argument("<tenant-id>", "Tenant ID")
     .action(async (tenantId) => {
-      try {
+      await runAction("tenant policy get", async () => {
         const ark = await getArkClient();
         const p = await ark.tenantPolicyGet(tenantId);
 
@@ -216,16 +203,14 @@ export function registerTenantCommands(program: Command) {
             console.log(`    - ${pool.pool_name} (${pool.provider}) min=${pool.min} max=${pool.max}`);
           }
         }
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   policy
     .command("list")
     .description("List all tenant compute policies")
     .action(async () => {
-      try {
+      await runAction("tenant policy list", async () => {
         const ark = await getArkClient();
         const policies = await ark.tenantPolicyList();
 
@@ -244,9 +229,7 @@ export function registerTenantCommands(program: Command) {
             `  ${p.tenant_id.padEnd(20)} ${providers.padEnd(25)} ${p.default_provider.padEnd(10)} ${String(p.max_concurrent_sessions).padEnd(10)} ${cost}`,
           );
         }
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   policy
@@ -254,7 +237,7 @@ export function registerTenantCommands(program: Command) {
     .description("Delete compute policy for a tenant")
     .argument("<tenant-id>", "Tenant ID")
     .action(async (tenantId) => {
-      try {
+      await runAction("tenant policy delete", async () => {
         const ark = await getArkClient();
         const deleted = await ark.tenantPolicyDelete(tenantId);
 
@@ -263,9 +246,7 @@ export function registerTenantCommands(program: Command) {
         } else {
           console.log(chalk.red(`No policy found for tenant '${tenantId}'`));
         }
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   // ── Claude auth subcommands (RPC: admin/tenant/auth/*) ──────────────
@@ -287,23 +268,20 @@ export function registerTenantCommands(program: Command) {
     .option("--api-key <name>", "Bind to a string secret storing ANTHROPIC_API_KEY")
     .option("--subscription-blob <name>", "Bind to a blob secret (the ~/.claude directory)")
     .action(async (tenantId, opts) => {
-      try {
-        const hasKey = typeof opts.apiKey === "string" && opts.apiKey.length > 0;
-        const hasBlob = typeof opts.subscriptionBlob === "string" && opts.subscriptionBlob.length > 0;
-        if (hasKey === hasBlob) {
-          console.log(chalk.red("Specify exactly one of --api-key or --subscription-blob."));
-          process.exitCode = 2;
-          return;
-        }
+      const hasKey = typeof opts.apiKey === "string" && opts.apiKey.length > 0;
+      const hasBlob = typeof opts.subscriptionBlob === "string" && opts.subscriptionBlob.length > 0;
+      if (hasKey === hasBlob) {
+        console.error(chalk.red("Specify exactly one of --api-key or --subscription-blob."));
+        process.exitCode = 2;
+        return;
+      }
+      await runAction("tenant auth set", async () => {
         const ark = await getArkClient();
         const kind = hasKey ? "api_key" : "subscription_blob";
         const ref = hasKey ? opts.apiKey : opts.subscriptionBlob;
         const row = await ark.tenantAuthSet(tenantId, kind, ref);
         console.log(chalk.green(`Tenant '${tenantId}' bound to ${row.kind} '${row.secret_ref}'.`));
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message ?? e}`));
-        process.exitCode = 1;
-      }
+      });
     });
 
   auth
@@ -311,7 +289,7 @@ export function registerTenantCommands(program: Command) {
     .description("Show the current Claude credential binding for a tenant.")
     .argument("<tenant-id>", "Tenant ID (or slug)")
     .action(async (tenantId) => {
-      try {
+      await runAction("tenant auth show", async () => {
         const ark = await getArkClient();
         const row = await ark.tenantAuthGet(tenantId);
         if (!row) {
@@ -322,10 +300,7 @@ export function registerTenantCommands(program: Command) {
         console.log(`  Kind:       ${row.kind}`);
         console.log(`  Secret ref: ${row.secret_ref}`);
         console.log(`  Updated:    ${row.updated_at}`);
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message ?? e}`));
-        process.exitCode = 1;
-      }
+      });
     });
 
   auth
@@ -333,14 +308,11 @@ export function registerTenantCommands(program: Command) {
     .description("Remove the Claude credential binding for a tenant.")
     .argument("<tenant-id>", "Tenant ID (or slug)")
     .action(async (tenantId) => {
-      try {
+      await runAction("tenant auth clear", async () => {
         const ark = await getArkClient();
         const ok = await ark.tenantAuthClear(tenantId);
         if (ok) console.log(chalk.green(`Cleared Claude auth for tenant '${tenantId}'.`));
         else console.log(chalk.yellow(`No binding to clear for tenant '${tenantId}'.`));
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message ?? e}`));
-        process.exitCode = 1;
-      }
+      });
     });
 }

@@ -18,6 +18,7 @@ import { createInterface } from "readline";
 import { readdirSync, readFileSync, writeFileSync, statSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 import { getArkClient } from "../app-client.js";
+import { runAction } from "./_shared.js";
 
 /** Read the entire stdin to a string. Used when the caller pipes a value in. */
 async function readStdin(): Promise<string> {
@@ -94,7 +95,7 @@ export function registerSecretsCommands(program: Command): void {
     .command("list")
     .description("List secret names (values are never returned)")
     .action(async () => {
-      try {
+      await runAction("secrets list", async () => {
         const ark = await getArkClient();
         const refs = await ark.secretList();
         if (refs.length === 0) {
@@ -106,10 +107,7 @@ export function registerSecretsCommands(program: Command): void {
           const desc = r.description ?? "";
           console.log(`  ${r.name.padEnd(32)} ${(r.updated_at ?? "").padEnd(22)} ${desc}`);
         }
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message ?? e}`));
-        process.exitCode = 1;
-      }
+      });
     });
 
   group
@@ -118,7 +116,7 @@ export function registerSecretsCommands(program: Command): void {
     .argument("<name>", "Secret name (ASCII [A-Z0-9_]+)")
     .option("-d, --description <text>", "Human-readable description")
     .action(async (name: string, opts) => {
-      try {
+      await runAction("secrets set", async () => {
         const ark = await getArkClient();
         let value: string;
         if (!process.stdin.isTTY) {
@@ -127,16 +125,13 @@ export function registerSecretsCommands(program: Command): void {
           value = await promptMasked(`Value for ${name}: `);
         }
         if (value.length === 0) {
-          console.log(chalk.red("Refusing to store an empty secret value."));
+          console.error(chalk.red("Refusing to store an empty secret value."));
           process.exitCode = 2;
           return;
         }
         await ark.secretSet(name, value, opts.description);
         console.log(chalk.green(`Secret '${name}' stored.`));
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message ?? e}`));
-        process.exitCode = 1;
-      }
+      });
     });
 
   group
@@ -145,7 +140,7 @@ export function registerSecretsCommands(program: Command): void {
     .argument("<name>", "Secret name")
     .option("-y, --yes", "Skip the confirm prompt")
     .action(async (name: string, opts) => {
-      try {
+      await runAction("secrets delete", async () => {
         if (!opts.yes) {
           const answer = await new Promise<string>((resolve) => {
             const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -166,10 +161,7 @@ export function registerSecretsCommands(program: Command): void {
         } else {
           console.log(chalk.yellow(`No secret '${name}' (idempotent).`));
         }
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message ?? e}`));
-        process.exitCode = 1;
-      }
+      });
     });
 
   // ── Blob (multi-file) subcommands ────────────────────────────────────
@@ -184,7 +176,7 @@ export function registerSecretsCommands(program: Command): void {
     .command("list")
     .description("List blob names (contents are never returned)")
     .action(async () => {
-      try {
+      await runAction("secrets blob list", async () => {
         const ark = await getArkClient();
         const names = await ark.secretBlobList();
         if (names.length === 0) {
@@ -192,10 +184,7 @@ export function registerSecretsCommands(program: Command): void {
           return;
         }
         for (const n of names) console.log(`  ${n}`);
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message ?? e}`));
-        process.exitCode = 1;
-      }
+      });
     });
 
   blob
@@ -204,15 +193,15 @@ export function registerSecretsCommands(program: Command): void {
     .argument("<name>", "Blob name (lowercase kebab-case, <=63 chars)")
     .argument("<dir>", "Directory to upload")
     .action(async (name: string, dir: string) => {
-      try {
+      await runAction("secrets blob upload", async () => {
         if (!existsSync(dir) || !statSync(dir).isDirectory()) {
-          console.log(chalk.red(`'${dir}' is not a directory`));
+          console.error(chalk.red(`'${dir}' is not a directory`));
           process.exitCode = 2;
           return;
         }
         const entries = readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile());
         if (entries.length === 0) {
-          console.log(chalk.red(`Directory '${dir}' has no files`));
+          console.error(chalk.red(`Directory '${dir}' has no files`));
           process.exitCode = 2;
           return;
         }
@@ -224,10 +213,7 @@ export function registerSecretsCommands(program: Command): void {
         const ark = await getArkClient();
         await ark.secretBlobSet(name, files, { encoding: "base64" });
         console.log(chalk.green(`Blob '${name}' uploaded (${entries.length} file${entries.length === 1 ? "" : "s"}).`));
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message ?? e}`));
-        process.exitCode = 1;
-      }
+      });
     });
 
   blob
@@ -236,11 +222,11 @@ export function registerSecretsCommands(program: Command): void {
     .argument("<name>", "Blob name")
     .argument("<dir>", "Target directory")
     .action(async (name: string, dir: string) => {
-      try {
+      await runAction("secrets blob download", async () => {
         const ark = await getArkClient();
         const blobData = await ark.secretBlobGet(name);
         if (!blobData) {
-          console.log(chalk.red(`Blob '${name}' not found`));
+          console.error(chalk.red(`Blob '${name}' not found`));
           process.exitCode = 1;
           return;
         }
@@ -253,10 +239,7 @@ export function registerSecretsCommands(program: Command): void {
         console.log(
           chalk.green(`Blob '${name}' written to ${dir} (${files.length} file${files.length === 1 ? "" : "s"}).`),
         );
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message ?? e}`));
-        process.exitCode = 1;
-      }
+      });
     });
 
   blob
@@ -265,7 +248,7 @@ export function registerSecretsCommands(program: Command): void {
     .argument("<name>", "Blob name")
     .option("-y, --yes", "Skip the confirm prompt")
     .action(async (name: string, opts) => {
-      try {
+      await runAction("secrets blob delete", async () => {
         if (!opts.yes) {
           const answer = await new Promise<string>((resolve) => {
             const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -283,10 +266,7 @@ export function registerSecretsCommands(program: Command): void {
         const removed = await ark.secretBlobDelete(name);
         if (removed) console.log(chalk.green(`Deleted blob '${name}'.`));
         else console.log(chalk.yellow(`No blob '${name}' (idempotent).`));
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message ?? e}`));
-        process.exitCode = 1;
-      }
+      });
     });
 
   group
@@ -295,9 +275,9 @@ export function registerSecretsCommands(program: Command): void {
     .argument("<name>", "Secret name")
     .option("--print", "Allow printing to a TTY (default: refuse to prevent shoulder surfing)")
     .action(async (name: string, opts) => {
-      try {
+      await runAction("secrets get", async () => {
         if (process.stdout.isTTY && !opts.print) {
-          console.log(
+          console.error(
             chalk.red(
               "Refusing to print a secret to a TTY. Re-run with --print, or pipe the output (e.g. `ark secrets get FOO | pbcopy`).",
             ),
@@ -308,7 +288,7 @@ export function registerSecretsCommands(program: Command): void {
         const ark = await getArkClient();
         const value = await ark.secretGet(name);
         if (value === null) {
-          console.log(chalk.red(`Secret '${name}' not found.`));
+          console.error(chalk.red(`Secret '${name}' not found.`));
           process.exitCode = 1;
           return;
         }
@@ -316,9 +296,6 @@ export function registerSecretsCommands(program: Command): void {
         // pollute a shell-substitution consumer ($(ark secrets get FOO)).
         process.stdout.write(value);
         if (process.stdout.isTTY) process.stdout.write("\n");
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message ?? e}`));
-        process.exitCode = 1;
-      }
+      });
     });
 }

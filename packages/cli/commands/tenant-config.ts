@@ -14,6 +14,7 @@ import type { Command } from "commander";
 import chalk from "chalk";
 import { readFileSync, existsSync } from "fs";
 import { getArkClient } from "../app-client.js";
+import { runAction } from "./_shared.js";
 
 export function registerTenantConfigCommands(program: Command): void {
   // If `ark tenant` already exists (registered by ./tenant.ts), reuse it;
@@ -29,30 +30,27 @@ export function registerTenantConfigCommands(program: Command): void {
     .argument("<tenantId>", "Tenant ID")
     .option("-f, --file <path>", "Path to YAML file with cluster overrides")
     .action(async (tenantId: string, opts: { file?: string }) => {
-      try {
-        if (!opts.file) {
-          console.log(chalk.red("--file <path> is required"));
-          process.exitCode = 2;
-          return;
-        }
-        if (!existsSync(opts.file)) {
-          console.log(chalk.red(`File not found: ${opts.file}`));
-          process.exitCode = 2;
-          return;
-        }
-        const yaml = readFileSync(opts.file, "utf-8");
-        if (yaml.length === 0) {
-          console.log(chalk.red("YAML file is empty"));
-          process.exitCode = 2;
-          return;
-        }
+      if (!opts.file) {
+        console.error(chalk.red("--file <path> is required"));
+        process.exitCode = 2;
+        return;
+      }
+      if (!existsSync(opts.file)) {
+        console.error(chalk.red(`File not found: ${opts.file}`));
+        process.exitCode = 2;
+        return;
+      }
+      const yaml = readFileSync(opts.file, "utf-8");
+      if (yaml.length === 0) {
+        console.error(chalk.red("YAML file is empty"));
+        process.exitCode = 2;
+        return;
+      }
+      await runAction("tenant config set-compute", async () => {
         const ark = await getArkClient();
         await ark.tenantComputeConfigSet(tenantId, yaml);
         console.log(chalk.green(`Compute config stored for tenant '${tenantId}'.`));
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e?.message ?? e}`));
-        process.exitCode = 1;
-      }
+      });
     });
 
   config
@@ -60,7 +58,7 @@ export function registerTenantConfigCommands(program: Command): void {
     .description("Fetch the compute-config YAML blob for a tenant")
     .argument("<tenantId>", "Tenant ID")
     .action(async (tenantId: string) => {
-      try {
+      await runAction("tenant config get-compute", async () => {
         const ark = await getArkClient();
         const yaml = await ark.tenantComputeConfigGet(tenantId);
         if (yaml == null) {
@@ -69,10 +67,7 @@ export function registerTenantConfigCommands(program: Command): void {
         }
         process.stdout.write(yaml);
         if (process.stdout.isTTY && !yaml.endsWith("\n")) process.stdout.write("\n");
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e?.message ?? e}`));
-        process.exitCode = 1;
-      }
+      });
     });
 
   config
@@ -80,14 +75,11 @@ export function registerTenantConfigCommands(program: Command): void {
     .description("Clear the compute-config YAML blob for a tenant")
     .argument("<tenantId>", "Tenant ID")
     .action(async (tenantId: string) => {
-      try {
+      await runAction("tenant config clear-compute", async () => {
         const ark = await getArkClient();
         const removed = await ark.tenantComputeConfigClear(tenantId);
         if (removed) console.log(chalk.green(`Cleared compute config for tenant '${tenantId}'.`));
         else console.log(chalk.yellow(`No compute config to clear for tenant '${tenantId}'.`));
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e?.message ?? e}`));
-        process.exitCode = 1;
-      }
+      });
     });
 }

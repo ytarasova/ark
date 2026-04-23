@@ -12,6 +12,7 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import { getArkClient } from "../app-client.js";
+import { runAction } from "./_shared.js";
 
 export function registerUserCommands(program: Command) {
   const user = program.command("user").description("Manage user identities");
@@ -21,7 +22,7 @@ export function registerUserCommands(program: Command) {
     .description("List users")
     .option("--json", "Output raw JSON")
     .action(async (opts) => {
-      try {
+      await runAction("user list", async () => {
         const ark = await getArkClient();
         const rows = await ark.adminUserList();
         if (opts.json) {
@@ -36,9 +37,7 @@ export function registerUserCommands(program: Command) {
         for (const u of rows) {
           console.log(`  ${u.id.padEnd(20)} ${u.email.padEnd(32)} ${u.name ?? ""}`);
         }
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   user
@@ -47,7 +46,7 @@ export function registerUserCommands(program: Command) {
     .argument("<idOrEmail>", "User id or email")
     .option("--json", "Output raw JSON")
     .action(async (idOrEmail, opts) => {
-      try {
+      await runAction("user get", async () => {
         const ark = await getArkClient();
         const u = await ark.adminUserGet(idOrEmail);
         if (!u) {
@@ -62,9 +61,7 @@ export function registerUserCommands(program: Command) {
         console.log(`  id:         ${u.id}`);
         console.log(`  name:       ${u.name ?? ""}`);
         console.log(`  created:    ${u.created_at}`);
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   user
@@ -74,14 +71,12 @@ export function registerUserCommands(program: Command) {
     .option("--name <name>", "Display name")
     .option("--json", "Output raw JSON")
     .action(async (opts) => {
-      try {
+      await runAction("user create", async () => {
         const ark = await getArkClient();
         const u = await ark.adminUserCreate({ email: opts.email, name: opts.name ?? null });
         if (opts.json) console.log(JSON.stringify(u, null, 2));
         else console.log(chalk.green(`User created: ${u.id} (${u.email})`));
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   user
@@ -89,7 +84,7 @@ export function registerUserCommands(program: Command) {
     .description("Delete a user (cascades memberships)")
     .argument("<idOrEmail>", "User id or email")
     .action(async (idOrEmail) => {
-      try {
+      await runAction("user delete", async () => {
         const ark = await getArkClient();
         const u = await ark.adminUserGet(idOrEmail);
         if (!u) {
@@ -98,8 +93,6 @@ export function registerUserCommands(program: Command) {
         }
         const ok = await ark.adminUserDelete(u.id);
         console.log(ok ? chalk.green(`User deleted: ${u.id}`) : chalk.red("Delete failed"));
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 }

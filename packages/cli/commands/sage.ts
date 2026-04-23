@@ -4,6 +4,7 @@ import { existsSync, statSync } from "fs";
 import { resolve, isAbsolute } from "path";
 
 import { getArkClient } from "../app-client.js";
+import { runAction } from "./_shared.js";
 
 /**
  * `ark sage <analysis-id-or-path>` -- thin client over the daemon's
@@ -36,7 +37,7 @@ export function registerSageCommands(program: Command): void {
       const { sageUrl, analysisId } = resolveAnalysisRef(ref, opts.sageUrl);
 
       if (opts.dryRun) {
-        try {
+        await runAction("sage analyze (dry-run)", async () => {
           const ctx = await ark.sageContext({ analysisId, sageUrl });
           console.log(chalk.bold(`\nfrom-sage-analysis dry-run`));
           console.log(chalk.dim(`  Ticket:    ${ctx.analysisId}`));
@@ -52,14 +53,11 @@ export function registerSageCommands(program: Command): void {
             }
           }
           console.log("");
-        } catch (e: any) {
-          console.error(chalk.red(`Failed to fetch analysis: ${e?.message ?? e}`));
-          process.exit(1);
-        }
+        });
         return;
       }
 
-      try {
+      await runAction("sage analyze", async () => {
         const result = await ark.sageAnalyze({
           analysisId,
           sageUrl,
@@ -70,17 +68,15 @@ export function registerSageCommands(program: Command): void {
         if (!result.ok) {
           console.error(chalk.red(`Dispatch failed: ${result.message ?? "unknown error"}`));
           if (result.sessionId) console.error(chalk.dim(`  Session id: ${result.sessionId}`));
-          process.exit(1);
+          process.exitCode = 1;
+          return;
         }
         console.log(chalk.green(`Created session ${result.sessionId} (flow=from-sage-analysis)`));
         console.log(chalk.dim(`  Analysis: ${result.analysisId}`));
         console.log(chalk.dim(`  Streams:  ${result.streamCount}`));
         console.log(chalk.dim(`  Tasks:    ${result.taskCount}`));
         console.log(chalk.green(`Dispatched. Session id: ${result.sessionId}`));
-      } catch (e: any) {
-        console.error(chalk.red(`Failed: ${e?.message ?? e}`));
-        process.exit(1);
-      }
+      });
       // NOTE: origin/main had a BlobStore-backed direct-dispatch variant here
       // (uploaded the analysis JSON into tenant-scoped blob storage then called
       // `startSession` + `dispatch` directly). We moved to CLI-daemon-first

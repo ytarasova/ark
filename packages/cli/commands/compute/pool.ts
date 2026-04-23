@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import chalk from "chalk";
 import { getInProcessApp } from "../../app-client.js";
 import { ComputePoolManager } from "../../../core/compute/pool.js";
+import { runAction } from "../_shared.js";
 
 export function registerPoolCommands(computeCmd: Command) {
   const pool = computeCmd.command("pool").description("Manage compute pools");
@@ -17,7 +18,7 @@ export function registerPoolCommands(computeCmd: Command) {
     .option("--region <region>", "Region (provider-specific)")
     .option("--image <image>", "Container image (provider-specific)")
     .action(async (name, opts) => {
-      try {
+      await runAction("compute pool create", async () => {
         const app = await getInProcessApp();
         const manager = new ComputePoolManager(app);
         const config: Record<string, unknown> = {};
@@ -35,16 +36,14 @@ export function registerPoolCommands(computeCmd: Command) {
         console.log(`  Provider: ${pool.provider}`);
         console.log(`  Min:      ${pool.min}`);
         console.log(`  Max:      ${pool.max}`);
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   pool
     .command("list")
     .description("List compute pools")
     .action(async () => {
-      try {
+      await runAction("compute pool list", async () => {
         const app = await getInProcessApp();
         const manager = new ComputePoolManager(app);
         const pools = await manager.listPools();
@@ -60,9 +59,7 @@ export function registerPoolCommands(computeCmd: Command) {
             `  ${p.name.padEnd(20)} ${p.provider.padEnd(10)} ${String(p.min).padEnd(5)} ${String(p.max).padEnd(5)} ${String(p.active).padEnd(8)} ${p.available}`,
           );
         }
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   pool
@@ -70,7 +67,7 @@ export function registerPoolCommands(computeCmd: Command) {
     .description("Delete a compute pool")
     .argument("<name>", "Pool name")
     .action(async (name) => {
-      try {
+      await runAction("compute pool delete", async () => {
         const app = await getInProcessApp();
         const manager = new ComputePoolManager(app);
         const deleted = await manager.deletePool(name);
@@ -79,8 +76,6 @@ export function registerPoolCommands(computeCmd: Command) {
         } else {
           console.log(chalk.red(`Pool '${name}' not found`));
         }
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 }

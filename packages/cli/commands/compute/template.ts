@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import chalk from "chalk";
 import { getArkClient, getInProcessApp } from "../../app-client.js";
 import type { ComputeProviderName } from "../../../types/index.js";
+import { runAction } from "../_shared.js";
 
 export function registerTemplateCommands(computeCmd: Command) {
   const template = computeCmd.command("template").description("Manage compute templates");
@@ -10,7 +11,7 @@ export function registerTemplateCommands(computeCmd: Command) {
     .command("list")
     .description("List compute templates")
     .action(async () => {
-      try {
+      await runAction("compute template list", async () => {
         const app = await getInProcessApp();
         const templates = await app.computeTemplates.list();
 
@@ -43,9 +44,7 @@ export function registerTemplateCommands(computeCmd: Command) {
         for (const t of allTemplates) {
           console.log(`  ${t.name.padEnd(20)} ${t.provider.padEnd(12)} ${t.description ?? ""}`);
         }
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   template
@@ -53,7 +52,7 @@ export function registerTemplateCommands(computeCmd: Command) {
     .description("Show a compute template")
     .argument("<name>", "Template name")
     .action(async (name) => {
-      try {
+      await runAction("compute template show", async () => {
         const app = await getInProcessApp();
         let tmpl: any = await app.computeTemplates.get(name);
 
@@ -82,9 +81,7 @@ export function registerTemplateCommands(computeCmd: Command) {
         for (const [k, v] of Object.entries(tmpl.config)) {
           console.log(`    ${k}: ${JSON.stringify(v)}`);
         }
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   template
@@ -100,7 +97,7 @@ export function registerTemplateCommands(computeCmd: Command) {
     .option("--image <image>", "Docker image (docker)")
     .option("--namespace <ns>", "K8s namespace (k8s)")
     .action(async (name, opts) => {
-      try {
+      await runAction("compute template create", async () => {
         const config: Record<string, unknown> = {};
         if (opts.size) config.size = opts.size;
         if (opts.arch) config.arch = opts.arch;
@@ -126,9 +123,7 @@ export function registerTemplateCommands(computeCmd: Command) {
         for (const [k, v] of Object.entries(config)) {
           console.log(`  ${k}: ${v}`);
         }
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 
   template
@@ -136,12 +131,10 @@ export function registerTemplateCommands(computeCmd: Command) {
     .description("Delete a compute template")
     .argument("<name>", "Template name")
     .action(async (name) => {
-      try {
+      await runAction("compute template delete", async () => {
         const app = await getInProcessApp();
         app.computeTemplates.delete(name);
         console.log(chalk.green(`Template '${name}' deleted`));
-      } catch (e: any) {
-        console.log(chalk.red(`Failed: ${e.message}`));
-      }
+      });
     });
 }
