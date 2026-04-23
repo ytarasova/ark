@@ -1,15 +1,14 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useApi } from "../hooks/useApi.js";
-import { useComputeQuery } from "../hooks/useComputeQueries.js";
-import { useSmartPoll } from "../hooks/useSmartPoll.js";
+import { useComputeQuery, useComputeSnapshotQuery, useRunningSessionsQuery } from "../hooks/useComputeQueries.js";
 import { cn } from "../lib/utils.js";
 import { Badge } from "./ui/badge.js";
 import { Server } from "lucide-react";
 import { statusDotColor } from "./compute/helpers.js";
 import { NewComputeForm } from "./compute/NewComputeForm.js";
 import { ComputeDetailPanel } from "./compute/ComputeDetailPanel.js";
-import type { ComputeSnapshot, MetricHistoryPoint } from "./compute/types.js";
+import type { MetricHistoryPoint } from "./compute/types.js";
 
 interface ComputeViewProps {
   showCreate?: boolean;
@@ -41,88 +40,49 @@ export function ComputeView({
     setSelectedInternal(item);
     onSelectedChange?.(item ? item.name || item.id || null : null);
   };
-  const [snapshot, setSnapshot] = useState<ComputeSnapshot | null>(null);
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [metricsState, setMetricsState] = useState<"loading" | "loaded" | "error">("loading");
+
+  const selectedName: string | null = selected ? selected.name || selected.id : null;
+
+  // Snapshot + running-sessions polling via TanStack instead of the old
+  // hand-rolled useSmartPoll + mountedRef dance.
+  const snapshotQuery = useComputeSnapshotQuery(selectedName);
+  const sessionsQuery = useRunningSessionsQuery();
+  const snapshot = snapshotQuery.data ?? null;
+  const sessions = sessionsQuery.data ?? [];
+
+  // Metrics-state derives from the query state + whether the snapshot has
+  // a `metrics` payload (the server returns `{metrics: null}` for targets
+  // that aren't reachable).
+  const metricsState: "loading" | "loaded" | "error" = !selected
+    ? "loading"
+    : snapshotQuery.isPending
+      ? "loading"
+      : snapshotQuery.isError || !snapshot?.metrics
+        ? "error"
+        : "loaded";
+
+  // metricHistory is legitimately client-side view-state (rolling window),
+  // fed from snapshotQuery.data via useEffect rather than a setState in the
+  // fetch callback.
   const metricHistoryRef = useRef<Map<string, MetricHistoryPoint[]>>(new Map());
   const [metricHistory, setMetricHistory] = useState<MetricHistoryPoint[]>([]);
-  const mountedRef = useRef(true);
 
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .getSessions({ status: "running" })
-      .then((data) => {
-        if (!cancelled) setSessions(data);
-      })
-      .catch((err) => {
-        console.warn(
-          `ComputeView: initial getSessions failed (running-sessions list will be empty):`,
-          err instanceof Error ? err.message : err,
-        );
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [api]);
-
-  const loadSnapshot = useCallback(() => {
-    if (!selected) {
-      setSnapshot(null);
-      setMetricsState("loading");
+    if (!selectedName || !snapshot?.metrics) {
+      // Keep the current series frozen on target switch / error -- resetting
+      // to [] would blank the chart while the next poll lands.
       return;
     }
-    const name = selected.name || selected.id;
-    api
-      .getComputeSnapshot(name === "local" ? undefined : name)
-      .then((snap) => {
-        if (!mountedRef.current) return;
-        setSnapshot(snap);
-        setMetricsState(snap?.metrics ? "loaded" : "error");
-        if (snap?.metrics) {
-          const key = name;
-          const history = metricHistoryRef.current.get(key) ?? [];
-          history.push({ t: Date.now(), cpu: snap.metrics.cpu, mem: snap.metrics.memPct, disk: snap.metrics.diskPct });
-          if (history.length > MAX_HISTORY) history.shift();
-          metricHistoryRef.current.set(key, history);
-          setMetricHistory([...history]);
-        }
-      })
-      .catch(() => {
-        if (!mountedRef.current) return;
-        setSnapshot(null);
-        setMetricsState("error");
-      });
-  }, [api, selected]);
-
-  useEffect(() => {
-    loadSnapshot();
-  }, [loadSnapshot]);
-
-  useSmartPoll(loadSnapshot, 5000);
-
-  useSmartPoll(
-    useCallback(() => {
-      api
-        .getSessions({ status: "running" })
-        .then((data) => {
-          if (mountedRef.current) setSessions(data);
-        })
-        .catch((err) => {
-          console.warn(
-            `ComputeView: poll getSessions failed (next 15s tick will retry):`,
-            err instanceof Error ? err.message : err,
-          );
-        });
-    }, [api]),
-    15000,
-  );
+    const history = metricHistoryRef.current.get(selectedName) ?? [];
+    history.push({
+      t: Date.now(),
+      cpu: snapshot.metrics.cpu,
+      mem: snapshot.metrics.memPct,
+      disk: snapshot.metrics.diskPct,
+    });
+    if (history.length > MAX_HISTORY) history.shift();
+    metricHistoryRef.current.set(selectedName, history);
+    setMetricHistory([...history]);
+  }, [snapshot, selectedName]);
 
   const [pendingAction, setPendingAction] = useState<string | null>(null);
 
@@ -166,7 +126,9 @@ export function ComputeView({
           onSelectedChange?.(res.name);
         }
         await queryClient.invalidateQueries({ queryKey: ["compute"] });
-        loadSnapshot();
+        // Nudge the snapshot query to refetch now instead of waiting for the
+        // 5s poll -- the user just asked for a state transition.
+        snapshotQuery.refetch();
       } else {
         onToast?.(res.message || `${actionLabel} failed`, "error");
       }
@@ -255,7 +217,10 @@ export function ComputeView({
               )}
               onClick={() => {
                 setSelected(c);
-                setMetricsState("loading");
+                // metricsState is derived from the snapshot query's own
+                // isPending flag, so no explicit loading-state reset is
+                // needed here -- the new queryKey will show isPending=true
+                // until the next fetch lands.
               }}
             >
               <div className="flex items-center gap-2 min-w-0">
@@ -295,7 +260,9 @@ export function ComputeView({
               onAction={handleAction}
               pendingAction={pendingAction}
               metricsState={metricsState}
-              onRetryMetrics={loadSnapshot}
+              onRetryMetrics={() => {
+                snapshotQuery.refetch();
+              }}
               onNavigateToSession={(sessionId) => onNavigate?.("sessions", sessionId)}
             />
           ) : (
