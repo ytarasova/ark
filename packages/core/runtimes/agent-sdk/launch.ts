@@ -559,6 +559,23 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
           if (!SKIP_HEADERS.has(k)) headers[k] = v;
         });
 
+        // Inject auth headers from ANTHROPIC_CUSTOM_HEADERS env if the inbound
+        // request didn't carry them. The SDK's bundled binary doesn't honor
+        // ANTHROPIC_CUSTOM_HEADERS (the standalone CLI does, but the SDK build
+        // we wrap does not), so it sends only `x-api-key: dummy` -- which TF
+        // rejects 401. We parse CUSTOM_HEADERS here and add the missing ones.
+        if (customHeaders) {
+          for (const line of customHeaders.split(/\r?\n/)) {
+            const idx = line.indexOf(":");
+            if (idx <= 0) continue;
+            const name = line.slice(0, idx).trim();
+            const value = line.slice(idx + 1).trim();
+            if (!name || !value) continue;
+            const lower = name.toLowerCase();
+            if (!(lower in headers)) headers[lower] = value;
+          }
+        }
+
         let body: string | undefined;
         if (req.method !== "GET" && req.method !== "HEAD") {
           const raw = await req.text();
@@ -625,14 +642,26 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
     }
   }
 
+  // When custom auth headers are in play (typical for gateway routing like
+  // TrueFoundry where ANTHROPIC_API_KEY=dummy and the real bearer is in
+  // ANTHROPIC_CUSTOM_HEADERS), the SDK's bundled binary picks up
+  // ANTHROPIC_AUTH_TOKEN if it's set in the inherited shell env (a leftover
+  // from LiteLLM or another proxy) and uses THAT as the Bearer -- short-
+  // circuiting our custom-headers path and producing 401s. Strip it.
+  // Mirrors the `make claude-tfy` target's `unset ANTHROPIC_AUTH_TOKEN`.
+  const sdkEnv: Record<string, string | undefined> = {
+    ...process.env,
+    ...(apiKey ? { ANTHROPIC_API_KEY: apiKey } : {}),
+    ...(effectiveBaseURL ? { ANTHROPIC_BASE_URL: effectiveBaseURL } : {}),
+    ...(customHeaders ? { ANTHROPIC_CUSTOM_HEADERS: customHeaders } : {}),
+  };
+  if (customHeaders) {
+    delete sdkEnv.ANTHROPIC_AUTH_TOKEN;
+  }
+
   const sdkOptions: Options = {
     cwd: worktree,
-    env: {
-      ...process.env,
-      ...(apiKey ? { ANTHROPIC_API_KEY: apiKey } : {}),
-      ...(effectiveBaseURL ? { ANTHROPIC_BASE_URL: effectiveBaseURL } : {}),
-      ...(customHeaders ? { ANTHROPIC_CUSTOM_HEADERS: customHeaders } : {}),
-    } as Record<string, string | undefined>,
+    env: sdkEnv as Record<string, string | undefined>,
     allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
     permissionMode: "bypassPermissions",
     allowDangerouslySkipPermissions: true,
