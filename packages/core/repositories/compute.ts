@@ -10,7 +10,7 @@ import type {
   RuntimeKindName,
   ComputeConfig,
 } from "../../types/index.js";
-import { providerToPair } from "../../compute/adapters/provider-map.js";
+import { providerToPair, pairToProvider } from "../../compute/adapters/provider-map.js";
 import { now } from "../util/time.js";
 
 // -- Insert contract ------------------------------------------------------
@@ -20,10 +20,13 @@ import { now } from "../util/time.js";
  * defaults, no rules, no kind inference. Callers (typically `ComputeService`)
  * are expected to apply domain rules (singleton, initialStatus, ...) before
  * reaching the repo layer.
+ *
+ * `provider` is an internal DB-column synthesis (derived from the two-axis
+ * kinds via `pairToProvider`) so legacy indexes + migrations keep working.
+ * Callers don't set it.
  */
 export interface InsertComputeRow {
   name: string;
-  provider: ComputeProviderName;
   compute_kind: ComputeKindName;
   runtime_kind: RuntimeKindName;
   status: ComputeStatus;
@@ -65,7 +68,6 @@ function rowToCompute(row: DrizzleSelectCompute): Compute {
   const runtime_kind = (row.runtimeKind as RuntimeKindName | undefined | null) ?? fallback.runtime;
   return {
     name: row.name,
-    provider: row.provider as ComputeProviderName,
     compute_kind: compute_kind as ComputeKindName,
     runtime_kind: runtime_kind as RuntimeKindName,
     status: row.status as ComputeStatus,
@@ -74,7 +76,7 @@ function rowToCompute(row: DrizzleSelectCompute): Compute {
     cloned_from: row.clonedFrom ?? null,
     created_at: row.createdAt,
     updated_at: row.updatedAt,
-  } as Compute;
+  };
 }
 
 // -- Repository -----------------------------------------------------------
@@ -115,9 +117,13 @@ export class ComputeRepository {
   async insert(row: InsertComputeRow): Promise<Compute> {
     const ts = now();
     const d = this.d();
+    // Legacy `provider` column is still materialized for back-compat indexes
+    // + downstream readers that haven't been swept yet. Derived from the
+    // canonical (compute_kind, runtime_kind) pair.
+    const providerColumn = pairToProvider({ compute: row.compute_kind, runtime: row.runtime_kind }) ?? row.compute_kind;
     await (d.db as any).insert(d.schema.compute).values({
       name: row.name,
-      provider: row.provider,
+      provider: providerColumn,
       computeKind: row.compute_kind,
       runtimeKind: row.runtime_kind,
       status: row.status,
@@ -132,9 +138,10 @@ export class ComputeRepository {
   }
 
   /**
-   * Single-row lookup by provider name. Used by `ComputeService` to enforce
-   * the singleton rule. `excludeTemplates` skips rows where `is_template`
-   * is true (templates are blueprints, not concrete instances).
+   * Single-row lookup by legacy provider name. Used by `ComputeService` to
+   * enforce the singleton rule. Queries the legacy `provider` column directly
+   * since that's the indexed path. `excludeTemplates` skips rows where
+   * `is_template` is true (templates are blueprints, not concrete instances).
    */
   async findByProvider(
     providerName: ComputeProviderName,
@@ -209,13 +216,23 @@ export class ComputeRepository {
     return (rows as DrizzleSelectCompute[]).map(rowToCompute);
   }
 
-  async update(name: string, fields: Partial<Compute>): Promise<Compute | null> {
+  async update(name: string, fields: Partial<Compute> & { provider?: ComputeProviderName }): Promise<Compute | null> {
     const d = this.d();
     const c = d.schema.compute;
 
     const set: Record<string, any> = { updatedAt: now() };
+    // The legacy `provider` column is still writable for callers that want
+    // to keep the DB-indexed string in sync; it's not part of the public
+    // Compute shape anymore.
     if (fields.provider !== undefined) set.provider = fields.provider;
-    if (fields.compute_kind !== undefined) set.computeKind = fields.compute_kind;
+    if (fields.compute_kind !== undefined) {
+      set.computeKind = fields.compute_kind;
+      // Keep the legacy column in sync when the canonical axes change.
+      if (fields.runtime_kind !== undefined) {
+        set.provider =
+          pairToProvider({ compute: fields.compute_kind, runtime: fields.runtime_kind }) ?? fields.compute_kind;
+      }
+    }
     if (fields.runtime_kind !== undefined) set.runtimeKind = fields.runtime_kind;
     if (fields.status !== undefined) set.status = fields.status;
     if (fields.config !== undefined) {

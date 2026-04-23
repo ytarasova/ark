@@ -10,6 +10,7 @@
  * - Flow YAML with compute_template loads correctly
  */
 
+import { providerOf } from "../../compute/adapters/provider-map.js";
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync, existsSync } from "fs";
 import { join } from "path";
@@ -136,7 +137,7 @@ describe("resolveComputeForStage", async () => {
     // Verify the clone was created with the template's provider
     const clone = await app.computes.get(result!);
     expect(clone).not.toBeNull();
-    expect(clone!.provider).toBe("docker");
+    expect(providerOf(clone!)).toBe("docker");
 
     // Verify event was logged
     const events = await app.events.list(session.id);
@@ -163,7 +164,7 @@ describe("resolveComputeForStage", async () => {
     // Verify compute was created from config template
     const compute = await app.computes.get(result!);
     expect(compute).not.toBeNull();
-    expect(compute!.provider).toBe("docker");
+    expect(providerOf(compute!)).toBe("docker");
 
     // Restore config
     app.config.computeTemplates = originalTemplates;

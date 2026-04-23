@@ -12,6 +12,7 @@ import { AppContext } from "../../app.js";
 import { ComputeService } from "../compute.js";
 import { ComputeRepository } from "../../repositories/compute.js";
 import type { Compute, ComputeStatus } from "../../../types/index.js";
+import { providerOf } from "../../../compute/adapters/provider-map.js";
 
 let app: AppContext;
 let repo: ComputeRepository;
@@ -34,7 +35,7 @@ describe("ComputeService", async () => {
   it("create returns compute with correct defaults (docker -> stopped)", async () => {
     const c = await svc.create({ name: "test-docker", provider: "docker" });
     expect(c.name).toBe("test-docker");
-    expect(c.provider).toBe("docker");
+    expect(providerOf(c)).toBe("docker");
     expect(c.status).toBe("stopped");
   });
 
@@ -82,7 +83,7 @@ describe("ComputeService", async () => {
   it("get returns seeded local compute", async () => {
     const c = await svc.get("local");
     expect(c).not.toBeNull();
-    expect(c!.provider).toBe("local");
+    expect(providerOf(c!)).toBe("local");
   });
 
   it("get returns null for nonexistent", async () => {
@@ -101,7 +102,7 @@ describe("ComputeService", async () => {
     await svc.create({ name: "d1", provider: "docker" });
     await svc.create({ name: "e1", provider: "ec2" });
     const dockers = await svc.list({ provider: "docker" });
-    expect(dockers.every((c) => c.provider === "docker")).toBe(true);
+    expect(dockers.every((c) => providerOf(c) === "docker")).toBe(true);
   });
 
   // ── update ─────────────────────────────────────────────────────────────
@@ -148,22 +149,23 @@ describe("ComputeService", async () => {
     it("swapping computes repo with a fake intercepts insert()", async () => {
       const stored: Compute[] = [];
       const fakeRepo = {
-        insert: mock(async (row: { name: string; provider: string; status: ComputeStatus }) => {
-          const c = {
-            name: row.name,
-            provider: row.provider,
-            status: row.status,
-            compute_kind: "local",
-            runtime_kind: "docker",
-            config: {},
-            is_template: false,
-            cloned_from: null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          } as unknown as Compute;
-          stored.push(c);
-          return c;
-        }),
+        insert: mock(
+          async (row: { name: string; compute_kind: string; runtime_kind: string; status: ComputeStatus }) => {
+            const c = {
+              name: row.name,
+              status: row.status,
+              compute_kind: row.compute_kind,
+              runtime_kind: row.runtime_kind,
+              config: {},
+              is_template: false,
+              cloned_from: null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            } as unknown as Compute;
+            stored.push(c);
+            return c;
+          },
+        ),
         findByProvider: mock(async () => null),
         get: mock(async (name: string) => stored.find((c) => c.name === name) ?? null),
         list: mock(async () => stored),

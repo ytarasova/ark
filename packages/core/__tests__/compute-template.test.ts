@@ -1,3 +1,4 @@
+import { providerOf } from "../../compute/adapters/provider-map.js";
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 import { AppContext } from "../app.js";
 

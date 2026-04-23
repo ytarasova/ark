@@ -24,6 +24,7 @@ import { createWorktreePR } from "../services/worktree/index.js";
 import { eventBus } from "../hooks.js";
 import type { OutboundMessage } from "./channel-types.js";
 import { getProvider } from "../../compute/index.js";
+import { providerOf } from "../../compute/adapters/provider-map.js";
 import { indexSession } from "../search/search.js";
 import { listSchedules, cronMatches, updateScheduleLastRun } from "../schedule.js";
 import { pollPRReviews } from "../integrations/pr-poller.js";
@@ -754,7 +755,7 @@ export async function deliverToChannel(
   const computeName = targetSession.compute_name || "local";
   const tenantApp = targetSession.tenant_id ? app.forTenant(targetSession.tenant_id) : app;
   const compute = await tenantApp.computes.get(computeName);
-  const provider = compute ? getProvider(compute.provider) : null;
+  const provider = compute ? getProvider(providerOf(compute)) : null;
   if (provider?.getArkdUrl) {
     try {
       const arkdUrl = provider.getArkdUrl(compute!);

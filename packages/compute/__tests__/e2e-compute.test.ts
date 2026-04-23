@@ -22,6 +22,7 @@ import {
 
 import { AppContext } from "../../core/app.js";
 import { getApp, setApp, clearApp } from "../../core/__tests__/test-helpers.js";
+import { providerOf } from "../adapters/provider-map.js";
 
 let app: AppContext;
 
@@ -88,7 +89,7 @@ describe("E2E Compute: Remote compute provider resolution", () => {
     computeNames.push(name);
 
     expect(compute.name).toBe(name);
-    expect(compute.provider).toBe("ec2");
+    expect(providerOf(compute)).toBe("ec2");
     expect(compute.status).toBe("stopped");
     expect(compute.config.size).toBe("m");
     expect(compute.config.region).toBe("us-east-1");
@@ -113,7 +114,7 @@ describe("E2E Compute: Docker compute provider resolution", () => {
     computeNames.push(name);
 
     expect(compute.name).toBe(name);
-    expect(compute.provider).toBe("docker");
+    expect(providerOf(compute)).toBe("docker");
     expect(compute.status).toBe("stopped");
 
     const provider = getProvider("docker");

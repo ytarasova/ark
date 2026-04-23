@@ -37,7 +37,14 @@ export async function resolveProvider(
   const scoped = session.tenant_id && session.tenant_id !== app.tenantId ? app.forTenant(session.tenant_id) : app;
   const compute = await scoped.computes.get(computeName);
   if (!compute) return { provider: null, compute: null };
-  const provider = app.getProvider(compute.provider as ComputeProviderName as string);
+  // Derive the legacy provider key from the two-axis (compute_kind, runtime_kind)
+  // since the `provider` field has been removed from the Compute type.
+  // ProviderRegistry is still keyed by legacy provider names.
+  const { pairToProvider } = await import("../compute/adapters/provider-map.js");
+  const providerKey =
+    pairToProvider({ compute: compute.compute_kind as string, runtime: compute.runtime_kind as string }) ??
+    (compute.compute_kind as string);
+  const provider = app.getProvider(providerKey as ComputeProviderName as string);
   return { provider: provider ?? null, compute };
 }
 
@@ -48,10 +55,8 @@ export async function resolveComputeTarget(
   const { compute } = await resolveProvider(app, session);
   if (!compute) return { target: null, compute: null };
 
-  const { providerToPair } = await import("../compute/adapters/provider-map.js");
-  const fallback = providerToPair(compute.provider);
-  const computeKind = ((compute as any).compute_kind ?? fallback.compute) as ComputeKind;
-  const runtimeKind = ((compute as any).runtime_kind ?? fallback.runtime) as RuntimeKind;
+  const computeKind = compute.compute_kind as ComputeKind;
+  const runtimeKind = compute.runtime_kind as RuntimeKind;
 
   const c = app.getCompute(computeKind);
   const r = app.getRuntime(runtimeKind);

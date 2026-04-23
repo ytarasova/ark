@@ -100,8 +100,6 @@ export type ComputeConfig = LocalComputeConfig | EC2ComputeConfig | DockerComput
 
 export interface Compute {
   name: string;
-  /** @deprecated Use `compute_kind` + `runtime_kind`. Kept for back-compat reads. */
-  provider: ComputeProviderName;
   /** Where the compute lives (dispatch axis). */
   compute_kind: ComputeKindName;
   /** How the agent process is launched (dispatch axis). */
@@ -126,8 +124,6 @@ export interface Compute {
 
 export interface CreateComputeOpts {
   name: string;
-  /** @deprecated Use `compute` + `runtime`. Accepted for back-compat. */
-  provider?: ComputeProviderName;
   /** Compute axis (e.g. "local", "ec2"). */
   compute?: ComputeKindName;
   /** Runtime axis (e.g. "direct", "docker"). */

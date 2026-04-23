@@ -6,6 +6,7 @@
  * injection, and that shutdown disposes cleanly.
  */
 
+import { providerOf } from "../../compute/adapters/provider-map.js";
 import { describe, it, expect, afterEach } from "bun:test";
 import { asValue } from "awilix";
 import { AppContext } from "../app.js";
@@ -59,7 +60,7 @@ describe("DI container registration", async () => {
     app = await AppContext.forTestAsync();
     // Config is registered in constructor, not boot
     expect(app.container.resolve("config")).toBeDefined();
-    expect(app.container.resolve("config").arkDir).toBeTruthy();
+    expect(app.container.resolve("config").dirs.ark).toBeTruthy();
   });
 
   it("db and repos require boot()", async () => {
@@ -183,7 +184,7 @@ describe("service dependency injection", async () => {
     // Verify it's in the DB via the repository
     const fromRepo = await app.computes.get("di-docker");
     expect(fromRepo).not.toBeNull();
-    expect(fromRepo!.provider).toBe("docker");
+    expect(providerOf(fromRepo!)).toBe("docker");
   });
 
   it("HistoryService shares the same DB as repositories", async () => {

@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import chalk from "chalk";
 import { getArkClient } from "../../app-client.js";
 import { logDebug } from "../../../core/observability/structured-log.js";
+import { providerOf } from "../../../compute/adapters/provider-map.js";
 
 export function registerLifecycleCommands(computeCmd: Command) {
   computeCmd
@@ -12,7 +13,7 @@ export function registerLifecycleCommands(computeCmd: Command) {
       const ark = await getArkClient();
       try {
         const compute = await ark.computeRead(name);
-        console.log(chalk.dim(`Provisioning '${name}' via ${compute.provider}...`));
+        console.log(chalk.dim(`Provisioning '${name}' via ${providerOf(compute)}...`));
         await ark.computeProvision(name);
         console.log(chalk.green(`Compute '${name}' provisioned and running`));
       } catch (e: any) {

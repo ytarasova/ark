@@ -14,6 +14,7 @@ import type { AppContext } from "../app.js";
 import type { Session, ComputeProviderName } from "../../types/index.js";
 import type { WorkerNode } from "./worker-registry.js";
 import type { TenantPolicyManager, TenantComputePolicy } from "../auth/index.js";
+import { providerOf } from "../../compute/adapters/provider-map.js";
 
 export class SessionScheduler {
   private policyManager: TenantPolicyManager | null = null;
@@ -154,7 +155,7 @@ export class SessionScheduler {
   /** Resolve the provider name from a compute record. */
   private async _resolveProviderFromCompute(computeName: string): Promise<string | null> {
     const compute = await this.app.computes.get(computeName);
-    return compute?.provider ?? null;
+    return compute ? providerOf(compute) : null;
   }
 
   /**

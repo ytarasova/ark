@@ -88,3 +88,14 @@ export function pairToProvider(pair: ComputeRuntimePair): string | null {
   }
   return null;
 }
+
+/**
+ * Derive the legacy provider name from a compute object's two-axis kinds.
+ *
+ * Canonical accessor for call sites that need the legacy string (UI, log lines,
+ * provider-registry lookups). Prefer this over reaching into a nonexistent
+ * `.provider` field on `Compute`.
+ */
+export function providerOf(c: { compute_kind: ComputeKind; runtime_kind: RuntimeKind }): string {
+  return pairToProvider({ compute: c.compute_kind, runtime: c.runtime_kind }) ?? c.compute_kind;
+}

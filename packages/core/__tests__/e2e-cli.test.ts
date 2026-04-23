@@ -5,6 +5,7 @@
  * Tests the same operations the CLI commands perform.
  */
 
+import { providerOf } from "../../compute/adapters/provider-map.js";
 import { describe, it, expect, afterEach } from "bun:test";
 import { execFileSync } from "child_process";
 import { join } from "path";
@@ -60,7 +61,7 @@ describe("CLI: compute lifecycle", async () => {
     await app.computeService.create({ name, provider: "ec2" });
     const compute = await app.computes.get(name);
     expect(compute).not.toBeNull();
-    expect(compute!.provider).toBe("ec2");
+    expect(providerOf(compute!)).toBe("ec2");
     expect(compute!.status).toBe("stopped");
   });
 
@@ -81,7 +82,7 @@ describe("CLI: compute lifecycle", async () => {
     const compute = await app.computes.get(name);
     expect(compute).not.toBeNull();
     expect(compute!.name).toBe(name);
-    expect(compute!.provider).toBe("ec2");
+    expect(providerOf(compute!)).toBe("ec2");
     expect(compute!.status).toBe("stopped");
   });
 

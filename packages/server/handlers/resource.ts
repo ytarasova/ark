@@ -5,7 +5,11 @@ import { instantiateRecipe } from "../../core/agent/recipe.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { guardBuiltin, projectArg, resolveProjectRoot, resolveScope, type Scope } from "./scope-helpers.js";
 import { logDebug } from "../../core/observability/structured-log.js";
+<<<<<<< HEAD
 import { providerToPair } from "../../compute/adapters/provider-map.js";
+=======
+import { providerOf } from "../../compute/adapters/provider-map.js";
+>>>>>>> 185cc6c5 (refactor(types): drop deprecated `provider` field from Compute + CreateComputeOpts)
 import type {
   AgentDefinition,
   AgentReadParams,
@@ -249,7 +253,8 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     if (include === "template") targets = await app.computes.listTemplates();
     else if (include === "concrete") targets = await app.computes.listConcrete();
     else targets = await app.computes.list();
-    return { targets };
+    // Wire-format back-compat: include derived `provider` on each row.
+    return { targets: targets.map((t) => ({ ...t, provider: providerOf(t) })) };
   });
   router.handle("compute/create", async (p) => {
     // Accept either legacy `{provider}` or new `{compute, runtime}`.
@@ -309,7 +314,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
       }
     }
 
-    const compute = await app.computeService.create({
+    const created = await app.computeService.create({
       name,
       provider: effectiveProvider,
       compute: computeKind,
@@ -318,7 +323,9 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
       is_template,
       cloned_from,
     });
-    return { compute };
+    // RPC wire format still carries `provider` for back-compat clients; derive
+    // it from the (compute_kind, runtime_kind) axes.
+    return { compute: { ...created, provider: providerOf(created) } };
   });
 
   // Discover available k8s contexts + namespaces from the local kubeconfig
@@ -371,7 +378,8 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
     if (!compute) throw new RpcError("Compute not found", ErrorCodes.SESSION_NOT_FOUND);
-    return { compute };
+    // Wire-format back-compat: include derived `provider`.
+    return { compute: { ...compute, provider: providerOf(compute) } };
   });
   /**
    * Return authoritative capability flags for a compute target, sourced
@@ -384,8 +392,8 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
     if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
-    const provider = app.getProvider(compute.provider);
-    if (!provider) throw new RpcError(`Unknown provider: ${compute.provider}`, ErrorCodes.NOT_FOUND);
+    const provider = app.getProvider(providerOf(compute));
+    if (!provider) throw new RpcError(`Unknown provider: ${providerOf(compute)}`, ErrorCodes.NOT_FOUND);
     return {
       capabilities: {
         provider: provider.name,
@@ -414,7 +422,6 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
       const cloneName = `${compute.name}-${Date.now().toString(36)}`;
       await app.computeService.create({
         name: cloneName,
-        provider: compute.provider,
         compute: compute.compute_kind,
         runtime: compute.runtime_kind,
         config: JSON.parse(JSON.stringify(compute.config ?? {})),
@@ -422,8 +429,13 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
         cloned_from: compute.name,
       });
       const clone = (await app.computes.get(cloneName))!;
+<<<<<<< HEAD
       const provider = getProvider(clone.provider);
       if (!provider) throw new RpcError(`Unknown provider: ${clone.provider}`, ErrorCodes.NOT_FOUND);
+=======
+      const provider = getProvider(providerOf(clone));
+      if (!provider) throw new Error(`Provider '${providerOf(clone)}' not found`);
+>>>>>>> 185cc6c5 (refactor(types): drop deprecated `provider` field from Compute + CreateComputeOpts)
       await app.computes.update(clone.name, { status: "provisioning" });
       try {
         // Provision validates the environment (namespace exists, config
@@ -448,8 +460,13 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
       }
     }
 
+<<<<<<< HEAD
     const provider = getProvider(compute.provider);
     if (!provider) throw new RpcError(`Unknown provider: ${compute.provider}`, ErrorCodes.NOT_FOUND);
+=======
+    const provider = getProvider(providerOf(compute));
+    if (!provider) throw new Error(`Provider '${providerOf(compute)}' not found`);
+>>>>>>> 185cc6c5 (refactor(types): drop deprecated `provider` field from Compute + CreateComputeOpts)
     await app.computes.update(compute.name, { status: "provisioning" });
     try {
       await provider.provision(compute);
@@ -465,8 +482,13 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const compute = await app.computes.get(name);
     if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
     const { getProvider } = await import("../../compute/index.js");
+<<<<<<< HEAD
     const provider = getProvider(compute.provider);
     if (!provider) throw new RpcError(`Unknown provider: ${compute.provider}`, ErrorCodes.NOT_FOUND);
+=======
+    const provider = getProvider(providerOf(compute));
+    if (!provider) throw new Error(`Provider '${providerOf(compute)}' not found`);
+>>>>>>> 185cc6c5 (refactor(types): drop deprecated `provider` field from Compute + CreateComputeOpts)
     try {
       await provider.stop(compute);
       await app.computes.update(compute.name, { status: "stopped" });
@@ -475,7 +497,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
         const real = await provider.checkStatus(compute).catch((err) => {
           logDebug("compute", `compute/stop-instance: checkStatus probe failed (name=${compute.name})`, {
             name: compute.name,
-            provider: compute.provider,
+            provider: providerOf(compute),
             error: err instanceof Error ? err.message : String(err),
           });
           return null;
@@ -495,8 +517,13 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const compute = await app.computes.get(name);
     if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
     const { getProvider } = await import("../../compute/index.js");
+<<<<<<< HEAD
     const provider = getProvider(compute.provider);
     if (!provider) throw new RpcError(`Unknown provider: ${compute.provider}`, ErrorCodes.NOT_FOUND);
+=======
+    const provider = getProvider(providerOf(compute));
+    if (!provider) throw new Error(`Provider '${providerOf(compute)}' not found`);
+>>>>>>> 185cc6c5 (refactor(types): drop deprecated `provider` field from Compute + CreateComputeOpts)
     await provider.start(compute);
     await app.computes.update(compute.name, { status: "running" });
     return { ok: true };
@@ -506,8 +533,8 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const compute = await app.computes.get(name);
     if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
     const { getProvider } = await import("../../compute/index.js");
-    const provider = getProvider(compute.provider);
-    if (!provider) throw new RpcError(`Unknown provider: ${compute.provider}`, ErrorCodes.NOT_FOUND);
+    const provider = getProvider(providerOf(compute));
+    if (!provider) throw new RpcError(`Unknown provider: ${providerOf(compute)}`, ErrorCodes.NOT_FOUND);
     // Capability-driven guard: reject destroy up front when the provider
     // declares canDelete=false, instead of relying on the provider's
     // `destroy()` to throw. Keeps the error surface clean (server refused
@@ -534,8 +561,8 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const compute = await app.computes.get(name);
     if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
     const { getProvider } = await import("../../compute/index.js");
-    const provider = getProvider(compute.provider);
-    if (!provider) throw new RpcError(`Unknown provider: ${compute.provider}`, ErrorCodes.NOT_FOUND);
+    const provider = getProvider(providerOf(compute));
+    if (!provider) throw new RpcError(`Unknown provider: ${providerOf(compute)}`, ErrorCodes.NOT_FOUND);
     // Capability-driven guard: consult provider.canReboot explicitly rather
     // than relying on method presence (a provider might define `reboot()`
     // that simply throws NotSupported). Matches the flag the UI queries via
@@ -570,12 +597,12 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
       }
       // Check AWS status if SSH fails
       const { getProvider } = await import("../../compute/index.js");
-      const provider = getProvider(compute.provider);
+      const provider = getProvider(providerOf(compute));
       if (provider?.checkStatus) {
         const real = await provider.checkStatus(compute).catch((err) => {
           logDebug("compute", `compute/ping: checkStatus probe failed (name=${compute.name})`, {
             name: compute.name,
-            provider: compute.provider,
+            provider: providerOf(compute),
             error: err instanceof Error ? err.message : String(err),
           });
           return null;

@@ -22,7 +22,7 @@ import type {
 } from "../../types/index.js";
 import type { ComputeRepository } from "../repositories/compute.js";
 import type { AppContext } from "../app.js";
-import { providerToPair, pairToProvider } from "../../compute/adapters/provider-map.js";
+import { providerToPair, pairToProvider, providerOf } from "../../compute/adapters/provider-map.js";
 
 export class ComputeService {
   private _app: AppContext | null = null;
@@ -49,9 +49,10 @@ export class ComputeService {
 
   // ── Create: rule-aware ──────────────────────────────────────────────────
 
-  async create(opts: CreateComputeOpts): Promise<Compute> {
-    // Resolve provider name: explicit `provider` wins, else derive from the
-    // compute/runtime pair, else default to "local".
+  async create(opts: CreateComputeOpts & { provider?: ComputeProviderName }): Promise<Compute> {
+    // Resolve provider name: explicit `provider` (kept as convenience for CLI
+    // / RPC callers) wins, else derive from the compute/runtime pair, else
+    // default to "local".
     let providerName: ComputeProviderName | undefined = opts.provider;
     if (!providerName && opts.compute && opts.runtime) {
       providerName = (pairToProvider({ compute: opts.compute, runtime: opts.runtime }) ?? opts.compute) as any;
@@ -87,7 +88,6 @@ export class ComputeService {
 
     return this.computes.insert({
       name: opts.name,
-      provider: providerName,
       compute_kind,
       runtime_kind,
       status: initialStatus,
@@ -120,9 +120,10 @@ export class ComputeService {
   async delete(name: string): Promise<boolean> {
     const row = await this.computes.get(name);
     if (!row) return false;
-    const provider = this.app.getProvider(row.provider);
+    const providerName = providerOf(row);
+    const provider = this.app.getProvider(providerName);
     if (provider && provider.canDelete === false) {
-      throw new Error(`Provider '${row.provider}' does not support deletion`);
+      throw new Error(`Provider '${providerName}' does not support deletion`);
     }
     return this.computes.delete(name);
   }

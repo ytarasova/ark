@@ -26,6 +26,7 @@
 import type { AppContext } from "../app.js";
 import type { Session, Compute } from "../../types/index.js";
 import { logDebug, logInfo, logWarn } from "../observability/structured-log.js";
+import { providerOf } from "../../compute/adapters/provider-map.js";
 
 /** Shape returned back to dispatch so it can merge env + record what was created. */
 export interface ClaudeAuthMaterialization {
@@ -101,9 +102,14 @@ export async function materializeClaudeAuthForDispatch(
   // gating on provider names, so a new k8s-family provider (e.g. EKS) gets
   // the Secret-mount path automatically by declaring `supportsSecretMount`.
   if (!compute) return EMPTY;
+<<<<<<< HEAD
   const providerName = compute.provider as string;
   const provider = app.getProvider(providerName);
   if (!provider || !provider.supportsSecretMount) {
+=======
+  const providerName = providerOf(compute);
+  if (providerName !== "k8s" && providerName !== "k8s-kata") {
+>>>>>>> 185cc6c5 (refactor(types): drop deprecated `provider` field from Compute + CreateComputeOpts)
     logDebug(
       "session",
       `tenant ${tenantId} bound to subscription_blob but compute '${compute.name}' (${providerName}) does not support Secret mount; skipping Secret creation`,

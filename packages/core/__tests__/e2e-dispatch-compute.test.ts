@@ -12,6 +12,7 @@
  * NOT the actual tmux/claude launch (which requires real tmux).
  */
 
+import { providerOf } from "../../compute/adapters/provider-map.js";
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import { existsSync, mkdirSync, readFileSync } from "fs";
 import { join } from "path";
@@ -53,9 +54,9 @@ describe("dispatch compute: worktree creation", async () => {
     const session = await getApp().sessions.create({ summary: "worktree-test", repo: repoDir, workdir: repoDir });
 
     // Simulate what launchAgentTmux checks:
-    // isLocal = no compute or compute.provider === "local"
+    // isLocal = no compute or providerOf(compute) === "local"
     const compute = session.compute_name ? await app.computes.get(session.compute_name) : null;
-    const isLocal = !compute || compute.provider === "local";
+    const isLocal = !compute || providerOf(compute) === "local";
     expect(isLocal).toBe(true);
 
     // wantWorktree = isLocal && config.worktree !== false
@@ -74,9 +75,9 @@ describe("dispatch compute: worktree creation", async () => {
 
     const compute = await app.computes.get(session.compute_name!);
     expect(compute).not.toBeNull();
-    expect(compute!.provider).toBe("ec2");
+    expect(providerOf(compute!)).toBe("ec2");
 
-    const isLocal = compute!.provider === "local";
+    const isLocal = providerOf(compute!) === "local";
     expect(isLocal).toBe(false);
 
     // With non-local compute, worktree should NOT be created
@@ -97,7 +98,7 @@ describe("dispatch compute: worktree creation", async () => {
     });
 
     const compute = session.compute_name ? await app.computes.get(session.compute_name) : null;
-    const isLocal = !compute || compute.provider === "local";
+    const isLocal = !compute || providerOf(compute) === "local";
     expect(isLocal).toBe(true);
 
     const config = typeof session.config === "string" ? JSON.parse(session.config) : session.config;

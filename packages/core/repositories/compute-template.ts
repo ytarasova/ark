@@ -21,7 +21,7 @@
 
 import type { DatabaseAdapter } from "../database/index.js";
 import type { ComputeProviderName, ComputeConfig, ComputeKindName, RuntimeKindName } from "../../types/index.js";
-import { providerToPair } from "../../compute/adapters/provider-map.js";
+import { providerToPair, pairToProvider } from "../../compute/adapters/provider-map.js";
 import { ComputeRepository } from "./compute.js";
 
 /** Sentinel tenant for system-wide compute templates seeded at boot. */
@@ -38,14 +38,16 @@ export interface ComputeTemplateView {
 
 function computeToTemplate(c: {
   name: string;
-  provider: ComputeProviderName;
+  compute_kind: ComputeKindName;
+  runtime_kind: RuntimeKindName;
   config: ComputeConfig;
   description?: string | null;
 }): ComputeTemplateView {
   return {
     name: c.name,
     description: (c as { description?: string | null }).description ?? undefined,
-    provider: c.provider,
+    provider: (pairToProvider({ compute: c.compute_kind, runtime: c.runtime_kind }) ??
+      c.compute_kind) as ComputeProviderName,
     config: c.config as Partial<ComputeConfig>,
   };
 }
@@ -108,7 +110,6 @@ export class ComputeTemplateRepository {
     // which would look up a provider this adapter doesn't need.
     await this.inner.insert({
       name: template.name,
-      provider,
       compute_kind: pair.compute as ComputeKindName,
       runtime_kind: pair.runtime as RuntimeKindName,
       status: "stopped",

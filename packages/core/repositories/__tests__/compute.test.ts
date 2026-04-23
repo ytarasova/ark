@@ -5,6 +5,7 @@ import type { DatabaseAdapter } from "../../database.js";
 import { ComputeRepository } from "../compute.js";
 import { initSchema, seedLocalCompute } from "../schema.js";
 import type { ComputeStatus, ComputeConfig } from "../../../types/index.js";
+import { providerOf } from "../../../compute/adapters/provider-map.js";
 
 let db: DatabaseAdapter;
 let repo: ComputeRepository;
@@ -22,13 +23,12 @@ describe("ComputeRepository", async () => {
   it("insert writes the row as given (no defaults, no rules)", async () => {
     const c = await repo.insert({
       name: "test-docker",
-      provider: "docker",
       compute_kind: "local",
       runtime_kind: "docker",
       status: "stopped",
     });
     expect(c.name).toBe("test-docker");
-    expect(c.provider).toBe("docker");
+    expect(providerOf(c)).toBe("docker");
     expect(c.status).toBe("stopped");
     expect(c.config).toEqual({});
     expect(c.created_at).toBeTruthy();
@@ -39,7 +39,6 @@ describe("ComputeRepository", async () => {
     // because enforcement now lives in ComputeService, not here.
     const c = await repo.insert({
       name: "local2",
-      provider: "local",
       compute_kind: "local",
       runtime_kind: "direct",
       status: "running",
@@ -50,7 +49,6 @@ describe("ComputeRepository", async () => {
   it("insert stores config", async () => {
     const c = await repo.insert({
       name: "ec2-1",
-      provider: "ec2",
       compute_kind: "ec2",
       runtime_kind: "direct",
       status: "stopped",
@@ -62,7 +60,6 @@ describe("ComputeRepository", async () => {
   it("insert persists is_template + cloned_from", async () => {
     await repo.insert({
       name: "tmpl-1",
-      provider: "ec2",
       compute_kind: "ec2",
       runtime_kind: "direct",
       status: "stopped",
@@ -73,7 +70,6 @@ describe("ComputeRepository", async () => {
 
     await repo.insert({
       name: "clone-1",
-      provider: "ec2",
       compute_kind: "ec2",
       runtime_kind: "direct",
       status: "stopped",
@@ -89,7 +85,7 @@ describe("ComputeRepository", async () => {
     // "local" is seeded.
     const found = await repo.findByProvider("local");
     expect(found).not.toBeNull();
-    expect(found!.provider).toBe("local");
+    expect(providerOf(found!)).toBe("local");
   });
 
   it("findByProvider returns null when no row matches", async () => {
@@ -100,7 +96,6 @@ describe("ComputeRepository", async () => {
   it("findByProvider with excludeTemplates=true skips template rows", async () => {
     await repo.insert({
       name: "ec2-tmpl",
-      provider: "ec2",
       compute_kind: "ec2",
       runtime_kind: "direct",
       status: "stopped",
@@ -115,7 +110,6 @@ describe("ComputeRepository", async () => {
   it("findByProvider with excludeTemplates=true returns a concrete row", async () => {
     await repo.insert({
       name: "ec2-concrete",
-      provider: "ec2",
       compute_kind: "ec2",
       runtime_kind: "direct",
       status: "stopped",
@@ -130,7 +124,7 @@ describe("ComputeRepository", async () => {
   it("get returns seeded local compute", async () => {
     const c = await repo.get("local");
     expect(c).not.toBeNull();
-    expect(c!.provider).toBe("local");
+    expect(providerOf(c!)).toBe("local");
     expect(c!.status).toBe("running");
   });
 
@@ -141,7 +135,6 @@ describe("ComputeRepository", async () => {
   it("get parses config from JSON", async () => {
     await repo.insert({
       name: "with-cfg",
-      provider: "docker",
       compute_kind: "local",
       runtime_kind: "docker",
       status: "stopped",
@@ -156,7 +149,6 @@ describe("ComputeRepository", async () => {
   it("list returns all compute entries", async () => {
     await repo.insert({
       name: "docker1",
-      provider: "docker",
       compute_kind: "local",
       runtime_kind: "docker",
       status: "stopped",
@@ -168,35 +160,31 @@ describe("ComputeRepository", async () => {
   it("list filters by provider", async () => {
     await repo.insert({
       name: "d1",
-      provider: "docker",
       compute_kind: "local",
       runtime_kind: "docker",
       status: "stopped",
     });
     await repo.insert({
       name: "d2",
-      provider: "docker",
       compute_kind: "local",
       runtime_kind: "docker",
       status: "stopped",
     });
     await repo.insert({
       name: "e1",
-      provider: "ec2",
       compute_kind: "ec2",
       runtime_kind: "direct",
       status: "stopped",
     });
     const dockers = await repo.list({ provider: "docker" });
     expect(dockers.length).toBe(2);
-    expect(dockers.every((c) => c.provider === "docker")).toBe(true);
+    expect(dockers.every((c) => providerOf(c) === "docker")).toBe(true);
   });
 
   it("list filters by status", async () => {
     // "local" already seeded as running; add a stopped docker
     await repo.insert({
       name: "stop1",
-      provider: "docker",
       compute_kind: "local",
       runtime_kind: "docker",
       status: "stopped",
@@ -210,7 +198,6 @@ describe("ComputeRepository", async () => {
     for (const n of ["a", "b", "c"]) {
       await repo.insert({
         name: n,
-        provider: "docker",
         compute_kind: "local",
         runtime_kind: "docker",
         status: "stopped",
@@ -225,7 +212,6 @@ describe("ComputeRepository", async () => {
   it("update changes fields and returns updated compute", async () => {
     await repo.insert({
       name: "upd",
-      provider: "docker",
       compute_kind: "local",
       runtime_kind: "docker",
       status: "stopped",
@@ -237,7 +223,6 @@ describe("ComputeRepository", async () => {
   it("update skips unknown columns", async () => {
     await repo.insert({
       name: "upd2",
-      provider: "docker",
       compute_kind: "local",
       runtime_kind: "docker",
       status: "stopped",
@@ -249,7 +234,6 @@ describe("ComputeRepository", async () => {
   it("update skips name and created_at", async () => {
     await repo.insert({
       name: "upd3",
-      provider: "docker",
       compute_kind: "local",
       runtime_kind: "docker",
       status: "stopped",
@@ -264,7 +248,6 @@ describe("ComputeRepository", async () => {
   it("update handles config as JSON", async () => {
     await repo.insert({
       name: "cfg-upd",
-      provider: "docker",
       compute_kind: "local",
       runtime_kind: "docker",
       status: "stopped",
@@ -282,7 +265,6 @@ describe("ComputeRepository", async () => {
   it("delete removes compute and returns true", async () => {
     await repo.insert({
       name: "del-me",
-      provider: "docker",
       compute_kind: "local",
       runtime_kind: "docker",
       status: "stopped",
@@ -308,7 +290,6 @@ describe("ComputeRepository", async () => {
   it("mergeConfig merges without replacing existing keys", async () => {
     await repo.insert({
       name: "merge",
-      provider: "docker",
       compute_kind: "local",
       runtime_kind: "docker",
       status: "stopped",
@@ -326,7 +307,6 @@ describe("ComputeRepository", async () => {
   it("mergeConfig updates updated_at", async () => {
     await repo.insert({
       name: "ts-test",
-      provider: "docker",
       compute_kind: "local",
       runtime_kind: "docker",
       status: "stopped",

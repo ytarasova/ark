@@ -10,6 +10,7 @@ import {
 } from "../core/auth/context.js";
 import { ArkdClient } from "../arkd/client.js";
 import { DEFAULT_ARKD_URL } from "../core/constants.js";
+import { providerOf } from "../compute/adapters/provider-map.js";
 
 export interface ServerConnection {
   id: string;
@@ -600,7 +601,7 @@ async function resolveArkdForSession(
   }
   const compute = await app.computes.get(session.compute_name);
   if (!compute) return { arkdUrl: fallback, token };
-  const provider = app.getProvider(compute.provider);
+  const provider = app.getProvider(providerOf(compute));
   if (provider?.getArkdUrl) {
     try {
       return { arkdUrl: provider.getArkdUrl(compute), token };

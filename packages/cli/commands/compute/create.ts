@@ -4,6 +4,7 @@ import { createInterface } from "readline";
 import { allFlagSpecs, getFlagSpec } from "../../../compute/index.js";
 import type { ProviderFlagOption } from "../../../compute/index.js";
 import { getArkClient } from "../../app-client.js";
+import { providerOf } from "../../../compute/adapters/provider-map.js";
 
 /**
  * Minimal raw-readline prompt. Returns the trimmed user input or the
@@ -226,7 +227,7 @@ export function registerCreateCommand(computeCmd: Command) {
       const rk = (compute as any).runtime_kind ?? "-";
       const kindLabel = opts.template ? "TEMPLATE" : "COMPUTE";
       console.log(chalk.green(`Created ${kindLabel} '${compute.name}' (${ck}/${rk})`));
-      console.log(`  Provider: ${compute.provider}`);
+      console.log(`  Provider: ${providerOf(compute)}`);
       if ((compute as any).compute_kind || (compute as any).runtime_kind) {
         console.log(`  Compute:  ${ck}`);
         console.log(`  Runtime:  ${rk}`);

@@ -12,6 +12,7 @@ import { join } from "path";
 import { tmpdir } from "os";
 
 import { getProvider, listProviders, resolvePortDecls } from "../index.js";
+import { providerOf } from "../adapters/provider-map.js";
 
 import { AppContext } from "../../core/app.js";
 import { getApp, setApp, clearApp } from "../../core/__tests__/test-helpers.js";
@@ -100,7 +101,7 @@ describe("E2E: Full compute lifecycle", async () => {
     const compute = await getApp().computes.get("local");
     expect(compute).not.toBeNull();
     expect(compute!.name).toBe("local");
-    expect(compute!.provider).toBe("local");
+    expect(providerOf(compute!)).toBe("local");
     expect(compute!.status).toBe("running"); // local computes are always running
 
     // Look up its provider
@@ -284,8 +285,8 @@ describe("E2E: Compute to provider resolution flow", () => {
     const ec2Compute = await getApp().computeService.create({ name: "my-ec2", provider: "ec2" });
     computeNames.push("my-ec2");
 
-    expect(localCompute.provider).toBe("local");
-    expect(ec2Compute.provider).toBe("ec2");
+    expect(providerOf(localCompute)).toBe("local");
+    expect(providerOf(ec2Compute)).toBe("ec2");
 
     // Verify getProvider("local") returns the local provider
     const localProvider = getProvider("local");

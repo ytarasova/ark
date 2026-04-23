@@ -70,7 +70,8 @@ export async function garbageCollectComputeIfTemplate(
   // still proceeds.
   try {
     const { getProvider } = await import("../../compute/index.js");
-    const provider = getProvider(compute.provider);
+    const { providerOf } = await import("../../compute/adapters/provider-map.js");
+    const provider = getProvider(providerOf(compute));
     if (provider) {
       await provider.destroy(compute);
     }

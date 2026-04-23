@@ -17,6 +17,7 @@
 import type { DispatchDeps } from "./types.js";
 import type { StageDefinition } from "../../state/flow.js";
 import type { ComputeProviderName } from "../../../types/index.js";
+import { providerOf } from "../../../compute/adapters/provider-map.js";
 
 export class ComputeResolver {
   constructor(private readonly deps: Pick<DispatchDeps, "computes" | "computeService" | "config" | "events">) {}
@@ -82,9 +83,9 @@ export class ComputeResolver {
     }
 
     log(`Cloning template '${templateName}' into '${cloneName}' for session ${sessionId}`);
+    const providerName = providerOf(tmpl);
     await this.deps.computeService.create({
       name: cloneName,
-      provider: tmpl.provider,
       compute: tmpl.compute_kind,
       runtime: tmpl.runtime_kind,
       // Deep-copy via JSON round-trip so later per-session mutations don't
@@ -95,7 +96,7 @@ export class ComputeResolver {
     });
     await this.deps.events.log(sessionId, "compute_cloned_from_template", {
       actor: "system",
-      data: { template: templateName, clone: cloneName, provider: tmpl.provider },
+      data: { template: templateName, clone: cloneName, provider: providerName },
     });
     return cloneName;
   }

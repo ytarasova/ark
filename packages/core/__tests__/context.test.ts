@@ -2,6 +2,7 @@
  * Tests for store context DI -- verifies test isolation works via AppContext.
  */
 
+import { providerOf } from "../../compute/adapters/provider-map.js";
 import { describe, it, expect, beforeEach, afterAll } from "bun:test";
 import { AppContext } from "../app.js";
 import { clearApp, getApp, setApp } from "./test-helpers.js";
@@ -53,7 +54,7 @@ describe("Store context isolation", async () => {
     const computes = await getApp().computes.list();
     const localCompute = computes.find((h) => h.name === "local");
     expect(localCompute).toBeDefined();
-    expect(localCompute!.provider).toBe("local");
+    expect(providerOf(localCompute!)).toBe("local");
   });
 
   it("CRUD works in isolated context", async () => {
@@ -78,7 +79,7 @@ describe("Store context isolation", async () => {
     await getApp().computeService.create({ name: "test-ec2", provider: "ec2", config: { size: "m" } });
     const compute = await getApp().computes.get("test-ec2");
     expect(compute).not.toBeNull();
-    expect(compute!.provider).toBe("ec2");
+    expect(providerOf(compute!)).toBe("ec2");
 
     // local + test-ec2
     expect((await getApp().computes.list()).length).toBe(2);

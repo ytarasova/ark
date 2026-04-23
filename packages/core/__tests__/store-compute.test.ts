@@ -1,6 +1,7 @@
 import { describe, it, expect } from "bun:test";
 import { withTestContext } from "./test-helpers.js";
 import { getApp } from "./test-helpers.js";
+import { providerOf } from "../../compute/adapters/provider-map.js";
 
 withTestContext();
 
@@ -18,7 +19,7 @@ describe("compute CRUD", () => {
       config: { image: "ubuntu:22.04", memory: "4g" },
     });
     expect(compute.name).toBe("docker-1");
-    expect(compute.provider).toBe("docker");
+    expect(providerOf(compute)).toBe("docker");
     expect(compute.status).toBe("stopped");
     expect(compute.config).toEqual({ image: "ubuntu:22.04", memory: "4g" });
   });
@@ -28,7 +29,7 @@ describe("compute CRUD", () => {
     const compute = await getApp().computes.get("fetch-me");
     expect(compute).not.toBeNull();
     expect(compute!.name).toBe("fetch-me");
-    expect(compute!.provider).toBe("ec2");
+    expect(providerOf(compute!)).toBe("ec2");
   });
 
   it("returns null for nonexistent compute", async () => {
@@ -51,7 +52,7 @@ describe("compute CRUD", () => {
     await getApp().computeService.create({ name: "ec2-1", provider: "ec2" });
     const computes = await getApp().computes.list({ provider: "docker" });
     expect(computes.length).toBe(2);
-    expect(computes.every((h) => h.provider === "docker")).toBe(true);
+    expect(computes.every((h) => providerOf(h) === "docker")).toBe(true);
   });
 
   it("filters by status", async () => {
@@ -120,7 +121,7 @@ describe("compute CRUD", () => {
 
     const updated = await getApp().computes.update("dev", {});
     expect(updated).not.toBeNull();
-    expect(updated!.provider).toBe("docker");
+    expect(providerOf(updated!)).toBe("docker");
     expect(updated!.status).toBe("stopped"); // non-local computes start as stopped
     expect(updated!.config).toEqual({});
     expect(updated!.updated_at >= originalUpdatedAt).toBe(true);

@@ -11,6 +11,7 @@ import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { getProvider } from "../../compute/index.js";
+import { providerOf } from "../../compute/adapters/provider-map.js";
 import { getAllSessionCosts } from "../../core/observability/costs.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import type { MetricsSnapshotParams } from "../../types/index.js";
@@ -21,7 +22,7 @@ export function registerMetricsHandlers(router: Router, app: AppContext): void {
     const resolved = computeName ?? "local";
     const compute = await app.computes.get(resolved);
     if (!compute) return { snapshot: null };
-    const provider = getProvider(compute.provider);
+    const provider = getProvider(providerOf(compute));
     if (!provider?.getMetrics) return { snapshot: null };
     try {
       const snapshot = await provider.getMetrics(compute);

@@ -5,6 +5,7 @@ import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { searchSessions, getSessionConversation, searchSessionConversation } from "../../core/search/search.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
+import { providerOf } from "../../compute/adapters/provider-map.js";
 import type {
   SessionIdParams,
   SessionStartParams,
@@ -490,7 +491,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     if (session.compute_name) {
       const compute = await app.computes.get(session.compute_name);
       if (compute) {
-        const provider = app.getProvider(compute.provider);
+        const provider = app.getProvider(providerOf(compute));
         try {
           const parts = provider?.getAttachCommand?.(compute, session) ?? [];
           if (parts.length > 0) {
