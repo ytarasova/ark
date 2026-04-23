@@ -114,7 +114,7 @@ export function SessionListPanel({
           id: s.id,
           status: normalizeStatus(s.status),
           summary: s.summary || s.id,
-          runtime: s.runtime || s.agent_runtime || undefined,
+          runtime: s.runtime || s.agent_runtime || s.agent || undefined,
           flow: s.pipeline || s.flow || undefined,
           stageLabel: s.stage || undefined,
           progress: computeProgress(s, flowStagesMap),

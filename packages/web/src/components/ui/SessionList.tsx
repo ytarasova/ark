@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { cn } from "../../lib/utils.js";
 import { StatusDot, type SessionStatus } from "./StatusDot.js";
-import { Search, X, Plus, Archive, Trash2 } from "lucide-react";
+import { Search, X, Plus, Archive, Trash2, Star } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -18,9 +18,13 @@ export interface SessionListItem {
   flow?: string;
   /** Additional inline stage/label text, e.g. "verifier gate". */
   stageLabel?: string;
-  /** Progress 0..1. Kept for back-compat; rows no longer render a fill lane. */
+  /** Progress 0..1 (0=empty, 1=full). Rendered as the thin gradient lane
+   *  beneath the meta row. Running rows always show a shimmering lane even
+   *  at progress=0, matching the target list composition. */
   progress?: number;
-  /** Deprecated — sparklines removed from session rows per design system. */
+  /** Optional 24h activity histogram for the mini sparkline above the lane.
+   *  Each number is a 0..1 bucket intensity. If missing, a muted placeholder
+   *  series is rendered so rows keep their vertical rhythm. */
   sparkline?: number[];
   /** Time chip at the right of the title row (relative or absolute). */
   relativeTime: string;
@@ -57,18 +61,23 @@ export interface SessionListProps extends React.ComponentProps<"div"> {
 }
 
 /**
- * Session list column — rebuilt to match
- * `/tmp/ark-design-system/preview/chrome-session-list.html`.
+ * Session list column — rebuilt from the user-05-desired-list reference.
  *
- * Each row is a tight ~52px-tall element:
- *   - 8px status pip on the left (running pip pulses).
- *   - Title (500 12.5px sans, -0.005em), optional 6px primary "updated" dot.
- *   - Right-aligned timestamp (10px mono-ui, fg-faint).
- *   - Meta row: mono-ui 10px UPPERCASE 0.04em tracking, fg-muted,
- *     format "STAGE · AGENT · COMPUTE". Right-aligned token count.
- *   - Running rows only: 2px shimmer lane under meta. No progress lane on
- *     completed / failed / waiting rows. No sparkline. No left-edge unread
- *     stripe.
+ * Each row composes:
+ *   - 3px left-edge accent stripe: amber for waiting / purple for selected /
+ *     nothing for default / completed / failed. Faded top/bottom via gradient.
+ *   - Title row: sans 14px 500, right-aligned elapsed time (mono-ui 11px).
+ *   - Meta row: small status dot + flow-name text + "☆ runtime" chip
+ *     (Lucide Star size 12).
+ *   - 24h mini sparkline (~11 bars). Amber when idle, primary when active,
+ *     status-colored for completed/waiting/failed. If no data we render a
+ *     muted placeholder so vertical rhythm is preserved.
+ *   - Thin (3px) progress lane beneath the sparkline:
+ *       running   blue->purple gradient + shimmer
+ *       completed solid green
+ *       waiting   amber
+ *       failed    red
+ *   - Selected row: bg-card + purple border + subtle drop shadow.
  */
 export function SessionList({
   sessions,
@@ -199,6 +208,82 @@ export function SessionList({
 // Session Row (chrome-session-list.html `.si`)
 // ---------------------------------------------------------------------------
 
+// Map session status to the lane + sparkline accent colour.
+function laneColors(status: SessionStatus): {
+  fill: string;
+  track: string;
+  spark: string;
+  shimmer?: boolean;
+} {
+  switch (status) {
+    case "running":
+      return {
+        fill: "linear-gradient(90deg, #60a5fa 0%, #8b5cf6 100%)",
+        track: "rgba(96,165,250,0.12)",
+        spark: "var(--primary)",
+        shimmer: true,
+      };
+    case "completed":
+      return {
+        fill: "var(--completed)",
+        track: "rgba(52,211,153,0.12)",
+        spark: "var(--completed)",
+      };
+    case "waiting":
+      return {
+        fill: "var(--waiting)",
+        track: "rgba(251,191,36,0.12)",
+        spark: "var(--waiting)",
+      };
+    case "failed":
+      return {
+        fill: "var(--failed)",
+        track: "rgba(248,113,113,0.12)",
+        spark: "var(--failed)",
+      };
+    default:
+      return {
+        fill: "rgba(255,255,255,0.12)",
+        track: "rgba(255,255,255,0.05)",
+        spark: "rgba(255,255,255,0.25)",
+      };
+  }
+}
+
+// Deterministic placeholder sparkline (11 bars) seeded on the session id so
+// each row has a stable shape even when the backend doesn't yet surface the
+// 24h histogram. Real data, when present, wins.
+function fallbackSparkline(id: string): number[] {
+  const n = 11;
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) {
+    h = (h * 1664525 + 1013904223) >>> 0;
+    out.push(0.25 + ((h >>> 8) & 0xff) / 340); // 0.25 .. ~1
+  }
+  return out;
+}
+
+function Sparkline({ values, color, active }: { values: number[]; color: string; active: boolean }) {
+  const max = Math.max(1e-6, ...values);
+  return (
+    <span aria-hidden className="flex items-end gap-[1.5px] h-[12px] min-w-0" style={{ opacity: active ? 1 : 0.4 }}>
+      {values.map((v, i) => (
+        <span
+          key={i}
+          style={{
+            width: 3,
+            height: `${Math.max(8, (v / max) * 100)}%`,
+            background: color,
+            borderRadius: 1,
+          }}
+        />
+      ))}
+    </span>
+  );
+}
+
 function SessionRow({
   session,
   selected,
@@ -219,11 +304,22 @@ function SessionRow({
   );
   const isRunning = session.status === "running";
   const isFailed = session.status === "failed";
+  const isWaiting = session.status === "waiting";
   const unread = (session.unreadCount ?? 0) > 0;
 
-  const stage = session.stageLabel || session.status;
-  const agent = session.agentName;
-  const compute = session.compute;
+  const lane = laneColors(session.status);
+  const progress = Math.max(0, Math.min(1, session.progress ?? (isRunning ? 0.4 : isFailed ? 0.6 : 1)));
+  const spark = useMemo(
+    () => (session.sparkline && session.sparkline.length > 0 ? session.sparkline : fallbackSparkline(session.id)),
+    [session.sparkline, session.id],
+  );
+
+  const flow = session.flow;
+  const runtime = session.runtime;
+  const stageLabel = session.stageLabel;
+
+  // Left-edge accent stripe: purple for selected, amber for waiting, none otherwise.
+  const stripeColor = selected ? "var(--primary)" : isWaiting ? "var(--waiting)" : undefined;
 
   return (
     <div
@@ -238,62 +334,36 @@ function SessionRow({
         }
       }}
       className={cn(
-        "group relative grid cursor-pointer",
-        "px-[12px] py-[10px] border-b border-[var(--border-light)] last:border-b-0",
-        "transition-colors duration-[120ms]",
+        "group relative flex flex-col cursor-pointer",
+        "mx-[8px] my-[3px] rounded-[8px] px-[12px] py-[10px]",
+        "border border-transparent transition-colors duration-[120ms]",
         "hover:bg-[rgba(255,255,255,0.015)]",
-        selected && "bg-[var(--bg-card)] border-[rgba(107,89,222,0.5)] shadow-[0_1px_2px_rgba(0,0,0,0.2)]",
+        selected && "bg-[var(--bg-card)] border-[rgba(107,89,222,0.5)] shadow-[0_2px_8px_rgba(0,0,0,0.25)]",
       )}
-      style={{
-        gridTemplateColumns: "auto 1fr auto",
-        gridTemplateRows: isRunning ? "auto auto auto" : "auto auto",
-        columnGap: 10,
-        rowGap: 3,
-      }}
     >
-      {/* Status pip -- spans rows 1/2 of the layout */}
-      <span
-        aria-hidden
-        className="relative self-center shrink-0"
-        style={{
-          gridRow: "1 / 3",
-          width: 8,
-          height: 8,
-          borderRadius: 999,
-        }}
-      >
+      {/* Left-edge accent stripe (3px, faded top/bottom). */}
+      {stripeColor && (
+        <span
+          aria-hidden
+          className="absolute left-0 top-[6px] bottom-[6px] w-[3px] rounded-r-[2px]"
+          style={{
+            background: `linear-gradient(180deg, transparent 0%, ${stripeColor} 15%, ${stripeColor} 85%, transparent 100%)`,
+            boxShadow: `0 0 6px ${stripeColor}`,
+            opacity: 0.85,
+          }}
+        />
+      )}
+
+      {/* Title row: summary + elapsed time. */}
+      <div className="flex items-center gap-[8px] min-w-0">
         <span
           className={cn(
-            "absolute inset-0 rounded-full",
-            session.status === "running" && "bg-[var(--running)] shadow-[var(--running-glow)]",
-            session.status === "waiting" && "bg-[var(--waiting)]",
-            session.status === "completed" && "bg-[var(--completed)]",
-            session.status === "failed" && "bg-[var(--failed)] shadow-[var(--failed-glow)]",
-            (session.status === "stopped" || session.status === "pending") && "bg-[var(--stopped)]",
+            "flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
+            "font-[family-name:var(--font-sans)] text-[14px] tracking-[-0.005em] text-[var(--fg)]",
+            unread ? "font-semibold" : "font-medium",
           )}
-        />
-        {isRunning && (
-          <span
-            aria-hidden
-            className="absolute rounded-full border-[1.5px] border-[var(--running)] opacity-40"
-            style={{
-              inset: -3,
-              animation: "pulse 1.6s ease-out infinite",
-            }}
-          />
-        )}
-      </span>
-
-      {/* Title row */}
-      <span
-        className={cn(
-          "flex items-center gap-[6px] min-w-0",
-          "font-[family-name:var(--font-sans)] text-[12.5px] text-[var(--fg)] tracking-[-0.005em]",
-          unread ? "font-semibold" : "font-medium",
-        )}
-        style={{ gridColumn: 2, gridRow: 1 }}
-      >
-        <span className="overflow-hidden text-ellipsis whitespace-nowrap min-w-0" title={session.summary}>
+          title={session.summary}
+        >
           {session.summary}
         </span>
         {unread && (
@@ -303,6 +373,9 @@ function SessionRow({
             style={{ boxShadow: "0 0 4px rgba(107,89,222,.5)" }}
           />
         )}
+        <span className="font-[family-name:var(--font-mono-ui)] text-[11px] font-normal text-[var(--fg-faint)] tabular-nums shrink-0">
+          {session.relativeTime}
+        </span>
         {onArchive && (
           <button
             type="button"
@@ -331,13 +404,12 @@ function SessionRow({
             <Trash2 size={12} />
           </button>
         )}
-      </span>
+      </div>
 
-      {/* Meta row */}
-      <span
-        className="flex items-center gap-[6px] min-w-0 font-[family-name:var(--font-mono-ui)] text-[10px] font-normal uppercase tracking-[0.04em] text-[var(--fg-faint)] whitespace-nowrap overflow-hidden"
-        style={{ gridColumn: 2, gridRow: 2 }}
-      >
+      {/* Meta row: status dot + status word + flow + star + runtime. */}
+      <div className="mt-[4px] flex items-center gap-[8px] min-w-0 font-[family-name:var(--font-mono-ui)] text-[11px] text-[var(--fg-muted)] whitespace-nowrap overflow-hidden">
+        <StatusDot status={session.status} size="md" pulse={isRunning} />
+        <span className="text-[var(--fg-muted)]">{session.status}</span>
         {isFailed && session.errorText ? (
           <span
             className="px-[4px] py-0 rounded-[3px] font-[family-name:var(--font-mono)] normal-case tracking-normal text-[var(--failed)]"
@@ -347,58 +419,49 @@ function SessionRow({
           </span>
         ) : (
           <>
-            {stage && <span className="text-[var(--fg-muted)]">{stage}</span>}
-            {agent && (
-              <>
-                <span className="opacity-50">·</span>
-                <span className="truncate">{agent}</span>
-              </>
-            )}
-            {compute && (
-              <>
-                <span className="opacity-50">·</span>
-                <span className="truncate">{compute}</span>
-              </>
+            {flow && <span className="truncate text-[var(--fg-muted)]">{flow}</span>}
+            {!flow && stageLabel && <span className="truncate text-[var(--fg-muted)]">{stageLabel}</span>}
+            {runtime && (
+              <span className="inline-flex items-center gap-[4px] shrink-0 text-[var(--fg-muted)]">
+                <Star size={12} strokeWidth={1.75} />
+                <span>{runtime}</span>
+              </span>
             )}
           </>
         )}
-      </span>
+      </div>
 
-      {/* Side: time + tokens */}
-      <span className="flex flex-col items-end gap-[3px] shrink-0" style={{ gridColumn: 3, gridRow: "1 / 3" }}>
-        <span className="font-[family-name:var(--font-mono-ui)] text-[10px] font-normal text-[var(--fg-faint)] tabular-nums">
-          {session.relativeTime}
-        </span>
-        {session.tokens && (
-          <span className="font-[family-name:var(--font-mono-ui)] text-[10px] font-medium text-[var(--fg)] tabular-nums">
-            {session.tokens}
-          </span>
-        )}
-      </span>
+      {/* Sparkline (24h activity, placeholder if absent). */}
+      <div className="mt-[6px] h-[12px]">
+        <Sparkline values={spark} color={lane.spark} active={isRunning} />
+      </div>
 
-      {/* Running row: 2px shimmer lane under the meta row */}
-      {isRunning && (
+      {/* Progress lane (always shown). */}
+      <div
+        aria-hidden
+        className="mt-[5px] relative overflow-hidden rounded-[2px]"
+        style={{ height: 3, background: lane.track }}
+      >
         <span
-          aria-hidden
-          className="relative overflow-hidden rounded-[2px]"
+          className="absolute top-0 left-0 h-full"
           style={{
-            gridColumn: "2 / 4",
-            gridRow: 3,
-            height: 2,
-            marginTop: 5,
-            background: "rgba(96,165,250,.1)",
+            width: `${progress * 100}%`,
+            background: lane.fill,
+            borderRadius: 2,
           }}
-        >
+        />
+        {lane.shimmer && (
           <span
-            className="absolute inset-0"
+            className="absolute inset-y-0"
             style={{
-              width: "40%",
-              background: "linear-gradient(90deg, transparent, var(--running), transparent)",
+              width: "30%",
+              left: 0,
+              background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)",
               animation: "slideRight 1.6s linear infinite",
             }}
           />
-        </span>
-      )}
+        )}
+      </div>
     </div>
   );
 }
