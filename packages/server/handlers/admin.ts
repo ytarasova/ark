@@ -31,7 +31,6 @@ export function registerAdminHandlers(router: Router, app: AppContext): void {
   const tenants = () => app.tenants;
   const teams = () => app.teams;
   const users = () => app.users;
-  const apiKeys = () => app.apiKeys;
 
   // ── Tenants ───────────────────────────────────────────────────────────
 
@@ -249,30 +248,7 @@ export function registerAdminHandlers(router: Router, app: AppContext): void {
     return { ok };
   });
 
-  // ── API keys ─────────────────────────────────────────────────────────
-  //
-  // Soft-delete (migration 006). The revoke path records the admin's
-  // user id in `deleted_by` so the audit trail captures who turned the
-  // key off. Tenant scoping is delegated to `ApiKeyManager.revoke` --
-  // callers with an explicit tenant_id cannot revoke across tenants.
-
-  router.handle("admin/apikey/list", async (p, _notify, ctx) => {
-    requireAdmin(ctx);
-    const { tenant_id, include_deleted } = extract<{ tenant_id: string; include_deleted?: boolean }>(p, ["tenant_id"]);
-    return { keys: await apiKeys().list(tenant_id, { includeDeleted: !!include_deleted }) };
-  });
-
-  router.handle("admin/apikey/delete", async (p, _notify, ctx) => {
-    requireAdmin(ctx);
-    const { id, tenant_id } = extract<{ id: string; tenant_id?: string }>(p, ["id"]);
-    const ok = await apiKeys().revoke(id, tenant_id, ctx.userId ?? null);
-    return { ok };
-  });
-
-  router.handle("admin/apikey/restore", async (p, _notify, ctx) => {
-    requireAdmin(ctx);
-    const { id, tenant_id } = extract<{ id: string; tenant_id?: string }>(p, ["id"]);
-    const ok = await apiKeys().restore(id, tenant_id);
-    return { ok };
-  });
+  // admin/apikey/* handlers live in handlers/admin-apikey.ts -- the single
+  // source of truth for API key CRUD + soft-delete. `register.ts` mounts it
+  // separately via `registerAdminApiKeyHandlers`.
 }

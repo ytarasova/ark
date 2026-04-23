@@ -122,7 +122,17 @@ function buildRecipe(name: string, body: Partial<RecipeDefinition>): RecipeDefin
 export function registerResourceCrudHandlers(router: Router, app: AppContext): void {
   // ── Agents ────────────────────────────────────────────────────────────
 
-  router.handle("agent/create", async (p) => {
+  // `resource-crud.ts` intentionally overrides the YAML-naive handlers
+  // registered earlier by `resource.ts`. `register.ts` orders the two so
+  // this file runs second, and the { override: true } flag keeps the
+  // Router's duplicate-registration assertion quiet. Agent/skill/recipe
+  // create + delete variants replace existing entries; the other methods
+  // (agent/edit, agent/copy, skill/create, recipe/create) are net-new
+  // and don't need the flag but it's safe to always pass -- simplifies
+  // reasoning at the register site.
+  const handle: typeof router.handle = (method, h) => router.handle(method, h, { override: true });
+
+  handle("agent/create", async (p) => {
     const params = extract<{ name: string; yaml?: string; scope?: Scope } & Partial<AgentDefinition>>(p, ["name"]);
     const name = requireName(params.name);
     const projectRoot = resolveProjectRoot();
@@ -154,7 +164,7 @@ export function registerResourceCrudHandlers(router: Router, app: AppContext): v
     return { ok: true, name: agent.name, scope: resolved };
   });
 
-  router.handle("agent/edit", async (p) => {
+  handle("agent/edit", async (p) => {
     const params = extract<{ name: string; yaml?: string; scope?: Scope } & Partial<AgentDefinition>>(p, ["name"]);
     const name = requireName(params.name);
     const projectRoot = resolveProjectRoot();
@@ -188,7 +198,7 @@ export function registerResourceCrudHandlers(router: Router, app: AppContext): v
     return { ok: true, name: merged.name, scope: resolved };
   });
 
-  router.handle("agent/delete", async (p) => {
+  handle("agent/delete", async (p) => {
     const { name, scope } = extract<{ name: string; scope?: Scope }>(p, ["name"]);
     const resolvedName = requireName(name);
     const projectRoot = resolveProjectRoot();
@@ -200,7 +210,7 @@ export function registerResourceCrudHandlers(router: Router, app: AppContext): v
     return { ok };
   });
 
-  router.handle("agent/copy", async (p) => {
+  handle("agent/copy", async (p) => {
     const { from, to, scope } = extract<{ from: string; to: string; scope?: Scope }>(p, ["from", "to"]);
     const fromName = requireName(from);
     const toName = requireName(to);
@@ -224,7 +234,7 @@ export function registerResourceCrudHandlers(router: Router, app: AppContext): v
 
   // ── Skills ────────────────────────────────────────────────────────────
 
-  router.handle("skill/create", async (p) => {
+  handle("skill/create", async (p) => {
     const params = extract<{ name: string; yaml?: string; scope?: Scope } & Partial<SkillDefinition>>(p, ["name"]);
     const name = requireName(params.name);
     const projectRoot = resolveProjectRoot();
@@ -254,7 +264,7 @@ export function registerResourceCrudHandlers(router: Router, app: AppContext): v
     return { ok: true, name: skill.name, scope: resolved };
   });
 
-  router.handle("skill/delete", async (p) => {
+  handle("skill/delete", async (p) => {
     const { name, scope } = extract<{ name: string; scope?: Scope }>(p, ["name"]);
     const resolvedName = requireName(name);
     const projectRoot = resolveProjectRoot();
@@ -268,7 +278,7 @@ export function registerResourceCrudHandlers(router: Router, app: AppContext): v
 
   // ── Recipes ───────────────────────────────────────────────────────────
 
-  router.handle("recipe/create", async (p) => {
+  handle("recipe/create", async (p) => {
     const params = extract<{ name: string; yaml?: string; scope?: Scope } & Partial<RecipeDefinition>>(p, ["name"]);
     const name = requireName(params.name);
     const projectRoot = resolveProjectRoot();
@@ -302,7 +312,7 @@ export function registerResourceCrudHandlers(router: Router, app: AppContext): v
     return { ok: true, name: recipe.name, scope: resolved };
   });
 
-  router.handle("recipe/delete", async (p) => {
+  handle("recipe/delete", async (p) => {
     const { name, scope } = extract<{ name: string; scope?: Scope }>(p, ["name"]);
     const resolvedName = requireName(name);
     const projectRoot = resolveProjectRoot();

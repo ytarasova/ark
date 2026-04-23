@@ -65,4 +65,19 @@ describe("Router", async () => {
     const res2 = await router.dispatch(req2);
     expect((res2 as JsonRpcResponse).result).toEqual({ ok: true });
   });
+
+  it("rejects duplicate handler registration", () => {
+    router.handle("dup/method", async () => ({ a: 1 }));
+    // Second registration without override flag throws -- the safety net
+    // that caught the admin/apikey/list double-registration bug.
+    expect(() => router.handle("dup/method", async () => ({ a: 2 }))).toThrow(/duplicate/i);
+  });
+
+  it("allows duplicate registration with { override: true }", async () => {
+    router.handle("dup2/method", async () => ({ value: "first" }));
+    router.handle("dup2/method", async () => ({ value: "second" }), { override: true });
+
+    const res = await router.dispatch(createRequest(1, "dup2/method", {}));
+    expect((res as JsonRpcResponse).result).toEqual({ value: "second" });
+  });
 });

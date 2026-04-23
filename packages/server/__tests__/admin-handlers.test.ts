@@ -10,6 +10,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test"
 import { AppContext } from "../../core/app.js";
 import { Router } from "../router.js";
 import { registerAdminHandlers } from "../handlers/admin.js";
+import { registerAdminApiKeyHandlers } from "../handlers/admin-apikey.js";
 import { createRequest, ErrorCodes, type JsonRpcError, type JsonRpcResponse } from "../../protocol/types.js";
 import { anonymousContext, localAdminContext, type TenantContext } from "../../core/auth/context.js";
 
@@ -28,6 +29,10 @@ afterAll(async () => {
 beforeEach(() => {
   router = new Router();
   registerAdminHandlers(router, app);
+  // admin/apikey/* lives in its own module now (consolidation of the
+  // previously-split handlers). Register it here too so the existing
+  // apikey gate tests keep exercising the full surface.
+  registerAdminApiKeyHandlers(router, app);
 });
 
 function dispatchAs(method: string, params: Record<string, unknown>, ctx: TenantContext) {

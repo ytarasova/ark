@@ -40,7 +40,24 @@ export class Router {
    */
   broadcast: NotifyFn = () => {};
 
-  handle(method: string, handler: Handler): void {
+  /**
+   * Register a handler for `method`. Throws if another handler is already
+   * registered for the same name -- the old silent-overwrite behavior
+   * hid a real consolidation bug where admin.ts + admin-apikey.ts both
+   * registered `admin/apikey/list`, with the latter winning and dropping
+   * the former's `include_deleted` parameter.
+   *
+   * Pass `{ override: true }` when the replacement is intentional (e.g.
+   * tests swapping a handler body, or a migration period where two
+   * registries both ship the same method).
+   */
+  handle(method: string, handler: Handler, opts?: { override?: boolean }): void {
+    if (this.handlers.has(method) && !opts?.override) {
+      throw new Error(
+        `Router: duplicate handler registration for '${method}'. ` +
+          `Pass { override: true } if the replacement is intentional.`,
+      );
+    }
     this.handlers.set(method, handler);
   }
 
