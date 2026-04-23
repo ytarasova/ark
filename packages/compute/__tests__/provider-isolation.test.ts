@@ -2,8 +2,8 @@
  * E2E tests for provider isolation modes.
  *
  * Validates that each provider reports the correct isolation modes:
- * - LocalProvider: worktree + inplace
- * - DockerProvider: container only
+ * - LocalWorktreeProvider: worktree + inplace
+ * - LocalDockerProvider: container only
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
@@ -24,7 +24,7 @@ afterEach(async () => {
 });
 
 describe("provider isolation modes", async () => {
-  it("LocalProvider has worktree and inplace modes", () => {
+  it("LocalWorktreeProvider has worktree and inplace modes", () => {
     const provider = app.getProvider("local");
     expect(provider).not.toBeNull();
 
@@ -36,21 +36,21 @@ describe("provider isolation modes", async () => {
     expect(values).toContain("inplace");
   });
 
-  it("LocalProvider worktree mode has correct label", () => {
+  it("LocalWorktreeProvider worktree mode has correct label", () => {
     const provider = app.getProvider("local")!;
     const worktree = provider.isolationModes.find((m) => m.value === "worktree");
     expect(worktree).toBeTruthy();
     expect(worktree!.label).toContain("worktree");
   });
 
-  it("LocalProvider inplace mode has correct label", () => {
+  it("LocalWorktreeProvider inplace mode has correct label", () => {
     const provider = app.getProvider("local")!;
     const inplace = provider.isolationModes.find((m) => m.value === "inplace");
     expect(inplace).toBeTruthy();
     expect(inplace!.label).toContain("direct");
   });
 
-  it("DockerProvider has container mode only", () => {
+  it("LocalDockerProvider has container mode only", () => {
     const provider = app.getProvider("docker");
     expect(provider).not.toBeNull();
 
@@ -59,7 +59,7 @@ describe("provider isolation modes", async () => {
     expect(modes[0].value).toBe("container");
   });
 
-  it("DockerProvider container mode has correct label", () => {
+  it("LocalDockerProvider container mode has correct label", () => {
     const provider = app.getProvider("docker")!;
     const container = provider.isolationModes[0];
     expect(container.label).toContain("Docker");

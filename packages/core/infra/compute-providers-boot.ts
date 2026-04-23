@@ -18,7 +18,7 @@ export class ComputeProvidersBoot {
       const compute = await import("../../compute/index.js");
       compute.setComputeApp(this.app);
       const providers = [
-        new compute.LocalProvider(),
+        new compute.LocalWorktreeProvider(),
         new compute.LocalDockerProvider(),
         new compute.LocalDevcontainerProvider(),
         new compute.LocalFirecrackerProvider(),

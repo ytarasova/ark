@@ -16,7 +16,7 @@ import {
   listProviders,
   resolvePortDecls,
   registerProvider,
-  LocalProvider,
+  LocalWorktreeProvider,
   LocalDockerProvider,
 } from "../index.js";
 
@@ -41,7 +41,7 @@ afterAll(async () => {
 // Ensure providers are registered (may be cleared by provider-registry.test.ts)
 function ensureProviders() {
   if (!getProvider("local")) {
-    const lp = new LocalProvider();
+    const lp = new LocalWorktreeProvider();
     lp.setApp?.(app);
     registerProvider(lp);
   }

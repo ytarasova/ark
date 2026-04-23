@@ -425,9 +425,9 @@ export class ArkServer {
    * tears the fifo + pipe-pane down.
    *
    * Works uniformly for local, ec2, k8s, firecracker -- any provider with a
-   * running arkd. Sessions backed by the legacy non-arkd LocalProvider fall
-   * back to DEFAULT_ARKD_URL (the local daemon on :19300) since that's where
-   * the tmux pane lives in single-host mode.
+   * running arkd. Sessions without an explicit arkd URL fall back to
+   * DEFAULT_ARKD_URL (the local daemon on :19300) since that's where the
+   * tmux pane lives in single-host mode.
    */
   private async startTerminalBridgeArkd(
     app: import("../core/app.js").AppContext,
