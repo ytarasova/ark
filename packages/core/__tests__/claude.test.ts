@@ -254,9 +254,9 @@ describe("writeChannelConfig", () => {
 
   it("also writes mcp.json to tracks dir", () => {
     const workdir = getCtx().arkDir;
-    writeChannelConfig("s-abc123", "work", 19300, workdir, { tracksDir: getApp().config.tracksDir });
+    writeChannelConfig("s-abc123", "work", 19300, workdir, { tracksDir: getApp().config.dirs.tracks });
 
-    const tracksFile = join(getApp().config.tracksDir, "s-abc123", "mcp.json");
+    const tracksFile = join(getApp().config.dirs.tracks, "s-abc123", "mcp.json");
     expect(existsSync(tracksFile)).toBe(true);
     const content = JSON.parse(readFileSync(tracksFile, "utf-8"));
     expect(content.mcpServers["ark-channel"]).toBeDefined();

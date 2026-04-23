@@ -23,10 +23,10 @@ describe("AppContext", async () => {
   it("creates directories on boot", async () => {
     app = await AppContext.forTestAsync();
     await app.boot();
-    expect(existsSync(app.config.arkDir)).toBe(true);
-    expect(existsSync(app.config.tracksDir)).toBe(true);
-    expect(existsSync(app.config.worktreesDir)).toBe(true);
-    expect(existsSync(app.config.logDir)).toBe(true);
+    expect(existsSync(app.config.dirs.ark)).toBe(true);
+    expect(existsSync(app.config.dirs.tracks)).toBe(true);
+    expect(existsSync(app.config.dirs.worktrees)).toBe(true);
+    expect(existsSync(app.config.dirs.logs)).toBe(true);
   });
 
   it("initializes database with schema on boot", async () => {
@@ -71,7 +71,7 @@ describe("AppContext", async () => {
   it("forTest cleans up temp dir on shutdown", async () => {
     app = await AppContext.forTestAsync();
     await app.boot();
-    const dir = app.config.arkDir;
+    const dir = app.config.dirs.ark;
     expect(existsSync(dir)).toBe(true);
     await app.shutdown();
     expect(existsSync(dir)).toBe(false);

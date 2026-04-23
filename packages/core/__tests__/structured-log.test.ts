@@ -28,12 +28,12 @@ describe("structured logging", () => {
   beforeEach(() => {
     setLogLevel("debug");
     setLogComponents(null);
-    clearLog(getApp().config.arkDir);
+    clearLog(getApp().config.dirs.ark);
   });
 
   it("writes JSONL entries", () => {
     logInfo("session", "test message", { key: "value" });
-    const entries = readLogEntries(getApp().config.arkDir);
+    const entries = readLogEntries(getApp().config.dirs.ark);
     expect(entries.length).toBeGreaterThan(0);
     const last = entries[entries.length - 1];
     expect(last.level).toBe("info");
@@ -46,7 +46,7 @@ describe("structured logging", () => {
     setLogLevel("error");
     logInfo("general", "should not appear");
     logError("general", "should appear");
-    const entries = readLogEntries(getApp().config.arkDir);
+    const entries = readLogEntries(getApp().config.dirs.ark);
     // Only error-level entries should be written
     expect(entries.length).toBeGreaterThan(0);
     expect(entries.every((e) => e.level === "error")).toBe(true);
@@ -56,7 +56,7 @@ describe("structured logging", () => {
     setLogComponents(["mcp"]);
     logInfo("session", "filtered out");
     logInfo("mcp", "allowed");
-    const entries = readLogEntries(getApp().config.arkDir);
+    const entries = readLogEntries(getApp().config.dirs.ark);
     // Only mcp component entries should be written
     expect(entries.length).toBeGreaterThan(0);
     expect(entries.every((e) => e.component === "mcp")).toBe(true);
@@ -64,7 +64,7 @@ describe("structured logging", () => {
 
   it("entries have timestamps", () => {
     logInfo("general", "timed");
-    const entries = readLogEntries(getApp().config.arkDir);
+    const entries = readLogEntries(getApp().config.dirs.ark);
     expect(entries.length).toBeGreaterThan(0);
     const last = entries[entries.length - 1];
     expect(new Date(last.timestamp).getTime()).toBeGreaterThan(0);

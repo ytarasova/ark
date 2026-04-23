@@ -60,7 +60,7 @@ export const agentSdkExecutor: Executor = {
     // Ensure session directory exists early so the log tee can write to stdio.log
     // before pipeToFile is wired up. We recreate it after worktree setup too, but
     // we need it now to wire the log() tee correctly.
-    const sessionDir = join(app.config.tracksDir, session.id);
+    const sessionDir = join(app.config.dirs.tracks, session.id);
     mkdirSync(sessionDir, { recursive: true });
     const stdioPath = join(sessionDir, "stdio.log");
 

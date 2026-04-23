@@ -175,7 +175,6 @@ describe("loadConfig precedence", () => {
     process.env.ARK_CONDUCTOR_PORT = "29100";
     const cfg = loadConfig({ profile: "local" });
     expect(cfg.ports.conductor).toBe(29100);
-    expect(cfg.conductorPort).toBe(29100); // legacy mirror also updated
   });
 
   it("YAML file wins over profile default but loses to env", () => {
@@ -199,9 +198,8 @@ describe("loadConfig precedence", () => {
     writeFileSync(join(dir, "config.yaml"), "ports:\n  conductor: 39100\n");
     process.env.ARK_DIR = dir;
     process.env.ARK_CONDUCTOR_PORT = "49100";
-    const cfg = loadConfig({ profile: "local", conductorPort: 59100 });
+    const cfg = loadConfig({ profile: "local", ports: { conductor: 59100 } as any });
     expect(cfg.ports.conductor).toBe(59100);
-    expect(cfg.conductorPort).toBe(59100);
   });
 
   it("YAML profile overlay merges on top of top-level keys", () => {
@@ -299,7 +297,7 @@ describe("loadAppConfig (async)", async () => {
   });
 
   it("programmatic overrides still beat auto-allocated test ports", async () => {
-    const cfg = await loadAppConfig({ profile: "test", conductorPort: 12345 });
+    const cfg = await loadAppConfig({ profile: "test", ports: { conductor: 12345 } as any });
     expect(cfg.ports.conductor).toBe(12345);
     tempDirsToCleanup.push(cfg.dirs.ark);
   });
@@ -318,21 +316,5 @@ describe("allocatePort", async () => {
       expect(p).toBeGreaterThan(1024);
       expect(p).toBeLessThan(65536);
     }
-  });
-});
-
-// ── Nested accessor parity ───────────────────────────────────────────────
-
-describe("legacy flat <-> nested parity", () => {
-  it("ports.conductor === conductorPort; dirs.ark === arkDir", () => {
-    process.env.ARK_DIR = scratchDir();
-    process.env.ARK_CONDUCTOR_PORT = "19100";
-    const cfg = loadConfig({ profile: "local" });
-    expect(cfg.ports.conductor).toBe(cfg.conductorPort);
-    expect(cfg.dirs.ark).toBe(cfg.arkDir);
-    expect(cfg.ports.arkd).toBe(cfg.arkdPort);
-    expect(cfg.dirs.tracks).toBe(cfg.tracksDir);
-    expect(cfg.dirs.worktrees).toBe(cfg.worktreesDir);
-    expect(cfg.dirs.logs).toBe(cfg.logDir);
   });
 });

@@ -165,7 +165,7 @@ describe("rebaseOntoBase", async () => {
     await app.sessions.update(session.id, { branch: "ark-s-wt01" });
 
     // Create a worktree directory at the expected path
-    const wtDir = join(app.config.worktreesDir, session.id);
+    const wtDir = join(app.config.dirs.worktrees, session.id);
     execFileSync("git", ["-C", work, "worktree", "add", wtDir, "-b", "ark-s-wt01"], {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],

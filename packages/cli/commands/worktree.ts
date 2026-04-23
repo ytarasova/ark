@@ -81,7 +81,7 @@ export function registerWorktreeCommands(program: Command) {
       const app = await getInProcessApp();
       const sessions = await ark.sessionList({ limit: 500 });
       const withWorktrees = sessions.filter((s) => {
-        const wtDir = join(app.config.worktreesDir, s.id);
+        const wtDir = join(app.config.dirs.worktrees, s.id);
         return existsSync(wtDir);
       });
 

@@ -71,7 +71,7 @@ export const claudeCodeExecutor: Executor = {
     const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, {
       conductorUrl,
       channelConfig,
-      tracksDir: app.config.tracksDir,
+      tracksDir: app.config.dirs.tracks,
       originalRepoDir,
       runtimeMcpServers,
       mcpConfigsDir: resolveMcpConfigsDir(),
@@ -114,7 +114,7 @@ export const claudeCodeExecutor: Executor = {
     // watches this same path. For remote compute the path refers to the
     // compute target filesystem; provider-specific remapping is out of
     // scope here and falls back to the launcher's /tmp default.
-    const localSessionDir = join(app.config.tracksDir, session.id);
+    const localSessionDir = join(app.config.dirs.tracks, session.id);
     const launchEnv: Record<string, string> = {
       ...(opts.agent.env ?? {}),
       ...(provider?.buildLaunchEnv(session) ?? {}),
@@ -136,10 +136,10 @@ export const claudeCodeExecutor: Executor = {
       initialPrompt: opts.initialPrompt,
     });
 
-    const launcher = tmux.writeLauncher(session.id, launchContent, app.config.tracksDir);
+    const launcher = tmux.writeLauncher(session.id, launchContent, app.config.dirs.tracks);
 
     // Save task for reference
-    const sessionDir = join(app.config.tracksDir, session.id);
+    const sessionDir = join(app.config.dirs.tracks, session.id);
     mkdirSync(sessionDir, { recursive: true });
     writeFileSync(join(sessionDir, "task.txt"), opts.task);
 
@@ -181,13 +181,13 @@ export const claudeCodeExecutor: Executor = {
     // reflows. pty_cols / pty_rows stay NULL until that first resize.
     // See packages/server/index.ts for the /terminal/:sessionId proxy.
     await tmux.createSessionAsync(tmuxName, `bash ${launcher}`, {
-      arkDir: app.config.arkDir,
+      arkDir: app.config.dirs.ark,
     });
     const rootPid = await tmux.getPanePidAsync(tmuxName);
 
     // Start recording terminal output for post-session replay
-    const recPath = recordingPath(app.config.arkDir, session.id);
-    mkdirSync(join(app.config.arkDir, "recordings"), { recursive: true });
+    const recPath = recordingPath(app.config.dirs.ark, session.id);
+    mkdirSync(join(app.config.dirs.ark, "recordings"), { recursive: true });
     await tmux.pipePaneAsync(tmuxName, recPath);
 
     claude.autoAcceptChannelPrompt(tmuxName);

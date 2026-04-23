@@ -108,7 +108,7 @@ export function registerRepositories(container: AppContainer): void {
  *   - Hosted (Postgres URL): DB-backed stores with tenant scoping.
  *
  * The factories receive `AppMode` from the cradle rather than re-sniffing
- * `config.databaseUrl` themselves -- that decision is made exactly once
+ * `config.database.url` themselves -- that decision is made exactly once
  * in `buildAppMode` and everyone downstream reads `mode.kind`.
  */
 export function registerResourceStores(container: AppContainer): void {
@@ -150,7 +150,7 @@ function makeFlowStore(db: DatabaseAdapter, config: ArkConfig, mode: AppMode) {
   return new EphemeralFlowStore(
     new FileFlowStore({
       builtinDir: join(resolveStoreBaseDir(), "flows", "definitions"),
-      userDir: join(config.arkDir, "flows"),
+      userDir: join(config.dirs.ark, "flows"),
     }),
   );
 }
@@ -162,7 +162,7 @@ function makeSkillStore(db: DatabaseAdapter, config: ArkConfig, mode: AppMode) {
   }
   return new FileSkillStore({
     builtinDir: join(resolveStoreBaseDir(), "skills"),
-    userDir: join(config.arkDir, "skills"),
+    userDir: join(config.dirs.ark, "skills"),
   });
 }
 
@@ -189,7 +189,7 @@ function makeAgentStore(db: DatabaseAdapter, config: ArkConfig, mode: AppMode, m
   }
   return new FileAgentStore({
     builtinDir: join(resolveStoreBaseDir(), "agents"),
-    userDir: join(config.arkDir, "agents"),
+    userDir: join(config.dirs.ark, "agents"),
   });
 }
 
@@ -200,7 +200,7 @@ function makeRecipeStore(db: DatabaseAdapter, config: ArkConfig, mode: AppMode) 
   }
   return new FileRecipeStore({
     builtinDir: join(resolveStoreBaseDir(), "recipes"),
-    userDir: join(config.arkDir, "recipes"),
+    userDir: join(config.dirs.ark, "recipes"),
   });
 }
 
@@ -211,7 +211,7 @@ function makeRuntimeStore(db: DatabaseAdapter, config: ArkConfig, mode: AppMode)
   }
   return new FileRuntimeStore({
     builtinDir: join(resolveStoreBaseDir(), "runtimes"),
-    userDir: join(config.arkDir, "runtimes"),
+    userDir: join(config.dirs.ark, "runtimes"),
   });
 }
 

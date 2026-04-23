@@ -42,7 +42,7 @@ test("cleanupSession removes the worktree and emits session_cleaned", async () =
   } as any);
 
   // Simulate a worktree directory at the canonical location.
-  const worktreeDir = join(app.config.worktreesDir, session.id);
+  const worktreeDir = join(app.config.dirs.worktrees, session.id);
   mkdirSync(worktreeDir, { recursive: true });
   writeFileSync(join(worktreeDir, "README.md"), "test file");
   expect(existsSync(worktreeDir)).toBe(true);
@@ -67,7 +67,7 @@ test("cleanupSession is idempotent (second call is a no-op)", async () => {
     status: "completed",
   } as any);
 
-  const worktreeDir = join(app.config.worktreesDir, session.id);
+  const worktreeDir = join(app.config.dirs.worktrees, session.id);
   mkdirSync(worktreeDir, { recursive: true });
 
   const freshSession = (await app.sessions.get(session.id))!;
@@ -91,7 +91,7 @@ test("cleanupSession survives a missing worktree", async () => {
   } as any);
 
   // Do NOT create a worktree dir -- it doesn't exist.
-  const worktreeDir = join(app.config.worktreesDir, session.id);
+  const worktreeDir = join(app.config.dirs.worktrees, session.id);
   expect(existsSync(worktreeDir)).toBe(false);
 
   const freshSession = (await app.sessions.get(session.id))!;

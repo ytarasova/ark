@@ -17,7 +17,7 @@ import {
   resolvePortDecls,
   registerProvider,
   LocalProvider,
-  DockerProvider,
+  LocalDockerProvider,
 } from "../index.js";
 
 import { AppContext } from "../../core/app.js";
@@ -45,7 +45,7 @@ function ensureProviders() {
     registerProvider(lp);
   }
   if (!getProvider("docker")) {
-    const dp = new DockerProvider();
+    const dp = new LocalDockerProvider();
     dp.setApp?.(app);
     registerProvider(dp);
   }

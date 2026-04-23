@@ -599,7 +599,7 @@ export class CoreDispatcher {
     const remoteUrl = session.config.remoteRepo as string;
     log(`Cloning remote repo: ${remoteUrl}`);
     try {
-      const tmpDir = join(this.deps.config.arkDir, "worktrees", sessionId);
+      const tmpDir = join(this.deps.config.dirs.ark, "worktrees", sessionId);
       mkdirSync(tmpDir, { recursive: true });
       await execFileAsync("git", ["clone", "--depth", "1", remoteUrl, tmpDir], { timeout: 120_000 });
       await this.deps.sessions.update(sessionId, { workdir: tmpDir });

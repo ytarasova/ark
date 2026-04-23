@@ -140,24 +140,3 @@ export interface CreateComputeOpts {
   /** Mark this row as cloned from the named template (set by the dispatcher). */
   cloned_from?: string;
 }
-
-/**
- * A reusable compute configuration preset.
- * Stored in config.yaml (local) or DB (control plane).
- *
- * @deprecated Prefer `Compute` with `is_template: true`. The two types now
- * back onto the same `compute` table; this interface is retained so callers
- * that haven't migrated still compile.
- */
-export interface ComputeTemplate {
-  /** Unique template name (e.g. "gpu-large", "sandbox", "quick"). */
-  name: string;
-  /** Human-readable description. */
-  description?: string;
-  /** Target provider. */
-  provider: ComputeProviderName;
-  /** Provider-specific config defaults. */
-  config: Partial<ComputeConfig>;
-  /** Tenant that owns this template (control plane only). */
-  tenant_id?: string;
-}

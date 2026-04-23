@@ -279,7 +279,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   router.handle("session/recording", async (params, _notify) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
     const { readRecording } = await import("../../core/recordings.js");
-    const output = readRecording(app.config.arkDir, sessionId);
+    const output = readRecording(app.config.dirs.ark, sessionId);
     return { ok: output !== null, output };
   });
 
@@ -415,7 +415,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     // into the prompt queue as the correction message for the next turn.
     const executorName = (s.config as Record<string, unknown> | null)?.launch_executor as string | undefined;
     if (executorName === "agent-sdk") {
-      const sessionDir = join(app.config.tracksDir, sessionId);
+      const sessionDir = join(app.config.dirs.tracks, sessionId);
       const interventionPath = join(sessionDir, "interventions.jsonl");
       await fsPromises.mkdir(sessionDir, { recursive: true });
       const line = JSON.stringify({ role: "user", content, control: "interrupt", ts: Date.now() }) + "\n";
@@ -681,7 +681,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
       return { ok: false, message: `session not running (status=${s.status})` };
     }
 
-    const sessionDir = join(app.config.tracksDir, sessionId);
+    const sessionDir = join(app.config.dirs.tracks, sessionId);
     const interventionPath = join(sessionDir, "interventions.jsonl");
     const line = JSON.stringify({ role: "user", content, ts: Date.now() }) + "\n";
 

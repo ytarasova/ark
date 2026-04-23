@@ -12,7 +12,7 @@ import { getApp } from "./test-helpers.js";
 
 const { getCtx } = withTestContext();
 
-const agentDir = () => join(getApp().config.arkDir, "agents");
+const agentDir = () => join(getApp().config.dirs.ark, "agents");
 
 function writeAgentYaml(name: string, data: Record<string, unknown>) {
   mkdirSync(agentDir(), { recursive: true });

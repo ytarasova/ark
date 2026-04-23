@@ -29,7 +29,7 @@ export async function getOutput(
   // For completed/stopped sessions (or when live capture returns empty),
   // fall back to the recorded terminal output file.
   const { readRecording } = await import("../recordings.js");
-  return readRecording(app.config.arkDir, sessionId) ?? "";
+  return readRecording(app.config.dirs.ark, sessionId) ?? "";
 }
 
 export async function send(

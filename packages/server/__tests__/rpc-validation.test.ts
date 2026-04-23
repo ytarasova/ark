@@ -478,7 +478,7 @@ const fixtures: Record<string, MethodFixture> = {
   "config/get": {
     validRequest: {},
     invalidRequest: [] as unknown as Record<string, unknown>,
-    sampleResponse: { hotkeys: {}, theme: {}, profile: {}, mode: "local", hosted: false },
+    sampleResponse: { hotkeys: {}, theme: {}, profile: {}, mode: "local" },
   },
   "profile/list": {
     validRequest: {},

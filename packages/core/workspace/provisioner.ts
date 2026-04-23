@@ -52,7 +52,7 @@ const execFileAsync = promisify(execFile);
  * One leaf per session: `<arkDir>/workspaces/<session_id>/`.
  */
 export function workspacesRootDir(app: AppContext): string {
-  return join(app.config.arkDir, "workspaces");
+  return join(app.config.dirs.ark, "workspaces");
 }
 
 /** The absolute path for a single workspace-scoped session workdir. */

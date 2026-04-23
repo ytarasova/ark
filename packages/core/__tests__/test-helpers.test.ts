@@ -13,16 +13,16 @@ describe("withTestContext", () => {
 
   it("creates isolated test context with unique paths", () => {
     const app = getCtx();
-    expect(app.config.arkDir).toContain("ark-test-");
+    expect(app.config.dirs.ark).toContain("ark-test-");
     expect(app.config.dbPath).toContain("ark-test-");
-    expect(app.config.tracksDir).toContain("tracks");
-    expect(app.config.worktreesDir).toContain("worktrees");
+    expect(app.config.dirs.tracks).toContain("tracks");
+    expect(app.config.dirs.worktrees).toContain("worktrees");
   });
 
   it("sets context as the active global context", () => {
     const app = getCtx();
     const active = getApp();
-    expect(active.config.arkDir).toBe(app.config.arkDir);
+    expect(active.config.dirs.ark).toBe(app.config.dirs.ark);
     expect(active.config.dbPath).toBe(app.config.dbPath);
   });
 
@@ -37,7 +37,7 @@ describe("withTestContext", () => {
     // will get different paths due to beforeEach recreation.
     // We verify the context is valid and unique per-run.
     const app = getCtx();
-    expect(app.config.arkDir).toBeTruthy();
+    expect(app.config.dirs.ark).toBeTruthy();
   });
 });
 

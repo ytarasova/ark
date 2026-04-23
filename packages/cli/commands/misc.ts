@@ -233,7 +233,7 @@ export function registerMiscCommands(program: Command) {
     .option("--path", "Just print the config path")
     .action(async (opts) => {
       const app = await getInProcessApp();
-      const configPath = join(app.config.arkDir, "config.yaml");
+      const configPath = join(app.config.dirs.ark, "config.yaml");
 
       // Create default config if missing
       if (!existsSync(configPath)) {

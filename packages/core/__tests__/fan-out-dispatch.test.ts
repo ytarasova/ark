@@ -28,7 +28,7 @@ describe("extractSubtasks", async () => {
     const app = getApp();
     const session = await app.sessions.create({ summary: "Big feature", flow: "bare" });
 
-    const wtDir = join(app.config.worktreesDir, session.id);
+    const wtDir = join(app.config.dirs.worktrees, session.id);
     mkdirSync(wtDir, { recursive: true });
     writeFileSync(
       join(wtDir, "PLAN.md"),
@@ -60,7 +60,7 @@ describe("extractSubtasks", async () => {
     const app = getApp();
     const session = await app.sessions.create({ summary: "Simple fix", flow: "bare" });
 
-    const wtDir = join(app.config.worktreesDir, session.id);
+    const wtDir = join(app.config.dirs.worktrees, session.id);
     mkdirSync(wtDir, { recursive: true });
     writeFileSync(join(wtDir, "PLAN.md"), "# Plan\n\n## Step 1: Fix the bug\nJust do it.\n");
 
@@ -81,7 +81,7 @@ describe("extractSubtasks", async () => {
     const app = getApp();
     const session = await app.sessions.create({ summary: "Feature", flow: "bare" });
 
-    const wtDir = join(app.config.worktreesDir, session.id);
+    const wtDir = join(app.config.dirs.worktrees, session.id);
     mkdirSync(wtDir, { recursive: true });
     writeFileSync(
       join(wtDir, "PLAN.md"),

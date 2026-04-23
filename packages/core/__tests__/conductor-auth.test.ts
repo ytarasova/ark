@@ -24,7 +24,7 @@
  *     - `GET /health` continues to work unauthenticated.
  *
  * The tests simulate hosted mode (auth required) by setting
- * `config.databaseUrl = "sqlite://local"` -- the conductor reads this as
+ * `config.database.url = "sqlite://local"` -- the conductor reads this as
  * "not local single-tenant" and denies unauthenticated calls. A real
  * hosted deployment would use a Postgres URL; the conductor only checks
  * that the field is truthy.

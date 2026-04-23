@@ -269,7 +269,7 @@ export function buildLocalAppMode(app?: AppContext, database?: DatabaseMode): Ap
   // Default to the user's home when no AppContext is available (bare
   // AppMode construction used by a few tests). The first real mutation
   // creates the directory, so this is safe to derive up front.
-  const arkDir = app?.config?.arkDir ?? `${process.env.HOME ?? "."}/.ark`;
+  const arkDir = app?.config?.dirs?.ark ?? `${process.env.HOME ?? "."}/.ark`;
   const secretsCfg = app?.config?.secrets;
   const secrets: SecretsCapability =
     secretsCfg?.backend === "aws"

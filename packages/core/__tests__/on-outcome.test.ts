@@ -30,7 +30,7 @@ afterAll(async () => {
 
 /** Write a YAML flow definition to the user flows directory. */
 function writeFlow(name: string, def: Record<string, unknown>): void {
-  const dir = join(app.config.arkDir, "flows");
+  const dir = join(app.config.dirs.ark, "flows");
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, `${name}.yaml`), YAML.stringify(def));
 }

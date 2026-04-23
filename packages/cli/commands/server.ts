@@ -35,9 +35,9 @@ export function registerServerCommands(program: Command) {
 
         console.log(chalk.green("Ark control plane running"));
         console.log(chalk.dim(`  Web UI:     http://localhost:${webPort}`));
-        console.log(chalk.dim(`  Conductor:  http://localhost:${config.conductorPort}`));
+        console.log(chalk.dim(`  Conductor:  http://localhost:${config.ports.conductor}`));
         if (config.redisUrl) console.log(chalk.dim(`  Redis:      ${config.redisUrl}`));
-        if (config.databaseUrl) console.log(chalk.dim(`  Database:   ${config.databaseUrl}`));
+        if (config.database.url) console.log(chalk.dim(`  Database:   ${config.database.url}`));
         console.log(chalk.dim("Press Ctrl+C to stop"));
 
         process.on("SIGINT", async () => {

@@ -78,7 +78,7 @@ export interface StageDefinition {
    * - `compute`: name of an existing compute target (ref). The stage
    *   dispatches onto that target as-is. Best for shared, long-lived
    *   targets (`local`, `ec2`).
-   * - `compute_template`: name of a `ComputeTemplate`. The dispatcher
+   * - `compute_template`: name of a template compute row (is_template=true). The dispatcher
    *   provisions a fresh compute row from the template if one doesn't
    *   already exist with that name. For template-lifecycle kinds
    *   (k8s, docker, firecracker, ...) the row is auto-cleaned when no

@@ -22,7 +22,7 @@ beforeAll(async () => {
 
   // Materialise a minimal sage analysis fixture the handler can fetch via
   // file:// -- the in-memory analysis has one plan stream with two tasks.
-  const fixtureDir = join(app.config.arkDir, "fixtures");
+  const fixtureDir = join(app.config.dirs.ark, "fixtures");
   mkdirSync(fixtureDir, { recursive: true });
   fixturePath = join(fixtureDir, "TEST-1.json");
   const analysis = {

@@ -116,7 +116,7 @@ export class LocalWorktreeProvider extends LocalArkdBase {
   }
 
   async cleanupSession(_compute: Compute, session: Session): Promise<void> {
-    const wtPath = join(this.app.config.worktreesDir, session.id);
+    const wtPath = join(this.app.config.dirs.worktrees, session.id);
     if (!existsSync(wtPath)) return;
 
     const repo = session.workdir ?? session.repo;

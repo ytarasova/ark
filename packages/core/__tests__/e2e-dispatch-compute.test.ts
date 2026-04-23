@@ -44,7 +44,7 @@ afterAll(async () => {
 describe("dispatch compute: worktree creation", async () => {
   it("creates worktree for local compute with a git repo", async () => {
     // Create a bare git repo to serve as the session workdir
-    const repoDir = join(app.config.arkDir, "test-repo");
+    const repoDir = join(app.config.dirs.ark, "test-repo");
     mkdirSync(repoDir, { recursive: true });
     execFileSync("git", ["init", repoDir], { stdio: "pipe" });
     // Create an initial commit so the worktree can branch
@@ -84,7 +84,7 @@ describe("dispatch compute: worktree creation", async () => {
   });
 
   it("does NOT create worktree when config.worktree === false", async () => {
-    const repoDir = join(app.config.arkDir, "test-repo-no-wt");
+    const repoDir = join(app.config.dirs.ark, "test-repo-no-wt");
     mkdirSync(repoDir, { recursive: true });
     execFileSync("git", ["init", repoDir], { stdio: "pipe" });
     execFileSync("git", ["-C", repoDir, "commit", "--allow-empty", "-m", "init"], { stdio: "pipe" });
@@ -110,7 +110,7 @@ describe("dispatch compute: worktree creation", async () => {
 
 describe("dispatch compute: config file writing", () => {
   it("writes .claude/settings.local.json (hooks config) to the working directory", async () => {
-    const workdir = join(app.config.arkDir, "workdir-hooks");
+    const workdir = join(app.config.dirs.ark, "workdir-hooks");
     mkdirSync(workdir, { recursive: true });
 
     const session = await getApp().sessions.create({ summary: "hooks-config-test" });
@@ -145,7 +145,7 @@ describe("dispatch compute: config file writing", () => {
   });
 
   it("writes .mcp.json (channel config) to the working directory", async () => {
-    const workdir = join(app.config.arkDir, "workdir-mcp");
+    const workdir = join(app.config.dirs.ark, "workdir-mcp");
     mkdirSync(workdir, { recursive: true });
 
     const session = await getApp().sessions.create({ summary: "mcp-config-test" });
@@ -164,7 +164,7 @@ describe("dispatch compute: config file writing", () => {
   });
 
   it("hooks config: PreToolUse is sync, all others are async", async () => {
-    const workdir = join(app.config.arkDir, "workdir-async-hooks");
+    const workdir = join(app.config.dirs.ark, "workdir-async-hooks");
     mkdirSync(workdir, { recursive: true });
 
     const session = await getApp().sessions.create({ summary: "async-hooks-test" });
@@ -187,7 +187,7 @@ describe("dispatch compute: config file writing", () => {
   });
 
   it("writeSettings is idempotent (can be called twice)", async () => {
-    const workdir = join(app.config.arkDir, "workdir-idempotent");
+    const workdir = join(app.config.dirs.ark, "workdir-idempotent");
     mkdirSync(workdir, { recursive: true });
 
     const session = await getApp().sessions.create({ summary: "idempotent-test" });
