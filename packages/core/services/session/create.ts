@@ -174,7 +174,10 @@ export class SessionCreator {
       const runtimeName = (session.config?.runtime as string | undefined) ?? session.agent ?? "claude";
       const runtime = d.runtimes.get(runtimeName);
       const billingMode = runtime?.billing?.mode ?? "api";
-      const model = (session.config?.model as string | undefined) ?? runtime?.default_model ?? "sonnet";
+      // Runtime no longer owns a default_model. Fall back to "sonnet" (a
+      // catalog alias) when neither the session nor the agent carries a model;
+      // usage recording only needs *some* label, not an accurate slug.
+      const model = (session.config?.model as string | undefined) ?? "sonnet";
 
       d.usageRecorder.record({
         sessionId: session.id,

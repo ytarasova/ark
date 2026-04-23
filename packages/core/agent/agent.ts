@@ -215,17 +215,11 @@ export function resolveAgentWithRuntime(
     agent.env = { ...runtime.env, ...agent.env };
   }
 
-  // model: only apply runtime default when the agent uses a generic alias
-  // (opus/sonnet/haiku) that doesn't map to a real model ID on this runtime.
-  // Custom model IDs set by the user (e.g. "MiniMax-M2.5") are always respected.
-  if (runtime.models && runtime.models.length > 0 && runtime.default_model) {
-    const GENERIC_ALIASES = ["opus", "sonnet", "haiku"];
-    const validModels = runtime.models.map((m) => m.id);
-    if (GENERIC_ALIASES.includes(agent.model) && !validModels.includes(agent.model)) {
-      agent.model = runtime.default_model;
-    }
-  }
-
+  // Model selection: the agent owns its `model` field verbatim. The
+  // ModelStore + resolveStage pipeline later turns it into a concrete
+  // provider slug via the catalog. Runtimes no longer carry a model list
+  // or a default_model fallback; absence of `agent.model` is a hard error
+  // at resolve time.
   return agent;
 }
 

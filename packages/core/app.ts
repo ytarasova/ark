@@ -49,7 +49,7 @@ import type { SessionHooks } from "./services/session-hooks/index.js";
 import type { SessionLifecycle } from "./services/session/index.js";
 import type { DispatchService } from "./services/dispatch/index.js";
 import type { StageAdvanceService } from "./services/stage-advance/index.js";
-import type { FlowStore, SkillStore, AgentStore, RecipeStore, RuntimeStore } from "./stores/index.js";
+import type { FlowStore, SkillStore, AgentStore, RecipeStore, RuntimeStore, ModelStore } from "./stores/index.js";
 import { buildTenantScope } from "./tenant-scope.js";
 import { ComputeRegistries } from "./compute-registries.js";
 import { resolveProvider, resolveComputeTarget } from "./compute-resolver.js";
@@ -465,6 +465,10 @@ export class AppContext {
   }
   get runtimes(): RuntimeStore {
     return this._resolve("runtimes");
+  }
+  /** Three-layer model catalog (project > global > bundled). */
+  get models(): ModelStore {
+    return this._resolve("models");
   }
   get knowledge(): KnowledgeStore {
     return this._resolve("knowledge");

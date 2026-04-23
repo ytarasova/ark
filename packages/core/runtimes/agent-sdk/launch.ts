@@ -551,7 +551,14 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
 
   let proxyServer: ReturnType<typeof Bun.serve> | undefined;
   let effectiveBaseURL = baseURL;
-  let effectiveModel = model;
+  // The model slug reaches launch.ts pre-resolved: the dispatch pipeline turns
+  // the agent's catalog id/alias into the concrete provider slug for the
+  // gateway in play (e.g. `pi-agentic/global.anthropic.claude-sonnet-4-6` for
+  // TF-Bedrock, bare `claude-sonnet-4-6` for Anthropic-direct). This file must
+  // NEVER synthesise or rewrite a model slug -- that is the model catalog's
+  // job, and keeping the two concerns separate keeps launch.ts free of model
+  // knowledge.
+  const effectiveModel = model;
   const bedrockCompat = compatModes.has("bedrock");
 
   if (bedrockCompat && baseURL) {
@@ -648,23 +655,11 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
 
     effectiveBaseURL = `http://localhost:${proxyServer.port}`;
     console.error(`[agent-sdk launch] Bedrock-compat proxy started on port ${proxyServer.port}`);
-
-    // The Claude binary normalizes short model slugs (e.g. strips "pi-agentic/" prefix)
-    // before the API call, so TF's Bedrock routing can't find the right model.
-    // Pass the full provider-qualified slug directly via sdkOptions.model so the binary
-    // receives "--model pi-agentic/global.anthropic.claude-sonnet-4-6" as a CLI arg
-    // and sends that slug verbatim in the request body.
-    //
-    // Agents/runtime YAML are expected to carry the concrete Anthropic slug
-    // (e.g. `claude-sonnet-4-6`). We only prepend the TF-Bedrock namespace;
-    // we do NOT map short aliases to concrete versions here (callers own that).
-    if (model && !model.includes("/")) {
-      effectiveModel = `pi-agentic/global.anthropic.${model}`;
-      console.error(`[agent-sdk launch] Bedrock-compat: expanding model ${model} -> ${effectiveModel}`);
-    } else if (!model) {
-      effectiveModel = "pi-agentic/global.anthropic.claude-sonnet-4-6";
-      console.error(`[agent-sdk launch] Bedrock-compat: using default model ${effectiveModel}`);
-    }
+    // NOTE: model-slug expansion for bedrock gateways used to happen here
+    // (pi-agentic/global.anthropic.<x>). That logic moved upstream into the
+    // model catalog + resolve-stage pipeline -- by the time we get here the
+    // caller has already selected the correct provider slug. See the comment
+    // on `effectiveModel` above for why this file is model-agnostic.
   }
 
   // When custom auth headers are in play (typical for gateway routing like

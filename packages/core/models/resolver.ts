@@ -1,21 +1,22 @@
 /**
  * Model catalog resolver.
  *
- * Reads `models/*.yaml` off disk, builds a case-insensitive lookup keyed by
- * canonical id AND by each alias, and exposes a helper to translate an
- * alias -> concrete provider slug for a given access path (anthropic-direct,
- * tf-bedrock, aws-bedrock, ...).
+ * Pure helpers that turn a model id / alias into a concrete provider slug.
+ * The three-layer lookup (project > global > bundled) lives in
+ * `packages/core/stores/model-store.ts`; this module stays free of AppContext
+ * so it can be used by any caller that already holds either a `ModelStore` or
+ * a pre-built catalog `Map`.
  *
- * This module is purely additive for now. Nothing in the production dispatch
- * path reads it yet; the next slice wires it into `launch.ts` so the
- * bedrock-compat string-concat (`pi-agentic/global.anthropic.<id>`) can be
- * deleted.
+ * `loadModels` remains exported for tests + the store's builtin-layer loader.
+ * It builds a single-directory catalog keyed by id AND by each alias. Callers
+ * with multi-layer needs should use a `FileModelStore` instead.
  */
 
 import { readdirSync, readFileSync } from "fs";
 import { join } from "path";
 import YAML from "yaml";
 import type { ModelDefinition } from "../../types/model.js";
+import type { ModelStore } from "../stores/model-store.js";
 
 export type { ModelDefinition, ModelPricing } from "../../types/model.js";
 
@@ -26,7 +27,9 @@ function normaliseKey(s: string): string {
 /**
  * Load every `*.yaml` file under `dir` and return a map keyed by canonical id
  * and by each alias. Throws if two models share an id or alias (no silent
- * collisions -- the catalog must be unambiguous).
+ * collisions -- the catalog must be unambiguous). Used by tests + the
+ * ModelStore's builtin-layer loader; for production lookups prefer the
+ * three-layer `ModelStore.get()`.
  */
 export function loadModels(dir: string): Map<string, ModelDefinition> {
   const catalog = new Map<string, ModelDefinition>();
@@ -89,8 +92,9 @@ export function loadModels(dir: string): Map<string, ModelDefinition> {
 }
 
 /**
- * Resolve a canonical id OR alias to a ModelDefinition. Throws with a caller-
- * friendly error listing the available canonical ids when the lookup misses.
+ * Resolve a canonical id OR alias against a pre-built catalog Map.
+ * Throws with a caller-friendly error listing the available canonical ids
+ * when the lookup misses.
  */
 export function resolveModel(catalog: Map<string, ModelDefinition>, idOrAlias: string): ModelDefinition {
   const hit = catalog.get(normaliseKey(idOrAlias));
@@ -101,6 +105,21 @@ export function resolveModel(catalog: Map<string, ModelDefinition>, idOrAlias: s
   for (const m of catalog.values()) ids.add(m.id);
   const sorted = Array.from(ids).sort();
   throw new Error(`Model "${idOrAlias}" not found in catalog. Available: [${sorted.join(", ")}]`);
+}
+
+/**
+ * Resolve a model id/alias via a `ModelStore`. Convenience wrapper used by
+ * `resolve-stage.ts` so callers on the hot path can skip the catalog-map
+ * plumbing and just call the store directly.
+ */
+export function resolveModelFromStore(store: ModelStore, idOrAlias: string, projectRoot?: string): ModelDefinition {
+  const hit = store.get(idOrAlias, projectRoot);
+  if (hit) return hit;
+  const ids = store
+    .list(projectRoot)
+    .map((m) => m.id)
+    .sort();
+  throw new Error(`Model "${idOrAlias}" not found in catalog. Available: [${ids.join(", ")}]`);
 }
 
 /**

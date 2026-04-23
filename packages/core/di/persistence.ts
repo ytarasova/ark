@@ -30,6 +30,7 @@ import {
   FileAgentStore,
   FileRecipeStore,
   FileRuntimeStore,
+  FileModelStore,
   EphemeralFlowStore,
 } from "../stores/index.js";
 import { DbResourceStore, initResourceDefinitionsTable } from "../stores/db-resource-store.js";
@@ -133,6 +134,7 @@ export function registerResourceStores(container: AppContainer): void {
       (c: { db: DatabaseAdapter; config: ArkConfig; mode: AppMode }) => makeRuntimeStore(c.db, c.config, c.mode),
       { lifetime: Lifetime.SINGLETON },
     ),
+    models: asFunction((c: { config: ArkConfig }) => makeModelStore(c.config), { lifetime: Lifetime.SINGLETON }),
   });
 }
 
@@ -204,5 +206,18 @@ function makeRuntimeStore(db: DatabaseAdapter, config: ArkConfig, mode: AppMode)
   return new FileRuntimeStore({
     builtinDir: join(resolveStoreBaseDir(), "runtimes"),
     userDir: join(config.arkDir, "runtimes"),
+  });
+}
+
+/**
+ * Model catalog is file-only (never DB-backed). Hosted mode still reads from
+ * the shipped YAMLs: model definitions are the user-invariant technical
+ * catalog (provider slugs, pricing) -- not tenant content -- so there's
+ * nothing tenant-scoped to store.
+ */
+function makeModelStore(config: ArkConfig) {
+  return new FileModelStore({
+    builtinDir: join(resolveStoreBaseDir(), "models"),
+    userDir: join(config.arkDir, "models"),
   });
 }

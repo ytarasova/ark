@@ -547,3 +547,4 @@ export { type SkillStore, FileSkillStore } from "./stores/index.js";
 export { type AgentStore, FileAgentStore } from "./stores/index.js";
 export { type RecipeStore, FileRecipeStore } from "./stores/index.js";
 export { type RuntimeStore, FileRuntimeStore } from "./stores/index.js";
+export { type ModelStore, FileModelStore } from "./stores/index.js";
