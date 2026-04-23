@@ -150,7 +150,7 @@ export function registerServerDaemonCommands(serverCmd: Command) {
       // dispatch and stage advancement.
       if (process.env.ARK_TEST_DIR) {
         console.log(chalk.yellow(`WARNING: ARK_TEST_DIR is set (${process.env.ARK_TEST_DIR})`));
-        console.log(chalk.yellow(`Daemon will use ${config.arkDir} instead of ~/.ark`));
+        console.log(chalk.yellow(`Daemon will use ${config.dirs.ark} instead of ~/.ark`));
         console.log(chalk.yellow(`Unset ARK_TEST_DIR if this is not intentional.`));
       }
 
@@ -169,7 +169,7 @@ export function registerServerDaemonCommands(serverCmd: Command) {
       console.log(chalk.green(`Ark server daemon started (pid ${process.pid})`));
       console.log(chalk.dim(`  WebSocket:  ws://localhost:${port}`));
       console.log(chalk.dim(`  Health:     http://localhost:${port}/health`));
-      console.log(chalk.dim(`  Conductor:  http://localhost:${config.conductorPort}`));
+      console.log(chalk.dim(`  Conductor:  http://localhost:${config.ports.conductor}`));
       console.log(chalk.dim("Press Ctrl+C to stop"));
 
       const shutdown = async () => {

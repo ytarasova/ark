@@ -79,16 +79,16 @@ describe("writeLauncher", () => {
 
   it("creates launch.sh and returns its path", () => {
     const testSessionId = `test-launcher-${Date.now()}`;
-    const path = writeLauncher(testSessionId, testContent, getApp().config.tracksDir);
+    const path = writeLauncher(testSessionId, testContent, getApp().config.dirs.tracks);
 
-    expect(path).toBe(join(getApp().config.tracksDir, testSessionId, "launch.sh"));
+    expect(path).toBe(join(getApp().config.dirs.tracks, testSessionId, "launch.sh"));
     expect(existsSync(path)).toBe(true);
   });
 
   it("file content matches the input", () => {
     const sessionId = `test-content-${Date.now()}`;
     const content = "#!/bin/bash\nset -e\ncd /app && npm start\n";
-    const path = writeLauncher(sessionId, content, getApp().config.tracksDir);
+    const path = writeLauncher(sessionId, content, getApp().config.dirs.tracks);
 
     const written = readFileSync(path, "utf-8");
     expect(written).toBe(content);
@@ -96,17 +96,17 @@ describe("writeLauncher", () => {
 
   it("creates parent directory if it does not exist", () => {
     const sessionId = `test-mkdir-${Date.now()}`;
-    const dir = join(getApp().config.tracksDir, sessionId);
+    const dir = join(getApp().config.dirs.tracks, sessionId);
     expect(existsSync(dir)).toBe(false);
 
-    writeLauncher(sessionId, "#!/bin/bash\n", getApp().config.tracksDir);
+    writeLauncher(sessionId, "#!/bin/bash\n", getApp().config.dirs.tracks);
 
     expect(existsSync(dir)).toBe(true);
   });
 
   it("sets executable permissions (755)", () => {
     const sessionId = `test-perms-${Date.now()}`;
-    const path = writeLauncher(sessionId, "#!/bin/bash\n", getApp().config.tracksDir);
+    const path = writeLauncher(sessionId, "#!/bin/bash\n", getApp().config.dirs.tracks);
 
     const mode = statSync(path).mode & 0o777;
     expect(mode).toBe(0o755);

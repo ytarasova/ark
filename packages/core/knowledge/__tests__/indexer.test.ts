@@ -36,7 +36,7 @@ describe("isCodegraphInstalled", () => {
 describe("indexCodebase", async () => {
   it("reads codegraph DB and maps nodes/edges into knowledge store", async () => {
     // Create a fake repo with a pre-built .codegraph/graph.db
-    const tmpDir = join(app.config.arkDir, "test-repo-cg");
+    const tmpDir = join(app.config.dirs.ark, "test-repo-cg");
     const cgDir = join(tmpDir, ".codegraph");
     mkdirSync(cgDir, { recursive: true });
 
@@ -106,7 +106,7 @@ describe("indexCodebase", async () => {
   it("handles duplicate (file, name) pairs with different line numbers", async () => {
     // Regression: codegraph produces many symbols with the same (file, name) pair
     // e.g. 50 'app' parameters across different functions. Each should get a unique ID.
-    const tmpDir = join(app.config.arkDir, "test-repo-dup");
+    const tmpDir = join(app.config.dirs.ark, "test-repo-dup");
     const cgDir = join(tmpDir, ".codegraph");
     mkdirSync(cgDir, { recursive: true });
 
@@ -155,7 +155,7 @@ describe("indexCodebase", async () => {
     await store.addNode({ id: "memory:keep-me", type: "memory", label: "should not be cleared" });
 
     // Create empty codegraph DB
-    const tmpDir = join(app.config.arkDir, "test-repo-cg2");
+    const tmpDir = join(app.config.dirs.ark, "test-repo-cg2");
     const cgDir = join(tmpDir, ".codegraph");
     mkdirSync(cgDir, { recursive: true });
     const db = new Database(join(cgDir, "graph.db"));

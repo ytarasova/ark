@@ -30,7 +30,7 @@ export class ConductorLauncher {
     if (this.opts.skip) return;
     await safeAsync("boot: start conductor", async () => {
       const { startConductor } = await import("../conductor/conductor.js");
-      this.handle = startConductor(this.app, this.config.conductorPort, { quiet: true });
+      this.handle = startConductor(this.app, this.config.ports.conductor, { quiet: true });
     });
   }
 

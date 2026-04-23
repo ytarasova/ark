@@ -26,7 +26,7 @@ afterAll(async () => {
 });
 
 function writeAgent(name: string, data: Record<string, unknown>): void {
-  const dir = join(getApp().config.arkDir, "agents");
+  const dir = join(getApp().config.dirs.ark, "agents");
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, `${name}.yaml`), YAML.stringify(data));
 }

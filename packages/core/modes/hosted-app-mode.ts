@@ -60,7 +60,7 @@ export function buildHostedAppMode(database: DatabaseMode, config?: ArkConfig): 
   const secretsCfg = config?.secrets;
   const secrets: SecretsCapability =
     secretsCfg?.backend === "file"
-      ? new FileSecretsProvider(config?.arkDir ?? `${process.env.HOME ?? "."}/.ark`)
+      ? new FileSecretsProvider(config?.dirs?.ark ?? `${process.env.HOME ?? "."}/.ark`)
       : new AwsSecretsProvider({ region: secretsCfg?.awsRegion, kmsKeyId: secretsCfg?.awsKmsKeyId });
   return {
     kind: "hosted",

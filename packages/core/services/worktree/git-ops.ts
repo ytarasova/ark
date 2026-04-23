@@ -73,7 +73,7 @@ export async function worktreeDiff(
     };
 
   // Determine the worktree path and branch
-  const wtDir = join(app.config.worktreesDir, sessionId);
+  const wtDir = join(app.config.dirs.worktrees, sessionId);
   let branch = session.branch;
   if (!branch && existsSync(wtDir)) {
     try {
@@ -212,7 +212,7 @@ export async function rebaseOntoBase(
   const repo = session.repo;
   if (!repo) return { ok: false, message: "Session has no repo" };
 
-  const wtDir = join(app.config.worktreesDir, sessionId);
+  const wtDir = join(app.config.dirs.worktrees, sessionId);
   const gitDir = existsSync(wtDir) ? wtDir : repo;
   const base = opts?.base ?? DEFAULT_BASE_BRANCH;
 
@@ -291,7 +291,7 @@ export async function finishWorktree(
   }
 
   // Determine the worktree path and branch
-  const wtDir = join(app.config.worktreesDir, sessionId);
+  const wtDir = join(app.config.dirs.worktrees, sessionId);
   const isWorktree = existsSync(wtDir);
 
   // Get the branch name from the worktree

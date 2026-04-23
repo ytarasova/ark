@@ -231,8 +231,8 @@ export function registerViewCommands(session: Command) {
         // Derive tracksDir from local config (same path the server uses).
         const { loadConfig } = await import("../../../core/config.js");
         const config = loadConfig();
-        const transcriptPath = join(config.tracksDir, id, "transcript.jsonl");
-        const stdioPath = join(config.tracksDir, id, "stdio.log");
+        const transcriptPath = join(config.dirs.tracks, id, "transcript.jsonl");
+        const stdioPath = join(config.dirs.tracks, id, "stdio.log");
 
         if (opts.printOnly) {
           process.stdout.write(`tail -n 200 -F ${transcriptPath} ${stdioPath}\n`);

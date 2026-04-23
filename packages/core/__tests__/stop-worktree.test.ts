@@ -26,7 +26,7 @@ afterEach(async () => {
 describe("stop() worktree cleanup", async () => {
   it("removes worktree directory when session is stopped", async () => {
     const session = await getApp().sessions.create({ summary: "stop-wt-test", repo: "/tmp/fake-repo" });
-    const wtPath = join(getApp().config.worktreesDir, session.id);
+    const wtPath = join(getApp().config.dirs.worktrees, session.id);
 
     // Simulate a worktree directory existing
     mkdirSync(wtPath, { recursive: true });
@@ -40,7 +40,7 @@ describe("stop() worktree cleanup", async () => {
 
   it("succeeds when no worktree directory exists on stop", async () => {
     const session = await getApp().sessions.create({ summary: "stop-no-wt-test", repo: "/tmp/fake-repo" });
-    const wtPath = join(getApp().config.worktreesDir, session.id);
+    const wtPath = join(getApp().config.dirs.worktrees, session.id);
 
     expect(existsSync(wtPath)).toBe(false);
 
@@ -50,7 +50,7 @@ describe("stop() worktree cleanup", async () => {
 
   it("stops session even if worktree cleanup fails gracefully", async () => {
     const session = await getApp().sessions.create({ summary: "stop-wt-no-repo-test" });
-    const wtPath = join(getApp().config.worktreesDir, session.id);
+    const wtPath = join(getApp().config.dirs.worktrees, session.id);
 
     // Create a worktree dir but session has no repo -- falls back to rmSync
     mkdirSync(wtPath, { recursive: true });
@@ -64,7 +64,7 @@ describe("stop() worktree cleanup", async () => {
 describe("removeSessionWorktree()", async () => {
   it("removes directory via rmSync fallback when no repo is set", async () => {
     const session = await getApp().sessions.create({ summary: "rmwt-no-repo" });
-    const wtPath = join(getApp().config.worktreesDir, session.id);
+    const wtPath = join(getApp().config.dirs.worktrees, session.id);
 
     mkdirSync(wtPath, { recursive: true });
     writeFileSync(join(wtPath, "file.txt"), "content");
@@ -76,7 +76,7 @@ describe("removeSessionWorktree()", async () => {
 
   it("is a no-op when worktree directory does not exist", async () => {
     const session = await getApp().sessions.create({ summary: "rmwt-missing" });
-    const wtPath = join(getApp().config.worktreesDir, session.id);
+    const wtPath = join(getApp().config.dirs.worktrees, session.id);
 
     expect(existsSync(wtPath)).toBe(false);
     // Should not throw
@@ -86,7 +86,7 @@ describe("removeSessionWorktree()", async () => {
 
   it("removes nested directory structure", async () => {
     const session = await getApp().sessions.create({ summary: "rmwt-nested" });
-    const wtPath = join(getApp().config.worktreesDir, session.id);
+    const wtPath = join(getApp().config.dirs.worktrees, session.id);
 
     mkdirSync(join(wtPath, "src", "deep"), { recursive: true });
     writeFileSync(join(wtPath, "src", "deep", "file.ts"), "export {}");

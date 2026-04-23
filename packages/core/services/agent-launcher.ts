@@ -147,7 +147,7 @@ export async function _launchAgentTmux(
   const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, {
     conductorUrl,
     channelConfig,
-    tracksDir: app.config.tracksDir,
+    tracksDir: app.config.dirs.tracks,
     originalRepoDir,
     runtimeMcpServers,
     mcpConfigsDir: resolveMcpConfigsDir(),
@@ -165,7 +165,7 @@ export async function _launchAgentTmux(
   // ARK_SESSION_DIR lets the launcher drop an exit-code sentinel when claude
   // exits non-zero; the status poller watches that path. See bug 3 in the
   // session-dispatch cascade fix.
-  const sessionDirEnv = join(app.config.tracksDir, session.id);
+  const sessionDirEnv = join(app.config.dirs.tracks, session.id);
   const launchEnv: Record<string, string> = {
     ...(agent.env ?? {}),
     ...(provider?.buildLaunchEnv(session) ?? {}),
@@ -180,10 +180,10 @@ export async function _launchAgentTmux(
     env: launchEnv,
   });
 
-  const launcher = tmux.writeLauncher(session.id, launchContent, app.config.tracksDir);
+  const launcher = tmux.writeLauncher(session.id, launchContent, app.config.dirs.tracks);
 
   // Save task for reference
-  const sessionDir = join(app.config.tracksDir, session.id);
+  const sessionDir = join(app.config.dirs.tracks, session.id);
   mkdirSync(sessionDir, { recursive: true });
   writeFileSync(join(sessionDir, "task.txt"), task);
 
@@ -222,7 +222,7 @@ export async function _launchAgentTmux(
   // Local launch via launcher abstraction
   log("Starting local session...");
   const launchResult = await app.launcher.launch(session, `bash ${launcher}`, {
-    arkDir: app.config.arkDir,
+    arkDir: app.config.dirs.ark,
     workdir: effectiveWorkdir,
   });
   claude.autoAcceptChannelPrompt(launchResult.handle);

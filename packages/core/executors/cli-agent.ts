@@ -56,7 +56,7 @@ export const cliAgentExecutor: Executor = {
     const taskDelivery = ((agent as Record<string, unknown>).task_delivery as string) ?? "stdin";
 
     // Save task to file for file-based delivery
-    const trackDir = join(app.config.tracksDir, sessionId);
+    const trackDir = join(app.config.dirs.tracks, sessionId);
     mkdirSync(trackDir, { recursive: true });
     const taskFile = join(trackDir, "task.txt");
     writeFileSync(taskFile, task);
@@ -113,12 +113,12 @@ export const cliAgentExecutor: Executor = {
 
     // Launch in tmux
     log(`Launching ${command[0]} in tmux...`);
-    await tmux.createSessionAsync(tmuxName, cmdLine, { arkDir: app.config.arkDir });
+    await tmux.createSessionAsync(tmuxName, cmdLine, { arkDir: app.config.dirs.ark });
     const rootPid = await tmux.getPanePidAsync(tmuxName);
 
     // Start recording terminal output for post-session replay
-    const recPath = recordingPath(app.config.arkDir, sessionId);
-    mkdirSync(join(app.config.arkDir, "recordings"), { recursive: true });
+    const recPath = recordingPath(app.config.dirs.ark, sessionId);
+    mkdirSync(join(app.config.dirs.ark, "recordings"), { recursive: true });
     await tmux.pipePaneAsync(tmuxName, recPath);
 
     // For stdin delivery with initialPrompt, send via tmux after the process starts

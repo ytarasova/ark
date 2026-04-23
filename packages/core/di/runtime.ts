@@ -109,7 +109,7 @@ export function registerRuntime(container: AppContainer): void {
         registry.register(new ClaudeTranscriptParser(undefined, (_workdir) => null));
         registry.register(new CodexTranscriptParser());
         registry.register(new GeminiTranscriptParser());
-        registry.register(new AgentSdkParser(_c.config.tracksDir));
+        registry.register(new AgentSdkParser(_c.config.dirs.tracks));
         return registry;
       },
       { lifetime: Lifetime.SINGLETON },
@@ -122,7 +122,7 @@ export function registerRuntime(container: AppContainer): void {
       dispose: (r: StatusPollerRegistry) => r.dispose(),
     }),
 
-    snapshotStore: asFunction((c: { config: ArkConfig }) => new FsSnapshotStore(join(c.config.arkDir, "snapshots")), {
+    snapshotStore: asFunction((c: { config: ArkConfig }) => new FsSnapshotStore(join(c.config.dirs.ark, "snapshots")), {
       lifetime: Lifetime.SINGLETON,
     }),
 

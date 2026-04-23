@@ -39,7 +39,7 @@ function getStore(app: AppContext): FileTriggerStore {
   let store = storeCache.get(app);
   if (!store) {
     store = createFileTriggerStore({
-      arkDir: app.config.arkDir,
+      arkDir: app.config.dirs.ark,
       builtinBaseDir: resolveStoreBaseDir(),
     });
     storeCache.set(app, store);

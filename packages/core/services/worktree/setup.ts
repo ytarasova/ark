@@ -232,7 +232,7 @@ async function setupWorktree(
   sessionId: string,
   branch?: string,
 ): Promise<string | null> {
-  const wtPath = join(app.config.worktreesDir, sessionId);
+  const wtPath = join(app.config.dirs.worktrees, sessionId);
   if (existsSync(wtPath)) return wtPath;
 
   const branchName = branch ?? `ark-${sessionId}`;
@@ -334,7 +334,7 @@ export async function runWorktreeSetup(
  * worktrees are always cleaned up regardless of compute provider availability.
  */
 export async function removeSessionWorktree(app: AppContext, session: Session): Promise<void> {
-  const wtPath = join(app.config.worktreesDir, session.id);
+  const wtPath = join(app.config.dirs.worktrees, session.id);
   if (!existsSync(wtPath)) return;
 
   // Try git worktree remove first (cleans up .git/worktrees metadata)
@@ -358,7 +358,7 @@ export async function removeSessionWorktree(app: AppContext, session: Session): 
 
 /** Find orphaned worktrees -- worktree dirs with no matching session. */
 export async function findOrphanedWorktrees(app: AppContext): Promise<string[]> {
-  const wtDir = app.config.worktreesDir;
+  const wtDir = app.config.dirs.worktrees;
   if (!existsSync(wtDir)) return [];
 
   const sessionIds = new Set((await app.sessions.list({ limit: 1000 })).map((s) => s.id));
@@ -384,7 +384,7 @@ export async function cleanupWorktrees(app: AppContext): Promise<{ removed: numb
   const errors: string[] = [];
 
   for (const id of orphans) {
-    const wtPath = join(app.config.worktreesDir, id);
+    const wtPath = join(app.config.dirs.worktrees, id);
     try {
       // Try git worktree remove first
       await execFileAsync("git", ["worktree", "remove", wtPath, "--force"], {

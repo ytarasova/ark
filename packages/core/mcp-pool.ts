@@ -263,7 +263,7 @@ export class McpPool {
 
   /**
    * @param socketDir directory for the per-server Unix sockets. Callers must
-   * pass a tenant-safe / instance-safe path (typically `app.config.arkDir +
+   * pass a tenant-safe / instance-safe path (typically `app.config.dirs.ark +
    * "/mcp-sockets"`). Hardcoding `/tmp` previously let concurrent ark
    * instances collide on the same socket filename and let other processes
    * on the host enumerate every pool socket.

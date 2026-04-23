@@ -90,7 +90,7 @@ describe("Store context isolation", async () => {
   it("cleanup removes temp directory", async () => {
     const tempApp = await AppContext.forTestAsync();
     await tempApp.boot();
-    const dir = tempApp.config.arkDir;
+    const dir = tempApp.config.dirs.ark;
     await tempApp.shutdown();
 
     // eslint-disable-next-line @typescript-eslint/no-require-imports

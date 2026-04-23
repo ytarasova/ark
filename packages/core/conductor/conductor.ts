@@ -453,7 +453,7 @@ export class Conductor {
     if (path === "/health") {
       return Response.json({
         status: "ok",
-        arkDir: this.app.config.arkDir,
+        arkDir: this.app.config.dirs.ark,
       });
     }
 

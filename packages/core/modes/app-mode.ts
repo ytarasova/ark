@@ -112,7 +112,7 @@ export interface MigrationsCapability {
 /**
  * Database dialect + connection URL. Populated once at DI composition from
  * the resolved config -- handlers read `app.mode.database.dialect` instead
- * of each re-sniffing `config.databaseUrl` with their own regex. Callers
+ * of each re-sniffing `config.database.url` with their own regex. Callers
  * that need the raw URL (e.g. the adapter factory) get it here too.
  *
  * The `MigrationsCapability` binds the same dialect at construction, so
@@ -130,8 +130,8 @@ export interface DatabaseMode {
  * `app.ts` can compute it once at boot (before the container is built and
  * `buildAppMode` runs) and hand the same object to `buildAppMode`.
  */
-export function resolveDatabaseMode(config: { databaseUrl?: string; database?: { url?: string } }): DatabaseMode {
-  const raw = config.database?.url ?? config.databaseUrl ?? null;
+export function resolveDatabaseMode(config: { database?: { url?: string } }): DatabaseMode {
+  const raw = config.database?.url ?? null;
   // Normalise empty strings to null so callers get a consistent "no URL"
   // signal -- otherwise `!!url` passes on "" and `startsWith` returns false,
   // but `url` is then still "" which is a footgun for downstream loggers.

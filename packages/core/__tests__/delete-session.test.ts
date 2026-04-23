@@ -84,7 +84,7 @@ describe("sessionLifecycle.deleteSession", async () => {
     });
 
     // Create a fake worktree directory under WORKTREES_DIR
-    const wtPath = join(getApp().config.worktreesDir, session.id);
+    const wtPath = join(getApp().config.dirs.worktrees, session.id);
     mkdirSync(wtPath, { recursive: true });
     writeFileSync(join(wtPath, "dummy.txt"), "test content");
     expect(existsSync(wtPath)).toBe(true);
@@ -101,7 +101,7 @@ describe("sessionLifecycle.deleteSession", async () => {
 
   it("does NOT touch filesystem when no worktree exists", async () => {
     // Use the repo dir as workdir (simulating a direct repo, no worktree)
-    const repoDir = join(app.config.arkDir, "fake-direct-repo");
+    const repoDir = join(app.config.dirs.ark, "fake-direct-repo");
     mkdirSync(repoDir, { recursive: true });
     writeFileSync(join(repoDir, "file.txt"), "important");
 
@@ -113,7 +113,7 @@ describe("sessionLifecycle.deleteSession", async () => {
     });
 
     // No worktree dir exists under WORKTREES_DIR
-    const wtPath = join(getApp().config.worktreesDir, session.id);
+    const wtPath = join(getApp().config.dirs.worktrees, session.id);
     expect(existsSync(wtPath)).toBe(false);
 
     await app.sessionLifecycle.deleteSession(session.id);
@@ -129,7 +129,7 @@ describe("sessionLifecycle.deleteSession", async () => {
 
   it("removes hook config from workdir", async () => {
     // Create a workdir with hooks written
-    const workdir = join(app.config.arkDir, "hook-test-workdir");
+    const workdir = join(app.config.dirs.ark, "hook-test-workdir");
     mkdirSync(workdir, { recursive: true });
 
     const session = await app.sessionLifecycle.start({

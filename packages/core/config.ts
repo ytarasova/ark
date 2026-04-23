@@ -150,23 +150,11 @@ export interface ArkConfig {
   /** Compute-wide configuration. Includes the system-layer cluster list. */
   compute: ComputeConfig;
 
-  // ── Legacy flat fields (derived from nested sections) ──────────────────
+  // ── Extra scalars not part of a nested section ─────────────────────────
 
-  /** @deprecated prefer `config.dirs.ark` */
-  arkDir: string;
   /** Path to SQLite DB file (SQLite only; undefined with a postgres databaseUrl). */
   dbPath: string;
-  /** @deprecated prefer `config.dirs.tracks` */
-  tracksDir: string;
-  /** @deprecated prefer `config.dirs.worktrees` */
-  worktreesDir: string;
-  /** @deprecated prefer `config.dirs.logs` */
-  logDir: string;
-  /** @deprecated prefer `config.ports.conductor` */
-  conductorPort: number;
   conductorUrl: string;
-  /** @deprecated prefer `config.ports.arkd` */
-  arkdPort: number;
   env: "production" | "test";
 
   // ── Unchanged nested blocks (not yet part of the Spring-style surface) ──
@@ -205,8 +193,6 @@ export interface ArkConfig {
     awsRegion?: string;
     awsKmsKeyId?: string;
   };
-  /** @deprecated prefer `config.database.url` */
-  databaseUrl?: string;
   /** Redis URL for hosted SSE bus and cross-instance pub/sub. redis://... */
   redisUrl?: string;
 }
@@ -306,7 +292,7 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
   //      replaces it with a per-call unique dir).
   //   - in other profiles: env beats defaults.
   const envOverrides = readEnv();
-  const explicitArkDir = overrides.arkDir ?? (overrides.dirs as Partial<DirsConfig> | undefined)?.ark;
+  const explicitArkDir = (overrides.dirs as Partial<DirsConfig> | undefined)?.ark;
   const arkDir =
     explicitArkDir ??
     (profile === "test"
@@ -318,7 +304,7 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
   const layered = mergeOverrides(yamlOverrides, envOverrides);
 
   // Step 3: programmatic flat-field overrides as a final layer
-  const programmaticOverrides = flatOverridesFromLegacy(overrides);
+  const programmaticOverrides = overridesToEnv(overrides);
   const merged = mergeOverrides(layered, programmaticOverrides);
 
   // Step 4: compute final nested sections
@@ -354,7 +340,7 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
   // inject DATABASE_URL="" which would otherwise win the ?? chain).
   const blankToUndef = (v: string | undefined): string | undefined => (v && v.length > 0 ? v : undefined);
   const databaseUrl =
-    blankToUndef(overrides.databaseUrl) ??
+    blankToUndef(overrides.database?.url) ??
     blankToUndef(merged.databaseUrl) ??
     blankToUndef(process.env.DATABASE_URL) ??
     dbAssembled;
@@ -375,12 +361,13 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
     storage.s3 = overrides.storage.s3 ?? storage.s3;
   }
 
+  const overrideDirs = overrides.dirs as Partial<DirsConfig> | undefined;
   const dirs: DirsConfig = {
     ark: arkDir,
-    worktrees: overrides.worktreesDir ?? join(arkDir, "worktrees"),
-    tracks: overrides.tracksDir ?? join(arkDir, "tracks"),
-    logs: overrides.logDir ?? join(arkDir, "logs"),
-    tmp: join(arkDir, "tmp"),
+    worktrees: overrideDirs?.worktrees ?? join(arkDir, "worktrees"),
+    tracks: overrideDirs?.tracks ?? join(arkDir, "tracks"),
+    logs: overrideDirs?.logs ?? join(arkDir, "logs"),
+    tmp: overrideDirs?.tmp ?? join(arkDir, "tmp"),
   };
 
   // Step 5: legacy YAML for sections not yet migrated to Spring-style
@@ -416,15 +403,9 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
     storage,
     compute: { clusters },
 
-    // Legacy flat fields
-    arkDir,
+    // Extra scalars
     dbPath: join(arkDir, "ark.db"),
-    tracksDir: dirs.tracks,
-    worktreesDir: dirs.worktrees,
-    logDir: dirs.logs,
-    conductorPort: ports.conductor,
     conductorUrl,
-    arkdPort: ports.arkd,
     env: isTestEnv ? "test" : "production",
 
     otlp: {
@@ -481,13 +462,12 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
     },
     computeTemplates: parseComputeTemplates(legacyYaml.compute_templates),
     secrets: parseSecretsConfig(legacyYaml.secrets, merged),
-    databaseUrl: database.url,
     redisUrl: process.env.REDIS_URL ?? (legacyYaml.redis_url as string) ?? merged.redisUrl,
   };
 
-  // Step 7: final programmatic override (legacy fields) wins
+  // Step 7: final programmatic override wins (profile already consumed)
   if (overrides) {
-    const { arkDir: _a, profile: _p, ...rest } = overrides;
+    const { profile: _p, ...rest } = overrides;
     Object.assign(base, rest);
   }
 
@@ -498,11 +478,9 @@ function emptyEnvOverrides(): EnvOverrides {
   return { ports: {}, channels: {}, observability: {}, auth: {}, features: {}, storage: {}, secrets: {} };
 }
 
-/** Extract partial Spring-style overrides from a legacy-flat overrides arg. */
-function flatOverridesFromLegacy(o: LoadConfigOptions): EnvOverrides {
+/** Translate LoadConfigOptions into EnvOverrides so it merges with env/yaml layers. */
+function overridesToEnv(o: LoadConfigOptions): EnvOverrides {
   const out = emptyEnvOverrides();
-  if (o.conductorPort !== undefined) out.ports.conductor = o.conductorPort;
-  if (o.arkdPort !== undefined) out.ports.arkd = o.arkdPort;
   if (o.ports) Object.assign(out.ports, o.ports);
   if (o.channels) Object.assign(out.channels, o.channels);
   if (o.observability) Object.assign(out.observability, o.observability);

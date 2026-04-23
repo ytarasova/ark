@@ -42,7 +42,7 @@ export async function createWorktreePR(
   if (!repo) return { ok: false, message: "Session has no repo" };
 
   // Determine branch
-  const wtDir = join(app.config.worktreesDir, sessionId);
+  const wtDir = join(app.config.dirs.worktrees, sessionId);
   let branch = session.branch;
   if (!branch && existsSync(wtDir)) {
     try {

@@ -32,7 +32,7 @@ const MAX_PLAN_BYTES = 1 * 1024 * 1024; // 1 MiB -- plans are text; reject patho
  */
 export async function capturePlanMdIfPresent(app: AppContext, session: Session): Promise<void> {
   try {
-    const wtDir = join(app.config.worktreesDir, session.id);
+    const wtDir = join(app.config.dirs.worktrees, session.id);
     const planPath = join(wtDir, "PLAN.md");
     if (!existsSync(planPath)) return;
 
@@ -86,7 +86,7 @@ export async function readPlanMd(app: AppContext, session: Session): Promise<str
     }
   }
 
-  const wtDir = join(app.config.worktreesDir, session.id);
+  const wtDir = join(app.config.dirs.worktrees, session.id);
   const planPath = join(wtDir, "PLAN.md");
   if (existsSync(planPath)) {
     try {

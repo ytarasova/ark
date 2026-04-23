@@ -21,7 +21,7 @@ const DEFAULTS: Required<LogManagerOptions> = {
 
 /** Get the log directory path. */
 export function logDir(app: AppContext): string {
-  return join(app.config.arkDir, "logs");
+  return join(app.config.dirs.ark, "logs");
 }
 
 /** Truncate a log file to maxLines, keeping the most recent. */

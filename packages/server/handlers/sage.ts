@@ -89,7 +89,7 @@ export function registerSageHandlers(router: Router, app: AppContext): void {
     // Materialise analysis JSON on disk so the flow can consume it via
     // inputs.files.analysis_json. Uses the daemon's arkDir (scoped apps
     // inherit config from the root, so this is always the daemon's dir).
-    const sageDir = join(scoped.config.arkDir, "sage");
+    const sageDir = join(scoped.config.dirs.ark, "sage");
     mkdirSync(sageDir, { recursive: true });
     const analysisPath = join(sageDir, `${analysis.jira_id}.analysis.json`);
     writeFileSync(analysisPath, JSON.stringify(analysis, null, 2), "utf-8");
