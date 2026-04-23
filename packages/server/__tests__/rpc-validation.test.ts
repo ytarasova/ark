@@ -280,6 +280,16 @@ const fixtures: Record<string, MethodFixture> = {
     invalidRequest: {},
     sampleResponse: { ok: true, output: null },
   },
+  "session/stdio": {
+    validRequest: { sessionId: "s-1", tail: 100 },
+    invalidRequest: { sessionId: "s-1", tail: -1 },
+    sampleResponse: { content: "", size: 0, exists: false },
+  },
+  "session/transcript": {
+    validRequest: { sessionId: "s-1" },
+    invalidRequest: {},
+    sampleResponse: { messages: [], size: 0, exists: false },
+  },
   "session/events": {
     validRequest: { sessionId: "s-1", limit: 10 },
     invalidRequest: { sessionId: 1 },

@@ -27,6 +27,10 @@ import type {
   SessionOutputResponse,
   SessionRecordingRequest,
   SessionRecordingResponse,
+  SessionStdioRequest,
+  SessionStdioResponse,
+  SessionTranscriptRequest,
+  SessionTranscriptResponse,
   SessionEventsRequest,
   SessionEventsResponse,
   SessionMessagesRequest,
@@ -308,6 +312,13 @@ export const api = {
     })),
   getRecording: (id: string) =>
     rpc<SessionRecordingResponse>("session/recording", { sessionId: id } satisfies SessionRecordingRequest),
+  getStdio: (id: string, opts?: { tail?: number }) =>
+    rpc<SessionStdioResponse>("session/stdio", {
+      sessionId: id,
+      ...(opts?.tail ? { tail: opts.tail } : {}),
+    } satisfies SessionStdioRequest),
+  getTranscript: (id: string) =>
+    rpc<SessionTranscriptResponse>("session/transcript", { sessionId: id } satisfies SessionTranscriptRequest),
   getEvents: (id: string) =>
     rpc<SessionEventsResponse>("session/events", { sessionId: id } satisfies SessionEventsRequest).then(
       (r) => r.events,

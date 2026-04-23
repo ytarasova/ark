@@ -243,6 +243,39 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     return { output };
   });
 
+  // ── Forensic files (tracks/<id>/stdio.log + transcript.jsonl) ────────────
+  //
+  // Both methods 404 when the session is missing, return empty content when
+  // the file doesn't exist, and enforce the same 2MB cap as the REST routes.
+  // `session/stdio` honours an optional `tail` to slice the trailing N lines.
+
+  router.handle("session/stdio", async (params) => {
+    const { sessionId, tail } = extract<{ sessionId: string; tail?: number }>(params, ["sessionId"]);
+    const session = await app.sessions.get(sessionId);
+    if (!session) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
+    const { readForensicFile } = await import("../../core/services/session-forensic.js");
+    const read = await readForensicFile(app.config.tracksDir, sessionId, "stdio.log", { tail });
+    if (read.tooLarge) {
+      throw new RpcError(
+        `stdio.log is ${read.size} bytes, over the 2MB cap -- pass tail=<N> to read the tail`,
+        ErrorCodes.INVALID_PARAMS,
+      );
+    }
+    return { content: read.content, size: read.size, exists: read.exists };
+  });
+
+  router.handle("session/transcript", async (params) => {
+    const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
+    const session = await app.sessions.get(sessionId);
+    if (!session) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
+    const { readForensicFile, parseJsonl } = await import("../../core/services/session-forensic.js");
+    const read = await readForensicFile(app.config.tracksDir, sessionId, "transcript.jsonl");
+    if (read.tooLarge) {
+      throw new RpcError(`transcript.jsonl is ${read.size} bytes, over the 2MB cap`, ErrorCodes.INVALID_PARAMS);
+    }
+    return { messages: parseJsonl(read.content), size: read.size, exists: read.exists };
+  });
+
   router.handle("session/recording", async (params, _notify) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
     const { readRecording } = await import("../../core/recordings.js");

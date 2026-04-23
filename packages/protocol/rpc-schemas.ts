@@ -647,6 +647,37 @@ export const sessionRecordingResponse = z
   .loose();
 export type SessionRecordingResponse = z.infer<typeof sessionRecordingResponse>;
 
+// ── session/stdio ───────────────────────────────────────────────────────────
+
+export const sessionStdioRequest = z.object({
+  sessionId: z.string().min(1),
+  tail: z.number().int().positive().optional(),
+});
+export type SessionStdioRequest = z.infer<typeof sessionStdioRequest>;
+
+export const sessionStdioResponse = z
+  .object({
+    content: z.string(),
+    size: z.number(),
+    exists: z.boolean(),
+  })
+  .loose();
+export type SessionStdioResponse = z.infer<typeof sessionStdioResponse>;
+
+// ── session/transcript ──────────────────────────────────────────────────────
+
+export const sessionTranscriptRequest = sessionIdParams;
+export type SessionTranscriptRequest = z.infer<typeof sessionTranscriptRequest>;
+
+export const sessionTranscriptResponse = z
+  .object({
+    messages: z.array(z.unknown()),
+    size: z.number(),
+    exists: z.boolean(),
+  })
+  .loose();
+export type SessionTranscriptResponse = z.infer<typeof sessionTranscriptResponse>;
+
 // ── session/events ──────────────────────────────────────────────────────────
 
 export const sessionEventsRequest = z.object({
@@ -1799,6 +1830,8 @@ export const rpcMethodSchemas: Record<string, RpcMethodSchemas> = {
   "knowledge/stats": { request: knowledgeStatsRequest, response: knowledgeStatsResponse },
   "session/output": { request: sessionOutputRequest, response: sessionOutputResponse },
   "session/recording": { request: sessionRecordingRequest, response: sessionRecordingResponse },
+  "session/stdio": { request: sessionStdioRequest, response: sessionStdioResponse },
+  "session/transcript": { request: sessionTranscriptRequest, response: sessionTranscriptResponse },
   "session/events": { request: sessionEventsRequest, response: sessionEventsResponse },
   "session/messages": { request: sessionMessagesRequest, response: sessionMessagesResponse },
   "session/export-data": { request: sessionExportDataRequest, response: sessionExportDataResponse },

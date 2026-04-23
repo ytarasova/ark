@@ -2,13 +2,15 @@
  * Conductor: HTTP server that receives channel reports from agents.
  *
  * Routes:
- *   POST /api/channel/:sessionId - receive agent report
- *   POST /api/relay              - relay message between agents
- *   GET  /api/sessions           - list sessions
- *   GET  /api/sessions/:id       - get session detail
- *   GET  /api/events/:id         - get events
- *   POST /hooks/github/merge     - GitHub PR merge webhook (auto-rollback)
- *   GET  /health                 - health check
+ *   POST /api/channel/:sessionId        - receive agent report
+ *   POST /api/relay                     - relay message between agents
+ *   GET  /api/sessions                  - list sessions
+ *   GET  /api/sessions/:id              - get session detail
+ *   GET  /api/sessions/:id/stdio        - read tracks/:id/stdio.log (raw text)
+ *   GET  /api/sessions/:id/transcript   - read tracks/:id/transcript.jsonl (ndjson)
+ *   GET  /api/events/:id                - get events
+ *   POST /hooks/github/merge            - GitHub PR merge webhook (auto-rollback)
+ *   GET  /health                        - health check
  */
 
 // Bun global type declaration (avoids requiring @types/bun as a dependency)
@@ -36,6 +38,7 @@ import { sendOSNotification } from "../notify.js";
 import { watchMergedPR, type RollbackConfig } from "../integrations/rollback.js";
 import { emitStageSpanEnd, emitSessionSpanEnd, flushSpans } from "../observability/otlp.js";
 import { DEFAULT_CONDUCTOR_PORT, DEFAULT_CONDUCTOR_HOST, DEFAULT_CHANNEL_BASE_URL } from "../constants.js";
+import { readForensicFile } from "../services/session-forensic.js";
 
 const DEFAULT_PORT = DEFAULT_CONDUCTOR_PORT;
 
@@ -494,6 +497,30 @@ export class Conductor {
         const existing = await app.sessions.get(id);
         if (!existing) return Response.json({ error: "not found" }, { status: 404 });
         return Response.json({ sessions: await app.sessions.listChildren(id) });
+      }
+      // ── /api/sessions/:id/stdio | /transcript -- forensic files ─────
+      // The session must exist (404 otherwise); the file may not yet
+      // (200 with an empty body). Respects a 2MB cap with ?tail=<N> for
+      // long-running sessions.
+      if (sub === "stdio" || sub === "transcript") {
+        const s = await app.sessions.get(id);
+        if (!s) return Response.json({ error: "not found" }, { status: 404 });
+        const innerUrl = new URL(req.url);
+        const rawTail = innerUrl.searchParams.get("tail");
+        const tail = rawTail != null ? Number(rawTail) : undefined;
+        if (rawTail != null && (!Number.isFinite(tail) || (tail as number) <= 0)) {
+          return Response.json({ error: "tail must be a positive integer" }, { status: 400 });
+        }
+        const fileName = sub === "stdio" ? "stdio.log" : "transcript.jsonl";
+        const read = await readForensicFile(app.config.tracksDir, id, fileName, { tail });
+        if (read.tooLarge) {
+          return Response.json(
+            { error: `file is ${read.size} bytes, over the 2MB cap -- use ?tail=<N> to read the tail` },
+            { status: 413 },
+          );
+        }
+        const contentType = sub === "stdio" ? "text/plain; charset=utf-8" : "application/x-ndjson; charset=utf-8";
+        return new Response(read.content, { status: 200, headers: { "Content-Type": contentType } });
       }
       if (sub) return Response.json({ error: "not found" }, { status: 404 });
       const s = await app.sessions.get(id);
