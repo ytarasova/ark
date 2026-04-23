@@ -52,25 +52,35 @@ import type { PluginRegistry } from "../plugins/registry.js";
 /**
  * Register the core services.
  *
- * Every registration is a singleton. `app: AppContext` is registered in
- * `AppContext.constructor()` so `c.app` is always resolvable by the time
- * these factories run.
+ * `app: AppContext` is registered in `AppContext.constructor()` so `c.app` is
+ * always resolvable by the time these factories run.
+ *
+ * The optional `lifetime` parameter lets `tenant-scope.ts` reuse these exact
+ * factories to register scoped copies in a child container, so tenant-sensitive
+ * services close over the tenant-scoped repos + tenant-scoped `c.app` instead
+ * of the root singletons. See `tenant-scope.ts` for the rationale: with awilix
+ * `strict: true`, singleton deps resolve through the parent scope, which would
+ * otherwise bind every tenant's `dispatchService` / `sessionLifecycle` /
+ * `sessionHooks` to the default-tenant repositories.
  */
-export function registerServices(container: AppContainer): void {
+export function registerServices(
+  container: AppContainer,
+  lifetime: Lifetime.SINGLETON | Lifetime.SCOPED = Lifetime.SINGLETON,
+): void {
   container.register({
     sessionService: asFunction(
       (c: { sessions: SessionRepository; events: EventRepository; messages: MessageRepository; app: AppContext }) =>
         new SessionService(c.sessions, c.events, c.messages, c.app),
-      { lifetime: Lifetime.SINGLETON },
+      { lifetime },
     ),
 
     computeService: asFunction(
       (c: { computes: ComputeRepository; app: AppContext }) => new ComputeService(c.computes, c.app),
-      { lifetime: Lifetime.SINGLETON },
+      { lifetime },
     ),
 
     historyService: asFunction((c: { db: DatabaseAdapter }) => new HistoryService(c.db), {
-      lifetime: Lifetime.SINGLETON,
+      lifetime,
     }),
 
     sessionHooks: asFunction(
@@ -104,7 +114,7 @@ export function registerServices(container: AppContainer): void {
           getStage: (flowName, stageName) => flow.getStage(c.app, flowName, stageName),
           getStageAction: (flowName, stageName) => flow.getStageAction(c.app, flowName, stageName),
         }),
-      { lifetime: Lifetime.SINGLETON },
+      { lifetime },
     ),
 
     sessionLifecycle: asFunction(
@@ -143,7 +153,7 @@ export function registerServices(container: AppContainer): void {
           advance: (id, force) => c.app.stageAdvance.advance(id, force),
           provisionWorkspaceWorkdir: (session, ws, opts) => provisionWorkspaceWorkdir(c.app, session, ws as any, opts),
         }),
-      { lifetime: Lifetime.SINGLETON },
+      { lifetime },
     ),
 
     // DispatchService -- RF-3 narrow deps. No AppContext field. Callbacks
@@ -222,7 +232,7 @@ export function registerServices(container: AppContainer): void {
           // executors stop touching AppContext (separate migration).
           getApp: () => c.app,
         }),
-      { lifetime: Lifetime.SINGLETON },
+      { lifetime },
     ),
 
     // StageAdvanceService -- RF-3 narrow deps. No AppContext. Callbacks break
@@ -282,7 +292,7 @@ export function registerServices(container: AppContainer): void {
           resolveNextStage: (flowName, stage, outcome) => flow.resolveNextStage(c.app, flowName, stage, outcome),
           evaluateGate: (flowName, stage, session) => flow.evaluateGate(c.app, flowName, stage, session),
         }),
-      { lifetime: Lifetime.SINGLETON },
+      { lifetime },
     ),
   });
 }

@@ -4,8 +4,11 @@
  * `forTenant()` returns a shallow copy of the parent AppContext whose DI
  * container is a child scope of the parent's. Tenant-scoped repositories
  * (with `setTenant(tenantId)` already applied) are registered on the child
- * scope; everything else (providers, infra launchers, pricing, ...) falls
- * through to the parent scope's singleton registrations.
+ * scope, together with scoped re-registrations of every core service whose
+ * dep graph closes over a tenant-sensitive repo (dispatch, lifecycle, hooks,
+ * stage-advance, history, session, compute). Everything else (providers,
+ * infra launchers, pricing, ...) falls through to the parent scope's
+ * singleton registrations.
  *
  * Why awilix `createScope()` instead of manual `new X(db)`? The old code
  * constructed each repo with `new SessionRepository(db)`, bypassing the DI
@@ -15,8 +18,16 @@
  * scope means the child's factory invocations pick up every dep the parent
  * factory declared, so adding a dep to a repo can never again skip the
  * tenant-scope path.
+ *
+ * Why re-register services as SCOPED? Awilix `strict: true` resolves
+ * SINGLETON deps through the parent scope. If services stayed SINGLETON,
+ * `tenantApp.dispatchService === rootApp.dispatchService` and every "tenant"
+ * call would land in default-tenant repos. SCOPED forces a fresh construction
+ * per child container, and registering `app: asValue(scoped)` on the child
+ * makes every callback that closes over `c.app` route through the child
+ * scope too.
  */
-import { asFunction, Lifetime } from "awilix";
+import { asFunction, asValue, Lifetime } from "awilix";
 import type { AppContext } from "./app.js";
 import type { AppContainer } from "./container.js";
 import type { DatabaseAdapter } from "./database/index.js";
@@ -35,8 +46,8 @@ import {
 import { KnowledgeStore } from "./knowledge/store.js";
 import { DbResourceStore } from "./stores/db-resource-store.js";
 import { UsageRecorder } from "./observability/usage.js";
-import { ComputeService } from "./services/compute.js";
 import type { PricingRegistry } from "./observability/pricing.js";
+import { registerServices } from "./di/services.js";
 
 /**
  * Build a tenant-scoped AppContext. The returned object shadows every
@@ -145,14 +156,6 @@ export function buildTenantScope(parent: AppContext, tenantId: string): AppConte
       },
       { lifetime: Lifetime.SCOPED },
     ),
-    // ComputeService consumes the child-scope `computes` repo so writes
-    // land in the tenant's rows. Awilix resolves the `computes` dep from
-    // the same child scope, so a new ctor dep on ComputeService (or any
-    // transitive dep on a repo) is picked up automatically.
-    computeService: asFunction(
-      (c: { computes: ComputeRepository; app: AppContext }) => new ComputeService(c.computes, c.app),
-      { lifetime: Lifetime.SCOPED },
-    ),
   });
 
   // Hosted-mode DB-backed resource stores. File-backed local stores are
@@ -239,6 +242,23 @@ export function buildTenantScope(parent: AppContext, tenantId: string): AppConte
     get: () => tenantId,
     configurable: true,
   });
+
+  // Services must see the TENANT-SCOPED AppContext, not the root. Registering
+  // `app: asValue(scoped)` on the child container shadows the parent's
+  // `asValue(root)`, so every service factory below (invoked via
+  // `registerServices(..., Lifetime.SCOPED)`) receives `c.app === scoped`.
+  // Callbacks like `c.app.dispatchService.dispatch(id)` then route through
+  // the child scope, so repo reads/writes land in the right tenant. Without
+  // this, awilix `strict: true` resolves `app` (a SINGLETON value) through
+  // the parent, binding services back to default-tenant repos.
+  childContainer.register({ app: asValue(scoped) });
+
+  // Re-register every core service as SCOPED on the child container. Shares
+  // the exact factory list in `di/services.ts` so adding a service dep can
+  // never silently bypass the tenant scope. Each factory reads deps from the
+  // child cradle -- which now resolves repos from `childContainer.register`
+  // above and `app` from `asValue(scoped)` just above.
+  registerServices(childContainer, Lifetime.SCOPED);
 
   return scoped;
 }

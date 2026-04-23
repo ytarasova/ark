@@ -301,4 +301,97 @@ describe("tenant scoping", async () => {
       app.sessions.setTenant("default");
     });
   });
+
+  // Regression tests for round-2 P0-1 (service-tree SCOPED lifecycle).
+  // Before the fix, services stayed SINGLETON on the root container so
+  // `tenantApp.dispatchService === rootApp.dispatchService` -- every service
+  // was bound to default-tenant repos, silently leaking cross-tenant.
+  describe("service-tree is tenant-scoped (round-2 P0-1)", () => {
+    it("service instances differ between tenants and root", () => {
+      const tenantApp = app.forTenant("acme");
+      const otherTenantApp = app.forTenant("other");
+
+      // Every service that closes over a tenant-sensitive repo must be a
+      // fresh scoped instance per child container. Identity-equal would mean
+      // the singleton leaked through the root scope.
+      expect(tenantApp.dispatchService).not.toBe(app.dispatchService);
+      expect(tenantApp.sessionLifecycle).not.toBe(app.sessionLifecycle);
+      expect(tenantApp.sessionService).not.toBe(app.sessionService);
+      expect(tenantApp.sessionHooks).not.toBe(app.sessionHooks);
+      expect(tenantApp.stageAdvance).not.toBe(app.stageAdvance);
+      expect(tenantApp.historyService).not.toBe(app.historyService);
+      expect(tenantApp.computeService).not.toBe(app.computeService);
+
+      // Two different tenant scopes also get different service instances.
+      expect(tenantApp.dispatchService).not.toBe(otherTenantApp.dispatchService);
+      expect(tenantApp.sessionLifecycle).not.toBe(otherTenantApp.sessionLifecycle);
+
+      // Within a single tenant scope, repeated accessor reads return the same
+      // instance (SCOPED -- one instance per child container).
+      expect(tenantApp.dispatchService).toBe(tenantApp.dispatchService);
+      expect(tenantApp.sessionLifecycle).toBe(tenantApp.sessionLifecycle);
+    });
+
+    it("sessionLifecycle.start() on a tenant scope writes with tenant_id", async () => {
+      const tenantApp = app.forTenant("acme");
+      const session = await tenantApp.sessionLifecycle.start({ summary: "tenant acme start" } as any);
+
+      // The row must be tagged with `acme` -- not `default`. Before the fix,
+      // sessionLifecycle was the root singleton, so its `sessions` dep was
+      // the default-tenant repo and the INSERT wrote `tenant_id='default'`.
+      expect(session.tenant_id).toBe("acme");
+
+      // Cross-check via the tenant-scoped sessions repo: it can read the row.
+      const roundtrip = await tenantApp.sessions.get(session.id);
+      expect(roundtrip).not.toBeNull();
+      expect(roundtrip!.tenant_id).toBe("acme");
+
+      // The default tenant's sessions repo must NOT see the acme session --
+      // proves the write actually tagged the tenant rather than accidentally
+      // landing in a tenant-agnostic row.
+      const fromDefault = await app.sessions.get(session.id);
+      expect(fromDefault).toBeNull();
+    });
+
+    it("sessionHooks closes over the tenant-scoped events repo", () => {
+      // Structural check: the hook-status applier reaches for deps.events.log
+      // at runtime. If the scoped sessionHooks were singleton-bound to the
+      // root events repo, every hook log would land in the default tenant.
+      // Reflect into the private deps to assert the tenant id is `acme`.
+      const tenantApp = app.forTenant("acme");
+      const hooks = tenantApp.sessionHooks as unknown as { hookStatus: { deps: { events: { getTenant(): string } } } };
+      expect(hooks.hookStatus.deps.events.getTenant()).toBe("acme");
+
+      // Confirm the default scope's hooks still use the default repo.
+      const rootHooks = app.sessionHooks as unknown as { hookStatus: { deps: { events: { getTenant(): string } } } };
+      expect(rootHooks.hookStatus.deps.events.getTenant()).toBe("default");
+    });
+
+    it("dispatchService on tenant scope binds to tenant-scoped sessions repo", async () => {
+      // Create a session in tenant `acme`. Calling the default-tenant
+      // dispatchService for that id must fail to locate the session (returns
+      // a not-found-ish result), while the tenant-scoped dispatchService sees
+      // it. Before the fix both resolved to the same root instance, so both
+      // reads would have gone through default-tenant repos.
+      const tenantApp = app.forTenant("acme");
+      const s = await tenantApp.sessions.create({ summary: "dispatch-ownership" });
+
+      // Default tenant's sessions repo does not see the row.
+      const fromDefault = await app.sessions.get(s.id);
+      expect(fromDefault).toBeNull();
+
+      // Tenant repo does.
+      const fromTenant = await tenantApp.sessions.get(s.id);
+      expect(fromTenant).not.toBeNull();
+
+      // dispatchService is scoped (identity differs from root) -- structural
+      // check already covered above. The observable effect is that behavior
+      // diverges: a dispatch called against the root would resolve
+      // nothing for `s.id`, while tenant-scoped dispatch would find it. We
+      // only assert the identity divergence here; downstream dispatch is
+      // exercised by the rest of the dispatch suite, which already runs
+      // through the container.
+      expect(tenantApp.dispatchService).not.toBe(app.dispatchService);
+    });
+  });
 });
