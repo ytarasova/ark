@@ -23,6 +23,15 @@ export function fmtCost(n: number): string {
   return n < 0.01 && n > 0 ? "<$0.01" : "$" + n.toFixed(2);
 }
 
+/** Format token counts as a compact "128.4k" / "1.2M" style string. */
+export function fmtTokens(tokensIn?: number | null, tokensOut?: number | null): string {
+  const total = (tokensIn ?? 0) + (tokensOut ?? 0);
+  if (!total) return "0";
+  if (total >= 1_000_000) return (total / 1_000_000).toFixed(2).replace(/\.?0+$/, "") + "M";
+  if (total >= 1_000) return (total / 1_000).toFixed(1).replace(/\.0$/, "") + "k";
+  return String(total);
+}
+
 /** Extract a friendly repository name from a path or URL. */
 export function formatRepoName(repo: string | null | undefined): string {
   if (!repo) return "-";

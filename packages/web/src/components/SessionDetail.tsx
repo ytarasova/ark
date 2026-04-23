@@ -2,7 +2,7 @@ import { useState } from "react";
 import { api } from "../hooks/useApi.js";
 import { useSessionDetail } from "../hooks/useSessionDetail.js";
 import { useSessionActions } from "../hooks/useSessionActions.js";
-import { fmtCost } from "../util.js";
+import { fmtCost, fmtTokens } from "../util.js";
 
 import { SessionHeader } from "./ui/SessionHeader.js";
 import { ContentTabs } from "./ui/ContentTabs.js";
@@ -110,7 +110,22 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         sessionId={session.id}
         summary={session.summary || session.id}
         status={normalizeStatus(session.status)}
-        stages={d.stages}
+        stageLabel={session.stage ? `${session.status} · ${session.stage}` : undefined}
+        runtime={session.runtime || session.agent_runtime}
+        agent={session.agent}
+        compute={session.compute_provider || session.compute_kind}
+        kvs={[
+          session.branch ? { k: "branch", v: session.branch, mono: true } : null,
+          session.flow ? { k: "flow", v: session.flow } : null,
+        ].filter(Boolean) as any}
+        tickers={
+          d.cost?.cost != null
+            ? [
+                { label: "tok", value: fmtTokens(d.cost?.tokens_in, d.cost?.tokens_out), bump: true },
+                { label: "", value: fmtCost(d.cost.cost) },
+              ]
+            : undefined
+        }
         cost={d.cost?.cost ? fmtCost(d.cost.cost) : undefined}
         actions={!readOnly ? headerActions : undefined}
         onCopyId={() => {
@@ -119,6 +134,7 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         }}
         selectedStage={d.stageFilter}
         onStageClick={d.toggleStageFilter}
+        stages={d.stages}
       />
 
       {d.totalStages > 0 && (
