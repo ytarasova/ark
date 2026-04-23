@@ -364,6 +364,12 @@ async function drainStream(
       if (msg.type === "result") {
         sawResult = true;
         if (msg.is_error) exitCode = 1;
+        // Streaming-input mode keeps the SDK iterator open after `result`
+        // waiting for the next user message in the queue. Break out so the
+        // process can exit -- if a caller wants the agent to handle another
+        // turn, they start a new session or push a message and re-enter via
+        // session/inject (which spawns a new query() call upstream).
+        break;
       }
     }
   } catch (err: unknown) {
