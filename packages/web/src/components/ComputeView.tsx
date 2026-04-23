@@ -67,6 +67,7 @@ export function ComputeView({
   const metricHistoryRef = useRef<Map<string, MetricHistoryPoint[]>>(new Map());
   const [metricHistory, setMetricHistory] = useState<MetricHistoryPoint[]>([]);
 
+  useEffect(() => {
     if (!selectedName || !snapshot?.metrics) {
       // Keep the current series frozen on target switch / error -- resetting
       // to [] would blank the chart while the next poll lands.
