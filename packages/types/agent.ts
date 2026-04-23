@@ -47,6 +47,14 @@ export interface RuntimeDefinition {
    * stage wins on conflict.
    */
   secrets?: string[];
+  /**
+   * Free-text completion instructions appended to every task prompt built for
+   * this runtime. Each runtime owns its own "how do you finish?" semantics
+   * (e.g. claude: call report(completed); agent-sdk: stop with a final
+   * assistant message). Rendered verbatim; Nunjucks substitution applies.
+   * When omitted, no completion ritual is appended.
+   */
+  task_prompt?: string;
   _source?: "builtin" | "global" | "project";
   _path?: string;
 }

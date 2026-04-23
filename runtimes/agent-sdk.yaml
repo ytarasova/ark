@@ -30,3 +30,11 @@ compat: [bedrock]
 billing:
   mode: api
   transcript_parser: agent-sdk
+# agent-sdk does not expose the conductor's `report` MCP tool. Completion is
+# signalled by the SDK's own `result/success` message (emitted when the agent
+# stops with a final assistant turn), which launch.ts forwards to the
+# conductor as a SessionEnd hook. Tell the agent plainly not to invent a tool
+# it doesn't have.
+task_prompt: |
+
+  When you finish, stop with a final assistant message that summarizes what you accomplished (files changed, tests added, key decisions). The UI picks up that summary automatically. Do not invent a "report" tool -- you don't have one.

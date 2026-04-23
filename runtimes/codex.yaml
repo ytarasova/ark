@@ -12,3 +12,6 @@ default_model: gpt-5-codex
 billing:
   mode: api
   transcript_parser: codex
+task_prompt: |
+
+  When you finish, stop with a final assistant message that summarizes what you accomplished (files changed, tests added, key decisions). The UI picks up that summary automatically. Do not invent a "report" tool -- you don't have one.
