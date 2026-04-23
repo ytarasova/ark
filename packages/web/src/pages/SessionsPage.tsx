@@ -49,7 +49,18 @@ export function SessionsPage({
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const serverStatus = filter === "archived" ? "archived" : undefined;
-  const { sessions, refresh } = useSessions(serverStatus);
+  // Group-by-parent is the default (tree mode). Persisted in localStorage so
+  // the user's toggle sticks across reloads.
+  const [groupByParent, setGroupByParent] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const raw = window.localStorage.getItem("ark:sessionList:groupByParent");
+    return raw == null ? true : raw === "1";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("ark:sessionList:groupByParent", groupByParent ? "1" : "0");
+  }, [groupByParent]);
+  const { sessions, refresh } = useSessions(serverStatus, { rootsOnly: groupByParent && filter !== "archived" });
   const [showNew, setShowNew] = useState(false);
 
   // ── Unread counts ──────────────────────────────────────────────────────────
@@ -243,6 +254,8 @@ export function SessionsPage({
       readOnly={readOnly}
       flowStagesMap={flowStagesMap}
       unreadCounts={unreadCounts}
+      groupByParent={groupByParent}
+      onGroupByParentChange={setGroupByParent}
     />
   ) : undefined;
 

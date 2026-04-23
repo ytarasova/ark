@@ -280,8 +280,19 @@ export async function fetchApi<T>(path: string, opts?: RequestInit): Promise<T> 
 
 export const api = {
   // ── Sessions (Zod-typed) ──────────────────────────────────────────────────
-  getSessions: (filters?: Partial<SessionListRequest>) =>
+  getSessions: (filters?: Partial<SessionListRequest> & { rootsOnly?: boolean }) =>
     rpc<SessionListResponse>("session/list", { limit: 200, ...(filters ?? {}) }).then((r) => r.sessions),
+  /**
+   * List the direct children of a session. Each row carries its own
+   * `child_stats` rollup (nullable). Backed by `session/list_children`
+   * which was added alongside the tree API.
+   */
+  getSessionChildren: (id: string) => rpc<{ sessions: any[] }>("session/list_children", { sessionId: id }),
+  /**
+   * Load the full recursive tree rooted at `id`. The server enforces max
+   * depth 6 and rejects non-root ids. Returns `{ root: SessionWithChildren }`.
+   */
+  getSessionTree: (id: string) => rpc<{ root: any }>("session/tree", { sessionId: id }),
   getSession: (id: string) =>
     rpc<SessionReadResponse>("session/read", { sessionId: id, include: ["events"] } satisfies SessionReadRequest),
   createSession: (data: SessionStartRequest) =>

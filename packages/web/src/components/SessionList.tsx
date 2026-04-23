@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { SessionList as UISessionList, type SessionListItem } from "./ui/SessionList.js";
 import { FilterChip } from "./ui/FilterChip.js";
 import type { SessionStatus } from "./ui/StatusDot.js";
+import { SessionRowWithChildren } from "./SessionRowWithChildren.js";
 import { relTime, fmtCost } from "../util.js";
 
 /** Format token counts in the "48.2k" / "1.2M" style the design uses. */
@@ -31,6 +32,9 @@ interface SessionListProps {
   readOnly: boolean;
   flowStagesMap?: Record<string, any[]>;
   unreadCounts?: Record<string, number>;
+  /** When true, render the list grouped by root with expand-to-tree rows. */
+  groupByParent?: boolean;
+  onGroupByParentChange?: (v: boolean) => void;
 }
 
 /** Map raw session status to a valid SessionStatus type. */
@@ -55,6 +59,67 @@ function computeProgress(session: any, flowStagesMap?: Record<string, any[]>): n
   return (idx + 1) / stages.length;
 }
 
+export function sessionToListItem(
+  s: any,
+  flowStagesMap?: Record<string, any[]>,
+  unreadCounts?: Record<string, number>,
+): SessionListItem {
+  const totalTokens =
+    typeof s.tokens_total === "number"
+      ? s.tokens_total
+      : typeof s.tokens_in === "number" || typeof s.tokens_out === "number"
+        ? (s.tokens_in ?? 0) + (s.tokens_out ?? 0)
+        : undefined;
+  return {
+    id: s.id,
+    status: normalizeStatus(s.status),
+    summary: s.summary || s.id,
+    runtime: s.runtime || s.agent_runtime || s.agent || undefined,
+    flow: s.pipeline || s.flow || undefined,
+    stageLabel: s.stage || undefined,
+    progress: computeProgress(s, flowStagesMap),
+    relativeTime: relTime(s.updated_at),
+    unreadCount: unreadCounts?.[s.id] ?? 0,
+    agentName: s.agent,
+    compute: s.compute_provider || s.compute_kind || undefined,
+    tokens: fmtTokens(totalTokens),
+    errorText: s.status === "failed" && s.error ? shortError(s.error) : undefined,
+    cost: s.cost != null ? fmtCost(s.cost) : undefined,
+  };
+}
+
+const EXPANDED_STORAGE_KEY = "ark:sessionList:expanded";
+
+function getStorage(): Storage | null {
+  // Look on both `window` (browser) and `globalThis` (tests). Return null
+  // when neither is available.
+  const maybe = (typeof window !== "undefined" ? window.localStorage : undefined) ?? (globalThis as any).localStorage;
+  return maybe ?? null;
+}
+
+function loadExpanded(): Set<string> {
+  const storage = getStorage();
+  if (!storage) return new Set();
+  try {
+    const raw = storage.getItem(EXPANDED_STORAGE_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function persistExpanded(ids: Set<string>): void {
+  const storage = getStorage();
+  if (!storage) return;
+  try {
+    storage.setItem(EXPANDED_STORAGE_KEY, JSON.stringify(Array.from(ids)));
+  } catch {
+    // ignore quota / availability errors
+  }
+}
+
 export function SessionListPanel({
   sessions,
   selectedId,
@@ -69,7 +134,25 @@ export function SessionListPanel({
   readOnly,
   flowStagesMap,
   unreadCounts,
+  groupByParent,
+  onGroupByParentChange,
 }: SessionListProps) {
+  const [expanded, setExpandedState] = useState<Set<string>>(() => loadExpanded());
+
+  // Persist whenever the set changes.
+  useEffect(() => {
+    persistExpanded(expanded);
+  }, [expanded]);
+
+  const toggleExpanded = useCallback((id: string) => {
+    setExpandedState((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
   // Compute status counts
   const counts = useMemo(() => {
     const c = { running: 0, waiting: 0, completed: 0, failed: 0 };
@@ -102,31 +185,7 @@ export function SessionListPanel({
 
   // Map to UI format
   const items: SessionListItem[] = useMemo(
-    () =>
-      filtered.map((s) => {
-        const totalTokens =
-          typeof s.tokens_total === "number"
-            ? s.tokens_total
-            : typeof s.tokens_in === "number" || typeof s.tokens_out === "number"
-              ? (s.tokens_in ?? 0) + (s.tokens_out ?? 0)
-              : undefined;
-        return {
-          id: s.id,
-          status: normalizeStatus(s.status),
-          summary: s.summary || s.id,
-          runtime: s.runtime || s.agent_runtime || s.agent || undefined,
-          flow: s.pipeline || s.flow || undefined,
-          stageLabel: s.stage || undefined,
-          progress: computeProgress(s, flowStagesMap),
-          relativeTime: relTime(s.updated_at),
-          unreadCount: unreadCounts?.[s.id] ?? 0,
-          agentName: s.agent,
-          compute: s.compute_provider || s.compute_kind || undefined,
-          tokens: fmtTokens(totalTokens),
-          errorText: s.status === "failed" && s.error ? shortError(s.error) : undefined,
-          cost: s.cost != null ? fmtCost(s.cost) : undefined,
-        };
-      }),
+    () => filtered.map((s) => sessionToListItem(s, flowStagesMap, unreadCounts)),
     [filtered, flowStagesMap, unreadCounts],
   );
 
@@ -152,15 +211,74 @@ export function SessionListPanel({
         />
       )}
       <FilterChip label="All" active={filter === "all"} onClick={() => onFilterChange("all")} />
+      {onGroupByParentChange && (
+        <label
+          data-testid="group-by-parent-toggle"
+          className="ml-auto inline-flex items-center gap-[4px] cursor-pointer select-none
+            font-[family-name:var(--font-mono-ui)] text-[10px] uppercase tracking-[0.05em] text-[var(--fg-muted)]
+            hover:text-[var(--fg)]"
+          title="Group spawned sessions under their parent"
+        >
+          <input
+            type="checkbox"
+            checked={!!groupByParent}
+            onChange={(e) => onGroupByParentChange(e.target.checked)}
+            className="h-[11px] w-[11px] cursor-pointer accent-[var(--primary)]"
+          />
+          Group by parent
+        </label>
+      )}
     </>
   );
 
   // Map "active" filter to combined running + waiting
-  const visible = filter === "active" ? items.filter((s) => s.status === "running" || s.status === "waiting") : items;
+  const visibleItems =
+    filter === "active" ? items.filter((s) => s.status === "running" || s.status === "waiting") : items;
+
+  // In tree mode we render custom rows ourselves so the chevron + child list
+  // can be inlined. `filtered` is kept 1:1 aligned with `items`.
+  if (groupByParent) {
+    const visibleSessions =
+      filter === "active" ? filtered.filter((s) => s.status === "running" || s.status === "waiting") : filtered;
+
+    return (
+      <UISessionList
+        sessions={[]}
+        selectedId={selectedId}
+        onSelect={onSelect}
+        search={search}
+        onSearchChange={onSearchChange}
+        filterChips={filterChips}
+        onNewSession={!readOnly ? onNewSession : undefined}
+        count={sessions?.length ?? 0}
+      >
+        <div data-testid="session-tree-list" className="flex-1 min-h-0 overflow-y-auto py-[2px] flex flex-col">
+          {visibleSessions.map((s) => (
+            <SessionRowWithChildren
+              key={s.id}
+              session={s}
+              depth={0}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              onArchive={!readOnly ? onArchive : undefined}
+              onDelete={!readOnly ? onDelete : undefined}
+              expanded={expanded}
+              onToggleExpand={toggleExpanded}
+              flowStagesMap={flowStagesMap}
+              unreadCounts={unreadCounts}
+            />
+          ))}
+          {visibleSessions.length === 0 && (
+            <div className="px-3 py-10 text-center text-[12px] text-[var(--fg-muted)]">No sessions yet</div>
+          )}
+        </div>
+      </UISessionList>
+    );
+  }
 
   return (
     <UISessionList
-      sessions={visible}
+      sessions={visibleItems}
       selectedId={selectedId}
       onSelect={onSelect}
       onArchive={!readOnly ? onArchive : undefined}

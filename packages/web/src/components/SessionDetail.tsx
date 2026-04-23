@@ -23,6 +23,7 @@ import { RestartDialog } from "./session/RestartDialog.js";
 import { BudgetBar } from "./session/BudgetBar.js";
 import { ResumeBanner } from "./session/ResumeBanner.js";
 import { ForEachRollup, ChildSessionCluster } from "./session/ForEachRollup.js";
+import { SessionBreadcrumb } from "./session/SessionBreadcrumb.js";
 import type { ErrorInfo } from "./session/types.js";
 
 // Re-exported for back-compat: `__tests__/RejectGateModal.test.ts` imports
@@ -141,6 +142,7 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-[var(--bg)]">
       <ScrollProgress progress={d.scrollProgress} />
+      {session.parent_id && <SessionBreadcrumb session={session} />}
       <SessionHeader
         sessionId={session.id}
         summary={session.summary || session.id}
