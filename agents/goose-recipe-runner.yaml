@@ -1,6 +1,7 @@
 name: goose-recipe-runner
 description: "Goose agent that executes a recipe file passed via session inputs."
 runtime: goose
+model: claude-sonnet-4-6
 max_turns: 200
 recipe: "{inputs.files.recipe}"
 system_prompt: |

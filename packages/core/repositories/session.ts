@@ -53,6 +53,7 @@ type DrizzleSelectSession = {
   userId: string | null;
   tenantId: string;
   workspaceId: string | null;
+  orchestrator: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -101,6 +102,7 @@ function rowToSession(row: DrizzleSelectSession): Session {
     user_id: row.userId,
     tenant_id: row.tenantId,
     workspace_id: row.workspaceId,
+    orchestrator: (row.orchestrator ?? "custom") as Session["orchestrator"],
     created_at: row.createdAt,
     updated_at: row.updatedAt,
   } as Session;
@@ -172,6 +174,8 @@ function snakeToDrizzleColumn(key: string, schema: DrizzleClient["schema"]): { c
       return { col: s.userId, jsonEncode: false };
     case "workspace_id":
       return { col: s.workspaceId, jsonEncode: false };
+    case "orchestrator":
+      return { col: s.orchestrator, jsonEncode: false };
     case "updated_at":
       return { col: s.updatedAt, jsonEncode: false };
     default:
@@ -265,6 +269,7 @@ export class SessionRepository {
       userId: opts.user_id ?? null,
       tenantId: this.tenantId,
       workspaceId: opts.workspace_id ?? null,
+      orchestrator: "custom",
       createdAt: ts,
       updatedAt: ts,
     });

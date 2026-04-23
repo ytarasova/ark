@@ -1,8 +1,9 @@
 import { type Command } from "commander";
 import chalk from "chalk";
 import { resolve } from "path";
-import { existsSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { execSync } from "child_process";
+import YAML from "yaml";
 import * as core from "../../../core/index.js";
 import { getArkClient, getInProcessApp } from "../../app-client.js";
 import { sanitizeSummary } from "../../helpers.js";
@@ -20,14 +21,16 @@ export function registerStartCommands(session: Command) {
       "Deterministic branch name for the worktree (default: derived from --ticket/--summary or auto)",
     )
     .option("-s, --summary <text>", "Task summary")
-    .option("-p, --flow <name>", "Flow name", "default")
+    .option(
+      "-p, --flow <name-or-path>",
+      "Flow name OR a path to an inline flow YAML. Paths ending in .yaml/.yml are read + parsed and forwarded as an inline flow definition; bare names hit the FlowStore.",
+      "default",
+    )
     .option("-c, --compute <name>", "Compute name")
     .option("-g, --group <name>", "Group name")
     .option("-a, --attach", "Attach to the session's tmux pane after starting")
     .option("--claude-session <id>", "Create from an existing Claude Code session (use 'ark claude list' to find IDs)")
     .option("--recipe <name>", "Create session from a recipe template")
-    .option("--runtime <name>", "Override agent runtime (e.g. codex, gemini, claude)")
-    .option("-m, --model <model>", "Override model for all stages (e.g. haiku, sonnet, opus, or a full provider slug)")
     .option(
       "--max-budget <usd>",
       "Cumulative cost cap for this session in USD. Halts for_each if exceeded.",
@@ -134,14 +137,24 @@ export function registerStartCommands(session: Command) {
         }
       }
 
-      // Handle --runtime / --model: store overrides in session config
+      // Inline flow support: `--flow ./foo.yaml` (or any path with a .yaml/.yml
+      // suffix and an actual file behind it) is read + parsed and forwarded as
+      // an inline flow object. Bare names still resolve via the FlowStore.
+      let flowArg: string | Record<string, unknown> | undefined = opts.flow;
+      if (typeof opts.flow === "string" && /\.(yaml|yml)$/i.test(opts.flow)) {
+        const flowPath = resolve(opts.flow);
+        if (existsSync(flowPath)) {
+          try {
+            flowArg = YAML.parse(readFileSync(flowPath, "utf-8")) as Record<string, unknown>;
+            console.log(chalk.dim(`Parsed inline flow from ${flowPath}`));
+          } catch (e: any) {
+            console.error(chalk.red(`Failed to parse inline flow YAML at ${flowPath}: ${e?.message ?? e}`));
+            process.exit(1);
+          }
+        }
+      }
+
       let sessionConfig: Record<string, unknown> | undefined;
-      if (opts.runtime) {
-        sessionConfig = { ...sessionConfig, runtime_override: opts.runtime };
-      }
-      if (opts.model) {
-        sessionConfig = { ...sessionConfig, model_override: opts.model };
-      }
       if (typeof opts.maxBudget === "number" && Number.isFinite(opts.maxBudget)) {
         sessionConfig = { ...sessionConfig, max_budget_usd: opts.maxBudget };
       }
@@ -169,7 +182,12 @@ export function registerStartCommands(session: Command) {
       const paramInputs: Record<string, string> = { ...(opts.param ?? {}) };
 
       try {
-        const flowDef = opts.flow ? await ark.flowRead(opts.flow) : null;
+        // Flow input validation: only run when the flow is passed by name
+        // (a named flow lives in the FlowStore, so we can flowRead it). Inline
+        // flows -- passed as an object -- carry their own declared inputs and
+        // are validated server-side when the session dispatches.
+        const flowDef =
+          typeof opts.flow === "string" && !/\.(yaml|yml)$/i.test(opts.flow) ? await ark.flowRead(opts.flow) : null;
         const declared = flowDef?.inputs;
         if (declared) {
           const missing: string[] = [];
@@ -217,7 +235,7 @@ export function registerStartCommands(session: Command) {
         summary,
         repo,
         ...(opts.branch ? { branch: opts.branch } : {}),
-        flow: opts.flow,
+        flow: flowArg as string,
         compute_name: opts.compute,
         agent: recipeAgent,
         workdir,
@@ -240,8 +258,6 @@ export function registerStartCommands(session: Command) {
       console.log(`  Flow:     ${s.flow}`);
       console.log(`  Stage:    ${s.stage ?? "-"}`);
       if (workdir) console.log(`  Workdir:  ${workdir}`);
-      if (opts.runtime) console.log(`  Runtime:  ${opts.runtime}`);
-      if (opts.model) console.log(`  Model:    ${opts.model}`);
 
       // Server handler now dispatches the first-stage agent atomically. Re-read
       // the session so --attach picks up the now-populated session_id.

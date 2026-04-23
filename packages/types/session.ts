@@ -112,15 +112,94 @@ export interface Session {
    * worktree). Wave 2a only threads the column through repo + CLI.
    */
   workspace_id: string | null;
+  /**
+   * Orchestrator that drives this session's state machine. `"custom"` is the
+   * in-tree engine under `packages/core/state/flow.ts`. A Temporal-backed
+   * alternative is in design (#374) and will ship as a second enum value;
+   * the column exists today so that the eventual cutover doesn't need a
+   * simultaneous schema change.
+   */
+  orchestrator: SessionOrchestrator;
   created_at: string;
   updated_at: string;
 }
+
+/** Enum of supported orchestrators. Only `custom` is implemented today. */
+export type SessionOrchestrator = "custom";
 
 export interface SessionInputs {
   /** Role-keyed absolute paths to files the session should consume. */
   files?: Record<string, string>;
   /** Arbitrary k=v params. Flattened into `{inputs.params.<key>}` templating. */
   params?: Record<string, string>;
+}
+
+/**
+ * Inline flow/agent/runtime/model shapes accepted at dispatch time. These are
+ * deliberately loose -- the domain validation lives in `resolveStage()`. Types
+ * are declared here so CLI + server + CLI tests share one definition.
+ */
+export interface InlineModelInput {
+  id: string;
+  display?: string;
+  provider: string;
+  aliases?: string[];
+  provider_slugs: Record<string, string>;
+  context_window?: number;
+  pricing?: Record<string, unknown>;
+  capabilities?: string[];
+}
+
+export interface InlineRuntimeInput {
+  name: string;
+  description?: string;
+  type: string;
+  command?: string[];
+  task_delivery?: "stdin" | "file" | "arg";
+  permission_mode?: string;
+  env?: Record<string, string>;
+  mcp_servers?: (string | Record<string, unknown>)[];
+  secrets?: string[];
+  billing?: Record<string, unknown>;
+  task_prompt?: string;
+  compat?: string[];
+}
+
+export interface InlineAgentInput {
+  name?: string;
+  description?: string;
+  runtime: string | InlineRuntimeInput;
+  model?: string | InlineModelInput;
+  max_turns?: number;
+  system_prompt: string;
+  tools?: string[];
+  mcp_servers?: (string | Record<string, unknown>)[];
+  skills?: string[];
+  memories?: string[];
+  context?: string[];
+  permission_mode?: string;
+  env?: Record<string, string>;
+  command?: string[];
+  task_delivery?: "stdin" | "file" | "arg";
+}
+
+export interface InlineStageInput {
+  name: string;
+  type?: "agent" | "action" | "fork";
+  agent?: string | InlineAgentInput;
+  action?: string;
+  task?: string;
+  gate?: "auto" | "manual" | "condition" | "review";
+  model?: string;
+  depends_on?: string[];
+  [k: string]: unknown;
+}
+
+export interface InlineFlowInput {
+  name?: string;
+  description?: string;
+  stages: InlineStageInput[];
+  [k: string]: unknown;
 }
 
 export interface CreateSessionOpts {
@@ -142,8 +221,19 @@ export interface CreateSessionOpts {
    * (no migration needed -- uses the existing JSON config blob).
    */
   max_budget_usd?: number;
-  flow?: string;
-  agent?: string | null;
+  /**
+   * Flow reference. Either a name (resolved via FlowStore) or a literal
+   * inline flow object. Inline flows are registered on the ephemeral overlay
+   * under `inline-<sessionId>` and persisted under `session.config.inline_flow`
+   * so the daemon can rehydrate them after a restart.
+   */
+  flow?: string | InlineFlowInput;
+  /**
+   * Agent override. Either an agent name or a literal inline agent object
+   * (see `InlineAgentInput` for the required fields). Persisted on the
+   * session row as a name only; inline agents flow through stage.agent.
+   */
+  agent?: string | InlineAgentInput | null;
   compute_name?: string;
   workdir?: string;
   group_name?: string;

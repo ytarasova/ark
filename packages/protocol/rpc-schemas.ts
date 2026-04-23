@@ -161,13 +161,93 @@ export const inputReadResponse = z.object({
 });
 export type InputReadResponse = z.infer<typeof inputReadResponse>;
 
+// Inline model / runtime / agent / flow shapes. Each level accepts either a
+// string (name-registry lookup) or a loose object (literal definition). The
+// server-side `resolveStage` pipeline handles both uniformly.
+const inlineModelSchema = z
+  .object({
+    id: z.string().min(1),
+    display: z.string().optional(),
+    provider: z.string(),
+    aliases: z.array(z.string()).optional(),
+    capabilities: z.array(z.string()).optional(),
+    pricing: z.record(z.string(), z.unknown()).optional(),
+    provider_slugs: z.record(z.string(), z.string()),
+    context_window: z.number().optional(),
+  })
+  .loose();
+
+const inlineRuntimeSchema = z
+  .object({
+    name: z.string().min(1),
+    description: z.string().optional(),
+    type: z.string(),
+    command: z.array(z.string()).optional(),
+    task_delivery: z.enum(["stdin", "file", "arg"]).optional(),
+    permission_mode: z.string().optional(),
+    env: z.record(z.string(), z.string()).optional(),
+    mcp_servers: z.array(z.union([z.string(), z.record(z.string(), z.unknown())])).optional(),
+    billing: z.record(z.string(), z.unknown()).optional(),
+    secrets: z.array(z.string()).optional(),
+    task_prompt: z.string().optional(),
+    compat: z.array(z.string()).optional(),
+  })
+  .loose();
+
+const inlineAgentSchema = z
+  .object({
+    name: z.string().optional(),
+    description: z.string().optional(),
+    runtime: z.union([z.string().min(1), inlineRuntimeSchema]),
+    model: z.union([z.string().min(1), inlineModelSchema]).optional(),
+    max_turns: z.number().optional(),
+    max_budget_usd: z.number().optional(),
+    system_prompt: z.string().min(1),
+    tools: z.array(z.string()).optional(),
+    mcp_servers: z.array(z.union([z.string(), z.record(z.string(), z.unknown())])).optional(),
+    skills: z.array(z.string()).optional(),
+    memories: z.array(z.string()).optional(),
+    context: z.array(z.string()).optional(),
+    permission_mode: z.string().optional(),
+    env: z.record(z.string(), z.string()).optional(),
+    command: z.array(z.string()).optional(),
+    task_delivery: z.enum(["stdin", "file", "arg"]).optional(),
+  })
+  .loose();
+
+const inlineStageSchema = z
+  .object({
+    name: z.string().min(1),
+    type: z.enum(["agent", "action", "fork"]).optional(),
+    agent: z.union([z.string(), inlineAgentSchema]).optional(),
+    action: z.string().optional(),
+    task: z.string().optional(),
+    gate: z.enum(["auto", "manual", "condition", "review"]).optional(),
+    model: z.string().optional(),
+    depends_on: z.array(z.string()).optional(),
+  })
+  .loose();
+
+const inlineFlowSchema = z
+  .object({
+    name: z.string().optional(),
+    description: z.string().optional(),
+    inputs: z.record(z.string(), z.unknown()).optional(),
+    stages: z.array(inlineStageSchema).min(1),
+  })
+  .loose();
+
 export const sessionStartRequest = z
   .object({
     ticket: z.string().optional(),
     summary: z.string().optional(),
     repo: z.string().optional(),
-    flow: z.string().optional(),
-    agent: z.string().nullable().optional(),
+    // Flow: either a name (resolved via FlowStore) or a literal inline flow
+    // definition. Inline flows are registered in the ephemeral overlay keyed
+    // as `inline-<sessionId>` and persisted under `session.config.inline_flow`
+    // for daemon-restart rehydration.
+    flow: z.union([z.string(), inlineFlowSchema]).optional(),
+    agent: z.union([z.string(), inlineAgentSchema]).nullable().optional(),
     compute_name: z.string().optional(),
     workdir: z.string().optional(),
     group_name: z.string().optional(),
