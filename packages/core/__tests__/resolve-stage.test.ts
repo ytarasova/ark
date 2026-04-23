@@ -66,10 +66,14 @@ beforeAll(async () => {
     provider_slugs: { "anthropic-direct": "claude-opus-4-7" },
   });
 
-  // Override the DI-registered store for the duration of this file.
+  // Override the DI-registered store for the duration of this file. We use
+  // `asValue` so the re-registration is a first-class singleton in the
+  // cradle -- otherwise downstream SINGLETON stores (hosted agent store)
+  // that depend on `models` fail awilix's strict lifetime check.
   const modelStore = new FileModelStore({ builtinDir: bundled, userDir: tmp() });
+  const { asValue: asValueHelper } = await import("awilix");
   (app as unknown as { _container: { register: (obj: Record<string, unknown>) => void } })._container.register({
-    models: { resolve: () => modelStore, __raw: modelStore } as unknown,
+    models: asValueHelper(modelStore),
   });
   // Simpler approach: monkey-patch the accessor via Object.defineProperty.
   Object.defineProperty(app, "models", { configurable: true, get: () => modelStore });

@@ -176,3 +176,56 @@ describe("FileModelStore: three-layer lookup", () => {
     expect(store.get("nope")).toBeNull();
   });
 });
+
+describe("FileModelStore.default()", () => {
+  let bundled: string;
+  let global: string;
+
+  beforeEach(() => {
+    bundled = join(tempDir(), "models");
+    global = join(tempDir(), "models");
+  });
+
+  it("resolves the alias 'sonnet' to the catalog entry carrying it", () => {
+    writeModel(bundled, "claude-sonnet-4-6.yaml", {
+      id: "claude-sonnet-4-6",
+      display: "Claude Sonnet 4.6",
+      provider: "anthropic",
+      aliases: ["sonnet"],
+      provider_slugs: { "anthropic-direct": "claude-sonnet-4-6" },
+    });
+    const store = new FileModelStore({ builtinDir: bundled, userDir: global });
+    const hit = store.default();
+    expect(hit.id).toBe("claude-sonnet-4-6");
+  });
+
+  it("honors global-layer override of the 'sonnet' alias", () => {
+    writeModel(bundled, "claude-sonnet-4-6.yaml", {
+      id: "claude-sonnet-4-6",
+      display: "Claude Sonnet 4.6",
+      provider: "anthropic",
+      aliases: ["sonnet"],
+      provider_slugs: { "anthropic-direct": "claude-sonnet-4-6" },
+    });
+    writeModel(global, "custom-default.yaml", {
+      id: "custom-default",
+      display: "Custom Default",
+      provider: "anthropic",
+      aliases: ["sonnet"],
+      provider_slugs: { "anthropic-direct": "custom" },
+    });
+    const store = new FileModelStore({ builtinDir: bundled, userDir: global });
+    expect(store.default().id).toBe("custom-default");
+  });
+
+  it("throws when the catalog has no 'sonnet' alias (fresh install is broken)", () => {
+    writeModel(bundled, "other.yaml", {
+      id: "other",
+      display: "Other",
+      provider: "anthropic",
+      provider_slugs: { "anthropic-direct": "other" },
+    });
+    const store = new FileModelStore({ builtinDir: bundled, userDir: global });
+    expect(() => store.default()).toThrow(/no catalog entry for alias "sonnet"/);
+  });
+});

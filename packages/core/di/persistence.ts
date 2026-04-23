@@ -33,6 +33,7 @@ import {
   FileModelStore,
   EphemeralFlowStore,
 } from "../stores/index.js";
+import type { ModelStore } from "../stores/model-store.js";
 import { DbResourceStore, initResourceDefinitionsTable } from "../stores/db-resource-store.js";
 import { KnowledgeStore } from "../knowledge/store.js";
 
@@ -123,7 +124,8 @@ export function registerResourceStores(container: AppContainer): void {
       { lifetime: Lifetime.SINGLETON },
     ),
     agents: asFunction(
-      (c: { db: DatabaseAdapter; config: ArkConfig; mode: AppMode }) => makeAgentStore(c.db, c.config, c.mode),
+      (c: { db: DatabaseAdapter; config: ArkConfig; mode: AppMode; models: ModelStore }) =>
+        makeAgentStore(c.db, c.config, c.mode, c.models),
       { lifetime: Lifetime.SINGLETON },
     ),
     recipes: asFunction(
@@ -164,12 +166,16 @@ function makeSkillStore(db: DatabaseAdapter, config: ArkConfig, mode: AppMode) {
   });
 }
 
-function makeAgentStore(db: DatabaseAdapter, config: ArkConfig, mode: AppMode) {
+function makeAgentStore(db: DatabaseAdapter, config: ArkConfig, mode: AppMode, models: ModelStore) {
   if (mode.kind === "hosted") {
     initResourceDefinitionsTable(db);
+    // `model` default comes from the catalog (alias "sonnet") rather than a
+    // hardcoded string. A fresh install with an empty catalog throws here
+    // by design -- a missing catalog is a broken install, not a data state
+    // we want to paper over with a stale slug.
     return new DbResourceStore(db, "agent", {
       description: "",
-      model: "sonnet",
+      model: models.default().id,
       max_turns: 200,
       system_prompt: "",
       tools: [],

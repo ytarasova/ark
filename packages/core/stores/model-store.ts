@@ -21,7 +21,18 @@ import type { ModelDefinition } from "../../types/model.js";
 export interface ModelStore {
   list(projectRoot?: string): ModelDefinition[];
   get(idOrAlias: string, projectRoot?: string): ModelDefinition | null;
+  /**
+   * The canonical default model for boot-time seeding. Resolves the alias
+   * "sonnet" against the catalog so operators can swap the default by
+   * pointing a project / global YAML at a different entry with that
+   * alias. Throws if the catalog has no "sonnet" alias -- a fresh install
+   * with no model catalog is a broken install.
+   */
+  default(projectRoot?: string): ModelDefinition;
 }
+
+/** Alias used by `default()`. Hosted agent-store seeding calls this. */
+export const DEFAULT_MODEL_ALIAS = "sonnet";
 
 // ── File-backed implementation ──────────────────────────────────────────────
 
@@ -173,5 +184,17 @@ export class FileModelStore implements ModelStore {
 
   list(projectRoot?: string): ModelDefinition[] {
     return Array.from(this.catalog(projectRoot).byId.values());
+  }
+
+  default(projectRoot?: string): ModelDefinition {
+    const hit = this.get(DEFAULT_MODEL_ALIAS, projectRoot);
+    if (!hit) {
+      throw new Error(
+        `ModelStore: no catalog entry for alias "${DEFAULT_MODEL_ALIAS}". ` +
+          `A fresh install with no model catalog is a broken install -- check that ` +
+          `models/*.yaml ships in the tarball or is present in ${this.builtinDir}.`,
+      );
+    }
+    return hit;
   }
 }

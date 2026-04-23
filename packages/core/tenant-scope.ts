@@ -76,9 +76,14 @@ export function buildTenantScope(parent: AppContext, tenantId: string): AppConte
   // composition-time check (creating the tenant scope's store wiring), not a
   // runtime branch, so it's allowed under the AppMode invariant.
   if (parent.mode.kind === "hosted") {
+    // `model` default comes from the parent's ModelStore (alias "sonnet").
+    // See di/persistence.ts:makeAgentStore for the same pattern -- keeping
+    // these two seeds aligned so a tenant-scoped DbResourceStore doesn't
+    // resurrect a stale hardcoded slug.
+    const defaultModelId = parent.models.default().id;
     const scopedAgents = new DbResourceStore(db, "agent", {
       description: "",
-      model: "sonnet",
+      model: defaultModelId,
       max_turns: 200,
       system_prompt: "",
       tools: [],
