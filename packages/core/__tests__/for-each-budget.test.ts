@@ -491,3 +491,141 @@ describe("CreateSessionOpts.max_budget_usd stored in session config", () => {
     expect(cfg?.runtime_override).toBe("agent-sdk");
   });
 });
+
+// ── Resume: prior-run child costs feed the cumulative on entry ────────────────
+//
+// Regression for the P1-2 "budget undercount on resume" bug (Batch 4, Item 1).
+// Before the fix, `spawnedChildIds` only tracked children spawned in the
+// current daemon run, so a restart after N already-completed iterations would
+// start the cumulative at $0 and happily run past the cap.
+describe("for_each budget -- resume-after-crash respects prior child costs", () => {
+  it("spawn mode: resuming with 30 completed iterations and $7.50 prior cost halts before overrun", async () => {
+    // Simulate a $8 budget / 50 iters x $0.25 each loop that crashed after
+    // iter 30. Resume should NOT blindly start cumulative at 0 -- it must
+    // include the $7.50 already spent across the 30 completed children.
+    //
+    // With cap=$8: 7.50 < 8 so iter 30 runs ($7.75). 7.75 < 8 iter 31 runs
+    // ($8.00). Iter 32's pre-check sees 8.00 >= 8.0 and halts. Pre-fix code
+    // would have started with cumulative=0 and dispatched all 20 remaining
+    // children for a $12.50 total -- 56% overrun.
+    const items = Array.from({ length: 50 }, (_, i) => ({ path: `/repo/${i}` }));
+    const { id: parentId, vars } = await makeParent(items, { maxBudget: 8.0 });
+
+    // Pre-create 30 completed children and log one SessionEnd cost hook per
+    // child on the child's own event track (this is where the real hook
+    // pipeline writes them).
+    for (let idx = 0; idx < 30; idx++) {
+      const child = await app.sessions.create({
+        summary: `child ${idx}`,
+        flow: "bare",
+        config: { for_each_parent: parentId, for_each_index: idx },
+      });
+      await app.sessions.update(child.id, { parent_id: parentId, status: "completed" });
+      await app.events.log(child.id, "hook_status", {
+        actor: "hook",
+        data: { hook_event_name: "SessionEnd", total_cost_usd: 0.25, session_id: child.id },
+      });
+    }
+
+    // Resume checkpoint pointing at iteration 30.
+    await app.sessions.mergeConfig(parentId, {
+      for_each_checkpoint: {
+        stage_name: "per_repo",
+        total_items: 50,
+        items,
+        next_index: 30,
+      } as any,
+    } as any);
+
+    const dispatchedIndices: number[] = [];
+    const dispatcher = makeSpawnDispatcher(async (childId) => {
+      const child = await app.sessions.get(childId);
+      const idx = (child?.config as Record<string, unknown>)?.for_each_index;
+      if (typeof idx === "number") dispatchedIndices.push(idx);
+      await app.sessions.update(childId, { status: "completed" });
+      // Each new iteration adds another $0.25.
+      await app.events.log(childId, "hook_status", {
+        actor: "hook",
+        data: { hook_event_name: "SessionEnd", total_cost_usd: 0.25, session_id: childId },
+      });
+    });
+
+    const stage = makeSpawnStage();
+    const result = await dispatcher.dispatchForEach(parentId, stage, vars);
+
+    // Must halt -- the cap is $8 and the 30 prior children already cost $7.50.
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain("budget exceeded");
+
+    // Only a few new iterations should have run. The exact number depends on
+    // how the running-sum is seeded; the key invariant is "much less than
+    // the 20 remaining". Pre-fix behaviour was 20.
+    expect(dispatchedIndices.length).toBeLessThan(10);
+
+    // And the budget_exceeded event fires with the true cumulative (>= cap),
+    // reflecting the prior-run costs.
+    const events = await app.events.list(parentId, { type: "for_each_budget_exceeded" });
+    expect(events).toHaveLength(1);
+    const evtData = events[0].data as Record<string, unknown>;
+    expect(evtData.cap_usd).toBe(8.0);
+    expect(Number(evtData.cumulative_cost_usd)).toBeGreaterThanOrEqual(8.0);
+  });
+});
+
+// ── Perf smoke: events.list is NOT called per iteration ──────────────────────
+//
+// Regression for the P1-3 "O(N^2) per iteration" bug (Batch 4, Item 2).
+// Before the fix, the budget loop pulled EVERY hook_status row via
+// `events.list(...)` per iteration (3x in inline mode). The SUM is now pushed
+// to SQL via `events.sumHookCost(...)`, so the hot path never hits `.list()`.
+describe("for_each budget -- events.list not called per iteration", () => {
+  it("spawn mode: 20 iterations -> events.list called 0 times from the budget helper", async () => {
+    const items = Array.from({ length: 20 }, (_, i) => ({ path: `/a/${i}` }));
+    const { id: parentId, vars } = await makeParent(items, { maxBudget: 100.0 });
+
+    // Spy-wrap events.list; we'll restore it after the run.
+    const real = app.events.list.bind(app.events);
+    let listCalls = 0;
+    (app.events as any).list = async (...args: any[]) => {
+      listCalls++;
+      return real(...args);
+    };
+
+    try {
+      const dispatcher = makeSpawnDispatcher(async (childId) => {
+        await app.sessions.update(childId, { status: "completed" });
+      });
+      const result = await dispatcher.dispatchForEach(parentId, makeSpawnStage(), vars);
+      expect(result.ok).toBe(true);
+    } finally {
+      (app.events as any).list = real;
+    }
+
+    // The budget helper used to call events.list() per iteration; now it
+    // hits sumHookCost() instead. Any remaining calls would come from
+    // unrelated code paths (there shouldn't be any in the dispatcher today).
+    expect(listCalls).toBe(0);
+  });
+
+  it("inline mode: 20 iterations -> events.list not called from the budget helper", async () => {
+    const items = Array.from({ length: 20 }, (_, i) => ({ path: `/a/${i}` }));
+    const { id: parentId, vars } = await makeParent(items, { maxBudget: 100.0 });
+
+    const real = app.events.list.bind(app.events);
+    let listCalls = 0;
+    (app.events as any).list = async (...args: any[]) => {
+      listCalls++;
+      return real(...args);
+    };
+
+    try {
+      const dispatcher = makeInlineDispatcher(async () => ({ ok: true, message: "ok" }));
+      const result = await dispatcher.dispatchForEach(parentId, makeInlineStage(), vars);
+      expect(result.ok).toBe(true);
+    } finally {
+      (app.events as any).list = real;
+    }
+
+    expect(listCalls).toBe(0);
+  });
+});

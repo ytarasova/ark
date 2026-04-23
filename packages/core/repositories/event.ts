@@ -1,7 +1,7 @@
 import type { DatabaseAdapter } from "../database/index.js";
 import { drizzleFromIDatabase } from "../drizzle/from-idb.js";
 import type { DrizzleClient } from "../drizzle/client.js";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { Event } from "../../types/index.js";
 import { now } from "../util/time.js";
 
@@ -91,6 +91,52 @@ export class EventRepository {
       .orderBy(asc(e.id))
       .limit(opts?.limit ?? 200);
     return (rows as DrizzleSelectEvent[]).map((r) => rowToEvent(drizzleToRow(r)));
+  }
+
+  /**
+   * Sum `data.total_cost_usd` across hook_status events whose payload
+   * `hook_event_name` matches one of `hookNames`, for one or more track ids.
+   *
+   * Pushes the aggregate to SQL so the caller avoids a full table scan +
+   * JS-side JSON.parse per event (the `for_each` budget loop called
+   * `events.list(...)` once per iteration, which was O(N^2) for large loops).
+   *
+   * Dual-dialect:
+   *   - SQLite: `json_extract(data, '$.hook_event_name')` /
+   *     `CAST(json_extract(data, '$.total_cost_usd') AS REAL)`.
+   *   - Postgres: `data` is stored as TEXT, so cast to `::json` first.
+   *
+   * Events whose `total_cost_usd` is missing / non-numeric contribute 0
+   * (SUM ignores NULLs; non-numeric JSON values return NULL from the cast).
+   */
+  async sumHookCost(trackIds: string | string[], hookNames: string[]): Promise<number> {
+    const ids = Array.isArray(trackIds) ? trackIds : [trackIds];
+    if (ids.length === 0 || hookNames.length === 0) return 0;
+
+    const d = this.d();
+    const e = d.schema.events;
+
+    const trackFilter = ids.length === 1 ? eq(e.trackId, ids[0]) : inArray(e.trackId, ids);
+
+    const [hookExpr, costExpr] =
+      d.dialect === "sqlite"
+        ? [
+            sql`json_extract(${e.data}, '$.hook_event_name')`,
+            sql`CAST(json_extract(${e.data}, '$.total_cost_usd') AS REAL)`,
+          ]
+        : [
+            sql`((${e.data})::json ->> 'hook_event_name')`,
+            sql`NULLIF((${e.data})::json ->> 'total_cost_usd', '')::double precision`,
+          ];
+
+    const rows = await (d.db as any)
+      .select({ total: sql<number>`COALESCE(SUM(${costExpr}), 0)` })
+      .from(e)
+      .where(and(trackFilter, eq(e.tenantId, this.tenantId), eq(e.type, "hook_status"), inArray(hookExpr, hookNames)));
+
+    const raw = (rows as Array<{ total: number | string | null }>)[0]?.total ?? 0;
+    const num = typeof raw === "number" ? raw : Number(raw);
+    return Number.isFinite(num) ? num : 0;
   }
 
   async deleteForTrack(trackId: string): Promise<void> {

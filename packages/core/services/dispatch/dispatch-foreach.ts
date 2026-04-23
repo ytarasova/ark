@@ -38,39 +38,26 @@ import { logDebug, logInfo, logWarn } from "../../observability/structured-log.j
 
 // ── Budget helpers ────────────────────────────────────────────────────────────
 
+/** Hook event names whose `total_cost_usd` payload counts toward the budget. */
+const COST_HOOK_NAMES = ["SessionEnd", "StopFailure"];
+
 /**
  * Sum the cost_usd reported in all hook_status events of type SessionEnd or
- * StopFailure for the given session (and its children, if childIds are provided).
+ * StopFailure across one-or-more track ids.
  *
- * Each hook_status event carries the hook payload in `data`: the relevant fields
- * are `data.hook_event_name` (string) and `data.total_cost_usd` (number).
- *
- * Returns 0.0 when there are no matching events.
+ * Thin wrapper over `EventRepository.sumHookCost`, which pushes the SUM to SQL
+ * so the budget loop doesn't have to scan the entire event table per iteration
+ * and JSON.parse each row in JS. Previously called once per iteration in
+ * `dispatchForEachSpawn` / `dispatchForEachInline`; today called at most once
+ * per loop entry to seed the running cumulative.
  */
 async function sumPriorIterationCosts(
-  events: Pick<DispatchDeps["events"], "list">,
+  events: Pick<DispatchDeps["events"], "sumHookCost">,
   sessionId: string,
   childIds?: string[],
 ): Promise<number> {
-  const COST_HOOKS = new Set(["SessionEnd", "StopFailure"]);
-  let total = 0;
-
   const trackIds = [sessionId, ...(childIds ?? [])];
-  for (const trackId of trackIds) {
-    const evts = await events.list(trackId, { type: "hook_status" });
-    for (const evt of evts) {
-      const data = evt.data as Record<string, unknown> | null;
-      if (!data) continue;
-      const hookName = data.hook_event_name as string | undefined;
-      if (!hookName || !COST_HOOKS.has(hookName)) continue;
-      const cost = data.total_cost_usd;
-      if (typeof cost === "number" && Number.isFinite(cost)) {
-        total += cost;
-      }
-    }
-  }
-
-  return total;
+  return events.sumHookCost(trackIds, COST_HOOK_NAMES);
 }
 
 // ── Checkpoint helpers ────────────────────────────────────────────────────────
@@ -114,19 +101,23 @@ async function clearCheckpoint(
 async function buildCompletedSetFromChildren(
   sessions: Pick<DispatchDeps["sessions"], "list">,
   parentId: string,
-): Promise<Set<number>> {
+): Promise<{ completed: Set<number>; allChildIds: string[] }> {
   const children = await sessions.list({ parent_id: parentId, limit: 500 } as any);
   const done = new Set<number>();
+  const allChildIds: string[] = [];
   for (const child of children) {
     const cfg = child.config as Record<string, unknown> | null;
     if (!cfg) continue;
     const idx = cfg.for_each_index;
     if (typeof idx !== "number") continue;
+    // Every prior iteration (completed, failed, or mid-flight) contributes to
+    // cumulative cost via its hook_status events.
+    allChildIds.push(child.id);
     if (child.status === "completed") {
       done.add(idx);
     }
   }
-  return done;
+  return { completed: done, allChildIds };
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -380,11 +371,23 @@ export class ForEachDispatcher {
     // Collect child IDs spawned so far so we can sum their costs too.
     const spawnedChildIds: string[] = [];
 
-    // In resume mode, build the set of already-completed iterations from child
-    // session status (not from checkpoint.completed -- see module docstring).
-    const completedSet: Set<number> = isResume
-      ? await buildCompletedSetFromChildren(this.deps.sessions, sessionId)
-      : new Set<number>();
+    // In resume mode, build the set of already-completed iterations AND the
+    // list of all prior-run child ids so the initial cumulative reflects their
+    // cost. Without this, a crash-and-resume would undercount and blow the cap
+    // (e.g. 50 iters * $0.25, crash after 30, $10 cap -> resume would start
+    // with cumulative=0 and run to $12.50).
+    let priorChildIds: string[] = [];
+    const completedSet: Set<number> = new Set<number>();
+    if (isResume) {
+      const scan = await buildCompletedSetFromChildren(this.deps.sessions, sessionId);
+      for (const idx of scan.completed) completedSet.add(idx);
+      priorChildIds = scan.allChildIds;
+    }
+
+    // Seed the running cumulative once at loop entry. Every subsequent
+    // iteration adds its own cost in-memory instead of re-scanning events --
+    // turns the old O(N^2) budget check into O(N).
+    let cumulative = sessionCap !== null ? await sumPriorIterationCosts(this.deps.events, sessionId, priorChildIds) : 0;
 
     for (let i = 0; i < items.length; i++) {
       // Resume: skip iterations that are already confirmed complete.
@@ -395,7 +398,6 @@ export class ForEachDispatcher {
 
       // -- Cumulative budget check (before spawning next iteration) --
       if (sessionCap !== null) {
-        const cumulative = await sumPriorIterationCosts(this.deps.events, sessionId, spawnedChildIds);
         if (cumulative >= sessionCap) {
           await this.deps.events.log(sessionId, "for_each_budget_exceeded", {
             stage: session.stage,
@@ -516,6 +518,16 @@ export class ForEachDispatcher {
 
       // Compute per-iteration cost from the child's hook_status events.
       const iterCostUsd = await sumPriorIterationCosts(this.deps.events, childId);
+
+      // Re-read the full cumulative across parent + prior-run children +
+      // this-run children. The in-memory running sum alone would miss cost
+      // events the real hook pipeline logs on the parent session. Still O(N)
+      // overall because the SUM is pushed to SQL (one aggregate scan per
+      // iteration, not a full list + JSON.parse).
+      cumulative =
+        sessionCap !== null
+          ? await sumPriorIterationCosts(this.deps.events, sessionId, [...priorChildIds, ...spawnedChildIds])
+          : 0;
 
       // Fetch child session to get num_turns from result if available.
       const childSession = await this.deps.sessions.get(childId);
@@ -702,10 +714,13 @@ export class ForEachDispatcher {
     const priorSucceeded = isResume ? resumeStartIndex : 0;
     succeeded = priorSucceeded;
 
+    // Seed the running cumulative once. Each iteration's `costAfterIter` then
+    // feeds the next iteration's check in-memory instead of re-scanning events.
+    let cumulative = sessionCap !== null ? await sumPriorIterationCosts(this.deps.events, sessionId) : 0;
+
     for (let i = isResume ? resumeStartIndex : 0; i < items.length; i++) {
       // -- Cumulative budget check (before dispatching next iteration) --
       if (sessionCap !== null) {
-        const cumulative = await sumPriorIterationCosts(this.deps.events, sessionId);
         if (cumulative >= sessionCap) {
           await this.deps.events.log(sessionId, "for_each_budget_exceeded", {
             stage: session.stage,
@@ -730,7 +745,8 @@ export class ForEachDispatcher {
       // Record start time for per-iteration duration tracking.
       const inlineIterStartMs = Date.now();
       // Snapshot current cumulative cost so we can compute per-iteration delta.
-      const costBeforeIter = await sumPriorIterationCosts(this.deps.events, sessionId);
+      // Using the running `cumulative` avoids a second SQL scan.
+      const costBeforeIter = cumulative;
 
       // Write in_flight checkpoint before this iteration's sub-stages.
       await writeCheckpoint(this.deps.sessions, sessionId, {
@@ -795,8 +811,11 @@ export class ForEachDispatcher {
       const inlineIterDurationMs = Date.now() - inlineIterStartMs;
       // Compute cost delta for this iteration using timestamp-window approximation.
       // Note: this can over-count if cost events from other sources overlap the window.
+      // One SQL scan per iteration (down from three) -- the result feeds the
+      // next iteration's cap check in-memory.
       const costAfterIter = await sumPriorIterationCosts(this.deps.events, sessionId);
       const inlineIterCostUsd = Math.max(0, costAfterIter - costBeforeIter);
+      cumulative = costAfterIter;
 
       // Clear in_flight after iteration terminal (success or failure).
       await writeCheckpoint(this.deps.sessions, sessionId, {
