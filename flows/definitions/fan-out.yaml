@@ -8,8 +8,18 @@ stages:
       Analyze {{summary}} and decompose into independent sub-tasks.
       Output a JSON array of tasks: [{"summary": "...", "agent": "implementer"}, ...]
   - name: execute
-    type: fan_out
+    for_each: "{{subtasks}}"
+    mode: spawn
+    iteration_var: subtask
     gate: auto
+    depends_on: [plan]
+    # max_parallel removed -- for_each + spawn is sequential-only
+    spawn:
+      flow: fan-out-execute
+      inputs:
+        summary: "{{subtask.summary}}"
+        agent: implementer
   - name: review
     agent: reviewer
     gate: auto
+    depends_on: [execute]

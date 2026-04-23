@@ -8,10 +8,11 @@
  *   4. Clone remote repo if `config.remoteRepo` + no workdir.
  *   5. Prompt-injection guard on session.summary.
  *   6. Per-stage compute override resolution (template clone path).
- *   7. Fork / fan-out branch dispatches via `FanOutDispatcher`.
- *   8. Agent stage: resolve agent -> build task -> inject context/repo-map
+ *   7. Fork branch dispatches via `FanOutDispatcher`.
+ *   8. for_each + mode:spawn iterates a list and spawns one child per item.
+ *   9. Agent stage: resolve agent -> build task -> inject context/repo-map
  *      -> resolve secrets + tenant claude auth -> launch via executor.
- *   9. Post-launch: guard against mid-dispatch stage-change race, persist
+ *  10. Post-launch: guard against mid-dispatch stage-change race, persist
  *      run state, log stage_started, checkpoint, start status poller.
  *
  * Resume: tear down any running tmux, clear transient status fields, call
@@ -152,10 +153,6 @@ export class CoreDispatcher {
 
     if (stageDef?.type === "fork") {
       return this.fanout.dispatchFork(sessionId, stageDef);
-    }
-
-    if (stageDef?.type === "fan_out") {
-      return this.fanout.dispatchFanOut(sessionId, stageDef);
     }
 
     // for_each + mode:spawn: iterate a list and spawn one child per item sequentially.

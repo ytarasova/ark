@@ -1,13 +1,10 @@
-import { describe, expect, test, beforeAll, afterAll } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { mkdtempSync, writeFileSync, rmSync, readFileSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 import { pathToFileURL } from "url";
 
-import { AppContext } from "../../app.js";
 import { fetchAnalysis, buildStreamSubtasks, type SageAnalysis } from "../sage-analysis.js";
-import { getStages } from "../../state/flow.js";
-import { extractSubtasks } from "../../services/task-builder.js";
 
 // ── Load the shipped sample.json once -- reused across describe blocks ──────
 
@@ -86,72 +83,6 @@ describe("buildStreamSubtasks", async () => {
   });
 });
 
-// ── Flow validator: from-sage-analysis.yaml loads with expected stages ──────
-
-describe("from-sage-analysis flow", async () => {
-  let app: AppContext;
-
-  beforeAll(async () => {
-    app = await AppContext.forTestAsync();
-    await app.boot();
-  });
-
-  afterAll(async () => {
-    await app?.shutdown();
-  });
-
-  test("loads via the flow store with the expected stage shape", () => {
-    const flow = app.flows.get("from-sage-analysis");
-    expect(flow).not.toBeNull();
-    expect(flow!.name).toBe("from-sage-analysis");
-
-    const stages = getStages(app, "from-sage-analysis");
-    expect(stages.map((s) => s.name)).toEqual(["fetch-analysis", "fan-out"]);
-
-    // Stage 1 is an action call, stage 2 is a fan_out.
-    expect(stages[0].action).toBe("fetch_sage_analysis");
-    expect(stages[0].gate).toBe("auto");
-    expect(stages[1].type).toBe("fan_out");
-    expect(stages[1].gate).toBe("auto");
-    expect(stages[1].depends_on).toEqual(["fetch-analysis"]);
-  });
-
-  test("extractSubtasks expands to one subtask per plan_stream when analysis_json is present", async () => {
-    // Upload the sample analysis to the blob store under the session's
-    // tenant (SessionRepository defaults to "default"). extractSubtasks
-    // reads it back via the locator -- matches how `ark sage` seeds the
-    // session in production.
-    const bytes = readFileSync(SAMPLE_PATH);
-    const meta = await app.blobStore.put(
-      { tenantId: "default", namespace: "sage-analysis", id: "test-IN-18342", filename: "sample.json" },
-      bytes,
-    );
-
-    const session = await app.sessionLifecycle.start({
-      summary: "sage:IN-18342",
-      flow: "from-sage-analysis",
-      inputs: {
-        files: { analysis_json: meta.locator },
-        params: { analysis_id: "IN-18342" },
-      },
-    });
-    const sessionRecord = (await app.sessions.get(session.id))!;
-    const subtasks = await extractSubtasks(app, sessionRecord);
-    expect(subtasks).toHaveLength(3);
-    // The first subtask prompt must contain the repo name + at least one task title.
-    expect(subtasks[0].task).toContain("pi-payouts-service");
-    expect(subtasks[0].task).toContain("PayoutFinalized");
-  });
-
-  test("extractSubtasks falls back to default when analysis_json is missing", async () => {
-    const session = await app.sessionLifecycle.start({
-      summary: "no-analysis",
-      flow: "from-sage-analysis",
-    });
-    const sessionRecord = (await app.sessions.get(session.id))!;
-    const subtasks = await extractSubtasks(app, sessionRecord);
-    // Default fallback returns implementation + tests
-    expect(subtasks.length).toBeGreaterThan(0);
-    expect(subtasks.some((s) => s.name === "implementation")).toBe(true);
-  });
-});
+// Note: from-sage-analysis.yaml was removed in P2.0b. The flow validator
+// tests below were deleted along with the YAML. The fetchAnalysis and
+// buildStreamSubtasks tests above cover the integration logic.

@@ -38,9 +38,7 @@ afterAll(async () => {
  * childId and may perform side effects (e.g. mark the child completed).
  * By default it immediately marks the child as "completed".
  */
-function makeDispatcher(
-  onDispatch?: (childId: string) => Promise<void>,
-): ForEachDispatcher {
+function makeDispatcher(onDispatch?: (childId: string) => Promise<void>): ForEachDispatcher {
   const dispatchChild: DispatchDeps["dispatchChild"] = async (childId: string) => {
     if (onDispatch) {
       await onDispatch(childId);

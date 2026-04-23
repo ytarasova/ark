@@ -1,5 +1,5 @@
 name: islc
-description: "Intent-to-Software Lifecycle -- full pipeline from Jira ticket to merged PR with fan-out execution"
+description: "Intent-to-Software Lifecycle -- full pipeline from Jira ticket to merged PR with for-each execution"
 stages:
   - name: ticket-intake
     agent: ticket-intake
@@ -25,13 +25,17 @@ stages:
       Audit plan coverage against spec. Write audit-report.md.
 
   - name: execute
-    type: fan_out
-    agent: task-implementer
+    for_each: "{{subtasks}}"
+    mode: spawn
+    iteration_var: subtask
     gate: auto
     depends_on: [audit]
-    max_parallel: 4
-    task: |
-      Execute subtasks from plan. Each child implements one subtask.
+    # max_parallel removed -- for_each + spawn is sequential-only
+    spawn:
+      flow: islc-execute-subtask
+      inputs:
+        summary: "{{subtask.summary}}"
+        agent: task-implementer
 
   - name: verify
     agent: verifier

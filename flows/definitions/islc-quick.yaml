@@ -17,13 +17,17 @@ stages:
       Decompose into subtasks, create Jira sub-tasks.
 
   - name: execute
-    type: fan_out
-    agent: islc-implementer
+    for_each: "{{subtasks}}"
+    mode: spawn
+    iteration_var: subtask
     gate: auto
     depends_on: [plan]
-    max_parallel: 4
-    task: |
-      Execute subtasks from plan. Each child implements one subtask.
+    # max_parallel removed -- for_each + spawn is sequential-only
+    spawn:
+      flow: islc-quick-execute-subtask
+      inputs:
+        summary: "{{subtask.summary}}"
+        agent: islc-implementer
 
   - name: verify
     agent: islc-verifier

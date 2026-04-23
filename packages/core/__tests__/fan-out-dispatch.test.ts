@@ -95,48 +95,6 @@ describe("extractSubtasks", async () => {
   });
 });
 
-describe("dispatch with fan_out stage", async () => {
-  it("dispatch on fan_out stage creates children and sets parent to waiting", async () => {
-    const app = getApp();
-    const parent = await app.sessions.create({ summary: "Test dispatch fan-out", flow: "fan-out" });
-    await app.sessions.update(parent.id, { stage: "execute", status: "ready" });
-
-    const result = await app.dispatchService.dispatch(parent.id);
-    expect(result.ok).toBe(true);
-
-    const updated = await app.sessions.get(parent.id);
-    expect(updated!.status).toBe("waiting");
-
-    const children = await app.sessions.getChildren(parent.id);
-    expect(children.length).toBeGreaterThan(0);
-
-    for (const child of children) {
-      expect(child.parent_id).toBe(parent.id);
-      expect(child.fork_group).toBeTruthy();
-    }
-
-    await app.sessionService.stopAll();
-  }, 30_000);
-
-  it("fan_out children share the same fork_group as parent", async () => {
-    const app = getApp();
-    const parent = await app.sessions.create({ summary: "Fork group test", flow: "fan-out" });
-    await app.sessions.update(parent.id, { stage: "execute", status: "ready" });
-
-    await app.dispatchService.dispatch(parent.id);
-
-    const updated = (await app.sessions.get(parent.id))!;
-    const children = await app.sessions.getChildren(parent.id);
-    expect(children.length).toBeGreaterThan(0);
-
-    for (const child of children) {
-      expect(child.fork_group).toBe(updated.fork_group);
-    }
-
-    await app.sessionService.stopAll();
-  }, 30_000);
-});
-
 describe("fan-out lifecycle integration", async () => {
   it("second fan-out on same parent replaces fork_group", async () => {
     const app = getApp();

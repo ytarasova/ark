@@ -1,0 +1,8 @@
+name: islc-quick-execute-subtask
+description: "One subtask in the islc-quick execute fan-out -- runs the islc-implementer agent on one subtask."
+stages:
+  - name: implement
+    agent: islc-implementer
+    gate: auto
+    task: |
+      {{summary}}

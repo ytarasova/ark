@@ -25,7 +25,7 @@ export interface ForEachSpawnSpec {
 
 export interface StageDefinition {
   name: string;
-  type?: "agent" | "action" | "fork" | "fan_out";
+  type?: "agent" | "action" | "fork";
   agent?: string;
   action?: string;
   task?: string; // Template for agent task prompt -- Nunjucks syntax ({{var}}, {% if %}, ...)
@@ -90,7 +90,7 @@ export interface StageDefinition {
     prompt?: string;
     max_rejections?: number;
   };
-  // Fork/fan_out-specific
+  // Fork-specific
   strategy?: string;
   max_parallel?: number;
   subtasks?: { name: string; task: string }[];
@@ -257,7 +257,7 @@ export function evaluateGate(
 // ── Stage action info ───────────────────────────────────────────────────────
 
 export interface StageAction {
-  type: "agent" | "action" | "fork" | "fan_out" | "for_each" | "unknown";
+  type: "agent" | "action" | "fork" | "for_each" | "unknown";
   agent?: string;
   action?: string;
   strategy?: string;
@@ -274,7 +274,7 @@ export function getStageAction(app: AppContext, flowName: string, stageName: str
     return { type: "for_each", on_failure: stage.on_failure, optional: stage.optional };
   }
 
-  if (stage.type === "fork" || stage.type === "fan_out") {
+  if (stage.type === "fork") {
     return {
       type: stage.type,
       agent: stage.agent ?? "implementer",

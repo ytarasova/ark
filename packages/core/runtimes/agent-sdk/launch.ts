@@ -562,13 +562,7 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
         // Strip accept-encoding too so TF responds uncompressed -- the SDK
         // can't decompress zstd (ZstdDecompressionError) and we'd otherwise
         // need to decompress + re-encode in the proxy.
-        const SKIP_HEADERS = new Set([
-          "host",
-          "connection",
-          "content-length",
-          "transfer-encoding",
-          "accept-encoding",
-        ]);
+        const SKIP_HEADERS = new Set(["host", "connection", "content-length", "transfer-encoding", "accept-encoding"]);
         const headers: Record<string, string> = {};
         req.headers.forEach((v, k) => {
           if (!SKIP_HEADERS.has(k)) headers[k] = v;

@@ -45,7 +45,7 @@ import { indexRepoForDispatch, injectKnowledgeContext, injectRepoMap } from "../
 import * as agentRegistry from "../agent/agent.js";
 import { getExecutor } from "../executor.js";
 import { startStatusPoller } from "../executors/status-poller.js";
-import { fork as forkFn, fanOut as fanOutFn } from "../services/fork-join.js";
+import { fork as forkFn } from "../services/fork-join.js";
 import type { ComputeService as ComputeServiceType } from "../services/compute.js";
 import type { PluginRegistry } from "../plugins/registry.js";
 
@@ -216,7 +216,6 @@ export function registerServices(container: AppContainer): void {
           executeAction: (sessionId, action) => c.app.stageAdvance.executeAction(sessionId, action),
           dispatchChild: (childId) => c.app.dispatchService.dispatch(childId),
           fork: (parentId, task, opts) => forkFn(c.app, parentId, task, opts),
-          fanOut: (parentId, spec) => fanOutFn(c.app, parentId, spec),
           startStatusPoller: (sessionId, tmuxName, runtime) => startStatusPoller(c.app, sessionId, tmuxName, runtime),
 
           // Executor-interface coupling: LaunchOpts.app is required until

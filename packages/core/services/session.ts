@@ -400,7 +400,7 @@ export class SessionService {
     try {
       const flow = await import("../state/flow.js");
       const action = flow.getStageAction(this.app, flowName, stage);
-      if (action.type === "agent" || action.type === "fork" || action.type === "fan_out") return "agent";
+      if (action.type === "agent" || action.type === "fork") return "agent";
       if (action.type === "action") return "action";
     } catch (err) {
       await this.events.log(sessionId, "dispatch_failed", {

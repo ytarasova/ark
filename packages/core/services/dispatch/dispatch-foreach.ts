@@ -3,8 +3,7 @@
  *
  * Iterates a list resolved from session inputs/state and spawns one child
  * session per item -- sequentially. Each child is awaited before the next
- * one starts. Coexists with `type: fan_out`; both are live until the P2.0b
- * migration pass removes fan_out callers.
+ * one starts. The legacy `type: fan_out` stage type was removed in P2.0b.
  *
  * Design constraints:
  *   - Sequential only (no parallel knob in P2.0a).
@@ -51,11 +50,7 @@ function flattenItem(prefix: string, value: unknown, out: Record<string, string>
  * The iteration item is flattened under `iterVar` so templates like
  * `{{repo.repo_path}}` (where iterVar="repo") resolve correctly.
  */
-function buildIterationVars(
-  baseVars: Record<string, string>,
-  iterVar: string,
-  item: unknown,
-): Record<string, string> {
+function buildIterationVars(baseVars: Record<string, string>, iterVar: string, item: unknown): Record<string, string> {
   const extra: Record<string, string> = {};
   flattenItem(iterVar, item, extra);
   // Also expose the raw item as the iterVar key (serialised) so `{{item}}`
@@ -107,12 +102,7 @@ const CHILD_POLL_INTERVAL_MS = 250;
 const CHILD_POLL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
 export class ForEachDispatcher {
-  constructor(
-    private readonly deps: Pick<
-      DispatchDeps,
-      "sessions" | "events" | "flows" | "dispatchChild"
-    >,
-  ) {}
+  constructor(private readonly deps: Pick<DispatchDeps, "sessions" | "events" | "flows" | "dispatchChild">) {}
 
   /**
    * Execute a `for_each + mode:spawn` stage.
@@ -362,7 +352,7 @@ function resolveForEachList(
 ): unknown[] {
   // Attempt direct config lookup when the expr is a simple identifier.
   if (!/\{\{/.test(expr)) {
-    const direct = resolveDotted(session.config as Record<string, unknown> ?? {}, expr);
+    const direct = resolveDotted((session.config as Record<string, unknown>) ?? {}, expr);
     if (direct !== undefined) return coerceToArray(direct);
     const fromVars = sessionVars[expr];
     if (fromVars !== undefined) return coerceToArray(fromVars);
@@ -375,10 +365,7 @@ function resolveForEachList(
   if (rendered.startsWith("{{") && rendered.endsWith("}}")) {
     // Try direct config lookup using the inner key
     const inner = rendered.slice(2, -2).trim();
-    const configVal = resolveDotted(
-      (session as any).config as Record<string, unknown> ?? {},
-      inner,
-    );
+    const configVal = resolveDotted(((session as any).config as Record<string, unknown>) ?? {}, inner);
     if (configVal !== undefined) return coerceToArray(configVal);
     throw new Error(`Cannot resolve for_each list: '${expr}' rendered to unresolvable '${rendered}'`);
   }
@@ -399,7 +386,10 @@ function coerceToArray(value: unknown): unknown[] {
         // fall through to split
       }
     }
-    return trimmed.split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
+    return trimmed
+      .split(/[\n,]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
   // scalar -- wrap in single-element array
   return [value];

@@ -34,7 +34,7 @@ export interface GetStageCb {
   (flowName: string, stageName: string): StageDefinition | null;
 }
 
-/** Stage action (agent | action | fork | fan_out) lookup. */
+/** Stage action (agent | action | fork | for_each) lookup. */
 export interface GetStageActionCb {
   (flowName: string, stageName: string): StageAction;
 }
@@ -115,14 +115,6 @@ export interface ForkCb {
   ): Promise<{ ok: true; sessionId: string } | { ok: false; message: string }>;
 }
 
-/** Fan-out primitive from fork-join.ts. */
-export interface FanOutCb {
-  (
-    parentId: string,
-    spec: { tasks: { summary: string; agent: string }[] },
-  ): Promise<{ ok: boolean; message?: string; childIds?: string[] }>;
-}
-
 /** Start the per-session status poller (crash-detection fallback). */
 export interface StartStatusPollerCb {
   (sessionId: string, tmuxName: string, runtime: string): void;
@@ -171,7 +163,7 @@ export interface GetAppCb {
  *   getScheduler      -- hosted mode only; returns null in local mode
  *   getStage/Action   -- stage definition + action-type lookup
  *   buildTask         -- buildTaskWithHandoff helper (still takes AppContext)
- *   extractSubtasks   -- extractSubtasks helper (for fork/fan_out)
+ *   extractSubtasks   -- extractSubtasks helper (for fork)
  *   indexRepo         -- indexRepoForDispatch helper
  *   injectKnowledge   -- injectKnowledgeContext helper
  *   injectRepoMap     -- injectRepoMap helper
@@ -183,7 +175,7 @@ export interface GetAppCb {
  *   mediateStageHandoff -- follow-on handoff after action-stage completes
  *   executeAction     -- action-stage in-process executor
  *   dispatchChild     -- nested dispatch() for fan-out children
- *   fork/fanOut       -- fork-join primitives (dynamic-imported today)
+ *   fork              -- fork primitive (dynamic-imported today)
  *   startStatusPoller -- best-effort crash-detection poller
  *   getApp            -- ONLY for LaunchOpts.app executor-interface coupling
  */
@@ -224,7 +216,6 @@ export interface DispatchDeps {
   executeAction: ExecuteActionCb;
   dispatchChild: DispatchChildCb;
   fork: ForkCb;
-  fanOut: FanOutCb;
   startStatusPoller: StartStatusPollerCb;
 
   // Executor-interface coupling only.

@@ -1,5 +1,5 @@
 /**
- * Fork / fan-out dispatch split.
+ * Fork dispatch split.
  *
  * These routes used to pull `fork` / `fanOut` in via dynamic import to dodge
  * the cycle with fork-join.ts. With the class-based split we thread those in
@@ -9,6 +9,9 @@
  * Child-session dispatch is similarly threaded in as `dispatchChild` --
  * wired at the DispatchService composition layer to loop back through
  * `this.dispatch(childId)`.
+ *
+ * Note: the legacy `dispatchFanOut` method (for `type: fan_out` stages) was
+ * removed in P2.0b. Callers migrated to `for_each + mode:spawn` (dispatch-foreach.ts).
  */
 
 import type { DispatchDeps, DispatchResult } from "./types.js";
@@ -16,10 +19,7 @@ import type { StageDefinition } from "../../state/flow.js";
 
 export class FanOutDispatcher {
   constructor(
-    private readonly deps: Pick<
-      DispatchDeps,
-      "sessions" | "events" | "extractSubtasks" | "fork" | "fanOut" | "dispatchChild"
-    >,
+    private readonly deps: Pick<DispatchDeps, "sessions" | "events" | "extractSubtasks" | "fork" | "dispatchChild">,
   ) {}
 
   async dispatchFork(sessionId: string, stageDef: StageDefinition): Promise<DispatchResult> {
@@ -41,27 +41,5 @@ export class FanOutDispatcher {
     });
 
     return { ok: true, message: `Forked into ${children.length} sessions` };
-  }
-
-  async dispatchFanOut(sessionId: string, stageDef: StageDefinition): Promise<DispatchResult> {
-    const session = (await this.deps.sessions.get(sessionId))!;
-    const subtasks = await this.deps.extractSubtasks(session);
-
-    const maxParallel = stageDef.max_parallel ?? 8;
-    const result = await this.deps.fanOut(sessionId, {
-      tasks: subtasks.slice(0, maxParallel).map((s) => ({
-        summary: s.task,
-        agent: stageDef.agent ?? session.agent ?? "implementer",
-      })),
-    });
-
-    if (!result.ok) return { ok: false, message: result.message ?? "Fan-out failed" };
-
-    // Dispatch all children -- await so their session_ids are registered before returning
-    const dispatched = await Promise.allSettled(
-      (result.childIds ?? []).map((childId) => this.deps.dispatchChild(childId)),
-    );
-
-    return { ok: true, message: `Fan-out: ${dispatched.length} children dispatched` };
   }
 }
