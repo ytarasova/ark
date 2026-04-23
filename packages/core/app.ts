@@ -159,7 +159,11 @@ export class AppContext {
     // so `agent/list` + friends return []. Seed the builtin YAMLs shipped with
     // the source tree (or install prefix) on every boot; the seeder is idempotent
     // and leaves any user-authored override rows untouched.
-    if (this.config.databaseUrl) {
+    //
+    // Gate on `mode.kind` rather than `config.databaseUrl` -- modes layer
+    // (packages/core/modes/app-mode.ts) explicitly forbids URL / `isHostedMode()`
+    // sniffing so deployment-mode decisions flow through one canonical switch.
+    if (this.mode.kind === "hosted") {
       const { seedBuiltinResources } = await import("./di/seed-builtins.js");
       await seedBuiltinResources(this);
     }
