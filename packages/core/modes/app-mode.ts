@@ -202,6 +202,15 @@ export interface AppMode {
   readonly tenantResolver: TenantResolverCapability;
   /** Dialect + URL of the configured database. Set once at boot. */
   readonly database: DatabaseMode;
+  /**
+   * Name of the default compute provider used when a session / call site
+   * does not carry an explicit `compute_name`. Local mode returns "local"
+   * (tmux single-user laptop semantics). Hosted mode returns `null` --
+   * every session MUST carry an explicit `compute_name` in the control
+   * plane; silent fall-through to "local" would mean agents spawn inside
+   * the control-plane pod itself.
+   */
+  readonly defaultProvider: string | null;
 }
 
 // ── Shared helper: Bearer-token path is identical in both modes ────────────

@@ -105,3 +105,15 @@ describe("app.mode (DI-registered)", () => {
     expect(a).toBe(b);
   });
 });
+
+describe("defaultProvider capability", () => {
+  it("local mode defaults to 'local' so tmux laptop installs work unchanged", () => {
+    const mode = buildAppMode({ database: { url: undefined } } as any);
+    expect(mode.defaultProvider).toBe("local");
+  });
+
+  it("hosted mode has NO default provider -- sessions must carry compute_name", () => {
+    const mode = buildAppMode({ database: { url: "postgres://fake/ark" } } as any);
+    expect(mode.defaultProvider).toBeNull();
+  });
+});

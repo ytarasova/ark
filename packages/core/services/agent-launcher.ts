@@ -12,7 +12,6 @@ import type { ComputeProvider } from "../../compute/types.js";
 import * as tmux from "../infra/tmux.js";
 import * as agentRegistry from "../agent/agent.js";
 import * as claude from "../claude/claude.js";
-import { getProvider } from "../../compute/index.js";
 import { resolvePortDecls, parseArcJson } from "../../compute/arc-json.js";
 import { setupSessionWorktree } from "./worktree/index.js";
 
@@ -118,9 +117,10 @@ export async function _launchAgentTmux(
   const log = opts?.onLog ?? (() => {});
   const tmuxName = `ark-${session.id}`;
 
-  // Resolve compute + provider
-  const compute = session.compute_name ? await app.computes.get(session.compute_name) : null;
-  const provider = getProvider(compute?.provider ?? "local");
+  // Resolve compute + provider via AppContext (polymorphic on AppMode's
+  // defaultProvider). Hosted sessions without an explicit compute_name
+  // resolve to null rather than silently defaulting to LocalProvider.
+  const { provider, compute } = await app.resolveProvider(session);
 
   // Setup worktree + trust
   const effectiveWorkdir = await setupSessionWorktree(app, session, compute, provider, log);

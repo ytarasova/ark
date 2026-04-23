@@ -75,5 +75,10 @@ export function buildHostedAppMode(database: DatabaseMode, config?: ArkConfig): 
     secrets,
     tenantResolver: makeHostedTenantResolver(),
     database,
+    // Hosted mode has no default -- every session MUST carry an explicit
+    // `compute_name`. A silent fall-through to "local" would mean agents
+    // spawn inside the control-plane pod itself, competing with the
+    // control plane for resources with zero isolation.
+    defaultProvider: null,
   };
 }

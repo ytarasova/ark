@@ -75,10 +75,12 @@ export const agentSdkExecutor: Executor = {
       }
     };
 
-    // Worktree setup
-    const compute = session.compute_name ? await app.computes.get(session.compute_name) : null;
-    const { getProvider } = await import("../../compute/index.js");
-    const provider = getProvider(compute?.provider ?? "local");
+    // Worktree setup. `app.resolveProvider` honors the AppMode's default
+    // (local: "local", hosted: null) when the session has no explicit
+    // `compute_name`. Hosted sessions without a compute resolve to null,
+    // which surfaces as a clear "no compute resolved" error at the call
+    // site rather than a silent fall-through to LocalProvider.
+    const { provider, compute } = await app.resolveProvider(session);
     const { setupSessionWorktree } = await import("../services/worktree/index.js");
     const effectiveWorkdir = await setupSessionWorktree(app, session, compute, provider, log);
 

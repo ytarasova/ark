@@ -13,7 +13,6 @@ import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../exec
 import * as claude from "../claude/claude.js";
 import * as tmux from "../infra/tmux.js";
 import { parseArcJson } from "../../compute/arc-json.js";
-import { getProvider } from "../../compute/index.js";
 
 export const claudeCodeExecutor: Executor = {
   name: "claude-code",
@@ -29,9 +28,11 @@ export const claudeCodeExecutor: Executor = {
     const tmuxName = `ark-${session.id}`;
     const stage = opts.stage ?? "work";
 
-    // Resolve compute + provider
-    const compute = session.compute_name ? await app.computes.get(session.compute_name) : null;
-    const provider = getProvider(compute?.provider ?? "local");
+    // Resolve compute + provider via the polymorphic AppContext helper so
+    // hosted sessions without an explicit `compute_name` resolve to null
+    // (caller surfaces "no compute resolved") rather than silently
+    // defaulting to LocalProvider.
+    const { provider, compute } = await app.resolveProvider(session);
 
     // Setup worktree + trust (dynamic import to avoid circular dependency)
     const { setupSessionWorktree } = await import("../services/worktree/index.js");

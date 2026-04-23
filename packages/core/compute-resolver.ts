@@ -17,7 +17,14 @@ export async function resolveProvider(
   app: AppContext,
   session: Session,
 ): Promise<{ provider: ComputeProvider | null; compute: Compute | null }> {
-  const computeName = session.compute_name || "local";
+  // When a session has no explicit `compute_name` we fall back to the
+  // AppMode's default provider (local mode: "local"; hosted mode: null).
+  // Hosted mode returns `{ provider: null, compute: null }` on purpose --
+  // callers that need a provider must surface a clear error rather than
+  // silently dispatching the session onto the control-plane host.
+  const defaultName = app.mode.defaultProvider;
+  const computeName = session.compute_name || defaultName;
+  if (!computeName) return { provider: null, compute: null };
   const row = (await app.db?.prepare("SELECT * FROM compute WHERE name = ?").get(computeName)) as
     | { name: string; provider: string; status: string; config: string; created_at: string; updated_at: string }
     | undefined;

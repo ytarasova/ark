@@ -292,5 +292,8 @@ export function buildLocalAppMode(app?: AppContext, database?: DatabaseMode): Ap
     secrets,
     tenantResolver,
     database: db,
+    // Local mode runs agents via tmux on the same host; a session without
+    // an explicit `compute_name` falls back to the seeded "local" row.
+    defaultProvider: "local",
   };
 }
