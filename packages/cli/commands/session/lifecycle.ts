@@ -124,11 +124,12 @@ export function registerLifecycleCommands(session: Command) {
 
   session
     .command("interrupt")
-    .description("Interrupt a running agent (Ctrl+C) without killing the session")
+    .description("Interrupt a running agent and inject a correction message for the next turn")
     .argument("<id>", "Session ID")
-    .action(async (id) => {
+    .argument("<content>", "Correction message to inject as the next user turn")
+    .action(async (id, content) => {
       const ark = await getArkClient();
-      const result = await ark.sessionInterrupt(id);
+      const result = await ark.sessionInterrupt(id, content);
       console.log(result.ok ? chalk.green(result.message) : chalk.red(result.message));
     });
 

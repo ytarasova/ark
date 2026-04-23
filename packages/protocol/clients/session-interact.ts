@@ -112,8 +112,13 @@ export class SessionInteractClient {
     );
   }
 
-  async sessionInterrupt(sessionId: string): Promise<SessionOpResult> {
-    return this.rpc<SessionOpResult>("session/interrupt", { sessionId });
+  /**
+   * Interrupt a running agent with a correction message. `content` is injected
+   * as the next user turn after the current turn aborts. Matches the server
+   * contract at `packages/protocol/rpc-schemas.ts:sessionInterruptRequest`.
+   */
+  async sessionInterrupt(sessionId: string, content: string): Promise<SessionOpResult> {
+    return this.rpc<SessionOpResult>("session/interrupt", { sessionId, content });
   }
 
   async sessionArchive(sessionId: string): Promise<SessionOpResult> {
