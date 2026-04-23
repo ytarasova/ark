@@ -90,7 +90,11 @@ export async function evaluateSession(app: AppContext, session: Session): Promis
 
   const config = session.config as Record<string, unknown>;
   const filesChanged = Array.isArray(config.filesChanged) ? config.filesChanged.length : 0;
-  const runtime = typeof config.runtime_override === "string" ? config.runtime_override : "claude";
+  // runtime/model on the eval record describe what actually ran, not a
+  // session-level override (which no longer exists). Leave them as best-effort
+  // strings the dispatch layer records into config at launch time, or fall
+  // back to a generic "claude" / "unknown" for legacy rows.
+  const runtime = typeof config.runtime === "string" ? config.runtime : "claude";
   const model = typeof config.model === "string" ? config.model : "unknown";
 
   const result: AgentEvalResult = {

@@ -195,13 +195,7 @@ export class ObservabilityClient {
     return this.rpc("sage/context", opts as Record<string, unknown>);
   }
 
-  async sageAnalyze(opts: {
-    analysisId: string;
-    sageUrl?: string;
-    compute?: string;
-    runtime?: string;
-    repo?: string;
-  }): Promise<{
+  async sageAnalyze(opts: { analysisId: string; sageUrl?: string; compute?: string; repo?: string }): Promise<{
     ok: boolean;
     sessionId: string;
     analysisId: string;

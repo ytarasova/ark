@@ -482,12 +482,12 @@ describe("CreateSessionOpts.max_budget_usd stored in session config", () => {
       summary: "with config",
       flow: "bare",
       max_budget_usd: 3.0,
-      config: { runtime_override: "agent-sdk" },
+      config: { turns: 12 },
     });
 
     const loaded = await app.sessions.get(session.id);
     const cfg = loaded?.config as Record<string, unknown>;
     expect(cfg?.max_budget_usd).toBe(3.0);
-    expect(cfg?.runtime_override).toBe("agent-sdk");
+    expect(cfg?.turns).toBe(12);
   });
 });

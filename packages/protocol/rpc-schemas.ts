@@ -921,7 +921,6 @@ export const sessionSpawnRequest = z
     sessionId: z.string().min(1),
     task: z.string(),
     agent: z.string().optional(),
-    model: z.string().optional(),
     group_name: z.string().optional(),
   })
   .loose();

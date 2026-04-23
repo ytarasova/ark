@@ -493,31 +493,19 @@ describe("spawnSubagent", async () => {
     expect(child.agent).toBe("implementer");
   });
 
-  it("stores model override in config", async () => {
-    const parent = await app.sessions.create({ summary: "parent", flow: "bare" });
-
-    const result = await spawnSubagent(app, parent.id, {
-      task: "cheap task",
-      model: "haiku",
-    });
-    const child = await app.sessions.get(result.sessionId!)!;
-    expect(child.config?.model_override).toBe("haiku");
-  });
-
   it("logs subagent_spawned event", async () => {
     const parent = await app.sessions.create({ summary: "parent", flow: "bare" });
     await app.sessions.update(parent.id, { agent: "implementer" });
 
     const result = await spawnSubagent(app, parent.id, {
       task: "do thing",
-      model: "haiku",
     });
 
     const events = await app.events.list(result.sessionId!);
     const spawnEvent = events.find((e) => e.type === "subagent_spawned");
     expect(spawnEvent).toBeTruthy();
     expect(spawnEvent!.data?.parent_id).toBe(parent.id);
-    expect(spawnEvent!.data?.model).toBe("haiku");
+    expect(spawnEvent!.data?.agent).toBe("implementer");
   });
 
   it("stores extensions in config", async () => {
@@ -594,12 +582,12 @@ describe("spawnParallelSubagents", async () => {
     }
   });
 
-  it("each subagent can have different model overrides", async () => {
+  it("each subagent can pick a different agent", async () => {
     const parent = await app.sessions.create({ summary: "parent", flow: "bare" });
-    await app.sessions.update(parent.id, { stage: "implement", status: "running" });
+    await app.sessions.update(parent.id, { stage: "implement", status: "running", agent: "implementer" });
 
-    const r1 = await spawnSubagent(app, parent.id, { task: "Review" });
-    const r2 = await spawnSubagent(app, parent.id, { task: "Docs", model: "haiku" });
+    const r1 = await spawnSubagent(app, parent.id, { task: "Review", agent: "reviewer" });
+    const r2 = await spawnSubagent(app, parent.id, { task: "Docs" });
 
     expect(r1.ok).toBe(true);
     expect(r2.ok).toBe(true);
@@ -609,7 +597,8 @@ describe("spawnParallelSubagents", async () => {
     // Both children are linked to parent
     expect(child1.parent_id).toBe(parent.id);
     expect(child2.parent_id).toBe(parent.id);
-    // Model override stored in config
-    expect(child2.config?.model_override).toBe("haiku");
+    // Agent override propagated; second child inherits the parent's agent.
+    expect(child1.agent).toBe("reviewer");
+    expect(child2.agent).toBe("implementer");
   });
 });

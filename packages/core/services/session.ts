@@ -609,7 +609,6 @@ export class SessionService {
     opts: {
       task: string;
       agent?: string;
-      model?: string;
       group_name?: string;
       extensions?: string[];
     },

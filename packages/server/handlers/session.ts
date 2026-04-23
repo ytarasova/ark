@@ -298,11 +298,10 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   });
 
   router.handle("session/spawn", async (params, notify) => {
-    const { sessionId, task, agent, model, group_name } = extract<SessionSpawnParams>(params, ["sessionId", "task"]);
+    const { sessionId, task, agent, group_name } = extract<SessionSpawnParams>(params, ["sessionId", "task"]);
     const result = await app.sessionService.spawn(sessionId, {
       task,
       agent,
-      model,
       group_name,
     });
     if (result.sessionId) {

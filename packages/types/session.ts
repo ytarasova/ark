@@ -26,7 +26,6 @@ export const SESSION_STATUSES: readonly SessionStatus[] = [
 export interface SessionConfig {
   // Runtime
   turns?: number;
-  model_override?: string;
   completion_summary?: string;
   filesChanged?: string[];
   commits?: string[];

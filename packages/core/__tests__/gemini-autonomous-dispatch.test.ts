@@ -174,7 +174,7 @@ describe("Gemini runtime + autonomous flow completion", async () => {
       status: "running",
       stage: "work",
       session_id: "ark-" + session.id,
-      config: { runtime: "gemini", runtime_override: "gemini" },
+      config: { runtime: "gemini" },
     });
 
     // Mock: tmux session already exited (gemini finished its work)
