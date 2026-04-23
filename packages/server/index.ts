@@ -223,9 +223,33 @@ export class ArkServer {
           if (!app) {
             return new Response("Terminal route requires AppContext", { status: 503 });
           }
+
+          // Resolve TenantContext from the captured credentials BEFORE any
+          // tenant-scoped lookup. Falls through to localAdminContext when
+          // auth is disabled (single-tenant local dev); returns a typed
+          // rejection when requireToken is on and no valid token was sent.
+          const fakeConn = {
+            id: "",
+            transport: { send: () => {}, onMessage: () => {}, close: () => {} },
+            subscriptions: [],
+            credentials: { authorizationHeader, queryToken },
+          } as unknown as ServerConnection;
+          let ctx: TenantContext;
+          try {
+            ctx = await self.resolveContext(fakeConn);
+          } catch (err: any) {
+            return new Response(`Unauthorized: ${err?.message ?? "auth failed"}`, { status: 401 });
+          }
+
           const session = await app.sessions.get(sessionId);
           if (!session) {
             return new Response("Session not found", { status: 404 });
+          }
+          // Tenant ownership gate: only sessions belonging to the caller's
+          // tenant (or admins) can be attached. Cross-tenant pane read +
+          // keystroke injection is exactly what round-2 P0-1 closed.
+          if (session.tenant_id !== ctx.tenantId && !ctx.isAdmin) {
+            return new Response("Forbidden: session belongs to a different tenant", { status: 403 });
           }
           if (!session.session_id) {
             return new Response("Session has no live tmux pane", { status: 409 });
