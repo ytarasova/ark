@@ -10,6 +10,9 @@ dist/
 !eslint.config.js
 !docs/**/*.js
 .env
+.env.dev
+.env.local
+.env.*.local
 .litellm/
 .worktrees/
 .claude/worktrees/

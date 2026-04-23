@@ -122,11 +122,11 @@ spike-temporal-bun: ## Run the Phase 0 Bun / Temporal worker compat spike
 claude-tfy: ## Claude Code -> TrueFoundry (direct; --continue unless CLAUDE_CONTINUE=0)
 	@command -v claude >/dev/null 2>&1 || { echo "Claude Code not found. Install: https://docs.anthropic.com/en/docs/claude-code"; exit 1; }
 	cd "$(CURDIR)" && \
-	  if [ -f .env ]; then set -a && . ./.env && set +a; fi && \
-	  test -n "$$TRUEFOUNDRY_API_KEY" || { echo "Set TRUEFOUNDRY_API_KEY in .env"; exit 1; } && \
+	  if [ -f .env.dev ]; then set -a && . ./.env.dev && set +a; fi && \
+	  test -n "$$TRUEFOUNDRY_API_KEY" || { echo "Set TRUEFOUNDRY_API_KEY in .env.dev"; exit 1; } && \
 	  tfy_anth_base="$$TRUEFOUNDRY_ANTHROPIC_BASE_URL"; \
 	  if [ -z "$$tfy_anth_base" ]; then tfy_anth_base="$$TRUEFOUNDRY_API_BASE"; fi; \
-	  if [ -z "$$tfy_anth_base" ]; then echo "Set TRUEFOUNDRY_ANTHROPIC_BASE_URL (preferred) or TRUEFOUNDRY_API_BASE in .env"; exit 1; fi; \
+	  if [ -z "$$tfy_anth_base" ]; then echo "Set TRUEFOUNDRY_ANTHROPIC_BASE_URL (preferred) or TRUEFOUNDRY_API_BASE in .env.dev"; exit 1; fi; \
 	  unset ANTHROPIC_AUTH_TOKEN 2>/dev/null || true; \
 	  export CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1 && \
 	  export ANTHROPIC_BASE_URL="$$tfy_anth_base" && \
