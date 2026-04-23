@@ -316,9 +316,14 @@ const fixtures: Record<string, MethodFixture> = {
     sampleResponse: { ok: true },
   },
   "session/interrupt": {
-    validRequest: { sessionId: "s-1" },
+    validRequest: { sessionId: "s-1", content: "stop that" },
     invalidRequest: {},
     sampleResponse: sampleSessionOpResult,
+  },
+  "session/inject": {
+    validRequest: { sessionId: "s-1", content: "heads up" },
+    invalidRequest: { sessionId: "s-1" },
+    sampleResponse: { ok: true },
   },
   "session/complete": {
     validRequest: { sessionId: "s-1" },

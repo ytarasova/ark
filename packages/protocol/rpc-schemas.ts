@@ -846,6 +846,22 @@ export const sessionInterruptResponse = z
   .loose();
 export type SessionInterruptResponse = z.infer<typeof sessionInterruptResponse>;
 
+// ── session/inject ──────────────────────────────────────────────────────────
+
+export const sessionInjectRequest = z.object({
+  sessionId: z.string().min(1),
+  content: z.string(),
+});
+export type SessionInjectRequest = z.infer<typeof sessionInjectRequest>;
+
+export const sessionInjectResponse = z
+  .object({
+    ok: z.boolean(),
+    message: z.string().optional(),
+  })
+  .loose();
+export type SessionInjectResponse = z.infer<typeof sessionInjectResponse>;
+
 // ── session/kill ─────────────────────────────────────────────────────────────
 
 export const sessionKillRequest = sessionIdParams;
@@ -1876,6 +1892,7 @@ export const rpcMethodSchemas: Record<string, RpcMethodSchemas> = {
   "session/clone": { request: sessionCloneRequest, response: sessionCloneResponse },
   "session/pause": { request: sessionPauseRequest, response: sessionPauseResponse },
   "session/interrupt": { request: sessionInterruptRequest, response: sessionInterruptResponse },
+  "session/inject": { request: sessionInjectRequest, response: sessionInjectResponse },
   "session/kill": { request: sessionKillRequest, response: sessionKillResponse },
   "session/complete": { request: sessionCompleteRequest, response: sessionCompleteResponse },
   "session/spawn": { request: sessionSpawnRequest, response: sessionSpawnResponse },
