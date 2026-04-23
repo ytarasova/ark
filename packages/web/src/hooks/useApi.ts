@@ -105,6 +105,7 @@ import type {
   RuntimeListResponse,
   RuntimeReadRequest,
   RuntimeReadResponse,
+  ModelListResponse,
   SkillListRequest,
   SkillListResponse,
   SkillSaveRequest,
@@ -466,6 +467,7 @@ export const api = {
   getRuntimes: () => rpc<RuntimeListResponse>("runtime/list").then((r) => r.runtimes),
   getRuntimeDetail: (name: string) =>
     rpc<RuntimeReadResponse>("runtime/read", { name } satisfies RuntimeReadRequest).then((r) => r.runtime),
+  getModels: () => rpc<ModelListResponse>("model/list").then((r) => r.models),
   createAgent: (data: AgentCreateRequest) =>
     rpc<AgentCreateResponse>("agent/create", data).then((r) => ({ ok: true as const, name: r.name })),
   updateAgent: (name: string, data: Omit<AgentUpdateRequest, "name">) =>

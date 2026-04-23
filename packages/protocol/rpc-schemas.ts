@@ -1409,6 +1409,35 @@ export type RuntimeReadRequest = z.infer<typeof runtimeReadRequest>;
 export const runtimeReadResponse = z.object({ runtime: runtimeDefinitionSchema });
 export type RuntimeReadResponse = z.infer<typeof runtimeReadResponse>;
 
+// ── model/list ──────────────────────────────────────────────────────────────
+
+const modelDefinitionSchema = z
+  .object({
+    id: z.string(),
+    display: z.string(),
+    provider: z.string(),
+    aliases: z.array(z.string()).optional(),
+    capabilities: z.array(z.string()).optional(),
+    pricing: z
+      .object({
+        input_per_mtok: z.number().optional(),
+        cached_input_per_mtok: z.number().optional(),
+        output_per_mtok: z.number().optional(),
+      })
+      .optional(),
+    provider_slugs: z.record(z.string(), z.string()),
+    context_window: z.number().optional(),
+    _source: z.enum(["builtin", "global", "project"]).optional(),
+    _path: z.string().optional(),
+  })
+  .loose();
+
+export const modelListRequest = z.object({}).loose();
+export type ModelListRequest = z.infer<typeof modelListRequest>;
+
+export const modelListResponse = z.object({ models: z.array(modelDefinitionSchema) });
+export type ModelListResponse = z.infer<typeof modelListResponse>;
+
 // ── agent/create ────────────────────────────────────────────────────────────
 
 export const agentCreateRequest = z
@@ -1950,6 +1979,7 @@ export const rpcMethodSchemas: Record<string, RpcMethodSchemas> = {
   "recipe/delete": { request: recipeDeleteRequest, response: recipeDeleteResponse },
   "runtime/list": { request: runtimeListRequest, response: runtimeListResponse },
   "runtime/read": { request: runtimeReadRequest, response: runtimeReadResponse },
+  "model/list": { request: modelListRequest, response: modelListResponse },
   "agent/create": { request: agentCreateRequest, response: agentCreateResponse },
   "agent/update": { request: agentUpdateRequest, response: agentUpdateResponse },
   "agent/delete": { request: agentDeleteRequest, response: agentDeleteResponse },

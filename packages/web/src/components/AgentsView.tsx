@@ -152,9 +152,7 @@ export function AgentsView({
                 >
                   <div className="flex flex-col min-w-0 mr-2">
                     <span className="text-foreground truncate">{r.name}</span>
-                    <span className="text-[11px] text-muted-foreground truncate">
-                      {r.type} / {r.default_model || "-"}
-                    </span>
+                    <span className="text-[11px] text-muted-foreground truncate">{r.type || "-"}</span>
                   </div>
                   <Badge variant="secondary" className="text-[10px] shrink-0">
                     {r._source || "builtin"}
