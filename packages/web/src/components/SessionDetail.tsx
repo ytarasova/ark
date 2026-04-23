@@ -20,6 +20,9 @@ import { EventsFooter, DiffFooter, TodosFooter } from "./session/TabFooter.js";
 import { TabPanels } from "./session/TabPanels.js";
 import { RejectGateModal } from "./session/RejectGateModal.js";
 import { RestartDialog } from "./session/RestartDialog.js";
+import { BudgetBar } from "./session/BudgetBar.js";
+import { ResumeBanner } from "./session/ResumeBanner.js";
+import { ForEachRollup, ChildSessionCluster } from "./session/ForEachRollup.js";
 import type { ErrorInfo } from "./session/types.js";
 
 // Re-exported for back-compat: `__tests__/RejectGateModal.test.ts` imports
@@ -147,7 +150,51 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         />
       )}
 
+      {/* Phase 3: resume-from-checkpoint banner. Surfaces when the session
+          has a stored for_each_checkpoint and isn't running. */}
+      {session.config?.for_each_checkpoint && session.status !== "running" && (
+        <ResumeBanner
+          checkpoint={`iteration ${session.config.for_each_checkpoint.index ?? "?"}`}
+        />
+      )}
+
+      {/* Phase 3: per-session budget cap bar. */}
+      {session.config?.max_budget_usd && (
+        <div className="px-[18px] py-[8px] border-b border-[var(--border-light)] bg-[rgba(0,0,0,0.12)]">
+          <BudgetBar spent={d.cost?.cost ?? 0} cap={session.config.max_budget_usd} />
+        </div>
+      )}
+
       <ContentTabs tabs={d.tabs} activeTab={d.activeTab} onTabChange={d.setActiveTab} ariaLabel="Session detail tabs" />
+
+      {/* Phase 2: for_each rollup + child cluster. Rendered inline above the
+          tab body so they're visible on every tab. Data is expected on
+          session.config.for_each. */}
+      {(session.config?.for_each?.total || session.children?.length > 0) && (
+        <div className="px-[18px] pt-[10px] pb-[4px] grid grid-cols-1 lg:grid-cols-2 gap-[10px] shrink-0">
+          {session.config?.for_each?.total && (
+            <ForEachRollup
+              total={session.config.for_each.total}
+              completed={session.config.for_each.completed ?? 0}
+              failed={session.config.for_each.failed ?? 0}
+              inflight={session.config.for_each.inflight ?? 0}
+              iterations={session.config.for_each.iterations ?? []}
+              onOpenIteration={(id) => {
+                window.location.hash = `#/sessions/${id}`;
+              }}
+            />
+          )}
+          {session.children && session.children.length > 0 && (
+            <ChildSessionCluster
+              parentId={session.parent_id}
+              children={session.children}
+              onOpen={(id) => {
+                window.location.hash = `#/sessions/${id}`;
+              }}
+            />
+          )}
+        </div>
+      )}
 
       <TabPanels
         activeTab={d.activeTab}

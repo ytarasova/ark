@@ -5,6 +5,8 @@ export interface TabDef {
   id: string;
   label: string;
   badge?: string | number;
+  /** Render a small dot beside the tab label (indicates new / unread). */
+  dot?: boolean;
 }
 
 export interface ContentTabsProps extends React.ComponentProps<"div"> {
@@ -19,20 +21,21 @@ export interface ContentTabsProps extends React.ComponentProps<"div"> {
 export function tabButtonId(tabId: string): string {
   return `tab-${tabId}`;
 }
-
 /** DOM id for the panel a tab controls. */
 export function tabPanelId(tabId: string): string {
   return `tabpanel-${tabId}`;
 }
 
 /**
- * Conversation / Terminal / Events / Diff / Todos tabs with count badges.
- * Keyboard shortcuts 1-5 handled by parent.
+ * Content tabs — rebuilt from `/tmp/ark-design-system/preview/app-chrome.html`
+ * (`.tabs` + `.tabs span`).
  *
- * Exposes full ARIA tablist semantics: the outer container is `role="tablist"`,
- * each button is `role="tab"` with a stable id, and `aria-controls` points at
- * the panel the parent renders. Pair with `<TabPanel>` for the content region.
- * See `.workflow/audit/8-a11y.md` finding B1.
+ *   tab strip    padding 0 18px; gap 2px; border-bottom 1 var(--border)
+ *                height 36px (chrome-session-header variant)
+ *   tab button   font sans 12px 500; padding 6px 10px (app-chrome)
+ *                / 10px 14px (chrome-session-header). We keep 6px 10px.
+ *                border-bottom 2px transparent, margin-bottom -1px.
+ *   active       color fg, border var(--primary).
  */
 export function ContentTabs({
   tabs,
@@ -46,7 +49,11 @@ export function ContentTabs({
     <div
       role="tablist"
       aria-label={ariaLabel}
-      className={cn("flex border-b border-[var(--border)] px-5 shrink-0", className)}
+      className={cn(
+        "flex items-end gap-[2px] shrink-0",
+        "px-[18px] border-b border-[var(--border)]",
+        className,
+      )}
       {...props}
     >
       {tabs.map((tab) => {
@@ -62,16 +69,19 @@ export function ContentTabs({
             tabIndex={active ? 0 : -1}
             onClick={() => onTabChange(tab.id)}
             className={cn(
-              "py-2.5 mr-6 text-[12px] font-medium cursor-pointer",
-              "border-b-2 border-transparent flex items-center gap-1.5",
-              "text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors duration-150",
-              "bg-transparent",
+              "relative inline-flex items-center gap-[6px] px-[10px] py-[6px]",
+              "font-[family-name:var(--font-sans)] text-[12px] font-medium",
+              "bg-transparent border-0 cursor-pointer whitespace-nowrap",
+              "text-[var(--fg-muted)] transition-colors duration-150",
+              "hover:text-[var(--fg)]",
+              "border-b-[2px] border-transparent -mb-px",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] focus-visible:ring-offset-0",
-              active && "text-[var(--primary)] border-b-[var(--primary)]",
+              active && "text-[var(--fg)] !border-b-[var(--primary)]",
             )}
           >
             {tab.label}
             {tab.badge != null && <TabBadge active={active}>{tab.badge}</TabBadge>}
+            {tab.dot && <span className="w-[5px] h-[5px] rounded-full bg-[var(--failed)]" />}
           </button>
         );
       })}
@@ -80,9 +90,7 @@ export function ContentTabs({
 }
 
 /**
- * Content region paired with a `ContentTabs` tab. Renders `role="tabpanel"`
- * with `aria-labelledby` pointing back at the tab button so screen readers
- * announce "<label> tab panel" when focus enters.
+ * Content region paired with a `ContentTabs` tab.
  */
 export function TabPanel({ tabId, children, className, ...props }: React.ComponentProps<"div"> & { tabId: string }) {
   return (
