@@ -307,6 +307,24 @@ export class SessionRepository {
   }
 
   /**
+   * Privileged by-id read across every tenant. The only supported callers are
+   * cross-cutting routes that need the session's `tenant_id` to enforce an
+   * ownership check BEFORE dispatching to a tenant-scoped context (e.g. the
+   * terminal-attach WS upgrade path). Handler code MUST NOT call this for
+   * normal reads -- use `get(id)` (tenant-scoped) or route through
+   * `app.forTenant(id).sessions.get(...)` instead.
+   *
+   * @internal
+   */
+  async getAcrossTenants(id: string): Promise<Session | null> {
+    const d = this.d();
+    const s = d.schema.sessions;
+    const rows = await (d.db as any).select().from(s).where(eq(s.id, id)).limit(1);
+    const row = (rows as DrizzleSelectSession[])[0];
+    return row ? rowToSession(row) : null;
+  }
+
+  /**
    * Privileged read across every tenant. The ONLY supported callers are
    * boot-time reconcilers (rehydrate inline flows, resume for_each loops,
    * stale-state detection, checkpoint recovery, compute GC ref-counting)

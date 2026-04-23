@@ -150,14 +150,28 @@ export class ArkServer {
    * local-admin context with the configured default tenant.
    */
   private async resolveContext(conn: ServerConnection): Promise<TenantContext> {
+    return this.resolveContextFromCredentials(conn.credentials);
+  }
+
+  /**
+   * Materialize a TenantContext from raw credential material. Used by
+   * non-JSON-RPC entry points (the /terminal/:sessionId WS upgrade path
+   * in particular) that need to enforce tenant ownership before upgrading
+   * the socket. Handlers on the JSON-RPC path should keep calling
+   * `resolveContext(conn)` which delegates through here.
+   */
+  private async resolveContextFromCredentials(credentials?: {
+    authorizationHeader?: string | null;
+    queryToken?: string | null;
+  }): Promise<TenantContext> {
     if (!this.auth || !this.auth.requireToken) {
       return localAdminContext(this.auth?.defaultTenant ?? null);
     }
     return materializeContext({
       requireToken: true,
       defaultTenant: this.auth.defaultTenant,
-      authorizationHeader: conn.credentials?.authorizationHeader ?? null,
-      queryToken: conn.credentials?.queryToken ?? null,
+      authorizationHeader: credentials?.authorizationHeader ?? null,
+      queryToken: credentials?.queryToken ?? null,
       apiKeys: this.auth.apiKeys,
     });
   }
@@ -178,6 +192,8 @@ export class ArkServer {
       tmuxName: string;
       authorizationHeader: string | null;
       queryToken: string | null;
+      /** Tenant id of the resolved session -- downstream bridge runs scoped. */
+      tenantId: string;
     };
     type RpcData = {
       kind: "rpc";
@@ -228,20 +244,19 @@ export class ArkServer {
           // tenant-scoped lookup. Falls through to localAdminContext when
           // auth is disabled (single-tenant local dev); returns a typed
           // rejection when requireToken is on and no valid token was sent.
-          const fakeConn = {
-            id: "",
-            transport: { send: () => {}, onMessage: () => {}, close: () => {} },
-            subscriptions: [],
-            credentials: { authorizationHeader, queryToken },
-          } as unknown as ServerConnection;
           let ctx: TenantContext;
           try {
-            ctx = await self.resolveContext(fakeConn);
+            ctx = await self.resolveContextFromCredentials({ authorizationHeader, queryToken });
           } catch (err: any) {
             return new Response(`Unauthorized: ${err?.message ?? "auth failed"}`, { status: 401 });
           }
 
-          const session = await app.sessions.get(sessionId);
+          // Tenant-agnostic lookup -- `app.sessions.get(sessionId)` is
+          // default-tenant-scoped, so in a hosted deployment it returns null
+          // for every cross-tenant session including the caller's own. We
+          // need the raw row here to compare `tenant_id` to `ctx.tenantId`.
+          // Downstream ops ALWAYS go through the tenant-scoped AppContext.
+          const session = await app.sessions.getAcrossTenants(sessionId);
           if (!session) {
             return new Response("Session not found", { status: 404 });
           }
@@ -265,6 +280,7 @@ export class ArkServer {
             tmuxName: session.session_id,
             authorizationHeader,
             queryToken,
+            tenantId: session.tenant_id,
           };
           if (server.upgrade(req, { data })) return;
           return new Response("WebSocket upgrade failed", { status: 500 });
@@ -283,7 +299,7 @@ export class ArkServer {
 
           // ── Terminal-attach route ────────────────────────────────────────
           if (upgradeData.kind === "terminal") {
-            const { sessionId, tmuxName } = upgradeData;
+            const { sessionId, tmuxName, tenantId } = upgradeData;
             terminalMetadata.set(ws, {
               sessionId,
               tmuxName,
@@ -293,7 +309,11 @@ export class ArkServer {
             });
             try {
               if (!app) throw new Error("terminal route requires AppContext");
-              await self.startTerminalBridgeArkd(app, ws, sessionId, tmuxName, terminalMetadata);
+              // Bridge runs against the tenant-scoped AppContext so any
+              // downstream session/compute reads land in the right tenant.
+              // The tenant ownership gate already passed at upgrade time.
+              const tenantApp = app.forTenant(tenantId);
+              await self.startTerminalBridgeArkd(tenantApp, ws, sessionId, tmuxName, terminalMetadata);
             } catch (err: any) {
               ws.send(JSON.stringify({ type: "error", message: err?.message ?? "attach failed" }));
               try {
