@@ -5,7 +5,6 @@
  */
 
 import type { AppContext } from "../app.js";
-import { resolveProvider } from "../provider-registry.js";
 import { detectInjection } from "../session/prompt-guard.js";
 import { logDebug } from "../observability/structured-log.js";
 
@@ -17,9 +16,13 @@ export async function getOutput(
   const session = await app.sessions.get(sessionId);
   if (!session) return "";
 
-  // For running sessions, capture live from tmux
+  // For running sessions, capture live from tmux. Resolve the provider via the
+  // session's tenant-scoped AppContext so that compute lookup respects the
+  // (name, tenant_id) primary key on the compute table -- otherwise two tenants
+  // with the same compute name would collide.
   if (session.session_id) {
-    const { provider, compute } = await resolveProvider(session);
+    const tenantApp = session.tenant_id ? app.forTenant(session.tenant_id) : app;
+    const { provider, compute } = await tenantApp.resolveProvider(session);
     if (provider && compute) {
       const live = await provider.captureOutput(compute, session, opts);
       if (live) return live;

@@ -2,16 +2,21 @@
  * Compute / Runtime resolution helpers.
  *
  * Extracted from app.ts so AppContext stays focused on lifecycle. Both
- * helpers are pure functions over an AppContext + session; they live
- * here (not on the class) because they're used by the session resolver
- * bridge (`setProviderResolver`) and benefit from being importable
- * without the full AppContext type surface.
+ * helpers are pure functions over an AppContext + session.
+ *
+ * Security: compute lookup MUST go through `app.computes.get()` (the
+ * tenant-scoped `ComputeRepository`), never a raw `db.prepare(...)`.
+ * The compute table's primary key is `(name, tenant_id)`; using a raw
+ * SELECT without a tenant filter lets any tenant resolve another
+ * tenant's provider/credentials for a colliding compute name (e.g.
+ * `prod-gpu`, `ci-runner`). Callers are expected to pass in a
+ * tenant-scoped AppContext (`app.forTenant(session.tenant_id)`);
+ * `ComputeRepository.get` enforces `WHERE tenant_id = ?`.
  */
 import type { AppContext } from "./app.js";
 import type { Session, Compute, ComputeProviderName } from "../types/index.js";
 import type { ComputeProvider } from "../compute/types.js";
 import type { ComputeKind, RuntimeKind } from "../compute/core/types.js";
-import { safeParseConfig } from "./util.js";
 
 export async function resolveProvider(
   app: AppContext,
@@ -25,11 +30,13 @@ export async function resolveProvider(
   const defaultName = app.mode.defaultProvider;
   const computeName = session.compute_name || defaultName;
   if (!computeName) return { provider: null, compute: null };
-  const row = (await app.db?.prepare("SELECT * FROM compute WHERE name = ?").get(computeName)) as
-    | { name: string; provider: string; status: string; config: string; created_at: string; updated_at: string }
-    | undefined;
-  if (!row) return { provider: null, compute: null };
-  const compute = { ...row, config: safeParseConfig(row.config) } as unknown as Compute;
+  // Re-scope to the session's tenant when the caller passed a different (or
+  // unscoped root) AppContext. Compute PK is (name, tenant_id) -- without this
+  // re-scope, two tenants holding the same compute name get arbitrary row-order
+  // resolution and can leak each other's provider + credentials.
+  const scoped = session.tenant_id && session.tenant_id !== app.tenantId ? app.forTenant(session.tenant_id) : app;
+  const compute = await scoped.computes.get(computeName);
+  if (!compute) return { provider: null, compute: null };
   const provider = app.getProvider(compute.provider as ComputeProviderName as string);
   return { provider: provider ?? null, compute };
 }

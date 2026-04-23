@@ -3,7 +3,6 @@
  * compute/HTTP service starts but after the container is built.
  *
  * Owns:
- *   - provider resolver bridge (session -> compute provider lookup)
  *   - plugin registry (seed builtin executors, kick off user plugin load)
  *   - module-level event bus clear
  *   - OTLP / telemetry / rollback config
@@ -12,8 +11,6 @@
  */
 import type { AppContext } from "../app.js";
 import type { PluginRegistry } from "../plugins/registry.js";
-import type { Session } from "../../types/index.js";
-import { setProviderResolver } from "../provider-registry.js";
 import { registerExecutor } from "../executor.js";
 import { builtinExecutors, loadPluginExecutors } from "../executors/index.js";
 import { configureOtlp } from "../observability/otlp.js";
@@ -28,8 +25,6 @@ export class ServiceWiring {
   ) {}
 
   start(): void {
-    setProviderResolver((session: Session) => this.app.resolveProvider(session));
-
     for (const ex of builtinExecutors) {
       this.pluginRegistry.register({ kind: "executor", name: ex.name, impl: ex, source: "builtin" });
       registerExecutor(ex);
@@ -78,8 +73,5 @@ export class ServiceWiring {
     // every interval on container.dispose(); no need to kick it manually here
     // (and calling into the DI container during shutdown risks re-resolving
     // disposed dependencies). Left as a comment for the explicit contract.
-
-    const { clearProviderResolver } = await import("../provider-registry.js");
-    clearProviderResolver();
   }
 }
