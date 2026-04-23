@@ -1,6 +1,7 @@
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
+import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import type { MessageSendParams, SessionIdParams } from "../../types/index.js";
 
 export function registerMessagingHandlers(router: Router, app: AppContext): void {
@@ -18,7 +19,7 @@ export function registerMessagingHandlers(router: Router, app: AppContext): void
 
   router.handle("gate/reject", async (p) => {
     const { sessionId, reason } = p as { sessionId?: string; reason?: string };
-    if (!sessionId) throw new Error("Missing required parameter: sessionId");
+    if (!sessionId) throw new RpcError("Missing required parameter: sessionId", ErrorCodes.INVALID_PARAMS);
     return await app.sessionService.rejectReviewGate(sessionId, reason ?? "");
   });
 

@@ -52,7 +52,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   router.handle("agent/read", async (p) => {
     const { name } = extract<AgentReadParams>(p, ["name"]);
     const agent = await app.agents.get(name, resolveProjectRoot());
-    if (!agent) throw new Error(`Agent '${name}' not found`);
+    if (!agent) throw new RpcError(`Agent '${name}' not found`, ErrorCodes.NOT_FOUND);
     return { agent };
   });
 
@@ -68,7 +68,10 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const projectRoot = resolveProjectRoot();
     const existing = await app.agents.get(params.name, projectRoot);
     if (existing && existing._source !== "builtin") {
-      throw new Error(`Agent '${params.name}' already exists. Use agent/update to modify it.`);
+      throw new RpcError(
+        `Agent '${params.name}' already exists. Use agent/update to modify it.`,
+        ErrorCodes.INVALID_PARAMS,
+      );
     }
     const agent: AgentDefinition = {
       name: params.name,
@@ -97,7 +100,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const { scope, ...rest } = params;
     const projectRoot = resolveProjectRoot();
     const existing = await app.agents.get(params.name, projectRoot);
-    if (!existing) throw new Error(`Agent '${params.name}' not found`);
+    if (!existing) throw new RpcError(`Agent '${params.name}' not found`, ErrorCodes.NOT_FOUND);
     guardBuiltin(existing, "Agent", params.name, "edit");
     const merged: AgentDefinition = { ...existing, ...rest, name: params.name };
     const resolvedScope = resolveScope(scope, existing, projectRoot);
@@ -109,7 +112,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const { name, scope } = extract<{ name: string; scope?: Scope }>(p, ["name"]);
     const projectRoot = resolveProjectRoot();
     const existing = await app.agents.get(name, projectRoot);
-    if (!existing) throw new Error(`Agent '${name}' not found`);
+    if (!existing) throw new RpcError(`Agent '${name}' not found`, ErrorCodes.NOT_FOUND);
     guardBuiltin(existing, "Agent", name, "delete");
     const resolvedScope = resolveScope(scope, existing, projectRoot);
     const ok = await app.agents.delete(name, resolvedScope, projectArg(resolvedScope, projectRoot));
@@ -120,7 +123,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   router.handle("flow/read", async (p) => {
     const { name } = extract<FlowReadParams>(p, ["name"]);
     const flow = await app.flows.get(name);
-    if (!flow) throw new Error(`Flow '${name}' not found`);
+    if (!flow) throw new RpcError(`Flow '${name}' not found`, ErrorCodes.NOT_FOUND);
     return { flow };
   });
 
@@ -141,11 +144,11 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
       scope?: "global" | "project";
     }>(p, ["name", "stages"]);
     if (!Array.isArray(params.stages) || params.stages.length === 0) {
-      throw new Error("flow/create requires at least one stage");
+      throw new RpcError("flow/create requires at least one stage", ErrorCodes.INVALID_PARAMS);
     }
     const summary = (await app.flows.list()).find((f) => f.name === params.name);
     if (summary && summary.source !== "builtin") {
-      throw new Error(`Flow '${params.name}' already exists.`);
+      throw new RpcError(`Flow '${params.name}' already exists.`, ErrorCodes.INVALID_PARAMS);
     }
     // The runtime FlowDefinition (core/state/flow.ts) is the right shape for
     // app.flows.save(); we cast through unknown because the protocol type
@@ -162,7 +165,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   router.handle("flow/delete", async (p) => {
     const { name, scope } = extract<{ name: string; scope?: Scope }>(p, ["name"]);
     const summary = (await app.flows.list()).find((f) => f.name === name);
-    if (!summary) throw new Error(`Flow '${name}' not found`);
+    if (!summary) throw new RpcError(`Flow '${name}' not found`, ErrorCodes.NOT_FOUND);
     // Flow summaries use `source` (not `_source`); adapt to the shared guard.
     guardBuiltin({ _source: summary.source }, "Flow", name, "delete");
     const ok = await app.flows.delete(name, scope ?? "global");
@@ -198,7 +201,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const { name, scope } = extract<{ name: string; scope?: Scope }>(p, ["name"]);
     const projectRoot = resolveProjectRoot();
     const existing = app.skills.get(name, projectRoot);
-    if (!existing) throw new Error(`Skill '${name}' not found`);
+    if (!existing) throw new RpcError(`Skill '${name}' not found`, ErrorCodes.NOT_FOUND);
     guardBuiltin(existing, "Skill", name, "delete");
     const resolvedScope = resolveScope(scope, existing, projectRoot);
     const ok = app.skills.delete(name, resolvedScope, projectArg(resolvedScope, projectRoot));
@@ -208,21 +211,21 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   router.handle("runtime/read", async (p) => {
     const { name } = extract<RuntimeReadParams>(p, ["name"]);
     const runtime = await app.runtimes.get(name);
-    if (!runtime) throw new Error(`Runtime '${name}' not found`);
+    if (!runtime) throw new RpcError(`Runtime '${name}' not found`, ErrorCodes.NOT_FOUND);
     return { runtime };
   });
   router.handle("recipe/list", async () => ({ recipes: await app.recipes.list() }));
   router.handle("recipe/read", async (p) => {
     const { name } = extract<RecipeReadParams>(p, ["name"]);
     const recipe = await app.recipes.get(name);
-    if (!recipe) throw new Error(`Recipe '${name}' not found`);
+    if (!recipe) throw new RpcError(`Recipe '${name}' not found`, ErrorCodes.NOT_FOUND);
     return { recipe };
   });
 
   router.handle("recipe/use", async (p) => {
     const { name, variables } = extract<RecipeUseParams>(p, ["name"]);
     const recipe = await app.recipes.get(name);
-    if (!recipe) throw new Error(`Recipe '${name}' not found`);
+    if (!recipe) throw new RpcError(`Recipe '${name}' not found`, ErrorCodes.NOT_FOUND);
     const instance = instantiateRecipe(recipe, (variables ?? {}) as Record<string, string>);
     const session = await app.sessionService.start(instance);
     return { session };
@@ -232,7 +235,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const { name, scope } = extract<{ name: string; scope?: Scope }>(p, ["name"]);
     const projectRoot = resolveProjectRoot();
     const existing = app.recipes.get(name, projectRoot);
-    if (!existing) throw new Error(`Recipe '${name}' not found`);
+    if (!existing) throw new RpcError(`Recipe '${name}' not found`, ErrorCodes.NOT_FOUND);
     guardBuiltin(existing, "Recipe", name, "delete");
     const resolvedScope = resolveScope(scope, existing, projectRoot);
     const ok = app.recipes.delete(name, resolvedScope, projectArg(resolvedScope, projectRoot));
@@ -399,7 +402,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   router.handle("compute/provision", async (p) => {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
-    if (!compute) throw new Error("Compute not found");
+    if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
     const { getProvider } = await import("../../compute/index.js");
 
     // Template provision: clone the template into a named concrete row,
@@ -420,7 +423,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
       });
       const clone = (await app.computes.get(cloneName))!;
       const provider = getProvider(clone.provider);
-      if (!provider) throw new Error(`Provider '${clone.provider}' not found`);
+      if (!provider) throw new RpcError(`Unknown provider: ${clone.provider}`, ErrorCodes.NOT_FOUND);
       await app.computes.update(clone.name, { status: "provisioning" });
       try {
         // Provision validates the environment (namespace exists, config
@@ -446,7 +449,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     }
 
     const provider = getProvider(compute.provider);
-    if (!provider) throw new Error(`Provider '${compute.provider}' not found`);
+    if (!provider) throw new RpcError(`Unknown provider: ${compute.provider}`, ErrorCodes.NOT_FOUND);
     await app.computes.update(compute.name, { status: "provisioning" });
     try {
       await provider.provision(compute);
@@ -460,10 +463,10 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   router.handle("compute/stop-instance", async (p) => {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
-    if (!compute) throw new Error("Compute not found");
+    if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
     const { getProvider } = await import("../../compute/index.js");
     const provider = getProvider(compute.provider);
-    if (!provider) throw new Error(`Provider '${compute.provider}' not found`);
+    if (!provider) throw new RpcError(`Unknown provider: ${compute.provider}`, ErrorCodes.NOT_FOUND);
     try {
       await provider.stop(compute);
       await app.computes.update(compute.name, { status: "stopped" });
@@ -490,10 +493,10 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   router.handle("compute/start-instance", async (p) => {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
-    if (!compute) throw new Error("Compute not found");
+    if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
     const { getProvider } = await import("../../compute/index.js");
     const provider = getProvider(compute.provider);
-    if (!provider) throw new Error(`Provider '${compute.provider}' not found`);
+    if (!provider) throw new RpcError(`Unknown provider: ${compute.provider}`, ErrorCodes.NOT_FOUND);
     await provider.start(compute);
     await app.computes.update(compute.name, { status: "running" });
     return { ok: true };
@@ -522,7 +525,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   router.handle("compute/clean", async (p) => {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
-    if (!compute) throw new Error("Compute not found");
+    if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
     const cleaned = await cleanZombieSessions(app);
     return { ok: true, cleaned };
   });
@@ -553,7 +556,7 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
   router.handle("compute/ping", async (p) => {
     const { name } = extract<ComputeNameParams>(p, ["name"]);
     const compute = await app.computes.get(name);
-    if (!compute) throw new Error("Compute not found");
+    if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
     const cfg = compute.config as Record<string, unknown>;
     const ip = cfg?.ip as string | undefined;
     if (!ip) return { reachable: false, message: "No IP configured" };

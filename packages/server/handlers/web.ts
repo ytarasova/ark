@@ -18,6 +18,7 @@ import { getAllSessionCosts, exportCostsCsv } from "../../core/observability/cos
 import { getActiveProfile } from "../../core/state/profiles.js";
 import { cleanupWorktrees } from "../../core/services/worktree/index.js";
 import { exportSession } from "../../core/session/share.js";
+import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { generateOpenApiSpec } from "../../core/openapi.js";
 import { DEFAULT_ARKD_URL } from "../../core/constants.js";
 
@@ -170,7 +171,7 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
       };
     }>(p, ["version", "session"]);
     if (body.version !== 1) {
-      throw new Error("Unsupported export version");
+      throw new RpcError(`Unsupported export version: ${body.version}`, ErrorCodes.UNSUPPORTED);
     }
     const session = await app.sessions.create({
       ticket: body.session.ticket,
@@ -188,7 +189,7 @@ export function registerWebHandlers(router: Router, app: AppContext): void {
   router.handle("session/export-data", async (p) => {
     const { sessionId } = extract<{ sessionId: string }>(p, ["sessionId"]);
     const data = await exportSession(app, sessionId);
-    if (!data) throw new Error("Session not found");
+    if (!data) throw new RpcError(`Session ${sessionId} not found`, ErrorCodes.SESSION_NOT_FOUND);
     return data;
   });
 

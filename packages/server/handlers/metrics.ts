@@ -12,6 +12,7 @@ import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { getProvider } from "../../compute/index.js";
 import { getAllSessionCosts } from "../../core/observability/costs.js";
+import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import type { MetricsSnapshotParams } from "../../types/index.js";
 
 export function registerMetricsHandlers(router: Router, app: AppContext): void {
@@ -69,7 +70,7 @@ export function registerMetricsHandlers(router: Router, app: AppContext): void {
   router.handle("costs/session", async (p) => {
     const params = (p ?? {}) as Record<string, any>;
     const sessionId = params.sessionId;
-    if (!sessionId) throw new Error("sessionId required");
+    if (!sessionId) throw new RpcError("sessionId required", ErrorCodes.INVALID_PARAMS);
 
     // Double-check the session exists in the caller's tenant. getSessionCost
     // also filters by tenant, so this is defense-in-depth -- but also lets
@@ -77,7 +78,7 @@ export function registerMetricsHandlers(router: Router, app: AppContext): void {
     // tenant, instead of silently returning an empty cost record (which
     // could be used to probe session ids).
     const session = await app.sessions.get(sessionId);
-    if (!session) throw new Error("Session not found");
+    if (!session) throw new RpcError(`Session ${sessionId} not found`, ErrorCodes.SESSION_NOT_FOUND);
 
     const result = await app.usageRecorder.getSessionCost(sessionId);
     return result;
@@ -86,14 +87,14 @@ export function registerMetricsHandlers(router: Router, app: AppContext): void {
   router.handle("costs/record", async (p) => {
     const params = (p ?? {}) as Record<string, any>;
     if (!params.sessionId || !params.model || !params.provider) {
-      throw new Error("sessionId, model, and provider are required");
+      throw new RpcError("sessionId, model, and provider are required", ErrorCodes.INVALID_PARAMS);
     }
     // Verify the session belongs to the caller's tenant. app.sessions is
     // tenant-scoped; .get() returns null for sessions in other tenants,
     // which both prevents cross-tenant write attribution and hides the
     // existence of other tenants' sessions from enumerators.
     const session = await app.sessions.get(params.sessionId);
-    if (!session) throw new Error("Session not found");
+    if (!session) throw new RpcError(`Session ${params.sessionId} not found`, ErrorCodes.SESSION_NOT_FOUND);
     // tenantId is intentionally NOT forwarded from the client -- the
     // UsageRecorder is tenant-scoped and will attribute the record to the
     // caller's tenant regardless.

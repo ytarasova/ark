@@ -5,6 +5,7 @@ import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import * as core from "../../core/index.js";
+import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import type {
   ToolsListParams,
   ToolsDeleteParams,
@@ -54,11 +55,11 @@ export function registerToolsHandlers(router: Router, app: AppContext): void {
         // arkDir) or deletes files on the shared container. Gate it on the
         // `fsCapability` presence check -- it's only populated in local mode.
         if (!app.mode.fsCapability) {
-          throw new Error("tools/delete kind=claude-skill is not available in hosted mode");
+          throw new RpcError("tools/delete kind=claude-skill is not available in hosted mode", ErrorCodes.UNSUPPORTED);
         }
         if (source && source !== "builtin") {
           if (typeof source !== "string" || !isSafeClaudeSkillPath(source)) {
-            throw new Error("Invalid claude-skill source path");
+            throw new RpcError("Invalid claude-skill source path", ErrorCodes.INVALID_PARAMS);
           }
           if (existsSync(source)) unlinkSync(source);
         }
@@ -93,7 +94,7 @@ export function registerToolsHandlers(router: Router, app: AppContext): void {
   router.handle("mcp/attach", async (p) => {
     const { sessionId, server } = extract<McpAttachParams>(p, ["sessionId", "server"]);
     const session = await app.sessions.get(sessionId);
-    if (!session) throw new Error("Session not found");
+    if (!session) throw new RpcError(`Session ${sessionId} not found`, ErrorCodes.SESSION_NOT_FOUND);
     core.addMcpServer(session.workdir ?? session.repo, server.name as string, server);
     return { ok: true };
   });
@@ -101,7 +102,7 @@ export function registerToolsHandlers(router: Router, app: AppContext): void {
   router.handle("mcp/detach", async (p) => {
     const { sessionId, serverName } = extract<McpDetachParams>(p, ["sessionId", "serverName"]);
     const session = await app.sessions.get(sessionId);
-    if (!session) throw new Error("Session not found");
+    if (!session) throw new RpcError(`Session ${sessionId} not found`, ErrorCodes.SESSION_NOT_FOUND);
     core.removeMcpServer(session.workdir ?? session.repo, serverName);
     return { ok: true };
   });
