@@ -39,6 +39,12 @@ export function formatTranscriptLine(raw: string): string {
     return `system/api_retry  attempt=${m.attempt}/${m.max_retries} status=${m.error_status} error=${m.error}`;
   }
 
+  // system/compact_boundary -- context compaction event
+  if (t === "system" && m.subtype === "compact_boundary") {
+    const meta = (m.compact_metadata ?? {}) as Record<string, unknown>;
+    return `system/compact    trigger=${meta.trigger ?? "?"} pre_tokens=${meta.pre_tokens ?? "?"}`;
+  }
+
   // generic system messages
   if (t === "system") {
     const msg = typeof m.message === "string" ? ` ${m.message}` : "";

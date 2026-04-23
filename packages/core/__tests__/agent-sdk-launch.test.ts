@@ -853,6 +853,98 @@ test("interrupt without sdkSessionId captured still resumes (no crash)", async (
   expect(callCount).toBe(2);
 });
 
+// ---------------------------------------------------------------------------
+// Compaction: compact_boundary emits Notification hook + re-feeds prompt
+// ---------------------------------------------------------------------------
+
+test("compact_boundary emits Notification hook AND re-feeds original prompt", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "agent-sdk-compact-"));
+  const promptFile = join(dir, "prompt.txt");
+  writeFileSync(promptFile, "the original task is to refactor the database layer");
+
+  const promptMessages: SDKUserMessage[] = [];
+  const hookCalls: FetchCall[] = [];
+
+  async function* stream(prompt: AsyncIterable<SDKUserMessage>) {
+    const iter = prompt[Symbol.asyncIterator]();
+
+    // Read initial prompt
+    const first = await iter.next();
+    if (!first.done) promptMessages.push(first.value);
+
+    // Yield system/init then compact_boundary
+    yield {
+      type: "system",
+      subtype: "init",
+      session_id: "sdk-1",
+      cwd: "/tmp",
+      tools: [],
+      model: "sonnet",
+      mcp_servers: [],
+      permissionMode: "bypassPermissions",
+      apiKeySource: "user",
+      slash_commands: [],
+      output_style: "default",
+      uuid: "u1",
+    } as any;
+    yield {
+      type: "system",
+      subtype: "compact_boundary",
+      session_id: "sdk-1",
+      uuid: "u2",
+      compact_metadata: { trigger: "auto", pre_tokens: 12345 },
+    } as any;
+
+    // The launch should have pushed a reminder; read it from the queue
+    const reminder = await iter.next();
+    if (!reminder.done) promptMessages.push(reminder.value);
+
+    // Then result
+    yield {
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      total_cost_usd: 0.001,
+      num_turns: 2,
+      usage: { input_tokens: 1, output_tokens: 1 },
+      stop_reason: "end_turn",
+      result: "ok",
+      duration_ms: 100,
+      duration_api_ms: 90,
+      uuid: "u3",
+      session_id: "sdk-1",
+      modelUsage: {},
+      permission_denials: [],
+    } as any;
+  }
+
+  const result = await runAgentSdkLaunch({
+    sessionId: "ark-cmp",
+    sessionDir: dir,
+    worktree: "/tmp",
+    promptFile,
+    streamFactory: (prompt) => stream(prompt as AsyncIterable<SDKUserMessage>),
+    conductorUrl: "http://c:19100",
+    fetchFn: makeFakeFetch(hookCalls),
+  });
+
+  expect(result.exitCode).toBe(0);
+
+  // Both messages should have been read: initial prompt + compaction reminder
+  expect(promptMessages).toHaveLength(2);
+  expect(promptMessages[0].message.content).toContain("the original task");
+  expect(promptMessages[1].message.content).toContain("Compaction occurred");
+  expect(promptMessages[1].message.content).toContain("the original task is to refactor the database layer");
+
+  // Notification hook should have been forwarded
+  const notif = hookCalls.find((c) => c.body.hook_event_name === "Notification");
+  expect(notif).toBeDefined();
+  expect(notif!.body.notification_type).toBe("compaction");
+  expect(notif!.body.trigger).toBe("auto");
+  expect(notif!.body.pre_tokens).toBe(12345);
+  expect(notif!.body.session_id).toBe("ark-cmp");
+});
+
 test("transition-driving hook (SessionEnd/StopFailure) is always the final hook for a result message", async () => {
   // Verify for a success result: Stop comes before SessionEnd
   const successCalls: FetchCall[] = [];

@@ -227,7 +227,21 @@ function messageToHooks(msg: unknown, arkSessionId: string): Array<Record<string
     return [stop, transitionHook];
   }
 
-  // stream_event, assistant-text-only, compact_boundary, and anything else: skip
+  if (type === "system" && (m.subtype as string | undefined) === "compact_boundary") {
+    const meta = (m.compact_metadata ?? {}) as Record<string, unknown>;
+    return [
+      {
+        hook_event_name: "Notification",
+        session_id: arkSessionId,
+        notification_type: "compaction",
+        trigger: meta.trigger,
+        pre_tokens: meta.pre_tokens,
+        ts: Date.now(),
+      },
+    ];
+  }
+
+  // stream_event, assistant-text-only, and anything else: skip
   return [];
 }
 
@@ -305,6 +319,10 @@ interface DrainResult {
  *
  * Returns `outcome: "aborted"` for SIGTERM/SIGINT aborts or unhandled errors.
  * Returns `outcome: "completed"` when a `result` message arrives normally.
+ *
+ * When `originalPrompt` and `promptQueue` are provided, a `compact_boundary`
+ * message causes the original prompt to be re-fed into the queue as a fresh
+ * user message so the agent re-anchors on the task after compaction.
  */
 async function drainStream(
   stream: AsyncIterable<unknown>,
@@ -312,6 +330,8 @@ async function drainStream(
   forwardDeps: ForwardDeps,
   signal?: AbortSignal,
   interruptFlag?: { fired: boolean },
+  originalPrompt?: string,
+  promptQueue?: PromptQueue,
 ): Promise<DrainResult> {
   let sawResult = false;
   let exitCode = 0;
@@ -328,6 +348,18 @@ async function drainStream(
 
       writeLine(message);
       await forwardToConductor(message, forwardDeps);
+
+      // Re-feed the original prompt after compaction so the agent stays on task.
+      if (m.type === "system" && (m.subtype as string | undefined) === "compact_boundary") {
+        if (originalPrompt !== undefined && promptQueue !== undefined) {
+          const reminder =
+            `[Compaction occurred. Original task preserved below to keep you on track.]\n\n` +
+            `${originalPrompt}\n\n` +
+            `[End of original task. Continue from where you left off.]`;
+          promptQueue.push(reminder);
+        }
+      }
+
       const msg = message as { type?: string; is_error?: boolean };
       if (msg.type === "result") {
         sawResult = true;
@@ -445,7 +477,15 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
         if (sdkSessionId) iterOptions.resume = sdkSessionId;
 
         const stream = opts.streamFactory(queue, iterOptions);
-        const dr = await drainStream(stream, writeLine, forwardDeps, abortHolder.ref.signal, interruptFlag);
+        const dr = await drainStream(
+          stream,
+          writeLine,
+          forwardDeps,
+          abortHolder.ref.signal,
+          interruptFlag,
+          promptText,
+          queue,
+        );
 
         if (dr.sdkSessionId && !sdkSessionId) {
           sdkSessionId = dr.sdkSessionId;
@@ -638,7 +678,15 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
       }
 
       const stream = query({ prompt: queue, options: sdkOptions });
-      const dr = await drainStream(stream, writeLine, forwardDeps, abortHolder.ref.signal, interruptFlag);
+      const dr = await drainStream(
+        stream,
+        writeLine,
+        forwardDeps,
+        abortHolder.ref.signal,
+        interruptFlag,
+        promptText,
+        queue,
+      );
 
       if (dr.sdkSessionId && !sdkSessionId) {
         sdkSessionId = dr.sdkSessionId;

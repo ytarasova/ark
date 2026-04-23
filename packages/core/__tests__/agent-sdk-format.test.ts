@@ -159,6 +159,18 @@ test("formatTranscriptLine: unknown type falls back to truncated JSON", () => {
   expect(formatted).toContain("future_type");
 });
 
+test("formatTranscriptLine: system/compact_boundary shows trigger and pre_tokens", () => {
+  const line = JSON.stringify({
+    type: "system",
+    subtype: "compact_boundary",
+    compact_metadata: { trigger: "auto", pre_tokens: 12345 },
+  });
+  const formatted = formatTranscriptLine(line);
+  expect(formatted).toMatch(/compact/i);
+  expect(formatted).toContain("12345");
+  expect(formatted).toContain("auto");
+});
+
 // ── formatTranscriptStream ------------------------------------------------
 
 test("formatTranscriptStream: yields nothing for nonexistent file", async () => {
