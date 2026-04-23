@@ -50,6 +50,13 @@ export class AnthropicAdapter implements ProviderAdapter {
     const chunkId = `chatcmpl-${Date.now()}`;
     const created = Math.floor(Date.now() / 1000);
 
+    // Track tool_use content blocks by Anthropic block index so input_json_delta
+    // events translate into OpenAI streaming tool_calls deltas. The first delta
+    // per tool call carries id/type/function.name; subsequent deltas carry only
+    // function.arguments (partial JSON). Text blocks are emitted as delta.content
+    // and do not need tracking.
+    const toolBlocks = new Map<number, { id: string; name: string; firstDeltaEmitted: boolean }>();
+
     try {
       while (true) {
         const { done, value } = await reader.read();
@@ -71,7 +78,16 @@ export class AnthropicAdapter implements ProviderAdapter {
             continue;
           }
 
-          if (event.type === "content_block_delta") {
+          if (event.type === "content_block_start") {
+            const block = event.content_block;
+            if (block?.type === "tool_use" && typeof event.index === "number") {
+              toolBlocks.set(event.index, {
+                id: block.id ?? "",
+                name: block.name ?? "",
+                firstDeltaEmitted: false,
+              });
+            }
+          } else if (event.type === "content_block_delta") {
             if (event.delta?.type === "text_delta") {
               yield {
                 id: chunkId,
@@ -81,12 +97,31 @@ export class AnthropicAdapter implements ProviderAdapter {
                 choices: [{ index: 0, delta: { content: event.delta.text }, finish_reason: null }],
               };
             } else if (event.delta?.type === "input_json_delta") {
+              const blockIndex = typeof event.index === "number" ? event.index : 0;
+              const tracked = toolBlocks.get(blockIndex);
+              const partial = event.delta.partial_json ?? "";
+              const toolCallDelta: Record<string, unknown> = {
+                index: blockIndex,
+                function: { arguments: partial },
+              };
+              if (tracked && !tracked.firstDeltaEmitted) {
+                toolCallDelta.id = tracked.id;
+                toolCallDelta.type = "function";
+                (toolCallDelta.function as Record<string, unknown>).name = tracked.name;
+                tracked.firstDeltaEmitted = true;
+              }
               yield {
                 id: chunkId,
                 object: "chat.completion.chunk",
                 created,
                 model: modelId,
-                choices: [{ index: 0, delta: { content: event.delta.partial_json }, finish_reason: null }],
+                choices: [
+                  {
+                    index: 0,
+                    delta: { tool_calls: [toolCallDelta] } as any,
+                    finish_reason: null,
+                  },
+                ],
               };
             }
           } else if (event.type === "message_delta") {

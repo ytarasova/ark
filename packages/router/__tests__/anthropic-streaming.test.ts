@@ -9,8 +9,8 @@
  */
 
 import { describe, test, expect } from "bun:test";
-import { Provider } from "../providers.js";
-import type { ChatCompletionChunk, ProviderConfig } from "../types.js";
+import { AnthropicAdapter } from "../adapters/anthropic-adapter.js";
+import type { ChatCompletionChunk } from "../types.js";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -22,39 +22,22 @@ function sseBody(events: Array<Record<string, unknown>>): Response {
   });
 }
 
-function makeAnthropicProvider(): Provider {
-  const cfg: ProviderConfig = {
-    name: "anthropic",
-    api_key: "test",
-    base_url: "https://api.anthropic.example",
-    models: [
-      {
-        id: "claude-test",
-        provider: "anthropic",
-        tier: "frontier",
-        cost_input: 0,
-        cost_output: 0,
-        max_context: 100,
-        supports_tools: true,
-        quality: 0.9,
-      },
-    ],
-  };
-  return new Provider(cfg);
-}
-
 async function collect(gen: AsyncGenerator<ChatCompletionChunk>): Promise<ChatCompletionChunk[]> {
   const out: ChatCompletionChunk[] = [];
   for await (const ch of gen) out.push(ch);
   return out;
 }
 
-// Reach into the private parseAnthropicSSE method via a typed cast.
-type ParseAnthropicSSE = (resp: Response, modelId: string) => AsyncGenerator<ChatCompletionChunk>;
+// Run SSE events through the adapter's streamChunks method.
+function parseSSE(_unused: unknown, resp: Response): AsyncGenerator<ChatCompletionChunk> {
+  const adapter = new AnthropicAdapter();
+  return adapter.streamChunks(resp, "claude-test");
+}
 
-function parseSSE(provider: Provider, resp: Response): AsyncGenerator<ChatCompletionChunk> {
-  const fn = (provider as unknown as { parseAnthropicSSE: ParseAnthropicSSE }).parseAnthropicSSE.bind(provider);
-  return fn(resp, "claude-test");
+function makeAnthropicProvider(): unknown {
+  // Placeholder kept for signature compatibility with legacy test helpers;
+  // the adapter path no longer needs a Provider instance.
+  return null;
 }
 
 // ── tests ────────────────────────────────────────────────────────────────────

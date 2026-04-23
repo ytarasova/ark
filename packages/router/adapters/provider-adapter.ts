@@ -7,12 +7,7 @@
  * ...). Adding a new provider means writing one adapter and registering it.
  */
 
-import type {
-  ChatCompletionRequest,
-  ChatCompletionResponse,
-  ChatCompletionChunk,
-  ProviderConfig,
-} from "../types.js";
+import type { ChatCompletionRequest, ChatCompletionResponse, ChatCompletionChunk, ProviderConfig } from "../types.js";
 
 /** A single HTTP call description -- URL plus RequestInit (headers, body, method). */
 export interface AdapterRequest {

@@ -23,6 +23,33 @@ import {
 } from "./adapters/index.js";
 import { fetchWithRetry } from "./retry.js";
 
+// ── Stream retry classifier ──────────────────────────────────────────────────
+
+/**
+ * Classify an error thrown from `Provider.stream()` as retryable. Matches
+ * transient network / upstream conditions (5xx, 408/429, socket resets,
+ * abort timeouts). Programmer errors (4xx other than 408/429, parse
+ * failures) are terminal.
+ */
+export function isRetryableStreamError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message ?? "";
+  // HTTP status codes embedded in provider error messages.
+  if (/\b(408|425|429|500|502|503|504)\b/.test(msg)) return true;
+  // Network-level failures.
+  if (
+    /\b(ECONNRESET|ECONNREFUSED|ECONNABORTED|ENOTFOUND|ETIMEDOUT|EAI_AGAIN|EPIPE|ENETUNREACH|EHOSTUNREACH|UND_ERR_)/i.test(
+      msg,
+    )
+  ) {
+    return true;
+  }
+  if (/socket hang up|network|fetch failed|connection reset/i.test(msg)) return true;
+  // AbortError (fetch timeout).
+  if (err.name === "AbortError") return true;
+  return false;
+}
+
 // ── Circuit Breaker ──────────────────────────────────────────────────────────
 
 const BREAKER_THRESHOLD = 5; // failures before opening
@@ -103,21 +130,57 @@ export class Provider {
     }
   }
 
-  /** Stream a chat completion (returns an async generator of chunks). */
+  /**
+   * Inner streaming primitive — one attempt, no retry. Test code stubs this
+   * method to exercise the retry wrapper without hitting the network.
+   */
+  protected async *streamProvider(
+    request: ChatCompletionRequest,
+    modelId: string,
+  ): AsyncGenerator<ChatCompletionChunk> {
+    const adapter = this.resolveAdapter();
+    const { url, init } = adapter.toStreamRequest(request, modelId, this.config);
+    const resp = await this.doFetch(url, init);
+    yield* adapter.streamChunks(resp, modelId);
+  }
+
+  /**
+   * Stream a chat completion with retry on transient failures. Retries ONLY
+   * if no chunks have yet been yielded to the caller (yieldedAny guard) —
+   * replaying after partial output would duplicate tokens. Post-yield failures
+   * re-throw immediately with a message noting the partial output.
+   */
   async *stream(request: ChatCompletionRequest, modelId: string): AsyncGenerator<ChatCompletionChunk> {
     if (this.breaker.isOpen()) {
       throw new Error(`Circuit breaker open for provider '${this.config.name}'`);
     }
 
-    try {
-      const adapter = this.resolveAdapter();
-      const { url, init } = adapter.toStreamRequest(request, modelId, this.config);
-      const resp = await this.doFetch(url, init);
-      yield* adapter.streamChunks(resp, modelId);
-      this.breaker.recordSuccess();
-    } catch (err) {
-      this.breaker.recordFailure();
-      throw err;
+    const retries = this.config.max_retries ?? 2;
+    let attempt = 0;
+    while (true) {
+      let yieldedAny = false;
+      try {
+        for await (const chunk of this.streamProvider(request, modelId)) {
+          yieldedAny = true;
+          yield chunk;
+        }
+        this.breaker.recordSuccess();
+        return;
+      } catch (err) {
+        if (yieldedAny) {
+          this.breaker.recordFailure();
+          const msg = err instanceof Error ? err.message : String(err);
+          throw new Error(`Stream aborted mid-response after partial output (provider=${this.config.name}): ${msg}`);
+        }
+        if (attempt >= retries || !isRetryableStreamError(err)) {
+          this.breaker.recordFailure();
+          throw err;
+        }
+        attempt++;
+        const base = 250 * 2 ** (attempt - 1);
+        const jitter = Math.random() * base * 0.3;
+        await this.sleep(Math.min(base + jitter, 20_000));
+      }
     }
   }
 
