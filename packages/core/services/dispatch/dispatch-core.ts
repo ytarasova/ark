@@ -27,6 +27,7 @@ import { execFile } from "child_process";
 
 import type { DispatchDeps, DispatchResult } from "./types.js";
 import type { Session } from "../../../types/index.js";
+import type { AgentDefinition } from "../../agent/agent.js";
 import { logDebug } from "../../observability/structured-log.js";
 import { recordEvent } from "../../observability.js";
 import { track } from "../../observability/telemetry.js";
@@ -176,25 +177,41 @@ export class CoreDispatcher {
       return { ok: false, message: `Stage '${stage}' is ${action.type}, not agent` };
     }
 
-    const agentName = action.agent!;
-    log(`Resolving agent: ${agentName}`);
     // Resolve runtime override from session config (set by --runtime CLI flag)
     const runtimeOverride = session.config?.runtime_override as string | undefined;
     const { findProjectRoot } = await import("../../agent/agent.js");
     const projectRoot = findProjectRoot(session.workdir || session.repo) ?? undefined;
-    let agent = this.deps.resolveAgent(agentName, sessionAsVars(session), { runtimeOverride, projectRoot });
-    // Fallback: agents created via the web UI are saved relative to the server's
-    // cwd which may differ from the session's workdir/repo.
-    if (!agent) {
-      const serverRoot = findProjectRoot(process.cwd()) ?? undefined;
-      if (serverRoot && serverRoot !== projectRoot) {
-        agent = this.deps.resolveAgent(agentName, sessionAsVars(session), {
-          runtimeOverride,
-          projectRoot: serverRoot,
-        });
+
+    // Agent can be either a string name (looked up via resolveAgent) or an
+    // inline AgentSpec object. Inline agents skip the store entirely.
+    const agentRef = action.agent;
+    let agent: AgentDefinition | null = null;
+    let agentName: string;
+    if (typeof agentRef === "object" && agentRef !== null) {
+      // Inline agent: build AgentDefinition in-place, apply runtime merge via
+      // buildInlineAgent so runtime defaults (model, env, etc.) are respected
+      // the same way as stored agents.
+      const { buildInlineAgent } = await import("../../agent/agent.js");
+      agent = buildInlineAgent(this.deps.getApp(), agentRef, sessionAsVars(session), { runtimeOverride });
+      agentName = agent?.name ?? "inline";
+      if (!agent) return { ok: false, message: `Inline agent build failed (missing runtime or system_prompt?)` };
+    } else {
+      agentName = agentRef!;
+      log(`Resolving agent: ${agentName}`);
+      agent = this.deps.resolveAgent(agentName, sessionAsVars(session), { runtimeOverride, projectRoot });
+      // Fallback: agents created via the web UI are saved relative to the server's
+      // cwd which may differ from the session's workdir/repo.
+      if (!agent) {
+        const serverRoot = findProjectRoot(process.cwd()) ?? undefined;
+        if (serverRoot && serverRoot !== projectRoot) {
+          agent = this.deps.resolveAgent(agentName, sessionAsVars(session), {
+            runtimeOverride,
+            projectRoot: serverRoot,
+          });
+        }
       }
+      if (!agent) return { ok: false, message: `Agent '${agentName}' not found` };
     }
-    if (!agent) return { ok: false, message: `Agent '${agentName}' not found` };
 
     // Resolve autonomy level from flow stage definition
     const autonomy = stageDef?.autonomy ?? "full";

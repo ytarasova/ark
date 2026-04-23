@@ -147,7 +147,9 @@ export class SessionCreator {
         repo: opts.repo,
         agent: opts.agent ?? undefined,
       });
-      emitStageSpanStart(session.id, { stage: firstStage, agent: action.agent, gate: "auto" });
+      const agentLabel =
+        typeof action.agent === "string" ? action.agent : ((action.agent as { name?: string })?.name ?? "inline");
+      emitStageSpanStart(session.id, { stage: firstStage, agent: agentLabel, gate: "auto" });
     }
 
     hooks?.onCreated?.(session.id);

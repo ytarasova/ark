@@ -41,10 +41,40 @@ export interface ForEachSpawnSpec {
   inputs: Record<string, unknown>;
 }
 
+/**
+ * Inline agent definition accepted in `stage.agent` as an alternative to a
+ * string name lookup. Useful when sage RPCs need to dispatch a bespoke agent
+ * shape without pre-registering a YAML file on disk. Minimum required:
+ * `runtime` and `system_prompt` (everything else defaults to AgentDefinition
+ * defaults or inherits from the runtime YAML).
+ */
+export interface InlineAgentSpec {
+  name?: string;
+  description?: string;
+  runtime: string;
+  model?: string;
+  max_turns?: number;
+  system_prompt: string;
+  tools?: string[];
+  mcp_servers?: (string | Record<string, unknown>)[];
+  skills?: string[];
+  memories?: string[];
+  context?: string[];
+  permission_mode?: string;
+  env?: Record<string, string>;
+  command?: string[];
+  task_delivery?: "stdin" | "file" | "arg";
+}
+
 export interface StageDefinition {
   name: string;
   type?: "agent" | "action" | "fork";
-  agent?: string;
+  /**
+   * Either a named agent (looked up via `app.agents.get(name)`) OR an inline
+   * agent definition object. Inline definitions skip the agent store and
+   * build an AgentDefinition in-place at dispatch time.
+   */
+  agent?: string | InlineAgentSpec;
   action?: string;
   task?: string; // Template for agent task prompt -- Nunjucks syntax ({{var}}, {% if %}, ...)
   gate: "auto" | "manual" | "condition" | "review";
@@ -276,7 +306,12 @@ export function evaluateGate(
 
 export interface StageAction {
   type: "agent" | "action" | "fork" | "for_each" | "unknown";
-  agent?: string;
+  /**
+   * For agent-type stages: either the agent name (looked up via the store) or
+   * an inline agent definition. Dispatch checks the type and routes
+   * accordingly.
+   */
+  agent?: string | InlineAgentSpec;
   action?: string;
   strategy?: string;
   max_parallel?: number;

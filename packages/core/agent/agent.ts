@@ -88,6 +88,62 @@ export function resolveAgent(
   return agent;
 }
 
+// ── Inline agents ───────────────────────────────────────────────────────────
+
+import type { InlineAgentSpec } from "../state/flow.js";
+
+/**
+ * Build an AgentDefinition from an inline spec (e.g. from a stage's `agent:`
+ * object) without touching the agent store. Applies the same template
+ * substitution + runtime merge that `resolveAgentWithRuntime` does for named
+ * agents, so inline agents behave identically downstream.
+ *
+ * Returns null if the spec is missing required fields (runtime, system_prompt).
+ */
+export function buildInlineAgent(
+  app: AppContext,
+  spec: InlineAgentSpec,
+  session: Record<string, unknown>,
+  opts?: { runtimeOverride?: string },
+): AgentDefinition | null {
+  if (!spec.runtime || !spec.system_prompt) return null;
+
+  const vars = buildSessionVars(session);
+  const agent: AgentDefinition = {
+    name: spec.name ?? "inline",
+    description: spec.description ?? "",
+    model: spec.model ?? "sonnet",
+    max_turns: spec.max_turns ?? 200,
+    system_prompt: substituteVars(spec.system_prompt, vars),
+    tools: spec.tools ?? ["Bash", "Read", "Write", "Edit", "Glob", "Grep"],
+    mcp_servers: spec.mcp_servers ?? [],
+    skills: spec.skills ?? [],
+    memories: spec.memories ?? [],
+    context: spec.context ?? [],
+    permission_mode: spec.permission_mode ?? "bypassPermissions",
+    env: spec.env ?? {},
+    runtime: spec.runtime,
+    command: spec.command,
+    task_delivery: spec.task_delivery,
+    _source: "builtin",
+  };
+
+  // Apply the same runtime merge that resolveAgentWithRuntime does for named
+  // agents, so inline agents get _resolved_runtime_type + runtime env etc.
+  const runtimeName = opts?.runtimeOverride ?? agent.runtime;
+  if (runtimeName) {
+    const runtime = app.runtimes.get(runtimeName);
+    if (runtime) {
+      agent._resolved_runtime_type = runtime.type;
+      if (!agent.command && runtime.command) agent.command = runtime.command;
+      if (!agent.task_delivery && runtime.task_delivery) agent.task_delivery = runtime.task_delivery;
+      if (runtime.env) agent.env = { ...runtime.env, ...agent.env };
+    }
+  }
+
+  return agent;
+}
+
 // ── Runtime resolution ──────────────────────────────────────────────────────
 
 /**
