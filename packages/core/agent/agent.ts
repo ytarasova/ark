@@ -35,6 +35,18 @@ export interface AgentDefinition {
   recipe?: string;
   /** Optional goose sub-recipe paths, handled by gooseExecutor. */
   sub_recipes?: string[];
+  /**
+   * Per-runtime field overrides. Keyed by runtime name (e.g. `agent-sdk`,
+   * `claude`, `gemini`). After the dispatch runtime is resolved, the matching
+   * override block is shallow-merged onto the agent definition (override
+   * fields replace base fields wholesale; arrays/objects are NOT deep-merged).
+   *
+   * Use cases: agent-sdk doesn't have the conductor `report` tool, so the
+   * worker agent's CC system_prompt (which instructs the agent to call
+   * `report(completed)`) needs an agent-sdk variant that uses transcript-and-
+   * exit semantics instead.
+   */
+  runtime_overrides?: Record<string, Partial<Omit<AgentDefinition, "name" | "runtime_overrides">>>;
   /** Resolved runtime type (claude-code, cli-agent, subprocess). Set by resolveAgentWithRuntime. */
   _resolved_runtime_type?: string;
   _source?: "builtin" | "global" | "project";
@@ -95,6 +107,22 @@ export function resolveAgentWithRuntime(
   if (!agent) return null;
 
   const runtimeName = opts?.runtimeOverride ?? agent.runtime;
+
+  // Apply per-runtime field overrides BEFORE template re-substitution so the
+  // override's system_prompt is also processed for {{vars}}. We merge against
+  // the dispatch runtime name (what actually gets used), not the agent's
+  // declared default. Overrides are shallow-merged: the override's value
+  // wholesale replaces the base's. Useful when an agent's CC-specific prompt
+  // assumes tools (e.g. `report`) that other runtimes don't have.
+  if (runtimeName && agent.runtime_overrides && agent.runtime_overrides[runtimeName]) {
+    const override = agent.runtime_overrides[runtimeName];
+    Object.assign(agent, override);
+    if (override.system_prompt) {
+      const vars = buildSessionVars(session);
+      agent.system_prompt = substituteVars(override.system_prompt, vars);
+    }
+  }
+
   if (!runtimeName) {
     // No runtime specified -- legacy behavior: use agent.runtime field as executor type
     return agent;
