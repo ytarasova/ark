@@ -32,6 +32,7 @@ import {
 import { handleWebhookRequest, matchWebhookPath } from "../../server/handlers/webhooks.js";
 import { type SSEBus, createSSEBus } from "./sse-bus.js";
 import { extractTenantContext, canWrite, type AuthConfig } from "../auth/index.js";
+import { fromWire, localAdminContext, type TenantContext as HandlerTenantContext } from "../auth/context.js";
 import type { TenantContext } from "../../types/index.js";
 import { resolveWebDist } from "../install-paths.js";
 import { VERSION } from "../version.js";
@@ -348,7 +349,19 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
             registerAllHandlers(rpcRouter, requestApp);
             rpcRouter.markInitialized();
           }
-          const result = await rpcRouter.dispatch(body as import("../../protocol/types.js").JsonRpcRequest);
+          // Thread TenantContext into dispatch so admin / ownership gates
+          // see the caller's real role instead of defaulting to local-admin.
+          // Wire contexts need `fromWire` to precompute `isAdmin`; missing
+          // contexts (auth disabled) fall back to local-admin for the
+          // configured default tenant.
+          const handlerCtx: HandlerTenantContext = tenantCtx
+            ? fromWire(tenantCtx)
+            : localAdminContext(app.config.authSection?.defaultTenant ?? null);
+          const result = await rpcRouter.dispatch(
+            body as import("../../protocol/types.js").JsonRpcRequest,
+            undefined,
+            handlerCtx,
+          );
           return jsonResponse(result);
         } catch (err) {
           return errorResponse(err, 400);

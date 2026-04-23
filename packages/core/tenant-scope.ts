@@ -1,14 +1,26 @@
 /**
  * Tenant-scoped AppContext helpers.
  *
- * `forTenant()` returns a shallow copy of the parent AppContext with every
- * tenant-aware repository + store replaced by a per-tenant instance. All
- * instances share the same DB, container, and provider registries -- only
- * the reads/writes are scoped via the repo's `setTenant()`.
+ * `forTenant()` returns a shallow copy of the parent AppContext whose DI
+ * container is a child scope of the parent's. Tenant-scoped repositories
+ * (with `setTenant(tenantId)` already applied) are registered on the child
+ * scope; everything else (providers, infra launchers, pricing, ...) falls
+ * through to the parent scope's singleton registrations.
  *
- * Extracted from app.ts to keep the main class under 500 LOC.
+ * Why awilix `createScope()` instead of manual `new X(db)`? The old code
+ * constructed each repo with `new SessionRepository(db)`, bypassing the DI
+ * container's factory. Any repo that gained a new constructor dependency
+ * (e.g. config, mode, drizzle client) silently lost it in the tenant scope
+ * because `buildTenantScope` only passed `db`. Routing through the child
+ * scope means the child's factory invocations pick up every dep the parent
+ * factory declared, so adding a dep to a repo can never again skip the
+ * tenant-scope path.
  */
+import { asFunction, Lifetime } from "awilix";
 import type { AppContext } from "./app.js";
+import type { AppContainer } from "./container.js";
+import type { DatabaseAdapter } from "./database/index.js";
+import type { ArkConfig } from "./config.js";
 import {
   SessionRepository,
   ComputeRepository,
@@ -24,87 +36,209 @@ import { KnowledgeStore } from "./knowledge/store.js";
 import { DbResourceStore } from "./stores/db-resource-store.js";
 import { UsageRecorder } from "./observability/usage.js";
 import { ComputeService } from "./services/compute.js";
+import type { PricingRegistry } from "./observability/pricing.js";
 
+/**
+ * Build a tenant-scoped AppContext. The returned object shadows every
+ * tenant-aware registration (repos, usage recorder, compute service,
+ * knowledge store, hosted resource stores) through a child scope of the
+ * parent container. All other services (providers, infra launchers,
+ * pricing, transcript parsers, plugins) resolve from the parent scope.
+ */
 export function buildTenantScope(parent: AppContext, tenantId: string): AppContext {
   const scoped = Object.create(parent) as AppContext;
-  const db = parent.db;
+  const childContainer = parent.container.createScope() as AppContainer;
 
-  const scopedSessions = new SessionRepository(db);
-  scopedSessions.setTenant(tenantId);
-  const scopedComputes = new ComputeRepository(db);
-  scopedComputes.setTenant(tenantId);
-  const scopedEvents = new EventRepository(db);
-  scopedEvents.setTenant(tenantId);
-  const scopedMessages = new MessageRepository(db);
-  scopedMessages.setTenant(tenantId);
-  const scopedTodos = new TodoRepository(db);
-  scopedTodos.setTenant(tenantId);
-  const scopedArtifacts = new ArtifactRepository(db);
-  scopedArtifacts.setTenant(tenantId);
-  const scopedFlowStates = new FlowStateRepository(db);
-  scopedFlowStates.setTenant(tenantId);
-  const scopedLedger = new LedgerRepository(db);
-  scopedLedger.setTenant(tenantId);
-  const scopedKnowledge = new KnowledgeStore(db);
-  scopedKnowledge.setTenant(tenantId);
-  const scopedComputeTemplates = new ComputeTemplateRepository(db);
-  scopedComputeTemplates.setTenant(tenantId);
-  const scopedUsage = new UsageRecorder(db, parent.pricing);
-  scopedUsage.setTenant(tenantId);
+  // Repositories -- each factory pulls `db` (and any future dep) from the
+  // cradle and applies `setTenant()` before returning. The child scope's
+  // Lifetime.SCOPED means the factory runs once per child container, and
+  // the resulting instance is cached on the child so every
+  // `scoped.sessions` call within this tenant scope returns the same
+  // instance.
+  childContainer.register({
+    sessions: asFunction(
+      (c: { db: DatabaseAdapter; config: ArkConfig }) => {
+        const repo = new SessionRepository(c.db);
+        repo.setChannelBounds(c.config.channels.basePort, c.config.channels.range);
+        repo.setTenant(tenantId);
+        return repo;
+      },
+      { lifetime: Lifetime.SCOPED },
+    ),
+    computes: asFunction(
+      (c: { db: DatabaseAdapter }) => {
+        const repo = new ComputeRepository(c.db);
+        repo.setTenant(tenantId);
+        return repo;
+      },
+      { lifetime: Lifetime.SCOPED },
+    ),
+    computeTemplates: asFunction(
+      (c: { db: DatabaseAdapter }) => {
+        const repo = new ComputeTemplateRepository(c.db);
+        repo.setTenant(tenantId);
+        return repo;
+      },
+      { lifetime: Lifetime.SCOPED },
+    ),
+    events: asFunction(
+      (c: { db: DatabaseAdapter }) => {
+        const repo = new EventRepository(c.db);
+        repo.setTenant(tenantId);
+        return repo;
+      },
+      { lifetime: Lifetime.SCOPED },
+    ),
+    messages: asFunction(
+      (c: { db: DatabaseAdapter }) => {
+        const repo = new MessageRepository(c.db);
+        repo.setTenant(tenantId);
+        return repo;
+      },
+      { lifetime: Lifetime.SCOPED },
+    ),
+    todos: asFunction(
+      (c: { db: DatabaseAdapter }) => {
+        const repo = new TodoRepository(c.db);
+        repo.setTenant(tenantId);
+        return repo;
+      },
+      { lifetime: Lifetime.SCOPED },
+    ),
+    artifacts: asFunction(
+      (c: { db: DatabaseAdapter }) => {
+        const repo = new ArtifactRepository(c.db);
+        repo.setTenant(tenantId);
+        return repo;
+      },
+      { lifetime: Lifetime.SCOPED },
+    ),
+    flowStates: asFunction(
+      (c: { db: DatabaseAdapter }) => {
+        const repo = new FlowStateRepository(c.db);
+        repo.setTenant(tenantId);
+        return repo;
+      },
+      { lifetime: Lifetime.SCOPED },
+    ),
+    ledger: asFunction(
+      (c: { db: DatabaseAdapter }) => {
+        const repo = new LedgerRepository(c.db);
+        repo.setTenant(tenantId);
+        return repo;
+      },
+      { lifetime: Lifetime.SCOPED },
+    ),
+    knowledge: asFunction(
+      (c: { db: DatabaseAdapter }) => {
+        const store = new KnowledgeStore(c.db);
+        store.setTenant(tenantId);
+        return store;
+      },
+      { lifetime: Lifetime.SCOPED },
+    ),
+    usageRecorder: asFunction(
+      (c: { db: DatabaseAdapter; pricing: PricingRegistry }) => {
+        const rec = new UsageRecorder(c.db, c.pricing);
+        rec.setTenant(tenantId);
+        return rec;
+      },
+      { lifetime: Lifetime.SCOPED },
+    ),
+    // ComputeService consumes the child-scope `computes` repo so writes
+    // land in the tenant's rows. Awilix resolves the `computes` dep from
+    // the same child scope, so a new ctor dep on ComputeService (or any
+    // transitive dep on a repo) is picked up automatically.
+    computeService: asFunction(
+      (c: { computes: ComputeRepository; app: AppContext }) => new ComputeService(c.computes, c.app),
+      { lifetime: Lifetime.SCOPED },
+    ),
+  });
 
-  // Tenant-scoped ComputeService bound to the scoped `computes` repo. Without
-  // this, callers reaching for `scoped.computeService.create(...)` would hit
-  // the root container's service (default tenant) even though the caller
-  // expects tenant-scoped writes.
-  const scopedComputeService = new ComputeService(scopedComputes, parent);
-
-  Object.defineProperty(scoped, "tenantId", { get: () => tenantId, configurable: true });
-  Object.defineProperty(scoped, "sessions", { get: () => scopedSessions, configurable: true });
-  Object.defineProperty(scoped, "computes", { get: () => scopedComputes, configurable: true });
-  Object.defineProperty(scoped, "computeService", { get: () => scopedComputeService, configurable: true });
-  Object.defineProperty(scoped, "computeTemplates", { get: () => scopedComputeTemplates, configurable: true });
-  Object.defineProperty(scoped, "events", { get: () => scopedEvents, configurable: true });
-  Object.defineProperty(scoped, "messages", { get: () => scopedMessages, configurable: true });
-  Object.defineProperty(scoped, "todos", { get: () => scopedTodos, configurable: true });
-  Object.defineProperty(scoped, "artifacts", { get: () => scopedArtifacts, configurable: true });
-  Object.defineProperty(scoped, "flowStates", { get: () => scopedFlowStates, configurable: true });
-  Object.defineProperty(scoped, "ledger", { get: () => scopedLedger, configurable: true });
-  Object.defineProperty(scoped, "knowledge", { get: () => scopedKnowledge, configurable: true });
-  Object.defineProperty(scoped, "usageRecorder", { get: () => scopedUsage, configurable: true });
-
-  // DB-backed resource stores are only live in hosted mode. This is a DI-
-  // composition-time check (creating the tenant scope's store wiring), not a
-  // runtime branch, so it's allowed under the AppMode invariant.
+  // Hosted-mode DB-backed resource stores. File-backed local stores are
+  // shared across tenants (the local mode has no tenant concept above the
+  // store boundary), so we only override in hosted mode. This check is at
+  // DI composition time -- still safe under the AppMode invariant.
   if (parent.mode.kind === "hosted") {
-    const scopedAgents = new DbResourceStore(db, "agent", {
-      description: "",
-      model: "sonnet",
-      max_turns: 200,
-      system_prompt: "",
-      tools: [],
-      mcp_servers: [],
-      skills: [],
-      memories: [],
-      context: [],
-      permission_mode: "bypassPermissions",
-      env: {},
+    childContainer.register({
+      agents: asFunction(
+        (c: { db: DatabaseAdapter }) => {
+          const store = new DbResourceStore(c.db, "agent", {
+            description: "",
+            model: "sonnet",
+            max_turns: 200,
+            system_prompt: "",
+            tools: [],
+            mcp_servers: [],
+            skills: [],
+            memories: [],
+            context: [],
+            permission_mode: "bypassPermissions",
+            env: {},
+          });
+          store.setTenant(tenantId);
+          return store;
+        },
+        { lifetime: Lifetime.SCOPED },
+      ),
+      flows: asFunction(
+        (c: { db: DatabaseAdapter }) => {
+          const store = new DbResourceStore(c.db, "flow", { stages: [] });
+          store.setTenant(tenantId);
+          return store;
+        },
+        { lifetime: Lifetime.SCOPED },
+      ),
+      skills: asFunction(
+        (c: { db: DatabaseAdapter }) => {
+          const store = new DbResourceStore(c.db, "skill", { description: "", content: "" });
+          store.setTenant(tenantId);
+          return store;
+        },
+        { lifetime: Lifetime.SCOPED },
+      ),
+      recipes: asFunction(
+        (c: { db: DatabaseAdapter }) => {
+          const store = new DbResourceStore(c.db, "recipe", { description: "", flow: "default" });
+          store.setTenant(tenantId);
+          return store;
+        },
+        { lifetime: Lifetime.SCOPED },
+      ),
+      runtimes: asFunction(
+        (c: { db: DatabaseAdapter }) => {
+          const store = new DbResourceStore(c.db, "runtime", {
+            description: "",
+            type: "cli-agent",
+            command: [],
+          });
+          store.setTenant(tenantId);
+          return store;
+        },
+        { lifetime: Lifetime.SCOPED },
+      ),
     });
-    scopedAgents.setTenant(tenantId);
-    const scopedFlows = new DbResourceStore(db, "flow", { stages: [] });
-    scopedFlows.setTenant(tenantId);
-    const scopedSkills = new DbResourceStore(db, "skill", { description: "", content: "" });
-    scopedSkills.setTenant(tenantId);
-    const scopedRecipes = new DbResourceStore(db, "recipe", { description: "", flow: "default" });
-    scopedRecipes.setTenant(tenantId);
-    const scopedRuntimes = new DbResourceStore(db, "runtime", { description: "", type: "cli-agent", command: [] });
-    scopedRuntimes.setTenant(tenantId);
-
-    Object.defineProperty(scoped, "agents", { get: () => scopedAgents, configurable: true });
-    Object.defineProperty(scoped, "flows", { get: () => scopedFlows, configurable: true });
-    Object.defineProperty(scoped, "skills", { get: () => scopedSkills, configurable: true });
-    Object.defineProperty(scoped, "recipes", { get: () => scopedRecipes, configurable: true });
-    Object.defineProperty(scoped, "runtimes", { get: () => scopedRuntimes, configurable: true });
   }
+
+  // Route every `this._resolve(...)` on the scoped context through the
+  // child scope. AppContext reads `this._container` (a plain instance
+  // field) inside `_resolve`; shadowing it via Object.defineProperty is
+  // enough because `Object.create(parent)` only copies the prototype --
+  // own-field writes land on `scoped`, not `parent`.
+  Object.defineProperty(scoped, "_container", {
+    value: childContainer,
+    configurable: true,
+    writable: true,
+    enumerable: false,
+  });
+  Object.defineProperty(scoped, "container", {
+    get: () => childContainer,
+    configurable: true,
+  });
+  Object.defineProperty(scoped, "tenantId", {
+    get: () => tenantId,
+    configurable: true,
+  });
 
   return scoped;
 }

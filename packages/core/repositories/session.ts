@@ -306,6 +306,41 @@ export class SessionRepository {
     return (rows as DrizzleSelectSession[]).map(rowToSession);
   }
 
+  /**
+   * Privileged read across every tenant. The ONLY supported callers are
+   * boot-time reconcilers (rehydrate inline flows, resume for_each loops,
+   * stale-state detection, checkpoint recovery, compute GC ref-counting)
+   * that must sweep every tenant's sessions before the server accepts
+   * traffic. Handler code MUST NOT call this -- use `list()` (tenant-scoped)
+   * or `app.forTenant(id).sessions.list(...)` instead.
+   *
+   * @internal
+   */
+  async listAcrossTenants(filters?: SessionListFilters): Promise<Session[]> {
+    const d = this.d();
+    const s = d.schema.sessions;
+    const conditions: any[] = [ne(s.status, "deleting")];
+
+    if (!filters?.status || filters.status !== "archived") {
+      conditions.push(ne(s.status, "archived"));
+    }
+
+    if (filters?.status) conditions.push(eq(s.status, filters.status));
+    if (filters?.repo) conditions.push(eq(s.repo, filters.repo));
+    if (filters?.group_name) conditions.push(eq(s.groupName, filters.group_name));
+    if (filters?.groupPrefix) conditions.push(like(s.groupName, filters.groupPrefix + "%"));
+    if (filters?.parent_id) conditions.push(eq(s.parentId, filters.parent_id));
+    if (filters?.flow) conditions.push(eq(s.flow, filters.flow));
+
+    const rows = await (d.db as any)
+      .select()
+      .from(s)
+      .where(and(...conditions))
+      .orderBy(desc(s.createdAt))
+      .limit(filters?.limit ?? 100);
+    return (rows as DrizzleSelectSession[]).map(rowToSession);
+  }
+
   async update(id: string, fields: Partial<Session>): Promise<Session | null> {
     const d = this.d();
     const s = d.schema.sessions;

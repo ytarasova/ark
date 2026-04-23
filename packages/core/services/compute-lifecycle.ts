@@ -47,8 +47,10 @@ export async function garbageCollectComputeIfTemplate(
   // Bail if any live session still references this compute. We deliberately
   // count *all* non-terminal sessions, not just running ones, so a session
   // that's paused / pending / waiting doesn't get its compute pulled out
-  // from under it.
-  const sessions = await app.sessions.list({});
+  // from under it. Compute rows are tenant-scoped but GC runs from the root
+  // (e.g. boot-time sweep, session termination hooks) and must count refs
+  // across every tenant that might still pin the row.
+  const sessions = await app.sessions.listAcrossTenants({});
   const referencing = sessions.filter(
     (s) => s.compute_name === computeName && !["completed", "failed", "stopped"].includes(s.status),
   );

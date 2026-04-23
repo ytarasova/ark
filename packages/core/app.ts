@@ -248,7 +248,9 @@ export class AppContext {
   async _reconcileForEachSessions(): Promise<void> {
     try {
       const { logInfo: li, logError: le } = await import("./observability/structured-log.js");
-      const running = await this.sessions.list({ status: "running", limit: 500 });
+      // Sweep every tenant -- a hosted deployment can have running sessions
+      // across many tenant_ids, and the root repo is bound to "default" only.
+      const running = await this.sessions.listAcrossTenants({ status: "running", limit: 500 });
       for (const session of running) {
         const cp = (session.config as Record<string, unknown> | null)?.for_each_checkpoint;
         if (!cp || typeof cp !== "object") continue;
@@ -261,10 +263,13 @@ export class AppContext {
         );
 
         // Reset session to ready so dispatch can proceed (it was left as running
-        // when the daemon crashed).
+        // when the daemon crashed). Route every write + dispatch through the
+        // session's tenant scope so tenant-scoped repos, services, and providers
+        // land in the right tenant (Core P1-6).
         try {
-          await this.sessions.update(session.id, { status: "ready", session_id: null });
-          await this.dispatchService.dispatch(session.id);
+          const tenantApp = this.forTenant(session.tenant_id);
+          await tenantApp.sessions.update(session.id, { status: "ready", session_id: null });
+          await tenantApp.dispatchService.dispatch(session.id);
         } catch (err: any) {
           le("boot", `reconcile for_each session ${session.id} failed: ${err?.message ?? err}`);
         }
@@ -291,7 +296,12 @@ export class AppContext {
    */
   private async _rehydrateInlineFlows(): Promise<void> {
     try {
-      const sessions = await this.sessions.list({ limit: 1000 });
+      // Sweep every tenant -- inline flow definitions persist under
+      // session.config.inline_flow across all tenants, not just "default".
+      // The flows store's inline overlay is process-wide (shared registry),
+      // so registering a tenant-A inline flow here is safe: the flow store
+      // is keyed by name and used by dispatch to look up the definition.
+      const sessions = await this.sessions.listAcrossTenants({ limit: 1000 });
       for (const session of sessions) {
         const inlineFlow = (session.config as Record<string, unknown> | null)?.inline_flow;
         if (!inlineFlow || typeof inlineFlow !== "object") continue;
@@ -348,7 +358,14 @@ export class AppContext {
 
   private async _seedComputeTemplates(db: DatabaseAdapter): Promise<void> {
     if (!this.config.computeTemplates?.length) return;
+    // Seed under the `__system__` sentinel tenant. Every tenant-scoped
+    // `computeTemplates.list/get` unions in system rows, so hosted
+    // deployments see the seeded blueprints from every tenant without
+    // duplicating one row per tenant. A tenant can override any system
+    // template by creating one of the same name under their own tenant_id.
+    const { SYSTEM_TENANT_ID } = await import("./repositories/compute-template.js");
     const tmplRepo = new ComputeTemplateRepositoryCtor(db);
+    tmplRepo.setTenant(SYSTEM_TENANT_ID);
     for (const tmpl of this.config.computeTemplates) {
       if (!(await tmplRepo.get(tmpl.name))) {
         await tmplRepo.create({

@@ -9,6 +9,14 @@
  *
  * Methods delegate to ComputeRepository. The adapter accepts the legacy
  * `ComputeTemplate` shape and translates to/from the unified `Compute` row.
+ *
+ * System templates: seed data (`config.computeTemplates`) is stored under
+ * the sentinel `tenant_id = '__system__'`. Every tenant-scoped read
+ * (`list`, `get`) unions the system tenant's templates with the caller's
+ * tenant's templates, so hosted deployments see the seeded blueprints from
+ * every tenant without duplicating rows. Writes always target the adapter's
+ * bound tenant -- a tenant can override a system template by creating one
+ * of the same name under their own tenant_id.
  */
 
 import type { DatabaseAdapter } from "../database/index.js";
@@ -21,6 +29,9 @@ import type {
 } from "../../types/index.js";
 import { providerToPair } from "../../compute/adapters/provider-map.js";
 import { ComputeRepository } from "./compute.js";
+
+/** Sentinel tenant for system-wide compute templates seeded at boot. */
+export const SYSTEM_TENANT_ID = "__system__";
 
 function computeToTemplate(c: {
   name: string;
@@ -38,24 +49,43 @@ function computeToTemplate(c: {
 
 export class ComputeTemplateRepository {
   private inner: ComputeRepository;
+  /** Shadow the inner repo's bound tenant so we can pivot to the system
+   *  sentinel for the union read without touching the caller-facing repo. */
+  private tenantId: string = "default";
+  private systemInner: ComputeRepository;
 
-  constructor(db: DatabaseAdapter) {
+  constructor(private db: DatabaseAdapter) {
     this.inner = new ComputeRepository(db);
+    this.systemInner = new ComputeRepository(db);
+    this.systemInner.setTenant(SYSTEM_TENANT_ID);
   }
 
   setTenant(id: string): void {
+    this.tenantId = id;
     this.inner.setTenant(id);
   }
 
   async list(): Promise<ComputeTemplate[]> {
     const rows = await this.inner.listTemplates();
-    return rows.map((r) => computeToTemplate(r));
+    const tenantNames = new Set(rows.map((r) => r.name));
+    // System templates are visible to every tenant. Per-tenant rows shadow
+    // system rows of the same name (tenant override wins).
+    const systemRows =
+      this.tenantId === SYSTEM_TENANT_ID
+        ? []
+        : (await this.systemInner.listTemplates()).filter((r) => !tenantNames.has(r.name));
+    return [...rows.map(computeToTemplate), ...systemRows.map(computeToTemplate)];
   }
 
   async get(name: string): Promise<ComputeTemplate | null> {
     const row = await this.inner.get(name);
-    if (!row) return null;
-    return computeToTemplate(row);
+    if (row) return computeToTemplate(row);
+    // Fall through to system tenant for seeded blueprints.
+    if (this.tenantId !== SYSTEM_TENANT_ID) {
+      const sys = await this.systemInner.get(name);
+      if (sys && sys.is_template) return computeToTemplate(sys);
+    }
+    return null;
   }
 
   async create(template: ComputeTemplate): Promise<void> {

@@ -79,15 +79,20 @@ export class StaleStateDetector {
 
     await safeAsync("boot: detect stale sessions", async () => {
       const { sessionExistsAsync } = await import("./tmux.js");
-      const running = await this.app.sessions.list({ status: "running" });
+      // Sweep every tenant -- stale tmux sessions can exist under any tenant
+      // in hosted mode, not just "default". Route the follow-up update + event
+      // log through the session's own tenant scope so tenant-scoped repos
+      // receive the write.
+      const running = await this.app.sessions.listAcrossTenants({ status: "running" });
       for (const s of running) {
         if (s.session_id && !(await sessionExistsAsync(s.session_id))) {
-          await this.app.sessions.update(s.id, {
+          const tenantApp = this.app.forTenant(s.tenant_id);
+          await tenantApp.sessions.update(s.id, {
             status: "failed",
             error: "Agent process exited while Ark was not running",
             session_id: null,
           });
-          await this.app.events.log(s.id, "session_stale_detected", { actor: "system" });
+          await tenantApp.events.log(s.id, "session_stale_detected", { actor: "system" });
         }
       }
     });

@@ -76,10 +76,25 @@ export async function listCheckpoints(deps: CheckpointDeps, sessionId: string): 
  * Find sessions that were running when the process died (no clean stop).
  * A session is orphaned if its status is "running" or "waiting" but its
  * tmux session no longer exists.
+ *
+ * Hosted mode: this boot-time scan must see sessions across every tenant,
+ * so it uses the privileged `listAcrossTenants` read when available and
+ * falls back to the tenant-scoped `list` for older repo shims. Handler code
+ * must continue to use `list()` (tenant-scoped).
  */
 export async function findOrphanedSessions(deps: Pick<CheckpointDeps, "sessions">): Promise<Session[]> {
-  const running = await deps.sessions.list({ status: "running" });
-  const waiting = await deps.sessions.list({ status: "waiting" });
+  const scan = (filter: Parameters<SessionRepository["list"]>[0]) =>
+    typeof (deps.sessions as SessionRepository & { listAcrossTenants?: typeof deps.sessions.list })
+      .listAcrossTenants === "function"
+      ? (
+          deps.sessions as SessionRepository & {
+            listAcrossTenants: (f?: Parameters<SessionRepository["list"]>[0]) => Promise<Session[]>;
+          }
+        ).listAcrossTenants(filter)
+      : deps.sessions.list(filter);
+
+  const running = await scan({ status: "running" });
+  const waiting = await scan({ status: "waiting" });
   const candidates = [...running, ...waiting];
 
   return candidates.filter((session) => {

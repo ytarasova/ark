@@ -57,36 +57,37 @@ function getRegistry(app: AppContext): TriggerSourceRegistry {
 }
 
 export function registerTriggerHandlers(router: Router, app: AppContext): void {
-  router.handle("trigger/list", async (params) => {
-    const { tenant } = extract<{ tenant?: string }>(params, []);
+  // Tenant for every trigger RPC is pulled from the authenticated
+  // TenantContext (ctx.tenantId). Body-level `tenant` fields are IGNORED --
+  // accepting them would let any caller read / toggle triggers from another
+  // tenant's config. Hosted mode runs behind `requireToken`, so ctx is
+  // bound to the bearer key's tenant; local mode materializes a local-admin
+  // context bound to `config.authSection.defaultTenant`.
+  router.handle("trigger/list", async (_params, _notify, ctx) => {
     const store = getStore(app);
-    const t = tenant ?? currentTenant(app);
-    return { triggers: store.list(t) };
+    return { triggers: store.list(ctx.tenantId) };
   });
 
-  router.handle("trigger/get", async (params) => {
-    const { name, tenant } = extract<{ name: string; tenant?: string }>(params, ["name"]);
+  router.handle("trigger/get", async (params, _notify, ctx) => {
+    const { name } = extract<{ name: string }>(params, ["name"]);
     const store = getStore(app);
-    const t = tenant ?? currentTenant(app);
-    const cfg = store.get(name, t);
+    const cfg = store.get(name, ctx.tenantId);
     if (!cfg) throw new RpcError(`Trigger ${name} not found`, ErrorCodes.SESSION_NOT_FOUND);
     return { trigger: cfg };
   });
 
-  router.handle("trigger/enable", async (params) => {
-    const { name, tenant } = extract<{ name: string; tenant?: string }>(params, ["name"]);
+  router.handle("trigger/enable", async (params, _notify, ctx) => {
+    const { name } = extract<{ name: string }>(params, ["name"]);
     const store = getStore(app);
-    const t = tenant ?? currentTenant(app);
-    const ok = store.enable(name, true, t);
+    const ok = store.enable(name, true, ctx.tenantId);
     if (!ok) throw new RpcError(`Trigger ${name} not found`, ErrorCodes.SESSION_NOT_FOUND);
     return { ok: true, name, enabled: true, ephemeral: true };
   });
 
-  router.handle("trigger/disable", async (params) => {
-    const { name, tenant } = extract<{ name: string; tenant?: string }>(params, ["name"]);
+  router.handle("trigger/disable", async (params, _notify, ctx) => {
+    const { name } = extract<{ name: string }>(params, ["name"]);
     const store = getStore(app);
-    const t = tenant ?? currentTenant(app);
-    const ok = store.enable(name, false, t);
+    const ok = store.enable(name, false, ctx.tenantId);
     if (!ok) throw new RpcError(`Trigger ${name} not found`, ErrorCodes.SESSION_NOT_FOUND);
     return { ok: true, name, enabled: false, ephemeral: true };
   });
@@ -110,17 +111,15 @@ export function registerTriggerHandlers(router: Router, app: AppContext): void {
     };
   });
 
-  router.handle("trigger/test", async (params) => {
-    const { name, payload, headers, tenant, dryRun } = extract<{
+  router.handle("trigger/test", async (params, _notify, ctx) => {
+    const { name, payload, headers, dryRun } = extract<{
       name: string;
       payload: unknown;
       headers?: Record<string, string>;
-      tenant?: string;
       dryRun?: boolean;
     }>(params, ["name", "payload"]);
     const store = getStore(app);
-    const t = tenant ?? currentTenant(app);
-    const cfg = store.get(name, t);
+    const cfg = store.get(name, ctx.tenantId);
     if (!cfg) throw new RpcError(`Trigger ${name} not found`, ErrorCodes.SESSION_NOT_FOUND);
 
     const event: NormalizedEvent = {
@@ -136,14 +135,8 @@ export function registerTriggerHandlers(router: Router, app: AppContext): void {
       return { ok: true, fired: fires.length > 0, dryRun: true, event };
     }
 
-    const dispatcher = new DefaultTriggerDispatcher(app);
+    const dispatcher = new DefaultTriggerDispatcher(app.forTenant(ctx.tenantId));
     const result = await dispatcher.dispatch({ event, config: cfg });
     return { ok: result.ok, fired: true, sessionId: result.sessionId, message: result.message };
   });
-}
-
-/** Resolve the tenant for the current RPC call. Phase 1: always "default". */
-function currentTenant(_app: AppContext): string {
-  // TODO: hook into extractTenantContext once trigger RPC is behind auth.
-  return "default";
 }
