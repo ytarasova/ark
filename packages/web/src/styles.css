@@ -274,6 +274,14 @@
   animation: shimmer 1.5s infinite;
 }
 
+/* ---- Utility: hide scrollbars ---- */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* ---- Sidebar label fade ---- */
 .sidebar-label {
   opacity: 1;
