@@ -9,9 +9,6 @@
 
 import type { ArkConfig } from "../config.js";
 import { AppContext } from "../app.js";
-import { WorkerRegistry } from "./worker-registry.js";
-import { SessionScheduler } from "./scheduler.js";
-import { TenantPolicyManager } from "../auth/index.js";
 import { logDebug } from "../observability/structured-log.js";
 
 export async function startHostedServer(config: ArkConfig): Promise<{
@@ -25,18 +22,17 @@ export async function startHostedServer(config: ArkConfig): Promise<{
   });
   await app.boot();
 
-  // Initialize worker registry
-  const registry = new WorkerRegistry(app.db);
-  app.setWorkerRegistry(registry);
-
-  // Initialize tenant policy manager
-  const policyManager = new TenantPolicyManager(app.db);
-  app.setTenantPolicyManager(policyManager);
-
-  // Initialize scheduler with tenant policy enforcement
-  const scheduler = new SessionScheduler(app);
-  scheduler.setPolicyManager(policyManager);
-  app.setScheduler(scheduler);
+  // WorkerRegistry / TenantPolicyManager / SessionScheduler are registered
+  // in the DI container via `registerHosted(container)` (gated on hosted
+  // mode). Resolve them once to force eager construction so the periodic
+  // health checker below has a registry to prune. The scheduler factory
+  // attaches the policy manager automatically.
+  const { workerRegistry: registry } = app.container.cradle;
+  // Force-resolve the other hosted services so they're fully wired and
+  // any construction errors surface synchronously during boot rather than
+  // at first request.
+  void app.container.cradle.tenantPolicyManager;
+  void app.container.cradle.sessionScheduler;
 
   // Start SSE bus (Redis if configured, in-memory otherwise)
   let redisBus: import("./sse-redis.js").RedisSSEBus | null = null;

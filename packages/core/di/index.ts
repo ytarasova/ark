@@ -27,12 +27,14 @@ import { registerServices } from "./services.js";
 import { registerRuntime } from "./runtime.js";
 import { registerStorage } from "./storage.js";
 import { registerAppMode } from "./mode.js";
+import { registerHosted } from "./hosted.js";
 
 export { registerDatabase, registerRepositories, registerResourceStores } from "./persistence.js";
 export { registerServices } from "./services.js";
 export { registerRuntime } from "./runtime.js";
 export { registerStorage } from "./storage.js";
 export { registerAppMode } from "./mode.js";
+export { registerHosted } from "./hosted.js";
 
 /**
  * Build a fully wired container.
@@ -79,6 +81,15 @@ export function buildContainer(opts: {
 
   // 6. Services.
   registerServices(container);
+
+  // 7. Hosted-mode coordination services (WorkerRegistry,
+  // TenantPolicyManager, SessionScheduler). Internally gates on
+  // `mode.kind === "hosted"` and is a no-op otherwise; local-mode
+  // containers have no entry for `workerRegistry` / `sessionScheduler` /
+  // `tenantPolicyManager` so resolving them throws -- exactly the
+  // behavior `app.workerRegistry` / `app.scheduler` need to signal
+  // "hosted mode only".
+  registerHosted(container);
 
   return container;
 }

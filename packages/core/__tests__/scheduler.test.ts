@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
+import { asValue } from "awilix";
 import { AppContext } from "../app.js";
 import { WorkerRegistry } from "../hosted/worker-registry.js";
 import { SessionScheduler } from "../hosted/scheduler.js";
@@ -10,11 +11,14 @@ beforeAll(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
 
-  // Initialize worker registry and scheduler (normally done by hosted.ts)
+  // Hosted services are only auto-registered in hosted mode. Tests run
+  // against a local SQLite profile, so we register test doubles directly
+  // on the container -- the same escape hatch production code would use
+  // for fakes. See packages/core/di/hosted.ts for the production wiring.
   const registry = new WorkerRegistry(app.db);
-  app.setWorkerRegistry(registry);
+  app.container.register({ workerRegistry: asValue(registry) });
   const scheduler = new SessionScheduler(app);
-  app.setScheduler(scheduler);
+  app.container.register({ sessionScheduler: asValue(scheduler) });
 });
 
 afterAll(async () => {

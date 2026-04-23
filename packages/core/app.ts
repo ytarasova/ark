@@ -98,11 +98,6 @@ export class AppContext {
   private _drizzle: DrizzleClient | null = null;
   private _codeIntel: CodeIntelStore | null = null;
   private _deployment: Deployment | null = null;
-  private _hostedServices: {
-    workerRegistry?: WorkerRegistry;
-    scheduler?: SessionScheduler;
-    tenantPolicyManager?: TenantPolicyManager;
-  } = {};
 
   /** Rollback config stored here so conductor can access it without globalThis. */
   rollbackConfig: import("./config.js").RollbackSettings | null = null;
@@ -671,41 +666,38 @@ export class AppContext {
   }
 
   // ── Worker registry / scheduler / tenant policy (container-resolved) ─
+  //
+  // Registered in `packages/core/di/hosted.ts` when `mode.kind === "hosted"`.
+  // In local mode the factories are absent, so the awilix resolve throws
+  // with "Could not resolve 'X'". Tests that need a real instance in local
+  // mode can override via `app.container.register({ workerRegistry: asValue(...) })`
+  // -- the usual DI escape hatch for test doubles.
 
-  /** Worker registry for hosted multi-tenant deployment. Throws until set. */
+  /** Worker registry for hosted multi-tenant deployment. Throws in local mode. */
   get workerRegistry(): WorkerRegistry {
-    if (!this._hostedServices.workerRegistry) {
+    try {
+      return this._container.resolve("workerRegistry") as WorkerRegistry;
+    } catch {
       throw new Error("Worker registry not initialized (hosted mode only)");
     }
-    return this._hostedServices.workerRegistry;
   }
 
-  setWorkerRegistry(r: WorkerRegistry): void {
-    this._hostedServices.workerRegistry = r;
-    this._container.register({ workerRegistry: asValue(r) });
-  }
-
-  /** Session scheduler for hosted multi-tenant deployment. Throws until set. */
+  /** Session scheduler for hosted multi-tenant deployment. Throws in local mode. */
   get scheduler(): SessionScheduler {
-    if (!this._hostedServices.scheduler) {
+    try {
+      return this._container.resolve("sessionScheduler") as SessionScheduler;
+    } catch {
       throw new Error("Scheduler not initialized (hosted mode only)");
     }
-    return this._hostedServices.scheduler;
   }
 
-  setScheduler(s: SessionScheduler): void {
-    this._hostedServices.scheduler = s;
-    this._container.register({ sessionScheduler: asValue(s) });
-  }
-
-  /** Tenant policy manager. Null until `setTenantPolicyManager` is called. */
+  /** Tenant policy manager. Null in local mode, present in hosted mode. */
   get tenantPolicyManager(): TenantPolicyManager | null {
-    return this._hostedServices.tenantPolicyManager ?? null;
-  }
-
-  setTenantPolicyManager(pm: TenantPolicyManager): void {
-    this._hostedServices.tenantPolicyManager = pm;
-    this._container.register({ tenantPolicyManager: asValue(pm) });
+    try {
+      return this._container.resolve("tenantPolicyManager") as TenantPolicyManager;
+    } catch {
+      return null;
+    }
   }
 
   // ── Private helpers used by ServiceWiring ──────────────────────────────
