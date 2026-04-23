@@ -224,6 +224,13 @@
   animation: dash 0.8s linear infinite;
 }
 
+/* ---- Input loading spinner ---- */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ---- Indeterminate progress bar ---- */
 @keyframes slideRight {
   0% {
