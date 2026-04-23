@@ -4,7 +4,7 @@ import { X, Skull, Square, RotateCcw, ExternalLink, Terminal, Loader2 } from "lu
 import { cn } from "../../lib/utils.js";
 import { Badge } from "../ui/badge.js";
 import { Button } from "../ui/button.js";
-import { api } from "../../hooks/useApi.js";
+import { useApi } from "../../hooks/useApi.js";
 import { pctColor, isArkProcess } from "./helpers.js";
 import type { SnapshotProcess, SnapshotSession, DockerContainer } from "./types.js";
 
@@ -100,6 +100,7 @@ function ProcessDetail({
   onNavigateToSession?: (id: string) => void;
   onClose: () => void;
 }) {
+  const api = useApi();
   const [killing, setKilling] = useState(false);
   const [killResult, setKillResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const arkSessionId = extractArkSessionId(process.command);
@@ -115,7 +116,7 @@ function ProcessDetail({
     } finally {
       setKilling(false);
     }
-  }, [process.pid, onClose]);
+  }, [api, process.pid, onClose]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -208,6 +209,7 @@ function ProcessDetail({
 // ── Docker detail ──────────────────────────────────────────────────────────
 
 function DockerDetail({ container, onClose }: { container: DockerContainer; onClose: () => void }) {
+  const api = useApi();
   const [logs, setLogs] = useState<string | null>(null);
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsError, setLogsError] = useState<string | null>(null);
@@ -228,7 +230,7 @@ function DockerDetail({ container, onClose }: { container: DockerContainer; onCl
       .then((l) => setLogs(l))
       .catch((err) => setLogsError(err.message || "Failed to load logs"))
       .finally(() => setLogsLoading(false));
-  }, [container.name]);
+  }, [api, container.name]);
 
   const handleAction = useCallback(
     async (action: "stop" | "restart") => {
@@ -246,7 +248,7 @@ function DockerDetail({ container, onClose }: { container: DockerContainer; onCl
         setActionLoading(null);
       }
     },
-    [container.name, onClose],
+    [api, container.name, onClose],
   );
 
   return (

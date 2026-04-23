@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "../../hooks/useApi.js";
+import { useApi } from "../../hooks/useApi.js";
 import { Button } from "../ui/button.js";
 import { Input } from "../ui/input.js";
 import { cn } from "../../lib/utils.js";
@@ -44,6 +44,7 @@ export function NewComputeForm({
   onClose: () => void;
   onSubmit: (form: NewComputePayload) => void;
 }) {
+  const api = useApi();
   const templatesQuery = useQuery({
     queryKey: ["compute", "templates"],
     queryFn: () => api.listComputeTemplates(),

@@ -28,7 +28,7 @@ import { ContentTabs, type TabDef } from "../components/ui/ContentTabs.js";
 import { Badge } from "../components/ui/badge.js";
 import { Button } from "../components/ui/button.js";
 import { Input } from "../components/ui/input.js";
-import { api } from "../hooks/useApi.js";
+import { useApi } from "../hooks/useApi.js";
 import { useTriggers, useConnectors, useIntegrations, useTriggerSources } from "../hooks/useIntegrationQueries.js";
 import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
 
@@ -58,6 +58,7 @@ function maturityVariant(status: string): "success" | "warning" | "secondary" {
  * and any session id returned by the dispatcher (when not dry-run).
  */
 function TriggerTestPanel({ trigger, onClose }: { trigger: any; onClose: () => void }) {
+  const api = useApi();
   const [yamlText, setYamlText] = useState<string>(
     `# Paste a sample webhook payload here (YAML).\n# Fields under 'match:' in the trigger YAML are matched against dotted\n# paths on this object. Example for a github pull-request hook:\n#\n# action: opened\n# repo: paytmteam/foo\n# pull_request:\n#   number: 42\n#   title: Add feature\naction: opened\n`,
   );
@@ -156,6 +157,7 @@ function TriggerTestPanel({ trigger, onClose }: { trigger: any; onClose: () => v
 }
 
 function TriggersTab({ readOnly }: { readOnly: boolean }) {
+  const api = useApi();
   const { data: triggers, loading: tLoading, error: tErr, refetch } = useTriggers();
   const { data: sources } = useTriggerSources();
   const [sourceFilter, setSourceFilter] = useState<string>("");
@@ -281,6 +283,7 @@ function TriggersTab({ readOnly }: { readOnly: boolean }) {
 // ── Connectors tab ─────────────────────────────────────────────────────────
 
 function ConnectorsTab() {
+  const api = useApi();
   const { data: connectors, loading, error, refetch: _refetch } = useConnectors();
   const [testResult, setTestResult] = useState<Record<string, { reachable: boolean; details: string }>>({});
 

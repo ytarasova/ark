@@ -18,7 +18,7 @@ import { PageShell } from "../components/PageShell.js";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog.js";
 import { NewSecretForm } from "../components/secrets/NewSecretForm.js";
 import { SecretsList, type SecretRowData } from "../components/secrets/SecretsList.js";
-import { api } from "../hooks/useApi.js";
+import { useApi } from "../hooks/useApi.js";
 import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
 
 interface SecretsPageProps {
@@ -29,6 +29,7 @@ interface SecretsPageProps {
 }
 
 export function SecretsPage({ view, onNavigate, readOnly, daemonStatus }: SecretsPageProps) {
+  const api = useApi();
   const [secrets, setSecrets] = useState<SecretRowData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -46,7 +47,7 @@ export function SecretsPage({ view, onNavigate, readOnly, daemonStatus }: Secret
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [api]);
 
   useEffect(() => {
     void refresh();

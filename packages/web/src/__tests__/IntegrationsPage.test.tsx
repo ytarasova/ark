@@ -14,7 +14,6 @@ import { renderToString } from "react-dom/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MockTransport } from "../transport/MockTransport.js";
 import { TransportProvider } from "../transport/TransportContext.js";
-import { setTransport } from "../hooks/useApi.js";
 import { IntegrationsPage } from "../pages/IntegrationsPage.js";
 
 interface MockTrigger {
@@ -106,7 +105,6 @@ beforeEach(() => {
     details: "ok",
   }));
   mock.register("trigger/test", () => ({ ok: true, fired: true, dryRun: true }));
-  setTransport(mock);
 });
 
 afterEach(() => {

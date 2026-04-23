@@ -7,7 +7,7 @@ import { DashboardView } from "../components/DashboardView.js";
 import { SessionStreamErrorBoundary } from "../components/ui/ErrorBoundary.js";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog.js";
 import { useSessions } from "../hooks/useSessions.js";
-import { api } from "../hooks/useApi.js";
+import { useApi } from "../hooks/useApi.js";
 import { ArrowLeft, Maximize2, Minimize2 } from "lucide-react";
 import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
 
@@ -34,6 +34,7 @@ export function SessionsPage({
   initialTab,
   onTabChange,
 }: SessionsPageProps) {
+  const api = useApi();
   const [selectedId, setSelectedIdInternal] = useState<string | null>(initialSelectedId ?? null);
   const [maximized, setMaximized] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -66,7 +67,7 @@ export function SessionsPage({
           err instanceof Error ? err.message : err,
         );
       });
-  }, []);
+  }, [api]);
 
   useEffect(() => {
     fetchUnreadCounts();

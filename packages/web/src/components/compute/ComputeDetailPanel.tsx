@@ -4,7 +4,7 @@ import { cn } from "../../lib/utils.js";
 import { Badge } from "../ui/badge.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card.js";
 import { Cpu, HardDrive, MemoryStick, Clock, Container, Terminal, Activity } from "lucide-react";
-import { api } from "../../hooks/useApi.js";
+import { useApi } from "../../hooks/useApi.js";
 import { statusDotColor, pctColor, isArkProcess } from "./helpers.js";
 import { MetricBar } from "./MetricBar.js";
 import { MetricSparkline } from "./MetricSparkline.js";
@@ -34,6 +34,7 @@ export function ComputeDetailPanel({
   onRetryMetrics: () => void;
   onNavigateToSession?: (sessionId: string) => void;
 }) {
+  const api = useApi();
   const [drawerItem, setDrawerItem] = useState<DrawerItem | null>(null);
   const closeDrawer = useCallback(() => setDrawerItem(null), []);
 

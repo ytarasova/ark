@@ -21,7 +21,6 @@ import { renderToString } from "react-dom/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MockTransport } from "../transport/MockTransport.js";
 import { TransportProvider } from "../transport/TransportContext.js";
-import { setTransport } from "../hooks/useApi.js";
 import { useSessionStream } from "../hooks/useSessionStream.js";
 
 function Harness({ sessionId }: { sessionId: string }) {
@@ -42,7 +41,6 @@ function Harness({ sessionId }: { sessionId: string }) {
 describe("useSessionStream", () => {
   test("renders without issuing RPC when sessionId is empty", () => {
     const mock = new MockTransport();
-    setTransport(mock);
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
     renderToString(
@@ -61,7 +59,6 @@ describe("useSessionStream", () => {
   test("returns defaults on SSR when no data is present", () => {
     const mock = new MockTransport();
     mock.register("session/read", () => ({ session: { id: "s1", status: "running" } }));
-    setTransport(mock);
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
     const html = renderToString(
