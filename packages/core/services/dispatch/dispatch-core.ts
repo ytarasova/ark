@@ -226,6 +226,20 @@ export class CoreDispatcher {
       agent.model = stageDef.model;
     }
 
+    // The model layer turns (agent.model, runtime.compat) into the concrete
+    // provider slug the runtime should send. Dispatch knows nothing about
+    // transport keys, bedrock, or catalog internals -- it asks the service
+    // and takes the answer. Null means "catalog doesn't know this id";
+    // leave it untouched so explicit out-of-band slugs still pass through.
+    if (agent.model && this.deps.models) {
+      const runtimeCompat = (agent as { compat?: string[] }).compat ?? [];
+      const resolved = this.deps.models.resolveSlug(agent.model, runtimeCompat, projectRoot);
+      if (resolved && resolved !== agent.model) {
+        log(`Catalog: ${agent.model} -> ${resolved}`);
+        agent.model = resolved;
+      }
+    }
+
     // Build task with handoff context
     log("Building task...");
     let task = await this.deps.buildTask(session, stage, agentName);

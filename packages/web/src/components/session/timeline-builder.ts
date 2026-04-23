@@ -162,14 +162,17 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
     } else {
       const evType = item.type || "";
       const evData = typeof item.data === "string" ? item.data : item.data?.message || "";
-      const nested = typeof item.data === "object" ? item.data?.data : null;
-      const evDataObj = typeof item.data === "object" ? item.data : {};
+      // `typeof null === "object"` in JS -- guard against it explicitly,
+      // otherwise any downstream `.message` / `.summary` read on evDataObj
+      // will crash the render with "Cannot read properties of null".
+      const nested = item.data && typeof item.data === "object" ? item.data?.data : null;
+      const evDataObj = item.data && typeof item.data === "object" ? item.data : {};
       const evStage = item.stage || item.data?.stage || nested?.stage || undefined;
 
       if (HIDDEN_EVENT_TYPES.includes(evType)) continue;
 
       if (evType === "hook_status") {
-        const hookData = typeof item.data === "object" ? item.data : {};
+        const hookData = item.data && typeof item.data === "object" ? item.data : {};
         const hookEvent = hookData.event || "";
 
         if (hookEvent === "PreToolUse") {

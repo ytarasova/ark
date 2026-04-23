@@ -133,3 +133,48 @@ export function providerSlugFor(model: ModelDefinition, providerKey: string): st
   }
   return slug;
 }
+
+/**
+ * Map a runtime's compat modes to the transport key in `provider_slugs`.
+ * Centralised here so dispatch + inline-resolve paths don't bake transport
+ * knowledge into themselves -- keeps the "dispatch asks, model answers"
+ * boundary honest.
+ *
+ * Today:
+ *   compat contains "bedrock" -> "tf-bedrock"
+ *   otherwise                  -> "anthropic-direct"
+ *
+ * When we add another transport (e.g. direct AWS Bedrock, Azure OpenAI),
+ * grow the map here, not at every call site.
+ */
+export function transportKeyForCompat(compat: readonly string[] | undefined): string {
+  const c = compat ?? [];
+  if (c.includes("bedrock")) return "tf-bedrock";
+  return "anthropic-direct";
+}
+
+/**
+ * One-shot: given a model id/alias and a runtime's compat modes, return the
+ * concrete slug the runtime should send to the provider. Returns the input
+ * verbatim if it already looks provider-qualified (contains "/"). Returns
+ * null if the catalog doesn't know this id -- caller decides whether that's
+ * fatal or whether to pass the raw id through.
+ */
+export function resolveProviderSlug(
+  store: ModelStore,
+  idOrAlias: string,
+  compat: readonly string[] | undefined,
+  projectRoot?: string,
+): string | null {
+  // Already provider-qualified (e.g. "pi-agentic/global.anthropic.sonnet-4-6")
+  // -- pass through untouched. Matches the dispatch-time precedence callers
+  // expect: an explicit slug beats the catalog.
+  if (idOrAlias.includes("/")) return idOrAlias;
+  const model = store.get(idOrAlias, projectRoot);
+  if (!model) return null;
+  const key = transportKeyForCompat(compat);
+  // Prefer the transport-specific slug; fall back to anthropic-direct so
+  // runtimes that don't carry a bedrock compat don't break when the catalog
+  // only lists one provider mapping.
+  return model.provider_slugs[key] ?? model.provider_slugs["anthropic-direct"] ?? null;
+}

@@ -16,6 +16,7 @@ import type { EventRepository } from "../../repositories/event.js";
 import type { FlowStateRepository } from "../../repositories/flow-state.js";
 import type { FlowStore } from "../../stores/flow-store.js";
 import type { RuntimeStore } from "../../stores/runtime-store.js";
+import type { ModelService } from "../../models/ModelService.js";
 import type { ComputeService } from "../compute.js";
 import type { PluginRegistry } from "../../plugins/registry.js";
 import type { StatusPollerRegistry } from "../../executors/status-poller.js";
@@ -187,6 +188,13 @@ export interface DispatchDeps {
   flowStates: FlowStateRepository;
   flows: FlowStore;
   runtimes: RuntimeStore;
+  /**
+   * Domain service over the model catalog. When present, dispatch-core
+   * resolves agent.model -> provider slug via `models.resolveSlug()`.
+   * Absent in tests that don't exercise the catalog path; raw `agent.model`
+   * flows through in that case.
+   */
+  models?: ModelService;
   computeService: ComputeService;
   pluginRegistry: PluginRegistry;
   statusPollers: StatusPollerRegistry;
