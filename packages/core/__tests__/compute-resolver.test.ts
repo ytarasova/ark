@@ -68,7 +68,7 @@ describe("app.resolveProvider (P1-1)", async () => {
     const session = mockSession({ id: "s-hosted-with-compute", compute_name: "k8s-test" });
     const { compute } = await app.resolveProvider(session);
     expect(compute?.name).toBe("k8s-test");
-    expect(compute?.provider).toBe("k8s");
+    expect(compute?.compute_kind).toBe("k8s");
   });
 
   it("tenant-scoped app: resolveProvider still honours the mode default", async () => {
@@ -125,7 +125,7 @@ describe("resolveProvider cross-tenant isolation (round-3 P0-1)", async () => {
     const sessionA = mockSession({ id: "sess-a", tenant_id: "tenant-a", compute_name: "prod-gpu" });
     const resolvedA = await app.resolveProvider(sessionA);
     expect(resolvedA.compute?.name).toBe("prod-gpu");
-    expect(resolvedA.compute?.provider).toBe("docker");
+    expect(resolvedA.compute?.runtime_kind).toBe("docker");
     expect((resolvedA.compute?.config as any)?.image).toBe("tenant-a-image:latest");
 
     // Session pinned to tenant-b gets null -- the old raw-SQL path would
@@ -168,7 +168,7 @@ describe("resolveProvider cross-tenant isolation (round-3 P0-1)", async () => {
     const session = mockSession({ id: "sess-c", tenant_id: "tenant-c", compute_name: "ci-runner" });
     const resolved = await scoped.resolveProvider(session);
     expect(resolved.compute?.name).toBe("ci-runner");
-    expect(resolved.compute?.provider).toBe("docker");
+    expect(resolved.compute?.runtime_kind).toBe("docker");
   });
 
   it("session-output.getOutput goes through the session's tenant scope", async () => {

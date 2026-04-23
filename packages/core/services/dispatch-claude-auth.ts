@@ -102,14 +102,9 @@ export async function materializeClaudeAuthForDispatch(
   // gating on provider names, so a new k8s-family provider (e.g. EKS) gets
   // the Secret-mount path automatically by declaring `supportsSecretMount`.
   if (!compute) return EMPTY;
-<<<<<<< HEAD
-  const providerName = compute.provider as string;
+  const providerName = providerOf(compute);
   const provider = app.getProvider(providerName);
   if (!provider || !provider.supportsSecretMount) {
-=======
-  const providerName = providerOf(compute);
-  if (providerName !== "k8s" && providerName !== "k8s-kata") {
->>>>>>> 185cc6c5 (refactor(types): drop deprecated `provider` field from Compute + CreateComputeOpts)
     logDebug(
       "session",
       `tenant ${tenantId} bound to subscription_blob but compute '${compute.name}' (${providerName}) does not support Secret mount; skipping Secret creation`,

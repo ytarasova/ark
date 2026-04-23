@@ -117,18 +117,10 @@ export const gooseExecutor: Executor = {
     const stage = opts.stage ?? "work";
     const tmuxName = `ark-${session.id}`;
 
-<<<<<<< HEAD
     // Worktree + compute provider. Use the polymorphic AppContext helper
     // so hosted sessions without an explicit `compute_name` surface a
     // clear "no compute resolved" error instead of defaulting to LocalProvider.
     const { provider, compute } = await app.resolveProvider(session);
-=======
-    // Worktree + compute provider
-    const compute = session.compute_name ? await app.computes.get(session.compute_name) : null;
-    const { getProvider } = await import("../../compute/index.js");
-    const { providerOf } = await import("../../compute/adapters/provider-map.js");
-    const provider = getProvider(compute ? providerOf(compute) : "local");
->>>>>>> 185cc6c5 (refactor(types): drop deprecated `provider` field from Compute + CreateComputeOpts)
     const { setupSessionWorktree } = await import("../services/worktree/index.js");
     const effectiveWorkdir = await setupSessionWorktree(app, session, compute, provider, log);
 

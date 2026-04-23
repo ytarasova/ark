@@ -5,11 +5,7 @@ import { instantiateRecipe } from "../../core/agent/recipe.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { guardBuiltin, projectArg, resolveProjectRoot, resolveScope, type Scope } from "./scope-helpers.js";
 import { logDebug } from "../../core/observability/structured-log.js";
-<<<<<<< HEAD
-import { providerToPair } from "../../compute/adapters/provider-map.js";
-=======
-import { providerOf } from "../../compute/adapters/provider-map.js";
->>>>>>> 185cc6c5 (refactor(types): drop deprecated `provider` field from Compute + CreateComputeOpts)
+import { providerToPair, providerOf } from "../../compute/adapters/provider-map.js";
 import type {
   AgentDefinition,
   AgentReadParams,
@@ -429,13 +425,8 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
         cloned_from: compute.name,
       });
       const clone = (await app.computes.get(cloneName))!;
-<<<<<<< HEAD
-      const provider = getProvider(clone.provider);
-      if (!provider) throw new RpcError(`Unknown provider: ${clone.provider}`, ErrorCodes.NOT_FOUND);
-=======
       const provider = getProvider(providerOf(clone));
-      if (!provider) throw new Error(`Provider '${providerOf(clone)}' not found`);
->>>>>>> 185cc6c5 (refactor(types): drop deprecated `provider` field from Compute + CreateComputeOpts)
+      if (!provider) throw new RpcError(`Unknown provider: ${providerOf(clone)}`, ErrorCodes.NOT_FOUND);
       await app.computes.update(clone.name, { status: "provisioning" });
       try {
         // Provision validates the environment (namespace exists, config
@@ -460,13 +451,8 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
       }
     }
 
-<<<<<<< HEAD
-    const provider = getProvider(compute.provider);
-    if (!provider) throw new RpcError(`Unknown provider: ${compute.provider}`, ErrorCodes.NOT_FOUND);
-=======
     const provider = getProvider(providerOf(compute));
-    if (!provider) throw new Error(`Provider '${providerOf(compute)}' not found`);
->>>>>>> 185cc6c5 (refactor(types): drop deprecated `provider` field from Compute + CreateComputeOpts)
+    if (!provider) throw new RpcError(`Unknown provider: ${providerOf(compute)}`, ErrorCodes.NOT_FOUND);
     await app.computes.update(compute.name, { status: "provisioning" });
     try {
       await provider.provision(compute);
@@ -482,13 +468,8 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const compute = await app.computes.get(name);
     if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
     const { getProvider } = await import("../../compute/index.js");
-<<<<<<< HEAD
-    const provider = getProvider(compute.provider);
-    if (!provider) throw new RpcError(`Unknown provider: ${compute.provider}`, ErrorCodes.NOT_FOUND);
-=======
     const provider = getProvider(providerOf(compute));
-    if (!provider) throw new Error(`Provider '${providerOf(compute)}' not found`);
->>>>>>> 185cc6c5 (refactor(types): drop deprecated `provider` field from Compute + CreateComputeOpts)
+    if (!provider) throw new RpcError(`Unknown provider: ${providerOf(compute)}`, ErrorCodes.NOT_FOUND);
     try {
       await provider.stop(compute);
       await app.computes.update(compute.name, { status: "stopped" });
@@ -517,13 +498,8 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const compute = await app.computes.get(name);
     if (!compute) throw new RpcError(`Unknown compute: ${name}`, ErrorCodes.NOT_FOUND);
     const { getProvider } = await import("../../compute/index.js");
-<<<<<<< HEAD
-    const provider = getProvider(compute.provider);
-    if (!provider) throw new RpcError(`Unknown provider: ${compute.provider}`, ErrorCodes.NOT_FOUND);
-=======
     const provider = getProvider(providerOf(compute));
-    if (!provider) throw new Error(`Provider '${providerOf(compute)}' not found`);
->>>>>>> 185cc6c5 (refactor(types): drop deprecated `provider` field from Compute + CreateComputeOpts)
+    if (!provider) throw new RpcError(`Unknown provider: ${providerOf(compute)}`, ErrorCodes.NOT_FOUND);
     await provider.start(compute);
     await app.computes.update(compute.name, { status: "running" });
     return { ok: true };
