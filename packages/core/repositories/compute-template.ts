@@ -7,8 +7,8 @@
  * `ark compute template *` CLI subcommands) so callers don't have to change
  * while we collapse the surfaces upstream.
  *
- * Methods delegate to ComputeRepository. The adapter accepts the legacy
- * `ComputeTemplate` shape and translates to/from the unified `Compute` row.
+ * Methods delegate to ComputeRepository. The adapter accepts the template
+ * shape and translates to/from the unified `Compute` row.
  *
  * System templates: seed data (`config.computeTemplates`) is stored under
  * the sentinel `tenant_id = '__system__'`. Every tenant-scoped read
@@ -20,25 +20,28 @@
  */
 
 import type { DatabaseAdapter } from "../database/index.js";
-import type {
-  ComputeTemplate,
-  ComputeProviderName,
-  ComputeConfig,
-  ComputeKindName,
-  RuntimeKindName,
-} from "../../types/index.js";
+import type { ComputeProviderName, ComputeConfig, ComputeKindName, RuntimeKindName } from "../../types/index.js";
 import { providerToPair } from "../../compute/adapters/provider-map.js";
 import { ComputeRepository } from "./compute.js";
 
 /** Sentinel tenant for system-wide compute templates seeded at boot. */
 export const SYSTEM_TENANT_ID = "__system__";
 
+/** Reusable compute configuration preset. Backed by a `compute` row with `is_template: true`. */
+export interface ComputeTemplateView {
+  name: string;
+  description?: string;
+  provider: ComputeProviderName;
+  config: Partial<ComputeConfig>;
+  tenant_id?: string;
+}
+
 function computeToTemplate(c: {
   name: string;
   provider: ComputeProviderName;
   config: ComputeConfig;
   description?: string | null;
-}): ComputeTemplate {
+}): ComputeTemplateView {
   return {
     name: c.name,
     description: (c as { description?: string | null }).description ?? undefined,
@@ -65,7 +68,7 @@ export class ComputeTemplateRepository {
     this.inner.setTenant(id);
   }
 
-  async list(): Promise<ComputeTemplate[]> {
+  async list(): Promise<ComputeTemplateView[]> {
     const rows = await this.inner.listTemplates();
     const tenantNames = new Set(rows.map((r) => r.name));
     // System templates are visible to every tenant. Per-tenant rows shadow
@@ -77,7 +80,7 @@ export class ComputeTemplateRepository {
     return [...rows.map(computeToTemplate), ...systemRows.map(computeToTemplate)];
   }
 
-  async get(name: string): Promise<ComputeTemplate | null> {
+  async get(name: string): Promise<ComputeTemplateView | null> {
     const row = await this.inner.get(name);
     if (row) return computeToTemplate(row);
     // Fall through to system tenant for seeded blueprints.
@@ -88,7 +91,7 @@ export class ComputeTemplateRepository {
     return null;
   }
 
-  async create(template: ComputeTemplate): Promise<void> {
+  async create(template: ComputeTemplateView): Promise<void> {
     // Tolerate older callers that JSON.stringify'd the config before
     // handing it to us (the previous repository wrote a string column).
     const cfg =
@@ -116,7 +119,7 @@ export class ComputeTemplateRepository {
 
   async update(
     name: string,
-    fields: Partial<Pick<ComputeTemplate, "description" | "provider" | "config">>,
+    fields: Partial<Pick<ComputeTemplateView, "description" | "provider" | "config">>,
   ): Promise<void> {
     const patch: Record<string, unknown> = {};
     if (fields.provider !== undefined) patch.provider = fields.provider;
