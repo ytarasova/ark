@@ -1,10 +1,32 @@
 // Existing components
-export { Badge, badgeVariants } from "./badge.js";
+export { Badge, badgeVariants, StatusBadge, TagChip, AgentChip, RuntimeChip, ComputeChip } from "./badge.js";
+export type { StatusBadgeProps, StatusBadgeStatus, TagChipProps } from "./badge.js";
 export { RichSelect } from "./RichSelect.js";
 export type { RichSelectOption, RichSelectProps } from "./RichSelect.js";
 export { Button, buttonVariants } from "./button.js";
 export { Card, CardHeader, CardTitle, CardDescription, CardContent } from "./card.js";
-export { Input } from "./input.js";
+export {
+  Input,
+  InputShell,
+  InputUnderline,
+  InputField,
+  HelperText,
+  CheckIcon,
+  WarnIcon,
+  ErrorIcon,
+  Spinner,
+} from "./input.js";
+export type { InputProps, InputShellProps, InputFieldProps, InputState, HelperTextProps } from "./input.js";
+export { Textarea } from "./textarea.js";
+export type { TextareaProps } from "./textarea.js";
+export { Select } from "./select.js";
+export type { SelectOption, SelectProps } from "./select.js";
+export { Checkbox } from "./checkbox.js";
+export type { CheckboxProps } from "./checkbox.js";
+export { Radio, RadioGroup } from "./radio.js";
+export type { RadioProps } from "./radio.js";
+export { Toggle } from "./toggle.js";
+export type { ToggleProps } from "./toggle.js";
 export { Modal } from "./modal.js";
 export { Separator } from "./separator.js";
 
@@ -42,10 +64,16 @@ export { TypingIndicator } from "./TypingIndicator.js";
 export type { TypingIndicatorProps } from "./TypingIndicator.js";
 
 // Design system -- status
-export { StageProgressBar } from "./StageProgressBar.js";
-export type { StageProgress, StageProgressBarProps } from "./StageProgressBar.js";
+export { StageProgressBar, SessionLane } from "./StageProgressBar.js";
+export type { StageProgress, StageProgressBarProps, SessionLaneProps } from "./StageProgressBar.js";
 export { StagePipeline } from "./StagePipeline.js";
 export type { StagePipelineProps } from "./StagePipeline.js";
+export { FlowDag, stagesToFlowDagNodes } from "./FlowDag.js";
+export type { FlowDagProps, FlowDagNode } from "./FlowDag.js";
+export { KpiCard } from "./KpiCard.js";
+export type { KpiCardProps, KpiColor } from "./KpiCard.js";
+export { CostBarChart } from "./CostBarChart.js";
+export type { CostBarChartProps, CostBarPoint } from "./CostBarChart.js";
 export { StatusDot } from "./StatusDot.js";
 export type { SessionStatus, StatusDotProps } from "./StatusDot.js";
 export { FilterChip } from "./FilterChip.js";

@@ -3,9 +3,9 @@ import { useFilePreviews } from "../hooks/useFilePreviews.js";
 import { useNewSessionForm } from "../hooks/useNewSessionForm.js";
 import { useAppMode } from "../providers/AppModeProvider.js";
 import { Button } from "./ui/button.js";
+import { Input } from "./ui/input.js";
 import { FolderPickerModal } from "./FolderPickerModal.js";
 import { InputsSection } from "./session/InputsSection.js";
-import { cn } from "../lib/utils.js";
 import { Zap } from "lucide-react";
 import { FlowDropdown } from "./session/new/FlowDropdown.js";
 import { ComputeDropdown } from "./session/new/ComputeDropdown.js";
@@ -149,15 +149,10 @@ export function NewSessionModal({ onClose, onSubmit }: NewSessionModalProps) {
               name="ticket"
               control={form.control}
               render={({ field }) => (
-                <input
+                <Input
                   value={field.value}
                   onChange={field.onChange}
                   placeholder="JIRA-123, github.com/org/repo/issues/42"
-                  className={cn(
-                    "flex h-9 w-full rounded-md border border-[var(--border)] bg-transparent",
-                    "px-3 py-1 text-[13px] text-[var(--fg)] transition-colors",
-                    "placeholder:text-[var(--fg-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]",
-                  )}
                 />
               )}
             />

@@ -9,25 +9,37 @@ interface LayoutProps {
   onNavigate: (view: string) => void;
   readOnly: boolean;
   daemonStatus?: DaemonStatus | null;
+  /** Middle column -- persistent 268px session list (or other context list). */
+  list?: React.ReactNode;
+  /** Main pane. */
   children: React.ReactNode;
-  /** Total unread message count to badge on Sessions icon */
+  /** Total unread message count to badge on Sessions icon. */
   totalUnread?: number;
+  /** Current user avatar initials. */
+  avatarInitials?: string;
+  /** Foot text (daemon latency etc.). */
+  latencyText?: string;
 }
 
 const BASE_NAV_ITEMS: IconRailItem[] = [
-  { id: "sessions", icon: <Play size={18} strokeWidth={1.5} />, label: "Sessions" },
-  { id: "agents", icon: <Bot size={18} strokeWidth={1.5} />, label: "Agents" },
-  { id: "flows", icon: <Zap size={18} strokeWidth={1.5} />, label: "Flows" },
-  { id: "compute", icon: <Monitor size={18} strokeWidth={1.5} />, label: "Compute" },
-  { id: "history", icon: <Clock size={18} strokeWidth={1.5} />, label: "History" },
-  { id: "memory", icon: <BookOpen size={18} strokeWidth={1.5} />, label: "Knowledge" },
-  { id: "tools", icon: <Wrench size={18} strokeWidth={1.5} />, label: "Tools" },
+  { id: "sessions", icon: <Play size={18} strokeWidth={1.5} />, label: "Sessions", shortcut: "S" },
+  { id: "agents", icon: <Bot size={18} strokeWidth={1.5} />, label: "Agents", shortcut: "A" },
+  { id: "flows", icon: <Zap size={18} strokeWidth={1.5} />, label: "Flows", shortcut: "F" },
+  { id: "compute", icon: <Monitor size={18} strokeWidth={1.5} />, label: "Compute", shortcut: "C" },
+  { id: "history", icon: <Clock size={18} strokeWidth={1.5} />, label: "History", shortcut: "H" },
+  { id: "memory", icon: <BookOpen size={18} strokeWidth={1.5} />, label: "Knowledge", shortcut: "M" },
+  { id: "tools", icon: <Wrench size={18} strokeWidth={1.5} />, label: "Tools", shortcut: "T" },
   { id: "schedules", icon: <Calendar size={18} strokeWidth={1.5} />, label: "Schedules" },
-  { id: "integrations", icon: <Plug size={18} strokeWidth={1.5} />, label: "Integrations" },
-  { id: "costs", icon: <DollarSign size={18} strokeWidth={1.5} />, label: "Costs" },
+  { id: "integrations", icon: <Plug size={18} strokeWidth={1.5} />, label: "Integrations", shortcut: "I" },
+  { id: "costs", icon: <DollarSign size={18} strokeWidth={1.5} />, label: "Costs", shortcut: "$" },
 ];
 
-const SETTINGS_ITEM = { id: "settings", icon: <Cog size={18} strokeWidth={1.5} />, label: "Settings" };
+const SETTINGS_ITEM: IconRailItem = {
+  id: "settings",
+  icon: <Cog size={18} strokeWidth={1.5} />,
+  label: "Settings",
+  shortcut: ",",
+};
 
 const SHORTCUTS: Record<string, string> = {
   s: "sessions",
@@ -42,7 +54,26 @@ const SHORTCUTS: Record<string, string> = {
   ",": "settings",
 };
 
-export function Layout({ view, onNavigate, daemonStatus, children, totalUnread }: LayoutProps) {
+/**
+ * Layout -- 3-column chrome from `/tmp/ark-design-system/preview/chrome-sidebar.html`.
+ *
+ *   grid-template-columns: 60px 268px 1fr
+ *
+ * The 60px icon rail is always mounted. The 268px middle column (session list
+ * or other context panel) is mounted when `list` is non-null; callers that
+ * don't need a context column (e.g. Settings, Admin) can omit it and the grid
+ * collapses to `60px 1fr`.
+ */
+export function Layout({
+  view,
+  onNavigate,
+  daemonStatus,
+  list,
+  children,
+  totalUnread,
+  avatarInitials,
+  latencyText,
+}: LayoutProps) {
   const navItems = useMemo(() => {
     if (!totalUnread) return BASE_NAV_ITEMS;
     return BASE_NAV_ITEMS.map((item) => (item.id === "sessions" ? { ...item, badge: totalUnread } : item));
@@ -53,11 +84,6 @@ export function Layout({ view, onNavigate, daemonStatus, children, totalUnread }
     function handleKeyDown(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
-      // Do not fire nav shortcuts when focus is in any interactive/text-entry
-      // element. We check both the event target and document.activeElement
-      // because Tab-stops like buttons and [contenteditable] divs won't set
-      // e.target the way inputs do.
-      // See `.workflow/audit/8-a11y.md` finding A1.
       const target = e.target as HTMLElement | null;
       const active = document.activeElement as HTMLElement | null;
       const el = target ?? active;
@@ -81,15 +107,31 @@ export function Layout({ view, onNavigate, daemonStatus, children, totalUnread }
   }, [onNavigate]);
 
   return (
-    <div className="flex h-screen bg-[var(--bg)] overflow-hidden">
+    <div
+      className="h-screen bg-[var(--bg)] overflow-hidden"
+      style={{
+        display: "grid",
+        gridTemplateColumns: list ? "60px 268px 1fr" : "60px 1fr",
+      }}
+    >
       <IconRail
         items={navItems}
         activeId={view}
         onSelect={onNavigate}
         settingsItem={SETTINGS_ITEM}
         daemonStatus={daemonStatus}
+        avatarInitials={avatarInitials}
+        latencyText={latencyText}
       />
-      <main id="main" className="flex-1 flex min-w-0 overflow-hidden">
+      {list && (
+        <aside
+          className="h-full min-w-0 overflow-hidden flex flex-col border-r border-[var(--border)] bg-[var(--bg)]"
+          aria-label="Session list"
+        >
+          {list}
+        </aside>
+      )}
+      <main id="main" className="h-full min-w-0 overflow-hidden flex flex-col">
         {children}
       </main>
     </div>

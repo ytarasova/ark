@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useApi } from "../hooks/useApi.js";
 import { useSessionDetail } from "../hooks/useSessionDetail.js";
 import { useSessionActions } from "../hooks/useSessionActions.js";
-import { fmtCost } from "../util.js";
+import { fmtCost, fmtTokens } from "../util.js";
 
 import { SessionHeader } from "./ui/SessionHeader.js";
 import { ContentTabs } from "./ui/ContentTabs.js";
@@ -20,11 +20,46 @@ import { EventsFooter, DiffFooter, TodosFooter } from "./session/TabFooter.js";
 import { TabPanels } from "./session/TabPanels.js";
 import { RejectGateModal } from "./session/RejectGateModal.js";
 import { RestartDialog } from "./session/RestartDialog.js";
+import { BudgetBar } from "./session/BudgetBar.js";
+import { ResumeBanner } from "./session/ResumeBanner.js";
+import { ForEachRollup, ChildSessionCluster } from "./session/ForEachRollup.js";
 import type { ErrorInfo } from "./session/types.js";
 
 // Re-exported for back-compat: `__tests__/RejectGateModal.test.ts` imports
 // the modal from this module; keep the symbol here so that import path holds.
 export { RejectGateModal } from "./session/RejectGateModal.js";
+
+/**
+ * Build the right-side ticker values for the 44px header strip:
+ *   `150K TOK   $0.84   02:47`
+ *
+ * The ticker always renders (even when cost is 0) so the strip stays
+ * visually balanced. Values fall back to a dash when we have no data.
+ */
+function buildHeaderTickers(session: any, cost: any): { label: string; value: string; bump?: boolean }[] {
+  const tokensIn = cost?.tokens_in;
+  const tokensOut = cost?.tokens_out;
+  const tokStr = fmtTokens(tokensIn, tokensOut);
+  const spendStr = cost?.cost != null ? fmtCost(cost.cost) : "$0.00";
+
+  const startMs = Date.parse(session.started_at || session.created_at || "");
+  const endMs = session.status === "running" ? Date.now() : Date.parse(session.ended_at || session.updated_at || "");
+  let elapsed = "--:--";
+  if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs >= startMs) {
+    const secs = Math.floor((endMs - startMs) / 1000);
+    const hh = Math.floor(secs / 3600);
+    const mm = Math.floor((secs % 3600) / 60);
+    const ss = secs % 60;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    elapsed = hh > 0 ? `${hh}:${pad(mm)}:${pad(ss)}` : `${pad(mm)}:${pad(ss)}`;
+  }
+
+  return [
+    { label: "tok", value: tokStr || "0", bump: true },
+    { label: "", value: spendStr, bump: true },
+    { label: "", value: elapsed, bump: session.status === "running" },
+  ];
+}
 
 interface SessionDetailProps {
   sessionId: string;
@@ -111,7 +146,17 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         sessionId={session.id}
         summary={session.summary || session.id}
         status={normalizeStatus(session.status)}
-        stages={d.stages}
+        stageLabel={session.stage ? `${session.status} · ${session.stage}` : undefined}
+        runtime={session.runtime || session.agent_runtime}
+        agent={session.agent}
+        compute={session.compute_provider || session.compute_kind}
+        kvs={
+          [
+            session.branch ? { k: "branch", v: session.branch, mono: true } : null,
+            session.flow ? { k: "flow", v: session.flow } : null,
+          ].filter(Boolean) as any
+        }
+        tickers={buildHeaderTickers(session, d.cost)}
         cost={d.cost?.cost ? fmtCost(d.cost.cost) : undefined}
         actions={!readOnly ? headerActions : undefined}
         onCopyId={() => {
@@ -120,6 +165,7 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         }}
         selectedStage={d.stageFilter}
         onStageClick={d.toggleStageFilter}
+        stages={d.stages}
       />
 
       {d.totalStages > 0 && (
@@ -132,7 +178,49 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         />
       )}
 
+      {/* Phase 3: resume-from-checkpoint banner. Surfaces when the session
+          has a stored for_each_checkpoint and isn't running. */}
+      {session.config?.for_each_checkpoint && session.status !== "running" && (
+        <ResumeBanner checkpoint={`iteration ${session.config.for_each_checkpoint.index ?? "?"}`} />
+      )}
+
+      {/* Phase 3: per-session budget cap bar. */}
+      {session.config?.max_budget_usd && (
+        <div className="px-[18px] py-[8px] border-b border-[var(--border-light)] bg-[rgba(0,0,0,0.12)]">
+          <BudgetBar spent={d.cost?.cost ?? 0} cap={session.config.max_budget_usd} />
+        </div>
+      )}
+
       <ContentTabs tabs={d.tabs} activeTab={d.activeTab} onTabChange={d.setActiveTab} ariaLabel="Session detail tabs" />
+
+      {/* Phase 2: for_each rollup + child cluster. Rendered inline above the
+          tab body so they're visible on every tab. Data is expected on
+          session.config.for_each. */}
+      {(session.config?.for_each?.total || session.children?.length > 0) && (
+        <div className="px-[18px] pt-[10px] pb-[4px] grid grid-cols-1 lg:grid-cols-2 gap-[10px] shrink-0">
+          {session.config?.for_each?.total && (
+            <ForEachRollup
+              total={session.config.for_each.total}
+              completed={session.config.for_each.completed ?? 0}
+              failed={session.config.for_each.failed ?? 0}
+              inflight={session.config.for_each.inflight ?? 0}
+              iterations={session.config.for_each.iterations ?? []}
+              onOpenIteration={(id) => {
+                window.location.hash = `#/sessions/${id}`;
+              }}
+            />
+          )}
+          {session.children && session.children.length > 0 && (
+            <ChildSessionCluster
+              parentId={session.parent_id}
+              children={session.children}
+              onOpen={(id) => {
+                window.location.hash = `#/sessions/${id}`;
+              }}
+            />
+          )}
+        </div>
+      )}
 
       <TabPanels
         activeTab={d.activeTab}
@@ -161,6 +249,7 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         onToggleTodo={handleToggleTodo}
         errorEvents={d.errorEvents}
         onSelectError={setSelectedError}
+        stages={d.stages}
       />
 
       {d.activeTab === "conversation" && (

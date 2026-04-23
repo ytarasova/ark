@@ -3,10 +3,15 @@ import { tabButtonId, tabPanelId } from "../ui/ContentTabs.js";
 import { EventTimeline, type TimelineEvent } from "../ui/EventTimeline.js";
 import { TodoList, type TodoItem } from "../ui/TodoList.js";
 import type { DiffFile } from "../ui/DiffViewer.js";
+import type { StageProgress } from "../ui/StageProgressBar.js";
 import { ConversationTab } from "./tabs/ConversationTab.js";
 import { TerminalTab } from "./tabs/TerminalTab.js";
 import { DiffTab } from "./tabs/DiffTab.js";
 import { ErrorsTab } from "./tabs/ErrorsTab.js";
+import { FlowTab } from "./tabs/FlowTab.js";
+import { FilesTab } from "./tabs/FilesTab.js";
+import { CostTab } from "./tabs/CostTab.js";
+import { KnowledgeTab } from "./tabs/KnowledgeTab.js";
 import type { ErrorInfo } from "./types.js";
 
 interface TabPanelsProps {
@@ -45,6 +50,9 @@ interface TabPanelsProps {
   // Errors
   errorEvents: any[];
   onSelectError: (err: ErrorInfo) => void;
+
+  // Flow widget (Conversation tab right rail)
+  stages?: StageProgress[];
 }
 
 /**
@@ -77,6 +85,7 @@ export function TabPanels(props: TabPanelsProps) {
     onToggleTodo,
     errorEvents,
     onSelectError,
+    stages,
   } = props;
 
   return (
@@ -103,6 +112,7 @@ export function TabPanels(props: TabPanelsProps) {
           isActive={isActive}
           agentIsTyping={agentIsTyping}
           bottomRef={bottomRef}
+          stages={stages}
         />
       )}
       {/*
@@ -137,6 +147,10 @@ export function TabPanels(props: TabPanelsProps) {
         />
       )}
       {activeTab === "todos" && <TodoList items={todoItems} onToggle={(id) => onToggleTodo(Number(id))} />}
+      {activeTab === "flow" && <FlowTab session={session} stages={stages ?? []} />}
+      {activeTab === "files" && <FilesTab diffFiles={diffFiles} onSelect={onDiffFileSelect} />}
+      {activeTab === "cost" && <CostTab session={session} cost={cost} />}
+      {activeTab === "knowledge" && <KnowledgeTab session={session} />}
       {activeTab === "errors" && (
         <ErrorsTab session={session} errorEvents={errorEvents} onSelectError={onSelectError} />
       )}

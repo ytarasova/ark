@@ -200,6 +200,53 @@ export function SessionsPage({
     }
   }
 
+  const listPanel = !maximized ? (
+    <SessionListPanel
+      sessions={sessions}
+      selectedId={selectedId}
+      onSelect={(id) => {
+        const next = id === selectedId ? null : id;
+        setSelectedId(next);
+        setShowNew(false);
+        if (next && unreadCounts[next]) {
+          api.markRead(next).then(() => {
+            setUnreadCounts((prev) => {
+              const copy = { ...prev };
+              delete copy[next];
+              return copy;
+            });
+          });
+        }
+      }}
+      onArchive={async (id) => {
+        try {
+          const res = await api.archive(id);
+          if (res.ok === false) {
+            onToast?.(`Archive failed: ${res.message ?? "unknown error"}`, "error");
+            return;
+          }
+          onToast?.(`Session ${id} archived`, "success");
+          if (selectedId === id) setSelectedId(null);
+          refresh();
+        } catch (err: any) {
+          onToast?.(`Archive failed: ${err?.message ?? err}`, "error");
+        }
+      }}
+      onDelete={(id) => setPendingDeleteId(id)}
+      filter={filter}
+      onFilterChange={setFilter}
+      search={search}
+      onSearchChange={setSearch}
+      onNewSession={() => {
+        setShowNew(true);
+        setSelectedId(null);
+      }}
+      readOnly={readOnly}
+      flowStagesMap={flowStagesMap}
+      unreadCounts={unreadCounts}
+    />
+  ) : undefined;
+
   return (
     <Layout
       view={view}
@@ -207,55 +254,9 @@ export function SessionsPage({
       readOnly={readOnly}
       daemonStatus={daemonStatus}
       totalUnread={totalUnread}
+      list={listPanel}
     >
       <h1 className="sr-only">Sessions</h1>
-      {/* Session List Panel -- hidden only when maximized */}
-      {!maximized && (
-        <SessionListPanel
-          sessions={sessions}
-          selectedId={selectedId}
-          onSelect={(id) => {
-            const next = id === selectedId ? null : id;
-            setSelectedId(next);
-            setShowNew(false);
-            if (next && unreadCounts[next]) {
-              api.markRead(next).then(() => {
-                setUnreadCounts((prev) => {
-                  const copy = { ...prev };
-                  delete copy[next];
-                  return copy;
-                });
-              });
-            }
-          }}
-          onArchive={async (id) => {
-            try {
-              const res = await api.archive(id);
-              if (res.ok === false) {
-                onToast?.(`Archive failed: ${res.message ?? "unknown error"}`, "error");
-                return;
-              }
-              onToast?.(`Session ${id} archived`, "success");
-              if (selectedId === id) setSelectedId(null);
-              refresh();
-            } catch (err: any) {
-              onToast?.(`Archive failed: ${err?.message ?? err}`, "error");
-            }
-          }}
-          onDelete={(id) => setPendingDeleteId(id)}
-          filter={filter}
-          onFilterChange={setFilter}
-          search={search}
-          onSearchChange={setSearch}
-          onNewSession={() => {
-            setShowNew(true);
-            setSelectedId(null);
-          }}
-          readOnly={readOnly}
-          flowStagesMap={flowStagesMap}
-          unreadCounts={unreadCounts}
-        />
-      )}
 
       {/* Center Panel */}
       {showNew ? (

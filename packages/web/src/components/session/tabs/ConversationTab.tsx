@@ -5,21 +5,64 @@ import { UserMessage } from "../../ui/UserMessage.js";
 import { SystemEvent } from "../../ui/SystemEvent.js";
 import { ToolCallRow } from "../../ui/ToolCallRow.js";
 import { ToolCallFailed } from "../../ui/ToolCallFailed.js";
+import { ToolBlock } from "../tool-block/index.js";
 import { TypingIndicator } from "../../ui/TypingIndicator.js";
 import { SessionSummary } from "../../ui/SessionSummary.js";
 import { AttachedFiles } from "../AttachedFiles.js";
 import { formatTime } from "../timeline-builder.js";
 import { renderAgentContent } from "../event-builder.js";
+import { FlowWidget } from "../FlowWidget.js";
+import { CostWidget } from "../CostWidget.js";
+import type { StageProgress } from "../../ui/StageProgressBar.js";
 
 interface ConversationTabProps {
   session: any;
   timeline: any[];
   conversationMessages: any[];
   events: any[];
-  cost: { cost: number } | null | undefined;
+  cost: { cost: number; tokens_in?: number; tokens_out?: number } | null | undefined;
   isActive: boolean;
   agentIsTyping: boolean;
   bottomRef: React.RefObject<HTMLDivElement>;
+  /** Per-stage progress for the Flow side widget. */
+  stages?: StageProgress[];
+}
+
+/** Count tool-call entries in the timeline for the Cost widget footer. */
+function countToolCalls(timeline: any[]): number {
+  let n = 0;
+  for (const item of timeline) {
+    if (item.kind === "tool") n++;
+  }
+  return n;
+}
+
+/** Compute per-stage durations in mm:ss from the raw events array. */
+function computeStageDurations(events: any[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  // Events that mark a stage boundary typically carry `data.stage` or a
+  // `stage` field. We compute per-stage span as (first event of stage) ->
+  // (first event of next stage or session end).
+  const byStage: { name: string; first: number; last: number }[] = [];
+  for (const ev of events || []) {
+    const stage = ev?.stage || ev?.data?.stage;
+    if (!stage) continue;
+    const t = Date.parse(ev.created_at);
+    if (!Number.isFinite(t)) continue;
+    const entry = byStage.find((x) => x.name === stage);
+    if (!entry) byStage.push({ name: stage, first: t, last: t });
+    else entry.last = t;
+  }
+  for (let i = 0; i < byStage.length; i++) {
+    const cur = byStage[i];
+    const next = byStage[i + 1];
+    const end = next ? next.first : cur.last;
+    const secs = Math.max(0, Math.floor((end - cur.first) / 1000));
+    const mm = Math.floor(secs / 60);
+    const ss = secs % 60;
+    out[cur.name] = `${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
+  }
+  return out;
 }
 
 /**
@@ -39,11 +82,16 @@ export function ConversationTab({
   isActive,
   agentIsTyping,
   bottomRef,
+  stages,
 }: ConversationTabProps) {
   const attachments = (session?.config?.attachments ?? []) as Array<{ name: string; content: string; type: string }>;
+  const hasSideWidgets = (stages && stages.length > 0) || cost != null;
+  const durations = computeStageDurations(events);
+  const toolCalls = countToolCalls(timeline);
+  const modelLabel = session?.config?.model || session?.agent || "";
 
-  return (
-    <div className="max-w-[720px] mx-auto">
+  const transcript = (
+    <>
       {attachments.length > 0 && <AttachedFiles attachments={attachments} />}
       {timeline.length === 0 && conversationMessages.length === 0 && (
         <div className="text-center text-sm text-[var(--fg-muted)] py-12">
@@ -71,6 +119,20 @@ export function ConversationTab({
           );
         if (item.kind === "system") return <SystemEvent key={"s-" + i}>{item.content}</SystemEvent>;
         if (item.kind === "tool") {
+          if (item.toolName) {
+            const blockStatus = item.status === "running" ? "running" : item.status === "error" ? "err" : "ok";
+            return (
+              <ToolBlock
+                key={"t-" + i}
+                name={item.toolName}
+                input={item.toolInput}
+                output={item.toolOutput}
+                status={blockStatus}
+                durationMs={item.durationMs}
+                elapsed={item.duration}
+              />
+            );
+          }
           if (item.status === "error")
             return <ToolCallFailed key={"t-" + i} label={item.label} duration={item.duration} error={item.error} />;
           return <ToolCallRow key={"t-" + i} label={item.label} duration={item.duration} status={item.status} />;
@@ -117,6 +179,28 @@ export function ConversationTab({
         />
       )}
       <div ref={bottomRef} />
+    </>
+  );
+
+  if (!hasSideWidgets) {
+    return <div className="max-w-[720px] mx-auto">{transcript}</div>;
+  }
+
+  return (
+    <div className="grid gap-[20px] items-start" style={{ gridTemplateColumns: "minmax(0,1fr) 320px" }}>
+      <div className="min-w-0">{transcript}</div>
+      <aside className="flex flex-col gap-[12px] sticky top-[4px]">
+        {stages && stages.length > 0 && <FlowWidget stages={stages} durations={durations} />}
+        {cost && (
+          <CostWidget
+            tokensIn={cost.tokens_in}
+            tokensOut={cost.tokens_out}
+            toolCalls={toolCalls}
+            modelLabel={modelLabel}
+            live={isActive}
+          />
+        )}
+      </aside>
     </div>
   );
 }

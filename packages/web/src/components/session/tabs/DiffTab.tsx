@@ -22,12 +22,7 @@ export function DiffTab({ diffData, diffFiles, activeDiffFile, onFileSelect, has
             {diffData.filesChanged} files changed, +{diffData.insertions || 0} -{diffData.deletions || 0}
           </div>
           {diffFiles.length > 0 ? (
-            <DiffViewer
-              files={diffFiles}
-              activeFile={activeDiffFile}
-              onFileSelect={onFileSelect}
-              className="border border-[var(--border)] rounded-lg overflow-hidden"
-            />
+            <DiffViewer files={diffFiles} activeFile={activeDiffFile} onFileSelect={onFileSelect} />
           ) : diffData.stat ? (
             <pre className="bg-[var(--bg-code)] border border-[var(--border)] rounded-lg p-3.5 font-[family-name:var(--font-mono)] text-[11px] leading-[1.7] overflow-auto whitespace-pre-wrap text-[var(--fg-muted)]">
               {diffData.stat}

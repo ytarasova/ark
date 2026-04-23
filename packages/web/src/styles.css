@@ -19,10 +19,10 @@
   --bg-code: #1a1a2c;
   --fg: #e4e4ed;
   --fg-muted: #7878a0;
-  --fg-faint: #606082;
-  --primary: #7c6aef;
-  --primary-hover: #6b59de;
-  --primary-subtle: rgba(124, 106, 239, 0.1);
+  --fg-faint: #8080a8;
+  --primary: #6b59de;
+  --primary-hover: #5b47d4;
+  --primary-subtle: rgba(107, 89, 222, 0.1);
   --primary-fg: #ffffff;
   --border: #252540;
   --border-light: #1e1e30;
@@ -37,7 +37,7 @@
   --diff-add-fg: #34d399;
   --diff-rm-bg: rgba(248, 113, 113, 0.08);
   --diff-rm-fg: #f87171;
-  --gradient-brand: linear-gradient(135deg, #7c6aef 0%, #06b6d4 100%);
+  --gradient-brand: linear-gradient(135deg, #6b59de 0%, #06b6d4 100%);
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
@@ -190,6 +190,47 @@
   }
 }
 
+/* ---- Ticker bump (running stats in SessionHeader) ---- */
+@keyframes bump {
+  0%,
+  80%,
+  100% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 0.4;
+  }
+}
+.bump {
+  animation: bump 1.8s ease-in-out infinite;
+}
+
+/* ---- Live-typing caret blink (ChatInput) ---- */
+@keyframes blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ---- Flow DAG connector "marching ants" (active edges only) ---- */
+@keyframes dash {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
+.dag-edge-active {
+  stroke-dasharray: 6 4;
+  stroke-dashoffset: 0;
+  animation: dash 0.8s linear infinite;
+}
+
+/* ---- Input loading spinner ---- */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ---- Indeterminate progress bar ---- */
 @keyframes slideRight {
   0% {
@@ -228,10 +269,93 @@
     background-position: 200% 0;
   }
 }
+/* ---- Lane shimmer (session list `.lane.running`) ---- */
+@keyframes laneShimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+/* ---- Running pip pulse (chrome-session-list `.pip.running::after`) ---- */
+@keyframes pulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+/* ---- Status chip dot pulse (chrome-session-header) ---- */
+@keyframes chipPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+/* ---- Brand live dot glow (app-chrome sidebar brand) ---- */
+@keyframes brandGlow {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* Brand tile backlight: breathing green halo when the daemon is online. */
+@keyframes brandBacklightOnline {
+  0%,
+  100% {
+    box-shadow:
+      0 2px 6px rgba(107, 89, 222, 0.4),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+      0 0 16px 2px rgba(52, 211, 153, 0.45);
+  }
+  50% {
+    box-shadow:
+      0 2px 6px rgba(107, 89, 222, 0.4),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+      0 0 26px 4px rgba(52, 211, 153, 0.7);
+  }
+}
+
+/* Brand tile backlight: faster red breathing when all daemons are offline. */
+@keyframes brandBacklightOffline {
+  0%,
+  100% {
+    box-shadow:
+      0 2px 6px rgba(107, 89, 222, 0.4),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+      0 0 18px 2px rgba(248, 113, 113, 0.5);
+  }
+  50% {
+    box-shadow:
+      0 2px 6px rgba(107, 89, 222, 0.4),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+      0 0 28px 5px rgba(248, 113, 113, 0.8);
+  }
+}
+
 .skeleton-shimmer {
   background: linear-gradient(90deg, var(--bg-hover) 25%, var(--bg-card) 50%, var(--bg-hover) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
+}
+
+/* ---- Utility: hide scrollbars ---- */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 /* ---- Sidebar label fade ---- */

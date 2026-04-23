@@ -189,6 +189,64 @@ jobs:
           retention-days: 1
           if-no-files-found: warn
 
+  # Vendor claude-code CLI. The Agent SDK shells out to a native `claude`
+  # binary at runtime but doesn't bundle one itself; each platform ships
+  # as an optional sibling package `@anthropic-ai/claude-agent-sdk-<plat>`.
+  # Without vendoring, fresh compute targets fail with "Native CLI binary
+  # not found" on first dispatch. We pull one binary per platform so the
+  # release tarball is a drop-in install.
+  vendor-claude-sdk:
+    runs-on: ubuntu-latest
+    name: vendor-claude-sdk
+    timeout-minutes: 5
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies (resolves SDK version)
+        run: bun install --force
+
+      - name: Download platform binaries from npm
+        run: |
+          SDK_VERSION=$(node -p "require('./node_modules/@anthropic-ai/claude-agent-sdk/package.json').version")
+          echo "SDK version resolved: $SDK_VERSION"
+          mkdir -p dist/vendor
+          for plat in darwin-arm64 darwin-x64 linux-arm64 linux-x64; do
+            pkg="@anthropic-ai/claude-agent-sdk-$plat"
+            echo "::group::fetch $pkg@$SDK_VERSION"
+            tmp=$(mktemp -d)
+            (
+              cd "$tmp"
+              npm pack "$pkg@$SDK_VERSION" --silent
+              tgz=$(ls -1 *.tgz | head -1)
+              tar -xzf "$tgz"
+            )
+            src="$tmp/package/claude"
+            if [ -f "$src" ]; then
+              cp "$src" "dist/vendor/claude-$plat"
+              chmod +x "dist/vendor/claude-$plat"
+              echo "vendored claude-$plat: $(du -h dist/vendor/claude-$plat | cut -f1)"
+            else
+              echo "::warning::$src missing from $pkg@$SDK_VERSION -- claude-$plat not vendored"
+            fi
+            rm -rf "$tmp"
+            echo "::endgroup::"
+          done
+          ls -lh dist/vendor/claude-* || true
+
+      - name: Upload claude binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-all
+          path: dist/vendor/claude-*
+          retention-days: 1
+          if-no-files-found: warn
+
   # Vendor tensorzero - build Rust gateway per platform.
   # Skips darwin-x64 (macos-13 queue saturation) and linux-arm64 (cross-compile
   # toolchain headache). The remaining platforms still produce useful vendor
@@ -277,7 +335,7 @@ jobs:
   # `if:` condition here -- that propagates to smoke-test and breaks matrix
   # expansion downstream.
   package:
-    needs: [build-ark, build-web, vendor-tmux-darwin, vendor-tmux-linux, vendor-codegraph]
+    needs: [build-ark, build-web, vendor-tmux-darwin, vendor-tmux-linux, vendor-codegraph, vendor-claude-sdk]
     strategy:
       fail-fast: false
       matrix:
@@ -314,6 +372,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: tensorzero-${{ matrix.name }}
+          path: dist/vendor
+        continue-on-error: true
+
+      - name: Download claude-code binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: claude-all
           path: dist/vendor
         continue-on-error: true
 
@@ -357,6 +422,17 @@ jobs:
             cp "dist/vendor/tensorzero-$PLAT" "$root/bin/tensorzero-gateway"
             chmod +x "$root/bin/tensorzero-gateway"
             echo "  bundled: tensorzero-gateway"
+          fi
+
+          # claude-code CLI -- consumed by agent-sdk runtime (SDK spawns it as
+          # a subprocess). Without this, fresh compute targets fail at first
+          # dispatch with "Native CLI binary for <platform> not found".
+          if [ -f "dist/vendor/claude-$PLAT" ]; then
+            cp "dist/vendor/claude-$PLAT" "$root/bin/claude"
+            chmod +x "$root/bin/claude"
+            echo "  bundled: claude ($(du -h "$root/bin/claude" | cut -f1))"
+          else
+            echo "  WARNING: claude missing for $PLAT"
           fi
 
           # Resource definitions

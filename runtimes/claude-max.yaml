@@ -17,3 +17,7 @@ billing:
   plan: claude-max-200
   cost_per_month: 200
   transcript_parser: claude
+task_prompt: |
+
+  When you start up, immediately call the `report` tool with type='progress' to announce you are online and ready for work.
+  When you finish your work, call `report` with type='completed' and a concise summary of what you accomplished (files changed, tests added, key decisions). This summary is shown to the user in the dashboard.

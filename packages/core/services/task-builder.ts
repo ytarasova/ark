@@ -55,13 +55,21 @@ export function formatTaskHeader(app: AppContext, session: Session, stage: strin
     parts.push(`\nYou are the ${agentName} agent, running the '${stage}' stage.`);
   }
 
-  // Readiness + completion reporting
-  parts.push(
-    `\nWhen you start up, immediately call the \`report\` tool with type='progress' to announce you are online and ready for work.`,
-  );
-  parts.push(
-    `When you finish your work, call \`report\` with type='completed' and a concise summary of what you accomplished (files changed, tests added, key decisions). This summary is shown to the user in the dashboard.`,
-  );
+  // Completion framing is owned by the runtime, not by task-builder. Each
+  // runtime YAML declares its own `task_prompt:` describing how its agents
+  // should signal completion (e.g. claude: "call report(completed)"; agent-sdk:
+  // "stop with final message"). We look up the effective runtime (accounting
+  // for --runtime overrides) and append its prompt verbatim. Missing YAML =
+  // no completion ritual appended.
+  const projectRoot = agentRegistry.findProjectRoot(session.workdir || session.repo) ?? undefined;
+  const agent = app.agents.get(agentName, projectRoot);
+  const effectiveRuntime = session.runtime ?? agent?.runtime;
+  if (effectiveRuntime) {
+    const runtime = app.runtimes.get(effectiveRuntime);
+    if (runtime?.task_prompt) {
+      parts.push(runtime.task_prompt);
+    }
+  }
 
   return parts;
 }

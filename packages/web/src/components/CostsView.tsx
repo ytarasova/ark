@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import { useCostsQuery } from "../hooks/useCostQueries.js";
 import { fmtCost } from "../util.js";
 import { Card } from "./ui/card.js";
+import { KpiCard } from "./ui/KpiCard.js";
+import { CostBarChart } from "./ui/CostBarChart.js";
 import { DollarSign, TrendingUp, Activity, Info } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { useChartPalette, useModelColors, ChartTooltip, AXIS_TICK_STYLE } from "./ui/chart.js";
@@ -91,41 +93,54 @@ export function CostsView() {
   return (
     <div className="overflow-y-auto h-full bg-background">
       <div className="p-5 max-w-[1200px] mx-auto space-y-5">
-        {/* Summary cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Card className="p-4">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-1">
-              Total Spend
-            </div>
-            <div className="text-2xl font-bold font-mono text-[var(--running)] tracking-[-0.02em]">
-              {fmtCost(costs.total || 0)}
-            </div>
-            <div className="text-[11px] text-muted-foreground mt-1">{sessions.length} sessions with usage data</div>
-          </Card>
-          <Card className="p-4">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-1">
-              Models Used
-            </div>
-            <div className="text-2xl font-bold font-mono text-foreground tracking-[-0.02em]">
-              {Object.keys(byModel).length}
-            </div>
-            <div className="text-[11px] text-muted-foreground mt-1">
-              {Object.entries(byModel)
-                .sort(([, a], [, b]) => b.cost - a.cost)
-                .map(([m]) => m)
-                .join(", ")}
-            </div>
-          </Card>
-          <Card className="p-4">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-1">
-              Avg Cost / Session
-            </div>
-            <div className="text-2xl font-bold font-mono text-foreground tracking-[-0.02em]">
-              {fmtCost(sessions.length > 0 ? (costs.total || 0) / sessions.length : 0)}
-            </div>
-            <div className="text-[11px] text-muted-foreground mt-1">across {sessions.length} sessions</div>
-          </Card>
+        {/* Summary KPI cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-[10px]">
+          <KpiCard
+            label="Total spend"
+            value={fmtCost(costs.total || 0)}
+            color="amber"
+            delta={`${sessions.length} sessions`}
+            deltaDir="neutral"
+          />
+          <KpiCard
+            label="Models used"
+            value={Object.keys(byModel).length}
+            color="blue"
+            delta={Object.keys(byModel).slice(0, 2).join(", ")}
+            deltaDir="neutral"
+          />
+          <KpiCard
+            label="Avg / session"
+            value={fmtCost(sessions.length > 0 ? (costs.total || 0) / sessions.length : 0)}
+            color="primary"
+            delta={`across ${sessions.length}`}
+            deltaDir="neutral"
+          />
+          <KpiCard
+            label="Top model"
+            value={Object.entries(byModel).sort(([, a], [, b]) => b.cost - a.cost)[0]?.[0] ?? "--"}
+            color="green"
+            delta={fmtCost(Object.entries(byModel).sort(([, a], [, b]) => b.cost - a.cost)[0]?.[1].cost ?? 0)}
+            deltaDir="neutral"
+          />
         </div>
+
+        {/* 14-day bar chart -- placeholder series from backend totals until
+            per-day cost history is exposed. */}
+        <CostBarChart
+          title="Cost · last 14 days"
+          today={fmtCost(costs.total || 0)}
+          points={Array.from({ length: 14 }, (_, i) => {
+            const avg = sessions.length > 0 ? (costs.total || 0) / Math.max(1, sessions.length) : 0;
+            const v = i === 13 ? costs.total || 0 : avg * (0.4 + ((i * 17) % 10) / 10);
+            return {
+              day: "MTWTFSS"[(new Date().getDay() - (13 - i) + 70) % 7] ?? "·",
+              value: v,
+              peak: i === 13,
+              label: i === 13 ? "Today" : undefined,
+            };
+          })}
+        />
 
         {/* Cost by model -- bar chart + breakdown cards side by side */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
