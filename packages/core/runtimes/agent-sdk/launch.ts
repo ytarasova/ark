@@ -553,11 +553,23 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
         // that must not be forwarded verbatim: the binary sends "host: localhost:<proxyPort>"
         // which causes TF's gateway to 404 (it routes on the Host header).
         // Let fetch set the correct host for the upstream URL.
-        const SKIP_HEADERS = new Set(["host", "connection", "content-length", "transfer-encoding"]);
+        // Strip accept-encoding too so TF responds uncompressed -- the SDK
+        // can't decompress zstd (ZstdDecompressionError) and we'd otherwise
+        // need to decompress + re-encode in the proxy.
+        const SKIP_HEADERS = new Set([
+          "host",
+          "connection",
+          "content-length",
+          "transfer-encoding",
+          "accept-encoding",
+        ]);
         const headers: Record<string, string> = {};
         req.headers.forEach((v, k) => {
           if (!SKIP_HEADERS.has(k)) headers[k] = v;
         });
+        // Force identity encoding upstream so TF doesn't pick zstd / br based
+        // on its own defaults.
+        headers["accept-encoding"] = "identity";
 
         // Inject auth headers from ANTHROPIC_CUSTOM_HEADERS env if the inbound
         // request didn't carry them. The SDK's bundled binary doesn't honor
