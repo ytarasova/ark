@@ -158,8 +158,35 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
 
   router.handle("session/list", async (params, _notify) => {
     const filters = extract<SessionListParams>(params, []);
+    // rootsOnly switches to the tree-aware path so every row carries a
+    // `child_stats` rollup. Flat behaviour is preserved when unset/false.
+    if (filters?.rootsOnly) {
+      const sessions = await app.sessions.listRoots(filters);
+      return { sessions };
+    }
     const sessions = await app.sessions.list(filters);
     return { sessions };
+  });
+
+  router.handle("session/list_children", async (params, _notify) => {
+    const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
+    const sessions = await app.sessions.listChildren(sessionId);
+    return { sessions };
+  });
+
+  router.handle("session/tree", async (params, _notify) => {
+    const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
+    const existing = await app.sessions.get(sessionId);
+    if (!existing) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
+    try {
+      const root = await app.sessions.loadTree(sessionId);
+      return { root };
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      // Bubble the parent-required error as a clean RpcError so the UI can
+      // show an actionable message without relying on string matching.
+      throw new RpcError(msg, SESSION_NOT_FOUND);
+    }
   });
 
   router.handle("session/read", async (params, _notify) => {

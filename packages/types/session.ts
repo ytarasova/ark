@@ -163,4 +163,37 @@ export interface SessionListFilters {
   parent_id?: string;
   flow?: string;
   limit?: number;
+  offset?: number;
+  /**
+   * When true, restricts results to sessions with `parent_id IS NULL` (roots).
+   * Each returned session also carries a `child_stats` rollup summarising its
+   * direct descendants. Used by the web UI tree view.
+   */
+  rootsOnly?: boolean;
+}
+
+/**
+ * Aggregate rollup over a session's direct children. Emitted alongside parent
+ * rows returned by the tree-aware list endpoints (`rootsOnly`, list_children,
+ * tree). Null when the session has no children.
+ */
+export interface SessionChildStats {
+  total: number;
+  running: number;
+  completed: number;
+  failed: number;
+  cost_usd_sum: number;
+}
+
+/** Session row with an attached `child_stats` rollup (nullable when leaf). */
+export interface SessionWithChildStats extends Session {
+  child_stats: SessionChildStats | null;
+}
+
+/**
+ * Recursive session shape returned by `session/tree`. Each node carries its own
+ * `child_stats` (or null for leaves) plus the nested `children` array.
+ */
+export interface SessionWithChildren extends SessionWithChildStats {
+  children: SessionWithChildren[];
 }

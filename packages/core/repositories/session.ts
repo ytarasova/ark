@@ -1,7 +1,7 @@
 import type { DatabaseAdapter } from "../database/index.js";
 import { drizzleFromIDatabase } from "../drizzle/from-idb.js";
 import type { DrizzleClient } from "../drizzle/client.js";
-import { and, desc, eq, like, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, like, ne, or, sql } from "drizzle-orm";
 import { customAlphabet } from "nanoid";
 import type {
   Session,
@@ -9,6 +9,9 @@ import type {
   SessionConfig,
   CreateSessionOpts,
   SessionListFilters,
+  SessionChildStats,
+  SessionWithChildStats,
+  SessionWithChildren,
 } from "../../types/index.js";
 import { now } from "../util/time.js";
 
@@ -296,14 +299,196 @@ export class SessionRepository {
     if (filters?.groupPrefix) conditions.push(like(s.groupName, filters.groupPrefix + "%"));
     if (filters?.parent_id) conditions.push(eq(s.parentId, filters.parent_id));
     if (filters?.flow) conditions.push(eq(s.flow, filters.flow));
+    if (filters?.rootsOnly) conditions.push(isNull(s.parentId));
 
-    const rows = await (d.db as any)
+    let q = (d.db as any)
       .select()
       .from(s)
       .where(and(...conditions))
       .orderBy(desc(s.createdAt))
       .limit(filters?.limit ?? 100);
+    if (typeof filters?.offset === "number" && filters.offset > 0) {
+      q = q.offset(filters.offset);
+    }
+    const rows = await q;
     return (rows as DrizzleSelectSession[]).map(rowToSession);
+  }
+
+  /**
+   * List root sessions (`parent_id IS NULL`) and attach a `child_stats`
+   * rollup to each row. The rollup is computed via a single grouped
+   * subquery over the sessions + usage_records tables -- no N+1.
+   */
+  async listRoots(filters?: SessionListFilters): Promise<SessionWithChildStats[]> {
+    const roots = await this.list({ ...(filters ?? {}), rootsOnly: true });
+    if (roots.length === 0) return [];
+    const statsByParent = await this.computeChildStats(roots.map((r) => r.id));
+    return roots.map((r) => ({ ...r, child_stats: statsByParent.get(r.id) ?? null }));
+  }
+
+  /**
+   * Return direct children of `parentId`, each with its own `child_stats`
+   * rollup so the UI can decide whether to render an expand affordance
+   * without a second round-trip.
+   */
+  async listChildren(parentId: string): Promise<SessionWithChildStats[]> {
+    const children = await this.list({ parent_id: parentId });
+    if (children.length === 0) return [];
+    const statsByParent = await this.computeChildStats(children.map((c) => c.id));
+    return children.map((c) => ({ ...c, child_stats: statsByParent.get(c.id) ?? null }));
+  }
+
+  /**
+   * Build the full recursive tree rooted at `rootId`. Rejects if the session
+   * already has a parent (callers must pass the actual root) or if traversal
+   * exceeds `maxDepth` levels (guards against cyclic parent chains from hand-
+   * written rows). We do an iterative BFS by level instead of a recursive CTE
+   * so the implementation is dialect-agnostic (sqlite + postgres).
+   */
+  async loadTree(rootId: string, maxDepth = 6): Promise<SessionWithChildren> {
+    const root = await this.get(rootId);
+    if (!root) throw new Error(`Session ${rootId} not found`);
+    if (root.parent_id) throw new Error("Parent-session required; pass the root");
+
+    const rootNode: SessionWithChildren = { ...root, child_stats: null, children: [] };
+    const byId = new Map<string, SessionWithChildren>([[root.id, rootNode]]);
+    let frontier: SessionWithChildren[] = [rootNode];
+    const visited = new Set<string>([root.id]);
+
+    for (let depth = 0; depth < maxDepth && frontier.length > 0; depth++) {
+      const parentIds = frontier.map((n) => n.id);
+      const children = await this.fetchChildrenForParents(parentIds);
+      const statsByParent = await this.computeChildStats(parentIds);
+
+      // Attach per-parent child_stats rollups.
+      for (const node of frontier) {
+        node.child_stats = statsByParent.get(node.id) ?? null;
+      }
+
+      const next: SessionWithChildren[] = [];
+      for (const child of children) {
+        if (!child.parent_id) continue;
+        if (visited.has(child.id)) {
+          // Cycle detected -- skip, don't recurse into it.
+          continue;
+        }
+        visited.add(child.id);
+        const parent = byId.get(child.parent_id);
+        if (!parent) continue;
+        const node: SessionWithChildren = { ...child, child_stats: null, children: [] };
+        parent.children.push(node);
+        byId.set(child.id, node);
+        next.push(node);
+      }
+
+      // If `next` still has entries and we're about to overflow the depth cap,
+      // that means there are grand-descendants we couldn't reach -- surface.
+      if (next.length > 0 && depth + 1 >= maxDepth) {
+        // Check whether any of `next` has children beyond the cap.
+        const overflow = await this.fetchChildrenForParents(next.map((n) => n.id));
+        if (overflow.length > 0) {
+          throw new Error(`Session tree depth exceeds ${maxDepth}`);
+        }
+      }
+
+      frontier = next;
+    }
+
+    return rootNode;
+  }
+
+  /** Fetch all children (single query) for the given parent ids. */
+  private async fetchChildrenForParents(parentIds: string[]): Promise<Session[]> {
+    if (parentIds.length === 0) return [];
+    const d = this.d();
+    const s = d.schema.sessions;
+    const rows = await (d.db as any)
+      .select()
+      .from(s)
+      .where(
+        and(
+          eq(s.tenantId, this.tenantId),
+          ne(s.status, "deleting"),
+          ne(s.status, "archived"),
+          inArray(s.parentId, parentIds),
+        ),
+      )
+      .orderBy(desc(s.createdAt));
+    return (rows as DrizzleSelectSession[]).map(rowToSession);
+  }
+
+  /**
+   * Compute `child_stats` rollups for the given parent ids in two queries:
+   * one grouped count/status scan over `sessions`, and one grouped sum over
+   * `usage_records`. Bounded by len(parentIds), never N+1.
+   */
+  private async computeChildStats(parentIds: string[]): Promise<Map<string, SessionChildStats>> {
+    const out = new Map<string, SessionChildStats>();
+    if (parentIds.length === 0) return out;
+
+    const d = this.d();
+    const s = d.schema.sessions;
+    const u = d.schema.usageRecords;
+
+    // 1. Count children per parent, broken out by running/completed/failed.
+    const countRows = (await (d.db as any)
+      .select({
+        parentId: s.parentId,
+        status: s.status,
+        n: sql<number>`COUNT(*)`,
+      })
+      .from(s)
+      .where(
+        and(
+          eq(s.tenantId, this.tenantId),
+          ne(s.status, "deleting"),
+          ne(s.status, "archived"),
+          inArray(s.parentId, parentIds),
+        ),
+      )
+      .groupBy(s.parentId, s.status)) as Array<{
+      parentId: string | null;
+      status: string;
+      n: number | string;
+    }>;
+
+    for (const row of countRows) {
+      if (!row.parentId) continue;
+      const stats = out.get(row.parentId) ?? {
+        total: 0,
+        running: 0,
+        completed: 0,
+        failed: 0,
+        cost_usd_sum: 0,
+      };
+      const n = Number(row.n);
+      stats.total += n;
+      if (row.status === "running") stats.running += n;
+      else if (row.status === "completed") stats.completed += n;
+      else if (row.status === "failed") stats.failed += n;
+      out.set(row.parentId, stats);
+    }
+
+    // 2. Sum cost per parent by joining usage_records to sessions on session_id.
+    // Drizzle: `select ... from sessions inner join usage_records on ...`.
+    const costRows = (await (d.db as any)
+      .select({
+        parentId: s.parentId,
+        costSum: sql<number>`COALESCE(SUM(${u.costUsd}), 0)`,
+      })
+      .from(s)
+      .innerJoin(u, eq(u.sessionId, s.id))
+      .where(and(eq(s.tenantId, this.tenantId), inArray(s.parentId, parentIds)))
+      .groupBy(s.parentId)) as Array<{ parentId: string | null; costSum: number | string }>;
+
+    for (const row of costRows) {
+      if (!row.parentId) continue;
+      const existing = out.get(row.parentId);
+      if (!existing) continue;
+      existing.cost_usd_sum = Number(row.costSum) || 0;
+    }
+
+    return out;
   }
 
   async update(id: string, fields: Partial<Session>): Promise<Session | null> {

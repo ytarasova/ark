@@ -304,6 +304,30 @@ export class Conductor {
     const payload = (await req.json()) as Record<string, unknown>;
     const event = String(payload.hook_event_name ?? "");
 
+    // Channel-report passthrough: the agent-sdk `ask_user` MCP (and any future
+    // non-hook emitters) POST `{type: "question"|"progress"|"error"}` payloads
+    // here without a `hook_event_name`. Route them through the same report
+    // pipeline the claude runtime's conductor-channel uses so the UI sees one
+    // event shape regardless of source.
+    if (!payload.hook_event_name && typeof payload.type === "string") {
+      const reportType = payload.type as string;
+      if (reportType === "question" || reportType === "progress" || reportType === "error") {
+        const msgText = (payload.message ?? payload.question ?? payload.error ?? "") as string;
+        const report = {
+          type: reportType,
+          sessionId,
+          stage: (payload.stage as string) ?? "",
+          ...(reportType === "question" ? { question: msgText } : {}),
+          ...(reportType === "error" ? { error: msgText } : {}),
+          ...(reportType === "progress" ? { message: msgText } : {}),
+          ...(payload.context != null ? { context: payload.context } : {}),
+          ...(payload.source ? { source: payload.source } : {}),
+        } as unknown as OutboundMessage;
+        await handleReport(app, sessionId, report);
+        return Response.json({ status: "ok", mapped: reportType });
+      }
+    }
+
     // Guard: ignore stale hook events from a previous stage's agent session.
     const hookAgentId = payload.session_id as string | undefined;
     if (hookAgentId && s.claude_session_id && hookAgentId !== s.claude_session_id) {
@@ -437,10 +461,41 @@ export class Conductor {
     if (resolved.ok === false) return resolved.response;
     const app = resolved.app;
 
-    if (path === "/api/sessions") return Response.json(await app.sessions.list());
+    if (path === "/api/sessions") {
+      const url = new URL(req.url);
+      // `?roots=true` activates the tree-aware list path (rootsOnly + child_stats).
+      // Preserves the flat default for existing callers that don't pass the flag.
+      if (url.searchParams.get("roots") === "true") {
+        return Response.json(await app.sessions.listRoots());
+      }
+      return Response.json(await app.sessions.list());
+    }
     if (path.startsWith("/api/sessions/")) {
       const id = extractPathSegment(path, 3);
       if (!id) return Response.json({ error: "missing session id" }, { status: 400 });
+      const sub = extractPathSegment(path, 4);
+      // ── /api/sessions/:id/tree/stream -- SSE debounced tree deltas ──
+      if (sub === "tree" && extractPathSegment(path, 5) === "stream") {
+        return this.handleTreeStream(app, id);
+      }
+      // ── /api/sessions/:id/tree -- recursive tree snapshot ───────────
+      if (sub === "tree") {
+        const existing = await app.sessions.get(id);
+        if (!existing) return Response.json({ error: "not found" }, { status: 404 });
+        try {
+          const root = await app.sessions.loadTree(id);
+          return Response.json({ root });
+        } catch (e: any) {
+          return Response.json({ error: String(e?.message ?? e) }, { status: 400 });
+        }
+      }
+      // ── /api/sessions/:id/children -- direct children with stats ────
+      if (sub === "children") {
+        const existing = await app.sessions.get(id);
+        if (!existing) return Response.json({ error: "not found" }, { status: 404 });
+        return Response.json({ sessions: await app.sessions.listChildren(id) });
+      }
+      if (sub) return Response.json({ error: "not found" }, { status: 404 });
       const s = await app.sessions.get(id);
       return s ? Response.json(s) : Response.json({ error: "not found" }, { status: 404 });
     }
@@ -451,6 +506,92 @@ export class Conductor {
       return Response.json(await app.events.list(id));
     }
     return new Response("Not found", { status: 404 });
+  }
+
+  /**
+   * SSE stream that emits an initial `tree-update` snapshot on connect, then
+   * debounced `tree-update` deltas whenever any descendant's status changes
+   * (via the `hook_status` event) or a new descendant session is created.
+   *
+   * Scoped to the tenant-resolved `app` so cross-tenant fan-out cannot leak
+   * across streams. Unsubscribes from the bus when the client disconnects.
+   */
+  private handleTreeStream(app: AppContext, rootId: string): Response {
+    const DEBOUNCE_MS = 200;
+    const encoder = new TextEncoder();
+    let unsub: (() => void) | null = null;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let closed = false;
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const send = (event: string, data: unknown) => {
+          if (closed) return;
+          try {
+            controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+          } catch {
+            // Controller closed mid-send.
+          }
+        };
+
+        // Collect descendant ids so we can filter bus events to this tree.
+        let descendantIds = new Set<string>();
+        const rebuild = async (): Promise<unknown | null> => {
+          try {
+            const root = await app.sessions.loadTree(rootId);
+            const next = new Set<string>();
+            const walk = (n: { id: string; children: any[] }) => {
+              next.add(n.id);
+              for (const c of n.children) walk(c);
+            };
+            walk(root as any);
+            descendantIds = next;
+            return root;
+          } catch (err: any) {
+            send("error", { message: String(err?.message ?? err) });
+            return null;
+          }
+        };
+
+        const pushSnapshot = async () => {
+          const root = await rebuild();
+          if (root) send("tree-update", { root });
+        };
+
+        // Initial snapshot.
+        await pushSnapshot();
+
+        const scheduleSnapshot = () => {
+          if (debounceTimer) return;
+          debounceTimer = setTimeout(async () => {
+            debounceTimer = null;
+            await pushSnapshot();
+          }, DEBOUNCE_MS);
+        };
+
+        unsub = eventBus.onAll((evt) => {
+          // Listen for status + cost-relevant events. `session_created` is
+          // always eligible (a new child may need to join the tree); other
+          // events are gated on tree membership.
+          if (evt.type !== "hook_status" && evt.type !== "session_updated" && evt.type !== "session_created") return;
+          if (evt.type !== "session_created" && !descendantIds.has(evt.sessionId)) return;
+          scheduleSnapshot();
+        });
+      },
+      cancel() {
+        closed = true;
+        if (debounceTimer) clearTimeout(debounceTimer);
+        unsub?.();
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      },
+    });
   }
 
   private async handlePRMergeWebhook(req: Request): Promise<Response> {
