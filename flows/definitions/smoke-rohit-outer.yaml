@@ -1,0 +1,27 @@
+name: smoke-rohit-outer
+description: "Phase 2 smoke: outer flow that fans out one child per repo (mode: spawn) with deterministic branch + inline inner flow."
+
+inputs:
+  ticket_id:
+    type: string
+    required: true
+  repos:
+    type: array
+    required: true
+
+stages:
+  - name: per_repo
+    for_each: "{{inputs.params.repos}}"
+    mode: spawn
+    iteration_var: repo
+    on_iteration_failure: stop
+    gate: auto
+    spawn:
+      # Per-iteration session-row overrides (P2.2)
+      repo: "{{repo.repo_path}}"
+      branch: "{{repo.branch}}"
+      # Named inner flow -- also works as inline object (P2.4)
+      flow: smoke-rohit-inner
+      inputs:
+        ticket_id: "{{inputs.params.ticket_id}}"
+        files: "{{repo.files}}"

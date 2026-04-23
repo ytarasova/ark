@@ -1,0 +1,41 @@
+name: smoke-rohit-inner
+description: "Phase 2 smoke: inner flow per repo -- for_each + mode:inline loops files sequentially in the same session."
+
+inputs:
+  ticket_id:
+    type: string
+    required: true
+  files:
+    type: array
+    required: true
+
+stages:
+  - name: per_file
+    for_each: "{{inputs.files}}"
+    mode: inline
+    iteration_var: file
+    on_iteration_failure: stop
+    gate: auto
+    stages:
+      - name: do_work
+        gate: auto
+        agent:
+          runtime: agent-sdk
+          model: pi-agentic/global.anthropic.claude-sonnet-4-6
+          system_prompt: |
+            You are an autonomous agent in a local git worktree.
+            Do exactly what the task says and stop. Do not commit or push.
+            Do not explore; just perform the one file operation requested.
+          tools:
+            - Read
+            - Write
+            - Edit
+            - Bash
+          max_turns: 10
+        task: |
+          Ticket: {{inputs.ticket_id}}
+
+          Append the single line below to the file `{{file.path}}` (create the file if it doesn't exist). Preserve existing content.
+
+          Line to append:
+          {{file.content}}
