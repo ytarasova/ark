@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api } from "../hooks/useApi.js";
+import { useApi } from "../hooks/useApi.js";
 import { useComputeQuery } from "../hooks/useComputeQueries.js";
 import { useSmartPoll } from "../hooks/useSmartPoll.js";
 import { cn } from "../lib/utils.js";
@@ -30,6 +30,7 @@ export function ComputeView({
   onSelectedChange,
   onToast,
 }: ComputeViewProps) {
+  const api = useApi();
   const queryClient = useQueryClient();
   const { data: computes = [] } = useComputeQuery();
   const [selectedInternal, setSelectedInternal] = useState<any>(null);
@@ -69,7 +70,7 @@ export function ComputeView({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [api]);
 
   const loadSnapshot = useCallback(() => {
     if (!selected) {
@@ -98,7 +99,7 @@ export function ComputeView({
         setSnapshot(null);
         setMetricsState("error");
       });
-  }, [selected]);
+  }, [api, selected]);
 
   useEffect(() => {
     loadSnapshot();
@@ -119,7 +120,7 @@ export function ComputeView({
             err instanceof Error ? err.message : err,
           );
         });
-    }, []),
+    }, [api]),
     15000,
   );
 

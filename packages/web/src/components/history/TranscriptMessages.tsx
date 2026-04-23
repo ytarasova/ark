@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { api } from "../../hooks/useApi.js";
+import { useApi } from "../../hooks/useApi.js";
 import { cn } from "../../lib/utils.js";
 import { relTime } from "../../util.js";
 
 /** Loads and displays the last N conversation turns for a Claude session. */
 export function TranscriptMessages({ sessionId }: { sessionId: string }) {
+  const api = useApi();
   const [turns, setTurns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [indexing, setIndexing] = useState(false);
@@ -19,7 +20,7 @@ export function TranscriptMessages({ sessionId }: { sessionId: string }) {
     } finally {
       setLoading(false);
     }
-  }, [sessionId]);
+  }, [api, sessionId]);
 
   useEffect(() => {
     if (sessionId) loadMessages();

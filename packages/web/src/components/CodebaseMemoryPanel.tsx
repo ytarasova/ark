@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../hooks/useApi.js";
+import { useApi } from "../hooks/useApi.js";
 import { CheckCircle2, AlertCircle, ExternalLink } from "lucide-react";
 
 interface CodebaseMemoryStatus {
@@ -18,6 +18,7 @@ interface CodebaseMemoryStatus {
  * tools directly. See docs/2026-04-18-CODE_INTELLIGENCE_DESIGN.md.
  */
 export function CodebaseMemoryPanel() {
+  const api = useApi();
   const [status, setStatus] = useState<CodebaseMemoryStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -37,7 +38,7 @@ export function CodebaseMemoryPanel() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [api]);
 
   if (loading) {
     return (

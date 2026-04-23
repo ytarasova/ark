@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api } from "../hooks/useApi.js";
+import { useApi } from "../hooks/useApi.js";
 import { useSessionDetail } from "../hooks/useSessionDetail.js";
 import { useSessionActions } from "../hooks/useSessionActions.js";
 import { fmtCost } from "../util.js";
@@ -35,6 +35,7 @@ interface SessionDetailProps {
 }
 
 export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabChange }: SessionDetailProps) {
+  const api = useApi();
   const d = useSessionDetail({ sessionId, initialTab, onTabChange });
   const { actionLoading, handleAction, handleGateApprove, handleGateReject, handleRestart } = useSessionActions({
     sessionId,

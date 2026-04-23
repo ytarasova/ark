@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useState, useCallback } from "react";
-import { api } from "../../hooks/useApi.js";
+import { useApi } from "../../hooks/useApi.js";
 import { Button } from "../ui/button.js";
 
 interface CopyAttachCommandButtonProps {
@@ -22,6 +22,7 @@ type LoadState =
   | { kind: "error"; message: string };
 
 export function CopyAttachCommandButton({ sessionId }: CopyAttachCommandButtonProps) {
+  const api = useApi();
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [copied, setCopied] = useState(false);
 
@@ -51,7 +52,7 @@ export function CopyAttachCommandButton({ sessionId }: CopyAttachCommandButtonPr
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+  }, [api, sessionId]);
 
   const copy = useCallback(async () => {
     if (state.kind !== "ready") return;

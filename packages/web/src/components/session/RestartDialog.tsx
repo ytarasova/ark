@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "../../hooks/useApi.js";
+import { useApi } from "../../hooks/useApi.js";
 import { cn } from "../../lib/utils.js";
 import { Modal } from "../ui/modal.js";
 import { Button } from "../ui/button.js";
@@ -19,6 +19,7 @@ interface RestartDialogProps {
  * re-dispatches from there.
  */
 export function RestartDialog({ sessionId, open, onClose, onRestart }: RestartDialogProps) {
+  const api = useApi();
   const flowQuery = useQuery({
     queryKey: ["session", sessionId, "flowStages"],
     queryFn: () => api.getFlowStages(sessionId),

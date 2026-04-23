@@ -20,7 +20,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { api } from "../../hooks/useApi.js";
+import { useApi } from "../../hooks/useApi.js";
 import { useAppMode } from "../../providers/AppModeProvider.js";
 import { Button } from "../ui/button.js";
 import { cn } from "../../lib/utils.js";
@@ -76,6 +76,7 @@ export function InputsSection({
   onPreview,
   onClearPreview,
 }: Props) {
+  const api = useApi();
   const { binding } = useAppMode();
   const { FileInputRow, FileInputAddEditor } = binding;
   const [schema, setSchema] = useState<FlowInputsSchema | null>(null);
@@ -109,7 +110,7 @@ export function InputsSection({
     return () => {
       cancelled = true;
     };
-  }, [flowName]);
+  }, [api, flowName]);
 
   // Seed declared param defaults once schema arrives. Deliberately ignoring
   // `value` / `onChange` in the dep array -- we only want to re-seed when the

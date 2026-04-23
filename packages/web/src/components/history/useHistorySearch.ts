@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api } from "../../hooks/useApi.js";
+import { useApi } from "../../hooks/useApi.js";
 
 export type SearchMode = "sessions" | "transcripts";
 
@@ -24,6 +24,7 @@ export interface HistorySearchState {
  * - exposes keyboard + clear handlers
  */
 export function useHistorySearch(mode: SearchMode): HistorySearchState {
+  const api = useApi();
   const [query, setQuery] = useState("");
   const [sessionResults, setSessionResults] = useState<any[]>([]);
   const [transcriptResults, setTranscriptResults] = useState<any[]>([]);
@@ -43,7 +44,7 @@ export function useHistorySearch(mode: SearchMode): HistorySearchState {
       setSessionResults([]);
     }
     setSearched(true);
-  }, [query, mode]);
+  }, [api, query, mode]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api } from "../hooks/useApi.js";
+import { useApi } from "../hooks/useApi.js";
 import { useSkillsQuery, useRecipesQuery } from "../hooks/useToolQueries.js";
 import { cn } from "../lib/utils.js";
 import { Badge } from "./ui/badge.js";
@@ -15,6 +15,7 @@ interface ToolsViewProps {
 }
 
 export function ToolsView({ activeTab = "skills", onTabChange: _onTabChange }: ToolsViewProps) {
+  const api = useApi();
   const queryClient = useQueryClient();
   const tab = activeTab;
   const { data: skills = [] } = useSkillsQuery();

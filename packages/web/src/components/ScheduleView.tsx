@@ -1,6 +1,6 @@
 import { useState, useEffect, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { api } from "../hooks/useApi.js";
+import { useApi } from "../hooks/useApi.js";
 import { useSchedulesQuery } from "../hooks/useScheduleQueries.js";
 import { cn } from "../lib/utils.js";
 import { Button } from "./ui/button.js";
@@ -50,6 +50,7 @@ function describeCron(cron: string): string {
 }
 
 export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleViewProps) {
+  const api = useApi();
   const queryClient = useQueryClient();
   const { data: schedules = [] } = useSchedulesQuery();
   const [selected, setSelected] = useState<any>(null);
@@ -233,6 +234,7 @@ export function ScheduleView({ showCreate = false, onCloseCreate }: ScheduleView
 }
 
 function NewScheduleForm({ onClose, onSubmit }: { onClose: () => void; onSubmit: (form: any) => void }) {
+  const api = useApi();
   const [form, setForm] = useState({
     cron: "",
     flow: "",
@@ -284,7 +286,7 @@ function NewScheduleForm({ onClose, onSubmit }: { onClose: () => void; onSubmit:
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [api]);
 
   function update(key: string, val: string) {
     setForm((prev) => ({ ...prev, [key]: val }));

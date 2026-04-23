@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, type KeyboardEvent } from "react";
-import { api } from "../hooks/useApi.js";
+import { useApi } from "../hooks/useApi.js";
 import { Modal } from "./ui/modal.js";
 import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";
@@ -24,6 +24,7 @@ const LAST_REPO_KEY = "ark:lastPickedRepo";
  * backend refuses the RPC when running hosted.
  */
 export function FolderPickerModal({ initialPath, onSelect, onClose }: FolderPickerModalProps) {
+  const api = useApi();
   const [cwd, setCwd] = useState<string | null>(null);
   const [parent, setParent] = useState<string | null>(null);
   const [entries, setEntries] = useState<DirEntry[]>([]);
@@ -55,7 +56,7 @@ export function FolderPickerModal({ initialPath, onSelect, onClose }: FolderPick
         setError(err.message || "Failed to list directory");
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [api]);
 
   useEffect(() => {
     load(requestedPath);
