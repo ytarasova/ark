@@ -1,0 +1,13 @@
+id: gemini-2-5-flash
+display: "Gemini 2.5 Flash"
+provider: google
+aliases: [gemini-2.5-flash]
+capabilities:
+  - tool-use
+  - vision
+pricing:
+  input_per_mtok: 0.30
+  output_per_mtok: 2.50
+provider_slugs:
+  google-direct: gemini-2.5-flash
+context_window: 1000000

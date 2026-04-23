@@ -1,0 +1,14 @@
+id: o4-mini
+display: "OpenAI o4-mini"
+provider: openai
+aliases: []
+capabilities:
+  - tool-use
+  - reasoning
+pricing:
+  input_per_mtok: 1.10
+  cached_input_per_mtok: 0.275
+  output_per_mtok: 4.40
+provider_slugs:
+  openai-direct: o4-mini
+context_window: 200000

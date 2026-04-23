@@ -1,0 +1,16 @@
+id: claude-haiku-4-5
+display: "Claude Haiku 4.5"
+provider: anthropic
+aliases: [haiku]
+capabilities:
+  - tool-use
+  - vision
+pricing:
+  input_per_mtok: 1.00
+  cached_input_per_mtok: 0.10
+  output_per_mtok: 5.00
+provider_slugs:
+  anthropic-direct: claude-haiku-4-5
+  tf-bedrock: pi-agentic/global.anthropic.claude-haiku-4-5-20251001-v1-0
+  aws-bedrock: global.anthropic.claude-haiku-4-5-20251001-v1-0
+context_window: 200000

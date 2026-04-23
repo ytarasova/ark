@@ -1,0 +1,13 @@
+id: gemini-2-5-pro
+display: "Gemini 2.5 Pro"
+provider: google
+aliases: [gemini-2.5-pro, gemini-pro]
+capabilities:
+  - tool-use
+  - vision
+pricing:
+  input_per_mtok: 1.25
+  output_per_mtok: 10.00
+provider_slugs:
+  google-direct: gemini-2.5-pro
+context_window: 2000000
