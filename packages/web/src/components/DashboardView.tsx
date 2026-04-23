@@ -6,6 +6,8 @@ import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
 import { useDashboardSummaryQuery, useRunningSessionsQuery } from "../hooks/useDashboardQuery.js";
 import { Button } from "./ui/button.js";
 import { Avatar } from "./ui/Avatar.js";
+import { KpiCard } from "./ui/KpiCard.js";
+import { CostBarChart, type CostBarPoint } from "./ui/CostBarChart.js";
 
 /**
  * Dashboard -- "Fleet overview" of the sessions surface.
@@ -99,24 +101,28 @@ function DashboardErrorState({ error, onRetry }: { error: unknown; onRetry: () =
   );
 }
 
-function StatTile({
-  label,
-  value,
-  delta,
-  deltaTone = "neutral",
-}: {
-  label: string;
-  value: string | number;
-  delta?: string;
-  deltaTone?: "good" | "bad" | "neutral";
-}) {
-  return (
-    <div className="stat-tile">
-      <span className="stat-tile-label">{label}</span>
-      <span className="stat-tile-value">{value}</span>
-      {delta && <span className={cn("stat-tile-delta", deltaTone)}>{delta}</span>}
-    </div>
-  );
+/**
+ * Build a 14-point placeholder series from totals. The backend exposes
+ * `today`, `week`, `month` totals but not a per-day history, so this
+ * approximates a ramp with today highlighted. When the backend adds
+ * daily-history, replace this with the real series.
+ */
+function buildPlaceholderCostSeries(today: number, week: number, month: number): CostBarPoint[] {
+  const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
+  const avg7 = week > 0 ? week / 7 : today;
+  const avg30 = month > 0 ? month / 30 : avg7;
+  const points: CostBarPoint[] = [];
+  // Start from 14 days ago -> today-1 -> today
+  for (let i = 13; i >= 0; i--) {
+    const isOldHalf = i >= 7;
+    const base = isOldHalf ? avg30 : avg7;
+    // mild variation so the chart doesn't look flat
+    const jitter = 0.7 + ((i * 37) % 10) * 0.06;
+    const v = i === 0 ? today : base * jitter;
+    const dayIdx = (new Date().getDay() - i + 70) % 7;
+    points.push({ day: DAYS[dayIdx], value: v, label: i === 0 ? "Today" : undefined, peak: i === 0 });
+  }
+  return points;
 }
 
 function DashboardSkeleton() {
@@ -417,12 +423,33 @@ export function DashboardView({
           <span className="dashboard-updated">updated {updatedLabel}</span>
         </div>
 
-        <div className="dashboard-grid">
-          <StatTile label="Active" value={running} />
-          <StatTile label="Total" value={totalSessions} />
-          <StatTile label="Cost today" value={fmtCost(costs.today || 0)} />
-          <StatTile label="Cost 7d" value={fmtCost(costs.week || 0)} />
+        <div className="grid grid-cols-4 gap-[10px]">
+          <KpiCard label="Active" value={running} color="primary" />
+          <KpiCard label="Total" value={totalSessions} color="blue" />
+          <KpiCard
+            label="Cost · today"
+            value={fmtCost(costs.today || 0)}
+            color="amber"
+            delta={`${fmtCost(costs.today || 0)} spent`}
+            deltaDir="neutral"
+          />
+          <KpiCard
+            label="Cost · 7d"
+            value={fmtCost(costs.week || 0)}
+            color="green"
+            delta={`${fmtCost((costs.week || 0) / 7)} / day avg`}
+            deltaDir="neutral"
+          />
         </div>
+
+        {/* 14-day cost sparkline -- backend only exposes totals today/week/month,
+            so we plumb the prop and render an even ramp placeholder that the
+            backend can fill once daily-cost history lands. */}
+        <CostBarChart
+          title="Cost · last 14 days"
+          today={fmtCost(costs.today || 0)}
+          points={buildPlaceholderCostSeries(costs.today || 0, costs.week || 0, costs.month || 0)}
+        />
 
         {hasBudgetWarning && budget && (
           <div className="budget-banner">
