@@ -68,6 +68,8 @@ export { StageProgressBar, SessionLane } from "./StageProgressBar.js";
 export type { StageProgress, StageProgressBarProps, SessionLaneProps } from "./StageProgressBar.js";
 export { StagePipeline } from "./StagePipeline.js";
 export type { StagePipelineProps } from "./StagePipeline.js";
+export { FlowDag, stagesToFlowDagNodes } from "./FlowDag.js";
+export type { FlowDagProps, FlowDagNode } from "./FlowDag.js";
 export { StatusDot } from "./StatusDot.js";
 export type { SessionStatus, StatusDotProps } from "./StatusDot.js";
 export { FilterChip } from "./FilterChip.js";
