@@ -220,21 +220,19 @@ export class SessionService {
       .then(async (result) => {
         // dispatch returns `{ ok: false, message }` for non-throw failures
         // (e.g. "Stage 'pr' is create_pr, not agent" on an action stage).
-        // Without this log, kickDispatch silently swallows the failure and
-        // the session sits idle -- which is what broke the Restart button
-        // on completed sessions whose terminal stage is an action.
+        // Log the failure event AND flip the session to `failed` so the UI
+        // stops showing it as pending/ready. Without the status update the
+        // row renders "pending" forever despite the dispatch_failed event.
         if (result && result.ok === false) {
-          await this.events.log(sessionId, "dispatch_failed", {
-            actor: "system",
-            data: { reason: result.message ?? "dispatch returned ok: false" },
-          });
+          const reason = result.message ?? "dispatch returned ok: false";
+          await this.events.log(sessionId, "dispatch_failed", { actor: "system", data: { reason } });
+          await this.markDispatchFailed(sessionId, reason);
         }
       })
       .catch(async (err) => {
-        await this.events.log(sessionId, "dispatch_failed", {
-          actor: "system",
-          data: { reason: err instanceof Error ? err.message : String(err) },
-        });
+        const reason = err instanceof Error ? err.message : String(err);
+        await this.events.log(sessionId, "dispatch_failed", { actor: "system", data: { reason } });
+        await this.markDispatchFailed(sessionId, reason);
       })
       .then(async () => {
         onDispatched(await this.sessions.get(sessionId));
@@ -254,6 +252,28 @@ export class SessionService {
   async drainPendingDispatches(): Promise<void> {
     if (this._pendingDispatches.size === 0) return;
     await Promise.allSettled([...this._pendingDispatches]);
+  }
+
+  /**
+   * Flip a session to `failed` after a dispatch-time error. Kept lenient:
+   * if the session was already marked terminal by some other path we skip
+   * the write so we don't clobber a more specific status (e.g. cancelled).
+   */
+  private async markDispatchFailed(sessionId: string, reason: string): Promise<void> {
+    try {
+      const existing = await this.sessions.get(sessionId);
+      if (!existing) return;
+      if (existing.status === "failed" || existing.status === "completed" || existing.status === "cancelled") return;
+      await this.sessions.update(sessionId, {
+        status: "failed" as SessionStatus,
+        error: reason,
+      } as Partial<Session>);
+    } catch (err) {
+      logWarn("session", `markDispatchFailed: failed to persist status (sessionId=${sessionId})`, {
+        sessionId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   /**

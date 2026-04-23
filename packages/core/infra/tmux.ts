@@ -10,7 +10,7 @@
 
 import { execFile, execFileSync, spawn } from "child_process";
 import { promisify } from "util";
-import { writeFileSync, mkdirSync, chmodSync, unlinkSync, existsSync } from "fs";
+import { writeFileSync, mkdirSync, chmodSync, unlinkSync, existsSync, realpathSync } from "fs";
 import { join, dirname } from "path";
 import { tmpdir } from "os";
 import { logDebug } from "../observability/structured-log.js";
@@ -19,16 +19,29 @@ const execFileAsync = promisify(execFile);
 
 /**
  * Resolve the tmux binary. Prefers:
- *   1. Vendored tmux next to the ark binary (self-contained install)
- *   2. tmux on PATH (system install)
+ *   1. Vendored tmux next to the ark binary (self-contained install). We
+ *      check both the raw argv[0] AND the realpath-resolved one because
+ *      typical installs symlink `~/bin/ark -> ~/apps/ark/bin/ark` -- without
+ *      resolving symlinks, dirname(argv[0]) is `~/bin/` which doesn't have
+ *      the vendored tmux, and we'd silently fall back to a stale system tmux.
+ *   2. tmux on PATH (system install).
  * Cached per-process.
  */
 let _tmuxBin: string | null = null;
 export function tmuxBin(): string {
   if (_tmuxBin) return _tmuxBin;
-  const arkBin = process.argv[0];
-  if (arkBin) {
-    const vendored = join(dirname(arkBin), "tmux");
+  const candidates: string[] = [];
+  for (const raw of [process.execPath, process.argv[0]]) {
+    if (!raw) continue;
+    candidates.push(raw);
+    try {
+      candidates.push(realpathSync(raw));
+    } catch {
+      /* broken symlink -- skip */
+    }
+  }
+  for (const bin of candidates) {
+    const vendored = join(dirname(bin), "tmux");
     if (existsSync(vendored)) {
       _tmuxBin = vendored;
       return vendored;
