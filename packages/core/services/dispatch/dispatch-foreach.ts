@@ -1,15 +1,18 @@
 /**
- * for_each + mode:spawn dispatcher (P2.0a).
+ * for_each dispatcher -- mode:spawn (P2.0a) and mode:inline (P2.5).
  *
- * Iterates a list resolved from session inputs/state and spawns one child
- * session per item -- sequentially. Each child is awaited before the next
- * one starts. The legacy `type: fan_out` stage type was removed in P2.0b.
+ * mode:spawn -- Iterates a list resolved from session inputs/state and spawns
+ * one child session per item sequentially. Each child is awaited before the
+ * next one starts.
  *
- * Design constraints:
- *   - Sequential only (no parallel knob in P2.0a).
+ * mode:inline -- Iterates a list and runs a fixed list of sub-stages
+ * sequentially IN THE PARENT SESSION per iteration. No child sessions, no
+ * worktree clone. The parent's worktree is used for all sub-stages.
+ *
+ * Design constraints (both modes):
+ *   - Sequential only (no parallel knob).
  *   - Iteration variable substitution via Nunjucks / substituteVars.
  *   - on_iteration_failure: stop (default) | continue.
- *   - Reuses DispatchDeps.sessions / events / flows / dispatchChild.
  */
 
 import { randomUUID } from "crypto";
@@ -95,6 +98,37 @@ function resolveDotted(obj: Record<string, unknown>, path: string): unknown {
   return cursor;
 }
 
+/**
+ * Substitute Nunjucks templates in the string fields of a StageDefinition.
+ * Used by mode:inline to resolve per-iteration templates before dispatching
+ * each sub-stage (task, agent.system_prompt, agent.name, etc.).
+ *
+ * Only the fields that influence dispatch are substituted:
+ *   - task
+ *   - agent (if InlineAgentSpec): system_prompt, name, description
+ * Other fields (gate, name, on_failure) are passed through unchanged.
+ */
+function substituteStageTemplates(stage: StageDefinition, vars: Record<string, string>): StageDefinition {
+  const resolved: StageDefinition = { ...stage };
+
+  if (typeof stage.task === "string") {
+    resolved.task = substituteVars(stage.task, vars);
+  }
+
+  // If agent is an inline spec object, substitute its string fields.
+  if (stage.agent && typeof stage.agent === "object") {
+    const spec = stage.agent;
+    resolved.agent = {
+      ...spec,
+      ...(spec.name ? { name: substituteVars(spec.name, vars) } : {}),
+      ...(spec.description ? { description: substituteVars(spec.description, vars) } : {}),
+      system_prompt: substituteVars(spec.system_prompt, vars),
+    };
+  }
+
+  return resolved;
+}
+
 // ── ForEachDispatcher ────────────────────────────────────────────────────────
 
 /** Milliseconds between polls when waiting for a child session to finish. */
@@ -102,8 +136,43 @@ const CHILD_POLL_INTERVAL_MS = 250;
 /** Maximum time to wait for a single child session to reach terminal state. */
 const CHILD_POLL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
+/**
+ * Callback for dispatching a single inline sub-stage against the parent
+ * session's worktree. Implemented by CoreDispatcher and injected here so
+ * ForEachDispatcher doesn't need to import the full agent-dispatch pipeline.
+ *
+ * The callback receives the parent sessionId, the resolved sub-stage definition
+ * (already template-substituted), and the iteration vars used for the sub-stage.
+ * It should launch the agent, wait for terminal, and return ok/failed.
+ */
+export interface DispatchInlineSubStageCb {
+  (sessionId: string, resolvedSubStage: StageDefinition, iterVars: Record<string, string>): Promise<DispatchResult>;
+}
+
 export class ForEachDispatcher {
-  constructor(private readonly deps: Pick<DispatchDeps, "sessions" | "events" | "flows" | "dispatchChild">) {}
+  constructor(
+    private readonly deps: Pick<DispatchDeps, "sessions" | "events" | "flows" | "dispatchChild"> & {
+      /** Required only for mode:inline sub-stage dispatch. */
+      dispatchInlineSubStage?: DispatchInlineSubStageCb;
+    },
+  ) {}
+
+  /**
+   * Dispatcher switch: routes to spawn or inline based on stageDef.mode.
+   * Default (omitted) is spawn for backward compat with P2.0a.
+   */
+  async dispatchForEach(
+    sessionId: string,
+    stageDef: StageDefinition,
+    /** Pre-built flat session var map (ticket, summary, inputs.*, etc.) */
+    sessionVars: Record<string, string>,
+  ): Promise<DispatchResult> {
+    const mode = stageDef.mode ?? "spawn";
+    if (mode === "inline") {
+      return this.dispatchForEachInline(sessionId, stageDef, sessionVars);
+    }
+    return this.dispatchForEachSpawn(sessionId, stageDef, sessionVars);
+  }
 
   /**
    * Execute a `for_each + mode:spawn` stage.
@@ -119,7 +188,7 @@ export class ForEachDispatcher {
    *      f. Handle failure per `on_iteration_failure`.
    *   3. Return ok when the loop finishes (or stops on failure).
    */
-  async dispatchForEach(
+  async dispatchForEachSpawn(
     sessionId: string,
     stageDef: StageDefinition,
     /** Pre-built flat session var map (ticket, summary, inputs.*, etc.) */
@@ -283,6 +352,138 @@ export class ForEachDispatcher {
     return {
       ok: true,
       message: `for_each: ${items.length} iterations complete (${succeeded} succeeded, ${failedCount} failed)`,
+    };
+  }
+
+  /**
+   * Execute a `for_each + mode:inline` stage.
+   *
+   * For each item in the resolved list, runs every sub-stage in `stageDef.stages`
+   * sequentially IN THE PARENT SESSION. No child sessions are created; the parent's
+   * worktree is reused for all sub-stages.
+   *
+   * Steps per iteration:
+   *   1. Build iteration vars (base session vars + flattened iteration item).
+   *   2. For each sub-stage: substitute templates in task and agent fields.
+   *   3. Dispatch the resolved sub-stage via the injected `dispatchInlineSubStage` callback.
+   *   4. Apply on_iteration_failure policy on failure.
+   */
+  async dispatchForEachInline(
+    sessionId: string,
+    stageDef: StageDefinition,
+    sessionVars: Record<string, string>,
+  ): Promise<DispatchResult> {
+    const dispatchSubStage = this.deps.dispatchInlineSubStage;
+    if (!dispatchSubStage) {
+      return { ok: false, message: "mode:inline requires dispatchInlineSubStage callback -- not wired" };
+    }
+
+    const session = await this.deps.sessions.get(sessionId);
+    if (!session) return { ok: false, message: `Session ${sessionId} not found` };
+
+    const forEachExpr = stageDef.for_each!;
+    const iterVar = stageDef.iteration_var ?? "item";
+    const onIterFailure = stageDef.on_iteration_failure ?? "stop";
+    const subStages = stageDef.stages ?? [];
+
+    if (subStages.length === 0) {
+      return { ok: false, message: `Stage '${stageDef.name}' has mode:inline but no stages defined` };
+    }
+
+    let items: unknown[];
+    try {
+      items = resolveForEachList(forEachExpr, sessionVars, session);
+    } catch (err: any) {
+      return { ok: false, message: `for_each: failed to resolve list: ${err.message}` };
+    }
+
+    if (items.length === 0) {
+      await this.deps.events.log(sessionId, "for_each_complete", {
+        stage: session.stage,
+        actor: "system",
+        data: { total: 0, succeeded: 0, failed: 0, note: "empty list -- no iterations" },
+      });
+      return { ok: true, message: "for_each: empty list -- stage complete" };
+    }
+
+    await this.deps.events.log(sessionId, "for_each_start", {
+      stage: session.stage,
+      actor: "system",
+      data: { total: items.length, mode: "inline", iterVar, subStageCount: subStages.length },
+    });
+
+    let succeeded = 0;
+    let failedCount = 0;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const iterVars = buildIterationVars(sessionVars, iterVar, item);
+
+      await this.deps.events.log(sessionId, "for_each_iteration_start", {
+        stage: session.stage,
+        actor: "system",
+        data: { index: i, item: JSON.stringify(item), mode: "inline" },
+      });
+
+      let iterationFailed = false;
+
+      for (const subStage of subStages) {
+        // Substitute iteration vars into all string fields of the sub-stage.
+        const resolvedSubStage = substituteStageTemplates(subStage, iterVars);
+
+        const subResult = await dispatchSubStage(sessionId, resolvedSubStage, iterVars);
+
+        if (!subResult.ok) {
+          iterationFailed = true;
+          await this.deps.events.log(sessionId, "for_each_iteration_failed", {
+            stage: session.stage,
+            actor: "system",
+            data: { index: i, subStage: subStage.name, reason: subResult.message },
+          });
+          logWarn("session", `for_each inline iteration ${i} sub-stage '${subStage.name}' failed`, {
+            sessionId,
+            iteration: i,
+            subStage: subStage.name,
+          });
+          break; // Stop sub-stages for this iteration on first failure
+        }
+
+        await this.deps.events.log(sessionId, "for_each_substage_complete", {
+          stage: session.stage,
+          actor: "system",
+          data: { index: i, subStage: subStage.name },
+        });
+      }
+
+      if (iterationFailed) {
+        failedCount++;
+        if (onIterFailure === "stop") {
+          return {
+            ok: false,
+            message: `for_each inline: iteration ${i} failed -- stopping`,
+          };
+        }
+        continue;
+      }
+
+      succeeded++;
+      await this.deps.events.log(sessionId, "for_each_iteration_complete", {
+        stage: session.stage,
+        actor: "system",
+        data: { index: i, mode: "inline" },
+      });
+      logDebug("session", `for_each inline iteration ${i}: complete`, { sessionId });
+    }
+
+    await this.deps.events.log(sessionId, "for_each_complete", {
+      stage: session.stage,
+      actor: "system",
+      data: { total: items.length, succeeded, failed: failedCount, mode: "inline" },
+    });
+
+    return {
+      ok: true,
+      message: `for_each inline: ${items.length} iterations complete (${succeeded} succeeded, ${failedCount} failed)`,
     };
   }
 

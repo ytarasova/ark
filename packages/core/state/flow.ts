@@ -117,10 +117,22 @@ export interface StageDefinition {
    *         repo_path: "{{repo.repo_path}}"
    */
   for_each?: string;
-  mode?: "spawn";
+  /**
+   * for_each execution mode:
+   * - "spawn" (default): spawns one child session per iteration.
+   * - "inline": runs sub-stages sequentially in the parent session per iteration.
+   *   Requires `stages:` (list of sub-stages). No child sessions, no worktree clone.
+   */
+  mode?: "spawn" | "inline";
   iteration_var?: string;
   on_iteration_failure?: "stop" | "continue";
   spawn?: ForEachSpawnSpec;
+  /**
+   * Inline sub-stages list. Only meaningful when mode=inline.
+   * Each sub-stage is dispatched as a regular agent stage in the parent session,
+   * with iteration variables substituted into task and agent fields before dispatch.
+   */
+  stages?: StageDefinition[];
   /**
    * Outcome-based routing. Maps outcome labels reported by the agent
    * to target stage names. When an agent completes with an `outcome`
@@ -384,6 +396,21 @@ export function validateDAG(stages: StageDefinition[]): void {
         if (!names.has(target)) {
           throw new Error(`Stage '${stage.name}' on_outcome '${outcome}' references unknown stage '${target}'`);
         }
+      }
+    }
+    // Validate for_each stages: exactly one of {spawn, stages} present, consistent with mode
+    if (stage.for_each !== undefined) {
+      const hasSpawn = stage.spawn !== undefined;
+      const hasStages = stage.stages !== undefined && stage.stages.length > 0;
+      const mode = stage.mode ?? "spawn";
+      if (mode === "spawn" && !hasSpawn) {
+        throw new Error(`Stage '${stage.name}' has mode:spawn but no spawn: spec`);
+      }
+      if (mode === "inline" && !hasStages) {
+        throw new Error(`Stage '${stage.name}' has mode:inline but no stages: list`);
+      }
+      if (hasSpawn && hasStages) {
+        throw new Error(`Stage '${stage.name}' has both spawn: and stages: -- use one or the other`);
       }
     }
   }

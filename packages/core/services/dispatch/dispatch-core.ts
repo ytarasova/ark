@@ -39,6 +39,7 @@ import { StageSecretResolver } from "./secrets-resolve.js";
 import { HostedDispatcher } from "./dispatch-hosted.js";
 import { FanOutDispatcher } from "./dispatch-fanout.js";
 import { ForEachDispatcher } from "./dispatch-foreach.js";
+import type { DispatchInlineSubStageCb } from "./dispatch-foreach.js";
 import { buildSessionVars } from "../../template.js";
 
 const execFileAsync = promisify(execFile);
@@ -55,7 +56,10 @@ export class CoreDispatcher {
     this.secrets = new StageSecretResolver(deps);
     this.hosted = new HostedDispatcher(deps);
     this.fanout = new FanOutDispatcher(deps);
-    this.foreach = new ForEachDispatcher(deps);
+    this.foreach = new ForEachDispatcher({
+      ...deps,
+      dispatchInlineSubStage: this.dispatchInlineSubStage.bind(this) as DispatchInlineSubStageCb,
+    });
   }
 
   /** Expose compute resolution so callers needing just that path can avoid launching. */
@@ -415,6 +419,146 @@ export class CoreDispatcher {
     track("session_dispatched", { agent: agentName });
 
     return { ok: true, message: tmuxName };
+  }
+
+  /**
+   * Dispatch a single inline sub-stage against the parent session's worktree.
+   *
+   * Used by mode:inline for_each iterations. Unlike the main dispatch() path:
+   *   - Task is already template-substituted (passed as subStage.task directly).
+   *   - No session.stage change (parent stays at the for_each stage name).
+   *   - No buildTask/knowledge-inject/repo-map overhead.
+   *   - Launches the agent and polls until terminal, then restores parent to "ready".
+   *
+   * Returns ok:true when the agent exits successfully, ok:false on failure.
+   */
+  private async dispatchInlineSubStage(
+    sessionId: string,
+    subStage: import("../../state/flow.js").StageDefinition,
+    _iterVars: Record<string, string>,
+  ): Promise<DispatchResult> {
+    const log = () => {};
+    const session = await this.deps.sessions.get(sessionId);
+    if (!session) return { ok: false, message: `Session ${sessionId} not found` };
+
+    const agentRef = subStage.agent;
+    if (!agentRef) {
+      return { ok: false, message: `Inline sub-stage '${subStage.name}' has no agent` };
+    }
+
+    const runtimeOverride = session.config?.runtime_override as string | undefined;
+    const { findProjectRoot, buildInlineAgent } = await import("../../agent/agent.js");
+    const projectRoot = findProjectRoot(session.workdir || session.repo) ?? undefined;
+
+    let agent: AgentDefinition | null = null;
+    let agentName: string;
+
+    if (typeof agentRef === "object" && agentRef !== null) {
+      agent = buildInlineAgent(this.deps.getApp(), agentRef, sessionAsVars(session), { runtimeOverride });
+      agentName = agent?.name ?? "inline";
+      if (!agent) return { ok: false, message: `Inline agent build failed for sub-stage '${subStage.name}'` };
+    } else {
+      agentName = agentRef;
+      agent = this.deps.resolveAgent(agentName, sessionAsVars(session), { runtimeOverride, projectRoot });
+      if (!agent) return { ok: false, message: `Agent '${agentName}' not found for sub-stage '${subStage.name}'` };
+    }
+
+    const autonomy = subStage.autonomy ?? "full";
+    const modelOverride = subStage.model ?? (session.config?.model_override as string | undefined);
+    if (modelOverride) agent.model = modelOverride;
+
+    // Task: use the already-substituted subStage.task, or fall back to session summary.
+    const task = subStage.task ?? session.summary ?? "";
+
+    const runtime = agent._resolved_runtime_type ?? agent.runtime ?? "claude-code";
+    const executor = this.deps.resolveExecutor(runtime);
+    if (!executor) return { ok: false, message: `Executor '${runtime}' not registered` };
+
+    const claudeArgs = runtime === "claude-code" ? this.deps.buildClaudeArgs(agent, { autonomy, projectRoot }) : [];
+
+    const secretEnv = await this.secrets.resolve(session, subStage, runtime, log);
+    if (secretEnv.error) return { ok: false, message: secretEnv.error };
+
+    const computeForAuth = session.compute_name ? await this.deps.computes.get(session.compute_name) : null;
+    const claudeAuth = await this.deps.materializeClaudeAuth(session, computeForAuth);
+    const launchEnv: Record<string, string> = { ...secretEnv.env, ...claudeAuth.env };
+
+    await this.deps.events.log(sessionId, "prompt_sent", {
+      stage: session.stage,
+      actor: "orchestrator",
+      data: {
+        agent: agentName,
+        sub_stage: subStage.name,
+        task_preview: task.slice(0, 500),
+        task_length: task.length,
+        task_full: task,
+      },
+    });
+
+    const launchResult = await executor.launch({
+      sessionId,
+      workdir: session.workdir ?? session.repo,
+      agent: agent as any,
+      task,
+      claudeArgs,
+      env: launchEnv,
+      stage: subStage.name,
+      autonomy,
+      onLog: log,
+      prevClaudeSessionId: undefined, // Inline sub-stages always start fresh
+      sessionName: `${session.summary ?? session.id} / ${subStage.name}`,
+      initialPrompt: task.slice(0, 2000),
+      compute: session.compute_name
+        ? (((await this.deps.computes.get(session.compute_name)) as unknown as {
+            name: string;
+            provider: string;
+            [k: string]: unknown;
+          } | null) ?? undefined)
+        : undefined,
+      app: this.deps.getApp(),
+    });
+
+    if (!launchResult.ok) return { ok: false, message: launchResult.message ?? "Launch failed" };
+    const tmuxName = launchResult.handle;
+
+    // Mark parent session as running while this sub-stage executes.
+    await this.deps.sessions.update(sessionId, { status: "running", session_id: tmuxName, agent: agentName });
+
+    await this.deps.events.log(sessionId, "stage_started", {
+      stage: session.stage,
+      actor: "system",
+      data: { sub_stage: subStage.name, agent: agentName, session_id: tmuxName, model: agent.model },
+    });
+
+    // Poll until the tmux session exits (agent finished).
+    const INLINE_POLL_MS = 250;
+    const INLINE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+    const deadline = Date.now() + INLINE_TIMEOUT_MS;
+    let agentOk = false;
+    while (Date.now() < deadline) {
+      await Bun.sleep(INLINE_POLL_MS);
+      // Check if tmux session still alive
+      let alive = false;
+      try {
+        execFileSync("tmux", ["has-session", "-t", tmuxName], { stdio: "pipe" });
+        alive = true;
+      } catch {
+        alive = false;
+      }
+      if (!alive) {
+        agentOk = true;
+        break;
+      }
+    }
+
+    // Restore parent session to ready so the inline loop can continue.
+    await this.deps.sessions.update(sessionId, { status: "ready", session_id: null });
+
+    if (!agentOk) {
+      return { ok: false, message: `Inline sub-stage '${subStage.name}' timed out after 30 minutes` };
+    }
+
+    return { ok: true, message: `sub-stage '${subStage.name}' complete` };
   }
 
   async resume(sessionId: string, opts?: { onLog?: (msg: string) => void }): Promise<DispatchResult> {

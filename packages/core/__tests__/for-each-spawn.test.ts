@@ -355,6 +355,79 @@ describe("for_each + mode:spawn -- inline flow object in spawn.flow", () => {
   });
 });
 
+describe("for_each -- dispatcher switch routes mode:spawn (default) to spawn path", () => {
+  it("routes an omitted mode to spawn (backward compat)", async () => {
+    const items = [{ path: "/repo/x" }, { path: "/repo/y" }];
+    const dispatchedIds: string[] = [];
+
+    // Build dispatcher WITH dispatchInlineSubStage so we can assert it is NOT called
+    const inlineCalls: string[] = [];
+    const dispatcher = new ForEachDispatcher({
+      sessions: app.sessions,
+      events: app.events,
+      flows: app.flows,
+      dispatchChild: async (childId: string) => {
+        dispatchedIds.push(childId);
+        await app.sessions.update(childId, { status: "completed" });
+        return { ok: true, message: "mocked" };
+      },
+      dispatchInlineSubStage: async (_sid, subStage) => {
+        inlineCalls.push(subStage.name);
+        return { ok: true, message: "should not be called" };
+      },
+    });
+
+    const { id: parentId, vars } = await makeParentWithList(items);
+    // Stage with NO mode field -- should default to spawn
+    const stage: StageDefinition = {
+      name: "per_repo",
+      for_each: "{{inputs.repos}}",
+      iteration_var: "repo",
+      on_iteration_failure: "stop",
+      gate: "auto",
+      spawn: { flow: "bare", inputs: { path: "{{repo.path}}" } },
+    };
+
+    const result = await dispatcher.dispatchForEach(parentId, stage, vars);
+
+    expect(result.ok).toBe(true);
+    // Spawn path was used -- child sessions were created
+    expect(dispatchedIds).toHaveLength(2);
+    // Inline callback was NOT called
+    expect(inlineCalls).toHaveLength(0);
+  });
+
+  it("routes mode:spawn explicitly to spawn path", async () => {
+    const items = [{ path: "/repo/a" }];
+    const dispatchedIds: string[] = [];
+    const inlineCalls: string[] = [];
+
+    const dispatcher = new ForEachDispatcher({
+      sessions: app.sessions,
+      events: app.events,
+      flows: app.flows,
+      dispatchChild: async (childId: string) => {
+        dispatchedIds.push(childId);
+        await app.sessions.update(childId, { status: "completed" });
+        return { ok: true, message: "mocked" };
+      },
+      dispatchInlineSubStage: async (_sid, subStage) => {
+        inlineCalls.push(subStage.name);
+        return { ok: true, message: "should not be called" };
+      },
+    });
+
+    const { id: parentId, vars } = await makeParentWithList(items);
+    const stage = makeStage({ mode: "spawn" });
+
+    const result = await dispatcher.dispatchForEach(parentId, stage, vars);
+
+    expect(result.ok).toBe(true);
+    expect(dispatchedIds).toHaveLength(1);
+    expect(inlineCalls).toHaveLength(0);
+  });
+});
+
 describe("for_each + mode:spawn -- on_iteration_failure: continue", () => {
   it("continues after item 2 fails and spawns all remaining items", async () => {
     const items = [{ idx: 0 }, { idx: 1 }, { idx: 2 }, { idx: 3 }];
