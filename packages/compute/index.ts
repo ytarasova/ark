@@ -63,12 +63,9 @@ export function clearProviders(): void {
   // noop -- AppContext owns the registry
 }
 
-// Legacy provider classes (kept for backward compatibility during migration)
+// Legacy provider class (kept for backward compatibility during migration)
 import { LocalProvider } from "./providers/local/index.js";
 export { LocalProvider };
-
-import { DockerProvider } from "./providers/docker/index.js";
-export { DockerProvider };
 
 // ArkD-backed providers (new universal architecture)
 import {
