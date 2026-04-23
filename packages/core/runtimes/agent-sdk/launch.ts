@@ -16,8 +16,20 @@
  * events-table path provides real-time observability.
  */
 
-import { appendFileSync, mkdirSync, readFileSync } from "fs";
+import { appendFileSync, mkdirSync, readFileSync, statSync } from "fs";
 import { dirname, join } from "path";
+
+function resolveClaudeExecutable(): string | undefined {
+  const override = process.env.ARK_CLAUDE_EXECUTABLE_PATH;
+  if (override) return override;
+  try {
+    const candidate = join(dirname(process.execPath), "claude");
+    if (statSync(candidate).isFile()) return candidate;
+  } catch {
+    /* no vendored binary next to ark -- fall through */
+  }
+  return Bun.which("claude") ?? undefined;
+}
 import type { Options } from "@anthropic-ai/claude-agent-sdk";
 import { startInterventionTail } from "./intervention-tail.js";
 
@@ -642,9 +654,9 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
     // receives "--model pi-agentic/global.anthropic.claude-sonnet-4-6" as a CLI arg
     // and sends that slug verbatim in the request body.
     //
-    // If model is already a short name (no "/"), default to the TF Bedrock slug.
-    // Callers can override by setting the full slug in ARK_AGENT_SDK_MODEL or via
-    // the session's runtime config.
+    // Agents/runtime YAML are expected to carry the concrete Anthropic slug
+    // (e.g. `claude-sonnet-4-6`). We only prepend the TF-Bedrock namespace;
+    // we do NOT map short aliases to concrete versions here (callers own that).
     if (model && !model.includes("/")) {
       effectiveModel = `pi-agentic/global.anthropic.${model}`;
       console.error(`[agent-sdk launch] Bedrock-compat: expanding model ${model} -> ${effectiveModel}`);
@@ -673,11 +685,12 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
 
   // The Agent SDK shells out to the Claude Code CLI (`cli.js`) as a subprocess.
   // When ark runs as a bun-compile single-file bundle, `require.resolve("./cli.js")`
-  // fails because the SDK's own node_modules path isn't on disk -- the SDK code
-  // raises "Native CLI binary for <platform> not found". Resolve an explicit path
-  // via Bun.which() / PATH, matching what the preflight doctor check already
-  // requires. Env override lets deployments pin a specific version.
-  const claudeExePath = process.env.ARK_CLAUDE_EXECUTABLE_PATH ?? Bun.which("claude") ?? undefined;
+  // fails because the SDK's own node_modules path isn't on disk. Resolve an
+  // explicit path so the SDK can locate the CLI, trying (in order):
+  //   1. ARK_CLAUDE_EXECUTABLE_PATH env override
+  //   2. `claude` next to the ark binary (release tarballs vendor it here)
+  //   3. `claude` on PATH (dev workstations with npm-installed claude-code)
+  const claudeExePath = resolveClaudeExecutable();
 
   const sdkOptions: Options = {
     cwd: worktree,
