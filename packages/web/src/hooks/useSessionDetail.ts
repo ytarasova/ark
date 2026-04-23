@@ -123,16 +123,25 @@ export function useSessionDetail({
   const totalStages = stages.length;
   const progressPct = totalStages > 0 ? Math.round((completedStages / totalStages) * 100) : 0;
 
+  // Count conversation messages (user + agent) for the Conversation tab pill.
+  const conversationCount = timeline.filter(
+    (t: any) => t.kind === "user" || t.kind === "agent" || t.kind === "tool",
+  ).length;
+  const filesChanged = diffData?.filesChanged ?? 0;
+
   const tabs: TabDef[] = [
-    { id: "conversation", label: "Conversation" },
-    { id: "terminal", label: "Terminal" },
-    { id: "events", label: "Events", badge: events.length > 0 ? events.length : undefined },
+    { id: "conversation", label: "Conversation", badge: conversationCount > 0 ? conversationCount : undefined },
+    { id: "flow", label: "Flow", badge: totalStages > 0 ? `${completedStages}/${totalStages}` : undefined },
     {
       id: "diff",
       label: "Diff",
-      badge: diffData?.filesChanged ? "+" + (diffData.insertions || 0) + "/-" + (diffData.deletions || 0) : undefined,
+      badge: filesChanged > 0 ? "+" + (diffData?.insertions || 0) + " -" + (diffData?.deletions || 0) : undefined,
     },
-    { id: "todos", label: "Todos", badge: todos.length > 0 ? todos.length : undefined },
+    { id: "files", label: "Files", badge: filesChanged > 0 ? filesChanged : undefined },
+    { id: "terminal", label: "Logs" },
+    { id: "cost", label: "Cost", badge: cost?.cost != null ? "$" + (cost.cost || 0).toFixed(2) : undefined },
+    { id: "knowledge", label: "Knowledge" },
+    { id: "events", label: "Events", badge: events.length > 0 ? events.length : undefined },
     ...(hasErrors
       ? [{ id: "errors", label: "Errors", badge: (errorEvents.length || 1) as number | string | undefined }]
       : []),
