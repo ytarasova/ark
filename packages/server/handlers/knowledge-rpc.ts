@@ -27,12 +27,7 @@ import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
-import type { TenantContext } from "../../core/auth/context.js";
-
-function scoped(app: AppContext, ctx: TenantContext): AppContext {
-  const tenantId = ctx.tenantId ?? app.tenantId ?? app.config.authSection.defaultTenant ?? "default";
-  return app.forTenant(tenantId);
-}
+import { resolveTenantApp as scoped } from "./scope-helpers.js";
 
 export function registerKnowledgeRpcHandlers(router: Router, app: AppContext): void {
   router.handle("knowledge/remember", async (p, _notify, ctx) => {

@@ -23,15 +23,7 @@ import { extract } from "../validate.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { logInfo } from "../../core/observability/structured-log.js";
 import { assertValidSecretName, assertValidBlobName, assertValidBlobFilename } from "../../core/secrets/types.js";
-import type { TenantContext } from "../../core/auth/context.js";
-
-function resolveTenantId(app: AppContext, ctx: TenantContext): string {
-  // Caller's ctx wins -- the router already materialized it from the bearer
-  // token (hosted) or the default-tenant config (local). Fall through to
-  // the legacy `app.tenantId` view + config default to preserve behavior
-  // for any caller that still reaches the handler without a ctx.
-  return ctx.tenantId ?? app.tenantId ?? app.config.authSection.defaultTenant ?? "default";
-}
+import { resolveTenantId } from "./scope-helpers.js";
 
 function wrapNameError(err: unknown): RpcError {
   const msg = err instanceof Error ? err.message : String(err);

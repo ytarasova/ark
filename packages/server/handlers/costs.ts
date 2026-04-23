@@ -27,11 +27,7 @@
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { syncCosts, getAllSessionCosts } from "../../core/observability/costs.js";
-
-function resolveTenantApp(app: AppContext, ctx: { tenantId?: string | null }): AppContext {
-  const tenantId = ctx.tenantId ?? app.tenantId ?? app.config.authSection.defaultTenant;
-  return tenantId ? app.forTenant(tenantId) : app;
-}
+import { resolveTenantApp } from "./scope-helpers.js";
 
 export function registerCostsAdminHandlers(router: Router, app: AppContext): void {
   router.handle("costs/sync", async (_p, _notify, ctx) => {

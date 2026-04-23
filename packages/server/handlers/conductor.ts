@@ -27,11 +27,7 @@ import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { createBridge } from "../../core/integrations/bridge.js";
 import type { KnowledgeNode } from "../../core/knowledge/types.js";
-
-function resolveTenantApp(app: AppContext, ctx: { tenantId?: string | null }): AppContext {
-  const tenantId = ctx.tenantId ?? app.tenantId ?? app.config.authSection?.defaultTenant ?? null;
-  return tenantId ? app.forTenant(tenantId) : app;
-}
+import { resolveTenantApp } from "./scope-helpers.js";
 
 interface LearningView {
   id: string;

@@ -34,17 +34,8 @@ import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
-import type { TenantContext } from "../../core/auth/context.js";
 import { DEFAULT_TENANT_ID } from "../../core/code-intel/constants.js";
-
-async function resolveTenantId(app: AppContext, ctx: TenantContext): Promise<string> {
-  const slug = ctx.tenantId ?? app.tenantId ?? app.config.authSection.defaultTenant;
-  if (slug) {
-    const found = await app.codeIntel.getTenantBySlug(slug);
-    if (found) return found.id;
-  }
-  return DEFAULT_TENANT_ID;
-}
+import { resolveCodeIntelTenantId as resolveTenantId } from "./scope-helpers.js";
 
 export function registerCodeIntelHandlers(router: Router, app: AppContext): void {
   // ── health + migrations ────────────────────────────────────────────────

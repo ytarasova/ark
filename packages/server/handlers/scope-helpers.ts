@@ -13,6 +13,9 @@
  */
 
 import { findProjectRoot } from "../../core/agent/agent.js";
+import type { AppContext } from "../../core/app.js";
+import type { TenantContext } from "../../core/auth/context.js";
+import { DEFAULT_TENANT_ID } from "../../core/code-intel/constants.js";
 
 export type Scope = "global" | "project";
 
@@ -75,4 +78,53 @@ export function guardBuiltin(
  */
 export function projectArg(scope: Scope, projectRoot: string | undefined): string | undefined {
   return scope === "project" ? projectRoot : undefined;
+}
+
+/**
+ * Resolve the tenant id for a request. Precedence:
+ *   1. the caller's materialized `TenantContext` (router auth middleware)
+ *   2. the root AppContext's tenantId (already-scoped view)
+ *   3. `config.authSection.defaultTenant` (local single-user mode)
+ *   4. the literal `"default"` sentinel
+ *
+ * Use this for handlers that need a tenant string to pass into a
+ * capability (e.g. `app.secrets.list(tenantId)`) but don't need a
+ * tenant-scoped AppContext view. For the latter, use `resolveTenantApp`.
+ *
+ * Previously duplicated across 7 handler files (costs, conductor,
+ * workspace, sage, secrets, code-intel, knowledge-rpc).
+ */
+export function resolveTenantId(app: AppContext, ctx: TenantContext): string {
+  return ctx.tenantId ?? app.tenantId ?? app.config.authSection.defaultTenant ?? "default";
+}
+
+/**
+ * Resolve the tenant-scoped AppContext view for a request. Returns
+ * `app.forTenant(id)` when an id is resolvable, otherwise the root `app`
+ * unchanged (the latter is the local single-user fallback).
+ *
+ * Previously duplicated (with subtle whitespace variations) across
+ * costs/conductor/sage/knowledge-rpc.
+ */
+export function resolveTenantApp(app: AppContext, ctx: TenantContext): AppContext {
+  const tenantId = ctx.tenantId ?? app.tenantId ?? app.config.authSection.defaultTenant ?? null;
+  return tenantId ? app.forTenant(tenantId) : app;
+}
+
+/**
+ * Resolve the tenant id from the code-intel schema (which keys tenants
+ * by slug). Does a DB lookup via `app.codeIntel.getTenantBySlug`; falls
+ * back to `DEFAULT_TENANT_ID` when the slug is unknown.
+ *
+ * Distinct from `resolveTenantId` -- the code-intel schema uses its own
+ * tenant table keyed by slug rather than the string id consumed elsewhere.
+ * Previously duplicated across workspace/code-intel handlers.
+ */
+export async function resolveCodeIntelTenantId(app: AppContext, ctx: TenantContext): Promise<string> {
+  const slug = ctx.tenantId ?? app.tenantId ?? app.config.authSection.defaultTenant;
+  if (slug) {
+    const found = await app.codeIntel.getTenantBySlug(slug);
+    if (found) return found.id;
+  }
+  return DEFAULT_TENANT_ID;
 }

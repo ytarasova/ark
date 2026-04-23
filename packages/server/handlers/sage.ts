@@ -31,13 +31,9 @@ import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { fetchAnalysis, type SageAnalysis } from "../../core/integrations/sage-analysis.js";
 import { mkdirSync, writeFileSync } from "fs";
 import { join } from "path";
+import { resolveTenantApp } from "./scope-helpers.js";
 
 const DEFAULT_SAGE_URL = "https://pi-team.mypaytm.com/sage";
-
-function resolveTenantApp(app: AppContext, ctx: { tenantId?: string | null }): AppContext {
-  const tenantId = ctx.tenantId ?? app.tenantId ?? app.config.authSection.defaultTenant;
-  return tenantId ? app.forTenant(tenantId) : app;
-}
 
 function countTasks(analysis: SageAnalysis): number {
   return analysis.plan_streams.reduce((n, s) => n + s.tasks.length, 0);
