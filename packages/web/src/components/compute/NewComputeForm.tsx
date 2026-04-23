@@ -15,27 +15,6 @@ import { effectiveLifecycle, type ComputeKindName, type RuntimeKindName } from "
 const DEFAULT_COMPUTE_KINDS = ["local", "firecracker", "ec2", "k8s", "k8s-kata"] as const;
 const DEFAULT_RUNTIME_KINDS = ["direct", "docker", "compose", "devcontainer", "firecracker-in-container"] as const;
 
-/**
- * Inline copy of providerToPair for the web bundle. The server maintains the
- * canonical table in packages/compute/adapters/provider-map.ts -- keep both
- * in sync. Kept short so drift is obvious.
- */
-function providerToPairLocal(name: string): { compute: string; runtime: string } {
-  const map: Record<string, { compute: string; runtime: string }> = {
-    local: { compute: "local", runtime: "direct" },
-    docker: { compute: "local", runtime: "docker" },
-    devcontainer: { compute: "local", runtime: "devcontainer" },
-    firecracker: { compute: "local", runtime: "firecracker-in-container" },
-    ec2: { compute: "ec2", runtime: "direct" },
-    "ec2-docker": { compute: "ec2", runtime: "docker" },
-    "ec2-devcontainer": { compute: "ec2", runtime: "devcontainer" },
-    "ec2-firecracker": { compute: "ec2", runtime: "firecracker-in-container" },
-    k8s: { compute: "k8s", runtime: "direct" },
-    "k8s-kata": { compute: "k8s-kata", runtime: "direct" },
-  };
-  return map[name] ?? { compute: "local", runtime: "direct" };
-}
-
 // Zod schema -- single source of truth for form validation. The submit
 // payload type is `NewComputeFormValues`, derived from the schema so caller
 // never has to double-declare the shape.
@@ -123,13 +102,20 @@ export function NewComputeForm({
   // Keep templateConfig in a ref-style state via watch / setValue -- we
   // stash the chosen template's config object and hand it over on submit.
   // The template dropdown drives (compute, runtime) + config together.
+  // The server attaches `compute` + `runtime` to every template row (derived
+  // from the legacy `provider` via the canonical `providerToPair` table in
+  // packages/compute/adapters/provider-map.ts), so the web bundle no longer
+  // needs its own copy of that mapping.
   useEffect(() => {
     if (!selectedTemplate) return;
     const tmpl = (templates as any[]).find((t) => t.name === selectedTemplate);
     if (!tmpl) return;
-    const pair = providerToPairLocal(tmpl.provider as string);
-    setValue("compute", pair.compute, { shouldDirty: true });
-    setValue("runtime", pair.runtime, { shouldDirty: true });
+    if (typeof tmpl.compute === "string" && tmpl.compute.length > 0) {
+      setValue("compute", tmpl.compute, { shouldDirty: true });
+    }
+    if (typeof tmpl.runtime === "string" && tmpl.runtime.length > 0) {
+      setValue("runtime", tmpl.runtime, { shouldDirty: true });
+    }
   }, [selectedTemplate, templates, setValue]);
 
   // Segmented control: the only real difference between a template and a

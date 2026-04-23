@@ -25,6 +25,7 @@ const fakeProvider: ComputeProvider = {
   supportsWorktree: false,
   initialStatus: "running",
   needsAuth: false,
+  supportsSecretMount: false,
   provision: async () => {},
   destroy: async () => {},
   start: async () => {},

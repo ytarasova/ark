@@ -58,7 +58,7 @@ import type { PluginRegistry } from "./plugins/registry.js";
 import type { SessionLauncher } from "./session-launcher.js";
 import { TmuxLauncher } from "./launchers/tmux.js";
 import { NoopLauncher } from "./launchers/noop.js";
-import { ApiKeyManager } from "./auth/index.js";
+import type { ApiKeyManager } from "./auth/index.js";
 import type { WorkerRegistry } from "./hosted/worker-registry.js";
 import type { SessionScheduler } from "./hosted/scheduler.js";
 import type { TenantPolicyManager } from "./auth/index.js";
@@ -95,7 +95,6 @@ export class AppContext {
 
   private _launcher: SessionLauncher = new TmuxLauncher();
   private _eventBusReady = false;
-  private _apiKeys: ApiKeyManager | null = null;
   private _drizzle: DrizzleClient | null = null;
   private _codeIntel: CodeIntelStore | null = null;
   private _deployment: Deployment | null = null;
@@ -131,14 +130,11 @@ export class AppContext {
     this.phase = "booting";
 
     // Preconditions that must happen before the container can be built:
-    // filesystem, DB open, schema migration, compute-template seeding, and
-    // ApiKeyManager init (the API key manager currently creates its own
-    // schema and isn't container-managed; kept here for minimal diff).
+    // filesystem, DB open, schema migration, compute-template seeding.
     this._initFilesystem();
     const db = await this._openDatabase();
     await this._initSchema(db);
     await this._seedComputeTemplates(db);
-    this._apiKeys = new ApiKeyManager(db);
 
     // Container + lifecycle. `buildContainer()` wires every repo, store,
     // service, and infra launcher; `lifecycle.start()` resolves + calls
@@ -440,8 +436,7 @@ export class AppContext {
 
   /** API key manager for multi-tenant auth. Available after boot. */
   get apiKeys(): ApiKeyManager {
-    if (!this._apiKeys) throw new Error("AppContext not booted -- apiKeys not available");
-    return this._apiKeys;
+    return this._resolve("apiKeys");
   }
 
   get sessionService(): SessionService {

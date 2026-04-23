@@ -34,6 +34,7 @@ import {
 } from "../stores/index.js";
 import { DbResourceStore, initResourceDefinitionsTable } from "../stores/db-resource-store.js";
 import { KnowledgeStore } from "../knowledge/store.js";
+import { ApiKeyManager } from "../auth/index.js";
 
 /**
  * Register the database under `db`. The DB is provided by the caller because
@@ -94,6 +95,10 @@ export function registerRepositories(container: AppContainer): void {
 
     // Knowledge graph is persistence-adjacent -- keep it here with the repos.
     knowledge: asFunction((c: { db: DatabaseAdapter }) => new KnowledgeStore(c.db), { lifetime: Lifetime.SINGLETON }),
+
+    // API key manager -- multi-tenant auth. Container-managed so tests can
+    // swap a double via `container.register({ apiKeys: asValue(fake) })`.
+    apiKeys: asFunction((c: { db: DatabaseAdapter }) => new ApiKeyManager(c.db), { lifetime: Lifetime.SINGLETON }),
   });
 }
 

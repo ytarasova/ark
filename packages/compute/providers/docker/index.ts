@@ -142,6 +142,7 @@ export class DockerProvider implements ComputeProvider {
   readonly supportsWorktree = false;
   readonly initialStatus = "stopped";
   readonly needsAuth = false;
+  readonly supportsSecretMount = false;
 
   private app!: AppContext;
 

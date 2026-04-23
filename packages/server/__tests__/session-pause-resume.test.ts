@@ -82,9 +82,17 @@ class FakeSnapshotCompute implements Compute {
 }
 
 /** Create a compute row if it doesn't already exist. */
-function ensureCompute(ctx: AppContext, name: string, provider: string): void {
-  if (ctx.computes.get(name)) return;
-  ctx.computeService.create({ name, provider, config: {} });
+async function ensureCompute(ctx: AppContext, name: string, provider: string, computeKind?: string): Promise<void> {
+  if (await ctx.computes.get(name)) return;
+  await ctx.computeService.create({
+    name,
+    provider,
+    // Explicit `compute` kind lets a test create a compute row whose
+    // `compute_kind` doesn't match `providerToPair(provider).compute`
+    // (session-snapshot resolves via the DB column, not the name prefix).
+    ...(computeKind ? { compute: computeKind as any } : {}),
+    config: {},
+  });
 }
 
 async function startSession(opts: Record<string, unknown> = {}): Promise<string> {
@@ -98,7 +106,7 @@ async function startSession(opts: Record<string, unknown> = {}): Promise<string>
 describe("session/pause", async () => {
   it("on a snapshot-capable compute: calls compute.snapshot() and persists via SnapshotStore", async () => {
     // Seed a compute row so the session resolves to the firecracker kind.
-    ensureCompute(app, "firecracker-1", "local-firecracker");
+    await ensureCompute(app, "firecracker-1", "firecracker", "firecracker");
     const fake = new FakeSnapshotCompute();
     app.registerCompute(fake);
 
@@ -138,7 +146,7 @@ describe("session/pause", async () => {
 
 describe("session/resume", async () => {
   it("restores from the session's last snapshot and clears blocked state", async () => {
-    ensureCompute(app, "firecracker-resume", "local-firecracker");
+    await ensureCompute(app, "firecracker-resume", "firecracker", "firecracker");
     const fake = new FakeSnapshotCompute();
     app.registerCompute(fake);
 

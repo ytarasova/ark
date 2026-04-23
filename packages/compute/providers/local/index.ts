@@ -61,6 +61,7 @@ export class LocalProvider implements ComputeProvider {
   readonly supportsWorktree = true;
   readonly initialStatus = "running";
   readonly needsAuth = false;
+  readonly supportsSecretMount = false;
 
   private app!: AppContext;
 

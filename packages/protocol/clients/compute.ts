@@ -89,7 +89,14 @@ export class ComputeClient {
   }
 
   async computeTemplateList(): Promise<{
-    templates: Array<{ name: string; description?: string; provider: string; config: Record<string, unknown> }>;
+    templates: Array<{
+      name: string;
+      description?: string;
+      provider: string;
+      compute?: string;
+      runtime?: string;
+      config: Record<string, unknown>;
+    }>;
   }> {
     return this.rpc("compute/template/list");
   }

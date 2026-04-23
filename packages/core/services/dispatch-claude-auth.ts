@@ -92,16 +92,21 @@ export async function materializeClaudeAuthForDispatch(
     }
   }
 
-  // subscription_blob: only materialize on k8s-family compute. On any
-  // other compute kind the blob is irrelevant -- sessions on docker /
-  // local use the host's `~/.claude` already. We still return EMPTY so
-  // the caller doesn't mis-assume env was populated.
+  // subscription_blob: only materialize on providers that support mounting
+  // cluster-side Secrets. On any other compute kind the blob is irrelevant
+  // -- sessions on docker / local use the host's `~/.claude` already. We
+  // still return EMPTY so the caller doesn't mis-assume env was populated.
+  //
+  // We read the capability off the registered provider rather than
+  // gating on provider names, so a new k8s-family provider (e.g. EKS) gets
+  // the Secret-mount path automatically by declaring `supportsSecretMount`.
   if (!compute) return EMPTY;
   const providerName = compute.provider as string;
-  if (providerName !== "k8s" && providerName !== "k8s-kata") {
+  const provider = app.getProvider(providerName);
+  if (!provider || !provider.supportsSecretMount) {
     logDebug(
       "session",
-      `tenant ${tenantId} bound to subscription_blob but compute '${compute.name}' is ${providerName}; skipping Secret creation`,
+      `tenant ${tenantId} bound to subscription_blob but compute '${compute.name}' (${providerName}) does not support Secret mount; skipping Secret creation`,
     );
     return EMPTY;
   }

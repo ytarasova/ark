@@ -31,6 +31,12 @@ export abstract class ArkdBackedProvider implements ComputeProvider {
   abstract readonly supportsWorktree: boolean;
   abstract readonly initialStatus: string;
   abstract readonly needsAuth: boolean;
+  /**
+   * Arkd-backed providers (local + EC2 families) never mount cluster-side
+   * Secrets; they rely on env injection + bind-mounts. Only k8s-family
+   * providers override this to `true`.
+   */
+  readonly supportsSecretMount: boolean = false;
 
   protected app!: AppContext;
 

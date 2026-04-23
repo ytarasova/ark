@@ -169,6 +169,7 @@ export class K8sProvider implements ComputeProvider {
   readonly canReboot = false;
   readonly supportsWorktree = false;
   readonly needsAuth = false;
+  readonly supportsSecretMount = true;
   readonly initialStatus = "stopped";
 
   protected app: AppContext | null = null;

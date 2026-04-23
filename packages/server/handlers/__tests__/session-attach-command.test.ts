@@ -102,6 +102,7 @@ describe("session/attach-command", () => {
       readonly supportsWorktree = false;
       readonly initialStatus = "running";
       readonly needsAuth = false;
+      readonly supportsSecretMount = false;
       readonly isolationModes: { value: string; label: string }[] = [];
       setApp(): void {
         /* no-op */

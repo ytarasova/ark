@@ -1775,6 +1775,9 @@ const computeTemplateSchema = z
     name: z.string(),
     description: z.string().nullable().optional(),
     provider: z.string(),
+    /** New two-axis (compute, runtime) pair derived from `provider`. */
+    compute: z.string().optional(),
+    runtime: z.string().optional(),
     config: z.unknown().optional(),
   })
   .loose();

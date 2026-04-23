@@ -137,6 +137,7 @@ describe("/terminal/:sessionId WS route", () => {
       readonly supportsWorktree = false;
       readonly initialStatus = "running";
       readonly needsAuth = false;
+      readonly supportsSecretMount = false;
       readonly isolationModes: any[] = [];
       setApp(): void {}
       async provision(): Promise<void> {}

@@ -5,6 +5,7 @@ import { instantiateRecipe } from "../../core/agent/recipe.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { guardBuiltin, projectArg, resolveProjectRoot, resolveScope, type Scope } from "./scope-helpers.js";
 import { logDebug } from "../../core/observability/structured-log.js";
+import { providerToPair } from "../../compute/adapters/provider-map.js";
 import type {
   AgentDefinition,
   AgentReadParams,
@@ -595,17 +596,22 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     const dbTemplates = await app.computeTemplates.list();
     const configTemplates = app.config.computeTemplates ?? [];
     const dbNames = new Set(dbTemplates.map((t) => t.name));
-    const merged = [
-      ...dbTemplates,
-      ...configTemplates
-        .filter((t) => !dbNames.has(t.name))
-        .map((t) => ({
-          name: t.name,
-          description: t.description,
-          provider: t.provider,
-          config: t.config,
-        })),
-    ];
+    // Every template carries both the legacy provider name AND the new
+    // two-axis (compute, runtime) pair so web clients don't have to
+    // maintain a duplicate provider-map table. Source of truth:
+    // packages/compute/adapters/provider-map.ts.
+    const withAxes = (t: { name: string; description?: string | null; provider: string; config: unknown }) => {
+      const pair = providerToPair(t.provider);
+      return {
+        name: t.name,
+        description: t.description ?? undefined,
+        provider: t.provider,
+        compute: pair.compute,
+        runtime: pair.runtime,
+        config: t.config,
+      };
+    };
+    const merged = [...dbTemplates.map(withAxes), ...configTemplates.filter((t) => !dbNames.has(t.name)).map(withAxes)];
     return { templates: merged };
   });
   router.handle("compute/template/get", async (p) => {

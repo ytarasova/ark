@@ -20,6 +20,7 @@ import type { TodoRepository } from "./repositories/todo.js";
 import type { ArtifactRepository } from "./repositories/artifact.js";
 import type { FlowStateRepository } from "./repositories/flow-state.js";
 import type { LedgerRepository } from "./repositories/ledger.js";
+import type { ApiKeyManager } from "./auth/index.js";
 import type { StatusPollerRegistry } from "./executors/status-poller.js";
 import type { SessionService } from "./services/session.js";
 import type { ComputeService } from "./services/compute.js";
@@ -107,6 +108,9 @@ export interface Cradle {
   artifacts: ArtifactRepository;
   flowStates: FlowStateRepository;
   ledger: LedgerRepository;
+
+  // Auth
+  apiKeys: ApiKeyManager;
 
   // Services
   sessionService: SessionService;

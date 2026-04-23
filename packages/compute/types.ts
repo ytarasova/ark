@@ -93,6 +93,14 @@ export interface ComputeProvider {
   readonly supportsWorktree: boolean;
   readonly initialStatus: string;
   readonly needsAuth: boolean;
+  /**
+   * Provider can mount a cluster-side Secret (or equivalent) at launch time.
+   * True for k8s-family providers (vanilla pod + Kata microVM); false for
+   * everything else (local/docker/devcontainer/firecracker/EC2), which rely
+   * on env injection + host bind-mounts. Drives the dispatch-time claude
+   * auth materialization path in `dispatch-claude-auth.ts`.
+   */
+  readonly supportsSecretMount: boolean;
 
   // ── Session lifecycle (extended) ──────────────────────────────────────
   checkSession(compute: Compute, tmuxSessionId: string): Promise<boolean>;

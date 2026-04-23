@@ -49,11 +49,10 @@ export interface ResumeFromSnapshotResult {
  * Resolve the `Compute` a session runs on, plus a stub handle derived from
  * the session row.
  *
- * A future revision replaces this with the DB `compute_kind` column and a
- * proper `ComputeTarget` lookup; for now we derive the kind from
- * `session.compute_name`'s suffix (local-*, ec2-*, firecracker-*, k8s-*)
- * which matches the seeded names in the repo. Unknown or missing computes
- * resolve to `local`.
+ * The compute kind is authoritative on the DB row (`compute.compute_kind`);
+ * user-chosen compute names (e.g. `kata-prod`) no longer need to advertise
+ * their kind via a prefix. Sessions with no `compute_name` fall back to
+ * `local`, the default compute for this daemon.
  */
 export async function resolveSessionCompute(
   app: AppContext,
@@ -63,7 +62,12 @@ export async function resolveSessionCompute(
   if (!session) return null;
 
   const name = session.compute_name || "local";
-  const kind = inferComputeKind(name);
+  let kind: ComputeKind = "local";
+  if (session.compute_name) {
+    const row = await app.computes.get(session.compute_name);
+    if (!row) return null;
+    kind = row.compute_kind as ComputeKind;
+  }
   const compute = app.getCompute(kind);
   if (!compute) return null;
 
@@ -72,17 +76,6 @@ export async function resolveSessionCompute(
   // same (kind, name) pair plus any handle-meta we persisted on the session.
   const meta = ((session.config as Record<string, unknown>).compute_handle ?? {}) as Record<string, unknown>;
   return { kind, handle: { kind, name, meta } };
-}
-
-/** Map a compute row name to the new `ComputeKind` taxonomy. */
-function inferComputeKind(name: string): ComputeKind {
-  if (name.startsWith("firecracker")) return "firecracker";
-  if (name.startsWith("ec2")) return "ec2";
-
-  if (name.startsWith("k8s-kata")) return "k8s-kata";
-  if (name.startsWith("k8s")) return "k8s";
-
-  return "local";
 }
 
 // ── Pause / resume with snapshot persistence ───────────────────────────────

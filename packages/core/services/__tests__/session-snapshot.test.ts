@@ -85,9 +85,19 @@ async function seedSession(computeName?: string): Promise<string> {
   return session.id;
 }
 
-async function ensureCompute(name: string, provider: string): Promise<void> {
+async function ensureCompute(name: string, provider: string, computeKind?: string): Promise<void> {
   if (await app.computes.get(name)) return;
-  await app.computeService.create({ name, provider, config: {} });
+  await app.computeService.create({
+    name,
+    provider,
+    // When the compute_kind differs from `providerToPair(provider).compute`
+    // (e.g. provider="firecracker" maps to compute="local" in the legacy
+    // table, but we want the snapshot tests to resolve to ComputeKind
+    // "firecracker"), pass the axis explicitly so the stored row carries
+    // the right kind.
+    ...(computeKind ? { compute: computeKind as any } : {}),
+    config: {},
+  });
 }
 
 // ── resolveSessionCompute ─────────────────────────────────────────────────
@@ -105,8 +115,8 @@ describe("resolveSessionCompute", async () => {
     expect(resolved!.handle.kind).toBe("local");
   });
 
-  it("resolves firecracker compute from compute_name prefix", async () => {
-    await ensureCompute("firecracker-test", "firecracker");
+  it("resolves firecracker compute from compute_kind column", async () => {
+    await ensureCompute("firecracker-test", "firecracker", "firecracker");
     const fake = new FakeSnapshotCompute();
     app.registerCompute(fake);
     const id = await seedSession("firecracker-test");
@@ -115,25 +125,45 @@ describe("resolveSessionCompute", async () => {
     expect(resolved!.kind).toBe("firecracker");
   });
 
-  it("resolves ec2 compute from compute_name prefix", async () => {
+  it("resolves ec2 compute from compute_kind column", async () => {
+    await ensureCompute("ec2-large", "ec2");
     const id = await seedSession("ec2-large");
     const resolved = await resolveSessionCompute(app, id);
     expect(resolved).not.toBeNull();
     expect(resolved!.kind).toBe("ec2");
   });
 
-  it("resolves k8s-kata compute from compute_name prefix", async () => {
+  it("resolves k8s-kata compute from compute_kind column", async () => {
+    await ensureCompute("k8s-kata-1", "k8s-kata");
     const id = await seedSession("k8s-kata-1");
     const resolved = await resolveSessionCompute(app, id);
     expect(resolved).not.toBeNull();
     expect(resolved!.kind).toBe("k8s-kata");
   });
 
-  it("resolves k8s compute from compute_name prefix", async () => {
+  it("resolves k8s compute from compute_kind column", async () => {
+    await ensureCompute("k8s-default", "k8s");
     const id = await seedSession("k8s-default");
     const resolved = await resolveSessionCompute(app, id);
     expect(resolved).not.toBeNull();
     expect(resolved!.kind).toBe("k8s");
+  });
+
+  // Regression: the old helper derived kind from the compute name prefix
+  // (e.g. "kata-prod" -> "local"). Now that we read `compute.compute_kind`
+  // directly, a user-chosen name pointing at a k8s-kata compute resolves
+  // to the correct kind.
+  it("reads compute_kind column for user-named k8s-kata compute", async () => {
+    await ensureCompute("kata-prod", "k8s-kata");
+    const id = await seedSession("kata-prod");
+    const resolved = await resolveSessionCompute(app, id);
+    expect(resolved).not.toBeNull();
+    expect(resolved!.kind).toBe("k8s-kata");
+  });
+
+  it("returns null when compute_name points at a missing compute row", async () => {
+    const id = await seedSession("does-not-exist");
+    expect(await resolveSessionCompute(app, id)).toBeNull();
   });
 
   it("includes compute_handle metadata from session config", async () => {
@@ -159,7 +189,7 @@ describe("pauseWithSnapshot", async () => {
     fake.snapshotCalls = 0;
     fake.restoreCalls = 0;
     app.registerCompute(fake);
-    await ensureCompute("firecracker-snap", "firecracker");
+    await ensureCompute("firecracker-snap", "firecracker", "firecracker");
   });
 
   it("snapshots + persists + marks session blocked", async () => {
@@ -240,7 +270,7 @@ describe("resumeFromSnapshot", async () => {
     fake.snapshotCalls = 0;
     fake.restoreCalls = 0;
     app.registerCompute(fake);
-    await ensureCompute("firecracker-res", "firecracker");
+    await ensureCompute("firecracker-res", "firecracker", "firecracker");
   });
 
   it("restores from session's last_snapshot_id", async () => {

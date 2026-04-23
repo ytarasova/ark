@@ -186,4 +186,24 @@ describe("ApiKeyManager", async () => {
       expect(await app.apiKeys.validate(victim.key)).not.toBeNull();
     });
   });
+
+  // Regression: ApiKeyManager used to be a process-boot-time singleton on
+  // AppContext, not resolved through the DI container. Tests that wanted to
+  // swap a double had no seam. With the manager registered in
+  // `packages/core/di/persistence.ts`, callers can override it after boot by
+  // re-registering the `apiKeys` key on the container.
+  describe("DI container", () => {
+    it("exposes the same ApiKeyManager instance on every read", () => {
+      const first = app.apiKeys;
+      const second = app.apiKeys;
+      expect(first).toBe(second);
+    });
+
+    it("supports test-time override via container.register({ apiKeys: asValue(...) })", async () => {
+      const { asValue } = await import("awilix");
+      const fake = { validate: async () => null } as unknown as typeof app.apiKeys;
+      app.container.register({ apiKeys: asValue(fake) });
+      expect(app.apiKeys).toBe(fake);
+    });
+  });
 });
