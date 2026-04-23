@@ -16,6 +16,13 @@ import { logDebug } from "../observability/structured-log.js";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
+export interface ForEachSpawnSpec {
+  /** Named flow to spawn for each iteration. */
+  flow: string;
+  /** Input map for the child session. Values may be Nunjucks templates. */
+  inputs: Record<string, unknown>;
+}
+
 export interface StageDefinition {
   name: string;
   type?: "agent" | "action" | "fork" | "fan_out";
@@ -25,6 +32,28 @@ export interface StageDefinition {
   gate: "auto" | "manual" | "condition" | "review";
   autonomy?: "full" | "execute" | "edit" | "read-only";
   on_failure?: string;
+  /**
+   * for_each + mode:spawn primitive (P2.0a).
+   *
+   * Iterates the resolved list and spawns one child session per item
+   * sequentially. Each child is awaited before the next one starts.
+   *
+   * Example:
+   *   - name: per_repo
+   *     for_each: "{{repos}}"
+   *     mode: spawn
+   *     iteration_var: repo
+   *     on_iteration_failure: stop
+   *     spawn:
+   *       flow: my-flow
+   *       inputs:
+   *         repo_path: "{{repo.repo_path}}"
+   */
+  for_each?: string;
+  mode?: "spawn";
+  iteration_var?: string;
+  on_iteration_failure?: "stop" | "continue";
+  spawn?: ForEachSpawnSpec;
   /**
    * Outcome-based routing. Maps outcome labels reported by the agent
    * to target stage names. When an agent completes with an `outcome`
@@ -228,7 +257,7 @@ export function evaluateGate(
 // ── Stage action info ───────────────────────────────────────────────────────
 
 export interface StageAction {
-  type: "agent" | "action" | "fork" | "fan_out" | "unknown";
+  type: "agent" | "action" | "fork" | "fan_out" | "for_each" | "unknown";
   agent?: string;
   action?: string;
   strategy?: string;
@@ -240,6 +269,10 @@ export interface StageAction {
 export function getStageAction(app: AppContext, flowName: string, stageName: string): StageAction {
   const stage = getStage(app, flowName, stageName);
   if (!stage) return { type: "unknown" };
+
+  if (stage.for_each !== undefined) {
+    return { type: "for_each", on_failure: stage.on_failure, optional: stage.optional };
+  }
 
   if (stage.type === "fork" || stage.type === "fan_out") {
     return {

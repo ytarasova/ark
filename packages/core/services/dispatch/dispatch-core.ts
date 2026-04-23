@@ -36,6 +36,8 @@ import { ComputeResolver } from "./compute-resolve.js";
 import { StageSecretResolver } from "./secrets-resolve.js";
 import { HostedDispatcher } from "./dispatch-hosted.js";
 import { FanOutDispatcher } from "./dispatch-fanout.js";
+import { ForEachDispatcher } from "./dispatch-foreach.js";
+import { buildSessionVars } from "../../template.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -44,12 +46,14 @@ export class CoreDispatcher {
   private readonly secrets: StageSecretResolver;
   private readonly hosted: HostedDispatcher;
   private readonly fanout: FanOutDispatcher;
+  private readonly foreach: ForEachDispatcher;
 
   constructor(private readonly deps: DispatchDeps) {
     this.compute = new ComputeResolver(deps);
     this.secrets = new StageSecretResolver(deps);
     this.hosted = new HostedDispatcher(deps);
     this.fanout = new FanOutDispatcher(deps);
+    this.foreach = new ForEachDispatcher(deps);
   }
 
   /** Expose compute resolution so callers needing just that path can avoid launching. */
@@ -152,6 +156,22 @@ export class CoreDispatcher {
 
     if (stageDef?.type === "fan_out") {
       return this.fanout.dispatchFanOut(sessionId, stageDef);
+    }
+
+    // for_each + mode:spawn: iterate a list and spawn one child per item sequentially.
+    if (stageDef?.for_each !== undefined) {
+      const sessionVars = buildSessionVars(session as unknown as Record<string, unknown>);
+      const result = await this.foreach.dispatchForEach(sessionId, stageDef, sessionVars);
+      if (result.ok) {
+        // Stage is complete -- mediate handoff to the next stage.
+        await this.deps.mediateStageHandoff(sessionId, { autoDispatch: true, source: "dispatch_for_each" });
+      } else {
+        await this.deps.sessions.update(sessionId, {
+          status: "failed",
+          error: result.message.slice(0, 500),
+        });
+      }
+      return result;
     }
 
     const action = this.deps.getStageAction(session.flow, stage);
