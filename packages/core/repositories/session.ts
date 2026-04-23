@@ -233,9 +233,12 @@ export class SessionRepository {
         .replace(/[^a-z0-9-]+/g, "-")
         .replace(/-{2,}/g, "-")
         .replace(/^-|-$/g, "");
-    const branch = opts.ticket
-      ? `feat/${sanitize(opts.ticket)}-${sanitize(opts.summary ?? "work").slice(0, 30)}`
-      : null;
+    // Caller-provided branch wins (deterministic dispatch from for_each + spawn,
+    // sage RPC, or `--branch` CLI flag). Fall back to ticket-derived name, else
+    // null (setupWorktree will then default to `ark-<sessionId>`).
+    const branch =
+      opts.branch ??
+      (opts.ticket ? `feat/${sanitize(opts.ticket)}-${sanitize(opts.summary ?? "work").slice(0, 30)}` : null);
 
     const d = this.d();
     await (d.db as any).insert(d.schema.sessions).values({

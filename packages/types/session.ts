@@ -127,6 +127,14 @@ export interface CreateSessionOpts {
   ticket?: string;
   summary?: string;
   repo?: string;
+  /**
+   * Deterministic git branch name for the session's worktree. When set,
+   * setupWorktree cuts (or reuses) this exact branch instead of the default
+   * derived name (`feat/<ticket>-<summary>` or `ark-<sessionId>`). Used by
+   * for_each + spawn callers that need the same branch across all child
+   * iterations targeting the same repo.
+   */
+  branch?: string;
   flow?: string;
   agent?: string | null;
   compute_name?: string;

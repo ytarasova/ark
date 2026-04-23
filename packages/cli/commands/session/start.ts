@@ -15,6 +15,7 @@ export function registerStartCommands(session: Command) {
     .argument("[ticket]", "External ticket reference (Jira key, GitHub issue, etc.)")
     .option("-r, --repo <path>", "Repository path or name")
     .option("--remote-repo <url>", "Git URL to clone on compute target (no local repo needed)")
+    .option("-b, --branch <name>", "Deterministic branch name for the worktree (default: derived from --ticket/--summary or auto)")
     .option("-s, --summary <text>", "Task summary")
     .option("-p, --flow <name>", "Flow name", "default")
     .option("-c, --compute <name>", "Compute name")
@@ -204,6 +205,7 @@ export function registerStartCommands(session: Command) {
         ticket,
         summary,
         repo,
+        ...(opts.branch ? { branch: opts.branch } : {}),
         flow: opts.flow,
         compute_name: opts.compute,
         agent: recipeAgent,
@@ -223,6 +225,7 @@ export function registerStartCommands(session: Command) {
       console.log(chalk.green(`Session ${s.id} created + dispatched`));
       console.log(`  Summary:  ${s.summary ?? "-"}`);
       console.log(`  Repo:     ${s.repo ?? "-"}`);
+      if (s.branch) console.log(`  Branch:   ${s.branch}`);
       console.log(`  Flow:     ${s.flow}`);
       console.log(`  Stage:    ${s.stage ?? "-"}`);
       if (workdir) console.log(`  Workdir:  ${workdir}`);
