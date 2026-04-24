@@ -45,7 +45,7 @@ export function StatusDot({ status, size, pulse, className, ...props }: StatusDo
       {showPulse && (
         <span
           aria-hidden
-          className="absolute inset-[-3px] rounded-full border-[1.5px] border-[var(--running)] opacity-40"
+          className="absolute inset-[-2px] rounded-full border border-[var(--running)] opacity-25"
           style={{ animation: "pulse 1.6s ease-out infinite" }}
         />
       )}
