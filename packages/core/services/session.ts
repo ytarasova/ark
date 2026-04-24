@@ -14,34 +14,38 @@ import type { SessionRepository } from "../repositories/session.js";
 import type { EventRepository } from "../repositories/event.js";
 import type { MessageRepository } from "../repositories/message.js";
 import type { AppContext } from "../app.js";
-import { logDebug, logWarn } from "../observability/structured-log.js";
+import { logDebug } from "../observability/structured-log.js";
+import { SessionDispatchListeners } from "./session-dispatch-listeners.js";
 
 // ── SessionService ───────────────────────────────────────────────────────────
 
 export class SessionService {
-  private _app: AppContext | null = null;
+  /**
+   * `app` is optional so a SessionService can be constructed with just repos
+   * in pure-unit tests that only exercise `start()` + direct repo pass-throughs.
+   * Methods that reach into other AppContext services (stop, dispatch, spawn,
+   * advance, ...) throw via the `app` accessor when the service was built
+   * without one.
+   */
+  private readonly dispatchListeners: SessionDispatchListeners;
 
   constructor(
     private sessions: SessionRepository,
     private events: EventRepository,
     private messages: MessageRepository,
-    app?: AppContext,
+    private readonly _app: AppContext | null = null,
   ) {
-    if (app) this._app = app;
+    this.dispatchListeners = new SessionDispatchListeners(
+      this.sessions,
+      this.events,
+      (sessionId) => this.dispatch(sessionId),
+    );
   }
 
-  /**
-   * Inject AppContext after construction.
-   * Prefer passing `app` via the constructor. This setter exists for cases
-   * where the AppContext is not yet available at construction time (legacy).
-   */
-  setApp(app: AppContext): void {
-    this._app = app;
-  }
-
-  /** Get the injected AppContext. Throws if not set. */
   private get app(): AppContext {
-    if (!this._app) throw new Error("SessionService: AppContext not set -- pass app to constructor or call setApp()");
+    if (!this._app) {
+      throw new Error("SessionService: AppContext required for this method -- pass app to the constructor");
+    }
     return this._app;
   }
 
@@ -154,126 +158,26 @@ export class SessionService {
   // The service owns every "a new session was created, launch it" moment.
   // Callers -- handlers, CLI, fork/clone/spawn orchestration -- just notify
   // the service that a session was created; dispatch happens automatically
-  // in the background. The service tracks in-flight promises so `stopAll()`
-  // / shutdown can drain them before teardown, otherwise tmux panes +
-  // agent CLIs leak when a test or server restart interrupts a dispatch.
+  // in the background via SessionDispatchListeners (see sibling file).
 
-  private _pendingDispatches = new Set<Promise<unknown>>();
-  private _sessionCreatedListeners: Array<(sessionId: string) => void> = [];
-
-  /**
-   * Subscribe to the `session_created` lifecycle moment. The default
-   * subscriber kicks a background dispatch; external consumers (conductor,
-   * audit sinks, etc.) can register their own.
-   */
+  /** @see SessionDispatchListeners.subscribe */
   onSessionCreated(listener: (sessionId: string) => void): () => void {
-    this._sessionCreatedListeners.push(listener);
-    return () => {
-      const i = this._sessionCreatedListeners.indexOf(listener);
-      if (i >= 0) this._sessionCreatedListeners.splice(i, 1);
-    };
+    return this.dispatchListeners.subscribe(listener);
   }
 
-  /**
-   * Emit the `session_created` lifecycle moment. Orchestration code
-   * (startSession, fork, clone, spawn) calls this after a session row has
-   * been committed. All registered listeners fire synchronously; the
-   * default listener kicks `dispatch` in the background.
-   */
+  /** @see SessionDispatchListeners.emit */
   emitSessionCreated(sessionId: string): void {
-    for (const l of this._sessionCreatedListeners) {
-      try {
-        l(sessionId);
-      } catch (err) {
-        // Fire-and-forget: listener errors should not block dispatch.
-        void this.events.log(sessionId, "session_created_listener_error", {
-          actor: "system",
-          data: { reason: err instanceof Error ? err.message : String(err) },
-        });
-      }
-    }
+    this.dispatchListeners.emit(sessionId);
   }
 
-  private _defaultDispatcherUnregister: (() => void) | null = null;
-
-  /**
-   * Register the default `session_created` -> background dispatch listener.
-   * Safe to call multiple times (e.g. per-test `beforeEach`): replaces any
-   * previous default registration, so listeners don't accumulate and fan out
-   * into duplicate dispatches.
-   */
+  /** @see SessionDispatchListeners.registerDefaultDispatcher */
   registerDefaultDispatcher(onDispatched: (session: Session | null) => void): () => void {
-    if (this._defaultDispatcherUnregister) {
-      this._defaultDispatcherUnregister();
-      this._defaultDispatcherUnregister = null;
-    }
-    const unregister = this.onSessionCreated((sessionId) => this.kickDispatch(sessionId, onDispatched));
-    this._defaultDispatcherUnregister = () => {
-      unregister();
-      this._defaultDispatcherUnregister = null;
-    };
-    return this._defaultDispatcherUnregister;
+    return this.dispatchListeners.registerDefaultDispatcher(onDispatched);
   }
 
-  private kickDispatch(sessionId: string, onDispatched: (session: Session | null) => void): void {
-    const promise = this.dispatch(sessionId)
-      .then(async (result) => {
-        // dispatch returns `{ ok: false, message }` for non-throw failures
-        // (e.g. "Stage 'pr' is create_pr, not agent" on an action stage).
-        // Log the failure event AND flip the session to `failed` so the UI
-        // stops showing it as pending/ready. Without the status update the
-        // row renders "pending" forever despite the dispatch_failed event.
-        if (result && result.ok === false) {
-          const reason = result.message ?? "dispatch returned ok: false";
-          await this.events.log(sessionId, "dispatch_failed", { actor: "system", data: { reason } });
-          await this.markDispatchFailed(sessionId, reason);
-        }
-      })
-      .catch(async (err) => {
-        const reason = err instanceof Error ? err.message : String(err);
-        await this.events.log(sessionId, "dispatch_failed", { actor: "system", data: { reason } });
-        await this.markDispatchFailed(sessionId, reason);
-      })
-      .then(async () => {
-        onDispatched(await this.sessions.get(sessionId));
-      });
-    this._pendingDispatches.add(promise);
-    promise
-      .finally(() => this._pendingDispatches.delete(promise))
-      .catch((err) => {
-        logWarn("session", `SessionService: background dispatch chain threw (sessionId=${sessionId})`, {
-          sessionId,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
-  }
-
-  /** Await every in-flight background dispatch. Called by app.shutdown(). */
+  /** @see SessionDispatchListeners.drain -- await in-flight dispatches at shutdown. */
   async drainPendingDispatches(): Promise<void> {
-    if (this._pendingDispatches.size === 0) return;
-    await Promise.allSettled([...this._pendingDispatches]);
-  }
-
-  /**
-   * Flip a session to `failed` after a dispatch-time error. Kept lenient:
-   * if the session was already marked terminal by some other path we skip
-   * the write so we don't clobber a more specific status (e.g. cancelled).
-   */
-  private async markDispatchFailed(sessionId: string, reason: string): Promise<void> {
-    try {
-      const existing = await this.sessions.get(sessionId);
-      if (!existing) return;
-      if (existing.status === "failed" || existing.status === "completed" || existing.status === "cancelled") return;
-      await this.sessions.update(sessionId, {
-        status: "failed" as SessionStatus,
-        error: reason,
-      } as Partial<Session>);
-    } catch (err) {
-      logWarn("session", `markDispatchFailed: failed to persist status (sessionId=${sessionId})`, {
-        sessionId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
+    await this.dispatchListeners.drain();
   }
 
   /**

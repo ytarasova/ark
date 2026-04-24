@@ -390,16 +390,6 @@ describe("SessionService", async () => {
     });
   });
 
-  // ── setApp / AppContext guard ──────────────────────────────────────────
-
-  describe("setApp", () => {
-    it("setApp injects AppContext", () => {
-      const mockApp = {} as any;
-      svc.setApp(mockApp);
-      expect(typeof svc.setApp).toBe("function");
-    });
-  });
-
   // ── list with filters ─────────────────────────────────────────────────
 
   describe("list with filters", async () => {
