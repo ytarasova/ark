@@ -100,11 +100,16 @@ export function resolveTenantId(app: AppContext, ctx: TenantContext): string {
 
 /**
  * Resolve the tenant-scoped AppContext view for a request. Returns
- * `app.forTenant(id)` when an id is resolvable, otherwise the root `app`
- * unchanged (the latter is the local single-user fallback).
+ * `app.forTenant(id)` when an id is resolvable from the caller's
+ * TenantContext (or the root app's already-scoped tenantId, or the
+ * configured default tenant); otherwise the root `app` unchanged (the
+ * latter is the local single-user fallback).
  *
- * Previously duplicated (with subtle whitespace variations) across
- * costs/conductor/sage/knowledge-rpc.
+ * Use this as the canonical way to route RPC handler writes/reads through
+ * the tenant-scoped DI child scope. Previously inlined in
+ * costs/conductor/sage handlers with identical logic -- see round-3
+ * DI P1-1: local-daemon WS path needs tenant-scoped dispatch just like
+ * the hosted HTTP path already does (per-request router rebuild).
  */
 export function resolveTenantApp(app: AppContext, ctx: TenantContext): AppContext {
   const tenantId = ctx.tenantId ?? app.tenantId ?? app.config.authSection.defaultTenant ?? null;

@@ -10,60 +10,68 @@ import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
 import { extract } from "../validate.js";
 import * as core from "../../core/index.js";
+import { resolveTenantApp } from "./scope-helpers.js";
 import type { HistoryListParams, HistoryImportParams, HistorySearchParams } from "../../types/index.js";
 
 export function registerHistoryHandlers(router: Router, app: AppContext): void {
-  router.handle("history/list", async (p) => {
+  router.handle("history/list", async (p, _notify, ctx) => {
     const { limit } = extract<HistoryListParams>(p, []);
-    const items = core.listClaudeSessions(app, { limit: limit ?? 100 });
+    const scoped = resolveTenantApp(app, ctx);
+    const items = core.listClaudeSessions(scoped, { limit: limit ?? 100 });
     return { items };
   });
 
-  router.handle("history/import", async (p) => {
+  router.handle("history/import", async (p, _notify, ctx) => {
     const { claudeSessionId, name, repo } = extract<HistoryImportParams>(p, []);
-    const session = await app.sessionLifecycle.start(
+    const scoped = resolveTenantApp(app, ctx);
+    const session = await scoped.sessionLifecycle.start(
       {
         summary: name ?? "import",
         repo: repo ?? ".",
         flow: "bare",
       },
-      { onCreated: (id) => app.sessionService.emitSessionCreated(id) },
+      { onCreated: (id) => scoped.sessionService.emitSessionCreated(id) },
     );
     if (claudeSessionId) {
-      await app.sessions.update(session.id, { claude_session_id: claudeSessionId });
+      await scoped.sessions.update(session.id, { claude_session_id: claudeSessionId });
     }
     return { session };
   });
 
-  router.handle("history/refresh", async (_p) => {
-    const count = await core.refreshClaudeSessionsCache(app, {
+  router.handle("history/refresh", async (_p, _notify, ctx) => {
+    const scoped = resolveTenantApp(app, ctx);
+    const count = await core.refreshClaudeSessionsCache(scoped, {
       onProgress: () => {},
     });
-    const items = await core.listClaudeSessions(app);
+    const items = await core.listClaudeSessions(scoped);
     return { ok: true, count: items.length, sessionCount: count };
   });
 
-  router.handle("history/index", async () => {
-    const count = await core.indexTranscripts(app, { onProgress: () => {} });
+  router.handle("history/index", async (_p, _notify, ctx) => {
+    const scoped = resolveTenantApp(app, ctx);
+    const count = await core.indexTranscripts(scoped, { onProgress: () => {} });
     return { ok: true, count };
   });
 
-  router.handle("history/refresh-and-index", async () => {
-    const sessionCount = await core.refreshClaudeSessionsCache(app, {});
-    const indexCount = await core.indexTranscripts(app, {});
-    const items = core.listClaudeSessions(app);
+  router.handle("history/refresh-and-index", async (_p, _notify, ctx) => {
+    const scoped = resolveTenantApp(app, ctx);
+    const sessionCount = await core.refreshClaudeSessionsCache(scoped, {});
+    const indexCount = await core.indexTranscripts(scoped, {});
+    const items = core.listClaudeSessions(scoped);
     return { ok: true, sessionCount, indexCount, items };
   });
 
-  router.handle("history/index-stats", async () => {
-    const stats = core.getIndexStats(app);
+  router.handle("history/index-stats", async (_p, _notify, ctx) => {
+    const scoped = resolveTenantApp(app, ctx);
+    const stats = core.getIndexStats(scoped);
     return { stats };
   });
 
-  router.handle("history/search", async (p) => {
+  router.handle("history/search", async (p, _notify, ctx) => {
     const { query, limit } = extract<HistorySearchParams>(p, ["query"]);
-    const dbResults = await core.searchSessions(app, query, { limit: limit ?? 20 });
-    const txResults = await core.searchTranscripts(app, query, { limit: limit ?? 20 });
+    const scoped = resolveTenantApp(app, ctx);
+    const dbResults = await core.searchSessions(scoped, query, { limit: limit ?? 20 });
+    const txResults = await core.searchTranscripts(scoped, query, { limit: limit ?? 20 });
     return { results: [...dbResults, ...txResults] };
   });
 }

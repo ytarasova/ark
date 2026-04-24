@@ -6,6 +6,7 @@ import { extract } from "../validate.js";
 import { searchSessions, getSessionConversation, searchSessionConversation } from "../../core/search/search.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { providerOf } from "../../compute/adapters/provider-map.js";
+import { resolveTenantApp } from "./scope-helpers.js";
 import type {
   SessionIdParams,
   SessionStartParams,
@@ -32,35 +33,41 @@ const SESSION_NOT_FOUND = ErrorCodes.SESSION_NOT_FOUND;
 export function registerSessionHandlers(router: Router, app: AppContext): void {
   // ── Session lifecycle ──────────────────────────────────────────────────────
 
-  router.handle("session/start", async (params, notify) => {
+  router.handle("session/start", async (params, notify, ctx) => {
     const opts = extract<SessionStartParams>(params, []);
+    const scoped = resolveTenantApp(app, ctx);
     // Atomic create + dispatch: splitting these across two RPCs used to force
     // every caller (CLI, web, tests) to remember the second call or live with
     // a session stuck at status=ready until the conductor's 60s poll tick.
     //
     // `start()` emits `session_created` before returning; the default
     // dispatcher listener (registered above) kicks the background launcher.
-    const session = await app.sessionLifecycle.start(opts, {
-      onCreated: (id) => app.sessionService.emitSessionCreated(id),
+    const session = await scoped.sessionLifecycle.start(opts, {
+      onCreated: (id) => scoped.sessionService.emitSessionCreated(id),
     });
     notify("session/created", { session });
     return { session };
   });
 
-  router.handle("input/upload", async (params) => {
+  router.handle("input/upload", async (params, _notify, ctx) => {
     const opts = extract<{
       name: string;
       role: string;
       content: string;
       contentEncoding?: "base64" | "utf-8";
     }>(params, ["name", "role", "content"]);
-    return app.sessionService.saveInput(opts);
+    const scoped = resolveTenantApp(app, ctx);
+    return scoped.sessionService.saveInput(opts);
   });
 
-  router.handle("input/read", async (params) => {
+  router.handle("input/read", async (params, _notify, ctx) => {
     const { locator } = extract<{ locator: string }>(params, ["locator"]);
+    const scoped = resolveTenantApp(app, ctx);
     const { LOCAL_TENANT_ID } = await import("../../core/storage/blob-store.js");
-    const { bytes, meta } = await app.blobStore.get(locator, app.tenantId ?? LOCAL_TENANT_ID);
+    // `app.blobStore` is not re-registered per tenant (no SCOPED variant in
+    // buildTenantScope), so resolve through the root handle but pass the
+    // tenant-scoped id so the stored blob is isolated.
+    const { bytes, meta } = await app.blobStore.get(locator, scoped.tenantId ?? LOCAL_TENANT_ID);
     return {
       filename: meta.filename,
       contentType: meta.contentType ?? "application/octet-stream",
@@ -70,199 +77,285 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     };
   });
 
-  router.handle("session/stop", async (params, notify) => {
+  router.handle("session/stop", async (params, notify, ctx) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
-    const result = await app.sessionService.stop(sessionId);
+    const scoped = resolveTenantApp(app, ctx);
+    const result = await scoped.sessionService.stop(sessionId);
     if (!result.ok) throw new RpcError(result.message ?? "Stop failed", SESSION_NOT_FOUND);
-    const session = await app.sessions.get(sessionId);
+    const session = await scoped.sessions.get(sessionId);
     if (session) notify("session/updated", { session });
     return result;
   });
 
-  router.handle("session/advance", async (params, notify) => {
+  router.handle("session/advance", async (params, notify, ctx) => {
     const { sessionId, force } = extract<SessionAdvanceParams>(params, ["sessionId"]);
-    const sessForLog = await app.sessions.get(sessionId);
-    await app.events.log(sessionId, "stage_advanced", {
+    const scoped = resolveTenantApp(app, ctx);
+    const sessForLog = await scoped.sessions.get(sessionId);
+    await scoped.events.log(sessionId, "stage_advanced", {
       actor: "user",
       stage: sessForLog?.stage ?? undefined,
       data: { force: force ?? false },
     });
-    const result = await app.sessionService.advance(sessionId, force ?? false);
-    const session = await app.sessions.get(sessionId);
+    const result = await scoped.sessionService.advance(sessionId, force ?? false);
+    const session = await scoped.sessions.get(sessionId);
     if (session) notify("session/updated", { session });
     return result;
   });
 
-  router.handle("session/complete", async (params, notify) => {
+  router.handle("session/complete", async (params, notify, ctx) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
-    const result = await app.sessionService.complete(sessionId);
+    const scoped = resolveTenantApp(app, ctx);
+    const result = await scoped.sessionService.complete(sessionId);
     if (!result.ok) throw new RpcError(result.message ?? "Complete failed", SESSION_NOT_FOUND);
     // Advance the flow after completing the stage -- without this, sessions
     // get stuck at "ready" instead of progressing to the next stage or "completed".
-    await app.sessionService.advance(sessionId, true);
-    const session = await app.sessions.get(sessionId);
+    await scoped.sessionService.advance(sessionId, true);
+    const session = await scoped.sessions.get(sessionId);
     if (session) notify("session/updated", { session });
     return result;
   });
 
-  router.handle("session/delete", async (params, notify) => {
+  router.handle("session/delete", async (params, notify, ctx) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
-    await app.sessionService.delete(sessionId);
+    const scoped = resolveTenantApp(app, ctx);
+    await scoped.sessionService.delete(sessionId);
     notify("session/deleted", { sessionId });
     return { ok: true };
   });
 
-  router.handle("session/undelete", async (params, notify) => {
+  router.handle("session/undelete", async (params, notify, ctx) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
-    const result = await app.sessionService.undelete(sessionId);
-    const session = await app.sessions.get(sessionId);
+    const scoped = resolveTenantApp(app, ctx);
+    const result = await scoped.sessionService.undelete(sessionId);
+    const session = await scoped.sessions.get(sessionId);
     if (session) notify("session/created", { session });
     return result;
   });
 
-  router.handle("session/fork", async (params, notify) => {
+  router.handle("session/fork", async (params, notify, ctx) => {
     const { sessionId, name, group_name } = extract<SessionForkParams>(params, ["sessionId"]);
-    const result = await app.sessionService.fork(sessionId, name);
+    const scoped = resolveTenantApp(app, ctx);
+    const result = await scoped.sessionService.fork(sessionId, name);
     if (!result.ok) {
       throw new RpcError(result.message, SESSION_NOT_FOUND);
     }
     if (group_name && result.sessionId) {
-      await app.sessions.update(result.sessionId, { group_name });
+      await scoped.sessions.update(result.sessionId, { group_name });
     }
-    const session = result.sessionId ? await app.sessions.get(result.sessionId) : null;
+    const session = result.sessionId ? await scoped.sessions.get(result.sessionId) : null;
     if (session) notify("session/created", { session });
     return { session };
   });
 
-  router.handle("session/clone", async (params, notify) => {
+  router.handle("session/clone", async (params, notify, ctx) => {
     const { sessionId, name } = extract<SessionCloneParams>(params, ["sessionId"]);
-    const result = await app.sessionService.clone(sessionId, name);
+    const scoped = resolveTenantApp(app, ctx);
+    const result = await scoped.sessionService.clone(sessionId, name);
     if (!result.ok) {
       throw new RpcError(result.message, SESSION_NOT_FOUND);
     }
-    const session = result.sessionId ? await app.sessions.get(result.sessionId) : null;
+    const session = result.sessionId ? await scoped.sessions.get(result.sessionId) : null;
     if (session) notify("session/created", { session });
     return { session };
   });
 
-  router.handle("session/update", async (params, notify) => {
+  router.handle("session/update", async (params, notify, ctx) => {
     const { sessionId, fields } = extract<SessionUpdateParams>(params, ["sessionId", "fields"]);
-    const existing = await app.sessions.get(sessionId);
+    const scoped = resolveTenantApp(app, ctx);
+    const existing = await scoped.sessions.get(sessionId);
     if (!existing) {
       throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
     }
-    await app.sessions.update(sessionId, fields);
-    const session = await app.sessions.get(sessionId);
+    await scoped.sessions.update(sessionId, fields);
+    const session = await scoped.sessions.get(sessionId);
     notify("session/updated", { session });
     return { session };
   });
 
-  router.handle("session/list", async (params, _notify) => {
+  router.handle("session/list", async (params, _notify, ctx) => {
     const filters = extract<SessionListParams>(params, []);
-    const sessions = await app.sessions.list(filters);
+    const scoped = resolveTenantApp(app, ctx);
+    // rootsOnly switches to the tree-aware path so every row carries a
+    // `child_stats` rollup. Flat behaviour is preserved when unset/false.
+    if (filters?.rootsOnly) {
+      const sessions = await scoped.sessions.listRoots(filters);
+      return { sessions };
+    }
+    const sessions = await scoped.sessions.list(filters);
     return { sessions };
   });
 
-  router.handle("session/read", async (params, _notify) => {
+  router.handle("session/list_children", async (params, _notify, ctx) => {
+    const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
+    const scoped = resolveTenantApp(app, ctx);
+    const sessions = await scoped.sessions.listChildren(sessionId);
+    return { sessions };
+  });
+
+  router.handle("session/tree", async (params, _notify, ctx) => {
+    const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
+    const scoped = resolveTenantApp(app, ctx);
+    const existing = await scoped.sessions.get(sessionId);
+    if (!existing) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
+    try {
+      const root = await scoped.sessions.loadTree(sessionId);
+      return { root };
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      // Bubble the parent-required error as a clean RpcError so the UI can
+      // show an actionable message without relying on string matching.
+      throw new RpcError(msg, SESSION_NOT_FOUND);
+    }
+  });
+
+  router.handle("session/read", async (params, _notify, ctx) => {
     const { sessionId, include } = extract<SessionReadParams>(params, ["sessionId"]);
-    const session = await app.sessions.get(sessionId);
+    const scoped = resolveTenantApp(app, ctx);
+    const session = await scoped.sessions.get(sessionId);
     if (!session) {
       throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
     }
     const result: Record<string, unknown> = { session };
     if (include?.includes("events")) {
-      result.events = await app.events.list(sessionId);
+      result.events = await scoped.events.list(sessionId);
     }
     if (include?.includes("messages")) {
-      result.messages = await app.messages.list(sessionId);
+      result.messages = await scoped.messages.list(sessionId);
     }
     return result;
   });
 
   // ── Queries ────────────────────────────────────────────────────────────────
 
-  router.handle("session/events", async (params, _notify) => {
+  router.handle("session/events", async (params, _notify, ctx) => {
     const { sessionId, limit } = extract<SessionEventsParams>(params, ["sessionId"]);
-    const events = await app.events.list(sessionId, { limit });
+    const scoped = resolveTenantApp(app, ctx);
+    const events = await scoped.events.list(sessionId, { limit });
     return { events };
   });
 
-  router.handle("session/messages", async (params, _notify) => {
+  router.handle("session/messages", async (params, _notify, ctx) => {
     const { sessionId, limit } = extract<SessionMessagesParams>(params, ["sessionId"]);
-    const messages = await app.messages.list(sessionId, { limit });
+    const scoped = resolveTenantApp(app, ctx);
+    const messages = await scoped.messages.list(sessionId, { limit });
     return { messages };
   });
 
-  router.handle("session/search", async (params, _notify) => {
+  router.handle("session/search", async (params, _notify, ctx) => {
     const { query } = extract<SessionSearchParams>(params, ["query"]);
-    const results = await searchSessions(app, query);
+    const scoped = resolveTenantApp(app, ctx);
+    const results = await searchSessions(scoped, query);
     return { results };
   });
 
-  router.handle("session/conversation", async (params, _notify) => {
+  router.handle("session/conversation", async (params, _notify, ctx) => {
     const { sessionId, limit } = extract<{ sessionId: string; limit?: number }>(params, ["sessionId"]);
-    const turns = await getSessionConversation(app, sessionId, { limit });
+    const scoped = resolveTenantApp(app, ctx);
+    const turns = await getSessionConversation(scoped, sessionId, { limit });
     return { turns };
   });
 
-  router.handle("session/search-conversation", async (params, _notify) => {
+  router.handle("session/search-conversation", async (params, _notify, ctx) => {
     const { sessionId, query } = extract<{ sessionId: string; query: string }>(params, ["sessionId", "query"]);
-    const results = await searchSessionConversation(app, sessionId, query);
+    const scoped = resolveTenantApp(app, ctx);
+    const results = await searchSessionConversation(scoped, sessionId, query);
     return { results };
   });
 
-  router.handle("session/output", async (params, _notify) => {
+  router.handle("session/output", async (params, _notify, ctx) => {
     const { sessionId, lines } = extract<SessionOutputParams>(params, ["sessionId"]);
-    const output = await app.sessionService.getOutput(sessionId, { lines });
+    const scoped = resolveTenantApp(app, ctx);
+    const output = await scoped.sessionService.getOutput(sessionId, { lines });
     return { output };
   });
 
-  router.handle("session/recording", async (params, _notify) => {
+  // ── Forensic files (tracks/<id>/stdio.log + transcript.jsonl) ────────────
+  //
+  // Both methods 404 when the session is missing, return empty content when
+  // the file doesn't exist, and enforce the same 2MB cap as the REST routes.
+  // `session/stdio` honours an optional `tail` to slice the trailing N lines.
+
+  router.handle("session/stdio", async (params, _notify, ctx) => {
+    const { sessionId, tail } = extract<{ sessionId: string; tail?: number }>(params, ["sessionId"]);
+    const scoped = resolveTenantApp(app, ctx);
+    const session = await scoped.sessions.get(sessionId);
+    if (!session) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
+    const { readForensicFile } = await import("../../core/services/session-forensic.js");
+    // Forensic files live under the daemon's tracks dir (not per-tenant on
+    // disk). Access control is via the tenant-scoped sessions lookup above.
+    const read = await readForensicFile(scoped.config.tracksDir, sessionId, "stdio.log", { tail });
+    if (read.tooLarge) {
+      throw new RpcError(
+        `stdio.log is ${read.size} bytes, over the 2MB cap -- pass tail=<N> to read the tail`,
+        ErrorCodes.INVALID_PARAMS,
+      );
+    }
+    return { content: read.content, size: read.size, exists: read.exists };
+  });
+
+  router.handle("session/transcript", async (params, _notify, ctx) => {
+    const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
+    const scoped = resolveTenantApp(app, ctx);
+    const session = await scoped.sessions.get(sessionId);
+    if (!session) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
+    const { readForensicFile, parseJsonl } = await import("../../core/services/session-forensic.js");
+    const read = await readForensicFile(scoped.config.tracksDir, sessionId, "transcript.jsonl");
+    if (read.tooLarge) {
+      throw new RpcError(`transcript.jsonl is ${read.size} bytes, over the 2MB cap`, ErrorCodes.INVALID_PARAMS);
+    }
+    return { messages: parseJsonl(read.content), size: read.size, exists: read.exists };
+  });
+
+  router.handle("session/recording", async (params, _notify, _ctx) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
     const { readRecording } = await import("../../core/recordings.js");
-    const output = readRecording(app.config.dirs.ark, sessionId);
+    // Recording files live in the daemon's arkDir (not tenant-segmented).
+    const output = readRecording(app.config.arkDir, sessionId);
     return { ok: output !== null, output };
   });
 
-  router.handle("session/handoff", async (params, notify) => {
+  router.handle("session/handoff", async (params, notify, ctx) => {
     const { sessionId, agent, instructions } = extract<SessionHandoffParams>(params, ["sessionId", "agent"]);
-    const result = await app.sessionService.handoff(sessionId, agent, instructions);
-    const session = await app.sessions.get(sessionId);
+    const scoped = resolveTenantApp(app, ctx);
+    const result = await scoped.sessionService.handoff(sessionId, agent, instructions);
+    const session = await scoped.sessions.get(sessionId);
     if (session) notify("session/updated", { session });
     return result;
   });
 
-  router.handle("session/join", async (params, _notify) => {
+  router.handle("session/join", async (params, _notify, ctx) => {
     const { sessionId, force } = extract<SessionJoinParams>(params, ["sessionId"]);
-    const result = await app.sessionService.join(sessionId, force ?? false);
+    const scoped = resolveTenantApp(app, ctx);
+    const result = await scoped.sessionService.join(sessionId, force ?? false);
     return result;
   });
 
-  router.handle("session/spawn", async (params, notify) => {
-    const { sessionId, task, agent, model, group_name } = extract<SessionSpawnParams>(params, ["sessionId", "task"]);
-    const result = await app.sessionService.spawn(sessionId, {
+  router.handle("session/spawn", async (params, notify, ctx) => {
+    const { sessionId, task, agent, group_name } = extract<SessionSpawnParams>(params, ["sessionId", "task"]);
+    const scoped = resolveTenantApp(app, ctx);
+    const result = await scoped.sessionService.spawn(sessionId, {
       task,
       agent,
-      model,
       group_name,
     });
     if (result.sessionId) {
-      const session = await app.sessions.get(result.sessionId);
+      const session = await scoped.sessions.get(result.sessionId);
       if (session) notify("session/created", { session });
       // spawn() emits session_created internally; the default listener handles dispatch.
     }
     return result;
   });
 
-  router.handle("session/fan-out", async (params, notify) => {
+  router.handle("session/fan-out", async (params, notify, ctx) => {
     const { sessionId, tasks } = extract<{
       sessionId: string;
       tasks: Array<{ summary: string; agent?: string; flow?: string }>;
     }>(params, ["sessionId", "tasks"]);
-    const result = await app.sessionService.fanOut(sessionId, { tasks });
+    const scoped = resolveTenantApp(app, ctx);
+    const result = await scoped.sessionService.fanOut(sessionId, { tasks });
     if (!result.ok) throw new RpcError(result.message ?? "Fan-out failed", SESSION_NOT_FOUND);
     for (const childId of result.childIds ?? []) {
-      const session = await app.sessions.get(childId);
+      const session = await scoped.sessions.get(childId);
       if (session) notify("session/created", { session });
     }
     // Fan-out children are dispatched en masse by the orchestrator (see
@@ -270,21 +363,22 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     return result;
   });
 
-  router.handle("session/resume", async (params, notify) => {
+  router.handle("session/resume", async (params, notify, ctx) => {
     const { sessionId, snapshotId, rewindToStage } = extract<SessionResumeParams>(params, ["sessionId"]);
+    const scoped = resolveTenantApp(app, ctx);
 
     // Snapshot-backed restore bypasses rewind: restoring a pinned snapshot is
     // a different operation from "re-run from stage X". If the caller wants
     // a rewind, they must not also ask for a snapshot.
-    const session = await app.sessions.get(sessionId);
+    const session = await scoped.sessions.get(sessionId);
     const lastSnapshotId =
       snapshotId ?? (session?.config as Record<string, unknown> | undefined)?.last_snapshot_id ?? undefined;
 
     if (lastSnapshotId && !rewindToStage) {
       const { resumeFromSnapshot } = await import("../../core/services/session-snapshot.js");
-      const snapResult = await resumeFromSnapshot(app, sessionId, { snapshotId: lastSnapshotId as string });
+      const snapResult = await resumeFromSnapshot(scoped, sessionId, { snapshotId: lastSnapshotId as string });
       if (snapResult.ok) {
-        const updated = await app.sessions.get(sessionId);
+        const updated = await scoped.sessions.get(sessionId);
         if (updated) notify("session/updated", { session: updated });
         return { ok: true, message: snapResult.message, snapshotId: snapResult.snapshotId };
       }
@@ -296,18 +390,19 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
       }
     }
 
-    const result = await app.sessionService.resume(sessionId, { rewindToStage });
-    const updated = await app.sessions.get(sessionId);
+    const result = await scoped.sessionService.resume(sessionId, { rewindToStage });
+    const updated = await scoped.sessions.get(sessionId);
     if (updated) notify("session/updated", { session: updated });
     return result;
   });
 
-  router.handle("session/flowStages", async (params) => {
+  router.handle("session/flowStages", async (params, _notify, ctx) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
-    const session = await app.sessions.get(sessionId);
+    const scoped = resolveTenantApp(app, ctx);
+    const session = await scoped.sessions.get(sessionId);
     if (!session) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
     const { getStages } = await import("../../core/state/flow.js");
-    const stages = getStages(app, session.flow).map((s) => ({
+    const stages = getStages(scoped, session.flow).map((s) => ({
       name: s.name,
       type: s.action ? "action" : s.agent ? "agent" : (s.type ?? "agent"),
       agent: s.agent ?? null,
@@ -316,15 +411,16 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     return { flow: session.flow, currentStage: session.stage, stages };
   });
 
-  router.handle("session/pause", async (params, notify) => {
+  router.handle("session/pause", async (params, notify, ctx) => {
     const { sessionId, reason } = extract<SessionPauseParams>(params, ["sessionId"]);
+    const scoped = resolveTenantApp(app, ctx);
 
     // Try the snapshot-backed pause first. If the underlying compute doesn't
     // support snapshot we transparently fall back to a state-only pause so
     // local sessions keep working the way they did before snapshotting.
     const { pauseWithSnapshot } = await import("../../core/services/session-snapshot.js");
-    const snapResult = await pauseWithSnapshot(app, sessionId, { reason });
-    const session = await app.sessions.get(sessionId);
+    const snapResult = await pauseWithSnapshot(scoped, sessionId, { reason });
+    const session = await scoped.sessions.get(sessionId);
 
     if (snapResult.ok) {
       if (session) notify("session/updated", { session });
@@ -336,16 +432,17 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     }
 
     // Fallback: state-only pause (pre-Phase-3 behaviour).
-    const result = await app.sessionService.pause(sessionId, reason);
-    const updated = await app.sessions.get(sessionId);
+    const result = await scoped.sessionService.pause(sessionId, reason);
+    const updated = await scoped.sessions.get(sessionId);
     if (updated) notify("session/updated", { session: updated });
     return { ...result, snapshot: null, notSupported: true };
   });
 
-  router.handle("session/interrupt", async (params) => {
+  router.handle("session/interrupt", async (params, _notify, ctx) => {
     const { sessionId, content } = extract<{ sessionId: string; content: string }>(params, ["sessionId", "content"]);
+    const scoped = resolveTenantApp(app, ctx);
 
-    const s = await app.sessions.get(sessionId);
+    const s = await scoped.sessions.get(sessionId);
     if (!s) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
     if (s.status !== "running") {
       return { ok: false, message: `session not running (status=${s.status})` };
@@ -357,13 +454,13 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     // into the prompt queue as the correction message for the next turn.
     const executorName = (s.config as Record<string, unknown> | null)?.launch_executor as string | undefined;
     if (executorName === "agent-sdk") {
-      const sessionDir = join(app.config.dirs.tracks, sessionId);
+      const sessionDir = join(scoped.config.tracksDir, sessionId);
       const interventionPath = join(sessionDir, "interventions.jsonl");
       await fsPromises.mkdir(sessionDir, { recursive: true });
       const line = JSON.stringify({ role: "user", content, control: "interrupt", ts: Date.now() }) + "\n";
       await fsPromises.appendFile(interventionPath, line, "utf8");
 
-      await app.events.log(sessionId, "session_interrupted", {
+      await scoped.events.log(sessionId, "session_interrupted", {
         actor: "user",
         data: { content_preview: content.slice(0, 80) },
       });
@@ -372,7 +469,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     }
 
     // Non-agent-sdk sessions: fall back to the tmux C-c interrupt.
-    const result = await app.sessionLifecycle.interrupt(sessionId);
+    const result = await scoped.sessionLifecycle.interrupt(sessionId);
     return result;
   });
 
@@ -382,10 +479,11 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   // Marks session `failed` with reason `killed` and runs D2 cleanup
   // synchronously so post-conditions are reliable for the caller.
 
-  router.handle("session/kill", async (params, notify) => {
+  router.handle("session/kill", async (params, notify, ctx) => {
     const { sessionId } = extract<{ sessionId: string }>(params, ["sessionId"]);
+    const scoped = resolveTenantApp(app, ctx);
 
-    const s = await app.sessions.get(sessionId);
+    const s = await scoped.sessions.get(sessionId);
     if (!s) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
 
     const terminalStatuses = ["completed", "failed", "archived", "stopped"];
@@ -410,41 +508,43 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     }
 
     // Mark session failed with reason "killed".
-    await app.sessions.update(sessionId, {
+    await scoped.sessions.update(sessionId, {
       status: "failed",
       error: "killed",
       session_id: null,
     } as Partial<import("../../types/index.js").Session>);
 
-    await app.events.log(sessionId, "session_killed", {
+    await scoped.events.log(sessionId, "session_killed", {
       actor: "user",
       data: { handle: handle ?? null },
     });
 
     // Run D2 cleanup synchronously so the caller can rely on post-conditions.
-    const updated = (await app.sessions.get(sessionId))!;
+    const updated = (await scoped.sessions.get(sessionId))!;
     if (updated) {
       const { cleanupSession } = await import("../../core/services/session/cleanup.js");
-      await cleanupSession(app, updated);
+      await cleanupSession(scoped, updated);
     }
 
-    const final = await app.sessions.get(sessionId);
+    const final = await scoped.sessions.get(sessionId);
     if (final) notify("session/updated", { session: final });
 
     return { ok: true, terminated_at: Date.now(), cleaned_up: true };
   });
 
-  router.handle("session/archive", async (params, notify) => {
+  router.handle("session/archive", async (params, notify, ctx) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
-    const result = await app.sessionService.archive(sessionId);
-    if (result.ok) notify("session/updated", { session: await app.sessions.get(sessionId) });
+    const scoped = resolveTenantApp(app, ctx);
+    const result = await scoped.sessionService.archive(sessionId);
+    if (result.ok) notify("session/updated", { session: await scoped.sessions.get(sessionId) });
     return result;
   });
 
-  router.handle("session/restore", async (params, notify) => {
+  router.handle("session/restore", async (params, notify, ctx) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
-    const result = await app.sessionService.restore(sessionId);
-    if (result.ok) notify("session/updated", { session: await app.sessions.get(sessionId) });
+    const scoped = resolveTenantApp(app, ctx);
+    const result = await scoped.sessionService.restore(sessionId);
+    if (result.ok) notify("session/updated", { session: await scoped.sessions.get(sessionId) });
     return result;
   });
 
@@ -458,9 +558,10 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   // For remote compute targets (ec2, k8s, ...), we delegate to the provider's
   // `getAttachCommand(compute, session)` so the returned string includes the
   // SSH / kubectl prefix the user needs to run locally.
-  router.handle("session/attach-command", async (params) => {
+  router.handle("session/attach-command", async (params, _notify, ctx) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
-    const session = await app.sessions.get(sessionId);
+    const scoped = resolveTenantApp(app, ctx);
+    const session = await scoped.sessions.get(sessionId);
     if (!session) {
       throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
     }
@@ -489,8 +590,10 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     let command = "";
     let displayHint = "Paste this into a terminal on the host running ark:";
     if (session.compute_name) {
-      const compute = await app.computes.get(session.compute_name);
+      const compute = await scoped.computes.get(session.compute_name);
       if (compute) {
+        // Provider registry is process-wide (not per-tenant), so resolve on
+        // the root app. The `compute` row itself was fetched tenant-scoped.
         const provider = app.getProvider(providerOf(compute));
         try {
           const parts = provider?.getAttachCommand?.(compute, session) ?? [];
@@ -510,12 +613,13 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     return { command, displayHint, attachable: true };
   });
 
-  router.handle("worktree/diff", async (params) => {
+  router.handle("worktree/diff", async (params, _notify, ctx) => {
     const { sessionId, base } = extract<{ sessionId: string; base?: string }>(params, ["sessionId"]);
-    return app.sessionService.worktreeDiff(sessionId, { base });
+    const scoped = resolveTenantApp(app, ctx);
+    return scoped.sessionService.worktreeDiff(sessionId, { base });
   });
 
-  router.handle("worktree/create-pr", async (params, notify) => {
+  router.handle("worktree/create-pr", async (params, notify, ctx) => {
     const { sessionId, title, body, base, draft } = extract<{
       sessionId: string;
       title?: string;
@@ -523,15 +627,17 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
       base?: string;
       draft?: boolean;
     }>(params, ["sessionId"]);
-    const result = await app.sessionService.createWorktreePR(sessionId, { title, body, base, draft });
-    const session = await app.sessions.get(sessionId);
+    const scoped = resolveTenantApp(app, ctx);
+    const result = await scoped.sessionService.createWorktreePR(sessionId, { title, body, base, draft });
+    const session = await scoped.sessions.get(sessionId);
     if (session) notify("session/updated", { session });
     return result;
   });
 
-  router.handle("worktree/finish", async (params, _notify) => {
+  router.handle("worktree/finish", async (params, _notify, ctx) => {
     const { sessionId, noMerge, createPR } = extract<WorktreeFinishParams>(params, ["sessionId"]);
-    const result = await app.sessionService.finishWorktree(sessionId, {
+    const scoped = resolveTenantApp(app, ctx);
+    const result = await scoped.sessionService.finishWorktree(sessionId, {
       noMerge: noMerge ?? false,
       createPR: createPR ?? false,
     });
@@ -540,68 +646,77 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
 
   // ── Todos ────────────────────────────────────────────────────────────────
 
-  router.handle("todo/list", async (params) => {
+  router.handle("todo/list", async (params, _notify, ctx) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
-    return { todos: await app.todos.list(sessionId) };
+    const scoped = resolveTenantApp(app, ctx);
+    return { todos: await scoped.todos.list(sessionId) };
   });
 
-  router.handle("todo/add", async (params) => {
+  router.handle("todo/add", async (params, _notify, ctx) => {
     const { sessionId, content } = extract<{ sessionId: string; content: string }>(params, ["sessionId", "content"]);
-    return { todo: await app.todos.add(sessionId, content) };
+    const scoped = resolveTenantApp(app, ctx);
+    return { todo: await scoped.todos.add(sessionId, content) };
   });
 
-  router.handle("todo/toggle", async (params) => {
+  router.handle("todo/toggle", async (params, _notify, ctx) => {
     const { id } = extract<{ id: number }>(params, ["id"]);
-    const todo = await app.todos.toggle(id);
+    const scoped = resolveTenantApp(app, ctx);
+    const todo = await scoped.todos.toggle(id);
     return { todo };
   });
 
-  router.handle("todo/delete", async (params) => {
+  router.handle("todo/delete", async (params, _notify, ctx) => {
     const { id } = extract<{ id: number }>(params, ["id"]);
-    return { ok: await app.todos.delete(id) };
+    const scoped = resolveTenantApp(app, ctx);
+    return { ok: await scoped.todos.delete(id) };
   });
 
   // ── Verification ─────────────────────────────────────────────────────────
 
-  router.handle("verify/run", async (params) => {
+  router.handle("verify/run", async (params, _notify, ctx) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
-    return app.sessionLifecycle.runVerification(sessionId);
+    const scoped = resolveTenantApp(app, ctx);
+    return scoped.sessionLifecycle.runVerification(sessionId);
   });
 
   // ── Export ─────────────────────────────────────────────────────────────
 
-  router.handle("session/export", async (params) => {
+  router.handle("session/export", async (params, _notify, ctx) => {
     const { sessionId, filePath } = extract<{ sessionId: string; filePath?: string }>(params, ["sessionId"]);
+    const scoped = resolveTenantApp(app, ctx);
     const { exportSession, exportSessionToFile } = await import("../../core/session/share.js");
     if (filePath) {
-      const ok = await exportSessionToFile(app, sessionId, filePath);
+      const ok = await exportSessionToFile(scoped, sessionId, filePath);
       return { ok, filePath };
     }
-    const data = await exportSession(app, sessionId);
+    const data = await exportSession(scoped, sessionId);
     if (!data) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
     return { ok: true, data };
   });
 
   // ── Artifact tracking ──────────────────────────────────────────────────────
 
-  router.handle("session/artifacts/list", async (params) => {
+  router.handle("session/artifacts/list", async (params, _notify, ctx) => {
     const { sessionId, type } = extract<{ sessionId: string; type?: string }>(params, ["sessionId"]);
-    const artifacts = await app.artifacts.list(sessionId, type as any);
+    const scoped = resolveTenantApp(app, ctx);
+    const artifacts = await scoped.artifacts.list(sessionId, type as any);
     return { artifacts };
   });
 
-  router.handle("session/artifacts/query", async (params) => {
+  router.handle("session/artifacts/query", async (params, _notify, ctx) => {
     const q = extract<{ session_id?: string; type?: string; value?: string; limit?: number }>(params, []);
-    const artifacts = await app.artifacts.query(q as any);
+    const scoped = resolveTenantApp(app, ctx);
+    const artifacts = await scoped.artifacts.query(q as any);
     return { artifacts };
   });
 
   // ── Replay ──────────────────────────────────────────────────────────────────
 
-  router.handle("session/replay", async (params) => {
+  router.handle("session/replay", async (params, _notify, ctx) => {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
+    const scoped = resolveTenantApp(app, ctx);
     const { buildReplay } = await import("../../core/session/replay.js");
-    const steps = await buildReplay(app, sessionId);
+    const steps = await buildReplay(scoped, sessionId);
     return { steps };
   });
 
@@ -614,16 +729,17 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
   // Do NOT route through deliverToChannel -- agent-sdk has no channel port.
   // File-tail is the transport.
 
-  router.handle("session/inject", async (params) => {
+  router.handle("session/inject", async (params, _notify, ctx) => {
     const { sessionId, content } = extract<{ sessionId: string; content: string }>(params, ["sessionId", "content"]);
+    const scoped = resolveTenantApp(app, ctx);
 
-    const s = await app.sessions.get(sessionId);
+    const s = await scoped.sessions.get(sessionId);
     if (!s) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
     if (s.status !== "running") {
       return { ok: false, message: `session not running (status=${s.status})` };
     }
 
-    const sessionDir = join(app.config.dirs.tracks, sessionId);
+    const sessionDir = join(scoped.config.tracksDir, sessionId);
     const interventionPath = join(sessionDir, "interventions.jsonl");
     const line = JSON.stringify({ role: "user", content, ts: Date.now() }) + "\n";
 
@@ -632,7 +748,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     await fsPromises.mkdir(sessionDir, { recursive: true });
     await fsPromises.appendFile(interventionPath, line, "utf8");
 
-    await app.events.log(sessionId, "session_injected", {
+    await scoped.events.log(sessionId, "session_injected", {
       actor: "user",
       data: { content_preview: content.slice(0, 80) },
     });
