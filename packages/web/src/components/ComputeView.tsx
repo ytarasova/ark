@@ -4,6 +4,7 @@ import { useApi } from "../hooks/useApi.js";
 import { useComputeQuery, useComputeSnapshotQuery, useRunningSessionsQuery } from "../hooks/useComputeQueries.js";
 import { cn } from "../lib/utils.js";
 import { Badge } from "./ui/badge.js";
+import { ListRow } from "./ui/ListRow.js";
 import { Server } from "lucide-react";
 import { statusDotColor } from "./compute/helpers.js";
 import { NewComputeForm } from "./compute/NewComputeForm.js";
@@ -205,49 +206,52 @@ export function ComputeView({
               </button>
             ))}
           </div>
-          {visibleComputes.map((c: any) => (
-            <div
-              key={c.name || c.id}
-              role="option"
-              aria-selected={(selected?.name || selected?.id) === (c.name || c.id)}
-              className={cn(
-                "flex items-center justify-between px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors text-[13px]",
-                "hover:bg-accent",
-                (selected?.name || selected?.id) === (c.name || c.id) &&
-                  "bg-accent border-l-2 border-l-primary font-semibold",
-              )}
-              onClick={() => {
-                setSelected(c);
-                // metricsState is derived from the snapshot query's own
-                // isPending flag, so no explicit loading-state reset is
-                // needed here -- the new queryKey will show isPending=true
-                // until the next fetch lands.
-              }}
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <span
-                  className={cn("inline-block w-2 h-2 rounded-full shrink-0", statusDotColor(c.status || "unknown"))}
-                />
-                <span className="text-foreground truncate">{c.name || c.id}</span>
-                {/* Tiny pill: TEMPLATE vs COMPUTE. Users should never wonder
-                    which they clicked on. Styled to match the existing
-                    Badge component so the page reads consistently. */}
-                <Badge
-                  variant={c.is_template ? "outline" : "secondary"}
-                  className="text-[9px] shrink-0 uppercase tracking-wider"
-                >
-                  {c.is_template ? "template" : "compute"}
+          {visibleComputes.map((c: any) => {
+            const isSelected = (selected?.name || selected?.id) === (c.name || c.id);
+            return (
+              <ListRow
+                key={c.name || c.id}
+                role="option"
+                selected={isSelected}
+                onSelect={() => {
+                  setSelected(c);
+                  // metricsState is derived from the snapshot query's own
+                  // isPending flag, so no explicit loading-state reset is
+                  // needed here -- the new queryKey will show isPending=true
+                  // until the next fetch lands.
+                }}
+                className={cn(
+                  "flex items-center justify-between px-4 py-2.5 border-b border-border/50 transition-colors text-[13px]",
+                  "hover:bg-accent",
+                  isSelected && "bg-accent border-l-2 border-l-primary font-semibold",
+                )}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span
+                    className={cn("inline-block w-2 h-2 rounded-full shrink-0", statusDotColor(c.status || "unknown"))}
+                  />
+                  <span className="text-foreground truncate">{c.name || c.id}</span>
+                  {/* Tiny pill: TEMPLATE vs COMPUTE. Users should never wonder
+                      which they clicked on. Styled to match the existing
+                      Badge component so the page reads consistently. */}
+                  <Badge
+                    variant={c.is_template ? "outline" : "secondary"}
+                    className="text-[9px] shrink-0 uppercase tracking-wider"
+                  >
+                    {c.is_template ? "template" : "compute"}
+                  </Badge>
+                </div>
+                <Badge variant="secondary" className="text-[10px] shrink-0 ml-2">
+                  {/* Prefer compute_kind + runtime_kind; fall back to the
+                      legacy type string for older rows. `provider` field was
+                      removed from the Compute type in the round-3 deprecation sweep. */}
+                  {(c as any).compute_kind && (c as any).runtime_kind
+                    ? `${(c as any).compute_kind}/${(c as any).runtime_kind}`
+                    : c.type || "local"}
                 </Badge>
-              </div>
-              <Badge variant="secondary" className="text-[10px] shrink-0 ml-2">
-                {/* Prefer compute_kind + runtime_kind; fall back to the
-                    legacy provider / type string for older rows. */}
-                {(c as any).compute_kind && (c as any).runtime_kind
-                  ? `${(c as any).compute_kind}/${(c as any).runtime_kind}`
-                  : c.provider || c.type || "local"}
-              </Badge>
-            </div>
-          ))}
+              </ListRow>
+            );
+          })}
         </div>
         <div className="overflow-y-auto bg-background">
           {showCreate ? (
