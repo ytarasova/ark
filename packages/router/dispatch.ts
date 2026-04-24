@@ -39,13 +39,18 @@ export class Dispatcher {
       }
     }
 
-    // Fallback: try other providers with models in the same tier
+    // Fallback: try other providers with models in the same tier.
+    //
+    // Exclude the primary provider too: breaker threshold is 5 failures, but
+    // we enter fallback after a single primary failure. Without the provider
+    // filter we'd send another request through the same Provider whose breaker
+    // is still closed but is observably failing, burning another retry budget.
     const selectedModel = this.registry.findModel(selected_model);
     const tier = selectedModel?.tier ?? "standard";
 
     const fallbackModels = this.registry
       .listModels()
-      .filter((m) => m.tier === tier && m.id !== selected_model)
+      .filter((m) => m.tier === tier && m.id !== selected_model && m.provider !== selected_provider)
       .sort((a, b) => a.quality - b.quality); // prefer lower quality first for cost
 
     for (const fallbackModel of fallbackModels) {
@@ -92,13 +97,14 @@ export class Dispatcher {
       }
     }
 
-    // Fallback: try other providers with models in same tier
+    // Fallback: try other providers with models in same tier (see note on the
+    // non-streaming path about excluding the primary provider).
     const selectedModel = this.registry.findModel(selected_model);
     const tier = selectedModel?.tier ?? "standard";
 
     const fallbackModels = this.registry
       .listModels()
-      .filter((m) => m.tier === tier && m.id !== selected_model)
+      .filter((m) => m.tier === tier && m.id !== selected_model && m.provider !== selected_provider)
       .sort((a, b) => a.quality - b.quality);
 
     for (const fallbackModel of fallbackModels) {

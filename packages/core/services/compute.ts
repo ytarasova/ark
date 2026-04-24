@@ -25,27 +25,10 @@ import type { AppContext } from "../app.js";
 import { providerToPair, pairToProvider, providerOf } from "../../compute/adapters/provider-map.js";
 
 export class ComputeService {
-  private _app: AppContext | null = null;
-
   constructor(
     private computes: ComputeRepository,
-    app?: AppContext,
-  ) {
-    if (app) this._app = app;
-  }
-
-  /**
-   * Inject AppContext after construction. Prefer the constructor argument;
-   * this setter exists for DI wiring sequences that can't get `app` up front.
-   */
-  setApp(app: AppContext): void {
-    this._app = app;
-  }
-
-  private get app(): AppContext {
-    if (!this._app) throw new Error("ComputeService: AppContext not set -- pass app to constructor or call setApp()");
-    return this._app;
-  }
+    private app: AppContext,
+  ) {}
 
   // ── Create: rule-aware ──────────────────────────────────────────────────
 
