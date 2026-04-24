@@ -123,7 +123,11 @@ const computeSchema = z
 // through the shared template substitution pipeline.
 export const sessionInputsSchema = z.object({
   files: z.record(z.string(), z.string()).optional(),
-  params: z.record(z.string(), z.string()).optional(),
+  // params hold for_each iteration sources, named scalars, and structured
+  // dispatch-time data. Arrays of objects (repo lists, ticket lists) flow
+  // through here, so values can't be limited to strings -- use `unknown`
+  // and let the template engine + for_each resolver do the typing.
+  params: z.record(z.string(), z.unknown()).optional(),
 });
 export type SessionInputs = z.infer<typeof sessionInputsSchema>;
 
