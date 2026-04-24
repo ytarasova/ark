@@ -74,8 +74,11 @@ describe("Manual completion path (bare flow)", async () => {
 
     // Manual gate: shouldAdvance must be false/undefined
     expect(result.shouldAdvance).toBeFalsy();
-    // Status should NOT be set to "ready" -- session stays running
-    expect(result.updates.status).toBeUndefined();
+    // Status flips to `blocked` so the UI stops the running spinner and
+    // surfaces Approve/Reject controls for the human; session_id is
+    // cleared because the agent has exited.
+    expect(result.updates.status).toBe("blocked");
+    expect(result.updates.session_id).toBeNull();
     // Completion data should still be saved
     expect(result.updates.config?.completion_summary).toBe("All tasks done");
     // Message should be generated for the UI
@@ -128,9 +131,10 @@ describe("Manual completion path (bare flow)", async () => {
       await app.messages.send(session.id, result.message.role, result.message.content, result.message.type);
     }
 
-    // Session should still be running (manual gate)
+    // Session transitions to `blocked` (manual gate, agent exited). Human
+    // force-advances below to reach `completed`.
     let current = await app.sessions.get(session.id);
-    expect(current?.status).toBe("running");
+    expect(current?.status).toBe("blocked");
     // Message should be stored
     const msgs = await app.messages.list(session.id);
     expect(msgs.length).toBe(1);
@@ -410,9 +414,10 @@ describe("Conductor channel report delivery", async () => {
     expect(msgs[0].type).toBe("completed");
     expect(msgs[0].content).toContain("Task finished");
 
-    // Manual gate: session should stay running
+    // Manual gate: session transitions to `blocked` (agent exited, awaiting
+    // human Approve/Reject).
     const updated = await app.sessions.get(session.id);
-    expect(updated?.status).toBe("running");
+    expect(updated?.status).toBe("blocked");
   });
 
   it("POST /api/channel/:id with completed report on auto-gate advances session", async () => {

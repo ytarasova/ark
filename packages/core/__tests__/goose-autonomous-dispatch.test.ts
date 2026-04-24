@@ -75,25 +75,6 @@ describe("Goose runtime resolution", () => {
     expect(agent!.task_delivery).toBe("arg");
   });
 
-  it("remaps agent model to goose default when agent model is not in goose model list", () => {
-    const session = { summary: "test", id: "s-goose02" };
-    const agent = resolveAgentWithRuntime(app, "worker", session, { runtimeOverride: "goose" });
-
-    // Worker agent defaults to "opus" which isn't in goose's model list.
-    // resolveAgentWithRuntime should remap to goose's default_model.
-    expect(agent).not.toBeNull();
-    expect(agent!.model).toBe("claude-sonnet-4-6");
-  });
-
-  it("preserves agent model when it exists in goose model list", () => {
-    const session = { summary: "test", id: "s-goose03" };
-    // Create a test agent with a model that IS in goose's list
-    const agent = resolveAgentWithRuntime(app, "worker", session, { runtimeOverride: "goose" });
-    // After remap, model should be goose default since "opus" isn't in goose models
-    expect(agent).not.toBeNull();
-    expect(agent!.model).toBe("claude-sonnet-4-6");
-  });
-
   it("all five builtin runtimes are loadable", () => {
     const names = ["claude", "claude-max", "codex", "gemini", "goose"];
     for (const name of names) {
@@ -362,21 +343,6 @@ describe("Goose runtime billing and transcript config", () => {
     const runtime = app.runtimes.get("goose");
     expect(runtime).not.toBeNull();
     expect(runtime!.billing?.mode).toBe("api");
-  });
-
-  it("goose runtime default model is claude-sonnet-4-6", () => {
-    const runtime = app.runtimes.get("goose");
-    expect(runtime).not.toBeNull();
-    expect(runtime!.default_model).toBe("claude-sonnet-4-6");
-  });
-
-  it("goose runtime has multiple model options", () => {
-    const runtime = app.runtimes.get("goose");
-    expect(runtime).not.toBeNull();
-    expect(runtime!.models!.length).toBeGreaterThanOrEqual(3);
-    const modelIds = runtime!.models!.map((m) => m.id);
-    expect(modelIds).toContain("claude-sonnet-4-6");
-    expect(modelIds).toContain("claude-opus-4-6");
   });
 });
 

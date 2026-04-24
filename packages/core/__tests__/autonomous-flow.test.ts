@@ -68,8 +68,10 @@ describe("applyReport auto-gate completion", async () => {
 
     expect(result.shouldAdvance).toBeFalsy();
     expect(result.shouldAutoDispatch).toBeFalsy();
-    // Manual gate: status stays unchanged (no status update)
-    expect(result.updates.status).toBeUndefined();
+    // Manual gate: status flips to `blocked` so the UI surfaces
+    // Approve/Reject; session_id is cleared because the agent exited.
+    expect(result.updates.status).toBe("blocked");
+    expect(result.updates.session_id).toBeNull();
   });
 });
 
