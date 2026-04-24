@@ -431,9 +431,13 @@ export class ForEachDispatcher {
       const resolvedWorkdir = spawnSpec.workdir ? substituteVars(spawnSpec.workdir, iterVars) : undefined;
 
       // DIAGNOSTIC: trace iter vars + resolved overrides for fan-out debugging.
-      console.error(
-        `[for_each spawn] iter=${i} item=${JSON.stringify(item)} iterVars=${JSON.stringify(iterVars)} spawnSpec.repo=${JSON.stringify(spawnSpec.repo)} resolvedRepo=${JSON.stringify(resolvedRepo)}`,
-      );
+      logInfo("session", `[for_each spawn] DIAG`, {
+        iter: i,
+        item,
+        iterVars,
+        spawn_repo_raw: spawnSpec.repo,
+        resolvedRepo,
+      });
 
       // Effective per-iteration cap: stage-level max_budget_usd overrides the
       // inherited session cap. This is set on the child session's config so the
