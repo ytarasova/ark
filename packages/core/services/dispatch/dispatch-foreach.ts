@@ -139,7 +139,7 @@ async function buildCompletedSetFromChildren(
  * - Objects are flattened recursively with dot-separated paths.
  * - Arrays are stringified at their leaf position.
  */
-function flattenItem(prefix: string, value: unknown, out: Record<string, string>): void {
+function flattenItem(prefix: string, value: unknown, out: Record<string, unknown>): void {
   if (value === null || value === undefined) return;
   if (Array.isArray(value)) {
     out[prefix] = JSON.stringify(value);
@@ -160,8 +160,12 @@ function flattenItem(prefix: string, value: unknown, out: Record<string, string>
  * The iteration item is flattened under `iterVar` so templates like
  * `{{repo.repo_path}}` (where iterVar="repo") resolve correctly.
  */
-function buildIterationVars(baseVars: Record<string, string>, iterVar: string, item: unknown): Record<string, string> {
-  const extra: Record<string, string> = {};
+function buildIterationVars(
+  baseVars: Record<string, unknown>,
+  iterVar: string,
+  item: unknown,
+): Record<string, unknown> {
+  const extra: Record<string, unknown> = {};
   flattenItem(iterVar, item, extra);
   // Expose the raw item as the iterVar key (serialised) ONLY when item is a
   // primitive -- so templates like `{{item}}` work for string/number lists.
@@ -181,7 +185,7 @@ function buildIterationVars(baseVars: Record<string, string>, iterVar: string, i
  * Nested objects and arrays are walked recursively; non-string leaves are
  * kept as-is.
  */
-function substituteInputs(inputs: Record<string, unknown>, vars: Record<string, string>): Record<string, unknown> {
+function substituteInputs(inputs: Record<string, unknown>, vars: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(inputs)) {
     if (typeof v === "string") {
@@ -219,7 +223,7 @@ function resolveDotted(obj: Record<string, unknown>, path: string): unknown {
  *   - agent (if InlineAgentSpec): system_prompt, name, description
  * Other fields (gate, name, on_failure) are passed through unchanged.
  */
-function substituteStageTemplates(stage: StageDefinition, vars: Record<string, string>): StageDefinition {
+function substituteStageTemplates(stage: StageDefinition, vars: Record<string, unknown>): StageDefinition {
   const resolved: StageDefinition = { ...stage };
 
   if (typeof stage.task === "string") {
@@ -257,7 +261,7 @@ const CHILD_POLL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
  * It should launch the agent, wait for terminal, and return ok/failed.
  */
 export interface DispatchInlineSubStageCb {
-  (sessionId: string, resolvedSubStage: StageDefinition, iterVars: Record<string, string>): Promise<DispatchResult>;
+  (sessionId: string, resolvedSubStage: StageDefinition, iterVars: Record<string, unknown>): Promise<DispatchResult>;
 }
 
 export class ForEachDispatcher {
@@ -276,7 +280,7 @@ export class ForEachDispatcher {
     sessionId: string,
     stageDef: StageDefinition,
     /** Pre-built flat session var map (ticket, summary, inputs.*, etc.) */
-    sessionVars: Record<string, string>,
+    sessionVars: Record<string, unknown>,
   ): Promise<DispatchResult> {
     const mode = stageDef.mode ?? "spawn";
     if (mode === "inline") {
@@ -306,7 +310,7 @@ export class ForEachDispatcher {
     sessionId: string,
     stageDef: StageDefinition,
     /** Pre-built flat session var map (ticket, summary, inputs.*, etc.) */
-    sessionVars: Record<string, string>,
+    sessionVars: Record<string, unknown>,
   ): Promise<DispatchResult> {
     const session = await this.deps.sessions.get(sessionId);
     if (!session) return { ok: false, message: `Session ${sessionId} not found` };
@@ -429,15 +433,6 @@ export class ForEachDispatcher {
       const resolvedRepo = spawnSpec.repo ? substituteVars(spawnSpec.repo, iterVars) : undefined;
       const resolvedBranch = spawnSpec.branch ? substituteVars(spawnSpec.branch, iterVars) : undefined;
       const resolvedWorkdir = spawnSpec.workdir ? substituteVars(spawnSpec.workdir, iterVars) : undefined;
-
-      // DIAGNOSTIC: trace iter vars + resolved overrides for fan-out debugging.
-      logInfo("session", `[for_each spawn] DIAG`, {
-        iter: i,
-        item,
-        iterVars,
-        spawn_repo_raw: spawnSpec.repo,
-        resolvedRepo,
-      });
 
       // Effective per-iteration cap: stage-level max_budget_usd overrides the
       // inherited session cap. This is set on the child session's config so the
@@ -634,7 +629,7 @@ export class ForEachDispatcher {
   async dispatchForEachInline(
     sessionId: string,
     stageDef: StageDefinition,
-    sessionVars: Record<string, string>,
+    sessionVars: Record<string, unknown>,
   ): Promise<DispatchResult> {
     const dispatchSubStage = this.deps.dispatchInlineSubStage;
     if (!dispatchSubStage) {
@@ -992,7 +987,7 @@ export class ForEachDispatcher {
  */
 function resolveForEachList(
   expr: string,
-  sessionVars: Record<string, string>,
+  sessionVars: Record<string, unknown>,
   session: Record<string, unknown>,
 ): unknown[] {
   // Attempt direct config lookup when the expr is a simple identifier.
@@ -1003,18 +998,37 @@ function resolveForEachList(
     if (fromVars !== undefined) return coerceToArray(fromVars);
   }
 
-  // Render as template
-  const rendered = substituteVars(expr, sessionVars);
+  // When expr is a bare `{{ path }}` template, resolve it to the NATIVE value
+  // via sessionVars -- don't round-trip through Nunjucks's string rendering,
+  // which would stringify an array of objects to `[object Object],...`. Only
+  // fall through to full template rendering for expressions with filters,
+  // concatenation, or multiple variables.
+  const bareMatch = expr.trim().match(/^\{\{\s*([a-zA-Z_][a-zA-Z0-9_.]*)\s*\}\}$/);
+  if (bareMatch) {
+    const path = bareMatch[1];
+    // Try exact flat-key match first (sessionVars stores `inputs.params.repos`
+    // as a flat dotted key).
+    if (Object.prototype.hasOwnProperty.call(sessionVars, path)) {
+      return coerceToArray(sessionVars[path]);
+    }
+    // Then try nested walk against sessionVars treated as an object tree.
+    const nested = resolveDotted(sessionVars, path);
+    if (nested !== undefined) return coerceToArray(nested);
+    // Then fall back to session.config (legacy call-sites set values there).
+    const configVal = resolveDotted((session.config as Record<string, unknown>) ?? {}, path);
+    if (configVal !== undefined) return coerceToArray(configVal);
+    throw new Error(`Cannot resolve for_each list: '${expr}' -- no value for '${path}'`);
+  }
 
-  // Detect unresolved placeholder -- the template preserved its `{{...}}`
+  // Complex template expression (filters, concatenation, ...). Render via
+  // Nunjucks as a string, then best-effort coerce.
+  const rendered = substituteVars(expr, sessionVars);
   if (rendered.startsWith("{{") && rendered.endsWith("}}")) {
-    // Try direct config lookup using the inner key
     const inner = rendered.slice(2, -2).trim();
     const configVal = resolveDotted(((session as any).config as Record<string, unknown>) ?? {}, inner);
     if (configVal !== undefined) return coerceToArray(configVal);
     throw new Error(`Cannot resolve for_each list: '${expr}' rendered to unresolvable '${rendered}'`);
   }
-
   return coerceToArray(rendered);
 }
 
