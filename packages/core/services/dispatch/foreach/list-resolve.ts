@@ -76,30 +76,49 @@ export function coerceToArray(value: unknown): unknown[] {
  * This lets both `"{{repos}}"` (where `repos` is a JSON-array string) and
  * plain `"myKey"` (a direct config lookup) work without ceremony.
  */
+/**
+ * If `expr` is either a plain dotted key or a bare `{{ path }}` template,
+ * return the path string. Complex templates (filters, concatenation,
+ * multiple vars) return null so the caller falls through to full Nunjucks
+ * rendering.
+ */
+function unwrapBarePath(expr: string): string | null {
+  const s = expr.trim();
+  if (!s) return null;
+  if (!s.includes("{{")) return s;
+  if (!s.startsWith("{{") || !s.endsWith("}}")) return null;
+  const inner = s.slice(2, -2).trim();
+  // A bare path is identifier-chars + dots only -- reject filters (|),
+  // operators, whitespace, and nested templates.
+  if (!inner || inner.includes(" ") || inner.includes("|") || inner.includes("{{")) return null;
+  return inner;
+}
+
 export function resolveForEachList(
   expr: string,
-  sessionVars: Record<string, string>,
+  sessionVars: Record<string, unknown>,
   session: Record<string, unknown>,
 ): unknown[] {
-  // Attempt direct config lookup when the expr is a simple identifier.
-  if (!/\{\{/.test(expr)) {
-    const direct = resolveDotted((session.config as Record<string, unknown>) ?? {}, expr);
-    if (direct !== undefined) return coerceToArray(direct);
-    const fromVars = sessionVars[expr];
+  // Fast path: the expression is a single dotted path (bare template or plain
+  // key). Resolve it natively so native types (array of objects, numbers,
+  // booleans) survive -- Nunjucks would stringify an array of objects to
+  // "[object Object],..." and the coercer would then split it by comma.
+  const path = unwrapBarePath(expr);
+  if (path !== null) {
+    const fromVars = Object.prototype.hasOwnProperty.call(sessionVars, path)
+      ? sessionVars[path]
+      : resolveDotted(sessionVars, path);
     if (fromVars !== undefined) return coerceToArray(fromVars);
+    const fromConfig = resolveDotted((session.config as Record<string, unknown>) ?? {}, path);
+    if (fromConfig !== undefined) return coerceToArray(fromConfig);
+    throw new Error(`Cannot resolve for_each list: '${expr}' -- no value for '${path}'`);
   }
 
-  // Render as template
+  // Complex template (filters, concatenation, multiple variables). Render via
+  // Nunjucks as a string, then best-effort coerce to an array.
   const rendered = substituteVars(expr, sessionVars);
-
-  // Detect unresolved placeholder -- the template preserved its `{{...}}`
   if (rendered.startsWith("{{") && rendered.endsWith("}}")) {
-    // Try direct config lookup using the inner key
-    const inner = rendered.slice(2, -2).trim();
-    const configVal = resolveDotted(((session as any).config as Record<string, unknown>) ?? {}, inner);
-    if (configVal !== undefined) return coerceToArray(configVal);
     throw new Error(`Cannot resolve for_each list: '${expr}' rendered to unresolvable '${rendered}'`);
   }
-
   return coerceToArray(rendered);
 }

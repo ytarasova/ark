@@ -17,7 +17,7 @@ import { randomUUID } from "crypto";
 import type { DispatchDeps, DispatchResult } from "../types.js";
 import type { StageDefinition } from "../../../state/flow.js";
 import { substituteVars } from "../../../template.js";
-import { logDebug, logInfo, logWarn } from "../../../observability/structured-log.js";
+import { logDebug, logWarn } from "../../../observability/structured-log.js";
 
 import { sumPriorIterationCosts } from "./budget.js";
 import { writeCheckpoint, clearCheckpoint, buildCompletedStateFromChildren } from "./checkpoint.js";
@@ -49,7 +49,7 @@ export async function dispatchForEachSpawn(
   childSpawner: ForEachChildSpawner,
   sessionId: string,
   stageDef: StageDefinition,
-  sessionVars: Record<string, string>,
+  sessionVars: Record<string, unknown>,
 ): Promise<DispatchResult> {
   const session = await deps.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
@@ -127,15 +127,6 @@ export async function dispatchForEachSpawn(
     const resolvedRepo = spawnSpec.repo ? substituteVars(spawnSpec.repo, iterVars) : undefined;
     const resolvedBranch = spawnSpec.branch ? substituteVars(spawnSpec.branch, iterVars) : undefined;
     const resolvedWorkdir = spawnSpec.workdir ? substituteVars(spawnSpec.workdir, iterVars) : undefined;
-
-    // DIAGNOSTIC: trace iter vars + resolved overrides for fan-out debugging.
-    logInfo("session", `[for_each spawn] DIAG`, {
-      iter: i,
-      item,
-      iterVars,
-      spawn_repo_raw: spawnSpec.repo,
-      resolvedRepo,
-    });
 
     // Effective per-iteration cap: stage-level max_budget_usd overrides the
     // inherited session cap. This is set on the child session's config so the

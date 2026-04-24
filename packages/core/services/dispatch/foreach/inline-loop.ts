@@ -25,7 +25,7 @@ export type InlineDeps = Pick<DispatchDeps, "sessions" | "events">;
  * full agent-dispatch pipeline.
  */
 export interface DispatchInlineSubStageCb {
-  (sessionId: string, resolvedSubStage: StageDefinition, iterVars: Record<string, string>): Promise<DispatchResult>;
+  (sessionId: string, resolvedSubStage: StageDefinition, iterVars: Record<string, unknown>): Promise<DispatchResult>;
 }
 
 /**
@@ -46,7 +46,7 @@ export async function dispatchForEachInline(
   dispatchSubStage: DispatchInlineSubStageCb | undefined,
   sessionId: string,
   stageDef: StageDefinition,
-  sessionVars: Record<string, string>,
+  sessionVars: Record<string, unknown>,
 ): Promise<DispatchResult> {
   if (!dispatchSubStage) {
     return { ok: false, message: "mode:inline requires dispatchInlineSubStage callback -- not wired" };

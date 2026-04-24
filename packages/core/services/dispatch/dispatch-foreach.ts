@@ -49,6 +49,16 @@ import { dispatchForEachSpawn as runSpawnLoop } from "./foreach/spawn-loop.js";
 import { dispatchForEachInline as runInlineLoop } from "./foreach/inline-loop.js";
 import type { DispatchInlineSubStageCb as InlineSubStageCb } from "./foreach/inline-loop.js";
 
+// Re-export helpers so tests + legacy call-sites can keep importing from the
+// facade path `./dispatch-foreach.js` without knowing about the split.
+export {
+  buildIterationVars,
+  flattenItem,
+  substituteInputs,
+  substituteStageTemplates,
+} from "./foreach/iteration-vars.js";
+export { resolveForEachList, coerceToArray, resolveDotted } from "./foreach/list-resolve.js";
+
 /**
  * Callback for dispatching a single inline sub-stage against the parent
  * session's worktree. Implemented by CoreDispatcher and injected here so
@@ -91,7 +101,7 @@ export class ForEachDispatcher {
     sessionId: string,
     stageDef: StageDefinition,
     /** Pre-built flat session var map (ticket, summary, inputs.*, etc.) */
-    sessionVars: Record<string, string>,
+    sessionVars: Record<string, unknown>,
   ): Promise<DispatchResult> {
     const mode = stageDef.mode ?? "spawn";
     if (mode === "inline") {
@@ -104,7 +114,7 @@ export class ForEachDispatcher {
   async dispatchForEachSpawn(
     sessionId: string,
     stageDef: StageDefinition,
-    sessionVars: Record<string, string>,
+    sessionVars: Record<string, unknown>,
   ): Promise<DispatchResult> {
     return runSpawnLoop(this.deps, this.childSpawner, sessionId, stageDef, sessionVars);
   }
@@ -113,7 +123,7 @@ export class ForEachDispatcher {
   async dispatchForEachInline(
     sessionId: string,
     stageDef: StageDefinition,
-    sessionVars: Record<string, string>,
+    sessionVars: Record<string, unknown>,
   ): Promise<DispatchResult> {
     return runInlineLoop(this.deps, this.deps.dispatchInlineSubStage, sessionId, stageDef, sessionVars);
   }

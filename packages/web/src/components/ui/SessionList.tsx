@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { cn } from "../../lib/utils.js";
 import { StatusDot, type SessionStatus } from "./StatusDot.js";
-import { Search, X, Plus, Archive, Trash2, Star } from "lucide-react";
+import { Search, X, Plus, Archive, Trash2 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -74,8 +74,7 @@ export interface SessionListProps extends React.ComponentProps<"div"> {
  *   - 3px left-edge accent stripe: amber for waiting / purple for selected /
  *     nothing for default / completed / failed. Faded top/bottom via gradient.
  *   - Title row: sans 14px 500, right-aligned elapsed time (mono-ui 11px).
- *   - Meta row: small status dot + flow-name text + "☆ runtime" chip
- *     (Lucide Star size 12).
+ *   - Meta row: small status dot + flow-name text + runtime label.
  *   - 24h mini sparkline (~11 bars). Amber when idle, primary when active,
  *     status-colored for completed/waiting/failed. If no data we render a
  *     muted placeholder so vertical rhythm is preserved.
@@ -190,7 +189,9 @@ export function SessionList({
       )}
 
       {/* ── Filter chips ──────────────────────────────────────────── */}
-      {filterChips && <div className="px-[12px] pt-[8px] pb-[4px] flex gap-1 shrink-0">{filterChips}</div>}
+      {filterChips && (
+        <div className="px-[12px] pt-[8px] pb-[6px] flex items-center gap-[6px] shrink-0">{filterChips}</div>
+      )}
 
       {/* ── Session rows ──────────────────────────────────────────── */}
       {children ?? (
@@ -352,12 +353,16 @@ export function SessionRow({
           onSelect(session.id);
         }
       }}
+      data-selected={selected ? "true" : undefined}
       className={cn(
         "group relative flex flex-col cursor-pointer",
         "my-[3px] rounded-[8px] px-[12px] py-[10px]",
         "border border-transparent transition-colors duration-[120ms]",
         "hover:bg-[rgba(255,255,255,0.015)]",
-        selected && "bg-[var(--bg-card)] border-[rgba(107,89,222,0.5)] shadow-[0_2px_8px_rgba(0,0,0,0.25)]",
+        // Selected: card bg + brand-accent border. Uses --primary so the
+        // ring matches the `+ New` button + brand tile gradient regardless
+        // of active theme (purple in midnight-circuit, amber in warm-obsidian).
+        selected && "bg-[var(--bg-card)] border-[var(--primary)] shadow-[0_2px_8px_rgba(0,0,0,0.25)]",
       )}
       style={{ marginLeft: 8 + indent, marginRight: 8 }}
     >
@@ -391,7 +396,7 @@ export function SessionRow({
           <span
             aria-hidden
             className="w-[6px] h-[6px] rounded-full bg-[var(--primary)] shrink-0"
-            style={{ boxShadow: "0 0 4px rgba(107,89,222,.5)" }}
+            style={{ boxShadow: "0 0 4px var(--primary)" }}
           />
         )}
         <span className="font-[family-name:var(--font-mono-ui)] text-[11px] font-normal text-[var(--fg-faint)] tabular-nums shrink-0">
@@ -444,7 +449,6 @@ export function SessionRow({
             {!flow && stageLabel && <span className="truncate text-[var(--fg-muted)]">{stageLabel}</span>}
             {runtime && (
               <span className="inline-flex items-center gap-[4px] shrink-0 text-[var(--fg-muted)]">
-                <Star size={12} strokeWidth={1.75} />
                 <span>{runtime}</span>
               </span>
             )}

@@ -242,7 +242,7 @@ describe("unresolvedVars", () => {
 // ── buildSessionVars ────────────────────────────────────────────────────────
 
 describe("buildSessionVars", () => {
-  it("builds correct map from session", () => {
+  it("passes session fields through as-is (native types)", () => {
     const vars = buildSessionVars({
       ticket: "PROJ-1",
       summary: "Fix bug",
@@ -258,35 +258,38 @@ describe("buildSessionVars", () => {
 
     expect(vars.ticket).toBe("PROJ-1");
     expect(vars.summary).toBe("Fix bug");
-    expect(vars.jira_key).toBe("PROJ-1");
-    expect(vars.jira_summary).toBe("Fix bug");
     expect(vars.repo).toBe("/code/repo");
     expect(vars.branch).toBe("feat/fix");
     expect(vars.workdir).toBe("/tmp/work");
-    expect(vars.track_id).toBe("s-abc");
-    expect(vars.session_id).toBe("s-abc");
+    expect(vars.id).toBe("s-abc");
     expect(vars.stage).toBe("implement");
     expect(vars.flow).toBe("default");
     expect(vars.agent).toBe("worker");
-    expect(vars.compute).toBe("remote-1");
+    expect(vars.compute_name).toBe("remote-1");
   });
 
-  it("handles missing fields gracefully", () => {
+  it("leaves missing fields undefined rather than coercing defaults", () => {
     const vars = buildSessionVars({});
 
-    expect(vars.ticket).toBe("");
-    expect(vars.summary).toBe("");
-    expect(vars.jira_key).toBe("");
-    expect(vars.jira_summary).toBe("");
-    expect(vars.repo).toBe("");
-    expect(vars.branch).toBe("");
-    expect(vars.workdir).toBe(".");
-    expect(vars.track_id).toBe("");
-    expect(vars.session_id).toBe("");
-    expect(vars.stage).toBe("");
-    expect(vars.flow).toBe("");
-    expect(vars.agent).toBe("");
-    expect(vars.compute).toBe("local");
+    expect(vars.ticket).toBeUndefined();
+    expect(vars.summary).toBeUndefined();
+    expect(vars.repo).toBeUndefined();
+    expect(vars.workdir).toBeUndefined();
+    expect(vars.id).toBeUndefined();
+    expect(vars.stage).toBeUndefined();
+  });
+
+  it("preserves structured lists (arrays of objects)", () => {
+    const vars = buildSessionVars({
+      id: "s-1",
+      config: {
+        inputs: {
+          params: { repos: [{ repo_path: "/a" }, { repo_path: "/b" }] },
+        },
+      },
+    });
+    expect(Array.isArray(vars["inputs.params.repos"])).toBe(true);
+    expect((vars["inputs.params.repos"] as Array<{ repo_path: string }>)[0].repo_path).toBe("/a");
   });
 
   it("flattens session.config.inputs into dotted keys", () => {
@@ -324,7 +327,7 @@ describe("buildSessionVars", () => {
       },
     });
     const rendered = substituteVars(
-      "session={{session_id}} ticket={{ticket}} summary={{summary}} recipe={{inputs.files.recipe}} jira={{inputs.params.jira_key}}",
+      "session={{id}} ticket={{ticket}} summary={{summary}} recipe={{inputs.files.recipe}} jira={{inputs.params.jira_key}}",
       vars,
     );
     expect(rendered).toBe("session=s-1 ticket=T-1 summary=Do X recipe=/tmp/r.yaml jira=J-1");

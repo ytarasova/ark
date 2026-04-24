@@ -11,14 +11,18 @@ import type { StageDefinition } from "../../../state/flow.js";
 import { substituteVars } from "../../../template.js";
 
 /**
- * Flatten an arbitrary value into a flat dotted-key string map so that
+ * Flatten an arbitrary value into a flat dotted-key map so that
  * substituteVars can resolve `{{iterVar.foo}}` templates.
  *
  * - Primitive values (string, number, boolean) are converted to strings.
  * - Objects are flattened recursively with dot-separated paths.
  * - Arrays are stringified at their leaf position.
+ *
+ * The output value map is `Record<string, unknown>` so native types (arrays
+ * of objects, numbers, booleans) can flow through to `resolveForEachList`
+ * without being coerced to strings prematurely.
  */
-export function flattenItem(prefix: string, value: unknown, out: Record<string, string>): void {
+export function flattenItem(prefix: string, value: unknown, out: Record<string, unknown>): void {
   if (value === null || value === undefined) return;
   if (Array.isArray(value)) {
     out[prefix] = JSON.stringify(value);
@@ -40,11 +44,11 @@ export function flattenItem(prefix: string, value: unknown, out: Record<string, 
  * `{{repo.repo_path}}` (where iterVar="repo") resolve correctly.
  */
 export function buildIterationVars(
-  baseVars: Record<string, string>,
+  baseVars: Record<string, unknown>,
   iterVar: string,
   item: unknown,
-): Record<string, string> {
-  const extra: Record<string, string> = {};
+): Record<string, unknown> {
+  const extra: Record<string, unknown> = {};
   flattenItem(iterVar, item, extra);
   // Expose the raw item as the iterVar key (serialised) ONLY when item is a
   // primitive -- so templates like `{{item}}` work for string/number lists.
@@ -66,7 +70,7 @@ export function buildIterationVars(
  */
 export function substituteInputs(
   inputs: Record<string, unknown>,
-  vars: Record<string, string>,
+  vars: Record<string, unknown>,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(inputs)) {
@@ -91,7 +95,7 @@ export function substituteInputs(
  *   - agent (if InlineAgentSpec): system_prompt, name, description
  * Other fields (gate, name, on_failure) are passed through unchanged.
  */
-export function substituteStageTemplates(stage: StageDefinition, vars: Record<string, string>): StageDefinition {
+export function substituteStageTemplates(stage: StageDefinition, vars: Record<string, unknown>): StageDefinition {
   const resolved: StageDefinition = { ...stage };
 
   if (typeof stage.task === "string") {

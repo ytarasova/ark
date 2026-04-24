@@ -33,7 +33,7 @@ export function prepareForEachLoop(
   session: Record<string, unknown>,
   stageName: string,
   forEachExpr: string,
-  sessionVars: Record<string, string>,
+  sessionVars: Record<string, unknown>,
   logPrefix: string,
   sessionId: string,
 ): { ok: true; prepared: PreparedLoop } | { ok: false; message: string } {

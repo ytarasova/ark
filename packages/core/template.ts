@@ -84,7 +84,7 @@ function chainPath(node: NunjucksNode): { root: string; path: string } | null {
  * if `path` (e.g. `files.X`) is not in vars but `inputs.<path>` is, return
  * that. Returns undefined if still unresolvable.
  */
-function resolvePath(path: string, vars: Record<string, string>): string | undefined {
+function resolvePath(path: string, vars: Record<string, unknown>): unknown {
   if (Object.prototype.hasOwnProperty.call(vars, path)) return vars[path];
   if (!path.startsWith("inputs.")) {
     const aliased = "inputs." + path;
@@ -102,7 +102,7 @@ function resolvePath(path: string, vars: Record<string, string>): string | undef
  * text. Conditional / loop / filter-arg positions are left alone so they get
  * standard Nunjucks undefined semantics (i.e. falsy when unset).
  */
-function transformAst(node: NunjucksNode | undefined, vars: Record<string, string>, locals: Set<string>): void {
+function transformAst(node: NunjucksNode | undefined, vars: Record<string, unknown>, locals: Set<string>): void {
   if (!node) return;
 
   // For: arr is evaluated in outer scope, body runs with loop vars bound.
@@ -181,7 +181,7 @@ function transformAst(node: NunjucksNode | undefined, vars: Record<string, strin
  * Convert flat dotted-key vars into a nested object tree so that non-Output
  * references (conditionals, loops, filter args) can reach into sub-paths.
  */
-function unflatten(vars: Record<string, string>): Record<string, unknown> {
+function unflatten(vars: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(vars)) {
     const parts = key.split(".");
@@ -231,7 +231,7 @@ function compileAstToTemplate(ast: NunjucksNode, name: string): nunjucks.Templat
  * positions are preserved verbatim; unknown vars in conditional / loop
  * contexts resolve to undefined (falsy).
  */
-export function substituteVars(template: string, vars: Record<string, string>): string {
+export function substituteVars(template: string, vars: Record<string, unknown>): string {
   if (!template) return template;
   const ast = PARSER.parse(template, [], {});
   transformAst(ast, vars, new Set());
@@ -247,7 +247,7 @@ export function substituteVars(template: string, vars: Record<string, string>): 
  * Uses the same AST walk as rendering. Locals introduced by For/Macro/Set are
  * excluded. Paths are returned in first-seen order, deduplicated.
  */
-export function unresolvedVars(template: string, vars: Record<string, string>): string[] {
+export function unresolvedVars(template: string, vars: Record<string, unknown>): string[] {
   if (!template) return [];
   const ast = PARSER.parse(template, [], {});
   const missing: string[] = [];
@@ -323,43 +323,55 @@ export function unresolvedVars(template: string, vars: Record<string, string>): 
 
 // ── Session variable map ────────────────────────────────────────────────────
 
-/** Flatten an arbitrarily nested object into a dotted-key string map. */
-function flatten(prefix: string, value: unknown, out: Record<string, string>): void {
+/**
+ * Flatten an arbitrarily nested object into a dotted-key map. Values are
+ * preserved in their native types (arrays, objects, primitives) so the
+ * template engine + for_each resolver can iterate them as-is. Earlier
+ * versions stringified everything via String(value), which collapsed
+ * arrays of objects to "[object Object],[object Object]" and broke
+ * any for_each over a structured list.
+ *
+ * Plain objects are walked into dotted-leaf keys; arrays are kept whole
+ * (so `{{repos[0].name}}` and `{{inputs.params.repos | length}}` work);
+ * primitives become themselves.
+ */
+function flatten(prefix: string, value: unknown, out: Record<string, unknown>): void {
   if (value === null || value === undefined) return;
   if (typeof value === "object" && !Array.isArray(value)) {
+    // Also expose the object as-is at the prefix so `{{prefix}}` evaluates
+    // to the whole object (Nunjucks renders objects as "[object Object]"
+    // in output position, but conditionals + filters still see the object).
+    out[prefix] = value;
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
       flatten(prefix ? `${prefix}.${k}` : k, v, out);
     }
     return;
   }
-  out[prefix] = String(value);
+  // Arrays + primitives flow through verbatim. The template engine's
+  // unflatten pass turns dotted keys back into the nested shape, so this
+  // works for both `{{a.b.c}}` and `{{a.b | length}}` references.
+  out[prefix] = value;
 }
 
 /**
- * Build the standard variable map from a session object.
+ * Build the template variable map from a session row.
  *
- * Session-level fields (ticket, summary, repo, ...) are exposed flat.
- * Per-session input bags live at `session.config.inputs` and are flattened
- * into the `inputs.files.*` / `inputs.params.*` namespace so any template
- * consumer can reference them without bespoke plumbing.
+ * Pass through every column on the session as-is (templates reference
+ * them by name: `{{summary}}`, `{{repo}}`, `{{stage}}`, ...) plus a
+ * couple of legacy aliases (`jira_key`, `track_id`, `compute`) and a
+ * flattened view of `session.config.inputs.*` so for_each over
+ * structured lists works.
+ *
+ * Values keep their native types -- arrays of objects flow through
+ * unchanged. Earlier versions stringified everything via String(value),
+ * which collapsed `inputs.params.repos: [{...}, {...}]` to a comma-
+ * joined `[object Object],[object Object]` and broke for_each.
  */
-export function buildSessionVars(session: Record<string, unknown>): Record<string, string> {
-  const vars: Record<string, string> = {
-    ticket: String(session.ticket ?? ""),
-    summary: String(session.summary ?? ""),
-    jira_key: String(session.ticket ?? ""),
-    jira_summary: String(session.summary ?? ""),
-    repo: String(session.repo ?? ""),
-    branch: String(session.branch ?? ""),
-    workdir: String(session.workdir ?? "."),
-    track_id: String(session.id ?? ""),
-    session_id: String(session.id ?? ""),
-    stage: String(session.stage ?? ""),
-    flow: String(session.flow ?? ""),
-    agent: String(session.agent ?? ""),
-    compute: String(session.compute_name ?? "local"),
-  };
+export function buildSessionVars(session: Record<string, unknown>): Record<string, unknown> {
+  const vars: Record<string, unknown> = { ...session };
 
+  // Flatten `session.config.inputs.*` into `inputs.files.*` / `inputs.params.*`
+  // so templates can reach them without needing `config.` in the path.
   const config = session.config as Record<string, unknown> | undefined;
   const inputs = config?.inputs;
   if (inputs && typeof inputs === "object") {

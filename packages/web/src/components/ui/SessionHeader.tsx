@@ -1,5 +1,6 @@
 import { Copy, Terminal } from "lucide-react";
 import { cn } from "../../lib/utils.js";
+import { resolveInlineDisplay, type InlineModelLike } from "../../lib/inline-display.js";
 import { type SessionStatus } from "./StatusDot.js";
 import type { StageProgress } from "./StageProgressBar.js";
 
@@ -46,6 +47,18 @@ export interface SessionHeaderProps extends React.ComponentProps<"div"> {
   stages?: StageProgress[];
   /** Legacy: cost chip (tokens / $). If given but no `tickers`, rendered on the right. */
   cost?: string;
+  /**
+   * Optional session row. When provided, the header detects inline-flow /
+   * inline-agent dispatches and rewrites the `agent` + `flow` meta blocks to
+   * show the actual `(runtime, model)` binding instead of the literal
+   * `inline` / synthetic `inline-s-…` strings.
+   */
+  session?: any;
+  /**
+   * Catalog from `model/list`, used to resolve a model id to its display
+   * name when rendering an inline agent's binding.
+   */
+  models?: InlineModelLike[];
 }
 
 /**
@@ -77,6 +90,8 @@ export function SessionHeader({
   onCopyId,
   onOpenTerminal,
   cost,
+  session,
+  models,
   className,
   ...props
 }: SessionHeaderProps) {
@@ -84,12 +99,45 @@ export function SessionHeader({
   const statusMeta = getStatusPillStyle(status);
   const isRunning = status === "running";
 
+  // Inline-dispatch override: when the session was created with an inline
+  // flow / inline agent, the header otherwise shows the literal `inline` and
+  // the synthetic `inline-s-<id>` flow name -- both Ark internals. Resolve
+  // the actual binding so users see something meaningful.
+  const inline = session ? resolveInlineDisplay(session, models) : null;
+  const effectiveAgent = inline?.isInlineAgent && inline.agentLabel ? inline.agentLabel : agent;
+
   // Additional labeled blocks derived from runtime/agent/compute props + kvs.
   const labeled: { k: string; v: React.ReactNode; mono?: boolean; link?: boolean; error?: boolean }[] = [];
   if (runtime) labeled.push({ k: "runtime", v: runtime });
-  if (agent) labeled.push({ k: "agent", v: agent });
+  if (effectiveAgent) labeled.push({ k: "agent", v: effectiveAgent });
   if (compute) labeled.push({ k: "compute", v: compute });
-  if (kvs && kvs.length > 0) labeled.push(...kvs);
+  if (kvs && kvs.length > 0) {
+    for (const kv of kvs) {
+      if (kv.k === "flow" && inline?.isInlineFlow) {
+        const tip = `${inline.inlineFlowName ?? "inline"} · ${inline.inlineFlowStageCount} stage${
+          inline.inlineFlowStageCount === 1 ? "" : "s"
+        }`;
+        labeled.push({
+          ...kv,
+          v: (
+            <span className="inline-flex items-baseline gap-[4px]">
+              <i className="not-italic">Inline flow</i>
+              <span
+                title={tip}
+                aria-label={tip}
+                data-testid="inline-flow-tooltip"
+                className="text-[var(--fg-faint)] cursor-help select-none text-[10px] tracking-normal"
+              >
+                (?)
+              </span>
+            </span>
+          ),
+        });
+      } else {
+        labeled.push(kv);
+      }
+    }
+  }
 
   return (
     <div className={cn("shrink-0 flex flex-col border-b border-[var(--border)] bg-[var(--bg)]", className)} {...props}>
@@ -105,14 +153,21 @@ export function SessionHeader({
               <span className="opacity-40">/</span>
             </span>
           ))}
-          <button
-            type="button"
-            onClick={onCopyId}
-            title="Click to copy id"
-            className="bg-transparent border-0 p-0 text-[var(--fg)] hover:text-[var(--primary)] transition-colors cursor-pointer font-[family-name:var(--font-mono)] text-[11px] normal-case tracking-[0.02em] truncate"
-          >
+          <span className="font-[family-name:var(--font-mono)] text-[11px] text-[var(--fg)] normal-case tracking-[0.02em] truncate">
             {sessionId}
-          </button>
+          </span>
+          {onCopyId && (
+            <button
+              type="button"
+              onClick={onCopyId}
+              title="Copy session id"
+              aria-label="Copy session id"
+              data-testid="breadcrumb-copy-id"
+              className="inline-flex items-center justify-center w-[18px] h-[18px] shrink-0 rounded-[4px] bg-transparent border-0 p-0 text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+            >
+              <Copy size={12} strokeWidth={1.75} />
+            </button>
+          )}
         </div>
 
         <span
@@ -176,11 +231,6 @@ export function SessionHeader({
         </div>
 
         <div className="flex items-center gap-[6px] shrink-0">
-          {onCopyId && (
-            <IconButton tip="copy id" onClick={onCopyId}>
-              <Copy size={13} />
-            </IconButton>
-          )}
           {onOpenTerminal && (
             <IconButton tip="terminal" onClick={onOpenTerminal}>
               <Terminal size={13} />

@@ -192,41 +192,49 @@ export function SessionListPanel({
   const filterChips = (
     <>
       <FilterChip
-        label={`Active ${totalActive}`}
+        label="Active"
+        count={totalActive}
         active={filter === "active"}
         onClick={() => onFilterChange(filter === "active" ? "all" : "active")}
       />
       {counts.completed > 0 && (
         <FilterChip
-          label={`Done ${counts.completed}`}
+          label="Done"
+          count={counts.completed}
           active={filter === "completed"}
           onClick={() => onFilterChange(filter === "completed" ? "all" : "completed")}
         />
       )}
       {counts.failed > 0 && (
         <FilterChip
-          label={`Failed ${counts.failed}`}
+          label="Failed"
+          count={counts.failed}
           active={filter === "failed"}
           onClick={() => onFilterChange(filter === "failed" ? "all" : "failed")}
         />
       )}
       <FilterChip label="All" active={filter === "all"} onClick={() => onFilterChange("all")} />
       {onGroupByParentChange && (
-        <label
-          data-testid="group-by-parent-toggle"
-          className="ml-auto inline-flex items-center gap-[4px] cursor-pointer select-none
-            font-[family-name:var(--font-mono-ui)] text-[10px] uppercase tracking-[0.05em] text-[var(--fg-muted)]
-            hover:text-[var(--fg)]"
-          title="Group spawned sessions under their parent"
-        >
-          <input
-            type="checkbox"
-            checked={!!groupByParent}
-            onChange={(e) => onGroupByParentChange(e.target.checked)}
-            className="h-[11px] w-[11px] cursor-pointer accent-[var(--primary)]"
-          />
-          Group by parent
-        </label>
+        <>
+          {/* Hairline vertical rule separates the count chips from the toggle so
+              the two groups read as distinct controls instead of a crowded run. */}
+          <span aria-hidden className="ml-auto mr-[4px] h-[14px] w-px bg-[var(--border)] self-center" />
+          <label
+            data-testid="group-by-parent-toggle"
+            className="inline-flex items-center gap-[4px] cursor-pointer select-none
+              font-[family-name:var(--font-mono-ui)] text-[10px] uppercase tracking-[0.05em] text-[var(--fg-muted)]
+              hover:text-[var(--fg)]"
+            title="Group spawned sessions under their parent"
+          >
+            <input
+              type="checkbox"
+              checked={!!groupByParent}
+              onChange={(e) => onGroupByParentChange(e.target.checked)}
+              className="h-[11px] w-[11px] cursor-pointer accent-[var(--primary)]"
+            />
+            Group by parent
+          </label>
+        </>
       )}
     </>
   );

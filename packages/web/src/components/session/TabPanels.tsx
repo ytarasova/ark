@@ -5,7 +5,6 @@ import { TodoList, type TodoItem } from "../ui/TodoList.js";
 import type { DiffFile } from "../ui/DiffViewer.js";
 import type { StageProgress } from "../ui/StageProgressBar.js";
 import { ConversationTab } from "./tabs/ConversationTab.js";
-import { TerminalTab } from "./tabs/TerminalTab.js";
 import { LogsTab } from "./tabs/LogsTab.js";
 import { DiffTab } from "./tabs/DiffTab.js";
 import { ErrorsTab } from "./tabs/ErrorsTab.js";
@@ -98,7 +97,7 @@ export function TabPanels(props: TabPanelsProps) {
       tabIndex={0}
       className={cn(
         "flex-1 min-h-0",
-        activeTab === "terminal" ? "flex flex-col overflow-hidden p-2" : "overflow-y-auto px-6 py-6",
+        activeTab === "logs" ? "flex flex-col overflow-hidden p-2" : "overflow-y-auto px-6 py-6",
         "focus-visible:outline-none",
       )}
       onScroll={onScroll}
@@ -116,21 +115,6 @@ export function TabPanels(props: TabPanelsProps) {
           stages={stages}
         />
       )}
-      {/*
-        Terminal tab stays mounted across tab switches so xterm scrollback +
-        viewport position survive -- only the live socket releases. We hide
-        the container via display:none when another tab is active.
-      */}
-      <div style={{ display: activeTab === "terminal" ? "contents" : "none" }} data-testid="terminal-tab-wrapper">
-        <TerminalTab
-          sessionId={session?.id ?? ""}
-          output={output}
-          cols={session?.pty_cols}
-          rows={session?.pty_rows}
-          isActive={isActive}
-          tabActive={activeTab === "terminal"}
-        />
-      </div>
       {activeTab === "events" && (
         <EventTimeline
           events={timelineEvents}
@@ -147,7 +131,17 @@ export function TabPanels(props: TabPanelsProps) {
           hasWorkdir={!!session.workdir}
         />
       )}
-      {activeTab === "logs" && <LogsTab sessionId={session?.id ?? ""} status={session?.status} />}
+      {activeTab === "logs" && (
+        <LogsTab
+          sessionId={session?.id ?? ""}
+          status={session?.status}
+          output={output}
+          ptyCols={session?.pty_cols}
+          ptyRows={session?.pty_rows}
+          isActive={isActive}
+          tabActive={activeTab === "logs"}
+        />
+      )}
       {activeTab === "todos" && <TodoList items={todoItems} onToggle={(id) => onToggleTodo(Number(id))} />}
       {activeTab === "flow" && <FlowTab session={session} stages={stages ?? []} />}
       {activeTab === "files" && <FilesTab diffFiles={diffFiles} onSelect={onDiffFileSelect} />}
