@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api } from "../hooks/useApi.js";
 import { useSessionDetail } from "../hooks/useSessionDetail.js";
 import { useSessionActions } from "../hooks/useSessionActions.js";
+import { useModelsQuery } from "../hooks/useRuntimeQueries.js";
 import { fmtCost, fmtTokens } from "../util.js";
 
 import { SessionHeader } from "./ui/SessionHeader.js";
@@ -77,6 +78,10 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
     onToast,
     refetchDetail: d.refetchDetail,
   });
+  // The model catalog is needed to resolve an inline agent's model id to its
+  // human-readable display name in the header. The query is cached, so this
+  // is a no-op on subsequent renders.
+  const { data: models } = useModelsQuery();
 
   const [chatMsg, setChatMsg] = useState("");
   const [activeDiffFile, setActiveDiffFile] = useState<string | undefined>(undefined);
@@ -157,6 +162,8 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
             session.flow ? { k: "flow", v: session.flow } : null,
           ].filter(Boolean) as any
         }
+        session={session}
+        models={models}
         tickers={buildHeaderTickers(session, d.cost)}
         cost={d.cost?.cost ? fmtCost(d.cost.cost) : undefined}
         actions={!readOnly ? headerActions : undefined}
@@ -170,13 +177,7 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
       />
 
       {d.totalStages > 0 && (
-        <StageProgress
-          agent={session.agent}
-          flow={session.flow}
-          completedStages={d.completedStages}
-          totalStages={d.totalStages}
-          progressPct={d.progressPct}
-        />
+        <StageProgress completedStages={d.completedStages} totalStages={d.totalStages} progressPct={d.progressPct} />
       )}
 
       {/* Phase 3: resume-from-checkpoint banner. Surfaces when the session
@@ -185,8 +186,11 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         <ResumeBanner checkpoint={`iteration ${session.config.for_each_checkpoint.index ?? "?"}`} />
       )}
 
-      {/* Phase 3: per-session budget cap bar. */}
-      {session.config?.max_budget_usd && (
+      {/* Phase 3: per-session budget cap bar. Suppressed unless the session
+          has a budget cap AND we're at >= 50% utilisation -- below that the
+          row is just visual noise (the Cost tab still surfaces the detail).
+          See Nit 2 in the cost-redundancy cleanup. */}
+      {session.config?.max_budget_usd && (d.cost?.cost ?? 0) / session.config.max_budget_usd >= 0.5 && (
         <div className="px-[18px] py-[8px] border-b border-[var(--border-light)] bg-[rgba(0,0,0,0.12)]">
           <BudgetBar spent={d.cost?.cost ?? 0} cap={session.config.max_budget_usd} />
         </div>

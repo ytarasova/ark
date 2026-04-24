@@ -189,7 +189,9 @@ export function SessionList({
       )}
 
       {/* ── Filter chips ──────────────────────────────────────────── */}
-      {filterChips && <div className="px-[12px] pt-[8px] pb-[4px] flex gap-1 shrink-0">{filterChips}</div>}
+      {filterChips && (
+        <div className="px-[12px] pt-[8px] pb-[6px] flex items-center gap-[6px] shrink-0">{filterChips}</div>
+      )}
 
       {/* ── Session rows ──────────────────────────────────────────── */}
       {children ?? (
