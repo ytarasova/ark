@@ -11,6 +11,7 @@ import { flowEdgesToPipeline, flowStagesToPipeline } from "./flows/pipeline/adap
 import { PipelineViewer } from "./pipeline/PipelineViewer.js";
 import { Badge } from "./ui/badge.js";
 import { Button } from "./ui/button.js";
+import { ListRow } from "./ui/ListRow.js";
 
 interface FlowsViewProps {
   showCreate?: boolean;
@@ -99,21 +100,24 @@ export function FlowsView({
       <div className="border-r border-border overflow-y-auto" role="listbox" aria-label="Flows">
         {flows.map((f: any) => {
           const stageCount = f.stages?.length ?? 0;
+          const isSelected = selected?.name === f.name;
           return (
-            <div
+            <ListRow
               key={f.name}
+              role="option"
+              selected={isSelected}
+              onSelect={() => setSelectedName(f.name)}
               className={cn(
-                "flex items-center justify-between px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors text-[13px]",
+                "flex items-center justify-between px-4 py-2.5 border-b border-border/50 transition-colors text-[13px]",
                 "hover:bg-accent",
-                selected?.name === f.name && "bg-accent border-l-2 border-l-primary font-semibold",
+                isSelected && "bg-accent border-l-2 border-l-primary font-semibold",
               )}
-              onClick={() => setSelectedName(f.name)}
             >
               <span className="text-foreground truncate">{f.name}</span>
               <Badge variant="secondary" className="text-[10px]">
                 {stageCount} stage{stageCount !== 1 ? "s" : ""}
               </Badge>
-            </div>
+            </ListRow>
           );
         })}
       </div>
