@@ -430,6 +430,11 @@ export class ForEachDispatcher {
       const resolvedBranch = spawnSpec.branch ? substituteVars(spawnSpec.branch, iterVars) : undefined;
       const resolvedWorkdir = spawnSpec.workdir ? substituteVars(spawnSpec.workdir, iterVars) : undefined;
 
+      // DIAGNOSTIC: trace iter vars + resolved overrides for fan-out debugging.
+      console.error(
+        `[for_each spawn] iter=${i} item=${JSON.stringify(item)} iterVars=${JSON.stringify(iterVars)} spawnSpec.repo=${JSON.stringify(spawnSpec.repo)} resolvedRepo=${JSON.stringify(resolvedRepo)}`,
+      );
+
       // Effective per-iteration cap: stage-level max_budget_usd overrides the
       // inherited session cap. This is set on the child session's config so the
       // child's own for_each (if any) also respects it.
