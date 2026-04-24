@@ -6,6 +6,7 @@ import { useAgentsQuery } from "../hooks/useAgentQueries.js";
 import { useRuntimesQuery } from "../hooks/useRuntimeQueries.js";
 import { cn } from "../lib/utils.js";
 import { Badge } from "./ui/badge.js";
+import { ListRow } from "./ui/ListRow.js";
 import { AgentForm } from "./agents/AgentForm.js";
 import { AgentDetailPanel } from "./agents/AgentDetailPanel.js";
 import { RuntimeDetailPanel } from "./agents/RuntimeDetailPanel.js";
@@ -116,52 +117,58 @@ export function AgentsView({
           aria-label={subTab === "roles" ? "Agent roles" : "Runtimes"}
         >
           {subTab === "roles"
-            ? agents.map((a: any) => (
-                <div
-                  key={a.name}
-                  className={cn(
-                    "flex items-center justify-between px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors text-[13px]",
-                    "hover:bg-accent",
-                    selected?.name === a.name &&
-                      selected?._kind === "role" &&
-                      "bg-accent border-l-2 border-l-primary font-semibold",
-                  )}
-                  onClick={() => setSelected({ ...a, _kind: "role" })}
-                >
-                  <div className="flex flex-col min-w-0 mr-2">
-                    <span className="text-foreground truncate">{a.name}</span>
-                    <span className="text-[11px] text-muted-foreground truncate">
-                      {a.runtime || "claude"} / {a.model}
-                    </span>
-                  </div>
-                  <Badge variant="secondary" className="text-[10px] shrink-0">
-                    {a.source || "builtin"}
-                  </Badge>
-                </div>
-              ))
-            : runtimes.map((r: any) => (
-                <div
-                  key={r.name}
-                  className={cn(
-                    "flex items-center justify-between px-4 py-2.5 cursor-pointer border-b border-border/50 transition-colors text-[13px]",
-                    "hover:bg-accent",
-                    selected?.name === r.name &&
-                      selected?._kind === "runtime" &&
-                      "bg-accent border-l-2 border-l-primary font-semibold",
-                  )}
-                  onClick={() => setSelected({ ...r, _kind: "runtime" })}
-                >
-                  <div className="flex flex-col min-w-0 mr-2">
-                    <span className="text-foreground truncate">{r.name}</span>
-                    <span className="text-[11px] text-muted-foreground truncate">
-                      {r.type} / {r.default_model || "-"}
-                    </span>
-                  </div>
-                  <Badge variant="secondary" className="text-[10px] shrink-0">
-                    {r._source || "builtin"}
-                  </Badge>
-                </div>
-              ))}
+            ? agents.map((a: any) => {
+                const isSelected = selected?.name === a.name && selected?._kind === "role";
+                return (
+                  <ListRow
+                    key={a.name}
+                    role="option"
+                    selected={isSelected}
+                    onSelect={() => setSelected({ ...a, _kind: "role" })}
+                    className={cn(
+                      "flex items-center justify-between px-4 py-2.5 border-b border-border/50 transition-colors text-[13px]",
+                      "hover:bg-accent",
+                      isSelected && "bg-accent border-l-2 border-l-primary font-semibold",
+                    )}
+                  >
+                    <div className="flex flex-col min-w-0 mr-2">
+                      <span className="text-foreground truncate">{a.name}</span>
+                      <span className="text-[11px] text-muted-foreground truncate">
+                        {a.runtime || "claude"} / {a.model}
+                      </span>
+                    </div>
+                    <Badge variant="secondary" className="text-[10px] shrink-0">
+                      {a.source || "builtin"}
+                    </Badge>
+                  </ListRow>
+                );
+              })
+            : runtimes.map((r: any) => {
+                const isSelected = selected?.name === r.name && selected?._kind === "runtime";
+                return (
+                  <ListRow
+                    key={r.name}
+                    role="option"
+                    selected={isSelected}
+                    onSelect={() => setSelected({ ...r, _kind: "runtime" })}
+                    className={cn(
+                      "flex items-center justify-between px-4 py-2.5 border-b border-border/50 transition-colors text-[13px]",
+                      "hover:bg-accent",
+                      isSelected && "bg-accent border-l-2 border-l-primary font-semibold",
+                    )}
+                  >
+                    <div className="flex flex-col min-w-0 mr-2">
+                      <span className="text-foreground truncate">{r.name}</span>
+                      <span className="text-[11px] text-muted-foreground truncate">
+                        {r.type} / {r.default_model || "-"}
+                      </span>
+                    </div>
+                    <Badge variant="secondary" className="text-[10px] shrink-0">
+                      {r._source || "builtin"}
+                    </Badge>
+                  </ListRow>
+                );
+              })}
         </div>
 
         <div className="overflow-y-auto bg-background">
