@@ -4,11 +4,10 @@
  * Engine: Nunjucks (Jinja-for-JS). Templates use Jinja syntax:
  *
  *   {{ ticket }}                         -- variable output
- *   {{ inputs.files.recipe }}            -- dotted lookup
- *   {{ files.recipe }}                   -- short-namespace alias for inputs.files.*
+ *   {{ inputs.recipe }}                  -- dotted lookup into the inputs bag
  *   {{ branch | default("main") }}       -- filters
  *   {% if ticket %}...{% endif %}        -- conditionals
- *   {% for k, v in inputs.params %}...{% endfor %} -- loops
+ *   {% for t in inputs.targets %}...{% endfor %} -- loops over inputs
  *   {% raw %}{{literal}}{% endraw %}     -- escape Jinja syntax
  *
  * Unknown variables in Output positions (e.g. `{{foo}}` where `foo` is not in
@@ -16,8 +15,9 @@
  * text. In conditional / loop / filter-arg positions, unknown variables
  * resolve to undefined (falsy / empty).
  *
- * Short-namespace aliases: `{{files.X}}` resolves to `inputs.files.X` if the
- * top-level key is unset; same for `params`, `data`, etc.
+ * Inputs are a flat bag: `session.config.inputs[<key>]`. Tagged rich content
+ * (`{ $type: "file", path }`, "blob", "image", "text") unwraps to its
+ * string form when used in a substitution position.
  *
  * Implementation notes:
  *   -- Zero regex, zero string substitution. All work goes through Nunjucks's
@@ -80,17 +80,33 @@ function chainPath(node: NunjucksNode): { root: string; path: string } | null {
 }
 
 /**
- * Resolve a dotted path against `vars`. Implements the short-namespace alias:
- * if `path` (e.g. `files.X`) is not in vars but `inputs.<path>` is, return
- * that. Returns undefined if still unresolvable.
+ * Resolve a dotted path against `vars`. Direct lookup only; flow inputs
+ * are a flat bag, so `{{inputs.<key>}}` is the canonical reference.
+ *
+ * Tagged rich-content values (`{ $type: "file", path }` / "blob" /
+ * "image" / "text") unwrap to their string form for substitution;
+ * consumers that need the structured form read the value directly.
  */
 function resolvePath(path: string, vars: Record<string, unknown>): unknown {
-  if (Object.prototype.hasOwnProperty.call(vars, path)) return vars[path];
-  if (!path.startsWith("inputs.")) {
-    const aliased = "inputs." + path;
-    if (Object.prototype.hasOwnProperty.call(vars, aliased)) return vars[aliased];
+  if (!Object.prototype.hasOwnProperty.call(vars, path)) return undefined;
+  return unwrapTagged(vars[path]);
+}
+
+/**
+ * Unwrap a tagged rich-content value for string-context substitution.
+ * Tagged objects carry a `$type` discriminator; consumers that need the
+ * structured form can read the value directly without going through
+ * template substitution.
+ */
+function unwrapTagged(value: unknown): unknown {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const tag = (value as Record<string, unknown>).$type;
+    if (tag === "file" && typeof (value as any).path === "string") return (value as any).path;
+    if (tag === "blob" && typeof (value as any).locator === "string") return (value as any).locator;
+    if (tag === "image" && typeof (value as any).locator === "string") return (value as any).locator;
+    if (tag === "text" && typeof (value as any).content === "string") return (value as any).content;
   }
-  return undefined;
+  return value;
 }
 
 /**
@@ -357,21 +373,25 @@ function flatten(prefix: string, value: unknown, out: Record<string, unknown>): 
  * Build the template variable map from a session row.
  *
  * Pass through every column on the session as-is (templates reference
- * them by name: `{{summary}}`, `{{repo}}`, `{{stage}}`, ...) plus a
- * couple of legacy aliases (`jira_key`, `track_id`, `compute`) and a
- * flattened view of `session.config.inputs.*` so for_each over
- * structured lists works.
+ * them by name: `{{id}}`, `{{ticket}}`, `{{summary}}`, `{{repo}}`,
+ * `{{branch}}`, `{{workdir}}`, `{{stage}}`, `{{flow}}`, `{{agent}}`,
+ * `{{compute_name}}`, ...) plus a flattened view of
+ * `session.config.inputs.*` so for_each over structured lists works.
+ *
+ * No convenience aliases -- templates use the real column name. Use
+ * `{{id}}` not `{{track_id}}`, `{{ticket}}` not `{{jira_key}}`,
+ * `{{compute_name}}` not `{{compute}}`.
  *
  * Values keep their native types -- arrays of objects flow through
  * unchanged. Earlier versions stringified everything via String(value),
- * which collapsed `inputs.params.repos: [{...}, {...}]` to a comma-
- * joined `[object Object],[object Object]` and broke for_each.
+ * which collapsed `inputs.repos: [{...}, {...}]` to a comma-joined
+ * `[object Object],[object Object]` and broke for_each.
  */
 export function buildSessionVars(session: Record<string, unknown>): Record<string, unknown> {
   const vars: Record<string, unknown> = { ...session };
 
-  // Flatten `session.config.inputs.*` into `inputs.files.*` / `inputs.params.*`
-  // so templates can reach them without needing `config.` in the path.
+  // Flatten `session.config.inputs.*` into dotted `inputs.<key>[.subpath]`
+  // entries so templates can reach them without needing `config.` in the path.
   const config = session.config as Record<string, unknown> | undefined;
   const inputs = config?.inputs;
   if (inputs && typeof inputs === "object") {

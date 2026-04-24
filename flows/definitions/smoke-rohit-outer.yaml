@@ -11,7 +11,7 @@ inputs:
 
 stages:
   - name: per_repo
-    for_each: "{{inputs.params.repos}}"
+    for_each: "{{inputs.repos}}"
     mode: spawn
     iteration_var: repo
     on_iteration_failure: stop
@@ -23,5 +23,5 @@ stages:
       # Named inner flow -- also works as inline object (P2.4)
       flow: smoke-rohit-inner
       inputs:
-        ticket_id: "{{inputs.params.ticket_id}}"
-        files: "{{repo.files}}"
+        ticket_id: "{{inputs.ticket_id}}"
+        targets: "{{repo.files}}"

@@ -1,19 +1,22 @@
 name: smoke-rohit-inner
 description: "Phase 2 smoke: inner flow per repo -- for_each + mode:inline loops files sequentially in the same session."
 
+# Flat-bag inputs: one entry per declared input, value at top level.
+# Rich form `{ type, required, default }` lets the CLI/server validate;
+# short form (bare scalar or list) is treated as a default-only input.
 inputs:
   ticket_id:
     type: string
     required: true
-  files:
+  targets:
     type: array
     required: true
 
 stages:
   - name: per_file
-    for_each: "{{inputs.files}}"
+    for_each: "{{inputs.targets}}"
     mode: inline
-    iteration_var: file
+    iteration_var: target
     on_iteration_failure: stop
     gate: auto
     stages:
@@ -35,7 +38,7 @@ stages:
         task: |
           Ticket: {{inputs.ticket_id}}
 
-          Append the single line below to the file `{{file.path}}` (create the file if it doesn't exist). Preserve existing content.
+          Append the single line below to the file `{{target.path}}` (create the file if it doesn't exist). Preserve existing content.
 
           Line to append:
-          {{file.content}}
+          {{target.content}}

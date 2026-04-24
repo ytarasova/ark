@@ -56,17 +56,23 @@ export function registerStartCommands(session: Command) {
       {} as Record<string, string>,
     )
     .option(
-      "--param <k=v>",
-      "Add a named param (repeatable). Exposed as {inputs.params.<k>} and, for goose runtimes, passed through as --params k=v.",
-      (value, prev: Record<string, string> = {}) => {
+      "--param <k=value>",
+      "Add a named input (repeatable). Exposed as {inputs.<k>}. Value is parsed as JSON when possible (arrays, objects, numbers, booleans, null) and falls back to a string otherwise. Use for any flow-declared input -- scalars, lists, nested objects.",
+      (value, prev: Record<string, unknown> = {}) => {
         const eq = value.indexOf("=");
-        if (eq < 0) throw new Error(`--param expects k=v, got: ${value}`);
+        if (eq < 0) throw new Error(`--param expects k=value, got: ${value}`);
         const k = value.slice(0, eq).trim();
-        const v = value.slice(eq + 1);
-        if (!k) throw new Error(`--param expects k=v, got: ${value}`);
-        return { ...prev, [k]: v };
+        const raw = value.slice(eq + 1);
+        if (!k) throw new Error(`--param expects k=value, got: ${value}`);
+        let parsed: unknown = raw;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          // Not valid JSON -- keep as a string.
+        }
+        return { ...prev, [k]: parsed };
       },
-      {} as Record<string, string>,
+      {} as Record<string, unknown>,
     )
     .action(async (ticket, opts) => {
       const { checkPrereqs, hasRequiredPrereqs, formatPrereqCheck } = await import("../../../core/prereqs.js");
@@ -175,11 +181,17 @@ export function registerStartCommands(session: Command) {
       const summary = sanitizeSummary(rawName);
       if (summary !== rawName) console.log(`Note: session name sanitized to "${summary}"`);
 
-      // Collect generic session inputs (files + params) and validate against
-      // the flow's declared `inputs:` contract if present. Extra ad-hoc params
-      // are always allowed; only declared-required entries block dispatch.
+      // Compose flow inputs. The flat shape is `inputs[key] = value`:
+      //  - `--param k=value` writes `inputs[k] = parsedJSONorString`
+      //  - `--file role=path` writes `inputs[role] = { $type: "file", path }`
+      // The server also accepts the legacy `{files: {}, params: {}}` sub-bucket
+      // shape and flattens it on ingest, so older dispatches still work.
+      const paramInputs: Record<string, unknown> = { ...(opts.param ?? {}) };
       const fileInputs: Record<string, string> = { ...(opts.file ?? {}) };
-      const paramInputs: Record<string, string> = { ...(opts.param ?? {}) };
+      const topLevelInputs: Record<string, unknown> = { ...paramInputs };
+      for (const [role, path] of Object.entries(fileInputs)) {
+        topLevelInputs[role] = { $type: "file", path };
+      }
 
       try {
         // Flow input validation: only run when the flow is passed by name
@@ -188,26 +200,40 @@ export function registerStartCommands(session: Command) {
         // are validated server-side when the session dispatches.
         const flowDef =
           typeof opts.flow === "string" && !/\.(yaml|yml)$/i.test(opts.flow) ? await ark.flowRead(opts.flow) : null;
-        const declared = flowDef?.inputs;
+        const declared = flowDef?.inputs as Record<string, any> | undefined;
         if (declared) {
           const missing: string[] = [];
-          for (const [role, def] of Object.entries(declared.files ?? {})) {
-            if (def?.required && !fileInputs[role]) missing.push(`--file ${role}=<path>`);
-          }
-          for (const [key, def] of Object.entries(declared.params ?? {})) {
-            if (def?.required && paramInputs[key] === undefined) {
-              if (def.default !== undefined) {
-                paramInputs[key] = def.default;
-              } else {
-                missing.push(`--param ${key}=<value>`);
+          for (const [key, def] of Object.entries(declared)) {
+            // Support both the legacy nested shape (declared.files / declared.params)
+            // and the new flat shape (one entry per input). Nested = a group header.
+            if (key === "files" && def && typeof def === "object" && !def.type) {
+              for (const [role, fdef] of Object.entries(def as Record<string, any>)) {
+                if (fdef?.required && !(role in topLevelInputs)) missing.push(`--file ${role}=<path>`);
               }
-            } else if (paramInputs[key] === undefined && def?.default !== undefined) {
-              paramInputs[key] = def.default;
+              continue;
             }
-            if (def?.pattern && paramInputs[key] !== undefined) {
+            if (key === "params" && def && typeof def === "object" && !def.type) {
+              for (const [pkey, pdef] of Object.entries(def as Record<string, any>)) {
+                if (pdef?.required && topLevelInputs[pkey] === undefined) {
+                  if (pdef.default !== undefined) topLevelInputs[pkey] = pdef.default;
+                  else missing.push(`--param ${pkey}=<value>`);
+                } else if (topLevelInputs[pkey] === undefined && pdef?.default !== undefined) {
+                  topLevelInputs[pkey] = pdef.default;
+                }
+              }
+              continue;
+            }
+            // Flat shape: def is `{ type, required?, default?, pattern? }`.
+            if (def?.required && topLevelInputs[key] === undefined) {
+              if (def.default !== undefined) topLevelInputs[key] = def.default;
+              else missing.push(`--param ${key}=<value>`);
+            } else if (topLevelInputs[key] === undefined && def?.default !== undefined) {
+              topLevelInputs[key] = def.default;
+            }
+            if (def?.pattern && typeof topLevelInputs[key] === "string") {
               const re = new RegExp(def.pattern);
-              if (!re.test(paramInputs[key])) {
-                console.error(chalk.red(`--param ${key}=${paramInputs[key]} does not match pattern ${def.pattern}`));
+              if (!re.test(topLevelInputs[key] as string)) {
+                console.error(chalk.red(`--param ${key}=${topLevelInputs[key]} does not match pattern ${def.pattern}`));
                 process.exit(1);
               }
             }
@@ -222,13 +248,7 @@ export function registerStartCommands(session: Command) {
         logDebug("session", "flow/read may 404 for ad-hoc flows; fall through without validation.");
       }
 
-      const inputs =
-        Object.keys(fileInputs).length || Object.keys(paramInputs).length
-          ? {
-              ...(Object.keys(fileInputs).length ? { files: fileInputs } : {}),
-              ...(Object.keys(paramInputs).length ? { params: paramInputs } : {}),
-            }
-          : undefined;
+      const inputs = Object.keys(topLevelInputs).length ? topLevelInputs : undefined;
 
       const s = await ark.sessionStart({
         ticket,

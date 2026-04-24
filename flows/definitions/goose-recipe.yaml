@@ -1,10 +1,10 @@
 name: goose-recipe
-description: "Run a goose recipe autonomously in one stage. Recipe path comes from --input recipe=<path>."
+description: "Run a goose recipe autonomously in one stage. Recipe path comes from --file recipe=<path>."
 stages:
   - name: run
     agent: goose-recipe-runner
     gate: auto
     task: |
-      Execute the recipe at {inputs.files.recipe}.
+      Execute the recipe at {inputs.recipe}.
       Working in {workdir} on repo {repo}.
       When the recipe completes, call report(completed) with a short summary.

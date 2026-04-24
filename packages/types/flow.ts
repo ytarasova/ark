@@ -167,19 +167,47 @@ export interface FlowParamInput {
 }
 
 /**
- * Declarative inputs contract for a flow. Drives the dispatch-time form
- * in the web UI and the CLI validator. All inputs end up flattened into
- * `session.config.inputs.{files,params}` and reachable via
- * `{inputs.files.<role>}` / `{inputs.params.<key>}` templating.
+ * Declarative input for a single flow input (flat-bag shape). Drives
+ * the dispatch-time form in the web UI and the CLI validator.
  *
- * Dispatch always accepts additional ad-hoc params beyond what is declared
- * here. Files are role-keyed and only the declared roles are validated; the
- * UI may still allow attaching arbitrary extras.
+ * The value stored in `inputs[<key>]` at dispatch time is either a bare
+ * scalar / array / object or a tagged rich-content object with a `$type`
+ * discriminator (see `rpc-schemas.ts` `sessionInputsSchema` for the full
+ * set of tags -- `file`, `blob`, `image`, `text`).
  */
-export interface FlowInputsSchema {
-  files?: Record<string, FlowFileInput>;
-  params?: Record<string, FlowParamInput>;
+export interface FlowInputDef {
+  /** Native type hint ("string" / "array" / "object" / "file" / ...). */
+  type?: string;
+  description?: string;
+  required?: boolean;
+  /** Default applied when the caller doesn't supply the key. */
+  default?: unknown;
+  /** Optional regex the submitted string value must match. */
+  pattern?: string;
+  /** UI hint -- accepted file extensions (only used when type = "file"). */
+  accept?: string;
 }
+
+/**
+ * Declarative inputs contract for a flow.
+ *
+ * Two shapes are accepted, for back-compat:
+ *
+ * 1. Flat bag (preferred): `{ <key>: FlowInputDef | <bare-default> }`.
+ *    Each key is a top-level input. A bare value (string / array / object)
+ *    is interpreted as a default with no further constraints.
+ *
+ * 2. Legacy nested: `{ files: Record<string, FlowFileInput>, params: ... }`.
+ *    Still honored by the CLI validator and server-side ingest. Inputs land
+ *    at `inputs.files.<role>` / `inputs.params.<key>` and the template
+ *    engine's compat shim also resolves them via the flat-bag short form.
+ *
+ * Dispatch always accepts additional ad-hoc keys beyond what is declared
+ * here. Only required-without-default entries block dispatch.
+ */
+export type FlowInputsSchema =
+  | { files?: Record<string, FlowFileInput>; params?: Record<string, FlowParamInput> }
+  | Record<string, FlowInputDef | unknown>;
 
 export interface FlowDefinition {
   name: string;

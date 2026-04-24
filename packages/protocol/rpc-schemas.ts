@@ -117,18 +117,27 @@ const computeSchema = z
 
 // ── session/start ───────────────────────────────────────────────────────────
 
-// Generic session inputs bag. Files are role-keyed absolute paths; params
-// are a dotted-key-safe k=v map. Both end up at `session.config.inputs` and
-// are reachable via `{inputs.files.<role>}` / `{inputs.params.<key>}`
-// through the shared template substitution pipeline.
-export const sessionInputsSchema = z.object({
-  files: z.record(z.string(), z.string()).optional(),
-  // params hold for_each iteration sources, named scalars, and structured
-  // dispatch-time data. Arrays of objects (repo lists, ticket lists) flow
-  // through here, so values can't be limited to strings -- use `unknown`
-  // and let the template engine + for_each resolver do the typing.
-  params: z.record(z.string(), z.unknown()).optional(),
-});
+// Generic session inputs bag.
+//
+// Shape: `{ [key]: unknown }` -- flow-declared keys at top level. Values can
+// be scalars, arrays, objects, or tagged-object "rich content":
+//
+//   ticket_id: "SMOKE-1"                                // scalar
+//   targets:   [{path: "foo.txt", content: "..."}]      // array of objects
+//   recipe:    { $type: "file", path: "/abs/rec.yaml" } // tagged file ref
+//   plan:      { $type: "blob", locator: "ark://..." }  // tagged blob ref
+//   image:     { $type: "image", locator: "ark://..." } // tagged image ref
+//
+// Tag semantics are opt-in and read by downstream handlers that know the tag
+// (e.g. the blob resolver looks for `$type === "blob"`). Bare values are
+// always valid -- a raw string that happens to be an absolute path still
+// works the same way it did before.
+//
+// Back-compat: the server accepts the legacy {files, params} sub-buckets
+// and flattens them into top-level keys on ingest. Existing flows using
+// `{{inputs.files.X}}` / `{{inputs.params.X}}` keep resolving via the
+// template engine's compat shim.
+export const sessionInputsSchema = z.record(z.string(), z.unknown());
 export type SessionInputs = z.infer<typeof sessionInputsSchema>;
 
 // ── input/upload ────────────────────────────────────────────────────────────
