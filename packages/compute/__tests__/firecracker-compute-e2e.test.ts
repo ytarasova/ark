@@ -21,11 +21,26 @@
  * Linux runner.
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { accessSync, constants as fsConstants } from "fs";
 
 import { FirecrackerCompute } from "../core/firecracker/compute.js";
 import type { FirecrackerMeta } from "../core/firecracker/compute.js";
+import { AppContext } from "../../core/app.js";
+import { setApp, clearApp } from "../../core/__tests__/test-helpers.js";
+
+let app: AppContext;
+
+beforeAll(async () => {
+  app = await AppContext.forTestAsync();
+  await app.boot();
+  setApp(app);
+});
+
+afterAll(async () => {
+  await app?.shutdown();
+  clearApp();
+});
 
 /**
  * Decide whether the e2e test should run. Non-throwing: on any check that
@@ -51,7 +66,7 @@ const { run, reason } = canRunE2e();
 
 describe.skipIf(!run)(`FirecrackerCompute e2e (${reason})`, async () => {
   it("boots a real microVM, reaches arkd /snapshot from the host, destroys", async () => {
-    const compute = new FirecrackerCompute();
+    const compute = new FirecrackerCompute(app);
     const logs: string[] = [];
     const handle = await compute.provision({
       tags: { name: `e2e-${Date.now()}` },

@@ -170,8 +170,7 @@ describe("K8sProvider.launch owner-ref integration", () => {
       deleteNamespacedPod: async () => {},
     };
 
-    const provider = new K8sProvider();
-    provider.setApp(app);
+    const provider = new K8sProvider(app);
     (provider as unknown as { kubeApi: unknown }).kubeApi = fakeApi;
 
     const compute = {
@@ -236,8 +235,7 @@ describe("K8sProvider.launch owner-ref integration", () => {
       deleteNamespacedPod: async () => {},
     };
 
-    const provider = new K8sProvider();
-    provider.setApp(app);
+    const provider = new K8sProvider(app);
     (provider as unknown as { kubeApi: unknown }).kubeApi = fakeApi;
 
     const compute = {

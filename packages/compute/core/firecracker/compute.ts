@@ -107,18 +107,16 @@ export class FirecrackerCompute implements Compute {
     provisionLatency: "seconds",
   };
 
-  private app: AppContext | null = null;
   private deps: FirecrackerComputeDeps;
   /** vmId -> live VM handle. Needed so start/stop/destroy/snapshot can find
    *  the object we created in provision() without re-spawning firecracker. */
   private vms = new Map<string, FirecrackerVm>();
 
-  constructor(deps?: Partial<FirecrackerComputeDeps>) {
+  constructor(
+    private readonly app: AppContext,
+    deps?: Partial<FirecrackerComputeDeps>,
+  ) {
     this.deps = deps ? { ...productionDeps, ...deps } : productionDeps;
-  }
-
-  setApp(app: AppContext): void {
-    this.app = app;
   }
 
   /** Test-only: swap one or more deps post-construction. */
@@ -469,7 +467,7 @@ export function registerFirecrackerIfAvailable(app: AppContext): FirecrackerComp
     });
     return null;
   }
-  const compute = new FirecrackerCompute();
+  const compute = new FirecrackerCompute(app);
   app.registerCompute(compute);
   logInfo("compute", "firecracker compute registered", {
     platform: avail.details?.platform,

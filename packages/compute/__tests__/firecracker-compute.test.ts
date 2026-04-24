@@ -22,7 +22,7 @@
  * (skipped by default, gated on Linux + KVM + opt-in env var).
  */
 
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "bun:test";
 
 import { FirecrackerCompute, type FirecrackerMeta } from "../core/firecracker/compute.js";
 import type { FirecrackerVm, FirecrackerVmSpec, SnapshotArtifacts, SnapshotOpts } from "../core/firecracker/vm.js";
@@ -30,6 +30,21 @@ import type { GuestAddr } from "../core/firecracker/network.js";
 import type { AvailabilityResult } from "../core/firecracker/availability.js";
 import type { RootfsPaths } from "../core/firecracker/rootfs.js";
 import type { ComputeHandle, Snapshot } from "../core/types.js";
+import { AppContext } from "../../core/app.js";
+import { setApp, clearApp } from "../../core/__tests__/test-helpers.js";
+
+let app: AppContext;
+
+beforeAll(async () => {
+  app = await AppContext.forTestAsync();
+  await app.boot();
+  setApp(app);
+});
+
+afterAll(async () => {
+  await app?.shutdown();
+  clearApp();
+});
 
 // ── Fake VM ─────────────────────────────────────────────────────────────────
 
@@ -111,7 +126,7 @@ function makeCompute(overrides: {
     vms: [],
   };
 
-  const compute = new FirecrackerCompute({
+  const compute = new FirecrackerCompute(app, {
     isFirecrackerAvailable: () => overrides.availability ?? { ok: true },
     ensureRootfs: async () => {
       log.ensureRootfs += 1;

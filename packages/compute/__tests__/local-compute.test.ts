@@ -32,7 +32,7 @@ function makeHandle(): ComputeHandle {
 
 describe("LocalCompute", async () => {
   it("advertises the expected capability flags", () => {
-    const c = new LocalCompute();
+    const c = new LocalCompute(app);
     expect(c.kind).toBe("local");
     expect(c.capabilities).toEqual({
       snapshot: false,
@@ -43,8 +43,7 @@ describe("LocalCompute", async () => {
   });
 
   it("provision is a no-op that mints a handle", async () => {
-    const c = new LocalCompute();
-    c.setApp(app);
+    const c = new LocalCompute(app);
     const h = await c.provision({ tags: { name: "local" } });
     expect(h.kind).toBe("local");
     expect(h.name).toBe("local");
@@ -52,41 +51,33 @@ describe("LocalCompute", async () => {
   });
 
   it("getArkdUrl reads config.ports.arkd from AppContext", () => {
-    const c = new LocalCompute();
-    c.setApp(app);
+    const c = new LocalCompute(app);
     const expected = `http://localhost:${app.config.ports.arkd}`;
     expect(c.getArkdUrl(makeHandle())).toBe(expected);
   });
 
-  it("getArkdUrl falls back to 19300 when AppContext is absent", () => {
-    // Edge case: if an adapter forgets to setApp, we fall back to the
-    // documented default instead of crashing with a TypeError.
-    const c = new LocalCompute();
-    expect(c.getArkdUrl(makeHandle())).toBe("http://localhost:19300");
-  });
-
   it("start throws NotSupportedError", async () => {
-    const c = new LocalCompute();
+    const c = new LocalCompute(app);
     (await expect(c.start(makeHandle()))).rejects.toBeInstanceOf(NotSupportedError);
   });
 
   it("stop throws NotSupportedError", async () => {
-    const c = new LocalCompute();
+    const c = new LocalCompute(app);
     (await expect(c.stop(makeHandle()))).rejects.toBeInstanceOf(NotSupportedError);
   });
 
   it("destroy throws NotSupportedError", async () => {
-    const c = new LocalCompute();
+    const c = new LocalCompute(app);
     (await expect(c.destroy(makeHandle()))).rejects.toBeInstanceOf(NotSupportedError);
   });
 
   it("snapshot throws NotSupportedError", async () => {
-    const c = new LocalCompute();
+    const c = new LocalCompute(app);
     (await expect(c.snapshot(makeHandle()))).rejects.toBeInstanceOf(NotSupportedError);
   });
 
   it("restore throws NotSupportedError", async () => {
-    const c = new LocalCompute();
+    const c = new LocalCompute(app);
     const snap: Snapshot = {
       id: "noop",
       computeKind: "local",

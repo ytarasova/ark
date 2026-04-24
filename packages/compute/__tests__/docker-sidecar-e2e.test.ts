@@ -73,8 +73,7 @@ describe("Docker arkd-sidecar e2e", async () => {
   it.skipIf(!GATED)(
     "provisions a container, starts arkd sidecar, verifies health, destroys",
     async () => {
-      const provider = new LocalDockerProvider();
-      provider.setApp(app);
+      const provider = new LocalDockerProvider(app);
 
       await app.computeService.create({ name: COMPUTE_NAME, provider: "docker" });
       let compute = await app.computes.get(COMPUTE_NAME)!;

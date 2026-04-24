@@ -120,8 +120,7 @@ function makeHarness(overrides: Partial<Harness> = {}): Harness {
 }
 
 function makeK8sCompute(deps: K8sComputeDeps): K8sCompute {
-  const c = new K8sCompute();
-  c.setApp(app);
+  const c = new K8sCompute(app);
   c.setDeps(deps);
   return c;
 }
@@ -130,7 +129,7 @@ function makeK8sCompute(deps: K8sComputeDeps): K8sCompute {
 
 describe("K8sCompute", async () => {
   it("advertises the documented capability flags", () => {
-    const c = new K8sCompute();
+    const c = new K8sCompute(app);
     expect(c.kind).toBe("k8s");
     expect(c.capabilities).toEqual({
       snapshot: false,

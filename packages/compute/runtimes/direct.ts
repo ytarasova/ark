@@ -23,13 +23,10 @@ export class DirectRuntime implements Runtime {
   readonly kind: RuntimeKind = "direct";
   readonly name = "direct";
 
-  private app!: AppContext;
   /** Override hook for tests; when null we build a fresh `ArkdClient`. */
   private clientFactory: ((url: string) => ArkdClient) | null = null;
 
-  setApp(app: AppContext): void {
-    this.app = app;
-  }
+  constructor(private readonly app: AppContext) {}
 
   /** Test-only: swap in a stub `ArkdClient` factory. */
   setClientFactory(factory: (url: string) => ArkdClient): void {

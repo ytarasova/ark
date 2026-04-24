@@ -18,28 +18,25 @@ export class ComputeProvidersBoot {
       const compute = await import("../../compute/index.js");
       compute.setComputeApp(this.app);
       const providers = [
-        new compute.LocalWorktreeProvider(),
-        new compute.LocalDockerProvider(),
-        new compute.LocalDevcontainerProvider(),
-        new compute.LocalFirecrackerProvider(),
-        new compute.RemoteWorktreeProvider(),
-        new compute.RemoteDockerProvider(),
-        new compute.RemoteDevcontainerProvider(),
-        new compute.RemoteFirecrackerProvider(),
+        new compute.LocalWorktreeProvider(this.app),
+        new compute.LocalDockerProvider(this.app),
+        new compute.LocalDevcontainerProvider(this.app),
+        new compute.LocalFirecrackerProvider(this.app),
+        new compute.RemoteWorktreeProvider(this.app),
+        new compute.RemoteDockerProvider(this.app),
+        new compute.RemoteDevcontainerProvider(this.app),
+        new compute.RemoteFirecrackerProvider(this.app),
       ];
       for (const p of providers) {
-        p.setApp?.(this.app);
         this.app.registerProvider(p);
       }
 
       // Optional: Kubernetes providers (gated on SDK install)
       try {
         const { K8sProvider, KataProvider } = await import("../../compute/providers/k8s.js");
-        const k8s = new K8sProvider();
-        k8s.setApp(this.app);
+        const k8s = new K8sProvider(this.app);
         this.app.registerProvider(k8s);
-        const kata = new KataProvider();
-        kata.setApp(this.app);
+        const kata = new KataProvider(this.app);
         this.app.registerProvider(kata);
       } catch {
         logDebug("general", "@kubernetes/client-node not installed");
@@ -50,8 +47,8 @@ export class ComputeProvidersBoot {
         await import("@kubernetes/client-node");
         const { K8sCompute } = await import("../../compute/core/k8s.js");
         const { KataCompute } = await import("../../compute/core/k8s-kata.js");
-        this.app.registerCompute(new K8sCompute());
-        this.app.registerCompute(new KataCompute());
+        this.app.registerCompute(new K8sCompute(this.app));
+        this.app.registerCompute(new KataCompute(this.app));
       } catch {
         logDebug("general", "@kubernetes/client-node not installed");
       }
@@ -63,12 +60,12 @@ export class ComputeProvidersBoot {
       const { DockerRuntime } = await import("../../compute/runtimes/docker.js");
       const { DevcontainerRuntime } = await import("../../compute/runtimes/devcontainer.js");
       const { DockerComposeRuntime } = await import("../../compute/runtimes/docker-compose.js");
-      this.app.registerCompute(new LocalCompute());
-      this.app.registerCompute(new EC2Compute());
-      this.app.registerRuntime(new DirectRuntime());
-      this.app.registerRuntime(new DockerRuntime());
-      this.app.registerRuntime(new DevcontainerRuntime());
-      this.app.registerRuntime(new DockerComposeRuntime());
+      this.app.registerCompute(new LocalCompute(this.app));
+      this.app.registerCompute(new EC2Compute(this.app));
+      this.app.registerRuntime(new DirectRuntime(this.app));
+      this.app.registerRuntime(new DockerRuntime(this.app));
+      this.app.registerRuntime(new DevcontainerRuntime(this.app));
+      this.app.registerRuntime(new DockerComposeRuntime(this.app));
 
       // FirecrackerCompute (gated on /dev/kvm availability)
       const { registerFirecrackerIfAvailable } = await import("../../compute/core/firecracker/compute.js");

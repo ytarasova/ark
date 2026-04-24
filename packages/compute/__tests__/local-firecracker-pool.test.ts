@@ -22,13 +22,28 @@
  *   - config validation catches bad min/max/target/thresholds
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
 import { FirecrackerCompute, type FirecrackerComputeDeps, type FirecrackerMeta } from "../core/firecracker/compute.js";
 import { LocalFirecrackerPool } from "../core/pool/local-firecracker-pool.js";
 import type { PoolConfig } from "../core/pool/types.js";
 import { NotSupportedError } from "../core/types.js";
 import type { FirecrackerVm, FirecrackerVmSpec, SnapshotArtifacts, SnapshotOpts } from "../core/firecracker/vm.js";
+import { AppContext } from "../../core/app.js";
+import { setApp as setTestApp, clearApp as clearTestApp } from "../../core/__tests__/test-helpers.js";
+
+let harnessApp: AppContext;
+
+beforeAll(async () => {
+  harnessApp = await AppContext.forTestAsync();
+  await harnessApp.boot();
+  setTestApp(harnessApp);
+});
+
+afterAll(async () => {
+  await harnessApp?.shutdown();
+  clearTestApp();
+});
 
 // ── Fake VM (same shape as in firecracker-compute.test.ts) ─────────────────
 
@@ -112,7 +127,7 @@ function makeHarness(
     waitForArkdReady: async () => {},
   };
 
-  const compute = new FirecrackerCompute(deps);
+  const compute = new FirecrackerCompute(harnessApp, deps);
 
   // Flip capabilities for the "no snapshot" path. Cast through unknown since
   // `capabilities` is readonly on the interface.

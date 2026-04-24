@@ -7,12 +7,27 @@
  * through.
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 
 import { DirectRuntime } from "../runtimes/direct.js";
 import { LocalCompute } from "../core/local.js";
 import type { ComputeHandle, LaunchOpts } from "../core/types.js";
 import type { ArkdClient } from "../../arkd/client.js";
+import { AppContext } from "../../core/app.js";
+import { setApp, clearApp } from "../../core/__tests__/test-helpers.js";
+
+let app: AppContext;
+
+beforeAll(async () => {
+  app = await AppContext.forTestAsync();
+  await app.boot();
+  setApp(app);
+});
+
+afterAll(async () => {
+  await app?.shutdown();
+  clearApp();
+});
 
 type LaunchCall = {
   sessionName: string;
@@ -32,9 +47,10 @@ function stubClient(record: LaunchCall[] | null, throwOnLaunch?: Error): ArkdCli
 }
 
 function makeCompute(): LocalCompute {
-  // LocalCompute's getArkdUrl falls back to :19300 without an app. Good
-  // enough -- the stubbed client ignores the URL anyway.
-  return new LocalCompute();
+  // The stubbed ArkdClient factory ignores the URL the compute hands back,
+  // so we only need a valid AppContext on the compute to keep the type
+  // check honest.
+  return new LocalCompute(app);
 }
 
 function makeHandle(): ComputeHandle {
@@ -51,13 +67,13 @@ function opts(): LaunchOpts {
 
 describe("DirectRuntime", async () => {
   it("has kind=direct and matching name", () => {
-    const r = new DirectRuntime();
+    const r = new DirectRuntime(app);
     expect(r.kind).toBe("direct");
     expect(r.name).toBe("direct");
   });
 
   it("prepare is a no-op", async () => {
-    const r = new DirectRuntime();
+    const r = new DirectRuntime(app);
     // Must not throw, must not call arkd.
     let called = false;
     r.setClientFactory(() => {
@@ -70,7 +86,7 @@ describe("DirectRuntime", async () => {
 
   it("launchAgent forwards sessionName, script, workdir to arkd", async () => {
     const calls: LaunchCall[] = [];
-    const r = new DirectRuntime();
+    const r = new DirectRuntime(app);
     r.setClientFactory(() => stubClient(calls));
 
     const handle = await r.launchAgent(makeCompute(), makeHandle(), opts());
@@ -86,7 +102,7 @@ describe("DirectRuntime", async () => {
 
   it("launchAgent resolves the arkd URL via Compute.getArkdUrl", async () => {
     const urls: string[] = [];
-    const r = new DirectRuntime();
+    const r = new DirectRuntime(app);
     r.setClientFactory((url) => {
       urls.push(url);
       return stubClient([]);
@@ -94,18 +110,18 @@ describe("DirectRuntime", async () => {
 
     await r.launchAgent(makeCompute(), makeHandle(), opts());
 
-    // Compute with no app falls back to the documented default.
-    expect(urls).toEqual(["http://localhost:19300"]);
+    // LocalCompute.getArkdUrl reads app.config.ports.arkd.
+    expect(urls).toEqual([`http://localhost:${app.config.ports.arkd}`]);
   });
 
   it("launchAgent propagates arkd errors", async () => {
-    const r = new DirectRuntime();
+    const r = new DirectRuntime(app);
     r.setClientFactory(() => stubClient(null, new Error("arkd down")));
     (await expect(r.launchAgent(makeCompute(), makeHandle(), opts()))).rejects.toThrow("arkd down");
   });
 
   it("shutdown is a no-op", async () => {
-    const r = new DirectRuntime();
+    const r = new DirectRuntime(app);
     let called = false;
     r.setClientFactory(() => {
       called = true;

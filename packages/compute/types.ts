@@ -42,9 +42,6 @@ export interface ComputeProvider {
   /** Isolation modes this provider supports. Empty = no isolation choice needed. */
   readonly isolationModes: IsolationMode[];
 
-  /** Inject AppContext reference so providers never need getApp(). */
-  setApp?(app: import("../core/app.js").AppContext): void;
-
   // ── Compute lifecycle ───────────────────────────────────────────────────
   provision(compute: Compute, opts?: ProvisionOpts): Promise<void>;
   destroy(compute: Compute): Promise<void>;

@@ -73,61 +73,37 @@ import type { ComputeProvider } from "../types.js";
  * any future provider).
  *
  * @param provider -- the legacy provider instance.
- * @param app      -- AppContext used to seed `setApp` on the new impls.
+ * @param app      -- AppContext injected into the new impls via constructor.
  */
 export function computeProviderToTarget(provider: ComputeProvider, app: AppContext): ComputeTarget | null {
   if (provider instanceof LocalWorktreeProvider) {
-    const compute = new LocalCompute();
-    compute.setApp(app);
-    const runtime = new DirectRuntime();
-    runtime.setApp(app);
-    return new ComputeTarget(compute, runtime, app);
+    return new ComputeTarget(new LocalCompute(app), new DirectRuntime(app), app);
   }
   if (provider instanceof LocalDockerProvider) {
     // Docker runtime: the host is still LocalCompute (always up). The
     // per-session container lifecycle lives entirely on the runtime.
-    const compute = new LocalCompute();
-    compute.setApp(app);
-    const runtime = new DockerRuntime();
-    runtime.setApp(app);
-    return new ComputeTarget(compute, runtime, app);
+    return new ComputeTarget(new LocalCompute(app), new DockerRuntime(app), app);
   }
   if (provider instanceof LocalFirecrackerProvider) {
     // Firecracker microVM IS the compute; inside the VM the agent runs
     // natively via arkd, so the runtime is `direct`.
-    const compute = new FirecrackerCompute();
-    compute.setApp(app);
-    const runtime = new DirectRuntime();
-    runtime.setApp(app);
-    return new ComputeTarget(compute, runtime, app);
+    return new ComputeTarget(new FirecrackerCompute(app), new DirectRuntime(app), app);
   }
   if (provider instanceof RemoteWorktreeProvider) {
     // Legacy "ec2" -- arkd runs on the instance; DirectRuntime forwards
     // launches straight through the EC2Compute SSH tunnel.
-    const compute = new EC2Compute();
-    compute.setApp(app);
-    const runtime = new DirectRuntime();
-    runtime.setApp(app);
-    return new ComputeTarget(compute, runtime, app);
+    return new ComputeTarget(new EC2Compute(app), new DirectRuntime(app), app);
   }
   if (provider instanceof RemoteDockerProvider) {
     // Legacy "ec2-docker" -- docker-in-ec2. The runtime's per-session
     // container lifecycle on the instance is identical to local docker; the
     // EC2Compute tunnel brings arkd back to the host conductor.
-    const compute = new EC2Compute();
-    compute.setApp(app);
-    const runtime = new DockerRuntime();
-    runtime.setApp(app);
-    return new ComputeTarget(compute, runtime, app);
+    return new ComputeTarget(new EC2Compute(app), new DockerRuntime(app), app);
   }
   if (provider instanceof RemoteDevcontainerProvider) {
     // Legacy "ec2-devcontainer" -- devcontainer-in-ec2. The devcontainer CLI
     // runs on the instance; EC2Compute owns the instance + tunnel.
-    const compute = new EC2Compute();
-    compute.setApp(app);
-    const runtime = new DevcontainerRuntime();
-    runtime.setApp(app);
-    return new ComputeTarget(compute, runtime, app);
+    return new ComputeTarget(new EC2Compute(app), new DevcontainerRuntime(app), app);
   }
   if (provider instanceof RemoteFirecrackerProvider) {
     // microVM-on-EC2 composition is not yet wired; until then the legacy
@@ -137,18 +113,10 @@ export function computeProviderToTarget(provider: ComputeProvider, app: AppConte
   // Kata must be checked before K8s because KataProvider extends K8sProvider
   // -- an `instanceof K8sProvider` match would otherwise swallow Kata instances.
   if (provider instanceof KataProvider) {
-    const compute = new KataCompute();
-    compute.setApp(app);
-    const runtime = new DirectRuntime();
-    runtime.setApp(app);
-    return new ComputeTarget(compute, runtime, app);
+    return new ComputeTarget(new KataCompute(app), new DirectRuntime(app), app);
   }
   if (provider instanceof K8sProvider) {
-    const compute = new K8sCompute();
-    compute.setApp(app);
-    const runtime = new DirectRuntime();
-    runtime.setApp(app);
-    return new ComputeTarget(compute, runtime, app);
+    return new ComputeTarget(new K8sCompute(app), new DirectRuntime(app), app);
   }
   // Everything else: future waves.
   return null;

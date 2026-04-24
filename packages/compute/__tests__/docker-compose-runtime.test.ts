@@ -20,6 +20,11 @@ import { parse as parseYaml } from "yaml";
 import { DockerComposeRuntime, type DockerComposeMeta } from "../runtimes/docker-compose.js";
 import { LocalCompute } from "../core/local.js";
 import type { ComputeHandle, PrepareCtx } from "../core/types.js";
+import type { AppContext } from "../../core/app.js";
+
+const fakeApp = {
+  config: { dirs: { ark: "/tmp/ark" }, ports: { arkd: 19300, conductor: 19100 } },
+} as unknown as AppContext;
 
 // ── Hook recorder ───────────────────────────────────────────────────────────
 
@@ -77,7 +82,7 @@ interface HookOverrides {
  */
 function makeRuntime(overrides: HookOverrides = {}): { runtime: DockerComposeRuntime; calls: HookCalls } {
   const calls = freshCalls();
-  const runtime = new DockerComposeRuntime({
+  const runtime = new DockerComposeRuntime(fakeApp, {
     resolveArkSourceRoot: () => (overrides.arkSourceNull ? null : "/opt/ark-source"),
     allocatePort: async () => {
       const port = overrides.portSeed ?? 45000;
@@ -191,7 +196,7 @@ function ctx(): PrepareCtx {
 
 describe("DockerComposeRuntime -- identity", () => {
   it("declares kind=compose and name=docker-compose", () => {
-    const r = new DockerComposeRuntime();
+    const r = new DockerComposeRuntime(fakeApp);
     expect(r.kind).toBe("compose");
     expect(r.name).toBe("docker-compose");
   });
@@ -205,7 +210,7 @@ describe("DockerComposeRuntime.prepare -- file only", async () => {
     const { runtime, calls } = makeRuntime();
     const handle = makeHandle();
 
-    await runtime.prepare(new LocalCompute(), handle, ctx());
+    await runtime.prepare(new LocalCompute(fakeApp), handle, ctx());
 
     // Exactly one -f file, resolved to the absolute path in workdir.
     expect(calls.composeUp).toHaveLength(1);
@@ -243,14 +248,16 @@ describe("DockerComposeRuntime.prepare -- file only", async () => {
     writeArc({ compose: { file: "docker-compose.prod.yml" } });
 
     const { runtime, calls } = makeRuntime();
-    await runtime.prepare(new LocalCompute(), makeHandle(), ctx());
+    await runtime.prepare(new LocalCompute(fakeApp), makeHandle(), ctx());
     expect(calls.composeUp[0].files).toEqual([altPath]);
   });
 
   it("throws when the configured file is missing", async () => {
     writeArc({ compose: { file: "does-not-exist.yml" } });
     const { runtime, calls } = makeRuntime();
-    (await expect(runtime.prepare(new LocalCompute(), makeHandle(), ctx()))).rejects.toThrow(/compose file not found/);
+    (await expect(runtime.prepare(new LocalCompute(fakeApp), makeHandle(), ctx()))).rejects.toThrow(
+      /compose file not found/,
+    );
     // Compose up must NOT have been invoked.
     expect(calls.composeUp).toHaveLength(0);
   });
@@ -276,7 +283,7 @@ describe("DockerComposeRuntime.prepare -- inline only", async () => {
     // The above disables the stub; we route through the real module.
     // But the stub we originally passed also wrote a fake `# stub` line to
     // the path -- reset by re-instantiating without the hook.
-    const runtime2 = new DockerComposeRuntime({
+    const runtime2 = new DockerComposeRuntime(fakeApp, {
       resolveArkSourceRoot: () => "/opt/ark-source",
       allocatePort: async () => 45100,
       pullImage: async (image) => {
@@ -308,7 +315,7 @@ describe("DockerComposeRuntime.prepare -- inline only", async () => {
     });
 
     const handle = makeHandle("inline-only");
-    await runtime2.prepare(new LocalCompute(), handle, ctx());
+    await runtime2.prepare(new LocalCompute(fakeApp), handle, ctx());
 
     expect(calls.composeUp).toHaveLength(1);
     expect(calls.composeUp[0].files).toHaveLength(1);
@@ -337,7 +344,7 @@ describe("DockerComposeRuntime.prepare -- inline only", async () => {
 
     const { runtime, calls } = makeRuntime();
     const handle = makeHandle("inline-stub");
-    await runtime.prepare(new LocalCompute(), handle, ctx());
+    await runtime.prepare(new LocalCompute(fakeApp), handle, ctx());
 
     expect(calls.writeInline).toHaveLength(1);
     expect(calls.writeInline[0].spec).toEqual(inline);
@@ -355,7 +362,7 @@ describe("DockerComposeRuntime.prepare -- file + inline", async () => {
 
     const { runtime, calls } = makeRuntime();
     const handle = makeHandle("both");
-    await runtime.prepare(new LocalCompute(), handle, ctx());
+    await runtime.prepare(new LocalCompute(fakeApp), handle, ctx());
 
     expect(calls.composeUp).toHaveLength(1);
     const files = calls.composeUp[0].files;
@@ -379,7 +386,7 @@ describe("DockerComposeRuntime.prepare -- file + inline", async () => {
   it("honors compose.skipUp and does not shell out to `docker compose up`", async () => {
     writeArc({ compose: { file: "docker-compose.yml", skipUp: true } });
     const { runtime, calls } = makeRuntime();
-    await runtime.prepare(new LocalCompute(), makeHandle("skip-up"), ctx());
+    await runtime.prepare(new LocalCompute(fakeApp), makeHandle("skip-up"), ctx());
     expect(calls.composeUp).toHaveLength(0);
     // But the sidecar lifecycle still runs.
     expect(calls.start).toHaveLength(1);
@@ -394,12 +401,12 @@ describe("DockerComposeRuntime.shutdown", async () => {
     writeArc({ compose: { inline: { services: { q: { image: "rabbitmq" } } } } });
     const { runtime, calls } = makeRuntime();
     const handle = makeHandle("shutdown-test");
-    await runtime.prepare(new LocalCompute(), handle, ctx());
+    await runtime.prepare(new LocalCompute(fakeApp), handle, ctx());
 
     const meta = handle.meta.dockerCompose as DockerComposeMeta;
     expect(existsSync(meta.inlineTempPath!)).toBe(true);
 
-    await runtime.shutdown(new LocalCompute(), handle);
+    await runtime.shutdown(new LocalCompute(fakeApp), handle);
 
     expect(calls.stop).toEqual([meta.containerName]);
     expect(calls.remove).toEqual([meta.containerName]);
@@ -410,7 +417,7 @@ describe("DockerComposeRuntime.shutdown", async () => {
 
   it("no-ops when there is no dockerCompose meta (nothing was prepared)", async () => {
     const { runtime, calls } = makeRuntime();
-    await runtime.shutdown(new LocalCompute(), makeHandle("never-prepared"));
+    await runtime.shutdown(new LocalCompute(fakeApp), makeHandle("never-prepared"));
     expect(calls.stop).toHaveLength(0);
     expect(calls.composeDown).toHaveLength(0);
   });
@@ -421,13 +428,13 @@ describe("DockerComposeRuntime.shutdown", async () => {
     // Start by preparing successfully...
     const { runtime, calls } = makeRuntime({ composeDownOk: false });
     const handle = makeHandle("tolerant");
-    await runtime.prepare(new LocalCompute(), handle, ctx());
+    await runtime.prepare(new LocalCompute(fakeApp), handle, ctx());
 
     const meta = handle.meta.dockerCompose as DockerComposeMeta;
     expect(existsSync(meta.inlineTempPath!)).toBe(true);
 
     // ...then shut down. composeDown returns {ok:false}; shutdown must not throw.
-    await runtime.shutdown(new LocalCompute(), handle);
+    await runtime.shutdown(new LocalCompute(fakeApp), handle);
 
     expect(calls.composeDown).toHaveLength(1);
     // Tempfile is still removed.
@@ -446,7 +453,7 @@ describe("DockerComposeRuntime.prepare -- rollback", async () => {
     const { runtime, calls } = makeRuntime({ bootstrapThrows: err });
     const handle = makeHandle("rollback");
 
-    (await expect(runtime.prepare(new LocalCompute(), handle, ctx()))).rejects.toThrow("bootstrap exploded");
+    (await expect(runtime.prepare(new LocalCompute(fakeApp), handle, ctx()))).rejects.toThrow("bootstrap exploded");
 
     // Sidecar removal attempted.
     expect(calls.remove).toEqual(["ark-rollback-compose"]);
@@ -467,7 +474,7 @@ describe("DockerComposeRuntime.prepare -- rollback", async () => {
     writeArc({ compose: { inline: { services: {} } } });
     const { runtime, calls } = makeRuntime({ composeUpOk: false, composeUpError: "boom" });
 
-    (await expect(runtime.prepare(new LocalCompute(), makeHandle("compose-fail"), ctx()))).rejects.toThrow(
+    (await expect(runtime.prepare(new LocalCompute(fakeApp), makeHandle("compose-fail"), ctx()))).rejects.toThrow(
       /docker compose up failed.*boom/,
     );
 
@@ -482,7 +489,9 @@ describe("DockerComposeRuntime.prepare -- rollback", async () => {
   it("skips compose down during rollback when skipUp is set", async () => {
     writeArc({ compose: { file: "docker-compose.yml", skipUp: true } });
     const { runtime, calls } = makeRuntime({ waitThrows: new Error("unhealthy") });
-    (await expect(runtime.prepare(new LocalCompute(), makeHandle("skip-down"), ctx()))).rejects.toThrow("unhealthy");
+    (await expect(runtime.prepare(new LocalCompute(fakeApp), makeHandle("skip-down"), ctx()))).rejects.toThrow(
+      "unhealthy",
+    );
     // Sidecar removed.
     expect(calls.remove).toHaveLength(1);
     // But we did not ask the user to bring a stack up, so we don't bring it down either.
@@ -496,17 +505,21 @@ describe("DockerComposeRuntime.prepare -- config errors", async () => {
   it("throws a clear error when arc.json has no compose block", async () => {
     writeArc({ ports: [{ port: 3000 }] });
     const { runtime } = makeRuntime();
-    (await expect(runtime.prepare(new LocalCompute(), makeHandle(), ctx()))).rejects.toThrow(/no compose config/);
+    (await expect(runtime.prepare(new LocalCompute(fakeApp), makeHandle(), ctx()))).rejects.toThrow(
+      /no compose config/,
+    );
   });
 
   it("throws when arc.json is missing entirely", async () => {
     const { runtime } = makeRuntime();
-    (await expect(runtime.prepare(new LocalCompute(), makeHandle(), ctx()))).rejects.toThrow(/no compose config/);
+    (await expect(runtime.prepare(new LocalCompute(fakeApp), makeHandle(), ctx()))).rejects.toThrow(
+      /no compose config/,
+    );
   });
 
   it("throws when ark source cannot be located", async () => {
     writeArc({ compose: true });
     const { runtime } = makeRuntime({ arkSourceNull: true });
-    (await expect(runtime.prepare(new LocalCompute(), makeHandle(), ctx()))).rejects.toThrow(/ark source tree/);
+    (await expect(runtime.prepare(new LocalCompute(fakeApp), makeHandle(), ctx()))).rejects.toThrow(/ark source tree/);
   });
 });

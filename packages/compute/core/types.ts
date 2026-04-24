@@ -15,8 +15,6 @@
  * every dispatch path reads from the new interfaces.
  */
 
-import type { AppContext } from "../../core/app.js";
-
 // ── Kinds ──────────────────────────────────────────────────────────────────
 
 /** Where the compute lives. Mirrors the vision doc's target set. */
@@ -143,9 +141,6 @@ export interface Compute {
   readonly kind: ComputeKind;
   readonly capabilities: ComputeCapabilities;
 
-  /** Injected at boot so impls can read ports, arkDir, etc. */
-  setApp?(app: AppContext): void;
-
   provision(opts: ProvisionOpts): Promise<ComputeHandle>;
   start(h: ComputeHandle): Promise<void>;
   stop(h: ComputeHandle): Promise<void>;
@@ -168,9 +163,6 @@ export interface Compute {
 export interface Runtime {
   readonly kind: RuntimeKind;
   readonly name: string;
-
-  /** Injected at boot. */
-  setApp?(app: AppContext): void;
 
   /** One-time setup inside a provisioned compute (install deps, bring up compose, etc.). */
   prepare(compute: Compute, h: ComputeHandle, ctx: PrepareCtx): Promise<void>;

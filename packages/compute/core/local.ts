@@ -20,11 +20,7 @@ export class LocalCompute implements Compute {
     provisionLatency: "instant",
   };
 
-  private app!: AppContext;
-
-  setApp(app: AppContext): void {
-    this.app = app;
-  }
+  constructor(private readonly app: AppContext) {}
 
   async provision(opts: ProvisionOpts): Promise<ComputeHandle> {
     // The host is always provisioned. We just mint a handle.
@@ -49,8 +45,7 @@ export class LocalCompute implements Compute {
   }
 
   getArkdUrl(_h: ComputeHandle): string {
-    const port = this.app?.config?.ports?.arkd ?? 19300;
-    return `http://localhost:${port}`;
+    return `http://localhost:${this.app.config.ports.arkd}`;
   }
 
   async snapshot(_h: ComputeHandle): Promise<Snapshot> {

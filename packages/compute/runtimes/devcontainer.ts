@@ -123,10 +123,12 @@ export class DevcontainerRuntime implements Runtime {
   readonly kind: RuntimeKind = "devcontainer";
   readonly name = "devcontainer";
 
-  private app!: AppContext;
   private deps: Required<DevcontainerRuntimeDeps>;
 
-  constructor(deps: DevcontainerRuntimeDeps = {}) {
+  constructor(
+    private readonly app: AppContext,
+    deps: DevcontainerRuntimeDeps = {},
+  ) {
     this.deps = {
       buildImage: deps.buildImage ?? buildDevcontainerImage,
       resolveShape: deps.resolveShape ?? resolveDevcontainerShape,
@@ -147,10 +149,6 @@ export class DevcontainerRuntime implements Runtime {
         }),
       arkdClientFactory: deps.arkdClientFactory ?? ((url: string) => new ArkdClient(url)),
     };
-  }
-
-  setApp(app: AppContext): void {
-    this.app = app;
   }
 
   /** Test-only: swap any subset of deps after construction. */
@@ -198,7 +196,7 @@ export class DevcontainerRuntime implements Runtime {
 
     await this.deps.createContainer(containerName, image, {
       extraVolumes: shape.mounts,
-      arkDir: this.app?.config?.dirs?.ark,
+      arkDir: this.app.config.dirs.ark,
       workdir: ctx.workdir,
       arkSource: this.deps.resolveArkSourceRoot() ?? undefined,
       arkdHostPort,
@@ -387,8 +385,7 @@ export class DevcontainerRuntime implements Runtime {
   }
 
   private conductorUrl(): string {
-    const port = this.app?.config?.ports?.conductor ?? 19100;
-    return `http://localhost:${port}`;
+    return `http://localhost:${this.app.config.ports.conductor}`;
   }
 
   /** Deterministic name so repeated prepare/destroy cycles don't collide. */

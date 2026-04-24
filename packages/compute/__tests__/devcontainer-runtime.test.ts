@@ -21,6 +21,11 @@ import { LocalCompute } from "../core/local.js";
 import type { ComputeHandle, LaunchOpts, PrepareCtx } from "../core/types.js";
 import type { ArkdClient } from "../../arkd/client.js";
 import type { DevcontainerShape } from "../providers/docker/devcontainer-resolve.js";
+import type { AppContext } from "../../core/app.js";
+
+const fakeApp = {
+  config: { dirs: { ark: "/tmp/ark" }, ports: { arkd: 19300, conductor: 19100 } },
+} as unknown as AppContext;
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -178,7 +183,7 @@ function buildHarness(opts: HarnessOpts = {}) {
     return { stdout: "", stderr: "" };
   };
 
-  const runtime = new DevcontainerRuntime({
+  const runtime = new DevcontainerRuntime(fakeApp, {
     buildImage,
     allocatePort,
     createContainer,
@@ -213,7 +218,7 @@ describe("DevcontainerRuntime", async () => {
   });
 
   it("has kind=devcontainer and matching name", () => {
-    const r = new DevcontainerRuntime();
+    const r = new DevcontainerRuntime(fakeApp);
     expect(r.kind).toBe("devcontainer");
     expect(r.name).toBe("devcontainer");
   });
@@ -225,7 +230,7 @@ describe("DevcontainerRuntime", async () => {
       const { runtime, log } = buildHarness();
       const h = makeHandle("unit-image");
 
-      await runtime.prepare(new LocalCompute(), h, prepareCtx(IMAGE_ONLY));
+      await runtime.prepare(new LocalCompute(fakeApp), h, prepareCtx(IMAGE_ONLY));
 
       const methods = log.map((e) => e.op);
       // We expect the following happy-path order for an image-only devcontainer.
@@ -262,7 +267,7 @@ describe("DevcontainerRuntime", async () => {
       });
 
       const { runtime, log } = buildHarness();
-      await runtime.prepare(new LocalCompute(), makeHandle("pc"), prepareCtx(workdir));
+      await runtime.prepare(new LocalCompute(fakeApp), makeHandle("pc"), prepareCtx(workdir));
 
       const methods = log.map((e) => e.op);
       // Find the `exec` entry that runs the postCreate command -- it's the
@@ -289,7 +294,9 @@ describe("DevcontainerRuntime", async () => {
 
       const { runtime, log } = buildHarness({ failPostCreate: true });
       const h = makeHandle("fail-pc");
-      (await expect(runtime.prepare(new LocalCompute(), h, prepareCtx(workdir)))).rejects.toThrow("postCreate failed");
+      (await expect(runtime.prepare(new LocalCompute(fakeApp), h, prepareCtx(workdir)))).rejects.toThrow(
+        "postCreate failed",
+      );
 
       const methods = log.map((e) => e.op);
       // We created a container and must have torn it down on error.
@@ -312,7 +319,7 @@ describe("DevcontainerRuntime", async () => {
 
       const logs: string[] = [];
       const { runtime } = buildHarness();
-      await runtime.prepare(new LocalCompute(), makeHandle("feat"), { workdir, onLog: (m) => logs.push(m) });
+      await runtime.prepare(new LocalCompute(fakeApp), makeHandle("feat"), { workdir, onLog: (m) => logs.push(m) });
 
       expect(logs.some((l) => l.includes("features not yet supported"))).toBe(true);
     });
@@ -325,7 +332,7 @@ describe("DevcontainerRuntime", async () => {
       const { runtime, log } = buildHarness({ composeServiceContainerId: "cid-compose-1" });
       const h = makeHandle("compose-1");
 
-      await runtime.prepare(new LocalCompute(), h, prepareCtx(COMPOSE));
+      await runtime.prepare(new LocalCompute(fakeApp), h, prepareCtx(COMPOSE));
 
       // Inspect the exec log to verify the compose up + ps + forwarder sidecar
       // commands were issued in the right order.
@@ -371,7 +378,7 @@ describe("DevcontainerRuntime", async () => {
     it("throws when compose ps returns no container for the service", async () => {
       const { runtime } = buildHarness({ composeServiceContainerId: "" });
       const h = makeHandle("compose-empty");
-      (await expect(runtime.prepare(new LocalCompute(), h, prepareCtx(COMPOSE)))).rejects.toThrow(
+      (await expect(runtime.prepare(new LocalCompute(fakeApp), h, prepareCtx(COMPOSE)))).rejects.toThrow(
         /no container for service/,
       );
     });
@@ -383,10 +390,10 @@ describe("DevcontainerRuntime", async () => {
     it("image mode: stops + removes the container, no compose calls", async () => {
       const { runtime, log } = buildHarness();
       const h = makeHandle("shutdown-image");
-      await runtime.prepare(new LocalCompute(), h, prepareCtx(IMAGE_ONLY));
+      await runtime.prepare(new LocalCompute(fakeApp), h, prepareCtx(IMAGE_ONLY));
       log.length = 0;
 
-      await runtime.shutdown(new LocalCompute(), h);
+      await runtime.shutdown(new LocalCompute(fakeApp), h);
       const methods = log.map((e) => e.op);
       expect(methods).toContain("stopContainer");
       expect(methods).toContain("removeContainer");
@@ -400,10 +407,10 @@ describe("DevcontainerRuntime", async () => {
     it("compose mode: removes forwarder first, then compose down", async () => {
       const { runtime, log } = buildHarness({ composeServiceContainerId: "cid-shut-1" });
       const h = makeHandle("shutdown-compose");
-      await runtime.prepare(new LocalCompute(), h, prepareCtx(COMPOSE));
+      await runtime.prepare(new LocalCompute(fakeApp), h, prepareCtx(COMPOSE));
       log.length = 0;
 
-      await runtime.shutdown(new LocalCompute(), h);
+      await runtime.shutdown(new LocalCompute(fakeApp), h);
 
       // Forwarder removal vs compose down ordering: removeContainer for the
       // forwarder must come before the `docker compose ... down` exec call.
@@ -422,7 +429,7 @@ describe("DevcontainerRuntime", async () => {
       const { runtime } = buildHarness();
       const h = makeHandle("no-meta");
       // Must not throw.
-      await runtime.shutdown(new LocalCompute(), h);
+      await runtime.shutdown(new LocalCompute(fakeApp), h);
     });
   });
 
@@ -433,9 +440,9 @@ describe("DevcontainerRuntime", async () => {
       const workdir = mkTmpWorkdir();
       tmpCleanup.push(workdir);
       const { runtime } = buildHarness();
-      (await expect(runtime.prepare(new LocalCompute(), makeHandle("none"), prepareCtx(workdir)))).rejects.toThrow(
-        /no devcontainer\.json found/,
-      );
+      (
+        await expect(runtime.prepare(new LocalCompute(fakeApp), makeHandle("none"), prepareCtx(workdir)))
+      ).rejects.toThrow(/no devcontainer\.json found/);
     });
   });
 
@@ -456,8 +463,8 @@ describe("DevcontainerRuntime", async () => {
       });
 
       const h = makeHandle("launch-a");
-      await harness.runtime.prepare(new LocalCompute(), h, prepareCtx(IMAGE_ONLY));
-      const out = await harness.runtime.launchAgent(new LocalCompute(), h, launchOpts("/tmp/work"));
+      await harness.runtime.prepare(new LocalCompute(fakeApp), h, prepareCtx(IMAGE_ONLY));
+      const out = await harness.runtime.launchAgent(new LocalCompute(fakeApp), h, launchOpts("/tmp/work"));
 
       expect(out.sessionName).toBe("ark-s-test");
       expect(calls.length).toBe(1);

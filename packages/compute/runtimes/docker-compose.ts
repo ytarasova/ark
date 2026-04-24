@@ -100,16 +100,14 @@ export class DockerComposeRuntime implements Runtime {
   readonly kind: RuntimeKind = "compose";
   readonly name = "docker-compose";
 
-  private app!: AppContext;
   private clientFactory: ((url: string) => ArkdClient) | null = null;
   private hooks: DockerComposeRuntimeHooks;
 
-  constructor(hooks: DockerComposeRuntimeHooks = {}) {
+  constructor(
+    private readonly app: AppContext,
+    hooks: DockerComposeRuntimeHooks = {},
+  ) {
     this.hooks = hooks;
-  }
-
-  setApp(app: AppContext): void {
-    this.app = app;
   }
 
   /** Test-only: swap in a stub `ArkdClient` factory. */
@@ -171,7 +169,7 @@ export class DockerComposeRuntime implements Runtime {
     try {
       await (this.hooks.pullImage ?? pullImage)(image);
       await (this.hooks.createContainer ?? createContainer)(containerName, image, {
-        arkDir: this.app?.config?.dirs?.ark,
+        arkDir: this.app.config.dirs.ark,
         arkSource,
         workdir,
         arkdHostPort,
@@ -182,7 +180,7 @@ export class DockerComposeRuntime implements Runtime {
 
       await (this.hooks.bootstrapContainer ?? bootstrapContainer)(containerName, bootstrapOpts);
 
-      const conductorUrl = `http://host.docker.internal:${this.app?.config?.ports?.conductor ?? 19100}`;
+      const conductorUrl = `http://host.docker.internal:${this.app.config.ports.conductor}`;
       await (this.hooks.startArkdInContainer ?? startArkdInContainer)(containerName, conductorUrl);
       await (this.hooks.waitForArkdHealth ?? waitForArkdHealth)(arkdUrl, 30_000);
     } catch (err) {
@@ -284,8 +282,7 @@ export class DockerComposeRuntime implements Runtime {
   }
 
   private runtimeDir(handle: ComputeHandle): string {
-    const arkDir = this.app?.config?.dirs?.ark ?? join(process.env.HOME ?? "/tmp", ".ark");
-    return join(arkDir, "runtime", handle.name);
+    return join(this.app.config.dirs.ark, "runtime", handle.name);
   }
 
   private resolveSidecarImage(handle: ComputeHandle): string {

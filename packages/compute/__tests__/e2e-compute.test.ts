@@ -41,14 +41,10 @@ afterAll(async () => {
 // Ensure providers are registered (may be cleared by provider-registry.test.ts)
 function ensureProviders() {
   if (!getProvider("local")) {
-    const lp = new LocalWorktreeProvider();
-    lp.setApp?.(app);
-    registerProvider(lp);
+    registerProvider(new LocalWorktreeProvider(app));
   }
   if (!getProvider("docker")) {
-    const dp = new LocalDockerProvider();
-    dp.setApp?.(app);
-    registerProvider(dp);
+    registerProvider(new LocalDockerProvider(app));
   }
 }
 

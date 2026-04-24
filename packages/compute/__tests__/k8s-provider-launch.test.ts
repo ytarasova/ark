@@ -70,8 +70,7 @@ function fakeApi(rec: Recorded) {
  * return this.kubeApi` first, so the real SDK is never touched.
  */
 function makeProvider(rec: Recorded): K8sProvider {
-  const p = new K8sProvider();
-  p.setApp(app);
+  const p = new K8sProvider(app);
   (p as unknown as { kubeApi: unknown }).kubeApi = fakeApi(rec);
   return p;
 }
@@ -378,8 +377,7 @@ describe("K8sProvider.launch clusterName resolution (agent G)", async () => {
     // Record what the k8s client loadFromOptions is called with by swapping
     // in a stub KubeConfig via a module-level mock. Simpler: call the private
     // method directly via cast.
-    const provider = new K8sProvider();
-    provider.setApp(app);
+    const provider = new K8sProvider(app);
     const recorded: any = { loaded: null, api: null };
     const fakeKc = {
       loadFromOptions(opts: unknown) {
@@ -430,8 +428,7 @@ describe("K8sProvider.launch clusterName resolution (agent G)", async () => {
       ],
     };
 
-    const provider = new K8sProvider();
-    provider.setApp(app);
+    const provider = new K8sProvider(app);
     const fakeKc = {
       loadFromOptions() {},
       loadFromCluster() {},
@@ -457,8 +454,7 @@ describe("K8sProvider.launch clusterName resolution (agent G)", async () => {
         },
       ],
     };
-    const provider = new K8sProvider();
-    provider.setApp(app);
+    const provider = new K8sProvider(app);
     const fakeKc = {
       loadFromOptions() {},
       loadFromCluster() {},
@@ -482,8 +478,7 @@ describe("K8sProvider.launch clusterName resolution (agent G)", async () => {
         },
       ],
     };
-    const provider = new K8sProvider();
-    provider.setApp(app);
+    const provider = new K8sProvider(app);
     const recorded: any = { loaded: null };
     const fakeKc = {
       loadFromOptions(opts: unknown) {

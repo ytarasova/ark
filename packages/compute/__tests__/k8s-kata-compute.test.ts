@@ -82,8 +82,7 @@ function makeHarness(): Harness {
 }
 
 function makeKataCompute(deps: K8sComputeDeps): KataCompute {
-  const c = new KataCompute();
-  c.setApp(app);
+  const c = new KataCompute(app);
   c.setDeps(deps);
   return c;
 }
@@ -92,7 +91,7 @@ function makeKataCompute(deps: K8sComputeDeps): KataCompute {
 
 describe("KataCompute", async () => {
   it("advertises `kind: 'k8s-kata'` and microVM-appropriate capabilities", () => {
-    const c = new KataCompute();
+    const c = new KataCompute(app);
     expect(c.kind).toBe("k8s-kata");
     expect(c.capabilities).toEqual({
       snapshot: true,

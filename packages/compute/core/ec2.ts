@@ -332,12 +332,9 @@ export class EC2Compute implements Compute {
     provisionLatency: "minutes",
   };
 
-  private app!: AppContext;
   private helpers: EC2ComputeHelpers = DEFAULT_HELPERS;
 
-  setApp(app: AppContext): void {
-    this.app = app;
-  }
+  constructor(private readonly app: AppContext) {}
 
   /**
    * Test-only: swap in stubs for every EC2 / SSH side-effect. Partial

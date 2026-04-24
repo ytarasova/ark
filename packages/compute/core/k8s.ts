@@ -98,14 +98,11 @@ export class K8sCompute implements Compute {
     provisionLatency: "seconds",
   };
 
-  protected app!: AppContext;
   protected deps: K8sComputeDeps = DEFAULT_DEPS;
   /** Memoized CoreV1Api client per kubeconfig path. */
   private apiCache = new Map<string, unknown>();
 
-  setApp(app: AppContext): void {
-    this.app = app;
-  }
+  constructor(protected readonly app: AppContext) {}
 
   /** Test-only: swap in stub deps (k8s SDK, kubectl spawn, port allocator). */
   setDeps(deps: Partial<K8sComputeDeps>): void {

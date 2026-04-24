@@ -97,13 +97,10 @@ export class DockerRuntime implements Runtime {
   readonly kind: RuntimeKind = "docker";
   readonly name = "docker";
 
-  private app!: AppContext;
   private helpers: DockerRuntimeHelpers = DEFAULT_HELPERS;
   private clientFactory: ((url: string) => ArkdClient) | null = null;
 
-  setApp(app: AppContext): void {
-    this.app = app;
-  }
+  constructor(private readonly app: AppContext) {}
 
   /** Test-only: swap in stubbed docker helpers + a stub `ArkdClient`. */
   setHelpersForTesting(helpers: Partial<DockerRuntimeHelpers>): void {
@@ -144,7 +141,7 @@ export class DockerRuntime implements Runtime {
 
       await this.helpers.createContainer(containerName, image, {
         extraVolumes,
-        arkDir: this.app?.config?.dirs?.ark,
+        arkDir: this.app.config.dirs.ark,
         arkSource,
         workdir: ctx.workdir,
         arkdHostPort,
@@ -160,8 +157,7 @@ export class DockerRuntime implements Runtime {
       // Point arkd at the host's conductor. Docker Desktop exposes the host
       // at host.docker.internal; Linux users on default bridge networking
       // rely on --add-host (not configured here yet) or a loopback route.
-      const conductorPort = this.app?.config?.ports?.conductor ?? 19100;
-      const conductorUrl = `http://host.docker.internal:${conductorPort}`;
+      const conductorUrl = `http://host.docker.internal:${this.app.config.ports.conductor}`;
       await this.helpers.startArkdInContainer(containerName, conductorUrl);
       await this.helpers.waitForArkdHealth(arkdUrl, 30_000);
     } catch (err) {

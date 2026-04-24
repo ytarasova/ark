@@ -6,10 +6,25 @@
  * calls so we can assert both behaviour and lifecycle order.
  */
 
-import { describe, it, expect } from "bun:test";
+import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 
 import { EC2Compute, type EC2ComputeHelpers, type EC2HandleMeta, ARKD_REMOTE_PORT } from "../core/ec2.js";
 import { NotSupportedError, type ComputeHandle, type Snapshot } from "../core/types.js";
+import { AppContext } from "../../core/app.js";
+import { setApp, clearApp } from "../../core/__tests__/test-helpers.js";
+
+let app: AppContext;
+
+beforeAll(async () => {
+  app = await AppContext.forTestAsync();
+  await app.boot();
+  setApp(app);
+});
+
+afterAll(async () => {
+  await app?.shutdown();
+  clearApp();
+});
 
 // ── Test doubles ─────────────────────────────────────────────────────────────
 
@@ -141,7 +156,7 @@ function makeProvisionedHandle(meta: Partial<EC2HandleMeta> = {}): ComputeHandle
 
 describe("EC2Compute", async () => {
   it("advertises the expected capability flags", () => {
-    const c = new EC2Compute();
+    const c = new EC2Compute(app);
     expect(c.kind).toBe("ec2");
     expect(c.capabilities).toEqual({
       snapshot: true,
@@ -154,7 +169,7 @@ describe("EC2Compute", async () => {
   describe("provision", async () => {
     it("runs generateSshKey -> buildUserData -> provisionStack -> SSH poll -> cloud-init poll -> allocatePort -> openSshTunnel -> health poll", async () => {
       const { helpers, calls } = makeHelpers();
-      const c = new EC2Compute();
+      const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
       const handle = await c.provision({ tags: { name: "test" }, size: "l", arch: "arm" });
@@ -189,7 +204,7 @@ describe("EC2Compute", async () => {
 
     it("forwards cfg (region, awsProfile, idleMinutes, isolation) through to buildUserData + provisionStack", async () => {
       const { helpers, calls } = makeHelpers();
-      const c = new EC2Compute();
+      const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
       await c.provision({
@@ -221,7 +236,7 @@ describe("EC2Compute", async () => {
 
     it("opens the tunnel to ARKD_REMOTE_PORT on the returned instance IP", async () => {
       const { helpers, calls } = makeHelpers({ ip: "203.0.113.42" });
-      const c = new EC2Compute();
+      const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
       await c.provision({ tags: { name: "test" } });
@@ -237,7 +252,7 @@ describe("EC2Compute", async () => {
 
     it("throws and tears the tunnel down if arkd never responds", async () => {
       const { helpers, calls } = makeHelpers({ healthy: false });
-      const c = new EC2Compute();
+      const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
       (await expect(c.provision({ tags: { name: "test" } }))).rejects.toThrow(/arkd never became reachable/);
@@ -250,7 +265,7 @@ describe("EC2Compute", async () => {
 
     it("throws if provisionStack returns no IP", async () => {
       const { helpers } = makeHelpers({ ip: null });
-      const c = new EC2Compute();
+      const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
       (await expect(c.provision({ tags: { name: "test" } }))).rejects.toThrow(/no IP/);
@@ -258,7 +273,7 @@ describe("EC2Compute", async () => {
 
     it("propagates provisionStack errors", async () => {
       const { helpers } = makeHelpers({ provisionError: new Error("quota exceeded") });
-      const c = new EC2Compute();
+      const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
       (await expect(c.provision({ tags: { name: "test" } }))).rejects.toThrow("quota exceeded");
@@ -267,13 +282,13 @@ describe("EC2Compute", async () => {
 
   describe("getArkdUrl", () => {
     it("returns the local tunnel endpoint, not the instance IP", () => {
-      const c = new EC2Compute();
+      const c = new EC2Compute(app);
       const handle = makeProvisionedHandle({ arkdLocalPort: 23456 });
       expect(c.getArkdUrl(handle)).toBe("http://localhost:23456");
     });
 
     it("throws if the handle has no ec2 meta (misuse)", () => {
-      const c = new EC2Compute();
+      const c = new EC2Compute(app);
       const bogus: ComputeHandle = { kind: "ec2", name: "test", meta: {} };
       expect(() => c.getArkdUrl(bogus)).toThrow(/missing meta.ec2/);
     });
@@ -282,7 +297,7 @@ describe("EC2Compute", async () => {
   describe("start", async () => {
     it("calls StartInstances, re-opens the tunnel, and waits for arkd health", async () => {
       const { helpers, calls } = makeHelpers();
-      const c = new EC2Compute();
+      const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
       const handle = makeProvisionedHandle({ sshPid: 11111 });
@@ -306,7 +321,7 @@ describe("EC2Compute", async () => {
 
     it("throws if the instance has no IP after start", async () => {
       const { helpers } = makeHelpers({ startIp: { publicIp: null, privateIp: null } });
-      const c = new EC2Compute();
+      const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
       (await expect(c.start(makeProvisionedHandle()))).rejects.toThrow(/no IP after start/);
@@ -314,7 +329,7 @@ describe("EC2Compute", async () => {
 
     it("falls back to privateIp when publicIp is null", async () => {
       const { helpers, calls } = makeHelpers({ startIp: { publicIp: null, privateIp: "10.0.0.99" } });
-      const c = new EC2Compute();
+      const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
       await c.start(makeProvisionedHandle({ sshPid: null }));
@@ -325,7 +340,7 @@ describe("EC2Compute", async () => {
 
     it("tears the new tunnel down if arkd never comes back", async () => {
       const { helpers, calls } = makeHelpers({ healthy: false });
-      const c = new EC2Compute();
+      const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
       const handle = makeProvisionedHandle({ sshPid: null });
@@ -342,7 +357,7 @@ describe("EC2Compute", async () => {
   describe("stop", async () => {
     it("kills the tunnel and then calls StopInstances", async () => {
       const { helpers, calls } = makeHelpers();
-      const c = new EC2Compute();
+      const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
       const handle = makeProvisionedHandle({ sshPid: 7777 });
@@ -363,7 +378,7 @@ describe("EC2Compute", async () => {
 
     it("skips killSshTunnel when there is no live PID", async () => {
       const { helpers, calls } = makeHelpers();
-      const c = new EC2Compute();
+      const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
       await c.stop(makeProvisionedHandle({ sshPid: null }));
@@ -375,7 +390,7 @@ describe("EC2Compute", async () => {
   describe("destroy", async () => {
     it("kills the tunnel, then calls destroyStack with the stored ids", async () => {
       const { helpers, calls } = makeHelpers();
-      const c = new EC2Compute();
+      const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
       const handle = makeProvisionedHandle({ sshPid: 5555 });
@@ -399,7 +414,7 @@ describe("EC2Compute", async () => {
 
     it("throws if the handle has no ec2 meta (misuse)", async () => {
       const { helpers } = makeHelpers();
-      const c = new EC2Compute();
+      const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
       const bogus: ComputeHandle = { kind: "ec2", name: "test", meta: {} };
@@ -409,12 +424,12 @@ describe("EC2Compute", async () => {
 
   describe("snapshot / restore", async () => {
     it("throws NotSupportedError on snapshot (deferred)", async () => {
-      const c = new EC2Compute();
+      const c = new EC2Compute(app);
       (await expect(c.snapshot(makeProvisionedHandle()))).rejects.toBeInstanceOf(NotSupportedError);
     });
 
     it("throws NotSupportedError on restore (deferred)", async () => {
-      const c = new EC2Compute();
+      const c = new EC2Compute(app);
       const snap: Snapshot = {
         id: "noop",
         computeKind: "ec2",
@@ -426,7 +441,7 @@ describe("EC2Compute", async () => {
     });
 
     it("still reports capabilities.snapshot = true so dispatch advertises the eventual shape", () => {
-      const c = new EC2Compute();
+      const c = new EC2Compute(app);
       expect(c.capabilities.snapshot).toBe(true);
     });
   });

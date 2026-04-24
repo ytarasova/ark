@@ -172,12 +172,9 @@ export class K8sProvider implements ComputeProvider {
   readonly supportsSecretMount = true;
   readonly initialStatus = "stopped";
 
-  protected app: AppContext | null = null;
   private kubeApi: any | null = null;
 
-  setApp(app: AppContext): void {
-    this.app = app;
-  }
+  constructor(protected readonly app: AppContext) {}
 
   private async getK8sModule(): Promise<typeof import("@kubernetes/client-node")> {
     return await import("@kubernetes/client-node");
@@ -239,9 +236,6 @@ export class K8sProvider implements ComputeProvider {
     k8s: typeof import("@kubernetes/client-node"),
   ): Promise<void> {
     const { resolveEffectiveClusters } = await import("../../core/config/clusters.js");
-    if (!this.app) {
-      throw new Error("K8sProvider: app context is required for clusterName resolution");
-    }
     const effective = await resolveEffectiveClusters(this.app, tenantId);
     const cluster = effective.find((c) => c.name === clusterName);
     if (!cluster) {
@@ -342,7 +336,7 @@ export class K8sProvider implements ComputeProvider {
       await api.createNamespace({ body: { metadata: { name: ns } } });
     }
 
-    this.app!.computes.update(compute.name, { status: "running" });
+    this.app.computes.update(compute.name, { status: "running" });
   }
 
   async launch(compute: Compute, session: Session, opts: LaunchOpts): Promise<string> {
@@ -429,7 +423,7 @@ export class K8sProvider implements ComputeProvider {
     // deleted (covers daemon crashes between Secret create and session
     // teardown). Best-effort: `setSecretOwnerToPod` swallows failures --
     // the boot-time reconciler catches anything that slips through.
-    if (cfg.credsSecretName && this.app) {
+    if (cfg.credsSecretName) {
       try {
         const { setSecretOwnerToPod } = await import("../../core/services/dispatch-claude-auth.js");
         await setSecretOwnerToPod(this.app, {
@@ -496,7 +490,7 @@ export class K8sProvider implements ComputeProvider {
     // Start raced), leave it alone -- idempotent by design.
     try {
       await api.readNamespacedPod({ name, namespace: ns });
-      await this.app!.computes.update(compute.name, { status: "running" });
+      await this.app.computes.update(compute.name, { status: "running" });
       return;
     } catch {
       // fall through to create
@@ -537,7 +531,7 @@ export class K8sProvider implements ComputeProvider {
     };
 
     await api.createNamespacedPod({ namespace: ns, body: pod });
-    await this.app!.computes.update(compute.name, { status: "running" });
+    await this.app.computes.update(compute.name, { status: "running" });
   }
 
   async stop(compute: Compute): Promise<void> {
@@ -552,7 +546,7 @@ export class K8sProvider implements ComputeProvider {
     } catch {
       logDebug("compute", "instance pod may already be gone");
     }
-    await this.app!.computes.update(compute.name, { status: "stopped" });
+    await this.app.computes.update(compute.name, { status: "stopped" });
   }
 
   async destroy(compute: Compute): Promise<void> {
@@ -569,7 +563,7 @@ export class K8sProvider implements ComputeProvider {
     } catch {
       logDebug("compute", "namespace may not exist yet");
     }
-    await this.app!.computes.update(compute.name, { status: "destroyed" });
+    await this.app.computes.update(compute.name, { status: "destroyed" });
   }
 
   async attach(_compute: Compute, _session: Session): Promise<void> {
@@ -678,9 +672,9 @@ export class KataProvider extends K8sProvider {
     // Ensure runtimeClassName defaults to "kata-fc" if not set
     const cfg = compute.config as K8sConfig;
     if (!cfg.runtimeClassName) {
-      await this.app!.computes.mergeConfig(compute.name, { runtimeClassName: "kata-fc" });
+      await this.app.computes.mergeConfig(compute.name, { runtimeClassName: "kata-fc" });
       // Re-read compute with updated config
-      const updated = await this.app!.computes.get(compute.name);
+      const updated = await this.app.computes.get(compute.name);
       if (updated) return super.launch(updated, session, opts);
     }
     return super.launch(compute, session, opts);

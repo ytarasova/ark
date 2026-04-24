@@ -38,11 +38,7 @@ export abstract class ArkdBackedProvider implements ComputeProvider {
    */
   readonly supportsSecretMount: boolean = false;
 
-  protected app!: AppContext;
-
-  setApp(app: AppContext): void {
-    this.app = app;
-  }
+  constructor(protected readonly app: AppContext) {}
 
   // ── Abstract: provider-specific ─────────────────────────────────────────
 
