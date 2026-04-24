@@ -2,12 +2,24 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../../hooks/useApi.js";
 import { cn } from "../../../lib/utils.js";
+import { TerminalTab } from "./TerminalTab.js";
 
 interface LogsTabProps {
   sessionId: string;
   /** Session status -- polling halts on terminal states. */
   status?: string | null;
+  /** Pty cols/rows for the static terminal recording. */
+  ptyCols?: number;
+  ptyRows?: number;
+  /** Static recording for finished sessions. */
+  output?: string | null;
+  /** True when the session is still active (drives live-terminal lazy mount). */
+  isActive?: boolean;
+  /** True when the parent tab is currently visible -- gates the live socket. */
+  tabActive?: boolean;
 }
+
+type LogsSource = "stdio" | "terminal";
 
 const TERMINAL_STATES = new Set(["completed", "failed", "stopped", "archived"]);
 const POLL_INTERVAL_MS = 2000;
@@ -22,10 +34,22 @@ const TAIL_DEFAULT = 500;
  * Terminal-panel treatment matches the DiffViewer: traffic-light dots in
  * the header, mono "stdio · <id>" chip, and the log body in a gutter-lined
  * monospace pre.
+ *
+ * Now also hosts the Live Terminal as a segmented sub-tab. The previous
+ * top-level Terminal tab was retired (both surfaces are runtime output --
+ * stdio is the captured log, terminal is the interactive xterm) so they
+ * share one tab with a `Logs / Live terminal` toggle. The terminal segment
+ * mounts lazily (only when its segment is selected) so the live xterm
+ * WebSocket isn't opened on every Logs tab visit.
  */
-export function LogsTab({ sessionId, status }: LogsTabProps) {
+export function LogsTab({ sessionId, status, ptyCols, ptyRows, output, isActive, tabActive }: LogsTabProps) {
   const [tailMode, setTailMode] = useState<boolean>(true);
   const [autoscroll, setAutoscroll] = useState<boolean>(true);
+  // Logs vs Live Terminal segmented toggle. We default to stdio because the
+  // live xterm carries a WebSocket cost and most users land here for plain
+  // log scrolling. The terminal segment mounts lazily on first selection.
+  const [source, setSource] = useState<LogsSource>("stdio");
+
   const preRef = useRef<HTMLPreElement | null>(null);
 
   const isRunning = !!status && !TERMINAL_STATES.has(status);
@@ -59,115 +83,170 @@ export function LogsTab({ sessionId, status }: LogsTabProps) {
 
   return (
     <div data-testid="logs-tab" className="flex flex-col gap-[10px] max-w-full">
-      <div
-        className={cn(
-          "relative overflow-hidden rounded-[9px] border border-[var(--border)]",
-          "bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0)_20%,rgba(0,0,0,0.15)_100%),var(--bg-card)]",
-          "border-t-[rgba(255,255,255,0.08)] border-b-[rgba(0,0,0,0.5)]",
-          "shadow-[inset_0_1px_0_rgba(255,255,255,0.05),inset_0_-1px_0_rgba(0,0,0,0.45),0_1px_2px_rgba(0,0,0,0.45),0_10px_22px_-6px_rgba(0,0,0,0.4)]",
-        )}
-      >
+      <SegmentedControl source={source} onChange={setSource} />
+      {source === "terminal" ? (
+        <div data-testid="logs-tab-terminal" className="flex-1 min-h-[360px]">
+          <TerminalTab
+            sessionId={sessionId}
+            output={output ?? null}
+            cols={ptyCols}
+            rows={ptyRows}
+            isActive={isActive ?? false}
+            tabActive={!!tabActive}
+          />
+        </div>
+      ) : (
         <div
+          data-testid="logs-tab-stdio"
           className={cn(
-            "flex items-center gap-[8px] px-[12px] py-[8px] border-b border-[var(--border)]",
-            "bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(0,0,0,0.1))]",
-            "font-[family-name:var(--font-mono-ui)] text-[10.5px] font-medium text-[var(--fg-muted)]",
+            "relative overflow-hidden rounded-[9px] border border-[var(--border)]",
+            "bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0)_20%,rgba(0,0,0,0.15)_100%),var(--bg-card)]",
+            "border-t-[rgba(255,255,255,0.08)] border-b-[rgba(0,0,0,0.5)]",
+            "shadow-[inset_0_1px_0_rgba(255,255,255,0.05),inset_0_-1px_0_rgba(0,0,0,0.45),0_1px_2px_rgba(0,0,0,0.45),0_10px_22px_-6px_rgba(0,0,0,0.4)]",
           )}
         >
-          <TrafficDot color="#f87171" />
-          <TrafficDot color="#fbbf24" />
-          <TrafficDot color="#34d399" />
-          <span
-            data-testid="logs-header-chip"
-            className={cn(
-              "inline-flex items-center gap-[5px] px-[7px] py-[3px] rounded-[4px]",
-              "text-[var(--fg)]",
-              "bg-[linear-gradient(180deg,#1f1f35,#181829)]",
-              "border border-[var(--border)] border-t-[rgba(255,255,255,0.08)]",
-              "shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_2px_rgba(0,0,0,0.3)]",
-            )}
-          >
-            stdio · {shortId}
-          </span>
-          {isRunning && (
-            <span className="text-[9.5px] uppercase tracking-[0.05em] text-[#86efac]" data-testid="logs-live-indicator">
-              live
-            </span>
-          )}
-          <div className="ml-auto flex items-center gap-[6px]">
-            <button
-              type="button"
-              onClick={() => setTailMode((t) => !t)}
-              className={cn(
-                "px-[8px] py-[3px] rounded-[4px] text-[10px] font-[family-name:var(--font-mono-ui)]",
-                "border border-[var(--border)] text-[var(--fg-muted)] hover:text-[var(--fg)]",
-                "bg-[rgba(0,0,0,0.2)]",
-              )}
-              data-testid="logs-tail-toggle"
-            >
-              {tailMode ? `Last ${TAIL_DEFAULT}` : "All"}
-            </button>
-            <label className="flex items-center gap-[4px] text-[10px] text-[var(--fg-muted)] cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={autoscroll}
-                onChange={(e) => setAutoscroll(e.target.checked)}
-                className="w-[11px] h-[11px]"
-                data-testid="logs-autoscroll-toggle"
-              />
-              autoscroll
-            </label>
-          </div>
-        </div>
-
-        {query.isError && (
-          <div className="px-[12px] py-[10px] text-[11px] text-[#f87171]" data-testid="logs-error">
-            Failed to load stdio: {(query.error as Error)?.message ?? "unknown error"}
-          </div>
-        )}
-
-        {!query.isError && lines.length === 0 && (
           <div
-            className="px-[12px] py-[24px] text-center text-[12px] text-[var(--fg-faint)] font-[family-name:var(--font-mono)]"
-            data-testid="logs-empty"
-          >
-            <div>No logs yet</div>
-            {status && <div className="mt-[4px] text-[10.5px] uppercase tracking-[0.05em]">status · {status}</div>}
-          </div>
-        )}
-
-        {lines.length > 0 && (
-          <pre
-            ref={preRef}
-            data-testid="logs-body"
             className={cn(
-              "m-0 px-0 py-[10px] whitespace-pre overflow-auto max-h-[60vh]",
-              "font-[family-name:var(--font-mono)] text-[11px] leading-[18px] text-[var(--fg)]",
-              "bg-[linear-gradient(180deg,rgba(0,0,0,0.2)_0%,rgba(0,0,0,0)_6%),var(--bg-code)]",
-              "shadow-[inset_0_2px_4px_rgba(0,0,0,0.35)]",
+              "flex items-center gap-[8px] px-[12px] py-[8px] border-b border-[var(--border)]",
+              "bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(0,0,0,0.1))]",
+              "font-[family-name:var(--font-mono-ui)] text-[10.5px] font-medium text-[var(--fg-muted)]",
             )}
           >
-            {lines.map((ln, i) => {
-              const isExec = ln.trimStart().startsWith("[exec ");
-              return (
-                <div key={i} className="flex">
-                  <span className="inline-block w-[48px] pr-[10px] text-right text-[var(--fg-faint)] select-none shrink-0">
-                    {i + 1}
-                  </span>
-                  <span
-                    className={cn(
-                      "whitespace-pre flex-1 min-w-0",
-                      isExec ? "text-[var(--fg-muted)]" : "text-[var(--fg)]",
-                    )}
-                  >
-                    {ln || " "}
-                  </span>
-                </div>
-              );
-            })}
-          </pre>
-        )}
-      </div>
+            <TrafficDot color="#f87171" />
+            <TrafficDot color="#fbbf24" />
+            <TrafficDot color="#34d399" />
+            <span
+              data-testid="logs-header-chip"
+              className={cn(
+                "inline-flex items-center gap-[5px] px-[7px] py-[3px] rounded-[4px]",
+                "text-[var(--fg)]",
+                "bg-[linear-gradient(180deg,#1f1f35,#181829)]",
+                "border border-[var(--border)] border-t-[rgba(255,255,255,0.08)]",
+                "shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_2px_rgba(0,0,0,0.3)]",
+              )}
+            >
+              stdio · {shortId}
+            </span>
+            {isRunning && (
+              <span
+                className="text-[9.5px] uppercase tracking-[0.05em] text-[#86efac]"
+                data-testid="logs-live-indicator"
+              >
+                live
+              </span>
+            )}
+            <div className="ml-auto flex items-center gap-[6px]">
+              <button
+                type="button"
+                onClick={() => setTailMode((t) => !t)}
+                className={cn(
+                  "px-[8px] py-[3px] rounded-[4px] text-[10px] font-[family-name:var(--font-mono-ui)]",
+                  "border border-[var(--border)] text-[var(--fg-muted)] hover:text-[var(--fg)]",
+                  "bg-[rgba(0,0,0,0.2)]",
+                )}
+                data-testid="logs-tail-toggle"
+              >
+                {tailMode ? `Last ${TAIL_DEFAULT}` : "All"}
+              </button>
+              <label className="flex items-center gap-[4px] text-[10px] text-[var(--fg-muted)] cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={autoscroll}
+                  onChange={(e) => setAutoscroll(e.target.checked)}
+                  className="w-[11px] h-[11px]"
+                  data-testid="logs-autoscroll-toggle"
+                />
+                autoscroll
+              </label>
+            </div>
+          </div>
+
+          {query.isError && (
+            <div className="px-[12px] py-[10px] text-[11px] text-[#f87171]" data-testid="logs-error">
+              Failed to load stdio: {(query.error as Error)?.message ?? "unknown error"}
+            </div>
+          )}
+
+          {!query.isError && lines.length === 0 && (
+            <div
+              className="px-[12px] py-[24px] text-center text-[12px] text-[var(--fg-faint)] font-[family-name:var(--font-mono)]"
+              data-testid="logs-empty"
+            >
+              <div>No logs yet</div>
+              {status && <div className="mt-[4px] text-[10.5px] uppercase tracking-[0.05em]">status · {status}</div>}
+            </div>
+          )}
+
+          {lines.length > 0 && (
+            <pre
+              ref={preRef}
+              data-testid="logs-body"
+              className={cn(
+                "m-0 px-0 py-[10px] whitespace-pre overflow-auto max-h-[60vh]",
+                "font-[family-name:var(--font-mono)] text-[11px] leading-[18px] text-[var(--fg)]",
+                "bg-[linear-gradient(180deg,rgba(0,0,0,0.2)_0%,rgba(0,0,0,0)_6%),var(--bg-code)]",
+                "shadow-[inset_0_2px_4px_rgba(0,0,0,0.35)]",
+              )}
+            >
+              {lines.map((ln, i) => {
+                const isExec = ln.trimStart().startsWith("[exec ");
+                return (
+                  <div key={i} className="flex">
+                    <span className="inline-block w-[48px] pr-[10px] text-right text-[var(--fg-faint)] select-none shrink-0">
+                      {i + 1}
+                    </span>
+                    <span
+                      className={cn(
+                        "whitespace-pre flex-1 min-w-0",
+                        isExec ? "text-[var(--fg-muted)]" : "text-[var(--fg)]",
+                      )}
+                    >
+                      {ln || " "}
+                    </span>
+                  </div>
+                );
+              })}
+            </pre>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Two-button segmented control rendered above the Logs/Terminal panels.
+ * Lazily mounts each segment so the live xterm WebSocket stays closed
+ * until the user explicitly switches to it.
+ */
+function SegmentedControl({ source, onChange }: { source: LogsSource; onChange: (s: LogsSource) => void }) {
+  const seg = (id: LogsSource, label: string) => (
+    <button
+      key={id}
+      type="button"
+      data-testid={`logs-segment-${id}`}
+      aria-pressed={source === id}
+      onClick={() => onChange(id)}
+      className={cn(
+        "px-[10px] py-[3px] rounded-[4px] text-[11px] font-[family-name:var(--font-mono-ui)]",
+        "border border-transparent transition-colors cursor-pointer",
+        source === id
+          ? "bg-[var(--bg-hover)] text-[var(--fg)] border-[var(--border)]"
+          : "text-[var(--fg-muted)] hover:text-[var(--fg)]",
+      )}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <div
+      data-testid="logs-segmented-control"
+      role="tablist"
+      aria-label="Logs source"
+      className="inline-flex gap-[2px] p-[2px] rounded-[6px] bg-[rgba(0,0,0,0.2)] self-start"
+    >
+      {seg("stdio", "Logs")}
+      {seg("terminal", "Live terminal")}
     </div>
   );
 }

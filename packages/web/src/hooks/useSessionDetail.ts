@@ -14,7 +14,23 @@ import type { DiffFile } from "../components/ui/DiffViewer.js";
 import type { TodoItem } from "../components/ui/TodoList.js";
 import type { TabDef } from "../components/ui/ContentTabs.js";
 
-const VALID_TABS = new Set(["conversation", "terminal", "events", "diff", "todos", "errors"]);
+// "terminal" + "knowledge" are still valid hash-router targets so deep
+// links survive, but they no longer get top-level tab strip real estate.
+// Terminal lives as a segmented control inside the Logs tab; Knowledge is
+// reachable via direct URL only.
+const VALID_TABS = new Set([
+  "conversation",
+  "logs",
+  "terminal",
+  "events",
+  "diff",
+  "files",
+  "cost",
+  "todos",
+  "errors",
+  "flow",
+  "knowledge",
+]);
 
 /**
  * Bundles all of the server state + derived data + view-local state that
@@ -129,6 +145,10 @@ export function useSessionDetail({
   ).length;
   const filesChanged = diffData?.filesChanged ?? 0;
 
+  // 7 top-level tabs (+ optional Errors). Terminal moved into Logs as a
+  // segmented control (both are runtime output, just different sources);
+  // Knowledge is now URL-only -- it's a low-frequency, low-density panel
+  // that doesn't earn top-level real estate.
   const tabs: TabDef[] = [
     { id: "conversation", label: "Conversation", badge: conversationCount > 0 ? conversationCount : undefined },
     { id: "flow", label: "Flow", badge: totalStages > 0 ? `${completedStages}/${totalStages}` : undefined },
@@ -139,9 +159,10 @@ export function useSessionDetail({
     },
     { id: "files", label: "Files", badge: filesChanged > 0 ? filesChanged : undefined },
     { id: "logs", label: "Logs" },
-    { id: "terminal", label: "Terminal" },
-    { id: "cost", label: "Cost", badge: cost?.cost != null ? "$" + (cost.cost || 0).toFixed(2) : undefined },
-    { id: "knowledge", label: "Knowledge" },
+    // Cost tab carries no $-amount badge -- the running spend is already
+    // visible in the header ticker, and the detail lives one click away.
+    // See "Nit 2 -- cost is mentioned everywhere" in the header cleanup.
+    { id: "cost", label: "Cost" },
     { id: "events", label: "Events", badge: events.length > 0 ? events.length : undefined },
     ...(hasErrors
       ? [{ id: "errors", label: "Errors", badge: (errorEvents.length || 1) as number | string | undefined }]
