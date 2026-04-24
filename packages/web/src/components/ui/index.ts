@@ -29,6 +29,8 @@ export { Toggle } from "./toggle.js";
 export type { ToggleProps } from "./toggle.js";
 export { Modal } from "./modal.js";
 export { Separator } from "./separator.js";
+export { ListRow } from "./ListRow.js";
+export type { ListRowProps } from "./ListRow.js";
 
 // Design system -- layout
 export { IconRail } from "./IconRail.js";
