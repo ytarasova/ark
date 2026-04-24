@@ -341,10 +341,17 @@ export class SessionService {
     }
 
     if (session.session_id) {
-      try {
-        await this.app.launcher.kill(session.session_id);
-      } catch {
-        // best-effort cleanup; a missing/dead tmux session is expected on resume
+      // Best-effort kill across every registered executor -- the handle is
+      // an opaque string that only the owning executor knows how to clean
+      // up (tmux session name for claude-code, `sdk-<id>` for agent-sdk,
+      // etc.). A missing/dead handle after a crash is expected on resume.
+      const handle = session.session_id;
+      for (const entry of this.app.pluginRegistry.listByKind("executor")) {
+        try {
+          await entry.impl.kill(handle);
+        } catch {
+          /* try next executor */
+        }
       }
     }
 

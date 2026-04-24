@@ -134,7 +134,6 @@ export function registerServices(container: AppContainer): void {
           getCodeIntel: () => c.app.codeIntel,
           config: c.config,
           usageRecorder: c.usageRecorder,
-          getLauncher: () => c.app.launcher,
           statusPollers: c.statusPollers,
           dispatch: (id) => c.app.dispatchService.dispatch(id),
           removeWorktree: (session) => removeSessionWorktree(c.app, session),
@@ -179,7 +178,6 @@ export function registerServices(container: AppContainer): void {
           computeService: c.computeService,
           pluginRegistry: c.pluginRegistry,
           statusPollers: c.statusPollers,
-          launcher: c.app.launcher,
           config: c.config,
           secrets: c.app.mode.secrets,
 

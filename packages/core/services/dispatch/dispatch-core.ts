@@ -380,9 +380,9 @@ export class CoreDispatcher {
     if (!currentSession || currentSession.stage !== stage || currentSession.status === "completed") {
       log(`Session moved past stage '${stage}' during dispatch -- aborting write.`);
       try {
-        await this.deps.launcher.kill(tmuxName);
+        await executor.kill(tmuxName);
       } catch {
-        logDebug("session", "tmux may already be gone");
+        logDebug("session", "handle may already be gone");
       }
       return { ok: false, message: `Session moved on during dispatch` };
     }
@@ -591,7 +591,21 @@ export class CoreDispatcher {
     if (!session) return { ok: false, message: `Session ${sessionId} not found` };
     if (session.status === "running" && session.session_id) return { ok: false, message: "Already running" };
 
-    if (session.session_id) await this.deps.launcher.kill(session.session_id);
+    // Best-effort kill of the prior live handle before clearing session_id.
+    // We don't know which executor owned it without re-resolving agent+runtime,
+    // so ask every registered executor to try. Each returns silently if the
+    // handle isn't theirs. A missing handle after a crash is fine -- the
+    // update below clears it regardless.
+    if (session.session_id) {
+      const handle = session.session_id;
+      for (const entry of this.deps.pluginRegistry.listByKind("executor")) {
+        try {
+          await entry.impl.kill(handle);
+        } catch {
+          /* try the next executor */
+        }
+      }
+    }
 
     await this.deps.sessions.update(sessionId, {
       status: "ready",

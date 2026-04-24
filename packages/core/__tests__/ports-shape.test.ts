@@ -37,7 +37,6 @@ describe("port catalog shape", () => {
       | Ports.Logger
       | Ports.Tracer
       | Ports.SecretStore
-      | Ports.SessionLauncher
       | Ports.ComputeProvider
       | Ports.FlowStore
       | Ports.AgentStore

@@ -75,11 +75,6 @@ export type { PluginRegistry, PluginEntry, PluginKind, PluginKindMap, PluginSour
 export { createPluginRegistry } from "./plugins/registry.js";
 export { startStatusPoller, stopStatusPoller, stopAllPollers } from "./executors/status-poller.js";
 
-// Session launcher abstraction
-export type { SessionLauncher } from "./session-launcher.js";
-export type { LaunchResult as SessionLaunchResult } from "./session-launcher.js";
-export { TmuxLauncher, ContainerLauncher, ArkdLauncher } from "./launchers/index.js";
-
 // Claude integration
 export * as claude from "./claude/claude.js";
 

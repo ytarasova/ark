@@ -19,7 +19,6 @@ import type { ComputeRepository } from "../../repositories/compute.js";
 import type { FlowStore } from "../../stores/flow-store.js";
 import type { RuntimeStore } from "../../stores/runtime-store.js";
 import type { UsageRecorder } from "../../observability/usage.js";
-import type { SessionLauncher } from "../../session-launcher.js";
 import type { StatusPollerRegistry } from "../../executors/status-poller.js";
 import type { ComputeProvider } from "../../../compute/types.js";
 import type { ComputeTarget } from "../../../compute/core/compute-target.js";
@@ -110,9 +109,6 @@ export interface SessionLifecycleDeps {
   config: ArkConfig;
   usageRecorder: UsageRecorder;
 
-  // Launcher + status-poller registry. Launcher resolved lazily so tests
-  // that call `app.setLauncher(stub)` see the replacement.
-  getLauncher: () => SessionLauncher;
   statusPollers: StatusPollerRegistry;
 
   // Callbacks for helpers that still take AppContext.

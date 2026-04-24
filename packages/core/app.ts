@@ -55,9 +55,7 @@ import { ComputeRegistries } from "./compute-registries.js";
 import { resolveProvider, resolveComputeTarget } from "./compute-resolver.js";
 import type { TranscriptParserRegistry } from "./runtimes/transcript-parser.js";
 import type { PluginRegistry } from "./plugins/registry.js";
-import type { SessionLauncher } from "./session-launcher.js";
-import { TmuxLauncher } from "./launchers/tmux.js";
-import { NoopLauncher } from "./launchers/noop.js";
+import { noopExecutor, NOOP_EXECUTOR_NAMES } from "./executors/noop.js";
 import { ApiKeyManager } from "./auth/index.js";
 import type { WorkerRegistry } from "./hosted/worker-registry.js";
 import type { SessionScheduler } from "./hosted/scheduler.js";
@@ -93,7 +91,6 @@ export class AppContext {
   // the AppContext), not constructed from config.
   private _registries = new ComputeRegistries(this);
 
-  private _launcher: SessionLauncher = new TmuxLauncher();
   private _eventBusReady = false;
   private _apiKeys: ApiKeyManager | null = null;
   private _drizzle: DrizzleClient | null = null;
@@ -146,6 +143,15 @@ export class AppContext {
     // resolution so `container.dispose()` later tears them down in reverse.
     this._container = buildContainer({ app: this, config: this.config, db, bootOptions: this.options });
     await this._container.cradle.lifecycle.start();
+
+    // Test profile: register the noop executor for every real runtime name.
+    // Without this, any test that triggers dispatch (directly or via the
+    // conductor HTTP hooks) would reach the real claude-code / agent-sdk
+    // executors and spawn tmux panes + live claude binaries, leaking into
+    // the host environment.
+    if (this.config.profile === "test") {
+      installNoopExecutors(this);
+    }
 
     // Rehydrate ephemeral inline-flow definitions persisted in session config.
     // When a child session is spawned with an inline flow object, the definition
@@ -646,18 +652,6 @@ export class AppContext {
     return this.tensorZero?.url ?? process.env.ARK_TENSORZERO_URL ?? null;
   }
 
-  // ── Session launcher ──────────────────────────────────────────────────
-
-  /** The session launcher (defaults to TmuxLauncher for local compute). */
-  get launcher(): SessionLauncher {
-    return this._launcher;
-  }
-
-  /** Replace the session launcher (e.g. for remote compute or testing). */
-  setLauncher(launcher: SessionLauncher): void {
-    this._launcher = launcher;
-  }
-
   // ── Worker registry / scheduler / tenant policy (container-resolved) ─
 
   /** Worker registry for hosted multi-tenant deployment. Throws until set. */
@@ -798,17 +792,27 @@ export class AppContext {
   static forTest(overrides?: Partial<ArkConfig>): AppContext {
     const tempDir = mkdtempSync(join(tmpdir(), "ark-test-"));
     const config = loadConfig({ arkDir: tempDir, env: "test", ...overrides });
-    const app = new AppContext(config, TEST_OPTIONS);
-    app.setLauncher(new NoopLauncher());
-    return app;
+    return new AppContext(config, TEST_OPTIONS);
   }
 
   /** Parallel-safe test AppContext -- allocates unique ports + arkDir per call. */
   static async forTestAsync(overrides?: Partial<ArkConfig>): Promise<AppContext> {
     const config = await loadAppConfig({ profile: "test", ...overrides });
-    const app = new AppContext(config, TEST_OPTIONS);
-    app.setLauncher(new NoopLauncher());
-    return app;
+    return new AppContext(config, TEST_OPTIONS);
+  }
+}
+
+/**
+ * Override every known executor name with the noop stub in the app's per-
+ * instance plugin registry. `resolveExecutor` in dispatch consults the
+ * per-app registry before the global one, so this prevents any test-mode
+ * dispatch from reaching the real claude-code / agent-sdk / goose
+ * executors (which would spawn tmux panes + real agent binaries).
+ */
+function installNoopExecutors(app: AppContext): void {
+  const reg = app.pluginRegistry;
+  for (const name of NOOP_EXECUTOR_NAMES) {
+    reg.register({ kind: "executor", name, impl: { ...noopExecutor, name } });
   }
 }
 
