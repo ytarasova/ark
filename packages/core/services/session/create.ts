@@ -119,13 +119,15 @@ export class SessionCreator {
       };
     }
 
-    if (opts.inputs && (opts.inputs.files || opts.inputs.params)) {
+    // Copy every top-level input onto session.config.inputs. Under the
+    // flat-bag schema each key is an arbitrary flow input (`targets`,
+    // `repos`, `analysis_id`, ...), not just the reserved `files`/`params`
+    // sub-buckets. Dropping unrecognised keys would silently orphan
+    // everything a flow reads via `{{inputs.<key>}}`.
+    if (opts.inputs && Object.keys(opts.inputs).length > 0) {
       mergedOpts.config = {
         ...((mergedOpts.config as Record<string, unknown>) ?? {}),
-        inputs: {
-          ...(opts.inputs.files ? { files: { ...opts.inputs.files } } : {}),
-          ...(opts.inputs.params ? { params: { ...opts.inputs.params } } : {}),
-        },
+        inputs: { ...opts.inputs },
       };
     }
 
