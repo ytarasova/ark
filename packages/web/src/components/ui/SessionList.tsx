@@ -74,8 +74,7 @@ export interface SessionListProps extends React.ComponentProps<"div"> {
  *   - 3px left-edge accent stripe: amber for waiting / purple for selected /
  *     nothing for default / completed / failed. Faded top/bottom via gradient.
  *   - Title row: sans 14px 500, right-aligned elapsed time (mono-ui 11px).
- *   - Meta row: small status dot + flow-name text + "☆ runtime" chip
- *     (Lucide Star size 12).
+ *   - Meta row: small status dot + flow-name text + runtime label.
  *   - 24h mini sparkline (~11 bars). Amber when idle, primary when active,
  *     status-colored for completed/waiting/failed. If no data we render a
  *     muted placeholder so vertical rhythm is preserved.
@@ -448,7 +447,6 @@ export function SessionRow({
             {!flow && stageLabel && <span className="truncate text-[var(--fg-muted)]">{stageLabel}</span>}
             {runtime && (
               <span className="inline-flex items-center gap-[4px] shrink-0 text-[var(--fg-muted)]">
-                <Star size={12} strokeWidth={1.75} />
                 <span>{runtime}</span>
               </span>
             )}
