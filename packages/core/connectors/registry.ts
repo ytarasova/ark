@@ -6,7 +6,6 @@
  */
 
 import type { Connector, ConnectorMcpEntry, WebhookSurface } from "./types.js";
-import { piSageConnector } from "./definitions/pi-sage.js";
 import { jiraConnector } from "./definitions/jira.js";
 import { githubConnector } from "./definitions/github.js";
 import { linearConnector } from "./definitions/linear.js";
@@ -85,5 +84,5 @@ export function createDefaultConnectorRegistry(): ConnectorRegistry {
 }
 
 export function builtinConnectors(): Connector[] {
-  return [piSageConnector, jiraConnector, githubConnector, linearConnector, bitbucketConnector, slackConnector];
+  return [jiraConnector, githubConnector, linearConnector, bitbucketConnector, slackConnector];
 }

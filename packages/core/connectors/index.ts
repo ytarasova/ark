@@ -19,7 +19,6 @@ export type {
 export { ConnectorRegistry, createDefaultConnectorRegistry, builtinConnectors } from "./registry.js";
 export { collectMcpEntries, flowConnectorsFor, getConnectorRegistry, setConnectorRegistry } from "./resolve.js";
 
-export { piSageConnector } from "./definitions/pi-sage.js";
 export { jiraConnector } from "./definitions/jira.js";
 export { githubConnector } from "./definitions/github.js";
 export { linearConnector } from "./definitions/linear.js";

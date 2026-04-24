@@ -165,7 +165,7 @@ export function expandEnvPlaceholders<T>(value: T, env: Record<string, string | 
  * as `RuntimeDefinition.mcp_servers` and `AgentDefinition.mcp_servers`:
  *   - string path to `<somewhere>/<name>.json` (loaded from disk; the file
  *     must contain `{"mcpServers": { "<name>": { ... } }}`)
- *   - bare server name like `"pi-sage"` -- looked up in `mcpConfigsDir` if
+ *   - bare server name like `"jira"` -- looked up in `mcpConfigsDir` if
  *     supplied, otherwise treated as just a name with no config to add
  *   - inline object `{ "<name>": { command, args, env } | { type, url } }`
  * Returns `null` when the entry can't be resolved (file missing, etc.).

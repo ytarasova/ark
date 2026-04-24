@@ -60,12 +60,11 @@ describe("connectors/* JSON-RPC handlers", async () => {
       expect(typeof c.label).toBe("string");
     }
 
-    // pi-sage is one of the shipped connectors.
-    const sage = list.find((c) => c.name === "pi-sage");
-    expect(sage).toBeDefined();
-    expect(sage?.kind).toBe("mcp");
-    expect(sage?.mcp?.configName).toBe("pi-sage");
-    expect(sage?.auth?.envVar).toBe("PI_SAGE_TOKEN");
+    // github is one of the shipped connectors.
+    const gh = list.find((c) => c.name === "github");
+    expect(gh).toBeDefined();
+    expect(gh?.kind).toBe("mcp");
+    expect(gh?.mcp?.configName).toBe("github");
   });
 
   it("connectors/get returns the connector view for a known name", async () => {

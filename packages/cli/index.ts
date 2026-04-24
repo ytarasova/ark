@@ -53,7 +53,6 @@ import { registerServerCommands } from "./commands/server.js";
 import { registerExecTryCommands } from "./commands/exec-try.js";
 import { registerDaemonCommands } from "./commands/daemon.js";
 import { registerMiscCommands } from "./commands/misc.js";
-import { registerSageCommands } from "./commands/sage.js";
 import { registerDbCommands } from "./commands/db.js";
 import { registerSecretsCommands } from "./commands/secrets.js";
 // --- BEGIN agent-G ---
@@ -130,7 +129,6 @@ registerServerCommands(program);
 registerDaemonCommands(program);
 registerExecTryCommands(program);
 registerMiscCommands(program);
-registerSageCommands(program);
 registerDbCommands(program);
 registerSecretsCommands(program);
 

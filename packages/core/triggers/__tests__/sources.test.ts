@@ -17,7 +17,6 @@ import { slackSource } from "../sources/slack.js";
 import { linearSource } from "../sources/linear.js";
 import { jiraSource } from "../sources/jira.js";
 import { genericHmacSource } from "../sources/generic-hmac.js";
-import { piSageSource } from "../sources/pi-sage.js";
 import { alertmanagerSource } from "../sources/alertmanager.js";
 import { prometheusSource } from "../sources/prometheus.js";
 import { pagerdutySource } from "../sources/pagerduty.js";
@@ -246,28 +245,6 @@ describe("generic-hmac source", async () => {
 });
 
 // ── Scaffolded + stub sources ────────────────────────────────────────────
-
-describe("pi-sage source (scaffolded)", async () => {
-  const SECRET = "sage_secret";
-  const body = JSON.stringify({ event: "analysis.ready", analysis_id: "A-99", ticket: "T-1" });
-
-  test("valid HMAC accepted", async () => {
-    const sig = sha256(body, SECRET);
-    expect(await piSageSource.verify(mkReq({ "x-sage-signature": sig }, body), SECRET)).toBe(true);
-  });
-
-  test("missing secret rejected", async () => {
-    expect(await piSageSource.verify(mkReq({ "x-sage-signature": "ignored" }, body), null)).toBe(false);
-  });
-
-  test("normalize carries analysisId + ticket in sourceMeta", async () => {
-    const ev = await piSageSource.normalize(mkReq({}, body));
-    expect(ev.event).toBe("analysis.ready");
-    expect(ev.ref).toBe("A-99");
-    expect(ev.sourceMeta?.analysisId).toBe("A-99");
-    expect(ev.sourceMeta?.ticket).toBe("T-1");
-  });
-});
 
 describe("alertmanager + prometheus (scaffolded)", async () => {
   const SECRET = "am_secret";

@@ -68,18 +68,6 @@ describe("integrations/* JSON-RPC handlers", async () => {
     }
   });
 
-  it("pi-sage entry shows trigger=scaffolded + connector=full (rolled-up status=full)", async () => {
-    const list = await listIntegrations();
-    const sage = list.find((e) => e.name === "pi-sage");
-    expect(sage).toBeDefined();
-    expect(sage?.has_trigger).toBe(true);
-    expect(sage?.has_connector).toBe(true);
-    expect(sage?.connector_kind).toBe("mcp");
-    expect(sage?.trigger_kind).toBe("webhook");
-    // status is the most-mature half: connector=full -> full.
-    expect(sage?.status).toBe("full");
-  });
-
   it("pagerduty entry shows trigger-only (no connector half)", async () => {
     const list = await listIntegrations();
     const pd = list.find((e) => e.name === "pagerduty");

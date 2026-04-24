@@ -49,9 +49,8 @@ import { registerAdminApiKeyHandlers } from "./handlers/admin-apikey.js";
 // --- BEGIN agent-C: resource-crud ---
 import { registerResourceCrudHandlers } from "./handlers/resource-crud.js";
 // --- END agent-C ---
-// --- BEGIN agent-E: conductor + sage + costs ---
+// --- BEGIN agent-E: conductor + costs ---
 import { registerConductorHandlers } from "./handlers/conductor.js";
-import { registerSageHandlers } from "./handlers/sage.js";
 import { registerCostsAdminHandlers } from "./handlers/costs.js";
 // --- END agent-E ---
 // --- BEGIN agent-D: knowledge + code-intel + workspace ---
@@ -118,9 +117,8 @@ export function registerSharedHandlers(router: Router, app: AppContext): void {
   registerResourceCrudHandlers(router, app);
   // --- END agent-C ---
 
-  // --- BEGIN agent-E: conductor + sage + costs ---
+  // --- BEGIN agent-E: conductor + costs ---
   registerConductorHandlers(router, app);
-  registerSageHandlers(router, app);
   registerCostsAdminHandlers(router, app);
   // --- END agent-E ---
 

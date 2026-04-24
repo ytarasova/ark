@@ -17,8 +17,7 @@ import * as agentRegistry from "../agent/agent.js";
 import { buildSessionVars } from "../template.js";
 import { resolveFlow } from "../state/flow.js";
 import { filterMessages, parseMessageFilter } from "../message-filter.js";
-import { logDebug, logWarn } from "../observability/structured-log.js";
-import { buildStreamSubtasks, type SageAnalysis } from "../integrations/sage-analysis.js";
+import { logDebug } from "../observability/structured-log.js";
 import { readPlanMd } from "./plan-artifact.js";
 
 /** Convert a typed Session to a plain Record for template variable resolution. */
@@ -211,24 +210,6 @@ export async function buildTaskWithHandoff(
 }
 
 export async function extractSubtasks(app: AppContext, session: Session): Promise<{ name: string; task: string }[]> {
-  // Sage-analysis path: when the session was seeded with a pi-sage analysis
-  // JSON (via `ark sage` or the `fetch_sage_analysis` action), the locator
-  // lives on `inputs.files.analysis_json`. Fan out one subtask per
-  // plan_stream. Happy path for the `from-sage-analysis` flow.
-  const inputs = (session.config as any)?.inputs as { files?: Record<string, string> } | undefined;
-  const analysisLocator = inputs?.files?.analysis_json;
-  if (analysisLocator) {
-    try {
-      const { bytes } = await app.blobStore.get(analysisLocator, session.tenant_id);
-      const analysis = JSON.parse(bytes.toString("utf-8")) as SageAnalysis;
-      if (Array.isArray(analysis.plan_streams) && analysis.plan_streams.length > 0) {
-        return buildStreamSubtasks(analysis).map((s) => ({ name: s.name, task: s.task }));
-      }
-    } catch (e: any) {
-      logWarn("session", `extractSubtasks: failed to load analysis ${analysisLocator}: ${e?.message ?? e}`);
-    }
-  }
-
   // PLAN.md fallback: BlobStore locator first, then worktree FS
   const plan = await readPlanMd(app, session);
   if (plan) {

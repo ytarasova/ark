@@ -252,7 +252,7 @@ export function agentSdkLaunchSpec(): { command: string; args: string[] } {
 /**
  * Resolve the directory containing shipped MCP config stubs
  * (`mcp-configs/<name>.json`). Used to look up runtime-declared MCP entries
- * by short name (e.g. `mcp_servers: [pi-sage]`).
+ * by short name (e.g. `mcp_servers: [jira]`).
  *
  * Installed tarball layout:   `<prefix>/mcp-configs/`
  * Source-tree layout:         `<repo>/mcp-configs/`

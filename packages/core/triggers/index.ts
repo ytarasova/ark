@@ -43,5 +43,4 @@ export { pagerdutySource } from "./sources/pagerduty.js";
 export { prometheusSource } from "./sources/prometheus.js";
 export { alertmanagerSource } from "./sources/alertmanager.js";
 export { cloudwatchSource } from "./sources/cloudwatch.js";
-export { piSageSource } from "./sources/pi-sage.js";
 export { emailSource } from "./sources/email.js";
