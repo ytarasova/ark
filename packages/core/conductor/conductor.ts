@@ -356,6 +356,18 @@ export class Conductor {
         });
       }
 
+      // Log the PreToolUse hook itself so the timeline can render the tool
+      // call as soon as it's invoked (not just after PostToolUse lands).
+      // Without this, every Pre is dropped and the matching Post becomes an
+      // orphan in `buildConversationTimeline`. PreToolUse doesn't transition
+      // session state, so we don't route it through applyHookStatus. Shape
+      // matches what applyHookStatus writes: { event: hookEventName, ...rest }.
+      await app.events.log(sessionId, "hook_status", {
+        stage: s.stage ?? undefined,
+        actor: "hook",
+        data: { event, ...payload },
+      });
+
       return Response.json({ status: "ok", guardrail: evalResult.action });
     }
 
