@@ -5,6 +5,7 @@ import { join } from "path";
 import * as core from "../../../core/index.js";
 import { SESSION_STATUSES } from "../../../types/index.js";
 import { getArkClient } from "../../app-client.js";
+import { coloredStatusIcon } from "../../formatters.js";
 
 export function registerViewCommands(session: Command) {
   session
@@ -26,30 +27,12 @@ export function registerViewCommands(session: Command) {
         console.log(chalk.dim("No sessions. Start one: ark session start --repo . --summary 'task'"));
         return;
       }
-      const icons: Record<string, string> = {
-        running: "●",
-        waiting: "⏸",
-        pending: "○",
-        ready: "◎",
-        completed: "✓",
-        failed: "✕",
-        blocked: "■",
-        archived: "▪",
-      };
-      const colors: Record<string, (s: string) => string> = {
-        running: chalk.blue,
-        waiting: chalk.yellow,
-        completed: chalk.green,
-        failed: chalk.red,
-        blocked: chalk.yellow,
-        archived: chalk.dim,
-      };
       for (const s of sessions) {
-        const icon = icons[s.status] ?? "?";
-        const color = colors[s.status] ?? chalk.dim;
         const group = s.group_name ? chalk.dim(`[${s.group_name}] `) : "";
         const summary = s.summary ?? s.ticket ?? s.repo ?? "-";
-        console.log(`  ${color(icon)} ${s.id}  ${group}${summary.slice(0, 40)}  ${s.stage ?? "-"}  ${s.status}`);
+        console.log(
+          `  ${coloredStatusIcon(s.status)} ${s.id}  ${group}${summary.slice(0, 40)}  ${s.stage ?? "-"}  ${s.status}`,
+        );
       }
     });
 

@@ -2,6 +2,7 @@ import type { Command } from "commander";
 import chalk from "chalk";
 import * as core from "../../../core/index.js";
 import { getArkClient, getInProcessApp } from "../../app-client.js";
+import { statusIcon } from "../../formatters.js";
 
 /**
  * `pr` subcommands -- list sessions bound to GitHub PRs and look up the
@@ -21,8 +22,7 @@ export function registerPrCommands(program: Command): void {
         return;
       }
       for (const s of prSessions) {
-        const icon = s.status === "running" ? "●" : s.status === "completed" ? "✓" : s.status === "failed" ? "✕" : "○";
-        console.log(`  ${icon} ${chalk.dim(s.id)}  ${s.pr_url}  ${s.summary || ""}`);
+        console.log(`  ${statusIcon(s.status)} ${chalk.dim(s.id)}  ${s.pr_url}  ${s.summary || ""}`);
       }
     });
 

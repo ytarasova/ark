@@ -10,6 +10,7 @@
 
 import type { Router } from "../router.js";
 import type { AppContext } from "../../core/app.js";
+import { RpcError, ErrorCodes } from "../../protocol/types.js";
 
 // Docker container names follow a restricted charset. Enforce it here to keep
 // command injection impossible even if the capability were ever swapped for
@@ -30,12 +31,14 @@ export function registerMetricsLocalHandlers(router: Router, app: AppContext): v
     // caller's session) or other shell-ish tokens that the host capability
     // forwards verbatim as argv to `kill`.
     const pid = Math.trunc(Number(pidRaw));
-    if (!Number.isFinite(pid) || pid <= 1) throw new Error("pid must be a positive integer greater than 1");
+    if (!Number.isFinite(pid) || pid <= 1) {
+      throw new RpcError("pid must be a positive integer greater than 1", ErrorCodes.INVALID_PARAMS);
+    }
     try {
       await host.killProcess(pid);
       return { ok: true };
     } catch (err: any) {
-      throw new Error(`Failed to kill process ${pid}: ${err.message}`);
+      throw new RpcError(`Failed to kill process ${pid}: ${err.message}`, ErrorCodes.INTERNAL_ERROR);
     }
   });
 
@@ -43,7 +46,7 @@ export function registerMetricsLocalHandlers(router: Router, app: AppContext): v
     const params = (p ?? {}) as Record<string, any>;
     const container = params.container;
     if (typeof container !== "string" || !DOCKER_NAME_RE.test(container)) {
-      throw new Error("container must be a valid docker name");
+      throw new RpcError("container must be a valid docker name", ErrorCodes.INVALID_PARAMS);
     }
     const tailNum = Math.trunc(Number(params.tail ?? 100));
     const tail = Number.isFinite(tailNum) && tailNum > 0 && tailNum <= 10000 ? tailNum : 100;
@@ -51,7 +54,7 @@ export function registerMetricsLocalHandlers(router: Router, app: AppContext): v
       const logs = await host.dockerLogs(container, tail);
       return { logs };
     } catch (err: any) {
-      throw new Error(`Failed to get logs for ${container}: ${err.message}`);
+      throw new RpcError(`Failed to get logs for ${container}: ${err.message}`, ErrorCodes.INTERNAL_ERROR);
     }
   });
 
@@ -60,14 +63,16 @@ export function registerMetricsLocalHandlers(router: Router, app: AppContext): v
     const container = params.container;
     const action = params.action;
     if (typeof container !== "string" || !DOCKER_NAME_RE.test(container)) {
-      throw new Error("container must be a valid docker name");
+      throw new RpcError("container must be a valid docker name", ErrorCodes.INVALID_PARAMS);
     }
-    if (!action || !["stop", "restart"].includes(action)) throw new Error("action must be stop or restart");
+    if (!action || !["stop", "restart"].includes(action)) {
+      throw new RpcError("action must be stop or restart", ErrorCodes.INVALID_PARAMS);
+    }
     try {
       await host.dockerAction(container, action as "stop" | "restart");
       return { ok: true };
     } catch (err: any) {
-      throw new Error(`Failed to ${action} container ${container}: ${err.message}`);
+      throw new RpcError(`Failed to ${action} container ${container}: ${err.message}`, ErrorCodes.INTERNAL_ERROR);
     }
   });
 }

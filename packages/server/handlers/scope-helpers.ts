@@ -16,6 +16,7 @@ import { findProjectRoot } from "../../core/agent/agent.js";
 import type { AppContext } from "../../core/app.js";
 import type { TenantContext } from "../../core/auth/context.js";
 import { DEFAULT_TENANT_ID } from "../../core/code-intel/constants.js";
+import { RpcError, ErrorCodes } from "../../protocol/types.js";
 
 export type Scope = "global" | "project";
 
@@ -65,9 +66,12 @@ export function guardBuiltin(
   if (!existing) return;
   if (existing._source === "builtin") {
     if (verb === "edit") {
-      throw new Error(`${kind} '${name}' is builtin -- copy it to global/project before editing.`);
+      throw new RpcError(
+        `${kind} '${name}' is builtin -- copy it to global/project before editing.`,
+        ErrorCodes.FORBIDDEN,
+      );
     }
-    throw new Error(`Cannot delete builtin ${kind.toLowerCase()} '${name}'.`);
+    throw new RpcError(`Cannot delete builtin ${kind.toLowerCase()} '${name}'.`, ErrorCodes.FORBIDDEN);
   }
 }
 
