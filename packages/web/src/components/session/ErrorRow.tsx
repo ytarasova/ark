@@ -1,4 +1,5 @@
 import type { ErrorInfo } from "./types.js";
+import { ListRow } from "../ui/ListRow.js";
 
 /**
  * A single row in the session Errors tab. Clicking the row opens the detail
@@ -7,7 +8,7 @@ import type { ErrorInfo } from "./types.js";
 export function ErrorRow({ type, message, stage, timestamp, onSelect }: ErrorInfo & { onSelect?: () => void }) {
   return (
     <div className="border-l-2 border-l-[var(--failed)] border-b border-b-[var(--border)]">
-      <div className="flex items-center gap-2 py-2 px-3 cursor-pointer hover:bg-[var(--bg-hover)]" onClick={onSelect}>
+      <ListRow className="flex items-center gap-2 py-2 px-3 hover:bg-[var(--bg-hover)]" onSelect={onSelect}>
         <div className="flex-1 min-w-0 flex items-center gap-2">
           <span className="text-[12px] font-semibold text-[var(--fg)] shrink-0">{type}</span>
           {message && <span className="text-[12px] text-[var(--fg-muted)] truncate min-w-0">{message}</span>}
@@ -22,7 +23,7 @@ export function ErrorRow({ type, message, stage, timestamp, onSelect }: ErrorInf
             {timestamp}
           </span>
         )}
-      </div>
+      </ListRow>
     </div>
   );
 }
