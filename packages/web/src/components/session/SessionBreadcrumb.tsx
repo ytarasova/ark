@@ -32,6 +32,12 @@ export function SessionBreadcrumb({ session }: SessionBreadcrumbProps) {
   if (!session.parent_id) return null;
   if (!chain || chain.length < 2) return null;
 
+  // Drop the last crumb -- it's the current session's own summary, which
+  // already renders as the SessionHeader's H1 title directly below. Showing
+  // it here was a visual duplicate.
+  const ancestors = chain.slice(0, -1);
+  if (ancestors.length === 0) return null;
+
   return (
     <nav
       data-testid="session-breadcrumb"
@@ -39,31 +45,22 @@ export function SessionBreadcrumb({ session }: SessionBreadcrumbProps) {
       className="flex items-center gap-[6px] px-[18px] py-[6px] border-b border-[var(--border-light)]
         font-[family-name:var(--font-mono-ui)] text-[11px] text-[var(--fg-muted)] whitespace-nowrap overflow-hidden"
     >
-      {chain.map((node, i) => {
-        const isLast = i === chain.length - 1;
-        return (
-          <span key={node.id} className="inline-flex items-center gap-[6px] min-w-0">
-            {i > 0 && (
-              <span aria-hidden className="text-[var(--fg-faint)] shrink-0">
-                <ChevronRight size={11} />
-              </span>
-            )}
-            {isLast ? (
-              <span className="text-[var(--fg)] truncate" title={node.summary || node.id}>
-                {truncate(node.summary || node.id, 48)}
-              </span>
-            ) : (
-              <a
-                href={`#/sessions/${node.id}`}
-                className="text-[var(--fg-muted)] hover:text-[var(--fg)] truncate no-underline hover:underline"
-                title={node.summary || node.id}
-              >
-                {truncate(node.summary || node.id, 40)}
-              </a>
-            )}
-          </span>
-        );
-      })}
+      {ancestors.map((node, i) => (
+        <span key={node.id} className="inline-flex items-center gap-[6px] min-w-0">
+          {i > 0 && (
+            <span aria-hidden className="text-[var(--fg-faint)] shrink-0">
+              <ChevronRight size={11} />
+            </span>
+          )}
+          <a
+            href={`#/sessions/${node.id}`}
+            className="text-[var(--fg-muted)] hover:text-[var(--fg)] truncate no-underline hover:underline"
+            title={node.summary || node.id}
+          >
+            {truncate(node.summary || node.id, 40)}
+          </a>
+        </span>
+      ))}
     </nav>
   );
 }
