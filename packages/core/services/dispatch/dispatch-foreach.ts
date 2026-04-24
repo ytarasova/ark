@@ -139,7 +139,7 @@ async function buildCompletedSetFromChildren(
  * - Objects are flattened recursively with dot-separated paths.
  * - Arrays are stringified at their leaf position.
  */
-function flattenItem(prefix: string, value: unknown, out: Record<string, unknown>): void {
+export function flattenItem(prefix: string, value: unknown, out: Record<string, unknown>): void {
   if (value === null || value === undefined) return;
   if (Array.isArray(value)) {
     out[prefix] = JSON.stringify(value);
@@ -160,7 +160,7 @@ function flattenItem(prefix: string, value: unknown, out: Record<string, unknown
  * The iteration item is flattened under `iterVar` so templates like
  * `{{repo.repo_path}}` (where iterVar="repo") resolve correctly.
  */
-function buildIterationVars(
+export function buildIterationVars(
   baseVars: Record<string, unknown>,
   iterVar: string,
   item: unknown,
@@ -985,7 +985,7 @@ export class ForEachDispatcher {
  * This lets both `"{{repos}}"` (where `repos` is a JSON-array string) and
  * plain `"myKey"` (a direct config lookup) work without ceremony.
  */
-function resolveForEachList(
+export function resolveForEachList(
   expr: string,
   sessionVars: Record<string, unknown>,
   session: Record<string, unknown>,
