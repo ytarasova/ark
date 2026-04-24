@@ -1,38 +1,28 @@
 /**
  * Core dispatch loop: resolve -> validate -> launch -> persist.
  *
- * Flow:
- *   1. Load + validate session state (status, stage, compute existence).
- *   2. Short-circuit `action:` stages (execute in-process, no agent launch).
- *   3. Hosted-mode scheduling takes precedence; falls through in local mode.
- *   4. Clone remote repo if `config.remoteRepo` + no workdir.
- *   5. Prompt-injection guard on session.summary.
- *   6. Per-stage compute override resolution (template clone path).
- *   7. Fork branch dispatches via `FanOutDispatcher`.
- *   8. for_each + mode:spawn iterates a list and spawns one child per item.
- *   9. Agent stage: resolve agent -> build task -> inject context/repo-map
- *      -> resolve secrets + tenant claude auth -> launch via executor.
- *  10. Post-launch: guard against mid-dispatch stage-change race, persist
- *      run state, log stage_started, checkpoint, start status poller.
+ * The heavy lifting lives in sibling modules; this file is now a thin
+ * coordinator that sequences them:
+ *
+ *   guards.ts          validateSessionForDispatch, maybeHandleActionStage,
+ *                       cloneRemoteRepoIfNeeded, checkPromptInjection
+ *   compute-resolve.ts ComputeResolver (per-stage template clone)
+ *   secrets-resolve.ts StageSecretResolver (stage + runtime secret merge)
+ *   dispatch-hosted.ts HostedDispatcher (hosted-mode scheduler takes precedence)
+ *   dispatch-fanout.ts FanOutDispatcher (fork stages)
+ *   dispatch-foreach.ts ForEachDispatcher (for_each + mode:{spawn,inline})
+ *   agent-resolve.ts   resolveDispatchAgent, applyStageModelAndResolveSlug
+ *   task-assembly.ts   assembleTask (buildTask + inject + rework prompt)
+ *   launch.ts          buildLaunchEnv, launchAgent
+ *   post-launch.ts     finalizeLaunch (persist run state + poller + telemetry)
+ *   inline-substage.ts dispatchInlineSubStage (for_each mode:inline sub-stages)
  *
  * Resume: tear down any running tmux, clear transient status fields, call
  * dispatch again.
  */
 
-import { mkdirSync } from "fs";
-import { join } from "path";
-import { execFileSync } from "child_process";
-import { promisify } from "util";
-import { execFile } from "child_process";
-
 import type { DispatchDeps, DispatchResult } from "./types.js";
-import type { Session } from "../../../types/index.js";
-import type { AgentDefinition } from "../../agent/agent.js";
-import { logDebug } from "../../observability/structured-log.js";
-import { recordEvent } from "../../observability.js";
-import { track } from "../../observability/telemetry.js";
-import { detectInjection } from "../../session/prompt-guard.js";
-import { sessionAsVars } from "../task-builder.js";
+import type { StageDefinition } from "../../state/flow.js";
 
 import { ComputeResolver } from "./compute-resolve.js";
 import { StageSecretResolver } from "./secrets-resolve.js";
@@ -42,7 +32,17 @@ import { ForEachDispatcher } from "./dispatch-foreach.js";
 import type { DispatchInlineSubStageCb } from "./dispatch-foreach.js";
 import { buildSessionVars } from "../../template.js";
 
-const execFileAsync = promisify(execFile);
+import {
+  validateSessionForDispatch,
+  maybeHandleActionStage,
+  cloneRemoteRepoIfNeeded,
+  checkPromptInjection,
+} from "./guards.js";
+import { resolveDispatchAgent, applyStageModelAndResolveSlug } from "./agent-resolve.js";
+import { assembleTask } from "./task-assembly.js";
+import { buildLaunchEnv, launchAgent } from "./launch.js";
+import { finalizeLaunch } from "./post-launch.js";
+import { dispatchInlineSubStage } from "./inline-substage.js";
 
 export class CoreDispatcher {
   private readonly compute: ComputeResolver;
@@ -58,13 +58,14 @@ export class CoreDispatcher {
     this.fanout = new FanOutDispatcher(deps);
     this.foreach = new ForEachDispatcher({
       ...deps,
-      dispatchInlineSubStage: this.dispatchInlineSubStage.bind(this) as DispatchInlineSubStageCb,
+      dispatchInlineSubStage: ((sessionId, subStage, iterVars) =>
+        dispatchInlineSubStage(this.deps, this.secrets, sessionId, subStage, iterVars)) as DispatchInlineSubStageCb,
     });
   }
 
   /** Expose compute resolution so callers needing just that path can avoid launching. */
   resolveComputeForStage(
-    stageDef: import("../../state/flow.js").StageDefinition | null,
+    stageDef: StageDefinition | null,
     sessionId: string,
     log: (msg: string) => void = () => {},
   ): Promise<string | null> {
@@ -73,99 +74,48 @@ export class CoreDispatcher {
 
   async dispatch(sessionId: string, opts?: { onLog?: (msg: string) => void }): Promise<DispatchResult> {
     const log = opts?.onLog ?? (() => {});
-    const session = await this.deps.sessions.get(sessionId);
-    if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
-    if (session.status === "running" && session.session_id) {
-      return { ok: true, message: `Already running (${session.session_id})` };
-    }
-    if (session.status !== "ready" && session.status !== "blocked") {
-      return {
-        ok: false,
-        message: `Not ready (status: ${session.status}). Stop it first, or wait for it to finish.`,
-      };
-    }
+    // 1. Load + validate session preconditions.
+    const validated = await validateSessionForDispatch(this.deps, sessionId);
+    if (validated.early) return validated.early;
+    const session = validated.session;
+    const stage = session.stage!;
 
-    const stage = session.stage;
-    if (!stage) return { ok: false, message: "No current stage. The session may have completed its flow." };
+    // 2. Action stages short-circuit ahead of the hosted path so single-action
+    // flows can auto-complete on the control plane without a worker.
+    const actionResult = await maybeHandleActionStage(this.deps, session);
+    if (actionResult) return actionResult;
 
-    // Validate compute exists if specified
-    if (session.compute_name && !(await this.deps.computes.get(session.compute_name))) {
-      return {
-        ok: false,
-        message: `Compute '${session.compute_name}' not found. Delete and recreate the session.`,
-      };
-    }
-
-    // Action stages execute in-process regardless of hosted/local mode -- they
-    // don't launch an agent, don't need an arkd worker, and must not be
-    // scheduled like one. Handle them here before the hosted scheduler path
-    // so single-action flows can auto-complete on the control plane without
-    // waiting on a worker that will never have anything to do.
-    const earlyAction = this.deps.getStageAction(session.flow, stage);
-    if (earlyAction.type === "action") {
-      const result = await this.deps.executeAction(sessionId, earlyAction.action ?? "");
-      if (!result.ok) {
-        await this.deps.sessions.update(sessionId, {
-          status: "failed",
-          error: `Action '${earlyAction.action}' failed: ${result.message.slice(0, 200)}`,
-        });
-        return { ok: false, message: result.message };
-      }
-      const postAction = await this.deps.sessions.get(sessionId);
-      if (postAction?.status === "ready") {
-        await this.deps.mediateStageHandoff(sessionId, { autoDispatch: true, source: "dispatch_action" });
-      }
-      return { ok: true, message: `Executed action '${earlyAction.action}'` };
-    }
-
-    // Hosted mode takes precedence; local dispatch runs only if no scheduler is wired.
+    // 3. Hosted mode takes precedence; falls through in local mode.
     const hosted = await this.hosted.dispatch(sessionId, session, log);
     if (hosted) return hosted;
 
-    const cloned = await this.cloneRemoteRepoIfNeeded(sessionId, session, log);
+    // 4. Clone remote repo if the session references one and no workdir yet.
+    const cloned = await cloneRemoteRepoIfNeeded(this.deps, session, log);
     if (cloned.ok === false) return { ok: false, message: cloned.message };
 
-    // Check task summary for prompt injection
-    try {
-      const injection = detectInjection(session.summary ?? "");
-      if (injection.severity === "high") {
-        await this.deps.events.log(sessionId, "prompt_injection_blocked", {
-          actor: "system",
-          data: { patterns: injection.patterns, context: "dispatch" },
-        });
-        return { ok: false, message: "Dispatch blocked: potential prompt injection in task summary" };
-      }
-      if (injection.detected) {
-        await this.deps.events.log(sessionId, "prompt_injection_warning", {
-          actor: "system",
-          data: { patterns: injection.patterns, severity: injection.severity, context: "dispatch" },
-        });
-      }
-    } catch {
-      logDebug("session", "skip guard on error");
-    }
+    // 5. Prompt-injection guard on session.summary.
+    const guard = await checkPromptInjection(this.deps, session);
+    if (guard.blocked) return { ok: false, message: guard.message! };
 
-    // Check if fork stage
+    // 6. Per-stage compute template override.
     const stageDef = this.deps.getStage(session.flow, stage);
-
-    // Resolve per-stage compute template override
     const stageCompute = await this.compute.resolveForStage(stageDef, sessionId, log);
     if (stageCompute) {
       await this.deps.sessions.update(sessionId, { compute_name: stageCompute });
       (session as { compute_name: string | null }).compute_name = stageCompute;
     }
 
+    // 7. Fork stage -> FanOutDispatcher.
     if (stageDef?.type === "fork") {
       return this.fanout.dispatchFork(sessionId, stageDef);
     }
 
-    // for_each + mode:spawn: iterate a list and spawn one child per item sequentially.
+    // 8. for_each -> ForEachDispatcher (spawn or inline mode).
     if (stageDef?.for_each !== undefined) {
       const sessionVars = buildSessionVars(session as unknown as Record<string, unknown>);
       const result = await this.foreach.dispatchForEach(sessionId, stageDef, sessionVars);
       if (result.ok) {
-        // Stage is complete -- mediate handoff to the next stage.
         await this.deps.mediateStageHandoff(sessionId, { autoDispatch: true, source: "dispatch_for_each" });
       } else {
         await this.deps.sessions.update(sessionId, {
@@ -176,110 +126,26 @@ export class CoreDispatcher {
       return result;
     }
 
+    // 9. Agent stage. Must come last -- all shorter-circuit paths above
+    // consumed the dispatch if they applied.
     const action = this.deps.getStageAction(session.flow, stage);
     if (action.type !== "agent") {
       return { ok: false, message: `Stage '${stage}' is ${action.type}, not agent` };
     }
 
-    // Per-stage (runtime, model) come from the resolveStage pipeline; dispatch
-    // no longer reads session-level runtime/model overrides. The CLI flags that
-    // wrote them have been removed, and the stage-level fields on the flow
-    // definition are the single source of truth.
     const { findProjectRoot } = await import("../../agent/agent.js");
     const projectRoot = findProjectRoot(session.workdir || session.repo) ?? undefined;
 
-    // Agent can be either a string name (looked up via resolveAgent) or an
-    // inline AgentSpec object. Inline agents skip the store entirely.
-    const agentRef = action.agent;
-    let agent: AgentDefinition | null = null;
-    let agentName: string;
-    if (typeof agentRef === "object" && agentRef !== null) {
-      // Inline agent: build AgentDefinition in-place, apply runtime merge via
-      // buildInlineAgent so runtime defaults (model, env, etc.) are respected
-      // the same way as stored agents.
-      const { buildInlineAgent } = await import("../../agent/agent.js");
-      agent = buildInlineAgent(this.deps.getApp(), agentRef, sessionAsVars(session));
-      agentName = agent?.name ?? "inline";
-      if (!agent) return { ok: false, message: `Inline agent build failed (missing runtime or system_prompt?)` };
-    } else {
-      agentName = agentRef!;
-      log(`Resolving agent: ${agentName}`);
-      agent = this.deps.resolveAgent(agentName, sessionAsVars(session), { projectRoot });
-      // Fallback: agents created via the web UI are saved relative to the server's
-      // cwd which may differ from the session's workdir/repo.
-      if (!agent) {
-        const serverRoot = findProjectRoot(process.cwd()) ?? undefined;
-        if (serverRoot && serverRoot !== projectRoot) {
-          agent = this.deps.resolveAgent(agentName, sessionAsVars(session), {
-            projectRoot: serverRoot,
-          });
-        }
-      }
-      if (!agent) return { ok: false, message: `Agent '${agentName}' not found` };
-    }
+    // Resolve agent (inline spec or named) + apply stage model override + catalog slug.
+    const agentResolution = await resolveDispatchAgent(this.deps, session, action.agent, projectRoot, log);
+    if (!agentResolution.ok) return { ok: false, message: agentResolution.message };
+    const { agent, agentName } = agentResolution.resolved;
+    applyStageModelAndResolveSlug(this.deps, agent, stageDef, projectRoot, log);
 
-    // Resolve autonomy level from flow stage definition
     const autonomy = stageDef?.autonomy ?? "full";
 
-    // Stage-level model override (legacy stage.model field) still wins if set.
-    if (stageDef?.model) {
-      agent.model = stageDef.model;
-    }
-
-    // The model layer turns (agent.model, runtime.compat) into the concrete
-    // provider slug the runtime should send. Dispatch knows nothing about
-    // transport keys, bedrock, or catalog internals -- it asks the service
-    // and takes the answer. Null means "catalog doesn't know this id";
-    // leave it untouched so explicit out-of-band slugs still pass through.
-    //
-    // `compat` is a runtime concern, not an agent concern -- look it up off
-    // the resolved runtime definition. If the agent's runtime points at a
-    // name we can't resolve, treat compat as empty (the resolver falls back
-    // to anthropic-direct).
-    if (agent.model && this.deps.models) {
-      const runtimeName = agent.runtime;
-      const runtimeDef = runtimeName ? this.deps.runtimes.get(runtimeName) : null;
-      const runtimeCompat = runtimeDef?.compat ?? [];
-      const resolved = this.deps.models.resolveSlug(agent.model, runtimeCompat, projectRoot);
-      if (resolved && resolved !== agent.model) {
-        log(`Catalog: ${agent.model} -> ${resolved} (compat: [${runtimeCompat.join(",")}])`);
-        agent.model = resolved;
-      }
-    }
-
-    // Build task with handoff context
-    log("Building task...");
-    let task = await this.deps.buildTask(session, stage, agentName);
-    // Capture clean user task before context/repo-map injection for event previews
-    const taskPreview = (session.summary || task.slice(0, 200)).slice(0, 200);
-
-    // Index codebase into knowledge graph (remote arkd for hosted, local otherwise).
-    await this.deps.indexRepo(session, log);
-
-    // Inject knowledge-graph context + repo map above/below the task.
-    task = await this.deps.injectKnowledge(session, task);
-    task = this.deps.injectRepoMap(session, task);
-
-    // Append rework prompt (set by gate/reject). Single-shot: cleared after a
-    // successful launch so subsequent dispatches of the same stage don't replay
-    // stale rework instructions.
-    const reworkPrompt = session.rework_prompt;
-    if (reworkPrompt) {
-      task += `\n\n## Rework requested\n\n${reworkPrompt}`;
-      log(`Appended rework prompt (rejection #${session.rejection_count ?? 0})`);
-    }
-
-    // Log the fully assembled prompt for audit trail
-    await this.deps.events.log(sessionId, "prompt_sent", {
-      stage,
-      actor: "orchestrator",
-      data: {
-        agent: agentName,
-        task_preview: task.slice(0, 500),
-        task_length: task.length,
-        task_full: task,
-      },
-    });
+    // Build task (with handoff context, knowledge, repo-map, rework prompt).
+    const { task, taskPreview } = await assembleTask(this.deps, session, stage, agentName, log);
 
     // Resolve executor -- use resolved runtime type (from RuntimeStore merge),
     // fall back to agent.runtime, then claude-code.
@@ -290,300 +156,44 @@ export class CoreDispatcher {
     // Build claude args (only for claude-code executor)
     const claudeArgs = runtime === "claude-code" ? this.deps.buildClaudeArgs(agent, { autonomy, projectRoot }) : [];
 
-    // Resolve secrets declared on the stage + the runtime and merge them
-    // into the launch env. Stage secrets win over runtime secrets on name
-    // conflict. A missing secret fails dispatch with a clear message --
-    // we never silently drop an env var the agent depends on.
-    const secretEnv = await this.secrets.resolve(session, stageDef, runtime, log);
-    if (secretEnv.error) return { ok: false, message: secretEnv.error };
+    // Assemble launch env: stage/runtime secrets + tenant claude auth.
+    const launchEnv = await buildLaunchEnv(this.deps, this.secrets, session, stageDef, runtime, log);
+    if (launchEnv.error) return { ok: false, message: launchEnv.error };
 
-    // Tenant-level claude auth materialization. Runs BEFORE we read the
-    // compute row for launch so any `credsSecretName` mutation lands before
-    // the provider sees it.
-    const computeForAuth = session.compute_name ? await this.deps.computes.get(session.compute_name) : null;
-    const claudeAuth = await this.deps.materializeClaudeAuth(session, computeForAuth);
-    if (Object.keys(claudeAuth.env).length > 0) {
-      log(`Injected tenant-level claude auth env: ${Object.keys(claudeAuth.env).join(", ")}`);
-    }
-    if (claudeAuth.credsSecretName) {
-      log(`Materialized subscription blob as k8s Secret '${claudeAuth.credsSecretName}'`);
-    }
-
-    // Merge launch env. Order: stage/runtime secrets first, tenant auth
-    // second -- we WANT the tenant's ANTHROPIC_API_KEY to win when an
-    // operator configured it, so sessions that don't declare their own
-    // secret still get auth.
-    const launchEnv: Record<string, string> = { ...secretEnv.env, ...claudeAuth.env };
-
-    // Launch via executor
+    // Launch via executor.
     log(`Launching via ${runtime}...`);
-    const launchResult = await executor.launch({
+    const launchResult = await launchAgent(this.deps, executor, {
       sessionId,
-      workdir: session.workdir ?? session.repo,
-      agent: agent as any,
+      session,
+      agent,
       task,
       claudeArgs,
-      env: launchEnv,
+      env: launchEnv.env,
       stage,
       autonomy,
-      onLog: log,
+      log,
       prevClaudeSessionId: session.claude_session_id,
       sessionName: session.summary ?? session.id,
       // Pass only the summary as the CLI positional arg (initial user message).
       // The full context-injected task is too large for ARG_MAX; it goes via
       // system prompt + channel delivery instead.
       initialPrompt: session.summary ?? task.slice(0, 2000),
-      compute: session.compute_name
-        ? (((await this.deps.computes.get(session.compute_name)) as unknown as {
-            name: string;
-            provider: string;
-            [k: string]: unknown;
-          } | null) ?? undefined)
-        : undefined,
-      // LaunchOpts.app is still required by the executor interface; dispatch
-      // is the sole reader of getApp() in this class. Refactoring executors
-      // off AppContext is a separate migration.
-      app: this.deps.getApp(),
     });
-
     if (!launchResult.ok) return { ok: false, message: launchResult.message ?? "Launch failed" };
-    const tmuxName = launchResult.handle;
 
-    // Persist launch PID for process-tree tracking
-    if (launchResult.pid) {
-      await this.deps.sessions.mergeConfig(sessionId, {
-        launch_pid: launchResult.pid,
-        launch_executor: runtime,
-        launched_at: new Date().toISOString(),
-      });
-    }
-
-    // Record HEAD sha at stage start for per-stage commit verification
-    let stageStartSha: string | undefined;
-    if (session.workdir) {
-      try {
-        stageStartSha = execFileSync("git", ["rev-parse", "HEAD"], {
-          cwd: session.workdir,
-          encoding: "utf-8",
-          timeout: 5000,
-        }).trim();
-      } catch {
-        logDebug("session", "no git -- skip");
-      }
-    }
-
-    // Guard against a race: if the session was force-advanced (or stopped /
-    // completed) while we were spinning up the launcher, don't stomp its
-    // current status/session_id with "running" for a stage that no longer
-    // belongs to it.
-    const currentSession = await this.deps.sessions.get(sessionId);
-    if (!currentSession || currentSession.stage !== stage || currentSession.status === "completed") {
-      log(`Session moved past stage '${stage}' during dispatch -- aborting write.`);
-      try {
-        await this.deps.launcher.kill(tmuxName);
-      } catch {
-        logDebug("session", "tmux may already be gone");
-      }
-      return { ok: false, message: `Session moved on during dispatch` };
-    }
-
-    await this.deps.sessions.update(sessionId, {
-      status: "running",
-      agent: agentName,
-      session_id: tmuxName,
-      // Single-shot rework prompt: clear now that it has been delivered.
-      ...(reworkPrompt ? { rework_prompt: null } : {}),
-    });
-    if (stageStartSha) {
-      await this.deps.sessions.mergeConfig(sessionId, { stage_start_sha: stageStartSha });
-    }
-    await this.deps.events.log(sessionId, "stage_started", {
+    // Post-launch persistence (race guard + run-state write + poller + telemetry).
+    return finalizeLaunch(this.deps, {
+      session,
+      agent,
+      agentName,
       stage,
-      actor: "user",
-      data: {
-        agent: agentName,
-        session_id: tmuxName,
-        model: agent.model,
-        tools: agent.tools,
-        skills: agent.skills,
-        memories: agent.memories,
-        task_preview: taskPreview,
-        stage_start_sha: stageStartSha,
-      },
+      runtime,
+      tmuxName: launchResult.handle,
+      launchPid: launchResult.pid,
+      reworkPromptCleared: Boolean(session.rework_prompt),
+      taskPreview,
+      log,
     });
-
-    // Persist flow state: mark current stage
-    try {
-      await this.deps.flowStates.setCurrentStage(sessionId, session.stage!, session.flow);
-    } catch {
-      logDebug("session", "skip flow-state on error");
-    }
-
-    // Checkpoint after successful dispatch
-    this.deps.checkpoint(sessionId);
-
-    // Start status poller for ALL runtimes as a crash detection fallback.
-    // Claude uses hook-based status but hooks don't fire when the agent crashes
-    // (e.g. MCP config error, OOM, segfault). The poller detects tmux session exit.
-    try {
-      this.deps.startStatusPoller(sessionId, tmuxName, runtime);
-    } catch {
-      logDebug("session", "status poller is best-effort -- agent runs fine without it");
-    }
-
-    // Observability + telemetry
-    recordEvent({
-      type: "session_start",
-      sessionId,
-      data: { agent: session.agent ?? agentName, flow: session.flow },
-    });
-    track("session_dispatched", { agent: agentName });
-
-    return { ok: true, message: tmuxName };
-  }
-
-  /**
-   * Dispatch a single inline sub-stage against the parent session's worktree.
-   *
-   * Used by mode:inline for_each iterations. Unlike the main dispatch() path:
-   *   - Task is already template-substituted (passed as subStage.task directly).
-   *   - No session.stage change (parent stays at the for_each stage name).
-   *   - No buildTask/knowledge-inject/repo-map overhead.
-   *   - Launches the agent and polls until terminal, then restores parent to "ready".
-   *
-   * Returns ok:true when the agent exits successfully, ok:false on failure.
-   */
-  private async dispatchInlineSubStage(
-    sessionId: string,
-    subStage: import("../../state/flow.js").StageDefinition,
-    _iterVars: Record<string, string>,
-  ): Promise<DispatchResult> {
-    const log = () => {};
-    const session = await this.deps.sessions.get(sessionId);
-    if (!session) return { ok: false, message: `Session ${sessionId} not found` };
-
-    const agentRef = subStage.agent;
-    if (!agentRef) {
-      return { ok: false, message: `Inline sub-stage '${subStage.name}' has no agent` };
-    }
-
-    const { findProjectRoot, buildInlineAgent } = await import("../../agent/agent.js");
-    const projectRoot = findProjectRoot(session.workdir || session.repo) ?? undefined;
-
-    let agent: AgentDefinition | null = null;
-    let agentName: string;
-
-    if (typeof agentRef === "object" && agentRef !== null) {
-      agent = buildInlineAgent(this.deps.getApp(), agentRef, sessionAsVars(session));
-      agentName = agent?.name ?? "inline";
-      if (!agent) return { ok: false, message: `Inline agent build failed for sub-stage '${subStage.name}'` };
-    } else {
-      agentName = agentRef;
-      agent = this.deps.resolveAgent(agentName, sessionAsVars(session), { projectRoot });
-      if (!agent) return { ok: false, message: `Agent '${agentName}' not found for sub-stage '${subStage.name}'` };
-    }
-
-    const autonomy = subStage.autonomy ?? "full";
-    // Stage-level model override (legacy subStage.model) still applies.
-    if (subStage.model) agent.model = subStage.model;
-
-    // Task: use the already-substituted subStage.task, or fall back to session summary.
-    const task = subStage.task ?? session.summary ?? "";
-
-    const runtime = agent._resolved_runtime_type ?? agent.runtime ?? "claude-code";
-    const executor = this.deps.resolveExecutor(runtime);
-    if (!executor) return { ok: false, message: `Executor '${runtime}' not registered` };
-
-    const claudeArgs = runtime === "claude-code" ? this.deps.buildClaudeArgs(agent, { autonomy, projectRoot }) : [];
-
-    const secretEnv = await this.secrets.resolve(session, subStage, runtime, log);
-    if (secretEnv.error) return { ok: false, message: secretEnv.error };
-
-    const computeForAuth = session.compute_name ? await this.deps.computes.get(session.compute_name) : null;
-    const claudeAuth = await this.deps.materializeClaudeAuth(session, computeForAuth);
-    const launchEnv: Record<string, string> = { ...secretEnv.env, ...claudeAuth.env };
-
-    await this.deps.events.log(sessionId, "prompt_sent", {
-      stage: session.stage,
-      actor: "orchestrator",
-      data: {
-        agent: agentName,
-        sub_stage: subStage.name,
-        task_preview: task.slice(0, 500),
-        task_length: task.length,
-        task_full: task,
-      },
-    });
-
-    const launchResult = await executor.launch({
-      sessionId,
-      workdir: session.workdir ?? session.repo,
-      agent: agent as any,
-      task,
-      claudeArgs,
-      env: launchEnv,
-      stage: subStage.name,
-      autonomy,
-      onLog: log,
-      prevClaudeSessionId: undefined, // Inline sub-stages always start fresh
-      sessionName: `${session.summary ?? session.id} / ${subStage.name}`,
-      initialPrompt: task.slice(0, 2000),
-      compute: session.compute_name
-        ? (((await this.deps.computes.get(session.compute_name)) as unknown as {
-            name: string;
-            provider: string;
-            [k: string]: unknown;
-          } | null) ?? undefined)
-        : undefined,
-      app: this.deps.getApp(),
-    });
-
-    if (!launchResult.ok) return { ok: false, message: launchResult.message ?? "Launch failed" };
-    const tmuxName = launchResult.handle;
-
-    // Mark parent session as running while this sub-stage executes.
-    await this.deps.sessions.update(sessionId, { status: "running", session_id: tmuxName, agent: agentName });
-
-    await this.deps.events.log(sessionId, "stage_started", {
-      stage: session.stage,
-      actor: "system",
-      data: { sub_stage: subStage.name, agent: agentName, session_id: tmuxName, model: agent.model },
-    });
-
-    // Poll until the agent process reaches a terminal state. Uses the
-    // executor's polymorphic status() interface rather than probing tmux
-    // directly -- agent-sdk (and other tmux-less runtimes) launch plain
-    // processes, so a tmux `has-session` check would falsely report the
-    // agent done on the first poll. executor.status(handle) returns
-    // "running"/"idle" while alive, "completed"/"failed" after exit, and
-    // "not_found" if the executor has no record (treated as done-but-
-    // already-cleaned).
-    const INLINE_POLL_MS = 250;
-    const INLINE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
-    const deadline = Date.now() + INLINE_TIMEOUT_MS;
-    let agentOk = false;
-    let agentExitOk = true;
-    while (Date.now() < deadline) {
-      await Bun.sleep(INLINE_POLL_MS);
-      const status = await executor.status(tmuxName);
-      if (status.state === "running" || status.state === "idle") continue;
-      // Terminal: completed / failed / not_found
-      agentOk = true;
-      if (status.state === "failed") agentExitOk = false;
-      break;
-    }
-
-    // Restore parent session to ready so the inline loop can continue.
-    await this.deps.sessions.update(sessionId, { status: "ready", session_id: null });
-
-    if (!agentOk) {
-      return { ok: false, message: `Inline sub-stage '${subStage.name}' timed out after 30 minutes` };
-    }
-    if (!agentExitOk) {
-      return { ok: false, message: `Inline sub-stage '${subStage.name}' agent exited with error` };
-    }
-
-    return { ok: true, message: `sub-stage '${subStage.name}' complete` };
   }
 
   async resume(sessionId: string, opts?: { onLog?: (msg: string) => void }): Promise<DispatchResult> {
@@ -608,32 +218,5 @@ export class CoreDispatcher {
 
     // Auto re-dispatch
     return this.dispatch(sessionId, opts);
-  }
-
-  /** Clone a remote repo referenced in session.config.remoteRepo into the worktrees dir. */
-  private async cloneRemoteRepoIfNeeded(
-    sessionId: string,
-    session: Session,
-    log: (msg: string) => void,
-  ): Promise<{ ok: true } | { ok: false; message: string }> {
-    if (!session.config?.remoteRepo || session.workdir) return { ok: true };
-    const remoteUrl = session.config.remoteRepo as string;
-    log(`Cloning remote repo: ${remoteUrl}`);
-    try {
-      const tmpDir = join(this.deps.config.dirs.ark, "worktrees", sessionId);
-      mkdirSync(tmpDir, { recursive: true });
-      await execFileAsync("git", ["clone", "--depth", "1", remoteUrl, tmpDir], { timeout: 120_000 });
-      await this.deps.sessions.update(sessionId, { workdir: tmpDir });
-      const updated = await this.deps.sessions.get(sessionId);
-      if (updated) (session as { workdir: string | null }).workdir = updated.workdir;
-      log(`Cloned remote repo to ${tmpDir}`);
-      await this.deps.events.log(sessionId, "remote_repo_cloned", {
-        actor: "system",
-        data: { url: remoteUrl, dir: tmpDir },
-      });
-      return { ok: true };
-    } catch (e: any) {
-      return { ok: false, message: `Failed to clone remote repo: ${e.message}` };
-    }
   }
 }
