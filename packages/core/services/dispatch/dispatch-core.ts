@@ -231,11 +231,18 @@ export class CoreDispatcher {
     // transport keys, bedrock, or catalog internals -- it asks the service
     // and takes the answer. Null means "catalog doesn't know this id";
     // leave it untouched so explicit out-of-band slugs still pass through.
+    //
+    // `compat` is a runtime concern, not an agent concern -- look it up off
+    // the resolved runtime definition. If the agent's runtime points at a
+    // name we can't resolve, treat compat as empty (the resolver falls back
+    // to anthropic-direct).
     if (agent.model && this.deps.models) {
-      const runtimeCompat = (agent as { compat?: string[] }).compat ?? [];
+      const runtimeName = agent.runtime;
+      const runtimeDef = runtimeName ? this.deps.runtimes.get(runtimeName) : null;
+      const runtimeCompat = runtimeDef?.compat ?? [];
       const resolved = this.deps.models.resolveSlug(agent.model, runtimeCompat, projectRoot);
       if (resolved && resolved !== agent.model) {
-        log(`Catalog: ${agent.model} -> ${resolved}`);
+        log(`Catalog: ${agent.model} -> ${resolved} (compat: [${runtimeCompat.join(",")}])`);
         agent.model = resolved;
       }
     }
