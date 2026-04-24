@@ -8,18 +8,12 @@
 import type { ComputeProvider } from "../compute/types.js";
 import type { Compute as NewCompute, Runtime as NewRuntime, ComputeKind, RuntimeKind } from "../compute/core/types.js";
 import type { ComputePool } from "../compute/core/pool/types.js";
-import type { AppContext } from "./app.js";
 
 export class ComputeRegistries {
   private providers = new Map<string, ComputeProvider>();
   private computes = new Map<ComputeKind, NewCompute>();
   private runtimes = new Map<RuntimeKind, NewRuntime>();
   private pools = new Map<ComputeKind, ComputePool>();
-
-  // `app` is retained for API compatibility; compute/runtime instances now
-  // take their AppContext via constructor injection rather than a post-hoc
-  // setApp() call, so the registry no longer needs to reach into the app.
-  constructor(_app: AppContext) {}
 
   registerProvider(p: ComputeProvider): void {
     this.providers.set(p.name, p);

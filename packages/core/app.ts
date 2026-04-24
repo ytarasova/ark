@@ -89,9 +89,8 @@ export class AppContext {
   private _container: AppContainer;
 
   // Non-container state -- provider registries live here because providers
-  // are registered imperatively during boot (they need a reference back to
-  // the AppContext), not constructed from config.
-  private _registries = new ComputeRegistries(this);
+  // are registered imperatively during boot, not constructed from config.
+  private _registries = new ComputeRegistries();
 
   private _launcher: SessionLauncher = new TmuxLauncher();
   private _eventBusReady = false;
