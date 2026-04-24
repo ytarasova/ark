@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { cn } from "../../lib/utils.js";
 import { StatusDot, type SessionStatus } from "./StatusDot.js";
-import { Search, X, Plus, Archive, Trash2, Star } from "lucide-react";
+import { Search, X, Plus, Archive, Trash2 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
