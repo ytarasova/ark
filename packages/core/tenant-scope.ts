@@ -166,9 +166,14 @@ export function buildTenantScope(parent: AppContext, tenantId: string): AppConte
     childContainer.register({
       agents: asFunction(
         (c: { db: DatabaseAdapter }) => {
+          // `model` default comes from the parent's ModelStore (alias
+          // "sonnet" by default). Keeps the hosted seed aligned with
+          // di/persistence.ts:makeAgentStore so a tenant-scoped store
+          // doesn't resurrect a stale hardcoded slug.
+          const defaultModelId = parent.models.default().id;
           const store = new DbResourceStore(c.db, "agent", {
             description: "",
-            model: "sonnet",
+            model: defaultModelId,
             max_turns: 200,
             system_prompt: "",
             tools: [],

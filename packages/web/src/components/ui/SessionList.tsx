@@ -58,6 +58,13 @@ export interface SessionListProps extends React.ComponentProps<"div"> {
   title?: string;
   /** Count label (e.g. total sessions). */
   count?: number | string;
+  /**
+   * If provided, renders this node in place of the default flat `sessions`
+   * body. Used by the tree-aware wrapper to inject its own row renderer
+   * (with chevrons + child expansion) while keeping the shared header +
+   * search + filter chrome from this atom.
+   */
+  children?: React.ReactNode;
 }
 
 /**
@@ -92,6 +99,7 @@ export function SessionList({
   title = "Sessions",
   count,
   className,
+  children,
   ...props
 }: SessionListProps) {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -185,21 +193,23 @@ export function SessionList({
       {filterChips && <div className="px-[12px] pt-[8px] pb-[4px] flex gap-1 shrink-0">{filterChips}</div>}
 
       {/* ── Session rows ──────────────────────────────────────────── */}
-      <div className="flex-1 min-h-0 overflow-y-auto py-[2px] flex flex-col">
-        {sessions.map((s) => (
-          <SessionRow
-            key={s.id}
-            session={s}
-            selected={selectedId === s.id}
-            onSelect={onSelect}
-            onArchive={onArchive}
-            onDelete={onDelete}
-          />
-        ))}
-        {sessions.length === 0 && (
-          <div className="px-3 py-10 text-center text-[12px] text-[var(--fg-muted)]">No sessions yet</div>
-        )}
-      </div>
+      {children ?? (
+        <div className="flex-1 min-h-0 overflow-y-auto py-[2px] flex flex-col">
+          {sessions.map((s) => (
+            <SessionRow
+              key={s.id}
+              session={s}
+              selected={selectedId === s.id}
+              onSelect={onSelect}
+              onArchive={onArchive}
+              onDelete={onDelete}
+            />
+          ))}
+          {sessions.length === 0 && (
+            <div className="px-3 py-10 text-center text-[12px] text-[var(--fg-muted)]">No sessions yet</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -284,18 +294,27 @@ function Sparkline({ values, color, active }: { values: number[]; color: string;
   );
 }
 
-function SessionRow({
+export function SessionRow({
   session,
   selected,
   onSelect,
   onArchive,
   onDelete,
+  leading,
+  trailing,
+  indent = 0,
 }: {
   session: SessionListItem;
   selected: boolean;
   onSelect: (id: string) => void;
   onArchive?: (id: string) => void;
   onDelete?: (id: string) => void;
+  /** Optional leading content rendered before the title (e.g. disclosure chevron). */
+  leading?: React.ReactNode;
+  /** Optional trailing content rendered on the meta row (e.g. child rollup chip). */
+  trailing?: React.ReactNode;
+  /** Indentation depth in px applied to the card's left margin (tree mode). */
+  indent?: number;
 }) {
   const iconBtn = cn(
     "opacity-0 group-hover:opacity-100 transition-opacity",
@@ -335,11 +354,12 @@ function SessionRow({
       }}
       className={cn(
         "group relative flex flex-col cursor-pointer",
-        "mx-[8px] my-[3px] rounded-[8px] px-[12px] py-[10px]",
+        "my-[3px] rounded-[8px] px-[12px] py-[10px]",
         "border border-transparent transition-colors duration-[120ms]",
         "hover:bg-[rgba(255,255,255,0.015)]",
         selected && "bg-[var(--bg-card)] border-[rgba(107,89,222,0.5)] shadow-[0_2px_8px_rgba(0,0,0,0.25)]",
       )}
+      style={{ marginLeft: 8 + indent, marginRight: 8 }}
     >
       {/* Left-edge accent stripe (3px, faded top/bottom). */}
       {stripeColor && (
@@ -356,6 +376,7 @@ function SessionRow({
 
       {/* Title row: summary + elapsed time. */}
       <div className="flex items-center gap-[8px] min-w-0">
+        {leading}
         <span
           className={cn(
             "flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
@@ -429,6 +450,7 @@ function SessionRow({
             )}
           </>
         )}
+        {trailing && <span className="ml-auto shrink-0">{trailing}</span>}
       </div>
 
       {/* Sparkline (24h activity, placeholder if absent). */}

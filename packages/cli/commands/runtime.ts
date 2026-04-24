@@ -42,15 +42,7 @@ export function registerRuntimeCommands(program: Command) {
       if (r.description) console.log(`  Description:    ${r.description}`);
       if (r.command) console.log(`  Command:        ${r.command.join(" ")}`);
       if (r.task_delivery) console.log(`  Task delivery:  ${r.task_delivery}`);
-      if (r.default_model) console.log(`  Default model:  ${r.default_model}`);
       if (r.permission_mode) console.log(`  Permission:     ${r.permission_mode}`);
-      if (r.models && r.models.length) {
-        console.log(`  Models:`);
-        for (const m of r.models) {
-          const isDefault = m.id === r.default_model ? chalk.dim(" (default)") : "";
-          console.log(`    - ${m.id}: ${m.label}${isDefault}`);
-        }
-      }
       if (r.env && Object.keys(r.env).length > 0) {
         console.log(`  Env:`);
         for (const [k, v] of Object.entries(r.env)) {

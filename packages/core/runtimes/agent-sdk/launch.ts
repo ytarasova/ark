@@ -32,6 +32,7 @@ function resolveClaudeExecutable(): string | undefined {
 }
 import type { Options } from "@anthropic-ai/claude-agent-sdk";
 import { startInterventionTail } from "./intervention-tail.js";
+import { createAskUserMcpServer } from "./mcp-ask-user.js";
 
 /**
  * SDK user message shape accepted by the Anthropic Agent SDK when passing an
@@ -550,7 +551,14 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
 
   let proxyServer: ReturnType<typeof Bun.serve> | undefined;
   let effectiveBaseURL = baseURL;
-  let effectiveModel = model;
+  // The model slug reaches launch.ts pre-resolved: the dispatch pipeline turns
+  // the agent's catalog id/alias into the concrete provider slug for the
+  // gateway in play (e.g. `pi-agentic/global.anthropic.claude-sonnet-4-6` for
+  // TF-Bedrock, bare `claude-sonnet-4-6` for Anthropic-direct). This file must
+  // NEVER synthesise or rewrite a model slug -- that is the model catalog's
+  // job, and keeping the two concerns separate keeps launch.ts free of model
+  // knowledge.
+  const effectiveModel = model;
   const bedrockCompat = compatModes.has("bedrock");
 
   if (bedrockCompat && baseURL) {
@@ -647,23 +655,11 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
 
     effectiveBaseURL = `http://localhost:${proxyServer.port}`;
     console.error(`[agent-sdk launch] Bedrock-compat proxy started on port ${proxyServer.port}`);
-
-    // The Claude binary normalizes short model slugs (e.g. strips "pi-agentic/" prefix)
-    // before the API call, so TF's Bedrock routing can't find the right model.
-    // Pass the full provider-qualified slug directly via sdkOptions.model so the binary
-    // receives "--model pi-agentic/global.anthropic.claude-sonnet-4-6" as a CLI arg
-    // and sends that slug verbatim in the request body.
-    //
-    // Agents/runtime YAML are expected to carry the concrete Anthropic slug
-    // (e.g. `claude-sonnet-4-6`). We only prepend the TF-Bedrock namespace;
-    // we do NOT map short aliases to concrete versions here (callers own that).
-    if (model && !model.includes("/")) {
-      effectiveModel = `pi-agentic/global.anthropic.${model}`;
-      console.error(`[agent-sdk launch] Bedrock-compat: expanding model ${model} -> ${effectiveModel}`);
-    } else if (!model) {
-      effectiveModel = "pi-agentic/global.anthropic.claude-sonnet-4-6";
-      console.error(`[agent-sdk launch] Bedrock-compat: using default model ${effectiveModel}`);
-    }
+    // NOTE: model-slug expansion for bedrock gateways used to happen here
+    // (pi-agentic/global.anthropic.<x>). That logic moved upstream into the
+    // model catalog + resolve-stage pipeline -- by the time we get here the
+    // caller has already selected the correct provider slug. See the comment
+    // on `effectiveModel` above for why this file is model-agnostic.
   }
 
   // When custom auth headers are in play (typical for gateway routing like
@@ -692,10 +688,24 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
   //   3. `claude` on PATH (dev workstations with npm-installed claude-code)
   const claudeExePath = resolveClaudeExecutable();
 
+  // Mount the ask_user MCP server so agents can ask mid-run questions as
+  // first-class conductor events (parity with the claude runtime's
+  // `report(question)` tool). Only when we can actually reach the conductor --
+  // tests skip this by leaving ARK_CONDUCTOR_URL unset.
+  const mcpServers: Record<string, ReturnType<typeof createAskUserMcpServer>> = {};
+  if (opts.conductorUrl) {
+    mcpServers["ark-ask-user"] = createAskUserMcpServer({
+      sessionId,
+      conductorUrl: opts.conductorUrl,
+      authToken: opts.authToken,
+      stage: process.env.ARK_STAGE ?? "",
+    });
+  }
+
   const sdkOptions: Options = {
     cwd: worktree,
     env: sdkEnv as Record<string, string | undefined>,
-    allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+    allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "mcp__ark-ask-user__ask_user"],
     permissionMode: "bypassPermissions",
     allowDangerouslySkipPermissions: true,
     executable: "bun",
@@ -704,6 +714,7 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
     maxBudgetUsd,
     systemPrompt: systemAppend ? { type: "preset", preset: "claude_code", append: systemAppend } : undefined,
     ...(claudeExePath ? { pathToClaudeCodeExecutable: claudeExePath } : {}),
+    ...(Object.keys(mcpServers).length > 0 ? { mcpServers } : {}),
   };
 
   // Mutable abort holder so the intervention tail always sees the current controller.

@@ -1,0 +1,10 @@
+id: llama-3-3-70b
+display: "Llama 3.3 70B Instruct"
+provider: meta
+aliases: []
+capabilities:
+  - tool-use
+provider_slugs:
+  tf-bedrock: pi-agentic/us.meta.llama3-3-70b-instruct-v1-0
+  aws-bedrock: us.meta.llama3-3-70b-instruct-v1-0
+context_window: 128000

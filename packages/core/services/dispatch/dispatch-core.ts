@@ -181,8 +181,10 @@ export class CoreDispatcher {
       return { ok: false, message: `Stage '${stage}' is ${action.type}, not agent` };
     }
 
-    // Resolve runtime override from session config (set by --runtime CLI flag)
-    const runtimeOverride = session.config?.runtime_override as string | undefined;
+    // Per-stage (runtime, model) come from the resolveStage pipeline; dispatch
+    // no longer reads session-level runtime/model overrides. The CLI flags that
+    // wrote them have been removed, and the stage-level fields on the flow
+    // definition are the single source of truth.
     const { findProjectRoot } = await import("../../agent/agent.js");
     const projectRoot = findProjectRoot(session.workdir || session.repo) ?? undefined;
 
@@ -196,20 +198,19 @@ export class CoreDispatcher {
       // buildInlineAgent so runtime defaults (model, env, etc.) are respected
       // the same way as stored agents.
       const { buildInlineAgent } = await import("../../agent/agent.js");
-      agent = buildInlineAgent(this.deps.getApp(), agentRef, sessionAsVars(session), { runtimeOverride });
+      agent = buildInlineAgent(this.deps.getApp(), agentRef, sessionAsVars(session));
       agentName = agent?.name ?? "inline";
       if (!agent) return { ok: false, message: `Inline agent build failed (missing runtime or system_prompt?)` };
     } else {
       agentName = agentRef!;
       log(`Resolving agent: ${agentName}`);
-      agent = this.deps.resolveAgent(agentName, sessionAsVars(session), { runtimeOverride, projectRoot });
+      agent = this.deps.resolveAgent(agentName, sessionAsVars(session), { projectRoot });
       // Fallback: agents created via the web UI are saved relative to the server's
       // cwd which may differ from the session's workdir/repo.
       if (!agent) {
         const serverRoot = findProjectRoot(process.cwd()) ?? undefined;
         if (serverRoot && serverRoot !== projectRoot) {
           agent = this.deps.resolveAgent(agentName, sessionAsVars(session), {
-            runtimeOverride,
             projectRoot: serverRoot,
           });
         }
@@ -220,10 +221,30 @@ export class CoreDispatcher {
     // Resolve autonomy level from flow stage definition
     const autonomy = stageDef?.autonomy ?? "full";
 
-    // Check for stage-level or session-level model override
-    const modelOverride = stageDef?.model ?? (session.config?.model_override as string | undefined);
-    if (modelOverride) {
-      agent.model = modelOverride;
+    // Stage-level model override (legacy stage.model field) still wins if set.
+    if (stageDef?.model) {
+      agent.model = stageDef.model;
+    }
+
+    // The model layer turns (agent.model, runtime.compat) into the concrete
+    // provider slug the runtime should send. Dispatch knows nothing about
+    // transport keys, bedrock, or catalog internals -- it asks the service
+    // and takes the answer. Null means "catalog doesn't know this id";
+    // leave it untouched so explicit out-of-band slugs still pass through.
+    //
+    // `compat` is a runtime concern, not an agent concern -- look it up off
+    // the resolved runtime definition. If the agent's runtime points at a
+    // name we can't resolve, treat compat as empty (the resolver falls back
+    // to anthropic-direct).
+    if (agent.model && this.deps.models) {
+      const runtimeName = agent.runtime;
+      const runtimeDef = runtimeName ? this.deps.runtimes.get(runtimeName) : null;
+      const runtimeCompat = runtimeDef?.compat ?? [];
+      const resolved = this.deps.models.resolveSlug(agent.model, runtimeCompat, projectRoot);
+      if (resolved && resolved !== agent.model) {
+        log(`Catalog: ${agent.model} -> ${resolved} (compat: [${runtimeCompat.join(",")}])`);
+        agent.model = resolved;
+      }
     }
 
     // Build task with handoff context
@@ -446,7 +467,6 @@ export class CoreDispatcher {
       return { ok: false, message: `Inline sub-stage '${subStage.name}' has no agent` };
     }
 
-    const runtimeOverride = session.config?.runtime_override as string | undefined;
     const { findProjectRoot, buildInlineAgent } = await import("../../agent/agent.js");
     const projectRoot = findProjectRoot(session.workdir || session.repo) ?? undefined;
 
@@ -454,18 +474,18 @@ export class CoreDispatcher {
     let agentName: string;
 
     if (typeof agentRef === "object" && agentRef !== null) {
-      agent = buildInlineAgent(this.deps.getApp(), agentRef, sessionAsVars(session), { runtimeOverride });
+      agent = buildInlineAgent(this.deps.getApp(), agentRef, sessionAsVars(session));
       agentName = agent?.name ?? "inline";
       if (!agent) return { ok: false, message: `Inline agent build failed for sub-stage '${subStage.name}'` };
     } else {
       agentName = agentRef;
-      agent = this.deps.resolveAgent(agentName, sessionAsVars(session), { runtimeOverride, projectRoot });
+      agent = this.deps.resolveAgent(agentName, sessionAsVars(session), { projectRoot });
       if (!agent) return { ok: false, message: `Agent '${agentName}' not found for sub-stage '${subStage.name}'` };
     }
 
     const autonomy = subStage.autonomy ?? "full";
-    const modelOverride = subStage.model ?? (session.config?.model_override as string | undefined);
-    if (modelOverride) agent.model = modelOverride;
+    // Stage-level model override (legacy subStage.model) still applies.
+    if (subStage.model) agent.model = subStage.model;
 
     // Task: use the already-substituted subStage.task, or fall back to session summary.
     const task = subStage.task ?? session.summary ?? "";

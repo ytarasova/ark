@@ -29,7 +29,6 @@ export function registerSageCommands(program: Command): void {
     .argument("<analysis-id-or-path>", "Jira key (e.g. IN-12345) or path to a local analysis JSON file")
     .option("--sage-url <url>", "Pi-sage base URL", "https://pi-team.mypaytm.com/sage")
     .option("--compute <name>", "Compute target for the parent + child sessions")
-    .option("--runtime <name>", "Runtime override (claude, codex, gemini, goose)")
     .option("--repo <path>", "Repo / workdir for the parent session", ".")
     .option("--dry-run", "Print the dispatch plan without creating a session")
     .action(async (ref: string, opts: SageOpts) => {
@@ -62,7 +61,6 @@ export function registerSageCommands(program: Command): void {
           analysisId,
           sageUrl,
           compute: opts.compute,
-          runtime: opts.runtime,
           repo: opts.repo,
         });
         if (!result.ok) {
@@ -90,7 +88,6 @@ export function registerSageCommands(program: Command): void {
 interface SageOpts {
   sageUrl?: string;
   compute?: string;
-  runtime?: string;
   repo?: string;
   dryRun?: boolean;
 }

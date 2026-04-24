@@ -171,6 +171,12 @@ export class ReportApplier {
               data: { summary: (report as unknown as Record<string, unknown>).summary },
             },
           });
+          // Flip status to `blocked` so the UI stops the running spinner and
+          // surfaces Approve/Reject as the primary actions. Without this the
+          // session sat at `running` forever after the agent's completion
+          // hook fired -- manual-gate stages can't auto-advance.
+          result.updates.status = "blocked";
+          result.updates.session_id = null;
         } else {
           result.updates.status = "ready";
           result.updates.session_id = null;

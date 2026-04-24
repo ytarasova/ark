@@ -66,8 +66,8 @@ describe("SessionRepository", async () => {
   });
 
   it("create stores config as JSON", async () => {
-    const s = await repo.create({ config: { model_override: "opus" } });
-    expect(s.config).toEqual({ model_override: "opus" });
+    const s = await repo.create({ config: { turns: 7 } });
+    expect(s.config).toEqual({ turns: 7 });
   });
 
   it("create stores agent field", async () => {
@@ -405,11 +405,11 @@ describe("SessionRepository", async () => {
   // -- mergeConfig ------------------------------------------------------
 
   it("mergeConfig merges without replacing existing keys", async () => {
-    const s = await repo.create({ config: { turns: 5, model_override: "opus" } });
+    const s = await repo.create({ config: { turns: 5, completion_summary: "orig" } });
     await repo.mergeConfig(s.id, { turns: 10 });
     const updated = (await repo.get(s.id))!;
     expect(updated.config.turns).toBe(10);
-    expect(updated.config.model_override).toBe("opus");
+    expect(updated.config.completion_summary).toBe("orig");
   });
 
   it("mergeConfig is no-op for nonexistent session", async () => {

@@ -64,11 +64,10 @@ export function registerSageHandlers(router: Router, app: AppContext): void {
   });
 
   router.handle("sage/analyze", async (p, _notify, ctx) => {
-    const { analysisId, sageUrl, compute, runtime, repo } = extract<{
+    const { analysisId, sageUrl, compute, repo } = extract<{
       analysisId: string;
       sageUrl?: string;
       compute?: string;
-      runtime?: string;
       repo?: string;
     }>(p, ["analysisId"]);
     const baseUrl = sageUrl ?? DEFAULT_SAGE_URL;
@@ -108,7 +107,6 @@ export function registerSageHandlers(router: Router, app: AppContext): void {
         files: { analysis_json: analysisPath },
         params: { analysis_id: analysis.jira_id, sage_base_url: baseUrl },
       },
-      config: runtime ? { runtime_override: runtime } : undefined,
     });
 
     const result = await scoped.dispatchService.dispatch(session.id);

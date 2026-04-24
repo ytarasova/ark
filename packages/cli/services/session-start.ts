@@ -15,7 +15,8 @@
  */
 
 import { resolve } from "path";
-import { existsSync } from "fs";
+import { existsSync, readFileSync } from "fs";
+import YAML from "yaml";
 import { sanitizeSummary } from "../helpers.js";
 import type { AppContext } from "../../core/app.js";
 
@@ -172,13 +173,34 @@ export class SessionStartService {
       notes.push({ kind: "info", message: `Note: session name sanitized to "${summary}"` });
     }
 
-    // ── CLI-side defaulting of declared flow params ────────────────
+    // ── Inline flow support ─────────────────────────────────────────
+    // `--flow ./foo.yaml` (any path ending in .yaml/.yml that actually
+    // exists on disk) is read + parsed and forwarded as an inline flow
+    // object. Bare names still resolve via the FlowStore.
+    let flowArg: string | Record<string, unknown> | undefined = opts.flow;
+    if (typeof opts.flow === "string" && /\.(yaml|yml)$/i.test(opts.flow)) {
+      const flowPath = resolve(opts.flow);
+      if (existsSync(flowPath)) {
+        try {
+          flowArg = YAML.parse(readFileSync(flowPath, "utf-8")) as Record<string, unknown>;
+          notes.push({ kind: "info", message: `Parsed inline flow from ${flowPath}` });
+        } catch (e: any) {
+          throw new SessionStartPlanError(`Failed to parse inline flow YAML at ${flowPath}: ${e?.message ?? e}`);
+        }
+      }
+    }
+
+    // ── CLI-side defaulting + pattern validation of flow params ────
     // The server-side Zod schema enforces declared-required inputs;
-    // here we just pre-apply declared defaults so the user does not
-    // have to re-type `{param: default}` for every invocation.
+    // here we pre-apply declared defaults and fail fast on pattern
+    // mismatches so the user does not have to round-trip to the server
+    // for a predictable validation error.
     const fileInputs: Record<string, string> = { ...(opts.file ?? {}) };
     const paramInputs: Record<string, string> = { ...(opts.param ?? {}) };
-    if (opts.flow) {
+    // Flow input validation only runs when the flow is passed by name
+    // (a named flow lives in the FlowStore, so we can flowRead it). Inline
+    // flows carry their own declared inputs and are validated server-side.
+    if (typeof opts.flow === "string" && !/\.(yaml|yml)$/i.test(opts.flow)) {
       try {
         const flowDef = await this.env.client.flowRead(opts.flow);
         const declared = flowDef?.inputs;
@@ -187,9 +209,18 @@ export class SessionStartService {
             if (paramInputs[key] === undefined && def?.default !== undefined) {
               paramInputs[key] = def.default;
             }
+            if (def?.pattern && paramInputs[key] !== undefined) {
+              const re = new RegExp(def.pattern);
+              if (!re.test(paramInputs[key])) {
+                throw new SessionStartPlanError(
+                  `--param ${key}=${paramInputs[key]} does not match pattern ${def.pattern}`,
+                );
+              }
+            }
           }
         }
-      } catch {
+      } catch (err) {
+        if (err instanceof SessionStartPlanError) throw err;
         // flow/read may 404 for ad-hoc flows -- server will still validate.
       }
     }
@@ -207,7 +238,7 @@ export class SessionStartService {
       summary,
       repo,
       ...(opts.branch ? { branch: opts.branch } : {}),
-      flow: opts.flow,
+      flow: flowArg,
       compute_name: opts.compute,
       agent: recipeAgent,
       workdir,

@@ -1,0 +1,13 @@
+id: gpt-5-codex
+display: "GPT-5 Codex"
+provider: openai
+aliases: []
+capabilities:
+  - tool-use
+pricing:
+  input_per_mtok: 1.25
+  cached_input_per_mtok: 0.125
+  output_per_mtok: 10.00
+provider_slugs:
+  openai-direct: gpt-5-codex
+context_window: 400000

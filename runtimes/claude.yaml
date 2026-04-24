@@ -1,14 +1,6 @@
 name: claude
 description: "Claude Code (Anthropic) - API billing"
 type: claude-code
-models:
-  - id: opus
-    label: "Claude Opus 4.6"
-  - id: sonnet
-    label: "Claude Sonnet 4.6"
-  - id: haiku
-    label: "Claude Haiku 4.5"
-default_model: sonnet
 permission_mode: bypassPermissions
 env:
   CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: "80"

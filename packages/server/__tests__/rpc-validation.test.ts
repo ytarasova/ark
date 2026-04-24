@@ -183,6 +183,22 @@ const fixtures: Record<string, MethodFixture> = {
     invalidRequest: [] as unknown as Record<string, unknown>,
     sampleResponse: { targets: [sampleCompute] },
   },
+  "compute/capabilities": {
+    validRequest: { name: "local" },
+    invalidRequest: { name: "" },
+    sampleResponse: {
+      capabilities: {
+        provider: "local",
+        singleton: true,
+        canReboot: false,
+        canDelete: false,
+        needsAuth: false,
+        supportsWorktree: true,
+        initialStatus: "running",
+        isolationModes: [{ value: "direct", label: "Direct" }],
+      },
+    },
+  },
   "compute/create": {
     validRequest: { name: "devbox", provider: "ec2" },
     invalidRequest: { name: "devbox", provider: "mystery-cloud" },
@@ -280,6 +296,16 @@ const fixtures: Record<string, MethodFixture> = {
     invalidRequest: {},
     sampleResponse: { ok: true, output: null },
   },
+  "session/stdio": {
+    validRequest: { sessionId: "s-1", tail: 100 },
+    invalidRequest: { sessionId: "s-1", tail: -1 },
+    sampleResponse: { content: "", size: 0, exists: false },
+  },
+  "session/transcript": {
+    validRequest: { sessionId: "s-1" },
+    invalidRequest: {},
+    sampleResponse: { messages: [], size: 0, exists: false },
+  },
   "session/events": {
     validRequest: { sessionId: "s-1", limit: 10 },
     invalidRequest: { sessionId: 1 },
@@ -316,9 +342,37 @@ const fixtures: Record<string, MethodFixture> = {
     sampleResponse: { ok: true },
   },
   "session/interrupt": {
-    validRequest: { sessionId: "s-1", content: "stop that" },
-    invalidRequest: {},
+    validRequest: { sessionId: "s-1", content: "stop and reconsider" },
+    invalidRequest: { sessionId: "s-1" },
     sampleResponse: sampleSessionOpResult,
+  },
+  "session/kill": {
+    validRequest: { sessionId: "s-1" },
+    invalidRequest: { sessionId: 42 },
+    sampleResponse: { ok: true, message: "terminated", cleaned_up: true },
+  },
+  "session/attach-command": {
+    validRequest: { sessionId: "s-1" },
+    invalidRequest: {},
+    sampleResponse: {
+      command: "tmux attach -t ark-s-1",
+      displayHint: "Detach with Ctrl+B then D",
+      attachable: true,
+    },
+  },
+  "model/list": {
+    validRequest: {},
+    invalidRequest: [] as unknown as Record<string, unknown>,
+    sampleResponse: {
+      models: [
+        {
+          id: "claude-sonnet-4-6",
+          display: "Claude Sonnet 4.6",
+          provider: "anthropic",
+          provider_slugs: { "anthropic-direct": "claude-sonnet-4-6" },
+        },
+      ],
+    },
   },
   "session/inject": {
     validRequest: { sessionId: "s-1", content: "heads up" },

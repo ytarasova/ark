@@ -1,14 +1,6 @@
 name: agent-sdk
 description: "Anthropic Agent SDK (in-process, direct or gateway-routed)"
 type: agent-sdk
-models:
-  - id: opus
-    label: "Claude Opus 4.7"
-  - id: sonnet
-    label: "Claude Sonnet 4.6"
-  - id: haiku
-    label: "Claude Haiku 4.5"
-default_model: sonnet
 permission_mode: bypassPermissions
 secrets:
   - ANTHROPIC_API_KEY
@@ -23,9 +15,9 @@ secrets:
 #             direct AWS Bedrock proxies). Starts an in-process proxy on an
 #             ephemeral port that (a) strips fields Bedrock rejects such as
 #             `context_management`, (b) rewrites the Host header so gateway
-#             SNI routing works, (c) expands short model slugs like
-#             `claude-sonnet-4-6` to their full provider path (e.g.
-#             `pi-agentic/global.anthropic.claude-sonnet-4-6`).
+#             SNI routing works. The agent's model catalog entry supplies the
+#             concrete provider slug for the gateway -- launch.ts never
+#             synthesises one.
 compat: [bedrock]
 billing:
   mode: api
@@ -38,3 +30,5 @@ billing:
 task_prompt: |
 
   When you finish, stop with a final assistant message that summarizes what you accomplished (files changed, tests added, key decisions). The UI picks up that summary automatically. Do not invent a "report" tool -- you don't have one.
+
+  If you need input from the user mid-run, call the `ask_user` tool with your question. Your next user message will contain their reply. Don't stop and wait -- call the tool and continue working on what you can, treating the reply as a normal user message when it arrives.

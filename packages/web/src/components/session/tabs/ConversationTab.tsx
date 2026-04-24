@@ -13,6 +13,7 @@ import { formatTime } from "../timeline-builder.js";
 import { renderAgentContent } from "../event-builder.js";
 import { FlowWidget } from "../FlowWidget.js";
 import { CostWidget } from "../CostWidget.js";
+import { SdkTranscriptPanel } from "../SdkTranscriptPanel.js";
 import type { StageProgress } from "../../ui/StageProgressBar.js";
 
 interface ConversationTabProps {
@@ -90,9 +91,16 @@ export function ConversationTab({
   const toolCalls = countToolCalls(timeline);
   const modelLabel = session?.config?.model || session?.agent || "";
 
+  // agent-sdk sessions also write a raw transcript.jsonl next to their
+  // events. Render those SDK-shaped messages inline above the timeline so
+  // we keep the existing event-based view for every other runtime.
+  const runtime = session?.runtime ?? session?.agent_runtime;
+  const isAgentSdk = runtime === "agent-sdk";
+
   const transcript = (
     <>
       {attachments.length > 0 && <AttachedFiles attachments={attachments} />}
+      {isAgentSdk && <SdkTranscriptPanel sessionId={session.id} status={session.status} isRunning={isActive} />}
       {timeline.length === 0 && conversationMessages.length === 0 && (
         <div className="text-center text-sm text-[var(--fg-muted)] py-12">
           No conversation yet.{" "}

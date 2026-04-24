@@ -127,7 +127,11 @@ const computeSchema = z
 // called from the session/start handler after reading the flow definition.
 export const sessionInputsSchema = z.object({
   files: z.record(z.string().min(1), z.string().min(1)).optional(),
-  params: z.record(z.string().min(1), z.string()).optional(),
+  // params hold for_each iteration sources, named scalars, and structured
+  // dispatch-time data. Arrays of objects (repo lists, ticket lists) flow
+  // through here, so values can't be limited to strings -- use `unknown`
+  // and let the template engine + for_each resolver do the typing.
+  params: z.record(z.string().min(1), z.unknown()).optional(),
 });
 export type SessionInputs = z.infer<typeof sessionInputsSchema>;
 
@@ -227,13 +231,93 @@ export const inputReadResponse = z.object({
 });
 export type InputReadResponse = z.infer<typeof inputReadResponse>;
 
+// Inline model / runtime / agent / flow shapes. Each level accepts either a
+// string (name-registry lookup) or a loose object (literal definition). The
+// server-side `resolveStage` pipeline handles both uniformly.
+const inlineModelSchema = z
+  .object({
+    id: z.string().min(1),
+    display: z.string().optional(),
+    provider: z.string(),
+    aliases: z.array(z.string()).optional(),
+    capabilities: z.array(z.string()).optional(),
+    pricing: z.record(z.string(), z.unknown()).optional(),
+    provider_slugs: z.record(z.string(), z.string()),
+    context_window: z.number().optional(),
+  })
+  .loose();
+
+const inlineRuntimeSchema = z
+  .object({
+    name: z.string().min(1),
+    description: z.string().optional(),
+    type: z.string(),
+    command: z.array(z.string()).optional(),
+    task_delivery: z.enum(["stdin", "file", "arg"]).optional(),
+    permission_mode: z.string().optional(),
+    env: z.record(z.string(), z.string()).optional(),
+    mcp_servers: z.array(z.union([z.string(), z.record(z.string(), z.unknown())])).optional(),
+    billing: z.record(z.string(), z.unknown()).optional(),
+    secrets: z.array(z.string()).optional(),
+    task_prompt: z.string().optional(),
+    compat: z.array(z.string()).optional(),
+  })
+  .loose();
+
+const inlineAgentSchema = z
+  .object({
+    name: z.string().optional(),
+    description: z.string().optional(),
+    runtime: z.union([z.string().min(1), inlineRuntimeSchema]),
+    model: z.union([z.string().min(1), inlineModelSchema]).optional(),
+    max_turns: z.number().optional(),
+    max_budget_usd: z.number().optional(),
+    system_prompt: z.string().min(1),
+    tools: z.array(z.string()).optional(),
+    mcp_servers: z.array(z.union([z.string(), z.record(z.string(), z.unknown())])).optional(),
+    skills: z.array(z.string()).optional(),
+    memories: z.array(z.string()).optional(),
+    context: z.array(z.string()).optional(),
+    permission_mode: z.string().optional(),
+    env: z.record(z.string(), z.string()).optional(),
+    command: z.array(z.string()).optional(),
+    task_delivery: z.enum(["stdin", "file", "arg"]).optional(),
+  })
+  .loose();
+
+const inlineStageSchema = z
+  .object({
+    name: z.string().min(1),
+    type: z.enum(["agent", "action", "fork"]).optional(),
+    agent: z.union([z.string(), inlineAgentSchema]).optional(),
+    action: z.string().optional(),
+    task: z.string().optional(),
+    gate: z.enum(["auto", "manual", "condition", "review"]).optional(),
+    model: z.string().optional(),
+    depends_on: z.array(z.string()).optional(),
+  })
+  .loose();
+
+const inlineFlowSchema = z
+  .object({
+    name: z.string().optional(),
+    description: z.string().optional(),
+    inputs: z.record(z.string(), z.unknown()).optional(),
+    stages: z.array(inlineStageSchema).min(1),
+  })
+  .loose();
+
 export const sessionStartRequest = z
   .object({
     ticket: z.string().optional(),
     summary: z.string().optional(),
     repo: z.string().optional(),
-    flow: z.string().optional(),
-    agent: z.string().nullable().optional(),
+    // Flow: either a name (resolved via FlowStore) or a literal inline flow
+    // definition. Inline flows are registered in the ephemeral overlay keyed
+    // as `inline-<sessionId>` and persisted under `session.config.inline_flow`
+    // for daemon-restart rehydration.
+    flow: z.union([z.string(), inlineFlowSchema]).optional(),
+    agent: z.union([z.string(), inlineAgentSchema]).nullable().optional(),
     compute_name: z.string().optional(),
     workdir: z.string().optional(),
     group_name: z.string().optional(),
@@ -713,6 +797,37 @@ export const sessionRecordingResponse = z
   .loose();
 export type SessionRecordingResponse = z.infer<typeof sessionRecordingResponse>;
 
+// ── session/stdio ───────────────────────────────────────────────────────────
+
+export const sessionStdioRequest = z.object({
+  sessionId: z.string().min(1),
+  tail: z.number().int().positive().optional(),
+});
+export type SessionStdioRequest = z.infer<typeof sessionStdioRequest>;
+
+export const sessionStdioResponse = z
+  .object({
+    content: z.string(),
+    size: z.number(),
+    exists: z.boolean(),
+  })
+  .loose();
+export type SessionStdioResponse = z.infer<typeof sessionStdioResponse>;
+
+// ── session/transcript ──────────────────────────────────────────────────────
+
+export const sessionTranscriptRequest = sessionIdParams;
+export type SessionTranscriptRequest = z.infer<typeof sessionTranscriptRequest>;
+
+export const sessionTranscriptResponse = z
+  .object({
+    messages: z.array(z.unknown()),
+    size: z.number(),
+    exists: z.boolean(),
+  })
+  .loose();
+export type SessionTranscriptResponse = z.infer<typeof sessionTranscriptResponse>;
+
 // ── session/events ──────────────────────────────────────────────────────────
 
 export const sessionEventsRequest = z.object({
@@ -892,7 +1007,6 @@ export const sessionSpawnRequest = z
     sessionId: z.string().min(1),
     task: z.string(),
     agent: z.string().optional(),
-    model: z.string().optional(),
     group_name: z.string().optional(),
   })
   .loose();
@@ -1355,9 +1469,8 @@ const runtimeDefinitionSchema = z
     type: z.string(),
     command: z.array(z.string()).optional(),
     task_delivery: z.enum(["stdin", "file", "arg"]).optional(),
-    models: z.array(z.object({ id: z.string(), label: z.string() }).loose()).optional(),
-    default_model: z.string().optional(),
     permission_mode: z.string().optional(),
+    compat: z.array(z.string()).optional(),
     env: z.record(z.string(), z.string()).optional(),
     mcp_servers: z.array(z.union([z.string(), z.record(z.string(), z.unknown())])).optional(),
     billing: z.record(z.string(), z.unknown()).optional(),
@@ -1380,6 +1493,35 @@ export type RuntimeReadRequest = z.infer<typeof runtimeReadRequest>;
 
 export const runtimeReadResponse = z.object({ runtime: runtimeDefinitionSchema });
 export type RuntimeReadResponse = z.infer<typeof runtimeReadResponse>;
+
+// ── model/list ──────────────────────────────────────────────────────────────
+
+const modelDefinitionSchema = z
+  .object({
+    id: z.string(),
+    display: z.string(),
+    provider: z.string(),
+    aliases: z.array(z.string()).optional(),
+    capabilities: z.array(z.string()).optional(),
+    pricing: z
+      .object({
+        input_per_mtok: z.number().optional(),
+        cached_input_per_mtok: z.number().optional(),
+        output_per_mtok: z.number().optional(),
+      })
+      .optional(),
+    provider_slugs: z.record(z.string(), z.string()),
+    context_window: z.number().optional(),
+    _source: z.enum(["builtin", "global", "project"]).optional(),
+    _path: z.string().optional(),
+  })
+  .loose();
+
+export const modelListRequest = z.object({}).loose();
+export type ModelListRequest = z.infer<typeof modelListRequest>;
+
+export const modelListResponse = z.object({ models: z.array(modelDefinitionSchema) });
+export type ModelListResponse = z.infer<typeof modelListResponse>;
 
 // ── agent/create ────────────────────────────────────────────────────────────
 
@@ -1883,6 +2025,8 @@ export const rpcMethodSchemas: Record<string, RpcMethodSchemas> = {
   "knowledge/stats": { request: knowledgeStatsRequest, response: knowledgeStatsResponse },
   "session/output": { request: sessionOutputRequest, response: sessionOutputResponse },
   "session/recording": { request: sessionRecordingRequest, response: sessionRecordingResponse },
+  "session/stdio": { request: sessionStdioRequest, response: sessionStdioResponse },
+  "session/transcript": { request: sessionTranscriptRequest, response: sessionTranscriptResponse },
   "session/events": { request: sessionEventsRequest, response: sessionEventsResponse },
   "session/messages": { request: sessionMessagesRequest, response: sessionMessagesResponse },
   "session/export-data": { request: sessionExportDataRequest, response: sessionExportDataResponse },
@@ -1924,6 +2068,7 @@ export const rpcMethodSchemas: Record<string, RpcMethodSchemas> = {
   "recipe/delete": { request: recipeDeleteRequest, response: recipeDeleteResponse },
   "runtime/list": { request: runtimeListRequest, response: runtimeListResponse },
   "runtime/read": { request: runtimeReadRequest, response: runtimeReadResponse },
+  "model/list": { request: modelListRequest, response: modelListResponse },
   "agent/create": { request: agentCreateRequest, response: agentCreateResponse },
   "agent/update": { request: agentUpdateRequest, response: agentUpdateResponse },
   "agent/delete": { request: agentDeleteRequest, response: agentDeleteResponse },

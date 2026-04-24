@@ -11,9 +11,11 @@ import * as flow from "../state/flow.js";
 import { logWarn } from "../observability/structured-log.js";
 
 /**
- * Spawn a subagent -- an independent child session with its own model/agent.
- * Unlike fork (which copies the parent's config), subagents can use different
- * models and agents for cost optimization or specialization.
+ * Spawn a subagent -- an independent child session with its own agent.
+ * Unlike fork (which copies the parent's config), subagents can pick a
+ * different agent for specialization. Per-subsession model selection now
+ * flows through the agent definition (or an inline agent on the flow
+ * stage) -- dispatch no longer reads a session-level `model_override`.
  */
 export async function spawnSubagent(
   app: AppContext,
@@ -21,7 +23,6 @@ export async function spawnSubagent(
   opts: {
     task: string;
     agent?: string;
-    model?: string;
     group_name?: string;
     extensions?: string[];
   },
@@ -39,7 +40,6 @@ export async function spawnSubagent(
     config: {
       parent_id: parentId,
       subagent: true,
-      model_override: opts.model,
       extensions: opts.extensions,
     },
   });
@@ -55,7 +55,7 @@ export async function spawnSubagent(
 
   await app.events.log(session.id, "subagent_spawned", {
     actor: "system",
-    data: { parent_id: parentId, task: opts.task, agent: agentName, model: opts.model },
+    data: { parent_id: parentId, task: opts.task, agent: agentName },
   });
 
   app.sessionService.emitSessionCreated(session.id);
@@ -71,7 +71,6 @@ export async function spawnParallelSubagents(
   tasks: Array<{
     task: string;
     agent?: string;
-    model?: string;
   }>,
 ): Promise<{ ok: boolean; sessionIds: string[]; message: string }> {
   const ids: string[] = [];

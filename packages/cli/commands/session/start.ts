@@ -18,14 +18,16 @@ export function registerStartCommands(session: Command) {
       "Deterministic branch name for the worktree (default: derived from --ticket/--summary or auto)",
     )
     .option("-s, --summary <text>", "Task summary")
-    .option("-p, --flow <name>", "Flow name", "default")
+    .option(
+      "-p, --flow <name-or-path>",
+      "Flow name OR a path to an inline flow YAML. Paths ending in .yaml/.yml are read + parsed and forwarded as an inline flow definition; bare names hit the FlowStore.",
+      "default",
+    )
     .option("-c, --compute <name>", "Compute name")
     .option("-g, --group <name>", "Group name")
     .option("-a, --attach", "Attach to the session's tmux pane after starting")
     .option("--claude-session <id>", "Create from an existing Claude Code session (use 'ark claude list' to find IDs)")
     .option("--recipe <name>", "Create session from a recipe template")
-    .option("--runtime <name>", "Override agent runtime (e.g. codex, gemini, claude)")
-    .option("-m, --model <model>", "Override model for all stages (e.g. haiku, sonnet, opus, or a full provider slug)")
     .option(
       "--max-budget <usd>",
       "Cumulative cost cap for this session in USD. Halts for_each if exceeded.",

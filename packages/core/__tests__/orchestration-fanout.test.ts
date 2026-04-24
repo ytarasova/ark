@@ -183,7 +183,6 @@ describe("spawnSubagent", async () => {
 
     const result = await spawnSubagent(getApp(), parent.id, {
       task: "doc this function",
-      model: "haiku",
     });
     expect(result.ok).toBe(true);
     expect(result.sessionId).toBeTruthy();
@@ -194,7 +193,6 @@ describe("spawnSubagent", async () => {
     expect(child.workdir).toBe("/wd");
     expect(child.agent).toBe("implementer"); // inherits parent's agent
     expect(child.config?.subagent).toBe(true);
-    expect(child.config?.model_override).toBe("haiku");
   });
 
   it("agent override takes precedence over the parent's agent", async () => {

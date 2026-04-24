@@ -1,0 +1,16 @@
+id: claude-sonnet-4
+display: "Claude Sonnet 4 (legacy)"
+provider: anthropic
+aliases: []
+capabilities:
+  - tool-use
+  - vision
+pricing:
+  input_per_mtok: 3.00
+  cached_input_per_mtok: 0.30
+  output_per_mtok: 15.00
+provider_slugs:
+  anthropic-direct: claude-sonnet-4
+  tf-bedrock: pi-agentic/us-anthropic-claude-sonnet-4-20250514-v1-0
+  aws-bedrock: us.anthropic.claude-sonnet-4-20250514-v1-0
+context_window: 200000

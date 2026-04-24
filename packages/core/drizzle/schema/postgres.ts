@@ -63,6 +63,7 @@ export const sessions = pgTable(
     userId: text("user_id"),
     tenantId: text("tenant_id").notNull().default("default"),
     workspaceId: text("workspace_id"),
+    orchestrator: text("orchestrator").notNull().default("custom"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },

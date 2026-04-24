@@ -1,0 +1,10 @@
+id: deepseek-v3
+display: "DeepSeek V3"
+provider: deepseek
+aliases: []
+capabilities:
+  - tool-use
+provider_slugs:
+  deepseek-direct: deepseek-v3
+  tf-bedrock: pi-agentic/deepseek.v3-v1-0
+context_window: 128000

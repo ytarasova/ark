@@ -3,12 +3,6 @@ description: "Google Gemini CLI"
 type: cli-agent
 command: ["gemini"]
 task_delivery: stdin
-models:
-  - id: gemini-2.5-pro
-    label: "Gemini 2.5 Pro"
-  - id: gemini-2.5-flash
-    label: "Gemini 2.5 Flash"
-default_model: gemini-2.5-pro
 billing:
   mode: api
   transcript_parser: gemini

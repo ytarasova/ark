@@ -6,6 +6,7 @@ import type { DiffFile } from "../ui/DiffViewer.js";
 import type { StageProgress } from "../ui/StageProgressBar.js";
 import { ConversationTab } from "./tabs/ConversationTab.js";
 import { TerminalTab } from "./tabs/TerminalTab.js";
+import { LogsTab } from "./tabs/LogsTab.js";
 import { DiffTab } from "./tabs/DiffTab.js";
 import { ErrorsTab } from "./tabs/ErrorsTab.js";
 import { FlowTab } from "./tabs/FlowTab.js";
@@ -146,6 +147,7 @@ export function TabPanels(props: TabPanelsProps) {
           hasWorkdir={!!session.workdir}
         />
       )}
+      {activeTab === "logs" && <LogsTab sessionId={session?.id ?? ""} status={session?.status} />}
       {activeTab === "todos" && <TodoList items={todoItems} onToggle={(id) => onToggleTodo(Number(id))} />}
       {activeTab === "flow" && <FlowTab session={session} stages={stages ?? []} />}
       {activeTab === "files" && <FilesTab diffFiles={diffFiles} onSelect={onDiffFileSelect} />}

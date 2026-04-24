@@ -104,8 +104,9 @@ export const agentSdkExecutor: Executor = {
       ARK_CONDUCTOR_URL: conductorUrl,
     };
 
-    // Optional model override
-    const model = opts.agent.model || (session.config?.model_override as string | undefined);
+    // Model comes from the agent definition (resolved via resolveStage at
+    // dispatch time). Session-level model_override is no longer consulted.
+    const model = opts.agent.model;
     if (model) arkEnv.ARK_MODEL = model;
 
     // Optional per-agent knobs (max_turns, etc.)
@@ -129,7 +130,7 @@ export const agentSdkExecutor: Executor = {
     // Lookup is keyed by this executor's name ("agent-sdk") rather than
     // opts.agent.runtime -- the agent definition's runtime field can carry the
     // post-resolution kind ("claude-code" if the agent originally targeted CC
-    // and was re-routed via runtime_override), which would point at the wrong
+    // and was re-routed via runtime resolution), which would point at the wrong
     // runtime YAML. The executor's own name is the authoritative key here.
     const runtimeDef = await app.runtimes?.get?.("agent-sdk");
     const compat = Array.isArray((runtimeDef as { compat?: unknown })?.compat)

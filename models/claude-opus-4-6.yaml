@@ -1,0 +1,16 @@
+id: claude-opus-4-6
+display: "Claude Opus 4.6"
+provider: anthropic
+aliases: [opus-4-6]
+capabilities:
+  - tool-use
+  - vision
+pricing:
+  input_per_mtok: 15.00
+  cached_input_per_mtok: 1.50
+  output_per_mtok: 75.00
+provider_slugs:
+  anthropic-direct: claude-opus-4-6
+  tf-bedrock: pi-agentic/global.anthropic.claude-opus-4-6-v1
+  aws-bedrock: global.anthropic.claude-opus-4-6-v1-0
+context_window: 200000

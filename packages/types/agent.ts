@@ -20,11 +20,9 @@ export interface RuntimeBilling {
 export interface RuntimeDefinition {
   name: string;
   description?: string;
-  type: "claude-code" | "cli-agent" | "subprocess" | "goose";
+  type: "claude-code" | "cli-agent" | "subprocess" | "goose" | "agent-sdk";
   command?: string[];
   task_delivery?: "stdin" | "file" | "arg";
-  models?: Array<{ id: string; label: string }>;
-  default_model?: string;
   permission_mode?: string;
   env?: Record<string, string>;
   /**
@@ -55,6 +53,13 @@ export interface RuntimeDefinition {
    * When omitted, no completion ritual is appended.
    */
   task_prompt?: string;
+  /**
+   * Gateway wire-format compatibility modes (e.g. `bedrock`). Opt-in; the
+   * runtime launcher reads this to enable wire-format rewrites for gateways
+   * that need them. Model resolution does NOT depend on these flags -- models
+   * carry their own per-provider slugs in the catalog.
+   */
+  compat?: string[];
   _source?: "builtin" | "global" | "project";
   _path?: string;
 }

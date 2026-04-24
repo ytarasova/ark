@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { Button } from "../ui/button.js";
 import { Input } from "../ui/input.js";
-import { RichSelect } from "../ui/RichSelect.js";
+import { RichSelect, type RichSelectOption } from "../ui/RichSelect.js";
+import { useModelsQuery } from "../../hooks/useRuntimeQueries.js";
 
 const TOOL_OPTIONS = ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "WebSearch"];
 
@@ -14,6 +15,7 @@ interface AgentFormProps {
 }
 
 export function AgentForm({ onClose, onSubmit, agent, isEdit, runtimes = [] }: AgentFormProps) {
+  const { data: models = [] } = useModelsQuery();
   const [form, setForm] = useState({
     name: agent?.name ?? "",
     description: agent?.description ?? "",
@@ -25,6 +27,34 @@ export function AgentForm({ onClose, onSubmit, agent, isEdit, runtimes = [] }: A
     scope: "project",
     system_prompt: agent?.system_prompt ?? "",
   });
+
+  // Build the model selector options from the catalog. Sorted by provider,
+  // then by display name. If the agent's current `model` isn't in the
+  // catalog (e.g. an agent was saved with an unknown alias), surface it as
+  // a disabled `<unknown: {id}>` entry so the value stays editable without
+  // the select appearing empty.
+  const modelOptions = useMemo<RichSelectOption[]>(() => {
+    const opts: RichSelectOption[] = [];
+    const sorted = [...models].sort((a: any, b: any) => {
+      const p = String(a.provider ?? "").localeCompare(String(b.provider ?? ""));
+      if (p !== 0) return p;
+      return String(a.display ?? a.id).localeCompare(String(b.display ?? b.id));
+    });
+    for (const m of sorted) {
+      const anyM = m as { id: string; display?: string; provider?: string; aliases?: string[] };
+      opts.push({
+        value: anyM.id,
+        label: `${anyM.display ?? anyM.id} -- ${anyM.id}`,
+        description: anyM.provider ?? undefined,
+      });
+    }
+    const current = String(form.model ?? "");
+    const isKnown = sorted.some((m: any) => m.id === current || (m.aliases ?? []).includes(current));
+    if (current && !isKnown) {
+      opts.unshift({ value: current, label: `<unknown: ${current}>` });
+    }
+    return opts;
+  }, [models, form.model]);
 
   function update(key: string, val: any) {
     setForm((prev) => ({ ...prev, [key]: val }));
@@ -76,26 +106,13 @@ export function AgentForm({ onClose, onSubmit, agent, isEdit, runtimes = [] }: A
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">
             Model
           </label>
-          <Input
-            list="model-suggestions"
+          <RichSelect
             value={form.model}
-            onChange={(e) => update("model", e.target.value)}
-            placeholder="e.g. sonnet, opus, claude-sonnet-4-6"
+            onChange={(v) => update("model", v)}
+            options={modelOptions}
+            placeholder="Select a model"
+            searchable
           />
-          <datalist id="model-suggestions">
-            <option value="opus" />
-            <option value="sonnet" />
-            <option value="haiku" />
-            {runtimes
-              .flatMap((r: any) => (r.models || []).map((m: any) => m.id))
-              .filter(
-                (id: string, i: number, arr: string[]) =>
-                  arr.indexOf(id) === i && !["opus", "sonnet", "haiku"].includes(id),
-              )
-              .map((id: string) => (
-                <option key={id} value={id} />
-              ))}
-          </datalist>
         </div>
         <div className="mb-3.5">
           <label className="block text-[11px] font-semibold text-muted-foreground mb-1.5 uppercase tracking-[0.04em]">

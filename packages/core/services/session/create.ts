@@ -48,13 +48,60 @@ export class SessionCreator {
     const rawGroup = opts.group_name ?? repoConfig.group;
     const groupName = prefix ? `${prefix}${rawGroup ?? ""}` : (rawGroup ?? undefined);
 
+    // Inline flow support: callers (CLI, web, RPC) may pass an object literal
+    // for `opts.flow` instead of a registered flow name. We normalize that
+    // here so the rest of the creator sees a plain string name, then register
+    // the definition on the ephemeral overlay + persist it to session.config
+    // for daemon-restart rehydration (mirrors the for_each spawn pattern).
+    let resolvedFlowName: string | undefined;
+    let inlineFlowDef: import("../../state/flow.js").FlowDefinition | undefined;
+    const flowRef = opts.flow ?? repoConfig.flow;
+    if (typeof flowRef === "object" && flowRef !== null) {
+      const raw = flowRef as import("../../../types/index.js").InlineFlowInput;
+      if (!Array.isArray(raw.stages) || raw.stages.length === 0) {
+        throw new Error("Inline flow must have at least one stage");
+      }
+      inlineFlowDef = {
+        name: raw.name ?? "inline",
+        description: raw.description,
+        stages: raw.stages as unknown as import("../../state/flow.js").StageDefinition[],
+      };
+      resolvedFlowName = inlineFlowDef.name;
+    } else {
+      resolvedFlowName = flowRef;
+    }
+
     const mergedOpts: Record<string, unknown> = {
       ...opts,
-      flow: opts.flow ?? repoConfig.flow,
+      flow: resolvedFlowName,
       compute_name: opts.compute_name ?? repoConfig.compute,
       group_name: groupName,
       workspace_id: opts.workspace_id ?? null,
     };
+    // Agent override: inline agents are not persistable as a session.agent
+    // name; we leave session.agent null and let the inline definition flow
+    // through the inline flow's stage.agent object.
+    if (opts.agent !== undefined && typeof opts.agent === "object" && opts.agent !== null) {
+      // An inline agent was passed at session start without an inline flow.
+      // Build a one-stage inline flow around it so the executor has something
+      // to dispatch. This is the same pattern the web UI uses via stage.agent
+      // object literals; we just hoist it to the top level for CLI convenience.
+      if (!inlineFlowDef) {
+        inlineFlowDef = {
+          name: "inline",
+          stages: [
+            {
+              name: "main",
+              agent: opts.agent as unknown as import("../../state/flow.js").InlineAgentSpec,
+              gate: "auto",
+            } as import("../../state/flow.js").StageDefinition,
+          ],
+        };
+        resolvedFlowName = inlineFlowDef.name;
+        mergedOpts.flow = resolvedFlowName;
+      }
+      delete (mergedOpts as Record<string, unknown>).agent;
+    }
 
     const repoUrl = resolveGitHubUrl(opts.workdir ?? opts.repo);
     if (repoUrl) {
@@ -84,6 +131,21 @@ export class SessionCreator {
 
     const session = await d.sessions.create(mergedOpts as StartSessionOpts);
 
+    // Inline flow persistence + ephemeral registration. We use a per-session
+    // synthetic name (`inline-<sessionId>`) so every inline flow lives in its
+    // own namespace and overlay reads never collide. The session row's
+    // `flow` column is rewritten to that synthetic name for lookup; the
+    // definition is stashed under `config.inline_flow` so `_rehydrateInlineFlows`
+    // in `app.ts` can re-register it after a daemon restart.
+    if (inlineFlowDef) {
+      const syntheticName = `inline-${session.id}`;
+      const finalDef: import("../../state/flow.js").FlowDefinition = { ...inlineFlowDef, name: syntheticName };
+      d.flows.registerInline?.(syntheticName, finalDef);
+      await d.sessions.update(session.id, { flow: syntheticName });
+      await d.sessions.mergeConfig?.(session.id, { inline_flow: finalDef });
+      (session as { flow: string }).flow = syntheticName;
+    }
+
     // Workspace-scoped dispatch: lay out ~/.ark/workspaces/<session_id>/.
     if (mergedOpts.workspace_id) {
       const wsId = mergedOpts.workspace_id as string;
@@ -106,22 +168,23 @@ export class SessionCreator {
       actor: "user",
       data: {
         summary: opts.summary,
-        flow: (mergedOpts.flow as string | undefined) ?? "default",
-        agent: opts.agent ?? null,
+        flow: session.flow ?? "default",
+        // Inline agents don't have a persistable name; log only string refs.
+        agent: typeof opts.agent === "string" ? opts.agent : null,
         compute: (mergedOpts.compute_name as string | undefined) ?? "local",
         repo: opts.repo ?? opts.workdir ?? null,
         group: (mergedOpts.group_name as string | undefined) ?? null,
       },
     });
 
-    track("session_created", { flow: (mergedOpts.flow as string | undefined) ?? "default" });
+    track("session_created", { flow: session.flow ?? "default" });
 
-    if (opts.agent) {
+    if (typeof opts.agent === "string" && opts.agent) {
       await d.sessions.update(session.id, { agent: opts.agent });
     }
 
     try {
-      await d.flows.get((mergedOpts.flow as string | undefined) ?? "default");
+      await d.flows.get(session.flow ?? "default");
     } catch {
       logDebug("session", "flow prefetch failed -- continue and rely on legacy sync path");
     }
@@ -130,7 +193,7 @@ export class SessionCreator {
     // from the container path where the FlowStore is warmed above, so the
     // sync getFirstStage path works. We shim a tiny AppContext-alike to
     // satisfy the existing helpers' signature.
-    const flowName = (mergedOpts.flow as string | undefined) ?? "default";
+    const flowName = session.flow ?? "default";
     const flowShim = { flows: d.flows } as unknown as Parameters<typeof flow.getFirstStage>[0];
     const firstStage = flow.getFirstStage(flowShim, flowName);
     if (firstStage) {
@@ -174,7 +237,10 @@ export class SessionCreator {
       const runtimeName = (session.config?.runtime as string | undefined) ?? session.agent ?? "claude";
       const runtime = d.runtimes.get(runtimeName);
       const billingMode = runtime?.billing?.mode ?? "api";
-      const model = (session.config?.model as string | undefined) ?? runtime?.default_model ?? "sonnet";
+      // Runtime no longer owns a default_model. Fall back to "sonnet" (a
+      // catalog alias) when neither the session nor the agent carries a model;
+      // usage recording only needs *some* label, not an accurate slug.
+      const model = (session.config?.model as string | undefined) ?? "sonnet";
 
       d.usageRecorder.record({
         sessionId: session.id,

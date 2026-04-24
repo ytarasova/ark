@@ -20,6 +20,8 @@ import type { TodoRepository } from "../repositories/todo.js";
 import type { FlowStateRepository } from "../repositories/flow-state.js";
 import type { FlowStore } from "../stores/flow-store.js";
 import type { RuntimeStore } from "../stores/runtime-store.js";
+import type { ModelStore } from "../stores/model-store.js";
+import { ModelService } from "../models/ModelService.js";
 import type { UsageRecorder } from "../observability/usage.js";
 import type { TranscriptParserRegistry } from "../runtimes/transcript-parser.js";
 import type { StatusPollerRegistry } from "../executors/status-poller.js";
@@ -169,6 +171,7 @@ export function registerServices(
         flowStates: FlowStateRepository;
         flows: FlowStore;
         runtimes: RuntimeStore;
+        models: ModelStore;
         computeService: ComputeServiceType;
         pluginRegistry: PluginRegistry;
         statusPollers: StatusPollerRegistry;
@@ -182,6 +185,7 @@ export function registerServices(
           flowStates: c.flowStates,
           flows: c.flows,
           runtimes: c.runtimes,
+          models: new ModelService(c.models),
           computeService: c.computeService,
           pluginRegistry: c.pluginRegistry,
           statusPollers: c.statusPollers,

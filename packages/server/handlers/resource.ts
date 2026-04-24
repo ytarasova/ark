@@ -214,6 +214,13 @@ export function registerResourceHandlers(router: Router, app: AppContext): void 
     if (!runtime) throw new RpcError(`Runtime '${name}' not found`, ErrorCodes.NOT_FOUND);
     return { runtime };
   });
+  // Model catalog -- file-backed three-tier store. Exposed so the web UI can
+  // populate the per-agent model selector from the same source of truth that
+  // dispatch uses (no duplicated runtime.models list).
+  router.handle("model/list", async () => {
+    const projectRoot = resolveProjectRoot();
+    return { models: app.models.list(projectRoot) };
+  });
   router.handle("recipe/list", async () => ({ recipes: await app.recipes.list() }));
   router.handle("recipe/read", async (p) => {
     const { name } = extract<RecipeReadParams>(p, ["name"]);

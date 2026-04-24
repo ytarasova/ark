@@ -22,6 +22,8 @@ import * as m008 from "./008_tenant_compute_config.js";
 import * as m009 from "./009_drizzle_cutover.js";
 // Migration 010: stage_operations table for RF-8 idempotency keys (#388).
 import * as m010 from "./010_stage_operations.js";
+// Migration 011: sessions.orchestrator column (future-proofing for temporal).
+import * as m011 from "./011_session_orchestrator.js";
 
 export const MIGRATIONS: ReadonlyArray<Migration> = [
   { version: m001.VERSION, name: m001.NAME, up: m001.up },
@@ -38,4 +40,5 @@ export const MIGRATIONS: ReadonlyArray<Migration> = [
   // --- END agent-G ---
   { version: m009.VERSION, name: m009.NAME, up: m009.up },
   { version: m010.VERSION, name: m010.NAME, up: m010.up },
+  { version: m011.VERSION, name: m011.NAME, up: m011.up },
 ];

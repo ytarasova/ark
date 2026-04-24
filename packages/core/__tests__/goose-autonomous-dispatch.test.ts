@@ -250,7 +250,7 @@ describe("Goose runtime + autonomous flow completion", async () => {
       status: "running",
       stage: "work",
       session_id: "ark-" + session.id,
-      config: { runtime: "goose", runtime_override: "goose" },
+      config: { runtime: "goose" },
     });
 
     // Mock: tmux session already exited (goose finished its work)

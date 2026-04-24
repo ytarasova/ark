@@ -23,19 +23,6 @@ describe("spawnSubagent", () => {
     expect(child!.agent).toBe("implementer");
   });
 
-  it("allows model override", async () => {
-    const parent = await getApp().sessions.create({ summary: "parent", repo: "/tmp/repo" });
-    await getApp().sessions.update(parent.id, { agent: "worker", workdir: "/tmp/repo" });
-
-    const result = await session.spawnSubagent(getApp(), parent.id, {
-      task: "cheap task",
-      model: "haiku",
-    });
-    expect(result.ok).toBe(true);
-    const child = await getApp().sessions.get(result.sessionId!);
-    expect(child!.config.model_override).toBe("haiku");
-  });
-
   it("allows agent override", async () => {
     const parent = await getApp().sessions.create({ summary: "parent", repo: "/tmp/repo" });
     await getApp().sessions.update(parent.id, { agent: "implementer", workdir: "/tmp/repo" });

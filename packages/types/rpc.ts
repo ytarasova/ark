@@ -97,7 +97,6 @@ export interface SessionSpawnParams {
   sessionId: string;
   task: string;
   agent?: string;
-  model?: string;
   group_name?: string;
 }
 

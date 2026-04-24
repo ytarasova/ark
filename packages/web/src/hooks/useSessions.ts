@@ -3,9 +3,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSessionsQuery, useGroupsQuery } from "./useSessionQueries.js";
 import { useSse } from "./useSse.js";
 
-export function useSessions(serverStatus?: string) {
+export function useSessions(serverStatus?: string, opts?: { rootsOnly?: boolean }) {
+  const rootsOnly = opts?.rootsOnly ?? false;
   const queryClient = useQueryClient();
-  const { data: sessions = [], refetch } = useSessionsQuery(serverStatus);
+  const { data: sessions = [], refetch } = useSessionsQuery(serverStatus, { rootsOnly });
   const { data: groups = [] } = useGroupsQuery();
 
   const sseData = useSse<any[]>("/api/events/stream");
@@ -14,7 +15,7 @@ export function useSessions(serverStatus?: string) {
     if (!sseData) return;
     // Skip SSE merges for archived view -- archived sessions don't change in real-time
     if (serverStatus === "archived") return;
-    const queryKey = ["sessions", serverStatus || "default"];
+    const queryKey = ["sessions", serverStatus || "default", rootsOnly ? "roots" : "flat"];
     queryClient.setQueryData<any[]>(queryKey, (prev) => {
       if (!prev) return prev;
       const map = new Map(prev.map((s) => [s.id, s]));
@@ -44,7 +45,7 @@ export function useSessions(serverStatus?: string) {
       }
       return Array.from(map.values());
     });
-  }, [sseData, queryClient, serverStatus]);
+  }, [sseData, queryClient, serverStatus, rootsOnly]);
 
   return { sessions, groups, refresh: refetch };
 }
