@@ -20,6 +20,7 @@ export function useSessionsQuery(serverStatus?: string, opts?: { rootsOnly?: boo
  * flipping a row closed then open reuses the fetched payload.
  */
 export function useSessionChildrenQuery(sessionId: string | null, enabled: boolean) {
+  const api = useApi();
   return useQuery({
     queryKey: ["session-children", sessionId],
     queryFn: () => api.getSessionChildren(sessionId!).then((r) => r.sessions),
@@ -34,6 +35,7 @@ export function useSessionChildrenQuery(sessionId: string | null, enabled: boole
  * track live child adds.
  */
 export function useSessionTreeQuery(rootId: string | null) {
+  const api = useApi();
   return useQuery({
     queryKey: ["session-tree", rootId],
     queryFn: () => api.getSessionTree(rootId!).then((r) => r.root),
@@ -64,4 +66,22 @@ export function useSessionOutput(id: string | null, enabled: boolean) {
     enabled: !!id && enabled,
     refetchInterval: 2000,
   });
+}
+
+/**
+ * Poll the server-aggregated unread-message counts every 10s. Returns a
+ * Record<sessionId, number> plus a derived `totalUnread`. Replaces the
+ * hand-rolled `setInterval(fetchUnreadCounts, 10_000)` dance in SessionsPage.
+ */
+export function useUnreadCountsQuery() {
+  const api = useApi();
+  const query = useQuery({
+    queryKey: ["unread-counts"],
+    queryFn: api.getUnreadCounts,
+    refetchInterval: 10_000,
+  });
+  const unreadCounts = query.data ?? {};
+  let totalUnread = 0;
+  for (const v of Object.values(unreadCounts)) totalUnread += v as number;
+  return { unreadCounts, totalUnread };
 }

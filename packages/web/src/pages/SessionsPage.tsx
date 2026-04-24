@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Layout } from "../components/Layout.js";
 import { SessionListPanel } from "../components/SessionList.js";
 import { SessionDetail } from "../components/SessionDetail.js";
@@ -8,6 +8,8 @@ import { SessionStreamErrorBoundary } from "../components/ui/ErrorBoundary.js";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog.js";
 import { useSessions } from "../hooks/useSessions.js";
 import { useApi } from "../hooks/useApi.js";
+import { useUnreadCountsQuery } from "../hooks/useSessionQueries.js";
+import { useFlowStagesMap } from "../hooks/useFlowQueries.js";
 import { ArrowLeft, Maximize2, Minimize2 } from "lucide-react";
 import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
 
@@ -64,69 +66,17 @@ export function SessionsPage({
   const { sessions, refresh } = useSessions(serverStatus, { rootsOnly: groupByParent && filter !== "archived" });
   const [showNew, setShowNew] = useState(false);
 
-  // ── Unread counts ──────────────────────────────────────────────────────────
-  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
-  const unreadTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const fetchUnreadCounts = useCallback(() => {
-    api
-      .getUnreadCounts()
-      .then(setUnreadCounts)
-      .catch((err) => {
-        console.warn(
-          `SessionsPage: getUnreadCounts failed (next 10s poll will retry):`,
-          err instanceof Error ? err.message : err,
-        );
-      });
-  }, [api]);
-
-  useEffect(() => {
-    fetchUnreadCounts();
-    unreadTimerRef.current = setInterval(fetchUnreadCounts, 10_000);
-    return () => {
-      if (unreadTimerRef.current) clearInterval(unreadTimerRef.current);
-    };
-  }, [fetchUnreadCounts]);
-
-  const totalUnread = useMemo(() => {
-    let sum = 0;
-    for (const v of Object.values(unreadCounts)) sum += v;
-    return sum;
-  }, [unreadCounts]);
-
-  // Load flow stages for pipeline visualization
-  const [flowStagesMap, setFlowStagesMap] = useState<Record<string, any[]>>({});
-
-  useEffect(() => {
-    // Collect unique flow names from sessions. We read `flowStagesMap` from
-    // inside the updater so this effect only needs to depend on `sessions`
-    // -- avoids refetching every flow whenever one entry is added.
-    const sessionFlowNames = new Set<string>();
+  // Unread counts + flow stages: TanStack queries, not hand-rolled polling.
+  const { unreadCounts, totalUnread } = useUnreadCountsQuery();
+  const sessionFlowNames = useMemo(() => {
+    const names: string[] = [];
     for (const s of sessions || []) {
       const f = s.pipeline || s.flow;
-      if (f) sessionFlowNames.add(f);
+      if (f) names.push(f);
     }
-    setFlowStagesMap((prev) => {
-      for (const name of sessionFlowNames) {
-        if (prev[name]) continue;
-        // Kick off a fetch for each unknown flow; update map when it resolves.
-        api
-          .getFlowDetail(name)
-          .then((d: any) => {
-            if (d.stages?.length) {
-              setFlowStagesMap((inner) => (inner[name] ? inner : { ...inner, [name]: d.stages }));
-            }
-          })
-          .catch((err) => {
-            console.warn(
-              `SessionsPage: getFlowDetail failed (flow="${name}"; pipeline viz will render without stages):`,
-              err instanceof Error ? err.message : err,
-            );
-          });
-      }
-      return prev;
-    });
-  }, [api, sessions]);
+    return names;
+  }, [sessions]);
+  const flowStagesMap = useFlowStagesMap(sessionFlowNames);
 
   // Compute filtered sessions for keyboard navigation
   const filteredSessions = useMemo(() => {
