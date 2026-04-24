@@ -105,14 +105,21 @@ export function SessionHeader({
               <span className="opacity-40">/</span>
             </span>
           ))}
-          <button
-            type="button"
-            onClick={onCopyId}
-            title="Click to copy id"
-            className="bg-transparent border-0 p-0 text-[var(--fg)] hover:text-[var(--primary)] transition-colors cursor-pointer font-[family-name:var(--font-mono)] text-[11px] normal-case tracking-[0.02em] truncate"
-          >
+          <span className="font-[family-name:var(--font-mono)] text-[11px] text-[var(--fg)] normal-case tracking-[0.02em] truncate">
             {sessionId}
-          </button>
+          </span>
+          {onCopyId && (
+            <button
+              type="button"
+              onClick={onCopyId}
+              title="Copy session id"
+              aria-label="Copy session id"
+              data-testid="breadcrumb-copy-id"
+              className="inline-flex items-center justify-center w-[18px] h-[18px] shrink-0 rounded-[4px] bg-transparent border-0 p-0 text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+            >
+              <Copy size={12} strokeWidth={1.75} />
+            </button>
+          )}
         </div>
 
         <span
@@ -176,11 +183,6 @@ export function SessionHeader({
         </div>
 
         <div className="flex items-center gap-[6px] shrink-0">
-          {onCopyId && (
-            <IconButton tip="copy id" onClick={onCopyId}>
-              <Copy size={13} />
-            </IconButton>
-          )}
           {onOpenTerminal && (
             <IconButton tip="terminal" onClick={onOpenTerminal}>
               <Terminal size={13} />
