@@ -15,11 +15,7 @@
 
 import { describe, it, expect } from "bun:test";
 import { buildSessionVars, substituteVars } from "../template.js";
-import {
-  buildIterationVars,
-  flattenItem,
-  resolveForEachList,
-} from "../services/dispatch/dispatch-foreach.js";
+import { buildIterationVars, flattenItem, resolveForEachList } from "../services/dispatch/dispatch-foreach.js";
 
 describe("for_each template resolution", () => {
   describe("buildSessionVars preserves native types", () => {

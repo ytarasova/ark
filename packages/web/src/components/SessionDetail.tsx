@@ -152,7 +152,7 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         sessionId={session.id}
         summary={session.summary || session.id}
         status={normalizeStatus(session.status)}
-        stageLabel={session.stage ? `${session.status} · ${session.stage}` : undefined}
+        stageLabel={session.stage || undefined}
         runtime={session.runtime || session.agent_runtime}
         agent={session.agent}
         compute={session.compute_provider || session.compute_kind}
