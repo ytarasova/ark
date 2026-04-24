@@ -1,3 +1,4 @@
+// e2e smoke: added by ark agent-sdk run
 /**
  * No-op executor for tests.
  *
