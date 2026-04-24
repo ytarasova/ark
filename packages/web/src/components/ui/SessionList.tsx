@@ -352,12 +352,16 @@ export function SessionRow({
           onSelect(session.id);
         }
       }}
+      data-selected={selected ? "true" : undefined}
       className={cn(
         "group relative flex flex-col cursor-pointer",
         "my-[3px] rounded-[8px] px-[12px] py-[10px]",
         "border border-transparent transition-colors duration-[120ms]",
         "hover:bg-[rgba(255,255,255,0.015)]",
-        selected && "bg-[var(--bg-card)] border-[rgba(107,89,222,0.5)] shadow-[0_2px_8px_rgba(0,0,0,0.25)]",
+        // Selected: card bg + brand-accent border. Uses --primary so the
+        // ring matches the `+ New` button + brand tile gradient regardless
+        // of active theme (purple in midnight-circuit, amber in warm-obsidian).
+        selected && "bg-[var(--bg-card)] border-[var(--primary)] shadow-[0_2px_8px_rgba(0,0,0,0.25)]",
       )}
       style={{ marginLeft: 8 + indent, marginRight: 8 }}
     >
@@ -391,7 +395,7 @@ export function SessionRow({
           <span
             aria-hidden
             className="w-[6px] h-[6px] rounded-full bg-[var(--primary)] shrink-0"
-            style={{ boxShadow: "0 0 4px rgba(107,89,222,.5)" }}
+            style={{ boxShadow: "0 0 4px var(--primary)" }}
           />
         )}
         <span className="font-[family-name:var(--font-mono-ui)] text-[11px] font-normal text-[var(--fg-faint)] tabular-nums shrink-0">
