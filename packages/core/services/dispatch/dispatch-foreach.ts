@@ -163,9 +163,14 @@ function flattenItem(prefix: string, value: unknown, out: Record<string, string>
 function buildIterationVars(baseVars: Record<string, string>, iterVar: string, item: unknown): Record<string, string> {
   const extra: Record<string, string> = {};
   flattenItem(iterVar, item, extra);
-  // Also expose the raw item as the iterVar key (serialised) so `{{item}}`
-  // resolves to the stringified value for primitive lists.
-  if (!(iterVar in extra)) {
+  // Expose the raw item as the iterVar key (serialised) ONLY when item is a
+  // primitive -- so templates like `{{item}}` work for string/number lists.
+  // For object items, flattenItem already produced nested flat keys
+  // (e.g. `repo.repo_path`); adding a literal `extra.repo = "[object Object]"`
+  // would cause `unflatten` (in template.ts) to overwrite the nested form
+  // with a string, so `{{repo.repo_path}}` would resolve to undefined and
+  // the template would render verbatim.
+  if (!(iterVar in extra) && (item === null || typeof item !== "object")) {
     extra[iterVar] = String(item);
   }
   return { ...baseVars, ...extra };
