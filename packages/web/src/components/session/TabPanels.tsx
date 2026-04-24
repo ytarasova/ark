@@ -1,6 +1,5 @@
 import { cn } from "../../lib/utils.js";
 import { tabButtonId, tabPanelId } from "../ui/ContentTabs.js";
-import { EventTimeline, type TimelineEvent } from "../ui/EventTimeline.js";
 import { TodoList, type TodoItem } from "../ui/TodoList.js";
 import type { DiffFile } from "../ui/DiffViewer.js";
 import type { StageProgress } from "../ui/StageProgressBar.js";
@@ -31,11 +30,6 @@ interface TabPanelsProps {
 
   // Terminal
   output: string | null | undefined;
-
-  // Events
-  timelineEvents: TimelineEvent[];
-  onStageFilterToggle: (stage: string) => void;
-  onEventSelect: (ev: TimelineEvent) => void;
 
   // Diff
   diffData: any;
@@ -74,9 +68,6 @@ export function TabPanels(props: TabPanelsProps) {
     agentIsTyping,
     bottomRef,
     output,
-    timelineEvents,
-    onStageFilterToggle,
-    onEventSelect,
     diffData,
     diffFiles,
     activeDiffFile,
@@ -112,14 +103,6 @@ export function TabPanels(props: TabPanelsProps) {
           isActive={isActive}
           agentIsTyping={agentIsTyping}
           bottomRef={bottomRef}
-          stages={stages}
-        />
-      )}
-      {activeTab === "events" && (
-        <EventTimeline
-          events={timelineEvents}
-          onStageClick={(stage) => onStageFilterToggle(stage)}
-          onEventSelect={onEventSelect}
         />
       )}
       {activeTab === "diff" && (

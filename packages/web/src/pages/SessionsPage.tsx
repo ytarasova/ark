@@ -8,7 +8,6 @@ import { SessionStreamErrorBoundary } from "../components/ui/ErrorBoundary.js";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog.js";
 import { useSessions } from "../hooks/useSessions.js";
 import { api } from "../hooks/useApi.js";
-import { ArrowLeft, Maximize2, Minimize2 } from "lucide-react";
 import type { DaemonStatus } from "../hooks/useDaemonStatus.js";
 
 interface SessionsPageProps {
@@ -277,24 +276,6 @@ export function SessionsPage({
         </div>
       ) : selectedId ? (
         <div className="detail-panel flex-1 flex flex-col min-w-0 overflow-hidden">
-          <div className="shrink-0 px-4 pt-2 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setSelectedId(null)}
-              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-            >
-              <ArrowLeft size={12} />
-              Back
-            </button>
-            <button
-              type="button"
-              onClick={() => setMaximized((prev) => !prev)}
-              className="inline-flex items-center justify-center h-6 w-6 rounded text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
-              title={maximized ? "Restore session list" : "Maximize session view"}
-            >
-              {maximized ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
-            </button>
-          </div>
           <SessionStreamErrorBoundary sessionId={selectedId}>
             <SessionDetail
               key={selectedId}
@@ -303,6 +284,9 @@ export function SessionsPage({
               readOnly={readOnly}
               initialTab={initialTab}
               onTabChange={onTabChange}
+              onMaximize={() => setMaximized((prev) => !prev)}
+              maximized={maximized}
+              onBack={() => setSelectedId(null)}
             />
           </SessionStreamErrorBoundary>
         </div>

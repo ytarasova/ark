@@ -9,22 +9,19 @@ import { SessionHeader } from "./ui/SessionHeader.js";
 import { ContentTabs } from "./ui/ContentTabs.js";
 import { ChatInput } from "./ui/ChatInput.js";
 import { ScrollProgress } from "./ui/ScrollProgress.js";
-import { type TimelineEvent } from "./ui/EventTimeline.js";
 import { ConfirmDialog } from "./ui/ConfirmDialog.js";
 
 import { normalizeStatus } from "./session/timeline-builder.js";
 import { HeaderActions } from "./session/HeaderActions.js";
-import { StageProgress } from "./session/StageProgress.js";
-import { EventDetailDrawer } from "./session/EventDetailDrawer.js";
 import { ErrorDetailDrawer } from "./session/ErrorDetailDrawer.js";
-import { EventsFooter, DiffFooter, TodosFooter } from "./session/TabFooter.js";
+import { DiffFooter, TodosFooter } from "./session/TabFooter.js";
 import { TabPanels } from "./session/TabPanels.js";
 import { RejectGateModal } from "./session/RejectGateModal.js";
 import { RestartDialog } from "./session/RestartDialog.js";
 import { BudgetBar } from "./session/BudgetBar.js";
 import { ResumeBanner } from "./session/ResumeBanner.js";
 import { ForEachRollup, ChildSessionCluster } from "./session/ForEachRollup.js";
-import { SessionBreadcrumb } from "./session/SessionBreadcrumb.js";
+import { useSessionTreeQuery } from "../hooks/useSessionQueries.js";
 import type { ErrorInfo } from "./session/types.js";
 
 // Re-exported for back-compat: `__tests__/RejectGateModal.test.ts` imports
@@ -69,9 +66,21 @@ interface SessionDetailProps {
   readOnly: boolean;
   initialTab?: string | null;
   onTabChange?: (tab: string | null) => void;
+  onMaximize?: () => void;
+  maximized?: boolean;
+  onBack?: () => void;
 }
 
-export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabChange }: SessionDetailProps) {
+export function SessionDetail({
+  sessionId,
+  onToast,
+  readOnly,
+  initialTab,
+  onTabChange,
+  onMaximize,
+  maximized,
+  onBack,
+}: SessionDetailProps) {
   const d = useSessionDetail({ sessionId, initialTab, onTabChange });
   const { actionLoading, handleAction, handleGateApprove, handleGateReject, handleRestart } = useSessionActions({
     sessionId,
@@ -83,9 +92,15 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
   // is a no-op on subsequent renders.
   const { data: models } = useModelsQuery();
 
+  // Parent-chain ancestors for the header breadcrumb. Only fires when the
+  // session has a parent_id, and the result is bailed on gracefully until
+  // the tree resolves (avoids flashing a partial crumb).
+  const parentId = d.session?.parent_id ?? null;
+  const { data: ancestorRoot } = useSessionTreeQuery(parentId);
+  const ancestors = parentId && ancestorRoot ? buildAncestors(ancestorRoot, sessionId) : undefined;
+
   const [chatMsg, setChatMsg] = useState("");
   const [activeDiffFile, setActiveDiffFile] = useState<string | undefined>(undefined);
-  const [selectedEvent, setSelectedEvent] = useState<TimelineEvent | null>(null);
   const [selectedError, setSelectedError] = useState<ErrorInfo | null>(null);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
@@ -147,11 +162,14 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-[var(--bg)]">
       <ScrollProgress progress={d.scrollProgress} />
-      {session.parent_id && <SessionBreadcrumb session={session} />}
       <SessionHeader
         sessionId={session.id}
         summary={session.summary || session.id}
         status={normalizeStatus(session.status)}
+        ancestors={ancestors}
+        onBack={onBack}
+        onMaximize={onMaximize}
+        maximized={maximized}
         stageLabel={session.stage || undefined}
         runtime={session.runtime || session.agent_runtime}
         agent={session.agent}
@@ -174,11 +192,10 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         selectedStage={d.stageFilter}
         onStageClick={d.toggleStageFilter}
         stages={d.stages}
+        stageProgress={
+          d.totalStages > 0 ? { completed: d.completedStages, total: d.totalStages, pct: d.progressPct } : undefined
+        }
       />
-
-      {d.totalStages > 0 && (
-        <StageProgress completedStages={d.completedStages} totalStages={d.totalStages} progressPct={d.progressPct} />
-      )}
 
       {/* Phase 3: resume-from-checkpoint banner. Surfaces when the session
           has a stored for_each_checkpoint and isn't running. */}
@@ -240,12 +257,6 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         agentIsTyping={d.agentIsTyping}
         bottomRef={d.bottomRef}
         output={d.output}
-        timelineEvents={d.timelineEvents}
-        onStageFilterToggle={(stage) => {
-          d.toggleStageFilter(stage);
-          d.setActiveTab("conversation");
-        }}
-        onEventSelect={setSelectedEvent}
         diffData={d.diffData}
         diffFiles={d.diffFiles}
         activeDiffFile={activeDiffFile}
@@ -268,13 +279,9 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
         />
       )}
 
-      {d.activeTab === "events" && events.length > 0 && (
-        <EventsFooter events={events} sessionId={session.id} onToast={onToast} />
-      )}
       {d.activeTab === "diff" && d.diffData && <DiffFooter diffData={d.diffData} />}
       {d.activeTab === "todos" && todos.length > 0 && <TodosFooter todos={todos} />}
 
-      <EventDetailDrawer event={selectedEvent} onClose={() => setSelectedEvent(null)} />
       <ErrorDetailDrawer error={selectedError} onClose={() => setSelectedError(null)} />
 
       {rejectOpen && (
@@ -313,4 +320,32 @@ export function SessionDetail({ sessionId, onToast, readOnly, initialTab, onTabC
       />
     </div>
   );
+}
+
+// Walk the session tree from `root` to `targetId`, returning each ancestor
+// (excluding the target itself) as {id, label}. We can't always guarantee
+// `root` is the true tree root — the server's session/tree only accepts root
+// ids, so we probe with the direct parent. If the target isn't found the
+// caller treats ancestors as absent.
+function buildAncestors(root: any, targetId: string): { id: string; label: string }[] | undefined {
+  const path: any[] = [];
+  if (!walk(root, targetId, path)) return undefined;
+  const ancestors = path.slice(0, -1);
+  if (ancestors.length === 0) return undefined;
+  return ancestors.map((n) => ({ id: n.id, label: truncate(n.summary || n.id, 40) }));
+}
+
+function walk(node: any, targetId: string, path: any[]): boolean {
+  path.push(node);
+  if (node.id === targetId) return true;
+  const children = Array.isArray(node.children) ? node.children : [];
+  for (const c of children) {
+    if (walk(c, targetId, path)) return true;
+  }
+  path.pop();
+  return false;
+}
+
+function truncate(s: string, n: number): string {
+  return s.length > n ? s.slice(0, n - 1) + "…" : s;
 }

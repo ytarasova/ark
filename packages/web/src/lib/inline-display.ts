@@ -54,13 +54,22 @@ export function resolveModelDisplay(modelId: string | null | undefined, models: 
  * dispatch before stage_ready).
  */
 export function resolveInlineDisplay(session: any, models: InlineModelLike[] | undefined): InlineDisplayResult {
-  const isInlineAgent = session?.agent === "inline";
   const flowName: string = session?.flow ?? "";
   const isInlineFlow = typeof flowName === "string" && flowName.startsWith("inline-s-");
 
   const def = session?.config?.inline_flow;
   const stages: any[] = Array.isArray(def?.stages) ? def.stages : [];
   const stageCount = stages.length;
+
+  // "Inline agent" includes:
+  //   - session.agent === "inline" (top-level inline dispatch)
+  //   - session.agent is null AND config.inline_flow is set -- this is the
+  //     spawn-child shape: the parent's for_each spawned a child session
+  //     whose agent lives inside inline_flow.stages[i].agent with no
+  //     top-level `agent` column written. Without this branch the child's
+  //     meta strip would show nothing, which reads as "agent details
+  //     missing".
+  const isInlineAgent = session?.agent === "inline" || (!session?.agent && stages.length > 0);
 
   let agentLabel: string | null = null;
   if (isInlineAgent && stages.length > 0) {

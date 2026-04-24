@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { ChevronRight } from "lucide-react";
 import { cn } from "../../../lib/utils.js";
 
 /**
@@ -38,6 +40,10 @@ export function ToolBlockShell({
   plainBody,
 }: ToolBlockShellProps) {
   const label = statusLabel ?? (status === "running" ? "running" : status === "err" ? "error" : "ok");
+  // Collapsed by default for finished tools so the session view is scannable;
+  // running tools stay open so live output is visible. Users can toggle via
+  // the chevron.
+  const [open, setOpen] = useState(status === "running");
   return (
     <div
       className={cn(
@@ -47,8 +53,23 @@ export function ToolBlockShell({
         className,
       )}
     >
-      {/* Header */}
-      <div className="flex items-center gap-[8px] px-[11px] py-[7px] bg-[rgba(0,0,0,0.2)] border-b border-[var(--border)]">
+      {/* Header (clickable: toggles body) */}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={cn(
+          "w-full flex items-center gap-[8px] px-[11px] py-[7px] text-left",
+          "bg-[rgba(0,0,0,0.2)] border-0 cursor-pointer hover:bg-[rgba(0,0,0,0.28)] transition-colors",
+          open && "border-b border-[var(--border)]",
+        )}
+      >
+        <ChevronRight
+          size={12}
+          strokeWidth={2}
+          aria-hidden
+          className={cn("text-[var(--fg-muted)] shrink-0 transition-transform duration-[120ms]", open && "rotate-90")}
+        />
         <span
           aria-hidden
           className="w-[18px] h-[18px] rounded-[4px] grid place-items-center shrink-0 bg-[rgba(107,89,222,0.15)] text-[var(--primary)]"
@@ -84,29 +105,33 @@ export function ToolBlockShell({
             {elapsed}
           </span>
         )}
-      </div>
+      </button>
 
-      {/* Body */}
-      {plainBody ? (
-        body
-      ) : (
-        <div
-          className={cn(
-            "px-[11px] py-[9px] bg-[var(--bg-code)]",
-            "font-[family-name:var(--font-mono)] text-[12px] leading-[1.55] text-[var(--fg)]",
-            "max-h-[220px] overflow-hidden relative",
-            bodyClassName,
+      {open && (
+        <>
+          {/* Body */}
+          {plainBody ? (
+            body
+          ) : (
+            <div
+              className={cn(
+                "px-[11px] py-[9px] bg-[var(--bg-code)]",
+                "font-[family-name:var(--font-mono)] text-[12px] leading-[1.55] text-[var(--fg)]",
+                "max-h-[220px] overflow-hidden relative",
+                bodyClassName,
+              )}
+            >
+              {body}
+            </div>
           )}
-        >
-          {body}
-        </div>
-      )}
 
-      {/* Footer */}
-      {footer && (
-        <div className="flex items-center gap-[10px] px-[11px] py-[5px] border-t border-[var(--border)] bg-[rgba(0,0,0,0.15)] font-[family-name:var(--font-mono-ui)] text-[10px] font-medium text-[var(--fg-faint)] uppercase tracking-[0.05em]">
-          {footer}
-        </div>
+          {/* Footer */}
+          {footer && (
+            <div className="flex items-center gap-[10px] px-[11px] py-[5px] border-t border-[var(--border)] bg-[rgba(0,0,0,0.15)] font-[family-name:var(--font-mono-ui)] text-[10px] font-medium text-[var(--fg-faint)] uppercase tracking-[0.05em]">
+              {footer}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

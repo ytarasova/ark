@@ -97,6 +97,15 @@ function truncate(s: string, maxLen = 120): string {
   return s.length > maxLen ? s.slice(0, maxLen) + "..." : s;
 }
 
+/** Format milliseconds as "350ms", "2.1s", "1m 3s". */
+function formatDurationMs(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  const mins = Math.floor(ms / 60_000);
+  const secs = Math.floor((ms % 60_000) / 1000);
+  return `${mins}m ${secs}s`;
+}
+
 /** Format tool input from hook data into a readable summary. */
 function formatToolInput(data: any): string {
   if (!data) return "";
@@ -134,9 +143,8 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
   const pendingTools = new Map<string, number>();
   const sessionAgent = session?.agent || "agent";
 
-  // Dedup tracking: one event per stage transition, first checkpoint per stage
+  // Dedup tracking: one event per stage transition.
   const seenStageTransitions = new Set<string>();
-  const seenCheckpointStages = new Set<string>();
 
   for (const ev of events || []) {
     all.push({ ...ev, _type: "event", _time: new Date(ev.created_at).getTime() });
@@ -148,6 +156,7 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
   all.sort((a, b) => a._time - b._time);
 
   for (const item of all) {
+    const beforeCount = items.length;
     if (item._type === "message") {
       items.push({
         kind: item.role === "user" ? "user" : item.role === "system" ? "system" : "agent",
@@ -178,6 +187,7 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
         if (hookEvent === "PreToolUse") {
           const toolName = hookData.tool_name || "tool";
           const toolInput = hookData.tool_input || hookData.input;
+          const toolUseId = hookData.tool_use_id;
           const inputSummary = formatToolInput(hookData);
           const label = inputSummary ? `${toolName}: ${inputSummary}` : toolName;
           const idx = items.length;
@@ -191,35 +201,33 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
             durationMs: undefined,
             stage: evStage,
           });
-          pendingTools.set(toolName, idx);
+          // Prefer keying by tool_use_id -- a stable identifier that
+          // survives parallel calls of the same tool and carries over
+          // runtimes where PostToolUse doesn't echo tool_name (agent-sdk).
+          // Fall back to name for runtimes that don't emit the id.
+          pendingTools.set(toolUseId || toolName, idx);
         } else if (hookEvent === "PostToolUse") {
           const toolName = hookData.tool_name || "tool";
-          const toolInput = hookData.tool_input || hookData.input;
-          const toolOutput = hookData.tool_response || hookData.tool_output || hookData.output;
-          const pendingIdx = pendingTools.get(toolName);
+          // agent-sdk ships the result in `tool_result_content`; other
+          // runtimes use tool_response / tool_output / output. Read all.
+          const toolOutput =
+            hookData.tool_response ?? hookData.tool_output ?? hookData.output ?? hookData.tool_result_content;
+          const toolUseId = hookData.tool_use_id;
+          const pendingKey = toolUseId && pendingTools.has(toolUseId) ? toolUseId : toolName;
+          const pendingIdx = pendingTools.get(pendingKey);
           if (pendingIdx !== undefined && items[pendingIdx]) {
-            items[pendingIdx].status = "done";
+            items[pendingIdx].status = hookData.is_error ? "error" : "done";
             items[pendingIdx].toolOutput = toolOutput;
             if (hookData.duration) {
               items[pendingIdx].duration = (hookData.duration / 1000).toFixed(1) + "s";
               items[pendingIdx].durationMs = hookData.duration;
             }
-            pendingTools.delete(toolName);
+            pendingTools.delete(pendingKey);
           } else {
-            const inputSummary = formatToolInput(hookData);
-            const label = inputSummary ? `${toolName}: ${inputSummary}` : toolName;
-            items.push({
-              kind: "tool",
-              toolName,
-              toolInput,
-              toolOutput,
-              label,
-              timestamp: formatTime(item.created_at),
-              status: "done" as const,
-              duration: hookData.duration ? (hookData.duration / 1000).toFixed(1) + "s" : undefined,
-              durationMs: hookData.duration,
-              stage: evStage,
-            });
+            // Orphan PostToolUse (no matching PreToolUse tracked). Skip it
+            // rather than synthesizing an empty `tool {}` row -- the row
+            // would have no name, no input, and misleading output framing.
+            continue;
           }
         } else if (hookEvent === "SessionStart" || hookEvent === "UserPromptSubmit") {
           // Infrastructure events -- skip
@@ -243,19 +251,26 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
       }
 
       if (evType === "checkpoint") {
-        // Only show the FIRST checkpoint per stage to avoid noise
-        const cpKey = evStage || "__global__";
-        if (seenCheckpointStages.has(cpKey)) continue;
-        seenCheckpointStages.add(cpKey);
-
         const cpData = evDataObj;
-        const status = cpData.status || "";
+        const status = String(cpData.status || "");
+        // Skip a `ready` checkpoint when a stage_ready for the same stage
+        // already rendered -- they describe the same transition from
+        // different layers (orchestrator vs. checkpoint writer).
+        if (status === "ready" && seenStageTransitions.has("ready:" + (evStage || "unknown"))) continue;
+
         const compute = cpData.compute || cpData.compute_type || "";
-        const label = (evStage || "session") + (status ? " " + status : "");
-        const suffix = compute ? " on " + compute + " compute" : "";
+        const worktree = cpData.worktree || "";
+        const stageLabel = evStage || "session";
+        // Human label: "Checkpoint: <stage> <status>" rather than the
+        // ambiguous raw form ("per_repo ready") that reads like a stage.
+        const head = `Checkpoint: ${stageLabel}${status ? " " + status : ""}`;
+        const extras: string[] = [];
+        if (compute) extras.push(`compute: ${compute}`);
+        if (worktree) extras.push(`worktree: ${truncate(String(worktree), 60)}`);
+        const suffix = extras.length > 0 ? ` (${extras.join(", ")})` : "";
         items.push({
           kind: "system",
-          content: label + suffix,
+          content: head + suffix,
           timestamp: formatTime(item.created_at),
           stage: evStage,
         });
@@ -367,6 +382,11 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
         const toStage = handoffData.to_stage || evStage || nested?.stage || "";
         const fromStage = handoffData.from_stage || "";
 
+        // Self-loop: stage advancing to itself isn't a user-facing transition
+        // (usually the orchestrator rescheduling the same stage after a
+        // fan-out / resume). Drop it rather than print "Advancing to X (from X)".
+        if (fromStage && toStage && fromStage === toStage) continue;
+
         // Deduplicate: only one handoff event per target stage
         const handoffKey = "handoff:" + (toStage || "unknown");
         if (seenStageTransitions.has(handoffKey)) continue;
@@ -378,6 +398,68 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
         items.push({
           kind: "system",
           content: toStage ? "Advancing to " + toStage + fromSuffix : "Advancing to next stage",
+          timestamp: formatTime(item.created_at),
+          stage: evStage,
+        });
+      } else if (evType === "for_each_start") {
+        const total = evDataObj.total;
+        const iterVar = evDataObj.iterVar;
+        const count = typeof total === "number" ? total : 0;
+        const noun = iterVar ? `${iterVar}${count === 1 ? "" : "s"}` : `item${count === 1 ? "" : "s"}`;
+        items.push({
+          kind: "system",
+          content: count > 0 ? `Fanning out over ${count} ${noun}` : "Fanning out",
+          timestamp: formatTime(item.created_at),
+          stage: evStage,
+        });
+      } else if (evType === "for_each_iteration_start") {
+        const index = evDataObj.index;
+        const idxLabel = typeof index === "number" ? `${index + 1}` : "?";
+        items.push({
+          kind: "system",
+          content: `Iteration ${idxLabel} started`,
+          timestamp: formatTime(item.created_at),
+          stage: evStage,
+        });
+      } else if (evType === "for_each_iteration_complete") {
+        const index = evDataObj.index;
+        const idxLabel = typeof index === "number" ? `${index + 1}` : "?";
+        const cost = typeof evDataObj.cost_usd === "number" ? evDataObj.cost_usd : null;
+        const durMs = typeof evDataObj.duration_ms === "number" ? evDataObj.duration_ms : null;
+        const extras: string[] = [];
+        if (durMs != null) extras.push(formatDurationMs(durMs));
+        if (cost != null && cost > 0) extras.push(`$${cost.toFixed(2)}`);
+        const suffix = extras.length > 0 ? ` (${extras.join(", ")})` : "";
+        items.push({
+          kind: "system",
+          content: `Iteration ${idxLabel} complete${suffix}`,
+          timestamp: formatTime(item.created_at),
+          stage: evStage,
+        });
+      } else if (evType === "for_each_iteration_failed") {
+        const index = evDataObj.index;
+        const idxLabel = typeof index === "number" ? `${index + 1}` : "?";
+        const reason = evDataObj.reason || evDataObj.error || "";
+        items.push({
+          kind: "system",
+          content: reason
+            ? `Iteration ${idxLabel} failed -- ${truncate(String(reason), 100)}`
+            : `Iteration ${idxLabel} failed`,
+          timestamp: formatTime(item.created_at),
+          stage: evStage,
+        });
+      } else if (evType === "for_each_complete") {
+        const total = evDataObj.total;
+        const succeeded = evDataObj.succeeded;
+        const failed = evDataObj.failed;
+        const parts: string[] = [];
+        if (typeof succeeded === "number") parts.push(`${succeeded} succeeded`);
+        if (typeof failed === "number" && failed > 0) parts.push(`${failed} failed`);
+        const totalStr = typeof total === "number" ? `${total} iteration${total === 1 ? "" : "s"}` : "iterations";
+        const summary = parts.length > 0 ? ` (${parts.join(", ")})` : "";
+        items.push({
+          kind: "system",
+          content: `Fan-out complete -- ${totalStr}${summary}`,
           timestamp: formatTime(item.created_at),
           stage: evStage,
         });
@@ -465,6 +547,18 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
         if (label) {
           items.push({ kind: "system", content: label, timestamp: formatTime(item.created_at), stage: evStage });
         }
+      }
+    }
+    // Attach the originating event to every item pushed this iteration so
+    // the Timeline view can open the raw record in a drawer. We skip
+    // message-sourced items -- their text is already visible in the bubble
+    // and the drawer renderer is shaped for events. We also don't overwrite
+    // rawEvent on existing rows (pendingTools merges PostToolUse into the
+    // PreToolUse row, and keeping PreToolUse preserves the "when the tool
+    // started" framing).
+    if (item._type === "event") {
+      for (let i = beforeCount; i < items.length; i++) {
+        if (items[i].rawEvent === undefined) items[i].rawEvent = item;
       }
     }
   }

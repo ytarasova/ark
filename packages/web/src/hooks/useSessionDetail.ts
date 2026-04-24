@@ -8,8 +8,6 @@ import {
   parseUnifiedDiff,
   buildConversationTimeline,
 } from "../components/session/timeline-builder.js";
-import { buildRichTimelineEvent } from "../components/session/event-builder.js";
-import type { TimelineEvent } from "../components/ui/EventTimeline.js";
 import type { DiffFile } from "../components/ui/DiffViewer.js";
 import type { TodoItem } from "../components/ui/TodoList.js";
 import type { TabDef } from "../components/ui/ContentTabs.js";
@@ -22,7 +20,6 @@ const VALID_TABS = new Set([
   "conversation",
   "logs",
   "terminal",
-  "events",
   "diff",
   "files",
   "cost",
@@ -149,8 +146,12 @@ export function useSessionDetail({
   // segmented control (both are runtime output, just different sources);
   // Knowledge is now URL-only -- it's a low-frequency, low-density panel
   // that doesn't earn top-level real estate.
+  // Timeline (formerly "Conversation") absorbs the old Events tab: the
+  // conversation builder already surfaces every stage/tool/action event the
+  // Events tab rendered raw, so keeping both was pure duplication. Each row
+  // in the Timeline view is clickable to open the raw event in a drawer.
   const tabs: TabDef[] = [
-    { id: "conversation", label: "Conversation", badge: conversationCount > 0 ? conversationCount : undefined },
+    { id: "conversation", label: "Session", badge: conversationCount > 0 ? conversationCount : undefined },
     { id: "flow", label: "Flow", badge: totalStages > 0 ? `${completedStages}/${totalStages}` : undefined },
     {
       id: "diff",
@@ -163,13 +164,11 @@ export function useSessionDetail({
     // visible in the header ticker, and the detail lives one click away.
     // See "Nit 2 -- cost is mentioned everywhere" in the header cleanup.
     { id: "cost", label: "Cost" },
-    { id: "events", label: "Events", badge: events.length > 0 ? events.length : undefined },
     ...(hasErrors
       ? [{ id: "errors", label: "Errors", badge: (errorEvents.length || 1) as number | string | undefined }]
       : []),
   ];
 
-  const timelineEvents: TimelineEvent[] = events.slice(-200).map((ev: any, i: number) => buildRichTimelineEvent(ev, i));
   const todoItems: TodoItem[] = todos.map((t: any) => ({
     id: String(t.id),
     text: t.content || t.text || "",
@@ -202,7 +201,6 @@ export function useSessionDetail({
     isActive,
     agentIsTyping,
     timeline,
-    timelineEvents,
     todoItems,
     diffData,
     diffFiles,

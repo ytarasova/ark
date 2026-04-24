@@ -1,4 +1,4 @@
-import { Copy, Terminal } from "lucide-react";
+import { ArrowLeft, Copy, Maximize2, Minimize2, Terminal } from "lucide-react";
 import { cn } from "../../lib/utils.js";
 import { resolveInlineDisplay, type InlineModelLike } from "../../lib/inline-display.js";
 import { type SessionStatus } from "./StatusDot.js";
@@ -20,6 +20,15 @@ export interface SessionHeaderProps extends React.ComponentProps<"div"> {
   status: SessionStatus;
   /** Breadcrumb segments (e.g. ["ark", "sessions"]). */
   breadcrumb?: string[];
+  /** Ancestor sessions, rendered as clickable crumbs between the static
+   *  `ark / sessions` prefix and the current session id. */
+  ancestors?: { id: string; label: string }[];
+  /** When provided, renders a Maximize/Minimize toggle in the title action row. */
+  onMaximize?: () => void;
+  maximized?: boolean;
+  /** When provided, renders a Back arrow in the title action row that
+   *  dismisses the detail view (e.g. returns to the session dashboard). */
+  onBack?: () => void;
   /** Labeled info blocks (runtime, agent, flow, compute, branch, etc.). */
   kvs?: SessionHeaderKv[];
   /** Runtime name (claude|codex|gemini|goose). */
@@ -45,6 +54,8 @@ export interface SessionHeaderProps extends React.ComponentProps<"div"> {
   onStageClick?: (stageName: string) => void;
   /** Stages -- currently only used by legacy StagePipeline callers. */
   stages?: StageProgress[];
+  /** Compact "N/M stages" + bar, rendered on the right of the meta strip. */
+  stageProgress?: { completed: number; total: number; pct: number };
   /** Legacy: cost chip (tokens / $). If given but no `tickers`, rendered on the right. */
   cost?: string;
   /**
@@ -80,6 +91,10 @@ export function SessionHeader({
   summary,
   status,
   breadcrumb,
+  ancestors,
+  onMaximize,
+  maximized,
+  onBack,
   kvs,
   runtime,
   agent,
@@ -89,6 +104,7 @@ export function SessionHeader({
   actions,
   onCopyId,
   onOpenTerminal,
+  stageProgress,
   cost,
   session,
   models,
@@ -151,6 +167,18 @@ export function SessionHeader({
             <span key={`${c}-${i}`} className="inline-flex items-center gap-[6px] shrink-0">
               <span className="hover:text-[var(--fg-muted)] transition-colors">{c}</span>
               <span className="opacity-40">/</span>
+            </span>
+          ))}
+          {ancestors?.map((a) => (
+            <span key={a.id} className="inline-flex items-center gap-[6px] min-w-0">
+              <a
+                href={`#/sessions/${a.id}`}
+                title={a.label}
+                className="text-[var(--fg-muted)] hover:text-[var(--fg)] truncate max-w-[200px] no-underline hover:underline"
+              >
+                {a.label}
+              </a>
+              <span className="opacity-40 shrink-0">/</span>
             </span>
           ))}
           <span className="font-[family-name:var(--font-mono)] text-[11px] text-[var(--fg)] normal-case tracking-[0.02em] truncate">
@@ -218,7 +246,18 @@ export function SessionHeader({
       </div>
 
       {/* ── Title row: summary + action buttons ───────────────────── */}
-      <div className="px-[18px] pt-[14px] pb-[12px] flex items-center gap-[16px] border-b border-[var(--border-light)]">
+      <div className="px-[18px] pt-[14px] pb-[12px] flex items-center gap-[12px] border-b border-[var(--border-light)]">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            title="Back to dashboard"
+            aria-label="Back to dashboard"
+            className="inline-flex items-center justify-center w-[26px] h-[26px] shrink-0 rounded-[6px] bg-transparent border-0 p-0 text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+          >
+            <ArrowLeft size={16} strokeWidth={1.75} />
+          </button>
+        )}
         <div className="flex-1 min-w-0">
           <h1 className="m-0 font-[family-name:var(--font-sans)] text-[17px] leading-[1.25] font-semibold text-[var(--fg)] tracking-[-0.015em] truncate">
             {summary}
@@ -236,6 +275,11 @@ export function SessionHeader({
               <Terminal size={13} />
             </IconButton>
           )}
+          {onMaximize && (
+            <IconButton tip={maximized ? "Restore session list" : "Maximize session view"} onClick={onMaximize}>
+              {maximized ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+            </IconButton>
+          )}
           {actions && (
             <>
               <span aria-hidden className="w-px h-[18px] bg-[var(--border)] mx-[4px]" />
@@ -245,8 +289,8 @@ export function SessionHeader({
         </div>
       </div>
 
-      {/* ── Meta strip: labeled blocks (runtime / agent / compute / …) ─ */}
-      {labeled.length > 0 && (
+      {/* ── Meta strip: labeled blocks + stage progress on the right ─── */}
+      {(labeled.length > 0 || stageProgress) && (
         <div
           className="px-[18px] py-[8px] flex items-center gap-[14px] flex-wrap border-b border-[var(--border-light)]"
           style={{ background: "rgba(0,0,0,.18)" }}
@@ -273,6 +317,22 @@ export function SessionHeader({
               </b>
             </span>
           ))}
+          {stageProgress && (
+            <div data-testid="stage-progress" className="ml-auto inline-flex items-center gap-[6px] shrink-0">
+              <span className="text-[11px] font-[family-name:var(--font-mono-ui)] text-[var(--fg-muted)]">
+                {stageProgress.completed}/{stageProgress.total} stages
+              </span>
+              <div className="w-[60px] h-[3px] bg-[var(--border)] rounded-sm overflow-hidden">
+                <div
+                  className="h-full bg-[var(--primary)] rounded-sm transition-[width] duration-300"
+                  style={{ width: stageProgress.pct + "%" }}
+                />
+              </div>
+              <span className="text-[11px] font-[family-name:var(--font-mono-ui)] font-semibold text-[var(--fg)] min-w-[28px] text-right tabular-nums">
+                {stageProgress.pct}%
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>

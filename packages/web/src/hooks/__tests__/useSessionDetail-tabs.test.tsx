@@ -1,10 +1,12 @@
 /**
  * useSessionDetail tab list tests.
  *
- * Verifies the new 7-top-level-tabs layout (Conversation, Flow, Diff, Files,
- * Logs, Cost, Events) plus the conditional "Errors" tab. Terminal + Knowledge
- * are no longer top-level tabs (Terminal moved into the Logs panel as a
- * segmented control; Knowledge is URL-only).
+ * Verifies the 6-top-level-tabs layout (Timeline, Flow, Diff, Files, Logs,
+ * Cost) plus the conditional "Errors" tab. The Timeline tab (id
+ * `conversation`) absorbed the former Events tab -- its rows now open the
+ * raw-event drawer directly, so a dedicated Events tab was duplication.
+ * Terminal + Knowledge are not top-level either (Terminal moved into Logs as
+ * a segmented control; Knowledge is URL-only).
  *
  * SSR-renders a tiny probe component that calls the hook and stamps the
  * resulting tab ids into the DOM, then asserts on the markup -- same
@@ -92,20 +94,21 @@ function tabIds(html: string): string[] {
 }
 
 describe("useSessionDetail tab list", () => {
-  test("renders 7 top-level tabs in the documented order", () => {
+  test("renders 6 top-level tabs in the documented order", () => {
     const html = render({ status: "running" });
     const ids = tabIds(html);
-    expect(ids).toEqual(["conversation", "flow", "diff", "files", "logs", "cost", "events"]);
-    expect(ids).toHaveLength(7);
+    expect(ids).toEqual(["conversation", "flow", "diff", "files", "logs", "cost"]);
+    expect(ids).toHaveLength(6);
     expect(ids).not.toContain("terminal");
     expect(ids).not.toContain("knowledge");
+    expect(ids).not.toContain("events");
   });
 
   test("appends Errors tab when the session has error events", () => {
     const html = render({ status: "failed", hasErrors: true });
     const ids = tabIds(html);
-    expect(ids).toEqual(["conversation", "flow", "diff", "files", "logs", "cost", "events", "errors"]);
-    expect(ids).toHaveLength(8);
+    expect(ids).toEqual(["conversation", "flow", "diff", "files", "logs", "cost", "errors"]);
+    expect(ids).toHaveLength(7);
   });
 
   test("Errors tab still appears when status alone is failed", () => {
