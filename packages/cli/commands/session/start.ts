@@ -194,13 +194,21 @@ export function registerStartCommands(session: Command) {
       }
 
       try {
-        // Flow input validation: only run when the flow is passed by name
-        // (a named flow lives in the FlowStore, so we can flowRead it). Inline
-        // flows -- passed as an object -- carry their own declared inputs and
-        // are validated server-side when the session dispatches.
-        const flowDef =
-          typeof opts.flow === "string" && !/\.(yaml|yml)$/i.test(opts.flow) ? await ark.flowRead(opts.flow) : null;
-        const declared = flowDef?.inputs as Record<string, any> | undefined;
+        // Flow input validation. Two paths:
+        //  - Named flow: hit the FlowStore for the declared inputs.
+        //  - Inline flow (parsed from the YAML at `flowArg`): use the
+        //    parsed object's `inputs` block directly. Without this branch
+        //    inline flows silently dropped declared defaults, so a flow
+        //    that baked its inputs into `default:` would dispatch with
+        //    every key undefined and the for_each resolver would throw
+        //    "Cannot resolve for_each list".
+        let declared: Record<string, any> | undefined;
+        if (typeof opts.flow === "string" && !/\.(yaml|yml)$/i.test(opts.flow)) {
+          const flowDef = await ark.flowRead(opts.flow);
+          declared = flowDef?.inputs as Record<string, any> | undefined;
+        } else if (flowArg && typeof flowArg === "object") {
+          declared = (flowArg as Record<string, any>).inputs as Record<string, any> | undefined;
+        }
         if (declared) {
           const missing: string[] = [];
           for (const [key, def] of Object.entries(declared)) {

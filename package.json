@@ -1,6 +1,6 @@
 {
   "name": "ark",
-  "version": "0.20.1",
+  "version": "0.21.0",
   "description": "Autonomous agent ecosystem -- AI coding agent orchestration",
   "type": "module",
   "bin": {
