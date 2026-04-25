@@ -42,3 +42,4 @@ export const noopExecutor: Executor = {
 
 /** Names the test-mode registry must override with the noop stub. */
 export const NOOP_EXECUTOR_NAMES = ["claude-code", "agent-sdk", "goose", "cli-agent", "subprocess"] as const;
+// verified: auto-advance after action stage (s-e2e-auto-advance)
