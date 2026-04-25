@@ -459,6 +459,21 @@ export class SessionService {
             actor: "system",
             data: { reason: `action '${action.action}' failed: ${result.message}` },
           });
+          return;
+        }
+        // Success: advance the flow. Without this, an action stage
+        // re-run via resume (e.g. a create_pr that failed once and got
+        // retried) completes the action but leaves the session sitting
+        // at `status=ready, stage=<action>` forever. The regular
+        // dispatch path handles this via `mediateStageHandoff` after
+        // `executeAction` returns (see dispatch-core.ts); mirror that
+        // here so resume behaves the same way.
+        const postAction = await this.sessions.get(sessionId);
+        if (postAction?.status === "ready") {
+          await this.app.sessionHooks.mediateStageHandoff(sessionId, {
+            autoDispatch: true,
+            source: "resume_action",
+          });
         }
       } catch (err) {
         await this.events.log(sessionId, "dispatch_failed", {

@@ -571,6 +571,12 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
 
     proxyServer = Bun.serve({
       port: 0, // OS-assigned ephemeral port
+      // Generous idle timeout: a single Sonnet/Opus turn can stream for
+      // 60-120s before TF returns. Bun.serve's default of 10s tears the
+      // socket down mid-response and the SDK surfaces a "socket connection
+      // was closed unexpectedly" API error. Pin to 5 minutes -- the SDK's
+      // own per-turn timeout is the upper bound, this is just floor.
+      idleTimeout: 255,
       async fetch(req) {
         const url = new URL(req.url);
         const targetUrl = `${forwardBase}${url.pathname}${url.search}`;
