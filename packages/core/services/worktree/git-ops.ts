@@ -20,6 +20,38 @@ const execFileAsync = promisify(execFile);
 const DEFAULT_BASE_BRANCH = "main";
 
 /**
+ * Resolve the repo's actual default branch instead of guessing `main`.
+ * Tries `origin/HEAD` (the canonical "what branch does origin point at"),
+ * falls back to inspecting common names, finally returns null. Without
+ * this, `worktreeDiff` against repos whose default is `develop` (Paytm's
+ * convention) returned 0 files / 0 insertions for every session whose
+ * actual branch was forked off develop.
+ */
+async function detectDefaultBranch(repo: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync("git", ["-C", repo, "symbolic-ref", "--short", "refs/remotes/origin/HEAD"], {
+      encoding: "utf-8",
+    });
+    const ref = stdout.trim();
+    if (ref.startsWith("origin/")) return ref.slice("origin/".length);
+    if (ref) return ref;
+  } catch {
+    /* fall through to common-name probe */
+  }
+  for (const candidate of ["main", "master", "develop"]) {
+    try {
+      await execFileAsync("git", ["-C", repo, "rev-parse", "--verify", `refs/remotes/origin/${candidate}`], {
+        encoding: "utf-8",
+      });
+      return candidate;
+    } catch {
+      /* not this one */
+    }
+  }
+  return null;
+}
+
+/**
  * Get a diff summary for a session's worktree branch vs its base branch.
  * Used for previewing changes before merge or PR creation.
  */
@@ -99,7 +131,10 @@ export async function worktreeDiff(
       message: "Cannot determine branch",
     };
 
-  const baseBranch = opts?.base ?? DEFAULT_BASE_BRANCH;
+  // Use the repo's actual default branch when the caller didn't pin one.
+  // Hard-coding "main" misses repos whose default is `develop` / `master`
+  // and silently produces empty diffs.
+  const baseBranch = opts?.base ?? (await detectDefaultBranch(repo)) ?? DEFAULT_BASE_BRANCH;
 
   try {
     // Get diff stat
