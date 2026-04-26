@@ -85,22 +85,26 @@ describe("agent-sdk Stop/SessionEnd cost recording", () => {
     expect(total.total_tokens).toBe(0);
   });
 
-  it("SessionEnd shape also records (the launch script emits both)", async () => {
-    const session = await getApp().sessions.create({ summary: "agent-sdk session-end" });
+  it("SessionEnd does NOT double-record (Stop is canonical, SessionEnd is the transition hook)", async () => {
+    // The launch script emits Stop + SessionEnd back-to-back with identical
+    // usage payloads. Recording on both doubled every cost ledger entry.
+    const session = await getApp().sessions.create({ summary: "no double record" });
     await getApp().sessions.update(session.id, { status: "running" });
 
     await postHook(session.id, {
+      hook_event_name: "Stop",
+      total_cost_usd: 0.05,
+      usage: { input_tokens: 100, output_tokens: 200 },
+    });
+    await postHook(session.id, {
       hook_event_name: "SessionEnd",
       total_cost_usd: 0.05,
-      usage: {
-        input_tokens: 100,
-        output_tokens: 200,
-        cache_read_input_tokens: 0,
-        cache_creation_input_tokens: 0,
-      },
+      usage: { input_tokens: 100, output_tokens: 200 },
     });
 
     const total = await getApp().usageRecorder.getSessionCost(session.id);
+    // Should be 300, not 600.
     expect(total.total_tokens).toBe(300);
+    expect(total.records.length).toBe(1);
   });
 });

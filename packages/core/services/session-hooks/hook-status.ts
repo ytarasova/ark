@@ -257,12 +257,13 @@ export class HookStatusApplier {
     // every agent-sdk session showed `$0.00` and `0 tokens` in the
     // SessionSummary panel + Cost tab even though the cost was sitting in
     // the event row.
-    if (
-      !transcriptPath &&
-      (hookEvent === "Stop" || hookEvent === "SessionEnd") &&
-      payload.usage &&
-      typeof payload.usage === "object"
-    ) {
+    //
+    // Only record on `Stop`, not on `SessionEnd`. The agent-sdk launch
+    // script emits *both* hooks for every result with identical
+    // `total_cost_usd` / `usage` payloads (Stop is canonical, SessionEnd
+    // is the synthetic transition hook the conductor's state machine
+    // needs). Recording on both would double-count the ledger.
+    if (!transcriptPath && hookEvent === "Stop" && payload.usage && typeof payload.usage === "object") {
       const u = payload.usage as Record<string, unknown>;
       const usage = {
         input_tokens: typeof u.input_tokens === "number" ? u.input_tokens : 0,
