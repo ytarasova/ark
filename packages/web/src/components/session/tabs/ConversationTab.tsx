@@ -90,7 +90,14 @@ export function ConversationTab({
         }
         if (item.kind === "tool") {
           if (item.toolName) {
-            const blockStatus = item.status === "running" ? "running" : item.status === "error" ? "err" : "ok";
+            const blockStatus =
+              item.status === "running"
+                ? "running"
+                : item.status === "error"
+                  ? "err"
+                  : item.status === "interrupted"
+                    ? "incomplete"
+                    : "ok";
             return (
               <ToolBlock
                 key={"t-" + i}

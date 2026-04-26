@@ -180,4 +180,47 @@ describe("buildConversationTimeline -- tool pairing", () => {
 
     expect(tools).toHaveLength(0);
   });
+
+  test("orphan PreToolUse on a terminal session flips to interrupted, not stuck running", () => {
+    // The session ended (timeout / stop / kill) before the runtime emitted
+    // a PostToolUse. Pre-fix this rendered as RUNNING with a spinner and a
+    // "stop ^C" affordance forever -- visually wrong on a finished flow.
+    // Real incident: PAI-31995 dispatch hit the for_each timeout while a
+    // bash gradle find was in flight.
+    const events = [
+      ev("hook_status", {
+        event: "PreToolUse",
+        tool_name: "Bash",
+        tool_use_id: "toolu_STUCK",
+        tool_input: { command: "find /root/.gradle -name spring-webflux*" },
+      }),
+    ];
+    const session = { status: "completed" };
+
+    const items = buildConversationTimeline(events, [], session);
+    const tools = items.filter((i) => i.kind === "tool");
+
+    expect(tools).toHaveLength(1);
+    expect(tools[0].status).toBe("interrupted");
+  });
+
+  test("orphan PreToolUse on a still-running session stays running (live tail)", () => {
+    // While the session is genuinely live, an unmatched PreToolUse means
+    // the tool is in flight -- do NOT prematurely flip it to interrupted.
+    const events = [
+      ev("hook_status", {
+        event: "PreToolUse",
+        tool_name: "Bash",
+        tool_use_id: "toolu_LIVE",
+        tool_input: { command: "sleep 10" },
+      }),
+    ];
+    const session = { status: "running" };
+
+    const items = buildConversationTimeline(events, [], session);
+    const tools = items.filter((i) => i.kind === "tool");
+
+    expect(tools).toHaveLength(1);
+    expect(tools[0].status).toBe("running");
+  });
 });

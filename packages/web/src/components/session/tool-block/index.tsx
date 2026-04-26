@@ -33,7 +33,9 @@ export function BashToolBlock({ command, output, status = "ok", elapsed, pid, cw
         ) : undefined
       }
       status={status}
-      statusLabel={status === "running" ? "running" : status === "err" ? "failed" : "done"}
+      statusLabel={
+        status === "running" ? "running" : status === "err" ? "failed" : status === "incomplete" ? "incomplete" : "done"
+      }
       elapsed={elapsed}
       bodyClassName="whitespace-pre"
       body={
@@ -118,7 +120,9 @@ export function EditToolBlock({
         </>
       }
       status={status}
-      statusLabel={status === "running" ? "editing" : status === "err" ? "failed" : "ok"}
+      statusLabel={
+        status === "running" ? "editing" : status === "err" ? "failed" : status === "incomplete" ? "incomplete" : "ok"
+      }
       elapsed={elapsed}
       plainBody
       body={

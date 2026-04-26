@@ -563,5 +563,28 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
     }
   }
 
+  // If the session has reached a terminal state, any tool block still
+  // tracked in pendingTools never received a PostToolUse -- the runtime
+  // was killed (timeout / stop / crash) mid-call. Flip them to
+  // `interrupted` so the UI doesn't render a forever-spinning "RUNNING"
+  // badge with a stop affordance on a session that's already done.
+  // Real incident: PAI-31995 dispatch hit a 30-min for_each timeout while
+  // a Bash gradle find was still in flight; the parent went `completed`
+  // but the orphan tool block stayed `running` indefinitely.
+  const sessionStatus = session?.status as string | undefined;
+  const sessionTerminal =
+    sessionStatus === "completed" ||
+    sessionStatus === "failed" ||
+    sessionStatus === "stopped" ||
+    sessionStatus === "archived";
+  if (sessionTerminal && pendingTools.size > 0) {
+    for (const idx of pendingTools.values()) {
+      if (items[idx] && items[idx].status === "running") {
+        items[idx].status = "interrupted";
+      }
+    }
+    pendingTools.clear();
+  }
+
   return items;
 }

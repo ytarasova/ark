@@ -9,7 +9,16 @@ import { cn } from "../../../lib/utils.js";
  * body (tool-specific content), footer (mono-ui stats + primary action).
  */
 
-export type ToolStatus = "running" | "ok" | "err";
+/**
+ * Tool block lifecycle states.
+ *
+ * - `running`: PreToolUse seen, waiting on PostToolUse. Spinner + stop affordance.
+ * - `ok` / `err`: terminal -- both Pre and Post observed.
+ * - `incomplete`: terminal but inconclusive. The session ended (timeout /
+ *   stop / kill) before the tool emitted a PostToolUse. No spinner, no stop
+ *   affordance, label reads "incomplete".
+ */
+export type ToolStatus = "running" | "ok" | "err" | "incomplete";
 
 export interface ToolBlockShellProps {
   icon: React.ReactNode;
@@ -39,7 +48,9 @@ export function ToolBlockShell({
   bodyClassName,
   plainBody,
 }: ToolBlockShellProps) {
-  const label = statusLabel ?? (status === "running" ? "running" : status === "err" ? "error" : "ok");
+  const label =
+    statusLabel ??
+    (status === "running" ? "running" : status === "err" ? "error" : status === "incomplete" ? "incomplete" : "ok");
   // Collapsed by default for finished tools so the session view is scannable;
   // running tools stay open so live output is visible. Users can toggle via
   // the chevron.
@@ -88,6 +99,7 @@ export function ToolBlockShell({
             status === "running" && "text-[var(--running)]",
             status === "ok" && "text-[var(--completed)]",
             status === "err" && "text-[var(--failed)]",
+            status === "incomplete" && "text-[var(--fg-muted)]",
           )}
         >
           {status === "running" ? (
