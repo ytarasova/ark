@@ -19,6 +19,18 @@ function shortError(err: string): string {
   return err.length > 40 ? err.slice(0, 37) + "…" : err;
 }
 
+/**
+ * Translate the synthetic `inline-s-<id>` flow names produced by the
+ * dispatch pipeline (when the caller passed an inline flow object) into
+ * the human-readable label "inline". Pre-fix the session list showed
+ * `inline-s-3nlgvtzhjv` -- an internal id that's noise to operators.
+ */
+function prettifyFlowName(raw: string | null | undefined): string | undefined {
+  if (!raw) return undefined;
+  if (raw.startsWith("inline-s-")) return "inline";
+  return raw;
+}
+
 interface SessionListProps {
   sessions: any[];
   selectedId: string | null;
@@ -76,7 +88,7 @@ export function sessionToListItem(
     status: normalizeStatus(s.status),
     summary: s.summary || s.id,
     runtime: s.runtime || s.agent_runtime || friendlyAgentName(s) || undefined,
-    flow: s.pipeline || s.flow || undefined,
+    flow: prettifyFlowName(s.pipeline || s.flow),
     stageLabel: s.stage || undefined,
     progress: computeProgress(s, flowStagesMap),
     relativeTime: relTime(s.updated_at),
