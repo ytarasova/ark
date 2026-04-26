@@ -248,8 +248,19 @@ function substituteStageTemplates(stage: StageDefinition, vars: Record<string, u
 
 /** Milliseconds between polls when waiting for a child session to finish. */
 const CHILD_POLL_INTERVAL_MS = 250;
-/** Maximum time to wait for a single child session to reach terminal state. */
-const CHILD_POLL_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+/**
+ * Default *idle* timeout for waiting on a child session. The deadline resets
+ * on every observed change to `child.updated_at` -- so a child that's actively
+ * progressing never times out, but a genuinely silent child gives up after
+ * this window. Override per-stage with `child_timeout_minutes:` in the YAML.
+ *
+ * Pre-2026-04-25 this was a hard 30-minute wall-clock timeout. That raced
+ * against active children -- a long Bedrock stream with no events for 30 min
+ * would trigger the timeout while the child was still doing useful work, the
+ * parent would mark the iteration "timed out, continuing" while the orphan
+ * child kept running and committed/pushed minutes later.
+ */
+const CHILD_IDLE_TIMEOUT_MS = 60 * 60 * 1000; // 60 minutes
 
 /**
  * Callback for dispatching a single inline sub-stage against the parent
@@ -519,8 +530,13 @@ export class ForEachDispatcher {
         continue;
       }
 
-      // Wait for the child to reach a terminal state
-      const terminalStatus = await this.waitForChild(childId);
+      // Wait for the child to reach a terminal state. Idle window resets on
+      // each `updated_at` bump -- override default via stage YAML.
+      const idleMs =
+        typeof stageDef.child_timeout_minutes === "number" && stageDef.child_timeout_minutes > 0
+          ? stageDef.child_timeout_minutes * 60 * 1000
+          : CHILD_IDLE_TIMEOUT_MS;
+      const terminalStatus = await this.waitForChild(childId, idleMs);
       const iterDurationMs = Date.now() - spawnIterStartMs;
 
       // Compute per-iteration cost from the child's hook_status events.
@@ -952,10 +968,18 @@ export class ForEachDispatcher {
 
   /**
    * Poll until the child session reaches a terminal state.
-   * Returns the terminal status ("completed" | "failed") or "timeout".
+   *
+   * The deadline is *idle-based*: we extend it whenever the child's
+   * `updated_at` advances (every event log bumps that timestamp). A child
+   * that's actively tool-calling or streaming model output therefore never
+   * times out, while a genuinely silent child gives up after `idleMs`.
    */
-  private async waitForChild(childId: string): Promise<"completed" | "failed" | "timeout"> {
-    const deadline = Date.now() + CHILD_POLL_TIMEOUT_MS;
+  private async waitForChild(
+    childId: string,
+    idleMs: number = CHILD_IDLE_TIMEOUT_MS,
+  ): Promise<"completed" | "failed" | "timeout"> {
+    let lastUpdatedAt: string | undefined;
+    let deadline = Date.now() + idleMs;
     while (Date.now() < deadline) {
       const child = await this.deps.sessions.get(childId);
       if (!child) return "failed";
@@ -963,6 +987,10 @@ export class ForEachDispatcher {
       if (child.status === "failed") return "failed";
       // stopped / archived are also terminal -- treat as failure
       if (child.status === "stopped" || child.status === "archived") return "failed";
+      if (child.updated_at !== lastUpdatedAt) {
+        lastUpdatedAt = child.updated_at;
+        deadline = Date.now() + idleMs;
+      }
       await Bun.sleep(CHILD_POLL_INTERVAL_MS);
     }
     return "timeout";

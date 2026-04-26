@@ -225,6 +225,13 @@ export interface StageDefinition {
    * if the inline agent spec does not already declare max_budget_usd.
    */
   max_budget_usd?: number;
+  /**
+   * Idle timeout (minutes) for `for_each + mode:spawn` child iterations.
+   * The deadline resets every time the child's `updated_at` advances, so a
+   * child that's actively tool-calling or streaming model output never times
+   * out -- this is the cap on a *silent* child. Default 60 minutes.
+   */
+  child_timeout_minutes?: number;
   // Fork-specific
   strategy?: string;
   max_parallel?: number;
