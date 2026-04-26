@@ -283,8 +283,19 @@ jobs:
 
       - name: Build gateway
         run: |
-          cd tensorzero
-          # gateway lives in the gateway/ subcrate of the workspace
+          # Upstream layout used to have Cargo.toml at the repo root; as of
+          # late 2026 they moved the workspace into `crates/`. Probe both.
+          if [ -f tensorzero/Cargo.toml ]; then
+            ws=tensorzero
+          elif [ -f tensorzero/crates/Cargo.toml ]; then
+            ws=tensorzero/crates
+          else
+            echo "could not find Cargo.toml in tensorzero/ or tensorzero/crates/"
+            ls -la tensorzero/
+            exit 1
+          fi
+          echo "tensorzero workspace: $ws"
+          cd "$ws"
           cargo build --release -p gateway || cargo build --release --bin gateway
 
       - name: Collect binary
@@ -292,7 +303,17 @@ jobs:
           PLAT: ${{ matrix.name }}
         run: |
           mkdir -p out
-          cp tensorzero/target/release/gateway "out/tensorzero-$PLAT"
+          # target/ dir lives next to the workspace Cargo.toml
+          if [ -f tensorzero/target/release/gateway ]; then
+            built=tensorzero/target/release/gateway
+          elif [ -f tensorzero/crates/target/release/gateway ]; then
+            built=tensorzero/crates/target/release/gateway
+          else
+            echo "built gateway binary not found"
+            find tensorzero -maxdepth 4 -name gateway -type f
+            exit 1
+          fi
+          cp "$built" "out/tensorzero-$PLAT"
           chmod +x "out/tensorzero-$PLAT"
           ls -lh out/
 
