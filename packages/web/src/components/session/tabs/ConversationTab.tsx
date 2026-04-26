@@ -11,7 +11,6 @@ import { SessionSummary } from "../../ui/SessionSummary.js";
 import { AttachedFiles } from "../AttachedFiles.js";
 import { formatTime } from "../timeline-builder.js";
 import { renderAgentContent } from "../event-builder.js";
-import { SdkTranscriptPanel } from "../SdkTranscriptPanel.js";
 import { friendlyAgentName } from "../../../lib/inline-display.js";
 
 interface ConversationTabProps {
@@ -49,16 +48,15 @@ export function ConversationTab({
   // runtime name (e.g. "agent-sdk") and finally to a generic "agent".
   const displayAgent = friendlyAgentName(session) ?? "agent";
 
-  // agent-sdk sessions also write a raw transcript.jsonl next to their
-  // events. Render those SDK-shaped messages inline above the timeline so
-  // we keep the existing event-based view for every other runtime.
-  const runtime = session?.runtime ?? session?.agent_runtime;
-  const isAgentSdk = runtime === "agent-sdk";
+  // agent-sdk narration used to render via the SdkTranscriptPanel above the
+  // timeline. Now that the runtime emits AgentMessage hooks that flow into
+  // the timeline as inline `kind: "agent"` items, the panel just duplicates
+  // the same text. The timeline path is authoritative; the legacy panel is
+  // gone.
 
   return (
     <div className="max-w-[720px] mx-auto">
       {attachments.length > 0 && <AttachedFiles attachments={attachments} />}
-      {isAgentSdk && <SdkTranscriptPanel sessionId={session.id} status={session.status} isRunning={isActive} />}
       {timeline.length === 0 && conversationMessages.length === 0 && (
         <div className="text-center text-sm text-[var(--fg-muted)] py-12">
           No conversation yet.{" "}
