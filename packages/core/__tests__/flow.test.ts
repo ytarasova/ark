@@ -263,6 +263,27 @@ describe("evaluateGate", async () => {
     const result = evaluateGate(getApp(), "nonexistent", "plan", {});
     expect(result.canProceed).toBe(false);
   });
+
+  it("treats a missing gate as auto so for_each-only flows can advance", () => {
+    // Real incident: PAI-31995 dispatches surfaced as "pending" parents
+    // forever because the outer for_each stage YAML didn't specify `gate:`,
+    // and the strict default emitted "Unknown gate: undefined" which made
+    // mediateStageHandoff -> advance bail before marking the flow completed.
+    writeUserFlow("for-each-no-gate", {
+      name: "for-each-no-gate",
+      stages: [
+        {
+          name: "per_item",
+          for_each: "{{inputs.items}}",
+          mode: "spawn",
+          spawn: { flow: "noop" },
+        },
+      ],
+    });
+    const result = evaluateGate(getApp(), "for-each-no-gate", "per_item", {});
+    expect(result.canProceed).toBe(true);
+    expect(result.reason).toContain("auto");
+  });
 });
 
 // ── getStageAction ───────────────────────────────────────────────────────────
