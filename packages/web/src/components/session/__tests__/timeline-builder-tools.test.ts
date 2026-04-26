@@ -204,6 +204,61 @@ describe("buildConversationTimeline -- tool pairing", () => {
     expect(tools[0].status).toBe("interrupted");
   });
 
+  test("agent_message events render as inline agent narration", () => {
+    // The agent-sdk runtime emits an AgentMessage hook for the model's
+    // narration text between tool calls. The conductor logs these as
+    // `agent_message` events. The timeline must surface them as agent
+    // items so the user can see what the agent is thinking, not just a
+    // stream of opaque tool blocks.
+    const events = [
+      {
+        type: "agent_message",
+        data: { text: "Looking at the file structure first." },
+        created_at: "2026-04-26T10:00:00Z",
+      },
+      ev(
+        "hook_status",
+        { event: "PreToolUse", tool_name: "Read", tool_use_id: "t1", tool_input: { path: "x" } },
+        "2026-04-26T10:00:01Z",
+      ),
+      ev(
+        "hook_status",
+        { event: "PostToolUse", tool_use_id: "t1", tool_result_content: "data" },
+        "2026-04-26T10:00:02Z",
+      ),
+      { type: "agent_message", data: { text: "Now updating the function." }, created_at: "2026-04-26T10:00:03Z" },
+    ];
+    const items = buildConversationTimeline(events, [], { agent: "implementer" });
+    const agentItems = items.filter((i) => i.kind === "agent");
+    expect(agentItems).toHaveLength(2);
+    expect(agentItems[0].content).toBe("Looking at the file structure first.");
+    expect(agentItems[0].isThinking).toBeFalsy();
+    expect(agentItems[1].content).toBe("Now updating the function.");
+  });
+
+  test("agent_message with thinking:true is tagged for the renderer to dim", () => {
+    const events = [
+      {
+        type: "agent_message",
+        data: { text: "Let me think about this carefully...", thinking: true },
+        created_at: "2026-04-26T10:00:00Z",
+      },
+    ];
+    const items = buildConversationTimeline(events, [], {});
+    const agentItems = items.filter((i) => i.kind === "agent");
+    expect(agentItems).toHaveLength(1);
+    expect(agentItems[0].isThinking).toBe(true);
+  });
+
+  test("agent_message with empty/whitespace text is dropped", () => {
+    const events = [
+      { type: "agent_message", data: { text: "" }, created_at: "2026-04-26T10:00:00Z" },
+      { type: "agent_message", data: { text: "   \n  " }, created_at: "2026-04-26T10:00:01Z" },
+    ];
+    const items = buildConversationTimeline(events, [], {});
+    expect(items.filter((i) => i.kind === "agent")).toHaveLength(0);
+  });
+
   test("orphan PreToolUse on a still-running session stays running (live tail)", () => {
     // While the session is genuinely live, an unmatched PreToolUse means
     // the tool is in flight -- do NOT prematurely flip it to interrupted.

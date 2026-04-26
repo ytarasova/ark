@@ -79,7 +79,13 @@ export function ConversationTab({
           );
         if (item.kind === "agent")
           return (
-            <AgentMessage key={"a-" + i} agentName={item.agentName} model={item.model} timestamp={item.timestamp}>
+            <AgentMessage
+              key={"a-" + i}
+              agentName={item.agentName}
+              model={item.model}
+              timestamp={item.timestamp}
+              isThinking={item.isThinking}
+            >
               {renderAgentContent(item.content, item.type)}
             </AgentMessage>
           );

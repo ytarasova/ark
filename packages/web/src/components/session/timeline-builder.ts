@@ -180,6 +180,25 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
 
       if (HIDDEN_EVENT_TYPES.includes(evType)) continue;
 
+      // agent-sdk narration / extended-thinking text. Renders as an inline
+      // agent message between tool blocks so the user sees what the agent
+      // is reasoning about, not just a stream of opaque tool calls.
+      if (evType === "agent_message") {
+        const data = item.data && typeof item.data === "object" ? item.data : {};
+        const text = typeof data.text === "string" ? data.text : "";
+        if (text.trim().length === 0) continue;
+        items.push({
+          kind: "agent",
+          role: "assistant",
+          content: text,
+          timestamp: formatTime(item.created_at),
+          agentName: sessionAgent || "agent",
+          isThinking: !!data.thinking,
+          stage: evStage,
+        });
+        continue;
+      }
+
       if (evType === "hook_status") {
         const hookData = item.data && typeof item.data === "object" ? item.data : {};
         const hookEvent = hookData.event || "";

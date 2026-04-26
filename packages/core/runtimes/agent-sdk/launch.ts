@@ -149,7 +149,7 @@ export interface RunAgentSdkLaunchResult {
  * has no `claude_session_id`, so the guard's middle clause short-circuits and
  * all our hooks pass through.
  */
-function messageToHooks(msg: unknown, arkSessionId: string): Array<Record<string, unknown>> {
+export function messageToHooks(msg: unknown, arkSessionId: string): Array<Record<string, unknown>> {
   const m = msg as Record<string, unknown>;
   const type = m.type as string | undefined;
 
@@ -172,7 +172,8 @@ function messageToHooks(msg: unknown, arkSessionId: string): Array<Record<string
     const content = (message?.content ?? []) as Array<Record<string, unknown>>;
     const hooks: Array<Record<string, unknown>> = [];
     for (const block of content) {
-      if ((block.type as string | undefined) === "tool_use") {
+      const blockType = block.type as string | undefined;
+      if (blockType === "tool_use") {
         hooks.push({
           hook_event_name: "PreToolUse",
           session_id: arkSessionId,
@@ -180,6 +181,34 @@ function messageToHooks(msg: unknown, arkSessionId: string): Array<Record<string
           tool_input: block.input,
           tool_use_id: block.id,
         });
+      } else if (blockType === "text") {
+        // The model's narration between tool calls. Without this hook the
+        // UI sees only PreToolUse / PostToolUse events and the user can't
+        // tell what the agent is doing or planning -- just a stream of
+        // bash/edit/read with no human-readable thread. Emit each text
+        // block as a separate hook so the timeline can render them inline
+        // alongside tool blocks.
+        const text = typeof block.text === "string" ? block.text : "";
+        if (text.trim().length > 0) {
+          hooks.push({
+            hook_event_name: "AgentMessage",
+            session_id: arkSessionId,
+            text,
+          });
+        }
+      } else if (blockType === "thinking") {
+        // Extended-thinking blocks (when enabled). The text lives on
+        // `block.thinking`. Same rendering as "text" but tagged so the UI
+        // can dim it / collapse it differently.
+        const text = typeof block.thinking === "string" ? block.thinking : "";
+        if (text.trim().length > 0) {
+          hooks.push({
+            hook_event_name: "AgentMessage",
+            session_id: arkSessionId,
+            text,
+            thinking: true,
+          });
+        }
       }
     }
     return hooks;
