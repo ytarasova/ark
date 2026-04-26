@@ -21,7 +21,18 @@ describe("buildGhPrCreateArgs", () => {
       title: "My change",
       body: "Session: s-123",
     });
-    expect(args).toEqual(["pr", "create", "--head", "feat/x", "--base", "main", "--title", "My change", "--body", "Session: s-123"]);
+    expect(args).toEqual([
+      "pr",
+      "create",
+      "--head",
+      "feat/x",
+      "--base",
+      "main",
+      "--title",
+      "My change",
+      "--body",
+      "Session: s-123",
+    ]);
   });
 
   test("never emits --repo", () => {
