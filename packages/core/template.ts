@@ -390,6 +390,18 @@ function flatten(prefix: string, value: unknown, out: Record<string, unknown>): 
 export function buildSessionVars(session: Record<string, unknown>): Record<string, unknown> {
   const vars: Record<string, unknown> = { ...session };
 
+  // Override the internal runtime-handle column with the ark session id.
+  // The Session row carries `session_id` (the tmux/claude/agent-sdk runtime
+  // handle, often null until the runtime starts) and `id` (the ark session
+  // id, always set). Users writing `{{session_id}}` in YAML templates mean
+  // "the session this is running in" -- i.e. the ark id. Without this
+  // override, `{{session_id}}` resolved to null for every spawn-child
+  // template before its runtime had been spawned, leaking "null" into
+  // worktree paths and prompt strings.
+  if (typeof session.id === "string" && session.id) {
+    vars.session_id = session.id;
+  }
+
   // Flatten `session.config.inputs.*` into dotted `inputs.<key>[.subpath]`
   // entries so templates can reach them without needing `config.` in the path.
   const config = session.config as Record<string, unknown> | undefined;
