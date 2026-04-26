@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OpenRPC Schema - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .method-group { margin-bottom: 2.5rem; }
+    .method-group-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid #1e293b;
+    }
+    .method-card {
+      border: 1px solid #1e293b;
+      border-radius: 6px;
+      margin-bottom: 0.5rem;
+      overflow: hidden;
+    }
+    .method-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.6rem 1rem;
+      cursor: pointer;
+      background: #0d1117;
+      transition: background 0.15s;
+      user-select: none;
+    }
+    .method-header:hover { background: #111827; }
+    .method-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: #38bdf8;
+      flex: 0 0 auto;
+    }
+    .method-desc {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      flex: 1;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    .method-chevron {
+      font-size: 0.6rem;
+      color: #475569;
+      transition: transform 0.2s;
+      flex: 0 0 auto;
+    }
+    .method-card.open .method-chevron { transform: rotate(90deg); }
+    .method-body {
+      display: none;
+      padding: 1rem;
+      background: #070b12;
+      border-top: 1px solid #1e293b;
+    }
+    .method-card.open .method-body { display: block; }
+    .schema-section { margin-bottom: 1rem; }
+    .schema-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #475569;
+      margin-bottom: 0.4rem;
+    }
+    .schema-block {
+      background: #0d1117;
+      border: 1px solid #1e293b;
+      border-radius: 4px;
+      padding: 0.75rem 1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      line-height: 1.6;
+      overflow-x: auto;
+      white-space: pre;
+      color: #c9d1d9;
+      max-height: 400px;
+    }
+    .no-params {
+      font-size: 0.78rem;
+      color: #475569;
+      font-style: italic;
+    }
+    .filter-bar {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+      align-items: center;
+    }
+    .filter-bar input {
+      flex: 1;
+      background: #0d1117;
+      border: 1px solid #1e293b;
+      border-radius: 4px;
+      padding: 0.4rem 0.75rem;
+      color: #c9d1d9;
+      font-size: 0.85rem;
+      font-family: inherit;
+      outline: none;
+    }
+    .filter-bar input:focus { border-color: #38bdf8; }
+    .filter-bar input::placeholder { color: #475569; }
+    .count-badge {
+      font-size: 0.7rem;
+      color: #475569;
+      white-space: nowrap;
+    }
+    .download-link {
+      display: inline-block;
+      font-size: 0.75rem;
+      color: #38bdf8;
+      text-decoration: none;
+      border: 1px solid #1e3a5f;
+      border-radius: 4px;
+      padding: 0.3rem 0.6rem;
+    }
+    .download-link:hover { background: #0d2545; }
+    #loading { color: #64748b; font-style: italic; }
+    #error { color: #f87171; }
+  </style>
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <a href="environment.html">Environment</a>
+      <div class="section-title">How-To</div>
+      <a href="howto-memories.html">Memories</a>
+      <a href="howto-knowledge.html">Knowledge Graph</a>
+      <a href="howto-costs.html">Cost Tracking</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="comparison-goose.html">vs Goose</a>
+      <div class="section-title">Architecture</div>
+      <a href="architecture.html">Overview</a>
+      <a href="arkd.html">ArkD Daemon</a>
+      <a href="router.html">LLM Router</a>
+      <a href="multi-tenancy.html">Multi-Tenancy</a>
+      <div class="section-title">Reference</div>
+      <a href="agents-reference.html">Agents</a>
+      <a href="flows-reference.html">Flows</a>
+      <a href="skills-reference.html">Skills</a>
+      <a href="recipes-reference.html">Recipes</a>
+      <a href="runtimes-reference.html">Runtimes</a>
+      <a href="api-reference.html">API Reference</a>
+      <a href="openrpc.html">OpenRPC Schema</a>
+      <div class="section-title">Development</div>
+      <a href="development.html">Contributing</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <h1>OpenRPC Schema</h1>
+      <p class="subtitle">Machine-readable JSON-RPC method definitions with request/response schemas.</p>
+
+      <p>
+        The full schema is available as <a href="openrpc.json" class="download-link" download>openrpc.json</a> --
+        an <a href="https://open-rpc.org/" target="_blank" rel="noopener">OpenRPC 1.3</a> document generated from
+        the Zod schemas in <code>packages/protocol/rpc-schemas.ts</code>.
+        Use it with any OpenRPC-compatible tooling (playground, mock server, client generators).
+      </p>
+      <p>Run <code>bun run scripts/generate-openrpc.ts</code> to regenerate after adding new methods.</p>
+
+      <div class="filter-bar">
+        <input id="filter" type="search" placeholder="Filter methods..." autocomplete="off" spellcheck="false">
+        <span class="count-badge" id="count-badge"></span>
+      </div>
+
+      <div id="loading">Loading schema...</div>
+      <div id="error" style="display:none"></div>
+      <div id="methods-root"></div>
+
+      <div class="doc-footer">
+        <a href="api-reference.html">&larr; API Reference</a>
+        <a href="development.html">Contributing &rarr;</a>
+      </div>
+    </main>
+  </div>
+  <script src="nav.js"></script>
+  <script>
+  (function () {
+    function el(tag, cls) {
+      var e = document.createElement(tag);
+      if (cls) e.className = cls;
+      return e;
+    }
+
+    function text(str) { return document.createTextNode(str || ''); }
+
+    // JSON pretty-print with syntax colouring using DOM nodes only.
+    function renderJson(obj) {
+      var pre = el('pre', 'schema-block');
+      var copy = Object.assign({}, obj);
+      delete copy['$schema'];
+      pre.textContent = JSON.stringify(copy, null, 2);
+      return pre;
+    }
+
+    function buildMethodCard(method) {
+      var card = el('div', 'method-card');
+      card.dataset.name = method.name;
+
+      var hasParams = method.params && method.params.length > 0;
+      var paramSchema = hasParams ? method.params[0].schema : null;
+
+      var header = el('div', 'method-header');
+
+      var nameSpan = el('span', 'method-name');
+      nameSpan.textContent = method.name;
+
+      var descSpan = el('span', 'method-desc');
+      descSpan.textContent = method.description || '';
+
+      var chevron = el('span', 'method-chevron');
+      chevron.textContent = '►';
+
+      header.appendChild(nameSpan);
+      header.appendChild(descSpan);
+      header.appendChild(chevron);
+
+      var body = el('div', 'method-body');
+
+      if (method.description) {
+        var descP = el('p');
+        descP.textContent = method.description;
+        descP.style.cssText = 'font-size:0.85rem;color:#94a3b8;margin-bottom:1rem';
+        body.appendChild(descP);
+      }
+
+      // Request params section
+      var reqSection = el('div', 'schema-section');
+      var reqLabel = el('div', 'schema-label');
+      reqLabel.textContent = 'Request params';
+      reqSection.appendChild(reqLabel);
+      if (hasParams && paramSchema) {
+        reqSection.appendChild(renderJson(paramSchema));
+      } else {
+        var noParams = el('div', 'no-params');
+        noParams.textContent = 'No parameters';
+        reqSection.appendChild(noParams);
+      }
+      body.appendChild(reqSection);
+
+      // Result section
+      if (method.result && method.result.schema) {
+        var resSection = el('div', 'schema-section');
+        var resLabel = el('div', 'schema-label');
+        resLabel.textContent = 'Result';
+        resSection.appendChild(resLabel);
+        resSection.appendChild(renderJson(method.result.schema));
+        body.appendChild(resSection);
+      }
+
+      header.addEventListener('click', function () {
+        card.classList.toggle('open');
+      });
+
+      card.appendChild(header);
+      card.appendChild(body);
+      return card;
+    }
+
+    function render(methods, filter) {
+      var root = document.getElementById('methods-root');
+      while (root.firstChild) root.removeChild(root.firstChild);
+
+      var lower = (filter || '').toLowerCase().trim();
+      var visible = lower
+        ? methods.filter(function (m) {
+            return m.name.toLowerCase().indexOf(lower) >= 0 ||
+              (m.description && m.description.toLowerCase().indexOf(lower) >= 0);
+          })
+        : methods;
+
+      var badge = document.getElementById('count-badge');
+      badge.textContent = visible.length + ' of ' + methods.length + ' methods';
+
+      // Group by namespace (text before first slash)
+      var groups = Object.create(null);
+      var order = [];
+      visible.forEach(function (m) {
+        var slash = m.name.indexOf('/');
+        var ns = slash >= 0 ? m.name.slice(0, slash) : m.name;
+        if (!groups[ns]) { groups[ns] = []; order.push(ns); }
+        groups[ns].push(m);
+      });
+
+      if (visible.length === 0) {
+        var p = el('p');
+        p.textContent = 'No methods match "' + filter + '"';
+        p.style.cssText = 'color:#475569;font-style:italic';
+        root.appendChild(p);
+        return;
+      }
+
+      order.forEach(function (ns) {
+        var section = el('div', 'method-group');
+        var title = el('div', 'method-group-title');
+        title.textContent = ns;
+        section.appendChild(title);
+        groups[ns].forEach(function (m) {
+          section.appendChild(buildMethodCard(m));
+        });
+        root.appendChild(section);
+      });
+    }
+
+    fetch('openrpc.json')
+      .then(function (r) { return r.json(); })
+      .then(function (doc) {
+        document.getElementById('loading').style.display = 'none';
+        var methods = doc.methods || [];
+        render(methods, '');
+        var input = document.getElementById('filter');
+        input.addEventListener('input', function () {
+          render(methods, input.value);
+        });
+      })
+      .catch(function (err) {
+        document.getElementById('loading').style.display = 'none';
+        var errorEl = document.getElementById('error');
+        errorEl.style.display = '';
+        errorEl.textContent = 'Failed to load openrpc.json: ' + err.message;
+      });
+  })();
+  </script>
+</body>
+</html>
