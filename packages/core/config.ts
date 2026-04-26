@@ -209,6 +209,22 @@ export interface ArkConfig {
   databaseUrl?: string;
   /** Redis URL for hosted SSE bus and cross-instance pub/sub. redis://... */
   redisUrl?: string;
+  /**
+   * Git identity Ark uses for agent commits inside worktrees.
+   *
+   * Applied via `git -C <wt> config user.{name,email}` immediately after
+   * `git worktree add`, so commits don't inherit a stale or invalid
+   * `~/.gitconfig` from the host. Server-side hooks (e.g. Bitbucket's
+   * BB Violator) reject or rewrite commits with placeholder author emails;
+   * setting this once on the host avoids that.
+   *
+   * @envvar ARK_GIT_AUTHOR_NAME / ARK_GIT_AUTHOR_EMAIL
+   * @default name="Ark Agent", email="agent@ark.local"
+   */
+  git?: {
+    authorName?: string;
+    authorEmail?: string;
+  };
 }
 
 /** Alias -- future-facing name for the same shape. Use this in new code. */
@@ -483,6 +499,18 @@ function assemble(defaults: ProfileDefaults, overrides: LoadConfigOptions, profi
     secrets: parseSecretsConfig(legacyYaml.secrets, merged),
     databaseUrl: database.url,
     redisUrl: process.env.REDIS_URL ?? (legacyYaml.redis_url as string) ?? merged.redisUrl,
+    git: {
+      authorName:
+        process.env.ARK_GIT_AUTHOR_NAME ??
+        ((legacyYaml.git as Record<string, unknown>)?.author_name as string) ??
+        ((legacyYaml.git as Record<string, unknown>)?.authorName as string) ??
+        "Ark Agent",
+      authorEmail:
+        process.env.ARK_GIT_AUTHOR_EMAIL ??
+        ((legacyYaml.git as Record<string, unknown>)?.author_email as string) ??
+        ((legacyYaml.git as Record<string, unknown>)?.authorEmail as string) ??
+        "agent@ark.local",
+    },
   };
 
   // Step 7: final programmatic override (legacy fields) wins

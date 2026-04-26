@@ -233,7 +233,10 @@ async function setupWorktree(
   branch?: string,
 ): Promise<string | null> {
   const wtPath = join(app.config.worktreesDir, sessionId);
-  if (existsSync(wtPath)) return wtPath;
+  if (existsSync(wtPath)) {
+    await applyWorktreeGitIdentity(app, wtPath);
+    return wtPath;
+  }
 
   const branchName = branch ?? `ark-${sessionId}`;
   try {
@@ -245,6 +248,7 @@ async function setupWorktree(
       await execFileAsync("git", ["-C", repoPath, "worktree", "add", "-b", branchName, wtPath], {
         encoding: "utf-8",
       });
+      await applyWorktreeGitIdentity(app, wtPath);
       return wtPath;
     } catch (e: any) {
       if (!String(e).includes("already exists")) {
@@ -256,6 +260,7 @@ async function setupWorktree(
       await execFileAsync("git", ["-C", repoPath, "worktree", "add", wtPath, branchName], {
         encoding: "utf-8",
       });
+      await applyWorktreeGitIdentity(app, wtPath);
       return wtPath;
     } catch (e: any) {
       if (!String(e).includes("already checked out") && !String(e).includes("already exists")) {
@@ -267,6 +272,7 @@ async function setupWorktree(
       await execFileAsync("git", ["-C", repoPath, "worktree", "add", "-b", `ark-${sessionId}`, wtPath], {
         encoding: "utf-8",
       });
+      await applyWorktreeGitIdentity(app, wtPath);
       return wtPath;
     } catch (e: any) {
       logError("session", `setupWorktree: all strategies failed for ${sessionId}: ${e?.message ?? e}`);
@@ -275,6 +281,24 @@ async function setupWorktree(
     logError("session", `setupWorktree: worktree prune failed: ${e?.message ?? e}`);
   }
   return null;
+}
+
+/**
+ * Pin `user.name` / `user.email` on the worktree's local git config so agent
+ * commits don't inherit a stale or invalid `~/.gitconfig` from the host.
+ * Server-side hooks (e.g. Bitbucket's BB Violator) reject or rewrite commits
+ * with placeholder author emails -- setting these values on the worktree
+ * avoids that. Non-fatal: we log and continue if `git config` fails.
+ */
+export async function applyWorktreeGitIdentity(app: AppContext, wtPath: string): Promise<void> {
+  const name = app.config.git?.authorName ?? "Ark Agent";
+  const email = app.config.git?.authorEmail ?? "agent@ark.local";
+  try {
+    await execFileAsync("git", ["-C", wtPath, "config", "user.name", name], { encoding: "utf-8" });
+    await execFileAsync("git", ["-C", wtPath, "config", "user.email", email], { encoding: "utf-8" });
+  } catch (e: any) {
+    logWarn("session", `applyWorktreeGitIdentity: failed to set author on ${wtPath}: ${e?.message ?? e}`);
+  }
 }
 
 /**
