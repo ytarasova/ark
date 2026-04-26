@@ -22,6 +22,9 @@ interface ConversationTabProps {
   isActive: boolean;
   agentIsTyping: boolean;
   bottomRef: React.RefObject<HTMLDivElement>;
+  /** Files changed in the worktree (from git diff). Used as a fallback when
+   *  the agent didn't report `filesChanged` via the channel. */
+  filesChangedCount?: number;
 }
 
 /**
@@ -41,6 +44,7 @@ export function ConversationTab({
   isActive,
   agentIsTyping,
   bottomRef,
+  filesChangedCount,
 }: ConversationTabProps) {
   const attachments = (session?.config?.attachments ?? []) as Array<{ name: string; content: string; type: string }>;
   // Resolve a display label that doesn't leak the literal "inline" placeholder
@@ -153,18 +157,29 @@ export function ConversationTab({
       {session.status === "completed" && cost && (
         <SessionSummary
           duration={(() => {
-            // Use actual run time: last event time - first event time (or created_at)
+            // Use actual run time: last event time - first event time (or created_at).
+            // Show seconds for sub-minute sessions instead of rounding to "0m".
             if (events.length > 1) {
               const start = new Date(events[0].created_at).getTime();
               const end = new Date(events[events.length - 1].created_at).getTime();
-              const mins = Math.round((end - start) / 60000);
+              const elapsedMs = end - start;
+              if (elapsedMs < 60_000) {
+                const secs = Math.max(1, Math.round(elapsedMs / 1000));
+                return `${secs}s`;
+              }
+              const mins = Math.round(elapsedMs / 60_000);
               if (mins < 60) return `${mins}m`;
               return `${Math.floor(mins / 60)}h ${mins % 60}m`;
             }
             return fmtDuration(session.created_at);
           })()}
           cost={fmtCost(cost.cost)}
-          filesChanged={session.config?.filesChanged?.length || 0}
+          filesChanged={
+            // Channel-reported list (legacy claude-runtime) wins when set;
+            // fall back to the worktree git diff count for agent-sdk + any
+            // runtime that doesn't emit a `report` with filesChanged.
+            session.config?.filesChanged?.length || filesChangedCount || 0
+          }
           testsPassed={session.config?.tests_passed}
           prLink={session.pr_url ? { href: session.pr_url, label: "View PR on GitHub" } : undefined}
         />

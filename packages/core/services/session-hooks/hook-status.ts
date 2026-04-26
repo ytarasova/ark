@@ -252,6 +252,30 @@ export class HookStatusApplier {
       }
     }
 
+    // agent-sdk emits Stop / SessionEnd with the cost + usage attached
+    // directly to the hook payload (no transcript file). Without this branch
+    // every agent-sdk session showed `$0.00` and `0 tokens` in the
+    // SessionSummary panel + Cost tab even though the cost was sitting in
+    // the event row.
+    if (
+      !transcriptPath &&
+      (hookEvent === "Stop" || hookEvent === "SessionEnd") &&
+      payload.usage &&
+      typeof payload.usage === "object"
+    ) {
+      const u = payload.usage as Record<string, unknown>;
+      const usage = {
+        input_tokens: typeof u.input_tokens === "number" ? u.input_tokens : 0,
+        output_tokens: typeof u.output_tokens === "number" ? u.output_tokens : 0,
+        cache_read_tokens: typeof u.cache_read_input_tokens === "number" ? u.cache_read_input_tokens : 0,
+        cache_write_tokens: typeof u.cache_creation_input_tokens === "number" ? u.cache_creation_input_tokens : 0,
+      };
+      const total = usage.input_tokens + usage.output_tokens + usage.cache_read_tokens + usage.cache_write_tokens;
+      if (total > 0) {
+        recordSessionUsage(session, usage, "anthropic", "agent-sdk-hook");
+      }
+    }
+
     // Check for agent-initiated handoff on session end (fire-and-forget async)
     if (hookEvent === "SessionEnd" || hookEvent === "Stop") {
       getOutput(session.id, { lines: 50 })

@@ -103,6 +103,7 @@ export function TabPanels(props: TabPanelsProps) {
           isActive={isActive}
           agentIsTyping={agentIsTyping}
           bottomRef={bottomRef}
+          filesChangedCount={diffFiles.length}
         />
       )}
       {activeTab === "diff" && (
