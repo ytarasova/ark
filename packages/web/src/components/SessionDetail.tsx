@@ -4,6 +4,7 @@ import { useSessionDetail } from "../hooks/useSessionDetail.js";
 import { useSessionActions } from "../hooks/useSessionActions.js";
 import { useModelsQuery } from "../hooks/useRuntimeQueries.js";
 import { fmtCost, fmtTokens } from "../util.js";
+import { friendlyAgentName } from "../lib/inline-display.js";
 
 import { SessionHeader } from "./ui/SessionHeader.js";
 import { ContentTabs } from "./ui/ContentTabs.js";
@@ -275,7 +276,7 @@ export function SessionDetail({
           onSend={handleSend}
           disabled={!d.isActive || d.sending}
           disabledText={!d.isActive ? "Session is not running" : undefined}
-          modelName={session.config?.model || session.agent}
+          modelName={session.config?.model || friendlyAgentName(session) || undefined}
         />
       )}
 
