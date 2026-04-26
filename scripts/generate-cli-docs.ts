@@ -189,3 +189,50 @@ out.push("");
 const content = out.join("\n");
 writeFileSync("docs/cli-reference.md", content);
 console.log(`docs/cli-reference.md written (${content.length} bytes, ${program.commands.length} top-level commands)`);
+
+// Also emit an HTML version wrapped in the docs chrome so the sidebar can
+// link to a real page. Markdown is rendered at build time -- no client-side
+// JS / external fetch / innerHTML of untrusted content.
+import { readFileSync } from "fs";
+import { marked } from "marked";
+
+function extractSidebar(htmlPath: string): string {
+  try {
+    const html = readFileSync(htmlPath, "utf-8");
+    const m = html.match(/<aside class="sidebar">[\s\S]*?<\/aside>/);
+    return m ? m[0] : "";
+  } catch {
+    return "";
+  }
+}
+
+const sidebar = extractSidebar("docs/cli.html");
+const renderedBody = await marked.parse(content);
+const htmlPage = `<!DOCTYPE html>
+<html lang="en" class="midnight-circuit dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CLI Reference (auto-generated) - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="colors_and_type.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  ${sidebar}
+  <div class="page-layout">
+    <main class="content">
+      <p style="color:var(--fg-faint);font-size:var(--type-caption-size);margin-bottom:1.5rem">
+        Auto-generated from the live Commander.js command tree on every push to main.
+        Source of truth: <code>scripts/generate-cli-docs.ts</code> +
+        <code>packages/cli/commands/</code>.
+      </p>
+      ${renderedBody}
+    </main>
+  </div>
+</body>
+</html>
+`;
+writeFileSync("docs/cli-reference.html", htmlPage);
+console.log(`docs/cli-reference.html written (${htmlPage.length} bytes)`);
