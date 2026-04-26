@@ -42,6 +42,7 @@
       <a href="recipes-reference.html">Recipes</a>
       <a href="runtimes-reference.html">Runtimes</a>
       <a href="api-reference.html">API Reference</a>
+      <a href="openrpc.html">OpenRPC Schema</a>
       <div class="section-title">Development</div>
       <a href="development.html">Contributing</a>
       <a href="troubleshooting.html">Troubleshooting</a>
@@ -123,6 +124,15 @@
           <tr><td><code>-32005</code></td><td>OVERLOADED</td><td>Server at capacity (too many concurrent sessions)</td></tr>
         </tbody>
       </table>
+
+      <h2>OpenRPC Schema</h2>
+      <p>
+        A machine-readable <a href="openrpc.html">OpenRPC 1.3 schema</a> is available with full request/response
+        JSON Schemas for every method. Use it with the
+        <a href="https://open-rpc.org/" target="_blank" rel="noopener">OpenRPC playground</a>, mock servers, or
+        client code generators. Download: <a href="openrpc.json"><code>openrpc.json</code></a>.
+      </p>
+      <p>Regenerate after adding new Zod schemas: <code>bun run scripts/generate-openrpc.ts</code></p>
 
       <h2>RPC Methods</h2>
 
