@@ -384,6 +384,15 @@ export class ForEachDispatcher {
         items,
         next_index: 0,
       });
+      // Mark the parent as running while iterations are in flight. Without
+      // this the parent stays at status="ready" the whole time -- which
+      // the UI normalizes to "pending" / initial state -- making it look
+      // like the parent hasn't started even when its child is actively
+      // working. The post-loop mediateStageHandoff transitions to
+      // "completed" (or "failed").
+      if (session.status !== "running") {
+        await this.deps.sessions.update(sessionId, { status: "running" });
+      }
       await this.deps.events.log(sessionId, "for_each_start", {
         stage: session.stage,
         actor: "system",
