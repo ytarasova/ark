@@ -4,6 +4,7 @@ import { FilterChip } from "./ui/FilterChip.js";
 import type { SessionStatus } from "./ui/StatusDot.js";
 import { SessionRowWithChildren } from "./SessionRowWithChildren.js";
 import { relTime, fmtCost } from "../util.js";
+import { friendlyAgentName } from "../lib/inline-display.js";
 
 /** Format token counts in the "48.2k" / "1.2M" style the design uses. */
 function fmtTokens(n?: number): string | undefined {
@@ -74,13 +75,13 @@ export function sessionToListItem(
     id: s.id,
     status: normalizeStatus(s.status),
     summary: s.summary || s.id,
-    runtime: s.runtime || s.agent_runtime || s.agent || undefined,
+    runtime: s.runtime || s.agent_runtime || friendlyAgentName(s) || undefined,
     flow: s.pipeline || s.flow || undefined,
     stageLabel: s.stage || undefined,
     progress: computeProgress(s, flowStagesMap),
     relativeTime: relTime(s.updated_at),
     unreadCount: unreadCounts?.[s.id] ?? 0,
-    agentName: s.agent,
+    agentName: friendlyAgentName(s) ?? undefined,
     compute: s.compute_provider || s.compute_kind || undefined,
     tokens: fmtTokens(totalTokens),
     errorText: s.status === "failed" && s.error ? shortError(s.error) : undefined,
