@@ -18,7 +18,18 @@ interface ConversationTabProps {
   timeline: any[];
   conversationMessages: any[];
   events: any[];
-  cost: { cost: number; tokens_in?: number; tokens_out?: number } | null | undefined;
+  // costs/session RPC returns input_tokens/output_tokens; legacy callers use
+  // tokens_in/tokens_out. Either shape works.
+  cost:
+    | {
+        cost: number;
+        input_tokens?: number;
+        output_tokens?: number;
+        tokens_in?: number;
+        tokens_out?: number;
+      }
+    | null
+    | undefined;
   isActive: boolean;
   agentIsTyping: boolean;
   bottomRef: React.RefObject<HTMLDivElement>;
