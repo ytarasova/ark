@@ -12,6 +12,7 @@ import { AttachedFiles } from "../AttachedFiles.js";
 import { formatTime } from "../timeline-builder.js";
 import { renderAgentContent } from "../event-builder.js";
 import { SdkTranscriptPanel } from "../SdkTranscriptPanel.js";
+import { friendlyAgentName } from "../../../lib/inline-display.js";
 
 interface ConversationTabProps {
   session: any;
@@ -43,6 +44,10 @@ export function ConversationTab({
   bottomRef,
 }: ConversationTabProps) {
   const attachments = (session?.config?.attachments ?? []) as Array<{ name: string; content: string; type: string }>;
+  // Resolve a display label that doesn't leak the literal "inline" placeholder
+  // ("inline is typing" reads as a bug). Falls back to the inline-flow stage's
+  // runtime name (e.g. "agent-sdk") and finally to a generic "agent".
+  const displayAgent = friendlyAgentName(session) ?? "agent";
 
   // agent-sdk sessions also write a raw transcript.jsonl next to their
   // events. Render those SDK-shaped messages inline above the timeline so
@@ -62,7 +67,7 @@ export function ConversationTab({
       )}
       {timeline.length > 0 && timeline.every((item: any) => item.kind === "system") && isActive && (
         <div className="text-center text-[12px] text-[var(--fg-muted)] py-4 mt-2 border border-dashed border-[var(--border)] rounded-lg">
-          {session.agent || "Agent"} is working... Switch to the Terminal tab to see live output.
+          {displayAgent} is working... Switch to the Terminal tab to see live output.
         </div>
       )}
       {timeline.map((item, i) => {
@@ -127,7 +132,12 @@ export function ConversationTab({
           return (
             <AgentMessage
               key={m.id || i}
-              agentName={m.agent_name || session.agent || m.role || "assistant"}
+              agentName={
+                m.agent_name ||
+                (session.agent && session.agent !== "inline" ? session.agent : null) ||
+                m.role ||
+                displayAgent
+              }
               model={m.model}
               timestamp={formatTime(m.created_at)}
             >
@@ -135,7 +145,7 @@ export function ConversationTab({
             </AgentMessage>
           );
         })}
-      {agentIsTyping && <TypingIndicator agentName={session.agent || "agent"} />}
+      {agentIsTyping && <TypingIndicator agentName={displayAgent} />}
       {session.status === "completed" && cost && (
         <SessionSummary
           duration={(() => {
