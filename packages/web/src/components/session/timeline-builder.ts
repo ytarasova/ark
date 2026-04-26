@@ -1,6 +1,7 @@
 import type { DiffFile, DiffLine } from "../ui/DiffViewer.js";
 import type { StageProgress } from "../ui/StageProgressBar.js";
 import type { SessionStatus } from "../ui/StatusDot.js";
+import { friendlyAgentName } from "../../lib/inline-display.js";
 
 export function normalizeStatus(s: string): SessionStatus {
   const valid: SessionStatus[] = ["running", "waiting", "completed", "failed", "stopped", "pending"];
@@ -141,7 +142,13 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
   const hasMessages = Array.isArray(messages) && messages.length > 0;
   const all: any[] = [];
   const pendingTools = new Map<string, number>();
-  const sessionAgent = session?.agent || "agent";
+  // Resolve a display name that doesn't leak the literal "inline" placeholder.
+  // session.agent may be set to "inline" for inline-flow dispatches, which
+  // bleeds into the typing indicator, agent message author labels, and
+  // anywhere else this string is shown. friendlyAgentName falls back to the
+  // active inline-flow stage's runtime (e.g. "agent-sdk"), then to a
+  // generic "agent".
+  const sessionAgent = friendlyAgentName(session) ?? "agent";
 
   // Dedup tracking: one event per stage transition.
   const seenStageTransitions = new Set<string>();
