@@ -3,4 +3,4 @@
 // release.yml `build-ark` job before `bun build --compile`. Baking the
 // version into a TS constant avoids runtime __dirname / package.json reads
 // that do not work in compiled binaries.
-export const VERSION = "0.21.4";
+export const VERSION = "0.21.5";
