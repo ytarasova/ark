@@ -1,11 +1,19 @@
 name: Deploy docs to GitHub Pages
 
+# Path filters cover the schema source AND the generators so the rendered
+# docs always match the current main. Editing only the OpenRPC viewer or
+# the Makefile target should also redeploy.
 on:
   push:
     branches: [main]
     paths:
       - "docs/**"
       - "packages/protocol/rpc-schemas.ts"
+      - "packages/cli/**"
+      - "scripts/generate-openrpc.ts"
+      - "scripts/generate-cli-docs.ts"
+      - "Makefile"
+      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:
@@ -30,8 +38,12 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Generate docs artifacts
-        run: make docs-openapi docs-cli || true
+      # Regenerate the auto-generated artefacts from the current source
+      # tree. If a future commit forgets to run `make docs` locally, the
+      # published site is still in sync with the schemas and the
+      # commander tree.
+      - name: Regenerate docs from current source
+        run: make docs
 
       - uses: actions/upload-pages-artifact@v3
         with:

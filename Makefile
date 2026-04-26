@@ -222,6 +222,11 @@ audit-check: ## CI gate: regenerate audit and diff against committed copy (non-z
 docs-cli: ## Generate docs/cli-reference.md from the Commander.js command tree
 	$(BUN) run scripts/generate-cli-docs.ts
 
+docs-openrpc: ## Generate docs/openrpc.json from the Zod RPC schemas
+	$(BUN) run scripts/generate-openrpc.ts
+
+docs: docs-cli docs-openrpc ## Regenerate all auto-generated docs
+
 # ── Building ─────────────────────────────────────────────────────────────────
 
 build: build-cli build-web ## Build CLI binary + web frontend
