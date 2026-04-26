@@ -80,16 +80,24 @@ export class EventRepository {
   }
 
   async list(trackId: string, opts?: { type?: string; limit?: number }): Promise<Event[]> {
+    // No default cap. The query is already scoped to one trackId + tenant,
+    // and a single session's event log is naturally bounded by the work the
+    // session actually did. Adding an arbitrary 200-row cap silently
+    // truncated the session detail view, dashboard rollups, share exports,
+    // task-builder context, and handoff retry counts -- and made Pre/Post
+    // tool-call pairs split across the boundary look like stuck "running"
+    // tools. Callers that want a small slice already pass `{ limit }`
+    // explicitly (dashboard preview = 5, dispatch resume = 1, replay = 1000).
     const d = this.d();
     const e = d.schema.events;
     const filters = [eq(e.trackId, trackId), eq(e.tenantId, this.tenantId)];
     if (opts?.type) filters.push(eq(e.type, opts.type));
-    const rows = await (d.db as any)
+    const q = (d.db as any)
       .select()
       .from(e)
       .where(and(...filters))
-      .orderBy(asc(e.id))
-      .limit(opts?.limit ?? 200);
+      .orderBy(asc(e.id));
+    const rows = opts?.limit !== undefined ? await q.limit(opts.limit) : await q;
     return (rows as DrizzleSelectEvent[]).map((r) => rowToEvent(drizzleToRow(r)));
   }
 
