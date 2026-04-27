@@ -376,12 +376,13 @@
    collapse chevron don't overlap the native traffic-light buttons
    (red/yellow/green) at the top-left of the window. The body class is
    added by packages/desktop/preload.js when running under Electron on
-   darwin. The 22px top padding clears the standard 28px traffic-light
-   strip; height auto + min-height keeps the row visually balanced. */
+   darwin. 28px top padding clears the standard 30px traffic-light strip
+   (the desktop-e2e test asserts the brand bounding box has y >= 30);
+   min-height keeps the row visually balanced. */
 body.is-macos .drag-region {
-  padding-top: 22px;
+  padding-top: 28px;
   height: auto;
-  min-height: 66px;
+  min-height: 72px;
 }
 
 /* ============================================================
