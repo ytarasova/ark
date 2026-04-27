@@ -474,8 +474,17 @@ export class ForEachDispatcher {
         },
       });
 
-      // Spawn a child session for this iteration (string name or inline object)
-      const spawnResult = await this.spawnChild(sessionId, forkGroup, spawnSpec.flow, resolvedInputs, i, {
+      // Spawn a child session for this iteration (string name or inline object).
+      // Inline flows reference iteration vars in stage `task` and `agent.system_prompt`
+      // -- substitute those *here*, against the parent's iterVars, before the child
+      // is created. The child has no awareness of `stream`/`item`/etc., so if we
+      // hand it the raw template the agent receives literal "{{stream.objective}}".
+      const flowToSpawn =
+        typeof spawnSpec.flow === "object"
+          ? { ...spawnSpec.flow, stages: spawnSpec.flow.stages.map((s) => substituteStageTemplates(s, iterVars)) }
+          : spawnSpec.flow;
+
+      const spawnResult = await this.spawnChild(sessionId, forkGroup, flowToSpawn, resolvedInputs, i, {
         repo: resolvedRepo,
         branch: resolvedBranch,
         workdir: resolvedWorkdir,
