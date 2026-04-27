@@ -118,7 +118,11 @@ export class StageAdvancer {
       const graphNextAction = deps.getStageAction(flowName, graphNextStage);
       const graphSessionUpdates: Partial<Session> = { stage: graphNextStage, status: "ready", session_id: null };
       if (graphNextAction.agent) {
-        graphSessionUpdates.agent = graphNextAction.agent;
+        // session.agent is `string | null` -- when the next stage's agent
+        // is an inline definition (object), persist the placeholder
+        // "inline" so SQLite doesn't reject the bind. The actual agent
+        // spec lives on session.config.inline_flow.stages[i].agent.
+        graphSessionUpdates.agent = typeof graphNextAction.agent === "string" ? graphNextAction.agent : "inline";
       }
       if (graphIsolation === "fresh") {
         graphSessionUpdates.claude_session_id = null;
@@ -226,7 +230,9 @@ export class StageAdvancer {
     const isolation = nextStageDef?.isolation ?? "fresh";
     const sessionUpdates: Partial<Session> = { stage: nextStage, status: "ready", error: null, session_id: null };
     if (nextAction.agent) {
-      sessionUpdates.agent = nextAction.agent;
+      // Same coercion as the graph-flow path above -- inline agent
+      // definitions are objects; the agent column is string-only.
+      sessionUpdates.agent = typeof nextAction.agent === "string" ? nextAction.agent : "inline";
     }
     if (isolation === "fresh") {
       sessionUpdates.claude_session_id = null;
