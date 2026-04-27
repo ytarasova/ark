@@ -11,7 +11,6 @@ import { FlowTab } from "./tabs/FlowTab.js";
 import { FilesTab } from "./tabs/FilesTab.js";
 import { CostTab } from "./tabs/CostTab.js";
 import { KnowledgeTab } from "./tabs/KnowledgeTab.js";
-import type { ErrorInfo } from "./types.js";
 
 interface TabPanelsProps {
   activeTab: string;
@@ -43,7 +42,6 @@ interface TabPanelsProps {
 
   // Errors
   errorEvents: any[];
-  onSelectError: (err: ErrorInfo) => void;
 
   // Flow widget (Conversation tab right rail)
   stages?: StageProgress[];
@@ -75,7 +73,6 @@ export function TabPanels(props: TabPanelsProps) {
     todoItems,
     onToggleTodo,
     errorEvents,
-    onSelectError,
     stages,
   } = props;
 
@@ -131,9 +128,7 @@ export function TabPanels(props: TabPanelsProps) {
       {activeTab === "files" && <FilesTab diffFiles={diffFiles} onSelect={onDiffFileSelect} />}
       {activeTab === "cost" && <CostTab session={session} cost={cost} />}
       {activeTab === "knowledge" && <KnowledgeTab session={session} />}
-      {activeTab === "errors" && (
-        <ErrorsTab session={session} errorEvents={errorEvents} onSelectError={onSelectError} />
-      )}
+      {activeTab === "errors" && <ErrorsTab session={session} errorEvents={errorEvents} />}
     </div>
   );
 }

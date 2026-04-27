@@ -182,6 +182,11 @@ export class UsageRecorder {
    * descendant, scoped to the recorder's tenant. Used by getSessionCost to
    * roll up fan-out children into the parent total. Single recursive CTE so
    * we don't N+1 the DB per level.
+   *
+   * Always includes `rootId` itself, even when there is no matching row in
+   * `sessions` (raw usage rows written before the session row is created,
+   * or synthetic ids used in unit tests). The strict "session does not
+   * exist -> empty result" path was a regression on existing behaviour.
    */
   private async collectDescendantIds(rootId: string): Promise<string[]> {
     const rows = (await this.db
@@ -196,7 +201,8 @@ export class UsageRecorder {
          SELECT id FROM descendants`,
       )
       .all(rootId, this.tenantId, this.tenantId)) as Array<{ id: string }>;
-    return rows.map((r) => r.id);
+    const ids = rows.map((r) => r.id);
+    return ids.includes(rootId) ? ids : [rootId, ...ids];
   }
 
   /**

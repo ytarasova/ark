@@ -1,19 +1,17 @@
 import { ErrorRow } from "../ErrorRow.js";
-import type { ErrorInfo } from "../types.js";
 import { formatTime } from "../timeline-builder.js";
 
 interface ErrorsTabProps {
   session: any;
   errorEvents: any[];
-  onSelectError: (err: ErrorInfo) => void;
 }
 
 /**
  * Errors tab body. Merges session-level errors (from a failed status) with
- * discrete error events recorded on the timeline; each row opens the error
- * detail drawer when clicked.
+ * discrete error events recorded on the timeline. Rows fold detail in/out
+ * inline -- same UX as session timeline tool blocks (no drawer).
  */
-export function ErrorsTab({ session, errorEvents, onSelectError }: ErrorsTabProps) {
+export function ErrorsTab({ session, errorEvents }: ErrorsTabProps) {
   return (
     <div className="max-w-[800px] mx-auto flex flex-col">
       {session.status === "failed" && session.error && (
@@ -22,15 +20,7 @@ export function ErrorsTab({ session, errorEvents, onSelectError }: ErrorsTabProp
           message={session.error.length > 100 ? session.error.slice(0, 100) + "..." : session.error}
           stage={session.stage}
           detail={session.error}
-          onSelect={() =>
-            onSelectError({
-              type: "Session Failed",
-              message: session.error,
-              stage: session.stage,
-              detail: session.error,
-              agent: session.agent,
-            })
-          }
+          agent={session.agent}
         />
       )}
       {errorEvents.map((ev: any, i: number) => (
@@ -41,16 +31,7 @@ export function ErrorsTab({ session, errorEvents, onSelectError }: ErrorsTabProp
           stage={ev.stage}
           timestamp={formatTime(ev.created_at)}
           detail={ev.data?.error || ev.data?.message || JSON.stringify(ev.data, null, 2)}
-          onSelect={() =>
-            onSelectError({
-              type: ev.type,
-              message: ev.data?.error || ev.data?.message,
-              stage: ev.stage,
-              timestamp: formatTime(ev.created_at),
-              detail: ev.data?.error || ev.data?.message || JSON.stringify(ev.data, null, 2),
-              agent: ev.data?.agent || ev.actor,
-            })
-          }
+          agent={ev.data?.agent || ev.actor}
         />
       ))}
       {!session.error && errorEvents.length === 0 && (

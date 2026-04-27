@@ -362,16 +362,7 @@ function autoCommitUncommittedChanges(
 
     execFileSync(
       "git",
-      [
-        "-c",
-        "user.name=Ark Agent",
-        "-c",
-        "user.email=agent@ark.local",
-        "commit",
-        "--no-verify",
-        "-m",
-        message,
-      ],
+      ["-c", "user.name=Ark Agent", "-c", "user.email=agent@ark.local", "commit", "--no-verify", "-m", message],
       { cwd: workdir, encoding: "utf-8", timeout: 10_000 },
     );
 
