@@ -24,7 +24,6 @@ const VALID_TABS = new Set([
   "files",
   "cost",
   "todos",
-  "errors",
   "flow",
   "knowledge",
 ]);
@@ -126,11 +125,6 @@ export function useSessionDetail({
     [],
   );
 
-  const errorEvents = events.filter(
-    (ev: any) => ev.type === "error" || ev.type === "action_failed" || (ev.data?.error && ev.type !== "hook_status"),
-  );
-  const hasErrors = session?.status === "failed" || errorEvents.length > 0;
-
   const stages = session ? buildStageProgress(session, flowStages) : [];
   const completedStages = stages.filter((s) => s.state === "done").length;
   const totalStages = stages.length;
@@ -142,14 +136,12 @@ export function useSessionDetail({
   ).length;
   const filesChanged = diffData?.filesChanged ?? 0;
 
-  // 7 top-level tabs (+ optional Errors). Terminal moved into Logs as a
-  // segmented control (both are runtime output, just different sources);
-  // Knowledge is now URL-only -- it's a low-frequency, low-density panel
-  // that doesn't earn top-level real estate.
-  // Timeline (formerly "Conversation") absorbs the old Events tab: the
-  // conversation builder already surfaces every stage/tool/action event the
-  // Events tab rendered raw, so keeping both was pure duplication. Each row
-  // in the Timeline view is clickable to open the raw event in a drawer.
+  // 6 top-level tabs. Terminal moved into Logs as a segmented control (both
+  // are runtime output, just different sources); Knowledge is URL-only.
+  // Errors no longer get their own tab -- the conversation timeline already
+  // renders agent_error and session_failed events as inline folds (the same
+  // pattern the rest of the UI uses for tool calls), so a separate tab +
+  // drawer was duplicate UX.
   const tabs: TabDef[] = [
     { id: "conversation", label: "Session", badge: conversationCount > 0 ? conversationCount : undefined },
     { id: "flow", label: "Flow", badge: totalStages > 0 ? `${completedStages}/${totalStages}` : undefined },
@@ -160,13 +152,7 @@ export function useSessionDetail({
     },
     { id: "files", label: "Files", badge: filesChanged > 0 ? filesChanged : undefined },
     { id: "logs", label: "Logs" },
-    // Cost tab carries no $-amount badge -- the running spend is already
-    // visible in the header ticker, and the detail lives one click away.
-    // See "Nit 2 -- cost is mentioned everywhere" in the header cleanup.
     { id: "cost", label: "Cost" },
-    ...(hasErrors
-      ? [{ id: "errors", label: "Errors", badge: (errorEvents.length || 1) as number | string | undefined }]
-      : []),
   ];
 
   const todoItems: TodoItem[] = todos.map((t: any) => ({
@@ -208,8 +194,6 @@ export function useSessionDetail({
     completedStages,
     totalStages,
     progressPct,
-    errorEvents,
-    hasErrors,
     isReviewGate,
     tabs,
     // view state

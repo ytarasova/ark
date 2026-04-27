@@ -14,7 +14,6 @@ import { ConfirmDialog } from "./ui/ConfirmDialog.js";
 
 import { normalizeStatus } from "./session/timeline-builder.js";
 import { HeaderActions } from "./session/HeaderActions.js";
-import { ErrorDetailDrawer } from "./session/ErrorDetailDrawer.js";
 import { DiffFooter, TodosFooter } from "./session/TabFooter.js";
 import { TabPanels } from "./session/TabPanels.js";
 import { RejectGateModal } from "./session/RejectGateModal.js";
@@ -23,7 +22,6 @@ import { BudgetBar } from "./session/BudgetBar.js";
 import { ResumeBanner } from "./session/ResumeBanner.js";
 import { ForEachRollup, ChildSessionCluster } from "./session/ForEachRollup.js";
 import { useSessionTreeQuery } from "../hooks/useSessionQueries.js";
-import type { ErrorInfo } from "./session/types.js";
 
 // Re-exported for back-compat: `__tests__/RejectGateModal.test.ts` imports
 // the modal from this module; keep the symbol here so that import path holds.
@@ -102,7 +100,6 @@ export function SessionDetail({
 
   const [chatMsg, setChatMsg] = useState("");
   const [activeDiffFile, setActiveDiffFile] = useState<string | undefined>(undefined);
-  const [selectedError, setSelectedError] = useState<ErrorInfo | null>(null);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -264,8 +261,6 @@ export function SessionDetail({
         onDiffFileSelect={setActiveDiffFile}
         todoItems={d.todoItems}
         onToggleTodo={handleToggleTodo}
-        errorEvents={d.errorEvents}
-        onSelectError={setSelectedError}
         stages={d.stages}
       />
 
@@ -282,8 +277,6 @@ export function SessionDetail({
 
       {d.activeTab === "diff" && d.diffData && <DiffFooter diffData={d.diffData} />}
       {d.activeTab === "todos" && todos.length > 0 && <TodosFooter todos={todos} />}
-
-      <ErrorDetailDrawer error={selectedError} onClose={() => setSelectedError(null)} />
 
       {rejectOpen && (
         <RejectGateModal
