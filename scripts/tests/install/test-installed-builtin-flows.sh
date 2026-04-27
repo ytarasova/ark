@@ -104,7 +104,7 @@ FAKE_HOME="$WORK/fake-home"
 mkdir -p "$FAKE_HOME"
 
 OUTPUT=$(env -i \
-  PATH="$PREFIX/bin:/usr/bin:/bin" \
+  PATH="/usr/bin:/bin" \
   HOME="$FAKE_HOME" \
   ARK_HOME="$FAKE_HOME/.ark" \
   "$PREFIX/bin/ark" flow list 2>&1)

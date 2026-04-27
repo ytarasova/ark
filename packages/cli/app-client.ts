@@ -80,16 +80,21 @@ async function probeHealth(port: number, timeoutMs = 600): Promise<boolean> {
  * daemon is healthy.
  */
 async function spawnLocalDaemon(port: number, deadlineMs = 10000): Promise<boolean> {
-  const arkBin = process.argv[1];
-  if (!arkBin) {
+  // Compiled Bun bundles report a virtual `/$bunfs/...` path in argv[1] and
+  // ship `bun` *inside* the binary -- there is no external `bun` to invoke.
+  // Detect that mode and exec the binary itself; only fall back to
+  // `bun <script>` when running from source (dev / test).
+  const fromCompiledBundle = process.argv[1]?.startsWith("/$bunfs/");
+  const cmd = fromCompiledBundle
+    ? [process.execPath, "server", "daemon", "start", "--port", String(port)]
+    : ["bun", process.argv[1]!, "server", "daemon", "start", "--port", String(port)];
+  if (!fromCompiledBundle && !process.argv[1]) {
     logDebug("general", "no process.argv[1] -- cannot spawn daemon");
     return false;
   }
-  // Detached child via `bun <arkBin> server daemon start --port <p>`.
-  // stdio ignored so the CLI isn't blocked by the child's output.
   try {
     const proc = Bun.spawn({
-      cmd: ["bun", arkBin, "server", "daemon", "start", "--port", String(port)],
+      cmd,
       stdio: ["ignore", "ignore", "ignore"],
       env: { ...process.env },
     });
