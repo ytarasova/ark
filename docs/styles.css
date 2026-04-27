@@ -14,6 +14,20 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 
+/* Docs reading scale -- the design tokens are sized for dense product UI
+ * (13px body). Docs need a more comfortable reading size, so we override
+ * the type tokens here without touching colors_and_type.css upstream. */
+:root {
+  --type-display-size: 32px;  --type-display-lh: 40px;
+  --type-title-size:   22px;  --type-title-lh:   30px;
+  --type-heading-size: 18px;  --type-heading-lh: 26px;
+  --type-body-size:    16px;  --type-body-lh:    26px;
+  --type-label-size:   13px;  --type-label-lh:   18px;
+  --type-caption-size: 12px;  --type-caption-lh: 17px;
+  --type-micro-size:   11px;  --type-micro-lh:   15px;
+  --type-2xs-size:     10px;  --type-2xs-lh:     13px;
+}
+
 body {
   font-family: var(--font-sans);
   background: var(--bg);
