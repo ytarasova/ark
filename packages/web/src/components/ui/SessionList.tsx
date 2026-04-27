@@ -379,16 +379,13 @@ export function SessionRow({
         />
       )}
 
-      {/* Title row: summary + elapsed time. Summary wraps up to 2 lines so
-          long names like "plan-then-implement-..." stay readable in narrow
-          side panels instead of clipping to "plan-th...". */}
-      <div className="flex items-start gap-[8px] min-w-0">
+      {/* Title row: summary + elapsed time. */}
+      <div className="flex items-center gap-[8px] min-w-0">
         {leading}
         <span
           className={cn(
-            "flex-1 min-w-0 break-words [overflow-wrap:anywhere]",
-            "[display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden",
-            "font-[family-name:var(--font-sans)] text-[14px] leading-[1.3] tracking-[-0.005em] text-[var(--fg)]",
+            "flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
+            "font-[family-name:var(--font-sans)] text-[14px] tracking-[-0.005em] text-[var(--fg)]",
             unread ? "font-semibold" : "font-medium",
           )}
           title={session.summary}
@@ -435,27 +432,14 @@ export function SessionRow({
         )}
       </div>
 
-      {/* Meta row: status dot + status word + flow + star + runtime.
-          When a row is in the failed state we allow the error pill to wrap
-          to 2 lines so messages like "Agent exited without producing
-          output" are fully readable in narrow side panels. */}
-      <div
-        className={cn(
-          "mt-[4px] flex items-center gap-[8px] min-w-0 font-[family-name:var(--font-mono-ui)] text-[11px] text-[var(--fg-muted)]",
-          isFailed && session.errorText ? "flex-wrap" : "whitespace-nowrap overflow-hidden",
-        )}
-      >
+      {/* Meta row: status dot + status word + flow + star + runtime. */}
+      <div className="mt-[4px] flex items-center gap-[8px] min-w-0 font-[family-name:var(--font-mono-ui)] text-[11px] text-[var(--fg-muted)] whitespace-nowrap overflow-hidden">
         <StatusDot status={session.status} size="md" pulse={isRunning} />
         <span className="text-[var(--fg-muted)]">{session.status}</span>
         {isFailed && session.errorText ? (
           <span
-            className={cn(
-              "px-[4px] py-0 rounded-[3px] font-[family-name:var(--font-mono)] normal-case tracking-normal text-[var(--failed)]",
-              "min-w-0 break-words [overflow-wrap:anywhere]",
-              "[display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden",
-            )}
+            className="px-[4px] py-0 rounded-[3px] font-[family-name:var(--font-mono)] normal-case tracking-normal text-[var(--failed)]"
             style={{ background: "rgba(248,113,113,.1)" }}
-            title={session.errorText}
           >
             {session.errorText}
           </span>
