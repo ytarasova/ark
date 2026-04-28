@@ -72,6 +72,42 @@ function computeProgress(session: any, flowStagesMap?: Record<string, any[]>): n
   return (idx + 1) / stages.length;
 }
 
+/** Project the flow's stages into per-segment state for the progress strip.
+ *  Mirrors the Flow tab's logic. Returns null when we don't have a stage list
+ *  (the row falls back to a single solid bar). */
+function computeStageSegments(
+  session: any,
+  flowStagesMap?: Record<string, any[]>,
+): { name: string; state: "done" | "active" | "pending" | "failed" | "skipped" }[] | null {
+  const flowName = session.pipeline || session.flow;
+  // Inline flows aren't in flowStagesMap (synthetic name + ephemeral); the
+  // child session row carries them under config.inline_flow.stages.
+  const stagesFromInline = session.config?.inline_flow?.stages;
+  const stages = (Array.isArray(stagesFromInline) && stagesFromInline.length > 0
+    ? stagesFromInline
+    : flowName
+      ? flowStagesMap?.[flowName]
+      : undefined) as Array<{ name: string }> | undefined;
+  if (!stages || stages.length === 0) return null;
+
+  const currentIdx = stages.findIndex((s) => s.name === session.stage);
+  const isCompleted = session.status === "completed";
+  const isFailed = session.status === "failed";
+  const isRunning = session.status === "running" || session.status === "waiting";
+
+  return stages.map((s, i) => {
+    if (isCompleted) return { name: s.name, state: "done" as const };
+    if (currentIdx < 0) return { name: s.name, state: "pending" as const };
+    if (i < currentIdx) return { name: s.name, state: "done" as const };
+    if (i === currentIdx) {
+      if (isFailed) return { name: s.name, state: "failed" as const };
+      if (isRunning) return { name: s.name, state: "active" as const };
+      return { name: s.name, state: "pending" as const };
+    }
+    return { name: s.name, state: "pending" as const };
+  });
+}
+
 export function sessionToListItem(
   s: any,
   flowStagesMap?: Record<string, any[]>,
@@ -91,6 +127,7 @@ export function sessionToListItem(
     flow: prettifyFlowName(s.pipeline || s.flow),
     stageLabel: s.stage || undefined,
     progress: computeProgress(s, flowStagesMap),
+    stages: computeStageSegments(s, flowStagesMap) ?? undefined,
     relativeTime: relTime(s.updated_at),
     unreadCount: unreadCounts?.[s.id] ?? 0,
     agentName: friendlyAgentName(s) ?? undefined,
