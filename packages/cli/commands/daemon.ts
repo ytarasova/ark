@@ -83,14 +83,18 @@ export function registerDaemonCommands(program: Command) {
       if (existing) removePidFile();
 
       if (opts.detach) {
-        // Background mode: spawn a detached child process running ark daemon start (without --detach)
-        const arkBin = process.argv[1];
+        // Background mode: spawn a detached child process running ark daemon
+        // start (without --detach). Use the shared self-spawn helper so this
+        // works from a compiled bundle (where argv[1] is /\$bunfs/... and
+        // there's no external `bun` to invoke). Same fix as v0.21.18 for the
+        // server daemon and v0.21.15 for the CLI auto-spawn.
         const args = ["daemon", "start", "--port", String(port), "--hostname", host];
         if (opts.conductorUrl) args.push("--conductor-url", opts.conductorUrl);
         if (opts.workspaceRoot) args.push("--workspace-root", opts.workspaceRoot);
 
+        const { arkSelfSpawnCmd } = await import("../helpers.js");
         const proc = Bun.spawn({
-          cmd: ["bun", arkBin, ...args],
+          cmd: arkSelfSpawnCmd(args),
           stdio: ["ignore", "ignore", "ignore"],
           env: { ...process.env },
         });
