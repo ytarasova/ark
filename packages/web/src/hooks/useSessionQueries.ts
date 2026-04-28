@@ -24,6 +24,15 @@ export function useSessionChildrenQuery(sessionId: string | null, enabled: boole
     queryFn: () => api.getSessionChildren(sessionId!).then((r) => r.sessions),
     enabled: !!sessionId && enabled,
     staleTime: 5000,
+    // Poll while the parent row is expanded so child rows reflect status
+    // transitions (running -> ready -> completed) live. The detail panel
+    // already polls per-session on a 5s cadence (useSessionStream); the
+    // children list cache was never invalidated on child completion --
+    // SSE broadcasts only patch the roots-only cache, not
+    // ["session-children", parentId]. Match that 5s rhythm so the side
+    // panel doesn't show stale "running" labels long after a child
+    // finished.
+    refetchInterval: enabled ? 5000 : false,
   });
 }
 
