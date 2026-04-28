@@ -80,16 +80,14 @@ async function probeHealth(port: number, timeoutMs = 600): Promise<boolean> {
  * daemon is healthy.
  */
 async function spawnLocalDaemon(port: number, deadlineMs = 10000): Promise<boolean> {
-  // Compiled Bun bundles report a virtual `/$bunfs/...` path in argv[1] and
-  // ship `bun` *inside* the binary -- there is no external `bun` to invoke.
-  // Detect that mode and exec the binary itself; only fall back to
-  // `bun <script>` when running from source (dev / test).
-  const fromCompiledBundle = process.argv[1]?.startsWith("/$bunfs/");
-  const cmd = fromCompiledBundle
-    ? [process.execPath, "server", "daemon", "start", "--port", String(port)]
-    : ["bun", process.argv[1]!, "server", "daemon", "start", "--port", String(port)];
-  if (!fromCompiledBundle && !process.argv[1]) {
-    logDebug("general", "no process.argv[1] -- cannot spawn daemon");
+  // Use the shared helper so the compiled-bundle vs source detection lives
+  // in one place (helpers.ts:arkSelfSpawnCmd).
+  let cmd: string[];
+  try {
+    const { arkSelfSpawnCmd } = await import("./helpers.js");
+    cmd = arkSelfSpawnCmd(["server", "daemon", "start", "--port", String(port)]);
+  } catch (err) {
+    logDebug("general", `daemon spawn cmd resolution failed: ${(err as Error).message}`);
     return false;
   }
   try {
