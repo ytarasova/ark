@@ -242,7 +242,20 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
           const pendingKey = toolUseId && pendingTools.has(toolUseId) ? toolUseId : toolName;
           const pendingIdx = pendingTools.get(pendingKey);
           if (pendingIdx !== undefined && items[pendingIdx]) {
-            items[pendingIdx].status = hookData.is_error ? "error" : "done";
+            // Some tool calls (notably the Task subagent tool) return a
+            // success-shaped response whose body actually describes an
+            // upstream failure -- the SDK doesn't set is_error true because
+            // from its perspective the tool returned text. Detect the most
+            // common signatures (API Error:, "Failed to authenticate") and
+            // promote those to "error" status so the UI doesn't render an
+            // OK pill above a 403.
+            const looksLikeApiError =
+              !hookData.is_error &&
+              (() => {
+                const probe = typeof toolOutput === "string" ? toolOutput : JSON.stringify(toolOutput ?? "");
+                return /\b(API Error: [45]\d\d|Failed to authenticate|not authorized to access model)\b/.test(probe);
+              })();
+            items[pendingIdx].status = hookData.is_error || looksLikeApiError ? "error" : "done";
             items[pendingIdx].toolOutput = toolOutput;
             if (hookData.duration) {
               items[pendingIdx].duration = (hookData.duration / 1000).toFixed(1) + "s";
