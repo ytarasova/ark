@@ -35,6 +35,41 @@ interface TrackedSdkProcess {
 const processes = new Map<string, TrackedSdkProcess>();
 
 /** Pipe a ReadableStream to a file (best-effort; errors are swallowed). */
+/**
+ * Project the agent-sdk runtime YAML's optional fields into the env vars
+ * launch.ts (and the bundled claude binary it spawns) read at runtime.
+ *
+ * Mapping today:
+ *   - `compat: ["bedrock", ...]`     -> ARK_COMPAT (comma-joined)
+ *   - `default_haiku_model: "<id>"`  -> ANTHROPIC_DEFAULT_HAIKU_MODEL
+ *
+ * Built-in SDK subagents (Explore etc.) cannot be reconfigured via the
+ * SDK's `agents` option per the SDK docs; the bundled binary does honour
+ * `ANTHROPIC_DEFAULT_HAIKU_MODEL` though, so that's the documented escape
+ * hatch for gateways whose haiku slug differs from the SDK's hardcoded
+ * `claude-haiku-4-5-20251001` (e.g. TF/Bedrock typically wants
+ * `pi-agentic/global.anthropic.claude-haiku-4-5`). Opt-in -- absence of
+ * the YAML field leaves the SDK default in place.
+ *
+ * Exported for unit testing without booting an AppContext.
+ */
+export function buildAgentSdkRuntimeEnv(runtimeDef: unknown): Record<string, string> {
+  const env: Record<string, string> = {};
+  const def = runtimeDef as { compat?: unknown; default_haiku_model?: unknown } | null | undefined;
+
+  const compat = Array.isArray(def?.compat)
+    ? (def.compat as unknown[]).filter((c): c is string => typeof c === "string" && c.length > 0)
+    : [];
+  if (compat.length > 0) env.ARK_COMPAT = compat.join(",");
+
+  const haiku = def?.default_haiku_model;
+  if (typeof haiku === "string" && haiku.length > 0) {
+    env.ANTHROPIC_DEFAULT_HAIKU_MODEL = haiku;
+  }
+
+  return env;
+}
+
 function pipeToFile(stream: ReadableStream<Uint8Array>, filePath: string): void {
   (async () => {
     try {
@@ -131,11 +166,12 @@ export const agentSdkExecutor: Executor = {
     // and was re-routed via runtime resolution), which would point at the wrong
     // runtime YAML. The executor's own name is the authoritative key here.
     const runtimeDef = await app.runtimes?.get?.("agent-sdk");
-    const compat = Array.isArray((runtimeDef as { compat?: unknown })?.compat)
-      ? (runtimeDef as { compat: string[] }).compat.filter((c) => typeof c === "string" && c.length > 0)
-      : [];
-    if (compat.length > 0) arkEnv.ARK_COMPAT = compat.join(",");
-    log(`agent-sdk compat modes: ${compat.length > 0 ? compat.join(",") : "(none)"}`);
+    const runtimeEnv = buildAgentSdkRuntimeEnv(runtimeDef);
+    Object.assign(arkEnv, runtimeEnv);
+    log(`agent-sdk compat modes: ${runtimeEnv.ARK_COMPAT ?? "(none)"}`);
+    if (runtimeEnv.ANTHROPIC_DEFAULT_HAIKU_MODEL) {
+      log(`agent-sdk default haiku model: ${runtimeEnv.ANTHROPIC_DEFAULT_HAIKU_MODEL}`);
+    }
 
     // opts.env carries secrets resolved by StageSecretResolver
     // (ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL per agent-sdk.yaml secrets block)

@@ -704,6 +704,13 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
   // from LiteLLM or another proxy) and uses THAT as the Bearer -- short-
   // circuiting our custom-headers path and producing 401s. Strip it.
   // Mirrors the `make claude-tfy` target's `unset ANTHROPIC_AUTH_TOKEN`.
+  // Built-in subagents (Explore etc.) cannot be overridden via the SDK's
+  // `agents` option -- the SDK docs explicitly call this out. The bundled
+  // claude binary does honour ANTHROPIC_DEFAULT_HAIKU_MODEL, which is the
+  // documented escape hatch for non-Anthropic gateways that don't accept
+  // the SDK's hardcoded `claude-haiku-4-5-20251001`. The executor sets
+  // that env var from the agent-sdk runtime YAML's `default_haiku_model`
+  // field, so we just propagate process.env without special-casing it.
   const sdkEnv: Record<string, string | undefined> = {
     ...process.env,
     ...(apiKey ? { ANTHROPIC_API_KEY: apiKey } : {}),
@@ -741,23 +748,6 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
     cwd: worktree,
     env: sdkEnv as Record<string, string | undefined>,
     allowedTools: ["Read", "Write", "Edit", "Bash", "Glob", "Grep", "mcp__ark-ask-user__ask_user"],
-    // Override the SDK's default subagent map so Task spawns inherit the
-    // *parent's* model (i.e. the provider-prefixed slug the gateway accepts)
-    // instead of the SDK's bundled `claude-haiku-4-5-20251001`. On TF/Bedrock
-    // gateways the bundled haiku id 403s -- the gateway expects something
-    // like `pi-agentic/global.anthropic.claude-haiku-4-5`. With model:
-    // "inherit", subagents reuse `effectiveModel` (the resolved parent slug)
-    // so they go through the same gateway path the main agent already
-    // succeeded against. Keeps Task usable instead of disabling it outright.
-    agents: {
-      "general-purpose": {
-        description:
-          "General-purpose subagent for exploration, research, and focused investigative work that doesn't need its own commit/PR cycle. Use when you want to fan out a question without polluting the main thread.",
-        prompt:
-          "You are a focused research subagent. Read the user's request carefully, do the minimum exploration needed to answer it, and return concise findings to the parent. Do not modify state unless explicitly asked.",
-        model: "inherit",
-      },
-    },
     permissionMode: "bypassPermissions",
     allowDangerouslySkipPermissions: true,
     executable: "bun",

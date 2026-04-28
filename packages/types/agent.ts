@@ -60,6 +60,18 @@ export interface RuntimeDefinition {
    * carry their own per-provider slugs in the catalog.
    */
   compat?: string[];
+  /**
+   * Override the bundled claude binary's default haiku model id for built-in
+   * subagents (Explore etc.) that the SDK ships with. Built-in subagents
+   * cannot be reconfigured via the SDK's `agents` option, but the bundled
+   * binary honours `ANTHROPIC_DEFAULT_HAIKU_MODEL`. Set this when routing
+   * through a gateway whose haiku slug differs from the SDK default
+   * `claude-haiku-4-5-20251001` (e.g. TF/Bedrock typically wants
+   * `pi-agentic/global.anthropic.claude-haiku-4-5`). Only relevant for the
+   * `agent-sdk` runtime; ignored elsewhere. Opt-in -- leaving it unset
+   * preserves the SDK's hardcoded default for users on Anthropic-direct.
+   */
+  default_haiku_model?: string;
   _source?: "builtin" | "global" | "project";
   _path?: string;
 }
