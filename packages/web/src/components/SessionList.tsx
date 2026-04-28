@@ -5,6 +5,7 @@ import type { SessionStatus } from "./ui/StatusDot.js";
 import { SessionRowWithChildren } from "./SessionRowWithChildren.js";
 import { relTime, fmtCost } from "../util.js";
 import { friendlyAgentName } from "../lib/inline-display.js";
+import { buildFlowProgress, type ProgressChild } from "../../../types/flow-progress.js";
 
 /** Format token counts in the "48.2k" / "1.2M" style the design uses. */
 function fmtTokens(n?: number): string | undefined {
@@ -72,46 +73,43 @@ function computeProgress(session: any, flowStagesMap?: Record<string, any[]>): n
   return (idx + 1) / stages.length;
 }
 
-/** Project the flow's stages into per-segment state for the progress strip.
- *  Mirrors the Flow tab's logic. Returns null when we don't have a stage list
- *  (the row falls back to a single solid bar). */
-function computeStageSegments(
+/**
+ * Resolve the row's flow definition shape (stages list) from either the
+ * inline-flow blob on the session or the named-flow lookup table. The
+ * domain projection in `buildFlowProgress` consumes this; nothing about
+ * the visual classification lives here.
+ */
+function resolveFlowDef(
   session: any,
   flowStagesMap?: Record<string, any[]>,
-): { name: string; state: "done" | "active" | "pending" | "failed" | "skipped" }[] | null {
+): { name: string; stages: Array<{ name: string; gate: any }> } | null {
+  const inlineStages = session.config?.inline_flow?.stages;
+  if (Array.isArray(inlineStages) && inlineStages.length > 0) {
+    return { name: session.flow ?? "inline", stages: inlineStages };
+  }
   const flowName = session.pipeline || session.flow;
-  // Inline flows aren't in flowStagesMap (synthetic name + ephemeral); the
-  // child session row carries them under config.inline_flow.stages.
-  const stagesFromInline = session.config?.inline_flow?.stages;
-  const stages = (Array.isArray(stagesFromInline) && stagesFromInline.length > 0
-    ? stagesFromInline
-    : flowName
-      ? flowStagesMap?.[flowName]
-      : undefined) as Array<{ name: string }> | undefined;
+  const stages = flowName ? flowStagesMap?.[flowName] : undefined;
   if (!stages || stages.length === 0) return null;
-
-  const currentIdx = stages.findIndex((s) => s.name === session.stage);
-  const isCompleted = session.status === "completed";
-  const isFailed = session.status === "failed";
-  const isRunning = session.status === "running" || session.status === "waiting";
-
-  return stages.map((s, i) => {
-    if (isCompleted) return { name: s.name, state: "done" as const };
-    if (currentIdx < 0) return { name: s.name, state: "pending" as const };
-    if (i < currentIdx) return { name: s.name, state: "done" as const };
-    if (i === currentIdx) {
-      if (isFailed) return { name: s.name, state: "failed" as const };
-      if (isRunning) return { name: s.name, state: "active" as const };
-      return { name: s.name, state: "pending" as const };
-    }
-    return { name: s.name, state: "pending" as const };
-  });
+  return { name: flowName, stages };
 }
 
+/**
+ * Build the row's view-model from a raw session.
+ *
+ * `children` is optional and only matters for for_each parents -- when the
+ * tree row is expanded the caller has already loaded children via
+ * `useSessionChildrenQuery`, so we pass them straight through and the
+ * domain projection emits real per-iteration segments. When children are
+ * absent (collapsed row, or non-fan-out session), the projection falls back
+ * to walking the session's own flow stages. Either way, no UI-side
+ * synthesis from count summaries -- ordering / state come from authoritative
+ * domain data.
+ */
 export function sessionToListItem(
   s: any,
   flowStagesMap?: Record<string, any[]>,
   unreadCounts?: Record<string, number>,
+  children?: ProgressChild[] | null,
 ): SessionListItem {
   const totalTokens =
     typeof s.tokens_total === "number"
@@ -119,6 +117,20 @@ export function sessionToListItem(
       : typeof s.tokens_in === "number" || typeof s.tokens_out === "number"
         ? (s.tokens_in ?? 0) + (s.tokens_out ?? 0)
         : undefined;
+
+  const flowDef = resolveFlowDef(s, flowStagesMap);
+  // For for_each parents the server attaches `child_iterations` (ordered
+  // by for_each_index) on every list response so the strip can paint real
+  // per-iteration progress on collapsed rows too. Caller-supplied
+  // `children` (e.g. from useSessionChildrenQuery on an expanded row)
+  // wins -- it carries fresher status across the 5s polling boundary.
+  const childrenForProgress = children ?? (s.child_iterations as ProgressChild[] | undefined) ?? null;
+  const progress = buildFlowProgress({
+    session: s,
+    flow: flowDef as any,
+    children: childrenForProgress,
+  });
+
   return {
     id: s.id,
     status: normalizeStatus(s.status),
@@ -127,7 +139,7 @@ export function sessionToListItem(
     flow: prettifyFlowName(s.pipeline || s.flow),
     stageLabel: s.stage || undefined,
     progress: computeProgress(s, flowStagesMap),
-    stages: computeStageSegments(s, flowStagesMap) ?? undefined,
+    stages: progress?.segments ?? undefined,
     relativeTime: relTime(s.updated_at),
     unreadCount: unreadCounts?.[s.id] ?? 0,
     agentName: friendlyAgentName(s) ?? undefined,

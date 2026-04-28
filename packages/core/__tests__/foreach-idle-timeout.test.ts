@@ -103,7 +103,11 @@ describe("for_each spawn -- idle-based child timeout", () => {
     // Tight idle window: 0.01 minutes = 600ms. Child does nothing -> timeout.
     const result = await dispatcher.dispatchForEach(parentId, makeStage({ child_timeout_minutes: 0.01 }), vars);
 
-    expect(result.ok).toBe(true); // on_iteration_failure: continue
+    // The single iteration timed out -> failed; parent's outcome is failure
+    // (any-iteration-failure-fails-parent rule). on_iteration_failure:
+    // continue only governs whether the loop keeps dispatching, not whether
+    // the parent's overall outcome counts as success.
+    expect(result.ok).toBe(false);
     const failed = await app.events.list(parentId, { type: "for_each_iteration_failed" });
     expect(failed.length).toBe(1);
     expect((failed[0].data as Record<string, unknown>).reason).toContain("timed out");

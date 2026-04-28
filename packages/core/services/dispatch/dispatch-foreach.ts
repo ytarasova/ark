@@ -637,9 +637,22 @@ export class ForEachDispatcher {
       data: { total: items.length, succeeded, failed: failedCount },
     });
 
+    // Any iteration failure means the parent's stage outcome is a failure.
+    // `on_iteration_failure: continue` only controls whether the LOOP keeps
+    // dispatching on failure -- it doesn't make the eventual outcome
+    // succeed. A partial success of a fan-out is still a failure at the
+    // parent level (the user explicitly called this out: "how can it be
+    // success if at least one failed?"). Report ok:false so
+    // mediateStageHandoff transitions the parent to `failed`.
+    if (failedCount > 0) {
+      return {
+        ok: false,
+        message: `for_each: ${failedCount} of ${items.length} iterations failed (${succeeded} succeeded)`,
+      };
+    }
     return {
       ok: true,
-      message: `for_each: ${items.length} iterations complete (${succeeded} succeeded, ${failedCount} failed)`,
+      message: `for_each: ${items.length} iterations complete`,
     };
   }
 
@@ -885,9 +898,16 @@ export class ForEachDispatcher {
       data: { total: items.length, succeeded, failed: failedCount, mode: "inline" },
     });
 
+    // Any iteration failure → parent stage fails (see spawn path comment).
+    if (failedCount > 0) {
+      return {
+        ok: false,
+        message: `for_each inline: ${failedCount} of ${items.length} iterations failed (${succeeded} succeeded)`,
+      };
+    }
     return {
       ok: true,
-      message: `for_each inline: ${items.length} iterations complete (${succeeded} succeeded, ${failedCount} failed)`,
+      message: `for_each inline: ${items.length} iterations complete`,
     };
   }
 

@@ -482,10 +482,13 @@ describe("for_each + mode:spawn -- on_iteration_failure: continue", () => {
 
     const result = await dispatcher.dispatchForEach(parentId, stage, vars);
 
-    expect(result.ok).toBe(true);
+    // continue means the LOOP keeps dispatching after a failure, but the
+    // parent's overall outcome is still a failure when any iteration
+    // failed (see foreach-all-failed-fails-parent.test.ts for the rule).
+    expect(result.ok).toBe(false);
     // All 4 children dispatched despite item 1 failing
     expect(dispatchCount).toHaveLength(4);
+    expect(result.message).toContain("1 of 4 iterations failed");
     expect(result.message).toContain("3 succeeded");
-    expect(result.message).toContain("1 failed");
   });
 });

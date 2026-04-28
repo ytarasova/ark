@@ -274,9 +274,29 @@ export interface SessionChildStats {
   cost_usd_sum: number;
 }
 
-/** Session row with an attached `child_stats` rollup (nullable when leaf). */
+/**
+ * Compact per-iteration projection of a for_each parent's children, ordered
+ * by `config.for_each_index` (ascending). Emitted alongside `child_stats`
+ * on parent rows so the UI can render real per-iteration progress segments
+ * without a second round-trip. Trimmed shape -- just enough for the UI's
+ * `buildFlowProgress` to map status -> segment state and key by id. Empty
+ * array when the parent has no children.
+ */
+export interface SessionChildIteration {
+  id: string;
+  status: string;
+  /** Iteration index from `session.config.for_each_index`. May be null for
+   *  legacy sessions or non-for_each spawns; UI then orders by created_at. */
+  for_each_index: number | null;
+  created_at: string | null;
+}
+
+/** Session row with attached `child_stats` rollup (nullable when leaf) and
+ *  -- when the session is a for_each parent -- the ordered per-iteration
+ *  list. */
 export interface SessionWithChildStats extends Session {
   child_stats: SessionChildStats | null;
+  child_iterations?: SessionChildIteration[];
 }
 
 /**

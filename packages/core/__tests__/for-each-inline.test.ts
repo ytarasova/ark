@@ -300,13 +300,14 @@ describe("for_each + mode:inline -- on_iteration_failure: continue", () => {
 
     const result = await dispatcher.dispatchForEach(parentId, stage, vars);
 
-    // Result is ok because we continued
-    expect(result.ok).toBe(true);
+    // continue means the loop kept dispatching after the failure, but the
+    // parent's overall outcome is a failure since iteration 2 failed.
+    expect(result.ok).toBe(false);
     // /src/c.ts should still have been dispatched
     expect(calledPaths.has("/src/c.ts")).toBe(true);
-    // Summary should reflect 2 succeeded, 1 failed
+    // Summary reflects the partial-failure shape
+    expect(result.message).toContain("1 of 3 iterations failed");
     expect(result.message).toContain("2 succeeded");
-    expect(result.message).toContain("1 failed");
   });
 });
 

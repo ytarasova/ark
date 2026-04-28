@@ -218,6 +218,25 @@ export function SessionHeader({
           {status}
         </span>
 
+        {stageProgress && (
+          <span
+            data-testid="stage-progress"
+            className="inline-flex items-center gap-[6px] shrink-0 font-[family-name:var(--font-mono-ui)] text-[10px] uppercase tracking-[0.04em] text-[var(--fg-muted)]"
+            title={`${stageProgress.completed}/${stageProgress.total} stages (${stageProgress.pct}%)`}
+          >
+            <span className="tabular-nums normal-case tracking-normal">
+              {stageProgress.completed}/{stageProgress.total}
+            </span>
+            <span>stages</span>
+            <div className="w-[48px] h-[3px] bg-[var(--border)] rounded-sm overflow-hidden">
+              <div
+                className="h-full bg-[var(--primary)] rounded-sm transition-[width] duration-300"
+                style={{ width: stageProgress.pct + "%" }}
+              />
+            </div>
+          </span>
+        )}
+
         {tickers && tickers.length > 0 && (
           <span className="inline-flex items-center gap-[12px] shrink-0">
             {tickers.map((t, i) => (
@@ -317,22 +336,6 @@ export function SessionHeader({
               </b>
             </span>
           ))}
-          {stageProgress && (
-            <div data-testid="stage-progress" className="ml-auto inline-flex items-center gap-[6px] shrink-0">
-              <span className="text-[11px] font-[family-name:var(--font-mono-ui)] text-[var(--fg-muted)]">
-                {stageProgress.completed}/{stageProgress.total} stages
-              </span>
-              <div className="w-[60px] h-[3px] bg-[var(--border)] rounded-sm overflow-hidden">
-                <div
-                  className="h-full bg-[var(--primary)] rounded-sm transition-[width] duration-300"
-                  style={{ width: stageProgress.pct + "%" }}
-                />
-              </div>
-              <span className="text-[11px] font-[family-name:var(--font-mono-ui)] font-semibold text-[var(--fg)] min-w-[28px] text-right tabular-nums">
-                {stageProgress.pct}%
-              </span>
-            </div>
-          )}
         </div>
       )}
     </div>

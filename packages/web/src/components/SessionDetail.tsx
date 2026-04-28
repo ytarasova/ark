@@ -158,7 +158,7 @@ export function SessionDetail({
   );
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-[var(--bg)]">
+    <div className="relative flex-1 flex flex-col min-w-0 min-h-0 bg-[var(--bg)]">
       <ScrollProgress progress={d.scrollProgress} />
       <SessionHeader
         sessionId={session.id}

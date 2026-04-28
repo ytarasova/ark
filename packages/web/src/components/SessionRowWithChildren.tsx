@@ -53,7 +53,12 @@ export function SessionRowWithChildren({
   const childQuery = useSessionChildrenQuery(session.id, isOpen && !tooDeep);
   const children: any[] = childQuery.data ?? [];
 
-  const item = sessionToListItem(session, flowStagesMap, unreadCounts);
+  // When the row is expanded we have fresher child status than the parent
+  // row's attached `child_iterations` (which is at-most-as-fresh as the
+  // parent list response). Pass them through so the segmented strip
+  // reflects in-flight transitions live; collapsed rows fall back to the
+  // server-attached snapshot in `session.child_iterations`.
+  const item = sessionToListItem(session, flowStagesMap, unreadCounts, isOpen ? children : null);
 
   const chevron = hasChildren ? (
     <button

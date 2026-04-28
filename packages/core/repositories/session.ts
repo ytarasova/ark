@@ -10,6 +10,7 @@ import type {
   CreateSessionOpts,
   SessionListFilters,
   SessionChildStats,
+  SessionChildIteration,
   SessionWithChildStats,
   SessionWithChildren,
 } from "../../types/index.js";
@@ -327,8 +328,16 @@ export class SessionRepository {
   async listRoots(filters?: SessionListFilters): Promise<SessionWithChildStats[]> {
     const roots = await this.list({ ...(filters ?? {}), rootsOnly: true });
     if (roots.length === 0) return [];
-    const statsByParent = await this.computeChildStats(roots.map((r) => r.id));
-    return roots.map((r) => ({ ...r, child_stats: statsByParent.get(r.id) ?? null }));
+    const ids = roots.map((r) => r.id);
+    const [statsByParent, itersByParent] = await Promise.all([
+      this.computeChildStats(ids),
+      this.computeChildIterations(ids),
+    ]);
+    return roots.map((r) => ({
+      ...r,
+      child_stats: statsByParent.get(r.id) ?? null,
+      child_iterations: itersByParent.get(r.id) ?? undefined,
+    }));
   }
 
   /**
@@ -339,8 +348,16 @@ export class SessionRepository {
   async listChildren(parentId: string): Promise<SessionWithChildStats[]> {
     const children = await this.list({ parent_id: parentId });
     if (children.length === 0) return [];
-    const statsByParent = await this.computeChildStats(children.map((c) => c.id));
-    return children.map((c) => ({ ...c, child_stats: statsByParent.get(c.id) ?? null }));
+    const ids = children.map((c) => c.id);
+    const [statsByParent, itersByParent] = await Promise.all([
+      this.computeChildStats(ids),
+      this.computeChildIterations(ids),
+    ]);
+    return children.map((c) => ({
+      ...c,
+      child_stats: statsByParent.get(c.id) ?? null,
+      child_iterations: itersByParent.get(c.id) ?? undefined,
+    }));
   }
 
   /**
@@ -491,6 +508,76 @@ export class SessionRepository {
       const existing = out.get(row.parentId);
       if (!existing) continue;
       existing.cost_usd_sum = Number(row.costSum) || 0;
+    }
+
+    return out;
+  }
+
+  /**
+   * Per-iteration projection of every direct child grouped by parent. Used to
+   * paint accurate fan-out progress strips on the parent row without making
+   * the UI fetch each parent's children separately. Only the columns the
+   * `buildFlowProgress` projection needs (id, status, for_each_index from
+   * config, created_at) are returned -- the heavy `transcript`/`workdir`
+   * fields stay out of the list response.
+   *
+   * One query for everything; we group + extract for_each_index in JS rather
+   * than relying on dialect-specific JSON1 functions so SQLite + Postgres
+   * stay on the same code path.
+   */
+  private async computeChildIterations(parentIds: string[]): Promise<Map<string, SessionChildIteration[]>> {
+    const out = new Map<string, SessionChildIteration[]>();
+    if (parentIds.length === 0) return out;
+
+    const d = this.d();
+    const s = d.schema.sessions;
+
+    const rows = (await (d.db as any)
+      .select({
+        id: s.id,
+        parentId: s.parentId,
+        status: s.status,
+        config: s.config,
+        createdAt: s.createdAt,
+      })
+      .from(s)
+      .where(
+        and(
+          eq(s.tenantId, this.tenantId),
+          ne(s.status, "deleting"),
+          ne(s.status, "archived"),
+          inArray(s.parentId, parentIds),
+        ),
+      )) as Array<{
+      id: string;
+      parentId: string | null;
+      status: string;
+      config: string | null;
+      createdAt: string | null;
+    }>;
+
+    for (const row of rows) {
+      if (!row.parentId) continue;
+      const cfg = safeParseConfig(row.config) as { for_each_index?: unknown } | null;
+      const idx = typeof cfg?.for_each_index === "number" && Number.isFinite(cfg.for_each_index) ? cfg.for_each_index : null;
+      const list = out.get(row.parentId) ?? [];
+      list.push({ id: row.id, status: row.status, for_each_index: idx, created_at: row.createdAt });
+      out.set(row.parentId, list);
+    }
+
+    // Sort each parent's iterations: by for_each_index ascending (canonical),
+    // tie-break with created_at then id so the order is deterministic.
+    for (const list of out.values()) {
+      list.sort((a, b) => {
+        if (a.for_each_index != null && b.for_each_index != null && a.for_each_index !== b.for_each_index) {
+          return a.for_each_index - b.for_each_index;
+        }
+        if (a.for_each_index != null && b.for_each_index == null) return -1;
+        if (a.for_each_index == null && b.for_each_index != null) return 1;
+        const at = a.created_at ?? "";
+        const bt = b.created_at ?? "";
+        return at < bt ? -1 : at > bt ? 1 : a.id.localeCompare(b.id);
+      });
     }
 
     return out;
