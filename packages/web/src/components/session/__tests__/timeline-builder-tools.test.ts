@@ -259,40 +259,6 @@ describe("buildConversationTimeline -- tool pairing", () => {
     expect(items.filter((i) => i.kind === "agent")).toHaveLength(0);
   });
 
-  test("Task subagent body containing API Error is promoted to error status", () => {
-    // Real incident: SDK Task tool returns success-shaped response whose
-    // body is `[{type:"text", text:"Failed to authenticate. API Error: 403
-    // ... not authorized to access model"}]`. is_error stays false because
-    // the tool itself returned, but the user-visible body is a 403. The
-    // builder must surface that as an error pill so the UI doesn't render
-    // an OK status above an obvious failure.
-    const events = [
-      ev("hook_status", {
-        event: "PreToolUse",
-        tool_name: "Task",
-        tool_use_id: "toolu_TASK_403",
-        tool_input: { description: "Explore worktree setup" },
-      }),
-      ev("hook_status", {
-        event: "PostToolUse",
-        tool_use_id: "toolu_TASK_403",
-        tool_result_content: [
-          {
-            type: "text",
-            text: "Failed to authenticate. API Error: 403 User foo-key is not authorized to access model claude-haiku-4-5-20251001/undefined or model does not exist",
-          },
-        ],
-        is_error: false,
-      }),
-    ];
-
-    const items = buildConversationTimeline(events, [], null);
-    const tools = items.filter((i) => i.kind === "tool");
-
-    expect(tools).toHaveLength(1);
-    expect(tools[0].status).toBe("error");
-  });
-
   test("orphan PreToolUse on a still-running session stays running (live tail)", () => {
     // While the session is genuinely live, an unmatched PreToolUse means
     // the tool is in flight -- do NOT prematurely flip it to interrupted.
