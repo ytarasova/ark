@@ -559,7 +559,8 @@ export class SessionRepository {
     for (const row of rows) {
       if (!row.parentId) continue;
       const cfg = safeParseConfig(row.config) as { for_each_index?: unknown } | null;
-      const idx = typeof cfg?.for_each_index === "number" && Number.isFinite(cfg.for_each_index) ? cfg.for_each_index : null;
+      const idx =
+        typeof cfg?.for_each_index === "number" && Number.isFinite(cfg.for_each_index) ? cfg.for_each_index : null;
       const list = out.get(row.parentId) ?? [];
       list.push({ id: row.id, status: row.status, for_each_index: idx, created_at: row.createdAt });
       out.set(row.parentId, list);

@@ -129,10 +129,7 @@ describe("sessionToListItem -- stage segments", () => {
   });
 
   it("returns no stages (single-bar fallback) when neither inline_flow nor flowStagesMap has the flow", () => {
-    const item = sessionToListItem(
-      { id: "s1", status: "running", flow: "unknown-flow", stage: "x" },
-      flowStagesMap,
-    );
+    const item = sessionToListItem({ id: "s1", status: "running", flow: "unknown-flow", stage: "x" }, flowStagesMap);
     expect(item.stages).toBeUndefined();
   });
 });

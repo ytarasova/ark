@@ -153,10 +153,7 @@ function projectIterations(
   return { kind: "iterations", segments };
 }
 
-function projectStages(
-  session: Pick<Session, "status" | "stage">,
-  flow: FlowDefinition,
-): FlowProgress {
+function projectStages(session: Pick<Session, "status" | "stage">, flow: FlowDefinition): FlowProgress {
   const stages = flow.stages;
   const currentIdx = stages.findIndex((s) => s.name === session.stage);
   const isCompleted = session.status === "completed";
