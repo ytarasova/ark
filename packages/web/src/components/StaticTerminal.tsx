@@ -116,9 +116,6 @@ export function StaticTerminal({ output, cols: colsProp, rows: rowsProp }: Stati
 
   return (
     <div className="panel-card" data-testid="static-terminal-panel">
-      <div className="panel-card-header">
-        <span>terminal · replay</span>
-      </div>
       <div ref={containerRef} className="terminal-host" />
     </div>
   );

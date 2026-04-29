@@ -754,23 +754,22 @@ body.is-macos .drag-region {
 
 /* ── Logs / terminal panels ─────────────────────────────────────────────── */
 
+/* Logs/Terminal panels sit directly inside the tab content area, which
+ * already provides framing via the tab strip. Keep the flex behaviour but
+ * drop the redundant border/background so the body fills flush. */
 .panel-card {
   display: flex;
   flex: 1;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-card);
 }
 
 .panel-card-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--border);
+  padding: 4px 2px 8px;
   font-family: var(--font-mono-ui);
   font-size: 10.5px;
   color: var(--fg-muted);

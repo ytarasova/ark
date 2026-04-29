@@ -53,12 +53,9 @@ export function LogsTab({ sessionId, status }: LogsTabProps) {
     el.scrollTop = el.scrollHeight;
   }, [lines, autoscroll]);
 
-  const shortId = sessionId.length > 14 ? sessionId.slice(0, 8) + "..." + sessionId.slice(-4) : sessionId;
-
   return (
     <div data-testid="logs-tab" className="panel-card">
       <div className="panel-card-header">
-        <span data-testid="logs-header-chip">stdio · {shortId}</span>
         {isRunning && (
           <span className="text-[9.5px] uppercase tracking-[0.05em] text-[#86efac]" data-testid="logs-live-indicator">
             live

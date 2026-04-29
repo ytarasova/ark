@@ -63,12 +63,9 @@ function render(opts: {
 }
 
 describe("LogsTab", () => {
-  test("renders the terminal-panel header with session id chip + traffic dots", () => {
+  test("renders the logs panel root", () => {
     const html = render({ content: "line1\nline2\n" });
     expect(html).toContain('data-testid="logs-tab"');
-    expect(html).toContain('data-testid="logs-header-chip"');
-    // React SSR inserts `<!-- -->` comment nodes between text + expression siblings.
-    expect(html).toMatch(/stdio ·.*s-1/);
   });
 
   test("renders log lines with line numbers", () => {

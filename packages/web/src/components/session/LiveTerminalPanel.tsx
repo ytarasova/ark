@@ -194,7 +194,6 @@ export function LiveTerminalPanel({ sessionId, isActive, fallback }: LiveTermina
   return (
     <div className="panel-card" data-testid="live-terminal-panel" style={{ display: isActive ? undefined : "none" }}>
       <div className="panel-card-header">
-        <span>terminal · {sessionId}</span>
         <span className={`panel-status ${statusColor}`} data-testid="live-terminal-status">
           {statusLabel}
         </span>
