@@ -44,6 +44,13 @@ export class ArkServer {
   private connections = new Map<string, ServerConnection>();
   private connCounter = 0;
   private auth: ServerAuthConfig | null = null;
+  /**
+   * Root AppContext reference, captured by `attachLifecycle` / `attachAuth`.
+   * Used to materialize a per-request tenant-scoped view (`scopedApp` on
+   * the dispatched `TenantContext`) so the WS path matches the hosted-HTTP
+   * path's per-tenant dispatch without re-registering handlers per call.
+   */
+  private app: import("../core/app.js").AppContext | null = null;
 
   constructor() {
     this.router.requireInitialization();
@@ -58,6 +65,7 @@ export class ArkServer {
    * launched simply skip this wiring.
    */
   attachLifecycle(app: import("../core/app.js").AppContext): () => void {
+    this.app = app;
     return app.sessionService.registerDefaultDispatcher((session) => {
       if (session) this.notify("session/updated", { session });
     });
@@ -69,11 +77,24 @@ export class ArkServer {
    * every request. Without this, the server falls back to local-admin.
    */
   attachAuth(app: import("../core/app.js").AppContext): void {
+    this.app = app;
     this.auth = {
       requireToken: app.config.authSection.requireToken,
       defaultTenant: app.config.authSection.defaultTenant,
       apiKeys: app.apiKeys,
     };
+  }
+
+  /**
+   * Materialize the per-request tenant-scoped AppContext view for `ctx`.
+   * Returns the root `app` unchanged when no app is wired (unit tests with
+   * a hand-built router) or when the caller's tenant matches the root's.
+   */
+  private scopedAppFor(ctx: TenantContext): import("../core/app.js").AppContext | undefined {
+    if (!this.app) return undefined;
+    const tenantId = ctx.tenantId ?? this.app.tenantId ?? this.app.config.authSection.defaultTenant ?? null;
+    if (!tenantId) return this.app;
+    return this.app.forTenant(tenantId);
   }
 
   /** Register a method handler. */
@@ -94,6 +115,7 @@ export class ArkServer {
           conn.subscriptions = msg.params.subscribe as string[];
         }
         const ctx = await this.resolveContext(conn);
+        ctx.scopedApp = this.scopedAppFor(ctx);
         const response = await this.router.dispatch(msg, this.notify.bind(this), ctx);
         transport.send(response);
 
@@ -359,6 +381,7 @@ export class ArkServer {
                 conn.subscriptions = msg.params.subscribe as string[];
               }
               const ctx = await self.resolveContext(conn);
+              ctx.scopedApp = self.scopedAppFor(ctx);
               const response = await self.router.dispatch(msg, self.notify.bind(self), ctx);
               conn.transport.send(response);
               if (msg.method === "initialize" && "result" in response) {

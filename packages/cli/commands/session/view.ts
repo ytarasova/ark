@@ -301,7 +301,9 @@ export function registerViewCommands(session: Command) {
           const d = (e.data ?? {}) as Record<string, unknown>;
           const idx = d.index ?? "?";
           const exitStatus = (d.exit_status as string | undefined) ?? "completed";
-          const statusIcon = exitStatus === "completed" ? chalk.green("PASS") : chalk.red("FAIL");
+          // exit_status comes off `for_each_complete` data as "completed" or
+          // "failed"; both map cleanly to the shared status color/icon table.
+          const statusIcon = coloredStatusIcon(exitStatus);
           const durationMs = typeof d.duration_ms === "number" ? (d.duration_ms as number) : null;
           const durStr =
             durationMs !== null
