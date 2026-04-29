@@ -15,8 +15,9 @@
 
 import { tmpdir } from "os";
 import { join } from "path";
-import { unlink } from "fs/promises";
+import { unlink, readdir } from "fs/promises";
 import { existsSync, createReadStream } from "fs";
+import { logDebug } from "../../core/observability/structured-log.js";
 import type {
   AgentAttachOpenReq,
   AgentAttachOpenRes,
@@ -53,6 +54,72 @@ interface AttachHandle {
 
 const attachStreams = new Map<string, AttachHandle>();
 let attachCounter = 0;
+
+/**
+ * Sweep `tmpdir()/arkd-attach-*.fifo` of leftovers from prior arkd runs
+ * (graceful shutdowns close their own; ungraceful stops + crashes leave
+ * the inode + a `cat >> fifo` writer behind). Unlink frees the inode and
+ * lets the writer exit on next pipe-write. Also kills the obvious zombies
+ * via `pkill -f arkd-attach` so they don't accumulate across many runs --
+ * we observed 80 of these orphans on a long-lived dev workstation, each
+ * holding a fifo + a sh + a cat. Best-effort: errors swallowed.
+ *
+ * Exported for `startArkd()` to call before the first request handler is
+ * mounted. No-op when the tmpdir has no matches.
+ */
+export async function sweepOrphanAttachFifos(): Promise<{ unlinked: number }> {
+  let unlinked = 0;
+  try {
+    const entries = await readdir(tmpdir());
+    for (const name of entries) {
+      if (!name.startsWith("arkd-attach-") || !name.endsWith(".fifo")) continue;
+      try {
+        await unlink(join(tmpdir(), name));
+        unlinked++;
+      } catch {
+        /* already gone */
+      }
+    }
+  } catch {
+    /* tmpdir not readable -- nothing to do */
+  }
+  if (unlinked > 0) {
+    try {
+      Bun.spawn({ cmd: ["pkill", "-f", "arkd-attach-"], stdout: "ignore", stderr: "ignore" });
+    } catch {
+      /* pkill missing on minimal images -- the unlinked fifos starve writers
+         eventually anyway */
+    }
+    logDebug("compute", `sweepOrphanAttachFifos: unlinked ${unlinked} stale fifos`);
+  }
+  return { unlinked };
+}
+
+/**
+ * Close every active attach stream owned by this arkd. Called from
+ * `startArkd().stop()` so a graceful shutdown leaves no fifos / writers
+ * behind. Mirrors `agentAttachClose` per-handle but skips the network
+ * round-trip.
+ */
+export async function closeAllAttachStreams(): Promise<void> {
+  for (const [handle, stream] of attachStreams) {
+    attachStreams.delete(handle);
+    try {
+      Bun.spawn({
+        cmd: ["tmux", "pipe-pane", "-t", stream.sessionName],
+        stdout: "ignore",
+        stderr: "ignore",
+      });
+    } catch {
+      /* tmux already gone */
+    }
+    try {
+      await unlink(stream.fifoPath);
+    } catch {
+      /* already gone */
+    }
+  }
+}
 
 async function isTmuxRunning(sessionName: string): Promise<boolean> {
   const proc = Bun.spawn({

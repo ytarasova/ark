@@ -41,7 +41,7 @@ async function boot(): Promise<void> {
 }
 
 function seedTracks(sessionId: string, files: { name: string; body: string }[]): void {
-  const dir = join(app.config.tracksDir, sessionId);
+  const dir = join(app.config.dirs.tracks, sessionId);
   mkdirSync(dir, { recursive: true });
   for (const f of files) {
     writeFileSync(join(dir, f.name), f.body);

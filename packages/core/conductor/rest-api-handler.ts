@@ -73,7 +73,7 @@ export async function handleRestApi(app: AppContext, req: Request, path: string)
         return Response.json({ error: "tail must be a positive integer" }, { status: 400 });
       }
       const fileName = sub === "stdio" ? "stdio.log" : "transcript.jsonl";
-      const read = await readForensicFile(scoped.config.tracksDir, id, fileName, { tail });
+      const read = await readForensicFile(scoped.config.dirs.tracks, id, fileName, { tail });
       if (read.tooLarge) {
         return Response.json(
           { error: `file is ${read.size} bytes, over the 2MB cap -- use ?tail=<N> to read the tail` },

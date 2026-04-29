@@ -16,6 +16,7 @@ import type { AppContext } from "../app.js";
 import { RpcError } from "../../protocol/types.js";
 import { logDebug } from "../observability/structured-log.js";
 import { addMcpServer, removeMcpServer } from "../tools.js";
+import { buildTenantScope } from "../tenant-scope.js";
 import { generateRepoMap } from "../repo-map.js";
 import { listClaudeSessions, refreshClaudeSessionsCache } from "../claude/sessions.js";
 import { indexTranscripts } from "../search/search.js";
@@ -301,15 +302,25 @@ export function buildLocalAppMode(app?: AppContext, database?: DatabaseMode): Ap
 }
 
 /**
- * Local mode is single-tenant. The "default" tenantId is a sentinel for
- * bookkeeping; there is no isolation to enforce, so every `forTenant`
- * call returns the same AppContext. Building a child DI scope here would
- * silently detach the per-tenant SessionService from the lifecycle
- * dispatcher (listener registries are per-instance) and break auto-
- * dispatch.
+ * Local mode is single-tenant by design. Production traffic always lands on
+ * the local-admin context (`tenantId === "default"` -- the bookkeeping
+ * sentinel), and there is no isolation to enforce: building a child DI
+ * scope for that path silently detaches the per-tenant SessionService
+ * from the lifecycle dispatcher (listener registries are per-instance)
+ * and breaks auto-dispatch.
+ *
+ * For the sentinel we therefore return the same AppContext. Tests that
+ * explicitly call `app.forTenant("non-default")` to seed multi-tenant
+ * fixtures against the local SQLite DB still get a real child scope so
+ * their tenant-scoped repos exercise `setTenant()` paths.
  */
 function makeLocalTenantScope(): TenantScopeCapability {
   return {
-    forTenant: (app) => app,
+    forTenant: (app, tenantId) => {
+      const sentinel = app.config.authSection.defaultTenant ?? "default";
+      if (tenantId === sentinel) return app;
+      if (app.tenantId === tenantId) return app;
+      return buildTenantScope(app, tenantId);
+    },
   };
 }
