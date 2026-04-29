@@ -888,7 +888,7 @@ body.is-macos .drag-region {
 }
 .terminal-tab-body {
   flex: 1;
-  min-height: 360px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }

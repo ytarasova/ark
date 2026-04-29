@@ -86,7 +86,7 @@ export function LogsTab({ sessionId, status, ptyCols, ptyRows, output, isActive,
     <div data-testid="logs-tab" className="flex flex-col gap-[10px] max-w-full flex-1 min-h-0">
       <SegmentedControl source={source} onChange={setSource} />
       {source === "terminal" ? (
-        <div data-testid="logs-tab-terminal" className="flex-1 min-h-[360px]">
+        <div data-testid="logs-tab-terminal" className="flex-1 min-h-0 flex flex-col">
           <TerminalTab
             sessionId={sessionId}
             output={output ?? null}
