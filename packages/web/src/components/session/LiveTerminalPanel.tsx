@@ -76,9 +76,12 @@ export function LiveTerminalPanel({ sessionId, isActive, fallback }: LiveTermina
         cursor: "#e4e4e7",
         selectionBackground: "#3f3f46",
         // OverviewRulerRenderer paints a 1px stripe on the left edge of the
-        // ruler canvas using this colour (defaults to foreground -> renders
-        // as a bright vertical line). Hide it.
-        overviewRulerBorder: "transparent",
+        // ruler canvas using this colour (xterm defaults to foreground ->
+        // renders as a bright vertical line; passing "transparent" doesn't
+        // help because xterm's css.toColor() throws and silently falls back
+        // to the foreground). Match the terminal background so the 1px
+        // stripe blends in.
+        overviewRulerBorder: "#0a0a0a",
       },
       allowProposedApi: true,
     });
