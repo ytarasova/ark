@@ -83,7 +83,7 @@ export function LogsTab({ sessionId, status, ptyCols, ptyRows, output, isActive,
   const shortId = sessionId.length > 14 ? sessionId.slice(0, 8) + "..." + sessionId.slice(-4) : sessionId;
 
   return (
-    <div data-testid="logs-tab" className="flex flex-col gap-[10px] max-w-full">
+    <div data-testid="logs-tab" className="flex flex-col gap-[10px] max-w-full flex-1 min-h-0">
       <SegmentedControl source={source} onChange={setSource} />
       {source === "terminal" ? (
         <div data-testid="logs-tab-terminal" className="flex-1 min-h-[360px]">
@@ -97,35 +97,12 @@ export function LogsTab({ sessionId, status, ptyCols, ptyRows, output, isActive,
           />
         </div>
       ) : (
-        <div
-          data-testid="logs-tab-stdio"
-          className={cn(
-            "relative overflow-hidden rounded-[9px] border border-[var(--border)]",
-            "bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0)_20%,rgba(0,0,0,0.15)_100%),var(--bg-card)]",
-            "border-t-[rgba(255,255,255,0.08)] border-b-[rgba(0,0,0,0.5)]",
-            "shadow-[inset_0_1px_0_rgba(255,255,255,0.05),inset_0_-1px_0_rgba(0,0,0,0.45),0_1px_2px_rgba(0,0,0,0.45),0_10px_22px_-6px_rgba(0,0,0,0.4)]",
-          )}
-        >
-          <div
-            className={cn(
-              "flex items-center gap-[8px] px-[12px] py-[8px] border-b border-[var(--border)]",
-              "bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(0,0,0,0.1))]",
-              "font-[family-name:var(--font-mono-ui)] text-[10.5px] font-medium text-[var(--fg-muted)]",
-            )}
-          >
-            <TrafficDot color="#f87171" />
-            <TrafficDot color="#fbbf24" />
-            <TrafficDot color="#34d399" />
-            <span
-              data-testid="logs-header-chip"
-              className={cn(
-                "inline-flex items-center gap-[5px] px-[7px] py-[3px] rounded-[4px]",
-                "text-[var(--fg)]",
-                "bg-[linear-gradient(180deg,#1f1f35,#181829)]",
-                "border border-[var(--border)] border-t-[rgba(255,255,255,0.08)]",
-                "shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_2px_rgba(0,0,0,0.3)]",
-              )}
-            >
+        <div data-testid="logs-tab-stdio" className="panel-card">
+          <div className="panel-card-header">
+            <span className="panel-traffic-dot red" aria-hidden />
+            <span className="panel-traffic-dot amber" aria-hidden />
+            <span className="panel-traffic-dot green" aria-hidden />
+            <span data-testid="logs-header-chip" className="panel-card-chip">
               stdio · {shortId}
             </span>
             {isRunning && (
@@ -179,31 +156,13 @@ export function LogsTab({ sessionId, status, ptyCols, ptyRows, output, isActive,
           )}
 
           {lines.length > 0 && (
-            <pre
-              ref={preRef}
-              data-testid="logs-body"
-              className={cn(
-                "m-0 px-0 py-[10px] whitespace-pre overflow-auto max-h-[60vh]",
-                "font-[family-name:var(--font-mono)] text-[11px] leading-[18px] text-[var(--fg)]",
-                "bg-[linear-gradient(180deg,rgba(0,0,0,0.2)_0%,rgba(0,0,0,0)_6%),var(--bg-code)]",
-                "shadow-[inset_0_2px_4px_rgba(0,0,0,0.35)]",
-              )}
-            >
+            <pre ref={preRef} data-testid="logs-body" className="panel-log-body">
               {lines.map((ln, i) => {
                 const isExec = ln.trimStart().startsWith("[exec ");
                 return (
-                  <div key={i} className="flex">
-                    <span className="inline-block w-[48px] pr-[10px] text-right text-[var(--fg-faint)] select-none shrink-0">
-                      {i + 1}
-                    </span>
-                    <span
-                      className={cn(
-                        "whitespace-pre flex-1 min-w-0",
-                        isExec ? "text-[var(--fg-muted)]" : "text-[var(--fg)]",
-                      )}
-                    >
-                      {ln || " "}
-                    </span>
+                  <div key={i} className="panel-log-line">
+                    <span className="panel-log-gutter">{i + 1}</span>
+                    <span className={cn("panel-log-content", isExec && "muted")}>{ln || " "}</span>
                   </div>
                 );
               })}
@@ -252,12 +211,3 @@ function SegmentedControl({ source, onChange }: { source: LogsSource; onChange: 
   );
 }
 
-function TrafficDot({ color }: { color: string }) {
-  return (
-    <span
-      aria-hidden
-      className="w-[6px] h-[6px] rounded-full shrink-0"
-      style={{ backgroundColor: color, boxShadow: `0 0 3px ${color}99` }}
-    />
-  );
-}

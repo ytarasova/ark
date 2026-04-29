@@ -34,9 +34,7 @@ export function TerminalTab({ sessionId, output, cols, rows, isActive, tabActive
           <StaticTerminal output={output} cols={cols} rows={rows} />
         </div>
       ) : (
-        <div className="text-center py-12 text-[var(--fg-faint)] font-[family-name:var(--font-mono)] text-[12px]">
-          No terminal output available
-        </div>
+        <div className="terminal-tab-empty">No terminal output available</div>
       )}
       <CopyAttachCommandButton sessionId={sessionId} />
     </div>
