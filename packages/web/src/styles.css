@@ -880,13 +880,17 @@ body.is-macos .drag-region {
  * ::-webkit-scrollbar rules don't apply. The track width is hardcoded to
  * `overviewRuler.width || 14`, hence the chunky default. We pass
  * `overviewRuler: { width: 6 }` to both Terminal constructors to shrink it to
- * 6px and let xterm's own scrollbarSliderBackground (20% opacity of the theme
- * foreground) own the colour -- it's context-aware (light on the dark
- * terminal canvas) where the app's --border token would render too bright
- * against #0a0a0a. Just round the corners so the thin thumb has the same
- * border-radius as the rest of the app's scrollbars. */
+ * 6px and override the slider colour with the same `--border` token every
+ * other scrollbar in the app uses, so the terminal's scrollbar tracks the
+ * theme (e.g. midnight-circuit dark = #252540, light = #dcdce8) instead of
+ * xterm's hardcoded 20%-opacity-foreground default. */
 .terminal-host .xterm .xterm-scrollable-element > .scrollbar > .slider {
+  background: var(--border);
   border-radius: 3px;
+}
+.terminal-host .xterm .xterm-scrollable-element > .scrollbar > .slider:hover,
+.terminal-host .xterm .xterm-scrollable-element > .scrollbar > .slider.active {
+  background: var(--ring);
 }
 
 /* Status pill rendered next to the panel chip (e.g. "Live", "Reconnecting 1/5"). */
