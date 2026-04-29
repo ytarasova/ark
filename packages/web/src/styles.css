@@ -903,14 +903,33 @@ body.is-macos .drag-region {
   font-size: 12px;
 }
 
-.static-terminal-host {
-  width: 100%;
-  height: 100%;
+/* Inner xterm host -- shared by Live + Static terminal panels.
+ * The panel-card wrapper provides the chrome (border, header, shadow);
+ * this just owns the dark canvas + scroll behaviour for xterm. */
+.terminal-host {
+  flex: 1;
   min-height: 0;
+  width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   background: #0a0a0a;
   padding: 4px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
+}
+
+/* Status pill rendered next to the panel chip (e.g. "Live", "Reconnecting 1/5"). */
+.panel-status {
+  font-size: 10px;
+  font-family: var(--font-mono-ui);
+}
+.panel-status.running {
+  color: var(--running);
+}
+.panel-status.waiting {
+  color: var(--waiting);
+}
+.panel-status.failed {
+  color: var(--failed);
+}
+.panel-status.idle {
+  color: var(--fg-faint);
 }

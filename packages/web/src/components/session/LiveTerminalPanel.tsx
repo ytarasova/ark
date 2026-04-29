@@ -184,29 +184,24 @@ export function LiveTerminalPanel({ sessionId, isActive, fallback }: LiveTermina
 
   const statusColor =
     status === "connected"
-      ? "text-[var(--running)]"
+      ? "running"
       : status === "error"
-        ? "text-[var(--failed)]"
+        ? "failed"
         : status === "reconnecting"
-          ? "text-[var(--waiting)]"
-          : "text-[var(--fg-faint)]";
+          ? "waiting"
+          : "idle";
 
   return (
-    <div
-      className="flex flex-col w-full h-full border border-border rounded-lg overflow-hidden bg-[#0a0a0a]"
-      data-testid="live-terminal-panel"
-      style={{ display: isActive ? undefined : "none" }}
-    >
-      <div className="flex items-center justify-between px-3 py-1.5 bg-secondary border-b border-border">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-            Live terminal
-          </span>
-          <span className={`text-[10px] ${statusColor}`} data-testid="live-terminal-status">
-            {statusLabel}
-          </span>
-        </div>
-        <div className="flex items-center gap-1">
+    <div className="panel-card" data-testid="live-terminal-panel" style={{ display: isActive ? undefined : "none" }}>
+      <div className="panel-card-header">
+        <span className="panel-traffic-dot red" aria-hidden />
+        <span className="panel-traffic-dot amber" aria-hidden />
+        <span className="panel-traffic-dot green" aria-hidden />
+        <span className="panel-card-chip">terminal · {sessionId}</span>
+        <span className={`panel-status ${statusColor}`} data-testid="live-terminal-status">
+          {statusLabel}
+        </span>
+        <div className="ml-auto flex items-center gap-[6px]">
           {(status === "connected" || status === "connecting" || status === "reconnecting") && (
             <Button
               variant="ghost"
@@ -232,9 +227,9 @@ export function LiveTerminalPanel({ sessionId, isActive, fallback }: LiveTermina
         </div>
       </div>
       {status === "error" && fallback ? (
-        <div className="p-4 text-[12px] text-[var(--fg-faint)]">{fallback}</div>
+        <div className="panel-card-empty">{fallback}</div>
       ) : (
-        <div ref={containerRef} className="flex-1 min-h-0 w-full" style={{ padding: "4px" }} />
+        <div ref={containerRef} className="terminal-host" />
       )}
     </div>
   );
