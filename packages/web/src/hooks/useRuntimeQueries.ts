@@ -14,5 +14,6 @@ export function useRuntimesQuery() {
  * advertise their own model list.
  */
 export function useModelsQuery() {
+  const api = useApi();
   return useQuery({ queryKey: ["models"], queryFn: api.getModels });
 }

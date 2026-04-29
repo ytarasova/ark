@@ -21,7 +21,6 @@ import { renderToString } from "react-dom/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MockTransport } from "../../../transport/MockTransport.js";
 import { TransportProvider } from "../../../transport/TransportContext.js";
-import { setTransport } from "../../../hooks/useApi.js";
 import { useSessionDetail } from "../../../hooks/useSessionDetail.js";
 import { BudgetBar } from "../BudgetBar.js";
 
@@ -72,7 +71,6 @@ beforeEach(() => {
   mock.register("session/messages", () => ({ messages: [] }));
   mock.register("session/cost_totals", () => null);
   mock.register("session/stdio", () => ({ content: "", size: 0, exists: false }));
-  setTransport(mock);
 });
 
 afterEach(() => {

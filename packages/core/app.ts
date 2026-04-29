@@ -756,8 +756,17 @@ export class AppContext {
    * Create a tenant-scoped view of this AppContext.
    * Returns a shallow copy with all repositories scoped to the given tenant.
    * Shares the same DB, container, providers, and infrastructure.
+   *
+   * Two short-circuits:
+   *   1. Local mode has no tenant isolation -- there's only one tenant (the
+   *      "default" sentinel), so building a child scope just creates a
+   *      parallel SessionService with empty dispatch-listener registry,
+   *      which silently breaks auto-dispatch. Return self.
+   *   2. Already scoped to this tenant -- avoid nesting scopes.
    */
   forTenant(tenantId: string): AppContext {
+    if (this.mode.kind !== "hosted") return this;
+    if (this.tenantId === tenantId) return this;
     return buildTenantScope(this, tenantId);
   }
 

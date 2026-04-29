@@ -283,7 +283,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const { readForensicFile } = await import("../../core/services/session-forensic.js");
     // Forensic files live under the daemon's tracks dir (not per-tenant on
     // disk). Access control is via the tenant-scoped sessions lookup above.
-    const read = await readForensicFile(scoped.config.tracksDir, sessionId, "stdio.log", { tail });
+    const read = await readForensicFile(scoped.config.dirs.tracks, sessionId, "stdio.log", { tail });
     if (read.tooLarge) {
       throw new RpcError(
         `stdio.log is ${read.size} bytes, over the 2MB cap -- pass tail=<N> to read the tail`,
@@ -299,7 +299,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const session = await scoped.sessions.get(sessionId);
     if (!session) throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
     const { readForensicFile, parseJsonl } = await import("../../core/services/session-forensic.js");
-    const read = await readForensicFile(scoped.config.tracksDir, sessionId, "transcript.jsonl");
+    const read = await readForensicFile(scoped.config.dirs.tracks, sessionId, "transcript.jsonl");
     if (read.tooLarge) {
       throw new RpcError(`transcript.jsonl is ${read.size} bytes, over the 2MB cap`, ErrorCodes.INVALID_PARAMS);
     }
@@ -454,7 +454,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     // into the prompt queue as the correction message for the next turn.
     const executorName = (s.config as Record<string, unknown> | null)?.launch_executor as string | undefined;
     if (executorName === "agent-sdk") {
-      const sessionDir = join(scoped.config.tracksDir, sessionId);
+      const sessionDir = join(scoped.config.dirs.tracks, sessionId);
       const interventionPath = join(sessionDir, "interventions.jsonl");
       await fsPromises.mkdir(sessionDir, { recursive: true });
       const line = JSON.stringify({ role: "user", content, control: "interrupt", ts: Date.now() }) + "\n";
@@ -739,7 +739,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
       return { ok: false, message: `session not running (status=${s.status})` };
     }
 
-    const sessionDir = join(scoped.config.tracksDir, sessionId);
+    const sessionDir = join(scoped.config.dirs.tracks, sessionId);
     const interventionPath = join(sessionDir, "interventions.jsonl");
     const line = JSON.stringify({ role: "user", content, ts: Date.now() }) + "\n";
 

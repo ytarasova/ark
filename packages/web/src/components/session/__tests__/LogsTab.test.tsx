@@ -16,7 +16,6 @@ import { renderToString } from "react-dom/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MockTransport } from "../../../transport/MockTransport.js";
 import { TransportProvider } from "../../../transport/TransportContext.js";
-import { setTransport } from "../../../hooks/useApi.js";
 import { LogsTab } from "../tabs/LogsTab.js";
 
 let mock: MockTransport;
@@ -33,7 +32,6 @@ function freshClient(
 beforeEach(() => {
   mock = new MockTransport();
   mock.register("session/stdio", () => ({ content: "", size: 0, exists: false }));
-  setTransport(mock);
 });
 
 afterEach(() => {

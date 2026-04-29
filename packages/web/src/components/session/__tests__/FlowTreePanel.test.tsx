@@ -22,7 +22,6 @@ import { renderToString } from "react-dom/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MockTransport } from "../../../transport/MockTransport.js";
 import { TransportProvider } from "../../../transport/TransportContext.js";
-import { setTransport } from "../../../hooks/useApi.js";
 import { FlowTreePanel } from "../FlowTreePanel.js";
 
 let mock: MockTransport;
@@ -61,7 +60,6 @@ function makeTree() {
 beforeEach(() => {
   mock = new MockTransport();
   mock.register("session/tree", () => ({ root: makeTree() }));
-  setTransport(mock);
 });
 
 function renderPanel(session: any, seedTree?: any): string {

@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "../../hooks/useApi.js";
+import { useApi } from "../../hooks/useApi.js";
 import { AgentMessage } from "../ui/AgentMessage.js";
 import { SystemEvent } from "../ui/SystemEvent.js";
 import { MarkdownContent } from "../ui/MarkdownContent.js";
@@ -26,6 +26,7 @@ const POLL_MS = 3000;
  * stream is sparse.
  */
 export function SdkTranscriptPanel({ sessionId, status, isRunning }: SdkTranscriptPanelProps) {
+  const api = useApi();
   const refetchInterval = isRunning || (status && !TERMINAL_STATES.has(status)) ? POLL_MS : false;
 
   const query = useQuery({

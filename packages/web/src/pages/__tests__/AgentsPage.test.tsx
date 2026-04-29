@@ -25,7 +25,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ModelDefinition } from "../../../../types/model.js";
 import { MockTransport } from "../../transport/MockTransport.js";
 import { TransportProvider } from "../../transport/TransportContext.js";
-import { setTransport } from "../../hooks/useApi.js";
 import { AgentForm } from "../../components/agents/AgentForm.js";
 
 const MODELS: ModelDefinition[] = [
@@ -63,7 +62,6 @@ function freshClient(): QueryClient {
 beforeEach(() => {
   mock = new MockTransport();
   mock.register("model/list", () => ({ models: MODELS }));
-  setTransport(mock);
 });
 
 function renderForm(agent?: Record<string, unknown>): string {

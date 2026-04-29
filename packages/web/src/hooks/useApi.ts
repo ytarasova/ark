@@ -220,6 +220,15 @@ export function makeApi(transport: WebTransport) {
       rpc<SessionListResponse>("session/list", { limit: 200, ...(filters ?? {}) }).then((r) => r.sessions),
     getSession: (id: string) =>
       rpc<SessionReadResponse>("session/read", { sessionId: id, include: ["events"] } satisfies SessionReadRequest),
+    getSessionChildren: (id: string) => rpc<{ sessions: any[] }>("session/list_children", { sessionId: id }),
+    getSessionTree: (id: string) => rpc<{ root: any }>("session/tree", { sessionId: id }),
+    getStdio: (id: string, opts?: { tail?: number }) =>
+      rpc<{ content: string; size: number; exists: boolean }>("session/stdio", {
+        sessionId: id,
+        ...(opts?.tail ? { tail: opts.tail } : {}),
+      }),
+    getTranscript: (id: string) =>
+      rpc<{ messages: any[]; size: number; exists: boolean }>("session/transcript", { sessionId: id }),
     createSession: (data: SessionStartRequest) =>
       rpc<SessionStartResponse>("session/start", data).then((r) => ({ ok: true as const, session: r.session })),
     stop: (id: string) => rpc<SessionStopResponse>("session/stop", { sessionId: id } satisfies SessionStopRequest),
@@ -385,6 +394,7 @@ export function makeApi(transport: WebTransport) {
     getRuntimes: () => rpc<RuntimeListResponse>("runtime/list").then((r) => r.runtimes),
     getRuntimeDetail: (name: string) =>
       rpc<RuntimeReadResponse>("runtime/read", { name } satisfies RuntimeReadRequest).then((r) => r.runtime),
+    getModels: () => rpc<{ models: any[] }>("model/list").then((r) => r.models),
     createAgent: (data: AgentCreateRequest) =>
       rpc<AgentCreateResponse>("agent/create", data).then((r) => ({ ok: true as const, name: r.name })),
     updateAgent: (name: string, data: Omit<AgentUpdateRequest, "name">) =>

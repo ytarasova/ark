@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "../../../hooks/useApi.js";
+import { useApi } from "../../../hooks/useApi.js";
 import { cn } from "../../../lib/utils.js";
 import { TerminalTab } from "./TerminalTab.js";
 
@@ -51,6 +51,7 @@ export function LogsTab({ sessionId, status, ptyCols, ptyRows, output, isActive,
   const [source, setSource] = useState<LogsSource>("stdio");
 
   const preRef = useRef<HTMLPreElement | null>(null);
+  const api = useApi();
 
   const isRunning = !!status && !TERMINAL_STATES.has(status);
   const tail = tailMode ? TAIL_DEFAULT : undefined;

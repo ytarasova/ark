@@ -22,7 +22,6 @@ import { renderToString } from "react-dom/server";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MockTransport } from "../../transport/MockTransport.js";
 import { TransportProvider } from "../../transport/TransportContext.js";
-import { setTransport } from "../../hooks/useApi.js";
 import { SessionListPanel } from "../SessionList.js";
 import { FilterChip } from "../ui/FilterChip.js";
 
@@ -30,7 +29,6 @@ let mock: MockTransport;
 
 beforeEach(() => {
   mock = new MockTransport();
-  setTransport(mock);
   // Reset localStorage so groupByParent default doesn't cross-contaminate.
   (globalThis as any).localStorage = {
     _data: {},

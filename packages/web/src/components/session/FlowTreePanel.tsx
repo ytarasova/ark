@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "../../hooks/useApi.js";
+import { useApi } from "../../hooks/useApi.js";
 import { useSessionTreeStream } from "../../hooks/useSessionTreeStream.js";
 import { cn } from "../../lib/utils.js";
 import { fmtCost, fmtDuration, relTime } from "../../util.js";
@@ -25,6 +25,7 @@ export interface FlowTreePanelProps {
 
 export function FlowTreePanel({ session, rootId: rootIdProp }: FlowTreePanelProps) {
   const rootId = rootIdProp ?? session.parent_id ?? session.id;
+  const api = useApi();
 
   const { data: root, isLoading } = useQuery({
     queryKey: ["session-tree", rootId],
