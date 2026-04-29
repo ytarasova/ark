@@ -5,6 +5,7 @@ import type { DiffFile } from "../ui/DiffViewer.js";
 import type { StageProgress } from "../ui/StageProgressBar.js";
 import { ConversationTab } from "./tabs/ConversationTab.js";
 import { LogsTab } from "./tabs/LogsTab.js";
+import { TerminalTab } from "./tabs/TerminalTab.js";
 import { DiffTab } from "./tabs/DiffTab.js";
 import { ErrorsTab } from "./tabs/ErrorsTab.js";
 import { FlowTab } from "./tabs/FlowTab.js";
@@ -84,7 +85,9 @@ export function TabPanels(props: TabPanelsProps) {
       tabIndex={0}
       className={cn(
         "flex-1 min-h-0",
-        activeTab === "logs" ? "flex flex-col overflow-hidden p-2" : "overflow-y-auto px-6 py-6",
+        activeTab === "logs" || activeTab === "terminal"
+          ? "flex flex-col overflow-hidden p-2"
+          : "overflow-y-auto px-6 py-6",
         "focus-visible:outline-none",
       )}
       onScroll={onScroll}
@@ -111,15 +114,15 @@ export function TabPanels(props: TabPanelsProps) {
           hasWorkdir={!!session.workdir}
         />
       )}
-      {activeTab === "logs" && (
-        <LogsTab
+      {activeTab === "logs" && <LogsTab sessionId={session?.id ?? ""} status={session?.status} />}
+      {activeTab === "terminal" && (
+        <TerminalTab
           sessionId={session?.id ?? ""}
-          status={session?.status}
-          output={output}
-          ptyCols={session?.pty_cols}
-          ptyRows={session?.pty_rows}
+          output={output ?? null}
+          cols={session?.pty_cols}
+          rows={session?.pty_rows}
           isActive={isActive}
-          tabActive={activeTab === "logs"}
+          tabActive={activeTab === "terminal"}
         />
       )}
       {activeTab === "todos" && <TodoList items={todoItems} onToggle={(id) => onToggleTodo(Number(id))} />}

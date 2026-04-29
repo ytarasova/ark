@@ -12,10 +12,9 @@ import type { DiffFile } from "../components/ui/DiffViewer.js";
 import type { TodoItem } from "../components/ui/TodoList.js";
 import type { TabDef } from "../components/ui/ContentTabs.js";
 
-// "terminal" + "knowledge" are still valid hash-router targets so deep
-// links survive, but they no longer get top-level tab strip real estate.
-// Terminal lives as a segmented control inside the Logs tab; Knowledge is
-// reachable via direct URL only.
+// "knowledge" is still a valid hash-router target so deep links survive,
+// but it no longer gets top-level tab strip real estate (low-frequency,
+// low-density panel; reachable via direct URL only).
 const VALID_TABS = new Set([
   "conversation",
   "logs",
@@ -142,10 +141,8 @@ export function useSessionDetail({
   ).length;
   const filesChanged = diffData?.filesChanged ?? 0;
 
-  // 7 top-level tabs (+ optional Errors). Terminal moved into Logs as a
-  // segmented control (both are runtime output, just different sources);
-  // Knowledge is now URL-only -- it's a low-frequency, low-density panel
-  // that doesn't earn top-level real estate.
+  // Top-level tabs (+ optional Errors). Knowledge is URL-only -- it's a
+  // low-frequency, low-density panel that doesn't earn top-level real estate.
   // Timeline (formerly "Conversation") absorbs the old Events tab: the
   // conversation builder already surfaces every stage/tool/action event the
   // Events tab rendered raw, so keeping both was pure duplication. Each row
@@ -159,6 +156,7 @@ export function useSessionDetail({
       badge: filesChanged > 0 ? `${filesChanged} · +${diffData?.insertions || 0} -${diffData?.deletions || 0}` : undefined,
     },
     { id: "logs", label: "Logs" },
+    { id: "terminal", label: "Terminal" },
     // Cost tab carries no $-amount badge -- the running spend is already
     // visible in the header ticker, and the detail lives one click away.
     // See "Nit 2 -- cost is mentioned everywhere" in the header cleanup.
