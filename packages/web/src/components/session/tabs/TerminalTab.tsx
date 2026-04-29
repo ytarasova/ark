@@ -13,30 +13,41 @@ interface TerminalTabProps {
 }
 
 /**
- * Terminal output. Prefers the live bridge (via the server daemon's
- * /terminal/:sessionId WS route) when the session is running; falls back to
- * the static recording for completed sessions. Always renders a CLI attach
- * button below so users can drop into a native shell.
+ * Terminal output. Three render branches, picked by session state:
+ *   - Live: WS-backed xterm via /terminal/:sessionId, plus a CLI-attach
+ *     command card so the user can drop into a native shell.
+ *   - Completed/failed (with a recording): full-height static replay only.
+ *     The CLI-attach card is hidden -- there's no pane to attach to, and
+ *     telling the user otherwise next to a visible replay is confusing.
+ *   - No live pane and no recording: empty-state copy.
  */
 export function TerminalTab({ sessionId, output, cols, rows, isActive, tabActive }: TerminalTabProps) {
-  return (
-    <div className="flex-1 min-h-0 flex flex-col gap-3">
-      {isActive ? (
-        <div className="flex-1 min-h-0" style={{ minHeight: "360px" }}>
+  if (isActive) {
+    return (
+      <div className="terminal-tab">
+        <div className="terminal-tab-body">
           <LiveTerminalPanel
             sessionId={sessionId}
             isActive={tabActive}
             fallback={<span>Live terminal unavailable. Copy the CLI command below to attach.</span>}
           />
         </div>
-      ) : output ? (
-        <div className="flex-1 min-h-0">
+        <CopyAttachCommandButton sessionId={sessionId} />
+      </div>
+    );
+  }
+  if (output) {
+    return (
+      <div className="terminal-tab">
+        <div className="terminal-tab-body">
           <StaticTerminal output={output} cols={cols} rows={rows} />
         </div>
-      ) : (
-        <div className="terminal-tab-empty">No terminal output available</div>
-      )}
-      <CopyAttachCommandButton sessionId={sessionId} />
+      </div>
+    );
+  }
+  return (
+    <div className="terminal-tab">
+      <div className="terminal-tab-empty">No terminal output available</div>
     </div>
   );
 }
