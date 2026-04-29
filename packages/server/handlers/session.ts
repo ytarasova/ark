@@ -566,21 +566,26 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
       throw new RpcError(`Session ${sessionId} not found`, SESSION_NOT_FOUND);
     }
 
-    // Sessions without a dispatched tmux pane have nothing to attach to.
-    if (!session.session_id) {
-      return {
-        command: "",
-        displayHint: "",
-        attachable: false,
-        reason: "Session has not been dispatched yet.",
-      };
-    }
+    // Terminal-state check first: completed / failed / archived sessions have
+    // had their tmux pane torn down at cleanup time (session_id cleared too),
+    // so this case must take precedence over the missing-session_id check
+    // below -- otherwise the UI shows "not yet dispatched" for sessions that
+    // ran end-to-end.
     if (session.status === "completed" || session.status === "failed" || session.status === "archived") {
       return {
         command: "",
         displayHint: "",
         attachable: false,
         reason: `Session is ${session.status}; no live pane to attach to.`,
+      };
+    }
+    // Pre-dispatch / between-stage sessions have no tmux pane yet.
+    if (!session.session_id) {
+      return {
+        command: "",
+        displayHint: "",
+        attachable: false,
+        reason: "Session has not been dispatched yet.",
       };
     }
 

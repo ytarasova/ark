@@ -116,6 +116,16 @@ export class LocalWorktreeProvider extends LocalArkdBase {
   }
 
   async cleanupSession(_compute: Compute, session: Session): Promise<void> {
+    // Kill the lingering tmux pane. The launcher script ends in `exec bash`
+    // so tmux survives the agent exit -- without this, every completed
+    // session leaks a tmux session named `ark-<sessionId>`. Best-effort:
+    // if the pane is already gone, killSessionAsync returns false and we
+    // continue with worktree cleanup.
+    const { killSessionAsync } = await import("../../core/infra/tmux.js");
+    await safeAsync(`[local] cleanupSession: tmux kill ark-${session.id}`, async () => {
+      await killSessionAsync(`ark-${session.id}`);
+    });
+
     const wtPath = join(this.app.config.dirs.worktrees, session.id);
     if (!existsSync(wtPath)) return;
 
