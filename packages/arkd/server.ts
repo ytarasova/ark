@@ -34,7 +34,7 @@ import { handleAgentRoutes } from "./routes/agent.js";
 import { handleMetricsSnapshotRoutes } from "./routes/metrics-snapshot.js";
 import { handleChannelRoutes } from "./routes/channel.js";
 import { handleMiscRoutes } from "./routes/misc.js";
-import { handleAttachRoutes } from "./routes/attach.js";
+import { handleAttachRoutes, sweepOrphanAttachFifos, closeAllAttachStreams } from "./routes/attach.js";
 
 declare const Bun: BunLike;
 
@@ -220,6 +220,11 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
 
   if (!opts?.quiet) process.stderr.write(`[arkd] listening on ${bindHost}:${port}\n`);
 
+  // Sweep orphaned attach fifos from prior crashed runs. Best-effort + async,
+  // does not gate request serving. (See packages/arkd/routes/attach.ts for
+  // why these accumulate -- observed 80+ leftovers on a long-lived dev box.)
+  void sweepOrphanAttachFifos();
+
   return {
     stop() {
       if (heartbeatTimer) clearInterval(heartbeatTimer);
@@ -233,6 +238,9 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
           /* best effort */
         });
       }
+      // Close any active attach streams so we don't leak fifos / `cat >> fifo`
+      // writers across the next arkd start. Best-effort + fire-and-forget.
+      void closeAllAttachStreams();
       server.stop();
     },
     setConductorUrl(url: string) {
