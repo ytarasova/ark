@@ -99,12 +99,7 @@ export function LogsTab({ sessionId, status, ptyCols, ptyRows, output, isActive,
       ) : (
         <div data-testid="logs-tab-stdio" className="panel-card">
           <div className="panel-card-header">
-            <span className="panel-traffic-dot red" aria-hidden />
-            <span className="panel-traffic-dot amber" aria-hidden />
-            <span className="panel-traffic-dot green" aria-hidden />
-            <span data-testid="logs-header-chip" className="panel-card-chip">
-              stdio · {shortId}
-            </span>
+            <span data-testid="logs-header-chip">stdio · {shortId}</span>
             {isRunning && (
               <span
                 className="text-[9.5px] uppercase tracking-[0.05em] text-[#86efac]"
