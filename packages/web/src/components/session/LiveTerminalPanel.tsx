@@ -26,6 +26,7 @@ import { Button } from "../ui/button.js";
 import { useTerminalSocket } from "../../hooks/useTerminalSocket.js";
 import { fontStacks } from "../../themes/typography.js";
 import { buildTerminalTheme } from "../../themes/terminal-theme.js";
+import { useTheme } from "../../themes/ThemeProvider.js";
 
 interface LiveTerminalPanelProps {
   sessionId: string;
@@ -43,6 +44,7 @@ export function LiveTerminalPanel({ sessionId, isActive, fallback }: LiveTermina
   const containerRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
+  const { themeName, colorMode } = useTheme();
 
   const { status, errorMessage, reconnectAttempt, maxReconnectAttempts, sendInput, sendResize, retry, disconnect } =
     useTerminalSocket({
@@ -171,6 +173,17 @@ export function LiveTerminalPanel({ sessionId, isActive, fallback }: LiveTermina
     // instance alive across tab switches and only tears down on unmount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Live theme reactivity: ThemeProvider has already pushed the new CSS
+  // variables to :root by the time this effect runs, so buildTerminalTheme()
+  // reads the active token set. Assigning to term.options.theme triggers
+  // an internal repaint with no remount.
+  useEffect(() => {
+    const term = termRef.current;
+    if (!term) return;
+    const base = buildTerminalTheme();
+    term.options.theme = { ...base, cursor: base.foreground };
+  }, [themeName, colorMode]);
 
   // Status pill: driven by the hook's state machine. Includes the current
   // reconnect attempt number while the backoff timer is running.

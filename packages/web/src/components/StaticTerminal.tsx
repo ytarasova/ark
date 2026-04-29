@@ -19,6 +19,7 @@ import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { buildTerminalTheme } from "../themes/terminal-theme.js";
+import { useTheme } from "../themes/ThemeProvider.js";
 
 interface StaticTerminalProps {
   output: string;
@@ -50,6 +51,8 @@ function detectCols(output: string): number {
 
 export function StaticTerminal({ output, cols: colsProp, rows: rowsProp }: StaticTerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const termRef = useRef<XTerm | null>(null);
+  const { themeName, colorMode } = useTheme();
 
   useEffect(() => {
     if (!containerRef.current || !output) return;
@@ -81,6 +84,7 @@ export function StaticTerminal({ output, cols: colsProp, rows: rowsProp }: Stati
 
     term.open(containerRef.current);
     term.write(output);
+    termRef.current = term;
 
     // FitAddon measures the container post-paint and sizes xterm to match.
     // The manual `clientHeight / cellHeight` calc we used previously ran at
@@ -100,8 +104,21 @@ export function StaticTerminal({ output, cols: colsProp, rows: rowsProp }: Stati
     return () => {
       resizeObserver.disconnect();
       term.dispose();
+      termRef.current = null;
     };
   }, [output, colsProp, rowsProp]);
+
+  // Live theme reactivity: when the active theme/colorMode changes the CSS
+  // variables on :root have already updated by the time this effect runs
+  // (ThemeProvider applies them synchronously in its own effect), so reading
+  // buildTerminalTheme() picks up the new tokens. Pushing to term.options.theme
+  // triggers an internal repaint -- no remount needed.
+  useEffect(() => {
+    const term = termRef.current;
+    if (!term) return;
+    const base = buildTerminalTheme();
+    term.options.theme = { ...base, cursor: base.background };
+  }, [themeName, colorMode]);
 
   return (
     <div className="panel-card" data-testid="static-terminal-panel">

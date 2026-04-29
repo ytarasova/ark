@@ -6,12 +6,13 @@
  * light variants) shifts the terminal alongside everything else.
  *
  * The slider color itself is applied via CSS (.terminal-host .xterm ...
- * .slider { background: var(--border) }) so it tracks live theme changes.
- * Canvas-level colours read here are snapshotted at construction time --
- * a theme switch mid-session won't repaint the existing xterm canvas; the
- * panel needs to be remounted (re-open the session detail view) to pick
- * up new tokens. ANSI palette colours stay hard-coded since they're
- * canonical and do not belong on the theme switcher.
+ * .slider { background: var(--border) }) so it tracks live theme changes
+ * automatically. Canvas-level colours read here are pushed back into the
+ * existing xterm instance via `term.options.theme = buildTerminalTheme()`
+ * from a theme-reactive effect in StaticTerminal + LiveTerminalPanel, so
+ * a theme switch mid-session repaints both terminals without remount.
+ * ANSI palette colours stay hard-coded since they're canonical and do
+ * not belong on the theme switcher.
  */
 function readVar(name: string, fallback: string): string {
   if (typeof window === "undefined") return fallback;
