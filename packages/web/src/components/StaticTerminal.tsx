@@ -18,6 +18,7 @@ import { useEffect, useRef } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
+import { buildTerminalTheme } from "../themes/terminal-theme.js";
 
 interface StaticTerminalProps {
   output: string;
@@ -66,35 +67,12 @@ export function StaticTerminal({ output, cols: colsProp, rows: rowsProp }: Stati
       // produces the chunky default-OS-looking thumb). Keep it 6px to match
       // the app's global ::-webkit-scrollbar rule.
       overviewRuler: { width: 6 },
-      theme: {
-        background: "#0a0a0a",
-        foreground: "#e4e4e7",
-        cursor: "#0a0a0a",
-        selectionBackground: "#3f3f46",
-        // OverviewRulerRenderer paints a 1px stripe on the left edge of the
-        // ruler canvas using this colour (xterm defaults to foreground ->
-        // renders as a bright vertical line; passing "transparent" doesn't
-        // help because xterm's css.toColor() throws and silently falls back
-        // to the foreground). Match the terminal background so the 1px
-        // stripe blends in.
-        overviewRulerBorder: "#0a0a0a",
-        black: "#09090b",
-        red: "#ef4444",
-        green: "#22c55e",
-        yellow: "#eab308",
-        blue: "#3b82f6",
-        magenta: "#a855f7",
-        cyan: "#06b6d4",
-        white: "#e4e4e7",
-        brightBlack: "#52525b",
-        brightRed: "#f87171",
-        brightGreen: "#4ade80",
-        brightYellow: "#facc15",
-        brightBlue: "#60a5fa",
-        brightMagenta: "#c084fc",
-        brightCyan: "#22d3ee",
-        brightWhite: "#fafafa",
-      },
+      // Static replay: hide the cursor by painting it the same color as the
+      // canvas. The canvas itself comes from the active theme.
+      theme: (() => {
+        const base = buildTerminalTheme();
+        return { ...base, cursor: base.background };
+      })(),
       scrollback: 100000,
       allowProposedApi: true,
     });

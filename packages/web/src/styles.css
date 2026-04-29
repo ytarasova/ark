@@ -871,7 +871,9 @@ body.is-macos .drag-region {
   width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  background: #0a0a0a;
+  /* Track the active theme's code surface so the wrapper matches the xterm
+   * canvas (which also reads --bg-code, see themes/terminal-theme.ts). */
+  background: var(--bg-code);
   padding: 4px;
 }
 

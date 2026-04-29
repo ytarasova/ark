@@ -25,6 +25,7 @@ import "@xterm/xterm/css/xterm.css";
 import { Button } from "../ui/button.js";
 import { useTerminalSocket } from "../../hooks/useTerminalSocket.js";
 import { fontStacks } from "../../themes/typography.js";
+import { buildTerminalTheme } from "../../themes/terminal-theme.js";
 
 interface LiveTerminalPanelProps {
   sessionId: string;
@@ -70,19 +71,12 @@ export function LiveTerminalPanel({ sessionId, isActive, fallback }: LiveTermina
       // produces the chunky default-OS-looking thumb). Match the app's
       // global 6px scrollbar instead.
       overviewRuler: { width: 6 },
-      theme: {
-        background: "#0a0a0a",
-        foreground: "#e4e4e7",
-        cursor: "#e4e4e7",
-        selectionBackground: "#3f3f46",
-        // OverviewRulerRenderer paints a 1px stripe on the left edge of the
-        // ruler canvas using this colour (xterm defaults to foreground ->
-        // renders as a bright vertical line; passing "transparent" doesn't
-        // help because xterm's css.toColor() throws and silently falls back
-        // to the foreground). Match the terminal background so the 1px
-        // stripe blends in.
-        overviewRulerBorder: "#0a0a0a",
-      },
+      // Live terminal: cursor uses the foreground colour so it stays
+      // visible against the canvas. Both come from the active theme.
+      theme: (() => {
+        const base = buildTerminalTheme();
+        return { ...base, cursor: base.foreground };
+      })(),
       allowProposedApi: true,
     });
     const fit = new FitAddon();
