@@ -15,6 +15,7 @@
         test test-file test-e2e test-e2e-fast test-e2e-web test-e2e-web-dev test-install test-watch lint lint-fix \
         format format-check \
         audit audit-check \
+        docs-cli \
         build build-cli build-web build-desktop \
         package package-cli package-desktop \
         spike-temporal-bun \
@@ -217,6 +218,14 @@ audit: ## Regenerate docs/architecture/* + docs/audit/audit.json (deterministic)
 
 audit-check: ## CI gate: regenerate audit and diff against committed copy (non-zero on drift)
 	$(BUN) run scripts/audit-codebase.ts check
+
+docs-cli: ## Generate docs/cli-reference.md from the Commander.js command tree
+	$(BUN) run scripts/generate-cli-docs.ts
+
+docs-openrpc: ## Generate docs/openrpc.json from the Zod RPC schemas
+	$(BUN) run scripts/generate-openrpc.ts
+
+docs: docs-cli docs-openrpc ## Regenerate all auto-generated docs
 
 # ── Building ─────────────────────────────────────────────────────────────────
 

@@ -53,17 +53,23 @@ export function registerStartCommands(session: Command) {
       {} as Record<string, string>,
     )
     .option(
-      "--param <k=v>",
-      "Add a named param (repeatable). Exposed as {inputs.params.<k>} and, for goose runtimes, passed through as --params k=v.",
-      (value, prev: Record<string, string> = {}) => {
+      "--param <k=value>",
+      "Add a named input (repeatable). Exposed as {inputs.<k>}. Value is parsed as JSON when possible (arrays, objects, numbers, booleans, null) and falls back to a string otherwise. Use for any flow-declared input -- scalars, lists, nested objects.",
+      (value, prev: Record<string, unknown> = {}) => {
         const eq = value.indexOf("=");
-        if (eq < 0) throw new Error(`--param expects k=v, got: ${value}`);
+        if (eq < 0) throw new Error(`--param expects k=value, got: ${value}`);
         const k = value.slice(0, eq).trim();
-        const v = value.slice(eq + 1);
-        if (!k) throw new Error(`--param expects k=v, got: ${value}`);
-        return { ...prev, [k]: v };
+        const raw = value.slice(eq + 1);
+        if (!k) throw new Error(`--param expects k=value, got: ${value}`);
+        let parsed: unknown = raw;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          // Not valid JSON -- keep as a string.
+        }
+        return { ...prev, [k]: parsed };
       },
-      {} as Record<string, string>,
+      {} as Record<string, unknown>,
     )
     .action(async (ticket, opts) => {
       const { checkPrereqs, hasRequiredPrereqs, formatPrereqCheck } = await import("../../../core/prereqs.js");

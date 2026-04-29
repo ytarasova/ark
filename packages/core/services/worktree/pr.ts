@@ -21,6 +21,28 @@ const execFileAsync = promisify(execFile);
 const DEFAULT_BASE_BRANCH = "main";
 
 /**
+ * Build the argv for `gh pr create`. Extracted so it's unit-testable
+ * without stubbing child_process.
+ *
+ * We never pass `--repo`: `gh` auto-detects the owner/name from the git
+ * remote of `cwd`, which is always the worktree. `session.repo` is a
+ * filesystem path, not the `OWNER/NAME` shape `--repo` expects -- passing
+ * it caused `gh` to reject the call with "expected the [HOST/]OWNER/REPO
+ * format" on local dispatches.
+ */
+export function buildGhPrCreateArgs(opts: {
+  head: string;
+  base: string;
+  title: string;
+  body: string;
+  draft?: boolean;
+}): string[] {
+  const args = ["pr", "create", "--head", opts.head, "--base", opts.base, "--title", opts.title, "--body", opts.body];
+  if (opts.draft) args.push("--draft");
+  return args;
+}
+
+/**
  * Create a GitHub PR from a session's worktree branch.
  * Optionally rebases onto the base branch first (controlled by repo config auto_rebase, default true).
  * Pushes the branch and creates the PR via gh CLI.
@@ -79,9 +101,9 @@ export async function createWorktreePR(
     const pushDir = existsSync(wtDir) ? wtDir : repo;
     await execFileAsync("git", ["-C", pushDir, "push", "-u", "origin", branch], { encoding: "utf-8", timeout: 30_000 });
 
-    // 2. Create PR via gh CLI
-    const ghArgs = ["pr", "create", "--repo", repo, "--head", branch, "--base", base, "--title", title, "--body", body];
-    if (opts?.draft) ghArgs.push("--draft");
+    // 2. Create PR via gh CLI (argv built by buildGhPrCreateArgs -- see
+    // its comment for why we never pass --repo).
+    const ghArgs = buildGhPrCreateArgs({ head: branch, base, title, body, draft: opts?.draft });
     const { stdout } = await execFileAsync("gh", ghArgs, { encoding: "utf-8", timeout: 30_000, cwd: pushDir });
     const prUrl = stdout.trim();
 

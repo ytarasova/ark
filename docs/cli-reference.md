@@ -1,2181 +1,3211 @@
 # Ark CLI Reference
 
-Complete reference for all `ark` commands. Run `ark --help` or `ark <command> --help` for built-in help.
+> Auto-generated from the Commander.js tree. Run `make docs-cli` to regenerate.
 
-## Global Options
+> Version: 0.21.10
+
+## Usage
 
 ```
 ark [options] <command>
-  -p, --profile <name>    Use a specific profile
-  --server <url>          Connect to a remote Ark control plane
-  --token <key>           API key for authentication with the remote server
-  -V, --version           Show version
-  -h, --help              Show help
 ```
 
-Remote mode can also be set via `ARK_SERVER` and `ARK_TOKEN` environment variables.
+## Global Options
+
+| Flag | Description |
+|------|-------------|
+| `-p, --profile <name>` | Use a specific profile |
+| `--server <url>` | Connect to a remote Ark control plane (e.g. https://ark.company.com) |
+| `--token <key>` | API key for authentication with the remote server |
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| [`ark session`](#ark-session) | Manage SDLC flow sessions |
+| [`ark compute`](#ark-compute) | Manage compute resources |
+| [`ark agent`](#ark-agent) | Manage agent definitions |
+| [`ark flow`](#ark-flow) | Manage flows |
+| [`ark skill`](#ark-skill) | Manage skills |
+| [`ark recipe`](#ark-recipe) | Manage recipes |
+| [`ark schedule`](#ark-schedule) | Manage scheduled recurring sessions |
+| [`ark trigger`](#ark-trigger) | Manage trigger configurations (webhook / schedule / poll) |
+| [`ark worktree`](#ark-worktree) | Git worktree operations |
+| [`ark search`](#ark-search) | Search across sessions, events, messages, and transcripts |
+| [`ark index`](#ark-index) | Build or rebuild the transcript search index |
+| [`ark search-all`](#ark-search-all) | Search across all Claude conversations |
+| [`ark memory`](#ark-memory) | Manage cross-session memory (backed by knowledge graph) |
+| [`ark profile`](#ark-profile) | Manage profiles |
+| [`ark conductor`](#ark-conductor) | Conductor operations |
+| [`ark router`](#ark-router) | LLM routing proxy |
+| [`ark runtime`](#ark-runtime) | Manage runtime definitions |
+| [`ark auth`](#ark-auth) | Manage authentication and API keys |
+| [`ark tenant`](#ark-tenant) | Manage tenant settings |
+| [`ark team`](#ark-team) | Manage teams + memberships |
+| [`ark user`](#ark-user) | Manage user identities |
+| [`ark knowledge`](#ark-knowledge) | Knowledge graph - search, index, remember, export |
+| [`ark code-intel`](#ark-code-intel) | Unified code-intelligence store (search, index, repos, runs) |
+| [`ark workspace`](#ark-workspace) | Manage workspaces (tenant -> workspace -> repo) |
+| [`ark eval`](#ark-eval) | Agent performance evaluation |
+| [`ark dashboard`](#ark-dashboard) | Show fleet status, costs, and recent activity |
+| [`ark costs`](#ark-costs) | Show cost summary across sessions |
+| [`ark costs-sync`](#ark-costs-sync) | Backfill cost data from transcripts (on the daemon host) |
+| [`ark costs-export`](#ark-costs-export) | Export cost data |
+| [`ark server`](#ark-server) | JSON-RPC server |
+| [`ark exec`](#ark-exec) | Run a session non-interactively (for CI/CD) |
+| [`ark try`](#ark-try) | Run a one-shot sandboxed session (auto-cleans up) |
+| [`ark daemon`](#ark-daemon) | Manage the arkd agent daemon |
+| [`ark pr`](#ark-pr) | Manage PR-bound sessions |
+| [`ark watch`](#ark-watch) | Watch GitHub issues with a label and auto-create sessions |
+| [`ark claude`](#ark-claude) | Interact with Claude Code sessions |
+| [`ark doctor`](#ark-doctor) | Check system prerequisites |
+| [`ark arkd`](#ark-arkd) | Start the arkd agent daemon |
+| [`ark channel`](#ark-channel) | Run the MCP channel server (used by remote agents) |
+| [`ark run-agent-sdk`](#ark-run-agent-sdk) | Run the agent-sdk launch script (internal -- used by agent-sdk executor) |
+| [`ark config`](#ark-config) | Open Ark config in your editor |
+| [`ark web`](#ark-web) | Start web dashboard |
+| [`ark openapi`](#ark-openapi) | Generate OpenAPI spec |
+| [`ark mcp-proxy`](#ark-mcp-proxy) | Bridge stdin/stdout to a pooled MCP socket (internal) |
+| [`ark acp`](#ark-acp) | Start headless ACP server on stdin/stdout (JSON-RPC) |
+| [`ark repo-map`](#ark-repo-map) | Generate repository structure map |
+| [`ark init`](#ark-init) | Initialize Ark for this repository |
+| [`ark db`](#ark-db) | Schema migrations + status |
+| [`ark secrets`](#ark-secrets) | Manage tenant-scoped secrets (env vars for sessions) |
+| [`ark cluster`](#ark-cluster) | List Kubernetes clusters visible to this tenant |
+
+## `ark session`
+
+Manage SDLC flow sessions
+
+**Synopsis:** `ark session`
+
+### `ark session start`
+
+Start a new session
+
+**Synopsis:** `ark session start [options] [ticket]`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `ticket` | no | External ticket reference (Jira key, GitHub issue, etc.) |
+
+**Options:**
 
----
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-r, --repo <path>` |  | Repository path or name |
+| `--remote-repo <url>` |  | Git URL to clone on compute target (no local repo needed) |
+| `-b, --branch <name>` |  | Deterministic branch name for the worktree (default: derived from --ticket/--summary or auto) |
+| `-s, --summary <text>` |  | Task summary |
+| `-p, --flow <name-or-path>` | `"default"` | Flow name OR a path to an inline flow YAML. Paths ending in .yaml/.yml are read + parsed and forwarded as an inline flow definition; bare names hit the FlowStore. |
+| `-c, --compute <name>` |  | Compute name |
+| `-g, --group <name>` |  | Group name |
+| `-a, --attach` |  | Attach to the session's tmux pane after starting |
+| `--claude-session <id>` |  | Create from an existing Claude Code session (use 'ark claude list' to find IDs) |
+| `--recipe <name>` |  | Create session from a recipe template |
+| `--max-budget <usd>` |  | Cumulative cost cap for this session in USD. Halts for_each if exceeded. |
+| `--with-mcp <name>` | `[]` | Mount an additional MCP server into the session (repeatable). Resolves against shipped mcp-configs/<name>.json or an inline path. |
+| `--file <role=path>` | `{}` | Attach a named file input (repeatable). Path is resolved absolute and exposed to agents + flows as {inputs.files.<role>}. |
+| `--param <k=value>` | `{}` | Add a named input (repeatable). Exposed as {inputs.<k>}. Value is parsed as JSON when possible (arrays, objects, numbers, booleans, null) and falls back to a string otherwise. Use for any flow-declared input -- scalars, lists, nested objects. |
 
-## ark session
+### `ark session spawn`
 
-Manage SDLC flow sessions.
+Spawn a child session for parallel work
 
-### ark session start
+**Synopsis:** `ark session spawn [options] <parent-id> <task>`
 
-Create a new session.
+**Arguments:**
 
-```
-ark session start [ticket] [options]
-```
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `parent-id` | yes |  |
+| `task` | yes |  |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-a, --agent <agent>` |  | Agent override |
+| `-m, --model <model>` |  | Model override (e.g., haiku, sonnet, opus) |
+
+### `ark session spawn-subagent`
+
+Spawn a subagent with optional model/agent override
+
+**Synopsis:** `ark session spawn-subagent [options] <parent-id> <task>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `parent-id` | yes |  |
+| `task` | yes |  |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-m, --model <model>` |  | Model override (e.g., haiku, sonnet, opus) |
+| `-a, --agent <agent>` |  | Agent override |
+| `-g, --group <name>` |  | Group name |
+
+### `ark session list`
+
+List all sessions
+
+**Synopsis:** `ark session list [options]`
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-s, --status <status>` |  | Filter by status |
+| `-r, --repo <repo>` |  | Filter by repo |
+| `-g, --group <group>` |  | Filter by group |
+| `--archived` |  | Include archived sessions |
+
+### `ark session show`
+
+Show session details
+
+**Synopsis:** `ark session show <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes | Session ID |
+
+### `ark session attach`
+
+Attach to a running agent session
+
+**Synopsis:** `ark session attach [options] <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes |  |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--print-only` |  | Print the attach command instead of running it |
+
+### `ark session output`
+
+Show live output from a running session
+
+**Synopsis:** `ark session output [options] <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes |  |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-n, --lines <n>` | `"30"` | Number of lines |
+
+### `ark session events`
+
+Show event history
+
+**Synopsis:** `ark session events [options] <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes |  |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--iteration <n>` |  | Filter to events for a specific for_each iteration (by index) |
+| `--summary` |  | Print one summary line per completed for_each iteration instead of individual events |
+
+### `ark session stop`
+
+Stop a session
+
+**Synopsis:** `ark session stop <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes |  |
+
+### `ark session resume`
+
+Resume a stopped/paused session (restores snapshot when available)
+
+**Synopsis:** `ark session resume [options] <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes |  |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--snapshot-id <id>` |  | Restore from a specific snapshot id (defaults to the session's latest) |
+
+### `ark session advance`
+
+Advance to the next flow stage
+
+**Synopsis:** `ark session advance [options] <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes |  |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-f, --force` |  | Force past gate |
+
+### `ark session approve`
+
+Approve a review gate and advance to the next stage
+
+**Synopsis:** `ark session approve <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes |  |
+
+### `ark session reject`
+
+Reject a review gate and dispatch a rework cycle with the given reason
+
+**Synopsis:** `ark session reject [options] <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes |  |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-r, --reason <text>` |  | Why the change needs rework (shown to the agent) *(required)* |
+
+### `ark session complete`
+
+Mark current stage done and advance
+
+**Synopsis:** `ark session complete [options] <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes |  |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--force` |  | Skip verification checks |
+
+### `ark session pause`
+
+Pause a session (persists a snapshot when the compute supports it)
+
+**Synopsis:** `ark session pause [options] <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes |  |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-r, --reason <text>` |  |  |
+
+### `ark session interrupt`
+
+Interrupt a running agent (Ctrl+C) without killing the session
+
+**Synopsis:** `ark session interrupt <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes | Session ID |
+
+### `ark session archive`
+
+Archive a session for later reference
+
+**Synopsis:** `ark session archive <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes | Session ID |
+
+### `ark session restore`
+
+Restore an archived session
+
+**Synopsis:** `ark session restore <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes | Session ID |
+
+### `ark session send`
+
+Send a message to a running Claude session
+
+**Synopsis:** `ark session send <id> <message>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes |  |
+| `message` | yes |  |
+
+### `ark session undelete`
+
+Restore a recently deleted session (within 90s)
+
+**Synopsis:** `ark session undelete <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes |  |
+
+### `ark session todo`
+
+Manage session verification todos
+
+**Synopsis:** `ark session todo <action> <session-id> [text]`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `action` | yes | add|list|done|delete |
+| `session-id` | yes | Session ID |
+| `text` | no | Todo content (for add) or todo ID (for done/delete) |
+
+### `ark session verify`
+
+Run verification scripts for a session
+
+**Synopsis:** `ark session verify <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes | Session ID |
+
+### `ark session handoff`
+
+Hand off to a different agent
+
+**Synopsis:** `ark session handoff [options] <id> <agent>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes |  |
+| `agent` | yes |  |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-i, --instructions <text>` |  |  |
+
+### `ark session join`
+
+Join all forked children
+
+**Synopsis:** `ark session join [options] <parent-id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `parent-id` | yes |  |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-f, --force` |  |  |
+
+### `ark session delete`
+
+Delete sessions
+
+**Synopsis:** `ark session delete <ids...>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `ids...` | yes |  |
+
+### `ark session group`
+
+Assign a session to a group
+
+**Synopsis:** `ark session group <id> <group>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes |  |
+| `group` | yes |  |
+
+### `ark session fork`
+
+Fork a session (branches the conversation)
+
+**Synopsis:** `ark session fork [options] <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes |  |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-t, --task <text>` |  | Task description for forked session |
+| `-g, --group <name>` |  | Group for forked session |
+
+### `ark session clone`
+
+Alias for fork (branches the conversation)
+
+**Synopsis:** `ark session clone [options] <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes |  |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-t, --task <text>` |  | Task description for forked session |
+| `-g, --group <name>` |  | Group for forked session |
+
+### `ark session export`
+
+Export session to file
+
+**Synopsis:** `ark session export <id> [file]`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes |  |
+| `file` | no |  |
+
+### `ark session import`
+
+Import session from file
+
+**Synopsis:** `ark session import <file>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `file` | yes |  |
+
+## `ark compute`
+
+Manage compute resources
+
+**Synopsis:** `ark compute`
+
+### `ark compute create`
+
+Create a new compute resource (concrete target or reusable template)
+
+**Synopsis:** `ark compute create [options] <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Compute name |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--compute <kind>` |  | Compute kind (local, firecracker, ec2, k8s, k8s-kata) |
+| `--runtime <kind>` |  | Runtime kind (direct, docker, compose, devcontainer, firecracker-in-container) |
+| `--provider <type>` |  | [deprecated] Provider type (local, docker, ec2, k8s, k8s-kata). Use --compute + --runtime. |
+| `--template` |  | Create a reusable template (blueprint) instead of a concrete compute target |
+| `--no-prompt` |  | Skip interactive prompts (fail if required fields are missing) |
+| `--image <image>` |  | Docker image (default: ubuntu:22.04) |
+| `--devcontainer` |  | Use devcontainer.json from project |
+| `--volume <mount>` | `[]` | Extra volume mount (repeatable) |
+| `--size <size>` | `"m"` | Instance size: xs (2vCPU/8GB), s (4/16), m (8/32), l (16/64), xl (32/128), xxl (48/192), xxxl (64/256) |
+| `--arch <arch>` | `"x64"` | Architecture: x64, arm |
+| `--region <region>` | `"us-east-1"` | Region |
+| `--profile <profile>` |  | AWS profile |
+| `--subnet-id <id>` |  | Subnet ID |
+| `--tag <key=value>` | `[]` | Tag (repeatable) |
+| `--context <name>` |  | Kubeconfig context (cluster) -- required |
+| `--namespace <ns>` |  | K8s namespace -- required |
+| `--kubeconfig <path>` |  | Path to kubeconfig (default: in-cluster or ~/.kube/config) |
+| `--service-account <sa>` |  | Pod service account name (for IRSA, etc.) |
+| `--runtime-class <class>` |  | K8s runtime class (e.g. kata-fc for Firecracker) |
+| `--cpu <amt>` |  | CPU request/limit (e.g. 2 or 500m) |
+| `--memory <amt>` |  | Memory request/limit (e.g. 4Gi) |
+| `--from-template <name>` |  | Use a compute template as defaults |
+
+### `ark compute provision`
+
+Provision a compute resource (create infrastructure)
+
+**Synopsis:** `ark compute provision <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Compute name |
+
+### `ark compute start`
+
+Start a compute resource
+
+**Synopsis:** `ark compute start <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Compute name |
+
+### `ark compute stop`
+
+Stop a compute resource
+
+**Synopsis:** `ark compute stop <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Compute name |
+
+### `ark compute destroy`
+
+Destroy a compute resource (removes infrastructure and DB record)
+
+**Synopsis:** `ark compute destroy <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Compute name |
+
+### `ark compute update`
+
+Update compute configuration
+
+**Synopsis:** `ark compute update [options] <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Compute name |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--size <size>` |  | Instance size |
+| `--arch <arch>` |  | Architecture: x64, arm |
+| `--region <region>` |  | AWS region |
+| `--profile <profile>` |  | AWS profile |
+| `--subnet-id <id>` |  | Subnet ID |
+| `--ingress <cidrs>` |  | SSH ingress CIDRs (comma-separated, or 'open' for 0.0.0.0/0) |
+| `--idle-minutes <min>` |  | Idle shutdown timeout in minutes |
+| `--set <key=value>` | `[]` | Set arbitrary config key |
+
+### `ark compute list`
+
+List compute targets and templates
+
+**Synopsis:** `ark compute list [options]`
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--templates-only` |  | Only list templates (reusable config blueprints) |
+| `--concrete-only` |  | Only list concrete compute targets |
+
+### `ark compute status`
+
+Show compute details
+
+**Synopsis:** `ark compute status <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Compute name |
+
+### `ark compute sync`
+
+Sync environment to/from compute
+
+**Synopsis:** `ark compute sync [options] <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Compute name |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--direction <dir>` | `"push"` | Sync direction (push|pull) |
+
+### `ark compute metrics`
+
+Show compute metrics
+
+**Synopsis:** `ark compute metrics <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Compute name |
+
+### `ark compute default`
+
+Set default compute
+
+**Synopsis:** `ark compute default <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Compute name |
+
+### `ark compute ssh`
+
+SSH into a compute
+
+**Synopsis:** `ark compute ssh <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Compute name |
+
+### `ark compute pool`
+
+Manage compute pools
+
+**Synopsis:** `ark compute pool`
+
+#### `ark compute pool create`
+
+Create a compute pool
+
+**Synopsis:** `ark compute pool create [options] <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Pool name |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--provider <type>` | `"ec2"` | Provider type (ec2, docker, k8s) |
+| `--min <n>` | `"0"` | Minimum warm instances |
+| `--max <n>` | `"10"` | Maximum instances |
+| `--size <size>` | `"m"` | Instance size (provider-specific) |
+| `--region <region>` |  | Region (provider-specific) |
+| `--image <image>` |  | Container image (provider-specific) |
+
+#### `ark compute pool list`
+
+List compute pools
+
+**Synopsis:** `ark compute pool list`
+
+#### `ark compute pool delete`
+
+Delete a compute pool
+
+**Synopsis:** `ark compute pool delete <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Pool name |
+
+### `ark compute template`
+
+Manage compute templates
+
+**Synopsis:** `ark compute template`
+
+#### `ark compute template list`
+
+List compute templates
+
+**Synopsis:** `ark compute template list`
+
+#### `ark compute template show`
+
+Show a compute template
+
+**Synopsis:** `ark compute template show <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Template name |
+
+#### `ark compute template create`
+
+Create a compute template (convenience alias for 'compute create --template')
+
+**Synopsis:** `ark compute template create [options] <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Template name |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--provider <type>` | `"ec2"` | Provider type |
+| `--description <desc>` |  | Description |
+| `--size <size>` |  | Instance size (ec2) |
+| `--arch <arch>` |  | Architecture (ec2) |
+| `--region <region>` |  | Region (ec2) |
+| `--profile <profile>` |  | AWS profile (ec2) |
+| `--image <image>` |  | Docker image (docker) |
+| `--namespace <ns>` |  | K8s namespace (k8s) |
+
+#### `ark compute template delete`
+
+Delete a compute template
+
+**Synopsis:** `ark compute template delete <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Template name |
+
+## `ark agent`
+
+Manage agent definitions
+
+**Synopsis:** `ark agent`
+
+### `ark agent list`
+
+List agents
+
+**Synopsis:** `ark agent list [options]`
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--project <dir>` |  | Project root |
+
+### `ark agent show`
+
+Show agent details
+
+**Synopsis:** `ark agent show <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes |  |
+
+### `ark agent create`
+
+Create a new agent
+
+**Synopsis:** `ark agent create [options] <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes |  |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--global` |  | Save at global scope instead of project scope |
+| `--from <file>` |  | Seed YAML from a file instead of scaffolding fresh |
+| `--no-editor` |  | Skip the $EDITOR step (use the scaffold / --from content as-is) |
+
+### `ark agent edit`
+
+Edit an agent definition
+
+**Synopsis:** `ark agent edit [options] <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes |  |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--global` |  | Write back at global scope (default follows the existing agent's scope) |
+
+### `ark agent delete`
+
+Delete a custom agent
+
+**Synopsis:** `ark agent delete [options] <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes |  |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-y, --yes` |  | Skip confirmation |
+
+### `ark agent copy`
+
+Copy an agent for customization
+
+**Synopsis:** `ark agent copy [options] <name> [new-name]`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes |  |
+| `new-name` | no |  |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--global` |  | Save at global scope instead of project scope |
+
+## `ark flow`
+
+Manage flows
+
+**Synopsis:** `ark flow`
+
+### `ark flow list`
+
+List flows
+
+**Synopsis:** `ark flow list`
+
+### `ark flow show`
+
+Show flow
+
+**Synopsis:** `ark flow show <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes |  |
+
+### `ark flow create`
+
+Create a flow from a YAML file
+
+**Synopsis:** `ark flow create [options] <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Flow name |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--from <file>` |  | YAML file containing the stages array |
+| `--description <text>` |  | Flow description |
+| `--scope <scope>` | `"global"` | global or project |
+
+### `ark flow delete`
+
+Delete a flow (global or project only -- builtins are protected)
+
+**Synopsis:** `ark flow delete [options] <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Flow name |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--scope <scope>` | `"global"` | global or project |
+
+## `ark skill`
+
+Manage skills
+
+**Synopsis:** `ark skill`
+
+### `ark skill list`
+
+List available skills
+
+**Synopsis:** `ark skill list`
+
+### `ark skill show`
+
+Show skill details
+
+**Synopsis:** `ark skill show <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Skill name |
+
+### `ark skill create`
+
+Create a new skill
+
+**Synopsis:** `ark skill create [options] [name]`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | no | Skill name (required unless --from) |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--from <file>` |  | Create from YAML file |
+| `-d, --description <desc>` |  | Skill description |
+| `-p, --prompt <prompt>` |  | Skill prompt |
+| `-s, --scope <scope>` | `"global"` | Scope: global or project |
+| `--tags <tags>` |  | Comma-separated tags |
+
+### `ark skill delete`
+
+Delete a skill (global or project only)
+
+**Synopsis:** `ark skill delete [options] <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Skill name |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-s, --scope <scope>` | `"global"` | Scope: global or project |
+
+## `ark recipe`
+
+Manage recipes
+
+**Synopsis:** `ark recipe`
+
+### `ark recipe list`
+
+List available recipes
+
+**Synopsis:** `ark recipe list`
+
+### `ark recipe show`
+
+Show recipe details
+
+**Synopsis:** `ark recipe show <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Recipe name |
+
+### `ark recipe create`
+
+Create a new recipe
+
+**Synopsis:** `ark recipe create [options]`
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--from <file>` |  | Create from YAML file |
+| `--from-session <id>` |  | Create from existing session |
+| `-n, --name <name>` |  | Recipe name (required with --from-session) |
+| `-s, --scope <scope>` | `"global"` | Scope: global or project |
+
+### `ark recipe delete`
+
+Delete a recipe (global or project only)
+
+**Synopsis:** `ark recipe delete [options] <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Recipe name |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-s, --scope <scope>` | `"global"` | Scope: global or project |
+
+## `ark schedule`
+
+Manage scheduled recurring sessions
+
+**Synopsis:** `ark schedule`
+
+### `ark schedule add`
+
+Create a recurring scheduled session
+
+**Synopsis:** `ark schedule add [options]`
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--cron <expression>` |  | Cron expression (e.g., "0 2 * * *") *(required)* |
+| `-f, --flow <name>` | `"bare"` | Flow name |
+| `-r, --repo <path>` |  | Repository path |
+| `-s, --summary <text>` |  | Session summary |
+| `-c, --compute <name>` |  | Compute name |
+| `-g, --group <name>` |  | Group name |
+
+### `ark schedule list`
+
+List all schedules
+
+**Synopsis:** `ark schedule list`
+
+### `ark schedule delete`
+
+Delete a schedule
+
+**Synopsis:** `ark schedule delete <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes | Schedule ID |
+
+### `ark schedule enable`
+
+Enable a schedule
+
+**Synopsis:** `ark schedule enable <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes | Schedule ID |
+
+### `ark schedule disable`
+
+Disable a schedule
+
+**Synopsis:** `ark schedule disable <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes | Schedule ID |
+
+## `ark trigger`
+
+Manage trigger configurations (webhook / schedule / poll)
+
+**Synopsis:** `ark trigger`
+
+### `ark trigger list`
+
+List configured triggers
+
+**Synopsis:** `ark trigger list [options]`
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tenant <name>` |  | Tenant scope (default: 'default') |
+
+### `ark trigger get`
+
+Show a trigger config
+
+**Synopsis:** `ark trigger get [options] <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Trigger name |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tenant <name>` |  | Tenant scope |
+
+### `ark trigger enable`
+
+Enable a trigger (in-memory; edit the YAML to persist)
+
+**Synopsis:** `ark trigger enable [options] <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Trigger name |
+
+**Options:**
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-r, --repo <path>` | Repository path or name | -- |
-| `-s, --summary <text>` | Task summary | -- |
-| `-p, --flow <name>` | Flow name | `default` |
-| `-c, --compute <name>` | Compute name | -- |
-| `-g, --group <name>` | Group name | -- |
-| `-d, --dispatch` | Auto-dispatch the first stage agent | -- |
-| `-a, --attach` | Dispatch and attach to the session | -- |
-| `--claude-session <id>` | Create from an existing Claude Code session | -- |
-| `--recipe <name>` | Create session from a recipe template | -- |
-| `--agent <name>` | Agent override | -- |
-| `--runtime <name>` | Runtime override: `claude`, `claude-max`, `codex`, or `gemini` | -- |
-| `--remote-repo <url>` | Git URL to clone on compute target (no local repo needed) | -- |
-
-Examples:
-
-```bash
-ark session start --repo . --summary "Add user auth" --dispatch
-ark session start PROJ-123 --repo ./my-app --summary "Fix login bug" --flow quick
-ark session start --recipe quick-fix --repo . --dispatch --attach
-ark session start --claude-session abc12345 --flow bare
-ark session start --repo . --summary "Task" --group backend
-ark session start --repo . --summary "Fix bug" --agent implementer --runtime codex --dispatch
-ark session start --remote-repo https://github.com/org/repo.git --summary "Task" --compute my-ec2
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tenant <name>` |  | Tenant scope |
 
-### ark session list
+### `ark trigger disable`
 
-List all sessions.
+Disable a trigger (in-memory; restart resets)
 
-```
-ark session list [options]
-```
+**Synopsis:** `ark trigger disable [options] <name>`
 
-| Option | Description |
-|--------|-------------|
-| `-s, --status <status>` | Filter by status (running/stopped/completed/failed/waiting/ready) |
-| `-r, --repo <repo>` | Filter by repo |
-| `-g, --group <group>` | Filter by group |
-| `--archived` | Show archived sessions |
-
-```bash
-ark session list
-ark session list --status running
-ark session list --group backend
-```
+**Arguments:**
 
-### ark session show
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Trigger name |
 
-Show session details.
+**Options:**
 
-```
-ark session show <id>
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tenant <name>` |  | Tenant scope |
 
-```bash
-ark session show s-a1b2c3
-```
+### `ark trigger reload`
 
-### ark session dispatch
+Re-read trigger YAML files from disk
 
-Dispatch the agent for the current stage.
+**Synopsis:** `ark trigger reload`
 
-```
-ark session dispatch <id>
-```
+### `ark trigger sources`
 
-```bash
-ark session dispatch s-a1b2c3
-```
+List registered source connectors and their status
 
-### ark session stop
+**Synopsis:** `ark trigger sources`
 
-Stop a running session.
+### `ark trigger test`
 
-```
-ark session stop <id>
-```
+Replay a sample payload against a trigger (dry-run by default)
 
-```bash
-ark session stop s-a1b2c3
-```
+**Synopsis:** `ark trigger test [options] <name>`
 
-### ark session resume
+**Arguments:**
 
-Resume a stopped or paused session.
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Trigger name |
 
-```
-ark session resume <id>
-```
+**Options:**
 
-```bash
-ark session resume s-a1b2c3
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--payload <file>` |  | JSON file with the synthetic payload *(required)* |
+| `--tenant <name>` |  | Tenant scope |
+| `--fire` |  | Actually invoke the flow (default: dry-run) |
 
-### ark session advance
+## `ark worktree`
 
-Advance to the next flow stage.
+Git worktree operations
 
-```
-ark session advance <id> [options]
-```
+**Synopsis:** `ark worktree`
 
-| Option | Description |
-|--------|-------------|
-| `-f, --force` | Force past gate |
+### `ark worktree diff`
 
-```bash
-ark session advance s-a1b2c3
-ark session advance s-a1b2c3 --force
-```
+Preview changes in a session worktree
 
-### ark session complete
+**Synopsis:** `ark worktree diff [options] <session-id>`
 
-Mark the current stage as done and advance. Blocked if verification scripts or todos are incomplete.
+**Arguments:**
 
-```
-ark session complete <id> [options]
-```
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `session-id` | yes | Session ID |
 
-| Option | Description |
-|--------|-------------|
-| `-f, --force` | Override verification and complete regardless |
+**Options:**
 
-```bash
-ark session complete s-a1b2c3
-ark session complete s-a1b2c3 --force
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--base <branch>` | `"main"` | Base branch to compare against |
 
-### ark session pause
+### `ark worktree finish`
 
-Pause a session with an optional reason.
+Merge worktree branch, remove worktree, delete session
 
-```
-ark session pause <id> [options]
-```
+**Synopsis:** `ark worktree finish [options] <session-id>`
 
-| Option | Description |
-|--------|-------------|
-| `-r, --reason <text>` | Reason for pausing |
+**Arguments:**
 
-```bash
-ark session pause s-a1b2c3 --reason "Waiting for API keys"
-```
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `session-id` | yes |  |
 
-### ark session attach
+**Options:**
 
-Attach to a running agent session (opens tmux).
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--into <branch>` | `"main"` | Target branch to merge into |
+| `--no-merge` |  | Skip merge, just remove worktree and delete session |
+| `--keep-branch` |  | Don't delete the branch after merge |
 
-```
-ark session attach <id>
-```
+### `ark worktree pr`
 
-If the session is not running, it will be dispatched first.
+Create a GitHub PR from a session worktree
 
-```bash
-ark session attach s-a1b2c3
-```
+**Synopsis:** `ark worktree pr [options] <session-id>`
 
-### ark session output
+**Arguments:**
 
-Show live output from a running session.
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `session-id` | yes | Session ID |
 
-```
-ark session output <id> [options]
-```
+**Options:**
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-n, --lines <n>` | Number of lines | `30` |
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--title <title>` |  | PR title |
+| `--base <branch>` | `"main"` | Base branch |
+| `--draft` |  | Create as draft PR |
 
-```bash
-ark session output s-a1b2c3
-ark session output s-a1b2c3 -n 100
-```
+### `ark worktree list`
 
-### ark session send
+List sessions with active worktrees
 
-Send a message to a running Claude session.
+**Synopsis:** `ark worktree list`
 
-```
-ark session send <id> <message>
-```
+### `ark worktree cleanup`
 
-```bash
-ark session send s-a1b2c3 "Focus on the API layer first"
-```
+Find and remove orphaned worktrees
 
-### ark session fork
+**Synopsis:** `ark worktree cleanup [options]`
 
-Fork a session (branches the conversation).
+**Options:**
 
-```
-ark session fork <id> [options]
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--dry-run` |  | Only show what would be removed |
 
-| Option | Description |
-|--------|-------------|
-| `-t, --task <text>` | Task description for forked session |
-| `-g, --group <name>` | Group for forked session |
-| `-d, --dispatch` | Auto-dispatch the forked session |
-
-```bash
-ark session fork s-a1b2c3 --task "Try approach B" --dispatch
-```
+## `ark search`
 
-### ark session clone
+Search across sessions, events, messages, and transcripts
 
-Alias for `fork`.
+**Synopsis:** `ark search [options] <query>`
 
-```
-ark session clone <id> [options]
-```
+**Arguments:**
 
-Same options as `fork`.
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `query` | yes | Search text (case-insensitive) |
 
-### ark session handoff
+**Options:**
 
-Hand off to a different agent mid-session.
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-l, --limit <n>` | `"20"` | Max results |
+| `-t, --transcripts` |  | Also search Claude transcripts (slower) |
+| `--index` |  | Rebuild transcript search index before searching |
+| `--hybrid` |  | Use hybrid search (memory + knowledge + transcripts with LLM re-ranking) |
 
-```
-ark session handoff <id> <agent> [options]
-```
+## `ark index`
 
-| Option | Description |
-|--------|-------------|
-| `-i, --instructions <text>` | Handoff instructions for the new agent |
+Build or rebuild the transcript search index
 
-```bash
-ark session handoff s-a1b2c3 reviewer --instructions "Focus on security"
-```
+**Synopsis:** `ark index`
 
-### ark session spawn
+## `ark search-all`
 
-Spawn a child session for parallel work (parent waits for children).
+Search across all Claude conversations
 
-```
-ark session spawn <parent-id> <task>
-```
+**Synopsis:** `ark search-all [options] <query>`
 
-```bash
-ark session spawn s-parent "Implement feature A"
-ark session spawn s-parent "Implement feature B"
-```
+**Arguments:**
 
-### ark session spawn-subagent
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `query` | yes |  |
 
-Spawn a subagent within a session with optional model/agent override.
+**Options:**
 
-```
-ark session spawn-subagent <parent-id> <task> [options]
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-n, --limit <n>` | `"20"` | Max results |
+| `--days <n>` | `"90"` | Recent days to search |
 
-| Option | Description |
-|--------|-------------|
-| `-m, --model <model>` | Model override (e.g., haiku, sonnet, opus) |
-| `-a, --agent <agent>` | Agent override |
-| `-g, --group <name>` | Group name |
-| `-d, --dispatch` | Auto-dispatch after spawning |
-
-```bash
-ark session spawn-subagent s-parent "Write unit tests" --dispatch
-ark session spawn-subagent s-parent "Refactor auth module" --model haiku --agent implementer
-ark session spawn-subagent s-parent "Review changes" --group backend --dispatch
-```
+## `ark memory`
 
-### ark session join
+Manage cross-session memory (backed by knowledge graph)
 
-Join all forked children back to the parent.
+**Synopsis:** `ark memory`
 
-```
-ark session join <parent-id> [options]
-```
+### `ark memory list`
 
-| Option | Description |
-|--------|-------------|
-| `-f, --force` | Force join even if children are not complete |
+List stored memories
 
-```bash
-ark session join s-parent
-ark session join s-parent --force
-```
+**Synopsis:** `ark memory list [options]`
 
-### ark session interrupt
+**Options:**
 
-Interrupt a running agent (sends Ctrl+C). The agent pauses and can be re-engaged with `ark session send`.
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-s, --scope <scope>` |  | Filter by scope |
 
-```
-ark session interrupt <id>
-```
+### `ark memory recall`
 
-```bash
-ark session interrupt s-a1b2c3
-```
+Recall memories relevant to a query
 
-### ark session archive
+**Synopsis:** `ark memory recall [options] <query>`
 
-Archive a completed session. Archived sessions are hidden from the default list.
+**Arguments:**
 
-```
-ark session archive <id>
-```
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `query` | yes | Search query |
 
-```bash
-ark session archive s-a1b2c3
-```
+**Options:**
 
-### ark session restore
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-s, --scope <scope>` |  | Filter by scope |
+| `-n, --limit <n>` | `"10"` | Max results |
 
-Restore an archived session to stopped status.
+### `ark memory forget`
 
-```
-ark session restore <id>
-```
+Forget a specific memory
 
-```bash
-ark session restore s-a1b2c3
-```
+**Synopsis:** `ark memory forget <id>`
 
-### ark session verify
+**Arguments:**
 
-Run verification scripts for the current stage. Shows pass/fail for each script.
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes | Memory ID |
 
-```
-ark session verify <id>
-```
+### `ark memory add`
 
-```bash
-ark session verify s-a1b2c3
-```
+Store a new memory
 
-### ark session todo
+**Synopsis:** `ark memory add [options] <content>`
 
-Manage verification todos (checklists that block stage completion).
+**Arguments:**
 
-```
-ark session todo <action> <id> [text]
-```
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `content` | yes | Memory content |
 
-| Action | Description |
-|--------|-------------|
-| `add` | Add a todo item (requires text) |
-| `list` | List all todos for the session |
-| `done` | Toggle a todo by number |
-
-```bash
-ark session todo add s-a1b2c3 "Write migration docs"
-ark session todo list s-a1b2c3
-ark session todo done s-a1b2c3 1
-```
+**Options:**
 
-### ark session events
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-t, --tags <tags>` |  | Comma-separated tags |
+| `-s, --scope <scope>` |  | Scope (default: global) |
+| `-i, --importance <n>` |  | Importance 0-1 (default: 0.5) |
 
-Show event history for a session.
+### `ark memory clear`
 
-```
-ark session events <id>
-```
+Clear all memories in a scope
 
-```bash
-ark session events s-a1b2c3
-```
+**Synopsis:** `ark memory clear [options]`
 
-### ark session delete
+**Options:**
 
-Delete one or more sessions (soft delete with 90s undo window).
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-s, --scope <scope>` |  | Scope to clear (omit for ALL) |
+| `--force` |  | Skip confirmation |
 
-```
-ark session delete <ids...>
-```
+## `ark profile`
 
-```bash
-ark session delete s-a1b2c3
-ark session delete s-aaa s-bbb s-ccc    # Delete multiple
-```
+Manage profiles
 
-### ark session undelete
+**Synopsis:** `ark profile`
 
-Restore a recently deleted session (within 90 seconds).
+### `ark profile list`
 
-```
-ark session undelete <id>
-```
+List profiles
 
-```bash
-ark session undelete s-a1b2c3
-```
+**Synopsis:** `ark profile list`
 
-### ark session group
+### `ark profile create`
 
-Assign a session to a group.
+Create a profile
 
-```
-ark session group <id> <group>
-```
+**Synopsis:** `ark profile create <name> [description]`
 
-```bash
-ark session group s-a1b2c3 backend
-```
+**Arguments:**
 
-### ark session export
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes |  |
+| `description` | no |  |
 
-Export a session to a JSON file.
+### `ark profile delete`
 
-```
-ark session export <id> [file]
-```
+Delete a profile
 
-Default output file: `session-<id>.json`
+**Synopsis:** `ark profile delete <name>`
 
-```bash
-ark session export s-a1b2c3
-ark session export s-a1b2c3 backup.json
-```
+**Arguments:**
 
-### ark session import
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes |  |
 
-Import a session from a JSON file.
+## `ark conductor`
 
-```
-ark session import <file>
-```
+Conductor operations
 
-```bash
-ark session import session-s-a1b2c3.json
-```
+**Synopsis:** `ark conductor`
 
----
+### `ark conductor status`
 
-## ark worktree
+Show whether a conductor is running on the daemon
 
-Git worktree operations.
+**Synopsis:** `ark conductor status`
 
-### ark worktree list
+### `ark conductor learnings`
 
-List sessions with active worktrees.
+Show conductor learnings
 
-```
-ark worktree list
-```
+**Synopsis:** `ark conductor learnings`
 
-### ark worktree finish
+### `ark conductor learn`
 
-Merge worktree branch, remove worktree, and delete session.
+Record a conductor learning
 
-```
-ark worktree finish <session-id> [options]
-```
+**Synopsis:** `ark conductor learn <title> [description]`
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--into <branch>` | Target branch to merge into | `main` |
-| `--no-merge` | Skip merge, just remove worktree and delete session | -- |
-| `--keep-branch` | Do not delete the branch after merge | -- |
-| `--pr` | Push branch and create a GitHub PR instead of merging locally | -- |
-
-```bash
-ark worktree finish s-a1b2c3
-ark worktree finish s-a1b2c3 --into develop
-ark worktree finish s-a1b2c3 --no-merge
-ark worktree finish s-a1b2c3 --keep-branch
-ark worktree finish s-a1b2c3 --pr
-```
+**Arguments:**
 
-### ark worktree diff
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `title` | yes |  |
+| `description` | no |  |
 
-Preview changes in a session's worktree branch.
+### `ark conductor bridge`
 
-```
-ark worktree diff <session-id> [options]
-```
+Start the messaging bridge (Slack/email) on the daemon
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--base <branch>` | Branch to compare against | `main` |
+**Synopsis:** `ark conductor bridge`
 
-```bash
-ark worktree diff s-a1b2c3
-ark worktree diff s-a1b2c3 --base develop
-```
+### `ark conductor notify`
 
-### ark worktree pr
+Send a test notification via bridge
 
-Push the worktree branch and create a GitHub PR.
+**Synopsis:** `ark conductor notify <message>`
 
-```
-ark worktree pr <session-id> [options]
-```
+**Arguments:**
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--title <text>` | PR title | session summary |
-| `--base <branch>` | Base branch for the PR | `main` |
-| `--draft` | Create as a draft PR | -- |
-
-```bash
-ark worktree pr s-a1b2c3
-ark worktree pr s-a1b2c3 --title "Add OAuth2 support"
-ark worktree pr s-a1b2c3 --base develop --draft
-```
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `message` | yes |  |
 
-### ark worktree cleanup
+## `ark router`
 
-Find and remove orphaned worktrees (worktrees that no longer have a matching session).
+LLM routing proxy
 
-```
-ark worktree cleanup [options]
-```
+**Synopsis:** `ark router`
 
-| Option | Description |
-|--------|-------------|
-| `--dry-run` | Only show what would be removed |
+### `ark router start`
 
-```bash
-ark worktree cleanup --dry-run
-ark worktree cleanup
-```
+Start the LLM router server
 
----
+**Synopsis:** `ark router start [options]`
 
-## ark costs
+**Options:**
 
-Show cost summary across sessions.
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-p, --port <port>` | `"8430"` | Listen port |
+| `--policy <policy>` | `"balanced"` | Routing policy: quality, balanced, cost |
+| `--config <path>` |  | Path to router config YAML |
+| `--tensorzero` |  | Enable TensorZero gateway (starts Docker container) |
+| `--tensorzero-url <url>` |  | TensorZero URL (skip auto-start, use existing) |
+| `--tensorzero-port <port>` | `"3000"` | TensorZero gateway port |
 
-```
-ark costs [options]
-```
+### `ark router status`
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-n, --limit <n>` | Number of sessions to show | `20` |
+Show router status and stats
 
-```bash
-ark costs
-ark costs --limit 50
-```
+**Synopsis:** `ark router status [options]`
 
----
+**Options:**
 
-## ark costs-sync
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--url <url>` | `"http://localhost:8430"` | Router URL |
+| `--tensorzero-url <url>` | `"http://localhost:3000"` | TensorZero URL |
 
-Backfill cost data from agent transcripts. Scans transcripts from all supported runtimes (Claude Code, OpenAI Codex, Google Gemini) via the polymorphic `TranscriptParserRegistry` and writes one row per turn into the `usage_records` table.
+### `ark router costs`
 
-The backfill picks the right parser per session by inspecting the session's runtime: `ClaudeTranscriptParser` reads `~/.claude/projects/<slug>/<sessionId>.jsonl`, `CodexTranscriptParser` reads `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl` (matched by cwd), `GeminiTranscriptParser` reads `~/.gemini/tmp/<projectHash>/chats/session-*.jsonl`.
+Show routing cost breakdown
 
-Each record carries a `cost_mode` (`api`, `subscription`, or `free`) inherited from the runtime's billing config -- so `claude-max` turns keep the token counts with `cost_usd = 0`, while `claude`/`codex`/`gemini` API turns get per-token pricing from the `PricingRegistry` (300+ models, LiteLLM JSON).
+**Synopsis:** `ark router costs [options]`
 
-```
-ark costs-sync
-```
+**Options:**
 
-```bash
-ark costs-sync
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--url <url>` | `"http://localhost:8430"` | Router URL |
+| `--group-by <field>` | `"model"` | Group by: model, provider, session |
 
----
+## `ark runtime`
 
-## ark costs-export
+Manage runtime definitions
 
-Export cost data to CSV or JSON.
+**Synopsis:** `ark runtime`
 
-```
-ark costs-export [options]
-```
+### `ark runtime list`
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--format <format>` | Output format: csv or json | `json` |
-| `-o, --output <file>` | Output file (prints to stdout if omitted) | -- |
-
-```bash
-ark costs-export
-ark costs-export --format csv
-ark costs-export --format csv -o costs.csv
-ark costs-export -o costs.json
-```
+List available runtimes
 
----
+**Synopsis:** `ark runtime list`
 
-## ark try
+### `ark runtime show`
 
-Run a one-shot sandboxed session that auto-cleans up when done.
+Show runtime details
 
-```
-ark try <task> [options]
-```
+**Synopsis:** `ark runtime show <name>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes |  |
+
+## `ark auth`
+
+Manage authentication and API keys
+
+**Synopsis:** `ark auth`
+
+### `ark auth setup`
+
+Set up Claude authentication (local or remote)
+
+**Synopsis:** `ark auth setup [options]`
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--host <name>` |  | Run setup-token on a specific remote compute |
+
+### `ark auth create-key`
+
+Create a new API key
+
+**Synopsis:** `ark auth create-key [options]`
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--name <name>` | `"default"` | Human-readable label for the key |
+| `--role <role>` | `"member"` | Role: admin, member, or viewer |
+| `--tenant <tenantId>` | `"default"` | Tenant ID |
+| `--expires <date>` |  | Expiration date (ISO 8601) |
+
+### `ark auth list-keys`
+
+List API keys
+
+**Synopsis:** `ark auth list-keys [options]`
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tenant <tenantId>` | `"default"` | Tenant ID |
+
+### `ark auth revoke-key`
+
+Revoke an API key
+
+**Synopsis:** `ark auth revoke-key [options] <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes | API key ID (e.g. ak-abcd1234) |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tenant <tenantId>` |  | Scope to this tenant (safer in multi-tenant setups) |
+
+### `ark auth rotate-key`
+
+Rotate an API key (revoke old, create new with same metadata)
+
+**Synopsis:** `ark auth rotate-key [options] <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes | API key ID to rotate |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tenant <tenantId>` |  | Scope to this tenant (safer in multi-tenant setups) |
+
+## `ark tenant`
+
+Manage tenant settings
+
+**Synopsis:** `ark tenant`
+
+### `ark tenant policy`
+
+Manage tenant compute policies
+
+**Synopsis:** `ark tenant policy`
+
+#### `ark tenant policy set`
+
+Set compute policy for a tenant
+
+**Synopsis:** `ark tenant policy set [options] <tenant-id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `tenant-id` | yes | Tenant ID |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--providers <list>` |  | Comma-separated allowed providers (e.g. k8s,ec2) |
+| `--default-provider <provider>` | `"k8s"` | Default provider |
+| `--max-sessions <n>` | `"10"` | Maximum concurrent sessions |
+| `--max-cost <usd>` |  | Maximum daily cost in USD |
+
+#### `ark tenant policy get`
+
+Get compute policy for a tenant
+
+**Synopsis:** `ark tenant policy get <tenant-id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `tenant-id` | yes | Tenant ID |
+
+#### `ark tenant policy list`
+
+List all tenant compute policies
+
+**Synopsis:** `ark tenant policy list`
+
+#### `ark tenant policy delete`
+
+Delete compute policy for a tenant
+
+**Synopsis:** `ark tenant policy delete <tenant-id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `tenant-id` | yes | Tenant ID |
+
+### `ark tenant list`
+
+List all tenants
+
+**Synopsis:** `ark tenant list [options]`
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--json` |  | Output raw JSON |
+
+### `ark tenant create`
+
+Create a new tenant
+
+**Synopsis:** `ark tenant create [options] <slug>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `slug` | yes | Kebab-case slug (unique) |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--name <name>` |  | Human-readable name (defaults to slug) |
+| `--json` |  | Output raw JSON |
+
+### `ark tenant update`
+
+Update a tenant's slug / name / status
+
+**Synopsis:** `ark tenant update [options] <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes | Tenant id or slug |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--slug <slug>` |  | New slug |
+| `--name <name>` |  | New name |
+| `--status <status>` |  | active | suspended | archived |
+
+### `ark tenant delete`
+
+Delete a tenant (cascades teams + memberships, leaves sessions/computes behind)
+
+**Synopsis:** `ark tenant delete <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes | Tenant id or slug |
+
+### `ark tenant suspend`
+
+Set tenant status to 'suspended'
+
+**Synopsis:** `ark tenant suspend <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes | Tenant id or slug |
+
+### `ark tenant resume`
+
+Set tenant status to 'active'
+
+**Synopsis:** `ark tenant resume <id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes | Tenant id or slug |
+
+### `ark tenant auth`
+
+Manage per-tenant Claude credential bindings
+
+**Synopsis:** `ark tenant auth`
+
+#### `ark tenant auth set`
+
+Bind a tenant to a Claude credential (api-key secret OR subscription-blob).
+
+**Synopsis:** `ark tenant auth set [options] <tenant-id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `tenant-id` | yes | Tenant ID (or slug) |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--api-key <name>` |  | Bind to a string secret storing ANTHROPIC_API_KEY |
+| `--subscription-blob <name>` |  | Bind to a blob secret (the ~/.claude directory) |
+
+#### `ark tenant auth show`
+
+Show the current Claude credential binding for a tenant.
+
+**Synopsis:** `ark tenant auth show <tenant-id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `tenant-id` | yes | Tenant ID (or slug) |
+
+#### `ark tenant auth clear`
+
+Remove the Claude credential binding for a tenant.
+
+**Synopsis:** `ark tenant auth clear <tenant-id>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `tenant-id` | yes | Tenant ID (or slug) |
+
+### `ark tenant config`
+
+Manage per-tenant configuration blobs
+
+**Synopsis:** `ark tenant config`
+
+#### `ark tenant config set-compute`
+
+Write the compute-config YAML blob for a tenant (cluster overrides)
+
+**Synopsis:** `ark tenant config set-compute [options] <tenantId>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `tenantId` | yes | Tenant ID |
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-f, --file <path>` |  | Path to YAML file with cluster overrides |
+
+#### `ark tenant config get-compute`
+
+Fetch the compute-config YAML blob for a tenant
+
+**Synopsis:** `ark tenant config get-compute <tenantId>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `tenantId` | yes | Tenant ID |
+
+#### `ark tenant config clear-compute`
+
+Clear the compute-config YAML blob for a tenant
+
+**Synopsis:** `ark tenant config clear-compute <tenantId>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `tenantId` | yes | Tenant ID |
+
+## `ark team`
+
+Manage teams + memberships
+
+**Synopsis:** `ark team`
+
+### `ark team list`
+
+List teams in a tenant
+
+**Synopsis:** `ark team list [options]`
+
+**Options:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tenant <id>` |  | Tenant id or slug *(required)* |
+| `--json` |  | Output raw JSON |
+
+### `ark team create`
+
+Create a team inside a tenant
+
+**Synopsis:** `ark team create [options] <slug>`
+
+**Arguments:**
+
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `slug` | yes | Kebab-case slug (unique within tenant) |
+
+**Options:**
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--image <image>` | Docker image | `ubuntu:22.04` |
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tenant <id>` |  | Tenant id or slug *(required)* |
+| `--name <name>` |  | Human-readable name (defaults to slug) |
+| `--description <text>` |  | Description |
+| `--json` |  | Output raw JSON |
 
-```bash
-ark try "Run the test suite and fix any failures"
-ark try "Refactor the auth module" --image node:20
-```
+### `ark team update`
 
----
+Update a team's slug / name / description
 
-## ark exec
+**Synopsis:** `ark team update [options] <id>`
 
-Run a session non-interactively (for CI/CD pipelines).
+**Arguments:**
 
-```
-ark exec [options]
-```
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes | Team id |
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-r, --repo <path>` | Repository path | `.` |
-| `-s, --summary <text>` | Task summary | -- |
-| `-t, --ticket <key>` | Ticket reference | -- |
-| `-f, --flow <name>` | Flow name | `bare` |
-| `-c, --compute <name>` | Compute target | -- |
-| `-g, --group <name>` | Group name | -- |
-| `-a, --autonomy <level>` | Autonomy: full/execute/edit/read-only | -- |
-| `-o, --output <format>` | Output: text/json | `text` |
-| `--timeout <seconds>` | Timeout in seconds (0 = unlimited) | `0` |
-
-```bash
-ark exec --summary "Run linter" --flow bare
-ark exec --summary "Fix tests" --timeout 300 --output json
-```
+**Options:**
 
----
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--slug <slug>` |  | New slug |
+| `--name <name>` |  | New name |
+| `--description <text>` |  | New description |
 
-## ark config
+### `ark team delete`
 
-Open Ark configuration in your editor.
+Delete a team (cascades memberships)
 
-```
-ark config [options]
-```
+**Synopsis:** `ark team delete <id>`
 
-| Option | Description |
-|--------|-------------|
-| `--path` | Print the config file path instead of opening editor |
+**Arguments:**
 
-```bash
-ark config                    # Opens ~/.ark/config.yaml in $EDITOR
-ark config --path             # Prints: /Users/you/.ark/config.yaml
-```
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `id` | yes | Team id |
 
----
+### `ark team members`
 
-## ark web
+Manage team memberships
 
-Start the web dashboard.
+**Synopsis:** `ark team members`
 
-```
-ark web [options]
-```
+#### `ark team members list`
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--port <port>` | Listen port | `8420` |
-| `--read-only` | Read-only mode (no mutations) | -- |
-| `--token <token>` | Bearer token for authentication | -- |
-| `--server <url>` | Proxy to a remote Ark server | -- |
-
-```bash
-ark web
-ark web --port 9000
-ark web --read-only
-ark web --token my-secret-token
-ark web --server https://ark.company.com --token xxx
-```
+List members of a team
 
----
+**Synopsis:** `ark team members list [options] <team>`
 
-## ark profile
+**Arguments:**
 
-Manage profiles (isolated session namespaces).
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `team` | yes | Team id |
 
-### ark profile list
+**Options:**
 
-List all profiles.
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--json` |  | Output raw JSON |
 
-```
-ark profile list
-```
+#### `ark team members add`
 
-### ark profile create
+Add a user to a team (creates the user if email is new)
 
-Create a new profile.
+**Synopsis:** `ark team members add [options] <team> <userEmail>`
 
-```
-ark profile create <name> [description]
-```
+**Arguments:**
 
-```bash
-ark profile create work "Work projects"
-ark profile create personal
-```
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `team` | yes | Team id |
+| `userEmail` | yes | User email |
 
-### ark profile delete
+**Options:**
 
-Delete a profile.
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--role <role>` | `"member"` | owner | admin | member | viewer |
 
-```
-ark profile delete <name>
-```
+#### `ark team members remove`
 
-```bash
-ark profile delete old-profile
-```
+Remove a user from a team
 
----
+**Synopsis:** `ark team members remove <team> <userEmail>`
 
-## ark search
+**Arguments:**
 
-Search across sessions, events, messages, and transcripts.
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `team` | yes | Team id |
+| `userEmail` | yes | User email |
 
-```
-ark search <query> [options]
-```
+#### `ark team members set-role`
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-l, --limit <n>` | Max results | `20` |
-| `-t, --transcripts` | Also search Claude transcripts (slower) | -- |
-| `--index` | Rebuild transcript search index before searching | -- |
-| `--hybrid` | Use hybrid search (knowledge graph + transcripts with LLM re-ranking) | -- |
-
-```bash
-ark search "authentication"
-ark search "auth" --transcripts
-ark search "auth" --index --transcripts
-ark search "auth" --limit 50
-ark search "auth" --hybrid
-```
+Change a member's role
 
----
+**Synopsis:** `ark team members set-role <team> <userEmail> <role>`
 
-## ark search-all
+**Arguments:**
 
-Search across all Claude Code conversations on disk (not just Ark sessions).
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `team` | yes | Team id |
+| `userEmail` | yes | User email |
+| `role` | yes | owner | admin | member | viewer |
 
-```
-ark search-all <query> [options]
-```
+## `ark user`
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-n, --limit <n>` | Max results | `20` |
-| `--days <n>` | Recent days to search | `90` |
-
-```bash
-ark search-all "database migration"
-ark search-all "error" --days 30
-ark search-all "refactor" --limit 50
-```
+Manage user identities
 
----
+**Synopsis:** `ark user`
 
-## ark index
+### `ark user list`
 
-Build or rebuild the transcript full-text search (FTS5) index.
+List users
 
-```
-ark index
-```
+**Synopsis:** `ark user list [options]`
 
-```bash
-ark index
-```
+**Options:**
 
----
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--json` |  | Output raw JSON |
 
-## ark agent
+### `ark user get`
 
-Manage agent definitions.
+Show a user by id or email
 
-### ark agent list
+**Synopsis:** `ark user get [options] <idOrEmail>`
 
-List all available agents.
+**Arguments:**
 
-```
-ark agent list [options]
-```
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `idOrEmail` | yes | User id or email |
 
-| Option | Description |
-|--------|-------------|
-| `--project <dir>` | Project root directory |
+**Options:**
 
-Output columns: scope (P=project, G=global, B=builtin), name, model, tool count, MCP count, skill count, memory count, description.
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--json` |  | Output raw JSON |
 
-```bash
-ark agent list
-```
+### `ark user create`
 
-### ark agent show
+Create a user
 
-Show agent details.
+**Synopsis:** `ark user create [options]`
 
-```
-ark agent show <name>
-```
+**Options:**
 
-```bash
-ark agent show implementer
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--email <email>` |  | User email (unique) *(required)* |
+| `--name <name>` |  | Display name |
+| `--json` |  | Output raw JSON |
 
-### ark agent create
+### `ark user delete`
 
-Create a new agent definition (opens in editor).
+Delete a user (cascades memberships)
 
-```
-ark agent create <name> [options]
-```
+**Synopsis:** `ark user delete <idOrEmail>`
 
-| Option | Description |
-|--------|-------------|
-| `--global` | Save to `~/.ark/agents/` instead of project |
+**Arguments:**
 
-```bash
-ark agent create my-agent
-ark agent create shared-agent --global
-```
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `idOrEmail` | yes | User id or email |
 
-### ark agent edit
+## `ark knowledge`
 
-Edit an agent definition in your editor.
+Knowledge graph - search, index, remember, export
 
-```
-ark agent edit <name>
-```
+**Synopsis:** `ark knowledge`
 
-If the agent is builtin, you will be prompted to copy it to project or global scope first.
+### `ark knowledge search`
 
-```bash
-ark agent edit my-agent
-```
+Search across all knowledge (files, memories, sessions, learnings)
 
-### ark agent copy
+**Synopsis:** `ark knowledge search [options] <query>`
 
-Copy an agent for customization.
+**Arguments:**
 
-```
-ark agent copy <name> [new-name] [options]
-```
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `query` | yes | Search query |
 
-| Option | Description |
-|--------|-------------|
-| `--global` | Save to `~/.ark/agents/` instead of project |
+**Options:**
 
-```bash
-ark agent copy implementer fast-impl
-ark agent copy implementer --global
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-t, --types <types>` |  | Comma-separated node types to filter (file,symbol,session,memory,learning,skill) |
+| `-n, --limit <n>` | `"20"` | Max results |
 
-### ark agent delete
+### `ark knowledge index`
 
-Delete a custom agent (cannot delete builtins).
+Index/re-index codebase into the knowledge graph (runs on daemon)
 
-```
-ark agent delete <name>
-```
+**Synopsis:** `ark knowledge index [options]`
 
-```bash
-ark agent delete my-agent
-```
+**Options:**
 
----
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-r, --repo <path>` |  | Repository path (default: cwd) |
+| `--incremental` |  | Only re-index changed files |
 
-## ark flow
+### `ark knowledge stats`
 
-Manage flow definitions.
+Show node/edge counts by type
 
-### ark flow list
+**Synopsis:** `ark knowledge stats`
 
-List all available flows.
+### `ark knowledge remember`
 
-```
-ark flow list
-```
+Store a new memory in the knowledge graph
 
-### ark flow show
+**Synopsis:** `ark knowledge remember [options] <content>`
 
-Show flow definition with stages.
+**Arguments:**
 
-```
-ark flow show <name>
-```
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `content` | yes | Memory content |
 
-```bash
-ark flow show default
-ark flow show quick
-```
+**Options:**
 
----
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-t, --tags <tags>` |  | Comma-separated tags |
+| `-i, --importance <n>` |  | Importance 0-1 (default: 0.5) |
 
-## ark skill
+### `ark knowledge recall`
 
-Manage skill definitions.
+Search memories and learnings
 
-### ark skill list
+**Synopsis:** `ark knowledge recall [options] <query>`
 
-List available skills.
+**Arguments:**
 
-```
-ark skill list
-```
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `query` | yes | Search query |
 
-### ark skill show
+**Options:**
 
-Show skill details and prompt content.
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-n, --limit <n>` | `"10"` | Max results |
 
-```
-ark skill show <name>
-```
+### `ark knowledge export`
 
-```bash
-ark skill show code-review
-```
+Export knowledge as markdown files (daemon-side filesystem)
 
-### ark skill create
+**Synopsis:** `ark knowledge export [options]`
 
-Create a new skill, either inline or from a YAML file.
+**Options:**
 
-```
-ark skill create [name] [options]
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-d, --dir <path>` | `"./knowledge-export"` | Output directory |
+| `-t, --types <types>` |  | Comma-separated types to export (default: memory,learning) |
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--from <file>` | Create from YAML file (name taken from YAML) | -- |
-| `-p, --prompt <prompt>` | Skill prompt (required unless --from) | -- |
-| `-d, --description <desc>` | Skill description | -- |
-| `-s, --scope <scope>` | Scope: global or project | `global` |
-| `--tags <tags>` | Comma-separated tags | -- |
-
-```bash
-ark skill create my-skill -p "Review for security issues" -d "Security review" --tags security,review
-ark skill create --from skill.yaml
-ark skill create my-skill -p "Prompt text" --scope project
-```
+### `ark knowledge import`
 
-### ark skill delete
+Import knowledge from markdown files (daemon-side filesystem)
 
-Delete a skill. Cannot delete builtin skills.
+**Synopsis:** `ark knowledge import [options]`
 
-```
-ark skill delete <name> [options]
-```
+**Options:**
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-s, --scope <scope>` | Scope: global or project | `global` |
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-d, --dir <path>` | `"./knowledge-export"` | Input directory |
 
-```bash
-ark skill delete my-skill
-ark skill delete my-skill --scope project
-```
+### `ark knowledge ingest`
 
----
+Ingest a directory into the knowledge graph (indexes files and symbols)
 
-## ark recipe
+**Synopsis:** `ark knowledge ingest [options] <path>`
 
-Manage recipe templates.
+**Arguments:**
 
-### ark recipe list
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `path` | yes | Directory to ingest |
 
-List available recipes.
+**Options:**
 
-```
-ark recipe list
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--incremental` |  | Only re-index changed files |
 
-### ark recipe show
+### `ark knowledge codebase`
 
-Show recipe details, including variables.
+codebase-memory-mcp (vendored code intelligence engine)
 
-```
-ark recipe show <name>
-```
+**Synopsis:** `ark knowledge codebase`
 
-```bash
-ark recipe show quick-fix
-```
+#### `ark knowledge codebase status`
 
-### ark recipe create
+Show codebase-memory-mcp installation status and version
 
-Create a new recipe from a YAML file or from an existing session.
+**Synopsis:** `ark knowledge codebase status`
 
-```
-ark recipe create [options]
-```
+#### `ark knowledge codebase tools`
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--from <file>` | Create from YAML file | -- |
-| `--from-session <id>` | Create from existing session | -- |
-| `-n, --name <name>` | Recipe name (required with --from-session) | -- |
-| `-s, --scope <scope>` | Scope: global or project | `global` |
-
-Must specify either `--from` or `--from-session`.
-
-```bash
-ark recipe create --from recipe.yaml
-ark recipe create --from-session s-a1b2c3 --name my-recipe
-ark recipe create --from recipe.yaml --scope project
-```
+List the 14 MCP tools exposed by codebase-memory-mcp
 
-### ark recipe delete
+**Synopsis:** `ark knowledge codebase tools`
 
-Delete a recipe. Cannot delete builtin recipes.
+#### `ark knowledge codebase reindex`
 
-```
-ark recipe delete <name> [options]
-```
+Run `index_repository` against a path via the caller's vendored binary
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-s, --scope <scope>` | Scope: global or project | `global` |
+**Synopsis:** `ark knowledge codebase reindex [path]`
 
-```bash
-ark recipe delete my-recipe
-ark recipe delete my-recipe --scope project
-```
+**Arguments:**
 
----
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `path` | no | Repository path (default: cwd) |
 
-## ark compute
+## `ark code-intel`
 
-Manage compute resources.
+Unified code-intelligence store (search, index, repos, runs)
 
-### ark compute create
+**Synopsis:** `ark code-intel`
 
-Create a new compute resource.
+### `ark code-intel db`
 
-```
-ark compute create <name> [options]
-```
+Schema migrations + status
 
-**General options:**
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--provider <type>` | Provider type: `local`, `docker`, `devcontainer`, `firecracker`, `ec2`, `ec2-docker`, `ec2-devcontainer`, `ec2-firecracker`, `e2b`, `k8s`, `k8s-kata` | `local` |
-| `--from-template <template>` | Create from a named compute template (see `ark compute template`) | -- |
-
-**EC2 options** (applies to `ec2`, `ec2-docker`, `ec2-devcontainer`, `ec2-firecracker`):
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--size <size>` | Instance size: xs/s/m/l/xl/xxl/xxxl | `m` |
-| `--arch <arch>` | Architecture: x64, arm | `x64` |
-| `--region <region>` | AWS region | `us-east-1` |
-| `--profile <profile>` | AWS profile | -- |
-| `--subnet-id <id>` | Subnet ID | -- |
-| `--tag <key=value>` | Tag (repeatable) | -- |
-
-**Docker / devcontainer options:**
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--image <image>` | Docker image | `ubuntu:22.04` |
-| `--devcontainer` | Use devcontainer.json from project | -- |
-| `--volume <mount>` | Extra volume mount (repeatable) | -- |
-
-```bash
-ark compute create my-ec2 --provider ec2 --size m --region us-east-1
-ark compute create my-docker --provider docker --image node:20
-ark compute create my-dev --provider devcontainer
-ark compute create my-fc --provider firecracker
-ark compute create my-ec2-fc --provider ec2-firecracker --size l
-ark compute create my-e2b --provider e2b
-ark compute create my-k8s --provider k8s
-ark compute create my-kata --provider k8s-kata
-ark compute create my-box --from-template gpu-large
-```
+**Synopsis:** `ark code-intel db`
 
-When `--from-template` is set, Ark loads the named template from `~/.ark/config.yaml` (under `compute_templates:`) and uses its provider + config as the base. Any additional flags on the command line override the template defaults.
+#### `ark code-intel db migrate`
 
-### ark compute template
+Apply any pending code-intel migrations
 
-Manage named compute templates -- preset provider configurations that `ark compute create --from-template` can consume.
+**Synopsis:** `ark code-intel db migrate [options]`
 
-Templates are defined in `~/.ark/config.yaml` under `compute_templates:` (see the Configuration reference), and can also be created from the CLI. In hosted/control-plane mode, templates are stored per-tenant in the `compute_templates` database table.
+**Options:**
 
-#### ark compute template list
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--to <version>` |  | Target version (default: latest) |
 
-List all defined compute templates.
+#### `ark code-intel db status`
 
-```
-ark compute template list
-```
+Print current schema version + pending migrations
 
-```bash
-ark compute template list
-```
+**Synopsis:** `ark code-intel db status`
 
-#### ark compute template show
+#### `ark code-intel db reset`
 
-Show a template's full configuration.
+Drop every code-intel table (DEV ONLY).
 
-```
-ark compute template show <name>
-```
+**Synopsis:** `ark code-intel db reset [options]`
 
-```bash
-ark compute template show gpu-large
-```
+**Options:**
 
-#### ark compute template create
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--yes` |  | Confirm destructive operation |
 
-Create a new compute template.
+### `ark code-intel repo`
 
-```
-ark compute template create <name> --provider <type> [options]
-```
+Manage indexed repositories
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--provider <type>` | Provider type (same list as `compute create`) | required |
-| `--size <size>` | Instance size (EC2-family providers) | -- |
-| `--region <region>` | AWS region (EC2-family) | -- |
-| `--image <image>` | Docker image (docker/devcontainer) | -- |
-| `--set <key=value>` | Set arbitrary config key (repeatable) | -- |
-
-```bash
-ark compute template create gpu-large --provider ec2 --size xxl --region us-west-2
-ark compute template create sandbox --provider docker --image node:20
-ark compute template create isolated --provider ec2-firecracker --size l
-```
+**Synopsis:** `ark code-intel repo`
 
-#### ark compute template delete
+#### `ark code-intel repo add`
 
-Delete a compute template.
+Register a repo for indexing
 
-```
-ark compute template delete <name>
-```
+**Synopsis:** `ark code-intel repo add [options] <url-or-path>`
 
-```bash
-ark compute template delete gpu-large
-```
+**Arguments:**
 
-### ark compute list
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `url-or-path` | yes | Repo URL or local path |
 
-List all compute resources.
+**Options:**
 
-```
-ark compute list
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tenant <slug>` |  | Tenant slug (default: caller's tenant) |
+| `--name <name>` |  | Display name (default: derived) |
+| `--default-branch <branch>` | `"main"` | Default branch |
 
-### ark compute provision
+#### `ark code-intel repo list`
 
-Provision infrastructure for a compute resource.
+List repos for a tenant
 
-```
-ark compute provision <name>
-```
+**Synopsis:** `ark code-intel repo list [options]`
 
-```bash
-ark compute provision my-ec2
-```
+**Options:**
 
-### ark compute start
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tenant <slug>` |  | Tenant slug (default: caller's tenant) |
 
-Start a stopped compute resource.
+### `ark code-intel reindex`
 
-```
-ark compute start <name>
-```
+Run extractors against a repo
 
-### ark compute stop
+**Synopsis:** `ark code-intel reindex [options]`
 
-Stop a running compute resource.
+**Options:**
 
-```
-ark compute stop <name>
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tenant <slug>` |  | Tenant slug (default: caller's tenant) |
+| `--repo <id-or-name>` |  | Repo id or name (default: only one if unambiguous) |
+| `--extractors <names>` |  | Comma-separated extractor names (default: all) |
 
-### ark compute destroy
+### `ark code-intel search`
 
-Tear down infrastructure (but keep database record).
+FTS over chunks (file content + symbols)
 
-```
-ark compute destroy <name>
-```
+**Synopsis:** `ark code-intel search [options] <query>`
 
-### ark compute delete
+**Arguments:**
 
-Remove compute record from the database. Must be stopped/destroyed first.
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `query` | yes | Search query |
 
-```
-ark compute delete <name>
-```
+**Options:**
 
-### ark compute status
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tenant <slug>` |  | Tenant slug (default: caller's tenant) |
+| `-n, --limit <n>` | `"20"` | Max results |
 
-Show compute details and metrics.
+### `ark code-intel get-context`
 
-```
-ark compute status <name>
-```
+Assemble a context snapshot for a file or symbol
 
-### ark compute metrics
+**Synopsis:** `ark code-intel get-context [options] <subject>`
 
-Show detailed metrics (CPU, memory, disk, network, uptime).
+**Arguments:**
 
-```
-ark compute metrics <name>
-```
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `subject` | yes | File path, file id, or symbol name |
 
-### ark compute ssh
+**Options:**
 
-SSH into a remote compute resource.
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tenant <slug>` |  | Tenant slug (default: caller's tenant) |
+| `--repo <id-or-name>` |  | Repo id or name (helps path lookup) |
 
-```
-ark compute ssh <name>
-```
+### `ark code-intel doctor`
 
-### ark compute sync
+Report VendorResolver + binary health (caller-local)
 
-Sync environment files to/from compute.
+**Synopsis:** `ark code-intel doctor`
 
-```
-ark compute sync <name> [options]
-```
+### `ark code-intel health`
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--direction <dir>` | Sync direction: push/pull | `push` |
+High-level store + deployment health
 
-```bash
-ark compute sync my-ec2
-ark compute sync my-ec2 --direction pull
-```
+**Synopsis:** `ark code-intel health`
 
-### ark compute update
+## `ark workspace`
 
-Update compute configuration.
+Manage workspaces (tenant -> workspace -> repo)
 
-```
-ark compute update <name> [options]
-```
+**Synopsis:** `ark workspace`
 
-| Option | Description |
-|--------|-------------|
-| `--size <size>` | Instance size |
-| `--arch <arch>` | Architecture |
-| `--region <region>` | AWS region |
-| `--profile <profile>` | AWS profile |
-| `--subnet-id <id>` | Subnet ID |
-| `--ingress <cidrs>` | SSH ingress CIDRs (comma-separated, or 'open') |
-| `--idle-minutes <min>` | Idle shutdown timeout in minutes |
-| `--set <key=value>` | Set arbitrary config key (repeatable) |
-
-```bash
-ark compute update my-ec2 --size l
-ark compute update my-ec2 --ingress open
-ark compute update my-ec2 --idle-minutes 30
-```
+### `ark workspace create`
 
-### ark compute default
+Create a new workspace
 
-Set the default compute resource. Persists the choice to `~/.ark/.env` so it survives restarts.
+**Synopsis:** `ark workspace create [options] <slug>`
 
-```
-ark compute default <name>
-```
+**Arguments:**
 
-```bash
-ark compute default my-ec2
-```
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `slug` | yes | Workspace slug (unique per tenant) |
 
----
+**Options:**
 
-## ark conductor
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tenant <slug>` |  | Tenant slug (default: caller's tenant) |
+| `--name <name>` |  | Display name (default: derived from slug) |
+| `--description <text>` |  | Free-form description |
 
-Conductor operations.
+### `ark workspace list`
 
-### ark conductor start
+List workspaces for a tenant
 
-Start the conductor server.
+**Synopsis:** `ark workspace list [options]`
 
-```
-ark conductor start [options]
-```
+**Options:**
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-p, --port <port>` | Port | `19100` |
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tenant <slug>` |  | Tenant slug (default: caller's tenant) |
+| `--format <fmt>` | `"text"` | Output format: yaml | text |
 
-### ark conductor learnings
+### `ark workspace show`
 
-Show conductor learnings and policies.
+Show a workspace + attached repos
 
-```
-ark conductor learnings
-```
+**Synopsis:** `ark workspace show [options] <slug>`
 
-### ark conductor learn
+**Arguments:**
 
-Record a conductor learning manually.
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `slug` | yes | Workspace slug |
 
-```
-ark conductor learn <title> [description]
-```
+**Options:**
 
-```bash
-ark conductor learn "Always run tests before merge" "Catches regressions early"
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tenant <slug>` |  | Tenant slug (default: caller's tenant) |
+| `--format <fmt>` | `"text"` | Output format: yaml | text |
 
-### ark conductor bridge
+### `ark workspace use`
 
-Start the messaging bridge (Telegram/Slack/Discord).
+Set the active workspace (persisted to the caller's ~/.ark/config.yaml)
 
-```
-ark conductor bridge
-```
+**Synopsis:** `ark workspace use [options] <slug>`
 
-Requires `~/.ark/bridge.json` to be configured.
+**Arguments:**
 
-### ark conductor notify
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `slug` | yes | Workspace slug |
 
-Send a test notification via the messaging bridge.
+**Options:**
 
-```
-ark conductor notify <message>
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tenant <slug>` |  | Tenant slug (default: caller's tenant) |
 
-```bash
-ark conductor notify "Deploy completed successfully"
-```
+### `ark workspace add-repo`
 
----
+Attach a repo to a workspace (creates the repo if it's a new path/URL)
 
-## ark schedule
+**Synopsis:** `ark workspace add-repo [options] <workspace-slug> <repo-path-or-url>`
 
-Manage scheduled recurring sessions.
+**Arguments:**
 
-### ark schedule add
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `workspace-slug` | yes | Workspace slug |
+| `repo-path-or-url` | yes | Repo path, URL, or existing repo id / name |
 
-Create a recurring scheduled session.
+**Options:**
 
-```
-ark schedule add [options]
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tenant <slug>` |  | Tenant slug (default: caller's tenant) |
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--cron <expression>` | Cron expression (required) | -- |
-| `-f, --flow <name>` | Flow name | `bare` |
-| `-r, --repo <path>` | Repository path | -- |
-| `-s, --summary <text>` | Session summary | -- |
-| `-c, --compute <name>` | Compute name | -- |
-| `-g, --group <name>` | Group name | -- |
-
-```bash
-ark schedule add --cron "0 2 * * *" --summary "Nightly tests" --repo . --flow bare
-ark schedule add --cron "0 9 * * 1" --summary "Weekly review" --repo .
-```
+### `ark workspace remove-repo`
 
-### ark schedule list
+Detach a repo from a workspace (repo itself is not deleted)
 
-List all schedules.
+**Synopsis:** `ark workspace remove-repo [options] <workspace-slug> <repo>`
 
-```
-ark schedule list
-```
+**Arguments:**
 
-### ark schedule enable
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `workspace-slug` | yes | Workspace slug |
+| `repo` | yes | Repo id, name, or URL |
 
-Enable a schedule.
+**Options:**
 
-```
-ark schedule enable <id>
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--tenant <slug>` |  | Tenant slug (default: caller's tenant) |
 
-### ark schedule disable
+## `ark eval`
 
-Disable a schedule.
+Agent performance evaluation
 
-```
-ark schedule disable <id>
-```
+**Synopsis:** `ark eval`
 
-### ark schedule delete
+### `ark eval stats`
 
-Delete a schedule.
+Show agent performance stats
 
-```
-ark schedule delete <id>
-```
+**Synopsis:** `ark eval stats [options]`
 
----
+**Options:**
 
-## ark doctor
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-a, --agent <role>` |  | Agent role to filter by |
 
-Check system prerequisites (Bun, tmux, git, Claude CLI). Reports which tools are available and flags any missing required dependencies.
+### `ark eval drift`
 
-```
-ark doctor
-```
+Check for performance drift
 
-```bash
-ark doctor
-```
+**Synopsis:** `ark eval drift [options]`
 
----
+**Options:**
 
-## ark init
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-a, --agent <role>` |  | Agent role to check |
+| `-d, --days <n>` | `"7"` | Recent window in days |
 
-Initialize Ark for the current repository. Runs an interactive wizard that checks prerequisites, verifies Claude CLI authentication, and creates a `.ark.yaml` configuration stub if one does not already exist.
+### `ark eval list`
 
-```
-ark init
-```
+List recent eval results
 
-```bash
-ark init
-```
+**Synopsis:** `ark eval list [options]`
 
----
+**Options:**
 
-## ark arkd
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-a, --agent <role>` |  | Agent role to filter by |
+| `-n, --limit <n>` | `"20"` | Max results |
 
-Start the ArkD universal agent daemon. ArkD is a stateless HTTP server (`packages/arkd/server.ts`, ~800 lines) that runs on every compute target -- local machine, Docker container, EC2 instance, K8s pod, Firecracker micro-VM -- and exposes one uniform API for agent lifecycle, file ops, metrics, and channel relay.
+## `ark dashboard`
 
-**Why it exists:** Without arkd, the conductor would need to shell into each compute via SSH for every operation (slow, auth-fragile, provider-specific). With arkd, the conductor talks HTTP to `http://<compute-ip>:19300` regardless of how or where the compute was provisioned.
+Show fleet status, costs, and recent activity
 
-**Responsibilities:**
-- Agent lifecycle (launch/kill/status) via tmux
-- File ops (read/write/list) on the remote target
-- Process execution with sandbox
-- System metrics (CPU/memory/disk/uptime)
-- Port probing
-- Channel relay (agent report -> arkd -> conductor at :19100)
-- Docker container ops (list/exec)
-- Codegraph indexing at `POST /codegraph/index` (runs `codegraph build` locally, parses `.codegraph/graph.db`, and returns nodes/edges to the conductor)
-- Optional bearer-token auth via the `ARK_ARKD_TOKEN` env var
+**Synopsis:** `ark dashboard [options]`
 
-```
-ark arkd [options]
-```
+**Options:**
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-p, --port <port>` | Port (env: `ARK_ARKD_PORT`) | `19300` |
-| `--hostname <host>` | Bind address | `0.0.0.0` |
-| `--conductor-url <url>` | Conductor URL for channel relay | `http://localhost:19100` |
-
-Override the URL seen by the rest of Ark with `ARK_ARKD_URL` (defaults to `http://localhost:19300`). Local providers target `http://localhost:19300`, remote providers target `http://<compute-ip>:19300`. Docker/devcontainer images bake arkd in so it starts on container boot; EC2 installs it via cloud-init as a systemd service; K8s runs it as a sidecar container in the agent pod.
-
-```bash
-ark arkd
-ark arkd --port 19400 --conductor-url http://localhost:19100
-ark arkd --hostname 127.0.0.1
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--json` |  | Output as JSON |
 
----
+## `ark costs`
 
-## ark auth (Claude setup)
+Show cost summary across sessions
 
-Set up Claude authentication. For API key management, see [ark auth](#ark-auth) (full auth commands) below.
+**Synopsis:** `ark costs [options]`
 
-```
-ark auth [options]
-```
+**Options:**
 
-| Option | Description |
-|--------|-------------|
-| `--host <name>` | Run setup-token on a specific remote compute instead of local |
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-n, --limit <n>` | `"20"` | Number of rows to show |
+| `--by <dimension>` |  | Group by: model, provider, runtime, agent, session, tenant, user |
+| `--trend` |  | Show daily cost trend |
+| `--days <n>` |  | Days for trend (default 30) |
+| `--since <date>` |  | Start date (ISO format) |
+| `--until <date>` |  | End date (ISO format) |
+| `--tenant <id>` |  | Filter by tenant |
 
-```bash
-ark auth                        # Local auth setup
-ark auth --host my-ec2          # Remote auth setup
-```
+## `ark costs-sync`
 
-This is an alias for `ark auth setup`. See the [full auth commands](#ark-auth-1) section for API key management.
+Backfill cost data from transcripts (on the daemon host)
 
----
+**Synopsis:** `ark costs-sync`
 
-## ark claude
+## `ark costs-export`
 
-Interact with Claude Code sessions.
+Export cost data
 
-### ark claude list
+**Synopsis:** `ark costs-export [options]`
 
-List Claude Code sessions found on disk.
+**Options:**
 
-```
-ark claude list [options]
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--format <format>` | `"json"` | csv or json |
+| `-o, --output <file>` |  | Output file |
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-p, --project <filter>` | Filter by project path | -- |
-| `-l, --limit <n>` | Max results | `20` |
-
-```bash
-ark claude list
-ark claude list --project /Users/me/my-project
-```
+## `ark server`
 
----
+JSON-RPC server
 
-## ark watch
+**Synopsis:** `ark server`
 
-Watch GitHub issues with a label and auto-create sessions.
+### `ark server daemon`
 
-```
-ark watch [options]
-```
+Manage the Ark server daemon
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-l, --label <label>` | GitHub label to watch | `ark` |
-| `-d, --dispatch` | Auto-dispatch created sessions | -- |
-| `-i, --interval <ms>` | Poll interval in milliseconds | `60000` |
-
-```bash
-ark watch --label ark --dispatch
-ark watch --label ark --dispatch --interval 30000
-```
+**Synopsis:** `ark server daemon`
 
----
+#### `ark server daemon start`
 
-## ark pr
+Start the Ark server daemon (AppContext + conductor + arkd + WebSocket)
 
-Manage PR-bound sessions.
+**Synopsis:** `ark server daemon start [options]`
 
-### ark pr list
+**Options:**
 
-List sessions bound to PRs.
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-p, --port <port>` | `"19400"` | WebSocket server port |
+| `-d, --detach` |  | Run in background (detached mode) |
 
-```
-ark pr list
-```
+#### `ark server daemon stop`
 
-### ark pr status
+Stop the server daemon
 
-Show session bound to a specific PR URL.
+**Synopsis:** `ark server daemon stop`
 
-```
-ark pr status <pr-url>
-```
+#### `ark server daemon status`
 
-```bash
-ark pr status https://github.com/org/repo/pull/123
-```
+Check server daemon status
 
----
+**Synopsis:** `ark server daemon status`
 
-## ark mcp-proxy
+### `ark server start`
 
-Bridge a Claude Code MCP client over stdio to a pooled MCP server reachable at a Unix domain socket.
+Start the Ark server
 
-```
-ark mcp-proxy <socket-path>
-```
+**Synopsis:** `ark server start [options]`
 
-When MCP socket pooling is enabled (`mcp_pool.enabled: true` in `~/.ark/config.yaml`), each pooled MCP server runs as a single long-lived process and exposes a socket at `/tmp/ark-mcp-<name>.sock`. Session `.mcp.json` entries reference the pool via:
-
-```json
-{
-  "mcpServers": {
-    "knowledge-graph": {
-      "command": "ark",
-      "args": ["mcp-proxy", "/tmp/ark-mcp-knowledge-graph.sock"]
-    }
-  }
-}
-```
+**Options:**
 
-`ark mcp-proxy` is the stdio-to-socket shim that Claude Code spawns. It is normally wired up automatically -- you only call it by hand when testing a custom `.mcp.json`. Pooling cuts memory roughly 85-90% versus the default one-process-per-session-per-MCP model.
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--stdio` |  | Use stdio transport (JSONL) |
+| `--ws` |  | Use WebSocket transport |
+| `--hosted` |  | Start as hosted multi-tenant control plane |
+| `-p, --port <port>` | `"19400"` | WebSocket port |
 
-```bash
-ark mcp-proxy /tmp/ark-mcp-knowledge-graph.sock
-```
+## `ark exec`
 
----
+Run a session non-interactively (for CI/CD)
 
-## ark channel
+**Synopsis:** `ark exec [options]`
 
-Run the ark-channel MCP server for a session. Each Ark session gets one channel server, spawned over stdio by the agent runtime (Claude Code, Codex, Gemini). The channel server implements the official Claude Code `claude/channel` capability:
+**Options:**
 
-- Inbound: `notifications/claude/channel` events (human steering flows from conductor -> arkd -> ark-channel -> agent)
-- Outbound MCP tools:
-  - `report` -- agent reports progress, completion, error, or question
-  - `send_to_agent` -- agent messages another agent (for handoff and fan-out coordination)
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-r, --repo <path>` |  | Repository path |
+| `-s, --summary <text>` |  | Task summary |
+| `-t, --ticket <key>` |  | Ticket reference |
+| `-f, --flow <name>` | `"bare"` | Flow name |
+| `-c, --compute <name>` |  | Compute target |
+| `-g, --group <name>` |  | Group name |
+| `-a, --autonomy <level>` |  | Autonomy: full/execute/edit/read-only |
+| `-o, --output <format>` | `"text"` | Output: text/json |
+| `-w, --workspace <slug>` |  | Workspace slug for multi-repo dispatch (Wave 2b-1: LOCAL compute only). Combine with --repo to set a primary. |
+| `-i, --input <pair>` | `[]` | Session input file as role=path (repeatable). Accessible to flows/agents as {inputs.files.<role>}. |
+| `-p, --param <pair>` | `[]` | Session input param as key=value (repeatable). Accessible as {inputs.params.<key>}. |
+| `--timeout <seconds>` | `"0"` | Timeout in seconds (0=unlimited) |
 
-**Port allocation is deterministic.** Each channel server opens an HTTP port for inbound traffic using the formula `19200 + (hash(sessionId) % 10000)` -- so the same session always gets the same port and two concurrent sessions almost never collide. This is normally invoked by the executor; you only call it by hand when debugging the MCP wiring.
+## `ark try`
 
-```
-ark channel
-```
+Run a one-shot sandboxed session (auto-cleans up)
 
-See also `ark arkd`, which relays channel reports from ark-channel back to the conductor at `:19100`.
+**Synopsis:** `ark try [options] <task>`
 
----
+**Arguments:**
 
-## ark openapi
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `task` | yes |  |
 
-Generate an OpenAPI spec from the JSON-RPC methods. Outputs JSON to stdout.
+**Options:**
 
-```
-ark openapi
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--image <image>` | `"ubuntu:22.04"` | Docker image |
 
-```bash
-ark openapi
-ark openapi > openapi.json
-```
+## `ark daemon`
 
----
+Manage the arkd agent daemon
 
-## ark acp
+**Synopsis:** `ark daemon`
 
-Start a headless ACP (Agent Communication Protocol) server on stdin/stdout using JSON-RPC. Used for programmatic access to Ark without the web interface.
+### `ark daemon start`
 
-```
-ark acp
-```
+Start the arkd agent daemon
 
-```bash
-ark acp
-```
+**Synopsis:** `ark daemon start [options]`
 
----
+**Options:**
 
-## ark repo-map
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-p, --port <port>` | `"19300"` | Port |
+| `--hostname <host>` | `"0.0.0.0"` | Bind address |
+| `--conductor-url <url>` |  | Conductor URL for channel relay |
+| `--workspace-root <path>` |  | Confine /file/* and /exec to this directory (recommended in hosted / multi-tenant deployments) |
+| `-d, --detach` |  | Run in background (detached mode) |
 
-Generate a repository structure map showing files and directory layout.
+### `ark daemon stop`
 
-```
-ark repo-map [dir] [options]
-```
+Stop a running daemon
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--max-files <n>` | Max files to include | `500` |
-| `--max-depth <n>` | Max directory depth | `10` |
-| `--json` | Output as JSON instead of text | -- |
-
-```bash
-ark repo-map
-ark repo-map /path/to/project
-ark repo-map --max-files 200 --max-depth 5
-ark repo-map --json
-```
+**Synopsis:** `ark daemon stop [options]`
 
----
+**Options:**
 
-## ark eval
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-p, --port <port>` |  | Port of daemon to stop (uses PID file by default) |
 
-Evaluate a recipe by creating N test sessions. Reports success rate, duration, and cost for each iteration.
+### `ark daemon status`
 
-```
-ark eval <recipe> [options]
-```
+Check daemon status
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-n, --iterations <n>` | Number of iterations | `3` |
+**Synopsis:** `ark daemon status [options]`
 
-```bash
-ark eval quick-fix
-ark eval feature-build --iterations 5
-```
+**Options:**
 
----
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-p, --port <port>` | `"19300"` | Port to check |
 
-## ark server
+## `ark pr`
 
-JSON-RPC protocol server.
+Manage PR-bound sessions
 
-### ark server start
+**Synopsis:** `ark pr`
 
-Start the Ark protocol server.
+### `ark pr list`
 
-```
-ark server start [options]
-```
+List sessions bound to PRs
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--stdio` | Use stdio transport (JSONL) | -- |
-| `--ws` | Use WebSocket transport | default |
-| `-p, --port <port>` | WebSocket port | `19400` |
-| `--hosted` | Start as hosted multi-tenant control plane | -- |
-
-Examples:
-
-```bash
-ark server start                   # WebSocket on port 19400
-ark server start --stdio           # JSONL over stdin/stdout
-ark server start --port 9000       # Custom port
-ark server start --hosted          # Multi-tenant control plane with workers + scheduler
-```
+**Synopsis:** `ark pr list`
 
-The CLI talks to the database directly via AppContext. Start the server daemon explicitly only for external clients (web UI, desktop app, remote clients).
+### `ark pr status`
 
-With `--hosted`, the server boots a full control plane: worker registry, session scheduler, tenant policies, and optional Redis SSE bus (via `REDIS_URL`). Database defaults to PostgreSQL (via `DATABASE_URL`).
+Show session bound to a PR URL
 
----
+**Synopsis:** `ark pr status <pr-url>`
 
-## ark memory
+**Arguments:**
 
-Cross-session persistent knowledge.
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `pr-url` | yes | GitHub PR URL |
 
-### ark memory list
+## `ark watch`
 
-List stored memories.
+Watch GitHub issues with a label and auto-create sessions
 
-```
-ark memory list [options]
-```
+**Synopsis:** `ark watch [options]`
 
-| Option | Description |
-|--------|-------------|
-| `--scope <scope>` | Filter by scope (e.g., "global", "project/myapp") |
+**Options:**
 
-### ark memory recall
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-l, --label <label>` | `"ark"` | GitHub label to watch |
+| `-d, --dispatch` |  | Auto-dispatch created sessions |
+| `-i, --interval <ms>` | `"60000"` | Poll interval in ms |
 
-Search memories by query.
+## `ark claude`
 
-```
-ark memory recall <query> [options]
-```
+Interact with Claude Code sessions
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--scope <scope>` | Limit to scope | all |
-| `--limit <n>` | Max results | 10 |
+**Synopsis:** `ark claude`
 
-### ark memory add
+### `ark claude list`
 
-Store a new memory.
+List Claude Code sessions found on disk
 
-```
-ark memory add <content> [options]
-```
+**Synopsis:** `ark claude list [options]`
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-t, --tags <tags>` | Comma-separated tags | -- |
-| `-s, --scope <scope>` | Memory scope | `global` |
-| `-i, --importance <n>` | Importance score (0-1) | `0.5` |
-
-Examples:
-
-```bash
-ark memory add "API uses rate limiting with 100 req/min"
-ark memory add "Deploy to staging first" --tags "process,deploy" --scope project
-ark memory add "Critical: never delete prod data" --importance 1.0
-```
+**Options:**
 
-### ark memory forget
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-p, --project <filter>` |  | Filter by project path |
+| `-l, --limit <n>` | `"20"` | Max results |
 
-Delete a memory entry.
+## `ark doctor`
 
-```
-ark memory forget <id>
-```
+Check system prerequisites
 
-### ark memory clear
+**Synopsis:** `ark doctor`
 
-Clear all memories in a scope.
+## `ark arkd`
 
-```
-ark memory clear [options]
-```
+Start the arkd agent daemon
 
-| Option | Description |
-|--------|-------------|
-| `-s, --scope <scope>` | Scope to clear (omit for ALL) |
-| `--force` | Skip confirmation prompt |
+**Synopsis:** `ark arkd [options]`
 
----
+**Options:**
 
-## ark knowledge
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-p, --port <port>` | `"19300"` | Port |
+| `--hostname <host>` | `"0.0.0.0"` | Bind address (default: 0.0.0.0) |
+| `--conductor-url <url>` |  | Conductor URL for channel relay |
 
-Knowledge base ingestion.
+## `ark channel`
 
-### ark knowledge search
+Run the MCP channel server (used by remote agents)
 
-Search across all knowledge (files, memories, sessions, learnings).
+**Synopsis:** `ark channel`
 
-```
-ark knowledge search <query> [options]
-```
+## `ark run-agent-sdk`
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-t, --types <types>` | Comma-separated node types to filter (file,symbol,session,memory,learning,skill) | all |
-| `-n, --limit <n>` | Max results | `20` |
-
-```bash
-ark knowledge search "authentication"
-ark knowledge search "auth" --types file,symbol --limit 50
-```
+Run the agent-sdk launch script (internal -- used by agent-sdk executor)
 
-### ark knowledge index
+**Synopsis:** `ark run-agent-sdk`
 
-Index/re-index codebase into the knowledge graph.
+## `ark config`
 
-```
-ark knowledge index [options]
-```
+Open Ark config in your editor
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-r, --repo <path>` | Repository path | cwd |
-| `--incremental` | Only re-index changed files | -- |
-
-```bash
-ark knowledge index --repo .
-ark knowledge index --repo . --incremental
-```
+**Synopsis:** `ark config [options]`
 
-### ark knowledge stats
+**Options:**
 
-Show node/edge counts by type.
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--path` |  | Just print the config path |
 
-```
-ark knowledge stats
-```
+## `ark web`
 
-### ark knowledge remember
+Start web dashboard
 
-Store a new memory in the knowledge graph.
+**Synopsis:** `ark web [options]`
 
-```
-ark knowledge remember <content> [options]
-```
+**Options:**
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-t, --tags <tags>` | Comma-separated tags | -- |
-| `-i, --importance <n>` | Importance 0-1 | `0.5` |
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--port <port>` | `"8420"` | Listen port |
+| `--read-only` |  | Read-only mode |
+| `--token <token>` |  | Bearer token for auth |
+| `--api-only` |  | API only, skip static file serving (for dev with Vite) |
+| `--with-daemon` |  | Also start conductor + arkd in-process (for desktop app / standalone use) |
 
-```bash
-ark knowledge remember "Always run tests before merging" --tags process,testing
-```
+## `ark openapi`
 
-### ark knowledge recall
+Generate OpenAPI spec
 
-Search memories and learnings.
+**Synopsis:** `ark openapi`
 
-```
-ark knowledge recall <query> [options]
-```
+## `ark mcp-proxy`
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-n, --limit <n>` | Max results | `10` |
+Bridge stdin/stdout to a pooled MCP socket (internal)
 
-```bash
-ark knowledge recall "authentication"
-```
+**Synopsis:** `ark mcp-proxy <socket-path>`
 
-### ark knowledge export
+**Arguments:**
 
-Export knowledge as markdown files.
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `socket-path` | yes |  |
 
-```
-ark knowledge export [options]
-```
+## `ark acp`
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-d, --dir <path>` | Output directory | `./knowledge-export` |
-| `-t, --types <types>` | Comma-separated types to export | `memory,learning` |
-
-```bash
-ark knowledge export
-ark knowledge export --dir ./backup --types memory,learning,skill
-```
+Start headless ACP server on stdin/stdout (JSON-RPC)
 
-### ark knowledge import
+**Synopsis:** `ark acp`
 
-Import knowledge from markdown files.
+## `ark repo-map`
 
-```
-ark knowledge import [options]
-```
+Generate repository structure map
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-d, --dir <path>` | Input directory | `./knowledge-export` |
+**Synopsis:** `ark repo-map [options] [dir]`
 
-```bash
-ark knowledge import --dir ./backup
-```
+**Arguments:**
 
-### ark knowledge ingest
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `dir` | no | Directory to scan |
 
-Ingest a directory into the knowledge graph (indexes files and symbols).
+**Options:**
 
-```
-ark knowledge ingest <path> [options]
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--max-files <n>` | `"500"` | Max files to include |
+| `--max-depth <n>` | `"10"` | Max directory depth |
+| `--json` |  | Output as JSON instead of text |
 
-| Option | Description |
-|--------|-------------|
-| `--incremental` | Only re-index changed files |
+## `ark init`
 
-```bash
-ark knowledge ingest docs/
-ark knowledge ingest src/api/ --incremental
-```
+Initialize Ark for this repository
 
----
+**Synopsis:** `ark init`
 
-## ark dashboard
+## `ark db`
 
-Show fleet status, costs, and recent activity.
+Schema migrations + status
 
-```
-ark dashboard [options]
-```
+**Synopsis:** `ark db`
 
-| Option | Description |
-|--------|-------------|
-| `--json` | Output as JSON |
+### `ark db migrate`
 
-```bash
-ark dashboard
-ark dashboard --json
-```
+Apply any pending Ark migrations
 
----
+**Synopsis:** `ark db migrate [options]`
 
-## ark runtime
+**Options:**
 
-Manage runtime definitions.
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--to <version>` |  | Target version (default: latest) |
 
-### ark runtime list
+### `ark db status`
 
-List available runtimes.
+Print current schema version + pending migrations
 
-```
-ark runtime list
-```
+**Synopsis:** `ark db status`
 
-### ark runtime show
+### `ark db down`
 
-Show runtime details.
+Roll back to a target version (Phase 1: not implemented)
 
-```
-ark runtime show <name>
-```
+**Synopsis:** `ark db down [options]`
 
-```bash
-ark runtime show claude
-ark runtime show codex
-```
+**Options:**
 
----
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--to <version>` |  | Target version *(required)* |
 
-## ark router
+## `ark secrets`
 
-LLM routing proxy.
+Manage tenant-scoped secrets (env vars for sessions)
 
-### ark router start
+**Synopsis:** `ark secrets`
 
-Start the LLM router server.
+### `ark secrets list`
 
-```
-ark router start [options]
-```
+List secret names (values are never returned)
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `-p, --port <port>` | Listen port | `8430` |
-| `--policy <policy>` | Routing policy: quality, balanced, cost | `balanced` |
-| `--config <path>` | Path to router config YAML | -- |
-| `--tensorzero` | Enable TensorZero backend (Rust gateway, Apache 2.0) | -- |
-| `--tensorzero-url <url>` | URL of an already-running TensorZero gateway (skips auto-start) | -- |
-| `--tensorzero-port <port>` | Port for the auto-started TensorZero gateway | `3000` |
-
-```bash
-ark router start
-ark router start --port 9000 --policy cost
-ark router start --tensorzero                                     # auto-start TensorZero sidecar
-ark router start --tensorzero --tensorzero-port 3030              # auto-start on custom port
-ark router start --tensorzero-url http://tensorzero.internal:3000 # reuse an external gateway
-```
+**Synopsis:** `ark secrets list`
 
-Requires at least one API key env var: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_API_KEY`.
+### `ark secrets set`
 
-When `--tensorzero` is set, the router's TensorZero lifecycle manager starts the gateway for you. It tries three strategies in order: (1) detect an already-running sidecar at the configured URL, (2) launch the native `tensorzero` Rust binary if it is on `PATH`, (3) fall back to running it in Docker. The config file (`tensorzero.toml`) is generated on the fly from your API key env vars.
+Create or replace a secret. Reads value from stdin if piped, otherwise prompts.
 
-When `router.enabled` + `router.auto_start` + `tensorZero.enabled` are all true in `~/.ark/config.yaml`, Ark starts both the router and TensorZero automatically at boot -- no manual `ark router start` needed.
+**Synopsis:** `ark secrets set [options] <name>`
 
-### ark router status
+**Arguments:**
 
-Show router status and stats.
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Secret name (ASCII [A-Z0-9_]+) |
 
-```
-ark router status [options]
-```
+**Options:**
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--url <url>` | Router URL | `http://localhost:8430` |
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-d, --description <text>` |  | Human-readable description |
 
-```bash
-ark router status
-```
+### `ark secrets delete`
 
-### ark router costs
+Delete a secret.
 
-Show routing cost breakdown.
+**Synopsis:** `ark secrets delete [options] <name>`
 
-```
-ark router costs [options]
-```
+**Arguments:**
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--url <url>` | Router URL | `http://localhost:8430` |
-| `--group-by <field>` | Group by: model, provider, session | `model` |
-
-```bash
-ark router costs
-ark router costs --group-by provider
-```
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Secret name |
 
----
+**Options:**
 
-## ark tenant
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-y, --yes` |  | Skip the confirm prompt |
 
-Manage tenant settings.
+### `ark secrets blob`
 
-### ark tenant policy set
+Manage multi-file secret blobs (directory-shaped secrets)
 
-Set compute policy for a tenant.
+**Synopsis:** `ark secrets blob`
 
-```
-ark tenant policy set <tenant-id> [options]
-```
+#### `ark secrets blob list`
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--providers <list>` | Comma-separated allowed providers | all |
-| `--default-provider <provider>` | Default provider | `k8s` |
-| `--max-sessions <n>` | Maximum concurrent sessions | `10` |
-| `--max-cost <usd>` | Maximum daily cost in USD | -- |
-
-```bash
-ark tenant policy set acme --providers k8s,e2b --max-sessions 20 --max-cost 100
-```
+List blob names (contents are never returned)
 
-### ark tenant policy get
+**Synopsis:** `ark secrets blob list`
 
-Get compute policy for a tenant.
+#### `ark secrets blob upload`
 
-```
-ark tenant policy get <tenant-id>
-```
+Upload a directory as a named blob. Reads every file in <dir> (non-recursive).
 
-### ark tenant policy list
+**Synopsis:** `ark secrets blob upload <name> <dir>`
 
-List all tenant compute policies.
+**Arguments:**
 
-```
-ark tenant policy list
-```
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Blob name (lowercase kebab-case, <=63 chars) |
+| `dir` | yes | Directory to upload |
 
-### ark tenant policy delete
+#### `ark secrets blob download`
 
-Delete compute policy for a tenant.
+Download a blob into a directory. Creates the directory if missing.
 
-```
-ark tenant policy delete <tenant-id>
-```
+**Synopsis:** `ark secrets blob download <name> <dir>`
 
----
+**Arguments:**
 
-## ark auth
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Blob name |
+| `dir` | yes | Target directory |
 
-Manage authentication and API keys.
+#### `ark secrets blob delete`
 
-### ark auth setup
+Delete a blob.
 
-Set up Claude authentication (local or remote).
+**Synopsis:** `ark secrets blob delete [options] <name>`
 
-```
-ark auth setup [options]
-```
+**Arguments:**
 
-| Option | Description |
-|--------|-------------|
-| `--host <name>` | Run setup-token on a specific remote compute |
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Blob name |
 
-```bash
-ark auth setup                        # Local auth setup
-ark auth setup --host my-ec2          # Remote auth setup
-```
+**Options:**
 
-### ark auth create-key
+| Flag | Default | Description |
+|------|---------|-------------|
+| `-y, --yes` |  | Skip the confirm prompt |
 
-Create a new API key.
+### `ark secrets get`
 
-```
-ark auth create-key [options]
-```
+Print a secret value to stdout. Refuses TTY stdout without --print.
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--name <name>` | Human-readable label | `default` |
-| `--role <role>` | Role: admin, member, or viewer | `member` |
-| `--tenant <tenantId>` | Tenant ID | `default` |
-| `--expires <date>` | Expiration date (ISO 8601) | -- |
-
-```bash
-ark auth create-key --tenant acme --name "CI pipeline" --role member
-```
+**Synopsis:** `ark secrets get [options] <name>`
 
-### ark auth list-keys
+**Arguments:**
 
-List API keys.
+| Argument | Required | Description |
+|----------|----------|-------------|
+| `name` | yes | Secret name |
 
-```
-ark auth list-keys [options]
-```
+**Options:**
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--tenant <tenantId>` | Tenant ID | `default` |
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--print` |  | Allow printing to a TTY (default: refuse to prevent shoulder surfing) |
 
-### ark auth revoke-key
+## `ark cluster`
 
-Revoke an API key.
+List Kubernetes clusters visible to this tenant
 
-```
-ark auth revoke-key <id>
-```
+**Synopsis:** `ark cluster`
 
-```bash
-ark auth revoke-key ak-abcd1234
-```
+### `ark cluster list`
 
-### ark auth rotate-key
+List effective clusters (system + tenant overrides)
 
-Rotate an API key (revoke old, create new with same metadata).
+**Synopsis:** `ark cluster list [options]`
 
-```
-ark auth rotate-key <id>
-```
+**Options:**
 
-```bash
-ark auth rotate-key ak-abcd1234
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--json` |  | Output raw JSON |
+

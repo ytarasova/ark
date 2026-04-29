@@ -464,9 +464,10 @@ describe("mediateStageHandoff via conductor HTTP", async () => {
 
     expect(resp.status).toBe(200);
 
-    // Manual gate: session stays running, no handoff
+    // Manual gate: session transitions to `blocked` (agent exited,
+    // awaiting human Approve/Reject); no handoff fires.
     const updated = await app.sessions.get(session.id);
-    expect(updated?.status).toBe("running");
+    expect(updated?.status).toBe("blocked");
 
     // No stage_handoff event should exist
     const events = await app.events.list(session.id);

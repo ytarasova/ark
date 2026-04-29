@@ -417,7 +417,7 @@ describe("for_each checkpoint -- boot reconciliation dispatches running sessions
 
     // Track dispatches by watching the session status changes.
     // _reconcileForEachSessions calls dispatchService.dispatch() which (with the
-    // NoopLauncher + for_each path) will update the session.
+    // noop executor + for_each path) will update the session.
     // Since we're testing real dispatch service integration, we just verify the
     // method can be called without error and that it processes the running session.
     const runningSessions = await app.sessions.list({ status: "running", limit: 500 });

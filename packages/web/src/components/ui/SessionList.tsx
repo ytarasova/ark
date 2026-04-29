@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect } from "react";
 import { cn } from "../../lib/utils.js";
 import { StatusDot, type SessionStatus } from "./StatusDot.js";
 import { Search, X, Plus, Archive, Trash2 } from "lucide-react";
@@ -18,14 +18,16 @@ export interface SessionListItem {
   flow?: string;
   /** Additional inline stage/label text, e.g. "verifier gate". */
   stageLabel?: string;
-  /** Progress 0..1 (0=empty, 1=full). Rendered as the thin gradient lane
-   *  beneath the meta row. Running rows always show a shimmering lane even
-   *  at progress=0, matching the target list composition. */
+  /** Progress 0..1 (0=empty, 1=full). Used as a fallback when `stages` is
+   *  not provided -- a single thin lane gets rendered instead of segmented
+   *  per-stage chips. */
   progress?: number;
-  /** Optional 24h activity histogram for the mini sparkline above the lane.
-   *  Each number is a 0..1 bucket intensity. If missing, a muted placeholder
-   *  series is rendered so rows keep their vertical rhythm. */
-  sparkline?: number[];
+  /** Per-stage progress segments. Each entry is one stage of the session's
+   *  flow. When present this replaces the single progress lane with one
+   *  segment per stage (GH Actions style). Drop the sparkline entirely --
+   *  the segmented strip already conveys "where are we in the flow" plus
+   *  "how much is left", which is what the sparkline was approximating. */
+  stages?: { name: string; state: "done" | "active" | "pending" | "failed" | "skipped" }[];
   /** Time chip at the right of the title row (relative or absolute). */
   relativeTime: string;
   /** If > 0, renders the small primary "updated" dot next to the title. */
@@ -219,11 +221,10 @@ export function SessionList({
 // Session Row (chrome-session-list.html `.si`)
 // ---------------------------------------------------------------------------
 
-// Map session status to the lane + sparkline accent colour.
+// Map session status to the progress strip's fill + track colors.
 function laneColors(status: SessionStatus): {
   fill: string;
   track: string;
-  spark: string;
   shimmer?: boolean;
 } {
   switch (status) {
@@ -231,67 +232,113 @@ function laneColors(status: SessionStatus): {
       return {
         fill: "linear-gradient(90deg, #60a5fa 0%, #8b5cf6 100%)",
         track: "rgba(96,165,250,0.12)",
-        spark: "var(--primary)",
         shimmer: true,
       };
     case "completed":
-      return {
-        fill: "var(--completed)",
-        track: "rgba(52,211,153,0.12)",
-        spark: "var(--completed)",
-      };
+      return { fill: "var(--completed)", track: "rgba(52,211,153,0.12)" };
     case "waiting":
-      return {
-        fill: "var(--waiting)",
-        track: "rgba(251,191,36,0.12)",
-        spark: "var(--waiting)",
-      };
+      return { fill: "var(--waiting)", track: "rgba(251,191,36,0.12)" };
     case "failed":
-      return {
-        fill: "var(--failed)",
-        track: "rgba(248,113,113,0.12)",
-        spark: "var(--failed)",
-      };
+      return { fill: "var(--failed)", track: "rgba(248,113,113,0.12)" };
     default:
-      return {
-        fill: "rgba(255,255,255,0.12)",
-        track: "rgba(255,255,255,0.05)",
-        spark: "rgba(255,255,255,0.25)",
-      };
+      return { fill: "rgba(255,255,255,0.12)", track: "rgba(255,255,255,0.05)" };
   }
 }
 
-// Deterministic placeholder sparkline (11 bars) seeded on the session id so
-// each row has a stable shape even when the backend doesn't yet surface the
-// 24h histogram. Real data, when present, wins.
-function fallbackSparkline(id: string): number[] {
-  const n = 11;
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  const out: number[] = [];
-  for (let i = 0; i < n; i++) {
-    h = (h * 1664525 + 1013904223) >>> 0;
-    out.push(0.25 + ((h >>> 8) & 0xff) / 340); // 0.25 .. ~1
+// Per-segment color for the GH-Actions-style stage strip.
+function segmentColor(state: "done" | "active" | "pending" | "failed" | "skipped"): {
+  bg: string;
+  shimmer?: boolean;
+} {
+  switch (state) {
+    case "done":
+      return { bg: "var(--completed)" };
+    case "active":
+      return { bg: "linear-gradient(90deg, #60a5fa 0%, #8b5cf6 100%)", shimmer: true };
+    case "failed":
+      return { bg: "var(--failed)" };
+    case "skipped":
+      return { bg: "rgba(255,255,255,0.06)" };
+    default:
+      return { bg: "rgba(255,255,255,0.10)" };
   }
-  return out;
 }
 
-function Sparkline({ values, color, active }: { values: number[]; color: string; active: boolean }) {
-  const max = Math.max(1e-6, ...values);
-  return (
-    <span aria-hidden className="flex items-end gap-[1.5px] h-[12px] min-w-0" style={{ opacity: active ? 1 : 0.4 }}>
-      {values.map((v, i) => (
+/** GH-Actions style segmented progress strip. One segment per stage in the
+ *  flow. Falls back to a single solid bar when the session has no stage
+ *  list (no flow registered, dispatch hasn't loaded it yet, etc). */
+function StageStrip({
+  stages,
+  status,
+  progress,
+  lane,
+}: {
+  stages: SessionListItem["stages"];
+  status: SessionStatus;
+  progress: number;
+  lane: { fill: string; track: string; shimmer?: boolean };
+}) {
+  if (!stages || stages.length === 0) {
+    // Fallback single-bar mode for sessions without a known flow shape.
+    return (
+      <div
+        aria-hidden
+        className="mt-[6px] relative overflow-hidden rounded-[2px]"
+        style={{ height: 3, background: lane.track }}
+      >
         <span
-          key={i}
-          style={{
-            width: 3,
-            height: `${Math.max(8, (v / max) * 100)}%`,
-            background: color,
-            borderRadius: 1,
-          }}
+          className="absolute top-0 left-0 h-full"
+          style={{ width: `${progress * 100}%`, background: lane.fill, borderRadius: 2 }}
         />
-      ))}
-    </span>
+        {lane.shimmer && (
+          <span
+            className="absolute inset-y-0"
+            style={{
+              width: "30%",
+              left: 0,
+              background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)",
+              animation: "slideRight 1.6s linear infinite",
+            }}
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      aria-label={`Flow progress: ${stages.filter((s) => s.state === "done").length} of ${stages.length} stages done${
+        status === "failed" ? " (failed)" : ""
+      }`}
+      role="progressbar"
+      className="mt-[6px] flex items-stretch gap-[3px] w-full"
+      style={{ height: 4 }}
+    >
+      {stages.map((s, i) => {
+        const c = segmentColor(s.state);
+        return (
+          <span
+            key={`${s.name}-${i}`}
+            title={`${s.name} — ${s.state}`}
+            className="flex-1 relative overflow-hidden rounded-[2px]"
+            style={{ background: c.bg, minWidth: 4 }}
+          >
+            {c.shimmer && (
+              <span
+                aria-hidden
+                className="absolute inset-y-0"
+                style={{
+                  width: "40%",
+                  left: 0,
+                  background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)",
+                  animation: "slideRight 1.6s linear infinite",
+                }}
+              />
+            )}
+          </span>
+        );
+      })}
+    </div>
   );
 }
 
@@ -329,10 +376,6 @@ export function SessionRow({
 
   const lane = laneColors(session.status);
   const progress = Math.max(0, Math.min(1, session.progress ?? (isRunning ? 0.4 : isFailed ? 0.6 : 1)));
-  const spark = useMemo(
-    () => (session.sparkline && session.sparkline.length > 0 ? session.sparkline : fallbackSparkline(session.id)),
-    [session.sparkline, session.id],
-  );
 
   const flow = session.flow;
   const runtime = session.runtime;
@@ -457,37 +500,13 @@ export function SessionRow({
         {trailing && <span className="ml-auto shrink-0">{trailing}</span>}
       </div>
 
-      {/* Sparkline (24h activity, placeholder if absent). */}
-      <div className="mt-[6px] h-[12px]">
-        <Sparkline values={spark} color={lane.spark} active={isRunning} />
-      </div>
-
-      {/* Progress lane (always shown). */}
-      <div
-        aria-hidden
-        className="mt-[5px] relative overflow-hidden rounded-[2px]"
-        style={{ height: 3, background: lane.track }}
-      >
-        <span
-          className="absolute top-0 left-0 h-full"
-          style={{
-            width: `${progress * 100}%`,
-            background: lane.fill,
-            borderRadius: 2,
-          }}
-        />
-        {lane.shimmer && (
-          <span
-            className="absolute inset-y-0"
-            style={{
-              width: "30%",
-              left: 0,
-              background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent)",
-              animation: "slideRight 1.6s linear infinite",
-            }}
-          />
-        )}
-      </div>
+      {/* Progress strip. When the session has a stage list (most flows do)
+          we render one segment per stage -- GH-Actions style -- so the row
+          shows "stage 2 of 5 done, currently on stage 3, 2 to go" at a
+          glance. Otherwise we fall back to a single solid lane. The
+          previous 24h activity sparkline was decorative and visually
+          competed with the progress; dropped it. */}
+      <StageStrip stages={session.stages} status={session.status} progress={progress} lane={lane} />
     </div>
   );
 }

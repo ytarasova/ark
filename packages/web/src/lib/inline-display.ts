@@ -54,13 +54,22 @@ export function resolveModelDisplay(modelId: string | null | undefined, models: 
  * dispatch before stage_ready).
  */
 export function resolveInlineDisplay(session: any, models: InlineModelLike[] | undefined): InlineDisplayResult {
-  const isInlineAgent = session?.agent === "inline";
   const flowName: string = session?.flow ?? "";
   const isInlineFlow = typeof flowName === "string" && flowName.startsWith("inline-s-");
 
   const def = session?.config?.inline_flow;
   const stages: any[] = Array.isArray(def?.stages) ? def.stages : [];
   const stageCount = stages.length;
+
+  // "Inline agent" includes:
+  //   - session.agent === "inline" (top-level inline dispatch)
+  //   - session.agent is null AND config.inline_flow is set -- this is the
+  //     spawn-child shape: the parent's for_each spawned a child session
+  //     whose agent lives inside inline_flow.stages[i].agent with no
+  //     top-level `agent` column written. Without this branch the child's
+  //     meta strip would show nothing, which reads as "agent details
+  //     missing".
+  const isInlineAgent = session?.agent === "inline" || (!session?.agent && stages.length > 0);
 
   let agentLabel: string | null = null;
   if (isInlineAgent && stages.length > 0) {
@@ -101,4 +110,31 @@ export function resolveInlineDisplay(session: any, models: InlineModelLike[] | u
     inlineFlowName,
     inlineFlowStageCount: stageCount,
   };
+}
+
+/**
+ * Short, human-friendly identity for the typing indicator and any other
+ * single-word "agent name" slot. Avoids leaking the literal placeholder
+ * `"inline"` into the UI ("inline is typing" reads as a bug).
+ *
+ * Resolution order:
+ *   1. `session.agent` if set and not the placeholder.
+ *   2. Runtime of the active inline-flow stage (e.g. `"agent-sdk"`).
+ *   3. `null` -- callers fall back to a generic word like "agent".
+ */
+export function friendlyAgentName(session: any): string | null {
+  const raw = session?.agent;
+  if (raw && raw !== "inline") return raw;
+
+  const stages: any[] = Array.isArray(session?.config?.inline_flow?.stages) ? session.config.inline_flow.stages : [];
+  if (stages.length === 0) return null;
+
+  const current = session?.stage;
+  const stage = (current && stages.find((s) => s?.name === current)) || stages[0];
+  const runtimeRaw = stage?.agent?.runtime;
+  if (typeof runtimeRaw === "string" && runtimeRaw) return runtimeRaw;
+  if (runtimeRaw && typeof runtimeRaw === "object" && typeof runtimeRaw.name === "string" && runtimeRaw.name) {
+    return runtimeRaw.name;
+  }
+  return null;
 }

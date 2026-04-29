@@ -52,9 +52,4 @@ describe("dispatch / executor no longer read session.config.runtime_override", (
     const src = read("packages/types/session.ts");
     expect(src).not.toMatch(/model_override/);
   });
-
-  it("sage handler does not write runtime_override into session config", () => {
-    const src = read("packages/server/handlers/sage.ts");
-    expect(src).not.toMatch(/runtime_override/);
-  });
 });

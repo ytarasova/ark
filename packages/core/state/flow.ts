@@ -225,6 +225,13 @@ export interface StageDefinition {
    * if the inline agent spec does not already declare max_budget_usd.
    */
   max_budget_usd?: number;
+  /**
+   * Idle timeout (minutes) for `for_each + mode:spawn` child iterations.
+   * The deadline resets every time the child's `updated_at` advances, so a
+   * child that's actively tool-calling or streaming model output never times
+   * out -- this is the cap on a *silent* child. Default 60 minutes.
+   */
+  child_timeout_minutes?: number;
   // Fork-specific
   strategy?: string;
   max_parallel?: number;
@@ -373,7 +380,15 @@ export function evaluateGate(
   const stage = getStage(app, flowName, stageName);
   if (!stage) return { canProceed: false, reason: `Stage '${stageName}' not found` };
 
-  switch (stage.gate) {
+  // Default to "auto" when the YAML omits `gate:`. The previous strict default
+  // ("Unknown gate: undefined") silently broke for_each + spawn stages whose
+  // YAML didn't bother specifying a gate -- the dispatcher's post-loop
+  // mediateStageHandoff -> advance -> evaluateGate chain returned an error
+  // and the parent session got stuck in `ready` state forever instead of
+  // advancing to `completed`. Real incident: PAI-31995 dispatches surfaced
+  // as "pending" parents in the session list with no further action possible.
+  const gate = stage.gate ?? "auto";
+  switch (gate) {
     case "auto":
       return session.error
         ? { canProceed: false, reason: `Stage has error: ${session.error}` }
@@ -385,7 +400,7 @@ export function evaluateGate(
     case "review":
       return { canProceed: false, reason: "review gate: awaiting PR approval" };
     default:
-      return { canProceed: false, reason: `Unknown gate: ${stage.gate}` };
+      return { canProceed: false, reason: `Unknown gate: ${gate}` };
   }
 }
 

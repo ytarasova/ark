@@ -44,7 +44,7 @@
  * fall back to `import.meta.url` for dev-mode source-tree layouts.
  */
 
-import { existsSync } from "fs";
+import { existsSync, realpathSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { logDebug } from "./observability/structured-log.js";
@@ -87,13 +87,29 @@ function sourceRepoRootFrom(sourceUrl: string): string {
  * tarball shape.
  */
 export function resolveInstallPrefixWith(env: ResolveEnv): string | null {
+  // Resolve symlinks before the marker check. Real-world install layouts put
+  // `ark` on PATH as a symlink (e.g. `~/.local/bin/ark -> ~/.local/ark/bin/ark`),
+  // and `process.execPath` reflects whatever the user invoked. Without
+  // realpath the marker check looks one dir up from the symlink and lands
+  // outside the install (e.g. `~/.local/flows/definitions`, which doesn't
+  // exist) -- so the binary thinks it's in dev mode and the agent-sdk
+  // launcher tries to spawn `ark <repo>/packages/core/runtimes/agent-sdk/launch.ts`,
+  // which exits 1 immediately.
+  let real = env.execPath;
   try {
-    const prefix = join(dirname(env.execPath), "..");
-    if (env.existsCheck(join(prefix, "flows", "definitions"))) {
-      return prefix;
-    }
+    real = realpathSync(env.execPath);
   } catch {
-    logDebug("session", "fall through");
+    /* fall through to raw execPath */
+  }
+  const candidates = [join(dirname(real), ".."), join(dirname(env.execPath), "..")];
+  for (const prefix of candidates) {
+    try {
+      if (env.existsCheck(join(prefix, "flows", "definitions"))) {
+        return prefix;
+      }
+    } catch {
+      logDebug("session", "install-prefix candidate failed -- try next");
+    }
   }
   return null;
 }
@@ -252,7 +268,7 @@ export function agentSdkLaunchSpec(): { command: string; args: string[] } {
 /**
  * Resolve the directory containing shipped MCP config stubs
  * (`mcp-configs/<name>.json`). Used to look up runtime-declared MCP entries
- * by short name (e.g. `mcp_servers: [pi-sage]`).
+ * by short name (e.g. `mcp_servers: [jira]`).
  *
  * Installed tarball layout:   `<prefix>/mcp-configs/`
  * Source-tree layout:         `<repo>/mcp-configs/`

@@ -149,7 +149,7 @@ export interface RunAgentSdkLaunchResult {
  * has no `claude_session_id`, so the guard's middle clause short-circuits and
  * all our hooks pass through.
  */
-function messageToHooks(msg: unknown, arkSessionId: string): Array<Record<string, unknown>> {
+export function messageToHooks(msg: unknown, arkSessionId: string): Array<Record<string, unknown>> {
   const m = msg as Record<string, unknown>;
   const type = m.type as string | undefined;
 
@@ -172,7 +172,8 @@ function messageToHooks(msg: unknown, arkSessionId: string): Array<Record<string
     const content = (message?.content ?? []) as Array<Record<string, unknown>>;
     const hooks: Array<Record<string, unknown>> = [];
     for (const block of content) {
-      if ((block.type as string | undefined) === "tool_use") {
+      const blockType = block.type as string | undefined;
+      if (blockType === "tool_use") {
         hooks.push({
           hook_event_name: "PreToolUse",
           session_id: arkSessionId,
@@ -180,6 +181,34 @@ function messageToHooks(msg: unknown, arkSessionId: string): Array<Record<string
           tool_input: block.input,
           tool_use_id: block.id,
         });
+      } else if (blockType === "text") {
+        // The model's narration between tool calls. Without this hook the
+        // UI sees only PreToolUse / PostToolUse events and the user can't
+        // tell what the agent is doing or planning -- just a stream of
+        // bash/edit/read with no human-readable thread. Emit each text
+        // block as a separate hook so the timeline can render them inline
+        // alongside tool blocks.
+        const text = typeof block.text === "string" ? block.text : "";
+        if (text.trim().length > 0) {
+          hooks.push({
+            hook_event_name: "AgentMessage",
+            session_id: arkSessionId,
+            text,
+          });
+        }
+      } else if (blockType === "thinking") {
+        // Extended-thinking blocks (when enabled). The text lives on
+        // `block.thinking`. Same rendering as "text" but tagged so the UI
+        // can dim it / collapse it differently.
+        const text = typeof block.thinking === "string" ? block.thinking : "";
+        if (text.trim().length > 0) {
+          hooks.push({
+            hook_event_name: "AgentMessage",
+            session_id: arkSessionId,
+            text,
+            thinking: true,
+          });
+        }
       }
     }
     return hooks;
@@ -571,6 +600,12 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
 
     proxyServer = Bun.serve({
       port: 0, // OS-assigned ephemeral port
+      // Generous idle timeout: a single Sonnet/Opus turn can stream for
+      // 60-120s before TF returns. Bun.serve's default of 10s tears the
+      // socket down mid-response and the SDK surfaces a "socket connection
+      // was closed unexpectedly" API error. Pin to 5 minutes -- the SDK's
+      // own per-turn timeout is the upper bound, this is just floor.
+      idleTimeout: 255,
       async fetch(req) {
         const url = new URL(req.url);
         const targetUrl = `${forwardBase}${url.pathname}${url.search}`;
@@ -669,6 +704,13 @@ export async function runAgentSdkLaunch(opts: RunAgentSdkLaunchOpts): Promise<Ru
   // from LiteLLM or another proxy) and uses THAT as the Bearer -- short-
   // circuiting our custom-headers path and producing 401s. Strip it.
   // Mirrors the `make claude-tfy` target's `unset ANTHROPIC_AUTH_TOKEN`.
+  // Built-in subagents (Explore etc.) cannot be overridden via the SDK's
+  // `agents` option -- the SDK docs explicitly call this out. The bundled
+  // claude binary does honour ANTHROPIC_DEFAULT_HAIKU_MODEL, which is the
+  // documented escape hatch for non-Anthropic gateways that don't accept
+  // the SDK's hardcoded `claude-haiku-4-5-20251001`. The executor sets
+  // that env var from the agent-sdk runtime YAML's `default_haiku_model`
+  // field, so we just propagate process.env without special-casing it.
   const sdkEnv: Record<string, string | undefined> = {
     ...process.env,
     ...(apiKey ? { ANTHROPIC_API_KEY: apiKey } : {}),

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { cn } from "../lib/utils.js";
 import { Card } from "./ui/card.js";
 import { Moon, Sun, Monitor, Palette } from "lucide-react";
@@ -45,6 +46,24 @@ const MODE_OPTIONS: {
 
 export function SettingsView() {
   const { themeName, colorMode, setThemeName, setColorMode } = useTheme();
+  // Pull the live ark version from /api/health so the About panel reflects
+  // the deployed binary instead of a hardcoded literal that drifts every
+  // release. Show the literal "—" while we're still fetching.
+  const [version, setVersion] = useState<string>("—");
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/health")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!cancelled && j?.version) setVersion(`v${j.version}`);
+      })
+      .catch(() => {
+        /* keep "—" */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Detect if "system" was effectively selected (no stored mode preference)
   const storedMode = (() => {
@@ -152,7 +171,7 @@ export function SettingsView() {
             <div className="flex items-center justify-between">
               <span className="text-[13px] text-muted-foreground">Version</span>
               <span className="text-[13px] text-foreground tabular-nums font-[family-name:var(--font-mono-ui)]">
-                v0.10.0
+                {version}
               </span>
             </div>
             <div className="flex items-center justify-between">

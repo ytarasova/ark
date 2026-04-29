@@ -155,8 +155,11 @@ describe("Flow templating E2E", () => {
       compute_name: "cloud-1",
     });
 
+    // Session columns are exposed verbatim by key name; no convenience
+    // aliases (no `track_id`, `jira_key`, `compute`). Templates use the
+    // real column names.
     const result = substituteVars(
-      "{{ticket}} {{summary}} {{repo}} {{branch}} {{workdir}} {{track_id}} {{stage}} {{flow}} {{agent}} {{compute}}",
+      "{{ticket}} {{summary}} {{repo}} {{branch}} {{workdir}} {{id}} {{stage}} {{flow}} {{agent}} {{compute_name}}",
       vars,
     );
     expect(result).toBe("PROJ-99 Full test /repo dev /work s-full build ci builder cloud-1");

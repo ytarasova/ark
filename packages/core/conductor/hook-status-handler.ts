@@ -66,6 +66,24 @@ export async function handleHookStatus(app: AppContext, req: Request, url: URL):
     return Response.json({ status: "ok", mapped: "ignored_stale" });
   }
 
+  // Agent narration / extended-thinking text blocks. These are not hooks in
+  // the conductor state-machine sense -- they don't transition status, they
+  // don't pair with anything, they're just human-readable progress for the
+  // UI. Log under a dedicated event type so the timeline-builder can render
+  // them inline with tool blocks without going through the hook_status
+  // pairing path.
+  if (event === "AgentMessage") {
+    await scoped.events.log(sessionId, "agent_message", {
+      stage: s.stage ?? undefined,
+      actor: "agent",
+      data: {
+        text: payload.text,
+        ...(payload.thinking ? { thinking: true } : {}),
+      },
+    });
+    return Response.json({ status: "ok", mapped: "agent_message" });
+  }
+
   // Guardrail evaluation for PreToolUse events
   if (event === "PreToolUse") {
     const toolName = String(payload.tool_name ?? "");
@@ -84,6 +102,18 @@ export async function handleHookStatus(app: AppContext, req: Request, url: URL):
         data: { tool: toolName, pattern: evalResult.rule?.pattern },
       });
     }
+
+    // Log the PreToolUse hook itself so the timeline can render the tool
+    // call as soon as it's invoked (not just after PostToolUse lands).
+    // Without this, every Pre is dropped and the matching Post becomes an
+    // orphan in `buildConversationTimeline`. PreToolUse doesn't transition
+    // session state, so we don't route it through applyHookStatus. Shape
+    // matches what applyHookStatus writes: { event: hookEventName, ...rest }.
+    await scoped.events.log(sessionId, "hook_status", {
+      stage: s.stage ?? undefined,
+      actor: "hook",
+      data: { event, ...payload },
+    });
 
     return Response.json({ status: "ok", guardrail: evalResult.action });
   }

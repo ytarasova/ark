@@ -21,7 +21,6 @@ import { prometheusSource } from "./sources/prometheus.js";
 import { jiraSource } from "./sources/jira.js";
 import { alertmanagerSource } from "./sources/alertmanager.js";
 import { cloudwatchSource } from "./sources/cloudwatch.js";
-import { piSageSource } from "./sources/pi-sage.js";
 import { emailSource } from "./sources/email.js";
 
 /**
@@ -70,7 +69,6 @@ export function builtinSources(): TriggerSource[] {
     jiraSource,
     alertmanagerSource,
     cloudwatchSource,
-    piSageSource,
     emailSource,
   ];
 }

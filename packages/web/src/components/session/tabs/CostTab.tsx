@@ -1,9 +1,22 @@
 import { KpiCard } from "../../ui/KpiCard.js";
 import { fmtCost } from "../../../util.js";
+import { friendlyAgentName } from "../../../lib/inline-display.js";
 
 interface CostTabProps {
   session: any;
-  cost: { cost: number; tokens_in?: number; tokens_out?: number } | null | undefined;
+  // costs/session RPC returns input_tokens / output_tokens (matching the
+  // ledger schema). Older callers pass tokens_in / tokens_out for back-
+  // compat; we read either shape.
+  cost:
+    | {
+        cost: number;
+        input_tokens?: number;
+        output_tokens?: number;
+        tokens_in?: number;
+        tokens_out?: number;
+      }
+    | null
+    | undefined;
 }
 
 /**
@@ -12,10 +25,14 @@ interface CostTabProps {
  * lives on the dashboard-level CostsView; per-session it is not meaningful.
  */
 export function CostTab({ session, cost }: CostTabProps) {
-  const tin = cost?.tokens_in ?? 0;
-  const tout = cost?.tokens_out ?? 0;
+  const tin = cost?.input_tokens ?? cost?.tokens_in ?? 0;
+  const tout = cost?.output_tokens ?? cost?.tokens_out ?? 0;
   const total = tin + tout;
-  const model = session?.config?.model || session?.agent || "--";
+  // For inline-flow dispatches `session.agent === "inline"` is a placeholder,
+  // not a real model name -- fall back to the agent's runtime via
+  // friendlyAgentName so the Model row reads e.g. "agent-sdk" instead of
+  // the literal "inline".
+  const model = session?.config?.model || friendlyAgentName(session) || "--";
   return (
     <div className="max-w-[900px] mx-auto flex flex-col gap-[14px]">
       <div className="grid grid-cols-4 gap-[10px]">

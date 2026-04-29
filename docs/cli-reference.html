@@ -1,0 +1,5645 @@
+<!DOCTYPE html>
+<html lang="en" class="midnight-circuit dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CLI Reference (auto-generated) - Ark</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="colors_and_type.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <button class="hamburger" aria-label="Menu">&#9776;</button>
+  <aside class="sidebar">
+    <a href="./" class="sidebar-logo"><img src="favicon.svg" alt="">ark</a>
+    <nav>
+      <div class="section-title">Getting Started</div>
+      <a href="quickstart.html">Quick Start</a>
+      <a href="concepts.html">Core Concepts</a>
+      <div class="section-title">Guides</div>
+      <a href="web.html">Web Dashboard</a>
+      <a href="cli.html">CLI Reference</a>
+      <a href="cli-reference.html">CLI Reference (generated)</a>
+      <a href="configuration.html">Configuration</a>
+      <a href="compute.html">Compute Providers</a>
+      <a href="environment.html">Environment</a>
+      <div class="section-title">How-To</div>
+      <a href="howto-memories.html">Memories</a>
+      <a href="howto-knowledge.html">Knowledge Graph</a>
+      <a href="howto-costs.html">Cost Tracking</a>
+      <div class="section-title">Features</div>
+      <a href="workflows.html">Workflows</a>
+      <a href="advanced.html">Advanced</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="comparison-goose.html">vs Goose</a>
+      <div class="section-title">Architecture</div>
+      <a href="architecture.html">Overview</a>
+      <a href="arkd.html">ArkD Daemon</a>
+      <a href="router.html">LLM Router</a>
+      <a href="multi-tenancy.html">Multi-Tenancy</a>
+      <div class="section-title">Reference</div>
+      <a href="agents-reference.html">Agents</a>
+      <a href="flows-reference.html">Flows</a>
+      <a href="skills-reference.html">Skills</a>
+      <a href="recipes-reference.html">Recipes</a>
+      <a href="runtimes-reference.html">Runtimes</a>
+      <a href="api-reference.html">API Reference</a>
+      <div class="section-title">Development</div>
+      <a href="development.html">Contributing</a>
+      <a href="troubleshooting.html">Troubleshooting</a>
+      <div class="section-title">Links</div>
+      <a href="https://github.com/ytarasova/ark">GitHub</a>
+      <a href="https://github.com/ytarasova/ark/releases">Releases</a>
+    </nav>
+  </aside>
+  <div class="page-layout">
+    <main class="content">
+      <p style="color:var(--fg-faint);font-size:var(--type-caption-size);margin-bottom:1.5rem">
+        Auto-generated from the live Commander.js command tree on every push to main.
+        Source of truth: <code>scripts/generate-cli-docs.ts</code> +
+        <code>packages/cli/commands/</code>.
+      </p>
+      <h1>Ark CLI Reference</h1>
+<blockquote>
+<p>Auto-generated from the Commander.js tree. Run <code>make docs-cli</code> to regenerate.</p>
+</blockquote>
+<blockquote>
+<p>Version: 0.21.10</p>
+</blockquote>
+<h2>Usage</h2>
+<pre><code>ark [options] &lt;command&gt;
+</code></pre>
+<h2>Global Options</h2>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-p, --profile &lt;name&gt;</code></td>
+<td>Use a specific profile</td>
+</tr>
+<tr>
+<td><code>--server &lt;url&gt;</code></td>
+<td>Connect to a remote Ark control plane (e.g. <a href="https://ark.company.com">https://ark.company.com</a>)</td>
+</tr>
+<tr>
+<td><code>--token &lt;key&gt;</code></td>
+<td>API key for authentication with the remote server</td>
+</tr>
+</tbody></table>
+<h2>Commands</h2>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="#ark-session"><code>ark session</code></a></td>
+<td>Manage SDLC flow sessions</td>
+</tr>
+<tr>
+<td><a href="#ark-compute"><code>ark compute</code></a></td>
+<td>Manage compute resources</td>
+</tr>
+<tr>
+<td><a href="#ark-agent"><code>ark agent</code></a></td>
+<td>Manage agent definitions</td>
+</tr>
+<tr>
+<td><a href="#ark-flow"><code>ark flow</code></a></td>
+<td>Manage flows</td>
+</tr>
+<tr>
+<td><a href="#ark-skill"><code>ark skill</code></a></td>
+<td>Manage skills</td>
+</tr>
+<tr>
+<td><a href="#ark-recipe"><code>ark recipe</code></a></td>
+<td>Manage recipes</td>
+</tr>
+<tr>
+<td><a href="#ark-schedule"><code>ark schedule</code></a></td>
+<td>Manage scheduled recurring sessions</td>
+</tr>
+<tr>
+<td><a href="#ark-trigger"><code>ark trigger</code></a></td>
+<td>Manage trigger configurations (webhook / schedule / poll)</td>
+</tr>
+<tr>
+<td><a href="#ark-worktree"><code>ark worktree</code></a></td>
+<td>Git worktree operations</td>
+</tr>
+<tr>
+<td><a href="#ark-search"><code>ark search</code></a></td>
+<td>Search across sessions, events, messages, and transcripts</td>
+</tr>
+<tr>
+<td><a href="#ark-index"><code>ark index</code></a></td>
+<td>Build or rebuild the transcript search index</td>
+</tr>
+<tr>
+<td><a href="#ark-search-all"><code>ark search-all</code></a></td>
+<td>Search across all Claude conversations</td>
+</tr>
+<tr>
+<td><a href="#ark-memory"><code>ark memory</code></a></td>
+<td>Manage cross-session memory (backed by knowledge graph)</td>
+</tr>
+<tr>
+<td><a href="#ark-profile"><code>ark profile</code></a></td>
+<td>Manage profiles</td>
+</tr>
+<tr>
+<td><a href="#ark-conductor"><code>ark conductor</code></a></td>
+<td>Conductor operations</td>
+</tr>
+<tr>
+<td><a href="#ark-router"><code>ark router</code></a></td>
+<td>LLM routing proxy</td>
+</tr>
+<tr>
+<td><a href="#ark-runtime"><code>ark runtime</code></a></td>
+<td>Manage runtime definitions</td>
+</tr>
+<tr>
+<td><a href="#ark-auth"><code>ark auth</code></a></td>
+<td>Manage authentication and API keys</td>
+</tr>
+<tr>
+<td><a href="#ark-tenant"><code>ark tenant</code></a></td>
+<td>Manage tenant settings</td>
+</tr>
+<tr>
+<td><a href="#ark-team"><code>ark team</code></a></td>
+<td>Manage teams + memberships</td>
+</tr>
+<tr>
+<td><a href="#ark-user"><code>ark user</code></a></td>
+<td>Manage user identities</td>
+</tr>
+<tr>
+<td><a href="#ark-knowledge"><code>ark knowledge</code></a></td>
+<td>Knowledge graph - search, index, remember, export</td>
+</tr>
+<tr>
+<td><a href="#ark-code-intel"><code>ark code-intel</code></a></td>
+<td>Unified code-intelligence store (search, index, repos, runs)</td>
+</tr>
+<tr>
+<td><a href="#ark-workspace"><code>ark workspace</code></a></td>
+<td>Manage workspaces (tenant -&gt; workspace -&gt; repo)</td>
+</tr>
+<tr>
+<td><a href="#ark-eval"><code>ark eval</code></a></td>
+<td>Agent performance evaluation</td>
+</tr>
+<tr>
+<td><a href="#ark-dashboard"><code>ark dashboard</code></a></td>
+<td>Show fleet status, costs, and recent activity</td>
+</tr>
+<tr>
+<td><a href="#ark-costs"><code>ark costs</code></a></td>
+<td>Show cost summary across sessions</td>
+</tr>
+<tr>
+<td><a href="#ark-costs-sync"><code>ark costs-sync</code></a></td>
+<td>Backfill cost data from transcripts (on the daemon host)</td>
+</tr>
+<tr>
+<td><a href="#ark-costs-export"><code>ark costs-export</code></a></td>
+<td>Export cost data</td>
+</tr>
+<tr>
+<td><a href="#ark-server"><code>ark server</code></a></td>
+<td>JSON-RPC server</td>
+</tr>
+<tr>
+<td><a href="#ark-exec"><code>ark exec</code></a></td>
+<td>Run a session non-interactively (for CI/CD)</td>
+</tr>
+<tr>
+<td><a href="#ark-try"><code>ark try</code></a></td>
+<td>Run a one-shot sandboxed session (auto-cleans up)</td>
+</tr>
+<tr>
+<td><a href="#ark-daemon"><code>ark daemon</code></a></td>
+<td>Manage the arkd agent daemon</td>
+</tr>
+<tr>
+<td><a href="#ark-pr"><code>ark pr</code></a></td>
+<td>Manage PR-bound sessions</td>
+</tr>
+<tr>
+<td><a href="#ark-watch"><code>ark watch</code></a></td>
+<td>Watch GitHub issues with a label and auto-create sessions</td>
+</tr>
+<tr>
+<td><a href="#ark-claude"><code>ark claude</code></a></td>
+<td>Interact with Claude Code sessions</td>
+</tr>
+<tr>
+<td><a href="#ark-doctor"><code>ark doctor</code></a></td>
+<td>Check system prerequisites</td>
+</tr>
+<tr>
+<td><a href="#ark-arkd"><code>ark arkd</code></a></td>
+<td>Start the arkd agent daemon</td>
+</tr>
+<tr>
+<td><a href="#ark-channel"><code>ark channel</code></a></td>
+<td>Run the MCP channel server (used by remote agents)</td>
+</tr>
+<tr>
+<td><a href="#ark-run-agent-sdk"><code>ark run-agent-sdk</code></a></td>
+<td>Run the agent-sdk launch script (internal -- used by agent-sdk executor)</td>
+</tr>
+<tr>
+<td><a href="#ark-config"><code>ark config</code></a></td>
+<td>Open Ark config in your editor</td>
+</tr>
+<tr>
+<td><a href="#ark-web"><code>ark web</code></a></td>
+<td>Start web dashboard</td>
+</tr>
+<tr>
+<td><a href="#ark-openapi"><code>ark openapi</code></a></td>
+<td>Generate OpenAPI spec</td>
+</tr>
+<tr>
+<td><a href="#ark-mcp-proxy"><code>ark mcp-proxy</code></a></td>
+<td>Bridge stdin/stdout to a pooled MCP socket (internal)</td>
+</tr>
+<tr>
+<td><a href="#ark-acp"><code>ark acp</code></a></td>
+<td>Start headless ACP server on stdin/stdout (JSON-RPC)</td>
+</tr>
+<tr>
+<td><a href="#ark-repo-map"><code>ark repo-map</code></a></td>
+<td>Generate repository structure map</td>
+</tr>
+<tr>
+<td><a href="#ark-init"><code>ark init</code></a></td>
+<td>Initialize Ark for this repository</td>
+</tr>
+<tr>
+<td><a href="#ark-db"><code>ark db</code></a></td>
+<td>Schema migrations + status</td>
+</tr>
+<tr>
+<td><a href="#ark-secrets"><code>ark secrets</code></a></td>
+<td>Manage tenant-scoped secrets (env vars for sessions)</td>
+</tr>
+<tr>
+<td><a href="#ark-cluster"><code>ark cluster</code></a></td>
+<td>List Kubernetes clusters visible to this tenant</td>
+</tr>
+</tbody></table>
+<h2><code>ark session</code></h2>
+<p>Manage SDLC flow sessions</p>
+<p><strong>Synopsis:</strong> <code>ark session</code></p>
+<h3><code>ark session start</code></h3>
+<p>Start a new session</p>
+<p><strong>Synopsis:</strong> <code>ark session start [options] [ticket]</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ticket</code></td>
+<td>no</td>
+<td>External ticket reference (Jira key, GitHub issue, etc.)</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-r, --repo &lt;path&gt;</code></td>
+<td></td>
+<td>Repository path or name</td>
+</tr>
+<tr>
+<td><code>--remote-repo &lt;url&gt;</code></td>
+<td></td>
+<td>Git URL to clone on compute target (no local repo needed)</td>
+</tr>
+<tr>
+<td><code>-b, --branch &lt;name&gt;</code></td>
+<td></td>
+<td>Deterministic branch name for the worktree (default: derived from --ticket/--summary or auto)</td>
+</tr>
+<tr>
+<td><code>-s, --summary &lt;text&gt;</code></td>
+<td></td>
+<td>Task summary</td>
+</tr>
+<tr>
+<td><code>-p, --flow &lt;name-or-path&gt;</code></td>
+<td><code>&quot;default&quot;</code></td>
+<td>Flow name OR a path to an inline flow YAML. Paths ending in .yaml/.yml are read + parsed and forwarded as an inline flow definition; bare names hit the FlowStore.</td>
+</tr>
+<tr>
+<td><code>-c, --compute &lt;name&gt;</code></td>
+<td></td>
+<td>Compute name</td>
+</tr>
+<tr>
+<td><code>-g, --group &lt;name&gt;</code></td>
+<td></td>
+<td>Group name</td>
+</tr>
+<tr>
+<td><code>-a, --attach</code></td>
+<td></td>
+<td>Attach to the session&#39;s tmux pane after starting</td>
+</tr>
+<tr>
+<td><code>--claude-session &lt;id&gt;</code></td>
+<td></td>
+<td>Create from an existing Claude Code session (use &#39;ark claude list&#39; to find IDs)</td>
+</tr>
+<tr>
+<td><code>--recipe &lt;name&gt;</code></td>
+<td></td>
+<td>Create session from a recipe template</td>
+</tr>
+<tr>
+<td><code>--max-budget &lt;usd&gt;</code></td>
+<td></td>
+<td>Cumulative cost cap for this session in USD. Halts for_each if exceeded.</td>
+</tr>
+<tr>
+<td><code>--with-mcp &lt;name&gt;</code></td>
+<td><code>[]</code></td>
+<td>Mount an additional MCP server into the session (repeatable). Resolves against shipped mcp-configs/<name>.json or an inline path.</td>
+</tr>
+<tr>
+<td><code>--file &lt;role=path&gt;</code></td>
+<td><code>{}</code></td>
+<td>Attach a named file input (repeatable). Path is resolved absolute and exposed to agents + flows as {inputs.files.<role>}.</td>
+</tr>
+<tr>
+<td><code>--param &lt;k=value&gt;</code></td>
+<td><code>{}</code></td>
+<td>Add a named input (repeatable). Exposed as {inputs.<k>}. Value is parsed as JSON when possible (arrays, objects, numbers, booleans, null) and falls back to a string otherwise. Use for any flow-declared input -- scalars, lists, nested objects.</td>
+</tr>
+</tbody></table>
+<h3><code>ark session spawn</code></h3>
+<p>Spawn a child session for parallel work</p>
+<p><strong>Synopsis:</strong> <code>ark session spawn [options] &lt;parent-id&gt; &lt;task&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>parent-id</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+<tr>
+<td><code>task</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-a, --agent &lt;agent&gt;</code></td>
+<td></td>
+<td>Agent override</td>
+</tr>
+<tr>
+<td><code>-m, --model &lt;model&gt;</code></td>
+<td></td>
+<td>Model override (e.g., haiku, sonnet, opus)</td>
+</tr>
+</tbody></table>
+<h3><code>ark session spawn-subagent</code></h3>
+<p>Spawn a subagent with optional model/agent override</p>
+<p><strong>Synopsis:</strong> <code>ark session spawn-subagent [options] &lt;parent-id&gt; &lt;task&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>parent-id</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+<tr>
+<td><code>task</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-m, --model &lt;model&gt;</code></td>
+<td></td>
+<td>Model override (e.g., haiku, sonnet, opus)</td>
+</tr>
+<tr>
+<td><code>-a, --agent &lt;agent&gt;</code></td>
+<td></td>
+<td>Agent override</td>
+</tr>
+<tr>
+<td><code>-g, --group &lt;name&gt;</code></td>
+<td></td>
+<td>Group name</td>
+</tr>
+</tbody></table>
+<h3><code>ark session list</code></h3>
+<p>List all sessions</p>
+<p><strong>Synopsis:</strong> <code>ark session list [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-s, --status &lt;status&gt;</code></td>
+<td></td>
+<td>Filter by status</td>
+</tr>
+<tr>
+<td><code>-r, --repo &lt;repo&gt;</code></td>
+<td></td>
+<td>Filter by repo</td>
+</tr>
+<tr>
+<td><code>-g, --group &lt;group&gt;</code></td>
+<td></td>
+<td>Filter by group</td>
+</tr>
+<tr>
+<td><code>--archived</code></td>
+<td></td>
+<td>Include archived sessions</td>
+</tr>
+</tbody></table>
+<h3><code>ark session show</code></h3>
+<p>Show session details</p>
+<p><strong>Synopsis:</strong> <code>ark session show &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td>Session ID</td>
+</tr>
+</tbody></table>
+<h3><code>ark session attach</code></h3>
+<p>Attach to a running agent session</p>
+<p><strong>Synopsis:</strong> <code>ark session attach [options] &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--print-only</code></td>
+<td></td>
+<td>Print the attach command instead of running it</td>
+</tr>
+</tbody></table>
+<h3><code>ark session output</code></h3>
+<p>Show live output from a running session</p>
+<p><strong>Synopsis:</strong> <code>ark session output [options] &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-n, --lines &lt;n&gt;</code></td>
+<td><code>&quot;30&quot;</code></td>
+<td>Number of lines</td>
+</tr>
+</tbody></table>
+<h3><code>ark session events</code></h3>
+<p>Show event history</p>
+<p><strong>Synopsis:</strong> <code>ark session events [options] &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--iteration &lt;n&gt;</code></td>
+<td></td>
+<td>Filter to events for a specific for_each iteration (by index)</td>
+</tr>
+<tr>
+<td><code>--summary</code></td>
+<td></td>
+<td>Print one summary line per completed for_each iteration instead of individual events</td>
+</tr>
+</tbody></table>
+<h3><code>ark session stop</code></h3>
+<p>Stop a session</p>
+<p><strong>Synopsis:</strong> <code>ark session stop &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3><code>ark session resume</code></h3>
+<p>Resume a stopped/paused session (restores snapshot when available)</p>
+<p><strong>Synopsis:</strong> <code>ark session resume [options] &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--snapshot-id &lt;id&gt;</code></td>
+<td></td>
+<td>Restore from a specific snapshot id (defaults to the session&#39;s latest)</td>
+</tr>
+</tbody></table>
+<h3><code>ark session advance</code></h3>
+<p>Advance to the next flow stage</p>
+<p><strong>Synopsis:</strong> <code>ark session advance [options] &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-f, --force</code></td>
+<td></td>
+<td>Force past gate</td>
+</tr>
+</tbody></table>
+<h3><code>ark session approve</code></h3>
+<p>Approve a review gate and advance to the next stage</p>
+<p><strong>Synopsis:</strong> <code>ark session approve &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3><code>ark session reject</code></h3>
+<p>Reject a review gate and dispatch a rework cycle with the given reason</p>
+<p><strong>Synopsis:</strong> <code>ark session reject [options] &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-r, --reason &lt;text&gt;</code></td>
+<td></td>
+<td>Why the change needs rework (shown to the agent) <em>(required)</em></td>
+</tr>
+</tbody></table>
+<h3><code>ark session complete</code></h3>
+<p>Mark current stage done and advance</p>
+<p><strong>Synopsis:</strong> <code>ark session complete [options] &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--force</code></td>
+<td></td>
+<td>Skip verification checks</td>
+</tr>
+</tbody></table>
+<h3><code>ark session pause</code></h3>
+<p>Pause a session (persists a snapshot when the compute supports it)</p>
+<p><strong>Synopsis:</strong> <code>ark session pause [options] &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-r, --reason &lt;text&gt;</code></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<h3><code>ark session interrupt</code></h3>
+<p>Interrupt a running agent (Ctrl+C) without killing the session</p>
+<p><strong>Synopsis:</strong> <code>ark session interrupt &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td>Session ID</td>
+</tr>
+</tbody></table>
+<h3><code>ark session archive</code></h3>
+<p>Archive a session for later reference</p>
+<p><strong>Synopsis:</strong> <code>ark session archive &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td>Session ID</td>
+</tr>
+</tbody></table>
+<h3><code>ark session restore</code></h3>
+<p>Restore an archived session</p>
+<p><strong>Synopsis:</strong> <code>ark session restore &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td>Session ID</td>
+</tr>
+</tbody></table>
+<h3><code>ark session send</code></h3>
+<p>Send a message to a running Claude session</p>
+<p><strong>Synopsis:</strong> <code>ark session send &lt;id&gt; &lt;message&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+<tr>
+<td><code>message</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3><code>ark session undelete</code></h3>
+<p>Restore a recently deleted session (within 90s)</p>
+<p><strong>Synopsis:</strong> <code>ark session undelete &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3><code>ark session todo</code></h3>
+<p>Manage session verification todos</p>
+<p><strong>Synopsis:</strong> <code>ark session todo &lt;action&gt; &lt;session-id&gt; [text]</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>action</code></td>
+<td>yes</td>
+<td>add</td>
+</tr>
+<tr>
+<td><code>session-id</code></td>
+<td>yes</td>
+<td>Session ID</td>
+</tr>
+<tr>
+<td><code>text</code></td>
+<td>no</td>
+<td>Todo content (for add) or todo ID (for done/delete)</td>
+</tr>
+</tbody></table>
+<h3><code>ark session verify</code></h3>
+<p>Run verification scripts for a session</p>
+<p><strong>Synopsis:</strong> <code>ark session verify &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td>Session ID</td>
+</tr>
+</tbody></table>
+<h3><code>ark session handoff</code></h3>
+<p>Hand off to a different agent</p>
+<p><strong>Synopsis:</strong> <code>ark session handoff [options] &lt;id&gt; &lt;agent&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+<tr>
+<td><code>agent</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-i, --instructions &lt;text&gt;</code></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<h3><code>ark session join</code></h3>
+<p>Join all forked children</p>
+<p><strong>Synopsis:</strong> <code>ark session join [options] &lt;parent-id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>parent-id</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-f, --force</code></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<h3><code>ark session delete</code></h3>
+<p>Delete sessions</p>
+<p><strong>Synopsis:</strong> <code>ark session delete &lt;ids...&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ids...</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3><code>ark session group</code></h3>
+<p>Assign a session to a group</p>
+<p><strong>Synopsis:</strong> <code>ark session group &lt;id&gt; &lt;group&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+<tr>
+<td><code>group</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3><code>ark session fork</code></h3>
+<p>Fork a session (branches the conversation)</p>
+<p><strong>Synopsis:</strong> <code>ark session fork [options] &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-t, --task &lt;text&gt;</code></td>
+<td></td>
+<td>Task description for forked session</td>
+</tr>
+<tr>
+<td><code>-g, --group &lt;name&gt;</code></td>
+<td></td>
+<td>Group for forked session</td>
+</tr>
+</tbody></table>
+<h3><code>ark session clone</code></h3>
+<p>Alias for fork (branches the conversation)</p>
+<p><strong>Synopsis:</strong> <code>ark session clone [options] &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-t, --task &lt;text&gt;</code></td>
+<td></td>
+<td>Task description for forked session</td>
+</tr>
+<tr>
+<td><code>-g, --group &lt;name&gt;</code></td>
+<td></td>
+<td>Group for forked session</td>
+</tr>
+</tbody></table>
+<h3><code>ark session export</code></h3>
+<p>Export session to file</p>
+<p><strong>Synopsis:</strong> <code>ark session export &lt;id&gt; [file]</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+<tr>
+<td><code>file</code></td>
+<td>no</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3><code>ark session import</code></h3>
+<p>Import session from file</p>
+<p><strong>Synopsis:</strong> <code>ark session import &lt;file&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>file</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2><code>ark compute</code></h2>
+<p>Manage compute resources</p>
+<p><strong>Synopsis:</strong> <code>ark compute</code></p>
+<h3><code>ark compute create</code></h3>
+<p>Create a new compute resource (concrete target or reusable template)</p>
+<p><strong>Synopsis:</strong> <code>ark compute create [options] &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Compute name</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--compute &lt;kind&gt;</code></td>
+<td></td>
+<td>Compute kind (local, firecracker, ec2, k8s, k8s-kata)</td>
+</tr>
+<tr>
+<td><code>--runtime &lt;kind&gt;</code></td>
+<td></td>
+<td>Runtime kind (direct, docker, compose, devcontainer, firecracker-in-container)</td>
+</tr>
+<tr>
+<td><code>--provider &lt;type&gt;</code></td>
+<td></td>
+<td>[deprecated] Provider type (local, docker, ec2, k8s, k8s-kata). Use --compute + --runtime.</td>
+</tr>
+<tr>
+<td><code>--template</code></td>
+<td></td>
+<td>Create a reusable template (blueprint) instead of a concrete compute target</td>
+</tr>
+<tr>
+<td><code>--no-prompt</code></td>
+<td></td>
+<td>Skip interactive prompts (fail if required fields are missing)</td>
+</tr>
+<tr>
+<td><code>--image &lt;image&gt;</code></td>
+<td></td>
+<td>Docker image (default: ubuntu:22.04)</td>
+</tr>
+<tr>
+<td><code>--devcontainer</code></td>
+<td></td>
+<td>Use devcontainer.json from project</td>
+</tr>
+<tr>
+<td><code>--volume &lt;mount&gt;</code></td>
+<td><code>[]</code></td>
+<td>Extra volume mount (repeatable)</td>
+</tr>
+<tr>
+<td><code>--size &lt;size&gt;</code></td>
+<td><code>&quot;m&quot;</code></td>
+<td>Instance size: xs (2vCPU/8GB), s (4/16), m (8/32), l (16/64), xl (32/128), xxl (48/192), xxxl (64/256)</td>
+</tr>
+<tr>
+<td><code>--arch &lt;arch&gt;</code></td>
+<td><code>&quot;x64&quot;</code></td>
+<td>Architecture: x64, arm</td>
+</tr>
+<tr>
+<td><code>--region &lt;region&gt;</code></td>
+<td><code>&quot;us-east-1&quot;</code></td>
+<td>Region</td>
+</tr>
+<tr>
+<td><code>--profile &lt;profile&gt;</code></td>
+<td></td>
+<td>AWS profile</td>
+</tr>
+<tr>
+<td><code>--subnet-id &lt;id&gt;</code></td>
+<td></td>
+<td>Subnet ID</td>
+</tr>
+<tr>
+<td><code>--tag &lt;key=value&gt;</code></td>
+<td><code>[]</code></td>
+<td>Tag (repeatable)</td>
+</tr>
+<tr>
+<td><code>--context &lt;name&gt;</code></td>
+<td></td>
+<td>Kubeconfig context (cluster) -- required</td>
+</tr>
+<tr>
+<td><code>--namespace &lt;ns&gt;</code></td>
+<td></td>
+<td>K8s namespace -- required</td>
+</tr>
+<tr>
+<td><code>--kubeconfig &lt;path&gt;</code></td>
+<td></td>
+<td>Path to kubeconfig (default: in-cluster or ~/.kube/config)</td>
+</tr>
+<tr>
+<td><code>--service-account &lt;sa&gt;</code></td>
+<td></td>
+<td>Pod service account name (for IRSA, etc.)</td>
+</tr>
+<tr>
+<td><code>--runtime-class &lt;class&gt;</code></td>
+<td></td>
+<td>K8s runtime class (e.g. kata-fc for Firecracker)</td>
+</tr>
+<tr>
+<td><code>--cpu &lt;amt&gt;</code></td>
+<td></td>
+<td>CPU request/limit (e.g. 2 or 500m)</td>
+</tr>
+<tr>
+<td><code>--memory &lt;amt&gt;</code></td>
+<td></td>
+<td>Memory request/limit (e.g. 4Gi)</td>
+</tr>
+<tr>
+<td><code>--from-template &lt;name&gt;</code></td>
+<td></td>
+<td>Use a compute template as defaults</td>
+</tr>
+</tbody></table>
+<h3><code>ark compute provision</code></h3>
+<p>Provision a compute resource (create infrastructure)</p>
+<p><strong>Synopsis:</strong> <code>ark compute provision &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Compute name</td>
+</tr>
+</tbody></table>
+<h3><code>ark compute start</code></h3>
+<p>Start a compute resource</p>
+<p><strong>Synopsis:</strong> <code>ark compute start &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Compute name</td>
+</tr>
+</tbody></table>
+<h3><code>ark compute stop</code></h3>
+<p>Stop a compute resource</p>
+<p><strong>Synopsis:</strong> <code>ark compute stop &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Compute name</td>
+</tr>
+</tbody></table>
+<h3><code>ark compute destroy</code></h3>
+<p>Destroy a compute resource (removes infrastructure and DB record)</p>
+<p><strong>Synopsis:</strong> <code>ark compute destroy &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Compute name</td>
+</tr>
+</tbody></table>
+<h3><code>ark compute update</code></h3>
+<p>Update compute configuration</p>
+<p><strong>Synopsis:</strong> <code>ark compute update [options] &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Compute name</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--size &lt;size&gt;</code></td>
+<td></td>
+<td>Instance size</td>
+</tr>
+<tr>
+<td><code>--arch &lt;arch&gt;</code></td>
+<td></td>
+<td>Architecture: x64, arm</td>
+</tr>
+<tr>
+<td><code>--region &lt;region&gt;</code></td>
+<td></td>
+<td>AWS region</td>
+</tr>
+<tr>
+<td><code>--profile &lt;profile&gt;</code></td>
+<td></td>
+<td>AWS profile</td>
+</tr>
+<tr>
+<td><code>--subnet-id &lt;id&gt;</code></td>
+<td></td>
+<td>Subnet ID</td>
+</tr>
+<tr>
+<td><code>--ingress &lt;cidrs&gt;</code></td>
+<td></td>
+<td>SSH ingress CIDRs (comma-separated, or &#39;open&#39; for 0.0.0.0/0)</td>
+</tr>
+<tr>
+<td><code>--idle-minutes &lt;min&gt;</code></td>
+<td></td>
+<td>Idle shutdown timeout in minutes</td>
+</tr>
+<tr>
+<td><code>--set &lt;key=value&gt;</code></td>
+<td><code>[]</code></td>
+<td>Set arbitrary config key</td>
+</tr>
+</tbody></table>
+<h3><code>ark compute list</code></h3>
+<p>List compute targets and templates</p>
+<p><strong>Synopsis:</strong> <code>ark compute list [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--templates-only</code></td>
+<td></td>
+<td>Only list templates (reusable config blueprints)</td>
+</tr>
+<tr>
+<td><code>--concrete-only</code></td>
+<td></td>
+<td>Only list concrete compute targets</td>
+</tr>
+</tbody></table>
+<h3><code>ark compute status</code></h3>
+<p>Show compute details</p>
+<p><strong>Synopsis:</strong> <code>ark compute status &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Compute name</td>
+</tr>
+</tbody></table>
+<h3><code>ark compute sync</code></h3>
+<p>Sync environment to/from compute</p>
+<p><strong>Synopsis:</strong> <code>ark compute sync [options] &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Compute name</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--direction &lt;dir&gt;</code></td>
+<td><code>&quot;push&quot;</code></td>
+<td>Sync direction (push</td>
+</tr>
+</tbody></table>
+<h3><code>ark compute metrics</code></h3>
+<p>Show compute metrics</p>
+<p><strong>Synopsis:</strong> <code>ark compute metrics &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Compute name</td>
+</tr>
+</tbody></table>
+<h3><code>ark compute default</code></h3>
+<p>Set default compute</p>
+<p><strong>Synopsis:</strong> <code>ark compute default &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Compute name</td>
+</tr>
+</tbody></table>
+<h3><code>ark compute ssh</code></h3>
+<p>SSH into a compute</p>
+<p><strong>Synopsis:</strong> <code>ark compute ssh &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Compute name</td>
+</tr>
+</tbody></table>
+<h3><code>ark compute pool</code></h3>
+<p>Manage compute pools</p>
+<p><strong>Synopsis:</strong> <code>ark compute pool</code></p>
+<h4><code>ark compute pool create</code></h4>
+<p>Create a compute pool</p>
+<p><strong>Synopsis:</strong> <code>ark compute pool create [options] &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Pool name</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--provider &lt;type&gt;</code></td>
+<td><code>&quot;ec2&quot;</code></td>
+<td>Provider type (ec2, docker, k8s)</td>
+</tr>
+<tr>
+<td><code>--min &lt;n&gt;</code></td>
+<td><code>&quot;0&quot;</code></td>
+<td>Minimum warm instances</td>
+</tr>
+<tr>
+<td><code>--max &lt;n&gt;</code></td>
+<td><code>&quot;10&quot;</code></td>
+<td>Maximum instances</td>
+</tr>
+<tr>
+<td><code>--size &lt;size&gt;</code></td>
+<td><code>&quot;m&quot;</code></td>
+<td>Instance size (provider-specific)</td>
+</tr>
+<tr>
+<td><code>--region &lt;region&gt;</code></td>
+<td></td>
+<td>Region (provider-specific)</td>
+</tr>
+<tr>
+<td><code>--image &lt;image&gt;</code></td>
+<td></td>
+<td>Container image (provider-specific)</td>
+</tr>
+</tbody></table>
+<h4><code>ark compute pool list</code></h4>
+<p>List compute pools</p>
+<p><strong>Synopsis:</strong> <code>ark compute pool list</code></p>
+<h4><code>ark compute pool delete</code></h4>
+<p>Delete a compute pool</p>
+<p><strong>Synopsis:</strong> <code>ark compute pool delete &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Pool name</td>
+</tr>
+</tbody></table>
+<h3><code>ark compute template</code></h3>
+<p>Manage compute templates</p>
+<p><strong>Synopsis:</strong> <code>ark compute template</code></p>
+<h4><code>ark compute template list</code></h4>
+<p>List compute templates</p>
+<p><strong>Synopsis:</strong> <code>ark compute template list</code></p>
+<h4><code>ark compute template show</code></h4>
+<p>Show a compute template</p>
+<p><strong>Synopsis:</strong> <code>ark compute template show &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Template name</td>
+</tr>
+</tbody></table>
+<h4><code>ark compute template create</code></h4>
+<p>Create a compute template (convenience alias for &#39;compute create --template&#39;)</p>
+<p><strong>Synopsis:</strong> <code>ark compute template create [options] &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Template name</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--provider &lt;type&gt;</code></td>
+<td><code>&quot;ec2&quot;</code></td>
+<td>Provider type</td>
+</tr>
+<tr>
+<td><code>--description &lt;desc&gt;</code></td>
+<td></td>
+<td>Description</td>
+</tr>
+<tr>
+<td><code>--size &lt;size&gt;</code></td>
+<td></td>
+<td>Instance size (ec2)</td>
+</tr>
+<tr>
+<td><code>--arch &lt;arch&gt;</code></td>
+<td></td>
+<td>Architecture (ec2)</td>
+</tr>
+<tr>
+<td><code>--region &lt;region&gt;</code></td>
+<td></td>
+<td>Region (ec2)</td>
+</tr>
+<tr>
+<td><code>--profile &lt;profile&gt;</code></td>
+<td></td>
+<td>AWS profile (ec2)</td>
+</tr>
+<tr>
+<td><code>--image &lt;image&gt;</code></td>
+<td></td>
+<td>Docker image (docker)</td>
+</tr>
+<tr>
+<td><code>--namespace &lt;ns&gt;</code></td>
+<td></td>
+<td>K8s namespace (k8s)</td>
+</tr>
+</tbody></table>
+<h4><code>ark compute template delete</code></h4>
+<p>Delete a compute template</p>
+<p><strong>Synopsis:</strong> <code>ark compute template delete &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Template name</td>
+</tr>
+</tbody></table>
+<h2><code>ark agent</code></h2>
+<p>Manage agent definitions</p>
+<p><strong>Synopsis:</strong> <code>ark agent</code></p>
+<h3><code>ark agent list</code></h3>
+<p>List agents</p>
+<p><strong>Synopsis:</strong> <code>ark agent list [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--project &lt;dir&gt;</code></td>
+<td></td>
+<td>Project root</td>
+</tr>
+</tbody></table>
+<h3><code>ark agent show</code></h3>
+<p>Show agent details</p>
+<p><strong>Synopsis:</strong> <code>ark agent show &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3><code>ark agent create</code></h3>
+<p>Create a new agent</p>
+<p><strong>Synopsis:</strong> <code>ark agent create [options] &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--global</code></td>
+<td></td>
+<td>Save at global scope instead of project scope</td>
+</tr>
+<tr>
+<td><code>--from &lt;file&gt;</code></td>
+<td></td>
+<td>Seed YAML from a file instead of scaffolding fresh</td>
+</tr>
+<tr>
+<td><code>--no-editor</code></td>
+<td></td>
+<td>Skip the $EDITOR step (use the scaffold / --from content as-is)</td>
+</tr>
+</tbody></table>
+<h3><code>ark agent edit</code></h3>
+<p>Edit an agent definition</p>
+<p><strong>Synopsis:</strong> <code>ark agent edit [options] &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--global</code></td>
+<td></td>
+<td>Write back at global scope (default follows the existing agent&#39;s scope)</td>
+</tr>
+</tbody></table>
+<h3><code>ark agent delete</code></h3>
+<p>Delete a custom agent</p>
+<p><strong>Synopsis:</strong> <code>ark agent delete [options] &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-y, --yes</code></td>
+<td></td>
+<td>Skip confirmation</td>
+</tr>
+</tbody></table>
+<h3><code>ark agent copy</code></h3>
+<p>Copy an agent for customization</p>
+<p><strong>Synopsis:</strong> <code>ark agent copy [options] &lt;name&gt; [new-name]</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+<tr>
+<td><code>new-name</code></td>
+<td>no</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--global</code></td>
+<td></td>
+<td>Save at global scope instead of project scope</td>
+</tr>
+</tbody></table>
+<h2><code>ark flow</code></h2>
+<p>Manage flows</p>
+<p><strong>Synopsis:</strong> <code>ark flow</code></p>
+<h3><code>ark flow list</code></h3>
+<p>List flows</p>
+<p><strong>Synopsis:</strong> <code>ark flow list</code></p>
+<h3><code>ark flow show</code></h3>
+<p>Show flow</p>
+<p><strong>Synopsis:</strong> <code>ark flow show &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3><code>ark flow create</code></h3>
+<p>Create a flow from a YAML file</p>
+<p><strong>Synopsis:</strong> <code>ark flow create [options] &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Flow name</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--from &lt;file&gt;</code></td>
+<td></td>
+<td>YAML file containing the stages array</td>
+</tr>
+<tr>
+<td><code>--description &lt;text&gt;</code></td>
+<td></td>
+<td>Flow description</td>
+</tr>
+<tr>
+<td><code>--scope &lt;scope&gt;</code></td>
+<td><code>&quot;global&quot;</code></td>
+<td>global or project</td>
+</tr>
+</tbody></table>
+<h3><code>ark flow delete</code></h3>
+<p>Delete a flow (global or project only -- builtins are protected)</p>
+<p><strong>Synopsis:</strong> <code>ark flow delete [options] &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Flow name</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--scope &lt;scope&gt;</code></td>
+<td><code>&quot;global&quot;</code></td>
+<td>global or project</td>
+</tr>
+</tbody></table>
+<h2><code>ark skill</code></h2>
+<p>Manage skills</p>
+<p><strong>Synopsis:</strong> <code>ark skill</code></p>
+<h3><code>ark skill list</code></h3>
+<p>List available skills</p>
+<p><strong>Synopsis:</strong> <code>ark skill list</code></p>
+<h3><code>ark skill show</code></h3>
+<p>Show skill details</p>
+<p><strong>Synopsis:</strong> <code>ark skill show &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Skill name</td>
+</tr>
+</tbody></table>
+<h3><code>ark skill create</code></h3>
+<p>Create a new skill</p>
+<p><strong>Synopsis:</strong> <code>ark skill create [options] [name]</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>no</td>
+<td>Skill name (required unless --from)</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--from &lt;file&gt;</code></td>
+<td></td>
+<td>Create from YAML file</td>
+</tr>
+<tr>
+<td><code>-d, --description &lt;desc&gt;</code></td>
+<td></td>
+<td>Skill description</td>
+</tr>
+<tr>
+<td><code>-p, --prompt &lt;prompt&gt;</code></td>
+<td></td>
+<td>Skill prompt</td>
+</tr>
+<tr>
+<td><code>-s, --scope &lt;scope&gt;</code></td>
+<td><code>&quot;global&quot;</code></td>
+<td>Scope: global or project</td>
+</tr>
+<tr>
+<td><code>--tags &lt;tags&gt;</code></td>
+<td></td>
+<td>Comma-separated tags</td>
+</tr>
+</tbody></table>
+<h3><code>ark skill delete</code></h3>
+<p>Delete a skill (global or project only)</p>
+<p><strong>Synopsis:</strong> <code>ark skill delete [options] &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Skill name</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-s, --scope &lt;scope&gt;</code></td>
+<td><code>&quot;global&quot;</code></td>
+<td>Scope: global or project</td>
+</tr>
+</tbody></table>
+<h2><code>ark recipe</code></h2>
+<p>Manage recipes</p>
+<p><strong>Synopsis:</strong> <code>ark recipe</code></p>
+<h3><code>ark recipe list</code></h3>
+<p>List available recipes</p>
+<p><strong>Synopsis:</strong> <code>ark recipe list</code></p>
+<h3><code>ark recipe show</code></h3>
+<p>Show recipe details</p>
+<p><strong>Synopsis:</strong> <code>ark recipe show &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Recipe name</td>
+</tr>
+</tbody></table>
+<h3><code>ark recipe create</code></h3>
+<p>Create a new recipe</p>
+<p><strong>Synopsis:</strong> <code>ark recipe create [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--from &lt;file&gt;</code></td>
+<td></td>
+<td>Create from YAML file</td>
+</tr>
+<tr>
+<td><code>--from-session &lt;id&gt;</code></td>
+<td></td>
+<td>Create from existing session</td>
+</tr>
+<tr>
+<td><code>-n, --name &lt;name&gt;</code></td>
+<td></td>
+<td>Recipe name (required with --from-session)</td>
+</tr>
+<tr>
+<td><code>-s, --scope &lt;scope&gt;</code></td>
+<td><code>&quot;global&quot;</code></td>
+<td>Scope: global or project</td>
+</tr>
+</tbody></table>
+<h3><code>ark recipe delete</code></h3>
+<p>Delete a recipe (global or project only)</p>
+<p><strong>Synopsis:</strong> <code>ark recipe delete [options] &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Recipe name</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-s, --scope &lt;scope&gt;</code></td>
+<td><code>&quot;global&quot;</code></td>
+<td>Scope: global or project</td>
+</tr>
+</tbody></table>
+<h2><code>ark schedule</code></h2>
+<p>Manage scheduled recurring sessions</p>
+<p><strong>Synopsis:</strong> <code>ark schedule</code></p>
+<h3><code>ark schedule add</code></h3>
+<p>Create a recurring scheduled session</p>
+<p><strong>Synopsis:</strong> <code>ark schedule add [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--cron &lt;expression&gt;</code></td>
+<td></td>
+<td>Cron expression (e.g., &quot;0 2 * * *&quot;) <em>(required)</em></td>
+</tr>
+<tr>
+<td><code>-f, --flow &lt;name&gt;</code></td>
+<td><code>&quot;bare&quot;</code></td>
+<td>Flow name</td>
+</tr>
+<tr>
+<td><code>-r, --repo &lt;path&gt;</code></td>
+<td></td>
+<td>Repository path</td>
+</tr>
+<tr>
+<td><code>-s, --summary &lt;text&gt;</code></td>
+<td></td>
+<td>Session summary</td>
+</tr>
+<tr>
+<td><code>-c, --compute &lt;name&gt;</code></td>
+<td></td>
+<td>Compute name</td>
+</tr>
+<tr>
+<td><code>-g, --group &lt;name&gt;</code></td>
+<td></td>
+<td>Group name</td>
+</tr>
+</tbody></table>
+<h3><code>ark schedule list</code></h3>
+<p>List all schedules</p>
+<p><strong>Synopsis:</strong> <code>ark schedule list</code></p>
+<h3><code>ark schedule delete</code></h3>
+<p>Delete a schedule</p>
+<p><strong>Synopsis:</strong> <code>ark schedule delete &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td>Schedule ID</td>
+</tr>
+</tbody></table>
+<h3><code>ark schedule enable</code></h3>
+<p>Enable a schedule</p>
+<p><strong>Synopsis:</strong> <code>ark schedule enable &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td>Schedule ID</td>
+</tr>
+</tbody></table>
+<h3><code>ark schedule disable</code></h3>
+<p>Disable a schedule</p>
+<p><strong>Synopsis:</strong> <code>ark schedule disable &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td>Schedule ID</td>
+</tr>
+</tbody></table>
+<h2><code>ark trigger</code></h2>
+<p>Manage trigger configurations (webhook / schedule / poll)</p>
+<p><strong>Synopsis:</strong> <code>ark trigger</code></p>
+<h3><code>ark trigger list</code></h3>
+<p>List configured triggers</p>
+<p><strong>Synopsis:</strong> <code>ark trigger list [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--tenant &lt;name&gt;</code></td>
+<td></td>
+<td>Tenant scope (default: &#39;default&#39;)</td>
+</tr>
+</tbody></table>
+<h3><code>ark trigger get</code></h3>
+<p>Show a trigger config</p>
+<p><strong>Synopsis:</strong> <code>ark trigger get [options] &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Trigger name</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--tenant &lt;name&gt;</code></td>
+<td></td>
+<td>Tenant scope</td>
+</tr>
+</tbody></table>
+<h3><code>ark trigger enable</code></h3>
+<p>Enable a trigger (in-memory; edit the YAML to persist)</p>
+<p><strong>Synopsis:</strong> <code>ark trigger enable [options] &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Trigger name</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--tenant &lt;name&gt;</code></td>
+<td></td>
+<td>Tenant scope</td>
+</tr>
+</tbody></table>
+<h3><code>ark trigger disable</code></h3>
+<p>Disable a trigger (in-memory; restart resets)</p>
+<p><strong>Synopsis:</strong> <code>ark trigger disable [options] &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Trigger name</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--tenant &lt;name&gt;</code></td>
+<td></td>
+<td>Tenant scope</td>
+</tr>
+</tbody></table>
+<h3><code>ark trigger reload</code></h3>
+<p>Re-read trigger YAML files from disk</p>
+<p><strong>Synopsis:</strong> <code>ark trigger reload</code></p>
+<h3><code>ark trigger sources</code></h3>
+<p>List registered source connectors and their status</p>
+<p><strong>Synopsis:</strong> <code>ark trigger sources</code></p>
+<h3><code>ark trigger test</code></h3>
+<p>Replay a sample payload against a trigger (dry-run by default)</p>
+<p><strong>Synopsis:</strong> <code>ark trigger test [options] &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Trigger name</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--payload &lt;file&gt;</code></td>
+<td></td>
+<td>JSON file with the synthetic payload <em>(required)</em></td>
+</tr>
+<tr>
+<td><code>--tenant &lt;name&gt;</code></td>
+<td></td>
+<td>Tenant scope</td>
+</tr>
+<tr>
+<td><code>--fire</code></td>
+<td></td>
+<td>Actually invoke the flow (default: dry-run)</td>
+</tr>
+</tbody></table>
+<h2><code>ark worktree</code></h2>
+<p>Git worktree operations</p>
+<p><strong>Synopsis:</strong> <code>ark worktree</code></p>
+<h3><code>ark worktree diff</code></h3>
+<p>Preview changes in a session worktree</p>
+<p><strong>Synopsis:</strong> <code>ark worktree diff [options] &lt;session-id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>session-id</code></td>
+<td>yes</td>
+<td>Session ID</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--base &lt;branch&gt;</code></td>
+<td><code>&quot;main&quot;</code></td>
+<td>Base branch to compare against</td>
+</tr>
+</tbody></table>
+<h3><code>ark worktree finish</code></h3>
+<p>Merge worktree branch, remove worktree, delete session</p>
+<p><strong>Synopsis:</strong> <code>ark worktree finish [options] &lt;session-id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>session-id</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--into &lt;branch&gt;</code></td>
+<td><code>&quot;main&quot;</code></td>
+<td>Target branch to merge into</td>
+</tr>
+<tr>
+<td><code>--no-merge</code></td>
+<td></td>
+<td>Skip merge, just remove worktree and delete session</td>
+</tr>
+<tr>
+<td><code>--keep-branch</code></td>
+<td></td>
+<td>Don&#39;t delete the branch after merge</td>
+</tr>
+</tbody></table>
+<h3><code>ark worktree pr</code></h3>
+<p>Create a GitHub PR from a session worktree</p>
+<p><strong>Synopsis:</strong> <code>ark worktree pr [options] &lt;session-id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>session-id</code></td>
+<td>yes</td>
+<td>Session ID</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--title &lt;title&gt;</code></td>
+<td></td>
+<td>PR title</td>
+</tr>
+<tr>
+<td><code>--base &lt;branch&gt;</code></td>
+<td><code>&quot;main&quot;</code></td>
+<td>Base branch</td>
+</tr>
+<tr>
+<td><code>--draft</code></td>
+<td></td>
+<td>Create as draft PR</td>
+</tr>
+</tbody></table>
+<h3><code>ark worktree list</code></h3>
+<p>List sessions with active worktrees</p>
+<p><strong>Synopsis:</strong> <code>ark worktree list</code></p>
+<h3><code>ark worktree cleanup</code></h3>
+<p>Find and remove orphaned worktrees</p>
+<p><strong>Synopsis:</strong> <code>ark worktree cleanup [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--dry-run</code></td>
+<td></td>
+<td>Only show what would be removed</td>
+</tr>
+</tbody></table>
+<h2><code>ark search</code></h2>
+<p>Search across sessions, events, messages, and transcripts</p>
+<p><strong>Synopsis:</strong> <code>ark search [options] &lt;query&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>query</code></td>
+<td>yes</td>
+<td>Search text (case-insensitive)</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-l, --limit &lt;n&gt;</code></td>
+<td><code>&quot;20&quot;</code></td>
+<td>Max results</td>
+</tr>
+<tr>
+<td><code>-t, --transcripts</code></td>
+<td></td>
+<td>Also search Claude transcripts (slower)</td>
+</tr>
+<tr>
+<td><code>--index</code></td>
+<td></td>
+<td>Rebuild transcript search index before searching</td>
+</tr>
+<tr>
+<td><code>--hybrid</code></td>
+<td></td>
+<td>Use hybrid search (memory + knowledge + transcripts with LLM re-ranking)</td>
+</tr>
+</tbody></table>
+<h2><code>ark index</code></h2>
+<p>Build or rebuild the transcript search index</p>
+<p><strong>Synopsis:</strong> <code>ark index</code></p>
+<h2><code>ark search-all</code></h2>
+<p>Search across all Claude conversations</p>
+<p><strong>Synopsis:</strong> <code>ark search-all [options] &lt;query&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>query</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-n, --limit &lt;n&gt;</code></td>
+<td><code>&quot;20&quot;</code></td>
+<td>Max results</td>
+</tr>
+<tr>
+<td><code>--days &lt;n&gt;</code></td>
+<td><code>&quot;90&quot;</code></td>
+<td>Recent days to search</td>
+</tr>
+</tbody></table>
+<h2><code>ark memory</code></h2>
+<p>Manage cross-session memory (backed by knowledge graph)</p>
+<p><strong>Synopsis:</strong> <code>ark memory</code></p>
+<h3><code>ark memory list</code></h3>
+<p>List stored memories</p>
+<p><strong>Synopsis:</strong> <code>ark memory list [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-s, --scope &lt;scope&gt;</code></td>
+<td></td>
+<td>Filter by scope</td>
+</tr>
+</tbody></table>
+<h3><code>ark memory recall</code></h3>
+<p>Recall memories relevant to a query</p>
+<p><strong>Synopsis:</strong> <code>ark memory recall [options] &lt;query&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>query</code></td>
+<td>yes</td>
+<td>Search query</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-s, --scope &lt;scope&gt;</code></td>
+<td></td>
+<td>Filter by scope</td>
+</tr>
+<tr>
+<td><code>-n, --limit &lt;n&gt;</code></td>
+<td><code>&quot;10&quot;</code></td>
+<td>Max results</td>
+</tr>
+</tbody></table>
+<h3><code>ark memory forget</code></h3>
+<p>Forget a specific memory</p>
+<p><strong>Synopsis:</strong> <code>ark memory forget &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td>Memory ID</td>
+</tr>
+</tbody></table>
+<h3><code>ark memory add</code></h3>
+<p>Store a new memory</p>
+<p><strong>Synopsis:</strong> <code>ark memory add [options] &lt;content&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>content</code></td>
+<td>yes</td>
+<td>Memory content</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-t, --tags &lt;tags&gt;</code></td>
+<td></td>
+<td>Comma-separated tags</td>
+</tr>
+<tr>
+<td><code>-s, --scope &lt;scope&gt;</code></td>
+<td></td>
+<td>Scope (default: global)</td>
+</tr>
+<tr>
+<td><code>-i, --importance &lt;n&gt;</code></td>
+<td></td>
+<td>Importance 0-1 (default: 0.5)</td>
+</tr>
+</tbody></table>
+<h3><code>ark memory clear</code></h3>
+<p>Clear all memories in a scope</p>
+<p><strong>Synopsis:</strong> <code>ark memory clear [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-s, --scope &lt;scope&gt;</code></td>
+<td></td>
+<td>Scope to clear (omit for ALL)</td>
+</tr>
+<tr>
+<td><code>--force</code></td>
+<td></td>
+<td>Skip confirmation</td>
+</tr>
+</tbody></table>
+<h2><code>ark profile</code></h2>
+<p>Manage profiles</p>
+<p><strong>Synopsis:</strong> <code>ark profile</code></p>
+<h3><code>ark profile list</code></h3>
+<p>List profiles</p>
+<p><strong>Synopsis:</strong> <code>ark profile list</code></p>
+<h3><code>ark profile create</code></h3>
+<p>Create a profile</p>
+<p><strong>Synopsis:</strong> <code>ark profile create &lt;name&gt; [description]</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>no</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3><code>ark profile delete</code></h3>
+<p>Delete a profile</p>
+<p><strong>Synopsis:</strong> <code>ark profile delete &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2><code>ark conductor</code></h2>
+<p>Conductor operations</p>
+<p><strong>Synopsis:</strong> <code>ark conductor</code></p>
+<h3><code>ark conductor status</code></h3>
+<p>Show whether a conductor is running on the daemon</p>
+<p><strong>Synopsis:</strong> <code>ark conductor status</code></p>
+<h3><code>ark conductor learnings</code></h3>
+<p>Show conductor learnings</p>
+<p><strong>Synopsis:</strong> <code>ark conductor learnings</code></p>
+<h3><code>ark conductor learn</code></h3>
+<p>Record a conductor learning</p>
+<p><strong>Synopsis:</strong> <code>ark conductor learn &lt;title&gt; [description]</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>title</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>no</td>
+<td></td>
+</tr>
+</tbody></table>
+<h3><code>ark conductor bridge</code></h3>
+<p>Start the messaging bridge (Slack/email) on the daemon</p>
+<p><strong>Synopsis:</strong> <code>ark conductor bridge</code></p>
+<h3><code>ark conductor notify</code></h3>
+<p>Send a test notification via bridge</p>
+<p><strong>Synopsis:</strong> <code>ark conductor notify &lt;message&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>message</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2><code>ark router</code></h2>
+<p>LLM routing proxy</p>
+<p><strong>Synopsis:</strong> <code>ark router</code></p>
+<h3><code>ark router start</code></h3>
+<p>Start the LLM router server</p>
+<p><strong>Synopsis:</strong> <code>ark router start [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-p, --port &lt;port&gt;</code></td>
+<td><code>&quot;8430&quot;</code></td>
+<td>Listen port</td>
+</tr>
+<tr>
+<td><code>--policy &lt;policy&gt;</code></td>
+<td><code>&quot;balanced&quot;</code></td>
+<td>Routing policy: quality, balanced, cost</td>
+</tr>
+<tr>
+<td><code>--config &lt;path&gt;</code></td>
+<td></td>
+<td>Path to router config YAML</td>
+</tr>
+<tr>
+<td><code>--tensorzero</code></td>
+<td></td>
+<td>Enable TensorZero gateway (starts Docker container)</td>
+</tr>
+<tr>
+<td><code>--tensorzero-url &lt;url&gt;</code></td>
+<td></td>
+<td>TensorZero URL (skip auto-start, use existing)</td>
+</tr>
+<tr>
+<td><code>--tensorzero-port &lt;port&gt;</code></td>
+<td><code>&quot;3000&quot;</code></td>
+<td>TensorZero gateway port</td>
+</tr>
+</tbody></table>
+<h3><code>ark router status</code></h3>
+<p>Show router status and stats</p>
+<p><strong>Synopsis:</strong> <code>ark router status [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--url &lt;url&gt;</code></td>
+<td><code>&quot;http://localhost:8430&quot;</code></td>
+<td>Router URL</td>
+</tr>
+<tr>
+<td><code>--tensorzero-url &lt;url&gt;</code></td>
+<td><code>&quot;http://localhost:3000&quot;</code></td>
+<td>TensorZero URL</td>
+</tr>
+</tbody></table>
+<h3><code>ark router costs</code></h3>
+<p>Show routing cost breakdown</p>
+<p><strong>Synopsis:</strong> <code>ark router costs [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--url &lt;url&gt;</code></td>
+<td><code>&quot;http://localhost:8430&quot;</code></td>
+<td>Router URL</td>
+</tr>
+<tr>
+<td><code>--group-by &lt;field&gt;</code></td>
+<td><code>&quot;model&quot;</code></td>
+<td>Group by: model, provider, session</td>
+</tr>
+</tbody></table>
+<h2><code>ark runtime</code></h2>
+<p>Manage runtime definitions</p>
+<p><strong>Synopsis:</strong> <code>ark runtime</code></p>
+<h3><code>ark runtime list</code></h3>
+<p>List available runtimes</p>
+<p><strong>Synopsis:</strong> <code>ark runtime list</code></p>
+<h3><code>ark runtime show</code></h3>
+<p>Show runtime details</p>
+<p><strong>Synopsis:</strong> <code>ark runtime show &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2><code>ark auth</code></h2>
+<p>Manage authentication and API keys</p>
+<p><strong>Synopsis:</strong> <code>ark auth</code></p>
+<h3><code>ark auth setup</code></h3>
+<p>Set up Claude authentication (local or remote)</p>
+<p><strong>Synopsis:</strong> <code>ark auth setup [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--host &lt;name&gt;</code></td>
+<td></td>
+<td>Run setup-token on a specific remote compute</td>
+</tr>
+</tbody></table>
+<h3><code>ark auth create-key</code></h3>
+<p>Create a new API key</p>
+<p><strong>Synopsis:</strong> <code>ark auth create-key [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--name &lt;name&gt;</code></td>
+<td><code>&quot;default&quot;</code></td>
+<td>Human-readable label for the key</td>
+</tr>
+<tr>
+<td><code>--role &lt;role&gt;</code></td>
+<td><code>&quot;member&quot;</code></td>
+<td>Role: admin, member, or viewer</td>
+</tr>
+<tr>
+<td><code>--tenant &lt;tenantId&gt;</code></td>
+<td><code>&quot;default&quot;</code></td>
+<td>Tenant ID</td>
+</tr>
+<tr>
+<td><code>--expires &lt;date&gt;</code></td>
+<td></td>
+<td>Expiration date (ISO 8601)</td>
+</tr>
+</tbody></table>
+<h3><code>ark auth list-keys</code></h3>
+<p>List API keys</p>
+<p><strong>Synopsis:</strong> <code>ark auth list-keys [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--tenant &lt;tenantId&gt;</code></td>
+<td><code>&quot;default&quot;</code></td>
+<td>Tenant ID</td>
+</tr>
+</tbody></table>
+<h3><code>ark auth revoke-key</code></h3>
+<p>Revoke an API key</p>
+<p><strong>Synopsis:</strong> <code>ark auth revoke-key [options] &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td>API key ID (e.g. ak-abcd1234)</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--tenant &lt;tenantId&gt;</code></td>
+<td></td>
+<td>Scope to this tenant (safer in multi-tenant setups)</td>
+</tr>
+</tbody></table>
+<h3><code>ark auth rotate-key</code></h3>
+<p>Rotate an API key (revoke old, create new with same metadata)</p>
+<p><strong>Synopsis:</strong> <code>ark auth rotate-key [options] &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td>API key ID to rotate</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--tenant &lt;tenantId&gt;</code></td>
+<td></td>
+<td>Scope to this tenant (safer in multi-tenant setups)</td>
+</tr>
+</tbody></table>
+<h2><code>ark tenant</code></h2>
+<p>Manage tenant settings</p>
+<p><strong>Synopsis:</strong> <code>ark tenant</code></p>
+<h3><code>ark tenant policy</code></h3>
+<p>Manage tenant compute policies</p>
+<p><strong>Synopsis:</strong> <code>ark tenant policy</code></p>
+<h4><code>ark tenant policy set</code></h4>
+<p>Set compute policy for a tenant</p>
+<p><strong>Synopsis:</strong> <code>ark tenant policy set [options] &lt;tenant-id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>tenant-id</code></td>
+<td>yes</td>
+<td>Tenant ID</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--providers &lt;list&gt;</code></td>
+<td></td>
+<td>Comma-separated allowed providers (e.g. k8s,ec2)</td>
+</tr>
+<tr>
+<td><code>--default-provider &lt;provider&gt;</code></td>
+<td><code>&quot;k8s&quot;</code></td>
+<td>Default provider</td>
+</tr>
+<tr>
+<td><code>--max-sessions &lt;n&gt;</code></td>
+<td><code>&quot;10&quot;</code></td>
+<td>Maximum concurrent sessions</td>
+</tr>
+<tr>
+<td><code>--max-cost &lt;usd&gt;</code></td>
+<td></td>
+<td>Maximum daily cost in USD</td>
+</tr>
+</tbody></table>
+<h4><code>ark tenant policy get</code></h4>
+<p>Get compute policy for a tenant</p>
+<p><strong>Synopsis:</strong> <code>ark tenant policy get &lt;tenant-id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>tenant-id</code></td>
+<td>yes</td>
+<td>Tenant ID</td>
+</tr>
+</tbody></table>
+<h4><code>ark tenant policy list</code></h4>
+<p>List all tenant compute policies</p>
+<p><strong>Synopsis:</strong> <code>ark tenant policy list</code></p>
+<h4><code>ark tenant policy delete</code></h4>
+<p>Delete compute policy for a tenant</p>
+<p><strong>Synopsis:</strong> <code>ark tenant policy delete &lt;tenant-id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>tenant-id</code></td>
+<td>yes</td>
+<td>Tenant ID</td>
+</tr>
+</tbody></table>
+<h3><code>ark tenant list</code></h3>
+<p>List all tenants</p>
+<p><strong>Synopsis:</strong> <code>ark tenant list [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--json</code></td>
+<td></td>
+<td>Output raw JSON</td>
+</tr>
+</tbody></table>
+<h3><code>ark tenant create</code></h3>
+<p>Create a new tenant</p>
+<p><strong>Synopsis:</strong> <code>ark tenant create [options] &lt;slug&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>slug</code></td>
+<td>yes</td>
+<td>Kebab-case slug (unique)</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--name &lt;name&gt;</code></td>
+<td></td>
+<td>Human-readable name (defaults to slug)</td>
+</tr>
+<tr>
+<td><code>--json</code></td>
+<td></td>
+<td>Output raw JSON</td>
+</tr>
+</tbody></table>
+<h3><code>ark tenant update</code></h3>
+<p>Update a tenant&#39;s slug / name / status</p>
+<p><strong>Synopsis:</strong> <code>ark tenant update [options] &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td>Tenant id or slug</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--slug &lt;slug&gt;</code></td>
+<td></td>
+<td>New slug</td>
+</tr>
+<tr>
+<td><code>--name &lt;name&gt;</code></td>
+<td></td>
+<td>New name</td>
+</tr>
+<tr>
+<td><code>--status &lt;status&gt;</code></td>
+<td></td>
+<td>active</td>
+</tr>
+</tbody></table>
+<h3><code>ark tenant delete</code></h3>
+<p>Delete a tenant (cascades teams + memberships, leaves sessions/computes behind)</p>
+<p><strong>Synopsis:</strong> <code>ark tenant delete &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td>Tenant id or slug</td>
+</tr>
+</tbody></table>
+<h3><code>ark tenant suspend</code></h3>
+<p>Set tenant status to &#39;suspended&#39;</p>
+<p><strong>Synopsis:</strong> <code>ark tenant suspend &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td>Tenant id or slug</td>
+</tr>
+</tbody></table>
+<h3><code>ark tenant resume</code></h3>
+<p>Set tenant status to &#39;active&#39;</p>
+<p><strong>Synopsis:</strong> <code>ark tenant resume &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td>Tenant id or slug</td>
+</tr>
+</tbody></table>
+<h3><code>ark tenant auth</code></h3>
+<p>Manage per-tenant Claude credential bindings</p>
+<p><strong>Synopsis:</strong> <code>ark tenant auth</code></p>
+<h4><code>ark tenant auth set</code></h4>
+<p>Bind a tenant to a Claude credential (api-key secret OR subscription-blob).</p>
+<p><strong>Synopsis:</strong> <code>ark tenant auth set [options] &lt;tenant-id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>tenant-id</code></td>
+<td>yes</td>
+<td>Tenant ID (or slug)</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--api-key &lt;name&gt;</code></td>
+<td></td>
+<td>Bind to a string secret storing ANTHROPIC_API_KEY</td>
+</tr>
+<tr>
+<td><code>--subscription-blob &lt;name&gt;</code></td>
+<td></td>
+<td>Bind to a blob secret (the ~/.claude directory)</td>
+</tr>
+</tbody></table>
+<h4><code>ark tenant auth show</code></h4>
+<p>Show the current Claude credential binding for a tenant.</p>
+<p><strong>Synopsis:</strong> <code>ark tenant auth show &lt;tenant-id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>tenant-id</code></td>
+<td>yes</td>
+<td>Tenant ID (or slug)</td>
+</tr>
+</tbody></table>
+<h4><code>ark tenant auth clear</code></h4>
+<p>Remove the Claude credential binding for a tenant.</p>
+<p><strong>Synopsis:</strong> <code>ark tenant auth clear &lt;tenant-id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>tenant-id</code></td>
+<td>yes</td>
+<td>Tenant ID (or slug)</td>
+</tr>
+</tbody></table>
+<h3><code>ark tenant config</code></h3>
+<p>Manage per-tenant configuration blobs</p>
+<p><strong>Synopsis:</strong> <code>ark tenant config</code></p>
+<h4><code>ark tenant config set-compute</code></h4>
+<p>Write the compute-config YAML blob for a tenant (cluster overrides)</p>
+<p><strong>Synopsis:</strong> <code>ark tenant config set-compute [options] &lt;tenantId&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>tenantId</code></td>
+<td>yes</td>
+<td>Tenant ID</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-f, --file &lt;path&gt;</code></td>
+<td></td>
+<td>Path to YAML file with cluster overrides</td>
+</tr>
+</tbody></table>
+<h4><code>ark tenant config get-compute</code></h4>
+<p>Fetch the compute-config YAML blob for a tenant</p>
+<p><strong>Synopsis:</strong> <code>ark tenant config get-compute &lt;tenantId&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>tenantId</code></td>
+<td>yes</td>
+<td>Tenant ID</td>
+</tr>
+</tbody></table>
+<h4><code>ark tenant config clear-compute</code></h4>
+<p>Clear the compute-config YAML blob for a tenant</p>
+<p><strong>Synopsis:</strong> <code>ark tenant config clear-compute &lt;tenantId&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>tenantId</code></td>
+<td>yes</td>
+<td>Tenant ID</td>
+</tr>
+</tbody></table>
+<h2><code>ark team</code></h2>
+<p>Manage teams + memberships</p>
+<p><strong>Synopsis:</strong> <code>ark team</code></p>
+<h3><code>ark team list</code></h3>
+<p>List teams in a tenant</p>
+<p><strong>Synopsis:</strong> <code>ark team list [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--tenant &lt;id&gt;</code></td>
+<td></td>
+<td>Tenant id or slug <em>(required)</em></td>
+</tr>
+<tr>
+<td><code>--json</code></td>
+<td></td>
+<td>Output raw JSON</td>
+</tr>
+</tbody></table>
+<h3><code>ark team create</code></h3>
+<p>Create a team inside a tenant</p>
+<p><strong>Synopsis:</strong> <code>ark team create [options] &lt;slug&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>slug</code></td>
+<td>yes</td>
+<td>Kebab-case slug (unique within tenant)</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--tenant &lt;id&gt;</code></td>
+<td></td>
+<td>Tenant id or slug <em>(required)</em></td>
+</tr>
+<tr>
+<td><code>--name &lt;name&gt;</code></td>
+<td></td>
+<td>Human-readable name (defaults to slug)</td>
+</tr>
+<tr>
+<td><code>--description &lt;text&gt;</code></td>
+<td></td>
+<td>Description</td>
+</tr>
+<tr>
+<td><code>--json</code></td>
+<td></td>
+<td>Output raw JSON</td>
+</tr>
+</tbody></table>
+<h3><code>ark team update</code></h3>
+<p>Update a team&#39;s slug / name / description</p>
+<p><strong>Synopsis:</strong> <code>ark team update [options] &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td>Team id</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--slug &lt;slug&gt;</code></td>
+<td></td>
+<td>New slug</td>
+</tr>
+<tr>
+<td><code>--name &lt;name&gt;</code></td>
+<td></td>
+<td>New name</td>
+</tr>
+<tr>
+<td><code>--description &lt;text&gt;</code></td>
+<td></td>
+<td>New description</td>
+</tr>
+</tbody></table>
+<h3><code>ark team delete</code></h3>
+<p>Delete a team (cascades memberships)</p>
+<p><strong>Synopsis:</strong> <code>ark team delete &lt;id&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>yes</td>
+<td>Team id</td>
+</tr>
+</tbody></table>
+<h3><code>ark team members</code></h3>
+<p>Manage team memberships</p>
+<p><strong>Synopsis:</strong> <code>ark team members</code></p>
+<h4><code>ark team members list</code></h4>
+<p>List members of a team</p>
+<p><strong>Synopsis:</strong> <code>ark team members list [options] &lt;team&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>team</code></td>
+<td>yes</td>
+<td>Team id</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--json</code></td>
+<td></td>
+<td>Output raw JSON</td>
+</tr>
+</tbody></table>
+<h4><code>ark team members add</code></h4>
+<p>Add a user to a team (creates the user if email is new)</p>
+<p><strong>Synopsis:</strong> <code>ark team members add [options] &lt;team&gt; &lt;userEmail&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>team</code></td>
+<td>yes</td>
+<td>Team id</td>
+</tr>
+<tr>
+<td><code>userEmail</code></td>
+<td>yes</td>
+<td>User email</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--role &lt;role&gt;</code></td>
+<td><code>&quot;member&quot;</code></td>
+<td>owner</td>
+</tr>
+</tbody></table>
+<h4><code>ark team members remove</code></h4>
+<p>Remove a user from a team</p>
+<p><strong>Synopsis:</strong> <code>ark team members remove &lt;team&gt; &lt;userEmail&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>team</code></td>
+<td>yes</td>
+<td>Team id</td>
+</tr>
+<tr>
+<td><code>userEmail</code></td>
+<td>yes</td>
+<td>User email</td>
+</tr>
+</tbody></table>
+<h4><code>ark team members set-role</code></h4>
+<p>Change a member&#39;s role</p>
+<p><strong>Synopsis:</strong> <code>ark team members set-role &lt;team&gt; &lt;userEmail&gt; &lt;role&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>team</code></td>
+<td>yes</td>
+<td>Team id</td>
+</tr>
+<tr>
+<td><code>userEmail</code></td>
+<td>yes</td>
+<td>User email</td>
+</tr>
+<tr>
+<td><code>role</code></td>
+<td>yes</td>
+<td>owner</td>
+</tr>
+</tbody></table>
+<h2><code>ark user</code></h2>
+<p>Manage user identities</p>
+<p><strong>Synopsis:</strong> <code>ark user</code></p>
+<h3><code>ark user list</code></h3>
+<p>List users</p>
+<p><strong>Synopsis:</strong> <code>ark user list [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--json</code></td>
+<td></td>
+<td>Output raw JSON</td>
+</tr>
+</tbody></table>
+<h3><code>ark user get</code></h3>
+<p>Show a user by id or email</p>
+<p><strong>Synopsis:</strong> <code>ark user get [options] &lt;idOrEmail&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>idOrEmail</code></td>
+<td>yes</td>
+<td>User id or email</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--json</code></td>
+<td></td>
+<td>Output raw JSON</td>
+</tr>
+</tbody></table>
+<h3><code>ark user create</code></h3>
+<p>Create a user</p>
+<p><strong>Synopsis:</strong> <code>ark user create [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--email &lt;email&gt;</code></td>
+<td></td>
+<td>User email (unique) <em>(required)</em></td>
+</tr>
+<tr>
+<td><code>--name &lt;name&gt;</code></td>
+<td></td>
+<td>Display name</td>
+</tr>
+<tr>
+<td><code>--json</code></td>
+<td></td>
+<td>Output raw JSON</td>
+</tr>
+</tbody></table>
+<h3><code>ark user delete</code></h3>
+<p>Delete a user (cascades memberships)</p>
+<p><strong>Synopsis:</strong> <code>ark user delete &lt;idOrEmail&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>idOrEmail</code></td>
+<td>yes</td>
+<td>User id or email</td>
+</tr>
+</tbody></table>
+<h2><code>ark knowledge</code></h2>
+<p>Knowledge graph - search, index, remember, export</p>
+<p><strong>Synopsis:</strong> <code>ark knowledge</code></p>
+<h3><code>ark knowledge search</code></h3>
+<p>Search across all knowledge (files, memories, sessions, learnings)</p>
+<p><strong>Synopsis:</strong> <code>ark knowledge search [options] &lt;query&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>query</code></td>
+<td>yes</td>
+<td>Search query</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-t, --types &lt;types&gt;</code></td>
+<td></td>
+<td>Comma-separated node types to filter (file,symbol,session,memory,learning,skill)</td>
+</tr>
+<tr>
+<td><code>-n, --limit &lt;n&gt;</code></td>
+<td><code>&quot;20&quot;</code></td>
+<td>Max results</td>
+</tr>
+</tbody></table>
+<h3><code>ark knowledge index</code></h3>
+<p>Index/re-index codebase into the knowledge graph (runs on daemon)</p>
+<p><strong>Synopsis:</strong> <code>ark knowledge index [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-r, --repo &lt;path&gt;</code></td>
+<td></td>
+<td>Repository path (default: cwd)</td>
+</tr>
+<tr>
+<td><code>--incremental</code></td>
+<td></td>
+<td>Only re-index changed files</td>
+</tr>
+</tbody></table>
+<h3><code>ark knowledge stats</code></h3>
+<p>Show node/edge counts by type</p>
+<p><strong>Synopsis:</strong> <code>ark knowledge stats</code></p>
+<h3><code>ark knowledge remember</code></h3>
+<p>Store a new memory in the knowledge graph</p>
+<p><strong>Synopsis:</strong> <code>ark knowledge remember [options] &lt;content&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>content</code></td>
+<td>yes</td>
+<td>Memory content</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-t, --tags &lt;tags&gt;</code></td>
+<td></td>
+<td>Comma-separated tags</td>
+</tr>
+<tr>
+<td><code>-i, --importance &lt;n&gt;</code></td>
+<td></td>
+<td>Importance 0-1 (default: 0.5)</td>
+</tr>
+</tbody></table>
+<h3><code>ark knowledge recall</code></h3>
+<p>Search memories and learnings</p>
+<p><strong>Synopsis:</strong> <code>ark knowledge recall [options] &lt;query&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>query</code></td>
+<td>yes</td>
+<td>Search query</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-n, --limit &lt;n&gt;</code></td>
+<td><code>&quot;10&quot;</code></td>
+<td>Max results</td>
+</tr>
+</tbody></table>
+<h3><code>ark knowledge export</code></h3>
+<p>Export knowledge as markdown files (daemon-side filesystem)</p>
+<p><strong>Synopsis:</strong> <code>ark knowledge export [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-d, --dir &lt;path&gt;</code></td>
+<td><code>&quot;./knowledge-export&quot;</code></td>
+<td>Output directory</td>
+</tr>
+<tr>
+<td><code>-t, --types &lt;types&gt;</code></td>
+<td></td>
+<td>Comma-separated types to export (default: memory,learning)</td>
+</tr>
+</tbody></table>
+<h3><code>ark knowledge import</code></h3>
+<p>Import knowledge from markdown files (daemon-side filesystem)</p>
+<p><strong>Synopsis:</strong> <code>ark knowledge import [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-d, --dir &lt;path&gt;</code></td>
+<td><code>&quot;./knowledge-export&quot;</code></td>
+<td>Input directory</td>
+</tr>
+</tbody></table>
+<h3><code>ark knowledge ingest</code></h3>
+<p>Ingest a directory into the knowledge graph (indexes files and symbols)</p>
+<p><strong>Synopsis:</strong> <code>ark knowledge ingest [options] &lt;path&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>path</code></td>
+<td>yes</td>
+<td>Directory to ingest</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--incremental</code></td>
+<td></td>
+<td>Only re-index changed files</td>
+</tr>
+</tbody></table>
+<h3><code>ark knowledge codebase</code></h3>
+<p>codebase-memory-mcp (vendored code intelligence engine)</p>
+<p><strong>Synopsis:</strong> <code>ark knowledge codebase</code></p>
+<h4><code>ark knowledge codebase status</code></h4>
+<p>Show codebase-memory-mcp installation status and version</p>
+<p><strong>Synopsis:</strong> <code>ark knowledge codebase status</code></p>
+<h4><code>ark knowledge codebase tools</code></h4>
+<p>List the 14 MCP tools exposed by codebase-memory-mcp</p>
+<p><strong>Synopsis:</strong> <code>ark knowledge codebase tools</code></p>
+<h4><code>ark knowledge codebase reindex</code></h4>
+<p>Run <code>index_repository</code> against a path via the caller&#39;s vendored binary</p>
+<p><strong>Synopsis:</strong> <code>ark knowledge codebase reindex [path]</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>path</code></td>
+<td>no</td>
+<td>Repository path (default: cwd)</td>
+</tr>
+</tbody></table>
+<h2><code>ark code-intel</code></h2>
+<p>Unified code-intelligence store (search, index, repos, runs)</p>
+<p><strong>Synopsis:</strong> <code>ark code-intel</code></p>
+<h3><code>ark code-intel db</code></h3>
+<p>Schema migrations + status</p>
+<p><strong>Synopsis:</strong> <code>ark code-intel db</code></p>
+<h4><code>ark code-intel db migrate</code></h4>
+<p>Apply any pending code-intel migrations</p>
+<p><strong>Synopsis:</strong> <code>ark code-intel db migrate [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--to &lt;version&gt;</code></td>
+<td></td>
+<td>Target version (default: latest)</td>
+</tr>
+</tbody></table>
+<h4><code>ark code-intel db status</code></h4>
+<p>Print current schema version + pending migrations</p>
+<p><strong>Synopsis:</strong> <code>ark code-intel db status</code></p>
+<h4><code>ark code-intel db reset</code></h4>
+<p>Drop every code-intel table (DEV ONLY).</p>
+<p><strong>Synopsis:</strong> <code>ark code-intel db reset [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--yes</code></td>
+<td></td>
+<td>Confirm destructive operation</td>
+</tr>
+</tbody></table>
+<h3><code>ark code-intel repo</code></h3>
+<p>Manage indexed repositories</p>
+<p><strong>Synopsis:</strong> <code>ark code-intel repo</code></p>
+<h4><code>ark code-intel repo add</code></h4>
+<p>Register a repo for indexing</p>
+<p><strong>Synopsis:</strong> <code>ark code-intel repo add [options] &lt;url-or-path&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>url-or-path</code></td>
+<td>yes</td>
+<td>Repo URL or local path</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--tenant &lt;slug&gt;</code></td>
+<td></td>
+<td>Tenant slug (default: caller&#39;s tenant)</td>
+</tr>
+<tr>
+<td><code>--name &lt;name&gt;</code></td>
+<td></td>
+<td>Display name (default: derived)</td>
+</tr>
+<tr>
+<td><code>--default-branch &lt;branch&gt;</code></td>
+<td><code>&quot;main&quot;</code></td>
+<td>Default branch</td>
+</tr>
+</tbody></table>
+<h4><code>ark code-intel repo list</code></h4>
+<p>List repos for a tenant</p>
+<p><strong>Synopsis:</strong> <code>ark code-intel repo list [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--tenant &lt;slug&gt;</code></td>
+<td></td>
+<td>Tenant slug (default: caller&#39;s tenant)</td>
+</tr>
+</tbody></table>
+<h3><code>ark code-intel reindex</code></h3>
+<p>Run extractors against a repo</p>
+<p><strong>Synopsis:</strong> <code>ark code-intel reindex [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--tenant &lt;slug&gt;</code></td>
+<td></td>
+<td>Tenant slug (default: caller&#39;s tenant)</td>
+</tr>
+<tr>
+<td><code>--repo &lt;id-or-name&gt;</code></td>
+<td></td>
+<td>Repo id or name (default: only one if unambiguous)</td>
+</tr>
+<tr>
+<td><code>--extractors &lt;names&gt;</code></td>
+<td></td>
+<td>Comma-separated extractor names (default: all)</td>
+</tr>
+</tbody></table>
+<h3><code>ark code-intel search</code></h3>
+<p>FTS over chunks (file content + symbols)</p>
+<p><strong>Synopsis:</strong> <code>ark code-intel search [options] &lt;query&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>query</code></td>
+<td>yes</td>
+<td>Search query</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--tenant &lt;slug&gt;</code></td>
+<td></td>
+<td>Tenant slug (default: caller&#39;s tenant)</td>
+</tr>
+<tr>
+<td><code>-n, --limit &lt;n&gt;</code></td>
+<td><code>&quot;20&quot;</code></td>
+<td>Max results</td>
+</tr>
+</tbody></table>
+<h3><code>ark code-intel get-context</code></h3>
+<p>Assemble a context snapshot for a file or symbol</p>
+<p><strong>Synopsis:</strong> <code>ark code-intel get-context [options] &lt;subject&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>subject</code></td>
+<td>yes</td>
+<td>File path, file id, or symbol name</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--tenant &lt;slug&gt;</code></td>
+<td></td>
+<td>Tenant slug (default: caller&#39;s tenant)</td>
+</tr>
+<tr>
+<td><code>--repo &lt;id-or-name&gt;</code></td>
+<td></td>
+<td>Repo id or name (helps path lookup)</td>
+</tr>
+</tbody></table>
+<h3><code>ark code-intel doctor</code></h3>
+<p>Report VendorResolver + binary health (caller-local)</p>
+<p><strong>Synopsis:</strong> <code>ark code-intel doctor</code></p>
+<h3><code>ark code-intel health</code></h3>
+<p>High-level store + deployment health</p>
+<p><strong>Synopsis:</strong> <code>ark code-intel health</code></p>
+<h2><code>ark workspace</code></h2>
+<p>Manage workspaces (tenant -&gt; workspace -&gt; repo)</p>
+<p><strong>Synopsis:</strong> <code>ark workspace</code></p>
+<h3><code>ark workspace create</code></h3>
+<p>Create a new workspace</p>
+<p><strong>Synopsis:</strong> <code>ark workspace create [options] &lt;slug&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>slug</code></td>
+<td>yes</td>
+<td>Workspace slug (unique per tenant)</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--tenant &lt;slug&gt;</code></td>
+<td></td>
+<td>Tenant slug (default: caller&#39;s tenant)</td>
+</tr>
+<tr>
+<td><code>--name &lt;name&gt;</code></td>
+<td></td>
+<td>Display name (default: derived from slug)</td>
+</tr>
+<tr>
+<td><code>--description &lt;text&gt;</code></td>
+<td></td>
+<td>Free-form description</td>
+</tr>
+</tbody></table>
+<h3><code>ark workspace list</code></h3>
+<p>List workspaces for a tenant</p>
+<p><strong>Synopsis:</strong> <code>ark workspace list [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--tenant &lt;slug&gt;</code></td>
+<td></td>
+<td>Tenant slug (default: caller&#39;s tenant)</td>
+</tr>
+<tr>
+<td><code>--format &lt;fmt&gt;</code></td>
+<td><code>&quot;text&quot;</code></td>
+<td>Output format: yaml</td>
+</tr>
+</tbody></table>
+<h3><code>ark workspace show</code></h3>
+<p>Show a workspace + attached repos</p>
+<p><strong>Synopsis:</strong> <code>ark workspace show [options] &lt;slug&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>slug</code></td>
+<td>yes</td>
+<td>Workspace slug</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--tenant &lt;slug&gt;</code></td>
+<td></td>
+<td>Tenant slug (default: caller&#39;s tenant)</td>
+</tr>
+<tr>
+<td><code>--format &lt;fmt&gt;</code></td>
+<td><code>&quot;text&quot;</code></td>
+<td>Output format: yaml</td>
+</tr>
+</tbody></table>
+<h3><code>ark workspace use</code></h3>
+<p>Set the active workspace (persisted to the caller&#39;s ~/.ark/config.yaml)</p>
+<p><strong>Synopsis:</strong> <code>ark workspace use [options] &lt;slug&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>slug</code></td>
+<td>yes</td>
+<td>Workspace slug</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--tenant &lt;slug&gt;</code></td>
+<td></td>
+<td>Tenant slug (default: caller&#39;s tenant)</td>
+</tr>
+</tbody></table>
+<h3><code>ark workspace add-repo</code></h3>
+<p>Attach a repo to a workspace (creates the repo if it&#39;s a new path/URL)</p>
+<p><strong>Synopsis:</strong> <code>ark workspace add-repo [options] &lt;workspace-slug&gt; &lt;repo-path-or-url&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>workspace-slug</code></td>
+<td>yes</td>
+<td>Workspace slug</td>
+</tr>
+<tr>
+<td><code>repo-path-or-url</code></td>
+<td>yes</td>
+<td>Repo path, URL, or existing repo id / name</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--tenant &lt;slug&gt;</code></td>
+<td></td>
+<td>Tenant slug (default: caller&#39;s tenant)</td>
+</tr>
+</tbody></table>
+<h3><code>ark workspace remove-repo</code></h3>
+<p>Detach a repo from a workspace (repo itself is not deleted)</p>
+<p><strong>Synopsis:</strong> <code>ark workspace remove-repo [options] &lt;workspace-slug&gt; &lt;repo&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>workspace-slug</code></td>
+<td>yes</td>
+<td>Workspace slug</td>
+</tr>
+<tr>
+<td><code>repo</code></td>
+<td>yes</td>
+<td>Repo id, name, or URL</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--tenant &lt;slug&gt;</code></td>
+<td></td>
+<td>Tenant slug (default: caller&#39;s tenant)</td>
+</tr>
+</tbody></table>
+<h2><code>ark eval</code></h2>
+<p>Agent performance evaluation</p>
+<p><strong>Synopsis:</strong> <code>ark eval</code></p>
+<h3><code>ark eval stats</code></h3>
+<p>Show agent performance stats</p>
+<p><strong>Synopsis:</strong> <code>ark eval stats [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-a, --agent &lt;role&gt;</code></td>
+<td></td>
+<td>Agent role to filter by</td>
+</tr>
+</tbody></table>
+<h3><code>ark eval drift</code></h3>
+<p>Check for performance drift</p>
+<p><strong>Synopsis:</strong> <code>ark eval drift [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-a, --agent &lt;role&gt;</code></td>
+<td></td>
+<td>Agent role to check</td>
+</tr>
+<tr>
+<td><code>-d, --days &lt;n&gt;</code></td>
+<td><code>&quot;7&quot;</code></td>
+<td>Recent window in days</td>
+</tr>
+</tbody></table>
+<h3><code>ark eval list</code></h3>
+<p>List recent eval results</p>
+<p><strong>Synopsis:</strong> <code>ark eval list [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-a, --agent &lt;role&gt;</code></td>
+<td></td>
+<td>Agent role to filter by</td>
+</tr>
+<tr>
+<td><code>-n, --limit &lt;n&gt;</code></td>
+<td><code>&quot;20&quot;</code></td>
+<td>Max results</td>
+</tr>
+</tbody></table>
+<h2><code>ark dashboard</code></h2>
+<p>Show fleet status, costs, and recent activity</p>
+<p><strong>Synopsis:</strong> <code>ark dashboard [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--json</code></td>
+<td></td>
+<td>Output as JSON</td>
+</tr>
+</tbody></table>
+<h2><code>ark costs</code></h2>
+<p>Show cost summary across sessions</p>
+<p><strong>Synopsis:</strong> <code>ark costs [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-n, --limit &lt;n&gt;</code></td>
+<td><code>&quot;20&quot;</code></td>
+<td>Number of rows to show</td>
+</tr>
+<tr>
+<td><code>--by &lt;dimension&gt;</code></td>
+<td></td>
+<td>Group by: model, provider, runtime, agent, session, tenant, user</td>
+</tr>
+<tr>
+<td><code>--trend</code></td>
+<td></td>
+<td>Show daily cost trend</td>
+</tr>
+<tr>
+<td><code>--days &lt;n&gt;</code></td>
+<td></td>
+<td>Days for trend (default 30)</td>
+</tr>
+<tr>
+<td><code>--since &lt;date&gt;</code></td>
+<td></td>
+<td>Start date (ISO format)</td>
+</tr>
+<tr>
+<td><code>--until &lt;date&gt;</code></td>
+<td></td>
+<td>End date (ISO format)</td>
+</tr>
+<tr>
+<td><code>--tenant &lt;id&gt;</code></td>
+<td></td>
+<td>Filter by tenant</td>
+</tr>
+</tbody></table>
+<h2><code>ark costs-sync</code></h2>
+<p>Backfill cost data from transcripts (on the daemon host)</p>
+<p><strong>Synopsis:</strong> <code>ark costs-sync</code></p>
+<h2><code>ark costs-export</code></h2>
+<p>Export cost data</p>
+<p><strong>Synopsis:</strong> <code>ark costs-export [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--format &lt;format&gt;</code></td>
+<td><code>&quot;json&quot;</code></td>
+<td>csv or json</td>
+</tr>
+<tr>
+<td><code>-o, --output &lt;file&gt;</code></td>
+<td></td>
+<td>Output file</td>
+</tr>
+</tbody></table>
+<h2><code>ark server</code></h2>
+<p>JSON-RPC server</p>
+<p><strong>Synopsis:</strong> <code>ark server</code></p>
+<h3><code>ark server daemon</code></h3>
+<p>Manage the Ark server daemon</p>
+<p><strong>Synopsis:</strong> <code>ark server daemon</code></p>
+<h4><code>ark server daemon start</code></h4>
+<p>Start the Ark server daemon (AppContext + conductor + arkd + WebSocket)</p>
+<p><strong>Synopsis:</strong> <code>ark server daemon start [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-p, --port &lt;port&gt;</code></td>
+<td><code>&quot;19400&quot;</code></td>
+<td>WebSocket server port</td>
+</tr>
+<tr>
+<td><code>-d, --detach</code></td>
+<td></td>
+<td>Run in background (detached mode)</td>
+</tr>
+</tbody></table>
+<h4><code>ark server daemon stop</code></h4>
+<p>Stop the server daemon</p>
+<p><strong>Synopsis:</strong> <code>ark server daemon stop</code></p>
+<h4><code>ark server daemon status</code></h4>
+<p>Check server daemon status</p>
+<p><strong>Synopsis:</strong> <code>ark server daemon status</code></p>
+<h3><code>ark server start</code></h3>
+<p>Start the Ark server</p>
+<p><strong>Synopsis:</strong> <code>ark server start [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--stdio</code></td>
+<td></td>
+<td>Use stdio transport (JSONL)</td>
+</tr>
+<tr>
+<td><code>--ws</code></td>
+<td></td>
+<td>Use WebSocket transport</td>
+</tr>
+<tr>
+<td><code>--hosted</code></td>
+<td></td>
+<td>Start as hosted multi-tenant control plane</td>
+</tr>
+<tr>
+<td><code>-p, --port &lt;port&gt;</code></td>
+<td><code>&quot;19400&quot;</code></td>
+<td>WebSocket port</td>
+</tr>
+</tbody></table>
+<h2><code>ark exec</code></h2>
+<p>Run a session non-interactively (for CI/CD)</p>
+<p><strong>Synopsis:</strong> <code>ark exec [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-r, --repo &lt;path&gt;</code></td>
+<td></td>
+<td>Repository path</td>
+</tr>
+<tr>
+<td><code>-s, --summary &lt;text&gt;</code></td>
+<td></td>
+<td>Task summary</td>
+</tr>
+<tr>
+<td><code>-t, --ticket &lt;key&gt;</code></td>
+<td></td>
+<td>Ticket reference</td>
+</tr>
+<tr>
+<td><code>-f, --flow &lt;name&gt;</code></td>
+<td><code>&quot;bare&quot;</code></td>
+<td>Flow name</td>
+</tr>
+<tr>
+<td><code>-c, --compute &lt;name&gt;</code></td>
+<td></td>
+<td>Compute target</td>
+</tr>
+<tr>
+<td><code>-g, --group &lt;name&gt;</code></td>
+<td></td>
+<td>Group name</td>
+</tr>
+<tr>
+<td><code>-a, --autonomy &lt;level&gt;</code></td>
+<td></td>
+<td>Autonomy: full/execute/edit/read-only</td>
+</tr>
+<tr>
+<td><code>-o, --output &lt;format&gt;</code></td>
+<td><code>&quot;text&quot;</code></td>
+<td>Output: text/json</td>
+</tr>
+<tr>
+<td><code>-w, --workspace &lt;slug&gt;</code></td>
+<td></td>
+<td>Workspace slug for multi-repo dispatch (Wave 2b-1: LOCAL compute only). Combine with --repo to set a primary.</td>
+</tr>
+<tr>
+<td><code>-i, --input &lt;pair&gt;</code></td>
+<td><code>[]</code></td>
+<td>Session input file as role=path (repeatable). Accessible to flows/agents as {inputs.files.<role>}.</td>
+</tr>
+<tr>
+<td><code>-p, --param &lt;pair&gt;</code></td>
+<td><code>[]</code></td>
+<td>Session input param as key=value (repeatable). Accessible as {inputs.params.<key>}.</td>
+</tr>
+<tr>
+<td><code>--timeout &lt;seconds&gt;</code></td>
+<td><code>&quot;0&quot;</code></td>
+<td>Timeout in seconds (0=unlimited)</td>
+</tr>
+</tbody></table>
+<h2><code>ark try</code></h2>
+<p>Run a one-shot sandboxed session (auto-cleans up)</p>
+<p><strong>Synopsis:</strong> <code>ark try [options] &lt;task&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>task</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--image &lt;image&gt;</code></td>
+<td><code>&quot;ubuntu:22.04&quot;</code></td>
+<td>Docker image</td>
+</tr>
+</tbody></table>
+<h2><code>ark daemon</code></h2>
+<p>Manage the arkd agent daemon</p>
+<p><strong>Synopsis:</strong> <code>ark daemon</code></p>
+<h3><code>ark daemon start</code></h3>
+<p>Start the arkd agent daemon</p>
+<p><strong>Synopsis:</strong> <code>ark daemon start [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-p, --port &lt;port&gt;</code></td>
+<td><code>&quot;19300&quot;</code></td>
+<td>Port</td>
+</tr>
+<tr>
+<td><code>--hostname &lt;host&gt;</code></td>
+<td><code>&quot;0.0.0.0&quot;</code></td>
+<td>Bind address</td>
+</tr>
+<tr>
+<td><code>--conductor-url &lt;url&gt;</code></td>
+<td></td>
+<td>Conductor URL for channel relay</td>
+</tr>
+<tr>
+<td><code>--workspace-root &lt;path&gt;</code></td>
+<td></td>
+<td>Confine /file/* and /exec to this directory (recommended in hosted / multi-tenant deployments)</td>
+</tr>
+<tr>
+<td><code>-d, --detach</code></td>
+<td></td>
+<td>Run in background (detached mode)</td>
+</tr>
+</tbody></table>
+<h3><code>ark daemon stop</code></h3>
+<p>Stop a running daemon</p>
+<p><strong>Synopsis:</strong> <code>ark daemon stop [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-p, --port &lt;port&gt;</code></td>
+<td></td>
+<td>Port of daemon to stop (uses PID file by default)</td>
+</tr>
+</tbody></table>
+<h3><code>ark daemon status</code></h3>
+<p>Check daemon status</p>
+<p><strong>Synopsis:</strong> <code>ark daemon status [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-p, --port &lt;port&gt;</code></td>
+<td><code>&quot;19300&quot;</code></td>
+<td>Port to check</td>
+</tr>
+</tbody></table>
+<h2><code>ark pr</code></h2>
+<p>Manage PR-bound sessions</p>
+<p><strong>Synopsis:</strong> <code>ark pr</code></p>
+<h3><code>ark pr list</code></h3>
+<p>List sessions bound to PRs</p>
+<p><strong>Synopsis:</strong> <code>ark pr list</code></p>
+<h3><code>ark pr status</code></h3>
+<p>Show session bound to a PR URL</p>
+<p><strong>Synopsis:</strong> <code>ark pr status &lt;pr-url&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>pr-url</code></td>
+<td>yes</td>
+<td>GitHub PR URL</td>
+</tr>
+</tbody></table>
+<h2><code>ark watch</code></h2>
+<p>Watch GitHub issues with a label and auto-create sessions</p>
+<p><strong>Synopsis:</strong> <code>ark watch [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-l, --label &lt;label&gt;</code></td>
+<td><code>&quot;ark&quot;</code></td>
+<td>GitHub label to watch</td>
+</tr>
+<tr>
+<td><code>-d, --dispatch</code></td>
+<td></td>
+<td>Auto-dispatch created sessions</td>
+</tr>
+<tr>
+<td><code>-i, --interval &lt;ms&gt;</code></td>
+<td><code>&quot;60000&quot;</code></td>
+<td>Poll interval in ms</td>
+</tr>
+</tbody></table>
+<h2><code>ark claude</code></h2>
+<p>Interact with Claude Code sessions</p>
+<p><strong>Synopsis:</strong> <code>ark claude</code></p>
+<h3><code>ark claude list</code></h3>
+<p>List Claude Code sessions found on disk</p>
+<p><strong>Synopsis:</strong> <code>ark claude list [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-p, --project &lt;filter&gt;</code></td>
+<td></td>
+<td>Filter by project path</td>
+</tr>
+<tr>
+<td><code>-l, --limit &lt;n&gt;</code></td>
+<td><code>&quot;20&quot;</code></td>
+<td>Max results</td>
+</tr>
+</tbody></table>
+<h2><code>ark doctor</code></h2>
+<p>Check system prerequisites</p>
+<p><strong>Synopsis:</strong> <code>ark doctor</code></p>
+<h2><code>ark arkd</code></h2>
+<p>Start the arkd agent daemon</p>
+<p><strong>Synopsis:</strong> <code>ark arkd [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-p, --port &lt;port&gt;</code></td>
+<td><code>&quot;19300&quot;</code></td>
+<td>Port</td>
+</tr>
+<tr>
+<td><code>--hostname &lt;host&gt;</code></td>
+<td><code>&quot;0.0.0.0&quot;</code></td>
+<td>Bind address (default: 0.0.0.0)</td>
+</tr>
+<tr>
+<td><code>--conductor-url &lt;url&gt;</code></td>
+<td></td>
+<td>Conductor URL for channel relay</td>
+</tr>
+</tbody></table>
+<h2><code>ark channel</code></h2>
+<p>Run the MCP channel server (used by remote agents)</p>
+<p><strong>Synopsis:</strong> <code>ark channel</code></p>
+<h2><code>ark run-agent-sdk</code></h2>
+<p>Run the agent-sdk launch script (internal -- used by agent-sdk executor)</p>
+<p><strong>Synopsis:</strong> <code>ark run-agent-sdk</code></p>
+<h2><code>ark config</code></h2>
+<p>Open Ark config in your editor</p>
+<p><strong>Synopsis:</strong> <code>ark config [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--path</code></td>
+<td></td>
+<td>Just print the config path</td>
+</tr>
+</tbody></table>
+<h2><code>ark web</code></h2>
+<p>Start web dashboard</p>
+<p><strong>Synopsis:</strong> <code>ark web [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--port &lt;port&gt;</code></td>
+<td><code>&quot;8420&quot;</code></td>
+<td>Listen port</td>
+</tr>
+<tr>
+<td><code>--read-only</code></td>
+<td></td>
+<td>Read-only mode</td>
+</tr>
+<tr>
+<td><code>--token &lt;token&gt;</code></td>
+<td></td>
+<td>Bearer token for auth</td>
+</tr>
+<tr>
+<td><code>--api-only</code></td>
+<td></td>
+<td>API only, skip static file serving (for dev with Vite)</td>
+</tr>
+<tr>
+<td><code>--with-daemon</code></td>
+<td></td>
+<td>Also start conductor + arkd in-process (for desktop app / standalone use)</td>
+</tr>
+</tbody></table>
+<h2><code>ark openapi</code></h2>
+<p>Generate OpenAPI spec</p>
+<p><strong>Synopsis:</strong> <code>ark openapi</code></p>
+<h2><code>ark mcp-proxy</code></h2>
+<p>Bridge stdin/stdout to a pooled MCP socket (internal)</p>
+<p><strong>Synopsis:</strong> <code>ark mcp-proxy &lt;socket-path&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>socket-path</code></td>
+<td>yes</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2><code>ark acp</code></h2>
+<p>Start headless ACP server on stdin/stdout (JSON-RPC)</p>
+<p><strong>Synopsis:</strong> <code>ark acp</code></p>
+<h2><code>ark repo-map</code></h2>
+<p>Generate repository structure map</p>
+<p><strong>Synopsis:</strong> <code>ark repo-map [options] [dir]</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>dir</code></td>
+<td>no</td>
+<td>Directory to scan</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--max-files &lt;n&gt;</code></td>
+<td><code>&quot;500&quot;</code></td>
+<td>Max files to include</td>
+</tr>
+<tr>
+<td><code>--max-depth &lt;n&gt;</code></td>
+<td><code>&quot;10&quot;</code></td>
+<td>Max directory depth</td>
+</tr>
+<tr>
+<td><code>--json</code></td>
+<td></td>
+<td>Output as JSON instead of text</td>
+</tr>
+</tbody></table>
+<h2><code>ark init</code></h2>
+<p>Initialize Ark for this repository</p>
+<p><strong>Synopsis:</strong> <code>ark init</code></p>
+<h2><code>ark db</code></h2>
+<p>Schema migrations + status</p>
+<p><strong>Synopsis:</strong> <code>ark db</code></p>
+<h3><code>ark db migrate</code></h3>
+<p>Apply any pending Ark migrations</p>
+<p><strong>Synopsis:</strong> <code>ark db migrate [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--to &lt;version&gt;</code></td>
+<td></td>
+<td>Target version (default: latest)</td>
+</tr>
+</tbody></table>
+<h3><code>ark db status</code></h3>
+<p>Print current schema version + pending migrations</p>
+<p><strong>Synopsis:</strong> <code>ark db status</code></p>
+<h3><code>ark db down</code></h3>
+<p>Roll back to a target version (Phase 1: not implemented)</p>
+<p><strong>Synopsis:</strong> <code>ark db down [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--to &lt;version&gt;</code></td>
+<td></td>
+<td>Target version <em>(required)</em></td>
+</tr>
+</tbody></table>
+<h2><code>ark secrets</code></h2>
+<p>Manage tenant-scoped secrets (env vars for sessions)</p>
+<p><strong>Synopsis:</strong> <code>ark secrets</code></p>
+<h3><code>ark secrets list</code></h3>
+<p>List secret names (values are never returned)</p>
+<p><strong>Synopsis:</strong> <code>ark secrets list</code></p>
+<h3><code>ark secrets set</code></h3>
+<p>Create or replace a secret. Reads value from stdin if piped, otherwise prompts.</p>
+<p><strong>Synopsis:</strong> <code>ark secrets set [options] &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Secret name (ASCII [A-Z0-9_]+)</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-d, --description &lt;text&gt;</code></td>
+<td></td>
+<td>Human-readable description</td>
+</tr>
+</tbody></table>
+<h3><code>ark secrets delete</code></h3>
+<p>Delete a secret.</p>
+<p><strong>Synopsis:</strong> <code>ark secrets delete [options] &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Secret name</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-y, --yes</code></td>
+<td></td>
+<td>Skip the confirm prompt</td>
+</tr>
+</tbody></table>
+<h3><code>ark secrets blob</code></h3>
+<p>Manage multi-file secret blobs (directory-shaped secrets)</p>
+<p><strong>Synopsis:</strong> <code>ark secrets blob</code></p>
+<h4><code>ark secrets blob list</code></h4>
+<p>List blob names (contents are never returned)</p>
+<p><strong>Synopsis:</strong> <code>ark secrets blob list</code></p>
+<h4><code>ark secrets blob upload</code></h4>
+<p>Upload a directory as a named blob. Reads every file in <dir> (non-recursive).</p>
+<p><strong>Synopsis:</strong> <code>ark secrets blob upload &lt;name&gt; &lt;dir&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Blob name (lowercase kebab-case, &lt;=63 chars)</td>
+</tr>
+<tr>
+<td><code>dir</code></td>
+<td>yes</td>
+<td>Directory to upload</td>
+</tr>
+</tbody></table>
+<h4><code>ark secrets blob download</code></h4>
+<p>Download a blob into a directory. Creates the directory if missing.</p>
+<p><strong>Synopsis:</strong> <code>ark secrets blob download &lt;name&gt; &lt;dir&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Blob name</td>
+</tr>
+<tr>
+<td><code>dir</code></td>
+<td>yes</td>
+<td>Target directory</td>
+</tr>
+</tbody></table>
+<h4><code>ark secrets blob delete</code></h4>
+<p>Delete a blob.</p>
+<p><strong>Synopsis:</strong> <code>ark secrets blob delete [options] &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Blob name</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>-y, --yes</code></td>
+<td></td>
+<td>Skip the confirm prompt</td>
+</tr>
+</tbody></table>
+<h3><code>ark secrets get</code></h3>
+<p>Print a secret value to stdout. Refuses TTY stdout without --print.</p>
+<p><strong>Synopsis:</strong> <code>ark secrets get [options] &lt;name&gt;</code></p>
+<p><strong>Arguments:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>Secret name</td>
+</tr>
+</tbody></table>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--print</code></td>
+<td></td>
+<td>Allow printing to a TTY (default: refuse to prevent shoulder surfing)</td>
+</tr>
+</tbody></table>
+<h2><code>ark cluster</code></h2>
+<p>List Kubernetes clusters visible to this tenant</p>
+<p><strong>Synopsis:</strong> <code>ark cluster</code></p>
+<h3><code>ark cluster list</code></h3>
+<p>List effective clusters (system + tenant overrides)</p>
+<p><strong>Synopsis:</strong> <code>ark cluster list [options]</code></p>
+<p><strong>Options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--json</code></td>
+<td></td>
+<td>Output raw JSON</td>
+</tr>
+</tbody></table>
+
+    </main>
+  </div>
+</body>
+</html>

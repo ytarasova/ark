@@ -19,6 +19,15 @@ secrets:
 #             concrete provider slug for the gateway -- launch.ts never
 #             synthesises one.
 compat: [bedrock]
+# Optional: override the bundled claude binary's default haiku model id used
+# by built-in subagents (Explore etc.). Built-in subagents cannot be
+# reconfigured via the SDK's `agents` option per the SDK docs, but the
+# bundled binary honours ANTHROPIC_DEFAULT_HAIKU_MODEL. Set this when
+# routing through a gateway whose haiku slug differs from the SDK default
+# `claude-haiku-4-5-20251001` -- TF/Bedrock typically wants
+# `pi-agentic/global.anthropic.claude-haiku-4-5`. Leave unset on
+# Anthropic-direct (the SDK's bundled id works there).
+# default_haiku_model: pi-agentic/global.anthropic.claude-haiku-4-5
 billing:
   mode: api
   transcript_parser: agent-sdk

@@ -211,9 +211,13 @@ describe("conductor on_failure retry loop", async () => {
     });
     expect(resp.status).toBe(200);
 
-    // retryWithContext should have reset to ready
+    // retryWithContext resets to `ready` and background-dispatches; under
+    // the test profile the noop executor completes that dispatch fast
+    // enough to flip status to `running` before we observe. Either state
+    // is acceptable -- the `retry_with_context` event is the authoritative
+    // signal that the retry path ran.
     const updated = await app.sessions.get(session.id)!;
-    expect(updated.status).toBe("ready");
+    expect(["ready", "running"]).toContain(updated.status);
     expect(updated.error).toBeNull();
 
     // Should have logged a retry event
@@ -283,9 +287,13 @@ describe("conductor on_failure retry loop", async () => {
     });
     expect(resp.status).toBe(200);
 
-    // retryWithContext should have reset to ready
+    // retryWithContext resets status to `ready` and kicks the dispatcher
+    // in the background; under the test profile that dispatch runs through
+    // the noop executor and promotes status back to `running` before this
+    // assertion fires. Accept either -- the `retry_with_context` event is
+    // the authoritative signal that the retry path actually ran.
     const updated = await app.sessions.get(session.id)!;
-    expect(updated.status).toBe("ready");
+    expect(["ready", "running"]).toContain(updated.status);
 
     // Should have logged a retry event
     const events = await app.events.list(session.id);

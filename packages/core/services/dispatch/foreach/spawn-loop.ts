@@ -88,6 +88,15 @@ export async function dispatchForEachSpawn(
     });
   }
 
+  // Mark the parent as running while iterations are in flight. Without this
+  // the parent stays at status="ready" -- which the UI normalises to
+  // "pending" / initial state -- making it look like the parent hasn't
+  // started even when its child is actively working. The post-loop
+  // mediateStageHandoff transitions to "completed" (or "failed").
+  if (session.status !== "running") {
+    await deps.sessions.update(sessionId, { status: "running" });
+  }
+
   const forkGroup = randomUUID().slice(0, 8);
   let succeeded = 0;
   let failedCount = 0;
@@ -213,8 +222,14 @@ export async function dispatchForEachSpawn(
       continue;
     }
 
-    // Wait for the child to reach a terminal state
-    const terminalStatus = await childSpawner.waitForChild(childId);
+    // Wait for the child to reach a terminal state. Idle window resets on
+    // each `updated_at` bump -- override default via stage YAML
+    // `child_timeout_minutes:`.
+    const idleMs =
+      typeof stageDef.child_timeout_minutes === "number" && stageDef.child_timeout_minutes > 0
+        ? stageDef.child_timeout_minutes * 60 * 1000
+        : undefined;
+    const terminalStatus = await childSpawner.waitForChild(childId, idleMs);
     const iterDurationMs = Date.now() - spawnIterStartMs;
 
     // Compute per-iteration cost from the child's hook_status events.
@@ -297,8 +312,18 @@ export async function dispatchForEachSpawn(
     data: { total: items.length, succeeded, failed: failedCount },
   });
 
+  // Any iteration failure means the parent's stage outcome is a failure.
+  // `on_iteration_failure: continue` only controls whether the LOOP keeps
+  // dispatching on failure -- it doesn't make the eventual outcome succeed.
+  // A partial success of a fan-out is still a failure at the parent level.
+  if (failedCount > 0) {
+    return {
+      ok: false,
+      message: `for_each: ${failedCount} of ${items.length} iterations failed (${succeeded} succeeded)`,
+    };
+  }
   return {
     ok: true,
-    message: `for_each: ${items.length} iterations complete (${succeeded} succeeded, ${failedCount} failed)`,
+    message: `for_each: ${items.length} iterations complete`,
   };
 }

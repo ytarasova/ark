@@ -91,7 +91,13 @@ describe("core lifecycle: startSession", async () => {
 // ── dispatch ───────────────────────────────────────────────────────────────
 
 describe("core lifecycle: dispatch", async () => {
-  it("transitions session to running with tmux", async () => {
+  it("transitions session to running", async () => {
+    // Under the test profile, AppContext.boot installs the noop executor
+    // for every runtime (see installNoopExecutors in app.ts) so the dispatch
+    // pipeline runs end-to-end WITHOUT spawning a real tmux pane + claude
+    // binary. The assertions below cover the session-row state transitions
+    // the pipeline is responsible for; the real tmux wiring is verified by
+    // the claude-code / agent-sdk executor unit tests.
     const session = await app.sessionLifecycle.start({
       repo: process.cwd(),
       summary: "lifecycle-dispatch-test",
@@ -102,17 +108,12 @@ describe("core lifecycle: dispatch", async () => {
 
     const result = await app.dispatchService.dispatch(session.id);
     expect(result.ok).toBe(true);
-    expect(result.message).toContain("ark-");
 
     const dispatched = await app.sessions.get(session.id)!;
     expect(dispatched.status).toBe("running");
     expect(dispatched.session_id).toBeTruthy();
     expect(dispatched.agent).toBeTruthy();
 
-    // Verify tmux session exists
-    expect(sessionExists(dispatched.session_id!)).toBe(true);
-
-    // Clean up tmux
     await app.sessionLifecycle.stop(session.id);
   }, 30_000);
 

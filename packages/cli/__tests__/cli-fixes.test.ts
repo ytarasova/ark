@@ -92,7 +92,7 @@ describe("forkCloneHandler deduplication", async () => {
     const { fileURLToPath } = await import("url");
 
     const cliDir = join(dirname(fileURLToPath(import.meta.url)), "..");
-    const source = readFileSync(join(cliDir, "commands", "session.ts"), "utf-8");
+    const source = readFileSync(join(cliDir, "commands", "session", "fork-clone.ts"), "utf-8");
 
     // Both fork and clone should use .action(forkCloneHandler)
     const forkMatch = source.match(/session\s*\.command\("fork"\)[\s\S]*?\.action\((\w+)\)/);

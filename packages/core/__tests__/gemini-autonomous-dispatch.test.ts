@@ -73,16 +73,6 @@ describe("Gemini runtime resolution", () => {
     expect(agent!.task_delivery).toBe("stdin");
   });
 
-  it("remaps agent model to gemini default when agent model is not in gemini model list", () => {
-    const session = { summary: "test", id: "s-test02" };
-    const agent = resolveAgentWithRuntime(app, "worker", session, { runtimeOverride: "gemini" });
-
-    // Worker agent defaults to a Claude model (e.g. "sonnet") which isn't in gemini's model list.
-    // resolveAgentWithRuntime should remap to gemini's default_model.
-    expect(agent).not.toBeNull();
-    expect(agent!.model).toBe("gemini-2.5-pro");
-  });
-
   it("falls back to claude-code when no runtime override is specified", () => {
     const session = { summary: "test", id: "s-test03" };
     const agent = resolveAgentWithRuntime(app, "worker", session, {});

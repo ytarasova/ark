@@ -1,11 +1,133 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="midnight-circuit dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>API Reference - Ark</title>
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="colors_and_type.css">
   <link rel="stylesheet" href="styles.css">
+  <style>
+    .method-group { margin-bottom: 2.5rem; }
+    .method-group-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #64748b;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.4rem;
+      border-bottom: 1px solid #1e293b;
+    }
+    .method-card {
+      border: 1px solid #1e293b;
+      border-radius: 6px;
+      margin-bottom: 0.5rem;
+      overflow: hidden;
+    }
+    .method-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.6rem 1rem;
+      cursor: pointer;
+      background: #0d1117;
+      transition: background 0.15s;
+      user-select: none;
+    }
+    .method-header:hover { background: #111827; }
+    .method-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: #38bdf8;
+      flex: 0 0 auto;
+    }
+    .method-desc {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      flex: 1;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    .method-chevron {
+      font-size: 0.6rem;
+      color: #475569;
+      transition: transform 0.2s;
+      flex: 0 0 auto;
+    }
+    .method-card.open .method-chevron { transform: rotate(90deg); }
+    .method-body {
+      display: none;
+      padding: 1rem;
+      background: #070b12;
+      border-top: 1px solid #1e293b;
+    }
+    .method-card.open .method-body { display: block; }
+    .schema-section { margin-bottom: 1rem; }
+    .schema-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #475569;
+      margin-bottom: 0.4rem;
+    }
+    .schema-block {
+      background: #0d1117;
+      border: 1px solid #1e293b;
+      border-radius: 4px;
+      padding: 0.75rem 1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      line-height: 1.6;
+      overflow-x: auto;
+      white-space: pre;
+      color: #c9d1d9;
+      max-height: 400px;
+    }
+    .no-params {
+      font-size: 0.78rem;
+      color: #475569;
+      font-style: italic;
+    }
+    .filter-bar {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+      align-items: center;
+    }
+    .filter-bar input {
+      flex: 1;
+      background: #0d1117;
+      border: 1px solid #1e293b;
+      border-radius: 4px;
+      padding: 0.4rem 0.75rem;
+      color: #c9d1d9;
+      font-size: 0.85rem;
+      font-family: inherit;
+      outline: none;
+    }
+    .filter-bar input:focus { border-color: #38bdf8; }
+    .filter-bar input::placeholder { color: #475569; }
+    .count-badge {
+      font-size: 0.7rem;
+      color: #475569;
+      white-space: nowrap;
+    }
+    .download-link {
+      display: inline-block;
+      font-size: 0.75rem;
+      color: #38bdf8;
+      text-decoration: none;
+      border: 1px solid #1e3a5f;
+      border-radius: 4px;
+      padding: 0.3rem 0.6rem;
+    }
+    .download-link:hover { background: #0d2545; }
+    #spec-loading { color: #64748b; font-style: italic; }
+    #spec-error { color: #f87171; }
+  </style>
 </head>
 <body>
   <button class="hamburger" aria-label="Menu">&#9776;</button>
@@ -18,6 +140,7 @@
       <div class="section-title">Guides</div>
       <a href="web.html">Web Dashboard</a>
       <a href="cli.html">CLI Reference</a>
+      <a href="cli-reference.html">CLI Reference (generated)</a>
       <a href="configuration.html">Configuration</a>
       <a href="compute.html">Compute Providers</a>
       <a href="environment.html">Environment</a>
@@ -125,198 +248,23 @@
       </table>
 
       <h2>RPC Methods</h2>
+      <p>
+        Live spec rendered from <a href="openrpc.json" class="download-link" download>openrpc.json</a>
+        (<a href="https://open-rpc.org/" target="_blank" rel="noopener">OpenRPC 1.3</a>),
+        generated from the Zod schemas in <code>packages/protocol/rpc-schemas.ts</code>.
+        Click any method to expand request params and result schemas. Use the filter to find a method by name or description.
+        Compatible with the OpenRPC playground, mock servers, and client code generators.
+      </p>
+      <p>Regenerate after adding new Zod schemas: <code>bun run scripts/generate-openrpc.ts</code></p>
 
-      <h3>Session Lifecycle</h3>
-      <table>
-        <thead><tr><th>Method</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr><td><code>session/start</code></td><td>Create a new session with a summary, repo, flow, agent, and compute target</td></tr>
-          <tr><td><code>session/dispatch</code></td><td>Launch the agent for a session (creates worktree, starts tmux)</td></tr>
-          <tr><td><code>session/stop</code></td><td>Stop a running session (kills the agent process)</td></tr>
-          <tr><td><code>session/advance</code></td><td>Advance to the next flow stage (approve a pending gate)</td></tr>
-          <tr><td><code>session/complete</code></td><td>Mark a session as completed</td></tr>
-          <tr><td><code>session/delete</code></td><td>Delete a session and its associated data</td></tr>
-          <tr><td><code>session/pause</code></td><td>Pause a running session (agent can be resumed later)</td></tr>
-          <tr><td><code>session/resume</code></td><td>Resume a paused session</td></tr>
-          <tr><td><code>session/interrupt</code></td><td>Send Ctrl+C to the agent without killing the tmux session</td></tr>
-        </tbody>
-      </table>
+      <div class="filter-bar">
+        <input id="spec-filter" type="search" placeholder="Filter methods..." autocomplete="off" spellcheck="false">
+        <span class="count-badge" id="spec-count-badge"></span>
+      </div>
 
-      <h3>Session Queries</h3>
-      <table>
-        <thead><tr><th>Method</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr><td><code>session/list</code></td><td>List sessions with optional filters (status, flow, agent)</td></tr>
-          <tr><td><code>session/read</code></td><td>Read full session details including current stage and events</td></tr>
-          <tr><td><code>session/update</code></td><td>Update session fields (summary, ticket, etc.)</td></tr>
-          <tr><td><code>session/search</code></td><td>Full-text search across session transcripts</td></tr>
-          <tr><td><code>session/search-conversation</code></td><td>Search within a specific session's conversation</td></tr>
-          <tr><td><code>session/output</code></td><td>Capture recent output from the agent's terminal</td></tr>
-          <tr><td><code>session/conversation</code></td><td>Get the full conversation history for a session</td></tr>
-          <tr><td><code>session/messages</code></td><td>Get messages exchanged between human and agent</td></tr>
-          <tr><td><code>session/events</code></td><td>Get events (status changes, stage transitions, errors)</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Session Operations</h3>
-      <table>
-        <thead><tr><th>Method</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr><td><code>session/fork</code></td><td>Fork a session into a child with its own worktree</td></tr>
-          <tr><td><code>session/clone</code></td><td>Clone a session with a new name</td></tr>
-          <tr><td><code>session/spawn</code></td><td>Spawn a new child session from a parent</td></tr>
-          <tr><td><code>session/fan-out</code></td><td>Decompose a task into N parallel child sessions</td></tr>
-          <tr><td><code>session/join</code></td><td>Wait for all child sessions to complete</td></tr>
-          <tr><td><code>session/handoff</code></td><td>Hand off a session to a different agent</td></tr>
-          <tr><td><code>session/archive</code></td><td>Archive a completed session (hidden from default list)</td></tr>
-          <tr><td><code>session/restore</code></td><td>Restore an archived session</td></tr>
-          <tr><td><code>session/undelete</code></td><td>Undelete a soft-deleted session</td></tr>
-          <tr><td><code>session/export</code></td><td>Export session data for portability</td></tr>
-          <tr><td><code>session/import</code></td><td>Import session data from an export</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Resources</h3>
-      <table>
-        <thead><tr><th>Method</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr><td><code>agent/list</code></td><td>List all available agents (across all tiers)</td></tr>
-          <tr><td><code>agent/read</code></td><td>Read an agent definition</td></tr>
-          <tr><td><code>agent/create</code></td><td>Create a new agent definition</td></tr>
-          <tr><td><code>agent/update</code></td><td>Update an existing agent definition</td></tr>
-          <tr><td><code>agent/delete</code></td><td>Delete an agent definition</td></tr>
-          <tr><td><code>flow/list</code></td><td>List all available flows</td></tr>
-          <tr><td><code>flow/read</code></td><td>Read a flow definition</td></tr>
-          <tr><td><code>flow/create</code></td><td>Create a new flow definition</td></tr>
-          <tr><td><code>flow/delete</code></td><td>Delete a flow definition</td></tr>
-          <tr><td><code>skill/list</code></td><td>List all available skills</td></tr>
-          <tr><td><code>skill/read</code></td><td>Read a skill definition</td></tr>
-          <tr><td><code>skill/save</code></td><td>Create or update a skill</td></tr>
-          <tr><td><code>skill/delete</code></td><td>Delete a skill definition</td></tr>
-          <tr><td><code>recipe/list</code></td><td>List all available recipes</td></tr>
-          <tr><td><code>recipe/read</code></td><td>Read a recipe definition</td></tr>
-          <tr><td><code>recipe/use</code></td><td>Create a session from a recipe template</td></tr>
-          <tr><td><code>recipe/delete</code></td><td>Delete a recipe definition</td></tr>
-          <tr><td><code>runtime/list</code></td><td>List all available runtimes</td></tr>
-          <tr><td><code>runtime/read</code></td><td>Read a runtime definition</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Messaging and Gates</h3>
-      <table>
-        <thead><tr><th>Method</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr><td><code>message/send</code></td><td>Send a message to a running agent (human steering)</td></tr>
-          <tr><td><code>message/markRead</code></td><td>Mark messages as read</td></tr>
-          <tr><td><code>gate/approve</code></td><td>Approve a pending gate to advance the flow</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Compute</h3>
-      <table>
-        <thead><tr><th>Method</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr><td><code>compute/list</code></td><td>List compute targets</td></tr>
-          <tr><td><code>compute/read</code></td><td>Read compute target details</td></tr>
-          <tr><td><code>compute/create</code></td><td>Create a new compute target</td></tr>
-          <tr><td><code>compute/provision</code></td><td>Provision a compute target (start VM, container, etc.)</td></tr>
-          <tr><td><code>compute/start-instance</code></td><td>Start a stopped compute instance</td></tr>
-          <tr><td><code>compute/stop-instance</code></td><td>Stop a running compute instance</td></tr>
-          <tr><td><code>compute/delete</code></td><td>Delete a compute target</td></tr>
-          <tr><td><code>compute/ping</code></td><td>Health check a compute target's ArkD endpoint</td></tr>
-          <tr><td><code>compute/clean</code></td><td>Clean up compute resources</td></tr>
-          <tr><td><code>compute/template/list</code></td><td>List compute templates</td></tr>
-          <tr><td><code>compute/template/create</code></td><td>Create a compute template</td></tr>
-          <tr><td><code>compute/template/delete</code></td><td>Delete a compute template</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Costs and Metrics</h3>
-      <table>
-        <thead><tr><th>Method</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr><td><code>costs/read</code></td><td>Read usage records with filters</td></tr>
-          <tr><td><code>costs/summary</code></td><td>Aggregated cost summary by model, provider, or session</td></tr>
-          <tr><td><code>costs/trend</code></td><td>Cost trend over time (daily, weekly, monthly)</td></tr>
-          <tr><td><code>costs/session</code></td><td>Cost breakdown for a specific session</td></tr>
-          <tr><td><code>costs/export</code></td><td>Export usage records as CSV</td></tr>
-          <tr><td><code>metrics/snapshot</code></td><td>Current system metrics (sessions, costs, compute)</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Knowledge and History</h3>
-      <table>
-        <thead><tr><th>Method</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr><td><code>knowledge/search</code></td><td>Search the knowledge graph</td></tr>
-          <tr><td><code>knowledge/stats</code></td><td>Knowledge graph statistics (nodes, edges, types)</td></tr>
-          <tr><td><code>knowledge/index</code></td><td>Index a codebase into the knowledge graph</td></tr>
-          <tr><td><code>history/list</code></td><td>List imported session history</td></tr>
-          <tr><td><code>history/import</code></td><td>Import session from transcript files</td></tr>
-          <tr><td><code>history/search</code></td><td>Search across session history</td></tr>
-          <tr><td><code>history/rebuild-fts</code></td><td>Rebuild the FTS5 search index</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Memory</h3>
-      <table>
-        <thead><tr><th>Method</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr><td><code>memory/list</code></td><td>List all memories</td></tr>
-          <tr><td><code>memory/add</code></td><td>Add a new memory</td></tr>
-          <tr><td><code>memory/recall</code></td><td>Recall memories matching a query</td></tr>
-          <tr><td><code>memory/forget</code></td><td>Delete a specific memory</td></tr>
-          <tr><td><code>memory/clear</code></td><td>Clear all memories</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Worktrees and Git</h3>
-      <table>
-        <thead><tr><th>Method</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr><td><code>worktree/list</code></td><td>List active worktrees</td></tr>
-          <tr><td><code>worktree/diff</code></td><td>View git diff stat for a session's worktree</td></tr>
-          <tr><td><code>worktree/create-pr</code></td><td>Push and create a GitHub PR from a worktree</td></tr>
-          <tr><td><code>worktree/finish</code></td><td>Merge worktree changes back to the base branch</td></tr>
-          <tr><td><code>worktree/cleanup</code></td><td>Clean up stale worktrees</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Configuration and Status</h3>
-      <table>
-        <thead><tr><th>Method</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr><td><code>config/read</code></td><td>Read the current configuration</td></tr>
-          <tr><td><code>config/write</code></td><td>Write configuration values</td></tr>
-          <tr><td><code>status/get</code></td><td>Get server status (version, uptime, mode)</td></tr>
-          <tr><td><code>dashboard/summary</code></td><td>Dashboard summary data (session counts, costs, health)</td></tr>
-          <tr><td><code>initialize</code></td><td>Initialize the client connection (required first call)</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Scheduling</h3>
-      <table>
-        <thead><tr><th>Method</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr><td><code>schedule/list</code></td><td>List scheduled sessions</td></tr>
-          <tr><td><code>schedule/create</code></td><td>Create a scheduled/recurring session</td></tr>
-          <tr><td><code>schedule/delete</code></td><td>Delete a schedule</td></tr>
-          <tr><td><code>schedule/enable</code></td><td>Enable a disabled schedule</td></tr>
-          <tr><td><code>schedule/disable</code></td><td>Disable an active schedule</td></tr>
-        </tbody>
-      </table>
-
-      <h3>Tools and MCP</h3>
-      <table>
-        <thead><tr><th>Method</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr><td><code>tools/list</code></td><td>List configured MCP tools, commands, and skills</td></tr>
-          <tr><td><code>tools/read</code></td><td>Read a specific tool's configuration</td></tr>
-          <tr><td><code>tools/delete</code></td><td>Delete a tool configuration</td></tr>
-          <tr><td><code>mcp/attach</code></td><td>Attach an MCP server to a session</td></tr>
-          <tr><td><code>mcp/detach</code></td><td>Detach an MCP server from a session</td></tr>
-        </tbody>
-      </table>
+      <div id="spec-loading">Loading schema...</div>
+      <div id="spec-error" style="display:none"></div>
+      <div id="spec-methods-root"></div>
 
       <h2>Authentication</h2>
       <p>In hosted mode, API keys authenticate requests. Key format: <code>ark_&lt;tenantId&gt;_&lt;secret&gt;</code>.</p>
@@ -340,6 +288,142 @@
       </div>
     </main>
   </div>
+  <script>
+  (function () {
+    function el(tag, cls) {
+      var e = document.createElement(tag);
+      if (cls) e.className = cls;
+      return e;
+    }
+
+    function renderJson(obj) {
+      var pre = el('pre', 'schema-block');
+      var copy = Object.assign({}, obj);
+      delete copy['$schema'];
+      pre.textContent = JSON.stringify(copy, null, 2);
+      return pre;
+    }
+
+    function buildMethodCard(method) {
+      var card = el('div', 'method-card');
+      card.dataset.name = method.name;
+
+      var hasParams = method.params && method.params.length > 0;
+      var paramSchema = hasParams ? method.params[0].schema : null;
+
+      var header = el('div', 'method-header');
+      var nameSpan = el('span', 'method-name');
+      nameSpan.textContent = method.name;
+      var descSpan = el('span', 'method-desc');
+      descSpan.textContent = method.description || '';
+      var chevron = el('span', 'method-chevron');
+      chevron.textContent = '►';
+      header.appendChild(nameSpan);
+      header.appendChild(descSpan);
+      header.appendChild(chevron);
+
+      var body = el('div', 'method-body');
+      if (method.description) {
+        var descP = el('p');
+        descP.textContent = method.description;
+        descP.style.cssText = 'font-size:0.85rem;color:#94a3b8;margin-bottom:1rem';
+        body.appendChild(descP);
+      }
+
+      var reqSection = el('div', 'schema-section');
+      var reqLabel = el('div', 'schema-label');
+      reqLabel.textContent = 'Request params';
+      reqSection.appendChild(reqLabel);
+      if (hasParams && paramSchema) {
+        reqSection.appendChild(renderJson(paramSchema));
+      } else {
+        var noParams = el('div', 'no-params');
+        noParams.textContent = 'No parameters';
+        reqSection.appendChild(noParams);
+      }
+      body.appendChild(reqSection);
+
+      if (method.result && method.result.schema) {
+        var resSection = el('div', 'schema-section');
+        var resLabel = el('div', 'schema-label');
+        resLabel.textContent = 'Result';
+        resSection.appendChild(resLabel);
+        resSection.appendChild(renderJson(method.result.schema));
+        body.appendChild(resSection);
+      }
+
+      header.addEventListener('click', function () {
+        card.classList.toggle('open');
+      });
+
+      card.appendChild(header);
+      card.appendChild(body);
+      return card;
+    }
+
+    function render(methods, filter) {
+      var root = document.getElementById('spec-methods-root');
+      while (root.firstChild) root.removeChild(root.firstChild);
+
+      var lower = (filter || '').toLowerCase().trim();
+      var visible = lower
+        ? methods.filter(function (m) {
+            return m.name.toLowerCase().indexOf(lower) >= 0 ||
+              (m.description && m.description.toLowerCase().indexOf(lower) >= 0);
+          })
+        : methods;
+
+      var badge = document.getElementById('spec-count-badge');
+      badge.textContent = visible.length + ' of ' + methods.length + ' methods';
+
+      var groups = Object.create(null);
+      var order = [];
+      visible.forEach(function (m) {
+        var slash = m.name.indexOf('/');
+        var ns = slash >= 0 ? m.name.slice(0, slash) : m.name;
+        if (!groups[ns]) { groups[ns] = []; order.push(ns); }
+        groups[ns].push(m);
+      });
+
+      if (visible.length === 0) {
+        var p = el('p');
+        p.textContent = 'No methods match "' + filter + '"';
+        p.style.cssText = 'color:#475569;font-style:italic';
+        root.appendChild(p);
+        return;
+      }
+
+      order.forEach(function (ns) {
+        var section = el('div', 'method-group');
+        var title = el('div', 'method-group-title');
+        title.textContent = ns;
+        section.appendChild(title);
+        groups[ns].forEach(function (m) {
+          section.appendChild(buildMethodCard(m));
+        });
+        root.appendChild(section);
+      });
+    }
+
+    fetch('openrpc.json')
+      .then(function (r) { return r.json(); })
+      .then(function (doc) {
+        document.getElementById('spec-loading').style.display = 'none';
+        var methods = doc.methods || [];
+        render(methods, '');
+        var input = document.getElementById('spec-filter');
+        input.addEventListener('input', function () {
+          render(methods, input.value);
+        });
+      })
+      .catch(function (err) {
+        document.getElementById('spec-loading').style.display = 'none';
+        var errorEl = document.getElementById('spec-error');
+        errorEl.style.display = '';
+        errorEl.textContent = 'Failed to load openrpc.json: ' + err.message;
+      });
+  })();
+  </script>
   <script src="nav.js"></script>
 </body>
 </html>

@@ -55,34 +55,35 @@ describe("substituteVars", () => {
   });
 });
 
-// ── substituteVars: short-namespace alias ───────────────────────────────────
+// ── substituteVars: flat inputs bag ─────────────────────────────────────────
 
-describe("substituteVars short-namespace alias", () => {
-  it("{{files.X}} resolves to inputs.files.X when top-level is unset", () => {
-    const result = substituteVars("{{files.recipe}}", {
-      "inputs.files.recipe": "/tmp/r.yaml",
+describe("substituteVars flat inputs bag", () => {
+  it("{{inputs.X}} resolves directly from the flat bag", () => {
+    const result = substituteVars("{{inputs.recipe}}", {
+      "inputs.recipe": "/tmp/r.yaml",
     });
     expect(result).toBe("/tmp/r.yaml");
   });
 
-  it("{{params.X}} resolves to inputs.params.X when top-level is unset", () => {
-    const result = substituteVars("{{params.jira_key}}", {
-      "inputs.params.jira_key": "IN-99",
-    });
-    expect(result).toBe("IN-99");
-  });
-
-  it("top-level {{files.X}} wins over alias", () => {
+  it("legacy {{files.X}} has no alias -- renders verbatim when the top-level key is unset", () => {
     const result = substituteVars("{{files.recipe}}", {
-      "files.recipe": "/top.yaml",
-      "inputs.files.recipe": "/tmp/r.yaml",
+      "inputs.recipe": "/tmp/r.yaml",
     });
-    expect(result).toBe("/top.yaml");
+    expect(result).toBe("{{files.recipe}}");
   });
 
-  it("alias does not apply to already-namespaced paths", () => {
-    const result = substituteVars("{{inputs.files.foo}}", {});
-    expect(result).toBe("{{inputs.files.foo}}");
+  it("unwraps a tagged file value to its path", () => {
+    const result = substituteVars("{{inputs.recipe}}", {
+      "inputs.recipe": { $type: "file", path: "/tmp/r.yaml" },
+    });
+    expect(result).toBe("/tmp/r.yaml");
+  });
+
+  it("unwraps a tagged blob value to its locator", () => {
+    const result = substituteVars("{{inputs.plan}}", {
+      "inputs.plan": { $type: "blob", locator: "ark://blob/abc" },
+    });
+    expect(result).toBe("ark://blob/abc");
   });
 });
 
@@ -140,11 +141,11 @@ describe("unresolvedVars", () => {
     expect(missing).toEqual(["files.bar"]);
   });
 
-  it("respects the short-namespace alias", () => {
+  it("reports bare `files.X` as unresolved with no legacy alias", () => {
     const missing = unresolvedVars("{{files.foo}} {{files.bar}}", {
       "inputs.files.foo": "/a",
     });
-    expect(missing).toEqual(["files.bar"]);
+    expect(missing).toEqual(["files.foo", "files.bar"]);
   });
 
   it("is empty when all vars resolve", () => {
@@ -177,23 +178,16 @@ describe("unresolvedVars", () => {
     expect(result).toBe("before {{unknown}} after");
   });
 
-  it("resolves {{files.X}} via the short-namespace alias", () => {
-    const result = substituteVars("env={{files.env}}", {
-      "inputs.files.env": "/tmp/.env",
+  it("resolves {{inputs.X}} from the flat bag", () => {
+    const result = substituteVars("env={{inputs.env}}", {
+      "inputs.env": "/tmp/.env",
     });
     expect(result).toBe("env=/tmp/.env");
   });
 
-  it("resolves {{params.X}} via the short-namespace alias", () => {
-    const result = substituteVars("ticket={{params.jira}}", {
-      "inputs.params.jira": "IN-42",
-    });
-    expect(result).toBe("ticket=IN-42");
-  });
-
   it("tolerates whitespace inside double braces", () => {
-    const result = substituteVars("path={{ files.foo }}", {
-      "inputs.files.foo": "/tmp/foo",
+    const result = substituteVars("path={{ inputs.foo }}", {
+      "inputs.foo": "/tmp/foo",
     });
     expect(result).toBe("path=/tmp/foo");
   });
@@ -225,10 +219,10 @@ describe("unresolvedVars", () => {
     expect(unresolvedVars("{unknown}", {})).toEqual([]);
   });
 
-  it("returns an empty array when everything resolves (direct + aliased)", () => {
+  it("returns an empty array when every direct reference resolves", () => {
     expect(
-      unresolvedVars("{{files.env}} {{ticket}}", {
-        "inputs.files.env": "/tmp/.env",
+      unresolvedVars("{{inputs.env}} {{ticket}}", {
+        "inputs.env": "/tmp/.env",
         ticket: "PROJ-1",
       }),
     ).toEqual([]);

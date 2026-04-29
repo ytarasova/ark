@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { ConnectorRegistry, createDefaultConnectorRegistry, builtinConnectors } from "../registry.js";
-import { piSageConnector } from "../definitions/pi-sage.js";
+import { githubConnector } from "../definitions/github.js";
 
 describe("ConnectorRegistry", () => {
   test("default registry holds every shipped connector", () => {
@@ -16,16 +16,16 @@ describe("ConnectorRegistry", () => {
 
   test("register replaces existing entry", () => {
     const reg = createDefaultConnectorRegistry();
-    reg.register({ ...piSageConnector, label: "Replaced" });
-    expect(reg.get("pi-sage")?.label).toBe("Replaced");
+    reg.register({ ...githubConnector, label: "Replaced" });
+    expect(reg.get("github")?.label).toBe("Replaced");
   });
 
   test("resolveMcpEntries returns shipped configName for full MCP connector", () => {
     const reg = createDefaultConnectorRegistry();
-    const entries = reg.resolveMcpEntries(["pi-sage"]);
+    const entries = reg.resolveMcpEntries(["github"]);
     expect(entries).toHaveLength(1);
-    expect(entries[0].entry).toBe("pi-sage");
-    expect(entries[0].fromConnector).toBe("pi-sage");
+    expect(entries[0].entry).toBe("github");
+    expect(entries[0].fromConnector).toBe("github");
   });
 
   test("resolveMcpEntries returns inline object for scaffolded connector", () => {
@@ -39,7 +39,7 @@ describe("ConnectorRegistry", () => {
 
   test("resolveMcpEntries skips unknown connectors silently", () => {
     const reg = createDefaultConnectorRegistry();
-    const entries = reg.resolveMcpEntries(["pi-sage", "missing"]);
+    const entries = reg.resolveMcpEntries(["github", "missing"]);
     expect(entries).toHaveLength(1);
   });
 
@@ -56,13 +56,13 @@ describe("ConnectorRegistry", () => {
         },
       },
     });
-    reg.register(piSageConnector);
-    expect(reg.resolveContextConnectors(["pi-sage", "ctx"]).map((c) => c.name)).toEqual(["ctx"]);
+    reg.register(githubConnector);
+    expect(reg.resolveContextConnectors(["github", "ctx"]).map((c) => c.name)).toEqual(["ctx"]);
   });
 
   test("MCP connectors do not show up in resolveContextConnectors", () => {
     const reg = createDefaultConnectorRegistry();
-    expect(reg.resolveContextConnectors(["pi-sage", "jira"])).toHaveLength(0);
+    expect(reg.resolveContextConnectors(["github", "jira"])).toHaveLength(0);
   });
 
   test("resolveMcpEntries picks up connectors that omit the legacy kind field", () => {
@@ -99,7 +99,7 @@ describe("ConnectorRegistry", () => {
 describe("ConnectorRegistry surface accessors (Wave 0)", () => {
   test("api() returns null for a connector without an api factory", () => {
     const reg = createDefaultConnectorRegistry();
-    expect(reg.api("pi-sage")).toBeNull();
+    expect(reg.api("github")).toBeNull();
   });
 
   test("api() invokes the factory and returns the client", () => {
@@ -126,8 +126,8 @@ describe("ConnectorRegistry surface accessors (Wave 0)", () => {
 });
 
 describe("connector definitions ship the expected configs", () => {
-  test("pi-sage maps to mcp-configs/pi-sage.json", () => {
-    expect(piSageConnector.mcp?.configName).toBe("pi-sage");
+  test("github maps to mcp-configs/github.json", () => {
+    expect(githubConnector.mcp?.configName).toBe("github");
   });
 
   test("jira reuses atlassian config", () => {

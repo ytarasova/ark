@@ -149,6 +149,8 @@ Env-var -> Config field map:
 | `ARK_DEFAULT_TENANT`                 | `config.authSection.defaultTenant`  | null                          |
 | `ARK_AUTO_REBASE`                    | `config.features.autoRebase`        | false                         |
 | `ARK_CODEGRAPH`                      | `config.features.codegraph`         | false                         |
+| `ARK_GIT_AUTHOR_NAME`                | `config.git.authorName`             | "Ark Agent"                   |
+| `ARK_GIT_AUTHOR_EMAIL`               | `config.git.authorEmail`            | "agent@ark.local"             |
 | `DATABASE_URL`                       | `config.database.url`               | undefined (SQLite)            |
 
 YAML format (`~/.ark/config.yaml`):

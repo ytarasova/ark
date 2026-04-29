@@ -9,7 +9,7 @@ interface LayoutProps {
   onNavigate: (view: string) => void;
   readOnly: boolean;
   daemonStatus?: DaemonStatus | null;
-  /** Middle column -- persistent 268px session list (or other context list). */
+  /** Middle column -- persistent 400px session list (or other context list). */
   list?: React.ReactNode;
   /** Main pane. */
   children: React.ReactNode;
@@ -57,9 +57,9 @@ const SHORTCUTS: Record<string, string> = {
 /**
  * Layout -- 3-column chrome from `/tmp/ark-design-system/preview/chrome-sidebar.html`.
  *
- *   grid-template-columns: 60px 268px 1fr
+ *   grid-template-columns: 60px 400px 1fr
  *
- * The 60px icon rail is always mounted. The 268px middle column (session list
+ * The 60px icon rail is always mounted. The 400px middle column (session list
  * or other context panel) is mounted when `list` is non-null; callers that
  * don't need a context column (e.g. Settings, Admin) can omit it and the grid
  * collapses to `60px 1fr`.
@@ -111,7 +111,7 @@ export function Layout({
       className="h-screen bg-[var(--bg)] overflow-hidden"
       style={{
         display: "grid",
-        gridTemplateColumns: list ? "60px 268px 1fr" : "60px 1fr",
+        gridTemplateColumns: list ? "60px 400px 1fr" : "60px 1fr",
       }}
     >
       <IconRail

@@ -35,10 +35,8 @@ export class SessionService {
     private messages: MessageRepository,
     private readonly _app: AppContext | null = null,
   ) {
-    this.dispatchListeners = new SessionDispatchListeners(
-      this.sessions,
-      this.events,
-      (sessionId) => this.dispatch(sessionId),
+    this.dispatchListeners = new SessionDispatchListeners(this.sessions, this.events, (sessionId) =>
+      this.dispatch(sessionId),
     );
   }
 
@@ -245,10 +243,17 @@ export class SessionService {
     }
 
     if (session.session_id) {
-      try {
-        await this.app.launcher.kill(session.session_id);
-      } catch {
-        // best-effort cleanup; a missing/dead tmux session is expected on resume
+      // Best-effort kill across every registered executor -- the handle is
+      // an opaque string that only the owning executor knows how to clean
+      // up (tmux session name for claude-code, `sdk-<id>` for agent-sdk,
+      // etc.). A missing/dead handle after a crash is expected on resume.
+      const handle = session.session_id;
+      for (const entry of this.app.pluginRegistry.listByKind("executor")) {
+        try {
+          await entry.impl.kill(handle);
+        } catch {
+          /* try next executor */
+        }
       }
     }
 
@@ -355,6 +360,21 @@ export class SessionService {
           await this.events.log(sessionId, "dispatch_failed", {
             actor: "system",
             data: { reason: `action '${action.action}' failed: ${result.message}` },
+          });
+          return;
+        }
+        // Success: advance the flow. Without this, an action stage
+        // re-run via resume (e.g. a create_pr that failed once and got
+        // retried) completes the action but leaves the session sitting
+        // at `status=ready, stage=<action>` forever. The regular
+        // dispatch path handles this via `mediateStageHandoff` after
+        // `executeAction` returns (see dispatch-core.ts); mirror that
+        // here so resume behaves the same way.
+        const postAction = await this.sessions.get(sessionId);
+        if (postAction?.status === "ready") {
+          await this.app.sessionHooks.mediateStageHandoff(sessionId, {
+            autoDispatch: true,
+            source: "resume_action",
           });
         }
       } catch (err) {

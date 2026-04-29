@@ -4,6 +4,8 @@ import { FilterChip } from "./ui/FilterChip.js";
 import type { SessionStatus } from "./ui/StatusDot.js";
 import { SessionRowWithChildren } from "./SessionRowWithChildren.js";
 import { relTime, fmtCost } from "../util.js";
+import { friendlyAgentName } from "../lib/inline-display.js";
+import { buildFlowProgress, type ProgressChild } from "../../../types/flow-progress.js";
 
 /** Format token counts in the "48.2k" / "1.2M" style the design uses. */
 function fmtTokens(n?: number): string | undefined {
@@ -16,6 +18,18 @@ function fmtTokens(n?: number): string | undefined {
 /** Compact, single-line error for the meta-row salmon pill. */
 function shortError(err: string): string {
   return err.length > 40 ? err.slice(0, 37) + "…" : err;
+}
+
+/**
+ * Translate the synthetic `inline-s-<id>` flow names produced by the
+ * dispatch pipeline (when the caller passed an inline flow object) into
+ * the human-readable label "inline". Pre-fix the session list showed
+ * `inline-s-3nlgvtzhjv` -- an internal id that's noise to operators.
+ */
+function prettifyFlowName(raw: string | null | undefined): string | undefined {
+  if (!raw) return undefined;
+  if (raw.startsWith("inline-s-")) return "inline";
+  return raw;
 }
 
 interface SessionListProps {
@@ -59,10 +73,43 @@ function computeProgress(session: any, flowStagesMap?: Record<string, any[]>): n
   return (idx + 1) / stages.length;
 }
 
+/**
+ * Resolve the row's flow definition shape (stages list) from either the
+ * inline-flow blob on the session or the named-flow lookup table. The
+ * domain projection in `buildFlowProgress` consumes this; nothing about
+ * the visual classification lives here.
+ */
+function resolveFlowDef(
+  session: any,
+  flowStagesMap?: Record<string, any[]>,
+): { name: string; stages: Array<{ name: string; gate: any }> } | null {
+  const inlineStages = session.config?.inline_flow?.stages;
+  if (Array.isArray(inlineStages) && inlineStages.length > 0) {
+    return { name: session.flow ?? "inline", stages: inlineStages };
+  }
+  const flowName = session.pipeline || session.flow;
+  const stages = flowName ? flowStagesMap?.[flowName] : undefined;
+  if (!stages || stages.length === 0) return null;
+  return { name: flowName, stages };
+}
+
+/**
+ * Build the row's view-model from a raw session.
+ *
+ * `children` is optional and only matters for for_each parents -- when the
+ * tree row is expanded the caller has already loaded children via
+ * `useSessionChildrenQuery`, so we pass them straight through and the
+ * domain projection emits real per-iteration segments. When children are
+ * absent (collapsed row, or non-fan-out session), the projection falls back
+ * to walking the session's own flow stages. Either way, no UI-side
+ * synthesis from count summaries -- ordering / state come from authoritative
+ * domain data.
+ */
 export function sessionToListItem(
   s: any,
   flowStagesMap?: Record<string, any[]>,
   unreadCounts?: Record<string, number>,
+  children?: ProgressChild[] | null,
 ): SessionListItem {
   const totalTokens =
     typeof s.tokens_total === "number"
@@ -70,17 +117,32 @@ export function sessionToListItem(
       : typeof s.tokens_in === "number" || typeof s.tokens_out === "number"
         ? (s.tokens_in ?? 0) + (s.tokens_out ?? 0)
         : undefined;
+
+  const flowDef = resolveFlowDef(s, flowStagesMap);
+  // For for_each parents the server attaches `child_iterations` (ordered
+  // by for_each_index) on every list response so the strip can paint real
+  // per-iteration progress on collapsed rows too. Caller-supplied
+  // `children` (e.g. from useSessionChildrenQuery on an expanded row)
+  // wins -- it carries fresher status across the 5s polling boundary.
+  const childrenForProgress = children ?? (s.child_iterations as ProgressChild[] | undefined) ?? null;
+  const progress = buildFlowProgress({
+    session: s,
+    flow: flowDef as any,
+    children: childrenForProgress,
+  });
+
   return {
     id: s.id,
     status: normalizeStatus(s.status),
     summary: s.summary || s.id,
-    runtime: s.runtime || s.agent_runtime || s.agent || undefined,
-    flow: s.pipeline || s.flow || undefined,
+    runtime: s.runtime || s.agent_runtime || friendlyAgentName(s) || undefined,
+    flow: prettifyFlowName(s.pipeline || s.flow),
     stageLabel: s.stage || undefined,
     progress: computeProgress(s, flowStagesMap),
+    stages: progress?.segments ?? undefined,
     relativeTime: relTime(s.updated_at),
     unreadCount: unreadCounts?.[s.id] ?? 0,
-    agentName: s.agent,
+    agentName: friendlyAgentName(s) ?? undefined,
     compute: s.compute_provider || s.compute_kind || undefined,
     tokens: fmtTokens(totalTokens),
     errorText: s.status === "failed" && s.error ? shortError(s.error) : undefined,

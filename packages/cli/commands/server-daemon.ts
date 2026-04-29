@@ -101,12 +101,13 @@ export function registerServerDaemonCommands(serverCmd: Command) {
       }
 
       if (opts.detach) {
-        // Background mode: spawn a detached child process
-        const arkBin = process.argv[1];
-        const args = ["server", "daemon", "start", "--port", String(port)];
+        // Background mode: spawn a detached child via the shared helper.
+        // Compiled bundles need exec(execPath); source-tree dev needs `bun`.
+        const { arkSelfSpawnCmd } = await import("../helpers.js");
+        const cmd = arkSelfSpawnCmd(["server", "daemon", "start", "--port", String(port)]);
 
         const proc = Bun.spawn({
-          cmd: ["bun", arkBin, ...args],
+          cmd,
           stdio: ["ignore", "ignore", "ignore"],
           env: { ...process.env },
         });

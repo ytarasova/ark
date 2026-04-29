@@ -226,8 +226,17 @@ export async function dispatchForEachInline(
     data: { total: items.length, succeeded, failed: failedCount, mode: "inline" },
   });
 
+  // Same parent-failure rule as spawn-loop: any iteration failure means the
+  // stage outcome is a failure. `on_iteration_failure: continue` only governs
+  // whether the loop keeps dispatching, not the parent's overall result.
+  if (failedCount > 0) {
+    return {
+      ok: false,
+      message: `for_each inline: ${failedCount} of ${items.length} iterations failed (${succeeded} succeeded)`,
+    };
+  }
   return {
     ok: true,
-    message: `for_each inline: ${items.length} iterations complete (${succeeded} succeeded, ${failedCount} failed)`,
+    message: `for_each inline: ${items.length} iterations complete`,
   };
 }

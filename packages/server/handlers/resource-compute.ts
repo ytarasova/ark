@@ -15,11 +15,7 @@ import { extract } from "../validate.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import { logDebug } from "../../core/observability/structured-log.js";
 import { providerToPair, providerOf } from "../../compute/adapters/provider-map.js";
-import type {
-  ComputeNameParams,
-  ComputeUpdateParams,
-  ComputeProviderName,
-} from "../../types/index.js";
+import type { ComputeNameParams, ComputeUpdateParams, ComputeProviderName } from "../../types/index.js";
 
 /**
  * Kill tmux sessions for zombie ark sessions (no DB record or terminal status).

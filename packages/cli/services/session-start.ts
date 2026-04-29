@@ -190,48 +190,79 @@ export class SessionStartService {
       }
     }
 
-    // ── CLI-side defaulting + pattern validation of flow params ────
-    // The server-side Zod schema enforces declared-required inputs;
-    // here we pre-apply declared defaults and fail fast on pattern
-    // mismatches so the user does not have to round-trip to the server
-    // for a predictable validation error.
+    // ── Compose flow inputs ────────────────────────────────────────────
+    // Flat shape: `inputs[key] = value`.
+    //   - `--param k=value` writes `inputs[k] = parsedJSONorString`
+    //   - `--file role=path` writes `inputs[role] = { $type: "file", path }`
+    // Server also accepts the legacy `{files, params}` sub-bucket shape and
+    // flattens it on ingest, so older dispatches still work.
+    const paramInputs: Record<string, unknown> = { ...(opts.param ?? {}) };
     const fileInputs: Record<string, string> = { ...(opts.file ?? {}) };
-    const paramInputs: Record<string, string> = { ...(opts.param ?? {}) };
-    // Flow input validation only runs when the flow is passed by name
-    // (a named flow lives in the FlowStore, so we can flowRead it). Inline
-    // flows carry their own declared inputs and are validated server-side.
+    const topLevelInputs: Record<string, unknown> = { ...paramInputs };
+    for (const [role, path] of Object.entries(fileInputs)) {
+      topLevelInputs[role] = { $type: "file", path };
+    }
+
+    // Flow input validation. Two paths:
+    //  - Named flow: hit the FlowStore for declared inputs.
+    //  - Inline flow (parsed YAML object): use its `inputs` block directly.
+    // Both apply declared defaults and fail fast on pattern mismatches so
+    // the user gets a predictable error before the server round-trip.
+    let declared: Record<string, any> | undefined;
     if (typeof opts.flow === "string" && !/\.(yaml|yml)$/i.test(opts.flow)) {
       try {
         const flowDef = await this.env.client.flowRead(opts.flow);
-        const declared = flowDef?.inputs;
-        if (declared?.params) {
-          for (const [key, def] of Object.entries<any>(declared.params)) {
-            if (paramInputs[key] === undefined && def?.default !== undefined) {
-              paramInputs[key] = def.default;
-            }
-            if (def?.pattern && paramInputs[key] !== undefined) {
-              const re = new RegExp(def.pattern);
-              if (!re.test(paramInputs[key])) {
-                throw new SessionStartPlanError(
-                  `--param ${key}=${paramInputs[key]} does not match pattern ${def.pattern}`,
-                );
-              }
+        declared = flowDef?.inputs as Record<string, any> | undefined;
+      } catch {
+        // flow/read may 404 for ad-hoc flows -- server validates server-side.
+      }
+    } else if (flowArg && typeof flowArg === "object") {
+      declared = (flowArg as Record<string, any>).inputs as Record<string, any> | undefined;
+    }
+    if (declared) {
+      const missing: string[] = [];
+      for (const [key, def] of Object.entries<any>(declared)) {
+        // Support both legacy nested shapes (declared.files / declared.params)
+        // and the flat shape (one entry per input).
+        if (key === "files" && def && typeof def === "object" && !def.type) {
+          for (const [role, fdef] of Object.entries<any>(def)) {
+            if (fdef?.required && !(role in topLevelInputs)) missing.push(`--file ${role}=<path>`);
+          }
+          continue;
+        }
+        if (key === "params" && def && typeof def === "object" && !def.type) {
+          for (const [pkey, pdef] of Object.entries<any>(def)) {
+            if (pdef?.required && topLevelInputs[pkey] === undefined) {
+              if (pdef.default !== undefined) topLevelInputs[pkey] = pdef.default;
+              else missing.push(`--param ${pkey}=<value>`);
+            } else if (topLevelInputs[pkey] === undefined && pdef?.default !== undefined) {
+              topLevelInputs[pkey] = pdef.default;
             }
           }
+          continue;
         }
-      } catch (err) {
-        if (err instanceof SessionStartPlanError) throw err;
-        // flow/read may 404 for ad-hoc flows -- server will still validate.
+        // Flat shape: def is `{ type, required?, default?, pattern? }`.
+        if (def?.required && topLevelInputs[key] === undefined) {
+          if (def.default !== undefined) topLevelInputs[key] = def.default;
+          else missing.push(`--param ${key}=<value>`);
+        } else if (topLevelInputs[key] === undefined && def?.default !== undefined) {
+          topLevelInputs[key] = def.default;
+        }
+        if (def?.pattern && typeof topLevelInputs[key] === "string") {
+          const re = new RegExp(def.pattern);
+          if (!re.test(topLevelInputs[key] as string)) {
+            throw new SessionStartPlanError(
+              `--param ${key}=${topLevelInputs[key]} does not match pattern ${def.pattern}`,
+            );
+          }
+        }
+      }
+      if (missing.length) {
+        throw new SessionStartPlanError(`Flow '${opts.flow}' is missing required inputs:\n  ${missing.join("\n  ")}`);
       }
     }
 
-    const inputs =
-      Object.keys(fileInputs).length || Object.keys(paramInputs).length
-        ? {
-            ...(Object.keys(fileInputs).length ? { files: fileInputs } : {}),
-            ...(Object.keys(paramInputs).length ? { params: paramInputs } : {}),
-          }
-        : undefined;
+    const inputs = Object.keys(topLevelInputs).length ? topLevelInputs : undefined;
 
     const request: Record<string, unknown> = {
       ticket,

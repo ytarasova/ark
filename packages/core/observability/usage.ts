@@ -118,7 +118,10 @@ export class UsageRecorder {
    * prevent cross-tenant cost disclosure. A caller in tenant A cannot read
    * tenant B's usage by guessing a session id.
    */
-  async getSessionCost(sessionId: string): Promise<{
+  async getSessionCost(
+    sessionId: string,
+    opts?: { includeDescendants?: boolean },
+  ): Promise<{
     cost: number;
     input_tokens: number;
     output_tokens: number;
@@ -127,9 +130,30 @@ export class UsageRecorder {
     total_tokens: number;
     records: UsageRecord[];
   }> {
+    // Resolve the set of session ids to roll up. Default behaviour aggregates
+    // every descendant via the sessions.parent_id chain so a fan-out parent
+    // surfaces the sum of its children's spend (the per-row ledger never has
+    // entries on the parent itself -- agents only run on leaves). Pass
+    // `{includeDescendants: false}` for a strict per-row query.
+    const ids = opts?.includeDescendants === false ? [sessionId] : await this.collectDescendantIds(sessionId);
+
+    if (ids.length === 0) {
+      return {
+        cost: 0,
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_read_tokens: 0,
+        cache_write_tokens: 0,
+        total_tokens: 0,
+        records: [],
+      };
+    }
+    const placeholders = ids.map(() => "?").join(",");
     const records = (await this.db
-      .prepare("SELECT * FROM usage_records WHERE session_id = ? AND tenant_id = ? ORDER BY created_at")
-      .all(sessionId, this.tenantId)) as UsageRecord[];
+      .prepare(
+        `SELECT * FROM usage_records WHERE session_id IN (${placeholders}) AND tenant_id = ? ORDER BY created_at`,
+      )
+      .all(...ids, this.tenantId)) as UsageRecord[];
     let cost = 0,
       input = 0,
       output = 0,
@@ -151,6 +175,34 @@ export class UsageRecorder {
       total_tokens: input + output,
       records,
     };
+  }
+
+  /**
+   * Walk the sessions.parent_id chain to collect this session and every
+   * descendant, scoped to the recorder's tenant. Used by getSessionCost to
+   * roll up fan-out children into the parent total. Single recursive CTE so
+   * we don't N+1 the DB per level.
+   *
+   * Always includes `rootId` itself, even when there is no matching row in
+   * `sessions` (raw usage rows written before the session row is created,
+   * or synthetic ids used in unit tests). The strict "session does not
+   * exist -> empty result" path was a regression on existing behaviour.
+   */
+  private async collectDescendantIds(rootId: string): Promise<string[]> {
+    const rows = (await this.db
+      .prepare(
+        `WITH RECURSIVE descendants(id) AS (
+           SELECT id FROM sessions WHERE id = ? AND tenant_id = ?
+           UNION ALL
+           SELECT s.id FROM sessions s
+             JOIN descendants d ON s.parent_id = d.id
+            WHERE s.tenant_id = ?
+         )
+         SELECT id FROM descendants`,
+      )
+      .all(rootId, this.tenantId, this.tenantId)) as Array<{ id: string }>;
+    const ids = rows.map((r) => r.id);
+    return ids.includes(rootId) ? ids : [rootId, ...ids];
   }
 
   /**

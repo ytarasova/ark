@@ -80,16 +80,19 @@ async function probeHealth(port: number, timeoutMs = 600): Promise<boolean> {
  * daemon is healthy.
  */
 async function spawnLocalDaemon(port: number, deadlineMs = 10000): Promise<boolean> {
-  const arkBin = process.argv[1];
-  if (!arkBin) {
-    logDebug("general", "no process.argv[1] -- cannot spawn daemon");
+  // Use the shared helper so the compiled-bundle vs source detection lives
+  // in one place (helpers.ts:arkSelfSpawnCmd).
+  let cmd: string[];
+  try {
+    const { arkSelfSpawnCmd } = await import("./helpers.js");
+    cmd = arkSelfSpawnCmd(["server", "daemon", "start", "--port", String(port)]);
+  } catch (err) {
+    logDebug("general", `daemon spawn cmd resolution failed: ${(err as Error).message}`);
     return false;
   }
-  // Detached child via `bun <arkBin> server daemon start --port <p>`.
-  // stdio ignored so the CLI isn't blocked by the child's output.
   try {
     const proc = Bun.spawn({
-      cmd: ["bun", arkBin, "server", "daemon", "start", "--port", String(port)],
+      cmd,
       stdio: ["ignore", "ignore", "ignore"],
       env: { ...process.env },
     });

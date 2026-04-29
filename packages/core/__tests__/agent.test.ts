@@ -295,10 +295,10 @@ describe("resolveAgent", () => {
     expect(agent!.system_prompt).toBe("Working on PROJ-123: Fix the bug in /code/myrepo on branch feat/fix-bug.");
   });
 
-  it("substitutes workdir, track_id, and stage vars", () => {
+  it("substitutes session column vars", () => {
     writeAgentYaml("vars-agent", {
       name: "vars-agent",
-      system_prompt: "Dir: {{workdir}}, Track: {{track_id}}, Stage: {{stage}}",
+      system_prompt: "Dir: {{workdir}}, Id: {{id}}, Stage: {{stage}}",
     });
 
     const agent = resolveAgent(getApp(), "vars-agent", {
@@ -307,21 +307,7 @@ describe("resolveAgent", () => {
       stage: "implement",
     });
 
-    expect(agent!.system_prompt).toBe("Dir: /tmp/work, Track: s-abc123, Stage: implement");
-  });
-
-  it("substitutes backward-compat jira_key and jira_summary", () => {
-    writeAgentYaml("compat-agent", {
-      name: "compat-agent",
-      system_prompt: "Ticket: {{jira_key}}, Summary: {{jira_summary}}",
-    });
-
-    const agent = resolveAgent(getApp(), "compat-agent", {
-      ticket: "JIRA-456",
-      summary: "Do the thing",
-    });
-
-    expect(agent!.system_prompt).toBe("Ticket: JIRA-456, Summary: Do the thing");
+    expect(agent!.system_prompt).toBe("Dir: /tmp/work, Id: s-abc123, Stage: implement");
   });
 
   it("preserves unknown template vars", () => {
@@ -334,14 +320,14 @@ describe("resolveAgent", () => {
     expect(agent!.system_prompt).toBe("Known: T-1, Unknown: {{custom_var}}");
   });
 
-  it("handles empty session -- vars resolve to empty strings", () => {
+  it("handles empty session -- unset vars render verbatim", () => {
     writeAgentYaml("empty-session", {
       name: "empty-session",
       system_prompt: "Ticket={{ticket}}, Repo={{repo}}",
     });
 
     const agent = resolveAgent(getApp(), "empty-session", {});
-    expect(agent!.system_prompt).toBe("Ticket=, Repo=");
+    expect(agent!.system_prompt).toBe("Ticket={{ticket}}, Repo={{repo}}");
   });
 
   it("handles agent with no system_prompt", () => {
@@ -350,16 +336,6 @@ describe("resolveAgent", () => {
     const agent = resolveAgent(getApp(), "no-prompt", { ticket: "X-1" });
     expect(agent).not.toBeNull();
     expect(agent!.system_prompt).toBe("");
-  });
-
-  it("workdir defaults to '.' when not provided", () => {
-    writeAgentYaml("workdir-default", {
-      name: "workdir-default",
-      system_prompt: "Dir: {{workdir}}",
-    });
-
-    const agent = resolveAgent(getApp(), "workdir-default", {});
-    expect(agent!.system_prompt).toBe("Dir: .");
   });
 });
 

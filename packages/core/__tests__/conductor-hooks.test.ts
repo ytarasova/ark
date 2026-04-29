@@ -426,6 +426,73 @@ describe("Conductor /hooks/status endpoint", async () => {
     expect(updated?.breakpoint_reason).toBeNull();
   });
 
+  it("PreToolUse is logged as hook_status so the Timeline pairs it with the PostToolUse", async () => {
+    // Regression: the conductor used to return early after guardrail
+    // evaluation without ever writing the PreToolUse event. Downstream,
+    // buildConversationTimeline pairs Pre/Post by tool_use_id and silently
+    // drops any PostToolUse whose Pre it never saw -- so agent-sdk tool
+    // calls disappeared entirely from the Timeline. Every PreToolUse must
+    // land in the events table regardless of the guardrail outcome.
+    const session = await getApp().sessions.create({ summary: "pre-tool test" });
+    await getApp().sessions.update(session.id, { status: "running" });
+
+    const resp = await postHook(session.id, {
+      hook_event_name: "PreToolUse",
+      tool_name: "Read",
+      tool_use_id: "toolu_REGRESSION",
+      tool_input: { file_path: "/tmp/foo.txt" },
+      session_id: "arbitrary-sdk-session",
+    });
+    expect(resp.status).toBe(200);
+
+    const events = await getApp().events.list(session.id);
+    const pre = events.find((e) => e.type === "hook_status" && (e.data as any)?.event === "PreToolUse");
+    expect(pre).toBeDefined();
+    expect((pre!.data as any).tool_use_id).toBe("toolu_REGRESSION");
+    expect((pre!.data as any).tool_name).toBe("Read");
+    expect((pre!.data as any).tool_input).toEqual({ file_path: "/tmp/foo.txt" });
+  });
+
+  it("AgentMessage hook is logged as agent_message event so the Timeline can render narration", async () => {
+    // Without this, agent-sdk sessions only show PreToolUse/PostToolUse
+    // events on the Timeline -- no human-readable narration. The user can't
+    // tell what the agent is doing or planning between tool calls.
+    const session = await getApp().sessions.create({ summary: "agent-message routing" });
+    await getApp().sessions.update(session.id, { status: "running" });
+
+    const resp = await postHook(session.id, {
+      hook_event_name: "AgentMessage",
+      text: "Looking at the file structure first.",
+      session_id: "arbitrary-sdk-session",
+    });
+    expect(resp.status).toBe(200);
+
+    const events = await getApp().events.list(session.id);
+    const msg = events.find((e) => e.type === "agent_message");
+    expect(msg).toBeDefined();
+    expect((msg!.data as any).text).toBe("Looking at the file structure first.");
+    // Critically: it should NOT also be logged as hook_status -- that would
+    // duplicate the rendering and confuse the timeline-builder's pairing.
+    const dup = events.find((e) => e.type === "hook_status" && (e.data as any)?.event === "AgentMessage");
+    expect(dup).toBeUndefined();
+  });
+
+  it("AgentMessage with thinking:true tags the event for the renderer", async () => {
+    const session = await getApp().sessions.create({ summary: "agent-thinking routing" });
+    await getApp().sessions.update(session.id, { status: "running" });
+
+    await postHook(session.id, {
+      hook_event_name: "AgentMessage",
+      text: "Let me reason carefully...",
+      thinking: true,
+    });
+
+    const events = await getApp().events.list(session.id);
+    const msg = events.find((e) => e.type === "agent_message");
+    expect(msg).toBeDefined();
+    expect((msg!.data as any).thinking).toBe(true);
+  });
+
   it("returns 400 for missing session param", async () => {
     const resp = await fetch(`http://localhost:${TEST_PORT}/hooks/status`, {
       method: "POST",

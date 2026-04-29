@@ -20,7 +20,6 @@ import type { ModelService } from "../../models/ModelService.js";
 import type { ComputeService } from "../compute.js";
 import type { PluginRegistry } from "../../plugins/registry.js";
 import type { StatusPollerRegistry } from "../../executors/status-poller.js";
-import type { SessionLauncher } from "../../session-launcher.js";
 import type { ArkConfig } from "../../config.js";
 import type { SecretsCapability } from "../../secrets/types.js";
 import type { Session, Compute } from "../../../types/index.js";
@@ -198,7 +197,6 @@ export interface DispatchDeps {
   computeService: ComputeService;
   pluginRegistry: PluginRegistry;
   statusPollers: StatusPollerRegistry;
-  launcher: SessionLauncher;
   config: ArkConfig;
   secrets: SecretsCapability;
 

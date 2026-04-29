@@ -5,10 +5,10 @@
  * `fs`, `child_process`, or `bun:sqlite` are allowed inside this directory.
  * The ESLint boundary rule in the repo root enforces that constraint.
  *
- * Existing ports that already live elsewhere (`SessionLauncher`,
- * `ComputeProvider`, resource stores) are re-exported from here so callers
- * can depend on a single catalog rather than guessing which package owns a
- * given interface. The authoritative files are NOT moved in this PR.
+ * Existing ports that already live elsewhere (`ComputeProvider`, resource
+ * stores) are re-exported from here so callers can depend on a single
+ * catalog rather than guessing which package owns a given interface. The
+ * authoritative files are NOT moved in this PR.
  */
 
 // New ports defined in this directory.
@@ -31,7 +31,6 @@ export type { Tracer, Span, SpanAttrs } from "./tracer.js";
 export type { SecretStore } from "./secret-store.js";
 
 // Existing ports kept in their current homes; re-exported for convenience.
-export type { SessionLauncher, LaunchResult } from "../session-launcher.js";
 export type { ComputeProvider } from "../../compute/types.js";
 export type { FlowStore, FlowSummary } from "../stores/flow-store.js";
 export type { AgentStore } from "../stores/agent-store.js";

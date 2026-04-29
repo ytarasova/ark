@@ -11,12 +11,6 @@ describe("integration catalog", () => {
     expect(gh?.connector?.status).toBe("full");
   });
 
-  test("contains pi-sage with both halves scaffolded", () => {
-    const sage = getIntegration("pi-sage");
-    expect(sage?.trigger?.status).toBe("scaffolded");
-    expect(sage?.connector?.status).toBe("full");
-  });
-
   test("trigger-only entries are surfaced (alertmanager, cloudwatch, pagerduty, prometheus)", () => {
     for (const name of ["alertmanager", "cloudwatch", "pagerduty", "prometheus"]) {
       const i = getIntegration(name);

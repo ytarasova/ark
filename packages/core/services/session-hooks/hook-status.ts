@@ -88,6 +88,31 @@ export class HookStatusApplier {
         hasNewCommits = true; /* no workdir = skip check */
       }
 
+      // Rescue path: agent exited without committing, but the worktree has
+      // uncommitted changes. Don't waste the work -- auto-commit so the
+      // flow can advance. This typically happens when the prompt gates
+      // commits behind a check the agent decided didn't pass (e.g. lint
+      // failed) and the model interprets that as "stop without committing"
+      // rather than "fix lint and then commit".
+      if (!hasNewCommits && session.workdir) {
+        const rescue = autoCommitUncommittedChanges(session.workdir, session.stage ?? null);
+        if (rescue.committed) {
+          hasNewCommits = true;
+          result.events!.push({
+            type: "auto_commit",
+            opts: {
+              stage: session.stage ?? undefined,
+              actor: "system",
+              data: {
+                reason: "agent exited with uncommitted changes",
+                files_changed: rescue.filesChanged,
+                head_sha: rescue.headSha,
+              },
+            },
+          });
+        }
+      }
+
       if (hasNewCommits) {
         result.shouldAdvance = true;
         result.shouldAutoDispatch = true;
@@ -252,6 +277,31 @@ export class HookStatusApplier {
       }
     }
 
+    // agent-sdk emits Stop / SessionEnd with the cost + usage attached
+    // directly to the hook payload (no transcript file). Without this branch
+    // every agent-sdk session showed `$0.00` and `0 tokens` in the
+    // SessionSummary panel + Cost tab even though the cost was sitting in
+    // the event row.
+    //
+    // Only record on `Stop`, not on `SessionEnd`. The agent-sdk launch
+    // script emits *both* hooks for every result with identical
+    // `total_cost_usd` / `usage` payloads (Stop is canonical, SessionEnd
+    // is the synthetic transition hook the conductor's state machine
+    // needs). Recording on both would double-count the ledger.
+    if (!transcriptPath && hookEvent === "Stop" && payload.usage && typeof payload.usage === "object") {
+      const u = payload.usage as Record<string, unknown>;
+      const usage = {
+        input_tokens: typeof u.input_tokens === "number" ? u.input_tokens : 0,
+        output_tokens: typeof u.output_tokens === "number" ? u.output_tokens : 0,
+        cache_read_tokens: typeof u.cache_read_input_tokens === "number" ? u.cache_read_input_tokens : 0,
+        cache_write_tokens: typeof u.cache_creation_input_tokens === "number" ? u.cache_creation_input_tokens : 0,
+      };
+      const total = usage.input_tokens + usage.output_tokens + usage.cache_read_tokens + usage.cache_write_tokens;
+      if (total > 0) {
+        recordSessionUsage(session, usage, "anthropic", "agent-sdk-hook");
+      }
+    }
+
     // Check for agent-initiated handoff on session end (fire-and-forget async)
     if (hookEvent === "SessionEnd" || hookEvent === "Stop") {
       getOutput(session.id, { lines: 50 })
@@ -277,5 +327,57 @@ export class HookStatusApplier {
     }
 
     return result;
+  }
+}
+
+/**
+ * Best-effort auto-commit of uncommitted worktree changes when an agent
+ * exits without committing. Returns committed=true with a file count and
+ * the new HEAD sha when something was committed; committed=false when the
+ * worktree is clean or git refuses (which we treat as "the strict
+ * no-commits failure path is correct after all").
+ *
+ * We pass user.name/user.email via -c flags so we don't depend on any
+ * AppContext or local git config -- the values mirror the defaults from
+ * services/worktree/setup.ts (applyWorktreeGitIdentity).
+ */
+function autoCommitUncommittedChanges(
+  workdir: string,
+  stage: string | null,
+): { committed: boolean; filesChanged: number; headSha: string | null } {
+  try {
+    const status = execFileSync("git", ["status", "--porcelain"], {
+      cwd: workdir,
+      encoding: "utf-8",
+      timeout: 5000,
+    }).trim();
+    if (!status) return { committed: false, filesChanged: 0, headSha: null };
+
+    const filesChanged = status.split("\n").filter((l) => l.trim().length > 0).length;
+
+    execFileSync("git", ["add", "-A"], { cwd: workdir, encoding: "utf-8", timeout: 5000 });
+
+    const stageLabel = stage ? ` (${stage})` : "";
+    const message = `[ark] auto-commit: agent did not commit before exit${stageLabel}`;
+
+    execFileSync(
+      "git",
+      ["-c", "user.name=Ark Agent", "-c", "user.email=agent@ark.local", "commit", "--no-verify", "-m", message],
+      { cwd: workdir, encoding: "utf-8", timeout: 10_000 },
+    );
+
+    const headSha = execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: workdir,
+      encoding: "utf-8",
+      timeout: 5000,
+    }).trim();
+
+    return { committed: true, filesChanged, headSha };
+  } catch (err) {
+    logDebug("session", "auto-commit fallback failed -- leaving session in failed state", {
+      workdir,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return { committed: false, filesChanged: 0, headSha: null };
   }
 }

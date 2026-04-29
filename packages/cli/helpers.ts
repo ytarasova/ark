@@ -84,3 +84,25 @@ export function formatEvent(type: string, data?: Record<string, unknown>): strin
       return type.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
   }
 }
+
+/**
+ * Build the cmd-array for spawning a child `ark` process.
+ *
+ * Compiled Bun bundles (the curl-installed binary) report a virtual
+ * `/$bunfs/...` path in `process.argv[1]` and ship `bun` *inside* the
+ * binary -- there is no external `bun` on PATH to invoke. In that mode
+ * we exec the binary itself via `process.execPath`. Source-tree dev runs
+ * still need `bun <script>` because `process.execPath` is just `bun`.
+ *
+ * Used by `app-client.ts` (auto-spawn when no daemon is running) and
+ * `commands/server-daemon.ts` (`ark server daemon start --detach`). A
+ * single helper keeps the logic identical in both call sites.
+ */
+export function arkSelfSpawnCmd(args: string[]): string[] {
+  const fromCompiledBundle = process.argv[1]?.startsWith("/$bunfs/");
+  if (fromCompiledBundle) return [process.execPath, ...args];
+  if (!process.argv[1]) {
+    throw new Error("arkSelfSpawnCmd: no process.argv[1] -- cannot spawn child ark");
+  }
+  return ["bun", process.argv[1], ...args];
+}

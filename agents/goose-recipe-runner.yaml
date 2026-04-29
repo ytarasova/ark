@@ -3,9 +3,9 @@ description: "Goose agent that executes a recipe file passed via session inputs.
 runtime: goose
 model: claude-sonnet-4-6
 max_turns: 200
-recipe: "{inputs.files.recipe}"
+recipe: "{inputs.recipe}"
 system_prompt: |
-  Executes the goose recipe at {inputs.files.recipe}. The recipe file is the
+  Executes the goose recipe at {inputs.recipe}. The recipe file is the
   source of truth for the task; this stanza is informational only.
 tools: []
 mcp_servers: []
