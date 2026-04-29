@@ -51,14 +51,14 @@ describe("docker flag spec", () => {
 });
 
 describe("ec2 flag spec", () => {
-  it("configFromFlags carries size/arch/region + optional profile/subnet/tags", () => {
+  it("configFromFlags carries size/arch/region + optional aws-profile/subnet/tags", () => {
     const cfg = ec2FlagSpec.configFromFlags({
       size: "m",
       arch: "x64",
-      region: "us-east-1",
-      profile: "yt",
-      subnetId: "subnet-abc",
-      tag: ["owner=yana", "env=dev"],
+      awsRegion: "us-east-1",
+      awsProfile: "yt",
+      awsSubnetId: "subnet-abc",
+      awsTag: ["owner=yana", "env=dev"],
     });
     expect(cfg).toEqual({
       size: "m",
@@ -74,21 +74,21 @@ describe("ec2 flag spec", () => {
     const cfg = ec2FlagSpec.configFromFlags({
       size: "s",
       arch: "arm",
-      region: "eu-west-1",
-      tag: [],
+      awsRegion: "eu-west-1",
+      awsTag: [],
     });
     expect(cfg).toEqual({ size: "s", arch: "arm", region: "eu-west-1" });
   });
 
   it("configFromFlags treats missing tag list as empty", () => {
-    const cfg = ec2FlagSpec.configFromFlags({ size: "xs", arch: "x64", region: "us-east-1" });
+    const cfg = ec2FlagSpec.configFromFlags({ size: "xs", arch: "x64", awsRegion: "us-east-1" });
     expect(cfg.tags).toBeUndefined();
   });
 
   it("displaySummary resolves size label from INSTANCE_SIZES", () => {
     const lines = ec2FlagSpec.displaySummary(
       { size: "m", arch: "x64", region: "us-east-1" },
-      { size: "m", arch: "x64", region: "us-east-1" },
+      { size: "m", arch: "x64", awsRegion: "us-east-1" },
     );
     expect(lines[0]).toContain("Medium");
     expect(lines[1]).toBe("  Arch:     x64");
@@ -98,7 +98,7 @@ describe("ec2 flag spec", () => {
   it("displaySummary falls back to raw size for unknown tier", () => {
     const lines = ec2FlagSpec.displaySummary(
       { size: "custom", arch: "arm", region: "ap-south-1" },
-      { size: "custom", arch: "arm", region: "ap-south-1" },
+      { size: "custom", arch: "arm", awsRegion: "ap-south-1" },
     );
     expect(lines[0]).toBe("  Size:     custom");
   });

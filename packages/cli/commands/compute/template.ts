@@ -92,8 +92,8 @@ export function registerTemplateCommands(computeCmd: Command) {
     .option("--description <desc>", "Description")
     .option("--size <size>", "Instance size (ec2)")
     .option("--arch <arch>", "Architecture (ec2)")
-    .option("--region <region>", "Region (ec2)")
-    .option("--profile <profile>", "AWS profile (ec2)")
+    .option("--aws-region <region>", "AWS region (ec2)")
+    .option("--aws-profile <profile>", "AWS profile (ec2)")
     .option("--image <image>", "Docker image (docker)")
     .option("--namespace <ns>", "K8s namespace (k8s)")
     .action(async (name, opts) => {
@@ -101,8 +101,8 @@ export function registerTemplateCommands(computeCmd: Command) {
         const config: Record<string, unknown> = {};
         if (opts.size) config.size = opts.size;
         if (opts.arch) config.arch = opts.arch;
-        if (opts.region) config.region = opts.region;
-        if (opts.profile) config.aws_profile = opts.profile;
+        if (opts.awsRegion) config.region = opts.awsRegion;
+        if (opts.awsProfile) config.aws_profile = opts.awsProfile;
         if (opts.image) config.image = opts.image;
         if (opts.namespace) config.namespace = opts.namespace;
 

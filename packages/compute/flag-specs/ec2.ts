@@ -1,9 +1,17 @@
 /**
  * EC2 provider flag spec.
  *
- * Owns `--size`, `--arch`, `--region`, `--profile`, `--subnet-id`,
- * `--tag <k=v>` (repeatable). The summary looks up the pretty size label
- * from `INSTANCE_SIZES` when available, falling back to the raw flag value.
+ * Owns `--size`, `--arch`, `--aws-region`, `--aws-profile`,
+ * `--aws-subnet-id`, `--aws-tag <k=v>` (repeatable).
+ *
+ * AWS-specific flags carry the `--aws-` prefix to (a) avoid collision with
+ * the root `ark -p, --profile <name>` ark-profile selector and (b) make it
+ * obvious at a glance that they're cloud-provider-specific. `--size` and
+ * `--arch` stay un-prefixed because they're generic VM concepts other
+ * providers (firecracker, k8s) may share later.
+ *
+ * The summary looks up the pretty size label from `INSTANCE_SIZES` when
+ * available, falling back to the raw flag value.
  */
 
 import type { ProviderFlagSpec } from "../flag-spec.js";
@@ -30,19 +38,19 @@ export const ec2FlagSpec: ProviderFlagSpec = {
       default: "m",
     },
     { flag: "--arch <arch>", description: "Architecture: x64, arm", default: "x64" },
-    { flag: "--region <region>", description: "Region", default: "us-east-1" },
-    { flag: "--profile <profile>", description: "AWS profile" },
-    { flag: "--subnet-id <id>", description: "Subnet ID" },
-    { flag: "--tag <key=value>", description: "Tag (repeatable)" },
+    { flag: "--aws-region <region>", description: "AWS region", default: "us-east-1" },
+    { flag: "--aws-profile <profile>", description: "AWS profile" },
+    { flag: "--aws-subnet-id <id>", description: "AWS subnet ID" },
+    { flag: "--aws-tag <key=value>", description: "AWS tag (repeatable)" },
   ],
   configFromFlags(opts) {
-    const tags = parseTags(opts.tag);
+    const tags = parseTags(opts.awsTag);
     return {
       size: opts.size,
       arch: opts.arch,
-      region: opts.region,
-      ...(opts.profile ? { aws_profile: opts.profile } : {}),
-      ...(opts.subnetId ? { subnet_id: opts.subnetId } : {}),
+      region: opts.awsRegion,
+      ...(opts.awsProfile ? { aws_profile: opts.awsProfile } : {}),
+      ...(opts.awsSubnetId ? { subnet_id: opts.awsSubnetId } : {}),
       ...(Object.keys(tags).length ? { tags } : {}),
     };
   },
@@ -56,7 +64,7 @@ export const ec2FlagSpec: ProviderFlagSpec = {
     }
     lines.push(`  Size:     ${sizeLabel}`);
     lines.push(`  Arch:     ${(opts.arch as string | undefined) ?? (config.arch as string | undefined) ?? ""}`);
-    lines.push(`  Region:   ${(opts.region as string | undefined) ?? (config.region as string | undefined) ?? ""}`);
+    lines.push(`  Region:   ${(opts.awsRegion as string | undefined) ?? (config.region as string | undefined) ?? ""}`);
     return lines;
   },
 };

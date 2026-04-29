@@ -74,9 +74,9 @@ export function registerLifecycleCommands(computeCmd: Command) {
     .argument("<name>", "Compute name")
     .option("--size <size>", "Instance size")
     .option("--arch <arch>", "Architecture: x64, arm")
-    .option("--region <region>", "AWS region")
-    .option("--profile <profile>", "AWS profile")
-    .option("--subnet-id <id>", "Subnet ID")
+    .option("--aws-region <region>", "AWS region")
+    .option("--aws-profile <profile>", "AWS profile")
+    .option("--aws-subnet-id <id>", "AWS subnet ID")
     .option("--ingress <cidrs>", "SSH ingress CIDRs (comma-separated, or 'open' for 0.0.0.0/0)")
     .option("--idle-minutes <min>", "Idle shutdown timeout in minutes")
     .option(
@@ -96,9 +96,9 @@ export function registerLifecycleCommands(computeCmd: Command) {
         const config: Record<string, unknown> = { ...compute.config };
         if (opts.size) config.size = opts.size;
         if (opts.arch) config.arch = opts.arch;
-        if (opts.region) config.region = opts.region;
-        if (opts.profile) config.aws_profile = opts.profile;
-        if (opts.subnetId) config.subnet_id = opts.subnetId;
+        if (opts.awsRegion) config.region = opts.awsRegion;
+        if (opts.awsProfile) config.aws_profile = opts.awsProfile;
+        if (opts.awsSubnetId) config.subnet_id = opts.awsSubnetId;
         if (opts.ingress) {
           config.ingress_cidrs =
             opts.ingress === "open" ? ["0.0.0.0/0"] : opts.ingress.split(",").map((s: string) => s.trim());
