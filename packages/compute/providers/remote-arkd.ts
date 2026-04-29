@@ -543,7 +543,12 @@ After=network.target
 
 [Service]
 User=ubuntu
-ExecStart=${REMOTE_HOME}/.bun/bin/bun ${REMOTE_HOME}/.ark/bin/ark arkd --port ${ARKD_REMOTE_PORT}${conductorFlag}
+# install.sh (https://ytarasova.github.io/ark/install.sh) drops a Bun-compiled
+# ELF at ~/.ark/bin/ark -- run it directly. The previous \`bun \${ark}\` prefix
+# made bun parse the ELF as JS source and crash at :1:1, leaving systemd
+# in an "activating (auto-restart)" loop and the post-provision arkd-health
+# poll failing.
+ExecStart=${REMOTE_HOME}/.ark/bin/ark arkd --port ${ARKD_REMOTE_PORT}${conductorFlag}
 Restart=always
 RestartSec=5
 Environment=HOME=${REMOTE_HOME}

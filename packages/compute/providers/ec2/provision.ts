@@ -7,6 +7,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { DEFAULT_ARKD_PORT } from "../../../core/constants.js";
 import {
   EC2Client,
   RunInstancesCommand,
@@ -192,6 +193,15 @@ export async function provisionStack(hostName: string, opts: ProvisionStackOpts)
       }
     }
 
+    // Two ingress rules:
+    //   - 22 (SSH): provisioning + cloud-init waits + maintenance
+    //   - 19300 (arkd): the control plane reaches arkd directly via
+    //     `http://${ip}:${ARKD_REMOTE_PORT}/health` (see remote-arkd.ts).
+    //     Without this rule the post-provision arkd-reachability poll
+    //     hangs ~90s and the catch block resets the compute row to
+    //     "stopped", even though the instance + cloud-init succeeded.
+    //     The instance's own iptables also opens 19300; that's
+    //     redundant if the SG is closed -- both layers must allow it.
     await client.send(
       new AuthorizeSecurityGroupIngressCommand({
         GroupId: sgId,
@@ -201,6 +211,12 @@ export async function provisionStack(hostName: string, opts: ProvisionStackOpts)
             FromPort: 22,
             ToPort: 22,
             IpRanges: [{ CidrIp: ingressCidr, Description: "SSH" }],
+          },
+          {
+            IpProtocol: "tcp",
+            FromPort: DEFAULT_ARKD_PORT,
+            ToPort: DEFAULT_ARKD_PORT,
+            IpRanges: [{ CidrIp: ingressCidr, Description: "arkd HTTP" }],
           },
         ],
       }),
