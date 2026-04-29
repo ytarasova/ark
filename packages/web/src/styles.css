@@ -137,9 +137,20 @@
   }
 }
 
-/* ---- Scrollbar ---- */
+/* ---- Scrollbar ----
+ * Firefox: html-level `scrollbar-*` props apply to every scrollable
+ * descendant unless overridden, so horizontal scrollers (xterm host,
+ * code blocks) get the same thin treatment as vertical ones without
+ * per-element rules.
+ * WebKit: width controls vertical thickness, height controls horizontal --
+ * both must be set or the OS default scrollbar comes back on the unset axis. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -862,15 +873,6 @@ body.is-macos .drag-region {
   overflow-y: hidden;
   background: #0a0a0a;
   padding: 4px;
-}
-
-/* xterm.js's .xterm-viewport gets the same thin transparent-track
- * scrollbar treatment as the rest of the app (see global ::-webkit-scrollbar
- * rules near line 141). Firefox needs the explicit `scrollbar-*` props
- * because the global rules use only the WebKit pseudo-elements. */
-.terminal-host .xterm-viewport {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
 }
 
 /* Status pill rendered next to the panel chip (e.g. "Live", "Reconnecting 1/5"). */
