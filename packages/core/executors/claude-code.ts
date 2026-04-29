@@ -69,44 +69,87 @@ export const claudeCodeExecutor: Executor = {
     const flowConnectors = flowConnectorsFor(app, session.flow);
     const runtimeMcpServers = collectMcpEntries(app, session, { runtimeName, flowConnectors });
     const { resolveMcpConfigsDir } = await import("../install-paths.js");
-    const mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, {
-      conductorUrl,
-      channelConfig,
-      tracksDir: app.config.dirs.tracks,
-      originalRepoDir,
-      runtimeMcpServers,
-      mcpConfigsDir: resolveMcpConfigsDir(),
-    });
 
-    // Verify MCP channel config was written
-    try {
-      const mcpContent = readFileSync(mcpConfigPath, "utf-8");
-      const mcpParsed = JSON.parse(mcpContent);
-      const hasChannel = !!mcpParsed?.mcpServers?.["ark-channel"];
+    const isRemote = !!(compute && provider && !provider.supportsWorktree);
+
+    // For LOCAL dispatch: write `.mcp.json` + `.claude/settings.local.json`
+    // directly into the local workdir Claude will run in. For REMOTE dispatch
+    // we skip the local writes (the workdir on the conductor is irrelevant)
+    // and instead build the JSON in-memory and ship it to the remote workdir
+    // via the launcher's embedFiles heredocs (see buildLauncher below). Same
+    // builders, two delivery vehicles -- no rsync from the conductor.
+    let mcpConfigPath: string;
+    let mcpJsonContent: string | null = null;
+    let settingsJsonContent: string | null = null;
+    const settingsRelPath = ".claude/settings.local.json";
+    const mcpRelPath = ".mcp.json";
+
+    if (isRemote) {
+      // Build JSON content for both files (no I/O on the conductor).
+      const channel = claude.buildChannelConfig(session.id, stage, channelPort, {
+        conductorUrl,
+        channelConfig,
+        // No `originalRepoDir` for remote -- the source repo is on the
+        // conductor; the remote freshly clones in `provider.launch`.
+        runtimeMcpServers,
+        mcpConfigsDir: resolveMcpConfigsDir(),
+        // codebase-memory binary lives on the conductor's filesystem; the
+        // path won't exist on EC2/k8s. Skip the probe.
+        includeLocalCodebaseMemory: false,
+      });
+      mcpJsonContent = channel.content;
+      const hasChannel = !!channel.object?.mcpServers?.["ark-channel"];
       if (!hasChannel) {
-        log(`CRITICAL: writeChannelConfig missing ark-channel in ${mcpConfigPath}`);
+        log(`CRITICAL: buildChannelConfig produced no ark-channel entry for remote dispatch`);
       }
-    } catch (e: any) {
-      log(`CRITICAL: failed to verify MCP config at ${mcpConfigPath}: ${e?.message ?? e}`);
-    }
 
-    // Status hooks + permissions allow-list -- MUST happen before agent launch.
-    // The settings file configures Claude Code hooks (PreToolUse, Stop, etc.) that
-    // report status back to the conductor. Without it, the conversation stays empty.
-    // Uses writeSettingsVerified for fail-fast: if hooks are missing, the agent
-    // would launch blind with no status reporting.
-    const settingsResult = claude.writeSettingsVerified(session.id, conductorUrl, effectiveWorkdir, {
-      autonomy: opts.autonomy,
-      agent: { tools: opts.agent.tools, mcp_servers: opts.agent.mcp_servers },
-      tenantId: session.tenant_id ?? "default",
-    });
+      const settings = claude.buildSettings(session.id, conductorUrl, {
+        autonomy: opts.autonomy,
+        agent: { tools: opts.agent.tools, mcp_servers: opts.agent.mcp_servers },
+        tenantId: session.tenant_id ?? "default",
+      });
+      settingsJsonContent = settings.content;
+      log(`Remote settings + MCP built: ${settings.hookCount} hook events; ` + `${Object.keys((channel.object as { mcpServers?: Record<string, unknown> })?.mcpServers ?? {}).length} mcp servers`);
 
-    if (!settingsResult.verified) {
-      const errMsg = `Settings verification failed for ${session.id}: ${settingsResult.errors.join("; ")}`;
-      log(`CRITICAL: ${errMsg}`);
-      return { ok: false, handle: "", message: errMsg };
+      // mcpConfigPath is referenced by buildLauncher's `mcpConfigPath` field.
+      // For remote, point at the path the launcher heredoc will write on the
+      // remote host, not a conductor-side path.
+      mcpConfigPath = `${effectiveWorkdir}/${mcpRelPath}`;
+    } else {
+      // Local: write both files atomically into the local workdir as before.
+      mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, {
+        conductorUrl,
+        channelConfig,
+        tracksDir: app.config.dirs.tracks,
+        originalRepoDir,
+        runtimeMcpServers,
+        mcpConfigsDir: resolveMcpConfigsDir(),
+      });
+
+      try {
+        const mcpContent = readFileSync(mcpConfigPath, "utf-8");
+        const mcpParsed = JSON.parse(mcpContent);
+        const hasChannel = !!mcpParsed?.mcpServers?.["ark-channel"];
+        if (!hasChannel) {
+          log(`CRITICAL: writeChannelConfig missing ark-channel in ${mcpConfigPath}`);
+        }
+      } catch (e: any) {
+        log(`CRITICAL: failed to verify MCP config at ${mcpConfigPath}: ${e?.message ?? e}`);
+      }
+
+      const settingsResult = claude.writeSettingsVerified(session.id, conductorUrl, effectiveWorkdir, {
+        autonomy: opts.autonomy,
+        agent: { tools: opts.agent.tools, mcp_servers: opts.agent.mcp_servers },
+        tenantId: session.tenant_id ?? "default",
+      });
+
+      if (!settingsResult.verified) {
+        const errMsg = `Settings verification failed for ${session.id}: ${settingsResult.errors.join("; ")}`;
+        log(`CRITICAL: ${errMsg}`);
+        return { ok: false, handle: "", message: errMsg };
+      }
+      log(`Settings verified at ${settingsResult.path}: ${settingsResult.hookCount} hook events`);
     }
-    log(`Settings verified at ${settingsResult.path}: ${settingsResult.hookCount} hook events`);
 
     // Build launch env from agent config + provider-specific env + router URL (if enabled)
     const { buildRouterEnv } = await import("./router-env.js");
@@ -128,6 +171,17 @@ export const claudeCodeExecutor: Executor = {
     };
 
     const claudeArgs = opts.claudeArgs ?? [];
+    // For remote dispatch, embed the .mcp.json and .claude/settings.local.json
+    // JSON we just built as heredocs in the launcher script. The launcher writes
+    // them in the remote workdir on first run -- no conductor-side files cross
+    // the wire, no rsync.
+    const embedFiles =
+      isRemote && mcpJsonContent && settingsJsonContent
+        ? [
+            { relPath: mcpRelPath, content: mcpJsonContent },
+            { relPath: settingsRelPath, content: settingsJsonContent },
+          ]
+        : undefined;
     const { content: launchContent, claudeSessionId } = claude.buildLauncher({
       workdir: effectiveWorkdir,
       claudeArgs,
@@ -135,6 +189,7 @@ export const claudeCodeExecutor: Executor = {
       prevClaudeSessionId: opts.prevClaudeSessionId ?? session.claude_session_id,
       env: launchEnv,
       initialPrompt: opts.initialPrompt,
+      embedFiles,
     });
 
     const launcher = tmux.writeLauncher(session.id, launchContent, app.config.dirs.tracks);

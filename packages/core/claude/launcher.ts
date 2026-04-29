@@ -20,6 +20,15 @@ export interface LauncherOpts {
   env?: Record<string, string>;
   /** Initial prompt passed as positional arg -- triggers immediate processing */
   initialPrompt?: string;
+  /**
+   * Files to materialise on the host the launcher runs on, before claude
+   * starts. Each entry is `{ relPath, content }`; `relPath` is interpreted
+   * relative to `workdir`. Used by remote dispatch to ship .mcp.json and
+   * .claude/settings.local.json into the workdir freshly cloned on the
+   * remote host -- the conductor builds the JSON locally, embeds it as a
+   * heredoc, and the launcher script writes it on first run. No rsync.
+   */
+  embedFiles?: Array<{ relPath: string; content: string }>;
 }
 
 /** Generate launcher bash script content. */
@@ -95,9 +104,31 @@ else
   echo "Claude exited with code $code. Session marked failed." >&2
 fi`;
 
+  // Optional file heredocs: write embedded files into the workdir on the host
+  // the launcher runs on. We use a quoted heredoc tag (`'ARK_EOF_<n>'`) so
+  // $-interpolation in the content is suppressed -- the JSON we embed must
+  // land verbatim on disk. A unique tag per entry guards against literal
+  // collisions in the content.
+  const embedBlock = (() => {
+    if (!opts.embedFiles?.length) return "";
+    const lines: string[] = [];
+    opts.embedFiles.forEach((file, idx) => {
+      // Resolve `<workdir>/<relPath>` into a single shell-quoted absolute path
+      // so the launcher script is invariant to the cwd it runs in.
+      const absolute = file.relPath.startsWith("/") ? file.relPath : `${opts.workdir}/${file.relPath}`;
+      const targetPath = shellQuote(absolute);
+      const tag = `ARK_EOF_${idx}`;
+      lines.push(`mkdir -p "$(dirname ${targetPath})"`);
+      lines.push(`cat > ${targetPath} <<'${tag}'`);
+      lines.push(file.content);
+      lines.push(tag);
+    });
+    return lines.join("\n") + "\n";
+  })();
+
   const content = `#!/bin/bash
 ${pathSetup}cd ${shellQuote(opts.workdir)}
-${envBlock}${body}
+${embedBlock}${envBlock}${body}
 exec bash
 `;
 

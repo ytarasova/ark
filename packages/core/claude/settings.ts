@@ -90,6 +90,77 @@ export interface WriteSettingsResult {
 }
 
 /**
+ * Pure builder: produces the JSON object Claude expects in
+ * `.claude/settings.local.json` given the active session + conductor + agent
+ * inputs, without touching the filesystem. Used both by `writeSettings` (which
+ * adds I/O + idempotent merge with an existing local file) and by the remote
+ * launcher path (which embeds the JSON as a heredoc so the launcher writes
+ * the file in the remote workdir on first launch).
+ *
+ * For the remote path there is no "existing settings.local.json" to merge with
+ * -- the remote workdir is freshly cloned. Callers that DO need the merge
+ * pass the existing object in via `existing` (writeSettings does this).
+ */
+export function buildSettings(
+  sessionId: string,
+  conductorUrl: string,
+  opts?: ClaudeSettingsOpts & { existing?: Record<string, unknown> },
+): { object: Record<string, unknown>; content: string; hookCount: number } {
+  const out: Record<string, unknown> = opts?.existing ? { ...opts.existing } : {};
+
+  // Strip prior ark hooks (idempotent).
+  if (out.hooks && typeof out.hooks === "object") {
+    filterOutArkHooks(out.hooks as Record<string, unknown[]>);
+    if (Object.keys(out.hooks as object).length === 0) delete out.hooks;
+  }
+
+  // Merge fresh ark hooks first so they fire before any user hooks.
+  const newHooks = buildHooksConfig(sessionId, conductorUrl, opts?.tenantId);
+  const existingHooks = (out.hooks ?? {}) as Record<string, unknown[]>;
+  for (const [event, matchers] of Object.entries(newHooks)) {
+    existingHooks[event] = [...matchers, ...(existingHooks[event] ?? [])];
+  }
+  out.hooks = existingHooks;
+
+  // Ark-managed state tracker for clean teardown.
+  const arkMeta = (out._ark ?? {}) as Record<string, unknown>;
+  arkMeta.sessionId = sessionId;
+  arkMeta.conductorUrl = conductorUrl;
+  arkMeta.updatedAt = new Date().toISOString();
+
+  // permissions.allow built from agent.tools + system MCPs.
+  if (opts?.agent) {
+    const allow = buildPermissionsAllow(opts.agent);
+    if (!allow.includes("mcp__ark-channel__*")) allow.push("mcp__ark-channel__*");
+    if (!allow.includes("mcp__codebase-memory__*")) allow.push("mcp__codebase-memory__*");
+    const perms = (out.permissions ?? {}) as Record<string, unknown>;
+    perms.allow = allow;
+    out.permissions = perms;
+    arkMeta.managedAllow = true;
+  }
+
+  if (opts?.autonomy === "edit") {
+    const perms = (out.permissions ?? {}) as Record<string, unknown>;
+    perms.deny = ["Bash"];
+    out.permissions = perms;
+    arkMeta.managedDeny = true;
+  } else if (opts?.autonomy === "read-only") {
+    const perms = (out.permissions ?? {}) as Record<string, unknown>;
+    perms.deny = ["Bash", "Write", "Edit"];
+    out.permissions = perms;
+    arkMeta.managedDeny = true;
+  }
+
+  out._ark = arkMeta;
+
+  return {
+    object: out,
+    content: JSON.stringify(out, null, 2),
+    hookCount: Object.keys(out.hooks ?? {}).length,
+  };
+}
+
+/**
  * Ensure .claude/settings.local.json and .mcp.json are listed in the workdir's
  * .gitignore. Idempotent -- skips if already present. Only appends to an
  * existing .gitignore; does not create one (worktrees inherit from root).
@@ -200,67 +271,11 @@ export function writeSettings(
     }
   }
 
-  // Remove previous ark hooks (idempotent)
-  if (existing.hooks && typeof existing.hooks === "object") {
-    filterOutArkHooks(existing.hooks as Record<string, unknown[]>);
-    if (Object.keys(existing.hooks as object).length === 0) delete existing.hooks;
-  }
-
-  // Merge new hooks -- ark entries go first so they fire before user hooks
-  const newHooks = buildHooksConfig(sessionId, conductorUrl, opts?.tenantId);
-  const existingHooks = (existing.hooks ?? {}) as Record<string, unknown[]>;
-  for (const [event, matchers] of Object.entries(newHooks)) {
-    existingHooks[event] = [...matchers, ...(existingHooks[event] ?? [])];
-  }
-  existing.hooks = existingHooks;
-
-  // Ark-managed state tracker
-  const arkMeta = (existing._ark ?? {}) as Record<string, unknown>;
-  arkMeta.sessionId = sessionId;
-  arkMeta.conductorUrl = conductorUrl;
-  arkMeta.updatedAt = new Date().toISOString();
-
-  // Build permissions.allow from agent.tools + declared mcp_servers (if agent provided).
-  // autonomy=full / --dangerously-skip-permissions is the explicit override: when set,
-  // Claude Code bypasses this list. The allow list is authoritative when bypass is off.
-  //
-  // ark-channel is ALWAYS included -- it's system infrastructure injected by dispatch,
-  // not declared in agent YAML. Without it, report/send_to_agent tools are blocked.
-  if (opts?.agent) {
-    const allow = buildPermissionsAllow(opts.agent);
-    if (!allow.includes("mcp__ark-channel__*")) {
-      allow.push("mcp__ark-channel__*");
-    }
-    // codebase-memory-mcp is system infrastructure injected by dispatch
-    // (see writeChannelConfig). Agents get its 14 code-intelligence tools
-    // for free without declaring it in mcp_servers.
-    if (!allow.includes("mcp__codebase-memory__*")) {
-      allow.push("mcp__codebase-memory__*");
-    }
-    const perms = (existing.permissions ?? {}) as Record<string, unknown>;
-    perms.allow = allow;
-    existing.permissions = perms;
-    arkMeta.managedAllow = true;
-  }
-
-  // Add permission restrictions based on autonomy level
-  if (opts?.autonomy === "edit") {
-    const perms = (existing.permissions ?? {}) as Record<string, unknown>;
-    perms.deny = ["Bash"];
-    existing.permissions = perms;
-    arkMeta.managedDeny = true;
-  } else if (opts?.autonomy === "read-only") {
-    const perms = (existing.permissions ?? {}) as Record<string, unknown>;
-    perms.deny = ["Bash", "Write", "Edit"];
-    existing.permissions = perms;
-    arkMeta.managedDeny = true;
-  }
-
-  existing._ark = arkMeta;
+  const { content } = buildSettings(sessionId, conductorUrl, { ...opts, existing });
 
   // Atomic write via tmp + rename
   const tmpPath = settingsPath + ".tmp";
-  writeFileSync(tmpPath, JSON.stringify(existing, null, 2));
+  writeFileSync(tmpPath, content);
   renameSync(tmpPath, settingsPath);
 
   return settingsPath;

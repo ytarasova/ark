@@ -21,9 +21,17 @@
 
 export { MODEL_MAP, resolveModel } from "./model.js";
 export { buildArgs, shellQuoteArgs, type ClaudeArgsOpts } from "./args.js";
-export { channelMcpConfig, expandEnvPlaceholders, writeChannelConfig, removeChannelConfig } from "./mcp-config.js";
+export {
+  channelMcpConfig,
+  expandEnvPlaceholders,
+  writeChannelConfig,
+  removeChannelConfig,
+  buildChannelConfig,
+  type BuildChannelConfigOpts,
+} from "./mcp-config.js";
 export { buildPermissionsAllow, buildToolHints, type AgentToolSpec } from "./permissions.js";
 export {
+  buildSettings,
   writeSettings,
   writeSettingsVerified,
   removeSettings,

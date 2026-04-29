@@ -130,62 +130,59 @@ function resolveMcpServerEntry(
   }
 }
 
+/** Inputs shared by the pure channel-config builder + the on-disk writer. */
+export interface BuildChannelConfigOpts {
+  conductorUrl?: string;
+  channelConfig?: Record<string, unknown>;
+  originalRepoDir?: string;
+  /** MCP servers declared on the active runtime YAML. */
+  runtimeMcpServers?: (string | Record<string, unknown>)[];
+  /** Directory holding `<name>.json` files referenced by string entries. */
+  mcpConfigsDir?: string;
+  /**
+   * When true, additionally inject the unified `ark-code-intel` MCP server
+   * alongside the legacy `codebase-memory` entry. Gated by
+   * `config.features.codeIntelV2`.
+   */
+  enableCodeIntelV2?: boolean;
+  /** Pre-parsed existing `.mcp.json` to merge with (writeChannelConfig fills this). */
+  existing?: Record<string, any>;
+  /**
+   * When false, skip the host-local `findCodebaseMemoryBinary()` probe.
+   * Set false for remote launchers -- the local conductor's vendored binary
+   * path is irrelevant on EC2/k8s.
+   */
+  includeLocalCodebaseMemory?: boolean;
+}
+
 /**
- * Write channel MCP config to the worktree's .mcp.json.
- * Claude Code reads .mcp.json from the project directory at startup.
- * --dangerously-load-development-channels server:NAME looks up NAME
- * in the loaded MCP config, so the server must be in .mcp.json.
+ * Pure builder: produces the merged `.mcp.json` JSON given the inputs above.
+ * No filesystem writes. Used by `writeChannelConfig` (which adds I/O + reads
+ * the existing file) and by the remote launcher path (which embeds the JSON
+ * as a heredoc that runs on the remote host).
  *
- * Merge order (later wins for the same name only via opt-in entries; the
- * channel + codebase-memory are always written last so they cannot be
- * shadowed by repo / runtime config):
- *   1. existing `.mcp.json` in the worktree
- *   2. servers copied from `originalRepoDir/.mcp.json` (skips `ark-channel`,
- *      never overwrites existing names)
- *   3. servers declared in the runtime YAML (`runtimeMcpServers`)
+ * Merge order, later wins only via opt-in entries:
+ *   1. `opts.existing` (whatever was already in `.mcp.json`)
+ *   2. `originalRepoDir/.mcp.json` (skip `ark-channel`, don't overwrite)
+ *   3. runtime-declared MCP servers (skip `ark-channel`, don't overwrite)
  *   4. `ark-channel` (always overwritten)
- *   5. `codebase-memory` (only if the binary is on disk and not already set)
+ *   5. `codebase-memory` (only when `includeLocalCodebaseMemory !== false`
+ *       AND the local conductor's vendored binary is present)
  */
-export function writeChannelConfig(
+export function buildChannelConfig(
   sessionId: string,
   stage: string,
   channelPort: number,
-  workdir: string,
-  opts?: {
-    conductorUrl?: string;
-    channelConfig?: Record<string, unknown>;
-    tracksDir?: string;
-    originalRepoDir?: string;
-    /** MCP servers declared on the active runtime YAML. */
-    runtimeMcpServers?: (string | Record<string, unknown>)[];
-    /** Directory holding `<name>.json` files referenced by string entries. */
-    mcpConfigsDir?: string;
-    /**
-     * When true, additionally inject the unified `ark-code-intel` MCP server
-     * alongside the legacy `codebase-memory` entry. Gated by
-     * `config.features.codeIntelV2`. Wave 1 default: false.
-     */
-    enableCodeIntelV2?: boolean;
-  },
-): string {
+  opts?: BuildChannelConfigOpts,
+): { object: Record<string, any>; content: string } {
   const config =
     opts?.channelConfig ?? channelMcpConfig(sessionId, stage, channelPort, { conductorUrl: opts?.conductorUrl });
 
-  // Write to worktree .mcp.json so Claude finds it
-  const mcpConfigPath = join(workdir, ".mcp.json");
-  let existing: Record<string, any> = {};
-  if (existsSync(mcpConfigPath)) {
-    try {
-      existing = JSON.parse(readFileSync(mcpConfigPath, "utf-8"));
-    } catch (e: any) {
-      console.error(`writeChannelConfig: failed to parse ${mcpConfigPath}:`, e?.message ?? e);
-    }
-  }
+  const existing: Record<string, any> = opts?.existing ? { ...opts.existing } : {};
 
-  // Merge MCP servers from the original repo's .mcp.json into the worktree.
-  // Git worktrees don't include untracked files like .mcp.json, so agents in
-  // worktrees would lose access to MCP servers configured in the original repo.
-  if (opts?.originalRepoDir && resolve(opts.originalRepoDir) !== resolve(workdir)) {
+  // 2. originalRepoDir merge -- only meaningful on the local conductor where
+  //    the repo dir is on disk.
+  if (opts?.originalRepoDir) {
     const origMcpPath = join(opts.originalRepoDir, ".mcp.json");
     if (existsSync(origMcpPath)) {
       try {
@@ -193,7 +190,6 @@ export function writeChannelConfig(
         if (origConfig.mcpServers && typeof origConfig.mcpServers === "object") {
           if (!existing.mcpServers) existing.mcpServers = {};
           for (const [name, serverConfig] of Object.entries(origConfig.mcpServers)) {
-            // Skip ark-channel (we write our own) and don't override existing entries
             if (name !== "ark-channel" && !existing.mcpServers[name]) {
               existing.mcpServers[name] = serverConfig;
             }
@@ -201,16 +197,14 @@ export function writeChannelConfig(
         }
       } catch (e: any) {
         console.error(
-          `writeChannelConfig: failed to merge original repo MCP config from ${origMcpPath}:`,
+          `buildChannelConfig: failed to merge original repo MCP config from ${origMcpPath}:`,
           e?.message ?? e,
         );
       }
     }
   }
 
-  // Merge runtime-declared MCP servers (e.g. from runtimes/claude.yaml). Same
-  // precedence as the original-repo merge: do not override entries already
-  // present in the worktree's .mcp.json or in the source repo's .mcp.json.
+  // 3. runtime-declared MCP servers
   if (opts?.runtimeMcpServers?.length) {
     if (!existing.mcpServers) existing.mcpServers = {};
     for (const entry of opts.runtimeMcpServers) {
@@ -222,46 +216,68 @@ export function writeChannelConfig(
     }
   }
 
+  // 4. ark-channel always wins
   if (!existing.mcpServers) existing.mcpServers = {};
   existing.mcpServers["ark-channel"] = config;
 
-  // Inject codebase-memory-mcp if the vendored binary is available.
-  // It speaks MCP over stdio with no args -- invoking the binary directly
-  // gives the agent its 14 code-intelligence tools (search_graph, trace_path,
-  // get_architecture, search_code, manage_adr, etc.).
-  // See docs/2026-04-18-CODE_INTELLIGENCE_DESIGN.md.
-  const cbmBin = findCodebaseMemoryBinary();
-  const cbmAvailable = cbmBin !== "codebase-memory-mcp" && existsSync(cbmBin);
-  if (cbmAvailable && !existing.mcpServers["codebase-memory"]) {
-    existing.mcpServers["codebase-memory"] = {
-      command: cbmBin,
-      args: [],
-      env: {
-        // Keep the HTTP graph UI disabled by default; arkd pool may override.
-        CBM_UI_ENABLED: "false",
-      },
-    };
+  // 5. codebase-memory: only inject if the local conductor's vendored binary
+  //    is on disk AND the caller hasn't asked us to skip this probe (remote
+  //    launchers do; the path doesn't translate).
+  if (opts?.includeLocalCodebaseMemory !== false) {
+    const cbmBin = findCodebaseMemoryBinary();
+    const cbmAvailable = cbmBin !== "codebase-memory-mcp" && existsSync(cbmBin);
+    if (cbmAvailable && !existing.mcpServers["codebase-memory"]) {
+      existing.mcpServers["codebase-memory"] = {
+        command: cbmBin,
+        args: [],
+        env: { CBM_UI_ENABLED: "false" },
+      };
+    }
   }
 
-  // Wave 1: gate the unified code-intel MCP behind the codeIntelV2 flag.
-  // The MCP server itself ships in Wave 2; for now we leave the entry name
-  // as the stable contract and skip injection until both the flag and the
-  // server binary are present.
+  // codeIntelV2 entry is reserved -- the MCP server binary doesn't ship yet.
   if (opts?.enableCodeIntelV2 && !existing.mcpServers["ark-code-intel"]) {
-    // The MCP server binary lands in Wave 2. Until then, the flag has no
-    // observable effect at write-time -- intentional: we don't want to
-    // inject a broken MCP entry, but we do want the gate to be wired so
-    // downstream wiring lights up the moment the server ships.
     void existing;
   }
 
-  writeFileSync(mcpConfigPath, JSON.stringify(existing, null, 2));
+  return { object: existing, content: JSON.stringify(existing, null, 2) };
+}
 
-  // Also write a copy to tracks dir for reference
+/**
+ * Write channel MCP config to the worktree's .mcp.json.
+ * Claude Code reads .mcp.json from the project directory at startup.
+ * --dangerously-load-development-channels server:NAME looks up NAME
+ * in the loaded MCP config, so the server must be in .mcp.json.
+ *
+ * Wraps `buildChannelConfig` with: read the existing local file, hand it to
+ * the builder, atomically write the result, optionally also drop a sidecar
+ * copy under `tracksDir/<sessionId>/mcp.json` for offline inspection.
+ */
+export function writeChannelConfig(
+  sessionId: string,
+  stage: string,
+  channelPort: number,
+  workdir: string,
+  opts?: BuildChannelConfigOpts & { tracksDir?: string },
+): string {
+  const mcpConfigPath = join(workdir, ".mcp.json");
+  let existing: Record<string, any> = {};
+  if (existsSync(mcpConfigPath)) {
+    try {
+      existing = JSON.parse(readFileSync(mcpConfigPath, "utf-8"));
+    } catch (e: any) {
+      console.error(`writeChannelConfig: failed to parse ${mcpConfigPath}:`, e?.message ?? e);
+    }
+  }
+
+  const { object, content } = buildChannelConfig(sessionId, stage, channelPort, { ...opts, existing });
+  writeFileSync(mcpConfigPath, content);
+
   if (opts?.tracksDir) {
     const sessionDir = join(opts.tracksDir, sessionId);
     mkdirSync(sessionDir, { recursive: true });
-    writeFileSync(join(sessionDir, "mcp.json"), JSON.stringify({ mcpServers: { "ark-channel": config } }, null, 2));
+    const channelOnly = JSON.stringify({ mcpServers: { "ark-channel": object.mcpServers["ark-channel"] } }, null, 2);
+    writeFileSync(join(sessionDir, "mcp.json"), channelOnly);
   }
 
   return mcpConfigPath;
