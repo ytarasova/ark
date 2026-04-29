@@ -19,6 +19,16 @@ import type {
 } from "../../types/index.js";
 import type { RpcFn } from "./rpc.js";
 
+/**
+ * Long-running infra calls (EC2 launch + cloud-init, k8s pod schedule,
+ * SG/key cleanup) routinely take 60-180s end-to-end. The default 30s
+ * RPC timeout in `client.ts` was firing mid-provision and surfacing as
+ * spurious "RPC timeout" errors even though the server completed
+ * successfully. 5 min covers the slowest provider path with margin;
+ * the user can still Ctrl-C if it's truly stuck.
+ */
+const INFRA_TIMEOUT_MS = 5 * 60 * 1000;
+
 export class ComputeClient {
   readonly rpc!: RpcFn;
   constructor(rpc?: RpcFn) {
@@ -57,19 +67,19 @@ export class ComputeClient {
   }
 
   async computeProvision(name: string): Promise<void> {
-    await this.rpc("compute/provision", { name });
+    await this.rpc("compute/provision", { name }, INFRA_TIMEOUT_MS);
   }
 
   async computeStopInstance(name: string): Promise<void> {
-    await this.rpc("compute/stop-instance", { name });
+    await this.rpc("compute/stop-instance", { name }, INFRA_TIMEOUT_MS);
   }
 
   async computeStartInstance(name: string): Promise<void> {
-    await this.rpc("compute/start-instance", { name });
+    await this.rpc("compute/start-instance", { name }, INFRA_TIMEOUT_MS);
   }
 
   async computeDestroy(name: string): Promise<void> {
-    await this.rpc("compute/destroy", { name });
+    await this.rpc("compute/destroy", { name }, INFRA_TIMEOUT_MS);
   }
 
   async computeClean(name: string): Promise<void> {
@@ -77,7 +87,7 @@ export class ComputeClient {
   }
 
   async computeReboot(name: string): Promise<void> {
-    await this.rpc("compute/reboot", { name });
+    await this.rpc("compute/reboot", { name }, INFRA_TIMEOUT_MS);
   }
 
   async computePing(name: string): Promise<ComputePingResult> {
