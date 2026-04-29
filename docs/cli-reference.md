@@ -1696,18 +1696,6 @@ Manage authentication and API keys
 
 **Synopsis:** `ark auth`
 
-### `ark auth setup`
-
-Set up Claude authentication (local or remote)
-
-**Synopsis:** `ark auth setup [options]`
-
-**Options:**
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--host <name>` |  | Run setup-token on a specific remote compute |
-
 ### `ark auth create-key`
 
 Create a new API key

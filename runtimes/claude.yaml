@@ -2,6 +2,12 @@ name: claude
 description: "Claude Code (Anthropic) - API billing"
 type: claude-code
 permission_mode: bypassPermissions
+# Declarative secrets contract: dispatch resolves these names against the
+# tenant's `ark secret` store and exports them as env vars on the launcher
+# (same pipeline agent-sdk.yaml uses). Without this list a fresh Claude on
+# a non-local compute has no API key and falls into interactive setup.
+secrets:
+  - ANTHROPIC_API_KEY
 env:
   CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: "80"
 billing:

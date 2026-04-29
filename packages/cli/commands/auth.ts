@@ -1,80 +1,23 @@
 import type { Command } from "commander";
 import chalk from "chalk";
-import { execFileSync } from "child_process";
-import { mkdirSync, writeFileSync } from "fs";
-import { join } from "path";
 import { getArkClient } from "../app-client.js";
 import { runAction } from "./_shared.js";
 
 /**
  * Auth commands. API-key CRUD dispatches to `admin/apikey/*` over RPC so
  * admin-gate enforcement is consistent with the rest of the admin surface.
- * `ark auth setup` remains a local-only flow -- it writes an OAuth token
- * into ~/.ark regardless of mode.
+ *
+ * The legacy `ark auth setup` (local + remote OAuth token capture) was
+ * removed: it conflated two unrelated concerns -- agent-runtime credentials
+ * and ark-API access -- and bypassed the secret store. Agent runtimes now
+ * declare what they need via `secrets: [...]` in their YAML (see
+ * runtimes/claude.yaml, runtimes/agent-sdk.yaml); operators store the
+ * value with `ark secret set <NAME> <VALUE>` and dispatch resolves it via
+ * `app.secrets.resolveMany(tenantId, names)`. Subscription-blob auth
+ * (claude-max) stays on `ark tenant auth set --subscription-blob`.
  */
 export function registerAuthCommands(program: Command) {
   const authCmd = program.command("auth").description("Manage authentication and API keys");
-
-  // Claude CLI auth setup (moved from misc.ts)
-  authCmd
-    .command("setup")
-    .description("Set up Claude authentication (local or remote)")
-    .option("--host <name>", "Run setup-token on a specific remote compute")
-    .action(async (opts) => {
-      if (opts.host) {
-        const ark = await getArkClient();
-        let compute: any;
-        try {
-          compute = await ark.computeRead(opts.host);
-        } catch {
-          console.error(`Compute '${opts.host}' not found`);
-          process.exit(1);
-        }
-        const cfg = compute.config as { ip?: string };
-        if (!cfg.ip) {
-          console.error(`No IP for '${opts.host}'`);
-          process.exit(1);
-        }
-        const key = `${process.env.HOME}/.ssh/ark-${compute.name}`;
-        console.log(`Running setup-token on ${compute.name} (${cfg.ip})...`);
-        execFileSync(
-          "ssh",
-          ["-i", key, "-o", "StrictHostKeyChecking=no", "-t", `ubuntu@${cfg.ip}`, "~/.local/bin/claude setup-token"],
-          { stdio: "inherit" },
-        );
-      } else {
-        const { spawn } = await import("child_process");
-        console.log("Setting up Claude authentication...\n");
-        const exitCode = await new Promise<number>((resolve) => {
-          const child = spawn("claude", ["setup-token"], { stdio: "inherit" });
-          process.on("SIGINT", () => child.kill("SIGINT"));
-          child.on("close", (code) => resolve(code ?? 1));
-        });
-        if (exitCode !== 0) process.exit(exitCode);
-
-        console.log("\nPaste the full OAuth token (sk-ant-oat01-...) and press Enter:");
-        process.stdout.write("> ");
-        const readline = await import("readline");
-        const rl = readline.createInterface({ input: process.stdin });
-        let tokenBuf = "";
-        const token = await new Promise<string>((resolve) => {
-          rl.on("close", () => resolve(tokenBuf.trim()));
-          rl.on("line", (line) => {
-            tokenBuf += line.trim();
-            if (tokenBuf.startsWith("sk-ant-oat") && tokenBuf.length >= 100) rl.close();
-          });
-        });
-
-        if (token.startsWith("sk-ant-oat")) {
-          const arkDir = join(process.env.HOME!, ".ark");
-          mkdirSync(arkDir, { recursive: true });
-          writeFileSync(join(arkDir, "claude-oauth-token"), token, { mode: 0o600 });
-          console.log(`\n+ Token saved to ~/.ark/claude-oauth-token`);
-        } else if (token) {
-          console.log("\nToken doesn't look right (should start with sk-ant-oat). Try again.");
-        }
-      }
-    });
 
   authCmd
     .command("create-key")
