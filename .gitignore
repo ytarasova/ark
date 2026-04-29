@@ -23,6 +23,7 @@ dist/
 
 # Junk / test artifacts
 .playwright-mcp/
+verify-*.png
 ark-native
 packages/web/design-audit/
 packages/web/DESIGN-BRIEF.md
