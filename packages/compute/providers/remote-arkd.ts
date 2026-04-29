@@ -324,21 +324,39 @@ export class RemoteWorktreeProvider extends RemoteArkdBase {
   readonly isolationType = "worktree";
   readonly isolationModes: IsolationMode[] = [{ value: "inplace", label: "Remote checkout (in-place)" }];
 
+  /**
+   * Where the cloned worktree lives on the remote host. The executor reads
+   * this via the optional `provider.resolveWorkdir(...)` hook to (a) embed
+   * the right path in the launcher's `cd` and (b) target the right path in
+   * the heredocs that write `.mcp.json` / `.claude/settings.local.json` on
+   * the remote. Without this, the launcher gets the conductor's local
+   * workdir which doesn't exist on Ubuntu.
+   */
+  resolveWorkdir(_compute: Compute, session: Session): string | null {
+    if (!session.repo) return null;
+    const repoName = session.repo.split("/").pop()?.replace(".git", "") ?? "project";
+    return `${REMOTE_HOME}/Projects/${repoName}`;
+  }
+
   async launch(compute: Compute, session: Session, opts: LaunchOpts): Promise<string> {
     const client = this.getClient(compute);
 
-    // Clone repo on remote if needed
-    if (session.repo) {
-      const repoName = session.repo.split("/").pop()?.replace(".git", "") ?? "project";
-      const remoteWorkdir = `${REMOTE_HOME}/Projects/${repoName}`;
+    // Clone repo on remote if needed. Use the same `resolveWorkdir` the
+    // executor used so the clone destination matches the path baked into
+    // the launcher script.
+    const remoteWorkdir = this.resolveWorkdir(compute, session);
+    if (session.repo && remoteWorkdir) {
       await client.run({ command: "git", args: ["clone", session.repo, remoteWorkdir], timeout: 120_000 });
     }
 
-    // Upload launcher and execute
+    // Upload launcher and execute. tmux's `-c <workdir>` flag wants the same
+    // path the launcher will `cd` into, otherwise we'd race against the
+    // launcher's own cd (and on a remote host the conductor-side path
+    // doesn't exist as a directory anyway).
     await client.launchAgent({
       sessionName: opts.tmuxName,
       script: opts.launcherContent,
-      workdir: opts.workdir,
+      workdir: remoteWorkdir ?? opts.workdir,
     });
     return opts.tmuxName;
   }

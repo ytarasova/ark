@@ -77,6 +77,18 @@ export interface ComputeProvider {
   /** Get the ArkD daemon URL for this compute target. */
   getArkdUrl?(compute: Compute): string;
 
+  /**
+   * Where the agent should `cd` and where the launcher should write embedded
+   * project-local files (`.mcp.json`, `.claude/settings.local.json`). Local
+   * providers leave this `undefined` -- the executor falls back to its own
+   * `effectiveWorkdir` (the laptop-side worktree). Remote providers return
+   * the path the cloned worktree lives at on the target host (e.g.
+   * `/home/ubuntu/Projects/<repo>` for EC2). Without this hook the launcher
+   * embeds the conductor's local Mac path, which doesn't exist on Ubuntu --
+   * `cd` fails and heredoc-written files land under a phantom path.
+   */
+  resolveWorkdir?(compute: Compute, session: Session): string | null;
+
   syncEnvironment(compute: Compute, opts: SyncOpts): Promise<void>;
 
   // ── Capability flags ────────────────────────────────────────────────────

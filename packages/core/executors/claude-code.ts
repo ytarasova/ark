@@ -72,6 +72,16 @@ export const claudeCodeExecutor: Executor = {
 
     const isRemote = !!(compute && provider && !provider.supportsWorktree);
 
+    // For remote dispatch the launcher must `cd` into the workdir on the
+    // REMOTE host -- not the conductor's local Mac path. Providers that
+    // need a translation (e.g. RemoteWorktreeProvider clones to
+    // `${REMOTE_HOME}/Projects/<repo>`) implement `resolveWorkdir`; the
+    // returned path also drives the heredoc target for the embedded files,
+    // and is passed through to `provider.launch` so tmux's `-c <workdir>`
+    // and the launcher agree.
+    const launcherWorkdir =
+      isRemote && compute && provider?.resolveWorkdir ? (provider.resolveWorkdir(compute, session) ?? effectiveWorkdir) : effectiveWorkdir;
+
     // For LOCAL dispatch: write `.mcp.json` + `.claude/settings.local.json`
     // directly into the local workdir Claude will run in. For REMOTE dispatch
     // we skip the local writes (the workdir on the conductor is irrelevant)
@@ -114,7 +124,7 @@ export const claudeCodeExecutor: Executor = {
       // mcpConfigPath is referenced by buildLauncher's `mcpConfigPath` field.
       // For remote, point at the path the launcher heredoc will write on the
       // remote host, not a conductor-side path.
-      mcpConfigPath = `${effectiveWorkdir}/${mcpRelPath}`;
+      mcpConfigPath = `${launcherWorkdir}/${mcpRelPath}`;
     } else {
       // Local: write both files atomically into the local workdir as before.
       mcpConfigPath = claude.writeChannelConfig(session.id, stage, channelPort, effectiveWorkdir, {
@@ -183,7 +193,7 @@ export const claudeCodeExecutor: Executor = {
           ]
         : undefined;
     const { content: launchContent, claudeSessionId } = claude.buildLauncher({
-      workdir: effectiveWorkdir,
+      workdir: launcherWorkdir,
       claudeArgs,
       mcpConfigPath,
       prevClaudeSessionId: opts.prevClaudeSessionId ?? session.claude_session_id,
@@ -211,11 +221,12 @@ export const claudeCodeExecutor: Executor = {
         { launchContent, onLog: log },
       );
 
-      // Launch via provider
+      // Launch via provider. Pass launcherWorkdir (== resolveWorkdir on
+      // remote) so tmux's `-c <workdir>` agrees with the launcher's `cd`.
       log("Launching on remote...");
       const result = await provider.launch(compute, session, {
         tmuxName,
-        workdir: effectiveWorkdir,
+        workdir: launcherWorkdir,
         launcherContent: finalLaunchContent,
         ports,
       });

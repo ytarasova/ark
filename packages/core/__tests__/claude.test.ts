@@ -15,6 +15,8 @@ import {
   writeChannelConfig,
   removeChannelConfig,
   buildLauncher,
+  buildChannelConfig,
+  buildSettings,
   trustDirectory,
   type ClaudeArgsOpts,
   type LauncherOpts,
@@ -739,6 +741,187 @@ describe("buildLauncher PTY geometry", () => {
     expect(content).not.toContain("export LINES");
     expect(content).not.toMatch(/GEOMETRY_SENTINEL/);
     expect(content).not.toMatch(/GEOMETRY_WAIT_MS/);
+  });
+});
+
+// ── buildLauncher embedFiles (heredoc emission for remote dispatch) ──────────
+
+describe("buildLauncher embedFiles", () => {
+  const baseOpts: LauncherOpts = {
+    workdir: "/home/ubuntu/Projects/ark",
+    claudeArgs: ["claude", "--model", "opus"],
+    mcpConfigPath: "/home/ubuntu/Projects/ark/.mcp.json",
+  };
+
+  it("emits no heredoc block when embedFiles is empty/undefined", () => {
+    const { content: a } = buildLauncher(baseOpts);
+    const { content: b } = buildLauncher({ ...baseOpts, embedFiles: [] });
+    expect(a).not.toContain("ARK_EOF_");
+    expect(b).not.toContain("ARK_EOF_");
+  });
+
+  it("writes each embedded file via a quoted heredoc with mkdir -p on the parent", () => {
+    const { content } = buildLauncher({
+      ...baseOpts,
+      embedFiles: [
+        { relPath: ".mcp.json", content: '{"mcpServers":{}}' },
+        { relPath: ".claude/settings.local.json", content: '{"hooks":{}}' },
+      ],
+    });
+    expect(content).toContain(`cat > '/home/ubuntu/Projects/ark/.mcp.json' <<'ARK_EOF_0'`);
+    expect(content).toContain('{"mcpServers":{}}');
+    expect(content).toContain(`cat > '/home/ubuntu/Projects/ark/.claude/settings.local.json' <<'ARK_EOF_1'`);
+    expect(content).toContain('{"hooks":{}}');
+    // Each heredoc terminator on its own line
+    expect(content).toMatch(/\nARK_EOF_0\n/);
+    expect(content).toMatch(/\nARK_EOF_1\n/);
+    // mkdir -p the parent of each target
+    expect(content).toContain(`mkdir -p "$(dirname '/home/ubuntu/Projects/ark/.mcp.json')"`);
+    expect(content).toContain(`mkdir -p "$(dirname '/home/ubuntu/Projects/ark/.claude/settings.local.json')"`);
+  });
+
+  it("uses a quoted heredoc tag so $-interpolation in JSON content is preserved", () => {
+    // A literal $VAR in the file content must not be expanded by bash before
+    // hitting disk -- the tag wrapping single quotes (`'ARK_EOF_0'`) suppresses
+    // interpolation. This guards against future maintainers swapping in an
+    // unquoted tag.
+    const tricky = '{"key":"value with $HOME and ${PATH} and `cmd`"}';
+    const { content } = buildLauncher({
+      ...baseOpts,
+      embedFiles: [{ relPath: ".mcp.json", content: tricky }],
+    });
+    expect(content).toContain("<<'ARK_EOF_0'");
+    expect(content).toContain(tricky);
+  });
+
+  it("treats absolute relPath as-is without prepending workdir", () => {
+    const { content } = buildLauncher({
+      ...baseOpts,
+      embedFiles: [{ relPath: "/etc/something/config", content: "x" }],
+    });
+    expect(content).toContain(`cat > '/etc/something/config' <<'ARK_EOF_0'`);
+    expect(content).not.toContain("/home/ubuntu/Projects/ark/etc/something");
+  });
+
+  it("emits heredocs after `cd` so writes land in the workdir Claude runs in", () => {
+    const { content } = buildLauncher({
+      ...baseOpts,
+      embedFiles: [{ relPath: ".mcp.json", content: "{}" }],
+    });
+    const cdIdx = content.indexOf("cd '/home/ubuntu/Projects/ark'");
+    const heredocIdx = content.indexOf("cat > '/home/ubuntu/Projects/ark/.mcp.json'");
+    expect(cdIdx).toBeGreaterThan(-1);
+    expect(heredocIdx).toBeGreaterThan(cdIdx);
+  });
+});
+
+// ── buildSettings (pure builder for .claude/settings.local.json) ────────────
+
+describe("buildSettings", () => {
+  it("returns a JSON object with hooks for every ark-tracked event", () => {
+    const { object, content, hookCount } = buildSettings("s-test", "http://127.0.0.1:19100");
+    expect(typeof object).toBe("object");
+    expect(content).toBe(JSON.stringify(object, null, 2));
+    // Every ark hook event group must be present.
+    const hooks = (object as { hooks: Record<string, unknown[]> }).hooks;
+    for (const ev of [
+      "PreToolUse",
+      "SessionStart",
+      "UserPromptSubmit",
+      "Stop",
+      "StopFailure",
+      "SessionEnd",
+      "Notification",
+      "PreCompact",
+      "PostCompact",
+    ]) {
+      expect(hooks[ev]).toBeTruthy();
+    }
+    expect(hookCount).toBe(Object.keys(hooks).length);
+  });
+
+  it("each ark-injected matcher group carries _ark: true so teardown can find it", () => {
+    const { object } = buildSettings("s-test", "http://127.0.0.1:19100");
+    const hooks = (object as { hooks: Record<string, Array<{ _ark?: boolean }>> }).hooks;
+    for (const matchers of Object.values(hooks)) {
+      expect(matchers[0]?._ark).toBe(true);
+    }
+  });
+
+  it("bakes the conductor URL into the curl command", () => {
+    const { content } = buildSettings("s-abc", "https://control.example.com");
+    expect(content).toContain("https://control.example.com/hooks/status?session=s-abc");
+  });
+
+  it("merges with an existing settings object instead of clobbering", () => {
+    const existing = { extra: "preserved", hooks: { Custom: [{ command: "echo hi" }] } };
+    const { object } = buildSettings("s-test", "http://x", { existing });
+    expect((object as { extra: string }).extra).toBe("preserved");
+    // User's Custom hook is preserved (not _ark, not curl-marker).
+    expect((object as { hooks: Record<string, unknown[]> }).hooks.Custom).toBeTruthy();
+  });
+
+  it("sets _ark.sessionId and _ark.conductorUrl in the metadata", () => {
+    const { object } = buildSettings("s-meta", "http://c");
+    const meta = (object as { _ark: { sessionId: string; conductorUrl: string; updatedAt: string } })._ark;
+    expect(meta.sessionId).toBe("s-meta");
+    expect(meta.conductorUrl).toBe("http://c");
+    expect(meta.updatedAt).toBeTruthy();
+  });
+
+  it("autonomy=read-only emits a deny list of Bash, Write, Edit", () => {
+    const { object } = buildSettings("s", "u", { autonomy: "read-only" });
+    const perms = (object as { permissions?: { deny?: string[] } }).permissions;
+    expect(perms?.deny).toEqual(["Bash", "Write", "Edit"]);
+  });
+});
+
+// ── buildChannelConfig (pure builder for .mcp.json) ──────────────────────────
+
+describe("buildChannelConfig", () => {
+  it("includes the ark-channel server with the right session/stage/port env", () => {
+    const { object } = buildChannelConfig("s-abc", "work", 19345);
+    const channel = (object as { mcpServers: Record<string, { env: Record<string, string> }> }).mcpServers[
+      "ark-channel"
+    ];
+    expect(channel).toBeTruthy();
+    expect(channel.env.ARK_SESSION_ID).toBe("s-abc");
+    expect(channel.env.ARK_STAGE).toBe("work");
+    expect(channel.env.ARK_CHANNEL_PORT).toBe("19345");
+  });
+
+  it("ark-channel always wins over a same-named entry in opts.existing", () => {
+    const existing = { mcpServers: { "ark-channel": { command: "stale" } } };
+    const { object } = buildChannelConfig("s", "work", 1, { existing });
+    const channel = (object as { mcpServers: Record<string, { command?: string }> }).mcpServers["ark-channel"];
+    expect(channel.command).not.toBe("stale");
+  });
+
+  it("preserves user-declared MCP servers from opts.existing without overriding", () => {
+    const existing = { mcpServers: { "user-mcp": { command: "user-cmd", args: [] } } };
+    const { object } = buildChannelConfig("s", "work", 1, { existing });
+    const userMcp = (object as { mcpServers: Record<string, { command: string }> }).mcpServers["user-mcp"];
+    expect(userMcp.command).toBe("user-cmd");
+  });
+
+  it("includeLocalCodebaseMemory:false skips the conductor-side binary probe", () => {
+    // The default path runs `findCodebaseMemoryBinary()` + `existsSync`. With
+    // the flag off, the builder must NOT attempt to inject a `codebase-memory`
+    // entry even if the conductor happens to have one installed.
+    const { object: off } = buildChannelConfig("s", "work", 1, { includeLocalCodebaseMemory: false });
+    expect((off as { mcpServers: Record<string, unknown> }).mcpServers["codebase-memory"]).toBeUndefined();
+  });
+
+  it("uses the provided channelConfig instead of channelMcpConfig() when supplied", () => {
+    const customChannel = { command: "/custom/ark", args: ["channel"], env: { CUSTOM: "1" } };
+    const { object } = buildChannelConfig("s", "work", 1, { channelConfig: customChannel });
+    const channel = (object as { mcpServers: Record<string, { command: string }> }).mcpServers["ark-channel"];
+    expect(channel.command).toBe("/custom/ark");
+  });
+
+  it("content is a stable JSON string of the object (2-space indent)", () => {
+    const { object, content } = buildChannelConfig("s", "work", 1);
+    expect(content).toBe(JSON.stringify(object, null, 2));
   });
 });
 
