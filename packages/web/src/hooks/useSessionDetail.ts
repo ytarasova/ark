@@ -21,7 +21,6 @@ const VALID_TABS = new Set([
   "logs",
   "terminal",
   "diff",
-  "files",
   "cost",
   "todos",
   "errors",
@@ -156,10 +155,9 @@ export function useSessionDetail({
     { id: "flow", label: "Flow", badge: totalStages > 0 ? `${completedStages}/${totalStages}` : undefined },
     {
       id: "diff",
-      label: "Diff",
-      badge: filesChanged > 0 ? "+" + (diffData?.insertions || 0) + " -" + (diffData?.deletions || 0) : undefined,
+      label: "Files",
+      badge: filesChanged > 0 ? `${filesChanged} · +${diffData?.insertions || 0} -${diffData?.deletions || 0}` : undefined,
     },
-    { id: "files", label: "Files", badge: filesChanged > 0 ? filesChanged : undefined },
     { id: "logs", label: "Logs" },
     // Cost tab carries no $-amount badge -- the running spend is already
     // visible in the header ticker, and the detail lives one click away.
