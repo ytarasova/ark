@@ -146,12 +146,9 @@ export function LogsTab({ sessionId, status, ptyCols, ptyRows, output, isActive,
           )}
 
           {!query.isError && lines.length === 0 && (
-            <div
-              className="px-[12px] py-[24px] text-center text-[12px] text-[var(--fg-faint)] font-[family-name:var(--font-mono)]"
-              data-testid="logs-empty"
-            >
+            <div className="panel-card-empty" data-testid="logs-empty">
               <div>No logs yet</div>
-              {status && <div className="mt-[4px] text-[10.5px] uppercase tracking-[0.05em]">status · {status}</div>}
+              {status && <div className="panel-card-empty-meta">status · {status}</div>}
             </div>
           )}
 
