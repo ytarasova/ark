@@ -103,19 +103,24 @@ export function resolveTenantId(app: AppContext, ctx: TenantContext): string {
 }
 
 /**
- * Resolve the tenant-scoped AppContext view for a request. Returns
- * `app.forTenant(id)` when an id is resolvable from the caller's
- * TenantContext (or the root app's already-scoped tenantId, or the
- * configured default tenant); otherwise the root `app` unchanged (the
- * latter is the local single-user fallback).
+ * Resolve the tenant-scoped AppContext view for a request.
  *
- * Use this as the canonical way to route RPC handler writes/reads through
- * the tenant-scoped DI child scope. Previously inlined in
- * costs/conductor/sage handlers with identical logic -- see round-3
- * DI P1-1: local-daemon WS path needs tenant-scoped dispatch just like
- * the hosted HTTP path already does (per-request router rebuild).
+ * Precedence:
+ *   1. `ctx.scopedApp` -- per-request scope materialized by the dispatch
+ *      entry (WS `addConnection` and hosted-HTTP `/api/rpc` both set this).
+ *   2. `app.forTenant(id)` -- fall back to a fresh forTenant call when an
+ *      id is resolvable from the caller's TenantContext, the root app's
+ *      already-scoped tenantId, or the configured default tenant.
+ *   3. The root `app` unchanged -- local single-user fallback.
+ *
+ * Preferring `ctx.scopedApp` lets the WS and HTTP transports share one
+ * code path: dispatch builds the scoped view once, every handler reuses
+ * it without re-resolving `forTenant` on every call. Round-3 DI P1-1
+ * closed the WS asymmetry by adding `scopedApp` to the handler-facing
+ * TenantContext; this function is the canonical reader.
  */
 export function resolveTenantApp(app: AppContext, ctx: TenantContext): AppContext {
+  if (ctx.scopedApp) return ctx.scopedApp;
   const tenantId = ctx.tenantId ?? app.tenantId ?? app.config.authSection.defaultTenant ?? null;
   return tenantId ? app.forTenant(tenantId) : app;
 }
