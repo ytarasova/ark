@@ -141,6 +141,24 @@ export function resolveDatabaseMode(config: { database?: { url?: string } }): Da
 }
 
 /**
+ * Build a tenant-scoped view of an AppContext. Local mode is single-tenant
+ * by definition, so it returns the same instance unchanged -- there's no
+ * isolation to enforce, and creating a child DI scope would silently
+ * detach the per-tenant SessionService from the registered lifecycle
+ * dispatcher (the listener registry is per-instance).
+ *
+ * Hosted mode builds a real child container scope with per-tenant repos,
+ * stores, and re-registered services. Already-scoped contexts (the same
+ * tenantId) short-circuit to avoid nesting scopes.
+ *
+ * Implementations live in `local-app-mode.ts` / `hosted-app-mode.ts`. Call
+ * sites go through `app.forTenant(id)` and never branch on `mode.kind`.
+ */
+export interface TenantScopeCapability {
+  forTenant(app: AppContext, tenantId: string): AppContext;
+}
+
+/**
  * Inbound HTTP tenant resolution (Authorization + X-Ark-Tenant-Id headers).
  *
  * The conductor's HTTP surface is the same endpoints in both modes, but the
@@ -200,6 +218,12 @@ export interface AppMode {
    * the mode-specific trust rules for tenant + Bearer headers.
    */
   readonly tenantResolver: TenantResolverCapability;
+  /**
+   * Tenant-scoping policy. Local mode returns the same AppContext (no
+   * isolation); hosted mode builds a child DI scope. See
+   * `TenantScopeCapability`.
+   */
+  readonly tenantScope: TenantScopeCapability;
   /** Dialect + URL of the configured database. Set once at boot. */
   readonly database: DatabaseMode;
   /**

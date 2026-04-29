@@ -32,6 +32,7 @@ import type {
   FtsRebuildCapability,
   HostCommandCapability,
   TenantResolverCapability,
+  TenantScopeCapability,
 } from "./app-mode.js";
 import { resolveBearerAuth, resolveDatabaseMode } from "./app-mode.js";
 import { seedLocalCompute } from "../repositories/schema.js";
@@ -291,9 +292,24 @@ export function buildLocalAppMode(app?: AppContext, database?: DatabaseMode): Ap
     migrations: buildMigrationsCapability(db.dialect),
     secrets,
     tenantResolver,
+    tenantScope: makeLocalTenantScope(),
     database: db,
     // Local mode runs agents via tmux on the same host; a session without
     // an explicit `compute_name` falls back to the seeded "local" row.
     defaultProvider: "local",
+  };
+}
+
+/**
+ * Local mode is single-tenant. The "default" tenantId is a sentinel for
+ * bookkeeping; there is no isolation to enforce, so every `forTenant`
+ * call returns the same AppContext. Building a child DI scope here would
+ * silently detach the per-tenant SessionService from the lifecycle
+ * dispatcher (listener registries are per-instance) and break auto-
+ * dispatch.
+ */
+function makeLocalTenantScope(): TenantScopeCapability {
+  return {
+    forTenant: (app) => app,
   };
 }

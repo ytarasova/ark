@@ -50,7 +50,6 @@ import type { SessionLifecycle } from "./services/session/index.js";
 import type { DispatchService } from "./services/dispatch/index.js";
 import type { StageAdvanceService } from "./services/stage-advance/index.js";
 import type { FlowStore, SkillStore, AgentStore, RecipeStore, RuntimeStore, ModelStore } from "./stores/index.js";
-import { buildTenantScope } from "./tenant-scope.js";
 import { ComputeRegistries } from "./compute-registries.js";
 import { resolveProvider, resolveComputeTarget } from "./compute-resolver.js";
 import type { TranscriptParserRegistry } from "./runtimes/transcript-parser.js";
@@ -753,21 +752,17 @@ export class AppContext {
   // ── Tenant scoping ─────────────────────────────────────────────────────
 
   /**
-   * Create a tenant-scoped view of this AppContext.
-   * Returns a shallow copy with all repositories scoped to the given tenant.
-   * Shares the same DB, container, providers, and infrastructure.
+   * Create a tenant-scoped view of this AppContext. Delegates to the mode's
+   * `tenantScope` capability:
+   *   - Local mode: single-tenant; returns self (no isolation to enforce).
+   *   - Hosted mode: builds a child DI container scope, with re-entrancy
+   *     short-circuit when already pinned to that tenant.
    *
-   * Two short-circuits:
-   *   1. Local mode has no tenant isolation -- there's only one tenant (the
-   *      "default" sentinel), so building a child scope just creates a
-   *      parallel SessionService with empty dispatch-listener registry,
-   *      which silently breaks auto-dispatch. Return self.
-   *   2. Already scoped to this tenant -- avoid nesting scopes.
+   * Call sites must NOT branch on `mode.kind`. Any per-mode policy lives in
+   * `local-app-mode.ts` / `hosted-app-mode.ts`.
    */
   forTenant(tenantId: string): AppContext {
-    if (this.mode.kind !== "hosted") return this;
-    if (this.tenantId === tenantId) return this;
-    return buildTenantScope(this, tenantId);
+    return this.mode.tenantScope.forTenant(this, tenantId);
   }
 
   // ── Container access ───────────────────────────────────────────────────

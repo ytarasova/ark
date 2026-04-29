@@ -8,13 +8,20 @@
  * with a consistent `RpcError` via the shared wrapper.
  */
 
-import type { AppMode, ComputeBootstrapCapability, DatabaseMode, TenantResolverCapability } from "./app-mode.js";
+import type {
+  AppMode,
+  ComputeBootstrapCapability,
+  DatabaseMode,
+  TenantResolverCapability,
+  TenantScopeCapability,
+} from "./app-mode.js";
 import { resolveBearerAuth } from "./app-mode.js";
 import { buildMigrationsCapability } from "./migrations-capability.js";
 import { AwsSecretsProvider } from "../secrets/aws-provider.js";
 import { FileSecretsProvider } from "../secrets/file-provider.js";
 import type { SecretsCapability } from "../secrets/types.js";
 import type { ArkConfig } from "../config.js";
+import { buildTenantScope } from "../tenant-scope.js";
 
 /**
  * Hosted compute bootstrap is intentionally a no-op. The operator
@@ -26,6 +33,18 @@ import type { ArkConfig } from "../config.js";
  */
 function makeNoopComputeBootstrap(): ComputeBootstrapCapability {
   return { seed: async () => undefined };
+}
+
+/**
+ * Hosted mode builds a tenant-scoped child DI container per call. Already-
+ * scoped contexts (re-asked for the tenant they're already pinned to)
+ * short-circuit to avoid nesting child scopes (which would invalidate
+ * `===` identity checks on services across re-resolutions).
+ */
+function makeHostedTenantScope(): TenantScopeCapability {
+  return {
+    forTenant: (app, tenantId) => (app.tenantId === tenantId ? app : buildTenantScope(app, tenantId)),
+  };
 }
 
 /**
@@ -74,6 +93,7 @@ export function buildHostedAppMode(database: DatabaseMode, config?: ArkConfig): 
     migrations: buildMigrationsCapability("postgres"),
     secrets,
     tenantResolver: makeHostedTenantResolver(),
+    tenantScope: makeHostedTenantScope(),
     database,
     // Hosted mode has no default -- every session MUST carry an explicit
     // `compute_name`. A silent fall-through to "local" would mean agents
