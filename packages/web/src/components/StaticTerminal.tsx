@@ -16,6 +16,7 @@
 
 import { useEffect, useRef } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
+import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 
 interface StaticTerminalProps {
@@ -53,7 +54,6 @@ export function StaticTerminal({ output, cols: colsProp, rows: rowsProp }: Stati
     if (!containerRef.current || !output) return;
 
     const cols = colsProp && colsProp > 0 ? colsProp : detectCols(output);
-    const cellHeight = 14;
 
     const term = new XTerm({
       cols,
@@ -87,19 +87,25 @@ export function StaticTerminal({ output, cols: colsProp, rows: rowsProp }: Stati
       scrollback: 100000,
       allowProposedApi: true,
     });
+    const fit = new FitAddon();
+    term.loadAddon(fit);
 
     term.open(containerRef.current);
     term.write(output);
 
-    const fitRows = () => {
-      const host = containerRef.current;
-      if (!host) return;
-      const rows = Math.max(1, Math.floor(host.clientHeight / cellHeight));
-      term.resize(cols, rows);
+    // FitAddon measures the container post-paint and sizes xterm to match.
+    // The manual `clientHeight / cellHeight` calc we used previously ran at
+    // 0×0 during the first render (before flex resolved) and never grew the
+    // canvas after the layout settled, so the replay collapsed to one row.
+    const fitNow = () => {
+      try {
+        fit.fit();
+      } catch {
+        /* container not yet attached */
+      }
     };
-    fitRows();
-
-    const resizeObserver = new ResizeObserver(fitRows);
+    fitNow();
+    const resizeObserver = new ResizeObserver(fitNow);
     resizeObserver.observe(containerRef.current);
 
     return () => {
@@ -108,5 +114,5 @@ export function StaticTerminal({ output, cols: colsProp, rows: rowsProp }: Stati
     };
   }, [output, colsProp, rowsProp]);
 
-  return <div ref={containerRef} className="w-full h-full min-h-0 overflow-x-auto overflow-y-hidden bg-[#0a0a0a]" />;
+  return <div ref={containerRef} className="static-terminal-host" />;
 }
