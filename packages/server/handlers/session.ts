@@ -310,7 +310,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const { sessionId } = extract<SessionIdParams>(params, ["sessionId"]);
     const { readRecording } = await import("../../core/recordings.js");
     // Recording files live in the daemon's arkDir (not tenant-segmented).
-    const output = readRecording(app.config.arkDir, sessionId);
+    const output = readRecording(app.config.dirs.ark, sessionId);
     return { ok: output !== null, output };
   });
 

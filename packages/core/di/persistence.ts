@@ -249,6 +249,6 @@ function makeRuntimeStore(db: DatabaseAdapter, config: ArkConfig, mode: AppMode)
 function makeModelStore(config: ArkConfig) {
   return new FileModelStore({
     builtinDir: join(resolveStoreBaseDir(), "models"),
-    userDir: join(config.arkDir, "models"),
+    userDir: join(config.dirs.ark, "models"),
   });
 }
