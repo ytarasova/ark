@@ -62,11 +62,19 @@ export function StaticTerminal({ output, cols: colsProp, rows: rowsProp }: Stati
       disableStdin: true,
       fontSize: 10,
       fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', monospace",
+      // overviewRuler.width drives the scrollbar gutter width too (default 14px
+      // produces the chunky default-OS-looking thumb). Keep it 6px to match
+      // the app's global ::-webkit-scrollbar rule.
+      overviewRuler: { width: 6 },
       theme: {
         background: "#0a0a0a",
         foreground: "#e4e4e7",
         cursor: "#0a0a0a",
         selectionBackground: "#3f3f46",
+        // OverviewRulerRenderer paints a 1px stripe on the left edge of the
+        // ruler canvas using this colour (defaults to foreground -> renders
+        // as a bright vertical line). Hide it.
+        overviewRulerBorder: "transparent",
         black: "#09090b",
         red: "#ef4444",
         green: "#22c55e",

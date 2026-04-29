@@ -875,6 +875,24 @@ body.is-macos .drag-region {
   padding: 4px;
 }
 
+/* xterm v6 renders a custom canvas-side scrollbar (the bundled .xterm-viewport
+ * + ::-webkit-scrollbar rules don't apply -- they're vestigial). The actual
+ * runtime DOM is `.xterm > .xterm-scrollable-element > .scrollbar.vertical
+ *   > .slider`, and xterm injects an inline <style> setting the slider
+ * background from the theme's scrollbarSliderBackground (~20% opacity foreground
+ * by default). The track WIDTH is `overviewRuler.width || 14`, hence the
+ * "chunky" default thumb -- we pass `overviewRuler: { width: 6 }` to both
+ * Terminal constructors to shrink it to 6px. These rules then color the slider
+ * to match the rest of the app instead of the default semi-transparent grey. */
+.terminal-host .xterm .xterm-scrollable-element > .scrollbar > .slider {
+  background: var(--border);
+  border-radius: 3px;
+}
+.terminal-host .xterm .xterm-scrollable-element > .scrollbar > .slider:hover,
+.terminal-host .xterm .xterm-scrollable-element > .scrollbar > .slider.active {
+  background: var(--ring);
+}
+
 /* Status pill rendered next to the panel chip (e.g. "Live", "Reconnecting 1/5"). */
 .panel-status {
   font-size: 10px;

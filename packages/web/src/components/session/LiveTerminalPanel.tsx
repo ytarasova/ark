@@ -66,11 +66,19 @@ export function LiveTerminalPanel({ sessionId, isActive, fallback }: LiveTermina
       fontSize: 14,
       fontFamily: fontStacks.mono,
       scrollback: SCROLLBACK_LINES,
+      // overviewRuler.width also sets the scrollbar gutter width (default 14
+      // produces the chunky default-OS-looking thumb). Match the app's
+      // global 6px scrollbar instead.
+      overviewRuler: { width: 6 },
       theme: {
         background: "#0a0a0a",
         foreground: "#e4e4e7",
         cursor: "#e4e4e7",
         selectionBackground: "#3f3f46",
+        // OverviewRulerRenderer paints a 1px stripe on the left edge of the
+        // ruler canvas using this colour (defaults to foreground -> renders
+        // as a bright vertical line). Hide it.
+        overviewRulerBorder: "transparent",
       },
       allowProposedApi: true,
     });
