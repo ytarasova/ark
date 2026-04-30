@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, beforeEach } from "bun:test";
-import { AwsSecretsProvider } from "../aws-provider.js";
+import { AwsSecretsProvider, decodeDescriptionEnvelope } from "../aws-provider.js";
 import {
   GetParameterCommand,
   GetParametersCommand,
@@ -76,8 +76,12 @@ describe("AwsSecretsProvider", () => {
       Overwrite: true,
       Tier: "Standard",
       KeyId: "alias/ark-secrets",
-      Description: "prod",
     });
+    // Description is now a JSON envelope -- decode and verify the intent.
+    const envelope = decodeDescriptionEnvelope(put.input.Description as string);
+    expect(envelope.description).toBe("prod");
+    expect(envelope.type).toBe("env-var");
+    expect(envelope.metadata).toEqual({});
   });
 
   it("paginates list across NextToken pages and returns refs only", async () => {
