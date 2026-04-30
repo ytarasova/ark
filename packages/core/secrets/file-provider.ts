@@ -45,11 +45,11 @@ import {
 import { randomBytes, createCipheriv, createDecipheriv, scryptSync } from "crypto";
 import os from "os";
 import { dirname, join } from "path";
-import type { SecretRef, SecretsCapability } from "./types.js";
+import type { SecretRef, SecretsCapability, SecretType } from "./types.js";
 import { assertValidSecretName, assertValidBlobName, assertValidBlobFilename } from "./types.js";
 import { normalizeBlob, type BlobInput, type BlobBytes } from "./blob.js";
 
-const VERSION = 1;
+const VERSION = 2;
 /** Pseudo-application-constant salt mixed into the scrypt KDF. */
 const SCRYPT_SALT = Buffer.from("ark-secrets-v1");
 const KEY_LEN = 32; // AES-256
@@ -59,6 +59,8 @@ const TAG_LEN = 16;
 interface FileStoredSecret {
   v: string; // base64(iv || ciphertext || authTag)
   d?: string; // description
+  t?: string; // SecretType (v2+); absent in v1 files, defaults to "env-var"
+  m?: Record<string, string>; // per-type metadata (v2+); absent in v1, defaults to {}
   created_at: string;
   updated_at: string;
 }
@@ -190,6 +192,8 @@ export class FileSecretsProvider implements SecretsCapability {
       refs.push({
         tenant_id: tenantId,
         name,
+        type: (entry.t as SecretType | undefined) ?? "env-var",
+        metadata: entry.m ?? {},
         description: entry.d,
         created_at: entry.created_at,
         updated_at: entry.updated_at,
@@ -206,7 +210,12 @@ export class FileSecretsProvider implements SecretsCapability {
     return decrypt(entry.v, this.keyProvider());
   }
 
-  async set(tenantId: string, name: string, value: string, opts?: { description?: string }): Promise<void> {
+  async set(
+    tenantId: string,
+    name: string,
+    value: string,
+    opts?: { description?: string; type?: SecretType; metadata?: Record<string, string> },
+  ): Promise<void> {
     assertValidSecretName(name);
     if (typeof value !== "string") throw new Error("Secret value must be a string");
     const store = this.loadStore();
@@ -216,6 +225,8 @@ export class FileSecretsProvider implements SecretsCapability {
     const entry: FileStoredSecret = {
       v: encrypt(value, this.keyProvider()),
       d: opts?.description ?? existing?.d,
+      t: opts?.type ?? (existing?.t as SecretType | undefined) ?? "env-var",
+      m: opts?.metadata ?? existing?.m ?? {},
       created_at: existing?.created_at ?? now,
       updated_at: now,
     };
@@ -362,3 +373,6 @@ export class FileSecretsProvider implements SecretsCapability {
     return true;
   }
 }
+
+/** @internal -- exported for tests only. Encrypts using the same machine-derived key as FileSecretsProvider. */
+export const __test_encrypt = (plaintext: string): string => encrypt(plaintext, deriveKey());

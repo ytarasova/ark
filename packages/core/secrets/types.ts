@@ -44,7 +44,12 @@ export interface SecretsCapability {
   get(tenantId: string, name: string): Promise<string | null>;
 
   /** Create-or-replace. Caller is responsible for auth / audit. */
-  set(tenantId: string, name: string, value: string, opts?: { description?: string }): Promise<void>;
+  set(
+    tenantId: string,
+    name: string,
+    value: string,
+    opts?: { description?: string; type?: SecretType; metadata?: Record<string, string> },
+  ): Promise<void>;
 
   /** Delete. Returns true when a secret was actually removed. */
   delete(tenantId: string, name: string): Promise<boolean>;
