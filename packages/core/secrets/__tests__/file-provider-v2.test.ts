@@ -86,4 +86,24 @@ describe("FileSecretsProvider v2", () => {
     expect(refs[0].type).toBe("generic-blob");
     expect(refs[0].metadata).toEqual({ target_path: "~/.claude" });
   });
+
+  test("blob can contain a file named _meta.json without colliding with sidecar", async () => {
+    const p = new FileSecretsProvider(dir);
+    await p.setBlob(
+      "default",
+      "tricky",
+      { "_meta.json": Buffer.from("user-content") },
+      {
+        type: "generic-blob",
+        metadata: { target_path: "~/.tricky" },
+      },
+    );
+    const blob = await p.getBlob("default", "tricky");
+    expect(blob).not.toBeNull();
+    expect(Buffer.from(blob!["_meta.json"]).toString()).toBe("user-content");
+    // Sidecar still preserves the metadata.
+    const refs = await p.listBlobsDetailed("default");
+    expect(refs).toHaveLength(1);
+    expect(refs[0].metadata).toEqual({ target_path: "~/.tricky" });
+  });
 });

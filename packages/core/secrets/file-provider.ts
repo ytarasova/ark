@@ -305,13 +305,30 @@ export class FileSecretsProvider implements SecretsCapability {
   // deleting or enumerating, and every filename is validated at the types
   // layer so the on-disk path is always a safe join.
   //
-  // Per-blob type + metadata are stored in a `_meta.json` sidecar file
-  // inside the blob directory (skipped by getBlob's filename validator).
+  // Per-blob type + metadata are stored in a sidecar at
+  //   `${arkDir}/secrets/<tenantId>/.meta/<blobName>.json`
+  // -- i.e. one level UP from the blob directory, inside a `.meta/`
+  // subdirectory of the tenant dir. This keeps the blob directory free of
+  // any reserved filenames so users can store a file literally named
+  // `_meta.json` (or anything else that passes BLOB_FILE_RE) without risk
+  // of collision. The `.meta/` name cannot collide with a tenant directory
+  // because `assertValidBlobTenantDir` rejects tenants named `.meta`.
   // Shape: { "t": SecretType, "m": Record<string,string>,
   //          "created_at": string, "updated_at": string }
 
   private blobRoot(): string {
     return join(dirname(this.path), "secrets");
+  }
+
+  /**
+   * Reject the reserved name `.meta` as a tenant ID in the blob namespace.
+   * `.meta/` is used at the tenant level to store per-blob sidecar JSON files;
+   * allowing a tenant named `.meta` would let it collide with that directory.
+   */
+  private assertValidBlobTenantDir(tenantId: string): void {
+    if (tenantId === ".meta") {
+      throw new Error("Tenant id '.meta' is reserved and cannot be used in the blob namespace");
+    }
   }
 
   private tenantBlobDir(tenantId: string): string {
@@ -323,7 +340,7 @@ export class FileSecretsProvider implements SecretsCapability {
   }
 
   private blobMetaPath(tenantId: string, name: string): string {
-    return join(this.blobDir(tenantId, name), "_meta.json");
+    return join(this.tenantBlobDir(tenantId), ".meta", `${name}.json`);
   }
 
   private readBlobMeta(
@@ -345,6 +362,8 @@ export class FileSecretsProvider implements SecretsCapability {
     meta: { t: string; m: Record<string, string>; created_at: string; updated_at: string },
   ): void {
     const p = this.blobMetaPath(tenantId, name);
+    // Ensure the .meta/ directory exists before writing.
+    mkdirSync(dirname(p), { recursive: true });
     const tmp = `${p}.tmp`;
     writeFileSync(tmp, JSON.stringify(meta), { encoding: "utf-8", mode: 0o600 });
     try {
@@ -360,11 +379,14 @@ export class FileSecretsProvider implements SecretsCapability {
   }
 
   async listBlobsDetailed(tenantId: string): Promise<BlobRef[]> {
+    this.assertValidBlobTenantDir(tenantId);
     const dir = this.tenantBlobDir(tenantId);
     if (!existsSync(dir)) return [];
     const entries = readdirSync(dir, { withFileTypes: true });
     const refs: BlobRef[] = [];
-    for (const e of entries.filter((e) => e.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
+    for (const e of entries
+      .filter((e) => e.isDirectory() && e.name !== ".meta")
+      .sort((a, b) => a.name.localeCompare(b.name))) {
       const meta = this.readBlobMeta(tenantId, e.name);
       const now = new Date(0).toISOString();
       refs.push({
@@ -380,6 +402,7 @@ export class FileSecretsProvider implements SecretsCapability {
   }
 
   async getBlob(tenantId: string, name: string): Promise<Record<string, Uint8Array> | null> {
+    this.assertValidBlobTenantDir(tenantId);
     assertValidBlobName(name);
     const dir = this.blobDir(tenantId, name);
     if (!existsSync(dir)) return null;
@@ -387,10 +410,12 @@ export class FileSecretsProvider implements SecretsCapability {
     const out: BlobBytes = {};
     for (const f of files) {
       if (!f.isFile()) continue;
-      // Defensive: even though setBlob validates, a manually-added file
-      // with a weird name should be ignored rather than crash reads.
-      // _meta.json uses an underscore prefix which fails BLOB_FILE_RE, so
-      // it is naturally excluded from the file listing.
+      // Defensive: even though setBlob validates filenames at write time, a
+      // manually-added file with a non-conforming name should be silently
+      // skipped rather than crashing the read. The blob directory contains
+      // only user files -- the metadata sidecar now lives at
+      // `<tenantDir>/.meta/<blobName>.json` so there are no reserved names
+      // to filter here.
       try {
         assertValidBlobFilename(f.name);
       } catch {
@@ -410,6 +435,7 @@ export class FileSecretsProvider implements SecretsCapability {
     files: BlobInput,
     opts?: { type?: SecretType; metadata?: Record<string, string> },
   ): Promise<void> {
+    this.assertValidBlobTenantDir(tenantId);
     assertValidBlobName(name);
     const normalized = normalizeBlob(files);
     const dir = this.blobDir(tenantId, name);
@@ -453,6 +479,7 @@ export class FileSecretsProvider implements SecretsCapability {
   }
 
   async deleteBlob(tenantId: string, name: string): Promise<boolean> {
+    this.assertValidBlobTenantDir(tenantId);
     assertValidBlobName(name);
     const dir = this.blobDir(tenantId, name);
     if (!existsSync(dir)) return false;
@@ -466,6 +493,9 @@ export class FileSecretsProvider implements SecretsCapability {
       return false;
     }
     rmSync(dir, { recursive: true, force: true });
+    // Remove the corresponding sidecar from <tenantDir>/.meta/<name>.json.
+    // rmSync with force:true is a no-op when the sidecar doesn't exist.
+    rmSync(this.blobMetaPath(tenantId, name), { force: true });
     return true;
   }
 }
