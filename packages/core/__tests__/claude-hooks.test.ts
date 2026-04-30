@@ -35,7 +35,7 @@ describe("writeSettings", () => {
     expect(events).toContain("Notification");
     expect(events).toContain("PreCompact");
     expect(events).toContain("PostCompact");
-    expect(events.length).toBe(9);
+    expect(events.length).toBe(10);
   });
 
   it("PreCompact/PostCompact hooks have no matcher (match all triggers)", () => {
@@ -169,7 +169,7 @@ describe("writeSettings", () => {
     writeSettings("s-test", "http://localhost:19100", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(claudeDir, "settings.local.json"), "utf-8"));
     expect(settings.hooks).toBeDefined();
-    expect(Object.keys(settings.hooks).length).toBe(9);
+    expect(Object.keys(settings.hooks).length).toBe(10);
   });
 });
 
@@ -177,7 +177,7 @@ describe("writeSettingsVerified", () => {
   it("returns verified: true for correct settings", () => {
     const result = writeSettingsVerified("s-test", "http://localhost:19100", getCtx().arkDir);
     expect(result.verified).toBe(true);
-    expect(result.hookCount).toBe(9);
+    expect(result.hookCount).toBe(10);
     expect(result.errors).toEqual([]);
   });
 

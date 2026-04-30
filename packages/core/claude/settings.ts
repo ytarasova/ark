@@ -44,6 +44,14 @@ function buildHooksConfig(sessionId: string, conductorUrl: string, tenantId?: st
   // filterOutArkHooks uses this tag (with command-string fallback for old data).
   return {
     PreToolUse: [{ _ark: true, hooks: [syncHook] }],
+    // PostToolUse is required for the conversation timeline to flip a tool
+    // call out of "INCOMPLETE" -- buildConversationTimeline merges
+    // PostToolUse into the PreToolUse row to mark completion. Local
+    // dispatch historically inferred this from the on-disk transcript file
+    // (~/.claude/projects/.../*.jsonl), but for remote dispatch the
+    // transcript lives on EC2 and the conductor can't read it. Subscribing
+    // explicitly via the hook closes the loop for both cases.
+    PostToolUse: [{ _ark: true, hooks: [asyncHook] }],
     SessionStart: [{ _ark: true, matcher: "startup|resume", hooks: [asyncHook] }],
     UserPromptSubmit: [{ _ark: true, hooks: [asyncHook] }],
     Stop: [{ _ark: true, hooks: [asyncHook] }],
