@@ -1,9 +1,9 @@
 /**
  * EC2 provisioning via direct AWS SDK calls.
  *
- * Replaces the former Pulumi Automation API with lightweight AWS SDK
- * operations. State is stored in compute.config (SQLite), no external
- * state directory needed.
+ * Lightweight AWS SDK operations: RunInstances, security groups, key pairs.
+ * State is stored in compute.config (SQLite); no external state directory
+ * needed.
  */
 
 import { readFileSync } from "node:fs";
@@ -129,14 +129,6 @@ async function findLatestAmi(client: EC2Client, arch: string): Promise<string> {
   const images = (result.Images ?? []).sort((a, b) => (b.CreationDate ?? "").localeCompare(a.CreationDate ?? ""));
   if (images.length === 0) throw new Error(`No AMI found for pattern: ${pattern}`);
   return images[0].ImageId!;
-}
-
-// ---------------------------------------------------------------------------
-// ensurePulumi - no longer needed, kept as no-op for backward compat
-// ---------------------------------------------------------------------------
-
-export async function ensurePulumi(_onLog?: (msg: string) => void): Promise<void> {
-  // No-op: Pulumi is no longer required. Direct AWS SDK calls are used.
 }
 
 // ---------------------------------------------------------------------------

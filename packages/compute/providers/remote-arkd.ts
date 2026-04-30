@@ -130,12 +130,10 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
     this.app.computes.update(compute.name, { status: "provisioning" });
 
     try {
-      const { ensurePulumi, provisionStack, resolveInstanceType } = await import("./ec2/provision.js");
+      const { provisionStack, resolveInstanceType } = await import("./ec2/provision.js");
       const { generateSshKey } = await import("./ec2/ssh.js");
       const { hourlyRate } = await import("./ec2/cost.js");
       const { poll } = await import("../util.js");
-
-      await ensurePulumi(log);
 
       log("Generating SSH key pair...");
       const { privateKeyPath } = await generateSshKey(compute.name);
@@ -148,7 +146,7 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
         conductorUrl,
       });
 
-      log("Creating Pulumi stack...");
+      log("Provisioning EC2 instance...");
       const result = await provisionStack(compute.name, {
         size: opts?.size ?? cfg.size ?? "m",
         arch: opts?.arch ?? cfg.arch ?? "x64",
@@ -161,7 +159,7 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
         sshKeyPath: privateKeyPath,
         onOutput: (msg) => {
           if (msg.includes("creating") || msg.includes("created") || msg.includes("updated")) {
-            log(`Pulumi: ${msg.slice(0, 120)}`);
+            log(msg.slice(0, 120));
           }
         },
       });

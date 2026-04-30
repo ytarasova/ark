@@ -380,7 +380,7 @@ export class EC2Compute implements Compute {
       userData,
       tags: opts.tags,
       sshKeyPath: privateKeyPath,
-      onOutput: (msg: string) => log(`[ec2] pulumi: ${msg}`),
+      onOutput: (msg: string) => log(`[ec2] ${msg}`),
     });
 
     const ip = result.ip;

@@ -137,7 +137,7 @@ config:
 
 ### 2.3 Remote via ArkD (EC2-backed)
 
-All four remote providers extend `RemoteArkdBase` (in `packages/compute/providers/remote-arkd.ts`). They share EC2 provisioning via Pulumi + cloud-init. Cloud-init installs bun, the ark CLI, and systemd-registers `arkd.service` listening on port 19300 so the conductor can reach it via HTTP.
+All four remote providers extend `RemoteArkdBase` (in `packages/compute/providers/remote-arkd.ts`). They share EC2 provisioning via direct AWS SDK calls + cloud-init. Cloud-init installs bun, the ark CLI, and systemd-registers `arkd.service` listening on port 19300 so the conductor can reach it via HTTP.
 
 Common config:
 ```yaml
@@ -155,7 +155,7 @@ config:
     - "203.0.113.0/24"
 ```
 
-All four need AWS credentials in the environment or via `aws_profile`. Pulumi is used under the hood (auto-installed on first run).
+All four need AWS credentials in the environment or via `aws_profile`. Provisioning uses the AWS SDK directly -- no extra binaries are required.
 
 #### `ec2`
 
