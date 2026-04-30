@@ -190,8 +190,20 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
       });
     }
 
+    // Pass the resource IDs we stashed at provision time. Without these,
+    // destroyStack's three branches (TerminateInstances / DeleteSecurityGroup
+    // / DeleteKeyPair) all silently no-op -- the function returns success
+    // without making any AWS API calls and the instance keeps billing.
+    // Reproduced earlier this session: yt-ec2 reported "Compute 'yt-ec2'
+    // destroyed" but `aws ec2 describe-instances` showed `running`.
     await safeAsync(`[remote] destroy: ${compute.name}`, async () => {
-      await destroyStack(compute.name);
+      await destroyStack(compute.name, {
+        region: cfg.region,
+        awsProfile: cfg.aws_profile,
+        instance_id: cfg.instance_id,
+        sg_id: cfg.sg_id,
+        key_name: cfg.key_name,
+      });
       destroyPool(compute.name);
     });
     this.app.computes.update(compute.name, { status: "destroyed" });
