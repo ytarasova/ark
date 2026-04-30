@@ -618,6 +618,9 @@ export function verifySettings(settingsPath: string): string[] {
  *
  * Idempotent: calling twice with the same args produces identical output.
  * User hooks are never clobbered -- ark entries are removed first, then re-added.
+ *
+ * @returns Absolute path to the written `.claude/settings.local.json` file.
+ *   Callers use this path to read back, verify, or delete the bundle later.
  */
 export function writeSettings(
   sessionId: string,
