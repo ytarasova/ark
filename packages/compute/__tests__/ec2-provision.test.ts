@@ -1,5 +1,10 @@
 import { describe, it, expect } from "bun:test";
+import { readFileSync } from "fs";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { INSTANCE_SIZES, resolveInstanceType, provisionStack, destroyStack } from "../providers/ec2/provision.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 describe("INSTANCE_SIZES", () => {
   it("has entries for xs through xxxl (7 sizes)", () => {
@@ -61,5 +66,31 @@ describe("provisionStack", () => {
 describe("destroyStack", () => {
   it("is an async function", () => {
     expect(typeof destroyStack).toBe("function");
+  });
+});
+
+describe("SSM transport requirements (regression markers)", () => {
+  // These tests don't exercise the AWS SDK -- they read the source to
+  // confirm that the SSM-only contract is preserved. AWS-side assertions
+  // would require mocking the SDK, which is out of scope here.
+  const src = readFileSync(join(__dirname, "..", "providers", "ec2", "provision.ts"), "utf-8");
+
+  it("does not request a port-22 ingress rule (SSM tunnel replaces direct SSH)", () => {
+    expect(src).not.toContain("FromPort: 22");
+    expect(src).not.toContain('Description: "SSH"');
+  });
+
+  it("does not request an arkd-port ingress rule (no inbound rules at all)", () => {
+    expect(src).not.toContain("AuthorizeSecurityGroupIngressCommand");
+  });
+
+  it("attaches an IAM instance profile to enable SSM (AmazonSSMManagedInstanceCore)", () => {
+    expect(src).toContain("IamInstanceProfile");
+    expect(src).toContain("ARK_EC2_INSTANCE_PROFILE");
+  });
+
+  it("does not allocate a public IP (NetworkInterfaces block is absent; SubnetId controls IP)", () => {
+    expect(src).not.toContain("AssociatePublicIpAddress");
+    expect(src).not.toContain("--associate-public-ip-address");
   });
 });

@@ -7,24 +7,35 @@
  */
 
 import { readFileSync } from "node:fs";
-import { DEFAULT_ARKD_PORT } from "../../../core/constants.js";
 import {
   EC2Client,
   RunInstancesCommand,
   TerminateInstancesCommand,
   DescribeInstancesCommand,
   CreateSecurityGroupCommand,
-  AuthorizeSecurityGroupIngressCommand,
   DeleteSecurityGroupCommand,
   ImportKeyPairCommand,
   DeleteKeyPairCommand,
   DescribeSubnetsCommand,
-  DescribeVpcsCommand,
   DescribeImagesCommand,
   CreateTagsCommand,
   waitUntilInstanceRunning,
 } from "@aws-sdk/client-ec2";
 import { fromIni } from "@aws-sdk/credential-providers";
+
+/**
+ * Default IAM instance profile that grants the EC2 instance permission to
+ * speak SSM (specifically the AmazonSSMManagedInstanceCore policy). The
+ * conductor connects via SSM Session Manager, so the instance MUST have
+ * this role attached or `aws ssm start-session` returns
+ * `TargetNotConnected`.
+ *
+ * The user can override per-call via `ProvisionStackOpts.iamInstanceProfile`,
+ * or globally via `ARK_EC2_INSTANCE_PROFILE`. If neither is set we use this
+ * conventional name; callers are expected to pre-create it in their AWS
+ * account (one-time setup, see docs/providers.md).
+ */
+const DEFAULT_INSTANCE_PROFILE = "ArkEC2SsmInstanceProfile";
 
 // ---------------------------------------------------------------------------
 // Instance size tiers - maps size label to [x64_type, arm_type]
@@ -89,6 +100,13 @@ export interface ProvisionStackOpts {
   keyName?: string;
   sshKeyPath?: string;
   awsProfile?: string;
+  /**
+   * Name (or full ARN) of the IAM instance profile to attach. The profile's
+   * role MUST have the AmazonSSMManagedInstanceCore policy or the conductor
+   * cannot start an SSM session against the instance. Defaults to
+   * `ARK_EC2_INSTANCE_PROFILE` env var, then to `DEFAULT_INSTANCE_PROFILE`.
+   */
+  iamInstanceProfile?: string;
   onOutput?: (msg: string) => void;
 }
 
@@ -153,15 +171,20 @@ export async function provisionStack(hostName: string, opts: ProvisionStackOpts)
   const amiId = await findLatestAmi(client, arch);
   log(`AMI: ${amiId}`);
 
-  // 2. Security group
+  // 2. Security group.
+  //
+  // SSM transport: the SG has NO ingress rules. SSH is tunneled through
+  // SSM Session Manager (outbound HTTPS to ssm.<region>.amazonaws.com),
+  // and arkd HTTP -- when the conductor needs it -- is reached via an
+  // SSH-forwarded local port. So nothing inbound is necessary.
   let sgId = opts.securityGroupId;
   let createdSg = false;
 
   if (!sgId) {
-    log("Creating security group...");
+    log("Creating security group (no ingress rules -- SSM-only)...");
     const sgParams: any = {
       GroupName: `ark-sg-${hostName}-${Date.now()}`,
-      Description: `Ark compute ${hostName} - SSH access`,
+      Description: `Ark compute ${hostName} - SSM-only (no inbound)`,
     };
 
     if (opts.subnetId) {
@@ -173,46 +196,6 @@ export async function provisionStack(hostName: string, opts: ProvisionStackOpts)
     const sgResult = await client.send(new CreateSecurityGroupCommand(sgParams));
     sgId = sgResult.GroupId!;
     createdSg = true;
-
-    // Determine ingress CIDR
-    let ingressCidr = "0.0.0.0/0";
-    if (opts.subnetId) {
-      const subnetResult = await client.send(new DescribeSubnetsCommand({ SubnetIds: [opts.subnetId] }));
-      const vpcId = subnetResult.Subnets?.[0]?.VpcId;
-      if (vpcId) {
-        const vpcResult = await client.send(new DescribeVpcsCommand({ VpcIds: [vpcId] }));
-        ingressCidr = vpcResult.Vpcs?.[0]?.CidrBlock ?? "0.0.0.0/0";
-      }
-    }
-
-    // Two ingress rules:
-    //   - 22 (SSH): provisioning + cloud-init waits + maintenance
-    //   - 19300 (arkd): the control plane reaches arkd directly via
-    //     `http://${ip}:${ARKD_REMOTE_PORT}/health` (see remote-arkd.ts).
-    //     Without this rule the post-provision arkd-reachability poll
-    //     hangs ~90s and the catch block resets the compute row to
-    //     "stopped", even though the instance + cloud-init succeeded.
-    //     The instance's own iptables also opens 19300; that's
-    //     redundant if the SG is closed -- both layers must allow it.
-    await client.send(
-      new AuthorizeSecurityGroupIngressCommand({
-        GroupId: sgId,
-        IpPermissions: [
-          {
-            IpProtocol: "tcp",
-            FromPort: 22,
-            ToPort: 22,
-            IpRanges: [{ CidrIp: ingressCidr, Description: "SSH" }],
-          },
-          {
-            IpProtocol: "tcp",
-            FromPort: DEFAULT_ARKD_PORT,
-            ToPort: DEFAULT_ARKD_PORT,
-            IpRanges: [{ CidrIp: ingressCidr, Description: "arkd HTTP" }],
-          },
-        ],
-      }),
-    );
 
     await client.send(
       new CreateTagsCommand({
@@ -256,32 +239,63 @@ export async function provisionStack(hostName: string, opts: ProvisionStackOpts)
     log(`Key pair: ${keyName}`);
   }
 
-  // 4. Launch instance
-  log(`Launching ${instanceType} instance...`);
-  const runResult = await client.send(
-    new RunInstancesCommand({
-      ImageId: amiId,
-      InstanceType: instanceType as import("@aws-sdk/client-ec2")._InstanceType,
-      MinCount: 1,
-      MaxCount: 1,
-      KeyName: keyName,
-      SecurityGroupIds: sgId ? [sgId] : undefined,
-      SubnetId: opts.subnetId,
-      UserData: opts.userData ? Buffer.from(opts.userData).toString("base64") : undefined,
-      BlockDeviceMappings: [
-        {
-          DeviceName: "/dev/sda1",
-          Ebs: { VolumeSize: 256, VolumeType: "gp3", DeleteOnTermination: true },
-        },
-      ],
-      TagSpecifications: [
-        {
-          ResourceType: "instance",
-          Tags: tags,
-        },
-      ],
-    }),
-  );
+  // 4. Launch instance.
+  //
+  // We attach an IAM instance profile so the instance can register with SSM
+  // (AmazonSSMManagedInstanceCore policy). The conductor's SSH transport is
+  // a Session Manager tunnel, which fails with `TargetNotConnected` when
+  // the instance lacks SSM permissions. The IAM profile is expected to exist
+  // already in the AWS account; if it doesn't, RunInstances returns
+  // `InvalidParameterValue: Invalid IAM Instance Profile name`, and we
+  // re-throw with CLI-friendly remediation.
+  const iamProfile = opts.iamInstanceProfile ?? process.env.ARK_EC2_INSTANCE_PROFILE ?? DEFAULT_INSTANCE_PROFILE;
+
+  log(`Launching ${instanceType} instance (IAM profile: ${iamProfile})...`);
+  let runResult;
+  try {
+    runResult = await client.send(
+      new RunInstancesCommand({
+        ImageId: amiId,
+        InstanceType: instanceType as import("@aws-sdk/client-ec2")._InstanceType,
+        MinCount: 1,
+        MaxCount: 1,
+        KeyName: keyName,
+        // IamInstanceProfile takes either Name or Arn. We pass Name for
+        // anything that doesn't look like an ARN.
+        IamInstanceProfile: iamProfile.startsWith("arn:") ? { Arn: iamProfile } : { Name: iamProfile },
+        // No NetworkInterfaces block + SubnetId-only -- the subnet's
+        // `MapPublicIpOnLaunch` setting wins. For a private subnet, no
+        // public IP is allocated, which is exactly what SSM transport needs.
+        SecurityGroupIds: sgId ? [sgId] : undefined,
+        SubnetId: opts.subnetId,
+        UserData: opts.userData ? Buffer.from(opts.userData).toString("base64") : undefined,
+        BlockDeviceMappings: [
+          {
+            DeviceName: "/dev/sda1",
+            Ebs: { VolumeSize: 256, VolumeType: "gp3", DeleteOnTermination: true },
+          },
+        ],
+        TagSpecifications: [
+          {
+            ResourceType: "instance",
+            Tags: tags,
+          },
+        ],
+      }),
+    );
+  } catch (err: any) {
+    const code = err?.Code ?? err?.name ?? "";
+    const msg = err?.message ?? String(err);
+    if (code.includes("IamInstanceProfile") || /IAM Instance Profile/i.test(msg)) {
+      throw new Error(
+        `EC2 launch failed: IAM instance profile '${iamProfile}' is missing or unauthorized. ` +
+          `Create one in your AWS account with the AmazonSSMManagedInstanceCore policy attached, ` +
+          `or set ARK_EC2_INSTANCE_PROFILE / pass --iam-instance-profile to point to an existing profile. ` +
+          `Original error: ${msg}`,
+      );
+    }
+    throw err;
+  }
 
   const instanceId = runResult.Instances?.[0]?.InstanceId;
   if (!instanceId) throw new Error("Failed to launch EC2 instance -- no instance ID returned");
@@ -295,12 +309,13 @@ export async function provisionStack(hostName: string, opts: ProvisionStackOpts)
     { InstanceIds: [instanceId] },
   );
 
-  // 6. Get IP address
+  // 6. Capture IP address for legacy back-compat (some callers still log it
+  // / use it for codegraph HTTP). Not required for SSH transport.
   const descResult = await client.send(new DescribeInstancesCommand({ InstanceIds: [instanceId] }));
   const instance = descResult.Reservations?.[0]?.Instances?.[0];
-  const ip = opts.subnetId ? (instance?.PrivateIpAddress ?? null) : (instance?.PublicIpAddress ?? null);
+  const ip = instance?.PrivateIpAddress ?? instance?.PublicIpAddress ?? null;
 
-  log(`Instance running: ${instanceId} (IP: ${ip ?? "pending"})`);
+  log(`Instance running: ${instanceId}${ip ? ` (private IP: ${ip})` : ""}`);
 
   return {
     ip,
