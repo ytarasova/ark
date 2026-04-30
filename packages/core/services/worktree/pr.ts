@@ -148,7 +148,16 @@ export async function mergeWorktreePR(
   try {
     const ghArgs = ["pr", "merge", prUrl, `--${method}`, "--auto"];
     if (deleteAfter) ghArgs.push("--delete-branch");
-    const cwd = session.workdir ?? repo;
+    // `gh pr merge <url>` derives the repo from the URL itself -- the cwd
+    // doesn't need to be a git checkout. Older code passed
+    // `session.workdir ?? repo`, but for remote-repo sessions
+    // session.workdir points at a phantom local path
+    // (e.g. /Users/<u>/Projects/<repo>/<repo>) and session.repo is just the
+    // basename ("ark"), so posix_spawn errored with ENOTDIR. Prefer the
+    // local worktree if it exists; otherwise fall back to the conductor's
+    // arkDir (always present).
+    const wtDir = join(app.config.dirs.worktrees, sessionId);
+    const cwd = existsSync(wtDir) ? wtDir : app.config.dirs.ark;
     await execFileAsync("gh", ghArgs, { encoding: "utf-8", timeout: 30_000, cwd });
 
     await app.events.log(sessionId, "pr_merged", {
