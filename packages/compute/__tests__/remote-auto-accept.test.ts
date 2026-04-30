@@ -81,7 +81,7 @@ describe("remote autoAcceptChannelPrompt", async () => {
   it("sends '1' then Enter when prompt is detected", async () => {
     sshResponses = [ok(PROMPT_OUTPUT), ok(WORKING_OUTPUT)];
 
-    await autoAcceptChannelPrompt("key", "1.2.3.4", "ark-test", { maxAttempts: 5, delayMs: 1 });
+    await autoAcceptChannelPrompt("key", "i-test", { region: "us-east-1" }, "ark-test", { maxAttempts: 5, delayMs: 1 });
 
     const sendKeysCalls = sshCalls.filter((c) => c.cmd.includes("send-keys"));
     expect(sendKeysCalls.length).toBe(2);
@@ -92,7 +92,7 @@ describe("remote autoAcceptChannelPrompt", async () => {
   it("stops polling when Claude is working", async () => {
     sshResponses = [ok(WORKING_OUTPUT)];
 
-    await autoAcceptChannelPrompt("key", "1.2.3.4", "ark-test", { maxAttempts: 5, delayMs: 1 });
+    await autoAcceptChannelPrompt("key", "i-test", { region: "us-east-1" }, "ark-test", { maxAttempts: 5, delayMs: 1 });
 
     const sendKeysCalls = sshCalls.filter((c) => c.cmd.includes("send-keys"));
     expect(sendKeysCalls.length).toBe(0);
@@ -106,7 +106,10 @@ describe("remote autoAcceptChannelPrompt", async () => {
       ok(WORKING_OUTPUT), // finally working
     ];
 
-    await autoAcceptChannelPrompt("key", "1.2.3.4", "ark-test", { maxAttempts: 10, delayMs: 1 });
+    await autoAcceptChannelPrompt("key", "i-test", { region: "us-east-1" }, "ark-test", {
+      maxAttempts: 10,
+      delayMs: 1,
+    });
 
     const sendKeysCalls = sshCalls.filter((c) => c.cmd.includes("send-keys"));
     // Should have sent keys for BOTH prompts: "1", Enter, "1", Enter
@@ -123,7 +126,7 @@ describe("remote autoAcceptChannelPrompt", async () => {
     `;
     sshResponses = [ok(altPrompt), ok(WORKING_OUTPUT)];
 
-    await autoAcceptChannelPrompt("key", "1.2.3.4", "ark-test", { maxAttempts: 5, delayMs: 1 });
+    await autoAcceptChannelPrompt("key", "i-test", { region: "us-east-1" }, "ark-test", { maxAttempts: 5, delayMs: 1 });
 
     const sendKeysCalls = sshCalls.filter((c) => c.cmd.includes("send-keys"));
     expect(sendKeysCalls.length).toBe(2);
@@ -136,7 +139,7 @@ describe("remote autoAcceptChannelPrompt", async () => {
     `;
     sshResponses = [ok(working)];
 
-    await autoAcceptChannelPrompt("key", "1.2.3.4", "ark-test", { maxAttempts: 5, delayMs: 1 });
+    await autoAcceptChannelPrompt("key", "i-test", { region: "us-east-1" }, "ark-test", { maxAttempts: 5, delayMs: 1 });
 
     const sendKeysCalls = sshCalls.filter((c) => c.cmd.includes("send-keys"));
     expect(sendKeysCalls.length).toBe(0);
@@ -152,7 +155,10 @@ describe("remote autoAcceptChannelPrompt", async () => {
       ok(WORKING_OUTPUT), // actually working
     ];
 
-    await autoAcceptChannelPrompt("key", "1.2.3.4", "ark-test", { maxAttempts: 10, delayMs: 1 });
+    await autoAcceptChannelPrompt("key", "i-test", { region: "us-east-1" }, "ark-test", {
+      maxAttempts: 10,
+      delayMs: 1,
+    });
 
     // Should have continued past the "Welcome" output and accepted the prompt
     const sendKeysCalls = sshCalls.filter((c) => c.cmd.includes("send-keys"));
@@ -162,7 +168,7 @@ describe("remote autoAcceptChannelPrompt", async () => {
   it("captures 30 lines of tmux output", async () => {
     sshResponses = [ok(WORKING_OUTPUT)];
 
-    await autoAcceptChannelPrompt("key", "1.2.3.4", "ark-test", { maxAttempts: 3, delayMs: 1 });
+    await autoAcceptChannelPrompt("key", "i-test", { region: "us-east-1" }, "ark-test", { maxAttempts: 3, delayMs: 1 });
 
     const captureCalls = sshCalls.filter((c) => c.cmd.includes("capture-pane"));
     expect(captureCalls.length).toBeGreaterThan(0);
@@ -172,7 +178,7 @@ describe("remote autoAcceptChannelPrompt", async () => {
   it("exhausts max attempts without error", async () => {
     sshResponses = [ok(STARTUP_OUTPUT)];
 
-    await autoAcceptChannelPrompt("key", "1.2.3.4", "ark-test", { maxAttempts: 3, delayMs: 1 });
+    await autoAcceptChannelPrompt("key", "i-test", { region: "us-east-1" }, "ark-test", { maxAttempts: 3, delayMs: 1 });
 
     const sendKeysCalls = sshCalls.filter((c) => c.cmd.includes("send-keys"));
     expect(sendKeysCalls.length).toBe(0);
