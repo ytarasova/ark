@@ -342,7 +342,12 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
               403,
             );
           }
-          // Create a tenant-scoped router if needed
+          // Create a tenant-scoped router if needed. The rebuild gives every
+          // handler that closes over `app` (i.e. doesn't use `resolveTenantApp`)
+          // a tenant-scoped view via its registration-time closure -- web.ts,
+          // knowledge.ts, memory.ts, dashboard.ts still rely on this. Modern
+          // handlers (session/history/messaging/conductor/...) bypass the
+          // rebuild entirely by reading `ctx.scopedApp` injected below.
           let rpcRouter = router;
           if (tenantCtx && tenantCtx.tenantId !== "default") {
             rpcRouter = new Router();
@@ -354,9 +359,15 @@ export function startWebServer(app: AppContext, opts?: WebServerOptions): { stop
           // Wire contexts need `fromWire` to precompute `isAdmin`; missing
           // contexts (auth disabled) fall back to local-admin for the
           // configured default tenant.
+          //
+          // `scopedApp` is the per-request tenant-scoped AppContext; handlers
+          // read it via `resolveTenantApp(app, ctx)`. Setting it on the HTTP
+          // path mirrors the WS-daemon dispatch (`packages/server/index.ts`)
+          // so both transports go through one tenant-resolution code path.
           const handlerCtx: HandlerTenantContext = tenantCtx
             ? fromWire(tenantCtx)
             : localAdminContext(app.config.authSection?.defaultTenant ?? null);
+          handlerCtx.scopedApp = requestApp;
           const result = await rpcRouter.dispatch(
             body as import("../../protocol/types.js").JsonRpcRequest,
             undefined,

@@ -25,15 +25,25 @@
 import type { TenantContext as WireTenantContext } from "../../types/index.js";
 import { ErrorCodes, RpcError } from "../../protocol/types.js";
 import type { ApiKeyManager } from "./api-keys.js";
+import type { AppContext } from "../app.js";
 
 /**
  * Handler-facing view of the caller. Adds `isAdmin` as a precomputed
  * boolean on top of the wire `TenantContext` so handlers can write
  * `if (!ctx.isAdmin)` without repeating the role check.
+ *
+ * `scopedApp` is the optional per-request tenant-scoped AppContext. The
+ * router materializes it once per dispatch (WS + HTTP) so handlers don't
+ * need to re-call `app.forTenant(ctx.tenantId)`. It is a runtime-only
+ * field -- the wire TenantContext crossing the JSON-RPC boundary stays
+ * lean. Handlers should read it via `resolveTenantApp(app, ctx)`, which
+ * prefers `ctx.scopedApp` when set and falls back to `app.forTenant(...)`.
  */
 export interface TenantContext extends WireTenantContext {
   /** Precomputed: `role === "admin"`. */
   isAdmin: boolean;
+  /** Per-request tenant-scoped AppContext, injected by the dispatch entry. */
+  scopedApp?: AppContext;
 }
 
 /** Whether the caller is an admin. */
