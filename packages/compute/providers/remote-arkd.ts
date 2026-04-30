@@ -12,7 +12,9 @@
 import { ArkdBackedProvider } from "./arkd-backed.js";
 import { safeAsync } from "../../core/safe.js";
 import { sshKeyPath } from "./ec2/ssh.js";
+import { EC2PlacementCtx } from "./ec2/placement-ctx.js";
 import type { Compute, Session, ProvisionOpts, SyncOpts, IsolationMode, LaunchOpts } from "../types.js";
+import type { PlacementCtx } from "../../core/secrets/placement-types.js";
 import { DEFAULT_CONDUCTOR_URL, DEFAULT_ARKD_PORT } from "../../core/constants.js";
 
 const ARKD_REMOTE_PORT = DEFAULT_ARKD_PORT;
@@ -62,6 +64,23 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
     if (cfg.arkd_url) return cfg.arkd_url;
     if (cfg.ip) return `http://${cfg.ip}:${ARKD_REMOTE_PORT}`;
     throw new Error(`Compute '${compute.name}' has no IP or arkd_url`);
+  }
+
+  /**
+   * Build an EC2-flavoured PlacementCtx so dispatch can place typed secrets
+   * on the remote instance over SSH. We resolve the SSH private key from the
+   * provider-managed location (`~/.ssh/ark-<computeName>`, written at
+   * provision time) and the public IP from the compute config row. If either
+   * is missing we throw -- placement is fail-fast on the EC2 path, and a
+   * silent skip would surprise operators who declared file-typed secrets on
+   * a remote stage.
+   */
+  async buildPlacementCtx(_session: Session, compute: Compute): Promise<PlacementCtx> {
+    const cfg = compute.config as RemoteConfig;
+    if (!cfg.ip) {
+      throw new Error(`Compute '${compute.name}' has no IP -- cannot build EC2 PlacementCtx`);
+    }
+    return new EC2PlacementCtx({ sshKeyPath: sshKeyPath(compute.name), ip: cfg.ip });
   }
 
   async provision(compute: Compute, opts?: ProvisionOpts): Promise<void> {
@@ -376,7 +395,12 @@ export class RemoteWorktreeProvider extends RemoteArkdBase {
   private repoBasename(session: Session): string {
     const src = this.cloneSource(session);
     if (!src) return "project";
-    return src.split("/").pop()?.replace(/\.git$/, "") ?? "project";
+    return (
+      src
+        .split("/")
+        .pop()
+        ?.replace(/\.git$/, "") ?? "project"
+    );
   }
 
   /**
