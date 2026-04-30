@@ -98,3 +98,60 @@ describe("ark secrets blob upload --type and --metadata", () => {
     ).rejects.toThrow(/Invalid --type/);
   });
 });
+
+/**
+ * Drive a secrets subcommand through Commander and capture stdout. We wire
+ * the registered commands onto a fresh root each call so we don't carry
+ * state between tests.
+ */
+async function captureSecretsCommand(args: string[]): Promise<{ stdout: string; stderr: string }> {
+  const { Command } = await import("commander");
+  const { registerSecretsCommands } = await import("../commands/secrets.js");
+  const root = new Command();
+  root.exitOverride();
+  registerSecretsCommands(root);
+
+  const stdoutLines: string[] = [];
+  const stderrLines: string[] = [];
+  const origLog = console.log;
+  const origErr = console.error;
+  console.log = (...a: any[]) => stdoutLines.push(a.map(String).join(" "));
+  console.error = (...a: any[]) => stderrLines.push(a.map(String).join(" "));
+  try {
+    await root.parseAsync(["node", "ark", ...args]);
+  } finally {
+    console.log = origLog;
+    console.error = origErr;
+  }
+  return { stdout: stdoutLines.join("\n"), stderr: stderrLines.join("\n") };
+}
+
+describe("ark secrets list TYPE column", () => {
+  test("renders TYPE column for string secrets", async () => {
+    await performSecretSet("FOO", "v", { type: "env-var", metadata: {} });
+    await performSecretSet("BB_KEY", "v", {
+      type: "ssh-private-key",
+      metadata: { host: "bitbucket.org" },
+    });
+    const { stdout } = await captureSecretsCommand(["secrets", "list"]);
+    expect(stdout).toContain("TYPE");
+    expect(stdout).toMatch(/FOO\s+env-var/);
+    expect(stdout).toMatch(/BB_KEY\s+ssh-private-key/);
+  });
+
+  test("renders TYPE column for blob list", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ark-cli-blob-list-"));
+    try {
+      writeFileSync(join(tmp, "a.txt"), "x");
+      await performBlobUpload("claude", tmp, {
+        type: "generic-blob",
+        metadata: { target_path: "~/.claude" },
+      });
+      const { stdout } = await captureSecretsCommand(["secrets", "blob", "list"]);
+      expect(stdout).toContain("TYPE");
+      expect(stdout).toMatch(/claude\s+generic-blob/);
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});

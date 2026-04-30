@@ -182,16 +182,19 @@ export function registerSecretsCommands(program: Command): void {
     .description("List secret names (values are never returned)")
     .action(async () => {
       await runAction("secrets list", async () => {
-        const ark = await getArkClient();
-        const refs = await ark.secretList();
+        const app = await getInProcessApp();
+        const tenantId = defaultTenantId(app);
+        const refs = await app.secrets.list(tenantId);
         if (refs.length === 0) {
           console.log(chalk.dim("No secrets configured."));
           return;
         }
-        console.log(`  ${"NAME".padEnd(32)} ${"UPDATED".padEnd(22)} DESCRIPTION`);
+        console.log(`  ${"NAME".padEnd(28)} ${"TYPE".padEnd(18)} ${"UPDATED".padEnd(24)} DESCRIPTION`);
         for (const r of refs) {
           const desc = r.description ?? "";
-          console.log(`  ${r.name.padEnd(32)} ${(r.updated_at ?? "").padEnd(22)} ${desc}`);
+          console.log(
+            `  ${r.name.padEnd(28)} ${r.type.padEnd(18)} ${(r.updated_at ?? "").padEnd(24)} ${desc}`,
+          );
         }
       });
     });
@@ -278,13 +281,17 @@ export function registerSecretsCommands(program: Command): void {
     .description("List blob names (contents are never returned)")
     .action(async () => {
       await runAction("secrets blob list", async () => {
-        const ark = await getArkClient();
-        const names = await ark.secretBlobList();
-        if (names.length === 0) {
+        const app = await getInProcessApp();
+        const tenantId = defaultTenantId(app);
+        const refs = await app.secrets.listBlobsDetailed(tenantId);
+        if (refs.length === 0) {
           console.log(chalk.dim("No blob secrets configured."));
           return;
         }
-        for (const n of names) console.log(`  ${n}`);
+        console.log(`  ${"NAME".padEnd(28)} ${"TYPE".padEnd(18)} ${"UPDATED".padEnd(24)}`);
+        for (const r of refs) {
+          console.log(`  ${r.name.padEnd(28)} ${r.type.padEnd(18)} ${(r.updated_at ?? "").padEnd(24)}`);
+        }
       });
     });
 
