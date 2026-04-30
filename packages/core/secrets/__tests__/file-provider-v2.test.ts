@@ -106,4 +106,24 @@ describe("FileSecretsProvider v2", () => {
     expect(refs).toHaveLength(1);
     expect(refs[0].metadata).toEqual({ target_path: "~/.tricky" });
   });
+
+  test("blob rotate without opts preserves existing type + metadata", async () => {
+    const p = new FileSecretsProvider(dir);
+    await p.setBlob(
+      "default",
+      "k",
+      { a: "v1" },
+      {
+        type: "generic-blob",
+        metadata: { target_path: "~/.k" },
+      },
+    );
+    // Rotate value only; no opts.
+    await p.setBlob("default", "k", { a: "v2" });
+    const refs = await p.listBlobsDetailed("default");
+    expect(refs[0].type).toBe("generic-blob");
+    expect(refs[0].metadata).toEqual({ target_path: "~/.k" });
+    const blob = await p.getBlob("default", "k");
+    expect(Buffer.from(blob!["a"]).toString()).toBe("v2");
+  });
 });

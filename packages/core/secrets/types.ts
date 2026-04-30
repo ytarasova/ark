@@ -97,6 +97,11 @@ export interface SecretsCapability {
    * replace a multi-file blob (AWS SSM) delete-then-write; a crash in the
    * middle may leave a partial blob. Callers that need strict atomicity
    * should use a single string secret instead.
+   *
+   * The metadata sidecar shares the same atomicity caveat: a crash between
+   * the file rotation and the sidecar rewrite leaves new content paired
+   * with stale metadata. Callers needing strict atomicity should write
+   * a single string secret instead.
    */
   setBlob(
     tenantId: string,

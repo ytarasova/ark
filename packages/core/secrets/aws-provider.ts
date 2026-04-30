@@ -12,7 +12,7 @@
  */
 
 import type { SSMClient } from "@aws-sdk/client-ssm";
-import type { BlobRef, SecretRef, SecretsCapability } from "./types.js";
+import type { BlobRef, SecretRef, SecretType, SecretsCapability } from "./types.js";
 import { assertValidSecretName, assertValidBlobName, assertValidBlobFilename } from "./types.js";
 import { normalizeBlob, type BlobInput, type BlobBytes } from "./blob.js";
 
@@ -273,7 +273,17 @@ export class AwsSecretsProvider implements SecretsCapability {
       }
       nextToken = res.NextToken;
     } while (nextToken);
-    // TODO(Task 4): read type + metadata from the Description envelope.
+    // TODO(Task 4): Persist + read type/metadata via the SSM Description JSON envelope.
+    // - Source of truth: the per-blob "manifest" parameter (we currently write
+    //   one Description per file -- pick one canonical "manifest" file by sort
+    //   order, or introduce a dedicated `<prefix>/.meta` parameter, OR encode
+    //   the envelope on every file's Description).
+    // - Envelope format: encodeDescriptionEnvelope({type, metadata}) (Task 4
+    //   adds this helper). decodeDescriptionEnvelope tolerates legacy plain
+    //   strings and missing fields.
+    // - SSM Description max length: 1024 chars. JSON envelope must fit.
+    // - created_at / updated_at: derived from SSM LastModifiedDate via
+    //   DescribeParameters (already used elsewhere in this file).
     // For now return safe defaults so callers that read ref.type never see
     // undefined. The envelope encode/decode lands in Task 4.
     const epoch = new Date(0).toISOString();
@@ -315,13 +325,22 @@ export class AwsSecretsProvider implements SecretsCapability {
     return Object.keys(out).length > 0 ? out : null;
   }
 
-  // TODO(Task 4): persist opts.type and opts.metadata in the Description
-  // envelope. For now the opts are accepted but not stored on the AWS path.
+  // TODO(Task 4): Persist + read type/metadata via the SSM Description JSON envelope.
+  // - Source of truth: the per-blob "manifest" parameter (we currently write
+  //   one Description per file -- pick one canonical "manifest" file by sort
+  //   order, or introduce a dedicated `<prefix>/.meta` parameter, OR encode
+  //   the envelope on every file's Description).
+  // - Envelope format: encodeDescriptionEnvelope({type, metadata}) (Task 4
+  //   adds this helper). decodeDescriptionEnvelope tolerates legacy plain
+  //   strings and missing fields.
+  // - SSM Description max length: 1024 chars. JSON envelope must fit.
+  // - created_at / updated_at: derived from SSM LastModifiedDate via
+  //   DescribeParameters (already used elsewhere in this file).
   async setBlob(
     tenantId: string,
     name: string,
     files: BlobInput,
-    _opts?: { type?: string; metadata?: Record<string, string> },
+    _opts?: { type?: SecretType; metadata?: Record<string, string> },
   ): Promise<void> {
     assertValidBlobName(name);
     const normalized = normalizeBlob(files);
