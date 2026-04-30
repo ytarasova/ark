@@ -25,9 +25,10 @@
  *   - The dispatcher attaches the deferred ctx to the launch options it
  *     hands to `executor.launch()`. The executor passes it through to
  *     `provider.launch()` on `LaunchOpts.placement`.
- *   - The provider, post-provision (after `compute.config.ip` is set), builds
- *     a real ctx (e.g. EC2PlacementCtx) and calls `deferred.flush(realCtx)`
- *     before spawning the agent process.
+ *   - The provider, post-provision (after `compute.config.instance_id` is
+ *     set), builds a real ctx (e.g. EC2PlacementCtx, keyed off
+ *     `instance_id` for the SSM transport) and calls
+ *     `deferred.flush(realCtx)` before spawning the agent process.
  *
  * Providers that *can* do real placement pre-launch (e.g. k8s -- the API
  * client doesn't need a pod IP, it talks to the cluster control plane)
