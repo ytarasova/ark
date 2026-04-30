@@ -2,7 +2,9 @@
  * Executor launch + launch-env assembly.
  *
  * Two collaborators:
- *   - buildLaunchEnv: resolve stage+runtime secrets, merge tenant claude-auth.
+ *   - buildLaunchEnv: resolve stage+runtime secrets, merge tenant claude-auth,
+ *                     and run typed-secret placement (Phase 1: additive, only
+ *                     fires when the provider implements buildPlacementCtx).
  *   - launchAgent:   invoke executor.launch() with a fully-assembled option
  *                    object. Common to main dispatch and inline sub-stages.
  *
@@ -16,6 +18,9 @@ import type { Session } from "../../../types/index.js";
 import type { StageDefinition } from "../../state/flow.js";
 import type { StageSecretResolver } from "./secrets-resolve.js";
 import type { Executor, LaunchResult } from "../../executor.js";
+import { providerOf } from "../../../compute/adapters/provider-map.js";
+import { placeAllSecrets } from "../../secrets/placement.js";
+import { logWarn } from "../../observability/structured-log.js";
 
 export interface LaunchEnvResult {
   env: Record<string, string>;
@@ -27,12 +32,16 @@ export interface LaunchEnvResult {
  *   1. Stage + runtime secrets (first wins on name collision; stage beats runtime).
  *   2. Tenant-level claude auth (wins over secrets -- operators who set
  *      ANTHROPIC_API_KEY on the tenant expect it to be authoritative).
+ *   3. Typed-secret placement (Phase 1: only runs when the provider implements
+ *      `buildPlacementCtx`). Merges any env vars the placers set into the
+ *      launch env. The legacy paths above stay -- placement is *additive* in
+ *      Phase 1; Phase 3 will retire the redundant paths.
  *
  * A missing secret surfaces as `error`; callers fail dispatch. Claude auth
  * materialization may also emit a k8s Secret side-effect (credsSecretName).
  */
 export async function buildLaunchEnv(
-  deps: Pick<DispatchDeps, "computes" | "materializeClaudeAuth">,
+  deps: Pick<DispatchDeps, "computes" | "materializeClaudeAuth" | "runtimes" | "getApp">,
   secrets: StageSecretResolver,
   session: Session,
   stageDef: StageDefinition | null,
@@ -58,7 +67,53 @@ export async function buildLaunchEnv(
     log(`Materialized subscription blob as k8s Secret '${claudeAuth.credsSecretName}'`);
   }
 
-  return { env: { ...secretEnv.env, ...claudeAuth.env } };
+  const env: Record<string, string> = { ...secretEnv.env, ...claudeAuth.env };
+
+  // Typed-secret placement (Phase 1: additive, gated on provider opt-in).
+  //
+  // The narrowing filter is the union of stage-declared and runtime-declared
+  // secret names. Empty means "auto-attach all tenant secrets". This mirrors
+  // how the legacy `secrets.resolve()` path scopes things, so a session that
+  // declared no secrets stays narrow even when placement runs.
+  //
+  // Until a provider opts in via `buildPlacementCtx`, this branch is dead --
+  // placeAllSecrets does not run, no env mutation. Tasks 18-20 wire up the
+  // first real impl (EC2). The wiring lives here so those tasks can land
+  // without touching dispatch again.
+  if (computeForAuth) {
+    try {
+      const app = deps.getApp();
+      const provider = app.getProvider(providerOf(computeForAuth));
+      if (provider?.buildPlacementCtx) {
+        const stageSecrets = stageDef?.secrets ?? [];
+        let runtimeSecrets: string[] = [];
+        try {
+          const rt = deps.runtimes?.get?.(runtime);
+          runtimeSecrets = Array.isArray(rt?.secrets) ? (rt as { secrets?: string[] }).secrets! : [];
+        } catch {
+          // Runtime row may be absent in legacy/test paths -- the legacy
+          // resolve() above already tolerates this; placement does too.
+        }
+        const narrow: Set<string> | undefined =
+          stageSecrets.length === 0 && runtimeSecrets.length === 0
+            ? undefined
+            : new Set([...stageSecrets, ...runtimeSecrets]);
+
+        const ctx = await provider.buildPlacementCtx(session, computeForAuth);
+        await placeAllSecrets(app, session, ctx, { narrow });
+        Object.assign(env, ctx.getEnv());
+      }
+    } catch (err: any) {
+      // Placer errors for fail-fast types (env-var, ssh-private-key, kubeconfig)
+      // surface here. Failing closed is right: missing one of these silently
+      // breaks the agent in subtle ways. Phase 3 collapses the legacy path so
+      // there is only one place that can fail; in Phase 1 we keep both.
+      logWarn("session", `placeAllSecrets failed: ${err?.message ?? err}`);
+      return { env: {}, error: `Secret placement failed: ${err?.message ?? String(err)}` };
+    }
+  }
+
+  return { env };
 }
 
 export interface LaunchAgentOpts {

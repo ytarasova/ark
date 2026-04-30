@@ -3,6 +3,7 @@
  */
 
 import type { Compute, Session } from "../types/index.js";
+import type { PlacementCtx } from "../core/secrets/placement-types.js";
 
 // Re-export for convenience
 export type { Compute, Session };
@@ -90,6 +91,18 @@ export interface ComputeProvider {
   resolveWorkdir?(compute: Compute, session: Session): string | null;
 
   syncEnvironment(compute: Compute, opts: SyncOpts): Promise<void>;
+
+  /**
+   * Build a `PlacementCtx` for the given session/compute pair so the typed-secret
+   * placement dispatch can write files, append blocks, set env vars, and configure
+   * the provisioner against this provider's medium (SSH, k8s API, fs, ...).
+   *
+   * Optional in Phase 1: providers without an impl get the no-op fallback (placement
+   * does not run for that compute), preserving the legacy claude-auth + stage/runtime
+   * secrets-resolve paths. Phase 2 adds real impls (EC2 first); Phase 3 retires the
+   * legacy paths once every provider has one.
+   */
+  buildPlacementCtx?(session: Session, compute: Compute): Promise<PlacementCtx>;
 
   // ── Capability flags ────────────────────────────────────────────────────
   //

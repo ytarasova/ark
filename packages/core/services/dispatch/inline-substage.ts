@@ -31,6 +31,7 @@ export async function dispatchInlineSubStage(
     | "resolveExecutor"
     | "buildClaudeArgs"
     | "materializeClaudeAuth"
+    | "runtimes"
   >,
   secrets: StageSecretResolver,
   sessionId: string,
