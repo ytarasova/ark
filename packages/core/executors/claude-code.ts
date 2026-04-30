@@ -170,12 +170,20 @@ export const claudeCodeExecutor: Executor = {
 
     // Build launch env from agent config + provider-specific env + router URL (if enabled)
     const { buildRouterEnv } = await import("./router-env.js");
-    // ARK_SESSION_DIR gives the launcher a place to drop the exit-code
-    // sentinel when claude exits non-zero (bug 3 fix). The status poller
-    // watches this same path. For remote compute the path refers to the
-    // compute target filesystem; provider-specific remapping is out of
-    // scope here and falls back to the launcher's /tmp default.
+    // ARK_SESSION_DIR is where the launcher writes its exit-code sentinel
+    // when claude exits non-zero. For LOCAL dispatch it points at the
+    // conductor's tracks dir (status-poller.ts watches that path). For
+    // REMOTE dispatch the conductor can't read EC2's filesystem, so the
+    // sentinel mechanism doesn't apply -- session completion is reported
+    // via the ark hooks (Stop / SessionEnd / StopFailure) curling back
+    // through the reverse tunnel set up in prepareRemoteEnvironment. We
+    // still need ARK_SESSION_DIR set to *something* writable on the
+    // remote; otherwise the launcher would `mkdir -p` the conductor's
+    // path on the EC2 host, leaving a phantom `/Users/<name>/.ark/...`
+    // tree on the wrong filesystem. /tmp is per-instance ephemeral and
+    // always writable by the ubuntu user.
     const localSessionDir = join(app.config.dirs.tracks, session.id);
+    const sessionDirEnv = isRemote ? `/tmp/ark-session-${session.id}` : localSessionDir;
     const launchEnv: Record<string, string> = {
       ...(opts.agent.env ?? {}),
       ...(provider?.buildLaunchEnv(session) ?? {}),
@@ -184,7 +192,7 @@ export const claudeCodeExecutor: Executor = {
       // every other env source so operator-rotated values take effect
       // on the next run without editing any YAML.
       ...(opts.env ?? {}),
-      ARK_SESSION_DIR: localSessionDir,
+      ARK_SESSION_DIR: sessionDirEnv,
     };
 
     const claudeArgs = opts.claudeArgs ?? [];
