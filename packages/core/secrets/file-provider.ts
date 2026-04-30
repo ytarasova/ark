@@ -18,14 +18,19 @@
  *
  * File shape (pretty-printed, stable key order):
  *   {
- *     "version": 1,
+ *     "version": 2,
  *     "secrets": {
  *       "<tenantId>": {
- *         "<NAME>": { "v": "<base64>", "d": "...", "created_at": "...",
- *                     "updated_at": "..." }
+ *         "<NAME>": { "v": "<base64>", "d": "...",
+ *                     "t": "<SecretType>", "m": {...},
+ *                     "created_at": "...", "updated_at": "..." }
  *       }
  *     }
  *   }
+ *
+ * Version history: v1 had no t/m fields; the loader supplies safe defaults
+ * (type=env-var, metadata={}). Writing back a v1-loaded file rewrites it
+ * as v2.
  *
  * Atomic writes: write to `secrets.json.tmp`, then rename -- partial
  * writes must never surface.
@@ -50,6 +55,20 @@ import { assertValidSecretName, assertValidBlobName, assertValidBlobFilename } f
 import { normalizeBlob, type BlobInput, type BlobBytes } from "./blob.js";
 
 const VERSION = 2;
+
+const VALID_TYPES: ReadonlySet<string> = new Set(["env-var", "ssh-private-key", "generic-blob", "kubeconfig"]);
+
+function safeSecretType(t: string | undefined): SecretType {
+  return t && VALID_TYPES.has(t) ? (t as SecretType) : "env-var";
+}
+
+function safeMetadata(m: unknown): Record<string, string> {
+  if (m && typeof m === "object" && !Array.isArray(m)) {
+    return m as Record<string, string>;
+  }
+  return {};
+}
+
 /** Pseudo-application-constant salt mixed into the scrypt KDF. */
 const SCRYPT_SALT = Buffer.from("ark-secrets-v1");
 const KEY_LEN = 32; // AES-256
@@ -192,8 +211,8 @@ export class FileSecretsProvider implements SecretsCapability {
       refs.push({
         tenant_id: tenantId,
         name,
-        type: (entry.t as SecretType | undefined) ?? "env-var",
-        metadata: entry.m ?? {},
+        type: safeSecretType(entry.t),
+        metadata: safeMetadata(entry.m),
         description: entry.d,
         created_at: entry.created_at,
         updated_at: entry.updated_at,
@@ -225,8 +244,8 @@ export class FileSecretsProvider implements SecretsCapability {
     const entry: FileStoredSecret = {
       v: encrypt(value, this.keyProvider()),
       d: opts?.description ?? existing?.d,
-      t: opts?.type ?? (existing?.t as SecretType | undefined) ?? "env-var",
-      m: opts?.metadata ?? existing?.m ?? {},
+      t: opts?.type ?? safeSecretType(existing?.t),
+      m: opts?.metadata ?? safeMetadata(existing?.m),
       created_at: existing?.created_at ?? now,
       updated_at: now,
     };

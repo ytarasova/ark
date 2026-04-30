@@ -53,4 +53,20 @@ describe("FileSecretsProvider v2", () => {
     const onDisk = JSON.parse(readFileSync(join(dir, "secrets.json"), "utf-8"));
     expect(onDisk.version).toBe(2);
   });
+
+  test("set without type/metadata preserves existing typed-secret state", async () => {
+    const p = new FileSecretsProvider(dir);
+    await p.set("default", "K", "v1", {
+      type: "ssh-private-key",
+      metadata: { host: "bitbucket.org" },
+    });
+    // Now update the value/description without re-passing type/metadata.
+    await p.set("default", "K", "v2", { description: "rotated" });
+    const refs = await p.list("default");
+    expect(refs[0].type).toBe("ssh-private-key");
+    expect(refs[0].metadata).toEqual({ host: "bitbucket.org" });
+    // Value also rotated.
+    const value = await p.get("default", "K");
+    expect(value).toBe("v2");
+  });
 });

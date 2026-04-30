@@ -111,6 +111,11 @@ export class AwsSecretsProvider implements SecretsCapability {
         refs.push({
           tenant_id: tenantId,
           name: n,
+          // Task 4 will decode the Description envelope to extract a real type
+          // and metadata. Until then, back-fill safe defaults so callers that
+          // read ref.type (e.g. placement code) never see undefined.
+          type: "env-var",
+          metadata: {},
           description: p.Description,
           // SSM doesn't track creation distinct from modification on parameters;
           // surface the same timestamp for both so the UI has something sensible.
