@@ -18,11 +18,12 @@ import type { AppContext } from "../app.js";
 import type { Session } from "../../types/index.js";
 import type { PlacementCtx, TypedSecret, TypedSecretPlacer } from "./placement-types.js";
 import { envVarPlacer } from "./placers/env-var.js";
+import { sshPrivateKeyPlacer } from "./placers/ssh-private-key.js";
 import { logInfo, logWarn, logDebug } from "../observability/structured-log.js";
 
 const PLACERS: Record<string, TypedSecretPlacer> = {
   "env-var": envVarPlacer,
-  // ssh-private-key registered in Phase 2 (Task 17)
+  "ssh-private-key": sshPrivateKeyPlacer,
   // generic-blob, kubeconfig registered in Phase 3
 };
 
