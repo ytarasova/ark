@@ -44,6 +44,7 @@
 
 import { spawn } from "child_process";
 
+import { REMOTE_USER } from "../providers/ec2/constants.js";
 import type { AppContext } from "../../core/app.js";
 import type { Compute, ComputeCapabilities, ComputeHandle, ComputeKind, ProvisionOpts, Snapshot } from "./types.js";
 import { NotSupportedError } from "./types.js";
@@ -211,7 +212,7 @@ function defaultOpenSshTunnel(opts: { keyPath: string; ip: string; localPort: nu
     ...SSH_TUNNEL_OPTS,
     "-L",
     `${opts.localPort}:localhost:${opts.remotePort}`,
-    `ubuntu@${opts.ip}`,
+    `${REMOTE_USER}@${opts.ip}`,
   ];
   const child = spawn("ssh", args, { detached: true, stdio: "ignore" });
   child.unref();

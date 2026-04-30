@@ -179,6 +179,17 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
   async destroy(compute: Compute): Promise<void> {
     const { destroyStack } = await import("./ec2/provision.js");
     const { destroyPool } = await import("./ec2/pool.js");
+    const { teardownReverseTunnel } = await import("./ec2/ports.js");
+
+    // Tear down the reverse tunnel set up in prepareRemoteEnvironment so
+    // the SSH tunnel process doesn't outlive the EC2 instance it points at.
+    const cfg = compute.config as RemoteConfig;
+    if (cfg.ip) {
+      await safeAsync(`[remote] destroy: teardown reverse tunnel for ${compute.name}`, async () => {
+        await teardownReverseTunnel(cfg.ip!, this.app.config.ports.conductor);
+      });
+    }
+
     await safeAsync(`[remote] destroy: ${compute.name}`, async () => {
       await destroyStack(compute.name);
       destroyPool(compute.name);
@@ -237,6 +248,15 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
   async stop(compute: Compute): Promise<void> {
     const cfg = compute.config as RemoteConfig;
     if (!cfg.instance_id) throw new Error("No instance_id - cannot stop");
+
+    // Tear down the reverse tunnel before the EC2 stop -- the ssh process is
+    // local; killing it after the instance halts only delays cleanup.
+    if (cfg.ip) {
+      const { teardownReverseTunnel } = await import("./ec2/ports.js");
+      await safeAsync(`[remote] stop: teardown reverse tunnel for ${compute.name}`, async () => {
+        await teardownReverseTunnel(cfg.ip!, this.app.config.ports.conductor);
+      });
+    }
 
     const { EC2Client, StopInstancesCommand } = await import("@aws-sdk/client-ec2");
     const { fromIni } = await import("@aws-sdk/credential-providers");

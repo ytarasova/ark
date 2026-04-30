@@ -10,6 +10,7 @@ import { existsSync, mkdirSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import { shellEscape } from "./shell-escape.js";
+import { REMOTE_USER } from "./constants.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -37,7 +38,7 @@ export function sshBaseArgs(key: string, ip: string, ports?: number[]): string[]
   for (const p of ports ?? []) {
     args.push("-L", `${p}:localhost:${p}`);
   }
-  args.push(`ubuntu@${ip}`);
+  args.push(`${REMOTE_USER}@${ip}`);
   return args;
 }
 
@@ -115,12 +116,12 @@ function rsyncSshOpt(key: string): string {
 
 /** Build rsync arguments for pushing local -> remote. */
 export function rsyncPushArgs(key: string, ip: string, local: string, remote: string): string[] {
-  return ["rsync", "-avz", "--update", "--timeout=30", "-e", rsyncSshOpt(key), local, `ubuntu@${ip}:${remote}`];
+  return ["rsync", "-avz", "--update", "--timeout=30", "-e", rsyncSshOpt(key), local, `${REMOTE_USER}@${ip}:${remote}`];
 }
 
 /** Build rsync arguments for pulling remote -> local. */
 export function rsyncPullArgs(key: string, ip: string, remote: string, local: string): string[] {
-  return ["rsync", "-avz", "--update", "--timeout=30", "-e", rsyncSshOpt(key), `ubuntu@${ip}:${remote}`, local];
+  return ["rsync", "-avz", "--update", "--timeout=30", "-e", rsyncSshOpt(key), `${REMOTE_USER}@${ip}:${remote}`, local];
 }
 
 /** Push local path to remote via rsync (async). */

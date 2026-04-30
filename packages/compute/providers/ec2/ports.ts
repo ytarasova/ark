@@ -6,20 +6,21 @@ import { execFile, spawn } from "child_process";
 import { promisify } from "util";
 import type { PortDecl, PortStatus } from "../../types.js";
 import { SSH_OPTS, sshExec } from "./ssh.js";
+import { REMOTE_USER } from "./constants.js";
 import { logInfo, logDebug } from "../../../core/observability/structured-log.js";
 
 const execFileAsync = promisify(execFile);
 
 /**
  * Build SSH args for a background tunnel process.
- * Produces: ssh -i key -N -f -L port:localhost:port ... ubuntu@ip
+ * Produces: ssh -i key -N -f -L port:localhost:port ... ${REMOTE_USER}@ip
  */
 export function buildTunnelArgs(key: string, ip: string, ports: PortDecl[]): string[] {
   const args = ["ssh", "-i", key, ...SSH_OPTS, "-N", "-f"];
   for (const p of ports) {
     args.push("-L", `${p.port}:localhost:${p.port}`);
   }
-  args.push(`ubuntu@${ip}`);
+  args.push(`${REMOTE_USER}@${ip}`);
   return args;
 }
 
@@ -69,15 +70,73 @@ export async function teardownTunnels(ports: PortDecl[]): Promise<void> {
 }
 
 /**
- * Spawn a background SSH reverse tunnel (-R) so the remote host
- * can reach a service on the local machine (e.g. the conductor).
- * Remote localhost:port → local localhost:port.
+ * Returns the PID of an existing reverse tunnel for `(ip, port)`, or null.
+ * Uses `pgrep -f` (cross-platform: macOS + Linux) with a substring pattern
+ * unique enough to avoid false positives -- `-R <port>:localhost:<port>` and
+ * `${REMOTE_USER}@<ip>` together only ever appear in the SSH args spawned by
+ * setupReverseTunnel below. macOS pgrep does NOT support the Linux `-a`
+ * flag, so we just list PIDs and trust the pattern.
  */
-export function setupReverseTunnel(key: string, ip: string, port: number): void {
-  const args = ["ssh", "-i", key, ...SSH_OPTS, "-N", "-f", "-R", `${port}:localhost:${port}`, `ubuntu@${ip}`];
+async function findReverseTunnelPid(ip: string, port: number): Promise<number | null> {
+  try {
+    // Pattern is a substring match. Lead with the port-pair (not the `-R `
+    // prefix) so pgrep doesn't try to parse it as its own flag, and pass
+    // `--` to terminate flag parsing for safety in case future patterns
+    // happen to start with `-`.
+    const pattern = `${port}:localhost:${port} ${REMOTE_USER}@${ip}`;
+    const { stdout } = await execFileAsync("pgrep", ["-f", "--", pattern], { encoding: "utf-8" });
+    const pid = stdout
+      .trim()
+      .split("\n")
+      .map((line) => parseInt(line.trim(), 10))
+      .find((n) => Number.isFinite(n));
+    return pid ?? null;
+  } catch {
+    // pgrep exits non-zero when nothing matches.
+    return null;
+  }
+}
+
+/**
+ * Spawn a background SSH reverse tunnel (-R) so the remote host can reach a
+ * service on the local machine (e.g. the conductor at localhost:19100).
+ * Remote `localhost:port` → local `localhost:port`.
+ *
+ * Idempotent: if a matching tunnel for `(ip, port)` is already running we
+ * return its PID without spawning a duplicate. The duplicate would fail
+ * fast on the remote port-bind anyway, but logging gets noisy.
+ */
+export async function setupReverseTunnel(key: string, ip: string, port: number): Promise<{ pid: number | null; reused: boolean }> {
+  const existing = await findReverseTunnelPid(ip, port);
+  if (existing) return { pid: existing, reused: true };
+
+  const args = ["ssh", "-i", key, ...SSH_OPTS, "-N", "-f", "-R", `${port}:localhost:${port}`, `${REMOTE_USER}@${ip}`];
   const [bin, ...rest] = args;
   const child = spawn(bin, rest, { detached: true, stdio: "ignore" });
   child.unref();
+
+  // ssh -f forks immediately and the parent exits, so the spawned child PID
+  // is the SHORT-LIVED parent. Resolve the actual long-lived tunnel PID via
+  // pgrep -- with a few retries because pgrep can race the fork.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await new Promise((r) => setTimeout(r, 100));
+    const pid = await findReverseTunnelPid(ip, port);
+    if (pid) return { pid, reused: false };
+  }
+  return { pid: null, reused: false };
+}
+
+/** Kill the reverse tunnel for `(ip, port)`, if any. Best-effort. */
+export async function teardownReverseTunnel(ip: string, port: number): Promise<boolean> {
+  const pid = await findReverseTunnelPid(ip, port);
+  if (!pid) return false;
+  try {
+    process.kill(pid, "SIGTERM");
+    return true;
+  } catch {
+    logDebug("compute", "reverse tunnel pid already gone");
+    return false;
+  }
 }
 
 /**

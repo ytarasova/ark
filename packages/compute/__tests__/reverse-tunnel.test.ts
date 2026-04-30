@@ -36,4 +36,13 @@ describe("setupReverseTunnel", async () => {
     const ports = await import("../providers/ec2/ports.js");
     expect(typeof ports.setupReverseTunnel).toBe("function");
   });
+
+  it("teardownReverseTunnel is exported and idempotent on a missing tunnel", async () => {
+    const ports = await import("../providers/ec2/ports.js");
+    expect(typeof ports.teardownReverseTunnel).toBe("function");
+    // Calling teardown for a non-existent tunnel returns false (nothing to
+    // kill) rather than throwing -- callers shouldn't have to guard this.
+    const killed = await ports.teardownReverseTunnel("203.0.113.255", 65530);
+    expect(killed).toBe(false);
+  });
 });

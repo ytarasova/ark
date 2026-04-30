@@ -11,6 +11,7 @@ import { existsSync, mkdirSync, rmSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import { SSH_OPTS } from "./ssh.js";
+import { REMOTE_USER } from "./constants.js";
 import { safeAsync } from "../../../core/safe.js";
 import { logDebug } from "../../../core/observability/structured-log.js";
 
@@ -76,7 +77,7 @@ export class SSHPool {
     try {
       await execFileAsync(
         "ssh",
-        ["-i", this.key, "-o", `ControlPath=${this.socketPath}`, "-O", "check", `ubuntu@${this.ip}`],
+        ["-i", this.key, "-o", `ControlPath=${this.socketPath}`, "-O", "check", `${REMOTE_USER}@${this.ip}`],
         { timeout: SSH_CHECK_TIMEOUT_MS },
       );
       return true;
@@ -119,7 +120,7 @@ export class SSHPool {
           `ControlPersist=${this.controlPersist}`,
           "-N",
           "-f",
-          `ubuntu@${this.ip}`,
+          `${REMOTE_USER}@${this.ip}`,
         ],
         { timeout: SSH_MASTER_CONNECT_TIMEOUT_MS },
       );
@@ -148,7 +149,7 @@ export class SSHPool {
           "StrictHostKeyChecking=no",
           "-o",
           "LogLevel=ERROR",
-          `ubuntu@${this.ip}`,
+          `${REMOTE_USER}@${this.ip}`,
           cmd,
         ],
         { encoding: "utf-8", timeout: opts?.timeout ?? SSH_EXEC_TIMEOUT_MS },
@@ -176,7 +177,7 @@ export class SSHPool {
       await safeAsync(`[ec2] SSHPool.rsyncPush: (${local} -> ${this.ip}:${remote})`, async () => {
         await execFileAsync(
           "rsync",
-          ["-avz", "--update", "--timeout=30", "-e", this.rsyncSshOpt(), local, `ubuntu@${this.ip}:${remote}`],
+          ["-avz", "--update", "--timeout=30", "-e", this.rsyncSshOpt(), local, `${REMOTE_USER}@${this.ip}:${remote}`],
           { encoding: "utf-8", timeout: opts?.timeout ?? RSYNC_TIMEOUT_MS },
         );
       });
@@ -192,7 +193,7 @@ export class SSHPool {
       await safeAsync(`[ec2] SSHPool.rsyncPull: (${this.ip}:${remote} -> ${local})`, async () => {
         await execFileAsync(
           "rsync",
-          ["-avz", "--update", "--timeout=30", "-e", this.rsyncSshOpt(), `ubuntu@${this.ip}:${remote}`, local],
+          ["-avz", "--update", "--timeout=30", "-e", this.rsyncSshOpt(), `${REMOTE_USER}@${this.ip}:${remote}`, local],
           { encoding: "utf-8", timeout: opts?.timeout ?? RSYNC_TIMEOUT_MS },
         );
       });
@@ -217,7 +218,7 @@ export class SSHPool {
         "-N",
         "-f",
         ...flags,
-        `ubuntu@${this.ip}`,
+        `${REMOTE_USER}@${this.ip}`,
       ],
       { detached: true, stdio: "ignore" },
     );
@@ -239,7 +240,7 @@ export class SSHPool {
       "-o",
       "ConnectTimeout=10",
       "-t",
-      `ubuntu@${this.ip}`,
+      `${REMOTE_USER}@${this.ip}`,
       remoteCmd,
     ];
   }
@@ -251,7 +252,7 @@ export class SSHPool {
 
   private async destroyMaster(): Promise<void> {
     try {
-      await execFileAsync("ssh", ["-o", `ControlPath=${this.socketPath}`, "-O", "exit", `ubuntu@${this.ip}`], {
+      await execFileAsync("ssh", ["-o", `ControlPath=${this.socketPath}`, "-O", "exit", `${REMOTE_USER}@${this.ip}`], {
         timeout: SSH_CHECK_TIMEOUT_MS,
       });
     } catch {

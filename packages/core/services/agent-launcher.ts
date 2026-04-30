@@ -70,6 +70,23 @@ export async function prepareRemoteEnvironment(
     if (exitCode !== 0) {
       throw new Error(`Cannot reach compute '${compute.name}' at ${ip}`);
     }
+
+    // Reverse tunnel back to the conductor. Required for normal operation:
+    // the agent's ark hooks (curl to ${conductorUrl}/hooks/status) and the
+    // ark-channel MCP server (ARK_CONDUCTOR_URL) both speak HTTP back to the
+    // conductor over `localhost:<conductorPort>`. From EC2 that's the
+    // instance's own loopback unless we tunnel; with the tunnel up,
+    // EC2 → SSH → conductor's localhost:<conductorPort>. Idempotent: if a
+    // tunnel for this (ip, port) already exists we reuse it.
+    const conductorPort = app.config.ports.conductor;
+    const { setupReverseTunnel } = await import("../../compute/providers/ec2/ports.js");
+    const tunnel = await setupReverseTunnel(sshKeyPath(compute.name), ip, conductorPort);
+    if (tunnel.pid) {
+      log(`Reverse tunnel ${tunnel.reused ? "reused" : "established"} (pid ${tunnel.pid}) ` +
+        `localhost:${conductorPort} on ${compute.name} -> conductor`);
+    } else {
+      log(`WARNING: reverse tunnel did not register a PID -- hooks/channel may be unreachable`);
+    }
   }
 
   // Resolve ports from arc.json / devcontainer / compose

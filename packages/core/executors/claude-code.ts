@@ -38,11 +38,18 @@ export const claudeCodeExecutor: Executor = {
     const { setupSessionWorktree } = await import("../services/worktree/index.js");
     const effectiveWorkdir = await setupSessionWorktree(app, session, compute, provider, log);
 
-    // Determine conductor URL based on compute type
+    // Determine conductor URL based on compute type. Default + remote both
+    // use `http://localhost:<port>` -- for remote that resolves on the EC2
+    // host, where the reverse tunnel established by prepareRemoteEnvironment
+    // forwards back to the conductor's actual port. Read the live port from
+    // app.config so a non-default `--conductor-port` is reflected in the
+    // baked-in URL (DEFAULT_CONDUCTOR_URL is hardcoded to 19100 and would
+    // mismatch if the user moved the conductor).
     const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
     const usesDevcontainer = arcJson?.devcontainer ?? false;
-    const { DEFAULT_CONDUCTOR_URL, DOCKER_CONDUCTOR_URL } = await import("../constants.js");
-    const conductorUrl = usesDevcontainer ? DOCKER_CONDUCTOR_URL : DEFAULT_CONDUCTOR_URL;
+    const { DOCKER_CONDUCTOR_URL } = await import("../constants.js");
+    const localConductorUrl = `http://localhost:${app.config.ports.conductor}`;
+    const conductorUrl = usesDevcontainer ? DOCKER_CONDUCTOR_URL : localConductorUrl;
 
     // Channel config + launcher
     const channelPort = app.sessions.channelPort(session.id);
