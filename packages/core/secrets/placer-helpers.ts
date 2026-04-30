@@ -33,3 +33,24 @@ export async function runKeyScan(hosts: string[], opts: RunKeyScanOpts = {}): Pr
     return new Uint8Array();
   }
 }
+
+export interface SshConfigBlockOpts {
+  name: string;
+  host: string;
+  aliases?: string[];
+  keyPath: string;
+  username: string;
+}
+
+export function buildSshConfigBlock(opts: SshConfigBlockOpts): string {
+  const hostLine = [opts.host, ...(opts.aliases ?? [])].join(" ");
+  return [
+    `# BEGIN ark:secret:${opts.name}`,
+    `Host ${hostLine}`,
+    `  IdentityFile ${opts.keyPath}`,
+    `  IdentitiesOnly yes`,
+    `  User ${opts.username}`,
+    `# END ark:secret:${opts.name}`,
+    "",
+  ].join("\n");
+}

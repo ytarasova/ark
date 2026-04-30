@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { runKeyScan } from "../placer-helpers.js";
+import { buildSshConfigBlock, runKeyScan } from "../placer-helpers.js";
 
 describe("runKeyScan", () => {
   test("returns lines for github.com (live ssh-keyscan)", async () => {
@@ -20,4 +20,32 @@ describe("runKeyScan", () => {
     const out = await runKeyScan(["github.com", "github.com"], { timeoutMs: 10_000 });
     expect(out.length).toBeGreaterThan(0);
   }, 15_000);
+});
+
+describe("buildSshConfigBlock", () => {
+  test("emits BEGIN/END markers + Host directive", () => {
+    const out = buildSshConfigBlock({
+      name: "BB_KEY",
+      host: "bitbucket.org",
+      keyPath: "/home/ubuntu/.ssh/id_bb_key",
+      username: "git",
+    });
+    expect(out).toContain("# BEGIN ark:secret:BB_KEY");
+    expect(out).toContain("# END ark:secret:BB_KEY");
+    expect(out).toContain("Host bitbucket.org");
+    expect(out).toContain("IdentityFile /home/ubuntu/.ssh/id_bb_key");
+    expect(out).toContain("IdentitiesOnly yes");
+    expect(out).toContain("User git");
+  });
+
+  test("includes aliases on the Host line", () => {
+    const out = buildSshConfigBlock({
+      name: "BB_KEY",
+      host: "bitbucket.org",
+      aliases: ["bitbucket.paytm.com"],
+      keyPath: "/k",
+      username: "git",
+    });
+    expect(out).toMatch(/Host bitbucket\.org bitbucket\.paytm\.com/);
+  });
 });
