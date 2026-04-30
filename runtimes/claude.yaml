@@ -7,7 +7,12 @@ permission_mode: bypassPermissions
 # (same pipeline agent-sdk.yaml uses). Without this list a fresh Claude on
 # a non-local compute has no API key and falls into interactive setup.
 secrets:
-  - ANTHROPIC_API_KEY
+  # Required for headless dispatch. Produced by `claude setup-token`
+  # (sk-ant-oat...). Operators with a console.anthropic.com API key
+  # (sk-ant-api...) instead can override at the stage / agent level by
+  # declaring `secrets: [ANTHROPIC_API_KEY]` there -- Claude Code reads
+  # both env vars and picks whichever is populated.
+  - CLAUDE_CODE_OAUTH_TOKEN
 env:
   CLAUDE_AUTOCOMPACT_PCT_OVERRIDE: "80"
 billing:

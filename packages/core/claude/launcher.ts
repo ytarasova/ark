@@ -29,6 +29,17 @@ export interface LauncherOpts {
    * heredoc, and the launcher script writes it on first run. No rsync.
    */
   embedFiles?: Array<{ relPath: string; content: string }>;
+  /**
+   * When true, the launcher prepends a small jq-based merge that updates
+   * the LAUNCH HOST's `~/.claude.json` so claude skips its first-run UX
+   * gates: `hasCompletedOnboarding: true` (theme picker) and
+   * `projects[<workdir>].hasTrustDialogAccepted: true` (workspace trust
+   * prompt). Local dispatch already does both via `trustDirectory()` /
+   * the existing onboarding state on the conductor's filesystem. Remote
+   * dispatch needs the writes to land on the EC2/k8s host instead, hence
+   * embedding the merge in the launcher script.
+   */
+  preAcceptClaudeUx?: boolean;
 }
 
 /** Generate launcher bash script content. */
@@ -126,9 +137,56 @@ fi`;
     return lines.join("\n") + "\n";
   })();
 
+  // Pre-accept Claude Code's first-run UX gates on the launch host so the
+  // agent never blocks on an interactive prompt. Five gates, each mapped
+  // to a single field in ~/.claude.json:
+  //
+  //   .hasCompletedOnboarding = true                              (theme picker)
+  //   .bypassPermissionsModeAccepted = true                       (--dangerously-skip-permissions disclaimer)
+  //   .projects[<wd>].hasTrustDialogAccepted = true               (workspace trust)
+  //   .projects[<wd>].enableAllProjectMcpServers = true           (mcp approval)
+  //   .customApiKeyResponses.approved += [<key.slice(-20)>]       (api-key prompt)
+  //
+  // The api-key gate only fires when ANTHROPIC_API_KEY is in the env. The
+  // "hash" Claude stores is literally `key.slice(-20)` -- we read that from
+  // the env var inside the launcher so the raw key never appears in the
+  // script. jq merges everything in place to preserve pre-existing fields
+  // (oauthAccount, firstStartTime, migration markers, etc.).
+  const preAcceptBlock = (() => {
+    if (!opts.preAcceptClaudeUx) return "";
+    const wd = shellQuote(opts.workdir);
+    const merge = `'.hasCompletedOnboarding = true
+      | .bypassPermissionsModeAccepted = true
+      | .projects = ((.projects // {}) | .[$dir] = ((.[$dir] // {}) | .hasTrustDialogAccepted = true | .enableAllProjectMcpServers = true))
+      | (if $keyHash == "" then . else
+          .customApiKeyResponses = ((.customApiKeyResponses // {approved:[], rejected:[]})
+            | .approved = (((.approved // []) - [$keyHash]) + [$keyHash])
+            | .rejected = ((.rejected // []) - [$keyHash]))
+        end)'`;
+    return [
+      `# Pre-accept Claude first-run UX (theme + workspace trust + MCP + API key)`,
+      `# Claude hashes the env API key as key.slice(-20); compute that here so`,
+      `# the raw key never appears in the launcher script.`,
+      `_ARK_CLAUDE_KEY_HASH=""`,
+      `if [ -n "\${ANTHROPIC_API_KEY:-}" ]; then`,
+      `  _ARK_CLAUDE_KEY_HASH="\${ANTHROPIC_API_KEY: -20}"`,
+      `fi`,
+      `if command -v jq >/dev/null 2>&1 && [ -f "$HOME/.claude.json" ]; then`,
+      `  jq --arg dir ${wd} --arg keyHash "$_ARK_CLAUDE_KEY_HASH" ${merge} "$HOME/.claude.json" > "$HOME/.claude.json.tmp" && mv "$HOME/.claude.json.tmp" "$HOME/.claude.json"`,
+      `elif command -v jq >/dev/null 2>&1; then`,
+      `  echo '{}' | jq --arg dir ${wd} --arg keyHash "$_ARK_CLAUDE_KEY_HASH" ${merge} > "$HOME/.claude.json"`,
+      `fi`,
+      `unset _ARK_CLAUDE_KEY_HASH`,
+      ``,
+    ].join("\n");
+  })();
+
+  // Order matters: envBlock exports ANTHROPIC_API_KEY which preAcceptBlock
+  // reads to compute the key-approval hash. Put envBlock first so $key is
+  // populated by the time the jq merge runs.
   const content = `#!/bin/bash
 ${pathSetup}cd ${shellQuote(opts.workdir)}
-${embedBlock}${envBlock}${body}
+${embedBlock}${envBlock}${preAcceptBlock}${body}
 exec bash
 `;
 

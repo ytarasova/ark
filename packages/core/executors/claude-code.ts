@@ -215,6 +215,12 @@ export const claudeCodeExecutor: Executor = {
       env: launchEnv,
       initialPrompt: opts.initialPrompt,
       embedFiles,
+      // Local dispatch already runs trustDirectory() in the worktree
+      // setup path against the conductor's ~/.claude.json. Remote needs
+      // the same writes to land on the EC2/k8s host -- the launcher
+      // embeds a jq merge that flips hasCompletedOnboarding +
+      // projects[workdir].hasTrustDialogAccepted before claude starts.
+      preAcceptClaudeUx: isRemote,
     });
 
     const launcher = tmux.writeLauncher(session.id, launchContent, app.config.dirs.tracks);
