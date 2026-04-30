@@ -49,7 +49,14 @@ export function buildLauncher(opts: LauncherOpts): { content: string; claudeSess
   // Channel config is in .mcp.json (project level), Claude reads it automatically.
   // --remote-control was dropped: it wrote session metadata into the host
   // workspace and nothing on the Ark side consumed it.
-  const extraFlags = `--dangerously-load-development-channels server:ark-channel`;
+  //
+  // We register the channel via `--channels server:ark-channel` (the
+  // production form). The deprecated `--dangerously-load-development-channels`
+  // alias triggers an interactive "Loading development channels" warning
+  // every launch with no persistable acknowledgement -- not viable for
+  // headless dispatch. The non-`dangerously-` flag accepts the same
+  // `server:<name>` syntax (verified against the binary's `--help`).
+  const extraFlags = `--channels server:ark-channel`;
 
   const envExports = Object.entries(opts.env ?? {})
     .map(([k, v]) => `export ${k}=${shellQuote(v)}`)

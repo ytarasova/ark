@@ -529,9 +529,9 @@ describe("buildLauncher", () => {
     expect(content).not.toContain("--remote-control");
   });
 
-  it("includes --dangerously-load-development-channels server:ark-channel", () => {
+  it("includes --channels server:ark-channel", () => {
     const { content } = buildLauncher(baseOpts);
-    expect(content).toContain("--dangerously-load-development-channels server:ark-channel");
+    expect(content).toContain("--channels server:ark-channel");
   });
 
   it("ends with exec bash", () => {
@@ -599,20 +599,20 @@ describe("buildLauncher initialPrompt", () => {
     });
     expect(content).toContain("'Fix the login bug'");
     // Should appear after the channel flag.
-    const flagsIndex = content.indexOf("--dangerously-load-development-channels");
+    const flagsIndex = content.indexOf("--channels");
     const promptIndex = content.indexOf("'Fix the login bug'");
     expect(promptIndex).toBeGreaterThan(flagsIndex);
   });
 
   it("inserts `--` between the channel flag and the prompt positional (bug 2)", () => {
-    // `--dangerously-load-development-channels` is greedy and would eat
+    // `--channels` is greedy and would eat
     // the prompt as another channel entry. The `--` separator stops that.
     const { content } = buildLauncher({
       ...baseOpts,
       initialPrompt: "Fix the login bug",
     });
-    const channelFlagIdx = content.indexOf("--dangerously-load-development-channels");
-    const separatorIdx = content.indexOf("--", channelFlagIdx + "--dangerously-load-development-channels".length);
+    const channelFlagIdx = content.indexOf("--channels");
+    const separatorIdx = content.indexOf("--", channelFlagIdx + "--channels".length);
     const promptIdx = content.indexOf("'Fix the login bug'");
     expect(separatorIdx).toBeGreaterThan(channelFlagIdx);
     expect(promptIdx).toBeGreaterThan(separatorIdx);
@@ -634,7 +634,7 @@ describe("buildLauncher initialPrompt", () => {
     const { content } = buildLauncher(baseOpts);
     // With no initialPrompt there is no positional to separate, so the
     // launcher should not contain a dangling `--` on the claude line.
-    const channelLineIdx = content.indexOf("--dangerously-load-development-channels");
+    const channelLineIdx = content.indexOf("--channels");
     const afterChannel = content.slice(channelLineIdx);
     // The only `--` on this line should be the channel flag itself.
     const extraDashDashMatch = afterChannel.match(/^[^\n]*\n\s*--(?!dangerously)/);
