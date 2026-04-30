@@ -15,10 +15,22 @@
  * dispatched agent sessions.
  */
 
+/**
+ * Discriminated union of all v1 secret types. Used by placement code to
+ * know how to land a secret on a compute target (e.g. ssh keys go to
+ * ~/.ssh, kubeconfigs to ~/.kube, env-vars are injected into the shell
+ * environment, generic-blobs are written verbatim).
+ */
+export type SecretType = "env-var" | "ssh-private-key" | "generic-blob" | "kubeconfig";
+
 export interface SecretRef {
   tenant_id: string;
   /** User-visible identifier, e.g. "ANTHROPIC_API_KEY". ASCII `[A-Z0-9_]+`. */
   name: string;
+  /** How the secret is used/placed on a compute target. */
+  type: SecretType;
+  /** Arbitrary per-type key-value metadata (e.g. target path, permissions). */
+  metadata: Record<string, string>;
   description?: string;
   created_at: string;
   updated_at: string;
