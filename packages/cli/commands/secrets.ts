@@ -20,6 +20,7 @@ import { join } from "path";
 import { getArkClient, getInProcessApp } from "../app-client.js";
 import { runAction } from "./_shared.js";
 import type { SecretType } from "../../core/secrets/types.js";
+import { registerDescribeCommand } from "./secrets/describe.js";
 
 /**
  * The set of secret types accepted by `ark secrets set` / `ark secrets blob upload`.
@@ -403,4 +404,6 @@ export function registerSecretsCommands(program: Command): void {
         if (process.stdout.isTTY) process.stdout.write("\n");
       });
     });
+
+  registerDescribeCommand(group);
 }

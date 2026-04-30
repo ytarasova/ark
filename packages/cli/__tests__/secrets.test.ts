@@ -155,3 +155,38 @@ describe("ark secrets list TYPE column", () => {
     }
   });
 });
+
+describe("ark secrets describe", () => {
+  test("prints type, metadata, and placement preview for a string secret", async () => {
+    await performSecretSet("BB", "v", {
+      type: "ssh-private-key",
+      metadata: { host: "bitbucket.org" },
+    });
+    const { stdout } = await captureSecretsCommand(["secrets", "describe", "BB"]);
+    expect(stdout).toContain("Type:        ssh-private-key");
+    expect(stdout).toContain('"host":"bitbucket.org"');
+    expect(stdout).toContain("Placement:");
+    expect(stdout).toContain("EC2 places at ~/.ssh/id_<name>");
+  });
+
+  test("falls back to blob lookup when name is not a string secret", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "ark-cli-describe-blob-"));
+    try {
+      writeFileSync(join(tmp, "a.txt"), "x");
+      await performBlobUpload("claude", tmp, {
+        type: "generic-blob",
+        metadata: { target_path: "~/.claude" },
+      });
+      const { stdout } = await captureSecretsCommand(["secrets", "describe", "claude"]);
+      expect(stdout).toContain("Type:        generic-blob");
+      expect(stdout).toContain('"target_path":"~/.claude"');
+    } finally {
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test("reports a missing secret on stderr", async () => {
+    const { stderr } = await captureSecretsCommand(["secrets", "describe", "MISSING"]);
+    expect(stderr).toMatch(/MISSING.*not found/);
+  });
+});
