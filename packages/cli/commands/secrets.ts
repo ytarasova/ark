@@ -73,6 +73,39 @@ export async function performSecretSet(name: string, value: string, opts: Secret
   });
 }
 
+export interface BlobUploadOptions {
+  type: string;
+  metadata?: Record<string, string>;
+}
+
+/**
+ * Core blob-upload logic. Reads every regular file in `dir` (non-recursive)
+ * and writes them as a single named blob via the in-process secrets backend.
+ * Throws on bad type / empty dir / not-a-directory rather than calling
+ * process.exit so tests can exercise the path directly.
+ */
+export async function performBlobUpload(name: string, dir: string, opts: BlobUploadOptions): Promise<number> {
+  assertAllowedType(opts.type);
+  if (!existsSync(dir) || !statSync(dir).isDirectory()) {
+    throw new Error(`'${dir}' is not a directory`);
+  }
+  const entries = readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile());
+  if (entries.length === 0) {
+    throw new Error(`Directory '${dir}' has no files`);
+  }
+  const files: Record<string, Uint8Array> = {};
+  for (const entry of entries) {
+    files[entry.name] = readFileSync(join(dir, entry.name));
+  }
+  const app = await getInProcessApp();
+  const tenantId = defaultTenantId(app);
+  await app.secrets.setBlob(tenantId, name, files, {
+    type: opts.type as SecretType,
+    metadata: opts.metadata ?? {},
+  });
+  return entries.length;
+}
+
 /** Read the entire stdin to a string. Used when the caller pipes a value in. */
 async function readStdin(): Promise<string> {
   return await new Promise<string>((resolve, reject) => {
@@ -260,27 +293,24 @@ export function registerSecretsCommands(program: Command): void {
     .description("Upload a directory as a named blob. Reads every file in <dir> (non-recursive).")
     .argument("<name>", "Blob name (lowercase kebab-case, <=63 chars)")
     .argument("<dir>", "Directory to upload")
-    .action(async (name: string, dir: string) => {
+    .option(
+      "--type <type>",
+      "Secret type (env-var, ssh-private-key, generic-blob, kubeconfig)",
+      "generic-blob",
+    )
+    .option(
+      "--metadata <kv>",
+      "Repeatable key=value metadata pair",
+      metadataCollector,
+      {} as Record<string, string>,
+    )
+    .action(async (name: string, dir: string, opts) => {
       await runAction("secrets blob upload", async () => {
-        if (!existsSync(dir) || !statSync(dir).isDirectory()) {
-          console.error(chalk.red(`'${dir}' is not a directory`));
-          process.exitCode = 2;
-          return;
-        }
-        const entries = readdirSync(dir, { withFileTypes: true }).filter((e) => e.isFile());
-        if (entries.length === 0) {
-          console.error(chalk.red(`Directory '${dir}' has no files`));
-          process.exitCode = 2;
-          return;
-        }
-        const files: Record<string, string> = {};
-        for (const entry of entries) {
-          const buf = readFileSync(join(dir, entry.name));
-          files[entry.name] = buf.toString("base64");
-        }
-        const ark = await getArkClient();
-        await ark.secretBlobSet(name, files, { encoding: "base64" });
-        console.log(chalk.green(`Blob '${name}' uploaded (${entries.length} file${entries.length === 1 ? "" : "s"}).`));
+        const count = await performBlobUpload(name, dir, {
+          type: opts.type,
+          metadata: opts.metadata ?? {},
+        });
+        console.log(chalk.green(`Blob '${name}' uploaded (${count} file${count === 1 ? "" : "s"}).`));
       });
     });
 

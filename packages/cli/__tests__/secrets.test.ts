@@ -9,9 +9,12 @@
  */
 
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from "bun:test";
+import { mkdtempSync, writeFileSync, rmSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 import { AppContext } from "../../core/app.js";
 import { setInProcessApp } from "../app-client.js";
-import { performSecretSet } from "../commands/secrets.js";
+import { performSecretSet, performBlobUpload } from "../commands/secrets.js";
 
 let app: AppContext;
 let tenantId: string;
@@ -64,3 +67,34 @@ describe("ark secrets set --type and --metadata", () => {
   });
 });
 
+describe("ark secrets blob upload --type and --metadata", () => {
+  let tmp: string;
+
+  beforeAll(() => {
+    tmp = mkdtempSync(join(tmpdir(), "ark-cli-blob-"));
+    writeFileSync(join(tmp, ".credentials.json"), "{}");
+  });
+
+  afterAll(() => {
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  test("stores type and metadata on the blob ref", async () => {
+    const count = await performBlobUpload("claude", tmp, {
+      type: "generic-blob",
+      metadata: { target_path: "~/.claude" },
+    });
+    expect(count).toBe(1);
+    const refs = await app.secrets.listBlobsDetailed(tenantId);
+    const claude = refs.find((r) => r.name === "claude");
+    expect(claude).toBeTruthy();
+    expect(claude?.type).toBe("generic-blob");
+    expect(claude?.metadata).toEqual({ target_path: "~/.claude" });
+  });
+
+  test("rejects an unknown --type value", async () => {
+    await expect(
+      performBlobUpload("nope", tmp, { type: "bogus" as any, metadata: {} }),
+    ).rejects.toThrow(/Invalid --type/);
+  });
+});
