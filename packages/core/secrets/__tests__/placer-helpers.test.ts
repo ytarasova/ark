@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildSshConfigBlock, runKeyScan } from "../placer-helpers.js";
+import { buildSshConfigBlock, runKeyScan, validateMetadataPath } from "../placer-helpers.js";
 
 describe("runKeyScan", () => {
   test("returns lines for github.com (live ssh-keyscan)", async () => {
@@ -47,5 +47,32 @@ describe("buildSshConfigBlock", () => {
       username: "git",
     });
     expect(out).toMatch(/Host bitbucket\.org bitbucket\.paytm\.com/);
+  });
+});
+
+describe("validateMetadataPath", () => {
+  test("accepts ~/.config/foo", () => {
+    expect(() => validateMetadataPath("~/.config/foo")).not.toThrow();
+  });
+  test("accepts ~/.ssh/id_x", () => {
+    expect(() => validateMetadataPath("~/.ssh/id_x")).not.toThrow();
+  });
+  test("accepts /run/secrets/x", () => {
+    expect(() => validateMetadataPath("/run/secrets/x")).not.toThrow();
+  });
+  test("rejects ..", () => {
+    expect(() => validateMetadataPath("~/../etc/passwd")).toThrow(/traversal/);
+  });
+  test("rejects absolute paths outside home", () => {
+    expect(() => validateMetadataPath("/etc/passwd")).toThrow(/absolute/);
+  });
+  test("rejects relative paths", () => {
+    expect(() => validateMetadataPath("foo/bar")).toThrow(/must start/);
+  });
+  test("rejects NUL", () => {
+    expect(() => validateMetadataPath("~/foo\0bar")).toThrow(/NUL/);
+  });
+  test("rejects CR/LF", () => {
+    expect(() => validateMetadataPath("~/foo\nbar")).toThrow(/control/);
   });
 });

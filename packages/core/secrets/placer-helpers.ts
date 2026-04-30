@@ -54,3 +54,15 @@ export function buildSshConfigBlock(opts: SshConfigBlockOpts): string {
     "",
   ].join("\n");
 }
+
+export function validateMetadataPath(path: string): void {
+  if (path.includes("\0")) throw new Error(`metadata path contains NUL byte`);
+  if (/[\r\n]/.test(path)) throw new Error(`metadata path contains control character`);
+  if (path.includes("..")) throw new Error(`metadata path traversal: ${path}`);
+  if (path.startsWith("/") && !path.startsWith("/run/secrets/")) {
+    throw new Error(`metadata path absolute and outside ~/. or /run/secrets/: ${path}`);
+  }
+  if (!path.startsWith("~/") && !path.startsWith("/run/secrets/")) {
+    throw new Error(`metadata path must start with ~/ or /run/secrets/: ${path}`);
+  }
+}
