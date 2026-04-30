@@ -13,9 +13,9 @@
  *      replacement on ~/.ssh/config and ~/.ssh/known_hosts, and the base64
  *      of the keyscan fixture lands in the known_hosts append cmd).
  *
- * This is the integration check that gates T21 (deletion of the legacy
- * syncSshPush): once this passes we know the typed-placement pipeline can
- * fully replace the old path on EC2.
+ * This is the integration check that gated T21 (deletion of the legacy
+ * EC2 ssh sync step): with this passing, the typed-placement pipeline now
+ * fully replaces the old rsync path on EC2.
  */
 
 import { describe, expect, test, beforeAll, afterAll, beforeEach } from "bun:test";

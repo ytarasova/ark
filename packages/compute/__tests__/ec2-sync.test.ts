@@ -33,12 +33,19 @@ describe("EC2 environment sync", () => {
   // SYNC_STEPS
   // -----------------------------------------------------------------------
   describe("SYNC_STEPS", () => {
-    it("has 5 entries", () => {
-      expect(SYNC_STEPS).toHaveLength(5);
+    it("has 4 entries", () => {
+      // ssh was removed -- ssh credentials now flow via typed-secret placement
+      // (see packages/core/secrets/placers/ssh-private-key.ts)
+      expect(SYNC_STEPS).toHaveLength(4);
+    });
+
+    it("does not include an 'ssh' step", () => {
+      const names = SYNC_STEPS.map((s) => s.name);
+      expect(names).not.toContain("ssh");
     });
 
     it("each step has name, push, and pull functions", () => {
-      const expectedNames = ["ssh", "aws", "git", "gh", "claude"];
+      const expectedNames = ["aws", "git", "gh", "claude"];
       for (let i = 0; i < SYNC_STEPS.length; i++) {
         const step = SYNC_STEPS[i];
         expect(step.name).toBe(expectedNames[i]);

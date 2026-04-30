@@ -1,6 +1,14 @@
 /**
  * Environment sync for EC2 hosts.
- * Syncs credentials and project files between local machine and remote EC2 host.
+ *
+ * Syncs AWS config, gitconfig, gh auth token, and the Claude CLI cache
+ * (~/.claude + ~/.claude.json) between the local machine and the remote
+ * EC2 host. Also pushes per-project sync files (e.g. arc.json "sync"
+ * entries like .env, terraform.tfvars).
+ *
+ * SSH credentials are NOT synced here. They flow via typed-secret
+ * placement (see packages/core/secrets/placers/ssh-private-key.ts and
+ * the EC2 placement context in packages/compute/providers/ec2/placement-ctx.ts).
  */
 
 import { execFile } from "child_process";
@@ -45,30 +53,6 @@ export interface SyncStep {
   name: string;
   push: (key: string, ip: string) => Promise<void>;
   pull: (key: string, ip: string) => Promise<void>;
-}
-
-async function syncSshPush(key: string, ip: string): Promise<void> {
-  const sshDir = join(homedir(), ".ssh");
-  if (!existsSync(sshDir)) return;
-
-  await sshExec(key, ip, "mkdir -p ~/.ssh && chmod 700 ~/.ssh");
-
-  // rsync the whole directory, excluding ark-* keys to avoid recursive key problem
-  await rsyncPush(key, ip, sshDir + "/", "~/.ssh/");
-
-  // Remove any ark-* keys that may have slipped through (belt and suspenders)
-  await sshExec(key, ip, "rm -f ~/.ssh/ark-* 2>/dev/null");
-
-  // Fix permissions and populate known_hosts for github.com
-  await sshExec(
-    key,
-    ip,
-    "chmod 600 ~/.ssh/id_* 2>/dev/null; " + "ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null",
-  );
-}
-
-async function syncSshPull(_key: string, _ip: string): Promise<void> {
-  // SSH keys are push-only - we never pull remote keys to local
 }
 
 async function syncAwsPush(key: string, ip: string): Promise<void> {
@@ -246,7 +230,6 @@ export async function refreshRemoteToken(key: string, ip: string): Promise<void>
 }
 
 export const SYNC_STEPS: SyncStep[] = [
-  { name: "ssh", push: syncSshPush, pull: syncSshPull },
   { name: "aws", push: syncAwsPush, pull: syncAwsPull },
   { name: "git", push: syncGitPush, pull: syncGitPull },
   { name: "gh", push: syncGhPush, pull: syncGhPull },
