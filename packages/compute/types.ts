@@ -22,6 +22,16 @@ export interface LaunchOpts {
   workdir: string;
   launcherContent: string;
   ports: PortDecl[];
+  /**
+   * Optional deferred PlacementCtx produced by the dispatcher's pre-launch
+   * placement pass (see core/secrets/deferred-placement-ctx.ts). Providers
+   * whose medium isn't ready until provision-time (EC2 family, anything
+   * SSH-keyed off `compute.config.ip`) flush its queued file ops onto a
+   * real ctx after `provider.start`/`provider.provision` has populated the
+   * IP and before the agent process is spawned. Providers that can place
+   * pre-launch (k8s) leave this field unread.
+   */
+  placement?: PlacementCtx;
 }
 
 export interface SyncOpts {

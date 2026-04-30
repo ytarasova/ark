@@ -18,6 +18,7 @@ import type { Session } from "../../../types/index.js";
 import type { StageDefinition } from "../../state/flow.js";
 import type { StageSecretResolver } from "./secrets-resolve.js";
 import type { Executor, LaunchResult } from "../../executor.js";
+import type { PlacementCtx } from "../../secrets/placement-types.js";
 import { providerOf } from "../../../compute/adapters/provider-map.js";
 import { placeAllSecrets } from "../../secrets/placement.js";
 import { logWarn } from "../../observability/structured-log.js";
@@ -25,6 +26,17 @@ import { logWarn } from "../../observability/structured-log.js";
 export interface LaunchEnvResult {
   env: Record<string, string>;
   error?: string;
+  /**
+   * The PlacementCtx used during pre-launch placement, when the provider
+   * implements `buildPlacementCtx`. For SSH-medium providers this is a
+   * `DeferredPlacementCtx` whose queued file ops the provider replays
+   * post-provision via `flushDeferredPlacement`. For providers that can
+   * place pre-launch (k8s) it's the real ctx that already executed the
+   * file ops -- there is nothing to flush, but plumbing it through is
+   * harmless. Undefined when the provider has no buildPlacementCtx, or
+   * the session has no resolved compute.
+   */
+  placement?: PlacementCtx;
 }
 
 /**
@@ -68,6 +80,7 @@ export async function buildLaunchEnv(
   }
 
   const env: Record<string, string> = { ...secretEnv.env, ...claudeAuth.env };
+  let placement: PlacementCtx | undefined;
 
   // Typed-secret placement (Phase 1: additive, gated on provider opt-in).
   //
@@ -102,6 +115,7 @@ export async function buildLaunchEnv(
         const ctx = await provider.buildPlacementCtx(session, computeForAuth);
         await placeAllSecrets(app, session, ctx, { narrow });
         Object.assign(env, ctx.getEnv());
+        placement = ctx;
       }
     } catch (err: any) {
       // Placer errors for fail-fast types (env-var, ssh-private-key, kubeconfig)
@@ -113,7 +127,7 @@ export async function buildLaunchEnv(
     }
   }
 
-  return { env };
+  return { env, placement };
 }
 
 export interface LaunchAgentOpts {
@@ -129,6 +143,13 @@ export interface LaunchAgentOpts {
   prevClaudeSessionId?: string | null;
   sessionName: string;
   initialPrompt: string;
+  /**
+   * PlacementCtx produced by `buildLaunchEnv`. Forwarded through the
+   * executor onto provider.launch so SSH-medium providers can flush
+   * queued file ops post-provision. Optional -- absent when the provider
+   * doesn't implement `buildPlacementCtx`, or there's no resolved compute.
+   */
+  placement?: PlacementCtx;
 }
 
 /**
@@ -164,6 +185,7 @@ export async function launchAgent(
     sessionName: opts.sessionName,
     initialPrompt: opts.initialPrompt,
     compute,
+    placement: opts.placement,
     // LaunchOpts.app is still required by the executor interface; dispatch
     // is the sole reader of getApp() in this class. Refactoring executors
     // off AppContext is a separate migration.

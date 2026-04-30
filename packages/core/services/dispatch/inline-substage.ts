@@ -107,6 +107,7 @@ export async function dispatchInlineSubStage(
     prevClaudeSessionId: undefined, // Inline sub-stages always start fresh
     sessionName: `${session.summary ?? session.id} / ${subStage.name}`,
     initialPrompt: task.slice(0, 2000),
+    placement: launchEnv.placement,
   });
 
   if (!launchResult.ok) return { ok: false, message: launchResult.message ?? "Launch failed" };

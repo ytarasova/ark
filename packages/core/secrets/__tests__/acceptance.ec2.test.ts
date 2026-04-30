@@ -1,17 +1,21 @@
 /**
  * Acceptance smoke test for typed-secret placement on EC2.
  *
- * Exercises the end-to-end Phase 1+2 flow:
+ * Exercises the end-to-end Phase 1+2 flow with the two-phase placement model:
  *   1. Boot a real AppContext (forTestAsync).
  *   2. Set an `ssh-private-key` typed secret with metadata.host.
- *   3. Build an EC2PlacementCtx with stubbed sshExec / pipeTarToSsh deps so the
- *      test never touches the network.
- *   4. Inject a stub `runKeyScan` into the ssh-private-key placer (via the DI
- *      factory + __test_registerPlacer) so the placer is also network-free.
- *   5. Call placeAllSecrets() directly and assert the captured ssh commands
- *      look right (tar pipe for the key file, chmod 600, sed BEGIN/END marker
- *      replacement on ~/.ssh/config and ~/.ssh/known_hosts, and the base64
- *      of the keyscan fixture lands in the known_hosts append cmd).
+ *   3. Build a DeferredPlacementCtx (what RemoteArkdBase.buildPlacementCtx now
+ *      returns) and run placeAllSecrets() against it. Pre-fix the test built
+ *      a real EC2PlacementCtx directly, which masked the live-dispatch bug
+ *      where an EC2PlacementCtx couldn't be built pre-launch (no IP).
+ *   4. Build a stubbed EC2PlacementCtx and call deferred.flush(realCtx) -- this
+ *      simulates the post-provision flush that happens inside
+ *      RemoteArkdBase.flushDeferredPlacement during provider.launch.
+ *   5. Assert the captured ssh commands look right (tar pipe for the key file,
+ *      chmod 600, sed BEGIN/END marker replacement on ~/.ssh/config and
+ *      ~/.ssh/known_hosts, and the base64 of the keyscan fixture lands in the
+ *      known_hosts append cmd) -- proving the queued ops replay onto the real
+ *      ctx unchanged.
  *
  * This is the integration check that gated T21 (deletion of the legacy
  * EC2 ssh sync step): with this passing, the typed-placement pipeline now
@@ -24,6 +28,7 @@ import { setApp, clearApp } from "../../__tests__/test-helpers.js";
 import { placeAllSecrets, __test_registerPlacer } from "../placement.js";
 import { _makeSshPrivateKeyPlacer, sshPrivateKeyPlacer } from "../placers/ssh-private-key.js";
 import { _makeEC2PlacementCtx } from "../../../compute/providers/ec2/placement-ctx.js";
+import { DeferredPlacementCtx } from "../deferred-placement-ctx.js";
 
 describe("ARK-AC1: typed ssh-private-key placement on EC2", () => {
   let app: AppContext;
@@ -64,8 +69,25 @@ describe("ARK-AC1: typed ssh-private-key placement on EC2", () => {
     });
   });
 
-  test("places key + ssh config + known_hosts on EC2 ctx", async () => {
-    const ctx = _makeEC2PlacementCtx({
+  test("places key + ssh config + known_hosts on EC2 ctx via deferred flush", async () => {
+    // Phase A: the dispatcher runs placement against a DeferredPlacementCtx.
+    // No SSH commands fire here -- everything is queued. This is what
+    // RemoteArkdBase.buildPlacementCtx now returns (pre-fix the dispatcher
+    // tried to build an EC2PlacementCtx directly and crashed on the no-IP
+    // path because the compute hadn't been provisioned yet).
+    const deferred = new DeferredPlacementCtx();
+    const session: any = { id: "s-acceptance", tenant_id: "default" };
+
+    await placeAllSecrets(app, session, deferred);
+
+    expect(sshExecCalls).toHaveLength(0); // dispatcher never touched the wire
+    expect(tarCalls).toHaveLength(0);
+    expect(deferred.hasDeferred()).toBe(true); // file ops are queued
+
+    // Phase B: post-provision the provider builds a real EC2PlacementCtx
+    // (now the IP is known) and replays the queue. This is what
+    // RemoteArkdBase.flushDeferredPlacement does inside provider.launch.
+    const realCtx = _makeEC2PlacementCtx({
       sshKeyPath: "/fake/key",
       ip: "10.0.0.1",
       sshExec: async (_k, _ip, cmd) => {
@@ -76,9 +98,7 @@ describe("ARK-AC1: typed ssh-private-key placement on EC2", () => {
         tarCalls.push({ tarArgs, remoteCmd });
       },
     });
-    const session: any = { id: "s-acceptance", tenant_id: "default" };
-
-    await placeAllSecrets(app, session, ctx);
+    await deferred.flush(realCtx);
 
     // 1. The key file was tar-piped to /home/ubuntu/.ssh/.
     expect(tarCalls).toHaveLength(1);
@@ -119,7 +139,12 @@ describe("ARK-AC1: typed ssh-private-key placement on EC2", () => {
   test("session with no typed secrets is a no-op (no ssh exec calls)", async () => {
     // Wipe the seeded secret so the dispatcher has nothing to place.
     await app.secrets.delete("default", "BB_KEY");
-    const ctx = _makeEC2PlacementCtx({
+    const deferred = new DeferredPlacementCtx();
+    await placeAllSecrets(app, { id: "s-empty", tenant_id: "default" } as any, deferred);
+    expect(deferred.hasDeferred()).toBe(false);
+
+    // Even when we synthesize a flush against a real ctx, no SSH calls fire.
+    const realCtx = _makeEC2PlacementCtx({
       sshKeyPath: "/fake/key",
       ip: "10.0.0.1",
       sshExec: async (_k, _ip, cmd) => {
@@ -130,7 +155,7 @@ describe("ARK-AC1: typed ssh-private-key placement on EC2", () => {
         tarCalls.push({ tarArgs, remoteCmd });
       },
     });
-    await placeAllSecrets(app, { id: "s-empty", tenant_id: "default" } as any, ctx);
+    await deferred.flush(realCtx);
     expect(sshExecCalls).toHaveLength(0);
     expect(tarCalls).toHaveLength(0);
   });

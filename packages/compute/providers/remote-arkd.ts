@@ -15,7 +15,9 @@ import { sshKeyPath } from "./ec2/ssh.js";
 import { EC2PlacementCtx } from "./ec2/placement-ctx.js";
 import type { Compute, Session, ProvisionOpts, SyncOpts, IsolationMode, LaunchOpts } from "../types.js";
 import type { PlacementCtx } from "../../core/secrets/placement-types.js";
+import { DeferredPlacementCtx } from "../../core/secrets/deferred-placement-ctx.js";
 import { DEFAULT_CONDUCTOR_URL, DEFAULT_ARKD_PORT } from "../../core/constants.js";
+import { logDebug, logWarn } from "../../core/observability/structured-log.js";
 
 const ARKD_REMOTE_PORT = DEFAULT_ARKD_PORT;
 const REMOTE_USER = "ubuntu";
@@ -67,20 +69,59 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
   }
 
   /**
-   * Build an EC2-flavoured PlacementCtx so dispatch can place typed secrets
-   * on the remote instance over SSH. We resolve the SSH private key from the
-   * provider-managed location (`~/.ssh/ark-<computeName>`, written at
-   * provision time) and the public IP from the compute config row. If either
-   * is missing we throw -- placement is fail-fast on the EC2 path, and a
-   * silent skip would surprise operators who declared file-typed secrets on
-   * a remote stage.
+   * Build a DeferredPlacementCtx for the EC2 family. This runs pre-launch on
+   * the dispatcher, where the medium (SSH connection) is *not* yet available:
+   * for a stopped/destroyed compute the IP is only assigned during
+   * `provider.start` / `provider.provision` inside `provider.launch`.
+   *
+   * The deferred ctx captures `setEnv` synchronously (so env-typed secrets
+   * land in the launch env the dispatcher hands to executor.launch) and
+   * queues every file / provisioner op. The provider's launch flow flushes
+   * those queued ops onto a real EC2PlacementCtx via `flushDeferredPlacement`
+   * once the IP is known.
+   *
+   * Pre-fix behaviour: this method built an EC2PlacementCtx directly and
+   * threw `Compute '<name>' has no IP -- cannot build EC2 PlacementCtx` for
+   * any session whose compute had not been provisioned at the time the
+   * dispatcher ran. Live EC2 dispatch failed reliably.
    */
-  async buildPlacementCtx(_session: Session, compute: Compute): Promise<PlacementCtx> {
+  async buildPlacementCtx(_session: Session, _compute: Compute): Promise<PlacementCtx> {
+    return new DeferredPlacementCtx(REMOTE_HOME);
+  }
+
+  /**
+   * Flush a DeferredPlacementCtx onto a real EC2PlacementCtx. Called by every
+   * subclass at the top of `launch()` -- after `prepareRemoteEnvironment` (in
+   * the executor) has guaranteed the compute is started + reachable, and
+   * before the agent process is spawned.
+   *
+   * No-op when:
+   *   - no deferred ctx was attached (e.g. a session with only env-typed
+   *     secrets, or a session where the dispatcher's placement branch was
+   *     disabled),
+   *   - the deferred ctx has no queued file ops (only env was set), or
+   *   - the compute config still lacks an IP (we log + skip rather than
+   *     throw; the launch path itself will surface the missing IP via the
+   *     SSH commands that follow, with better context than this helper has).
+   */
+  protected async flushDeferredPlacement(compute: Compute, opts: LaunchOpts): Promise<void> {
+    const deferred = opts.placement;
+    if (!(deferred instanceof DeferredPlacementCtx)) return;
+    if (!deferred.hasDeferred()) {
+      logDebug("compute", `flushDeferredPlacement: no queued ops on '${compute.name}', skipping`);
+      return;
+    }
     const cfg = compute.config as RemoteConfig;
     if (!cfg.ip) {
-      throw new Error(`Compute '${compute.name}' has no IP -- cannot build EC2 PlacementCtx`);
+      logWarn(
+        "compute",
+        `flushDeferredPlacement: compute '${compute.name}' has no IP at launch time -- ` +
+          `${deferred.queuedOps.length} queued placement op(s) skipped`,
+      );
+      return;
     }
-    return new EC2PlacementCtx({ sshKeyPath: sshKeyPath(compute.name), ip: cfg.ip });
+    const realCtx = new EC2PlacementCtx({ sshKeyPath: sshKeyPath(compute.name), ip: cfg.ip });
+    await deferred.flush(realCtx);
   }
 
   async provision(compute: Compute, opts?: ProvisionOpts): Promise<void> {
@@ -417,6 +458,12 @@ export class RemoteWorktreeProvider extends RemoteArkdBase {
   }
 
   async launch(compute: Compute, session: Session, opts: LaunchOpts): Promise<string> {
+    // Replay any file-typed secret placement queued by the dispatcher's
+    // pre-launch buildLaunchEnv pass. This must happen BEFORE we clone the
+    // repo / spawn the agent so private keys, ssh config, known_hosts, etc.
+    // are in place when git/ssh fire.
+    await this.flushDeferredPlacement(compute, opts);
+
     const client = this.getClient(compute);
 
     // Clone repo on remote if a source URL/path is set. We MUST use the
@@ -492,6 +539,11 @@ export class RemoteDockerProvider extends RemoteArkdBase {
   }
 
   async launch(compute: Compute, _session: Session, opts: LaunchOpts): Promise<string> {
+    // Replay deferred placement onto the EC2 host (host-level files; the
+    // container bind-mounts ~/.ssh and ~/.claude, so placing on the host
+    // is what the container picks up).
+    await this.flushDeferredPlacement(compute, opts);
+
     const client = this.getClient(compute);
     const container = this.containerName(compute);
 
@@ -534,6 +586,8 @@ export class RemoteDevcontainerProvider extends RemoteArkdBase {
   }
 
   async launch(compute: Compute, _session: Session, opts: LaunchOpts): Promise<string> {
+    await this.flushDeferredPlacement(compute, opts);
+
     const client = this.getClient(compute);
     const cfg = compute.config as RemoteConfig;
     const workdir = (cfg.devcontainer_workdir as string) || opts.workdir;
@@ -601,6 +655,8 @@ export class RemoteFirecrackerProvider extends RemoteArkdBase {
   }
 
   async launch(compute: Compute, _session: Session, opts: LaunchOpts): Promise<string> {
+    await this.flushDeferredPlacement(compute, opts);
+
     const client = this.getClient(compute);
     const _cfg = compute.config as RemoteConfig;
     const vmSshPort = 2222; // Default firecracker VM SSH port

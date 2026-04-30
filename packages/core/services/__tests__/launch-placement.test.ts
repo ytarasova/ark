@@ -20,6 +20,10 @@ import { buildLaunchEnv } from "../dispatch/launch.js";
 import { StageSecretResolver } from "../dispatch/secrets-resolve.js";
 import type { PlacementCtx } from "../../secrets/placement-types.js";
 import { MockPlacementCtx } from "../../secrets/__tests__/mock-placement-ctx.js";
+import { DeferredPlacementCtx } from "../../secrets/deferred-placement-ctx.js";
+import { __test_registerPlacer } from "../../secrets/placement.js";
+import { envVarPlacer } from "../../secrets/placers/env-var.js";
+import type { TypedSecretPlacer } from "../../secrets/placement-types.js";
 import type { ComputeProvider } from "../../../compute/types.js";
 import type { Compute, Session } from "../../../types/index.js";
 
@@ -236,6 +240,101 @@ describe("buildLaunchEnv with placeAllSecrets wiring", () => {
     expect(result.env.WANTED).toBe("yes");
     expect(result.env.EXTRA).toBeUndefined();
     expect(ctx.calls.filter((c) => c.kind === "setEnv").map((c: any) => c.key)).toEqual(["WANTED"]);
+  });
+
+  it("returns the placement ctx so dispatch can forward it to provider.launch", async () => {
+    // The dispatcher needs a handle on the ctx so it can pipe a deferred
+    // ctx through to provider.launch (where SSH-medium providers flush
+    // queued file ops once the IP is known). buildLaunchEnv exposes it
+    // as `result.placement`.
+    const ctx = new MockPlacementCtx();
+    app.registerProvider(makeStubProvider({ name: "local", buildCtx: async () => ctx }));
+    await app.computes.insert({
+      name: "echo-target",
+      provider: "local",
+      compute_kind: "local",
+      runtime_kind: "direct",
+      status: "running",
+      config: {},
+    } as any);
+
+    const session = await app.sessions.create({
+      summary: "s",
+      flow: "quick",
+      compute_name: "echo-target",
+    });
+    const fetched = (await app.sessions.get(session.id))!;
+
+    const deps = makeDeps();
+    const secrets = new StageSecretResolver({
+      runtimes: app.runtimes,
+      secrets: app.secrets,
+      config: app.config,
+    });
+    const result = await buildLaunchEnv(deps, secrets, fetched, null, "claude-code", () => {});
+    expect(result.placement).toBe(ctx);
+  });
+
+  it("file-typed secrets are deferred (queued, not executed) when the ctx is a DeferredPlacementCtx", async () => {
+    // The EC2 path now hands buildLaunchEnv a DeferredPlacementCtx because
+    // the SSH medium isn't ready pre-launch. Register a stub placer that
+    // both writes a file AND sets an env var; assert the env lands on the
+    // launch env synchronously while the file op is queued for post-flush.
+    const stubPlacer: TypedSecretPlacer = {
+      type: "env-var",
+      async place(secret, place) {
+        // Pretend this is a multi-effect secret: env + file.
+        place.setEnv(secret.name, secret.value!);
+        await place.writeFile("/home/ubuntu/.token", 0o600, new TextEncoder().encode(secret.value!));
+      },
+    };
+    __test_registerPlacer("env-var", stubPlacer);
+    // Restore the production env-var placer after this case so we don't
+    // leak the multi-effect stub into other tests / files that share the
+    // module-level placer registry.
+    try {
+      const ctx = new DeferredPlacementCtx();
+      app.registerProvider(makeStubProvider({ name: "local", buildCtx: async () => ctx }));
+      await app.computes.insert({
+        name: "deferred-target",
+        provider: "local",
+        compute_kind: "local",
+        runtime_kind: "direct",
+        status: "running",
+        config: {},
+      } as any);
+
+      await app.secrets.set(tenant(), "DEFER_TOKEN", "secret-val", { type: "env-var", metadata: {} });
+
+      const session = await app.sessions.create({
+        summary: "s",
+        flow: "quick",
+        compute_name: "deferred-target",
+      });
+      const fetched = (await app.sessions.get(session.id))!;
+
+      const deps = makeDeps();
+      const secrets = new StageSecretResolver({
+        runtimes: app.runtimes,
+        secrets: app.secrets,
+        config: app.config,
+      });
+      const result = await buildLaunchEnv(deps, secrets, fetched, null, "claude-code", () => {});
+
+      expect(result.error).toBeUndefined();
+      // Env was captured synchronously and merged into the launch env.
+      expect(result.env.DEFER_TOKEN).toBe("secret-val");
+      // The file write was DEFERRED, not executed -- the queue holds one op.
+      expect(ctx.hasDeferred()).toBe(true);
+      expect(ctx.queuedOps).toHaveLength(1);
+      expect(ctx.queuedOps[0]).toMatchObject({ kind: "writeFile", path: "/home/ubuntu/.token" });
+
+      // The placement ctx is also returned via result.placement so the
+      // dispatcher can pipe it to provider.launch for post-provision flush.
+      expect(result.placement).toBe(ctx);
+    } finally {
+      __test_registerPlacer("env-var", envVarPlacer);
+    }
   });
 
   it("returns an error and does not launch when a fail-fast placer throws", async () => {

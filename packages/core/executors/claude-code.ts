@@ -87,7 +87,9 @@ export const claudeCodeExecutor: Executor = {
     // and is passed through to `provider.launch` so tmux's `-c <workdir>`
     // and the launcher agree.
     const launcherWorkdir =
-      isRemote && compute && provider?.resolveWorkdir ? (provider.resolveWorkdir(compute, session) ?? effectiveWorkdir) : effectiveWorkdir;
+      isRemote && compute && provider?.resolveWorkdir
+        ? (provider.resolveWorkdir(compute, session) ?? effectiveWorkdir)
+        : effectiveWorkdir;
 
     // For LOCAL dispatch: write `.mcp.json` + `.claude/settings.local.json`
     // directly into the local workdir Claude will run in. For REMOTE dispatch
@@ -126,7 +128,10 @@ export const claudeCodeExecutor: Executor = {
         tenantId: session.tenant_id ?? "default",
       });
       settingsJsonContent = settings.content;
-      log(`Remote settings + MCP built: ${settings.hookCount} hook events; ` + `${Object.keys((channel.object as { mcpServers?: Record<string, unknown> })?.mcpServers ?? {}).length} mcp servers`);
+      log(
+        `Remote settings + MCP built: ${settings.hookCount} hook events; ` +
+          `${Object.keys((channel.object as { mcpServers?: Record<string, unknown> })?.mcpServers ?? {}).length} mcp servers`,
+      );
 
       // mcpConfigPath is referenced by buildLauncher's `mcpConfigPath` field.
       // For remote, point at the path the launcher heredoc will write on the
@@ -244,12 +249,16 @@ export const claudeCodeExecutor: Executor = {
 
       // Launch via provider. Pass launcherWorkdir (== resolveWorkdir on
       // remote) so tmux's `-c <workdir>` agrees with the launcher's `cd`.
+      // `placement` is the deferred ctx the dispatcher built pre-launch:
+      // SSH-medium providers flush its queued file ops onto a real ctx
+      // here, after `prepareRemoteEnvironment` has guaranteed the IP.
       log("Launching on remote...");
       const result = await provider.launch(compute, session, {
         tmuxName,
         workdir: launcherWorkdir,
         launcherContent: finalLaunchContent,
         ports,
+        placement: opts.placement,
       });
 
       await app.sessions.update(session.id, { claude_session_id: claudeSessionId });

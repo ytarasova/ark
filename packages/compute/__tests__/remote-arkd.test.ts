@@ -14,6 +14,7 @@ import {
   RemoteDevcontainerProvider,
   RemoteFirecrackerProvider,
 } from "../providers/remote-arkd.js";
+import { DeferredPlacementCtx } from "../../core/secrets/deferred-placement-ctx.js";
 import type { Compute, Session } from "../types.js";
 
 function makeCompute(overrides?: Partial<Compute>): Compute {
@@ -89,6 +90,26 @@ describe("RemoteWorktreeProvider", () => {
     } as Session);
     expect(cmd[0]).toBe("ssh");
     expect(cmd).toContain("ubuntu@10.0.1.5");
+  });
+
+  it("buildPlacementCtx returns a DeferredPlacementCtx even without an IP", async () => {
+    // Regression: pre-fix this threw `Compute '<name>' has no IP -- cannot
+    // build EC2 PlacementCtx`, breaking every dispatch where the compute
+    // hadn't been provisioned at the time the dispatcher ran (which is
+    // always, for stopped/destroyed computes -- the IP only comes back
+    // during provider.start inside provider.launch).
+    const noIp = makeCompute({ config: {} });
+    const ctx = await provider.buildPlacementCtx({} as Session, noIp);
+    expect(ctx).toBeInstanceOf(DeferredPlacementCtx);
+  });
+
+  it("buildPlacementCtx returns a DeferredPlacementCtx when an IP is already set", async () => {
+    // Even when the IP is known, we still hand back a deferred ctx -- the
+    // provider's launch flow flushes it onto a real EC2PlacementCtx
+    // post-`prepareRemoteEnvironment`. Pre-fix this returned an
+    // EC2PlacementCtx directly; today the deferred contract is uniform.
+    const ctx = await provider.buildPlacementCtx({} as Session, makeCompute());
+    expect(ctx).toBeInstanceOf(DeferredPlacementCtx);
   });
 });
 

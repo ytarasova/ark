@@ -39,6 +39,13 @@ export interface LaunchOpts {
   sessionName?: string;
   /** Initial prompt to pass as positional arg for immediate processing. */
   initialPrompt?: string;
+  /**
+   * PlacementCtx forwarded from dispatch's pre-launch placement pass. The
+   * executor passes this through to `provider.launch()` on `LaunchOpts.placement`
+   * so SSH-medium providers can flush queued file ops post-provision. Opaque
+   * to executors -- they neither read nor mutate it.
+   */
+  placement?: import("./secrets/placement-types.js").PlacementCtx;
   /** AppContext passed from dispatch -- avoids getApp() in executors. */
   app?: import("./app.js").AppContext;
 }
