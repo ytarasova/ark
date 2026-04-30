@@ -22,7 +22,7 @@ function makeCompute(overrides?: Partial<Compute>): Compute {
     name: "test-remote",
     provider: "ec2",
     status: "running",
-    config: { ip: "10.0.1.5" },
+    config: { instance_id: "i-test123", region: "us-east-1" },
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     ...overrides,
@@ -43,17 +43,23 @@ describe("RemoteWorktreeProvider", () => {
     expect(provider.needsAuth).toBe(true);
   });
 
-  it("getArkdUrl uses compute IP", () => {
-    expect(provider.getArkdUrl(makeCompute())).toBe("http://10.0.1.5:19300");
+  it("getArkdUrl uses compute IP when present (legacy path)", () => {
+    // arkd HTTP from the conductor still goes via the legacy ip field when
+    // it's set. SSM-only deployments rely on the SSH-tunnel route exposed by
+    // EC2Compute (packages/compute/core/ec2.ts) instead.
+    const compute = makeCompute({ config: { instance_id: "i-x", region: "us-east-1", ip: "10.0.1.5" } });
+    expect(provider.getArkdUrl(compute)).toBe("http://10.0.1.5:19300");
   });
 
   it("getArkdUrl prefers arkd_url from config", () => {
-    const compute = makeCompute({ config: { ip: "10.0.1.5", arkd_url: "http://custom:9999" } });
+    const compute = makeCompute({
+      config: { instance_id: "i-x", region: "us-east-1", arkd_url: "http://custom:9999" },
+    });
     expect(provider.getArkdUrl(compute)).toBe("http://custom:9999");
   });
 
-  it("getArkdUrl throws when no IP", () => {
-    const compute = makeCompute({ config: {} });
+  it("getArkdUrl throws when no arkd_url and no ip", () => {
+    const compute = makeCompute({ config: { instance_id: "i-x", region: "us-east-1" } });
     try {
       provider.getArkdUrl(compute);
       expect(true).toBe(false);
@@ -84,28 +90,30 @@ describe("RemoteWorktreeProvider", () => {
     expect((cfg.env as Record<string, string>).ARK_SESSION_ID).toBe("s-1");
   });
 
-  it("getAttachCommand includes ssh", () => {
+  it("getAttachCommand includes ssh with SSM ProxyCommand", () => {
     const cmd = provider.getAttachCommand(makeCompute(), {
       session_id: "ark-s-test",
     } as Session);
     expect(cmd[0]).toBe("ssh");
-    expect(cmd).toContain("ubuntu@10.0.1.5");
+    expect(cmd).toContain("ubuntu@i-test123");
+    // ProxyCommand wraps SSH in an SSM Session Manager tunnel.
+    expect(cmd.some((a) => a.startsWith("ProxyCommand=aws ssm start-session"))).toBe(true);
   });
 
-  it("buildPlacementCtx returns a DeferredPlacementCtx even without an IP", async () => {
+  it("buildPlacementCtx returns a DeferredPlacementCtx even without an instance_id", async () => {
     // Regression: pre-fix this threw `Compute '<name>' has no IP -- cannot
     // build EC2 PlacementCtx`, breaking every dispatch where the compute
     // hadn't been provisioned at the time the dispatcher ran (which is
-    // always, for stopped/destroyed computes -- the IP only comes back
+    // always, for stopped/destroyed computes -- the address only comes back
     // during provider.start inside provider.launch).
-    const noIp = makeCompute({ config: {} });
-    const ctx = await provider.buildPlacementCtx({} as Session, noIp);
+    const noTarget = makeCompute({ config: {} });
+    const ctx = await provider.buildPlacementCtx({} as Session, noTarget);
     expect(ctx).toBeInstanceOf(DeferredPlacementCtx);
   });
 
-  it("buildPlacementCtx returns a DeferredPlacementCtx when an IP is already set", async () => {
-    // Even when the IP is known, we still hand back a deferred ctx -- the
-    // provider's launch flow flushes it onto a real EC2PlacementCtx
+  it("buildPlacementCtx returns a DeferredPlacementCtx when an instance_id is already set", async () => {
+    // Even when the instance_id is known, we still hand back a deferred ctx
+    // -- the provider's launch flow flushes it onto a real EC2PlacementCtx
     // post-`prepareRemoteEnvironment`. Pre-fix this returned an
     // EC2PlacementCtx directly; today the deferred contract is uniform.
     const ctx = await provider.buildPlacementCtx({} as Session, makeCompute());
@@ -126,8 +134,9 @@ describe("RemoteDockerProvider", () => {
     expect(provider.isolationType).toBe("docker");
   });
 
-  it("getArkdUrl uses compute IP", () => {
-    expect(provider.getArkdUrl(makeCompute())).toBe("http://10.0.1.5:19300");
+  it("getArkdUrl uses compute IP when present (legacy path)", () => {
+    const compute = makeCompute({ config: { instance_id: "i-x", region: "us-east-1", ip: "10.0.1.5" } });
+    expect(provider.getArkdUrl(compute)).toBe("http://10.0.1.5:19300");
   });
 
   it("isolationModes includes container", () => {
@@ -170,7 +179,8 @@ describe("RemoteFirecrackerProvider", () => {
     expect(provider.isolationModes[0].value).toBe("microvm");
   });
 
-  it("getArkdUrl uses compute IP", () => {
-    expect(provider.getArkdUrl(makeCompute())).toBe("http://10.0.1.5:19300");
+  it("getArkdUrl uses compute IP when present (legacy path)", () => {
+    const compute = makeCompute({ config: { instance_id: "i-x", region: "us-east-1", ip: "10.0.1.5" } });
+    expect(provider.getArkdUrl(compute)).toBe("http://10.0.1.5:19300");
   });
 });

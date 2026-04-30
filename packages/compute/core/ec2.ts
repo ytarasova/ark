@@ -1,22 +1,28 @@
 /**
  * EC2Compute -- Compute impl that lives on an AWS EC2 instance.
  *
+ * Transport: SSH runs over an SSM Session Manager tunnel; the conductor
+ * does not need direct network reachability to the instance, no public
+ * IP is required, and the security group has no inbound rules. Callers
+ * never see AWS-level networking details -- arkd is reached through a
+ * local SSH-forwarded port.
+ *
  * Lifecycle overview:
  *
- *   provision: ensure SSH key -> provisionStack (RunInstances + SG + key) ->
- *              wait for SSH reachability -> wait for cloud-init "ready" marker
- *              -> open a forward SSH tunnel from a local ephemeral port to
- *              arkd's internal :19300 -> wait for arkd /health through the
- *              tunnel -> return a handle whose `meta.ec2` captures everything
- *              needed to resume, tear down, and talk to arkd.
+ *   provision: ensure SSH key -> provisionStack (RunInstances + IAM SSM
+ *              role + SG + key) -> wait for SSH-via-SSM reachability ->
+ *              wait for cloud-init "ready" marker -> open a forward SSH
+ *              tunnel (over SSM) from a local ephemeral port to arkd's
+ *              internal :19300 -> wait for arkd /health through the
+ *              tunnel -> return a handle whose `meta.ec2` captures
+ *              everything needed to resume, tear down, and talk to arkd.
  *
- *   getArkdUrl: always returns http://localhost:<arkdLocalPort>. The conductor
- *               talks to arkd via the tunnel; the remote instance IP never
- *               leaks into the URL, which means callers don't need AWS-level
- *               reachability to speak to a provisioned compute.
+ *   getArkdUrl: always returns http://localhost:<arkdLocalPort>. The
+ *               conductor talks to arkd via the SSM-tunneled SSH forward;
+ *               the instance ID is the canonical address, no IP needed.
  *
- *   start / stop: map to EC2 StartInstances / StopInstances. `start` waits
- *                 until a fresh public IP is assigned, then re-establishes
+ *   start / stop: map to EC2 StartInstances / StopInstances. `start`
+ *                 waits until the instance is running, then re-establishes
  *                 the tunnel (the local port stays stable across restarts).
  *
  *   destroy: TerminateInstances (via `destroyStack`), close the tunnel,
@@ -73,11 +79,11 @@ export interface EC2ProvisionConfig {
 
 /** Shape stashed on `handle.meta.ec2` after a successful provision. */
 export interface EC2HandleMeta {
-  /** AWS instance id returned by RunInstances. */
+  /** AWS instance id returned by RunInstances. Canonical address for SSM. */
   instanceId: string;
-  /** Current public IPv4 (null for private-subnet launches). */
+  /** Current public IPv4 (null when private subnet -- typical with SSM). */
   publicIp: string | null;
-  /** Private IPv4 on the VPC. */
+  /** Private IPv4 on the VPC (informational; not required for transport). */
   privateIp: string | null;
   /** Local ephemeral host port the SSH tunnel listens on. */
   arkdLocalPort: number;
@@ -85,7 +91,7 @@ export interface EC2HandleMeta {
   sshPid: number | null;
   /** Absolute path of the SSH private key (ed25519) used for provisioning. */
   sshKeyPath: string;
-  /** AWS region the stack lives in. */
+  /** AWS region the stack lives in. Required for SSM session establishment. */
   region: string;
   /** Optional AWS profile for credentials. */
   awsProfile?: string;
@@ -114,12 +120,16 @@ export interface EC2HandleMeta {
 export interface EC2ComputeHelpers {
   /** Ensure an ed25519 SSH key exists for the given host name. */
   generateSshKey: (hostName: string) => Promise<{ publicKeyPath: string; privateKeyPath: string }>;
-  /** One-shot SSH command for readiness probes (returns exitCode 0 on success). */
+  /**
+   * One-shot SSH (over SSM) command for readiness probes.
+   * Returns exitCode 0 on success; never throws. The host arg is an
+   * EC2 instance_id; SSM provides the underlying transport.
+   */
   sshExec: (
     key: string,
-    ip: string,
+    instanceId: string,
     cmd: string,
-    opts?: { timeout?: number },
+    opts?: { timeout?: number; region?: string; awsProfile?: string },
   ) => Promise<{ stdout: string; stderr: string; exitCode: number }>;
   /** Build the cloud-init user-data bundle. */
   buildUserData: (opts: {
@@ -155,10 +165,18 @@ export interface EC2ComputeHelpers {
     awsProfile?: string;
   }) => Promise<{ publicIp: string | null; privateIp: string | null }>;
   /**
-   * Spawn a background `ssh -N -L <localPort>:localhost:19300` process and
-   * return its PID. The returned PID is stored on `handle.meta.ec2.sshPid`.
+   * Spawn a background `ssh -N -L <localPort>:localhost:19300` process
+   * (tunneled through SSM Session Manager) and return its PID. The
+   * returned PID is stored on `handle.meta.ec2.sshPid`.
    */
-  openSshTunnel: (opts: { keyPath: string; ip: string; localPort: number; remotePort: number }) => number;
+  openSshTunnel: (opts: {
+    keyPath: string;
+    instanceId: string;
+    region: string;
+    awsProfile?: string;
+    localPort: number;
+    remotePort: number;
+  }) => number;
   /** Kill a PID (SIGTERM). Swallows ESRCH -- tunnel may already be gone. */
   killSshTunnel: (pid: number) => void;
   /**
@@ -200,19 +218,35 @@ async function defaultFetchHealth(url: string, timeoutMs: number): Promise<boole
   }
 }
 
-function defaultOpenSshTunnel(opts: { keyPath: string; ip: string; localPort: number; remotePort: number }): number {
+function defaultOpenSshTunnel(opts: {
+  keyPath: string;
+  instanceId: string;
+  region: string;
+  awsProfile?: string;
+  localPort: number;
+  remotePort: number;
+}): number {
   // `-N` = no remote command; `-L local:host:remote` forwards.
   // We deliberately do NOT pass `-f` here: Node can't reliably capture the PID
   // of a self-daemonised ssh. Instead we spawn detached + unref so the process
   // survives this process's event loop while still exposing a PID we can kill.
+  // Transport is SSH-over-SSM via the AWS-StartSSHSession document.
+  const profilePart = opts.awsProfile ? ` --profile ${opts.awsProfile}` : "";
+  const proxy =
+    `aws ssm start-session --target %h ` +
+    `--document-name AWS-StartSSHSession ` +
+    `--parameters portNumber=%p ` +
+    `--region ${opts.region}${profilePart}`;
   const args = [
     "-i",
     opts.keyPath,
     "-N",
     ...SSH_TUNNEL_OPTS,
+    "-o",
+    `ProxyCommand=${proxy}`,
     "-L",
     `${opts.localPort}:localhost:${opts.remotePort}`,
-    `${REMOTE_USER}@${opts.ip}`,
+    `${REMOTE_USER}@${opts.instanceId}`,
   ];
   const child = spawn("ssh", args, { detached: true, stdio: "ignore" });
   child.unref();
@@ -290,9 +324,9 @@ const DEFAULT_HELPERS: EC2ComputeHelpers = {
     const { generateSshKey } = await import("../providers/ec2/ssh.js");
     return generateSshKey(hostName);
   }) as EC2ComputeHelpers["generateSshKey"],
-  sshExec: (async (key, ip, cmd, opts) => {
+  sshExec: (async (key, instanceId, cmd, opts) => {
     const { sshExec } = await import("../providers/ec2/ssh.js");
-    return sshExec(key, ip, cmd, opts);
+    return sshExec(key, instanceId, cmd, opts);
   }) as EC2ComputeHelpers["sshExec"],
   buildUserData: (async (opts) => {
     const { buildUserData } = await import("../providers/ec2/cloud-init.js");
@@ -383,39 +417,45 @@ export class EC2Compute implements Compute {
       onOutput: (msg: string) => log(`[ec2] ${msg}`),
     });
 
-    const ip = result.ip;
-    if (!ip) {
-      throw new Error(`EC2Compute.provision: instance ${result.instance_id} has no IP -- cannot reach arkd`);
-    }
-
-    log(`[ec2] Instance ${result.instance_id} running at ${ip}. Waiting for SSH...`);
+    // SSM transport: target is instance_id, no IP required.
+    const instanceId = result.instance_id;
+    log(`[ec2] Instance ${instanceId} running. Waiting for SSH (via SSM)...`);
     const sshReady = await this.helpers.poll(
       async () => {
-        const res = await this.helpers.sshExec(privateKeyPath, ip, "echo ok", { timeout: 15_000 });
+        const res = await this.helpers.sshExec(privateKeyPath, instanceId, "echo ok", {
+          timeout: 15_000,
+          region,
+          awsProfile: cfg.awsProfile,
+        });
         return res.exitCode === 0;
       },
       { maxAttempts: 30, delayMs: 5000 },
     );
     if (!sshReady) {
-      throw new Error(`EC2Compute.provision: SSH never became reachable on ${ip}`);
+      throw new Error(`EC2Compute.provision: SSH (via SSM) never became reachable for ${instanceId}`);
     }
 
     log("[ec2] Waiting for cloud-init ready marker...");
     await this.helpers.poll(
       async () => {
-        const res = await this.helpers.sshExec(privateKeyPath, ip, "test -f /home/ubuntu/.ark-ready && echo ready", {
-          timeout: 10_000,
-        });
+        const res = await this.helpers.sshExec(
+          privateKeyPath,
+          instanceId,
+          "test -f /home/ubuntu/.ark-ready && echo ready",
+          { timeout: 10_000, region, awsProfile: cfg.awsProfile },
+        );
         return res.stdout.includes("ready");
       },
       { maxAttempts: 60, delayMs: 10_000 },
     );
 
-    log("[ec2] Opening SSH tunnel to arkd...");
+    log("[ec2] Opening SSH tunnel (via SSM) to arkd...");
     const arkdLocalPort = await this.helpers.allocatePort();
     const sshPid = this.helpers.openSshTunnel({
       keyPath: privateKeyPath,
-      ip,
+      instanceId,
+      region,
+      awsProfile: cfg.awsProfile,
       localPort: arkdLocalPort,
       remotePort: ARKD_REMOTE_PORT,
     });
@@ -433,8 +473,8 @@ export class EC2Compute implements Compute {
     }
 
     const meta: EC2HandleMeta = {
-      instanceId: result.instance_id,
-      publicIp: ip,
+      instanceId,
+      publicIp: result.ip,
       privateIp: null,
       arkdLocalPort,
       sshPid,
@@ -459,15 +499,14 @@ export class EC2Compute implements Compute {
 
   async start(h: ComputeHandle): Promise<void> {
     const meta = readMeta(h);
+    // SSM transport: instance_id is the canonical address; IPs are
+    // informational. We still record any private/public IPs the SDK
+    // returns so legacy diagnostic logs / external tools have them.
     const { publicIp, privateIp } = await this.helpers.startInstance({
       instanceId: meta.instanceId,
       region: meta.region,
       awsProfile: meta.awsProfile,
     });
-    const ip = publicIp ?? privateIp;
-    if (!ip) {
-      throw new Error(`EC2Compute.start: instance ${meta.instanceId} has no IP after start`);
-    }
 
     // Kill any previous tunnel (defensive -- stop() should have handled it,
     // but a crash/reboot may have left a stale PID on the meta).
@@ -477,7 +516,9 @@ export class EC2Compute implements Compute {
 
     const sshPid = this.helpers.openSshTunnel({
       keyPath: meta.sshKeyPath,
-      ip,
+      instanceId: meta.instanceId,
+      region: meta.region,
+      awsProfile: meta.awsProfile,
       localPort: meta.arkdLocalPort,
       remotePort: ARKD_REMOTE_PORT,
     });

@@ -3,6 +3,10 @@
  *
  * One persistent master connection per host. All SSH operations (exec, rsync,
  * tunnels) multiplex over it. A semaphore limits concurrent channels.
+ *
+ * Transport: the master connection is SSM-tunneled SSH. The host arg is
+ * an EC2 instance_id; SSM provides the underlying TCP transport via
+ * AWS-StartSSHSession.
  */
 
 import { execFile, spawn } from "child_process";
@@ -10,7 +14,7 @@ import { promisify } from "util";
 import { existsSync, mkdirSync, rmSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
-import { SSH_OPTS } from "./ssh.js";
+import { SSH_OPTS, buildSsmProxyArgs, type SsmConnectOpts } from "./ssh.js";
 import { REMOTE_USER } from "./constants.js";
 import { safeAsync } from "../../../core/safe.js";
 import { logDebug } from "../../../core/observability/structured-log.js";
@@ -34,7 +38,8 @@ const RSYNC_TIMEOUT_MS = 300_000;
 export interface SSHPoolOpts {
   computeName: string;
   key: string;
-  ip: string;
+  instanceId: string;
+  ssm: SsmConnectOpts;
   maxConcurrent?: number; // default 10
   controlPersist?: number; // default 300 seconds
 }
@@ -42,7 +47,8 @@ export interface SSHPoolOpts {
 export class SSHPool {
   readonly computeName: string;
   readonly key: string;
-  private ip: string;
+  private instanceId: string;
+  private ssm: SsmConnectOpts;
   private socketPath: string;
   private maxConcurrent: number;
   private controlPersist: number;
@@ -54,22 +60,24 @@ export class SSHPool {
   constructor(opts: SSHPoolOpts) {
     this.computeName = opts.computeName;
     this.key = opts.key;
-    this.ip = opts.ip;
+    this.instanceId = opts.instanceId;
+    this.ssm = opts.ssm;
     this.maxConcurrent = opts.maxConcurrent ?? 10;
     this.controlPersist = opts.controlPersist ?? 300;
     this.socketPath = join(CONTROL_DIR, `${opts.computeName}.sock`);
     mkdirSync(CONTROL_DIR, { recursive: true });
   }
 
-  /** Update IP (after stop/start cycle). Destroys existing master. */
-  async updateIp(newIp: string): Promise<void> {
-    if (newIp === this.ip) return;
+  /** Update target instance_id (after stop/start cycle). Destroys existing master. */
+  async updateTarget(newInstanceId: string, newSsm?: SsmConnectOpts): Promise<void> {
+    if (newInstanceId === this.instanceId && (!newSsm || newSsm === this.ssm)) return;
     await this.destroyMaster();
-    this.ip = newIp;
+    this.instanceId = newInstanceId;
+    if (newSsm) this.ssm = newSsm;
   }
 
-  getIp(): string {
-    return this.ip;
+  getInstanceId(): string {
+    return this.instanceId;
   }
 
   async isAlive(): Promise<boolean> {
@@ -77,7 +85,7 @@ export class SSHPool {
     try {
       await execFileAsync(
         "ssh",
-        ["-i", this.key, "-o", `ControlPath=${this.socketPath}`, "-O", "check", `${REMOTE_USER}@${this.ip}`],
+        ["-i", this.key, "-o", `ControlPath=${this.socketPath}`, "-O", "check", `${REMOTE_USER}@${this.instanceId}`],
         { timeout: SSH_CHECK_TIMEOUT_MS },
       );
       return true;
@@ -112,6 +120,7 @@ export class SSHPool {
           "-i",
           this.key,
           ...SSH_OPTS,
+          ...buildSsmProxyArgs(this.ssm),
           "-o",
           `ControlMaster=yes`,
           "-o",
@@ -120,7 +129,7 @@ export class SSHPool {
           `ControlPersist=${this.controlPersist}`,
           "-N",
           "-f",
-          `${REMOTE_USER}@${this.ip}`,
+          `${REMOTE_USER}@${this.instanceId}`,
         ],
         { timeout: SSH_MASTER_CONNECT_TIMEOUT_MS },
       );
@@ -149,7 +158,7 @@ export class SSHPool {
           "StrictHostKeyChecking=no",
           "-o",
           "LogLevel=ERROR",
-          `${REMOTE_USER}@${this.ip}`,
+          `${REMOTE_USER}@${this.instanceId}`,
           cmd,
         ],
         { encoding: "utf-8", timeout: opts?.timeout ?? SSH_EXEC_TIMEOUT_MS },
@@ -174,10 +183,18 @@ export class SSHPool {
     await this.connect();
     await this.acquire();
     try {
-      await safeAsync(`[ec2] SSHPool.rsyncPush: (${local} -> ${this.ip}:${remote})`, async () => {
+      await safeAsync(`[ec2] SSHPool.rsyncPush: (${local} -> ${this.instanceId}:${remote})`, async () => {
         await execFileAsync(
           "rsync",
-          ["-avz", "--update", "--timeout=30", "-e", this.rsyncSshOpt(), local, `${REMOTE_USER}@${this.ip}:${remote}`],
+          [
+            "-avz",
+            "--update",
+            "--timeout=30",
+            "-e",
+            this.rsyncSshOpt(),
+            local,
+            `${REMOTE_USER}@${this.instanceId}:${remote}`,
+          ],
           { encoding: "utf-8", timeout: opts?.timeout ?? RSYNC_TIMEOUT_MS },
         );
       });
@@ -190,10 +207,18 @@ export class SSHPool {
     await this.connect();
     await this.acquire();
     try {
-      await safeAsync(`[ec2] SSHPool.rsyncPull: (${this.ip}:${remote} -> ${local})`, async () => {
+      await safeAsync(`[ec2] SSHPool.rsyncPull: (${this.instanceId}:${remote} -> ${local})`, async () => {
         await execFileAsync(
           "rsync",
-          ["-avz", "--update", "--timeout=30", "-e", this.rsyncSshOpt(), `${REMOTE_USER}@${this.ip}:${remote}`, local],
+          [
+            "-avz",
+            "--update",
+            "--timeout=30",
+            "-e",
+            this.rsyncSshOpt(),
+            `${REMOTE_USER}@${this.instanceId}:${remote}`,
+            local,
+          ],
           { encoding: "utf-8", timeout: opts?.timeout ?? RSYNC_TIMEOUT_MS },
         );
       });
@@ -218,7 +243,7 @@ export class SSHPool {
         "-N",
         "-f",
         ...flags,
-        `${REMOTE_USER}@${this.ip}`,
+        `${REMOTE_USER}@${this.instanceId}`,
       ],
       { detached: true, stdio: "ignore" },
     );
@@ -240,7 +265,7 @@ export class SSHPool {
       "-o",
       "ConnectTimeout=10",
       "-t",
-      `${REMOTE_USER}@${this.ip}`,
+      `${REMOTE_USER}@${this.instanceId}`,
       remoteCmd,
     ];
   }
@@ -252,9 +277,13 @@ export class SSHPool {
 
   private async destroyMaster(): Promise<void> {
     try {
-      await execFileAsync("ssh", ["-o", `ControlPath=${this.socketPath}`, "-O", "exit", `${REMOTE_USER}@${this.ip}`], {
-        timeout: SSH_CHECK_TIMEOUT_MS,
-      });
+      await execFileAsync(
+        "ssh",
+        ["-o", `ControlPath=${this.socketPath}`, "-O", "exit", `${REMOTE_USER}@${this.instanceId}`],
+        {
+          timeout: SSH_CHECK_TIMEOUT_MS,
+        },
+      );
     } catch {
       logDebug("pool", "Master may already be dead -- expected during cleanup");
     }
@@ -290,13 +319,13 @@ export function getPool(computeName: string): SSHPool | undefined {
   return pools.get(computeName);
 }
 
-export function getOrCreatePool(computeName: string, key: string, ip: string): SSHPool {
+export function getOrCreatePool(computeName: string, key: string, instanceId: string, ssm: SsmConnectOpts): SSHPool {
   let pool = pools.get(computeName);
   if (pool) {
-    if (pool.getIp() !== ip) pool.updateIp(ip);
+    if (pool.getInstanceId() !== instanceId) pool.updateTarget(instanceId, ssm);
     return pool;
   }
-  pool = new SSHPool({ computeName, key, ip });
+  pool = new SSHPool({ computeName, key, instanceId, ssm });
   pools.set(computeName, pool);
   return pool;
 }

@@ -112,15 +112,20 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
       return;
     }
     const cfg = compute.config as RemoteConfig;
-    if (!cfg.ip) {
+    if (!cfg.instance_id) {
       logWarn(
         "compute",
-        `flushDeferredPlacement: compute '${compute.name}' has no IP at launch time -- ` +
+        `flushDeferredPlacement: compute '${compute.name}' has no instance_id at launch time -- ` +
           `${deferred.queuedOps.length} queued placement op(s) skipped`,
       );
       return;
     }
-    const realCtx = new EC2PlacementCtx({ sshKeyPath: sshKeyPath(compute.name), ip: cfg.ip });
+    const realCtx = new EC2PlacementCtx({
+      sshKeyPath: sshKeyPath(compute.name),
+      instanceId: cfg.instance_id,
+      region: cfg.region ?? "us-east-1",
+      awsProfile: cfg.aws_profile,
+    });
     await deferred.flush(realCtx);
   }
 
@@ -176,13 +181,20 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
       const rate = hourlyRate(instanceType);
       if (rate > 0) this.app.computes.mergeConfig(compute.name, { hourlyRate: rate });
 
-      // Wait for SSH + cloud-init
-      if (result.ip) {
+      // Wait for SSH + cloud-init. SSH connectivity is via SSM Session Manager
+      // tunnel keyed off instance_id; no public IP / SG ingress required.
+      if (result.instance_id) {
+        const region = cfg.region ?? "us-east-1";
+        const awsProfile = cfg.aws_profile;
         const { sshExecAsync } = await import("./ec2/ssh.js");
-        log("Waiting for SSH...");
+        log("Waiting for SSH (via SSM)...");
         await poll(
           async () => {
-            const res = await sshExecAsync(privateKeyPath, result.ip!, "echo ok", { timeout: 15_000 });
+            const res = await sshExecAsync(privateKeyPath, result.instance_id, "echo ok", {
+              timeout: 15_000,
+              region,
+              awsProfile,
+            });
             return res.exitCode === 0;
           },
           { maxAttempts: 30, delayMs: 5000 },
@@ -193,26 +205,29 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
           async () => {
             const res = await sshExecAsync(
               privateKeyPath,
-              result.ip!,
+              result.instance_id,
               `test -f ${REMOTE_HOME}/.ark-ready && echo ready`,
-              { timeout: 10_000 },
+              { timeout: 10_000, region, awsProfile },
             );
             return res.stdout.includes("ready");
           },
           { maxAttempts: 60, delayMs: 10_000 },
         );
 
-        // Wait for arkd to be reachable
+        // Wait for arkd to be reachable. We poll via SSH-on-the-instance
+        // (curl localhost:ARKD_REMOTE_PORT) rather than from the conductor
+        // network: with SSM-only, the conductor cannot reach the instance
+        // directly; arkd HTTP would have to be tunneled separately.
         log("Waiting for arkd...");
-        const arkdUrl = `http://${result.ip}:${ARKD_REMOTE_PORT}`;
         await poll(
           async () => {
-            try {
-              const resp = await fetch(`${arkdUrl}/health`, { signal: AbortSignal.timeout(5000) });
-              return resp.ok;
-            } catch {
-              return false;
-            }
+            const res = await sshExecAsync(
+              privateKeyPath,
+              result.instance_id,
+              `curl -fsS http://localhost:${ARKD_REMOTE_PORT}/health`,
+              { timeout: 10_000, region, awsProfile },
+            );
+            return res.exitCode === 0;
           },
           { maxAttempts: 30, delayMs: 3000 },
         );
@@ -241,10 +256,12 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
 
     // Tear down the reverse tunnel set up in prepareRemoteEnvironment so
     // the SSH tunnel process doesn't outlive the EC2 instance it points at.
+    // The tunnel pgrep pattern matches on `${REMOTE_USER}@<target>`, where
+    // `target` is now the instance_id (SSM-tunneled SSH).
     const cfg = compute.config as RemoteConfig;
-    if (cfg.ip) {
+    if (cfg.instance_id) {
       await safeAsync(`[remote] destroy: teardown reverse tunnel for ${compute.name}`, async () => {
-        await teardownReverseTunnel(cfg.ip!, this.app.config.ports.conductor);
+        await teardownReverseTunnel(cfg.instance_id!, this.app.config.ports.conductor);
       });
     }
 
@@ -271,43 +288,51 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
     const cfg = compute.config as RemoteConfig;
     if (!cfg.instance_id) throw new Error("No instance_id - cannot start");
 
+    const region = cfg.region ?? "us-east-1";
+    const awsProfile = cfg.aws_profile;
     const { EC2Client, StartInstancesCommand, DescribeInstancesCommand } = await import("@aws-sdk/client-ec2");
     const { fromIni } = await import("@aws-sdk/credential-providers");
     const { poll } = await import("../util.js");
 
     const ec2 = new EC2Client({
-      region: cfg.region ?? "us-east-1",
-      ...(cfg.aws_profile ? { credentials: fromIni({ profile: cfg.aws_profile }) } : {}),
+      region,
+      ...(awsProfile ? { credentials: fromIni({ profile: awsProfile }) } : {}),
     });
 
     await ec2.send(new StartInstancesCommand({ InstanceIds: [cfg.instance_id] }));
 
-    // Poll for public IP
-    let ip: string | null = null;
+    // Poll until the instance has reached the "running" state. With SSM
+    // transport we don't depend on a public IP; we still record any private
+    // IP we see for legacy callers + diagnostic logs.
+    let privateIp: string | null = null;
     await poll(
       async () => {
         const desc = await ec2.send(new DescribeInstancesCommand({ InstanceIds: [cfg.instance_id!] }));
-        ip = desc.Reservations?.[0]?.Instances?.[0]?.PublicIpAddress ?? null;
-        return ip !== null;
+        const inst = desc.Reservations?.[0]?.Instances?.[0];
+        privateIp = inst?.PrivateIpAddress ?? null;
+        return inst?.State?.Name === "running";
       },
       { maxAttempts: 30, delayMs: 5000 },
     );
 
     this.app.computes.mergeConfig(compute.name, {
-      ip: ip!,
-      arkd_url: `http://${ip}:${ARKD_REMOTE_PORT}`,
+      ...(privateIp ? { ip: privateIp } : {}),
     });
 
-    // Wait for arkd to be reachable before marking as running
-    const arkdUrl = `http://${ip}:${ARKD_REMOTE_PORT}`;
+    // Wait for arkd by curling its loopback endpoint over an SSM-tunneled
+    // SSH session. Avoids depending on conductor->instance HTTP reachability.
+    const { sshExecAsync } = await import("./ec2/ssh.js");
+    const { sshKeyPath } = await import("./ec2/ssh.js");
+    const keyPath = sshKeyPath(compute.name);
     await poll(
       async () => {
-        try {
-          const res = await fetch(`${arkdUrl}/health`, { signal: AbortSignal.timeout(5000) });
-          return res.ok;
-        } catch {
-          return false;
-        }
+        const res = await sshExecAsync(
+          keyPath,
+          cfg.instance_id!,
+          `curl -fsS http://localhost:${ARKD_REMOTE_PORT}/health`,
+          { timeout: 10_000, region, awsProfile },
+        );
+        return res.exitCode === 0;
       },
       { maxAttempts: 30, delayMs: 2000 },
     );
@@ -320,11 +345,12 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
     if (!cfg.instance_id) throw new Error("No instance_id - cannot stop");
 
     // Tear down the reverse tunnel before the EC2 stop -- the ssh process is
-    // local; killing it after the instance halts only delays cleanup.
-    if (cfg.ip) {
+    // local; killing it after the instance halts only delays cleanup. The
+    // tunnel pgrep pattern uses `${REMOTE_USER}@<instance_id>` (SSM transport).
+    if (cfg.instance_id) {
       const { teardownReverseTunnel } = await import("./ec2/ports.js");
       await safeAsync(`[remote] stop: teardown reverse tunnel for ${compute.name}`, async () => {
-        await teardownReverseTunnel(cfg.ip!, this.app.config.ports.conductor);
+        await teardownReverseTunnel(cfg.instance_id!, this.app.config.ports.conductor);
       });
     }
 
@@ -346,26 +372,40 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
 
   async syncEnvironment(compute: Compute, opts: SyncOpts): Promise<void> {
     const cfg = compute.config as RemoteConfig;
-    if (!cfg.ip) return;
+    if (!cfg.instance_id) return;
     const { sshKeyPath } = await import("./ec2/ssh.js");
     const { syncToHost } = await import("./ec2/sync.js");
-    await syncToHost(sshKeyPath(compute.name), cfg.ip, {
+    await syncToHost(sshKeyPath(compute.name), cfg.instance_id, {
       direction: opts.direction,
       categories: opts.categories,
+      region: cfg.region ?? "us-east-1",
+      awsProfile: cfg.aws_profile,
       onLog: opts.onLog,
     });
   }
 
   getAttachCommand(compute: Compute, session: Session): string[] {
     const cfg = compute.config as RemoteConfig;
-    if (!session.session_id || !cfg.ip) return [];
+    if (!session.session_id || !cfg.instance_id) return [];
+    const region = cfg.region ?? "us-east-1";
+    const profilePart = cfg.aws_profile ? ` --profile ${cfg.aws_profile}` : "";
+    const proxy =
+      `aws ssm start-session --target %h ` +
+      `--document-name AWS-StartSSHSession ` +
+      `--parameters portNumber=%p ` +
+      `--region ${region}${profilePart}`;
     return [
       "ssh",
       "-i",
       sshKeyPath(compute.name),
       "-o",
       "StrictHostKeyChecking=no",
-      `${REMOTE_USER}@${cfg.ip}`,
+      "-o",
+      "UserKnownHostsFile=/dev/null",
+      "-o",
+      `ProxyCommand=${proxy}`,
+      "-t",
+      `${REMOTE_USER}@${cfg.instance_id}`,
       `tmux attach -t ${session.session_id}`,
     ];
   }

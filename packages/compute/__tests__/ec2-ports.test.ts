@@ -3,7 +3,8 @@ import { buildTunnelArgs, setupTunnels, teardownTunnels, probeRemotePorts } from
 import type { PortDecl } from "../types.js";
 
 const KEY = "/tmp/test-key";
-const IP = "1.2.3.4";
+const INSTANCE_ID = "i-0abc";
+const SSM = { region: "us-east-1" };
 
 const ports: PortDecl[] = [
   { port: 8080, name: "http", source: "arc.json" },
@@ -12,32 +13,33 @@ const ports: PortDecl[] = [
 
 describe("buildTunnelArgs", () => {
   test("includes -N and -f flags", () => {
-    const args = buildTunnelArgs(KEY, IP, ports);
+    const args = buildTunnelArgs(KEY, INSTANCE_ID, ports, SSM);
     expect(args).toContain("-N");
     expect(args).toContain("-f");
   });
 
   test("includes -L for each port", () => {
-    const args = buildTunnelArgs(KEY, IP, ports);
+    const args = buildTunnelArgs(KEY, INSTANCE_ID, ports, SSM);
     const lArgs = args.filter((a) => a.startsWith("8080:") || a.startsWith("3000:"));
     expect(lArgs).toContain("8080:localhost:8080");
     expect(lArgs).toContain("3000:localhost:3000");
   });
 
   test("with empty ports array still produces valid SSH args", () => {
-    const args = buildTunnelArgs(KEY, IP, []);
+    const args = buildTunnelArgs(KEY, INSTANCE_ID, [], SSM);
     expect(args[0]).toBe("ssh");
     expect(args).toContain("-i");
     expect(args).toContain("-N");
     expect(args).toContain("-f");
-    expect(args[args.length - 1]).toBe(`ubuntu@${IP}`);
+    expect(args[args.length - 1]).toBe(`ubuntu@${INSTANCE_ID}`);
     // No -L flags should be present
     expect(args).not.toContain("-L");
   });
 
-  test("uses correct user@host format", () => {
-    const args = buildTunnelArgs(KEY, IP, ports);
-    expect(args[args.length - 1]).toBe(`ubuntu@${IP}`);
+  test("targets ubuntu@<instance_id> with SSM ProxyCommand", () => {
+    const args = buildTunnelArgs(KEY, INSTANCE_ID, ports, SSM);
+    expect(args[args.length - 1]).toBe(`ubuntu@${INSTANCE_ID}`);
+    expect(args.some((a) => a.startsWith("ProxyCommand=aws ssm start-session"))).toBe(true);
   });
 });
 

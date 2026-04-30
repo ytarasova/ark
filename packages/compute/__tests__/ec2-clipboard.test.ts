@@ -2,6 +2,8 @@ import { describe, it, expect } from "bun:test";
 
 import { getClipboardImage, uploadToSession, watchClipboard } from "../providers/ec2/clipboard.js";
 
+const SSM = { region: "us-east-1" };
+
 describe("EC2 clipboard sync", async () => {
   // -----------------------------------------------------------------------
   // getClipboardImage
@@ -27,7 +29,7 @@ describe("EC2 clipboard sync", async () => {
   // -----------------------------------------------------------------------
   describe("watchClipboard", () => {
     it("returns an object with a stop function", () => {
-      const handle = watchClipboard("/tmp/fake-key", "192.0.2.1", "/tmp", {
+      const handle = watchClipboard("/tmp/fake-key", "i-0bogus", "/tmp", SSM, {
         intervalMs: 60_000,
       });
       expect(handle).toHaveProperty("stop");
@@ -36,7 +38,7 @@ describe("EC2 clipboard sync", async () => {
     });
 
     it("stop cancels the interval without crashing", () => {
-      const handle = watchClipboard("/tmp/fake-key", "192.0.2.1", "/tmp", {
+      const handle = watchClipboard("/tmp/fake-key", "i-0bogus", "/tmp", SSM, {
         intervalMs: 60_000,
       });
       handle.stop();

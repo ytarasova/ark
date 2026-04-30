@@ -4,7 +4,7 @@
  */
 
 import type { DockerContainer, ComputeMetrics, ComputeProcess, ComputeSession, ComputeSnapshot } from "../../types.js";
-import { sshExec, sshExecAsync } from "./ssh.js";
+import { sshExec, sshExecAsync, type SsmConnectOpts } from "./ssh.js";
 import { REMOTE_PROJECTS_DIR } from "./constants.js";
 
 // ---------------------------------------------------------------------------
@@ -270,35 +270,39 @@ export function parseSnapshot(stdout: string): ComputeSnapshot {
 }
 
 /**
- * Fetch fast metrics from an EC2 host via SSH.
+ * Fetch fast metrics from an EC2 host via SSH (over SSM tunnel).
  * Runs SSH_FAST_CMD and parses the output into a ComputeSnapshot.
  */
-export async function fetchMetrics(key: string, ip: string): Promise<ComputeSnapshot> {
-  const { stdout } = await sshExec(key, ip, SSH_FAST_CMD, { timeout: 15_000 });
+export async function fetchMetrics(key: string, instanceId: string, ssm: SsmConnectOpts): Promise<ComputeSnapshot> {
+  const { stdout } = await sshExec(key, instanceId, SSH_FAST_CMD, { ...ssm, timeout: 15_000 });
   return parseSnapshot(stdout);
 }
 
 /**
  * Fetch fast metrics from an EC2 host via SSH (async / non-blocking).
  */
-export async function fetchMetricsAsync(key: string, ip: string): Promise<ComputeSnapshot> {
-  const { stdout } = await sshExecAsync(key, ip, SSH_FAST_CMD, { timeout: 15_000 });
+export async function fetchMetricsAsync(
+  key: string,
+  instanceId: string,
+  ssm: SsmConnectOpts,
+): Promise<ComputeSnapshot> {
+  const { stdout } = await sshExecAsync(key, instanceId, SSH_FAST_CMD, { ...ssm, timeout: 15_000 });
   return parseSnapshot(stdout);
 }
 
 /**
- * Fetch docker metrics from an EC2 host via SSH.
+ * Fetch docker metrics from an EC2 host via SSH (over SSM tunnel).
  * Runs SSH_DOCKER_CMD and parses the output (only docker fields populated).
  */
-export async function fetchDocker(key: string, ip: string): Promise<ComputeSnapshot> {
-  const { stdout } = await sshExec(key, ip, SSH_DOCKER_CMD, { timeout: 30_000 });
+export async function fetchDocker(key: string, instanceId: string, ssm: SsmConnectOpts): Promise<ComputeSnapshot> {
+  const { stdout } = await sshExec(key, instanceId, SSH_DOCKER_CMD, { ...ssm, timeout: 30_000 });
   return parseSnapshot(stdout);
 }
 
 /**
  * Fetch docker metrics from an EC2 host via SSH (async / non-blocking).
  */
-export async function fetchDockerAsync(key: string, ip: string): Promise<ComputeSnapshot> {
-  const { stdout } = await sshExecAsync(key, ip, SSH_DOCKER_CMD, { timeout: 30_000 });
+export async function fetchDockerAsync(key: string, instanceId: string, ssm: SsmConnectOpts): Promise<ComputeSnapshot> {
+  const { stdout } = await sshExecAsync(key, instanceId, SSH_DOCKER_CMD, { ...ssm, timeout: 30_000 });
   return parseSnapshot(stdout);
 }

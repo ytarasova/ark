@@ -1,14 +1,14 @@
 /**
  * Clipboard sync for EC2 sessions.
  * Watches the macOS clipboard for images and uploads them to a remote
- * session's working directory via rsync.
+ * session's working directory via rsync (over an SSM-tunneled SSH).
  */
 
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { readFileSync } from "fs";
 import { createHash } from "crypto";
-import { rsyncPush } from "./ssh.js";
+import { rsyncPush, type SsmConnectOpts } from "./ssh.js";
 import { logDebug } from "../../../core/observability/structured-log.js";
 
 const execFileAsync = promisify(execFile);
@@ -53,11 +53,12 @@ export async function getClipboardImage(): Promise<string | null> {
  */
 export async function uploadToSession(
   key: string,
-  ip: string,
+  instanceId: string,
   localPath: string,
   remoteWorkdir: string,
+  ssm: SsmConnectOpts,
 ): Promise<void> {
-  await rsyncPush(key, ip, localPath, remoteWorkdir);
+  await rsyncPush(key, instanceId, localPath, remoteWorkdir, ssm);
 }
 
 /**
@@ -67,8 +68,9 @@ export async function uploadToSession(
  */
 export function watchClipboard(
   key: string,
-  ip: string,
+  instanceId: string,
   remoteWorkdir: string,
+  ssm: SsmConnectOpts,
   opts?: {
     intervalMs?: number;
     onUpload?: (filename: string) => void;
@@ -91,7 +93,7 @@ export function watchClipboard(
       const filename = `clipboard-${Date.now()}.png`;
       const remoteDest = remoteWorkdir.endsWith("/") ? `${remoteWorkdir}${filename}` : `${remoteWorkdir}/${filename}`;
 
-      await uploadToSession(key, ip, imgPath, remoteDest);
+      await uploadToSession(key, instanceId, imgPath, remoteDest, ssm);
       opts?.onUpload?.(filename);
     } catch {
       logDebug("compute", "best-effort - skip this tick");

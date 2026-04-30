@@ -1,6 +1,6 @@
 /**
  * EC2 placement context: medium-specific delivery of typed secrets to an
- * EC2 host over SSH.
+ * EC2 host over SSH (tunneled through SSM Session Manager).
  *
  * - writeFile: stages bytes to a local tmpdir, then pipes `tar c | ssh tar x`
  *   so file mode is preserved on the wire. A defence-in-depth chmod follows.
@@ -18,7 +18,7 @@ import { mkdtempSync, writeFileSync, rmSync } from "fs";
 import { tmpdir } from "os";
 import { join, dirname, basename } from "path";
 import { spawn } from "child_process";
-import { sshExec as defaultSshExec } from "./ssh.js";
+import { sshExec as defaultSshExec, buildSsmProxyArgs, type SsmConnectOpts } from "./ssh.js";
 import { shellEscape } from "./shell-escape.js";
 import { REMOTE_HOME, REMOTE_USER } from "./constants.js";
 import type { PlacementCtx } from "../../../core/secrets/placement-types.js";
@@ -26,7 +26,9 @@ import { logDebug } from "../../../core/observability/structured-log.js";
 
 export interface EC2PlacementCtxOpts {
   sshKeyPath: string;
-  ip: string;
+  instanceId: string;
+  region: string;
+  awsProfile?: string;
 }
 
 /**
@@ -35,39 +37,43 @@ export interface EC2PlacementCtxOpts {
  * `{ stdout, stderr, exitCode }`. Production placers don't consume the result.
  */
 export interface EC2PlacementCtxDeps {
-  sshExec: (keyPath: string, ip: string, cmd: string) => Promise<string>;
+  sshExec: (keyPath: string, instanceId: string, cmd: string) => Promise<string>;
   /** Pipe local tar -> ssh stdin to deliver bytes at a remote path. */
   pipeTarToSsh: (tarArgs: string[], remoteCmd: string) => Promise<void>;
 }
 
-const defaultDeps = (opts: EC2PlacementCtxOpts): EC2PlacementCtxDeps => ({
-  sshExec: async (keyPath, ip, cmd) => {
-    const { stdout } = await defaultSshExec(keyPath, ip, cmd);
-    return stdout;
-  },
-  pipeTarToSsh: (tarArgs, remoteCmd) =>
-    new Promise<void>((resolve, reject) => {
-      const tar = spawn("tar", tarArgs, { stdio: ["ignore", "pipe", "inherit"] });
-      const ssh = spawn(
-        "ssh",
-        [
-          "-i",
-          opts.sshKeyPath,
-          "-o",
-          "StrictHostKeyChecking=no",
-          "-o",
-          "UserKnownHostsFile=/dev/null",
-          `${REMOTE_USER}@${opts.ip}`,
-          remoteCmd,
-        ],
-        { stdio: ["pipe", "inherit", "inherit"] },
-      );
-      tar.stdout!.pipe(ssh.stdin!);
-      ssh.on("close", (code) => (code === 0 ? resolve() : reject(new Error(`ssh exit ${code}`))));
-      tar.on("error", reject);
-      ssh.on("error", reject);
-    }),
-});
+const defaultDeps = (opts: EC2PlacementCtxOpts): EC2PlacementCtxDeps => {
+  const ssm: SsmConnectOpts = { region: opts.region, awsProfile: opts.awsProfile };
+  return {
+    sshExec: async (keyPath, instanceId, cmd) => {
+      const { stdout } = await defaultSshExec(keyPath, instanceId, cmd, ssm);
+      return stdout;
+    },
+    pipeTarToSsh: (tarArgs, remoteCmd) =>
+      new Promise<void>((resolve, reject) => {
+        const tar = spawn("tar", tarArgs, { stdio: ["ignore", "pipe", "inherit"] });
+        const ssh = spawn(
+          "ssh",
+          [
+            "-i",
+            opts.sshKeyPath,
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            "UserKnownHostsFile=/dev/null",
+            ...buildSsmProxyArgs(ssm),
+            `${REMOTE_USER}@${opts.instanceId}`,
+            remoteCmd,
+          ],
+          { stdio: ["pipe", "inherit", "inherit"] },
+        );
+        tar.stdout!.pipe(ssh.stdin!);
+        ssh.on("close", (code) => (code === 0 ? resolve() : reject(new Error(`ssh exit ${code}`))));
+        tar.on("error", reject);
+        ssh.on("error", reject);
+      }),
+  };
+};
 
 /**
  * Test-only factory: build an EC2PlacementCtx with injected deps so tests
@@ -75,7 +81,12 @@ const defaultDeps = (opts: EC2PlacementCtxOpts): EC2PlacementCtxDeps => ({
  * EC2PlacementCtx constructor directly.
  */
 export function _makeEC2PlacementCtx(opts: EC2PlacementCtxOpts & Partial<EC2PlacementCtxDeps>): EC2PlacementCtx {
-  const baseOpts: EC2PlacementCtxOpts = { sshKeyPath: opts.sshKeyPath, ip: opts.ip };
+  const baseOpts: EC2PlacementCtxOpts = {
+    sshKeyPath: opts.sshKeyPath,
+    instanceId: opts.instanceId,
+    region: opts.region,
+    awsProfile: opts.awsProfile,
+  };
   const deps: EC2PlacementCtxDeps = {
     ...defaultDeps(baseOpts),
     ...(opts.sshExec ? { sshExec: opts.sshExec } : {}),
@@ -105,7 +116,11 @@ export class EC2PlacementCtx implements PlacementCtx {
       const tarArgs = ["c", "-C", stage, base];
       await this.deps.pipeTarToSsh(tarArgs, remoteCmd);
       // Defence-in-depth chmod (tar should preserve, but be explicit).
-      await this.deps.sshExec(this.opts.sshKeyPath, this.opts.ip, `chmod ${mode.toString(8)} ${shellEscape(path)}`);
+      await this.deps.sshExec(
+        this.opts.sshKeyPath,
+        this.opts.instanceId,
+        `chmod ${mode.toString(8)} ${shellEscape(path)}`,
+      );
     } finally {
       rmSync(stage, { recursive: true, force: true });
     }
@@ -130,7 +145,7 @@ export class EC2PlacementCtx implements PlacementCtx {
       `sed -i '/${begin}/,/${end}/d' ${shellEscape(path)}`,
       `printf %s ${shellEscape(encoded)} | base64 -d >> ${shellEscape(path)}`,
     ].join(" && ");
-    await this.deps.sshExec(this.opts.sshKeyPath, this.opts.ip, cmd);
+    await this.deps.sshExec(this.opts.sshKeyPath, this.opts.instanceId, cmd);
   }
 
   setEnv(key: string, value: string): void {

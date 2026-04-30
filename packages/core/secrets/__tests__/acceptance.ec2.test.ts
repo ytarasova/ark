@@ -85,12 +85,13 @@ describe("ARK-AC1: typed ssh-private-key placement on EC2", () => {
     expect(deferred.hasDeferred()).toBe(true); // file ops are queued
 
     // Phase B: post-provision the provider builds a real EC2PlacementCtx
-    // (now the IP is known) and replays the queue. This is what
+    // (now the instance_id is known) and replays the queue. This is what
     // RemoteArkdBase.flushDeferredPlacement does inside provider.launch.
     const realCtx = _makeEC2PlacementCtx({
       sshKeyPath: "/fake/key",
-      ip: "10.0.0.1",
-      sshExec: async (_k, _ip, cmd) => {
+      instanceId: "i-acceptance",
+      region: "us-east-1",
+      sshExec: async (_k, _id, cmd) => {
         sshExecCalls.push(cmd);
         return "";
       },
@@ -146,8 +147,9 @@ describe("ARK-AC1: typed ssh-private-key placement on EC2", () => {
     // Even when we synthesize a flush against a real ctx, no SSH calls fire.
     const realCtx = _makeEC2PlacementCtx({
       sshKeyPath: "/fake/key",
-      ip: "10.0.0.1",
-      sshExec: async (_k, _ip, cmd) => {
+      instanceId: "i-acceptance-empty",
+      region: "us-east-1",
+      sshExec: async (_k, _id, cmd) => {
         sshExecCalls.push(cmd);
         return "";
       },

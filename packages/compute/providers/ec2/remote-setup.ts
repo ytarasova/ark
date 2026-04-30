@@ -3,11 +3,13 @@
  *
  * Resolves git repos, clones them on the remote host, pre-trusts directories
  * in Claude's config, and handles the development-channels acceptance prompt.
+ *
+ * SSH transport is via SSM Session Manager; the host arg is an instance_id.
  */
 
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { sshExecAsync } from "./ssh.js";
+import { sshExecAsync, type SsmConnectOpts } from "./ssh.js";
 import { REMOTE_HOME } from "./constants.js";
 
 const execFileAsync = promisify(execFile);
@@ -53,7 +55,8 @@ export function getRepoName(repoUrlOrPath: string): string {
  */
 export async function cloneRepoOnRemote(
   key: string,
-  ip: string,
+  instanceId: string,
+  ssm: SsmConnectOpts,
   repoUrl: string,
   repoName: string,
   opts?: { branch?: string; sessionId?: string; onLog?: (msg: string) => void },
@@ -65,16 +68,16 @@ export async function cloneRepoOnRemote(
   const remotePath = `${REMOTE_HOME}/Projects/${dirName}`;
 
   // Ensure Projects directory exists
-  await sshExecAsync(key, ip, "mkdir -p ~/Projects", { timeout: 5000 });
+  await sshExecAsync(key, instanceId, "mkdir -p ~/Projects", { ...ssm, timeout: 5000 });
 
   // Clone
   const branchFlag = opts?.branch ? `-b ${opts.branch}` : "";
   log(`Cloning ${repoUrl} into ${dirName}...`);
   const { exitCode, stderr } = await sshExecAsync(
     key,
-    ip,
+    instanceId,
     `cd ~/Projects && git clone ${branchFlag} ${repoUrl} ${dirName}`,
-    { timeout: 120_000 },
+    { ...ssm, timeout: 120_000 },
   );
 
   if (exitCode !== 0) {
@@ -88,7 +91,12 @@ export async function cloneRepoOnRemote(
 /**
  * Pre-trust a directory in Claude's config on the remote host.
  */
-export async function trustRemoteDirectory(key: string, ip: string, remotePath: string): Promise<void> {
+export async function trustRemoteDirectory(
+  key: string,
+  instanceId: string,
+  ssm: SsmConnectOpts,
+  remotePath: string,
+): Promise<void> {
   // Use python3 since it's always available on Ubuntu
   const script = `python3 -c "
 import json, os
@@ -98,7 +106,7 @@ j.setdefault('projects', {})
 j['projects']['${remotePath}'] = {'hasTrustDialogAccepted': True}
 json.dump(j, open(f, 'w'), indent=2)
 " 2>/dev/null || echo '{"projects":{"${remotePath}":{"hasTrustDialogAccepted":true}}}' > ~/.claude.json`;
-  await sshExecAsync(key, ip, script, { timeout: 10_000 });
+  await sshExecAsync(key, instanceId, script, { ...ssm, timeout: 10_000 });
 }
 
 /** Markers that indicate the channel development prompt is visible. */
@@ -110,21 +118,25 @@ const CLAUDE_WORKING_MARKERS = ["ctrl+o to expand", "esc to interrupt"];
 /** Single iteration of the channel prompt poll loop. */
 async function pollChannelPrompt(
   key: string,
-  ip: string,
+  instanceId: string,
+  ssm: SsmConnectOpts,
   tmuxName: string,
   attempt: number,
   max: number,
 ): Promise<"done" | "retry"> {
   try {
-    const { stdout } = await sshExecAsync(key, ip, `tmux capture-pane -t '${tmuxName}' -p 2>/dev/null | tail -30`, {
-      timeout: 10_000,
-    });
+    const { stdout } = await sshExecAsync(
+      key,
+      instanceId,
+      `tmux capture-pane -t '${tmuxName}' -p 2>/dev/null | tail -30`,
+      { ...ssm, timeout: 10_000 },
+    );
 
     if (CHANNEL_PROMPT_MARKERS.some((m) => stdout.includes(m))) {
-      await sshExecAsync(key, ip, `tmux send-keys -t '${tmuxName}' 1`, { timeout: 5_000 });
+      await sshExecAsync(key, instanceId, `tmux send-keys -t '${tmuxName}' 1`, { ...ssm, timeout: 5_000 });
       const { sleep } = await import("../../util.js");
       await sleep(300);
-      await sshExecAsync(key, ip, `tmux send-keys -t '${tmuxName}' Enter`, { timeout: 5_000 });
+      await sshExecAsync(key, instanceId, `tmux send-keys -t '${tmuxName}' Enter`, { ...ssm, timeout: 5_000 });
       return "retry";
     }
 
@@ -148,7 +160,8 @@ async function pollChannelPrompt(
  */
 export async function autoAcceptChannelPrompt(
   key: string,
-  ip: string,
+  instanceId: string,
+  ssm: SsmConnectOpts,
   tmuxName: string,
   opts?: { maxAttempts?: number; delayMs?: number },
 ): Promise<void> {
@@ -158,7 +171,7 @@ export async function autoAcceptChannelPrompt(
 
   for (let i = 0; i < max; i++) {
     await sleep(delay);
-    const result = await pollChannelPrompt(key, ip, tmuxName, i, max);
+    const result = await pollChannelPrompt(key, instanceId, ssm, tmuxName, i, max);
     if (result === "done") return;
   }
 }

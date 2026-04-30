@@ -5,21 +5,29 @@
 import { describe, it, expect } from "bun:test";
 import { buildTunnelArgs } from "../providers/ec2/ports.js";
 
+const SSM = { region: "us-east-1" };
+
 describe("buildTunnelArgs", () => {
-  it("builds correct -L forward tunnel args", () => {
-    const args = buildTunnelArgs("/key", "1.2.3.4", [{ port: 3000, name: "web", source: "test" }]);
+  it("builds correct -L forward tunnel args (instance_id + SSM ProxyCommand)", () => {
+    const args = buildTunnelArgs("/key", "i-0abc", [{ port: 3000, name: "web", source: "test" }], SSM);
     expect(args).toContain("-L");
     expect(args).toContain("3000:localhost:3000");
-    expect(args).toContain("ubuntu@1.2.3.4");
+    expect(args).toContain("ubuntu@i-0abc");
     expect(args).toContain("-N");
     expect(args).toContain("-f");
+    expect(args.some((a) => a.startsWith("ProxyCommand=aws ssm start-session"))).toBe(true);
   });
 
   it("builds args for multiple ports", () => {
-    const args = buildTunnelArgs("/key", "1.2.3.4", [
-      { port: 3000, name: "web", source: "test" },
-      { port: 5432, name: "db", source: "test" },
-    ]);
+    const args = buildTunnelArgs(
+      "/key",
+      "i-0abc",
+      [
+        { port: 3000, name: "web", source: "test" },
+        { port: 5432, name: "db", source: "test" },
+      ],
+      SSM,
+    );
     const lFlags = args.filter((a) => a === "-L");
     expect(lFlags.length).toBe(2);
     expect(args).toContain("3000:localhost:3000");
@@ -42,7 +50,7 @@ describe("setupReverseTunnel", async () => {
     expect(typeof ports.teardownReverseTunnel).toBe("function");
     // Calling teardown for a non-existent tunnel returns false (nothing to
     // kill) rather than throwing -- callers shouldn't have to guard this.
-    const killed = await ports.teardownReverseTunnel("203.0.113.255", 65530);
+    const killed = await ports.teardownReverseTunnel("i-bogus-target", 65530);
     expect(killed).toBe(false);
   });
 });

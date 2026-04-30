@@ -12,10 +12,11 @@ import {
   sshExec,
   rsyncPushArgs,
   rsyncPullArgs,
+  buildSsmProxyArgs,
   generateSshKey,
 } from "../providers/ec2/ssh.js";
 
-describe("EC2 SSH primitives", async () => {
+describe("EC2 SSH primitives (SSM transport)", async () => {
   // -----------------------------------------------------------------------
   // sshKeyPath
   // -----------------------------------------------------------------------
@@ -28,28 +29,55 @@ describe("EC2 SSH primitives", async () => {
   });
 
   // -----------------------------------------------------------------------
+  // buildSsmProxyArgs
+  // -----------------------------------------------------------------------
+  describe("buildSsmProxyArgs", () => {
+    it("emits an `-o ProxyCommand=aws ssm start-session ...` pair", () => {
+      const args = buildSsmProxyArgs({ region: "us-east-1" });
+      expect(args[0]).toBe("-o");
+      expect(args[1]).toContain("ProxyCommand=aws ssm start-session");
+      expect(args[1]).toContain("--target %h");
+      expect(args[1]).toContain("--document-name AWS-StartSSHSession");
+      expect(args[1]).toContain("--parameters portNumber=%p");
+      expect(args[1]).toContain("--region us-east-1");
+    });
+
+    it("includes --profile when awsProfile is provided", () => {
+      const args = buildSsmProxyArgs({ region: "us-west-2", awsProfile: "yt" });
+      expect(args[1]).toContain("--profile yt");
+    });
+
+    it("omits --profile when awsProfile is undefined", () => {
+      const args = buildSsmProxyArgs({ region: "us-east-1" });
+      expect(args[1]).not.toContain("--profile");
+    });
+  });
+
+  // -----------------------------------------------------------------------
   // sshBaseArgs
   // -----------------------------------------------------------------------
   describe("sshBaseArgs", () => {
-    it("builds correct args without port forwards", () => {
-      const args = sshBaseArgs("/tmp/key", "1.2.3.4");
+    it("targets ubuntu@<instance_id>, not ubuntu@<ip>", () => {
+      const args = sshBaseArgs("/tmp/key", "i-0abc123", { region: "us-east-1" });
       expect(args[0]).toBe("ssh");
       expect(args).toContain("-i");
       expect(args).toContain("/tmp/key");
       // SSH_OPTS should be present
       expect(args).toContain("-o");
       expect(args).toContain("StrictHostKeyChecking=no");
-      // target user@ip at the end
-      expect(args[args.length - 1]).toBe("ubuntu@1.2.3.4");
+      // SSM ProxyCommand wraps the connection.
+      expect(args.some((a) => a.startsWith("ProxyCommand=aws ssm start-session"))).toBe(true);
+      // target user@instance-id at the end
+      expect(args[args.length - 1]).toBe("ubuntu@i-0abc123");
     });
 
     it("includes -L port forwards when ports are provided", () => {
-      const args = sshBaseArgs("/tmp/key", "1.2.3.4", [8080, 9090]);
+      const args = sshBaseArgs("/tmp/key", "i-0abc", { region: "us-east-1" }, [8080, 9090]);
       expect(args).toContain("-L");
       expect(args).toContain("8080:localhost:8080");
       expect(args).toContain("9090:localhost:9090");
       // target is still last
-      expect(args[args.length - 1]).toBe("ubuntu@1.2.3.4");
+      expect(args[args.length - 1]).toBe("ubuntu@i-0abc");
     });
   });
 
@@ -57,26 +85,29 @@ describe("EC2 SSH primitives", async () => {
   // rsyncPushArgs / rsyncPullArgs
   // -----------------------------------------------------------------------
   describe("rsyncPushArgs", () => {
-    it("builds correct rsync push command", () => {
-      const args = rsyncPushArgs("/tmp/key", "1.2.3.4", "/local/dir/", "/remote/dir/");
+    it("builds correct rsync push command targeting instance_id with SSM ProxyCommand", () => {
+      const args = rsyncPushArgs("/tmp/key", "i-0abc", "/local/dir/", "/remote/dir/", { region: "us-east-1" });
       expect(args[0]).toBe("rsync");
       expect(args).toContain("-avz");
       expect(args).toContain("--update");
       expect(args).toContain("--timeout=30");
       expect(args).toContain("-e");
       expect(args).toContain("/local/dir/");
-      expect(args[args.length - 1]).toBe("ubuntu@1.2.3.4:/remote/dir/");
+      // The -e arg embeds the SSM ProxyCommand.
+      const eFlag = args[args.indexOf("-e") + 1];
+      expect(eFlag).toContain("ProxyCommand=aws ssm start-session");
+      expect(args[args.length - 1]).toBe("ubuntu@i-0abc:/remote/dir/");
     });
   });
 
   describe("rsyncPullArgs", () => {
-    it("builds correct rsync pull command", () => {
-      const args = rsyncPullArgs("/tmp/key", "1.2.3.4", "/remote/dir/", "/local/dir/");
+    it("builds correct rsync pull command (instance_id, SSM proxy)", () => {
+      const args = rsyncPullArgs("/tmp/key", "i-0abc", "/remote/dir/", "/local/dir/", { region: "us-east-1" });
       expect(args[0]).toBe("rsync");
       expect(args).toContain("-avz");
       expect(args).toContain("--update");
-      // source is remote, destination is local
-      expect(args).toContain("ubuntu@1.2.3.4:/remote/dir/");
+      // source is remote (instance_id), destination is local
+      expect(args).toContain("ubuntu@i-0abc:/remote/dir/");
       expect(args[args.length - 1]).toBe("/local/dir/");
     });
   });
@@ -85,15 +116,29 @@ describe("EC2 SSH primitives", async () => {
   // sshExec - graceful failure
   // -----------------------------------------------------------------------
   describe("sshExec", async () => {
-    it("handles failure gracefully (unreachable host, nonexistent key)", async () => {
-      // 192.0.2.1 is TEST-NET-1 (RFC 5737) - guaranteed unreachable.
-      // Use a very short timeout so the test doesn't block.
-      const result = await sshExec("/nonexistent/key", "192.0.2.1", "echo hi", { timeout: 3_000 });
+    it("handles failure gracefully (no AWS credentials, bogus instance id)", async () => {
+      // No real SSM session can succeed in the sandbox -- aws CLI either
+      // isn't installed or has no creds. We just assert the helper returns
+      // a non-zero exitCode rather than throwing.
+      const result = await sshExec("/nonexistent/key", "i-0bogus", "echo hi", {
+        timeout: 3_000,
+        region: "us-east-1",
+      });
       expect(result).toHaveProperty("stdout");
       expect(result).toHaveProperty("stderr");
       expect(result).toHaveProperty("exitCode");
       expect(result.exitCode).not.toBe(0);
     }, 15_000);
+  });
+
+  // -----------------------------------------------------------------------
+  // SSH_OPTS smoke check (regression: must NOT include direct ProxyJump etc)
+  // -----------------------------------------------------------------------
+  describe("SSH_OPTS", () => {
+    it("includes StrictHostKeyChecking=no and a UserKnownHostsFile override", () => {
+      expect(SSH_OPTS).toContain("StrictHostKeyChecking=no");
+      expect(SSH_OPTS).toContain("UserKnownHostsFile=/dev/null");
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -123,6 +168,9 @@ describe("EC2 SSH primitives", async () => {
 
       expect(existsSync(privateKeyPath)).toBe(true);
       expect(existsSync(publicKeyPath)).toBe(true);
+      // generateSshKey is exported and is a function; the body is not
+      // exercised here because it writes to ~/.ssh.
+      expect(typeof generateSshKey).toBe("function");
     });
   });
 });

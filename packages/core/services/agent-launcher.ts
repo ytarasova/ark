@@ -23,7 +23,8 @@ async function applyContainerSetup(
 
   // Docker Compose - only when explicitly enabled in arc.json { "compose": true }
   const arcJson = parseArcJson(effectiveWorkdir);
-  if (arcJson?.compose === true && compute.config?.ip) {
+  const cfg = compute.config as { instance_id?: string; region?: string; aws_profile?: string } | null | undefined;
+  if (arcJson?.compose === true && cfg?.instance_id) {
     onLog("Starting Docker Compose services...");
     const { sshExec, sshKeyPath } = await import("../../compute/providers/ec2/ssh.js");
     const { shellEscape } = await import("../../compute/providers/ec2/shell-escape.js");
@@ -31,7 +32,10 @@ async function applyContainerSetup(
     // session.workdir / session.repo, both attacker-controllable in hosted
     // mode. Escape before interpolating into the remote shell.
     const quotedWorkdir = shellEscape(effectiveWorkdir);
-    sshExec(sshKeyPath(compute.name), compute.config.ip as string, `cd ${quotedWorkdir} && docker compose up -d`);
+    sshExec(sshKeyPath(compute.name), cfg.instance_id, `cd ${quotedWorkdir} && docker compose up -d`, {
+      region: cfg.region ?? "us-east-1",
+      awsProfile: cfg.aws_profile,
+    });
   }
 
   // Devcontainer - only used when explicitly enabled in arc.json { "devcontainer": true }
@@ -61,29 +65,42 @@ export async function prepareRemoteEnvironment(
     await provider.start(compute);
   }
 
-  // Verify host is reachable before starting expensive sync/clone chain
-  const ip = (compute.config as { ip?: string }).ip;
-  if (ip) {
-    log("Checking host connectivity...");
+  // Verify host is reachable before starting expensive sync/clone chain.
+  // SSM transport keys off instance_id; no IP required.
+  const cfgRemote = compute.config as { instance_id?: string; region?: string; aws_profile?: string };
+  const instanceId = cfgRemote.instance_id;
+  if (instanceId) {
+    const region = cfgRemote.region ?? "us-east-1";
+    const awsProfile = cfgRemote.aws_profile;
+    log("Checking host connectivity (via SSM)...");
     const { sshExecAsync, sshKeyPath } = await import("../../compute/providers/ec2/ssh.js");
-    const { exitCode } = await sshExecAsync(sshKeyPath(compute.name), ip, "echo ok", { timeout: 15_000 });
+    const { exitCode } = await sshExecAsync(sshKeyPath(compute.name), instanceId, "echo ok", {
+      timeout: 15_000,
+      region,
+      awsProfile,
+    });
     if (exitCode !== 0) {
-      throw new Error(`Cannot reach compute '${compute.name}' at ${ip}`);
+      throw new Error(`Cannot reach compute '${compute.name}' at ${instanceId} (via SSM)`);
     }
 
     // Reverse tunnel back to the conductor. Required for normal operation:
     // the agent's ark hooks (curl to ${conductorUrl}/hooks/status) and the
     // ark-channel MCP server (ARK_CONDUCTOR_URL) both speak HTTP back to the
     // conductor over `localhost:<conductorPort>`. From EC2 that's the
-    // instance's own loopback unless we tunnel; with the tunnel up,
-    // EC2 → SSH → conductor's localhost:<conductorPort>. Idempotent: if a
-    // tunnel for this (ip, port) already exists we reuse it.
+    // instance's own loopback unless we tunnel; with the tunnel up (over SSM),
+    // EC2 -> SSH -> conductor's localhost:<conductorPort>. Idempotent: if a
+    // tunnel for this (instance_id, port) already exists we reuse it.
     const conductorPort = app.config.ports.conductor;
     const { setupReverseTunnel } = await import("../../compute/providers/ec2/ports.js");
-    const tunnel = await setupReverseTunnel(sshKeyPath(compute.name), ip, conductorPort);
+    const tunnel = await setupReverseTunnel(sshKeyPath(compute.name), instanceId, conductorPort, {
+      region,
+      awsProfile,
+    });
     if (tunnel.pid) {
-      log(`Reverse tunnel ${tunnel.reused ? "reused" : "established"} (pid ${tunnel.pid}) ` +
-        `localhost:${conductorPort} on ${compute.name} -> conductor`);
+      log(
+        `Reverse tunnel ${tunnel.reused ? "reused" : "established"} (pid ${tunnel.pid}) ` +
+          `localhost:${conductorPort} on ${compute.name} -> conductor`,
+      );
     } else {
       log(`WARNING: reverse tunnel did not register a PID -- hooks/channel may be unreachable`);
     }

@@ -3,30 +3,30 @@ import { EC2PlacementCtx, _makeEC2PlacementCtx } from "../placement-ctx.js";
 
 describe("EC2PlacementCtx", () => {
   let sshExecCalls: string[] = [];
-  let stubSshExec: (keyPath: string, ip: string, cmd: string) => Promise<string>;
+  let stubSshExec: (keyPath: string, instanceId: string, cmd: string) => Promise<string>;
 
   beforeEach(() => {
     sshExecCalls = [];
-    stubSshExec = async (_keyPath, _ip, cmd) => {
+    stubSshExec = async (_keyPath, _instanceId, cmd) => {
       sshExecCalls.push(cmd);
       return "";
     };
   });
 
   test("setEnv accumulates; getEnv returns merged map", () => {
-    const ctx = new EC2PlacementCtx({ sshKeyPath: "/k", ip: "1.2.3.4" });
+    const ctx = new EC2PlacementCtx({ sshKeyPath: "/k", instanceId: "i-abc", region: "us-east-1" });
     ctx.setEnv("FOO", "1");
     ctx.setEnv("BAR", "2");
     expect(ctx.getEnv()).toEqual({ FOO: "1", BAR: "2" });
   });
 
   test("setProvisionerConfig logs no-op (EC2 does not consume kubeconfig)", () => {
-    const ctx = new EC2PlacementCtx({ sshKeyPath: "/k", ip: "1.2.3.4" });
+    const ctx = new EC2PlacementCtx({ sshKeyPath: "/k", instanceId: "i-abc", region: "us-east-1" });
     expect(() => ctx.setProvisionerConfig({ kubeconfig: new Uint8Array([1]) })).not.toThrow();
   });
 
   test("expandHome substitutes ~/ with /home/ubuntu", () => {
-    const ctx = new EC2PlacementCtx({ sshKeyPath: "/k", ip: "1.2.3.4" });
+    const ctx = new EC2PlacementCtx({ sshKeyPath: "/k", instanceId: "i-abc", region: "us-east-1" });
     expect(ctx.expandHome("~/.ssh/config")).toBe("/home/ubuntu/.ssh/config");
     expect(ctx.expandHome("/abs/path")).toBe("/abs/path");
   });
@@ -35,7 +35,8 @@ describe("EC2PlacementCtx", () => {
     let tarPipeInvoked = false;
     const ctx = _makeEC2PlacementCtx({
       sshKeyPath: "/k",
-      ip: "1.2.3.4",
+      instanceId: "i-abc",
+      region: "us-east-1",
       sshExec: stubSshExec,
       pipeTarToSsh: async (_tarArgs, _remoteCmd) => {
         tarPipeInvoked = true;
@@ -50,7 +51,8 @@ describe("EC2PlacementCtx", () => {
   test("appendFile replaces a stale block keyed by marker (sed BEGIN/END deletion)", async () => {
     const ctx = _makeEC2PlacementCtx({
       sshKeyPath: "/k",
-      ip: "1.2.3.4",
+      instanceId: "i-abc",
+      region: "us-east-1",
       sshExec: stubSshExec,
       pipeTarToSsh: async () => {},
     });
@@ -75,7 +77,8 @@ describe("EC2PlacementCtx", () => {
     // So `appendFile("...", "ark:secret:BB_KEY", ...)` produces `# BEGIN ark:secret:BB_KEY`.
     const ctx = _makeEC2PlacementCtx({
       sshKeyPath: "/k",
-      ip: "1.2.3.4",
+      instanceId: "i-abc",
+      region: "us-east-1",
       sshExec: stubSshExec,
       pipeTarToSsh: async () => {},
     });

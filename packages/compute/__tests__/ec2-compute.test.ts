@@ -234,17 +234,22 @@ describe("EC2Compute", async () => {
       expect(stackOpts.sshKeyPath).toBe("/tmp/keys/ark-test");
     });
 
-    it("opens the tunnel to ARKD_REMOTE_PORT on the returned instance IP", async () => {
-      const { helpers, calls } = makeHelpers({ ip: "203.0.113.42" });
+    it("opens the tunnel to ARKD_REMOTE_PORT on the returned instance_id", async () => {
+      const { helpers, calls } = makeHelpers();
       const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
-      await c.provision({ tags: { name: "test" } });
+      await c.provision({
+        tags: { name: "test" },
+        config: { region: "us-west-2", awsProfile: "yt" },
+      });
 
       const tunnelCall = calls.find((call) => call.fn === "openSshTunnel")!;
       expect(tunnelCall.args[0]).toEqual({
         keyPath: "/tmp/keys/ark-test",
-        ip: "203.0.113.42",
+        instanceId: "i-abc123",
+        region: "us-west-2",
+        awsProfile: "yt",
         localPort: 54321,
         remotePort: ARKD_REMOTE_PORT,
       });
@@ -261,14 +266,6 @@ describe("EC2Compute", async () => {
       const killCalls = calls.filter((call) => call.fn === "killSshTunnel");
       expect(killCalls.length).toBe(1);
       expect(killCalls[0].args[0]).toBe(99999);
-    });
-
-    it("throws if provisionStack returns no IP", async () => {
-      const { helpers } = makeHelpers({ ip: null });
-      const c = new EC2Compute(app);
-      c.setHelpersForTesting(helpers);
-
-      (await expect(c.provision({ tags: { name: "test" } }))).rejects.toThrow(/no IP/);
     });
 
     it("propagates provisionStack errors", async () => {
@@ -319,23 +316,20 @@ describe("EC2Compute", async () => {
       expect(meta.sshPid).toBe(99999);
     });
 
-    it("throws if the instance has no IP after start", async () => {
-      const { helpers } = makeHelpers({ startIp: { publicIp: null, privateIp: null } });
-      const c = new EC2Compute(app);
-      c.setHelpersForTesting(helpers);
-
-      (await expect(c.start(makeProvisionedHandle()))).rejects.toThrow(/no IP after start/);
-    });
-
-    it("falls back to privateIp when publicIp is null", async () => {
-      const { helpers, calls } = makeHelpers({ startIp: { publicIp: null, privateIp: "10.0.0.99" } });
+    it("re-opens the SSM tunnel keyed off instance_id even when no IP is available", async () => {
+      // Pre-fix this threw `EC2Compute.start: instance i-abc has no IP after
+      // start`. Under SSM, the canonical address is the instance_id; IPs are
+      // informational. The tunnel still opens cleanly.
+      const { helpers, calls } = makeHelpers({ startIp: { publicIp: null, privateIp: null } });
       const c = new EC2Compute(app);
       c.setHelpersForTesting(helpers);
 
       await c.start(makeProvisionedHandle({ sshPid: null }));
 
       const tunnelCall = calls.find((call) => call.fn === "openSshTunnel")!;
-      expect((tunnelCall.args[0] as { ip: string }).ip).toBe("10.0.0.99");
+      const tunnelArgs = tunnelCall.args[0] as { instanceId: string; region: string };
+      expect(tunnelArgs.instanceId).toBe("i-abc123");
+      expect(tunnelArgs.region).toBe("us-east-1");
     });
 
     it("tears the new tunnel down if arkd never comes back", async () => {
