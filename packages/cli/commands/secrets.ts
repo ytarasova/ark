@@ -17,8 +17,61 @@ import chalk from "chalk";
 import { createInterface } from "readline";
 import { readdirSync, readFileSync, writeFileSync, statSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
-import { getArkClient } from "../app-client.js";
+import { getArkClient, getInProcessApp } from "../app-client.js";
 import { runAction } from "./_shared.js";
+import type { SecretType } from "../../core/secrets/types.js";
+
+/**
+ * The set of secret types accepted by `ark secrets set` / `ark secrets blob upload`.
+ * Mirrors `SecretType` from packages/core/secrets/types.ts; kept as a runtime
+ * constant so the CLI can reject unknown values before we even hit the
+ * provider.
+ */
+const ALLOWED_TYPES = ["env-var", "ssh-private-key", "generic-blob", "kubeconfig"] as const;
+type AllowedType = (typeof ALLOWED_TYPES)[number];
+
+function assertAllowedType(t: string): asserts t is AllowedType {
+  if (!ALLOWED_TYPES.includes(t as AllowedType)) {
+    throw new Error(`Invalid --type '${t}'. Allowed: ${ALLOWED_TYPES.join(", ")}`);
+  }
+}
+
+/** Commander option callback: accumulate repeatable `--metadata key=value` flags into a record. */
+function metadataCollector(val: string, prev: Record<string, string>): Record<string, string> {
+  const eq = val.indexOf("=");
+  if (eq < 0) throw new Error(`Invalid --metadata: '${val}' (expected key=value)`);
+  return { ...prev, [val.slice(0, eq)]: val.slice(eq + 1) };
+}
+
+/** Resolve the tenant id we should write secrets under in CLI context. */
+function defaultTenantId(app: Awaited<ReturnType<typeof getInProcessApp>>): string {
+  return app.config.authSection.defaultTenant ?? "default";
+}
+
+export interface SecretSetOptions {
+  description?: string;
+  type: string;
+  metadata?: Record<string, string>;
+}
+
+/**
+ * Core set-secret logic, factored out so tests can drive it without having
+ * to fake stdin / TTY. The CLI action handler is a thin wrapper that
+ * resolves the value (stdin or masked prompt) and then delegates here.
+ */
+export async function performSecretSet(name: string, value: string, opts: SecretSetOptions): Promise<void> {
+  assertAllowedType(opts.type);
+  if (value.length === 0) {
+    throw new Error("Refusing to store an empty secret value.");
+  }
+  const app = await getInProcessApp();
+  const tenantId = defaultTenantId(app);
+  await app.secrets.set(tenantId, name, value, {
+    description: opts.description,
+    type: opts.type as SecretType,
+    metadata: opts.metadata ?? {},
+  });
+}
 
 /** Read the entire stdin to a string. Used when the caller pipes a value in. */
 async function readStdin(): Promise<string> {
@@ -115,9 +168,20 @@ export function registerSecretsCommands(program: Command): void {
     .description("Create or replace a secret. Reads value from stdin if piped, otherwise prompts.")
     .argument("<name>", "Secret name (ASCII [A-Z0-9_]+)")
     .option("-d, --description <text>", "Human-readable description")
+    .option(
+      "--type <type>",
+      "Secret type (env-var, ssh-private-key, generic-blob, kubeconfig)",
+      "env-var",
+    )
+    .option(
+      "--metadata <kv>",
+      "Repeatable key=value metadata pair",
+      metadataCollector,
+      {} as Record<string, string>,
+    )
     .action(async (name: string, opts) => {
       await runAction("secrets set", async () => {
-        const ark = await getArkClient();
+        assertAllowedType(opts.type);
         let value: string;
         if (!process.stdin.isTTY) {
           value = (await readStdin()).replace(/\r?\n$/, "");
@@ -129,7 +193,11 @@ export function registerSecretsCommands(program: Command): void {
           process.exitCode = 2;
           return;
         }
-        await ark.secretSet(name, value, opts.description);
+        await performSecretSet(name, value, {
+          description: opts.description,
+          type: opts.type,
+          metadata: opts.metadata ?? {},
+        });
         console.log(chalk.green(`Secret '${name}' stored.`));
       });
     });
