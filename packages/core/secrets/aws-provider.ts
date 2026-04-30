@@ -12,7 +12,7 @@
  */
 
 import type { SSMClient } from "@aws-sdk/client-ssm";
-import type { SecretRef, SecretsCapability } from "./types.js";
+import type { BlobRef, SecretRef, SecretsCapability } from "./types.js";
 import { assertValidSecretName, assertValidBlobName, assertValidBlobFilename } from "./types.js";
 import { normalizeBlob, type BlobInput, type BlobBytes } from "./blob.js";
 
@@ -242,6 +242,10 @@ export class AwsSecretsProvider implements SecretsCapability {
   }
 
   async listBlobs(tenantId: string): Promise<string[]> {
+    return (await this.listBlobsDetailed(tenantId)).map((r) => r.name);
+  }
+
+  async listBlobsDetailed(tenantId: string): Promise<BlobRef[]> {
     const { GetParametersByPathCommand } = await import("@aws-sdk/client-ssm");
     const ssm = await this.client();
     const prefix = blobPrefix(tenantId);
@@ -269,7 +273,20 @@ export class AwsSecretsProvider implements SecretsCapability {
       }
       nextToken = res.NextToken;
     } while (nextToken);
-    return Array.from(names).sort();
+    // TODO(Task 4): read type + metadata from the Description envelope.
+    // For now return safe defaults so callers that read ref.type never see
+    // undefined. The envelope encode/decode lands in Task 4.
+    const epoch = new Date(0).toISOString();
+    return Array.from(names)
+      .sort()
+      .map((name) => ({
+        tenant_id: tenantId,
+        name,
+        type: "generic-blob" as const,
+        metadata: {},
+        created_at: epoch,
+        updated_at: epoch,
+      }));
   }
 
   async getBlob(tenantId: string, name: string): Promise<Record<string, Uint8Array> | null> {
@@ -298,7 +315,14 @@ export class AwsSecretsProvider implements SecretsCapability {
     return Object.keys(out).length > 0 ? out : null;
   }
 
-  async setBlob(tenantId: string, name: string, files: BlobInput): Promise<void> {
+  // TODO(Task 4): persist opts.type and opts.metadata in the Description
+  // envelope. For now the opts are accepted but not stored on the AWS path.
+  async setBlob(
+    tenantId: string,
+    name: string,
+    files: BlobInput,
+    _opts?: { type?: string; metadata?: Record<string, string> },
+  ): Promise<void> {
     assertValidBlobName(name);
     const normalized = normalizeBlob(files);
     const { PutParameterCommand, DeleteParametersCommand } = await import("@aws-sdk/client-ssm");

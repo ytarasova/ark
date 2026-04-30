@@ -50,7 +50,7 @@ import {
 import { randomBytes, createCipheriv, createDecipheriv, scryptSync } from "crypto";
 import os from "os";
 import { dirname, join } from "path";
-import type { SecretRef, SecretsCapability, SecretType } from "./types.js";
+import type { BlobRef, SecretRef, SecretsCapability, SecretType } from "./types.js";
 import { assertValidSecretName, assertValidBlobName, assertValidBlobFilename } from "./types.js";
 import { normalizeBlob, type BlobInput, type BlobBytes } from "./blob.js";
 
@@ -60,6 +60,11 @@ const VALID_TYPES: ReadonlySet<string> = new Set(["env-var", "ssh-private-key", 
 
 function safeSecretType(t: string | undefined): SecretType {
   return t && VALID_TYPES.has(t) ? (t as SecretType) : "env-var";
+}
+
+/** Like safeSecretType but defaults to "generic-blob" for blob contexts. */
+function safeBlobType(t: string | undefined): SecretType {
+  return t && VALID_TYPES.has(t) ? (t as SecretType) : "generic-blob";
 }
 
 function safeMetadata(m: unknown): Record<string, string> {
@@ -299,6 +304,11 @@ export class FileSecretsProvider implements SecretsCapability {
   // We DO refuse to traverse outside `${arkDir}/secrets/<tenant>/` when
   // deleting or enumerating, and every filename is validated at the types
   // layer so the on-disk path is always a safe join.
+  //
+  // Per-blob type + metadata are stored in a `_meta.json` sidecar file
+  // inside the blob directory (skipped by getBlob's filename validator).
+  // Shape: { "t": SecretType, "m": Record<string,string>,
+  //          "created_at": string, "updated_at": string }
 
   private blobRoot(): string {
     return join(dirname(this.path), "secrets");
@@ -312,14 +322,61 @@ export class FileSecretsProvider implements SecretsCapability {
     return join(this.tenantBlobDir(tenantId), name);
   }
 
+  private blobMetaPath(tenantId: string, name: string): string {
+    return join(this.blobDir(tenantId, name), "_meta.json");
+  }
+
+  private readBlobMeta(
+    tenantId: string,
+    name: string,
+  ): { t: string; m: Record<string, string>; created_at: string; updated_at: string } | null {
+    const p = this.blobMetaPath(tenantId, name);
+    if (!existsSync(p)) return null;
+    try {
+      return JSON.parse(readFileSync(p, "utf-8"));
+    } catch {
+      return null;
+    }
+  }
+
+  private writeBlobMeta(
+    tenantId: string,
+    name: string,
+    meta: { t: string; m: Record<string, string>; created_at: string; updated_at: string },
+  ): void {
+    const p = this.blobMetaPath(tenantId, name);
+    const tmp = `${p}.tmp`;
+    writeFileSync(tmp, JSON.stringify(meta), { encoding: "utf-8", mode: 0o600 });
+    try {
+      chmodSync(tmp, 0o600);
+    } catch {
+      // best-effort
+    }
+    renameSync(tmp, p);
+  }
+
   async listBlobs(tenantId: string): Promise<string[]> {
+    return (await this.listBlobsDetailed(tenantId)).map((r) => r.name);
+  }
+
+  async listBlobsDetailed(tenantId: string): Promise<BlobRef[]> {
     const dir = this.tenantBlobDir(tenantId);
     if (!existsSync(dir)) return [];
     const entries = readdirSync(dir, { withFileTypes: true });
-    return entries
-      .filter((e) => e.isDirectory())
-      .map((e) => e.name)
-      .sort();
+    const refs: BlobRef[] = [];
+    for (const e of entries.filter((e) => e.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
+      const meta = this.readBlobMeta(tenantId, e.name);
+      const now = new Date(0).toISOString();
+      refs.push({
+        tenant_id: tenantId,
+        name: e.name,
+        type: safeBlobType(meta?.t),
+        metadata: safeMetadata(meta?.m),
+        created_at: meta?.created_at ?? now,
+        updated_at: meta?.updated_at ?? now,
+      });
+    }
+    return refs;
   }
 
   async getBlob(tenantId: string, name: string): Promise<Record<string, Uint8Array> | null> {
@@ -332,6 +389,8 @@ export class FileSecretsProvider implements SecretsCapability {
       if (!f.isFile()) continue;
       // Defensive: even though setBlob validates, a manually-added file
       // with a weird name should be ignored rather than crash reads.
+      // _meta.json uses an underscore prefix which fails BLOB_FILE_RE, so
+      // it is naturally excluded from the file listing.
       try {
         assertValidBlobFilename(f.name);
       } catch {
@@ -345,10 +404,19 @@ export class FileSecretsProvider implements SecretsCapability {
     return out;
   }
 
-  async setBlob(tenantId: string, name: string, files: BlobInput): Promise<void> {
+  async setBlob(
+    tenantId: string,
+    name: string,
+    files: BlobInput,
+    opts?: { type?: SecretType; metadata?: Record<string, string> },
+  ): Promise<void> {
     assertValidBlobName(name);
     const normalized = normalizeBlob(files);
     const dir = this.blobDir(tenantId, name);
+    // Read existing meta BEFORE wiping the directory so we can preserve
+    // type/metadata when opts doesn't supply them (rotate-value pattern).
+    const existingMeta = this.readBlobMeta(tenantId, name);
+    const now = new Date().toISOString();
     // Wipe first so a shrinking blob doesn't leave stale files behind.
     if (existsSync(dir)) {
       rmSync(dir, { recursive: true, force: true });
@@ -373,6 +441,15 @@ export class FileSecretsProvider implements SecretsCapability {
       }
       renameSync(tmp, dest);
     }
+    // Write per-blob metadata sidecar. Default type for blobs is
+    // "generic-blob"; preserve existing when opts doesn't override.
+    const meta = {
+      t: opts?.type ?? existingMeta?.t ?? "generic-blob",
+      m: opts?.metadata ?? safeMetadata(existingMeta?.m),
+      created_at: existingMeta?.created_at ?? now,
+      updated_at: now,
+    };
+    this.writeBlobMeta(tenantId, name, meta);
   }
 
   async deleteBlob(tenantId: string, name: string): Promise<boolean> {

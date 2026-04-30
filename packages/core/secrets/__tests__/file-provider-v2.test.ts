@@ -69,4 +69,21 @@ describe("FileSecretsProvider v2", () => {
     const value = await p.get("default", "K");
     expect(value).toBe("v2");
   });
+
+  test("blob round-trip with type=generic-blob and target_path metadata", async () => {
+    const p = new FileSecretsProvider(dir);
+    await p.setBlob(
+      "default",
+      "claude",
+      { ".credentials.json": "X" },
+      {
+        type: "generic-blob",
+        metadata: { target_path: "~/.claude" },
+      },
+    );
+    const refs = await p.listBlobsDetailed("default");
+    expect(refs).toHaveLength(1);
+    expect(refs[0].type).toBe("generic-blob");
+    expect(refs[0].metadata).toEqual({ target_path: "~/.claude" });
+  });
 });

@@ -36,6 +36,15 @@ export interface SecretRef {
   updated_at: string;
 }
 
+export interface BlobRef {
+  tenant_id: string;
+  name: string;
+  type: SecretType;
+  metadata: Record<string, string>;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SecretsCapability {
   /** List secret refs (never values) for the tenant. */
   list(tenantId: string): Promise<SecretRef[]>;
@@ -71,6 +80,9 @@ export interface SecretsCapability {
   /** List blob names (never contents) for the tenant. Sorted ASCII. */
   listBlobs(tenantId: string): Promise<string[]>;
 
+  /** List blob refs (name + type + metadata, never contents) for the tenant. */
+  listBlobsDetailed(tenantId: string): Promise<BlobRef[]>;
+
   /**
    * Fetch every file in a blob. Returns null when the blob doesn't exist.
    * File values are Uint8Array (binary-safe).
@@ -86,7 +98,12 @@ export interface SecretsCapability {
    * middle may leave a partial blob. Callers that need strict atomicity
    * should use a single string secret instead.
    */
-  setBlob(tenantId: string, name: string, files: Record<string, Uint8Array | string>): Promise<void>;
+  setBlob(
+    tenantId: string,
+    name: string,
+    files: Record<string, Uint8Array | string>,
+    opts?: { type?: SecretType; metadata?: Record<string, string> },
+  ): Promise<void>;
 
   /** Delete a blob. Returns true when a blob was actually removed. */
   deleteBlob(tenantId: string, name: string): Promise<boolean>;
