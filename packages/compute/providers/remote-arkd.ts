@@ -345,6 +345,29 @@ export class RemoteWorktreeProvider extends RemoteArkdBase {
   readonly isolationModes: IsolationMode[] = [{ value: "inplace", label: "Remote checkout (in-place)" }];
 
   /**
+   * Pick the URL/path EC2 should clone from. `session.repo` is the local-
+   * filesystem path on the conductor (e.g. /Users/yana/Projects/ark) which
+   * doesn't exist on EC2; `session.config.remoteRepo` is the URL the user
+   * passed via `--remote-repo` and is the source of truth for remote clones.
+   * Prefer the remote URL; fall back to session.repo only when the conductor
+   * and the compute target share a filesystem (not the case for EC2 today,
+   * but keeps the contract honest for future co-located compute kinds).
+   */
+  private cloneSource(session: Session): string | null {
+    const cfg = session.config as { remoteRepo?: string } | null | undefined;
+    if (cfg?.remoteRepo) return cfg.remoteRepo;
+    if (session.repo) return session.repo;
+    return null;
+  }
+
+  /** Repo basename used to derive the workdir path under ${REMOTE_HOME}/Projects. */
+  private repoBasename(session: Session): string {
+    const src = this.cloneSource(session);
+    if (!src) return "project";
+    return src.split("/").pop()?.replace(/\.git$/, "") ?? "project";
+  }
+
+  /**
    * Where the cloned worktree lives on the remote host. The executor reads
    * this via the optional `provider.resolveWorkdir(...)` hook to (a) embed
    * the right path in the launcher's `cd` and (b) target the right path in
@@ -353,20 +376,23 @@ export class RemoteWorktreeProvider extends RemoteArkdBase {
    * workdir which doesn't exist on Ubuntu.
    */
   resolveWorkdir(_compute: Compute, session: Session): string | null {
-    if (!session.repo) return null;
-    const repoName = session.repo.split("/").pop()?.replace(".git", "") ?? "project";
-    return `${REMOTE_HOME}/Projects/${repoName}`;
+    if (!this.cloneSource(session)) return null;
+    return `${REMOTE_HOME}/Projects/${this.repoBasename(session)}`;
   }
 
   async launch(compute: Compute, session: Session, opts: LaunchOpts): Promise<string> {
     const client = this.getClient(compute);
 
-    // Clone repo on remote if needed. Use the same `resolveWorkdir` the
-    // executor used so the clone destination matches the path baked into
-    // the launcher script.
+    // Clone repo on remote if a source URL/path is set. We MUST use the
+    // remote-reachable URL (session.config.remoteRepo) when present --
+    // session.repo is the conductor-local path, which doesn't exist on EC2.
+    // The previous \`git clone <session.repo> ...\` invocation silently
+    // failed (path not found on remote), leaving an empty workdir and
+    // making the agent run against nothing.
     const remoteWorkdir = this.resolveWorkdir(compute, session);
-    if (session.repo && remoteWorkdir) {
-      await client.run({ command: "git", args: ["clone", session.repo, remoteWorkdir], timeout: 120_000 });
+    const source = this.cloneSource(session);
+    if (source && remoteWorkdir) {
+      await client.run({ command: "git", args: ["clone", source, remoteWorkdir], timeout: 120_000 });
     }
 
     // Upload launcher and execute. tmux's `-c <workdir>` flag wants the same

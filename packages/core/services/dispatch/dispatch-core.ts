@@ -147,21 +147,33 @@ export class CoreDispatcher {
     // Build task (with handoff context, knowledge, repo-map, rework prompt).
     const { task, taskPreview } = await assembleTask(this.deps, session, stage, agentName, log);
 
-    // Resolve executor -- use resolved runtime type (from RuntimeStore merge),
-    // fall back to agent.runtime, then claude-code.
-    const runtime = agent._resolved_runtime_type ?? agent.runtime ?? "claude-code";
-    const executor = this.deps.resolveExecutor(runtime);
-    if (!executor) return { ok: false, message: `Executor '${runtime}' not registered` };
+    // Two distinct identifiers, do not conflate:
+    //   - runtimeType: dispatch the right executor (claude-code, agent-sdk,
+    //     cli-agent, ...). Comes from the runtime YAML's `type` field.
+    //   - runtimeName: lookup key into RuntimeStore for `secrets:`,
+    //     `mcp_servers`, env, etc. Comes from the agent YAML's
+    //     `runtime: <name>` (which references runtimes/<name>.yaml).
+    //
+    // The previous code passed runtimeType to both executor resolution AND
+    // secrets resolution. Type and name happen to match for `agent-sdk`
+    // (name=agent-sdk, type=agent-sdk) so its declared secrets resolved.
+    // For claude (name=claude, type=claude-code) the secrets resolver did
+    // `runtimes.get("claude-code")` -> null -> ANTHROPIC_API_KEY never made
+    // it into the launch env even though runtimes/claude.yaml declares it.
+    const runtimeType = agent._resolved_runtime_type ?? agent.runtime ?? "claude-code";
+    const runtimeName = agent.runtime ?? runtimeType;
+    const executor = this.deps.resolveExecutor(runtimeType);
+    if (!executor) return { ok: false, message: `Executor '${runtimeType}' not registered` };
 
     // Build claude args (only for claude-code executor)
-    const claudeArgs = runtime === "claude-code" ? this.deps.buildClaudeArgs(agent, { autonomy, projectRoot }) : [];
+    const claudeArgs = runtimeType === "claude-code" ? this.deps.buildClaudeArgs(agent, { autonomy, projectRoot }) : [];
 
     // Assemble launch env: stage/runtime secrets + tenant claude auth.
-    const launchEnv = await buildLaunchEnv(this.deps, this.secrets, session, stageDef, runtime, log);
+    const launchEnv = await buildLaunchEnv(this.deps, this.secrets, session, stageDef, runtimeName, log);
     if (launchEnv.error) return { ok: false, message: launchEnv.error };
 
     // Launch via executor.
-    log(`Launching via ${runtime}...`);
+    log(`Launching via ${runtimeType} (runtime '${runtimeName}')...`);
     const launchResult = await launchAgent(this.deps, executor, {
       sessionId,
       session,
@@ -187,7 +199,7 @@ export class CoreDispatcher {
       agent,
       agentName,
       stage,
-      runtime,
+      runtime: runtimeType,
       tmuxName: launchResult.handle,
       launchPid: launchResult.pid,
       reworkPromptCleared: Boolean(session.rework_prompt),
