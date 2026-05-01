@@ -229,51 +229,83 @@ export class ArkdClient {
     return {};
   }
 
+  /**
+   * Recognize transient transport-level fetch failures: a stale pooled
+   * keep-alive socket closed by the peer (or the SSH tunnel that carries it)
+   * surfaces as `TypeError: The socket connection was closed unexpectedly`.
+   * Bun's connection pool can hand out a socket that the underlying tunnel
+   * has already torn down without the runtime noticing -- the next fetch
+   * issues an HTTP request, the kernel returns RST, and we get this error.
+   * Retrying immediately opens a fresh socket and almost always succeeds.
+   *
+   * We intentionally do NOT retry timeouts (those are caller-shaped) or
+   * ArkdClientError (those are real arkd-side rejects with codes).
+   */
+  private isTransientTransportError(e: unknown): boolean {
+    if (e instanceof ArkdClientError) return false;
+    const msg = (e as { message?: string })?.message ?? String(e);
+    return (
+      msg.includes("socket connection was closed") ||
+      msg.includes("ECONNRESET") ||
+      msg.includes("ECONNREFUSED") ||
+      msg.includes("EPIPE") ||
+      msg.includes("fetch failed")
+    );
+  }
+
+  private async fetchWithRetry(url: string, init: RequestInit, timeoutMs: number, path: string): Promise<Response> {
+    // Two retries on transient transport errors. Backoff: 250ms, 1s.
+    // Each attempt gets the full timeout budget -- we don't shorten it,
+    // because the original request might have been partway through a long
+    // arkd-side exec; we'd rather wait the timeout than fail-fast on the
+    // first transient close.
+    const delays = [250, 1000];
+    for (let attempt = 0; ; attempt++) {
+      const ac = new AbortController();
+      const t = setTimeout(() => ac.abort(new Error(`arkd ${path}: timeout after ${timeoutMs}ms`)), timeoutMs);
+      try {
+        return await fetch(url, { ...init, signal: ac.signal });
+      } catch (e) {
+        if (attempt < delays.length && this.isTransientTransportError(e)) {
+          await new Promise((r) => setTimeout(r, delays[attempt]));
+          continue;
+        }
+        throw e;
+      } finally {
+        clearTimeout(t);
+      }
+    }
+  }
+
   private async post<Req, Res>(path: string, body: Req, opts?: { timeoutMs?: number }): Promise<Res> {
     const timeoutMs = opts?.timeoutMs ?? this.requestTimeoutMs;
-    // Manual AbortController + setTimeout instead of AbortSignal.timeout.
-    // Bun 1.3.x has had crash bugs with `AbortSignal.timeout` firing on
-    // long-running fetches (>90s) under load -- the daemon dies natively
-    // with no logged error. Manual timer + .clear in finally is portable
-    // and behaves identically on the happy path.
-    const ac = new AbortController();
-    const t = setTimeout(() => ac.abort(new Error(`arkd ${path}: timeout after ${timeoutMs}ms`)), timeoutMs);
-    try {
-      const resp = await fetch(`${this.baseUrl}${path}`, {
+    const resp = await this.fetchWithRetry(
+      `${this.baseUrl}${path}`,
+      {
         method: "POST",
         headers: { "Content-Type": "application/json", ...this.authHeaders() },
         body: JSON.stringify(body),
-        signal: ac.signal,
-      });
-      const data = await resp.json();
-      if (!resp.ok) {
-        const err = data as ArkdError;
-        throw new ArkdClientError(`arkd ${path}: ${err.error}`, err.code, resp.status);
-      }
-      return data as Res;
-    } finally {
-      clearTimeout(t);
+      },
+      timeoutMs,
+      path,
+    );
+    const data = await resp.json();
+    if (!resp.ok) {
+      const err = data as ArkdError;
+      throw new ArkdClientError(`arkd ${path}: ${err.error}`, err.code, resp.status);
     }
+    return data as Res;
   }
 
   private async get<Res>(path: string, opts?: { timeoutMs?: number }): Promise<Res> {
     const timeoutMs = opts?.timeoutMs ?? this.requestTimeoutMs;
-    const ac = new AbortController();
-    const t = setTimeout(() => ac.abort(new Error(`arkd ${path}: timeout after ${timeoutMs}ms`)), timeoutMs);
-    try {
-      const resp = await fetch(`${this.baseUrl}${path}`, {
-        headers: this.authHeaders(),
-        signal: ac.signal,
-      });
-      const data = await resp.json();
-      if (!resp.ok) {
-        const err = data as ArkdError;
-        throw new ArkdClientError(`arkd ${path}: ${err.error}`, err.code, resp.status);
-      }
-      return data as Res;
-    } finally {
-      clearTimeout(t);
+    const resp = await this.fetchWithRetry(`${this.baseUrl}${path}`, { headers: this.authHeaders() }, timeoutMs, path);
+    const data = await resp.json();
+    if (!resp.ok) {
+      const err = data as ArkdError;
+      throw new ArkdClientError(`arkd ${path}: ${err.error}`, err.code, resp.status);
     }
+    return data as Res;
   }
 }
 
