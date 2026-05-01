@@ -126,7 +126,11 @@ export function useSessionDetail({
   );
 
   const errorEvents = events.filter(
-    (ev: any) => ev.type === "error" || ev.type === "action_failed" || (ev.data?.error && ev.type !== "hook_status"),
+    (ev: any) =>
+      ev.type === "error" ||
+      ev.type === "action_failed" ||
+      ev.type === "dispatch_failed" ||
+      (ev.data?.error && ev.type !== "hook_status"),
   );
   const hasErrors = session?.status === "failed" || errorEvents.length > 0;
 

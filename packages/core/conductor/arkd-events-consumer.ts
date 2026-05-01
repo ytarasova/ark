@@ -144,10 +144,17 @@ async function readEventsStreamOnce(
   arkdToken: string | null,
 ): Promise<void> {
   const url = `${arkdUrl.replace(/\/+$/, "")}/events/stream`;
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    // Force a dedicated TCP socket for the long-poll stream so it never
+    // enters Bun's keep-alive pool. Without this, every short-lived
+    // dispatch fetch (`/exec`, `/file/*`) to the same `localhost:<port>`
+    // origin can land on the half-streaming long-poll socket and surface
+    // as "The socket connection was closed unexpectedly" mid-clone.
+    Connection: "close",
+  };
   if (arkdToken) headers.Authorization = `Bearer ${arkdToken}`;
 
-  const resp = await fetch(url, { headers, signal: entry.abort.signal });
+  const resp = await fetch(url, { headers, signal: entry.abort.signal, keepalive: false });
   if (!resp.ok) {
     throw new Error(`arkd /events/stream returned ${resp.status}`);
   }

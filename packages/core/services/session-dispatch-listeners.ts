@@ -81,13 +81,45 @@ export async function markDispatchFailedShared(
   events: EventRepository,
   sessionId: string,
   reason: string,
+  detail?: { error?: unknown; context?: Record<string, unknown> },
 ): Promise<void> {
+  // Capture as much context as we can: the original error's stack,
+  // any structured fields the underlying error carries (URL, method,
+  // attempt count for ArkdClientTransportError), and the raw `cause`
+  // chain. This goes to ark.jsonl AND the dispatch_failed event so a
+  // session that fails has a findable forensic trail beyond the
+  // 200-char truncated `session.error` column.
+  const err = detail?.error;
+  const errorObj = err instanceof Error ? err : null;
+  const errorChain: Array<{ name?: string; message?: string; stack?: string }> = [];
+  let cur: unknown = err;
+  while (cur instanceof Error && errorChain.length < 5) {
+    errorChain.push({ name: cur.name, message: cur.message, stack: cur.stack });
+    cur = (cur as { cause?: unknown }).cause;
+  }
+  const fullData: Record<string, unknown> = { reason, ...(detail?.context ?? {}) };
+  if (errorChain.length > 0) fullData.errorChain = errorChain;
+  if (errorObj && (errorObj as { url?: string }).url) {
+    fullData.requestUrl = (errorObj as { url?: string }).url;
+    fullData.requestMethod = (errorObj as { method?: string }).method;
+    fullData.requestPath = (errorObj as { path?: string }).path;
+    fullData.attempts = (errorObj as { attempts?: number }).attempts;
+  }
+
+  // Mirror to structured-log so operators can grep ark.jsonl by
+  // session id and find the same payload. The session.error column
+  // stays short (UI shows it directly); the long-form lives here.
+  logWarn("session", `dispatch failed for ${sessionId}: ${reason}`, {
+    sessionId,
+    ...fullData,
+  });
+
   try {
-    await events.log(sessionId, "dispatch_failed", { actor: "system", data: { reason } });
-  } catch (err) {
+    await events.log(sessionId, "dispatch_failed", { actor: "system", data: fullData });
+  } catch (logErr) {
     logWarn("session", `markDispatchFailedShared: failed to log dispatch_failed event (sessionId=${sessionId})`, {
       sessionId,
-      error: err instanceof Error ? err.message : String(err),
+      error: logErr instanceof Error ? logErr.message : String(logErr),
     });
   }
   try {
@@ -98,10 +130,10 @@ export async function markDispatchFailedShared(
       status: "failed" as SessionStatus,
       error: reason,
     } as Partial<Session>);
-  } catch (err) {
+  } catch (persistErr) {
     logWarn("session", `markDispatchFailedShared: failed to persist status (sessionId=${sessionId})`, {
       sessionId,
-      error: err instanceof Error ? err.message : String(err),
+      error: persistErr instanceof Error ? persistErr.message : String(persistErr),
     });
   }
 }
@@ -248,7 +280,7 @@ export class SessionDispatchListeners {
       })
       .catch(async (err) => {
         const reason = err instanceof Error ? err.message : String(err);
-        await markDispatchFailedShared(this.sessions, this.events, sessionId, reason);
+        await markDispatchFailedShared(this.sessions, this.events, sessionId, reason, { error: err });
       })
       .then(async () => {
         onDispatched(await this.sessions.get(sessionId));

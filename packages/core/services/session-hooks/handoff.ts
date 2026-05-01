@@ -126,7 +126,10 @@ export class HandoffMediator {
             ? dispatchError.message
             : (dispatchResult!.message ?? "dispatch returned ok: false");
           logWarn("handoff", `auto-dispatch failed for ${sessionId}/${toStage}: ${reason}`);
-          await markDispatchFailedShared(sessions, events, sessionId, reason);
+          await markDispatchFailedShared(sessions, events, sessionId, reason, {
+            error: dispatchError ?? undefined,
+            context: { fromStage: fromStage ?? null, toStage, source },
+          });
           dispatched = false;
         } else {
           dispatched = true;
@@ -158,7 +161,10 @@ export class HandoffMediator {
               : (actionResult!.message ?? "action returned ok: false");
             const reason = `Action '${nextAction.action}' failed: ${rawReason.slice(0, 200)}`;
             logWarn("handoff", `action '${nextAction.action}' failed for ${sessionId}: ${rawReason}`);
-            await markDispatchFailedShared(sessions, events, sessionId, reason);
+            await markDispatchFailedShared(sessions, events, sessionId, reason, {
+              error: actionError ?? undefined,
+              context: { action: nextAction.action ?? null, fromStage: fromStage ?? null, toStage, source },
+            });
             dispatched = false;
           } else {
             // Action succeeded -- chain into next stage unless the action

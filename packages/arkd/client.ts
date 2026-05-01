@@ -253,28 +253,46 @@ export class ArkdClient {
     );
   }
 
-  private async fetchWithRetry(url: string, init: RequestInit, timeoutMs: number, path: string): Promise<Response> {
+  private async fetchWithRetry(
+    url: string,
+    init: RequestInit,
+    timeoutMs: number,
+    path: string,
+    method: "GET" | "POST",
+  ): Promise<Response> {
     // Two retries on transient transport errors. Backoff: 250ms, 1s.
     // Each attempt gets the full timeout budget -- we don't shorten it,
     // because the original request might have been partway through a long
     // arkd-side exec; we'd rather wait the timeout than fail-fast on the
     // first transient close.
     const delays = [250, 1000];
+    let lastErr: unknown = null;
     for (let attempt = 0; ; attempt++) {
       const ac = new AbortController();
       const t = setTimeout(() => ac.abort(new Error(`arkd ${path}: timeout after ${timeoutMs}ms`)), timeoutMs);
       try {
         return await fetch(url, { ...init, signal: ac.signal });
       } catch (e) {
+        lastErr = e;
         if (attempt < delays.length && this.isTransientTransportError(e)) {
           await new Promise((r) => setTimeout(r, delays[attempt]));
           continue;
         }
-        throw e;
+        // Wrap with full request context so callers (and the operator
+        // staring at the failure in the UI) can tell *which* request
+        // failed without spelunking through stack frames. Original
+        // error is preserved as `cause`.
+        throw new ArkdClientTransportError(
+          `arkd ${method} ${url} failed after ${attempt + 1} attempt(s): ` +
+            `${(e as { message?: string })?.message ?? String(e)}`,
+          { url, method, path, attempts: attempt + 1, cause: e },
+        );
       } finally {
         clearTimeout(t);
       }
     }
+    // Unreachable but TypeScript wants it.
+    throw lastErr;
   }
 
   private async post<Req, Res>(path: string, body: Req, opts?: { timeoutMs?: number }): Promise<Res> {
@@ -288,6 +306,7 @@ export class ArkdClient {
       },
       timeoutMs,
       path,
+      "POST",
     );
     const data = await resp.json();
     if (!resp.ok) {
@@ -299,13 +318,45 @@ export class ArkdClient {
 
   private async get<Res>(path: string, opts?: { timeoutMs?: number }): Promise<Res> {
     const timeoutMs = opts?.timeoutMs ?? this.requestTimeoutMs;
-    const resp = await this.fetchWithRetry(`${this.baseUrl}${path}`, { headers: this.authHeaders() }, timeoutMs, path);
+    const resp = await this.fetchWithRetry(
+      `${this.baseUrl}${path}`,
+      { headers: this.authHeaders() },
+      timeoutMs,
+      path,
+      "GET",
+    );
     const data = await resp.json();
     if (!resp.ok) {
       const err = data as ArkdError;
       throw new ArkdClientError(`arkd ${path}: ${err.error}`, err.code, resp.status);
     }
     return data as Res;
+  }
+}
+
+/**
+ * Error thrown when fetch() itself fails (DNS / connect / socket-close /
+ * timeout) -- distinct from `ArkdClientError`, which is a clean non-2xx
+ * arkd-side reject. Carries the request URL + method + attempt count so
+ * a session that fails dispatch surfaces an actionable message in the
+ * UI instead of a bare `TypeError: socket closed`. The original error
+ * is preserved on `.cause` for stack-trace reconstruction.
+ */
+export class ArkdClientTransportError extends Error {
+  readonly url: string;
+  readonly method: string;
+  readonly path: string;
+  readonly attempts: number;
+  constructor(
+    message: string,
+    opts: { url: string; method: string; path: string; attempts: number; cause?: unknown },
+  ) {
+    super(message, { cause: opts.cause });
+    this.name = "ArkdClientTransportError";
+    this.url = opts.url;
+    this.method = opts.method;
+    this.path = opts.path;
+    this.attempts = opts.attempts;
   }
 }
 
