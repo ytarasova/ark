@@ -9,6 +9,7 @@
 import type { AppContext } from "../app.js";
 import * as flow from "../state/flow.js";
 import { logWarn } from "../observability/structured-log.js";
+import { markDispatchFailedShared } from "./session-dispatch-listeners.js";
 
 /**
  * Spawn a subagent -- an independent child session with its own agent.
@@ -89,30 +90,31 @@ export async function spawnParallelSubagents(
   await Promise.allSettled(
     ids.map(async (id) => {
       try {
-        await app.dispatchService.dispatch(id);
+        const r = await app.dispatchService.dispatch(id);
+        if (r && r.ok === false) {
+          // Non-throw failure path: pre-fix `{ok:false}` was silently
+          // dropped (only thrown errors made it into the catch). Use the
+          // shared helper so the dispatch_failed event AND the status flip
+          // to `failed` happen together.
+          const reason = r.message ?? "subagent dispatch returned ok:false";
+          logWarn("session", `subagents: dispatch returned ok:false (parent=${parentId}, child=${id}): ${reason}`, {
+            parentId,
+            childId: id,
+            reason,
+          });
+          await markDispatchFailedShared(app.sessions, app.events, id, reason);
+        }
       } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
         logWarn("session", `subagents: dispatch failed for child session (parent=${parentId}, child=${id})`, {
           parentId,
           childId: id,
-          error: err instanceof Error ? err.message : String(err),
+          error: reason,
         });
-        // Best-effort: record on the child session so the parent flow (and
-        // operators) can observe the failure instead of silently dropping it.
-        try {
-          await app.events.log(id, "dispatch_failed", {
-            actor: "system",
-            data: {
-              reason: err instanceof Error ? err.message : String(err),
-              parent_id: parentId,
-              source: "spawnParallelSubagents",
-            },
-          });
-        } catch (logErr) {
-          logWarn("session", `subagents: failed to persist dispatch_failed event (child=${id})`, {
-            childId: id,
-            error: logErr instanceof Error ? logErr.message : String(logErr),
-          });
-        }
+        // Use markDispatchFailedShared so the failure carries the same
+        // shape as kickDispatch + handoff -- event row + status=failed
+        // (lenient against an already-terminal status).
+        await markDispatchFailedShared(app.sessions, app.events, id, reason);
       }
     }),
   );

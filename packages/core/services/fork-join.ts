@@ -9,6 +9,8 @@ import { randomUUID } from "crypto";
 
 import type { AppContext } from "../app.js";
 import * as flow from "../state/flow.js";
+import { logWarn } from "../observability/structured-log.js";
+import { markDispatchFailedShared } from "./session-dispatch-listeners.js";
 
 type SessionOpResult = Promise<{ ok: true; sessionId: string } | { ok: false; message: string }>;
 
@@ -53,7 +55,33 @@ export async function fork(
   if (opts?.dispatch !== false) {
     // Route through app.dispatchService so the DI-wired DispatchService
     // handles the nested dispatch (previously a dynamic-import cycle-breaker).
-    await app.dispatchService.dispatch(child.id);
+    // Pre-fix the call had no .catch and didn't inspect the result -- both
+    // throws and `{ok:false}` were silent on the child. The parent's
+    // FanOutDispatcher would then list the child as "started" while the
+    // child sat at status=ready forever. Surface failures via the shared
+    // helper so the child row flips to `failed` with the underlying reason.
+    try {
+      const r = await app.dispatchService.dispatch(child.id);
+      if (r && r.ok === false) {
+        const reason = r.message ?? "child dispatch returned ok:false";
+        logWarn("session", `fork: child dispatch returned ok:false (parent=${parentId}, child=${child.id}): ${reason}`, {
+          parentId,
+          childId: child.id,
+          reason,
+        });
+        await markDispatchFailedShared(app.sessions, app.events, child.id, reason);
+        return { ok: false, message: reason };
+      }
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      logWarn("session", `fork: child dispatch threw (parent=${parentId}, child=${child.id})`, {
+        parentId,
+        childId: child.id,
+        error: reason,
+      });
+      await markDispatchFailedShared(app.sessions, app.events, child.id, reason);
+      return { ok: false, message: reason };
+    }
   }
   return { ok: true, sessionId: child.id };
 }

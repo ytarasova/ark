@@ -15,6 +15,7 @@ import type { OutboundMessage } from "./channel-types.js";
 import { safeAsync } from "../safe.js";
 import { logDebug, logError, logInfo, logWarn } from "../observability/structured-log.js";
 import { sendOSNotification } from "../notify.js";
+import { markDispatchFailedShared } from "../services/session-dispatch-listeners.js";
 
 export async function handleReport(app: AppContext, sessionId: string, report: OutboundMessage): Promise<void> {
   const result = await app.sessionHooks.applyReport(sessionId, report);
@@ -64,9 +65,25 @@ export async function handleReport(app: AppContext, sessionId: string, report: O
     });
     if (retryResult.ok) {
       logInfo("conductor", `on_failure retry triggered for ${sessionId}: ${retryResult.message}`);
-      app.dispatchService.dispatch(sessionId).catch((err) => {
-        logError("conductor", `on_failure retry dispatch failed for ${sessionId}: ${err?.message ?? err}`);
-      });
+      // Inspect the resolved DispatchResult so non-throwing failures
+      // (`{ok:false}`) are surfaced too. Pre-fix only `.catch` ran, and
+      // `{ok:false}` was silently dropped -- the on_failure retry would
+      // appear "scheduled" but the session never made progress. Now both
+      // throw and ok:false flip the session to failed.
+      app.dispatchService
+        .dispatch(sessionId)
+        .then(async (r) => {
+          if (r && r.ok === false) {
+            const reason = r.message ?? "on_failure retry returned ok:false";
+            logWarn("conductor", `on_failure retry dispatch returned ok:false for ${sessionId}: ${reason}`);
+            await markDispatchFailedShared(app.sessions, app.events, sessionId, reason);
+          }
+        })
+        .catch(async (err) => {
+          const reason = err instanceof Error ? err.message : String(err);
+          logError("conductor", `on_failure retry dispatch failed for ${sessionId}: ${reason}`);
+          await markDispatchFailedShared(app.sessions, app.events, sessionId, reason);
+        });
       return;
     }
     logWarn("conductor", `on_failure retry exhausted for ${sessionId}: ${retryResult.message}`);
