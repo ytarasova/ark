@@ -21,7 +21,7 @@ import type { Executor, LaunchResult } from "../../executor.js";
 import type { PlacementCtx } from "../../secrets/placement-types.js";
 import { providerOf } from "../../../compute/adapters/provider-map.js";
 import { placeAllSecrets } from "../../secrets/placement.js";
-import { logWarn } from "../../observability/structured-log.js";
+import { logDebug, logWarn } from "../../observability/structured-log.js";
 
 export interface LaunchEnvResult {
   env: Record<string, string>;
@@ -103,9 +103,11 @@ export async function buildLaunchEnv(
         try {
           const rt = deps.runtimes?.get?.(runtime);
           runtimeSecrets = Array.isArray(rt?.secrets) ? (rt as { secrets?: string[] }).secrets! : [];
-        } catch {
+        } catch (err: any) {
           // Runtime row may be absent in legacy/test paths -- the legacy
           // resolve() above already tolerates this; placement does too.
+          // Pre-test fallback path; debug-level is appropriate here.
+          logDebug("session", `runtimes.get('${runtime}') failed inside placement narrowing: ${err?.message ?? err}`);
         }
         const narrow: Set<string> | undefined =
           stageSecrets.length === 0 && runtimeSecrets.length === 0

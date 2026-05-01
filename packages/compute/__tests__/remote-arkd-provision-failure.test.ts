@@ -58,9 +58,9 @@ describe("RemoteArkdBase.provision failure -> structured logError", () => {
     });
 
     try {
-      await expect(
-        provider.provision(compute, { onLog: () => {} } as any),
-      ).rejects.toThrow(/synthetic provision failure/);
+      await expect(provider.provision(compute, { onLog: () => {} } as any)).rejects.toThrow(
+        /synthetic provision failure/,
+      );
     } finally {
       provisionSpy.mockRestore();
     }

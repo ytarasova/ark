@@ -94,9 +94,7 @@ describe("prepareRemoteEnvironment syncEnvironment failure", () => {
     });
 
     const entries = readLogEntries(app.config.dirs.ark);
-    const errorEntry = entries.find(
-      (e) => e.level === "error" && String(e.message).includes("syncEnvironment failed"),
-    );
+    const errorEntry = entries.find((e) => e.level === "error" && String(e.message).includes("syncEnvironment failed"));
     expect(errorEntry).toBeTruthy();
     expect(errorEntry.component).toBe("session");
     expect(errorEntry.data.sessionId).toBe(session.id);
@@ -113,9 +111,7 @@ describe("prepareRemoteEnvironment syncEnvironment failure", () => {
     await prepareRemoteEnvironment(app, session, compute, provider, "", { onLog: () => {} });
 
     const entries = readLogEntries(app.config.dirs.ark);
-    const errorEntry = entries.find(
-      (e) => e.level === "error" && String(e.message).includes("syncEnvironment failed"),
-    );
+    const errorEntry = entries.find((e) => e.level === "error" && String(e.message).includes("syncEnvironment failed"));
     expect(errorEntry).toBeFalsy();
   });
 });

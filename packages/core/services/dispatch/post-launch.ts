@@ -19,7 +19,7 @@
 
 import { execFileSync } from "child_process";
 
-import { logDebug } from "../../observability/structured-log.js";
+import { logWarn } from "../../observability/structured-log.js";
 import { recordEvent } from "../../observability.js";
 import { track } from "../../observability/telemetry.js";
 import type { DispatchDeps, DispatchResult } from "./types.js";
@@ -70,8 +70,9 @@ export async function finalizeLaunch(
         encoding: "utf-8",
         timeout: 5000,
       }).trim();
-    } catch {
-      logDebug("session", "no git -- skip");
+    } catch (err: any) {
+      // no git -- skip
+      logWarn("session", `no git -- skip: ${err?.message ?? err}`);
     }
   }
 
@@ -84,8 +85,9 @@ export async function finalizeLaunch(
     log(`Session moved past stage '${stage}' during dispatch -- aborting write.`);
     try {
       await deps.launcher.kill(tmuxName);
-    } catch {
-      logDebug("session", "tmux may already be gone");
+    } catch (err: any) {
+      // tmux may already be gone
+      logWarn("session", `tmux may already be gone: ${err?.message ?? err}`);
     }
     return { ok: false, message: `Session moved on during dispatch` };
   }
@@ -118,8 +120,9 @@ export async function finalizeLaunch(
   // Persist flow state: mark current stage
   try {
     await deps.flowStates.setCurrentStage(sessionId, session.stage!, session.flow);
-  } catch {
-    logDebug("session", "skip flow-state on error");
+  } catch (err: any) {
+    // skip flow-state on error
+    logWarn("session", `skip flow-state on error: ${err?.message ?? err}`);
   }
 
   // Checkpoint after successful dispatch
@@ -130,8 +133,9 @@ export async function finalizeLaunch(
   // (e.g. MCP config error, OOM, segfault). The poller detects tmux session exit.
   try {
     deps.startStatusPoller(sessionId, tmuxName, runtime);
-  } catch {
-    logDebug("session", "status poller is best-effort -- agent runs fine without it");
+  } catch (err: any) {
+    // status poller is best-effort -- agent runs fine without it
+    logWarn("session", `status poller is best-effort -- agent runs fine without it: ${err?.message ?? err}`);
   }
 
   // Observability + telemetry

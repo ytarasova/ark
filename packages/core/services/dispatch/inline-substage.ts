@@ -16,9 +16,53 @@ import type { StageDefinition } from "../../state/flow.js";
 import type { StageSecretResolver } from "./secrets-resolve.js";
 import { buildLaunchEnv, launchAgent } from "./launch.js";
 import { sessionAsVars } from "../task-builder.js";
+import { logInfo, logWarn } from "../../observability/structured-log.js";
 
 const INLINE_POLL_MS = 250;
 const INLINE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+
+/**
+ * Poll an executor until it reaches a terminal state (completed / failed /
+ * not_found) or the deadline elapses. Exported for unit tests.
+ *
+ * - `running` / `idle`        -> keep polling.
+ * - `completed`               -> { agentOk: true, agentExitOk: true }
+ * - `failed`                  -> { agentOk: true, agentExitOk: false }
+ * - `not_found`               -> { agentOk: true, agentExitOk: false }
+ *     (executor has no record of the handle -- a real failure mode; was
+ *      previously treated as success and silently swallowed.)
+ * - deadline elapsed          -> { agentOk: false, agentExitOk: true }
+ */
+export async function pollInlineExecutorUntilTerminal(
+  executor: { status(handle: string): Promise<{ state: string; [k: string]: unknown }> },
+  handle: string,
+  opts: { pollMs?: number; timeoutMs?: number; sleep?: (ms: number) => Promise<void> } = {},
+): Promise<{ agentOk: boolean; agentExitOk: boolean }> {
+  const pollMs = opts.pollMs ?? INLINE_POLL_MS;
+  const timeoutMs = opts.timeoutMs ?? INLINE_TIMEOUT_MS;
+  const sleep = opts.sleep ?? ((ms: number) => Bun.sleep(ms));
+
+  const deadline = Date.now() + timeoutMs;
+  let agentOk = false;
+  let agentExitOk = true;
+  while (Date.now() < deadline) {
+    await sleep(pollMs);
+    const status = await executor.status(handle);
+    if (status.state === "running" || status.state === "idle") continue;
+    // Terminal: completed / failed / not_found
+    agentOk = true;
+    if (status.state === "failed") agentExitOk = false;
+    if (status.state === "not_found") {
+      // not_found means the executor has no record of the handle -- this is a
+      // real failure mode (handle never registered, or was cleaned up before
+      // we could observe a terminal state). Don't paper over it as success.
+      agentExitOk = false;
+      logWarn("session", "inline-substage executor.status returned not_found -- treating as failed");
+    }
+    break;
+  }
+  return { agentOk, agentExitOk };
+}
 
 export async function dispatchInlineSubStage(
   deps: Pick<
@@ -38,7 +82,7 @@ export async function dispatchInlineSubStage(
   subStage: StageDefinition,
   _iterVars: Record<string, string>,
 ): Promise<DispatchResult> {
-  const log = () => {};
+  const log = (msg: string) => logInfo("session", `[inline-substage] ${msg}`);
   const session = await deps.sessions.get(sessionId);
   if (!session) return { ok: false, message: `Session ${sessionId} not found` };
 
@@ -128,20 +172,9 @@ export async function dispatchInlineSubStage(
   // processes, so a tmux `has-session` check would falsely report the
   // agent done on the first poll. executor.status(handle) returns
   // "running"/"idle" while alive, "completed"/"failed" after exit, and
-  // "not_found" if the executor has no record (treated as done-but-
-  // already-cleaned).
-  const deadline = Date.now() + INLINE_TIMEOUT_MS;
-  let agentOk = false;
-  let agentExitOk = true;
-  while (Date.now() < deadline) {
-    await Bun.sleep(INLINE_POLL_MS);
-    const status = await executor.status(tmuxName);
-    if (status.state === "running" || status.state === "idle") continue;
-    // Terminal: completed / failed / not_found
-    agentOk = true;
-    if (status.state === "failed") agentExitOk = false;
-    break;
-  }
+  // "not_found" if the executor has no record (now treated as failed --
+  // see pollInlineExecutorUntilTerminal).
+  const { agentOk, agentExitOk } = await pollInlineExecutorUntilTerminal(executor, tmuxName);
 
   // Restore parent session to ready so the inline loop can continue.
   await deps.sessions.update(sessionId, { status: "ready", session_id: null });

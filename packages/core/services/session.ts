@@ -251,8 +251,9 @@ export class SessionService {
       for (const entry of this.app.pluginRegistry.listByKind("executor")) {
         try {
           await entry.impl.kill(handle);
-        } catch {
-          /* try next executor */
+        } catch (err: any) {
+          // try next executor -- only the owning executor knows the handle
+          logDebug("session", `kill via executor '${entry.name}' failed: ${err?.message ?? err}`);
         }
       }
     }

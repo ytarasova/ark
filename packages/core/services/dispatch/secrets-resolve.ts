@@ -9,7 +9,7 @@
  * never silently drop an env var the agent depends on.
  */
 
-import { logDebug } from "../../observability/structured-log.js";
+import { logWarn } from "../../observability/structured-log.js";
 import type { DispatchDeps } from "./types.js";
 import type { Session } from "../../../types/index.js";
 import type { StageDefinition } from "../../state/flow.js";
@@ -31,10 +31,13 @@ export class StageSecretResolver {
     // known (legacy executor paths may dispatch without a RuntimeStore row).
     try {
       const rt = this.deps.runtimes?.get?.(runtimeKind) ?? null;
+      if (!rt) {
+        logWarn("session", `secrets-resolve: runtime '${runtimeKind}' not found in store`);
+      }
       const rtSecrets = Array.isArray(rt?.secrets) ? (rt as { secrets?: string[] }).secrets! : [];
       for (const n of rtSecrets) names.add(n);
-    } catch {
-      logDebug("session", "runtime secrets list unavailable -- skipping");
+    } catch (err: any) {
+      logWarn("session", `secrets-resolve: runtime '${runtimeKind}' lookup failed: ${err?.message ?? err}`);
     }
 
     if (names.size === 0) return { env: {} };

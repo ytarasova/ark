@@ -155,7 +155,9 @@ export class SessionDispatchListeners {
    */
   track(promise: Promise<unknown>): void {
     this.pendingDispatches.add(promise);
-    promise.finally(() => this.pendingDispatches.delete(promise)).catch(() => {});
+    promise
+      .finally(() => this.pendingDispatches.delete(promise))
+      .catch((err) => logWarn("session", `kickActionStage trailing chain threw: ${err?.message ?? err}`));
   }
 
   private kickDispatch(sessionId: string, onDispatched: (session: Session | null) => void): void {

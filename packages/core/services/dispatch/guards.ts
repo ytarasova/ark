@@ -17,7 +17,7 @@ import { join } from "path";
 import { promisify } from "util";
 import { execFile } from "child_process";
 
-import { logDebug } from "../../observability/structured-log.js";
+import { logWarn } from "../../observability/structured-log.js";
 import { detectInjection } from "../../session/prompt-guard.js";
 import type { DispatchDeps, DispatchResult } from "./types.js";
 import type { Session } from "../../../types/index.js";
@@ -151,8 +151,10 @@ export async function checkPromptInjection(
         data: { patterns: injection.patterns, severity: injection.severity, context: "dispatch" },
       });
     }
-  } catch {
-    logDebug("session", "skip guard on error");
+  } catch (err: any) {
+    // Don't disable injection blocking silently if the regex throws --
+    // surface so a bug here is visible in the structured log.
+    logWarn("session", `prompt-injection guard failed: ${err?.message ?? err}`);
   }
   return { blocked: false };
 }

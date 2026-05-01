@@ -10,7 +10,7 @@ import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import type { AppContext } from "../app.js";
 import { getExecutor } from "../executor.js";
-import { logDebug, logInfo } from "../observability/structured-log.js";
+import { logDebug, logInfo, logWarn } from "../observability/structured-log.js";
 
 /**
  * Read the exit-code sentinel for a session, if the launcher wrote one.
@@ -183,8 +183,9 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
               autoDispatch: true,
               source: "status_poller",
             });
-          } catch {
-            logInfo("status", "advance may fail if flow is done");
+          } catch (err: any) {
+            // advance may fail if flow is done
+            logWarn("status", `mediateStageHandoff failed for ${sessionId}: ${err?.message ?? err}`);
           }
         }
 
@@ -197,8 +198,9 @@ export function startStatusPoller(app: AppContext, sessionId: string, handle: st
           logDebug("status", "best-effort");
         }
       }
-    } catch {
-      logDebug("status", "ignore polling errors");
+    } catch (err: any) {
+      // Don't crash the poller; surface the error in structured log.
+      logWarn("status", `polling tick failed: ${err?.message ?? err}`);
     }
   }, 3000); // Check every 3 seconds
 

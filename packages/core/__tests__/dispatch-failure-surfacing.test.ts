@@ -100,10 +100,7 @@ describe("Pass 3 #11: dispatch failure surfacing at the three call sites", () =>
       const parent = await app.sessions.create({ summary: "subagent ok:false test", flow: "quick" });
       await app.sessions.update(parent.id, { stage: "implement", status: "running" });
 
-      const result = await spawnParallelSubagents(app, parent.id, [
-        { task: "task A" },
-        { task: "task B" },
-      ]);
+      const result = await spawnParallelSubagents(app, parent.id, [{ task: "task A" }, { task: "task B" }]);
 
       expect(result.ok).toBe(true);
       expect(result.sessionIds).toHaveLength(2);
