@@ -369,6 +369,20 @@ export function removeSettings(workdir: string): void {
     if (Object.keys(perms).length === 0) delete settings.permissions;
   }
 
+  // Strip `enabledMcpjsonServers` entries that ark added (`ark-channel`,
+  // `codebase-memory`). User-added entries stay. Without this, the
+  // field outlives removeSettings and the "delete file when only ark
+  // content remains" path keeps the file alive forever.
+  if (Array.isArray(settings.enabledMcpjsonServers)) {
+    const arkServers = new Set(["ark-channel", "codebase-memory"]);
+    const remaining = (settings.enabledMcpjsonServers as string[]).filter((s) => !arkServers.has(s));
+    if (remaining.length === 0) {
+      delete settings.enabledMcpjsonServers;
+    } else {
+      settings.enabledMcpjsonServers = remaining;
+    }
+  }
+
   delete settings._ark;
 
   // If nothing meaningful remains, remove the file entirely

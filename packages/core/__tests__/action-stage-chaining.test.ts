@@ -133,16 +133,16 @@ describe("action stage chaining", async () => {
 
     expect(result.ok).toBe(true);
     expect(result.toStage).toBe("pr");
-    expect(result.dispatched).toBe(true);
+    // `dispatched` reflects ACTION SUCCESS, not "we attempted to run it"
+    // (cf. line 56 above where a successful action sets it to true).
+    // create_pr fails because the session has no workdir; mediator
+    // marks the session failed AND reports dispatched=false.
+    expect(result.dispatched).toBe(false);
 
-    // Wait for the failure to propagate
-    await waitFor(
-      async () => {
-        const s = await app.sessions.get(session.id);
-        return s?.status === "failed";
-      },
-      { timeout: 5000, message: "Expected session to reach failed status" },
-    );
+    // Failure was already propagated synchronously by the mediator's
+    // markDispatchFailedShared call -- no need to wait.
+    const updated0 = await app.sessions.get(session.id);
+    expect(updated0?.status).toBe("failed");
 
     const updated = await app.sessions.get(session.id);
     expect(updated?.status).toBe("failed");

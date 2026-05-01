@@ -142,6 +142,7 @@ export class AppContext {
     // the host environment.
     if (this.config.profile === "test") {
       installNoopExecutors(this);
+      await installTestSecrets(this);
     }
 
     // Rehydrate ephemeral inline-flow definitions persisted in session config.
@@ -855,6 +856,42 @@ function installNoopExecutors(app: AppContext): void {
   const reg = app.pluginRegistry;
   for (const name of NOOP_EXECUTOR_NAMES) {
     reg.register({ kind: "executor", name, impl: { ...noopExecutor, name } });
+  }
+}
+
+/**
+ * Test profile: pre-seed the secret store with dummy values for every
+ * env-var secret declared by a builtin runtime YAML (claude.yaml's
+ * CLAUDE_CODE_OAUTH_TOKEN, agent-sdk's ANTHROPIC_API_KEY, etc).
+ *
+ * Without this, any test that runs through `dispatchService.dispatch`
+ * fails at `buildLaunchEnv` with "Missing secrets for tenant 'default'"
+ * because the test-mode arkDir is fresh and the secret store is empty.
+ * The noop executor never reads these values; we just need them to be
+ * resolvable so the runtime's secret contract is satisfied.
+ *
+ * Walks `app.runtimes` so future runtime-secret additions are seeded
+ * automatically without anyone having to edit this list.
+ */
+async function installTestSecrets(app: AppContext): Promise<void> {
+  const TENANT = "default";
+  const runtimes = await app.runtimes.list();
+  const seen = new Set<string>();
+  for (const rt of runtimes) {
+    const decls = (rt as { secrets?: unknown }).secrets;
+    if (!Array.isArray(decls)) continue;
+    for (const decl of decls as unknown[]) {
+      const name = typeof decl === "string" ? decl : (decl as { name?: string })?.name;
+      if (typeof name !== "string" || !name) continue;
+      if (seen.has(name)) continue;
+      seen.add(name);
+      try {
+        await app.secrets.set(TENANT, name, "test-dummy-value", { type: "env-var" });
+      } catch {
+        // Secret-store backends differ; best-effort. The dispatch will
+        // surface a clearer error if any of these turn out to be required.
+      }
+    }
   }
 }
 
