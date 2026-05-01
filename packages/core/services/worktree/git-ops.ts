@@ -233,6 +233,11 @@ export async function worktreeDiff(
  * Rebase the session branch onto the base branch before PR creation.
  * Fetches origin, then rebases onto origin/<base>. On conflict, aborts
  * the rebase and returns an error -- the branch is left unchanged.
+ *
+ * Remote-aware: for sessions on a non-`supportsWorktree` provider the agent's
+ * commits live on the remote box, so the fetch + rebase must run there.
+ * `runGit` (in pr.ts) routes the dispatch through `ArkdClient.run`; for
+ * local sessions it falls back to the existing `execFileAsync` path.
  */
 export async function rebaseOntoBase(
   app: AppContext,
@@ -247,22 +252,21 @@ export async function rebaseOntoBase(
   const repo = session.repo;
   if (!repo) return { ok: false, message: "Session has no repo" };
 
+  // Local-side cwd for the local-dispatch path. The remote dispatcher
+  // (runGit) ignores this and uses the provider's resolved remote workdir.
   const wtDir = join(app.config.dirs.worktrees, sessionId);
-  const gitDir = existsSync(wtDir) ? wtDir : repo;
+  const localCwd = existsSync(wtDir) ? wtDir : repo;
   const base = opts?.base ?? DEFAULT_BASE_BRANCH;
+
+  // Lazy import to avoid the pr.ts <-> git-ops.ts circular at module load.
+  const { runGit } = await import("./pr.js");
 
   try {
     // Fetch latest from origin so rebase target is up to date
-    await execFileAsync("git", ["-C", gitDir, "fetch", "origin", base], {
-      encoding: "utf-8",
-      timeout: 30_000,
-    });
+    await runGit(app, session, ["fetch", "origin", base], { timeout: 30_000, localCwd });
 
     // Rebase onto origin/<base>
-    await execFileAsync("git", ["-C", gitDir, "rebase", `origin/${base}`], {
-      encoding: "utf-8",
-      timeout: 60_000,
-    });
+    await runGit(app, session, ["rebase", `origin/${base}`], { timeout: 60_000, localCwd });
 
     await app.events.log(sessionId, "rebase_completed", {
       stage: session.stage ?? undefined,
@@ -272,11 +276,11 @@ export async function rebaseOntoBase(
 
     return { ok: true, message: `Rebased onto origin/${base}` };
   } catch (e: any) {
-    // Abort the rebase to leave the branch in its original state
+    // Abort the rebase to leave the branch in its original state. Use the
+    // same dispatcher so the abort lands on the same machine the rebase
+    // was running on.
     try {
-      await execFileAsync("git", ["-C", gitDir, "rebase", "--abort"], {
-        encoding: "utf-8",
-      });
+      await runGit(app, session, ["rebase", "--abort"], { timeout: 15_000, localCwd });
     } catch {
       logDebug("session", "already clean");
     }
