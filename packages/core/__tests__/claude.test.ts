@@ -848,9 +848,12 @@ describe("buildSettings", () => {
     }
   });
 
-  it("bakes the conductor URL into the curl command", () => {
-    const { content } = buildSettings("s-abc", "https://control.example.com");
-    expect(content).toContain("https://control.example.com/hooks/status?session=s-abc");
+  it("bakes the arkd hook-forward URL into the curl command", () => {
+    // The launcher hook now POSTs to local arkd's `/hooks/forward`, not
+    // the conductor's `/hooks/status`. Arkd queues the event and the
+    // conductor pulls it via `/events/stream`. See commit c7f4d01d.
+    const { content } = buildSettings("s-abc", "http://localhost:19300");
+    expect(content).toContain("http://localhost:19300/hooks/forward?session=s-abc");
   });
 
   it("merges with an existing settings object instead of clobbering", () => {
@@ -861,11 +864,11 @@ describe("buildSettings", () => {
     expect((object as { hooks: Record<string, unknown[]> }).hooks.Custom).toBeTruthy();
   });
 
-  it("sets _ark.sessionId and _ark.conductorUrl in the metadata", () => {
+  it("sets _ark.sessionId and _ark.arkdUrl in the metadata", () => {
     const { object } = buildSettings("s-meta", "http://c");
-    const meta = (object as { _ark: { sessionId: string; conductorUrl: string; updatedAt: string } })._ark;
+    const meta = (object as { _ark: { sessionId: string; arkdUrl: string; updatedAt: string } })._ark;
     expect(meta.sessionId).toBe("s-meta");
-    expect(meta.conductorUrl).toBe("http://c");
+    expect(meta.arkdUrl).toBe("http://c");
     expect(meta.updatedAt).toBeTruthy();
   });
 
