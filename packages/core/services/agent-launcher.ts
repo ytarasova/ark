@@ -13,7 +13,7 @@ import type { ComputeProvider } from "../../compute/types.js";
 import { resolvePortDecls, parseArcJson } from "../../compute/arc-json.js";
 import { allocatePort } from "../config/port-allocator.js";
 import { DEFAULT_ARKD_PORT } from "../constants.js";
-import { logError, logInfo } from "../observability/structured-log.js";
+import { logInfo } from "../observability/structured-log.js";
 
 /** Apply arc.json container setup: Docker Compose and devcontainer. */
 async function applyContainerSetup(
@@ -193,37 +193,16 @@ export async function prepareRemoteEnvironment(
     });
   }
 
-  // Sync environment to compute
-  log("Syncing credentials...");
-  logInfo("session", `[trace:prep:${sid}] syncEnvironment begin`);
-  try {
-    const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
-    await provider.syncEnvironment(compute, {
-      direction: "push",
-      projectFiles: arcJson?.sync,
-      projectDir: effectiveWorkdir,
-      onLog: log,
-    });
-    logInfo("session", `[trace:prep:${sid}] syncEnvironment done`);
-  } catch (e: any) {
-    // The session-scoped `log` callback writes to a per-launch stream that's
-    // invisible in stuck-at-ready debugging scenarios. logError lands in
-    // ~/.ark/ark.jsonl so operators tailing structured logs see the failure.
-    // We still continue (sync is best-effort -- the agent might have what it
-    // needs from the remote's existing env), but the failure is no longer
-    // silent.
-    //
-    // TODO: classify failures (auth-required, network-blip, partial-sync,
-    // permission-denied) and short-circuit to dispatch_failed for the
-    // un-recoverable cases. Tracked as Phase 3 polish.
-    const reason = e?.message ?? String(e);
-    log(`Credential sync failed (continuing): ${reason}`);
-    logError(
-      "session",
-      `prepareRemoteEnvironment: syncEnvironment failed (compute=${compute.name}, sessionId=${session.id})`,
-      { sessionId: session.id, compute: compute.name, error: reason },
-    );
-  }
+  // No sync from local. Every credential, env var, and project-scoped
+  // file flows through typed-secret placement (env-var, ssh-private-key,
+  // generic-blob, kubeconfig) or compute-template provisioning. The
+  // legacy `syncEnvironment` path was wrong by construction in
+  // control-plane mode (hosted conductor has no useful ~/.aws,
+  // ~/.gitconfig, ~/.claude, gh auth token) and was the source of a
+  // daemon-killer crash on EC2 dispatch (huge ~/.claude rsync over the
+  // SSM tunnel). Sensitive project files belong in `ark secrets`; non-
+  // sensitive ones in the repo.
+  logInfo("session", `[trace:prep:${sid}] sync skipped -- credentials via typed secrets only`);
 
   // Apply container setup (Docker Compose + devcontainer)
   logInfo("session", `[trace:prep:${sid}] applyContainerSetup begin`);
