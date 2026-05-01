@@ -46,8 +46,15 @@ export async function placeAllSecrets(
   const stringRefs = await app.secrets.list(tenantId);
   const blobRefs = await app.secrets.listBlobsDetailed(tenantId);
 
-  const eligible = <T extends { name: string }>(refs: T[]): T[] =>
-    opts.narrow ? refs.filter((r) => opts.narrow!.has(r.name)) : refs;
+  // Narrowing filter applies only to env-var-typed secrets -- the historical
+  // semantic of stage/runtime YAML `secrets: [NAME]` lists is "include these
+  // env vars at minimum". File/blob-typed secrets (ssh keys, kubeconfigs,
+  // generic blobs) auto-attach regardless so a session can use git+ssh
+  // without every runtime YAML having to enumerate the keypair name.
+  const eligible = <T extends { name: string; type: string }>(refs: T[]): T[] =>
+    opts.narrow
+      ? refs.filter((r) => r.type !== "env-var" || opts.narrow!.has(r.name))
+      : refs;
 
   const stringSelected = eligible(stringRefs);
   const blobSelected = eligible(blobRefs);

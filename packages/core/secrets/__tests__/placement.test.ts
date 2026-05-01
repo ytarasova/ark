@@ -63,7 +63,7 @@ describe("placeAllSecrets", () => {
     );
   });
 
-  test("narrowing filter restricts to listed names", async () => {
+  test("narrowing filter restricts env-var secrets to listed names", async () => {
     await app.secrets.set("default", "FOO_KEY", "foo-value", { type: "env-var", metadata: {} });
     await app.secrets.set("default", "BAR_KEY", "bar-value", { type: "env-var", metadata: {} });
 
@@ -72,6 +72,49 @@ describe("placeAllSecrets", () => {
 
     const envCalls = ctx.calls.filter((c) => c.kind === "setEnv");
     expect(envCalls).toEqual([{ kind: "setEnv", key: "FOO_KEY", value: "foo-value" }]);
+  });
+
+  test("narrowing filter does NOT restrict file/blob-typed secrets -- they auto-attach", async () => {
+    // env-var secrets respect the narrow list; ssh-private-key (a file-typed
+    // secret) auto-attaches regardless. This matches the historical
+    // YAML `secrets: [NAME]` semantic ("include these env vars at minimum")
+    // without forcing every runtime YAML to enumerate ssh-key names.
+    await app.secrets.set("default", "FOO_KEY", "foo-value", { type: "env-var", metadata: {} });
+    await app.secrets.set("default", "BAR_KEY", "bar-value", { type: "env-var", metadata: {} });
+    await app.secrets.set("default", "BB_KEY", "PEM_BODY", {
+      type: "ssh-private-key",
+      metadata: { host: "bitbucket.org" },
+    });
+
+    // Stub the ssh-keyscan helper so the test doesn't hit the network. Return
+    // non-empty bytes so the placer's "skip known_hosts when empty" branch
+    // doesn't fire (we want to assert both appendFile calls).
+    const { _makeSshPrivateKeyPlacer } = await import("../placers/ssh-private-key.js");
+    const stubPlacer = _makeSshPrivateKeyPlacer({
+      runKeyScan: async () => Buffer.from("bitbucket.org ssh-rsa AAAA...\n"),
+    });
+    __test_registerPlacer("ssh-private-key", stubPlacer);
+
+    try {
+      const ctx = new MockPlacementCtx();
+      await placeAllSecrets(app, fakeSession(), ctx, { narrow: new Set(["FOO_KEY"]) });
+
+      // env-var: only FOO_KEY (BAR_KEY filtered out).
+      const envCalls = ctx.calls.filter((c) => c.kind === "setEnv");
+      expect(envCalls).toEqual([{ kind: "setEnv", key: "FOO_KEY", value: "foo-value" }]);
+
+      // ssh-private-key: BB_KEY placed (writeFile + 2 appendFile) even though
+      // it's not in the narrow list.
+      const writeCalls = ctx.calls.filter((c) => c.kind === "writeFile");
+      expect(writeCalls).toHaveLength(1);
+      expect(writeCalls[0].path).toContain("/.ssh/id_bb_key");
+      const appendCalls = ctx.calls.filter((c) => c.kind === "appendFile");
+      expect(appendCalls).toHaveLength(2);
+    } finally {
+      // Restore the real placer so it doesn't leak across tests.
+      const { sshPrivateKeyPlacer } = await import("../placers/ssh-private-key.js");
+      __test_registerPlacer("ssh-private-key", sshPrivateKeyPlacer);
+    }
   });
 
   test("unknown type is skipped, not thrown (kubeconfig has no Phase 1 placer)", async () => {
