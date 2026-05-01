@@ -50,6 +50,13 @@ export function buildSshConfigBlock(opts: SshConfigBlockOpts): string {
     `  IdentityFile ${opts.keyPath}`,
     `  IdentitiesOnly yes`,
     `  User ${opts.username}`,
+    // accept-new: trust-on-first-use for the host key. The control-plane
+    // ssh-keyscan can fail (network blip, host slow to respond, behind a
+    // firewall) and we don't want git/ssh to choke on an empty known_hosts.
+    // accept-new accepts an unseen key on first connect and writes it,
+    // then enforces it on subsequent connects -- safer than `no` (which
+    // also disables MITM detection).
+    `  StrictHostKeyChecking accept-new`,
     `# END ark:secret:${opts.name}`,
     "",
   ].join("\n");
