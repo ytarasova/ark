@@ -155,6 +155,45 @@ export async function prepareRemoteEnvironment(
     // localhost endpoint instead of the unreachable private IP.
     await app.computes.mergeConfig(compute.name, { arkd_local_forward_port: arkdTunnel.localPort });
 
+    // The SSH `-L` listener appears in pgrep BEFORE the SSM session through
+    // it has finished establishing. The first few seconds after the tunnel
+    // is reported "up" are racy: a fetch from the conductor (Bun) hits the
+    // local listener but the inner SSM session is still mid-handshake, so
+    // the kernel reports "connection refused" and Bun surfaces it as
+    // "Unable to connect. Is the computer able to access the url?". Worse,
+    // those failed connect attempts seem to poison Bun's HTTP keep-alive
+    // pool: subsequent fetches to the same `localhost:<port>` keep failing
+    // even after the tunnel has settled.
+    //
+    // Probe arkd `/health` until it answers (or we hit a budget) so the
+    // first real fetch the dispatcher sends is guaranteed to land on a
+    // live, fully-handshaken socket -- no poisoned-pool symptoms.
+    const arkdProbeUrl = `http://localhost:${arkdTunnel.localPort}/health`;
+    const probeBudgetMs = Number(process.env.ARK_ARKD_PROBE_BUDGET_MS ?? 30_000);
+    const probeStarted = Date.now();
+    let probeOk = false;
+    while (Date.now() - probeStarted < probeBudgetMs) {
+      try {
+        const r = await fetch(arkdProbeUrl, { signal: AbortSignal.timeout(2_000) });
+        if (r.ok) {
+          probeOk = true;
+          break;
+        }
+      } catch {
+        /* SSH tunnel still settling -- back off and try again */
+      }
+      await new Promise((res) => setTimeout(res, 500));
+    }
+    logInfo(
+      "session",
+      `[trace:prep:${sid}] arkd-probe ${probeOk ? "ok" : "timeout"} after ${Date.now() - probeStarted}ms`,
+    );
+    if (!probeOk) {
+      throw new Error(
+        `arkd at localhost:${arkdTunnel.localPort} did not become reachable within ${probeBudgetMs}ms`,
+      );
+    }
+
     // Open the events stream so hook callbacks (agent_message, hook_status,
     // channel reports) flow back to the conductor without a reverse tunnel.
     // Idempotent -- a second call for the same compute is a no-op.
