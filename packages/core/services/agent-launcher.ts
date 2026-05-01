@@ -13,7 +13,7 @@ import type { ComputeProvider } from "../../compute/types.js";
 import { resolvePortDecls, parseArcJson } from "../../compute/arc-json.js";
 import { allocatePort } from "../config/port-allocator.js";
 import { DEFAULT_ARKD_PORT } from "../constants.js";
-import { logError } from "../observability/structured-log.js";
+import { logError, logInfo } from "../observability/structured-log.js";
 
 /** Apply arc.json container setup: Docker Compose and devcontainer. */
 async function applyContainerSetup(
@@ -61,11 +61,15 @@ export async function prepareRemoteEnvironment(
   opts?: { launchContent?: string; onLog?: (msg: string) => void },
 ): Promise<{ finalLaunchContent: string; ports: any[] }> {
   const log = opts?.onLog ?? (() => {});
+  const sid = session.id;
+  logInfo("session", `[trace:prep:${sid}] start compute=${compute.name} status=${compute.status}`);
 
   // Auto-start stopped computes
   if (compute.status === "stopped") {
     log(`Starting compute '${compute.name}'...`);
+    logInfo("session", `[trace:prep:${sid}] provider.start begin`);
     await provider.start(compute);
+    logInfo("session", `[trace:prep:${sid}] provider.start done`);
   }
 
   // Verify host is reachable before starting expensive sync/clone chain.
@@ -87,6 +91,7 @@ export async function prepareRemoteEnvironment(
     const ssmConnectTimeoutMs = Number(process.env.ARK_SSM_CONNECT_TIMEOUT_MS ?? 45_000);
 
     log("Checking host connectivity (via SSM)...");
+    logInfo("session", `[trace:prep:${sid}] connectivity-check begin`);
     let lastExitCode = -1;
     let lastErr: unknown = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
@@ -108,6 +113,7 @@ export async function prepareRemoteEnvironment(
       const detail = lastErr ? ` (last error: ${lastErr instanceof Error ? lastErr.message : String(lastErr)})` : "";
       throw new Error(`Cannot reach compute '${compute.name}' at ${instanceId} (via SSM) after 2 attempts${detail}`);
     }
+    logInfo("session", `[trace:prep:${sid}] connectivity-check done`);
 
     // Reverse tunnel back to the conductor. Required for normal operation:
     // the agent's ark hooks (curl to ${conductorUrl}/hooks/status) and the
@@ -118,10 +124,12 @@ export async function prepareRemoteEnvironment(
     // tunnel for this (instance_id, port) already exists we reuse it.
     const conductorPort = app.config.ports.conductor;
     const { setupReverseTunnel, setupForwardTunnel } = await import("../../compute/providers/ec2/ports.js");
+    logInfo("session", `[trace:prep:${sid}] reverse-tunnel begin`);
     const tunnel = await setupReverseTunnel(sshKeyPath(compute.name), instanceId, conductorPort, {
       region,
       awsProfile,
     });
+    logInfo("session", `[trace:prep:${sid}] reverse-tunnel done pid=${tunnel.pid} reused=${tunnel.reused}`);
     if (!tunnel.pid) {
       // Without the reverse tunnel, the agent's `ark hooks` (curl to
       // ${conductorUrl}/hooks/status) and the `ark-channel` MCP server
@@ -151,11 +159,13 @@ export async function prepareRemoteEnvironment(
     // `http://localhost:<localForwardPort>`. The local port is allocated
     // dynamically per compute and persisted on `compute.config.arkd_local_forward_port`
     // for `RemoteArkdBase.getArkdUrl` to read.
+    logInfo("session", `[trace:prep:${sid}] forward-tunnel begin`);
     const localPort = await allocatePort();
     const arkdTunnel = await setupForwardTunnel(sshKeyPath(compute.name), instanceId, DEFAULT_ARKD_PORT, localPort, {
       region,
       awsProfile,
     });
+    logInfo("session", `[trace:prep:${sid}] forward-tunnel done pid=${arkdTunnel.pid} localPort=${arkdTunnel.localPort}`);
     if (!arkdTunnel.pid) {
       throw new Error(
         `Failed to set up arkd forward tunnel for compute '${compute.name}' ` +
@@ -185,6 +195,7 @@ export async function prepareRemoteEnvironment(
 
   // Sync environment to compute
   log("Syncing credentials...");
+  logInfo("session", `[trace:prep:${sid}] syncEnvironment begin`);
   try {
     const arcJson = effectiveWorkdir ? parseArcJson(effectiveWorkdir) : null;
     await provider.syncEnvironment(compute, {
@@ -193,6 +204,7 @@ export async function prepareRemoteEnvironment(
       projectDir: effectiveWorkdir,
       onLog: log,
     });
+    logInfo("session", `[trace:prep:${sid}] syncEnvironment done`);
   } catch (e: any) {
     // The session-scoped `log` callback writes to a per-launch stream that's
     // invisible in stuck-at-ready debugging scenarios. logError lands in
@@ -214,7 +226,10 @@ export async function prepareRemoteEnvironment(
   }
 
   // Apply container setup (Docker Compose + devcontainer)
+  logInfo("session", `[trace:prep:${sid}] applyContainerSetup begin`);
   const finalLaunchContent = await applyContainerSetup(compute, effectiveWorkdir, opts?.launchContent ?? "", log);
+  logInfo("session", `[trace:prep:${sid}] applyContainerSetup done`);
 
+  logInfo("session", `[trace:prep:${sid}] return ports=${ports.length}`);
   return { finalLaunchContent, ports };
 }
