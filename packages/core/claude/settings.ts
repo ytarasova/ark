@@ -147,6 +147,19 @@ export function buildSettings(
     arkMeta.managedAllow = true;
   }
 
+  // Pre-approve every MCP server we ship in .mcp.json so the agent doesn't
+  // sit on Claude Code's first-run "trust this server?" prompt forever on
+  // remote dispatch (where there's no human at the keyboard to press 1).
+  // `enabledMcpjsonServers` is Claude Code's project-level pre-approval
+  // list; entries match the keys of `.mcp.json:mcpServers`.
+  const existingEnabled = Array.isArray(out.enabledMcpjsonServers)
+    ? (out.enabledMcpjsonServers as string[])
+    : [];
+  const enabledServers = new Set<string>(existingEnabled);
+  enabledServers.add("ark-channel");
+  enabledServers.add("codebase-memory");
+  out.enabledMcpjsonServers = Array.from(enabledServers);
+
   if (opts?.autonomy === "edit") {
     const perms = (out.permissions ?? {}) as Record<string, unknown>;
     perms.deny = ["Bash"];
