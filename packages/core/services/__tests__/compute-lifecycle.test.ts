@@ -196,10 +196,16 @@ describe("garbageCollectComputeIfTemplate", () => {
     // infrastructure externally -- deleting the row through GC would leak
     // the external resource. The service-layer canDelete guard must kick in
     // and the GC helper must swallow the resulting error and return false.
-    app.registerProvider(makeStubProvider({ name: "stub-nodelete", canDelete: false }));
+    // Provider name must match what `providerOf({compute_kind, runtime_kind})`
+    // returns -- the registry is keyed by the legacy provider name derived
+    // from the two-axis kinds, NOT by the row's `provider` column. For
+    // {compute_kind:"k8s", runtime_kind:"direct"} that's "k8s". Registering
+    // under "k8s" just shadows the production K8s provider for this app
+    // instance.
+    app.registerProvider(makeStubProvider({ name: "k8s", canDelete: false }));
     await app.computeService.create({
       name: "stub-row",
-      provider: "stub-nodelete" as any,
+      provider: "k8s" as any,
       compute: "k8s",
       runtime: "direct",
       config: {},

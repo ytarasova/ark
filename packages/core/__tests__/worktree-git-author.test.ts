@@ -33,7 +33,7 @@ beforeEach(async () => {
   app = await AppContext.forTestAsync();
   await app.boot();
 
-  repoDir = join(app.config.arkDir, "fake-live-repo");
+  repoDir = join(app.config.dirs.ark, "fake-live-repo");
   mkdirSync(repoDir, { recursive: true });
   execFileSync("git", ["init", repoDir], { stdio: "pipe" });
   // Set a host-level identity that we explicitly do NOT want the agent

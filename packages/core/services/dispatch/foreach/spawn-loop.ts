@@ -21,7 +21,7 @@ import { logDebug, logWarn } from "../../../observability/structured-log.js";
 
 import { sumPriorIterationCosts } from "./budget.js";
 import { writeCheckpoint, clearCheckpoint, buildCompletedStateFromChildren } from "./checkpoint.js";
-import { buildIterationVars, substituteInputs } from "./iteration-vars.js";
+import { buildIterationVars, substituteInputs, substituteStageTemplates } from "./iteration-vars.js";
 import { ForEachChildSpawner } from "./child-spawner.js";
 import { prepareForEachLoop, emitEmptyListComplete, enforceBudgetCap, emitLoopStart } from "./orchestration.js";
 
@@ -157,8 +157,23 @@ export async function dispatchForEachSpawn(
       },
     });
 
+    // Substitute iteration vars into the spawn flow's stage definitions so
+    // each child receives a fully-resolved task / system_prompt instead of
+    // the raw `{{stream.objective}}` template. Only inline flow definitions
+    // get substituted -- named flows are looked up at dispatch time and
+    // their templates are resolved by the per-stage path. mode:inline
+    // already does this via `substituteStageTemplates`; we mirror it here
+    // for mode:spawn so the two modes have parity.
+    const resolvedFlow =
+      typeof spawnSpec.flow === "string"
+        ? spawnSpec.flow
+        : {
+            ...spawnSpec.flow,
+            stages: spawnSpec.flow.stages.map((s) => substituteStageTemplates(s, iterVars)),
+          };
+
     // Spawn a child session for this iteration (string name or inline object)
-    const spawnResult = await childSpawner.spawnChild(sessionId, forkGroup, spawnSpec.flow, resolvedInputs, i, {
+    const spawnResult = await childSpawner.spawnChild(sessionId, forkGroup, resolvedFlow, resolvedInputs, i, {
       repo: resolvedRepo,
       branch: resolvedBranch,
       workdir: resolvedWorkdir,

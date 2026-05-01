@@ -83,14 +83,22 @@ describe("for_each + mode:spawn + inline flow templating", () => {
 
     // Drive the for_each loop directly via dispatch. We don't need the agent
     // to actually run -- we only care that the spawned children's persisted
-    // inline_flow has the templates substituted.
+    // inline_flow has the templates substituted. Cap the dispatch wait at
+    // 3s so that the test fails fast with a useful child-count assertion
+    // instead of timing out at the test-runner level.
     try {
-      await app.sessionService.dispatch(parent.id);
+      await Promise.race([
+        app.sessionService.dispatch(parent.id),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("dispatch wait cap")), 3000)),
+      ]);
     } catch {
       // dispatch attempts to launch agents; on a unit-test compute that may
-      // fail. The substitution happens BEFORE launch, so child sessions are
-      // already created with the substituted flow.
+      // fail or hang. The substitution happens BEFORE launch, so child
+      // sessions are already created with the substituted flow.
     }
+    // The for_each may be queued asynchronously after the dispatch returns;
+    // give the spawn loop a moment to write child rows.
+    await new Promise((r) => setTimeout(r, 250));
 
     // Find children spawned by the for_each. The first iteration's dispatch
     // may abort the loop in this test environment (no real compute) -- we

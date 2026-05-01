@@ -283,9 +283,17 @@ describe("buildLaunchEnv with placeAllSecrets wiring", () => {
     const stubPlacer: TypedSecretPlacer = {
       type: "env-var",
       async place(secret, place) {
-        // Pretend this is a multi-effect secret: env + file.
+        // Pretend this is a multi-effect secret: env + file. We key the
+        // file path off `secret.name` so the assertion can find OUR
+        // op even when other seeded runtime secrets (added by
+        // installTestSecrets in the test profile) ride through the
+        // same stub.
         place.setEnv(secret.name, secret.value!);
-        await place.writeFile("/home/ubuntu/.token", 0o600, new TextEncoder().encode(secret.value!));
+        await place.writeFile(
+          `/home/ubuntu/.${secret.name}.token`,
+          0o600,
+          new TextEncoder().encode(secret.value!),
+        );
       },
     };
     __test_registerPlacer("env-var", stubPlacer);
@@ -324,10 +332,16 @@ describe("buildLaunchEnv with placeAllSecrets wiring", () => {
       expect(result.error).toBeUndefined();
       // Env was captured synchronously and merged into the launch env.
       expect(result.env.DEFER_TOKEN).toBe("secret-val");
-      // The file write was DEFERRED, not executed -- the queue holds one op.
+      // The file write for DEFER_TOKEN was DEFERRED, not executed.
+      // The test profile pre-seeds dummy values for every runtime-
+      // declared secret (CLAUDE_CODE_OAUTH_TOKEN, ANTHROPIC_API_KEY, ...);
+      // they all ride through the same stub and produce their own
+      // writeFile ops. Find ours by name.
       expect(ctx.hasDeferred()).toBe(true);
-      expect(ctx.queuedOps).toHaveLength(1);
-      expect(ctx.queuedOps[0]).toMatchObject({ kind: "writeFile", path: "/home/ubuntu/.token" });
+      const deferOp = ctx.queuedOps.find(
+        (op) => op.kind === "writeFile" && op.path === "/home/ubuntu/.DEFER_TOKEN.token",
+      );
+      expect(deferOp).toBeDefined();
 
       // The placement ctx is also returned via result.placement so the
       // dispatcher can pipe it to provider.launch for post-provision flush.

@@ -130,8 +130,10 @@ export interface DatabaseMode {
  * `app.ts` can compute it once at boot (before the container is built and
  * `buildAppMode` runs) and hand the same object to `buildAppMode`.
  */
-export function resolveDatabaseMode(config: { database?: { url?: string } }): DatabaseMode {
-  const raw = config.database?.url ?? null;
+export function resolveDatabaseMode(config: { database?: { url?: string }; databaseUrl?: string }): DatabaseMode {
+  // Prefer the new nested config.database.url; fall back to the legacy
+  // flat `databaseUrl` field for back-compat with older config shapes.
+  const raw = config.database?.url ?? config.databaseUrl ?? null;
   // Normalise empty strings to null so callers get a consistent "no URL"
   // signal -- otherwise `!!url` passes on "" and `startsWith` returns false,
   // but `url` is then still "" which is a footgun for downstream loggers.
