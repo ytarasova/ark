@@ -28,17 +28,48 @@ export class FanOutDispatcher {
     const subtasks = await this.deps.extractSubtasks(session);
 
     const children: string[] = [];
-    for (const sub of subtasks.slice(0, stageDef.max_parallel ?? 4)) {
+    const failures: string[] = [];
+    const planned = subtasks.slice(0, stageDef.max_parallel ?? 4);
+    for (const sub of planned) {
       const result = await this.deps.fork(sessionId, sub.task, { dispatch: true });
-      if (result.ok === true) children.push(result.sessionId);
+      if (result.ok === true) {
+        children.push(result.sessionId);
+      } else {
+        // Surface the failed child reason. Without this the parent waits at
+        // status=waiting forever (auto-join only fires once children complete,
+        // but the children that "failed" never actually got created).
+        const reason = result.message ?? "fork returned ok:false";
+        failures.push(reason);
+        await this.deps.events.log(sessionId, "fork_child_failed", {
+          stage: session.stage,
+          actor: "system",
+          data: { task: sub.task, reason },
+        });
+      }
     }
 
     await this.deps.sessions.update(sessionId, { status: "running" });
     await this.deps.events.log(sessionId, "fork_started", {
       stage: session.stage,
       actor: "system",
-      data: { children_count: children.length, children },
+      data: {
+        children_count: children.length,
+        children,
+        failures_count: failures.length,
+        failures,
+      },
     });
+
+    // Zero-children fan-out is a dispatch failure: the parent has nothing to
+    // wait on, so the auto-join path never fires and the session sits at
+    // `waiting` forever. Surface as ok:false so the caller (kickDispatch +
+    // mediateStageHandoff) marks the session failed via markDispatchFailedShared.
+    if (planned.length > 0 && children.length === 0) {
+      return {
+        ok: false,
+        message: `All ${planned.length} fork children failed: ${failures.join("; ")}`,
+      };
+    }
 
     return { ok: true, message: `Forked into ${children.length} sessions` };
   }
