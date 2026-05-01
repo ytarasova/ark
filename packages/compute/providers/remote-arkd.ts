@@ -17,7 +17,7 @@ import type { Compute, Session, ProvisionOpts, SyncOpts, IsolationMode, LaunchOp
 import type { PlacementCtx } from "../../core/secrets/placement-types.js";
 import { DeferredPlacementCtx } from "../../core/secrets/deferred-placement-ctx.js";
 import { DEFAULT_CONDUCTOR_URL, DEFAULT_ARKD_PORT } from "../../core/constants.js";
-import { logDebug, logWarn } from "../../core/observability/structured-log.js";
+import { logDebug } from "../../core/observability/structured-log.js";
 
 const ARKD_REMOTE_PORT = DEFAULT_ARKD_PORT;
 const REMOTE_USER = "ubuntu";
@@ -110,14 +110,20 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
    * the executor) has guaranteed the compute is started + reachable, and
    * before the agent process is spawned.
    *
-   * No-op when:
-   *   - no deferred ctx was attached (e.g. a session with only env-typed
-   *     secrets, or a session where the dispatcher's placement branch was
-   *     disabled),
-   *   - the deferred ctx has no queued file ops (only env was set), or
-   *   - the compute config still lacks an IP (we log + skip rather than
-   *     throw; the launch path itself will surface the missing IP via the
-   *     SSH commands that follow, with better context than this helper has).
+   * Behaviour:
+   *   - No-op when no deferred ctx was attached (e.g. a session with only
+   *     env-typed secrets, or a session where the dispatcher's placement
+   *     branch was disabled).
+   *   - No-op when the deferred ctx has no queued file ops (only env was
+   *     set) -- nothing to flush, regardless of whether the compute has an
+   *     instance_id.
+   *   - THROWS when the ctx has queued file/provisioner ops but the compute
+   *     config still lacks an instance_id. Pre-fix this only logged a warning
+   *     and dropped the queued ops on the floor, leading to silent failures
+   *     where the agent ran without its SSH key / kubeconfig / generic blob
+   *     and `dispatch_failed` was never reported. The throw propagates up
+   *     through `provider.launch -> executor.launch -> dispatch-core` so
+   *     `kickDispatch` marks the dispatch failed and the user sees it.
    */
   protected async flushDeferredPlacement(compute: Compute, opts: LaunchOpts): Promise<void> {
     const deferred = opts.placement;
@@ -128,12 +134,14 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
     }
     const cfg = compute.config as RemoteConfig;
     if (!cfg.instance_id) {
-      logWarn(
-        "compute",
-        `flushDeferredPlacement: compute '${compute.name}' has no instance_id at launch time -- ` +
-          `${deferred.queuedOps.length} queued placement op(s) skipped`,
+      // Fail-fast: dropping queued file-typed secret ops here used to leave
+      // the agent running without its SSH key / kubeconfig and surface no
+      // terminal status. Keep the queued count in the message so the user
+      // can correlate against `secrets list`.
+      throw new Error(
+        `flushDeferredPlacement: compute '${compute.name}' has no instance_id at launch time but ` +
+          `${deferred.queuedOps.length} placement op(s) are queued. Cannot proceed.`,
       );
-      return;
     }
     const realCtx = new EC2PlacementCtx({
       sshKeyPath: sshKeyPath(compute.name),

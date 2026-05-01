@@ -142,6 +142,39 @@ describe("RemoteWorktreeProvider", () => {
     const ctx = await provider.buildPlacementCtx({} as Session, makeCompute());
     expect(ctx).toBeInstanceOf(DeferredPlacementCtx);
   });
+
+  it("flushDeferredPlacement throws when ops are queued but instance_id is missing", async () => {
+    // Regression: pre-fix this logged a warning and silently dropped the
+    // queued ops, leaving the agent running without its ssh-private-key /
+    // kubeconfig / generic-blob and surfacing no terminal status. The throw
+    // propagates up to `provider.launch -> executor.launch -> dispatch-core`
+    // so kickDispatch marks the dispatch failed.
+    const ctx = new DeferredPlacementCtx();
+    await ctx.writeFile("/home/ubuntu/.ssh/id_ed25519", 0o600, new Uint8Array([1, 2, 3]));
+    const compute = makeCompute({ config: { region: "us-east-1" } }); // no instance_id
+    const flush = (provider as any).flushDeferredPlacement.bind(provider);
+    await expect(flush(compute, { placement: ctx } as any)).rejects.toThrow(/no instance_id/);
+  });
+
+  it("flushDeferredPlacement is a no-op when no ops are queued, even without instance_id", async () => {
+    // Symmetric guard for the throw above: an empty queue should never
+    // throw -- there's nothing to flush, and env-only sessions hit this
+    // path constantly.
+    const ctx = new DeferredPlacementCtx();
+    ctx.setEnv("FOO", "bar"); // env only -- not queued
+    const compute = makeCompute({ config: { region: "us-east-1" } }); // no instance_id
+    const flush = (provider as any).flushDeferredPlacement.bind(provider);
+    await flush(compute, { placement: ctx } as any); // must not throw
+  });
+
+  it("flushDeferredPlacement is a no-op when no deferred ctx is attached", async () => {
+    // Sessions where the dispatcher's placement branch was disabled don't
+    // attach a deferred ctx at all. The instance_id check shouldn't even
+    // run -- the early return on the type guard handles it.
+    const compute = makeCompute({ config: { region: "us-east-1" } }); // no instance_id
+    const flush = (provider as any).flushDeferredPlacement.bind(provider);
+    await flush(compute, { placement: undefined } as any); // must not throw
+  });
 });
 
 // ── RemoteDockerProvider ────────────────────────────────────────────────────
