@@ -263,9 +263,14 @@ export const claudeCodeExecutor: Executor = {
 
       await app.sessions.update(session.id, { claude_session_id: claudeSessionId });
 
-      // Deliver task via channel
-      log("Delivering task...");
-      claude.deliverTask(session.id, channelPort, opts.task, stage);
+      // Skip deliverTask on remote dispatch. The fallback path inside
+      // deliverTask hits `localhost:<channelPort>` from the conductor's
+      // perspective, but for a remote launch the channel runs on the EC2
+      // box -- the conductor's loopback can't reach it. The 60-retry loop
+      // would just time out and the executor (which already returned) would
+      // never know. The initial prompt is baked into launch.sh anyway, so
+      // there's nothing to deliver here.
+      log("Skipping deliverTask (remote launch -- prompt baked into launch.sh)");
 
       return { ok: true, handle: result, claudeSessionId };
     }
