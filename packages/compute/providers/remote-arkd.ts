@@ -48,6 +48,14 @@ interface RemoteConfig {
    * instead of trying to hit the (private, unroutable) instance IP directly.
    */
   arkd_local_forward_port?: number;
+  /**
+   * Override the ArkdClient request timeout (ms). Default 30s is right for
+   * health/launch/file ops; bump it for compute targets that legitimately
+   * sit behind slow links so transient latency doesn't masquerade as a
+   * dispatch-time hang. Lower it for control-plane-style deployments where
+   * a fast fail is preferred.
+   */
+  arkd_request_timeout_ms?: number;
   ssh_tunnel_port?: number;
   isolation?: string;
   container_name?: string;
@@ -84,6 +92,11 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
     if (cfg.arkd_url) return cfg.arkd_url;
     if (cfg.ip) return `http://${cfg.ip}:${ARKD_REMOTE_PORT}`;
     throw new Error(`Compute '${compute.name}' has no arkd_local_forward_port, arkd_url, or ip`);
+  }
+
+  protected getArkdRequestTimeoutMs(compute: Compute): number | undefined {
+    const cfg = compute.config as RemoteConfig;
+    return typeof cfg.arkd_request_timeout_ms === "number" ? cfg.arkd_request_timeout_ms : undefined;
   }
 
   /**

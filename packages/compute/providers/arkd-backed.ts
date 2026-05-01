@@ -63,10 +63,23 @@ export abstract class ArkdBackedProvider implements ComputeProvider {
   /** Returns the base URL for the arkd instance on this compute target. */
   abstract getArkdUrl(compute: Compute): string;
 
+  /**
+   * Per-compute override for the arkd HTTP client request timeout (ms).
+   * Returning `undefined` keeps the ArkdClient default (30s).
+   *
+   * Subclasses that read a request-timeout from their compute config
+   * (e.g. RemoteConfig.arkd_request_timeout_ms) override this so the
+   * client honours the operator-configured value.
+   */
+  protected getArkdRequestTimeoutMs(_compute: Compute): number | undefined {
+    return undefined;
+  }
+
   // ── Concrete: delegated to arkd ─────────────────────────────────────────
 
   protected getClient(compute: Compute): ArkdClient {
-    return new ArkdClient(this.getArkdUrl(compute));
+    const timeoutMs = this.getArkdRequestTimeoutMs(compute);
+    return new ArkdClient(this.getArkdUrl(compute), timeoutMs ? { requestTimeoutMs: timeoutMs } : undefined);
   }
 
   async launch(_compute: Compute, _session: Session, opts: LaunchOpts): Promise<string> {

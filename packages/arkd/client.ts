@@ -61,6 +61,12 @@ export class ArkdClient {
     // docker stats in parallel) without masking a genuinely gone daemon.
     // Callers hitting `/health` or `/exec` normally return in <1s so the
     // extra headroom costs nothing on the happy path.
+    //
+    // EVERY fetch call in this client MUST honor this timeout. The Pass-5
+    // remediation traced a 7+ minute hang to a fetch against an unreachable
+    // arkd URL: an `AbortSignal.timeout` on every single fetch is the only
+    // belt-side guarantee that a dispatch eventually surfaces failure rather
+    // than sitting at status=ready forever.
     this.requestTimeoutMs = opts?.requestTimeoutMs ?? 30_000;
   }
 
@@ -88,8 +94,20 @@ export class ArkdClient {
 
   // ── Process running ───────────────────────────────────────────────────────
 
+  /**
+   * Run a command on arkd. The fetch timeout is derived from the server-side
+   * `req.timeout` (default 30_000ms) so we don't abort the HTTP request
+   * before arkd can finish executing. We add a 30s buffer to cover the time
+   * it takes arkd to package up the response after the child exits.
+   *
+   * Without this, callers who set `timeout: 300_000` (e.g. `docker pull`) hit
+   * the default 30s `requestTimeoutMs` ceiling on the client side and saw
+   * fetch aborts mid-exec with no useful error.
+   */
   async run(req: ExecReq): Promise<ExecRes> {
-    return this.post("/exec", req);
+    const serverTimeout = typeof req.timeout === "number" ? req.timeout : 30_000;
+    const effectiveTimeout = Math.max(this.requestTimeoutMs, serverTimeout + 30_000);
+    return this.post("/exec", req, { timeoutMs: effectiveTimeout });
   }
 
   // ── Agent lifecycle ───────────────────────────────────────────────────────
@@ -133,11 +151,20 @@ export class ArkdClient {
    * `Response` so callers can pipe the body directly. The response stays
    * open until the handle is closed or the server tears it down.
    *
+   * Connect timeout: we still cap the time spent waiting for response
+   * headers via `AbortSignal.timeout(requestTimeoutMs)`. Once `fetch()`
+   * resolves the headers are in and the body stream lives independently
+   * (the AbortSignal does NOT abort the in-flight body once headers
+   * arrive). Without this, an unreachable arkd would leave the fetch
+   * pending indefinitely -- the same hang shape the Pass-5 remediation
+   * is fixing on the JSON paths.
+   *
    * Throws if the server returns a non-2xx.
    */
   async attachStream(streamHandle: string): Promise<Response> {
     const resp = await fetch(`${this.baseUrl}/agent/attach/stream?handle=${encodeURIComponent(streamHandle)}`, {
       headers: this.authHeaders(),
+      signal: AbortSignal.timeout(this.requestTimeoutMs),
     });
     if (!resp.ok) {
       const body = await resp.text().catch(() => "");
@@ -193,12 +220,13 @@ export class ArkdClient {
     return {};
   }
 
-  private async post<Req, Res>(path: string, body: Req): Promise<Res> {
+  private async post<Req, Res>(path: string, body: Req, opts?: { timeoutMs?: number }): Promise<Res> {
+    const timeoutMs = opts?.timeoutMs ?? this.requestTimeoutMs;
     const resp = await fetch(`${this.baseUrl}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...this.authHeaders() },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(this.requestTimeoutMs),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     const data = await resp.json();
     if (!resp.ok) {
@@ -208,10 +236,11 @@ export class ArkdClient {
     return data as Res;
   }
 
-  private async get<Res>(path: string): Promise<Res> {
+  private async get<Res>(path: string, opts?: { timeoutMs?: number }): Promise<Res> {
+    const timeoutMs = opts?.timeoutMs ?? this.requestTimeoutMs;
     const resp = await fetch(`${this.baseUrl}${path}`, {
       headers: this.authHeaders(),
-      signal: AbortSignal.timeout(this.requestTimeoutMs),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     const data = await resp.json();
     if (!resp.ok) {
