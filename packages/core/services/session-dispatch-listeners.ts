@@ -16,6 +16,32 @@ type SessionCreatedListener = (sessionId: string) => void;
 type DispatchFn = (sessionId: string) => Promise<{ ok: boolean; message?: string }>;
 
 /**
+ * Belt-and-braces watchdog: even with timeouts on every ArkdClient fetch
+ * (Pass-5 client-side fix), a future code path could re-introduce a hang
+ * outside the client (a poll loop with no upper bound, an external
+ * subprocess that never exits, etc.). The watchdog races the dispatch
+ * promise against this deadline and forces `markDispatchFailedShared` if
+ * it expires.
+ *
+ * 5 minutes is generous: a worst-case real EC2 dispatch with cold cloud-
+ * init takes ~3 minutes, so 5min should not produce false positives in
+ * practice. The live evidence that motivated the watchdog (7+ minute
+ * dispatch hung at status=ready) is well past this deadline.
+ *
+ * Configurable via env var so an operator can ratchet down (faster fail)
+ * or up (slower compute) without a code change.
+ */
+const DEFAULT_DISPATCH_WATCHDOG_MS = 5 * 60 * 1000;
+
+function readDispatchWatchdogMs(): number {
+  const raw = process.env.ARK_DISPATCH_WATCHDOG_MS;
+  if (!raw) return DEFAULT_DISPATCH_WATCHDOG_MS;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_DISPATCH_WATCHDOG_MS;
+  return parsed;
+}
+
+/**
  * Allow-list of `dispatch()` success messages where the session is *expected*
  * to remain at status=ready. Without this, a strict post-condition check on
  * `result.ok === true` would mark every legitimate-no-launch path as failed.
@@ -84,12 +110,16 @@ export class SessionDispatchListeners {
   private readonly listeners: SessionCreatedListener[] = [];
   private readonly pendingDispatches = new Set<Promise<unknown>>();
   private defaultDispatcherUnregister: (() => void) | null = null;
+  private readonly dispatchWatchdogMs: number;
 
   constructor(
     private readonly sessions: SessionRepository,
     private readonly events: EventRepository,
     private readonly dispatch: DispatchFn,
-  ) {}
+    opts?: { dispatchWatchdogMs?: number },
+  ) {
+    this.dispatchWatchdogMs = opts?.dispatchWatchdogMs ?? readDispatchWatchdogMs();
+  }
 
   /**
    * Subscribe to the `session_created` lifecycle moment. Orchestration code
@@ -161,8 +191,33 @@ export class SessionDispatchListeners {
   }
 
   private kickDispatch(sessionId: string, onDispatched: (session: Session | null) => void): void {
-    const promise = this.dispatch(sessionId)
+    // Belt-and-braces watchdog. Pass-5 traced a hung dispatch to a fetch
+    // against an unreachable arkd URL with no timeout (now fixed in
+    // arkd/client.ts). The watchdog catches any future regression of the
+    // same shape: dispatch wedged for any reason -> mark failed after the
+    // deadline, fire the dispatch_failed event, and let kickDispatch's
+    // existing chain run onDispatched so the UI updates.
+    const deadlineMs = this.dispatchWatchdogMs;
+    const watchdog = new Promise<{ ok: false; message: string; __watchdog: true }>((resolve) => {
+      setTimeout(() => {
+        resolve({
+          ok: false,
+          message: `dispatch hung past ${deadlineMs}ms watchdog deadline (sessionId=${sessionId})`,
+          __watchdog: true,
+        });
+      }, deadlineMs).unref?.();
+    });
+    const raced = Promise.race([this.dispatch(sessionId), watchdog]);
+    const promise = raced
       .then(async (result) => {
+        // Watchdog winner: the real dispatch is still pending. Surface a
+        // dispatch_failed and move on. The orphaned dispatch promise will
+        // eventually settle (if ever) but its result is ignored -- the
+        // session is already marked failed.
+        if ((result as { __watchdog?: boolean }).__watchdog) {
+          await markDispatchFailedShared(this.sessions, this.events, sessionId, result.message ?? "dispatch hung");
+          return;
+        }
         // dispatch returns `{ ok: false, message }` for non-throw failures
         // (e.g. "Stage 'pr' is create_pr, not agent" on an action stage).
         // Log the failure event AND flip the session to `failed` so the UI
