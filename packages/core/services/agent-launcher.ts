@@ -70,20 +70,43 @@ export async function prepareRemoteEnvironment(
 
   // Verify host is reachable before starting expensive sync/clone chain.
   // SSM transport keys off instance_id; no IP required.
+  //
+  // SSM Session Manager has variable cold-start latency: a first
+  // `start-session` after the agent has been idle can take 10-25s while
+  // Systems Manager establishes the WebSocket. Manual test from a warm
+  // shell measures ~9-10s; under concurrent load (sync + clone in same
+  // dispatch) the same call can slip past 15s. Use 45s as the per-attempt
+  // timeout AND retry once on failure -- the retry path has a hot SSM
+  // session and typically completes in <5s.
   const cfgRemote = compute.config as { instance_id?: string; region?: string; aws_profile?: string };
   const instanceId = cfgRemote.instance_id;
   if (instanceId) {
     const region = cfgRemote.region ?? "us-east-1";
     const awsProfile = cfgRemote.aws_profile;
-    log("Checking host connectivity (via SSM)...");
     const { sshExecAsync, sshKeyPath } = await import("../../compute/providers/ec2/ssh.js");
-    const { exitCode } = await sshExecAsync(sshKeyPath(compute.name), instanceId, "echo ok", {
-      timeout: 15_000,
-      region,
-      awsProfile,
-    });
-    if (exitCode !== 0) {
-      throw new Error(`Cannot reach compute '${compute.name}' at ${instanceId} (via SSM)`);
+    const ssmConnectTimeoutMs = Number(process.env.ARK_SSM_CONNECT_TIMEOUT_MS ?? 45_000);
+
+    log("Checking host connectivity (via SSM)...");
+    let lastExitCode = -1;
+    let lastErr: unknown = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const { exitCode } = await sshExecAsync(sshKeyPath(compute.name), instanceId, "echo ok", {
+          timeout: ssmConnectTimeoutMs,
+          region,
+          awsProfile,
+        });
+        lastExitCode = exitCode;
+        if (exitCode === 0) break;
+        log(`Connectivity check attempt ${attempt} returned exit=${exitCode}; retrying...`);
+      } catch (err) {
+        lastErr = err;
+        log(`Connectivity check attempt ${attempt} threw: ${err instanceof Error ? err.message : String(err)}; retrying...`);
+      }
+    }
+    if (lastExitCode !== 0) {
+      const detail = lastErr ? ` (last error: ${lastErr instanceof Error ? lastErr.message : String(lastErr)})` : "";
+      throw new Error(`Cannot reach compute '${compute.name}' at ${instanceId} (via SSM) after 2 attempts${detail}`);
     }
 
     // Reverse tunnel back to the conductor. Required for normal operation:
