@@ -13,6 +13,7 @@ import type { ComputeProvider } from "../../compute/types.js";
 import { resolvePortDecls, parseArcJson } from "../../compute/arc-json.js";
 import { allocatePort } from "../config/port-allocator.js";
 import { DEFAULT_ARKD_PORT } from "../constants.js";
+import { logError } from "../observability/structured-log.js";
 
 /** Apply arc.json container setup: Docker Compose and devcontainer. */
 async function applyContainerSetup(
@@ -160,7 +161,23 @@ export async function prepareRemoteEnvironment(
       onLog: log,
     });
   } catch (e: any) {
-    log(`Credential sync failed (continuing): ${e?.message ?? e}`);
+    // The session-scoped `log` callback writes to a per-launch stream that's
+    // invisible in stuck-at-ready debugging scenarios. logError lands in
+    // ~/.ark/ark.jsonl so operators tailing structured logs see the failure.
+    // We still continue (sync is best-effort -- the agent might have what it
+    // needs from the remote's existing env), but the failure is no longer
+    // silent.
+    //
+    // TODO: classify failures (auth-required, network-blip, partial-sync,
+    // permission-denied) and short-circuit to dispatch_failed for the
+    // un-recoverable cases. Tracked as Phase 3 polish.
+    const reason = e?.message ?? String(e);
+    log(`Credential sync failed (continuing): ${reason}`);
+    logError(
+      "session",
+      `prepareRemoteEnvironment: syncEnvironment failed (compute=${compute.name}, sessionId=${session.id})`,
+      { sessionId: session.id, compute: compute.name, error: reason },
+    );
   }
 
   // Apply container setup (Docker Compose + devcontainer)
