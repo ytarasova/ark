@@ -16,6 +16,32 @@ type SessionCreatedListener = (sessionId: string) => void;
 type DispatchFn = (sessionId: string) => Promise<{ ok: boolean; message?: string }>;
 
 /**
+ * Allow-list of `dispatch()` success messages where the session is *expected*
+ * to remain at status=ready. Without this, a strict post-condition check on
+ * `result.ok === true` would mark every legitimate-no-launch path as failed.
+ *
+ * Concrete cases this covers (from the existing dispatch surface):
+ *   - "Already running"        -- duplicate-dispatch noop
+ *   - "Executed action 'X'"    -- action stages don't launch a tmux session
+ *   - "Forked into N sessions" -- fan-out parent intentionally stays ready
+ *   - "Dispatched to worker"   -- hosted-mode handoff to scheduler
+ *
+ * Anything else returning `ok:true` while the session is still at `ready`
+ * indicates a silent-launch-failure: log + flip to failed.
+ */
+const ALLOWED_NO_LAUNCH_MESSAGES: ReadonlyArray<string | RegExp> = [
+  "Already running",
+  /^Executed action /,
+  /^Forked into \d+ sessions?$/,
+  /^Dispatched to worker/,
+];
+
+function messageAllowsNoLaunch(msg: string | undefined): boolean {
+  if (!msg) return false;
+  return ALLOWED_NO_LAUNCH_MESSAGES.some((p) => (typeof p === "string" ? p === msg : p.test(msg)));
+}
+
+/**
  * Flip a session to `failed` after a dispatch-time error. Kept lenient:
  * if the session was already marked terminal by another path we skip the
  * write so we don't clobber a more specific status (e.g. cancelled).
@@ -143,6 +169,24 @@ export class SessionDispatchListeners {
         if (result && result.ok === false) {
           const reason = result.message ?? "dispatch returned ok: false";
           await markDispatchFailedShared(this.sessions, this.events, sessionId, reason);
+          return;
+        }
+        // Post-condition check on the success branch. dispatch() can legitimately
+        // return `{ok:true}` without launching anything (action stage, hosted-mode
+        // handoff, fan-out parent). For every OTHER ok:true case, a successful
+        // launch flips the session out of `ready` -- typically to `running`.
+        // If the row is still at `ready` AND the message isn't an explicit
+        // "no-launch ok" sentinel, we hit a silent-launch-failure: surface it.
+        if (result && result.ok === true) {
+          const refreshed = await this.sessions.get(sessionId);
+          if (refreshed && refreshed.status === "ready" && !messageAllowsNoLaunch(result.message)) {
+            await markDispatchFailedShared(
+              this.sessions,
+              this.events,
+              sessionId,
+              `dispatch returned ok:true but session still at status=ready (message: ${result.message ?? "<no message>"})`,
+            );
+          }
         }
       })
       .catch(async (err) => {
