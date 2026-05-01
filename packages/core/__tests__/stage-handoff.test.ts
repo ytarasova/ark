@@ -15,6 +15,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { asValue } from "awilix";
 import { AppContext } from "../app.js";
 import { startConductor } from "../conductor/conductor.js";
 import type { OutboundMessage } from "../conductor/channel-types.js";
@@ -41,6 +42,18 @@ describe("mediateStageHandoff", async () => {
       const session = await app.sessions.create({ summary: "handoff test", flow: "quick" });
       await app.sessions.update(session.id, { status: "ready", stage: "implement" });
 
+      // Stub dispatch to succeed without touching the real launch path so the
+      // test exercises mediator logic in isolation. The flip-to-running side
+      // effect is the dispatcher's responsibility -- we mimic it here.
+      app.container.register({
+        dispatchService: asValue({
+          dispatch: async (id: string) => {
+            await app.sessions.update(id, { status: "running" });
+            return { ok: true, message: "stubbed-dispatch" };
+          },
+        }),
+      });
+
       const result = await app.sessionHooks.mediateStageHandoff(session.id, { source: "test" });
 
       expect(result.ok).toBe(true);
@@ -49,13 +62,20 @@ describe("mediateStageHandoff", async () => {
 
       const updated = await app.sessions.get(session.id);
       expect(updated?.stage).toBe("verify");
-      // Status is "running" because autoDispatch defaults to true and dispatch is now awaited
       expect(updated?.status).toBe("running");
     });
 
     it("returns dispatched=true when autoDispatch is enabled", async () => {
       const session = await app.sessions.create({ summary: "dispatch test", flow: "quick" });
       await app.sessions.update(session.id, { status: "ready", stage: "implement" });
+
+      // Stub dispatch to succeed -- the assertion is about the dispatched
+      // flag wiring, not the real dispatch path.
+      app.container.register({
+        dispatchService: asValue({
+          dispatch: async () => ({ ok: true, message: "stubbed-ok" }),
+        }),
+      });
 
       const result = await app.sessionHooks.mediateStageHandoff(session.id, {
         autoDispatch: true,
@@ -240,6 +260,108 @@ describe("mediateStageHandoff", async () => {
       expect(result.ok).toBe(false);
     });
   });
+
+  // Bug B regression: the mediator must surface dispatch failures (both
+  // `{ok:false}` returns and thrown errors) by writing a `dispatch_failed`
+  // event and flipping the session to `failed`, mirroring
+  // SessionDispatchListeners.markDispatchFailed exactly. Pre-fix the wrapper
+  // (`safeAsync`) only logged thrown errors and `{ok:false}` returns were
+  // indistinguishable from successful dispatches.
+  describe("auto-dispatch failure surfacing (Bug B regression)", async () => {
+    it("marks session failed when dispatch returns {ok:false}", async () => {
+      const session = await app.sessions.create({ summary: "dispatch-ok-false test", flow: "quick" });
+      await app.sessions.update(session.id, { status: "ready", stage: "implement" });
+
+      // Stub dispatchService to return a non-throwing failure. Override is
+      // picked up by the wired callback because it resolves
+      // c.app.dispatchService at call time (post-Bug-A).
+      app.container.register({
+        dispatchService: asValue({
+          dispatch: async () => ({ ok: false, message: "boom" }),
+        }),
+      });
+
+      const result = await app.sessionHooks.mediateStageHandoff(session.id, { source: "test" });
+
+      // Mediator advanced to verify, then attempted dispatch, then saw
+      // {ok:false} and surfaced the failure. dispatched must reflect that.
+      expect(result.ok).toBe(true); // advance succeeded; only the dispatch failed
+      expect(result.toStage).toBe("verify");
+      expect(result.dispatched).toBe(false);
+
+      // Session flipped to failed with the underlying reason
+      const updated = await app.sessions.get(session.id);
+      expect(updated?.status).toBe("failed");
+      expect(updated?.error).toBe("boom");
+
+      // dispatch_failed event was logged with the underlying reason
+      const events = await app.events.list(session.id);
+      const dispatchFailed = events.find((e) => e.type === "dispatch_failed");
+      expect(dispatchFailed).toBeTruthy();
+      expect(dispatchFailed!.data?.reason).toBe("boom");
+    });
+
+    it("marks session failed when dispatch throws", async () => {
+      const session = await app.sessions.create({ summary: "dispatch-throw test", flow: "quick" });
+      await app.sessions.update(session.id, { status: "ready", stage: "implement" });
+
+      // Stub dispatchService to throw -- pre-fix safeAsync swallowed the
+      // throw to logError without touching session state.
+      app.container.register({
+        dispatchService: asValue({
+          dispatch: async () => {
+            throw new Error("kaboom");
+          },
+        }),
+      });
+
+      const result = await app.sessionHooks.mediateStageHandoff(session.id, { source: "test" });
+
+      expect(result.ok).toBe(true);
+      expect(result.toStage).toBe("verify");
+      expect(result.dispatched).toBe(false);
+
+      const updated = await app.sessions.get(session.id);
+      expect(updated?.status).toBe("failed");
+      expect(updated?.error).toBe("kaboom");
+
+      const events = await app.events.list(session.id);
+      const dispatchFailed = events.find((e) => e.type === "dispatch_failed");
+      expect(dispatchFailed).toBeTruthy();
+      expect(dispatchFailed!.data?.reason).toBe("kaboom");
+    });
+
+    it("does not clobber an already-terminal status (lenient guard)", async () => {
+      // If another path beat us to terminal (e.g. session was cancelled mid
+      // dispatch), markDispatchFailed must not overwrite that status.
+      const session = await app.sessions.create({ summary: "lenient guard test", flow: "quick" });
+      await app.sessions.update(session.id, { status: "ready", stage: "implement" });
+
+      app.container.register({
+        dispatchService: asValue({
+          dispatch: async () => {
+            // Simulate a concurrent terminal flip while dispatch is in flight.
+            await app.sessions.update(session.id, {
+              status: "cancelled" as any,
+              error: "user cancelled",
+            });
+            return { ok: false, message: "boom-after-cancel" };
+          },
+        }),
+      });
+
+      await app.sessionHooks.mediateStageHandoff(session.id, { source: "test" });
+
+      const updated = await app.sessions.get(session.id);
+      expect(updated?.status).toBe("cancelled");
+      expect(updated?.error).toBe("user cancelled");
+
+      // The dispatch_failed event still gets logged for observability even
+      // when the status flip is skipped.
+      const events = await app.events.list(session.id);
+      expect(events.some((e) => e.type === "dispatch_failed")).toBe(true);
+    });
+  });
 });
 
 // ── Integration: applyReport -> mediateStageHandoff ─────────────────────
@@ -384,6 +506,17 @@ describe("mediateStageHandoff via conductor HTTP", async () => {
 
   it("channel report on auto-gate stage triggers handoff to next stage", async () => {
     server = startConductor(app, TEST_PORT, { quiet: true });
+
+    // Stub the launch path to a no-op success so the conductor->mediate
+    // chain exercises in isolation from the real dispatcher.
+    app.container.register({
+      dispatchService: asValue({
+        dispatch: async (id: string) => {
+          await app.sessions.update(id, { status: "running" });
+          return { ok: true, message: "stubbed-conductor-dispatch" };
+        },
+      }),
+    });
 
     const session = await app.sessions.create({ summary: "conductor handoff test", flow: "quick" });
     await app.sessions.update(session.id, { status: "running", stage: "implement" });

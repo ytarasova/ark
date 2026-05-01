@@ -9,7 +9,8 @@
 
 import { logWarn } from "../../observability/structured-log.js";
 import { loadRepoConfig } from "../../repo-config.js";
-import { safeAsync } from "../../safe.js";
+import type { DispatchResult } from "../dispatch/types.js";
+import { markDispatchFailedShared } from "../session-dispatch-listeners.js";
 import type { StageHandoffResult, SessionHooksDeps } from "./types.js";
 
 export class HandoffMediator {
@@ -107,41 +108,71 @@ export class HandoffMediator {
     if (autoDispatch && updated?.status === "ready" && toStage) {
       const nextAction = getStageAction(updated.flow, toStage);
       if (nextAction.type === "agent" || nextAction.type === "fork") {
-        const dispatchResult = await safeAsync(`handoff: auto-dispatch ${sessionId}/${toStage}`, async () => {
-          await dispatch(sessionId);
-        });
-        dispatched = dispatchResult;
+        // Inspect the DispatchResult: a `{ok:false}` return is just as much a
+        // dispatch failure as a thrown error. Mirror SessionDispatchListeners
+        // behaviour (dispatch_failed event + flip-to-failed lenient guard) so
+        // mediator-driven auto-dispatch (planner -> implement -> verify ...)
+        // surfaces failures the same way kickDispatch does.
+        let dispatchResult: DispatchResult | null = null;
+        let dispatchError: Error | null = null;
+        try {
+          dispatchResult = await dispatch(sessionId);
+        } catch (err: any) {
+          dispatchError = err instanceof Error ? err : new Error(String(err));
+        }
+
+        if (dispatchError || (dispatchResult && dispatchResult.ok === false)) {
+          const reason = dispatchError
+            ? dispatchError.message
+            : (dispatchResult!.message ?? "dispatch returned ok: false");
+          logWarn("handoff", `auto-dispatch failed for ${sessionId}/${toStage}: ${reason}`);
+          await markDispatchFailedShared(sessions, events, sessionId, reason);
+          dispatched = false;
+        } else {
+          dispatched = true;
+        }
       } else if (nextAction.type === "action") {
-        await safeAsync(`auto-action: ${sessionId}/${nextAction.action}`, async () => {
-          const verify = await runVerification(sessionId);
-          if (!verify.ok) {
-            logWarn("handoff", `action stage blocked by verification for ${sessionId}/${toStage}: ${verify.message}`);
-            await sessions.update(sessionId, {
-              status: "blocked",
-              breakpoint_reason: `Verification failed: ${verify.message.slice(0, 200)}`,
-            });
-            return;
+        // Verification + executeAction. A `{ok:false}` from executeAction is
+        // a dispatch-equivalent failure for the action stage; surface it via
+        // the same shared helper so the failure shape matches the agent path.
+        const verify = await runVerification(sessionId);
+        if (!verify.ok) {
+          logWarn("handoff", `action stage blocked by verification for ${sessionId}/${toStage}: ${verify.message}`);
+          await sessions.update(sessionId, {
+            status: "blocked",
+            breakpoint_reason: `Verification failed: ${verify.message.slice(0, 200)}`,
+          });
+          dispatched = false;
+        } else {
+          let actionResult: { ok: boolean; message: string } | null = null;
+          let actionError: Error | null = null;
+          try {
+            actionResult = await executeAction(sessionId, nextAction.action ?? "");
+          } catch (err: any) {
+            actionError = err instanceof Error ? err : new Error(String(err));
           }
-          const result = await executeAction(sessionId, nextAction.action ?? "");
-          if (!result.ok) {
-            logWarn("handoff", `action '${nextAction.action}' failed for ${sessionId}: ${result.message}`);
-            await sessions.update(sessionId, {
-              status: "failed",
-              error: `Action '${nextAction.action}' failed: ${result.message.slice(0, 200)}`,
-            });
-            return;
+
+          if (actionError || (actionResult && actionResult.ok === false)) {
+            const rawReason = actionError
+              ? actionError.message
+              : (actionResult!.message ?? "action returned ok: false");
+            const reason = `Action '${nextAction.action}' failed: ${rawReason.slice(0, 200)}`;
+            logWarn("handoff", `action '${nextAction.action}' failed for ${sessionId}: ${rawReason}`);
+            await markDispatchFailedShared(sessions, events, sessionId, reason);
+            dispatched = false;
+          } else {
+            // Action succeeded -- chain into next stage unless the action
+            // set a non-ready status (e.g. auto_merge sets "waiting").
+            const postAction = await sessions.get(sessionId);
+            if (postAction?.status === "ready") {
+              await this.mediate(sessionId, {
+                autoDispatch: true,
+                source: "action_chain",
+              });
+            }
+            dispatched = true;
           }
-          // Action succeeded -- chain into next stage unless the action
-          // set a non-ready status (e.g. auto_merge sets "waiting").
-          const postAction = await sessions.get(sessionId);
-          if (postAction?.status === "ready") {
-            await this.mediate(sessionId, {
-              autoDispatch: true,
-              source: "action_chain",
-            });
-          }
-        });
-        dispatched = true;
+        }
       }
     }
 

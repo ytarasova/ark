@@ -15,6 +15,45 @@ import { logWarn } from "../observability/structured-log.js";
 type SessionCreatedListener = (sessionId: string) => void;
 type DispatchFn = (sessionId: string) => Promise<{ ok: boolean; message?: string }>;
 
+/**
+ * Flip a session to `failed` after a dispatch-time error. Kept lenient:
+ * if the session was already marked terminal by another path we skip the
+ * write so we don't clobber a more specific status (e.g. cancelled).
+ *
+ * Shared between `SessionDispatchListeners.kickDispatch` and
+ * `HandoffMediator.mediate` so both auto-dispatch paths produce the same
+ * `dispatch_failed` event + status-update shape on failure.
+ */
+export async function markDispatchFailedShared(
+  sessions: SessionRepository,
+  events: EventRepository,
+  sessionId: string,
+  reason: string,
+): Promise<void> {
+  try {
+    await events.log(sessionId, "dispatch_failed", { actor: "system", data: { reason } });
+  } catch (err) {
+    logWarn("session", `markDispatchFailedShared: failed to log dispatch_failed event (sessionId=${sessionId})`, {
+      sessionId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+  try {
+    const existing = await sessions.get(sessionId);
+    if (!existing) return;
+    if (existing.status === "failed" || existing.status === "completed" || existing.status === "cancelled") return;
+    await sessions.update(sessionId, {
+      status: "failed" as SessionStatus,
+      error: reason,
+    } as Partial<Session>);
+  } catch (err) {
+    logWarn("session", `markDispatchFailedShared: failed to persist status (sessionId=${sessionId})`, {
+      sessionId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 export class SessionDispatchListeners {
   private readonly listeners: SessionCreatedListener[] = [];
   private readonly pendingDispatches = new Set<Promise<unknown>>();
@@ -92,14 +131,12 @@ export class SessionDispatchListeners {
         // row renders "pending" forever despite the dispatch_failed event.
         if (result && result.ok === false) {
           const reason = result.message ?? "dispatch returned ok: false";
-          await this.events.log(sessionId, "dispatch_failed", { actor: "system", data: { reason } });
-          await this.markDispatchFailed(sessionId, reason);
+          await markDispatchFailedShared(this.sessions, this.events, sessionId, reason);
         }
       })
       .catch(async (err) => {
         const reason = err instanceof Error ? err.message : String(err);
-        await this.events.log(sessionId, "dispatch_failed", { actor: "system", data: { reason } });
-        await this.markDispatchFailed(sessionId, reason);
+        await markDispatchFailedShared(this.sessions, this.events, sessionId, reason);
       })
       .then(async () => {
         onDispatched(await this.sessions.get(sessionId));
@@ -113,27 +150,5 @@ export class SessionDispatchListeners {
           error: err instanceof Error ? err.message : String(err),
         });
       });
-  }
-
-  /**
-   * Flip a session to `failed` after a dispatch-time error. Kept lenient:
-   * if the session was already marked terminal by another path we skip the
-   * write so we don't clobber a more specific status (e.g. cancelled).
-   */
-  private async markDispatchFailed(sessionId: string, reason: string): Promise<void> {
-    try {
-      const existing = await this.sessions.get(sessionId);
-      if (!existing) return;
-      if (existing.status === "failed" || existing.status === "completed" || existing.status === "cancelled") return;
-      await this.sessions.update(sessionId, {
-        status: "failed" as SessionStatus,
-        error: reason,
-      } as Partial<Session>);
-    } catch (err) {
-      logWarn("session", `markDispatchFailed: failed to persist status (sessionId=${sessionId})`, {
-        sessionId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
   }
 }
