@@ -67,10 +67,71 @@ const defaultDeps = (opts: EC2PlacementCtxOpts): EC2PlacementCtxDeps => {
           ],
           { stdio: ["pipe", "inherit", "inherit"] },
         );
-        tar.stdout!.pipe(ssh.stdin!);
-        ssh.on("close", (code) => (code === 0 ? resolve() : reject(new Error(`ssh exit ${code}`))));
-        tar.on("error", reject);
-        ssh.on("error", reject);
+
+        // Bookkeeping so a single failure (or a timeout) cleans up both procs
+        // without throwing twice or letting an unhandled stream error kill the
+        // parent process. EPIPE on `ssh.stdin` (when ssh dies first) is the
+        // specific failure that was crashing the dispatcher daemon -- Node's
+        // default stream-error behaviour is to exit the process unless every
+        // stream has an `error` listener.
+        let settled = false;
+        const finish = (err?: Error): void => {
+          if (settled) return;
+          settled = true;
+          try {
+            if (!tar.killed) tar.kill("SIGTERM");
+          } catch {
+            /* tar already gone */
+          }
+          try {
+            if (!ssh.killed) ssh.kill("SIGTERM");
+          } catch {
+            /* ssh already gone */
+          }
+          if (err) reject(err);
+          else resolve();
+        };
+
+        // Process-level error / exit
+        tar.on("error", finish);
+        ssh.on("error", finish);
+        tar.on("close", (code) => {
+          if (code !== 0 && !settled) finish(new Error(`tar exit ${code}`));
+          // tar code 0 just lets ssh close trigger resolve -- fall through.
+        });
+        ssh.on("close", (code) => {
+          if (code === 0) finish();
+          else finish(new Error(`ssh exit ${code}`));
+        });
+
+        // Stream-level error handlers MUST exist on every stream we touch.
+        // Without these, EPIPE / ECONNRESET propagate as "unhandled error"
+        // events and crash the parent process. We don't reject on them
+        // directly -- the close handler above already produces a clean
+        // reject with the exit code, which is more informative than EPIPE.
+        const tarOut = tar.stdout;
+        const sshIn = ssh.stdin;
+        if (tarOut)
+          tarOut.on("error", () => {
+            /* surfaced via process close */
+          });
+        if (sshIn)
+          sshIn.on("error", () => {
+            /* surfaced via process close */
+          });
+        if (tarOut && sshIn) tarOut.pipe(sshIn);
+
+        // Belt-and-braces timeout. The actual SSH hang case (SSM session
+        // mid-stream stall) is the one that previously wedged the daemon.
+        const timeoutMs = Number(process.env.ARK_PLACEMENT_TAR_TIMEOUT_MS ?? 60_000);
+        const t = setTimeout(() => finish(new Error(`pipeTarToSsh timed out after ${timeoutMs}ms`)), timeoutMs);
+        // unref so the timer doesn't block the process from exiting on
+        // graceful shutdown.
+        t.unref?.();
+        // Clear timer once we've settled (resolved or rejected).
+        const clearOnSettle = (): void => clearTimeout(t);
+        tar.on("close", clearOnSettle);
+        ssh.on("close", clearOnSettle);
       }),
   };
 };
