@@ -64,11 +64,15 @@ export async function fork(
       const r = await app.dispatchService.dispatch(child.id);
       if (r && r.ok === false) {
         const reason = r.message ?? "child dispatch returned ok:false";
-        logWarn("session", `fork: child dispatch returned ok:false (parent=${parentId}, child=${child.id}): ${reason}`, {
-          parentId,
-          childId: child.id,
-          reason,
-        });
+        logWarn(
+          "session",
+          `fork: child dispatch returned ok:false (parent=${parentId}, child=${child.id}): ${reason}`,
+          {
+            parentId,
+            childId: child.id,
+            reason,
+          },
+        );
         await markDispatchFailedShared(app.sessions, app.events, child.id, reason);
         return { ok: false, message: reason };
       }
