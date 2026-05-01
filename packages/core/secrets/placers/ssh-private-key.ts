@@ -50,8 +50,13 @@ export function _makeSshPrivateKeyPlacer(deps: Partial<SshPrivateKeyPlacerDeps> 
 
       const expandedKeyPath = ctx.expandHome(targetPath);
 
-      // 1. Write the private key with 0600 permissions.
-      await ctx.writeFile(expandedKeyPath, 0o600, Buffer.from(secret.value, "utf-8"));
+      // 1. Write the private key with 0600 permissions. PEM keys MUST end
+      // with a newline -- without it OpenSSL's libcrypto rejects the key
+      // with "error in libcrypto" and ssh treats it as unloadable. Common
+      // capture paths (`cat ~/.ssh/id_rsa | ark secrets set`) strip the
+      // trailing newline through stdin, so guarantee one here.
+      const keyBytes = Buffer.from(secret.value.endsWith("\n") ? secret.value : secret.value + "\n", "utf-8");
+      await ctx.writeFile(expandedKeyPath, 0o600, keyBytes);
 
       // 2. Append the config block (idempotent via marker).
       const configBlock = buildSshConfigBlock({

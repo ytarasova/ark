@@ -596,6 +596,12 @@ export class RemoteWorktreeProvider extends RemoteArkdBase {
     const source = this.cloneSource(session);
     if (source && remoteWorkdir) {
       logInfo("compute", `[trace:${sid}] gitClone.begin source=${source}`);
+      // Wipe any pre-existing dir so `git clone` doesn't refuse with
+      // "destination path already exists and is not an empty directory".
+      // A previous run that crashed mid-clone (or one whose secret
+      // placement was broken so clone failed silently) leaves the target
+      // dir half-populated; we don't want to inherit that state.
+      await client.run({ command: "rm", args: ["-rf", remoteWorkdir], timeout: 30_000 });
       await client.run({ command: "git", args: ["clone", source, remoteWorkdir], timeout: 120_000 });
       logInfo("compute", `[trace:${sid}] gitClone.done`);
     }
