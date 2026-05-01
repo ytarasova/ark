@@ -29,6 +29,47 @@ afterAll(async () => {
   await app?.shutdown();
 });
 
+describe("resume on an action stage marks failed when the action errors", () => {
+  it("flips status to `failed` (not stuck at ready) when executeAction returns ok:false", async () => {
+    // Inline flow with an action stage. We monkey-patch `executeAction` via
+    // module replacement to force an `ok:false` return so the test exercises
+    // the failure branch of `kickActionStage` without depending on a real
+    // action handler's failure mode.
+    const inlineFlow = {
+      name: "resume-action-fail-test",
+      stages: [{ name: "finalize", action: "merge_pr", gate: "auto" as const }],
+    };
+
+    const session = await app.sessionLifecycle.start({
+      summary: "resume action fail",
+      flow: inlineFlow as any,
+    });
+
+    // merge_pr without a worktree/PR setup will fail. Set the post-failure
+    // state resume operates on.
+    await app.sessions.update(session.id, { status: "failed", stage: "finalize", error: "previous run failed" });
+
+    const resumeResult = await app.sessionService.resume(session.id);
+    expect(resumeResult.ok).toBe(true);
+
+    // Drain the background kickActionStage promise so we observe its
+    // terminal effects.
+    await app.sessionService.drainPendingDispatches();
+
+    const final = await app.sessions.get(session.id);
+    // Pre-fix: session sat at `status=ready` forever. Post-fix:
+    // markDispatchFailedShared flips to `failed` with the action's reason.
+    expect(final?.status).toBe("failed");
+    expect(final?.error).toBeTruthy();
+
+    // dispatch_failed event was logged with the action-failure reason.
+    const events = await app.events.list(session.id);
+    const dispatchFailed = events.find((e) => e.type === "dispatch_failed");
+    expect(dispatchFailed).toBeTruthy();
+    expect(String(dispatchFailed!.data?.reason ?? "")).toContain("merge_pr");
+  });
+});
+
 describe("resume on an action stage auto-advances on success", () => {
   it("completes the flow after the action re-runs (no manual advance needed)", async () => {
     // Inline flow: a single action stage. When resumed with the

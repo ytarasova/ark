@@ -121,6 +121,17 @@ export class SessionDispatchListeners {
     await Promise.allSettled([...this.pendingDispatches]);
   }
 
+  /**
+   * Register an externally-managed background promise (e.g. SessionService's
+   * `kickActionStage`) into the same pending set. `drain()` will await it
+   * alongside the listener-owned dispatches; without this, a Promise spawned
+   * outside the listener races shutdown unobserved.
+   */
+  track(promise: Promise<unknown>): void {
+    this.pendingDispatches.add(promise);
+    promise.finally(() => this.pendingDispatches.delete(promise)).catch(() => {});
+  }
+
   private kickDispatch(sessionId: string, onDispatched: (session: Session | null) => void): void {
     const promise = this.dispatch(sessionId)
       .then(async (result) => {

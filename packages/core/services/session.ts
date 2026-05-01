@@ -15,7 +15,7 @@ import type { EventRepository } from "../repositories/event.js";
 import type { MessageRepository } from "../repositories/message.js";
 import type { AppContext } from "../app.js";
 import { logDebug } from "../observability/structured-log.js";
-import { SessionDispatchListeners } from "./session-dispatch-listeners.js";
+import { SessionDispatchListeners, markDispatchFailedShared } from "./session-dispatch-listeners.js";
 
 // ── SessionService ───────────────────────────────────────────────────────────
 
@@ -311,7 +311,11 @@ export class SessionService {
     // whose current stage is an action is silently a no-op.
     const route = await this.resolveResumeRoute(id, session.flow, targetStage);
     if (route === "agent") {
-      this.kickDispatch(id, () => {});
+      // Re-emit the session_created lifecycle moment so the registered
+      // default dispatcher picks it up. That path owns its own pending-set
+      // tracking and dispatch_failed surfacing -- no need for a private
+      // kickDispatch shim on SessionService.
+      this.emitSessionCreated(id);
     } else if (route === "action") {
       this.kickActionStage(id);
     }
@@ -357,10 +361,17 @@ export class SessionService {
         const { executeAction } = await import("./actions/index.js");
         const result = await executeAction(this.app, sessionId, action.action);
         if (!result.ok) {
-          await this.events.log(sessionId, "dispatch_failed", {
-            actor: "system",
-            data: { reason: `action '${action.action}' failed: ${result.message}` },
-          });
+          // Without flipping status to `failed`, an action stage that errors
+          // on resume (`create_pr`, `merge`, ...) emits the dispatch_failed
+          // event but the session row stays at `status=ready` forever. Use
+          // the shared helper so resume + auto-handoff produce the same
+          // event + status-update shape on action failure.
+          await markDispatchFailedShared(
+            this.sessions,
+            this.events,
+            sessionId,
+            `action '${action.action}' failed: ${result.message}`,
+          );
           return;
         }
         // Success: advance the flow. Without this, an action stage
@@ -378,14 +389,20 @@ export class SessionService {
           });
         }
       } catch (err) {
-        await this.events.log(sessionId, "dispatch_failed", {
-          actor: "system",
-          data: { reason: err instanceof Error ? err.message : String(err) },
-        });
+        // Mirror the action-failure branch above: thrown errors leave the
+        // session at status=ready otherwise. markDispatchFailedShared logs
+        // the dispatch_failed event AND flips status to failed.
+        await markDispatchFailedShared(
+          this.sessions,
+          this.events,
+          sessionId,
+          err instanceof Error ? err.message : String(err),
+        );
       }
     })();
-    this._pendingDispatches.add(promise);
-    promise.finally(() => this._pendingDispatches.delete(promise)).catch(() => {});
+    // Register on the listener's pending set so app.shutdown() awaits this
+    // background promise alongside listener-owned dispatches.
+    this.dispatchListeners.track(promise);
   }
 
   /**
