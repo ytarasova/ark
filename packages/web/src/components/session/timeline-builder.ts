@@ -107,6 +107,40 @@ function formatDurationMs(ms: number): string {
   return `${mins}m ${secs}s`;
 }
 
+/**
+ * Render a `provisioning_step` event payload as a single inline label.
+ *
+ * Returns `null` for the `started` status so the caller can skip
+ * rendering -- the terminal event (`ok` / `failed`) carries duration
+ * and is the useful one to display.
+ *
+ * Output shape:
+ *   "Provisioning · git-clone · ok in 5.2s"
+ *   "Provisioning · git-clone · ok in 5.2s (3 attempts)"
+ *   "Provisioning · git-clone · retry after attempt 1: socket closed"
+ *   "Provisioning · git-clone · FAILED after 3 attempts in 12.4s: ..."
+ */
+function formatProvisioningStep(data: any): string | null {
+  const step = String(data?.step ?? "step");
+  const status = String(data?.status ?? "");
+  if (status === "started") return null;
+  if (status === "ok") {
+    const dur = formatDurationMs(Number(data?.durationMs) || 0);
+    const attempts = Number(data?.attempts) > 1 ? ` (${data.attempts} attempts)` : "";
+    return `Provisioning · ${step} · ok in ${dur}${attempts}`;
+  }
+  if (status === "retrying") {
+    const attempt = Number(data?.attempt) || 0;
+    return `Provisioning · ${step} · retry after attempt ${attempt}: ${truncate(String(data?.message ?? ""), 100)}`;
+  }
+  if (status === "failed") {
+    const dur = formatDurationMs(Number(data?.durationMs) || 0);
+    const attempts = Number(data?.attempts) > 1 ? ` after ${data.attempts} attempts` : "";
+    return `Provisioning · ${step} · FAILED${attempts} in ${dur}: ${truncate(String(data?.message ?? ""), 120)}`;
+  }
+  return `Provisioning · ${step} · ${status}`;
+}
+
 /** Format tool input from hook data into a readable summary. */
 function formatToolInput(data: any): string {
   if (!data) return "";
@@ -358,6 +392,20 @@ export function buildConversationTimeline(events: any[], messages: any[], sessio
           timestamp: formatTime(item.created_at),
           stage: evStage,
         });
+      } else if (evType === "provisioning_step") {
+        // Per-step trail emitted by `provisionStep` -- one `started`,
+        // optional `retrying`s, exactly one terminal `ok`/`failed`.
+        // We skip `started` so the timeline isn't double-stamped; the
+        // duration on the terminal event carries the start time.
+        const label = formatProvisioningStep(evDataObj);
+        if (!label) continue;
+        items.push({
+          kind: "system",
+          content: label,
+          timestamp: formatTime(item.created_at),
+          stage: evStage,
+        });
+        continue;
       } else if (evType === "stage_ready") {
         // Deduplicate: if we already showed a stage_handoff for this stage, skip stage_ready
         const readyKey = "ready:" + (evStage || "unknown");

@@ -1,21 +1,51 @@
 /**
- * Remote-environment preparation helpers shared by the claude-code executor.
+ * Provider-agnostic remote-environment preparation for the claude-code
+ * executor.
  *
- * Extracted from session-orchestration.ts. The executor calls
- * `prepareRemoteEnvironment` to build the launcher content for remote
- * compute targets; the applyContainerSetup helper wraps it with Docker
- * Compose / devcontainer logic.
+ * This module owns the dispatch-time orchestration that's shared across
+ * every compute provider:
+ *
+ *   1. Auto-start a stopped compute (delegated to provider.start).
+ *   2. Run the provider's transport setup (`provider.prepareForLaunch`),
+ *      which knows its own medium-specific steps -- SSH-over-SSM for
+ *      EC2, kubectl port-forward for k8s, no-op for local. Each provider
+ *      is responsible for emitting `provisioning_step` events for its
+ *      own internal phases.
+ *   3. Resolve `arc.json`-declared ports.
+ *   4. Apply opt-in container setup (Docker Compose / devcontainer).
+ *
+ * Things this module deliberately does NOT do:
+ *   - Touch SSH, AWS SSM, EC2 metadata, or any other provider-specific
+ *     transport concept. The provider owns its medium.
+ *   - Run the agent. That's `provider.launch(...)` (today, will move to
+ *     a provider-agnostic arkd orchestrator in a follow-up).
+ *
+ * The only thing this module knows about a provider is the optional
+ * `prepareForLaunch` hook -- everything else is a black box.
  */
 
 import type { AppContext } from "../app.js";
 import type { Session, Compute } from "../../types/index.js";
 import type { ComputeProvider } from "../../compute/types.js";
 import { resolvePortDecls, parseArcJson } from "../../compute/arc-json.js";
-import { allocatePort } from "../config/port-allocator.js";
-import { DEFAULT_ARKD_PORT } from "../constants.js";
-import { logInfo } from "../observability/structured-log.js";
+import { provisionStep } from "./provisioning-steps.js";
 
-/** Apply arc.json container setup: Docker Compose and devcontainer. */
+/**
+ * Apply opt-in container setup declared in `arc.json`:
+ *   - `compose: true`        -> `docker compose up -d` on the remote
+ *   - `devcontainer: true`   -> wrap launch content in the devcontainer launcher
+ *
+ * Most sessions have neither; the function is a fast no-op on bare
+ * worktrees, so we don't wrap it in a `provisionStep` -- the trace
+ * would be noise for the 99% case.
+ *
+ * This is the only piece of provider-specific knowledge left in this
+ * module: it pokes EC2's `sshExec` / `shellEscape` when `compose: true`
+ * because there's no clean provider-side hook for "run an arbitrary
+ * command on the host as part of pre-launch". A follow-up should move
+ * this onto a `provider.runOnHost(cmd)` hook so this module is fully
+ * provider-agnostic.
+ */
 async function applyContainerSetup(
   compute: Compute,
   effectiveWorkdir: string,
@@ -24,16 +54,16 @@ async function applyContainerSetup(
 ): Promise<string> {
   if (!effectiveWorkdir) return launchContent;
 
-  // Docker Compose - only when explicitly enabled in arc.json { "compose": true }
   const arcJson = parseArcJson(effectiveWorkdir);
   const cfg = compute.config as { instance_id?: string; region?: string; aws_profile?: string } | null | undefined;
+
   if (arcJson?.compose === true && cfg?.instance_id) {
     onLog("Starting Docker Compose services...");
     const { sshExec, sshKeyPath } = await import("../../compute/providers/ec2/ssh.js");
     const { shellEscape } = await import("../../compute/providers/ec2/shell-escape.js");
-    // `effectiveWorkdir` is a DB-persisted value derived (transitively) from
-    // session.workdir / session.repo, both attacker-controllable in hosted
-    // mode. Escape before interpolating into the remote shell.
+    // `effectiveWorkdir` is DB-persisted (transitively from
+    // session.workdir / session.repo, both attacker-controllable in
+    // hosted mode). Escape before interpolating into the remote shell.
     const quotedWorkdir = shellEscape(effectiveWorkdir);
     sshExec(sshKeyPath(compute.name), cfg.instance_id, `cd ${quotedWorkdir} && docker compose up -d`, {
       region: cfg.region ?? "us-east-1",
@@ -41,7 +71,6 @@ async function applyContainerSetup(
     });
   }
 
-  // Devcontainer - only used when explicitly enabled in arc.json { "devcontainer": true }
   if (arcJson?.devcontainer === true) {
     onLog("Building devcontainer...");
     const { buildLaunchCommand } = await import("../../compute/providers/docker/devcontainer.js");
@@ -51,7 +80,11 @@ async function applyContainerSetup(
   return launchContent;
 }
 
-/** Prepare remote compute: connectivity check, env sync, docker/devcontainer setup. */
+/**
+ * Bring a compute target to the point where the agent can be launched.
+ * Returns the (possibly container-wrapped) launch script and the
+ * declared ports from `arc.json`.
+ */
 export async function prepareRemoteEnvironment(
   app: AppContext,
   session: Session,
@@ -59,186 +92,35 @@ export async function prepareRemoteEnvironment(
   provider: ComputeProvider,
   effectiveWorkdir: string,
   opts?: { launchContent?: string; onLog?: (msg: string) => void },
-): Promise<{ finalLaunchContent: string; ports: any[] }> {
+): Promise<{ finalLaunchContent: string; ports: ReturnType<typeof resolvePortDecls> }> {
   const log = opts?.onLog ?? (() => {});
   const sid = session.id;
-  logInfo("session", `[trace:prep:${sid}] start compute=${compute.name} status=${compute.status}`);
 
-  // Auto-start stopped computes
+  // Auto-start a stopped compute. Wrapped as a step so the timeline
+  // shows a uniform entry instead of an opaque pause.
   if (compute.status === "stopped") {
     log(`Starting compute '${compute.name}'...`);
-    logInfo("session", `[trace:prep:${sid}] provider.start begin`);
-    await provider.start(compute);
-    logInfo("session", `[trace:prep:${sid}] provider.start done`);
-  }
-
-  // Verify host is reachable before starting expensive sync/clone chain.
-  // SSM transport keys off instance_id; no IP required.
-  //
-  // SSM Session Manager has variable cold-start latency: a first
-  // `start-session` after the agent has been idle can take 10-25s while
-  // Systems Manager establishes the WebSocket. Manual test from a warm
-  // shell measures ~9-10s; under concurrent load (sync + clone in same
-  // dispatch) the same call can slip past 15s. Use 45s as the per-attempt
-  // timeout AND retry once on failure -- the retry path has a hot SSM
-  // session and typically completes in <5s.
-  const cfgRemote = compute.config as { instance_id?: string; region?: string; aws_profile?: string };
-  const instanceId = cfgRemote.instance_id;
-  if (instanceId) {
-    const region = cfgRemote.region ?? "us-east-1";
-    const awsProfile = cfgRemote.aws_profile;
-    const { sshExecAsync, sshKeyPath } = await import("../../compute/providers/ec2/ssh.js");
-    const ssmConnectTimeoutMs = Number(process.env.ARK_SSM_CONNECT_TIMEOUT_MS ?? 45_000);
-
-    log("Checking host connectivity (via SSM)...");
-    logInfo("session", `[trace:prep:${sid}] connectivity-check begin`);
-    let lastExitCode = -1;
-    let lastErr: unknown = null;
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        const { exitCode } = await sshExecAsync(sshKeyPath(compute.name), instanceId, "echo ok", {
-          timeout: ssmConnectTimeoutMs,
-          region,
-          awsProfile,
-        });
-        lastExitCode = exitCode;
-        if (exitCode === 0) break;
-        log(`Connectivity check attempt ${attempt} returned exit=${exitCode}; retrying...`);
-      } catch (err) {
-        lastErr = err;
-        log(
-          `Connectivity check attempt ${attempt} threw: ${err instanceof Error ? err.message : String(err)}; retrying...`,
-        );
-      }
-    }
-    if (lastExitCode !== 0) {
-      const detail = lastErr ? ` (last error: ${lastErr instanceof Error ? lastErr.message : String(lastErr)})` : "";
-      throw new Error(`Cannot reach compute '${compute.name}' at ${instanceId} (via SSM) after 2 attempts${detail}`);
-    }
-    logInfo("session", `[trace:prep:${sid}] connectivity-check done`);
-
-    // Forward tunnel for arkd. After we dropped public-IP assignment (commit
-    // 7a888f74), `cfg.ip` is the *private* address (e.g. 10.x.y.z). The
-    // conductor can't reach a private VPC IP, so every ArkdClient call hung
-    // until 30s timeout. Wire an SSH `-L` forward tunnel over SSM so
-    // `ArkdClient` reaches arkd via `http://localhost:<localForwardPort>`.
-    // The local port is allocated dynamically per compute and persisted on
-    // `compute.config.arkd_local_forward_port` for `RemoteArkdBase.getArkdUrl`.
-    //
-    // Note: there is no longer a *reverse* `-R 19100:...:19100` tunnel.
-    // The agent's hook callbacks now POST to local arkd's `/hooks/forward`
-    // (always reachable -- arkd runs on the same host as the agent), and
-    // the conductor pulls them via arkd's `/events/stream` over THIS forward
-    // tunnel. See `arkd-events-consumer.ts`.
-    const { setupForwardTunnel } = await import("../../compute/providers/ec2/ports.js");
-    logInfo("session", `[trace:prep:${sid}] forward-tunnel begin`);
-    const localPort = await allocatePort();
-    const arkdTunnel = await setupForwardTunnel(sshKeyPath(compute.name), instanceId, DEFAULT_ARKD_PORT, localPort, {
-      region,
-      awsProfile,
+    await provisionStep(app, sid, "compute-start", () => provider.start(compute), {
+      retries: 1,
+      retryBackoffMs: 2_000,
+      context: { compute: compute.name },
     });
-    logInfo(
-      "session",
-      `[trace:prep:${sid}] forward-tunnel done pid=${arkdTunnel.pid} localPort=${arkdTunnel.localPort}`,
-    );
-    if (!arkdTunnel.pid) {
-      throw new Error(
-        `Failed to set up arkd forward tunnel for compute '${compute.name}' ` +
-          `(localhost:${arkdTunnel.localPort} -> ${instanceId}:${DEFAULT_ARKD_PORT})`,
-      );
-    }
-    log(
-      `Arkd forward tunnel ${arkdTunnel.reused ? "reused" : "established"} (pid ${arkdTunnel.pid}) ` +
-        `localhost:${arkdTunnel.localPort} -> ${instanceId}:${DEFAULT_ARKD_PORT}`,
-    );
-    // Persist the local-forward port so getArkdUrl resolves to the tunneled
-    // localhost endpoint instead of the unreachable private IP.
-    //
-    // CRITICAL: also mutate the in-memory `compute.config` so the caller's
-    // reference picks up the fresh port. `provider.launch(compute, ...)` is
-    // called downstream with the SAME compute object the executor fetched
-    // BEFORE we ran here -- if we only update the DB, `getArkdUrl(compute)`
-    // still reads the previous run's port off the in-memory config and the
-    // dispatch's first `client.run` POSTs to a localhost port that no
-    // longer routes anywhere ("Unable to connect"). Refreshing the in-mem
-    // copy keeps the rest of the dispatch on the live tunnel.
-    await app.computes.mergeConfig(compute.name, { arkd_local_forward_port: arkdTunnel.localPort });
-    (compute.config as { arkd_local_forward_port?: number }).arkd_local_forward_port = arkdTunnel.localPort;
-
-    // The SSH `-L` listener appears in pgrep BEFORE the SSM session through
-    // it has finished establishing. The first few seconds after the tunnel
-    // is reported "up" are racy: a fetch from the conductor (Bun) hits the
-    // local listener but the inner SSM session is still mid-handshake, so
-    // the kernel reports "connection refused" and Bun surfaces it as
-    // "Unable to connect. Is the computer able to access the url?". Worse,
-    // those failed connect attempts seem to poison Bun's HTTP keep-alive
-    // pool: subsequent fetches to the same `localhost:<port>` keep failing
-    // even after the tunnel has settled.
-    //
-    // Probe arkd `/health` until it answers (or we hit a budget) so the
-    // first real fetch the dispatcher sends is guaranteed to land on a
-    // live, fully-handshaken socket -- no poisoned-pool symptoms.
-    const arkdProbeUrl = `http://localhost:${arkdTunnel.localPort}/health`;
-    const probeBudgetMs = Number(process.env.ARK_ARKD_PROBE_BUDGET_MS ?? 30_000);
-    const probeStarted = Date.now();
-    let probeOk = false;
-    while (Date.now() - probeStarted < probeBudgetMs) {
-      try {
-        const r = await fetch(arkdProbeUrl, { signal: AbortSignal.timeout(2_000) });
-        if (r.ok) {
-          probeOk = true;
-          break;
-        }
-      } catch {
-        /* SSH tunnel still settling -- back off and try again */
-      }
-      await new Promise((res) => setTimeout(res, 500));
-    }
-    logInfo(
-      "session",
-      `[trace:prep:${sid}] arkd-probe ${probeOk ? "ok" : "timeout"} after ${Date.now() - probeStarted}ms`,
-    );
-    if (!probeOk) {
-      throw new Error(
-        `arkd at localhost:${arkdTunnel.localPort} did not become reachable within ${probeBudgetMs}ms`,
-      );
-    }
-
-    // Open the events stream so hook callbacks (agent_message, hook_status,
-    // channel reports) flow back to the conductor without a reverse tunnel.
-    // Idempotent -- a second call for the same compute is a no-op.
-    const { startArkdEventsConsumer } = await import("../conductor/arkd-events-consumer.js");
-    const arkdToken = process.env.ARK_ARKD_TOKEN ?? null;
-    startArkdEventsConsumer(app, compute.name, `http://localhost:${arkdTunnel.localPort}`, arkdToken);
-    logInfo("session", `[trace:prep:${sid}] events-consumer started compute=${compute.name}`);
   }
 
-  // Resolve ports from arc.json / devcontainer / compose
+  // Hand off to the provider for medium-specific transport setup.
+  // Local providers don't implement this hook -- arkd is on the same
+  // host and there's nothing to do.
+  if (provider.prepareForLaunch) {
+    await provider.prepareForLaunch({ app, compute, session, onLog: log });
+  }
+
+  // Resolve declared ports + persist on session config so the launcher
+  // can plumb them through to the agent runtime.
   const ports = effectiveWorkdir ? resolvePortDecls(effectiveWorkdir) : [];
-
-  // Store ports on session config
   if (ports.length > 0) {
-    await app.sessions.update(session.id, {
-      config: { ...session.config, ports },
-    });
+    await app.sessions.update(session.id, { config: { ...session.config, ports } });
   }
 
-  // No sync from local. Every credential, env var, and project-scoped
-  // file flows through typed-secret placement (env-var, ssh-private-key,
-  // generic-blob, kubeconfig) or compute-template provisioning. The
-  // legacy `syncEnvironment` path was wrong by construction in
-  // control-plane mode (hosted conductor has no useful ~/.aws,
-  // ~/.gitconfig, ~/.claude, gh auth token) and was the source of a
-  // daemon-killer crash on EC2 dispatch (huge ~/.claude rsync over the
-  // SSM tunnel). Sensitive project files belong in `ark secrets`; non-
-  // sensitive ones in the repo.
-  logInfo("session", `[trace:prep:${sid}] sync skipped -- credentials via typed secrets only`);
-
-  // Apply container setup (Docker Compose + devcontainer)
-  logInfo("session", `[trace:prep:${sid}] applyContainerSetup begin`);
   const finalLaunchContent = await applyContainerSetup(compute, effectiveWorkdir, opts?.launchContent ?? "", log);
-  logInfo("session", `[trace:prep:${sid}] applyContainerSetup done`);
-
-  logInfo("session", `[trace:prep:${sid}] return ports=${ports.length}`);
   return { finalLaunchContent, ports };
 }
