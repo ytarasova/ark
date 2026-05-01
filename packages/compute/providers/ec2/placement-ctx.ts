@@ -22,7 +22,7 @@ import { sshExec as defaultSshExec, buildSsmProxyArgs, type SsmConnectOpts } fro
 import { shellEscape } from "./shell-escape.js";
 import { REMOTE_HOME, REMOTE_USER } from "./constants.js";
 import type { PlacementCtx } from "../../../core/secrets/placement-types.js";
-import { logDebug } from "../../../core/observability/structured-log.js";
+import { logDebug, logInfo } from "../../../core/observability/structured-log.js";
 
 export interface EC2PlacementCtxOpts {
   sshKeyPath: string;
@@ -175,7 +175,9 @@ export class EC2PlacementCtx implements PlacementCtx {
       writeFileSync(join(stage, base), Buffer.from(bytes), { mode });
       const remoteCmd = `mkdir -p ${shellEscape(dir)} && tar x -C ${shellEscape(dir)}`;
       const tarArgs = ["c", "-C", stage, base];
+      logInfo("compute", `[trace:writeFile] begin path=${path} bytes=${bytes.length}`);
       await this.deps.pipeTarToSsh(tarArgs, remoteCmd);
+      logInfo("compute", `[trace:writeFile] tar-pipe done path=${path}`);
       // Defence-in-depth chmod (tar should preserve, but be explicit).
       await this.deps.sshExec(
         this.opts.sshKeyPath,

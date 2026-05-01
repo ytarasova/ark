@@ -17,7 +17,7 @@ import type { Compute, Session, ProvisionOpts, SyncOpts, IsolationMode, LaunchOp
 import type { PlacementCtx } from "../../core/secrets/placement-types.js";
 import { DeferredPlacementCtx } from "../../core/secrets/deferred-placement-ctx.js";
 import { DEFAULT_CONDUCTOR_URL, DEFAULT_ARKD_PORT } from "../../core/constants.js";
-import { logDebug, logError } from "../../core/observability/structured-log.js";
+import { logDebug, logError, logInfo } from "../../core/observability/structured-log.js";
 
 const ARKD_REMOTE_PORT = DEFAULT_ARKD_PORT;
 const REMOTE_USER = "ubuntu";
@@ -165,7 +165,12 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
       region: cfg.region ?? "us-east-1",
       awsProfile: cfg.aws_profile,
     });
+    logInfo(
+      "compute",
+      `[trace:flushDeferred] compute=${compute.name} instanceId=${cfg.instance_id} ops=${deferred.queuedOps.length}`,
+    );
     await deferred.flush(realCtx);
+    logInfo("compute", `[trace:flushDeferred] done compute=${compute.name}`);
   }
 
   async provision(compute: Compute, opts?: ProvisionOpts): Promise<void> {
@@ -569,11 +574,15 @@ export class RemoteWorktreeProvider extends RemoteArkdBase {
   }
 
   async launch(compute: Compute, session: Session, opts: LaunchOpts): Promise<string> {
+    const sid = session.id;
+    logInfo("compute", `[trace:${sid}] launch.start compute=${compute.name}`);
     // Replay any file-typed secret placement queued by the dispatcher's
     // pre-launch buildLaunchEnv pass. This must happen BEFORE we clone the
     // repo / spawn the agent so private keys, ssh config, known_hosts, etc.
     // are in place when git/ssh fire.
+    logInfo("compute", `[trace:${sid}] flushDeferredPlacement.begin`);
     await this.flushDeferredPlacement(compute, opts);
+    logInfo("compute", `[trace:${sid}] flushDeferredPlacement.done`);
 
     const client = this.getClient(compute);
 
@@ -586,9 +595,12 @@ export class RemoteWorktreeProvider extends RemoteArkdBase {
     const remoteWorkdir = this.resolveWorkdir(compute, session);
     const source = this.cloneSource(session);
     if (source && remoteWorkdir) {
+      logInfo("compute", `[trace:${sid}] gitClone.begin source=${source}`);
       await client.run({ command: "git", args: ["clone", source, remoteWorkdir], timeout: 120_000 });
+      logInfo("compute", `[trace:${sid}] gitClone.done`);
     }
 
+    logInfo("compute", `[trace:${sid}] launchAgent.begin tmux=${opts.tmuxName}`);
     // Upload launcher and execute. tmux's `-c <workdir>` flag wants the same
     // path the launcher will `cd` into, otherwise we'd race against the
     // launcher's own cd (and on a remote host the conductor-side path
@@ -598,6 +610,7 @@ export class RemoteWorktreeProvider extends RemoteArkdBase {
       script: opts.launcherContent,
       workdir: remoteWorkdir ?? opts.workdir,
     });
+    logInfo("compute", `[trace:${sid}] launchAgent.done`);
     return opts.tmuxName;
   }
 }
