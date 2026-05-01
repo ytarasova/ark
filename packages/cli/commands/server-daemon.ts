@@ -183,6 +183,22 @@ export function registerServerDaemonCommands(serverCmd: Command) {
       process.on("SIGINT", shutdown);
       process.on("SIGTERM", shutdown);
 
+      // Daemon-stability guard. Without these, an unhandled rejection or
+      // uncaughtException anywhere in the dispatch chain (an orphaned
+      // `provider.launch` after a watchdog wins, a stream-error escaping
+      // a child-process pipe, etc.) crashes the bun process. Live evidence:
+      // every EC2 dispatch attempt killed the daemon ~108s in despite the
+      // dispatch-layer try/catch chain. Logging + survival here is strictly
+      // better than the silent-restart we had before.
+      process.on("unhandledRejection", (reason, promise) => {
+        const msg = reason instanceof Error ? reason.stack ?? reason.message : String(reason);
+        console.error(`[daemon] unhandledRejection: ${msg}`);
+        void (promise as Promise<unknown>)?.catch?.(() => {});
+      });
+      process.on("uncaughtException", (err) => {
+        console.error(`[daemon] uncaughtException: ${err.stack ?? err.message}`);
+      });
+
       // Keep alive
       await new Promise(() => {});
     });
