@@ -17,7 +17,7 @@ import type { Compute, Session, ProvisionOpts, SyncOpts, IsolationMode, LaunchOp
 import type { PlacementCtx } from "../../core/secrets/placement-types.js";
 import { DeferredPlacementCtx } from "../../core/secrets/deferred-placement-ctx.js";
 import { DEFAULT_CONDUCTOR_URL, DEFAULT_ARKD_PORT } from "../../core/constants.js";
-import { logDebug } from "../../core/observability/structured-log.js";
+import { logDebug, logError } from "../../core/observability/structured-log.js";
 
 const ARKD_REMOTE_PORT = DEFAULT_ARKD_PORT;
 const REMOTE_USER = "ubuntu";
@@ -263,8 +263,20 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
 
       this.app.computes.mergeConfig(compute.name, { cloud_init_done: true });
     } catch (err) {
-      this.app.computes.mergeConfig(compute.name, { last_error: err instanceof Error ? err.message : String(err) });
+      const reason = err instanceof Error ? err.message : String(err);
+      this.app.computes.mergeConfig(compute.name, { last_error: reason });
       this.app.computes.update(compute.name, { status: "stopped" });
+      // Pre-fix the failure was only readable via `compute show` (the
+      // last_error field). No event row, no operator-tailable signal in
+      // ~/.ark/ark.jsonl. Add a structured logError so a provision failure
+      // is visible alongside the rest of the system's structured events;
+      // the existing throw still surfaces through the caller's normal
+      // error path.
+      logError("compute", `provision failed for compute '${compute.name}': ${reason}`, {
+        compute: compute.name,
+        provider: this.constructor.name,
+        error: reason,
+      });
       throw err;
     }
   }
