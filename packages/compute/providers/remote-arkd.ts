@@ -71,16 +71,19 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
 
   getArkdUrl(compute: Compute): string {
     const cfg = compute.config as RemoteConfig;
-    if (cfg.arkd_url) return cfg.arkd_url;
-    // Preferred SSM-only path: the conductor reaches arkd via the SSH `-L`
-    // forward tunnel set up in `prepareRemoteEnvironment` -- the remote
-    // private IP isn't routable from the conductor's network.
+    // Preferred SSM-only path: when an SSH `-L` forward tunnel is up
+    // (set up in `prepareRemoteEnvironment`), the conductor reaches arkd
+    // via localhost. This wins over the legacy `arkd_url` field because
+    // `provision()` writes a private-IP `arkd_url` for back-compat -- and
+    // that URL is unreachable from the conductor's network in the SSM-only
+    // model. The forward port being present means the tunnel is the
+    // canonical path; honour it first.
     if (cfg.arkd_local_forward_port) return `http://localhost:${cfg.arkd_local_forward_port}`;
-    // Legacy back-compat: in-VPC conductors can still reach the instance's
-    // private IP directly. Kept so existing co-located deployments keep
-    // working without a tunnel.
+    // Operator override or legacy in-VPC deployment where the conductor
+    // can still reach the private IP directly.
+    if (cfg.arkd_url) return cfg.arkd_url;
     if (cfg.ip) return `http://${cfg.ip}:${ARKD_REMOTE_PORT}`;
-    throw new Error(`Compute '${compute.name}' has no arkd_url, arkd_local_forward_port, or ip`);
+    throw new Error(`Compute '${compute.name}' has no arkd_local_forward_port, arkd_url, or ip`);
   }
 
   /**

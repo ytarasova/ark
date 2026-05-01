@@ -50,19 +50,32 @@ describe("RemoteWorktreeProvider", () => {
     expect(provider.getArkdUrl(compute)).toBe("http://10.0.1.5:19300");
   });
 
-  it("getArkdUrl prefers arkd_url from config", () => {
+  it("getArkdUrl uses arkd_url when no forward port is set (legacy in-VPC path)", () => {
     const compute = makeCompute({
       config: { instance_id: "i-x", region: "us-east-1", arkd_url: "http://custom:9999" },
     });
     expect(provider.getArkdUrl(compute)).toBe("http://custom:9999");
   });
 
+  it("getArkdUrl prefers arkd_local_forward_port over a stale arkd_url", () => {
+    // `provision()` writes `arkd_url: http://<private-ip>:19300` for legacy
+    // back-compat. After commit 7a888f74 (no public IPs) that URL is not
+    // reachable from the conductor. `prepareRemoteEnvironment` sets up an
+    // SSH `-L` forward tunnel and stores the local port; the forward port
+    // must win over the stale `arkd_url` so dispatch actually reaches arkd.
+    const compute = makeCompute({
+      config: {
+        instance_id: "i-x",
+        region: "us-east-1",
+        ip: "10.72.217.109",
+        arkd_url: "http://10.72.217.109:19300",
+        arkd_local_forward_port: 41234,
+      },
+    });
+    expect(provider.getArkdUrl(compute)).toBe("http://localhost:41234");
+  });
+
   it("getArkdUrl uses arkd_local_forward_port over the legacy ip field", () => {
-    // After commit 7a888f74 (no public IPs), `cfg.ip` is the private VPC
-    // address and the conductor can't reach it. `prepareRemoteEnvironment`
-    // sets up an SSH `-L` forward tunnel and stores the local port; this
-    // test pins the precedence so an unreachable private IP doesn't shadow
-    // a working tunnel.
     const compute = makeCompute({
       config: {
         instance_id: "i-x",
@@ -87,7 +100,7 @@ describe("RemoteWorktreeProvider", () => {
       provider.getArkdUrl(compute);
       expect(true).toBe(false);
     } catch (e: any) {
-      expect(e.message).toMatch(/no arkd_url, arkd_local_forward_port, or ip/);
+      expect(e.message).toMatch(/no arkd_local_forward_port, arkd_url, or ip/);
     }
   });
 
