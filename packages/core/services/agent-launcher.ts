@@ -153,7 +153,17 @@ export async function prepareRemoteEnvironment(
     );
     // Persist the local-forward port so getArkdUrl resolves to the tunneled
     // localhost endpoint instead of the unreachable private IP.
+    //
+    // CRITICAL: also mutate the in-memory `compute.config` so the caller's
+    // reference picks up the fresh port. `provider.launch(compute, ...)` is
+    // called downstream with the SAME compute object the executor fetched
+    // BEFORE we ran here -- if we only update the DB, `getArkdUrl(compute)`
+    // still reads the previous run's port off the in-memory config and the
+    // dispatch's first `client.run` POSTs to a localhost port that no
+    // longer routes anywhere ("Unable to connect"). Refreshing the in-mem
+    // copy keeps the rest of the dispatch on the live tunnel.
     await app.computes.mergeConfig(compute.name, { arkd_local_forward_port: arkdTunnel.localPort });
+    (compute.config as { arkd_local_forward_port?: number }).arkd_local_forward_port = arkdTunnel.localPort;
 
     // The SSH `-L` listener appears in pgrep BEFORE the SSM session through
     // it has finished establishing. The first few seconds after the tunnel
