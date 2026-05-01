@@ -24,7 +24,9 @@ describe("sshPrivateKeyPlacer", () => {
     expect(writeCalls).toHaveLength(1);
     expect(writeCalls[0].kind === "writeFile" && writeCalls[0].path).toBe("/home/ubuntu/.ssh/id_bb_key");
     expect(writeCalls[0].kind === "writeFile" && writeCalls[0].mode).toBe(0o600);
-    expect(writeCalls[0].kind === "writeFile" && Buffer.from(writeCalls[0].bytes).toString()).toBe("PEM");
+    // Placer guarantees PEM trailing newline (OpenSSL libcrypto rejects
+    // keys without it). The "PEM" fixture gets a `\n` appended at write time.
+    expect(writeCalls[0].kind === "writeFile" && Buffer.from(writeCalls[0].bytes).toString()).toBe("PEM\n");
 
     const appendCalls = ctx.calls.filter((c) => c.kind === "appendFile");
     expect(appendCalls).toHaveLength(2);

@@ -570,7 +570,11 @@ export class RemoteWorktreeProvider extends RemoteArkdBase {
    */
   resolveWorkdir(_compute: Compute, session: Session): string | null {
     if (!this.cloneSource(session)) return null;
-    return `${REMOTE_HOME}/Projects/${this.repoBasename(session)}`;
+    // Session-scoped path so concurrent / sequential sessions on the same
+    // compute don't collide: each session clones into its own directory
+    // and we never inherit a half-populated clone from a crashed run.
+    // Repo basename stays in the path for human readability.
+    return `${REMOTE_HOME}/Projects/${session.id}/${this.repoBasename(session)}`;
   }
 
   async launch(compute: Compute, session: Session, opts: LaunchOpts): Promise<string> {
@@ -595,13 +599,15 @@ export class RemoteWorktreeProvider extends RemoteArkdBase {
     const remoteWorkdir = this.resolveWorkdir(compute, session);
     const source = this.cloneSource(session);
     if (source && remoteWorkdir) {
-      logInfo("compute", `[trace:${sid}] gitClone.begin source=${source}`);
-      // Wipe any pre-existing dir so `git clone` doesn't refuse with
-      // "destination path already exists and is not an empty directory".
-      // A previous run that crashed mid-clone (or one whose secret
-      // placement was broken so clone failed silently) leaves the target
-      // dir half-populated; we don't want to inherit that state.
-      await client.run({ command: "rm", args: ["-rf", remoteWorkdir], timeout: 30_000 });
+      logInfo("compute", `[trace:${sid}] gitClone.begin source=${source} dest=${remoteWorkdir}`);
+      // The remoteWorkdir is session-scoped (resolveWorkdir embeds session.id),
+      // so the parent directory exists once we mkdir -p it; the leaf is
+      // guaranteed-fresh on first clone. No `rm -rf` needed.
+      await client.run({
+        command: "mkdir",
+        args: ["-p", remoteWorkdir.replace(/\/[^/]+$/, "")],
+        timeout: 15_000,
+      });
       await client.run({ command: "git", args: ["clone", source, remoteWorkdir], timeout: 120_000 });
       logInfo("compute", `[trace:${sid}] gitClone.done`);
     }
