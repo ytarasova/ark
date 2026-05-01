@@ -540,6 +540,53 @@ describe("container override", async () => {
   });
 });
 
+// -- SessionHooks dispatch wiring -------------------------------------------
+
+describe("sessionHooks.dispatch wiring (Bug A regression)", async () => {
+  it("propagates the underlying DispatchResult instead of swallowing it", async () => {
+    app = await AppContext.forTestAsync();
+    await app.boot();
+    setApp(app);
+
+    // Override dispatchService AFTER boot. The wired callback resolves
+    // c.app.dispatchService at call time, so subsequent dispatch() calls
+    // route through this fake.
+    const fakeResult = { ok: false as const, message: "wired-dispatch-failure" };
+    const fakeDispatchService = {
+      dispatch: async () => fakeResult,
+    };
+    app.container.register({ dispatchService: asValue(fakeDispatchService) });
+
+    // Reach into the private deps to invoke the wired dispatch callback
+    // exactly as HandoffMediator would. Pre-Bug-A this returned undefined;
+    // post-fix it must return the DispatchResult verbatim.
+    const hooks = app.sessionHooks as unknown as {
+      handoff: { deps: { dispatch: (id: string) => Promise<unknown> } };
+    };
+    const out = await hooks.handoff.deps.dispatch("s-anything");
+
+    expect(out).toEqual(fakeResult);
+  });
+
+  it("propagates a successful DispatchResult unchanged", async () => {
+    app = await AppContext.forTestAsync();
+    await app.boot();
+    setApp(app);
+
+    const fakeResult = { ok: true as const, message: "ok-from-fake" };
+    app.container.register({
+      dispatchService: asValue({ dispatch: async () => fakeResult }),
+    });
+
+    const hooks = app.sessionHooks as unknown as {
+      handoff: { deps: { dispatch: (id: string) => Promise<unknown> } };
+    };
+    const out = await hooks.handoff.deps.dispatch("s-anything");
+
+    expect(out).toEqual(fakeResult);
+  });
+});
+
 // -- Post-shutdown behavior -------------------------------------------------
 
 describe("post-shutdown behavior", async () => {

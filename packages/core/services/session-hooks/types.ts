@@ -17,14 +17,20 @@ import type { UsageRecorder } from "../../observability/usage.js";
 import type { TranscriptParserRegistry } from "../../runtimes/transcript-parser.js";
 import type { Session, MessageRole, MessageType } from "../../../types/index.js";
 import type { StageDefinition, StageAction } from "../../state/flow.js";
+import type { DispatchResult } from "../dispatch/types.js";
 
 // ── Callbacks for helpers that still take AppContext ────────────────────────
 
 export interface StageAdvanceCb {
   (sessionId: string, force?: boolean, outcome?: string): Promise<{ ok: boolean; message: string }>;
 }
+/**
+ * Auto-dispatch callback. Returns the underlying `DispatchResult` so the
+ * mediator can distinguish a clean success from a `{ok:false}` result and
+ * surface the failure (event + status) instead of silently swallowing it.
+ */
 export interface DispatchCb {
-  (sessionId: string): Promise<void>;
+  (sessionId: string): Promise<DispatchResult>;
 }
 export interface ExecuteActionCb {
   (sessionId: string, action: string): Promise<{ ok: boolean; message: string }>;

@@ -105,9 +105,7 @@ export function registerServices(
           usageRecorder: c.usageRecorder,
           transcriptParsers: c.transcriptParsers,
           advance: (id, force, outcome) => c.app.stageAdvance.advance(id, force, outcome),
-          dispatch: async (id) => {
-            await c.app.dispatchService.dispatch(id);
-          },
+          dispatch: (id) => c.app.dispatchService.dispatch(id),
           executeAction: (id, action) => c.app.stageAdvance.executeAction(id, action),
           runVerification: (id) => c.app.sessionLifecycle.runVerification(id),
           recordSessionUsage: (session, usage, provider, source) =>
