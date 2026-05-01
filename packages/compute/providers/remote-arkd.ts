@@ -308,21 +308,18 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
   async destroy(compute: Compute): Promise<void> {
     const { destroyStack } = await import("./ec2/provision.js");
     const { destroyPool } = await import("./ec2/pool.js");
-    const { teardownReverseTunnel, teardownForwardTunnel } = await import("./ec2/ports.js");
+    const { teardownForwardTunnel } = await import("./ec2/ports.js");
+    const { stopArkdEventsConsumer } = await import("../../core/conductor/arkd-events-consumer.js");
 
-    // Tear down the reverse tunnel set up in prepareRemoteEnvironment so
-    // the SSH tunnel process doesn't outlive the EC2 instance it points at.
-    // The tunnel pgrep pattern matches on `${REMOTE_USER}@<target>`, where
-    // `target` is now the instance_id (SSM-tunneled SSH).
     const cfg = compute.config as RemoteConfig;
     if (cfg.instance_id) {
-      await safeAsync(`[remote] destroy: teardown reverse tunnel for ${compute.name}`, async () => {
-        await teardownReverseTunnel(cfg.instance_id!, this.app.config.ports.conductor);
-      });
-      // Same story for the arkd forward tunnel set up in
+      // Stop pulling events from this compute's arkd before tearing down
+      // the forward tunnel that carries the stream.
+      stopArkdEventsConsumer(compute.name);
+      // Tear down the arkd forward tunnel established in
       // prepareRemoteEnvironment. We key off (instance_id, ARKD_REMOTE_PORT)
-      // -- the local port is dynamically allocated and may or may not be in
-      // the config (it gets cleared below).
+      // -- the local port is dynamically allocated and may or may not be
+      // in the config (it gets cleared below).
       await safeAsync(`[remote] destroy: teardown arkd forward tunnel for ${compute.name}`, async () => {
         await teardownForwardTunnel(cfg.instance_id!, ARKD_REMOTE_PORT);
       });
@@ -412,15 +409,15 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
     const cfg = compute.config as RemoteConfig;
     if (!cfg.instance_id) throw new Error("No instance_id - cannot stop");
 
-    // Tear down the reverse + arkd-forward tunnels before the EC2 stop --
-    // the ssh processes are local; killing them after the instance halts
-    // only delays cleanup. The tunnel pgrep patterns use
-    // `${REMOTE_USER}@<instance_id>` (SSM transport).
+    // Tear down the arkd-forward tunnel before the EC2 stop -- the ssh
+    // process is local; killing it after the instance halts only delays
+    // cleanup. The pgrep pattern uses `${REMOTE_USER}@<instance_id>` (SSM
+    // transport). Also stops the events-stream consumer that rides over
+    // this tunnel.
     if (cfg.instance_id) {
-      const { teardownReverseTunnel, teardownForwardTunnel } = await import("./ec2/ports.js");
-      await safeAsync(`[remote] stop: teardown reverse tunnel for ${compute.name}`, async () => {
-        await teardownReverseTunnel(cfg.instance_id!, this.app.config.ports.conductor);
-      });
+      const { teardownForwardTunnel } = await import("./ec2/ports.js");
+      const { stopArkdEventsConsumer } = await import("../../core/conductor/arkd-events-consumer.js");
+      stopArkdEventsConsumer(compute.name);
       await safeAsync(`[remote] stop: teardown arkd forward tunnel for ${compute.name}`, async () => {
         await teardownForwardTunnel(cfg.instance_id!, ARKD_REMOTE_PORT);
       });

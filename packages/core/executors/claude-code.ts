@@ -122,7 +122,14 @@ export const claudeCodeExecutor: Executor = {
         log(`CRITICAL: buildChannelConfig produced no ark-channel entry for remote dispatch`);
       }
 
-      const settings = claude.buildSettings(session.id, conductorUrl, {
+      // Hooks curl arkd's `/hooks/forward`, not the conductor's
+      // `/hooks/status`. Arkd is reachable from the agent at localhost on
+      // the agent's host (EC2 in remote mode, laptop in local mode), so
+      // `localhost:<arkd_port>` is correct on whichever side runs the
+      // launcher script. The conductor pulls from arkd's `/events/stream`
+      // over the existing forward tunnel and re-dispatches each event.
+      const arkdHookUrl = `http://localhost:${app.config.ports.arkd}`;
+      const settings = claude.buildSettings(session.id, arkdHookUrl, {
         autonomy: opts.autonomy,
         agent: { tools: opts.agent.tools, mcp_servers: opts.agent.mcp_servers },
         tenantId: session.tenant_id ?? "default",
@@ -159,7 +166,11 @@ export const claudeCodeExecutor: Executor = {
         log(`CRITICAL: failed to verify MCP config at ${mcpConfigPath}: ${e?.message ?? e}`);
       }
 
-      const settingsResult = claude.writeSettingsVerified(session.id, conductorUrl, effectiveWorkdir, {
+      // Same arkd hook URL as the remote path -- launcher runs on the
+      // host where arkd lives, so localhost:<arkd_port> resolves correctly
+      // in both local and remote modes.
+      const arkdHookUrl = `http://localhost:${app.config.ports.arkd}`;
+      const settingsResult = claude.writeSettingsVerified(session.id, arkdHookUrl, effectiveWorkdir, {
         autonomy: opts.autonomy,
         agent: { tools: opts.agent.tools, mcp_servers: opts.agent.mcp_servers },
         tenantId: session.tenant_id ?? "default",

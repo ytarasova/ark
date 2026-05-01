@@ -74,92 +74,6 @@ export async function teardownTunnels(ports: PortDecl[]): Promise<void> {
 }
 
 /**
- * Returns the PID of an existing reverse tunnel for `(target, port)`, or null.
- * Uses `pgrep -f` (cross-platform: macOS + Linux) with a substring pattern
- * unique enough to avoid false positives -- `-R <port>:localhost:<port>` and
- * `${REMOTE_USER}@<target>` together only ever appear in the SSH args spawned
- * by setupReverseTunnel below. macOS pgrep does NOT support the Linux `-a`
- * flag, so we just list PIDs and trust the pattern.
- */
-async function findReverseTunnelPid(target: string, port: number): Promise<number | null> {
-  try {
-    // Pattern is a substring match. Lead with the port-pair (not the `-R `
-    // prefix) so pgrep doesn't try to parse it as its own flag, and pass
-    // `--` to terminate flag parsing for safety in case future patterns
-    // happen to start with `-`.
-    const pattern = `${port}:localhost:${port} ${REMOTE_USER}@${target}`;
-    const { stdout } = await execFileAsync("pgrep", ["-f", "--", pattern], { encoding: "utf-8" });
-    const pid = stdout
-      .trim()
-      .split("\n")
-      .map((line) => parseInt(line.trim(), 10))
-      .find((n) => Number.isFinite(n));
-    return pid ?? null;
-  } catch {
-    // pgrep exits non-zero when nothing matches.
-    return null;
-  }
-}
-
-/**
- * Spawn a background SSH reverse tunnel (-R) so the remote host can reach a
- * service on the local machine (e.g. the conductor at localhost:19100).
- * Remote `localhost:port` -> local `localhost:port`.
- *
- * Idempotent: if a matching tunnel for `(instanceId, port)` is already running
- * we return its PID without spawning a duplicate. The duplicate would fail
- * fast on the remote port-bind anyway, but logging gets noisy.
- */
-export async function setupReverseTunnel(
-  key: string,
-  instanceId: string,
-  port: number,
-  ssm: SsmConnectOpts,
-): Promise<{ pid: number | null; reused: boolean }> {
-  const existing = await findReverseTunnelPid(instanceId, port);
-  if (existing) return { pid: existing, reused: true };
-
-  const args = [
-    "ssh",
-    "-i",
-    key,
-    ...SSH_OPTS,
-    ...buildSsmProxyArgs(ssm),
-    "-N",
-    "-f",
-    "-R",
-    `${port}:localhost:${port}`,
-    `${REMOTE_USER}@${instanceId}`,
-  ];
-  const [bin, ...rest] = args;
-  const child = spawn(bin, rest, { detached: true, stdio: "ignore" });
-  child.unref();
-
-  // ssh -f forks immediately and the parent exits, so the spawned child PID
-  // is the SHORT-LIVED parent. Resolve the actual long-lived tunnel PID via
-  // pgrep -- with a few retries because pgrep can race the fork.
-  for (let attempt = 0; attempt < 5; attempt++) {
-    await new Promise((r) => setTimeout(r, 100));
-    const pid = await findReverseTunnelPid(instanceId, port);
-    if (pid) return { pid, reused: false };
-  }
-  return { pid: null, reused: false };
-}
-
-/** Kill the reverse tunnel for `(instanceId, port)`, if any. Best-effort. */
-export async function teardownReverseTunnel(instanceId: string, port: number): Promise<boolean> {
-  const pid = await findReverseTunnelPid(instanceId, port);
-  if (!pid) return false;
-  try {
-    process.kill(pid, "SIGTERM");
-    return true;
-  } catch {
-    logDebug("compute", "reverse tunnel pid already gone");
-    return false;
-  }
-}
-
-/**
  * Returns the PID of an existing forward tunnel for `(instanceId, remotePort)`, or null.
  *
  * The pgrep pattern includes the `:localhost:<remotePort>` half of the `-L`
@@ -167,8 +81,8 @@ export async function teardownReverseTunnel(instanceId: string, port: number): P
  * stable key (the local port is dynamically allocated and may differ across
  * runs), but the instance_id pins the match to this specific compute target.
  *
- * Mirrors `findReverseTunnelPid` -- no `-a` (macOS pgrep doesn't support it),
- * `--` to terminate flag parsing, and we trust the substring match.
+ * No `-a` (macOS pgrep doesn't support it), `--` to terminate flag
+ * parsing, and we trust the substring match.
  */
 async function findForwardTunnelPid(instanceId: string, remotePort: number): Promise<number | null> {
   try {
@@ -221,8 +135,7 @@ async function readForwardTunnelLocalPort(pid: number, remotePort: number): Prom
  * in -- this lets the function stay a pure shell-out without dragging the
  * core port-allocator into the compute package. If a forward tunnel for
  * `(instanceId, remotePort)` is already running, we reuse it and return its
- * existing local port (ignoring the `localPort` arg), matching the
- * idempotency contract on `setupReverseTunnel`.
+ * existing local port (ignoring the `localPort` arg) for idempotency.
  */
 export async function setupForwardTunnel(
   key: string,
@@ -258,8 +171,7 @@ export async function setupForwardTunnel(
   child.unref();
 
   // ssh -f forks; the spawned child is the short-lived parent. Resolve the
-  // long-lived PID via pgrep with retries (race against fork). Same shape as
-  // setupReverseTunnel.
+  // long-lived PID via pgrep with retries (race against fork).
   for (let attempt = 0; attempt < 5; attempt++) {
     await new Promise((r) => setTimeout(r, 100));
     const pid = await findForwardTunnelPid(instanceId, remotePort);

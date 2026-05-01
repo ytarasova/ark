@@ -17,9 +17,23 @@ import { buildPermissionsAllow, type AgentToolSpec } from "./permissions.js";
 
 const ARK_HOOK_MARKER = "# ark-status";
 
-function hookCommand(sessionId: string, conductorUrl: string, tenantId?: string): string {
+/**
+ * Build the curl command Claude's hook system runs on every PreToolUse /
+ * PostToolUse / AgentMessage / etc. event. The target is **local arkd**
+ * (`http://localhost:<arkd-port>/hooks/forward`), not the conductor.
+ * Arkd queues each event and the conductor pulls them via the existing
+ * forward tunnel through `/events/stream`. This eliminates the brittle
+ * SSH `-R` reverse tunnel that previously carried hook callbacks --
+ * arkd is always reachable from the agent because both run on the same
+ * host (laptop in local mode, EC2 in remote mode).
+ *
+ * `conductorUrl` is retained as a parameter only because callers persist
+ * it in `_ark` metadata for human-debugging; it is NOT used for the
+ * actual curl URL anymore.
+ */
+function hookCommand(sessionId: string, arkdUrl: string, tenantId?: string): string {
   const tenantHeader = tenantId ? ` -H 'X-Ark-Tenant-Id: ${tenantId}'` : "";
-  return `curl -sf -X POST -H 'Content-Type: application/json'${tenantHeader} -d @- '${conductorUrl}/hooks/status?session=${sessionId}' > /dev/null 2>&1 || true ${ARK_HOOK_MARKER}`;
+  return `curl -sf -X POST -H 'Content-Type: application/json'${tenantHeader} -d @- '${arkdUrl}/hooks/forward?session=${sessionId}' > /dev/null 2>&1 || true ${ARK_HOOK_MARKER}`;
 }
 
 /**
@@ -35,8 +49,8 @@ function postCompactTaskHook(sessionId: string): Record<string, unknown> {
   return { type: "command", command: cmd, async: true };
 }
 
-function buildHooksConfig(sessionId: string, conductorUrl: string, tenantId?: string): Record<string, unknown[]> {
-  const cmd = hookCommand(sessionId, conductorUrl, tenantId);
+function buildHooksConfig(sessionId: string, arkdUrl: string, tenantId?: string): Record<string, unknown[]> {
+  const cmd = hookCommand(sessionId, arkdUrl, tenantId);
   const asyncHook = { type: "command" as const, command: cmd, async: true };
   const syncHook = { type: "command" as const, command: cmd, async: false };
 
@@ -111,7 +125,7 @@ export interface WriteSettingsResult {
  */
 export function buildSettings(
   sessionId: string,
-  conductorUrl: string,
+  arkdUrl: string,
   opts?: ClaudeSettingsOpts & { existing?: Record<string, unknown> },
 ): { object: Record<string, unknown>; content: string; hookCount: number } {
   const out: Record<string, unknown> = opts?.existing ? { ...opts.existing } : {};
@@ -123,7 +137,7 @@ export function buildSettings(
   }
 
   // Merge fresh ark hooks first so they fire before any user hooks.
-  const newHooks = buildHooksConfig(sessionId, conductorUrl, opts?.tenantId);
+  const newHooks = buildHooksConfig(sessionId, arkdUrl, opts?.tenantId);
   const existingHooks = (out.hooks ?? {}) as Record<string, unknown[]>;
   for (const [event, matchers] of Object.entries(newHooks)) {
     existingHooks[event] = [...matchers, ...(existingHooks[event] ?? [])];
@@ -133,7 +147,7 @@ export function buildSettings(
   // Ark-managed state tracker for clean teardown.
   const arkMeta = (out._ark ?? {}) as Record<string, unknown>;
   arkMeta.sessionId = sessionId;
-  arkMeta.conductorUrl = conductorUrl;
+  arkMeta.arkdUrl = arkdUrl;
   arkMeta.updatedAt = new Date().toISOString();
 
   // permissions.allow built from agent.tools + system MCPs.
@@ -152,9 +166,7 @@ export function buildSettings(
   // remote dispatch (where there's no human at the keyboard to press 1).
   // `enabledMcpjsonServers` is Claude Code's project-level pre-approval
   // list; entries match the keys of `.mcp.json:mcpServers`.
-  const existingEnabled = Array.isArray(out.enabledMcpjsonServers)
-    ? (out.enabledMcpjsonServers as string[])
-    : [];
+  const existingEnabled = Array.isArray(out.enabledMcpjsonServers) ? (out.enabledMcpjsonServers as string[]) : [];
   const enabledServers = new Set<string>(existingEnabled);
   enabledServers.add("ark-channel");
   enabledServers.add("codebase-memory");
@@ -271,7 +283,7 @@ export function verifySettings(settingsPath: string): string[] {
  */
 export function writeSettings(
   sessionId: string,
-  conductorUrl: string,
+  arkdUrl: string,
   workdir: string,
   opts?: ClaudeSettingsOpts,
 ): string {
@@ -292,7 +304,7 @@ export function writeSettings(
     }
   }
 
-  const { content } = buildSettings(sessionId, conductorUrl, { ...opts, existing });
+  const { content } = buildSettings(sessionId, arkdUrl, { ...opts, existing });
 
   // Atomic write via tmp + rename
   const tmpPath = settingsPath + ".tmp";
@@ -308,11 +320,11 @@ export function writeSettings(
  */
 export function writeSettingsVerified(
   sessionId: string,
-  conductorUrl: string,
+  arkdUrl: string,
   workdir: string,
   opts?: ClaudeSettingsOpts,
 ): WriteSettingsResult {
-  const path = writeSettings(sessionId, conductorUrl, workdir, opts);
+  const path = writeSettings(sessionId, arkdUrl, workdir, opts);
   const errors = verifySettings(path);
   const hookCount = (() => {
     try {

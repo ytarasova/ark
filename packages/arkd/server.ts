@@ -35,6 +35,7 @@ import { handleMetricsSnapshotRoutes } from "./routes/metrics-snapshot.js";
 import { handleChannelRoutes } from "./routes/channel.js";
 import { handleMiscRoutes } from "./routes/misc.js";
 import { handleAttachRoutes, sweepOrphanAttachFifos, closeAllAttachStreams } from "./routes/attach.js";
+import { handleEventsRoutes } from "./routes/events.js";
 
 declare const Bun: BunLike;
 
@@ -201,6 +202,9 @@ export function startArkd(port = DEFAULT_PORT, opts?: ArkdOpts): { stop(): void;
 
         const channelRes = await handleChannelRoutes(req, path, ctx);
         if (channelRes) return channelRes;
+
+        const eventsRes = await handleEventsRoutes(req, path, ctx);
+        if (eventsRes) return eventsRes;
 
         const miscRes = await handleMiscRoutes(req, path, ctx);
         if (miscRes) return miscRes;
