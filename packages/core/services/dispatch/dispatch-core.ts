@@ -19,6 +19,29 @@
  *
  * Resume: tear down any running tmux, clear transient status fields, call
  * dispatch again.
+ *
+ * ── ComputeTarget migration call chart ─────────────────────────────────────
+ *
+ * The dispatch path today still consumes the legacy `ComputeProvider`
+ * interface. Plan to flip onto `ComputeTarget` (Compute × Runtime
+ * composition) is in
+ * `docs/superpowers/plans/2026-05-01-compute-target-dispatch-flip-plan.md`.
+ *
+ * | Today (legacy `provider`)        | After flip (`target`)              |
+ * |----------------------------------|------------------------------------|
+ * | `provider.start(compute)`        | `target.compute.start(handle)`     |
+ * | `provider.prepareForLaunch(...)` | `target.prepare(handle, ctx)`      |
+ * | `applyContainerSetup(...)`       | covered by `target.prepare`        |
+ * | `provider.launch(c, s, opts)`    | `target.launchAgent(handle, opts)` |
+ * | `provider.killAgent(c, s)`       | arkd-side via `client.kill`        |
+ * | `provider.cleanupSession(c, s)`  | `target.shutdown(handle)`          |
+ * | `provider.captureOutput(c, s)`   | arkd `/agent/capture`              |
+ * | `provider.getArkdUrl(c)`         | `target.getArkdUrl(handle)`        |
+ *
+ * The new helpers `resolveTargetAndHandle` and `runTargetLifecycle`
+ * (added in tasks 2 + 3 of the plan) wrap the lifecycle in
+ * `provisionStep` so each phase emits structured events. Compute
+ * provisioning is pool-aware via `ComputeTarget.provision`.
  */
 
 import type { DispatchDeps, DispatchResult } from "./types.js";
