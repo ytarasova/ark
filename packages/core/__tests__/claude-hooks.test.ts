@@ -132,10 +132,12 @@ describe("writeSettings", () => {
   });
 
   it("tracks session metadata in _ark", () => {
-    writeSettings("s-meta", "http://localhost:19100", getCtx().arkDir);
+    writeSettings("s-meta", "http://localhost:19300", getCtx().arkDir);
     const settings = JSON.parse(readFileSync(join(getCtx().arkDir, ".claude", "settings.local.json"), "utf-8"));
     expect(settings._ark.sessionId).toBe("s-meta");
-    expect(settings._ark.conductorUrl).toBe("http://localhost:19100");
+    // The second arg is the arkd URL now (`/hooks/forward` lives there).
+    // See c7f4d01d.
+    expect(settings._ark.arkdUrl).toBe("http://localhost:19300");
     expect(settings._ark.updatedAt).toBeDefined();
   });
 
