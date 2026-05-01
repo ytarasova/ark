@@ -99,14 +99,24 @@ export async function prepareRemoteEnvironment(
       region,
       awsProfile,
     });
-    if (tunnel.pid) {
-      log(
-        `Reverse tunnel ${tunnel.reused ? "reused" : "established"} (pid ${tunnel.pid}) ` +
-          `localhost:${conductorPort} on ${compute.name} -> conductor`,
+    if (!tunnel.pid) {
+      // Without the reverse tunnel, the agent's `ark hooks` (curl to
+      // ${conductorUrl}/hooks/status) and the `ark-channel` MCP server
+      // (ARK_CONDUCTOR_URL) have no path back to the conductor. The agent
+      // runs on EC2 and sends every report to a closed loopback, so the
+      // session sits silent at status=running until manual cancel. Treat
+      // this as fatal -- mirrors the throw shape Pass 1 added for the new
+      // arkd forward tunnel below.
+      throw new Error(
+        `Reverse tunnel did not register a PID for compute '${compute.name}' ` +
+          `(localhost:${conductorPort} on ${instanceId} -> conductor) -- ` +
+          `hooks + channel would be unreachable; aborting launch`,
       );
-    } else {
-      log(`WARNING: reverse tunnel did not register a PID -- hooks/channel may be unreachable`);
     }
+    log(
+      `Reverse tunnel ${tunnel.reused ? "reused" : "established"} (pid ${tunnel.pid}) ` +
+        `localhost:${conductorPort} on ${compute.name} -> conductor`,
+    );
 
     // Forward tunnel for arkd. After we dropped public-IP assignment (commit
     // 7a888f74), `cfg.ip` is the *private* address (e.g. 10.x.y.z). The
