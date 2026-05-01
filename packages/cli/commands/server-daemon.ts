@@ -183,6 +183,20 @@ export function registerServerDaemonCommands(serverCmd: Command) {
       process.on("SIGINT", shutdown);
       process.on("SIGTERM", shutdown);
 
+      // Ignore SIGPIPE explicitly. macOS default action on SIGPIPE is
+      // TERMINATE -- writes to a socket whose peer closed (SSM session
+      // disconnect, SSH tunnel mid-stream hiccup, fetch peer reset)
+      // crash the daemon with NO graceful shutdown, NO uncaughtException
+      // (signals don't go through the JS exception path), NO crash report.
+      // Node ignores SIGPIPE by default; Bun does not. Live evidence: every
+      // EC2 dispatch died silently at +125-130s with no logged error and
+      // no shutdown message, while local dispatch on the same daemon ran
+      // for 7+ minutes through full stage transitions.
+      process.on("SIGPIPE", () => {
+        // No-op: install a JS handler so the kernel default (terminate)
+        // is bypassed.
+      });
+
       // Daemon-stability guard. Without these, an unhandled rejection or
       // uncaughtException anywhere in the dispatch chain (an orphaned
       // `provider.launch` after a watchdog wins, a stream-error escaping
