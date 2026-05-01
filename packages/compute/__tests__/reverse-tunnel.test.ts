@@ -54,3 +54,21 @@ describe("setupReverseTunnel", async () => {
     expect(killed).toBe(false);
   });
 });
+
+// Forward tunnel for arkd HTTP. Same shape as setupReverseTunnel but with
+// `-L <localPort>:localhost:<remotePort>` so the conductor can reach the
+// remote arkd through SSM. We don't spawn real SSH; we exercise the export
+// surface and the teardown idempotency contract.
+describe("setupForwardTunnel", async () => {
+  it("is exported from ports module", async () => {
+    const ports = await import("../providers/ec2/ports.js");
+    expect(typeof ports.setupForwardTunnel).toBe("function");
+  });
+
+  it("teardownForwardTunnel is exported and idempotent on a missing tunnel", async () => {
+    const ports = await import("../providers/ec2/ports.js");
+    expect(typeof ports.teardownForwardTunnel).toBe("function");
+    const killed = await ports.teardownForwardTunnel("i-bogus-target", 65530);
+    expect(killed).toBe(false);
+  });
+});

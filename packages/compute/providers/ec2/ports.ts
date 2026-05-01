@@ -160,6 +160,128 @@ export async function teardownReverseTunnel(instanceId: string, port: number): P
 }
 
 /**
+ * Returns the PID of an existing forward tunnel for `(instanceId, remotePort)`, or null.
+ *
+ * The pgrep pattern includes the `:localhost:<remotePort>` half of the `-L`
+ * flag *and* `${REMOTE_USER}@<instanceId>` -- the remote port is the
+ * stable key (the local port is dynamically allocated and may differ across
+ * runs), but the instance_id pins the match to this specific compute target.
+ *
+ * Mirrors `findReverseTunnelPid` -- no `-a` (macOS pgrep doesn't support it),
+ * `--` to terminate flag parsing, and we trust the substring match.
+ */
+async function findForwardTunnelPid(instanceId: string, remotePort: number): Promise<number | null> {
+  try {
+    // Match the right-hand half of `-L <local>:localhost:<remote>` plus the
+    // remote target. The local port varies, so we deliberately don't anchor
+    // on it -- the (`:localhost:<remotePort>`, `${REMOTE_USER}@<instanceId>`)
+    // pair is unique enough to never collide with the reverse tunnel
+    // (which uses `<port>:localhost:<port>` -- same number both sides).
+    const pattern = `:localhost:${remotePort} .*${REMOTE_USER}@${instanceId}`;
+    const { stdout } = await execFileAsync("pgrep", ["-f", "--", pattern], { encoding: "utf-8" });
+    const pid = stdout
+      .trim()
+      .split("\n")
+      .map((line) => parseInt(line.trim(), 10))
+      .find((n) => Number.isFinite(n));
+    return pid ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read the local-side port a forward tunnel is bound to by parsing the
+ * matched ssh command line. We use `ps -o command=` (cross-platform) for the
+ * pid the pgrep above returned and pull `-L <local>:localhost:<remote>`.
+ *
+ * This is how `setupForwardTunnel` discovers the local port for an *existing*
+ * tunnel it's reusing -- the compute config is the source of truth, but the
+ * helper has to be safe to call when the config has been wiped (e.g. a
+ * crashed conductor that left the SSH process running).
+ */
+async function readForwardTunnelLocalPort(pid: number, remotePort: number): Promise<number | null> {
+  try {
+    const { stdout } = await execFileAsync("ps", ["-o", "command=", "-p", String(pid)], { encoding: "utf-8" });
+    const match = stdout.match(new RegExp(`-L\\s+(\\d+):localhost:${remotePort}`));
+    if (!match) return null;
+    const port = parseInt(match[1], 10);
+    return Number.isFinite(port) ? port : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Spawn a background SSH forward tunnel (-L) so the conductor can reach a
+ * service on the remote host (e.g. arkd at remote `localhost:19300`).
+ * Local `localhost:<localPort>` -> remote `localhost:<remotePort>`.
+ *
+ * `localPort` is allocated by the caller via `allocatePort()` and threaded
+ * in -- this lets the function stay a pure shell-out without dragging the
+ * core port-allocator into the compute package. If a forward tunnel for
+ * `(instanceId, remotePort)` is already running, we reuse it and return its
+ * existing local port (ignoring the `localPort` arg), matching the
+ * idempotency contract on `setupReverseTunnel`.
+ */
+export async function setupForwardTunnel(
+  key: string,
+  instanceId: string,
+  remotePort: number,
+  localPort: number,
+  ssm: SsmConnectOpts,
+): Promise<{ pid: number | null; localPort: number; reused: boolean }> {
+  const existing = await findForwardTunnelPid(instanceId, remotePort);
+  if (existing) {
+    const existingLocal = await readForwardTunnelLocalPort(existing, remotePort);
+    if (existingLocal) {
+      return { pid: existing, localPort: existingLocal, reused: true };
+    }
+    // Stale match (couldn't read the ps line) -- fall through and respawn.
+    // The duplicate would fail fast on the local port-bind anyway.
+  }
+
+  const args = [
+    "ssh",
+    "-i",
+    key,
+    ...SSH_OPTS,
+    ...buildSsmProxyArgs(ssm),
+    "-N",
+    "-f",
+    "-L",
+    `${localPort}:localhost:${remotePort}`,
+    `${REMOTE_USER}@${instanceId}`,
+  ];
+  const [bin, ...rest] = args;
+  const child = spawn(bin, rest, { detached: true, stdio: "ignore" });
+  child.unref();
+
+  // ssh -f forks; the spawned child is the short-lived parent. Resolve the
+  // long-lived PID via pgrep with retries (race against fork). Same shape as
+  // setupReverseTunnel.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await new Promise((r) => setTimeout(r, 100));
+    const pid = await findForwardTunnelPid(instanceId, remotePort);
+    if (pid) return { pid, localPort, reused: false };
+  }
+  return { pid: null, localPort, reused: false };
+}
+
+/** Kill the forward tunnel for `(instanceId, remotePort)`, if any. Best-effort. */
+export async function teardownForwardTunnel(instanceId: string, remotePort: number): Promise<boolean> {
+  const pid = await findForwardTunnelPid(instanceId, remotePort);
+  if (!pid) return false;
+  try {
+    process.kill(pid, "SIGTERM");
+    return true;
+  } catch {
+    logDebug("compute", "forward tunnel pid already gone");
+    return false;
+  }
+}
+
+/**
  * SSH into the remote host, run `ss -tln`, and check which declared ports
  * are actually listening. Returns a PortStatus[] with listening: true/false.
  */

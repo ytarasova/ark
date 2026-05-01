@@ -40,6 +40,14 @@ interface RemoteConfig {
   ingress_cidrs?: string[];
   tags?: Record<string, string>;
   arkd_url?: string;
+  /**
+   * Local port on the conductor that the SSM-tunneled SSH `-L` is listening
+   * on, forwarding to remote `localhost:19300`. Set by
+   * `prepareRemoteEnvironment` after the forward tunnel is established;
+   * read by `getArkdUrl` so `ArkdClient` reaches arkd via the local tunnel
+   * instead of trying to hit the (private, unroutable) instance IP directly.
+   */
+  arkd_local_forward_port?: number;
   ssh_tunnel_port?: number;
   isolation?: string;
   container_name?: string;
@@ -64,8 +72,15 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
   getArkdUrl(compute: Compute): string {
     const cfg = compute.config as RemoteConfig;
     if (cfg.arkd_url) return cfg.arkd_url;
+    // Preferred SSM-only path: the conductor reaches arkd via the SSH `-L`
+    // forward tunnel set up in `prepareRemoteEnvironment` -- the remote
+    // private IP isn't routable from the conductor's network.
+    if (cfg.arkd_local_forward_port) return `http://localhost:${cfg.arkd_local_forward_port}`;
+    // Legacy back-compat: in-VPC conductors can still reach the instance's
+    // private IP directly. Kept so existing co-located deployments keep
+    // working without a tunnel.
     if (cfg.ip) return `http://${cfg.ip}:${ARKD_REMOTE_PORT}`;
-    throw new Error(`Compute '${compute.name}' has no IP or arkd_url`);
+    throw new Error(`Compute '${compute.name}' has no arkd_url, arkd_local_forward_port, or ip`);
   }
 
   /**
@@ -252,7 +267,7 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
   async destroy(compute: Compute): Promise<void> {
     const { destroyStack } = await import("./ec2/provision.js");
     const { destroyPool } = await import("./ec2/pool.js");
-    const { teardownReverseTunnel } = await import("./ec2/ports.js");
+    const { teardownReverseTunnel, teardownForwardTunnel } = await import("./ec2/ports.js");
 
     // Tear down the reverse tunnel set up in prepareRemoteEnvironment so
     // the SSH tunnel process doesn't outlive the EC2 instance it points at.
@@ -262,6 +277,18 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
     if (cfg.instance_id) {
       await safeAsync(`[remote] destroy: teardown reverse tunnel for ${compute.name}`, async () => {
         await teardownReverseTunnel(cfg.instance_id!, this.app.config.ports.conductor);
+      });
+      // Same story for the arkd forward tunnel set up in
+      // prepareRemoteEnvironment. We key off (instance_id, ARKD_REMOTE_PORT)
+      // -- the local port is dynamically allocated and may or may not be in
+      // the config (it gets cleared below).
+      await safeAsync(`[remote] destroy: teardown arkd forward tunnel for ${compute.name}`, async () => {
+        await teardownForwardTunnel(cfg.instance_id!, ARKD_REMOTE_PORT);
+      });
+      // Clear the persisted local-forward port so a future re-provision
+      // doesn't try to reuse a port that no longer points anywhere.
+      await safeAsync(`[remote] destroy: clear arkd_local_forward_port for ${compute.name}`, async () => {
+        await this.app.computes.mergeConfig(compute.name, { arkd_local_forward_port: undefined });
       });
     }
 
@@ -344,13 +371,23 @@ abstract class RemoteArkdBase extends ArkdBackedProvider {
     const cfg = compute.config as RemoteConfig;
     if (!cfg.instance_id) throw new Error("No instance_id - cannot stop");
 
-    // Tear down the reverse tunnel before the EC2 stop -- the ssh process is
-    // local; killing it after the instance halts only delays cleanup. The
-    // tunnel pgrep pattern uses `${REMOTE_USER}@<instance_id>` (SSM transport).
+    // Tear down the reverse + arkd-forward tunnels before the EC2 stop --
+    // the ssh processes are local; killing them after the instance halts
+    // only delays cleanup. The tunnel pgrep patterns use
+    // `${REMOTE_USER}@<instance_id>` (SSM transport).
     if (cfg.instance_id) {
-      const { teardownReverseTunnel } = await import("./ec2/ports.js");
+      const { teardownReverseTunnel, teardownForwardTunnel } = await import("./ec2/ports.js");
       await safeAsync(`[remote] stop: teardown reverse tunnel for ${compute.name}`, async () => {
         await teardownReverseTunnel(cfg.instance_id!, this.app.config.ports.conductor);
+      });
+      await safeAsync(`[remote] stop: teardown arkd forward tunnel for ${compute.name}`, async () => {
+        await teardownForwardTunnel(cfg.instance_id!, ARKD_REMOTE_PORT);
+      });
+      // Clear the local-forward port -- on next start, prepareRemoteEnvironment
+      // will allocate a fresh one (the previous local port may be reused by
+      // unrelated processes while we're stopped).
+      await safeAsync(`[remote] stop: clear arkd_local_forward_port for ${compute.name}`, async () => {
+        await this.app.computes.mergeConfig(compute.name, { arkd_local_forward_port: undefined });
       });
     }
 

@@ -43,10 +43,9 @@ describe("RemoteWorktreeProvider", () => {
     expect(provider.needsAuth).toBe(true);
   });
 
-  it("getArkdUrl uses compute IP when present (legacy path)", () => {
-    // arkd HTTP from the conductor still goes via the legacy ip field when
-    // it's set. SSM-only deployments rely on the SSH-tunnel route exposed by
-    // EC2Compute (packages/compute/core/ec2.ts) instead.
+  it("getArkdUrl uses compute IP when present (legacy path, in-VPC conductor only)", () => {
+    // Legacy back-compat: in-VPC conductors can still hit the private IP
+    // directly. SSM-only deployments use the forward-tunnel path below.
     const compute = makeCompute({ config: { instance_id: "i-x", region: "us-east-1", ip: "10.0.1.5" } });
     expect(provider.getArkdUrl(compute)).toBe("http://10.0.1.5:19300");
   });
@@ -58,13 +57,37 @@ describe("RemoteWorktreeProvider", () => {
     expect(provider.getArkdUrl(compute)).toBe("http://custom:9999");
   });
 
-  it("getArkdUrl throws when no arkd_url and no ip", () => {
+  it("getArkdUrl uses arkd_local_forward_port over the legacy ip field", () => {
+    // After commit 7a888f74 (no public IPs), `cfg.ip` is the private VPC
+    // address and the conductor can't reach it. `prepareRemoteEnvironment`
+    // sets up an SSH `-L` forward tunnel and stores the local port; this
+    // test pins the precedence so an unreachable private IP doesn't shadow
+    // a working tunnel.
+    const compute = makeCompute({
+      config: {
+        instance_id: "i-x",
+        region: "us-east-1",
+        ip: "10.72.217.109",
+        arkd_local_forward_port: 41234,
+      },
+    });
+    expect(provider.getArkdUrl(compute)).toBe("http://localhost:41234");
+  });
+
+  it("getArkdUrl uses arkd_local_forward_port when no ip is set", () => {
+    const compute = makeCompute({
+      config: { instance_id: "i-x", region: "us-east-1", arkd_local_forward_port: 41234 },
+    });
+    expect(provider.getArkdUrl(compute)).toBe("http://localhost:41234");
+  });
+
+  it("getArkdUrl throws when no arkd_url, no forward port, and no ip", () => {
     const compute = makeCompute({ config: { instance_id: "i-x", region: "us-east-1" } });
     try {
       provider.getArkdUrl(compute);
       expect(true).toBe(false);
     } catch (e: any) {
-      expect(e.message).toContain("no IP");
+      expect(e.message).toMatch(/no arkd_url, arkd_local_forward_port, or ip/);
     }
   });
 

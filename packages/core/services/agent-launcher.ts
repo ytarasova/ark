@@ -11,6 +11,8 @@ import type { AppContext } from "../app.js";
 import type { Session, Compute } from "../../types/index.js";
 import type { ComputeProvider } from "../../compute/types.js";
 import { resolvePortDecls, parseArcJson } from "../../compute/arc-json.js";
+import { allocatePort } from "../config/port-allocator.js";
+import { DEFAULT_ARKD_PORT } from "../constants.js";
 
 /** Apply arc.json container setup: Docker Compose and devcontainer. */
 async function applyContainerSetup(
@@ -91,7 +93,7 @@ export async function prepareRemoteEnvironment(
     // EC2 -> SSH -> conductor's localhost:<conductorPort>. Idempotent: if a
     // tunnel for this (instance_id, port) already exists we reuse it.
     const conductorPort = app.config.ports.conductor;
-    const { setupReverseTunnel } = await import("../../compute/providers/ec2/ports.js");
+    const { setupReverseTunnel, setupForwardTunnel } = await import("../../compute/providers/ec2/ports.js");
     const tunnel = await setupReverseTunnel(sshKeyPath(compute.name), instanceId, conductorPort, {
       region,
       awsProfile,
@@ -104,6 +106,37 @@ export async function prepareRemoteEnvironment(
     } else {
       log(`WARNING: reverse tunnel did not register a PID -- hooks/channel may be unreachable`);
     }
+
+    // Forward tunnel for arkd. After we dropped public-IP assignment (commit
+    // 7a888f74), `cfg.ip` is the *private* address (e.g. 10.x.y.z). The
+    // conductor (running on the operator's laptop) can't reach a private
+    // VPC IP, so every ArkdClient call (`launch`, `killAgent`, `captureOutput`,
+    // `checkSession`, `getMetrics`, `probePorts`, plus the worktree
+    // provider's `git clone`) hung until 30s timeout. Wire an SSH `-L`
+    // forward tunnel over SSM so `ArkdClient` reaches arkd via
+    // `http://localhost:<localForwardPort>`. The local port is allocated
+    // dynamically per compute and persisted on `compute.config.arkd_local_forward_port`
+    // for `RemoteArkdBase.getArkdUrl` to read.
+    const localPort = await allocatePort();
+    const arkdTunnel = await setupForwardTunnel(sshKeyPath(compute.name), instanceId, DEFAULT_ARKD_PORT, localPort, {
+      region,
+      awsProfile,
+    });
+    if (!arkdTunnel.pid) {
+      throw new Error(
+        `Failed to set up arkd forward tunnel for compute '${compute.name}' ` +
+          `(localhost:${arkdTunnel.localPort} -> ${instanceId}:${DEFAULT_ARKD_PORT})`,
+      );
+    }
+    log(
+      `Arkd forward tunnel ${arkdTunnel.reused ? "reused" : "established"} (pid ${arkdTunnel.pid}) ` +
+        `localhost:${arkdTunnel.localPort} -> ${instanceId}:${DEFAULT_ARKD_PORT}`,
+    );
+    // Persist the local-forward port so getArkdUrl resolves to the tunneled
+    // localhost endpoint instead of the unreachable private IP. Reuse case
+    // covers crashed-conductor restarts: the SSH process is still alive and
+    // we round-trip its actual local port from `ps`.
+    await app.computes.mergeConfig(compute.name, { arkd_local_forward_port: arkdTunnel.localPort });
   }
 
   // Resolve ports from arc.json / devcontainer / compose
