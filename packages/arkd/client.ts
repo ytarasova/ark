@@ -162,9 +162,18 @@ export class ArkdClient {
    * Throws if the server returns a non-2xx.
    */
   async attachStream(streamHandle: string): Promise<Response> {
+    const ac = new AbortController();
+    const t = setTimeout(
+      () => ac.abort(new Error(`arkd attachStream: timeout after ${this.requestTimeoutMs}ms`)),
+      this.requestTimeoutMs,
+    );
+    // Don't clear `t` in a finally -- once headers arrive and we return the
+    // Response, the body stream lives on independently. Caller is expected
+    // to consume the stream promptly. Worst case we leak a no-op timer.
+    void t;
     const resp = await fetch(`${this.baseUrl}/agent/attach/stream?handle=${encodeURIComponent(streamHandle)}`, {
       headers: this.authHeaders(),
-      signal: AbortSignal.timeout(this.requestTimeoutMs),
+      signal: ac.signal,
     });
     if (!resp.ok) {
       const body = await resp.text().catch(() => "");
@@ -222,32 +231,49 @@ export class ArkdClient {
 
   private async post<Req, Res>(path: string, body: Req, opts?: { timeoutMs?: number }): Promise<Res> {
     const timeoutMs = opts?.timeoutMs ?? this.requestTimeoutMs;
-    const resp = await fetch(`${this.baseUrl}${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...this.authHeaders() },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    const data = await resp.json();
-    if (!resp.ok) {
-      const err = data as ArkdError;
-      throw new ArkdClientError(`arkd ${path}: ${err.error}`, err.code, resp.status);
+    // Manual AbortController + setTimeout instead of AbortSignal.timeout.
+    // Bun 1.3.x has had crash bugs with `AbortSignal.timeout` firing on
+    // long-running fetches (>90s) under load -- the daemon dies natively
+    // with no logged error. Manual timer + .clear in finally is portable
+    // and behaves identically on the happy path.
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(new Error(`arkd ${path}: timeout after ${timeoutMs}ms`)), timeoutMs);
+    try {
+      const resp = await fetch(`${this.baseUrl}${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...this.authHeaders() },
+        body: JSON.stringify(body),
+        signal: ac.signal,
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        const err = data as ArkdError;
+        throw new ArkdClientError(`arkd ${path}: ${err.error}`, err.code, resp.status);
+      }
+      return data as Res;
+    } finally {
+      clearTimeout(t);
     }
-    return data as Res;
   }
 
   private async get<Res>(path: string, opts?: { timeoutMs?: number }): Promise<Res> {
     const timeoutMs = opts?.timeoutMs ?? this.requestTimeoutMs;
-    const resp = await fetch(`${this.baseUrl}${path}`, {
-      headers: this.authHeaders(),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    const data = await resp.json();
-    if (!resp.ok) {
-      const err = data as ArkdError;
-      throw new ArkdClientError(`arkd ${path}: ${err.error}`, err.code, resp.status);
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(new Error(`arkd ${path}: timeout after ${timeoutMs}ms`)), timeoutMs);
+    try {
+      const resp = await fetch(`${this.baseUrl}${path}`, {
+        headers: this.authHeaders(),
+        signal: ac.signal,
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        const err = data as ArkdError;
+        throw new ArkdClientError(`arkd ${path}: ${err.error}`, err.code, resp.status);
+      }
+      return data as Res;
+    } finally {
+      clearTimeout(t);
     }
-    return data as Res;
   }
 }
 
