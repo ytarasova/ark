@@ -25,9 +25,18 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import type { AppContext } from "../../core/app.js";
 import { allocatePort } from "../../core/config/port-allocator.js";
-import type { Compute, ComputeCapabilities, ComputeHandle, ComputeKind, ProvisionOpts, Snapshot } from "./types.js";
+import type {
+  Compute,
+  ComputeCapabilities,
+  ComputeHandle,
+  ComputeKind,
+  EnsureReachableOpts,
+  ProvisionOpts,
+  Snapshot,
+} from "./types.js";
 import { NotSupportedError } from "./types.js";
 import { logDebug } from "../../core/observability/structured-log.js";
+import { provisionStep } from "../../core/services/provisioning-steps.js";
 
 /**
  * Config payload read from `ProvisionOpts.config`. Same shape as the legacy
@@ -191,29 +200,82 @@ export class K8sCompute implements Compute {
 
     await api.createNamespacedPod({ namespace, body: pod });
 
-    // Spawn the port-forward. We allocate a host port and connect it to
-    // the pod's :19300 so the conductor can reach arkd locally.
-    const arkdLocalPort = await this.deps.allocatePort();
-    const pfArgs = this.buildPortForwardArgs(podName, namespace, arkdLocalPort, cfg.kubeconfig);
-    const child = this.deps.spawnPortForward(pfArgs);
-    const portForwardPid = child.pid ?? null;
-
+    // Build a partial meta -- transport fields (arkdLocalPort, portForwardPid)
+    // are filled in by setupPortForward, called next. Done this way so
+    // setupPortForward is shared between fresh-provision and rehydrate via
+    // ensureReachable.
     const meta: K8sHandleMeta = this.buildHandleMeta(
       {
         podName,
         namespace,
-        portForwardPid,
-        arkdLocalPort,
+        portForwardPid: null,
+        arkdLocalPort: 0,
         kubeconfig: cfg.kubeconfig,
       },
       cfg,
     );
 
-    return {
+    const handle: ComputeHandle = {
       kind: this.kind,
       name,
       meta: { k8s: meta },
     };
+
+    await this.setupPortForward(handle);
+    return handle;
+  }
+
+  // ── ensureReachable ──────────────────────────────────────────────────────
+  //
+  // Idempotent port-forward setup. On rehydrate (multi-stage flow, persisted
+  // handle) the recorded port-forward PID may or may not still be running;
+  // setupPortForward reuses it when alive and otherwise allocates a fresh
+  // local port + spawns a new `kubectl port-forward`.
+  //
+  // Phases emit `provisioning_step` events so the timeline shows a uniform
+  // per-step trail.
+
+  async ensureReachable(h: ComputeHandle, opts: EnsureReachableOpts): Promise<void> {
+    await this.setupPortForward(h, opts);
+  }
+
+  // ── setupPortForward (private; shared by provision + ensureReachable) ────
+  //
+  // Reuse the running `kubectl port-forward` if its PID is alive. Otherwise
+  // allocate a fresh host port + spawn a new one. Mutates handle.meta.k8s
+  // so subsequent `getArkdUrl(h)` calls resolve to the live tunnel.
+  private async setupPortForward(
+    h: ComputeHandle,
+    opts: { app?: AppContext; sessionId?: string; onLog?: (msg: string) => void } = {},
+  ): Promise<void> {
+    const meta = this.readMeta(h);
+    const useStep = !!opts.app && !!opts.sessionId;
+    const stepCtx = { compute: h.name, podName: meta.podName, namespace: meta.namespace };
+
+    const fn = async (): Promise<void> => {
+      // Idempotent reuse: if we already recorded a port-forward and its PID
+      // is still alive, keep using it.
+      if (meta.portForwardPid !== null && meta.portForwardPid > 0 && meta.arkdLocalPort > 0) {
+        if (isPidAlive(meta.portForwardPid)) {
+          return;
+        }
+        // Stale PID -- the previous kubectl process is gone. Fall through
+        // to spawn a fresh one.
+      }
+
+      const arkdLocalPort = await this.deps.allocatePort();
+      const args = this.buildPortForwardArgs(meta.podName, meta.namespace, arkdLocalPort, meta.kubeconfig);
+      const child = this.deps.spawnPortForward(args);
+      meta.arkdLocalPort = arkdLocalPort;
+      meta.portForwardPid = child.pid ?? null;
+      this.writeMeta(h, meta);
+    };
+
+    if (useStep) {
+      await provisionStep(opts.app!, opts.sessionId!, "k8s-port-forward", fn, { context: stepCtx });
+    } else {
+      await fn();
+    }
   }
 
   async start(h: ComputeHandle): Promise<void> {
@@ -285,5 +347,22 @@ export class K8sCompute implements Compute {
     if (kubeconfig) args.push("--kubeconfig", kubeconfig);
     args.push("port-forward", "-n", namespace, `pod/${pod}`, `${hostPort}:${ARKD_POD_PORT}`);
     return args;
+  }
+}
+
+/**
+ * Probe whether `pid` names a live process. `process.kill(pid, 0)` is the
+ * canonical zero-cost liveness probe on POSIX -- a permissions error is
+ * still "the pid is alive" so we treat EPERM as live; only ESRCH means the
+ * process is gone.
+ */
+function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    const e = err as NodeJS.ErrnoException;
+    if (e.code === "EPERM") return true;
+    return false;
   }
 }

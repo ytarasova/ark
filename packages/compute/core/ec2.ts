@@ -52,9 +52,19 @@ import { spawn } from "child_process";
 
 import { REMOTE_USER } from "../providers/ec2/constants.js";
 import type { AppContext } from "../../core/app.js";
-import type { Compute, ComputeCapabilities, ComputeHandle, ComputeKind, ProvisionOpts, Snapshot } from "./types.js";
+import type {
+  Compute,
+  ComputeCapabilities,
+  ComputeHandle,
+  ComputeKind,
+  EnsureReachableOpts,
+  ProvisionOpts,
+  Snapshot,
+} from "./types.js";
 import { NotSupportedError } from "./types.js";
 import { logDebug } from "../../core/observability/structured-log.js";
+import { provisionStep } from "../../core/services/provisioning-steps.js";
+import { startArkdEventsConsumer } from "../../core/conductor/arkd-events-consumer.js";
 
 // ── Config read from ProvisionOpts / AppContext ─────────────────────────────
 
@@ -449,35 +459,15 @@ export class EC2Compute implements Compute {
       { maxAttempts: 60, delayMs: 10_000 },
     );
 
-    log("[ec2] Opening SSH tunnel (via SSM) to arkd...");
-    const arkdLocalPort = await this.helpers.allocatePort();
-    const sshPid = this.helpers.openSshTunnel({
-      keyPath: privateKeyPath,
-      instanceId,
-      region,
-      awsProfile: cfg.awsProfile,
-      localPort: arkdLocalPort,
-      remotePort: ARKD_REMOTE_PORT,
-    });
-
-    const arkdUrl = `http://localhost:${arkdLocalPort}`;
-    log(`[ec2] Waiting for arkd at ${arkdUrl}...`);
-    const arkdReady = await this.helpers.poll(() => this.helpers.fetchHealth(`${arkdUrl}/health`, 5000), {
-      maxAttempts: 30,
-      delayMs: 3000,
-    });
-    if (!arkdReady) {
-      // Tear the tunnel down so we don't leak an ssh process on failure.
-      this.helpers.killSshTunnel(sshPid);
-      throw new Error(`EC2Compute.provision: arkd never became reachable at ${arkdUrl}`);
-    }
-
+    // Build a partial meta -- transport fields (arkdLocalPort, sshPid) are
+    // filled in by setupTransport, called next. Done this way so the same
+    // setupTransport body covers fresh-provision and rehydrate.
     const meta: EC2HandleMeta = {
       instanceId,
       publicIp: result.ip,
       privateIp: null,
-      arkdLocalPort,
-      sshPid,
+      arkdLocalPort: 0,
+      sshPid: null,
       sshKeyPath: privateKeyPath,
       region,
       awsProfile: cfg.awsProfile,
@@ -487,12 +477,160 @@ export class EC2Compute implements Compute {
       size,
       arch,
     };
-
-    return {
+    const handle: ComputeHandle = {
       kind: this.kind,
       name,
       meta: { ec2: meta },
     };
+
+    await this.setupTransport(handle, { log });
+    return handle;
+  }
+
+  // ── ensureReachable ──────────────────────────────────────────────────────
+  //
+  // Bring the conductor's connection to arkd into a "ready" state on every
+  // dispatch. Fresh provision feeds in the meta we just minted; rehydrate
+  // (multi-stage flow, persisted handle from a previous run) feeds in the
+  // existing meta. setupTransport reuses the live ssh -L process when the
+  // recorded PID is still alive AND arkd answers /health through it, so
+  // this method is idempotent.
+  //
+  // Each phase emits `provisioning_step` events on the session timeline
+  // (started / ok / failed) so the web UI shows a uniform per-step trail.
+
+  async ensureReachable(h: ComputeHandle, opts: EnsureReachableOpts): Promise<void> {
+    await this.setupTransport(h, opts);
+  }
+
+  // ── setupTransport (private; shared by provision + ensureReachable) ──────
+  //
+  // Three phases:
+  //   1. forward-tunnel  -- check for a live tunnel; reuse if healthy,
+  //                         otherwise allocate a port and openSshTunnel.
+  //   2. arkd-probe      -- /health on the (possibly fresh) local tunnel.
+  //   3. events-consumer -- subscribe to arkd's NDJSON event stream so
+  //                         hook events from the agent flow back to the
+  //                         session timeline. startArkdEventsConsumer is
+  //                         idempotent.
+  //
+  // Mutates `handle.meta.ec2.arkdLocalPort` + `sshPid` so subsequent
+  // `getArkdUrl(h)` calls resolve to the live tunnel.
+  //
+  // When `opts.app` and `opts.sessionId` are provided (the ensureReachable
+  // case), each phase is wrapped in `provisionStep` so the timeline shows
+  // a uniform per-step trail. When called from `provision` we don't yet
+  // have a sessionId; the helpers do their own log-line streaming via
+  // `opts.log` for that case.
+  private async setupTransport(
+    h: ComputeHandle,
+    opts: { app?: AppContext; sessionId?: string; log?: (msg: string) => void; onLog?: (msg: string) => void } = {},
+  ): Promise<void> {
+    const meta = readMeta(h);
+    const log = opts.log ?? opts.onLog ?? (() => {});
+    const useStep = !!opts.app && !!opts.sessionId;
+    const stepCtx = { compute: h.name, instanceId: meta.instanceId };
+
+    // Phase 0 (rehydrate-only): connectivity-check. Fail fast if the SSM
+    // transport itself isn't alive before we waste time on tunnel setup.
+    // Skipped on the fresh-provision path because `provision` already polled
+    // sshExec to confirm the instance is up before it called us, and adding
+    // a second connectivity hit there would change the existing test's
+    // observable poll order.
+    if (useStep) {
+      await provisionStep(
+        opts.app!,
+        opts.sessionId!,
+        "connectivity-check",
+        async () => {
+          const res = await this.helpers.sshExec(meta.sshKeyPath, meta.instanceId, "echo ok", {
+            timeout: 15_000,
+            region: meta.region,
+            awsProfile: meta.awsProfile,
+          });
+          if (res.exitCode !== 0) throw new Error(`ssh returned non-zero exit ${res.exitCode}`);
+        },
+        { retries: 1, retryBackoffMs: 1_000, context: stepCtx },
+      );
+    }
+
+    // Phase 1: forward-tunnel. Reuse the existing one when healthy.
+    const tunnelFn = async (): Promise<{ localPort: number; sshPid: number; reused: boolean }> => {
+      // Idempotent reuse: if we already recorded a tunnel and arkd answers
+      // through it, keep using it. This is the rehydrate-after-multi-stage
+      // path -- a stale meta from 5 minutes ago whose ssh process is still
+      // alive should not provoke a tunnel respawn.
+      if (meta.sshPid !== null && meta.sshPid > 0 && meta.arkdLocalPort > 0) {
+        const probeUrl = `http://localhost:${meta.arkdLocalPort}`;
+        const live = await this.helpers.fetchHealth(`${probeUrl}/health`, 2000);
+        if (live) {
+          return { localPort: meta.arkdLocalPort, sshPid: meta.sshPid, reused: true };
+        }
+        // Old tunnel is dead -- tear down the recorded PID before respawning
+        // so we don't leak the orphaned ssh process.
+        this.helpers.killSshTunnel(meta.sshPid);
+      }
+
+      log("[ec2] Opening SSH tunnel (via SSM) to arkd...");
+      const localPort = await this.helpers.allocatePort();
+      const sshPid = this.helpers.openSshTunnel({
+        keyPath: meta.sshKeyPath,
+        instanceId: meta.instanceId,
+        region: meta.region,
+        awsProfile: meta.awsProfile,
+        localPort,
+        remotePort: ARKD_REMOTE_PORT,
+      });
+      return { localPort, sshPid, reused: false };
+    };
+
+    const tunnel = useStep
+      ? await provisionStep(opts.app!, opts.sessionId!, "forward-tunnel", tunnelFn, { context: stepCtx })
+      : await tunnelFn();
+
+    // Persist the port + pid before the health probe so a probe failure
+    // teardown can find the right pid to kill.
+    meta.arkdLocalPort = tunnel.localPort;
+    meta.sshPid = tunnel.sshPid;
+
+    // Phase 2: arkd /health probe through the (possibly fresh) tunnel.
+    const arkdUrl = `http://localhost:${tunnel.localPort}`;
+    const probeFn = async (): Promise<void> => {
+      log(`[ec2] Waiting for arkd at ${arkdUrl}...`);
+      const ready = await this.helpers.poll(() => this.helpers.fetchHealth(`${arkdUrl}/health`, 5000), {
+        maxAttempts: 30,
+        delayMs: 3000,
+      });
+      if (!ready) {
+        // Tear the tunnel down so we don't leak an ssh process on failure.
+        this.helpers.killSshTunnel(tunnel.sshPid);
+        meta.sshPid = null;
+        throw new Error(`EC2Compute.setupTransport: arkd never became reachable at ${arkdUrl}`);
+      }
+    };
+    if (useStep) {
+      await provisionStep(opts.app!, opts.sessionId!, "arkd-probe", probeFn, {
+        context: { ...stepCtx, localPort: tunnel.localPort },
+      });
+    } else {
+      await probeFn();
+    }
+
+    // Phase 3: arkd-events consumer subscribe. Idempotent: a second start
+    // for the same compute is a no-op inside startArkdEventsConsumer.
+    if (useStep) {
+      await provisionStep(
+        opts.app!,
+        opts.sessionId!,
+        "events-consumer-start",
+        async () => {
+          startArkdEventsConsumer(opts.app!, h.name, arkdUrl, process.env.ARK_ARKD_TOKEN ?? null);
+        },
+        { context: stepCtx },
+      );
+    }
+    // When called from provision (no app yet), the events-consumer is started
+    // by the dispatcher's later `ensureReachable` pass; nothing to do here.
   }
 
   // ── start / stop ─────────────────────────────────────────────────────────

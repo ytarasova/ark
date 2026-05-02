@@ -48,6 +48,11 @@ export class LocalCompute implements Compute {
     return `http://localhost:${this.app.config.ports.arkd}`;
   }
 
+  async ensureReachable(): Promise<void> {
+    // Local arkd shares a host with the conductor. There's no transport
+    // to set up.
+  }
+
   async snapshot(_h: ComputeHandle): Promise<Snapshot> {
     throw new NotSupportedError(this.kind, "snapshot");
   }

@@ -100,6 +100,19 @@ export interface LaunchOpts {
   env?: Record<string, string>;
 }
 
+/**
+ * Options threaded into `Compute.ensureReachable`. The implementation
+ * needs `app` to emit `provisioning_step` events on the session timeline
+ * (via `provisionStep` from `core/services/provisioning-steps.ts`), and
+ * `sessionId` so those events land on the right session. `onLog` mirrors
+ * the human-facing log line the dispatcher already streams to the UI.
+ */
+export interface EnsureReachableOpts {
+  app: import("../../core/app.js").AppContext;
+  sessionId: string;
+  onLog?: (msg: string) => void;
+}
+
 // ── Errors ─────────────────────────────────────────────────────────────────
 
 /**
@@ -148,6 +161,26 @@ export interface Compute {
 
   /** Where arkd listens. URL reachable from the ark host conductor. */
   getArkdUrl(h: ComputeHandle): string;
+
+  /**
+   * Make the compute reachable from the conductor. Idempotent. Called
+   * on every dispatch (fresh provision AND rehydrated handle).
+   *
+   * Provider-specific behaviour:
+   *   - LocalCompute: no-op (arkd is on the same host as the conductor).
+   *   - EC2Compute: SSH-over-SSM connectivity check, forward `-L`
+   *     tunnel, arkd /health probe, events-stream subscribe. Mutates
+   *     `handle.meta.ec2.arkdLocalPort` so the next call to
+   *     `getArkdUrl(h)` resolves to the new tunnel.
+   *   - K8sCompute: kubectl port-forward, arkd /health probe.
+   *   - FirecrackerCompute: TAP bridge wiring, microVM ssh probe.
+   *
+   * Implementations should emit `provisioning_step` events for their
+   * internal phases via `provisionStep`.
+   *
+   * Optional: omit on impls that need no transport setup.
+   */
+  ensureReachable?(h: ComputeHandle, opts: EnsureReachableOpts): Promise<void>;
 
   /** Snapshot support. Throws `NotSupportedError` if `!capabilities.snapshot`. */
   snapshot(h: ComputeHandle): Promise<Snapshot>;

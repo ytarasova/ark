@@ -31,10 +31,19 @@
 
 import type { AppContext } from "../../../core/app.js";
 import { logInfo } from "../../../core/observability/structured-log.js";
-import type { Compute, ComputeCapabilities, ComputeHandle, ComputeKind, ProvisionOpts, Snapshot } from "../types.js";
+import type {
+  Compute,
+  ComputeCapabilities,
+  ComputeHandle,
+  ComputeKind,
+  EnsureReachableOpts,
+  ProvisionOpts,
+  Snapshot,
+} from "../types.js";
 // ^ core/types.ts -- the new Compute/Runtime abstractions. Do NOT import from
 // `packages/compute/types.ts`, which is the legacy ComputeProvider surface.
 import { NotSupportedError } from "../types.js";
+import { provisionStep } from "../../../core/services/provisioning-steps.js";
 import { isFirecrackerAvailable } from "./availability.js";
 import { assignGuestIp, createTap, ensureBridge, removeTap } from "./network.js";
 import { vmSnapshotPaths, vmWorkDir } from "./paths.js";
@@ -258,6 +267,40 @@ export class FirecrackerCompute implements Compute {
 
   getArkdUrl(h: ComputeHandle): string {
     return readMeta(h).arkdUrl;
+  }
+
+  // ── ensureReachable ──────────────────────────────────────────────────────
+  //
+  // The microVM's kernel boot is one-shot inside `provision`. The network
+  // layer (TAP bridge) and the host-to-guest readiness probe are the only
+  // pieces that may need to re-run on rehydrate. ensureBridge is idempotent
+  // (createTap is not, so we don't touch the TAP itself); waitForArkdReady
+  // is the probe. Together they give the conductor confidence that the
+  // recorded `arkdUrl` still answers before it dispatches.
+
+  async ensureReachable(h: ComputeHandle, opts: EnsureReachableOpts): Promise<void> {
+    const meta = readMeta(h);
+    const stepCtx = { compute: h.name, vmId: meta.vmId };
+
+    await provisionStep(
+      opts.app,
+      opts.sessionId,
+      "firecracker-bridge",
+      async () => {
+        await this.deps.ensureBridge(BRIDGE_NAME);
+      },
+      { context: stepCtx },
+    );
+
+    await provisionStep(
+      opts.app,
+      opts.sessionId,
+      "firecracker-arkd-probe",
+      async () => {
+        await this.deps.waitForArkdReady(meta.arkdUrl, ARKD_READY_TIMEOUT_MS);
+      },
+      { context: { ...stepCtx, arkdUrl: meta.arkdUrl } },
+    );
   }
 
   /**
