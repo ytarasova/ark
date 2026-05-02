@@ -13,6 +13,64 @@ import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../exec
 import * as claude from "../claude/claude.js";
 import * as tmux from "../infra/tmux.js";
 import { parseArcJson } from "../../compute/arc-json.js";
+import { logWarn } from "../observability/structured-log.js";
+
+/**
+ * Default home directory on EC2 / k8s remote hosts. Used as the
+ * remote-safe fallback for `launcherWorkdir` when a remote dispatch has
+ * no clone source (bare worktree dispatch). Hard-coded to mirror
+ * `packages/compute/providers/ec2/constants.ts:REMOTE_HOME` -- duplicated
+ * here so this executor module avoids a cross-package import on the
+ * compute layer.
+ */
+const REMOTE_HOME_FALLBACK = "/home/ubuntu";
+
+/**
+ * Resolve the workdir paths used by remote dispatch:
+ *   - `launcher`: where the launcher script's `cd` and embedded-file
+ *      heredocs target on the agent's host. MUST NOT be the conductor's
+ *      filesystem path (e.g. `/Users/...`); falls back to REMOTE_HOME
+ *      when the provider can't compute one (bare-worktree remote dispatch).
+ *   - `runTarget`: what's threaded into `runTargetLifecycle.workspace.remoteWorkdir`.
+ *      Falls back to `null` so prepare-workspace cleanly skips on bare-worktree
+ *      rather than asking the lifecycle to clone into a conductor-shaped path.
+ *
+ * For local dispatch (`isRemote=false`) both fields fall through to the
+ * conductor-side `effectiveWorkdir`, which is correct -- the agent runs
+ * on the conductor.
+ *
+ * Pure: no I/O. Easy to unit-test against a stub provider.
+ */
+export function resolveRemoteWorkdirs(opts: {
+  isRemote: boolean;
+  effectiveWorkdir: string | null;
+  resolveWorkdir: (() => string | null) | undefined;
+  /** Hook invoked when a remote dispatch falls back to REMOTE_HOME. Tests pass a spy. */
+  onFallback?: (reason: string) => void;
+}): { launcher: string; runTarget: string | null } {
+  const { isRemote, effectiveWorkdir, resolveWorkdir, onFallback } = opts;
+  if (!isRemote) {
+    // Local: agent runs on the conductor; effectiveWorkdir is the right answer
+    // for both fields. effectiveWorkdir may be null on bare-worktree local
+    // dispatch -- callers handle that downstream.
+    return { launcher: effectiveWorkdir ?? "", runTarget: effectiveWorkdir ?? null };
+  }
+  const resolved = resolveWorkdir ? resolveWorkdir() : null;
+  if (resolved) {
+    return { launcher: resolved, runTarget: resolved };
+  }
+  // Remote dispatch with no resolveWorkdir result. The conductor's path
+  // would be `/Users/...` which doesn't exist on Ubuntu; bake REMOTE_HOME
+  // into the launcher's `cd` instead so the script doesn't fail with
+  // `cd: no such file or directory`. Run-target stays null so
+  // prepare-workspace skips cleanly (bare-worktree dispatch surfaces the
+  // misconfig at the agent stage rather than masquerading as a clone).
+  onFallback?.(
+    "remote dispatch has no resolveWorkdir result (no --remote-repo? bare worktree?); " +
+      `falling back to ${REMOTE_HOME_FALLBACK} for launcher cwd, null for prepare-workspace`,
+  );
+  return { launcher: REMOTE_HOME_FALLBACK, runTarget: null };
+}
 
 export const claudeCodeExecutor: Executor = {
   name: "claude-code",
@@ -86,10 +144,21 @@ export const claudeCodeExecutor: Executor = {
     // the returned path drives both the heredoc target for embedded
     // files AND the workdir threaded into `runTargetLifecycle` so tmux's
     // `-c <workdir>` and the launcher agree.
-    const launcherWorkdir =
-      isRemote && compute && provider?.resolveWorkdir
-        ? (provider.resolveWorkdir(compute, session) ?? effectiveWorkdir)
-        : effectiveWorkdir;
+    //
+    // When `resolveWorkdir` returns null (bare-worktree remote dispatch
+    // with no `--remote-repo`), pre-fix this silently fell through to
+    // `effectiveWorkdir` -- the conductor's local path -- and the launcher
+    // `cd`'d into a non-existent /Users/... path on Ubuntu. Audit finding
+    // F3 traced that to the silent fallback; we now bounce through
+    // `resolveRemoteWorkdirs` which uses REMOTE_HOME for the launcher and
+    // null for the run-target's prepare-workspace argument.
+    const { launcher: launcherWorkdir } = resolveRemoteWorkdirs({
+      isRemote,
+      effectiveWorkdir,
+      resolveWorkdir:
+        compute && provider?.resolveWorkdir ? () => provider.resolveWorkdir!(compute, session) : undefined,
+      onFallback: (reason) => log(`launcherWorkdir: ${reason}`),
+    });
 
     // For LOCAL dispatch: write `.mcp.json` + `.claude/settings.local.json`
     // directly into the local workdir Claude will run in. For REMOTE dispatch
@@ -279,10 +348,23 @@ export const claudeCodeExecutor: Executor = {
       // `launcherWorkdir` above (both yield `${REMOTE_HOME}/Projects/<sid>/<repo>`
       // for the EC2 family). We re-resolve here through the Compute interface
       // so the new path doesn't depend on the legacy provider hook -- the two
-      // results agree for every shipping Compute kind. Falls back to
-      // `effectiveWorkdir` when the impl omits the method (e.g. compute
-      // shares the conductor's filesystem).
-      const remoteWorkdir = target.compute.resolveWorkdir?.(handle, session) ?? effectiveWorkdir;
+      // results agree for every shipping Compute kind.
+      //
+      // Fallback to `null` (NOT `effectiveWorkdir`): when the compute can't
+      // compute a remote workdir (bare worktree dispatch with no
+      // --remote-repo), the conductor's `effectiveWorkdir` is a /Users/...
+      // path that doesn't exist on Ubuntu. `runTargetLifecycle` skips
+      // prepareWorkspace cleanly when remoteWorkdir is null; that's the
+      // honest signal "no workspace to prepare" instead of asking the
+      // lifecycle to clone into a conductor-shaped path. Audit finding F3.
+      const { runTarget: remoteWorkdir } = resolveRemoteWorkdirs({
+        isRemote: true,
+        effectiveWorkdir,
+        resolveWorkdir: target.compute.resolveWorkdir
+          ? () => target.compute.resolveWorkdir!(handle, session)
+          : undefined,
+        onFallback: (reason) => logWarn("session", `remote workdir fallback for session ${session.id}: ${reason}`),
+      });
       const ports = remoteWorkdir ? resolvePortDecls(remoteWorkdir) : [];
       if (ports.length > 0) {
         await app.sessions.update(session.id, { config: { ...session.config, ports } });
