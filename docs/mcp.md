@@ -25,9 +25,15 @@ When `auth.requireToken` is on (control-plane profile default), missing
 or invalid tokens get a 401 -- there is no anonymous fallback for the
 MCP route.
 
-## Configuring Claude Code
+## Connecting an MCP client
 
-Edit `~/.claude.json` (or `.claude.json` in your project) and add:
+The endpoint speaks Streamable HTTP, so any modern MCP client works.
+Configuration boils down to `{ type: "http", url, headers }` -- the
+exact file each client reads differs.
+
+### Claude Code
+
+Edit `~/.claude.json` (or `.claude.json` in your project):
 
 ```json
 {
@@ -42,7 +48,57 @@ Edit `~/.claude.json` (or `.claude.json` in your project) and add:
 ```
 
 Restart Claude Code. The 27 Ark tools (`session_start`, `agent_create`,
-...) appear in `/mcp` and are callable by name.
+...) appear and are callable by name.
+
+### Claude Desktop
+
+Edit `~/Library/Application Support/Claude/claude_desktop_config.json`
+(macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "ark": {
+      "type": "http",
+      "url": "http://localhost:19400/mcp",
+      "headers": { "Authorization": "Bearer <your-token>" }
+    }
+  }
+}
+```
+
+Quit and relaunch Claude Desktop (cmd-Q on macOS -- a window close
+is not enough, the menubar process needs to restart).
+
+### Cursor
+
+Settings -> MCP -> Add Server, or edit `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "ark": {
+      "url": "http://localhost:19400/mcp",
+      "headers": { "Authorization": "Bearer <your-token>" }
+    }
+  }
+}
+```
+
+### Other clients
+
+Anything that speaks Streamable HTTP MCP. Point it at
+`http://localhost:19400/mcp` and pass the bearer in `Authorization`.
+Each tool call is a single POST -- no client-side state required.
+
+### Important: this is the META surface
+
+The `/mcp` endpoint is for clients that drive Ark: dispatching
+sessions, editing agents/flows, inspecting state. It is NOT mounted
+into sessions Ark itself dispatches -- those agents see only the
+`ark-channel` stdio MCP (`report`, `send_to_agent`). Worker agents
+cannot recursively dispatch sub-sessions, edit agent definitions, or
+read other tenants' resources.
 
 ## Tool Catalogue
 
