@@ -1,16 +1,16 @@
 /**
- * Tests for the agent-sdk executor dispatch path.
+ * Tests for the claude-agent executor dispatch path.
  *
  * Validates:
- *  1. agent-sdk runtime definition loads from RuntimeStore
- *  2. resolveAgentWithRuntime merges agent-sdk runtime into worker agent
- *  3. agentSdkExecutor is registered with the correct interface
+ *  1. claude-agent runtime definition loads from RuntimeStore
+ *  2. resolveAgentWithRuntime merges claude-agent runtime into worker agent
+ *  3. claudeAgentExecutor is registered with the correct interface
  *  4. Executor dispatch assembles ARK_* env vars and spawns without tmux
  *  5. kill() sends SIGTERM to the tracked process
  *  6. status() reflects process state
  *
  * All tests that touch the executor itself use a mock Bun.spawn so no real
- * agent-sdk process is started -- tests run without ANTHROPIC_API_KEY.
+ * claude-agent process is started -- tests run without ANTHROPIC_API_KEY.
  */
 
 import { describe, it, expect, beforeEach, afterEach, spyOn, mock } from "bun:test";
@@ -18,7 +18,7 @@ import { join } from "path";
 import { mkdirSync, existsSync, writeFileSync } from "fs";
 import { AppContext } from "../app.js";
 import { resolveAgentWithRuntime } from "../agent/agent.js";
-import { agentSdkExecutor } from "../executors/agent-sdk.js";
+import { claudeAgentExecutor } from "../executors/claude-agent.js";
 import { stopAllPollers } from "../executors/status-poller.js";
 
 // ── App fixture ──────────────────────────────────────────────────────────────
@@ -37,28 +37,30 @@ afterEach(async () => {
 
 // ── Runtime resolution ───────────────────────────────────────────────────────
 
-describe("agent-sdk runtime resolution", () => {
-  it("agent-sdk runtime definition loads from RuntimeStore", () => {
-    const runtime = app.runtimes.get("agent-sdk");
+describe("claude-agent runtime resolution", () => {
+  it("claude-agent runtime definition loads from RuntimeStore", () => {
+    const runtime = app.runtimes.get("claude-agent");
     expect(runtime).not.toBeNull();
-    expect(runtime!.name).toBe("agent-sdk");
-    expect(runtime!.type).toBe("agent-sdk");
+    expect(runtime!.name).toBe("claude-agent");
+    expect(runtime!.type).toBe("claude-agent");
     expect(Array.isArray(runtime!.secrets)).toBe(true);
     expect(runtime!.secrets).toContain("ANTHROPIC_API_KEY");
     expect(runtime!.billing?.mode).toBe("api");
+    // transcript_parser is a separate identifier from the runtime name and was
+    // intentionally left as `agent-sdk` -- it pairs with AgentSdkParser.kind.
     expect(runtime!.billing?.transcript_parser).toBe("agent-sdk");
   });
 
-  it("resolveAgentWithRuntime merges agent-sdk runtime into worker agent", () => {
+  it("resolveAgentWithRuntime merges claude-agent runtime into worker agent", () => {
     const session = { summary: "test task", id: "s-sdk01" };
-    const agent = resolveAgentWithRuntime(app, "worker", session, { runtimeOverride: "agent-sdk" });
+    const agent = resolveAgentWithRuntime(app, "worker", session, { runtimeOverride: "claude-agent" });
 
     expect(agent).not.toBeNull();
-    expect(agent!._resolved_runtime_type).toBe("agent-sdk");
+    expect(agent!._resolved_runtime_type).toBe("claude-agent");
   });
 
-  it("all six builtin runtimes are loadable including agent-sdk", () => {
-    const names = ["claude", "claude-max", "codex", "gemini", "goose", "agent-sdk"];
+  it("all six builtin runtimes are loadable including claude-agent", () => {
+    const names = ["claude-code", "claude-max", "codex", "gemini", "goose", "claude-agent"];
     for (const name of names) {
       const runtime = app.runtimes.get(name);
       expect(runtime).not.toBeNull();
@@ -66,47 +68,66 @@ describe("agent-sdk runtime resolution", () => {
     }
   });
 
-  it("agent-sdk runtime type maps to agent-sdk executor (not cli-agent)", () => {
-    const runtime = app.runtimes.get("agent-sdk");
-    expect(runtime!.type).toBe("agent-sdk");
+  it("claude-agent runtime type maps to claude-agent executor (not cli-agent)", () => {
+    const runtime = app.runtimes.get("claude-agent");
+    expect(runtime!.type).toBe("claude-agent");
     // Verify this is distinct from gemini which uses cli-agent
     const gemini = app.runtimes.get("gemini");
     expect(gemini!.type).toBe("cli-agent");
     expect(runtime!.type).not.toBe(gemini!.type);
   });
+
+  // ── Backward-compat alias for the May 2026 runtime rename ─────────────────
+  it("legacy runtime name `agent-sdk` resolves to claude-agent via alias", () => {
+    const aliased = app.runtimes.get("agent-sdk");
+    const canonical = app.runtimes.get("claude-agent");
+    expect(aliased).not.toBeNull();
+    expect(canonical).not.toBeNull();
+    expect(aliased!.name).toBe(canonical!.name);
+    expect(aliased!.type).toBe(canonical!.type);
+  });
+
+  it("legacy runtime name `claude` resolves to claude-code via alias", () => {
+    const aliased = app.runtimes.get("claude");
+    const canonical = app.runtimes.get("claude-code");
+    expect(aliased).not.toBeNull();
+    expect(canonical).not.toBeNull();
+    expect(aliased!.name).toBe(canonical!.name);
+    expect(aliased!.type).toBe(canonical!.type);
+  });
 });
 
 // ── Executor interface ────────────────────────────────────────────────────────
 
-describe("agentSdkExecutor interface", () => {
+describe("claudeAgentExecutor interface", () => {
   it("executor is registered with the correct name", () => {
-    expect(agentSdkExecutor.name).toBe("agent-sdk");
-    expect(typeof agentSdkExecutor.launch).toBe("function");
-    expect(typeof agentSdkExecutor.kill).toBe("function");
-    expect(typeof agentSdkExecutor.status).toBe("function");
-    expect(typeof agentSdkExecutor.send).toBe("function");
-    expect(typeof agentSdkExecutor.capture).toBe("function");
+    expect(claudeAgentExecutor.name).toBe("claude-agent");
+    expect(typeof claudeAgentExecutor.launch).toBe("function");
+    expect(typeof claudeAgentExecutor.kill).toBe("function");
+    expect(typeof claudeAgentExecutor.status).toBe("function");
+    expect(typeof claudeAgentExecutor.send).toBe("function");
+    expect(typeof claudeAgentExecutor.capture).toBe("function");
   });
 
   it("status returns not_found for an unknown handle", async () => {
-    const status = await agentSdkExecutor.status("sdk-does-not-exist");
+    const status = await claudeAgentExecutor.status("sdk-does-not-exist");
     expect(status.state).toBe("not_found");
   });
 
   it("kill is a no-op for an unknown handle", async () => {
     // Should not throw
-    await agentSdkExecutor.kill("sdk-does-not-exist");
+    await claudeAgentExecutor.kill("sdk-does-not-exist");
   });
 
   it("capture returns empty string for unknown handle (no tracked entry)", async () => {
-    const out = await agentSdkExecutor.capture("sdk-does-not-exist", 20);
+    const out = await claudeAgentExecutor.capture("sdk-does-not-exist", 20);
     expect(out).toBe("");
   });
 });
 
 // ── capture(): reads transcript.jsonl + stdio.log when process is tracked ────
 
-describe("agentSdkExecutor.capture -- from tracked entry", () => {
+describe("claudeAgentExecutor.capture -- from tracked entry", () => {
   /**
    * We exercise capture() by launching with a mock spawn (so the TrackedSdkProcess
    * entry is registered in the module-level map) and then writing transcript.jsonl
@@ -144,11 +165,11 @@ describe("agentSdkExecutor.capture -- from tracked entry", () => {
         mcp_servers: [],
         permission_mode: "bypassPermissions",
         env: {},
-        runtime: "agent-sdk",
-        _resolved_runtime_type: "agent-sdk",
+        runtime: "claude-agent",
+        _resolved_runtime_type: "claude-agent",
       };
 
-      const result = await agentSdkExecutor.launch({
+      const result = await claudeAgentExecutor.launch({
         sessionId: session.id,
         workdir: app.config.dirs.ark,
         agent,
@@ -177,9 +198,9 @@ describe("agentSdkExecutor.capture -- from tracked entry", () => {
         }),
       ];
       writeFileSync(join(sessionDir, "transcript.jsonl"), transcriptLines.join("\n") + "\n");
-      writeFileSync(join(sessionDir, "stdio.log"), "[exec 2026-04-22T19:51:00Z] agent-sdk compat modes: (none)\n");
+      writeFileSync(join(sessionDir, "stdio.log"), "[exec 2026-04-22T19:51:00Z] claude-agent compat modes: (none)\n");
 
-      const output = await agentSdkExecutor.capture(handle, 80);
+      const output = await claudeAgentExecutor.capture(handle, 80);
 
       // Transcript lines should be formatted
       expect(output).toContain("system/init");
@@ -188,7 +209,7 @@ describe("agentSdkExecutor.capture -- from tracked entry", () => {
       expect(output).toContain("$0.0042");
       // Stdio section should appear
       expect(output).toContain("--- stdio ---");
-      expect(output).toContain("agent-sdk compat modes");
+      expect(output).toContain("claude-agent compat modes");
     } finally {
       spawnSpy.mockRestore();
     }
@@ -197,7 +218,7 @@ describe("agentSdkExecutor.capture -- from tracked entry", () => {
 
 // ── Dispatch: spawns without tmux ────────────────────────────────────────────
 
-describe("agentSdkExecutor.launch -- spawn mechanics", () => {
+describe("claudeAgentExecutor.launch -- spawn mechanics", () => {
   /**
    * Build a minimal fake Bun subprocess that reports as "exited" immediately.
    * This lets launch() complete without actually running the agent.
@@ -243,11 +264,11 @@ describe("agentSdkExecutor.launch -- spawn mechanics", () => {
         mcp_servers: [],
         permission_mode: "bypassPermissions",
         env: {},
-        runtime: "agent-sdk",
-        _resolved_runtime_type: "agent-sdk",
+        runtime: "claude-agent",
+        _resolved_runtime_type: "claude-agent",
       };
 
-      const result = await agentSdkExecutor.launch({
+      const result = await claudeAgentExecutor.launch({
         sessionId: session.id,
         workdir: app.config.dirs.ark,
         agent,
@@ -302,11 +323,11 @@ describe("agentSdkExecutor.launch -- spawn mechanics", () => {
         mcp_servers: [],
         permission_mode: "bypassPermissions",
         env: {},
-        runtime: "agent-sdk",
-        _resolved_runtime_type: "agent-sdk",
+        runtime: "claude-agent",
+        _resolved_runtime_type: "claude-agent",
       };
 
-      await agentSdkExecutor.launch({
+      await claudeAgentExecutor.launch({
         sessionId: session.id,
         workdir: app.config.dirs.ark,
         agent,
@@ -355,13 +376,13 @@ describe("agentSdkExecutor.launch -- spawn mechanics", () => {
         mcp_servers: [],
         permission_mode: "bypassPermissions",
         env: {},
-        runtime: "agent-sdk",
-        _resolved_runtime_type: "agent-sdk",
+        runtime: "claude-agent",
+        _resolved_runtime_type: "claude-agent",
       };
 
       const task = "implement the feature described in issue #42";
 
-      await agentSdkExecutor.launch({
+      await claudeAgentExecutor.launch({
         sessionId: session.id,
         workdir: app.config.dirs.ark,
         agent,
@@ -419,11 +440,11 @@ describe("agentSdkExecutor.launch -- spawn mechanics", () => {
         mcp_servers: [],
         permission_mode: "bypassPermissions",
         env: {},
-        runtime: "agent-sdk",
-        _resolved_runtime_type: "agent-sdk",
+        runtime: "claude-agent",
+        _resolved_runtime_type: "claude-agent",
       };
 
-      const result = await agentSdkExecutor.launch({
+      const result = await claudeAgentExecutor.launch({
         sessionId: session.id,
         workdir: app.config.dirs.ark,
         agent,
@@ -436,12 +457,12 @@ describe("agentSdkExecutor.launch -- spawn mechanics", () => {
       expect(result.ok).toBe(true);
       const handle = result.handle;
 
-      const status = await agentSdkExecutor.status(handle);
+      const status = await claudeAgentExecutor.status(handle);
       expect(status.state).toBe("running");
       expect((status as { state: string; pid?: number }).pid).toBe(12345);
 
       // Kill cleans up
-      await agentSdkExecutor.kill(handle);
+      await claudeAgentExecutor.kill(handle);
       // Process should now be gone or killed
       await exitedPromise; // wait for exited to resolve
     } finally {
@@ -452,11 +473,19 @@ describe("agentSdkExecutor.launch -- spawn mechanics", () => {
 
 // ── executor registered in builtinExecutors ───────────────────────────────────
 
-describe("agentSdkExecutor registration", () => {
+describe("claudeAgentExecutor registration", () => {
   it("is included in builtinExecutors", async () => {
     const { builtinExecutors } = await import("../executors/index.js");
-    const found = builtinExecutors.find((e) => e.name === "agent-sdk");
+    const found = builtinExecutors.find((e) => e.name === "claude-agent");
     expect(found).not.toBeUndefined();
-    expect(found!.name).toBe("agent-sdk");
+    expect(found!.name).toBe("claude-agent");
+  });
+
+  it("getExecutor resolves the legacy `agent-sdk` name via alias", async () => {
+    const { getExecutor } = await import("../executor.js");
+    const aliased = getExecutor("agent-sdk");
+    const canonical = getExecutor("claude-agent");
+    expect(canonical).not.toBeUndefined();
+    expect(aliased).toBe(canonical);
   });
 });

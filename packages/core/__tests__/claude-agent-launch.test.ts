@@ -9,8 +9,8 @@ import { test, expect } from "bun:test";
 import { appendFileSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runAgentSdkLaunch } from "../runtimes/agent-sdk/launch.js";
-import type { SDKUserMessage } from "../runtimes/agent-sdk/launch.js";
+import { runAgentSdkLaunch } from "../runtimes/claude-agent/launch.js";
+import type { SDKUserMessage } from "../runtimes/claude-agent/launch.js";
 
 function makeTmpDir(): string {
   return mkdtempSync(join(tmpdir(), "agent-sdk-launch-"));

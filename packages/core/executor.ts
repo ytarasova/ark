@@ -95,12 +95,22 @@ export interface Executor {
 
 const registry = new Map<string, Executor>();
 
+/**
+ * Backward-compat aliases for the May 2026 runtime rename. Sessions persisted
+ * before the rename store `launch_executor: "agent-sdk"`; redirect to the
+ * post-rename name so dispatch keeps working without a data migration.
+ */
+const EXECUTOR_NAME_ALIASES: Record<string, string> = {
+  "agent-sdk": "claude-agent",
+};
+
 export function registerExecutor(executor: Executor): void {
   registry.set(executor.name, executor);
 }
 
 export function getExecutor(name: string): Executor | undefined {
-  return registry.get(name);
+  const resolved = EXECUTOR_NAME_ALIASES[name] ?? name;
+  return registry.get(resolved);
 }
 
 export function listExecutors(): Executor[] {

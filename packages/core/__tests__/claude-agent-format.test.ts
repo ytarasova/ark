@@ -9,7 +9,7 @@ import { test, expect, beforeAll, afterAll } from "bun:test";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { formatTranscriptLine, formatTranscriptStream } from "../runtimes/agent-sdk/format.js";
+import { formatTranscriptLine, formatTranscriptStream } from "../runtimes/claude-agent/format.js";
 
 // ── formatTranscriptLine --------------------------------------------------
 

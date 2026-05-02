@@ -9,7 +9,7 @@ import { test, expect, describe, beforeAll, afterAll } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync, symlinkSync, existsSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import { AgentSdkParser } from "../runtimes/agent-sdk/parser.js";
+import { AgentSdkParser } from "../runtimes/claude-agent/parser.js";
 
 const TEST_DIR = join(tmpdir(), `ark-agent-sdk-parser-${process.pid}-${Date.now()}`);
 // tracksDir mirrors ~/.ark/tracks: subdirs are session IDs, each contains transcript.jsonl

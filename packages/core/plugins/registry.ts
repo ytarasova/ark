@@ -24,6 +24,16 @@
 
 import type { Executor } from "../executor.js";
 
+/**
+ * Backward-compat aliases for the May 2026 runtime rename. Mirrors the map in
+ * `executor.ts` -- both lookups (plugin registry first, global registry second)
+ * normalise the same legacy names so persisted `launch_executor` values keep
+ * resolving across the cutover.
+ */
+const EXECUTOR_NAME_ALIASES: Record<string, string> = {
+  "agent-sdk": "claude-agent",
+};
+
 // ── Plugin kinds ────────────────────────────────────────────────────────────
 //
 // Today only executors are registered. Future extensions: compute-provider,
@@ -120,7 +130,8 @@ export function createPluginRegistry(): PluginRegistry {
     },
 
     executor(name) {
-      return this.get("executor", name);
+      const resolved = EXECUTOR_NAME_ALIASES[name] ?? name;
+      return this.get("executor", resolved);
     },
   };
 }

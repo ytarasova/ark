@@ -1,10 +1,10 @@
-name: claude
+name: claude-code
 description: "Claude Code (Anthropic) - API billing"
 type: claude-code
 permission_mode: bypassPermissions
 # Declarative secrets contract: dispatch resolves these names against the
 # tenant's `ark secret` store and exports them as env vars on the launcher
-# (same pipeline agent-sdk.yaml uses). Without this list a fresh Claude on
+# (same pipeline claude-agent.yaml uses). Without this list a fresh Claude on
 # a non-local compute has no API key and falls into interactive setup.
 secrets:
   # Required for headless dispatch. Produced by `claude setup-token`

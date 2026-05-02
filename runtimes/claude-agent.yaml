@@ -1,6 +1,6 @@
-name: agent-sdk
+name: claude-agent
 description: "Anthropic Agent SDK (in-process, direct or gateway-routed)"
-type: agent-sdk
+type: claude-agent
 permission_mode: bypassPermissions
 secrets:
   - ANTHROPIC_API_KEY
@@ -31,7 +31,7 @@ compat: [bedrock]
 billing:
   mode: api
   transcript_parser: agent-sdk
-# agent-sdk does not expose the conductor's `report` MCP tool. Completion is
+# claude-agent does not expose the conductor's `report` MCP tool. Completion is
 # signalled by the SDK's own `result/success` message (emitted when the agent
 # stops with a final assistant turn), which launch.ts forwards to the
 # conductor as a SessionEnd hook. Tell the agent plainly not to invent a tool

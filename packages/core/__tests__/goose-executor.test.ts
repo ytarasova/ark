@@ -203,10 +203,10 @@ describe("loadPluginExecutors", async () => {
 // ── Barrel ────────────────────────────────────────────────────────────────
 
 describe("builtinExecutors", async () => {
-  it("includes agent-sdk, claude-code, cli-agent, goose, and subprocess", async () => {
+  it("includes claude-agent, claude-code, cli-agent, goose, and subprocess", async () => {
     const { builtinExecutors } = await import("../executors/index.js");
     const names = builtinExecutors.map((e) => e.name).sort();
-    expect(names).toEqual(["agent-sdk", "claude-code", "cli-agent", "goose", "subprocess"]);
+    expect(names).toEqual(["claude-agent", "claude-code", "cli-agent", "goose", "subprocess"]);
   });
 
   it("every builtin executor exposes the Executor interface", async () => {

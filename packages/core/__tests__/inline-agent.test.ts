@@ -28,13 +28,13 @@ afterAll(async () => {
 
 test("builds AgentDefinition from a minimal inline spec", () => {
   const spec: InlineAgentSpec = {
-    runtime: "agent-sdk",
+    runtime: "claude-agent",
     system_prompt: "You are a test agent.",
   };
   const agent = buildInlineAgent(app, spec, {});
   expect(agent).not.toBeNull();
   expect(agent!.name).toBe("inline");
-  expect(agent!.runtime).toBe("agent-sdk");
+  expect(agent!.runtime).toBe("claude-agent");
   expect(agent!.system_prompt).toBe("You are a test agent.");
   // Defaults
   expect(agent!.model).toBe("sonnet");
@@ -44,7 +44,7 @@ test("builds AgentDefinition from a minimal inline spec", () => {
 });
 
 test("returns null when system_prompt is missing", () => {
-  const spec = { runtime: "agent-sdk" } as InlineAgentSpec;
+  const spec = { runtime: "claude-agent" } as InlineAgentSpec;
   expect(buildInlineAgent(app, spec, {})).toBeNull();
 });
 
@@ -55,7 +55,7 @@ test("returns null when runtime is missing", () => {
 
 test("substitutes session vars into system_prompt", () => {
   const spec: InlineAgentSpec = {
-    runtime: "agent-sdk",
+    runtime: "claude-agent",
     system_prompt: "You are working on {{ticket}} in {{workdir}}.",
   };
   const agent = buildInlineAgent(app, spec, { ticket: "PAI-31080", workdir: "/tmp/test" });
@@ -65,7 +65,7 @@ test("substitutes session vars into system_prompt", () => {
 test("caller-provided fields override defaults", () => {
   const spec: InlineAgentSpec = {
     name: "my-custom-agent",
-    runtime: "agent-sdk",
+    runtime: "claude-agent",
     model: "opus",
     max_turns: 50,
     system_prompt: "custom",
@@ -80,22 +80,22 @@ test("caller-provided fields override defaults", () => {
 
 test("applies runtime merge -- _resolved_runtime_type is set", () => {
   const spec: InlineAgentSpec = {
-    runtime: "agent-sdk",
+    runtime: "claude-agent",
     system_prompt: "test",
   };
   const agent = buildInlineAgent(app, spec, {});
-  // The agent-sdk runtime YAML should resolve to type: "agent-sdk"
+  // The claude-agent runtime YAML should resolve to type: "claude-agent"
   expect(agent!._resolved_runtime_type).toBeDefined();
 });
 
 test("runtimeOverride takes precedence over spec.runtime for the merge", () => {
   const spec: InlineAgentSpec = {
-    runtime: "claude",
+    runtime: "claude-code",
     system_prompt: "test",
   };
-  const agent = buildInlineAgent(app, spec, {}, { runtimeOverride: "agent-sdk" });
+  const agent = buildInlineAgent(app, spec, {}, { runtimeOverride: "claude-agent" });
   // agent.runtime stays as the spec's declared runtime, but the merged
   // _resolved_runtime_type reflects the override.
-  expect(agent!.runtime).toBe("claude");
+  expect(agent!.runtime).toBe("claude-code");
   expect(agent!._resolved_runtime_type).toBeDefined();
 });

@@ -20,7 +20,7 @@ export interface RuntimeBilling {
 export interface RuntimeDefinition {
   name: string;
   description?: string;
-  type: "claude-code" | "cli-agent" | "subprocess" | "goose" | "agent-sdk";
+  type: "claude-code" | "cli-agent" | "subprocess" | "goose" | "claude-agent";
   command?: string[];
   task_delivery?: "stdin" | "file" | "arg";
   permission_mode?: string;

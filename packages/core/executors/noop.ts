@@ -1,7 +1,7 @@
 /**
  * No-op executor for tests.
  *
- * Replaces every real executor (claude-code / agent-sdk / goose / codex /
+ * Replaces every real executor (claude-code / claude-agent / goose / codex /
  * gemini / cli-agent / subprocess) with a stub that never spawns tmux or a
  * real agent binary. `launch()` returns a synthetic handle immediately,
  * `status()` reports completed, `kill` / `send` / `capture` are no-ops.
@@ -41,4 +41,4 @@ export const noopExecutor: Executor = {
 };
 
 /** Names the test-mode registry must override with the noop stub. */
-export const NOOP_EXECUTOR_NAMES = ["claude-code", "agent-sdk", "goose", "cli-agent", "subprocess"] as const;
+export const NOOP_EXECUTOR_NAMES = ["claude-code", "claude-agent", "goose", "cli-agent", "subprocess"] as const;

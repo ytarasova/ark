@@ -142,7 +142,7 @@ describe("session/interrupt", () => {
     });
     await app.sessions.update(session.id, {
       status: "running",
-      config: { launch_executor: "agent-sdk" },
+      config: { launch_executor: "claude-agent" },
     } as any);
 
     const sessionDir = join(app.config.dirs.tracks, session.id);
@@ -174,7 +174,7 @@ describe("session/interrupt", () => {
     });
     await app.sessions.update(session.id, {
       status: "running",
-      config: { launch_executor: "agent-sdk" },
+      config: { launch_executor: "claude-agent" },
     } as any);
 
     const sessionDir = join(app.config.dirs.tracks, session.id);

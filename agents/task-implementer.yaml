@@ -1,6 +1,6 @@
 name: task-implementer
 description: "Implements a single subtask from the ISLC execution plan"
-runtime: claude
+runtime: claude-code
 model: opus
 max_turns: 200
 system_prompt: |

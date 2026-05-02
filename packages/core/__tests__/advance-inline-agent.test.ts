@@ -37,7 +37,7 @@ describe("advance() with inline agent in next stage", () => {
           name: "plan",
           gate: "auto",
           agent: {
-            runtime: "agent-sdk",
+            runtime: "claude-agent",
             model: "sonnet",
             system_prompt: "plan",
           },
@@ -46,7 +46,7 @@ describe("advance() with inline agent in next stage", () => {
           name: "implement",
           gate: "auto",
           agent: {
-            runtime: "agent-sdk",
+            runtime: "claude-agent",
             model: "sonnet",
             system_prompt: "implement",
           },

@@ -99,7 +99,7 @@ function makeInlineStage(overrides: Partial<StageDefinition> = {}): StageDefinit
         name: "do_work",
         gate: "auto",
         agent: {
-          runtime: "agent-sdk",
+          runtime: "claude-agent",
           system_prompt: "Do work on {{repo.path}}",
         },
         task: "Work on {{repo.path}}",
@@ -396,7 +396,7 @@ describe("stage-level max_budget_usd propagates to inline sub-stage agent", () =
           name: "do_work",
           gate: "auto",
           agent: {
-            runtime: "agent-sdk",
+            runtime: "claude-agent",
             system_prompt: "Work",
             max_budget_usd: 1.0,
           },

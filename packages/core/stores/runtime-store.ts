@@ -21,6 +21,16 @@ export interface RuntimeStore {
   delete(name: string, scope?: "global" | "project"): boolean;
 }
 
+/**
+ * Backward-compat aliases for the May 2026 runtime rename. Sessions, agent
+ * YAMLs, and external callers persisted before the rename still reference the
+ * old names; this map redirects them to the new on-disk YAML files.
+ */
+export const RUNTIME_NAME_ALIASES: Record<string, string> = {
+  claude: "claude-code",
+  "agent-sdk": "claude-agent",
+};
+
 // ── File-backed implementation ──────────────────────────────────────────────
 
 export interface FileRuntimeStoreOpts {
@@ -41,13 +51,18 @@ export class FileRuntimeStore implements RuntimeStore {
   }
 
   get(name: string): RuntimeDefinition | null {
+    // Normalise legacy names (claude, agent-sdk) to their post-rename equivalents
+    // so old session rows + agent YAMLs continue to resolve. This is a single
+    // Map lookup -- effectively free in the hot path.
+    const resolved = RUNTIME_NAME_ALIASES[name] ?? name;
+
     // Resolution order: project > user > builtin
     const dirs: [string, RuntimeDefinition["_source"]][] = [];
     if (this.projectDir) dirs.push([this.projectDir, "project"]);
     dirs.push([this.userDir, "global"], [this.builtinDir, "builtin"]);
 
     for (const [dir, source] of dirs) {
-      const path = join(dir, `${name}.yaml`);
+      const path = join(dir, `${resolved}.yaml`);
       if (existsSync(path)) {
         const raw = YAML.parse(readFileSync(path, "utf-8")) ?? {};
         return { ...raw, _source: source, _path: path } as RuntimeDefinition;

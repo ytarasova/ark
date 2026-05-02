@@ -14,7 +14,7 @@ import { join } from "path";
 import { AppContext } from "../app.js";
 import { setApp, clearApp } from "./test-helpers.js";
 import { cleanupSession } from "../services/session/cleanup.js";
-import { agentSdkExecutor } from "../executors/agent-sdk.js";
+import { claudeAgentExecutor } from "../executors/claude-agent.js";
 import { Router } from "../../server/router.js";
 import { registerSessionHandlers } from "../../server/handlers/session.js";
 import { createRequest, type JsonRpcResponse, type JsonRpcError } from "../../protocol/types.js";
@@ -107,7 +107,7 @@ test("cleanupSession survives a missing worktree", async () => {
 
 // ── session/kill RPC tests ────────────────────────────────────────────────────
 
-test("agentSdkExecutor.terminate sends SIGKILL and resolves when process exits", async () => {
+test("claudeAgentExecutor.terminate sends SIGKILL and resolves when process exits", async () => {
   // Spawn a real long-running process.
   const proc = Bun.spawn({ cmd: ["sleep", "60"], stdout: "ignore", stderr: "ignore" });
   const pid = proc.pid;
@@ -116,7 +116,7 @@ test("agentSdkExecutor.terminate sends SIGKILL and resolves when process exits",
   // Verify terminate resolves -- it should kill and await process exit.
   // Since the handle is not registered in the processes map we can test
   // terminate is a no-op for unregistered handles (safe guard).
-  await agentSdkExecutor.terminate!("sdk-unregistered-handle");
+  await claudeAgentExecutor.terminate!("sdk-unregistered-handle");
 
   // Kill the spawned process ourselves to clean up.
   proc.kill("SIGKILL");
@@ -168,7 +168,7 @@ test("session/kill RPC marks running session as failed with reason killed", asyn
   // Put it in running state with no real executor process (handle not in registry).
   await app.sessions.update(session.id, {
     status: "running",
-    config: { launch_executor: "agent-sdk" },
+    config: { launch_executor: "claude-agent" },
   } as any);
 
   const req = createRequest(202, "session/kill", { sessionId: session.id });

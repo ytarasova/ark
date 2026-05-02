@@ -1,6 +1,6 @@
 name: planner
 description: "Analyzes tasks and creates detailed implementation plans"
-runtime: claude
+runtime: claude-code
 model: opus
 max_turns: 50
 system_prompt: |

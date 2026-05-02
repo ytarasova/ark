@@ -30,8 +30,8 @@ describe("dispatch / executor no longer read session.config.runtime_override", (
     expect(src).not.toMatch(/model_override/);
   });
 
-  it("agent-sdk executor does not reference session.config.model_override", () => {
-    const src = read("packages/core/executors/agent-sdk.ts");
+  it("claude-agent executor does not reference session.config.model_override", () => {
+    const src = read("packages/core/executors/claude-agent.ts");
     // Comments describing the removal may mention the old name; ensure we
     // never read it off session.config directly.
     expect(src).not.toMatch(/config\?\.model_override/);

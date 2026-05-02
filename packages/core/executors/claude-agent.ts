@@ -1,5 +1,5 @@
 /**
- * Agent SDK executor -- spawns the agent-sdk launch process as a plain
+ * claude-agent executor -- spawns the claude-agent launch process as a plain
  * child process (no tmux). The launch script reads session context from
  * ARK_* env vars, drives the Anthropic Agent SDK query loop, writes
  * transcript.jsonl to <sessionDir>/, and POSTs hooks to the conductor.
@@ -19,7 +19,7 @@ import { join } from "path";
 
 import type { Executor, LaunchOpts, LaunchResult, ExecutorStatus } from "../executor.js";
 import { agentSdkLaunchSpec } from "../install-paths.js";
-import { formatTranscriptLine } from "../runtimes/agent-sdk/format.js";
+import { formatTranscriptLine } from "../runtimes/claude-agent/format.js";
 
 interface TrackedSdkProcess {
   proc: ReturnType<typeof Bun.spawn>;
@@ -36,7 +36,7 @@ const processes = new Map<string, TrackedSdkProcess>();
 
 /** Pipe a ReadableStream to a file (best-effort; errors are swallowed). */
 /**
- * Project the agent-sdk runtime YAML's optional fields into the env vars
+ * Project the claude-agent runtime YAML's optional fields into the env vars
  * launch.ts (and the bundled claude binary it spawns) read at runtime.
  *
  * Mapping today:
@@ -82,8 +82,8 @@ function pipeToFile(stream: ReadableStream<Uint8Array>, filePath: string): void 
   })();
 }
 
-export const agentSdkExecutor: Executor = {
-  name: "agent-sdk",
+export const claudeAgentExecutor: Executor = {
+  name: "claude-agent",
 
   async launch(opts: LaunchOpts): Promise<LaunchResult> {
     const app = opts.app!;
@@ -92,18 +92,18 @@ export const agentSdkExecutor: Executor = {
       return { ok: false, handle: "", message: `Session ${opts.sessionId} not found` };
     }
 
-    // The agent-sdk executor runs in-process as a child of the conductor and
+    // The claude-agent executor runs in-process as a child of the conductor and
     // writes task.txt + stdio.log + transcript.jsonl to `<config.dirs.tracks>/<sid>/`.
     // In hosted mode that path lives on the conductor pod's ephemeral disk and
     // is shared across tenants -- not isolated, not durable. The supported
     // hosted-mode runtime is the Claude Code executor on a real compute target,
-    // not in-process agent-sdk. Refuse the launch with a clear error.
+    // not in-process claude-agent. Refuse the launch with a clear error.
     if (app.mode.kind === "hosted") {
       return {
         ok: false,
         handle: "",
         message:
-          "agent-sdk executor is local-mode only -- it runs in-process on the conductor and " +
+          "claude-agent executor is local-mode only -- it runs in-process on the conductor and " +
           "writes per-session state to the conductor pod's ephemeral disk. Use the claude-code " +
           "runtime on an external compute target for hosted deployments.",
       };
@@ -179,21 +179,21 @@ export const agentSdkExecutor: Executor = {
     // ARK_COMPAT env var. launch.ts reads this to enable gateway-specific
     // wire-format rewrites without any heuristic guessing.
     //
-    // Lookup is keyed by this executor's name ("agent-sdk") rather than
+    // Lookup is keyed by this executor's name ("claude-agent") rather than
     // opts.agent.runtime -- the agent definition's runtime field can carry the
     // post-resolution kind ("claude-code" if the agent originally targeted CC
     // and was re-routed via runtime resolution), which would point at the wrong
     // runtime YAML. The executor's own name is the authoritative key here.
-    const runtimeDef = await app.runtimes?.get?.("agent-sdk");
+    const runtimeDef = await app.runtimes?.get?.("claude-agent");
     const runtimeEnv = buildAgentSdkRuntimeEnv(runtimeDef);
     Object.assign(arkEnv, runtimeEnv);
-    log(`agent-sdk compat modes: ${runtimeEnv.ARK_COMPAT ?? "(none)"}`);
+    log(`claude-agent compat modes: ${runtimeEnv.ARK_COMPAT ?? "(none)"}`);
     if (runtimeEnv.ANTHROPIC_DEFAULT_HAIKU_MODEL) {
-      log(`agent-sdk default haiku model: ${runtimeEnv.ANTHROPIC_DEFAULT_HAIKU_MODEL}`);
+      log(`claude-agent default haiku model: ${runtimeEnv.ANTHROPIC_DEFAULT_HAIKU_MODEL}`);
     }
 
     // opts.env carries secrets resolved by StageSecretResolver
-    // (ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL per agent-sdk.yaml secrets block)
+    // (ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL per claude-agent.yaml secrets block)
     // as well as tenant-level claude auth from materializeClaudeAuth.
     // These override all other env sources so operator-rotated values take effect.
     const secretEnv = opts.env ?? {};
@@ -202,7 +202,7 @@ export const agentSdkExecutor: Executor = {
     const launchSpec = agentSdkLaunchSpec();
     const cmd = [launchSpec.command, ...launchSpec.args];
 
-    log(`Spawning agent-sdk launch process: ${cmd.join(" ")}`);
+    log(`Spawning claude-agent launch process: ${cmd.join(" ")}`);
 
     const proc = Bun.spawn({
       cmd,
@@ -231,7 +231,7 @@ export const agentSdkExecutor: Executor = {
     proc.exited.then((code) => {
       tracked.exitCode = code;
       tracked.exited = true;
-      log(`agent-sdk process (${handle}) exited with code ${code}`);
+      log(`claude-agent process (${handle}) exited with code ${code}`);
       // Auto-cleanup after 5 minutes to prevent memory leaks
       setTimeout(
         () => {
@@ -284,7 +284,7 @@ export const agentSdkExecutor: Executor = {
   },
 
   async send(_handle: string, _message: string): Promise<void> {
-    // The agent-sdk runtime does not accept mid-session input via stdin.
+    // The claude-agent runtime does not accept mid-session input via stdin.
     // All context is delivered via the prompt file before launch.
   },
 

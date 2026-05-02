@@ -1,6 +1,6 @@
 name: verifier
 description: "Runs verification layers: tests, security, AC, design UAT"
-runtime: claude
+runtime: claude-code
 model: sonnet
 max_turns: 100
 system_prompt: |

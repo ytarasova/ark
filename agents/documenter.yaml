@@ -1,6 +1,6 @@
 name: documenter
 description: "Updates project documentation to reflect code changes"
-runtime: claude
+runtime: claude-code
 model: sonnet
 max_turns: 30
 system_prompt: |

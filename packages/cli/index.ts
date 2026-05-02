@@ -55,6 +55,7 @@ import { registerDaemonCommands } from "./commands/daemon.js";
 import { registerMiscCommands } from "./commands/misc.js";
 import { registerDbCommands } from "./commands/db.js";
 import { registerSecretsCommands } from "./commands/secrets.js";
+import { registerTokenCommand } from "./commands/token.js";
 // --- BEGIN agent-G ---
 import { registerClusterCommands } from "./commands/cluster.js";
 import { registerTenantConfigCommands } from "./commands/tenant-config.js";
@@ -131,6 +132,7 @@ registerExecTryCommands(program);
 registerMiscCommands(program);
 registerDbCommands(program);
 registerSecretsCommands(program);
+registerTokenCommand(program);
 
 // --- BEGIN agent-G ---
 registerClusterCommands(program);

@@ -448,12 +448,13 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
       return { ok: false, message: `session not running (status=${s.status})` };
     }
 
-    // Agent-sdk sessions use file-tail IPC via interventions.jsonl.
+    // claude-agent sessions use file-tail IPC via interventions.jsonl.
     // Writing control:"interrupt" causes launch.ts to abort the current turn
     // and resume with options.resume = <sdkSessionId>. The content is pushed
     // into the prompt queue as the correction message for the next turn.
+    // Persisted sessions may carry the legacy `agent-sdk` executor name.
     const executorName = (s.config as Record<string, unknown> | null)?.launch_executor as string | undefined;
-    if (executorName === "agent-sdk") {
+    if (executorName === "claude-agent" || executorName === "agent-sdk") {
       const sessionDir = join(scoped.config.dirs.tracks, sessionId);
       const interventionPath = join(sessionDir, "interventions.jsonl");
       await fsPromises.mkdir(sessionDir, { recursive: true });
@@ -468,7 +469,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
       return { ok: true };
     }
 
-    // Non-agent-sdk sessions: fall back to the tmux C-c interrupt.
+    // Non-claude-agent sessions: fall back to the tmux C-c interrupt.
     const result = await scoped.sessionLifecycle.interrupt(sessionId);
     return result;
   });
@@ -725,13 +726,13 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     return { steps };
   });
 
-  // ── Mid-session intervention (agent-sdk) ─────────────────────────────────
+  // ── Mid-session intervention (claude-agent) ─────────────────────────────
   //
   // Appends a user message to `<sessionDir>/interventions.jsonl`. A running
-  // agent-sdk launch.ts tails that file and pushes each line into its prompt
+  // claude-agent launch.ts tails that file and pushes each line into its prompt
   // queue so the agent picks up the correction on its next turn.
   //
-  // Do NOT route through deliverToChannel -- agent-sdk has no channel port.
+  // Do NOT route through deliverToChannel -- claude-agent has no channel port.
   // File-tail is the transport.
 
   router.handle("session/inject", async (params, _notify, ctx) => {
@@ -748,7 +749,7 @@ export function registerSessionHandlers(router: Router, app: AppContext): void {
     const interventionPath = join(sessionDir, "interventions.jsonl");
     const line = JSON.stringify({ role: "user", content, ts: Date.now() }) + "\n";
 
-    // mkdirSync is not needed -- agent-sdk executor always creates sessionDir at
+    // mkdirSync is not needed -- claude-agent executor always creates sessionDir at
     // dispatch time. Use promises.mkdir with recursive as a belt-and-braces guard.
     await fsPromises.mkdir(sessionDir, { recursive: true });
     await fsPromises.appendFile(interventionPath, line, "utf8");
