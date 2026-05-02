@@ -32,10 +32,12 @@ import type {
   ComputeHandle,
   ComputeKind,
   EnsureReachableOpts,
+  PrepareWorkspaceOpts,
   ProvisionOpts,
   Snapshot,
 } from "./types.js";
 import { NotSupportedError } from "./types.js";
+import { cloneWorkspaceViaArkd } from "./workspace-clone.js";
 import { logDebug } from "../../core/observability/structured-log.js";
 import { provisionStep } from "../../core/services/provisioning-steps.js";
 
@@ -388,6 +390,41 @@ export class K8sCompute implements Compute {
 
   resolveWorkdir(_h: ComputeHandle, _session: Session): string | null {
     return null;
+  }
+
+  // ── prepareWorkspace ─────────────────────────────────────────────────────
+  //
+  // mkdir + git clone via arkd HTTP using the URL from `getArkdUrl(h)`.
+  // Idempotent on the leaf path (the dispatcher's resolveWorkdir embeds
+  // session.id when it lands on a fresh path; re-dispatch into the same
+  // sessionId hits the same leaf and the second clone fails fast on
+  // "already exists" -- caller is expected to scope per session id).
+  //
+  // Ordering invariant: `ensureReachable` (which sets up the kubectl
+  // port-forward + binds the local arkdLocalPort) must have run on `h`
+  // before this call so `getArkdUrl(h)` resolves to the live local
+  // tunnel. The dispatcher's `runTargetLifecycle` enforces this.
+
+  /**
+   * Test-only: swap the helper that performs `mkdir -p` + `git clone`
+   * via arkd. Default is the production `cloneWorkspaceViaArkd`.
+   */
+  setCloneHelperForTesting(fn: typeof cloneWorkspaceViaArkd): void {
+    this.cloneHelper = fn;
+  }
+
+  protected cloneHelper: typeof cloneWorkspaceViaArkd = cloneWorkspaceViaArkd;
+
+  async prepareWorkspace(h: ComputeHandle, opts: PrepareWorkspaceOpts): Promise<void> {
+    if (!opts.source || !opts.remoteWorkdir) return;
+    const arkdUrl = this.getArkdUrl(h);
+    const arkdToken = process.env.ARK_ARKD_TOKEN ?? null;
+    await this.cloneHelper({
+      arkdUrl,
+      arkdToken,
+      source: opts.source,
+      remoteWorkdir: opts.remoteWorkdir,
+    });
   }
 
   async snapshot(_h: ComputeHandle): Promise<Snapshot> {

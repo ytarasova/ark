@@ -113,6 +113,22 @@ export interface EnsureReachableOpts {
   onLog?: (msg: string) => void;
 }
 
+/**
+ * Options threaded into `Compute.prepareWorkspace`. Both `source` and
+ * `remoteWorkdir` are nullable: callers pass through the resolved
+ * values from `session.config.remoteRepo`/`session.repo` and
+ * `Compute.resolveWorkdir` respectively, and either can be unset on a
+ * bare-worktree dispatch.
+ */
+export interface PrepareWorkspaceOpts {
+  /** Source URL or path to clone. Typically `session.config.remoteRepo` or `session.repo`. */
+  source: string | null;
+  /** Resolved remote workdir from `Compute.resolveWorkdir`. Null on local. */
+  remoteWorkdir: string | null;
+  sessionId: string;
+  onLog?: (msg: string) => void;
+}
+
 // ── Errors ─────────────────────────────────────────────────────────────────
 
 /**
@@ -198,6 +214,26 @@ export interface Compute {
    * Optional: omit on impls that need no transport setup.
    */
   ensureReachable?(h: ComputeHandle, opts: EnsureReachableOpts): Promise<void>;
+
+  /**
+   * Set up the per-session workspace on the compute. Idempotent on the
+   * leaf path (the dispatcher's resolveWorkdir embeds the session id so
+   * the leaf is fresh per dispatch; the parent mkdir is idempotent).
+   *
+   *   - LocalCompute: omits (the worktree is already on the host;
+   *     conductor and compute share a filesystem).
+   *   - EC2Compute / K8sCompute / FirecrackerCompute: mkdir + git clone
+   *     via arkd HTTP using the URL from `getArkdUrl(handle)`.
+   *
+   * Returns silently when `source` or `remoteWorkdir` is null (no work
+   * to do; caller is bare-worktree mode).
+   *
+   * Ordering invariant: `ensureReachable` MUST have run on this handle
+   * before `prepareWorkspace` so `getArkdUrl(handle)` resolves to a
+   * live transport. The dispatcher's `runTargetLifecycle` enforces
+   * this; ad-hoc callers must do the same.
+   */
+  prepareWorkspace?(h: ComputeHandle, opts: PrepareWorkspaceOpts): Promise<void>;
 
   /** Snapshot support. Throws `NotSupportedError` if `!capabilities.snapshot`. */
   snapshot(h: ComputeHandle): Promise<Snapshot>;

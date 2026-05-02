@@ -59,10 +59,12 @@ import type {
   ComputeHandle,
   ComputeKind,
   EnsureReachableOpts,
+  PrepareWorkspaceOpts,
   ProvisionOpts,
   Snapshot,
 } from "./types.js";
 import { NotSupportedError } from "./types.js";
+import { cloneWorkspaceViaArkd } from "./workspace-clone.js";
 import { logDebug } from "../../core/observability/structured-log.js";
 import { provisionStep } from "../../core/services/provisioning-steps.js";
 import { startArkdEventsConsumer } from "../../core/conductor/arkd-events-consumer.js";
@@ -784,6 +786,46 @@ export class EC2Compute implements Compute {
         ?.replace(/\.git$/, "") ?? "project";
     const remoteHome = (h.meta.ec2 as { remoteHome?: string } | undefined)?.remoteHome ?? REMOTE_HOME;
     return `${remoteHome}/Projects/${session.id}/${repoBasename}`;
+  }
+
+  // ── prepareWorkspace ─────────────────────────────────────────────────────
+  //
+  // Per-session workspace setup on the remote host: mkdir the parent and
+  // git clone the source into the leaf. Routes through arkd via the live
+  // SSH-over-SSM tunnel that `ensureReachable` set up; no SSH out-of-band
+  // ops at this layer.
+  //
+  // Returns silently when either `source` or `remoteWorkdir` is null --
+  // the dispatcher computes both upstream from session config and the
+  // bare-worktree path is meaningful (no clone, agent runs against an
+  // empty workdir; misconfig surfaces at the agent stage rather than
+  // here). Mirror the legacy `RemoteWorktreeProvider.launch` body.
+  //
+  // Ordering invariant: `ensureReachable` must have run on `h` before
+  // this call so `getArkdUrl(h)` resolves to the live local-forward
+  // port. `runTargetLifecycle` in the dispatcher enforces this.
+
+  /**
+   * Test-only: swap the helper that performs `mkdir -p` + `git clone`
+   * via arkd. Default is the production `cloneWorkspaceViaArkd` which
+   * constructs an `ArkdClient` against `getArkdUrl(handle)`.
+   */
+  setCloneHelperForTesting(fn: typeof cloneWorkspaceViaArkd): void {
+    this.cloneHelper = fn;
+  }
+
+  private cloneHelper: typeof cloneWorkspaceViaArkd = cloneWorkspaceViaArkd;
+
+  async prepareWorkspace(h: ComputeHandle, opts: PrepareWorkspaceOpts): Promise<void> {
+    if (!opts.source || !opts.remoteWorkdir) return;
+    const arkdUrl = this.getArkdUrl(h);
+    const arkdToken = process.env.ARK_ARKD_TOKEN ?? null;
+    await this.cloneHelper({
+      arkdUrl,
+      arkdToken,
+      source: opts.source,
+      remoteWorkdir: opts.remoteWorkdir,
+    });
   }
 
   // ── snapshot / restore (deferred) ────────────────────────────────────────

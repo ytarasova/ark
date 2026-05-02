@@ -38,12 +38,14 @@ import type {
   ComputeHandle,
   ComputeKind,
   EnsureReachableOpts,
+  PrepareWorkspaceOpts,
   ProvisionOpts,
   Snapshot,
 } from "../types.js";
 // ^ core/types.ts -- the new Compute/Runtime abstractions. Do NOT import from
 // `packages/compute/types.ts`, which is the legacy ComputeProvider surface.
 import { NotSupportedError } from "../types.js";
+import { cloneWorkspaceViaArkd } from "../workspace-clone.js";
 import { provisionStep } from "../../../core/services/provisioning-steps.js";
 import { isFirecrackerAvailable } from "./availability.js";
 import { assignGuestIp, createTap, ensureBridge, removeTap } from "./network.js";
@@ -296,6 +298,43 @@ export class FirecrackerCompute implements Compute {
         ?.replace(/\.git$/, "") ?? "project";
     const guestHome = (h.meta.firecracker as { guestHome?: string } | undefined)?.guestHome ?? "/home/ubuntu";
     return `${guestHome}/Projects/${session.id}/${repoBasename}`;
+  }
+
+  // ── prepareWorkspace ─────────────────────────────────────────────────────
+  //
+  // mkdir + git clone inside the microVM via arkd HTTP. Routes through
+  // `getArkdUrl(h)` (i.e. the host-reachable `http://<guestIp>:19300`)
+  // so all FS ops happen guest-side -- no scp / vsock dance at this
+  // layer.
+  //
+  // Returns silently on bare-worktree dispatch (either source or
+  // remoteWorkdir null). Mirrors EC2 / K8s.
+  //
+  // Ordering invariant: `ensureReachable` must have run on `h` first
+  // so the bridge + arkd readiness probe pass before we ask arkd to
+  // run mkdir/git clone. The dispatcher's `runTargetLifecycle`
+  // enforces this.
+
+  /**
+   * Test-only: swap the helper that performs `mkdir -p` + `git clone`
+   * via arkd. Default is the production `cloneWorkspaceViaArkd`.
+   */
+  setCloneHelperForTesting(fn: typeof cloneWorkspaceViaArkd): void {
+    this.cloneHelper = fn;
+  }
+
+  private cloneHelper: typeof cloneWorkspaceViaArkd = cloneWorkspaceViaArkd;
+
+  async prepareWorkspace(h: ComputeHandle, opts: PrepareWorkspaceOpts): Promise<void> {
+    if (!opts.source || !opts.remoteWorkdir) return;
+    const arkdUrl = this.getArkdUrl(h);
+    const arkdToken = process.env.ARK_ARKD_TOKEN ?? null;
+    await this.cloneHelper({
+      arkdUrl,
+      arkdToken,
+      source: opts.source,
+      remoteWorkdir: opts.remoteWorkdir,
+    });
   }
 
   // ── ensureReachable ──────────────────────────────────────────────────────
