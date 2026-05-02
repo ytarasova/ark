@@ -246,31 +246,66 @@ export const claudeCodeExecutor: Executor = {
     mkdirSync(sessionDir, { recursive: true });
     writeFileSync(join(sessionDir, "task.txt"), opts.task);
 
-    // Remote compute (providers that don't support local worktrees)
+    // Remote compute (providers that don't support local worktrees).
+    //
+    // Routes through ComputeTarget rather than the legacy
+    // `prepareRemoteEnvironment + provider.launch` pair. `runTargetLifecycle`
+    // walks the per-dispatch lifecycle inside structured `provisioning_step`
+    // events: compute-start (if stopped) -> ensure-reachable -> flush-secrets
+    // -> prepare-workspace -> runtime-prepare -> launch-agent. Each step is
+    // optional on the compute (LocalCompute is a no-op for ensureReachable /
+    // prepareWorkspace / flushPlacement); the helper skips any method the
+    // impl omits.
     if (compute && provider && !provider.supportsWorktree) {
-      const { prepareRemoteEnvironment } = await import("../services/agent-launcher.js");
-      const { finalLaunchContent, ports } = await prepareRemoteEnvironment(
-        app,
-        session,
-        compute,
-        provider,
-        effectiveWorkdir,
-        { launchContent, onLog: log },
-      );
+      const { resolveTargetAndHandle } = await import("../services/dispatch/target-resolver.js");
+      const { runTargetLifecycle } = await import("../services/dispatch/target-lifecycle.js");
+      const { resolvePortDecls } = await import("../../compute/arc-json.js");
 
-      // Launch via provider. Pass launcherWorkdir (== resolveWorkdir on
-      // remote) so tmux's `-c <workdir>` agrees with the launcher's `cd`.
-      // `placement` is the deferred ctx the dispatcher built pre-launch:
-      // SSH-medium providers flush its queued file ops onto a real ctx
-      // here, after `prepareRemoteEnvironment` has guaranteed the IP.
+      const { target, handle } = await resolveTargetAndHandle(app, session);
+      if (!target || !handle) {
+        return { ok: false, handle: "", message: "no compute target resolved for remote dispatch" };
+      }
+
+      // `target.compute.resolveWorkdir` mirrors the legacy
+      // `provider.resolveWorkdir(compute, session)` shape used to build
+      // `launcherWorkdir` above (both yield `${REMOTE_HOME}/Projects/<sid>/<repo>`
+      // for the EC2 family). We re-resolve here through the Compute interface
+      // so the new path doesn't depend on the legacy provider hook -- the two
+      // results agree for every shipping Compute kind. Falls back to
+      // `effectiveWorkdir` when the impl omits the method (e.g. compute
+      // shares the conductor's filesystem).
+      const remoteWorkdir = target.compute.resolveWorkdir?.(handle, session) ?? effectiveWorkdir;
+      const ports = remoteWorkdir ? resolvePortDecls(remoteWorkdir) : [];
+      if (ports.length > 0) {
+        await app.sessions.update(session.id, { config: { ...session.config, ports } });
+      }
+
+      // Source URL/path for the per-session worktree. Prefer the
+      // remote-clone URL the user passed via `--remote-repo` (typed via
+      // `session.config.remoteRepo`); fall back to `session.repo` for
+      // co-located compute kinds. Null suppresses prepare-workspace --
+      // bare-worktree dispatch surfaces the misconfig at the agent stage.
+      const cloneSource = (session.config as { remoteRepo?: string } | null)?.remoteRepo ?? session.repo ?? null;
+
       log("Launching on remote...");
-      const result = await provider.launch(compute, session, {
-        tmuxName,
-        workdir: launcherWorkdir,
-        launcherContent: finalLaunchContent,
-        ports,
-        placement: opts.placement,
-      });
+      const agentHandle = await runTargetLifecycle(
+        app,
+        session.id,
+        target,
+        handle,
+        {
+          tmuxName,
+          workdir: remoteWorkdir,
+          launcherContent: launchContent,
+          ports,
+        },
+        {
+          prepareCtx: { workdir: remoteWorkdir, onLog: log },
+          workspace: { source: cloneSource, remoteWorkdir },
+          placement: opts.placement,
+          computeStatus: compute.status,
+        },
+      );
 
       await app.sessions.update(session.id, { claude_session_id: claudeSessionId });
 
@@ -283,7 +318,7 @@ export const claudeCodeExecutor: Executor = {
       // there's nothing to deliver here.
       log("Skipping deliverTask (remote launch -- prompt baked into launch.sh)");
 
-      return { ok: true, handle: result, claudeSessionId };
+      return { ok: true, handle: agentHandle.sessionName, claudeSessionId };
     }
 
     // Local launch
