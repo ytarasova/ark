@@ -33,7 +33,11 @@ test.afterAll(async () => {
 
 async function goToSessions() {
   await page.click('nav button:has-text("Sessions")');
-  await expect(page.locator("h1")).toContainText("Sessions");
+  // Wait for the page-transition to complete before asserting. Scope the
+  // locator to the sr-only landing-page title rather than `h1` -- when a
+  // session is selected, SessionHeader.tsx adds a second h1 with the session
+  // summary, and the bare `h1` locator violates Playwright's strict mode.
+  await expect(page.locator("h1.sr-only")).toContainText("Sessions", { timeout: 10_000 });
 }
 
 // -- Landmark ---------------------------------------------------------------
