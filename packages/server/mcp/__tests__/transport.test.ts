@@ -45,4 +45,53 @@ describe("POST /mcp", () => {
     const resp = await fetch(`http://localhost:${port}/mcp`);
     expect(resp.status).toBe(405);
   });
+
+  it("tools/list returns an empty array when no tools are registered", async () => {
+    // MCP requires initialize before tools/list can be served on a session,
+    // and the Streamable-HTTP transport correlates the two via the
+    // Mcp-Session-Id response header. Capture it from the init response and
+    // echo it back on the tools/list request.
+    const initResp = await fetch(`http://localhost:${port}/mcp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "test", version: "0" } },
+      }),
+    });
+    expect(initResp.status).toBe(200);
+    const sessionId = initResp.headers.get("mcp-session-id");
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+    };
+    if (sessionId) headers["mcp-session-id"] = sessionId;
+
+    const listResp = await fetch(`http://localhost:${port}/mcp`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }),
+    });
+    expect(listResp.status).toBe(200);
+    const text = await listResp.text();
+    // Streamable HTTP frames the response as SSE; pull out the data line(s)
+    // and find the one carrying the JSON-RPC envelope for id:2.
+    const dataLines = text.match(/data:\s*(\{.*?\})\s*$/gm) ?? [];
+    let payload: { result?: { tools?: unknown[] } } | null = null;
+    for (const line of dataLines) {
+      const m = line.match(/data:\s*(\{.*\})/);
+      if (!m) continue;
+      const env = JSON.parse(m[1]);
+      if (env.id === 2) {
+        payload = env;
+        break;
+      }
+    }
+    expect(payload).toBeTruthy();
+    expect(Array.isArray(payload?.result?.tools)).toBe(true);
+    expect(payload?.result?.tools?.length).toBe(0);
+  });
 });
